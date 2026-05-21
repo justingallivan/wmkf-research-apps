@@ -2084,7 +2084,9 @@ function EditCandidateModal({ isOpen, candidate, onClose, onSave }) {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to update candidate');
+        // Prefer the human-readable `message` (set for translated errors like
+        // duplicate-key 409s); fall back to the machine code or generic.
+        throw new Error(data.message || data.error || 'Failed to update candidate');
       }
 
       // Call parent callback with updated data

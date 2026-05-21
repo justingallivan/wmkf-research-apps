@@ -442,12 +442,42 @@ async function handlePatch(req, res, access) {
       updated: { suggestionId, ...lifecycle, ...(hasResearcher && { name, affiliation, email, website, hIndex }) },
     });
   } catch (error) {
+    // Translate Dataverse alternate-key violations (412 on a unique field
+    // like wmkf_emailaddress) into a meaningful 409. The raw error is a
+    // long XML-laden 412 that the client surfaces as an opaque 500;
+    // staff need to know which existing row is holding the conflicting
+    // value so they can decide whether to merge or pick a different email.
+    const translated = translateDuplicateKeyError(error);
+    if (translated) {
+      console.warn('[my-candidates] duplicate-key on update:', translated);
+      return res.status(409).json(translated);
+    }
     console.error('Update candidate error:', error);
     return res.status(500).json({
       error: 'Failed to update candidate',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
+}
+
+// Extracts a usable shape from a Dataverse 412 "Entity Key violated" error.
+// Returns null for any other error. The Id in the DuplicateEntity XML is the
+// row that ALREADY holds the conflicting value — i.e. the merge target.
+function translateDuplicateKeyError(error) {
+  if (!error || error.status !== 412) return null;
+  const msg = String(error.message || '');
+  if (!/Entity Key|0x80060892/.test(msg)) return null;
+  const fieldMatch = msg.match(/DuplicateAttributes>[\s\S]*?<([a-z0-9_]+)>([^<]+)</);
+  const idMatch = msg.match(/<Id>([0-9a-f-]{36})<\/Id>/i);
+  return {
+    error: 'duplicate_key',
+    message: fieldMatch
+      ? `Another reviewer record already has ${fieldMatch[1]} = "${fieldMatch[2]}". Edit blocked — the two records need to be merged before this field can move.`
+      : 'A Dataverse alternate-key constraint blocked this update.',
+    field: fieldMatch?.[1] || null,
+    value: fieldMatch?.[2] || null,
+    conflictingRecordId: idMatch?.[1] || null,
+  };
 }
 
 // ───────── DELETE ─────────
