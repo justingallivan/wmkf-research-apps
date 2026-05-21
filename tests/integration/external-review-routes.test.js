@@ -25,7 +25,33 @@ jest.mock('../../lib/external/verify-suggestion-token', () => ({
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
     updateRecord: jest.fn(),
+    queryRecords: jest.fn(async () => ({ records: [] })),
+    getRecord: jest.fn(async () => null),
   },
+}));
+
+// Stage 2a (S143) added a getActivePolicies call to the context handler when
+// engagement view is 'stage2a'. The fetcher throws on missing slots, which
+// would 500 the handler before its file-listing logic. Stub it to return
+// minimal valid policy data — these file-listing tests don't assert on
+// policy contents.
+jest.mock('../../lib/external/policy-fetcher', () => ({
+  getActivePolicies: jest.fn(async (slotCodes) => {
+    const out = {};
+    for (const code of slotCodes) {
+      out[code] = {
+        slotCode: code,
+        versionId: `test-version-${code}`,
+        versionLabel: '1.0',
+        title: `Test policy ${code}`,
+        body: 'test policy body',
+        effectiveDate: '2026-01-01',
+      };
+    }
+    return out;
+  }),
+  getActivePolicy: jest.fn(),
+  invalidate: jest.fn(),
 }));
 
 jest.mock('../../lib/services/graph-service', () => ({
@@ -60,6 +86,12 @@ const verifiedSuggestion = {
     wmkf_reviewerimpact: 4,
     wmkf_reviewerrisk: 2,
     wmkf_revieweroverallrating: 5,
+    // Stage 2b (materials sent). S143 gated file-listing on this view —
+    // pre-materials views (stage2a / accepted-pre-materials / declined) no
+    // longer call getRequestSharePointBuckets. The file-listing assertions
+    // below need a stage2b/submitted view to fire.
+    wmkf_accepted: true,
+    wmkf_reviewstatus: 100000001,
   },
   request: {
     akoya_requestid: 'request-1',

@@ -36,6 +36,20 @@ process.env.NODE_ENV = 'test'
 process.env.CLAUDE_API_KEY = 'test-claude-api-key'
 process.env.API_SECRET_KEY = 'test-secret-key'
 
+// Default mock for the app-access service. Wave 1 closeout (2026-05-12)
+// moved listAppKeysForUser from Postgres to a Dataverse-by-default dispatch
+// wrapper; without this default, any test that lets a requireAppAccess-
+// guarded handler run will trigger a real Dataverse call, fail on missing
+// env, and short-circuit the handler before its own mocks are reached.
+// Tests that need non-empty app grants (auth-mock helper, custom per-test
+// setups) re-mock this module — their jest.mock calls override this default.
+jest.mock('./lib/services/app-access-service', () => ({
+  listAppKeysForUser: jest.fn(() => Promise.resolve([])),
+  listAllGrantsForAdmin: jest.fn(() => Promise.resolve([])),
+  grantApps: jest.fn(() => Promise.resolve({ granted: [] })),
+  revokeApps: jest.fn(() => Promise.resolve({ revoked: [] })),
+}))
+
 // Global test utilities
 global.fetch = jest.fn()
 

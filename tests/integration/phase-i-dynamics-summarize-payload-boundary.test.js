@@ -26,6 +26,16 @@ jest.mock('next-auth/next', () => ({
 
 jest.mock('../../pages/api/auth/[...nextauth]', () => ({ authOptions: {} }));
 
+// Wave 1 closeout (2026-05-12): listAppKeysForUser moved from Postgres to
+// a Dataverse-by-default dispatch wrapper. Override the jest.setup.js default
+// to grant the app key this test exercises.
+jest.mock('../../lib/services/app-access-service', () => ({
+  listAppKeysForUser: jest.fn(() => Promise.resolve(['batch-phase-i-summaries'])),
+  listAllGrantsForAdmin: jest.fn(() => Promise.resolve([])),
+  grantApps: jest.fn(() => Promise.resolve({ granted: [] })),
+  revokeApps: jest.fn(() => Promise.resolve({ revoked: [] })),
+}));
+
 jest.mock('@vercel/postgres', () => {
   const handle = (q) => {
     const text = String(q).toLowerCase();

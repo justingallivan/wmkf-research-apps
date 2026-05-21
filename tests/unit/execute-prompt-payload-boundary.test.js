@@ -32,6 +32,16 @@ jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((tag, fn) => fn()),
 }));
 
+// S145 added a `loadAvailableModels()` warmup call inside callClaude that
+// makes a fetch to /v1/models before the Claude messages call. Without this
+// mock the global.fetch stub captures BOTH requests, breaking the "exactly
+// one fetch" assertion on the first test in the file (subsequent tests hit
+// the resolver's in-memory cache and only see the messages fetch).
+jest.mock('../../lib/services/model-resolver', () => ({
+  resolveModel: (v) => v || null,
+  loadAvailableModels: jest.fn(() => Promise.resolve([])),
+}));
+
 // Capture the Claude request body sent via direct fetch.
 const fetchedBodies = [];
 const originalFetch = global.fetch;
