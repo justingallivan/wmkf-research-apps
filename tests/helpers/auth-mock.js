@@ -10,6 +10,7 @@
 // Re-usable mock references — set by the presets below
 let _mockSession = null;
 let _mockSqlResults = {};
+let _mockAppKeys = [];
 
 /**
  * Mock `getServerSession` to return whatever _mockSession holds.
@@ -51,6 +52,22 @@ jest.mock('../../pages/api/auth/[...nextauth]', () => ({
   authOptions: {},
 }));
 
+/**
+ * Mock the app-access-service wrapper. Wave 1 closeout (2026-05-12) moved
+ * `listAppKeysForUser` from Postgres to a Dataverse-by-default dispatch;
+ * the old `_mockSqlResults.user_app_access` no longer intercepts the read
+ * path. Mock the wrapper directly so test app-key grants stay declarative.
+ *
+ * Other wrapper methods are mocked as no-ops — tests that need
+ * listAllGrantsForAdmin / grantApps / revokeApps should set them per-test.
+ */
+jest.mock('../../lib/services/app-access-service', () => ({
+  listAppKeysForUser: jest.fn(() => Promise.resolve(_mockAppKeys)),
+  listAllGrantsForAdmin: jest.fn(() => Promise.resolve([])),
+  grantApps: jest.fn(() => Promise.resolve({ granted: [] })),
+  revokeApps: jest.fn(() => Promise.resolve({ revoked: [] })),
+}));
+
 // ---------------------------------------------------------------------------
 // Presets
 // ---------------------------------------------------------------------------
@@ -62,6 +79,7 @@ jest.mock('../../pages/api/auth/[...nextauth]', () => ({
 export function mockUnauthenticated() {
   _mockSession = null;
   _mockSqlResults = {};
+  _mockAppKeys = [];
   // Ensure auth is required
   process.env.AUTH_REQUIRED = 'true';
   process.env.AZURE_AD_CLIENT_ID = 'test-client-id';
@@ -87,7 +105,11 @@ export function mockAuthenticatedUser(profileId, appKeys = [], opts = {}) {
 
   const roles = opts.isSuperuser ? [{ role: 'superuser' }] : [];
 
+  _mockAppKeys = [...appKeys];
   _mockSqlResults = {
+    // user_app_access mock retained for any legacy callers that still hit
+    // raw SQL directly; the live read path goes through the app-access-service
+    // mock above (Wave 1 closeout 2026-05-12).
     user_app_access: { rows: appKeys.map(k => ({ app_key: k })), rowCount: appKeys.length },
     dynamics_user_roles: { rows: roles, rowCount: roles.length },
     is_active: { rows: [{ is_active: true }], rowCount: 1 },
@@ -113,6 +135,7 @@ export function mockDisabledUser(profileId) {
     },
   };
 
+  _mockAppKeys = ['dynamics-explorer'];
   _mockSqlResults = {
     user_app_access: { rows: [{ app_key: 'dynamics-explorer' }], rowCount: 1 },
     dynamics_user_roles: { rows: [], rowCount: 0 },
@@ -137,6 +160,7 @@ export function mockNoProfile() {
     },
   };
 
+  _mockAppKeys = [];
   _mockSqlResults = {};
 
   process.env.AUTH_REQUIRED = 'true';
