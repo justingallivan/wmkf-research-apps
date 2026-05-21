@@ -15,6 +15,7 @@ import {
   mockDisabledUser,
   mockNoProfile,
   mockRoleLookupFailure,
+  mockIsActiveLookupFailure,
   createMockReq,
   createMockRes,
   clearAppAccessCache,
@@ -173,6 +174,17 @@ describe('requireAuthWithProfile', () => {
 
     expect(result).toBe(5);
     expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('fails closed with 503 when the is_active check errors', async () => {
+    mockIsActiveLookupFailure(42);
+    const req = createMockReq();
+    const res = createMockRes();
+
+    const result = await requireAuthWithProfile(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(503);
   });
 });
 

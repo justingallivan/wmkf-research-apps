@@ -11,8 +11,16 @@ const customJestConfig = {
   testEnvironment: 'jest-environment-jsdom',
   testPathIgnorePatterns: [
     '<rootDir>/.next/',
+    '<rootDir>/.next.nosync/',
     '<rootDir>/node_modules/',
+    '<rootDir>/node_modules.nosync/',
     '<rootDir>/tests/e2e/' // E2E tests handled separately
+  ],
+  // iCloud-exclusion artifacts (*.nosync). Without this, Jest's haste map
+  // scans node_modules.nosync/ and aborts on duplicate package names.
+  modulePathIgnorePatterns: [
+    '<rootDir>/node_modules\\.nosync/',
+    '<rootDir>/\\.next\\.nosync/',
   ],
   collectCoverageFrom: [
     'shared/**/*.{js,jsx}',

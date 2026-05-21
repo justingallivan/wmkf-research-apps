@@ -179,6 +179,28 @@ export function mockRoleLookupFailure() {
   };
 }
 
+/**
+ * Make the is_active revocation check fail. Caller should first set a session
+ * (e.g. via mockAuthenticatedUser) so requireAuthWithProfile reaches the check.
+ */
+export function mockIsActiveLookupFailure(profileId) {
+  _mockSession = {
+    user: {
+      profileId,
+      email: `user${profileId}@wmkeck.org`,
+      name: `Test User ${profileId}`,
+    },
+  };
+  _mockAppKeys = [];
+  _mockSqlResults = {
+    is_active: new Error('postgres unavailable'),
+  };
+  process.env.AUTH_REQUIRED = 'true';
+  process.env.AZURE_AD_CLIENT_ID = 'test-client-id';
+  process.env.AZURE_AD_CLIENT_SECRET = 'test-client-secret';
+  process.env.AZURE_AD_TENANT_ID = 'test-tenant-id';
+}
+
 // ---------------------------------------------------------------------------
 // Request / Response helpers
 // ---------------------------------------------------------------------------

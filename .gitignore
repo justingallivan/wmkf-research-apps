@@ -41,6 +41,8 @@ proposals-for-migration.csv
 scripts/dynamics-schema-output.json
 scripts/dynamics-schema-diff.json
 .git.nosync
+# iCloud-exclusion artifacts (local-only build/dep dirs)
+*.nosync/
 tmp/
 .playwright-mcp/
 # Codex CLI artifacts. .agents/ stays ignored (corrupted s/Claude/Codex/ skill
