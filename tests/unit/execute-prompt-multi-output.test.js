@@ -249,3 +249,66 @@ describe('persistOutputs — multi-output PATCH coalescing', () => {
     expect(reasons).toEqual(['concurrent_edit', 'concurrent_edit']);
   });
 });
+
+// ---------------------------------------------------------------------------
+// A7 step 3 — validationSchema: post-parse output-schema enforcement
+// ---------------------------------------------------------------------------
+describe('parseClaudeOutput — validationSchema (A7 step 3)', () => {
+  function buildSchemaPromptRow(validationSchema) {
+    return {
+      wmkf_ai_promptid: 'prompt-vs',
+      wmkf_ai_promptname: 'test.validation-schema',
+      wmkf_promptversion: '1.0',
+      wmkf_ai_systemprompt: 'SYS',
+      wmkf_ai_promptbody: 'BODY: {{x}}',
+      wmkf_ai_promptvariables: JSON.stringify({
+        variables: [{ name: 'x', source: { kind: 'override' }, required: true }],
+      }),
+      wmkf_ai_promptoutputschema: JSON.stringify({
+        outputs: [
+          { name: 'summary', type: 'string', target: { kind: 'akoya_request', field: 'wmkf_ai_summary' }, guard: 'always-overwrite' },
+        ],
+        parseMode: 'json',
+        rawOutputRetention: 'hash',
+        validationSchema,
+      }),
+      wmkf_ai_model: 'claude-test',
+      wmkf_ai_maxtokens: 1024,
+      wmkf_ai_temperature: 0.1,
+    };
+  }
+
+  // A declarative validateAiJson node — JSON-serialisable, exactly as it would
+  // be stored in the wmkf_ai_promptoutputschema Memo field.
+  const SCHEMA = { type: 'object', fields: { summary: { type: 'string', maxLength: 5000 } } };
+
+  async function runWithSchema(validationSchema, claudeOutput) {
+    promptRow = buildSchemaPromptRow(validationSchema);
+    setClaudeJson(claudeOutput);
+    getRecordImpl = async (entitySet, id) =>
+      (entitySet === 'akoya_requests' && id === 'req-1') ? REQUEST_ROW : null;
+    return executePrompt({
+      promptName: 'test.validation-schema',
+      requestId: 'req-1',
+      runSource: 'Vercel Test',
+      overrideVariables: { x: 'value' },
+    });
+  }
+
+  test('drops an injected key the validationSchema does not declare', async () => {
+    const result = await runWithSchema(SCHEMA, { summary: 'S', injected: 'rm -rf /' });
+    expect(result.parsed).toEqual({ summary: 'S' });
+    const patch = updateCalls.find(c => c.entitySet === 'akoya_requests');
+    expect(patch.payload).toEqual({ wmkf_ai_summary: 'S' });
+  });
+
+  test('a type-invalid output (invalid-but-parseable JSON) fails the run', async () => {
+    await expect(runWithSchema(SCHEMA, { summary: 12345 }))
+      .rejects.toThrow(/failed schema validation/);
+  });
+
+  test('no validationSchema → parsed passes through unchanged (backward compat)', async () => {
+    const result = await runWithSchema(undefined, { summary: 'S', extra: 'kept' });
+    expect(result.parsed).toEqual({ summary: 'S', extra: 'kept' });
+  });
+});

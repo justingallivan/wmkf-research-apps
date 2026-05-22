@@ -223,6 +223,8 @@ Each output may declare a `guard` policy that the Executor applies in step 4 (pr
 
 **`parseMode` (output schema, Phase 0):** `"json"` (default — Claude must return parseable JSON matching `jsonSchema`) or `"raw"` (the entire `content[0].text` becomes the value of the single declared output; `jsonSchema` ignored). Multi-output prompts must use `"json"`.
 
+**`validationSchema` (output schema, added 2026-05-22 — A7 step 3):** an optional declarative schema, in the `validateAiJson` node format (`lib/utils/ai-output-schema.js` — `{ "type": "object", "fields": { … } }`, plus `array` / `record` / scalar nodes; fully JSON-serialisable). When present and `parseMode = "json"`, the Executor validates the parsed model output against it in step 7, **after** the `jsonSchema.required` check and **before** step 8 persistence. Undeclared keys are dropped and types/lengths are bounded, so a prompt-injected model cannot smuggle an extra field through to an `akoya_request` writeback. A validation failure throws (logged as a `failed` run row). Prompts that omit `validationSchema` are unchanged — the field is purely additive. `raw` parseMode never reaches this check. `jsonSchema` (presence/required-key assertion) and `validationSchema` (post-parse shape enforcement) are independent and may both be declared.
+
 **`rawOutputRetention` (output schema, added 2026-05-04):** controls what the Executor writes to `wmkf_ai_run.wmkf_ai_rawoutput` after parsing/persisting the model response. Default is `"full"` for backwards compatibility.
 
 | Mode | `wmkf_ai_rawoutput` content |
