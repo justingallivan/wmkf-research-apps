@@ -5,9 +5,10 @@ Session 176 2026-05-22). All 24 LLM-input surfaces in the registry are
 `migrated`; `check:prompt-injection-tagging` reports 0 pending.
 Created 2026-05-21 (Session 173). Revised 2026-05-21 (Session 174) after a
 Codex review against the live codebase — see "Revision log" at the foot.
-**Owed deploy step:** re-run `scripts/seed-phase-i-summary-prompt.js --execute`
-so the live `wmkf_ai_prompts` row carries the new `untrusted: true` declaration
-on `proposal_text` (Part 2; the Executor honours it once the row is updated).
+**Deploy step (Part 2) — DONE 2026-05-22 (S176):** `scripts/seed-phase-i-summary-prompt.js --execute`
+was re-run; the live `wmkf_ai_prompts` row `d4201d8e-3840-f111-88b5-000d3a3065b8`
+carries the `untrusted: true` declaration on `proposal_text` (4 variables, all
+verification checks passed). The Executor now wraps that prompt's proposal text.
 **Origin:** Security audit 2026-05-21 (`SECURITY_AUDIT_2026-05-21.md`), item A7.
 **Scope:** Harden against prompt injection in attacker/applicant-influenced
 content that reaches an LLM — boundary-tagging of untrusted content,
