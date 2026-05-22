@@ -38,13 +38,13 @@
  *     file-level: builders wrap via per-file helper indirection, so a
  *     per-builder body slice cannot see the wrap call.
  *
- *     `builders` is opt-in per surface and only applies where each builder
- *     calls `buildUntrustedContentPreamble()` directly in its own body.
- *     Surfaces that instead inject the preamble at the route/service call
- *     site (peer-reviewer, proposal-summarizer{,-legacy}, expertise-finder's
- *     `buildUserPrompt`) cannot use it — there the single call-site preamble
- *     is not a per-builder concern, and those surfaces keep the file-level
- *     check. Adopt `builders` for any new self-carrying multi-builder file.
+ *     `builders` is opt-in per surface. A builder that injects its preamble at
+ *     the route/service call site rather than in its own body is declared as
+ *     `{ name, routePreamble: true }` — exempt from the in-body check but
+ *     still drift-tracked. The only multi-builder surface still on the plain
+ *     file-level check is peer-reviewer, whose two prompt files build one
+ *     preamble in the route and reuse it for every builder (no per-builder
+ *     concern). Adopt `builders` for any new multi-builder prompt file.
  *
  *   - status 'pending'  — not yet hardened (a later A7 Part). Tracked, not
  *     enforced. As Parts 2-6 land, surfaces move pending -> migrated here in
@@ -126,6 +126,14 @@ const SURFACES = [
     status: 'migrated',
     promptFiles: ['shared/config/prompts/proposal-summarizer-legacy.js'],
     callSiteFiles: ['pages/api/process-legacy.js'],
+    // Mixed file: the summary/extraction builders self-carry the preamble; the
+    // refinement/Q&A builders get it from their route.
+    builders: [
+      'createSummarizationPrompt',
+      'createStructuredDataExtractionPrompt',
+      { name: 'createRefinementPrompt', routePreamble: true },
+      { name: 'createQAPrompt', routePreamble: true },
+    ],
   },
   {
     id: 'qa',
@@ -133,8 +141,18 @@ const SURFACES = [
     status: 'migrated',
     // createQASystemPrompt lives in proposal-summarizer.js (also #3's file);
     // the route supplies the wrapper, the prompt file supplies the preamble.
+    // This is the single-promptFile surface for proposal-summarizer.js, so it
+    // carries the per-builder coverage for the whole file (#3 references the
+    // same file but adds phase-ii-dynamics.js, so it stays file-level).
     promptFiles: ['shared/config/prompts/proposal-summarizer.js'],
     callSiteFiles: ['pages/api/qa.js'],
+    builders: [
+      'createSummarizationPrompt',
+      'createStructuredDataExtractionPrompt',
+      'createQASystemPrompt',
+      { name: 'createRefinementPrompt', routePreamble: true },
+      { name: 'createQAPrompt', routePreamble: true },
+    ],
   },
   {
     id: 'refine',
@@ -218,6 +236,12 @@ const SURFACES = [
     callSiteFiles: [
       'pages/api/expertise-finder/match.js',
       'pages/api/expertise-finder/batch-match.js',
+    ],
+    // buildCacheableSystemPrompt self-carries the preamble; buildUserPrompt
+    // builds the user message and relies on the system-prompt preamble.
+    builders: [
+      'buildCacheableSystemPrompt',
+      { name: 'buildUserPrompt', routePreamble: true },
     ],
   },
   {
@@ -404,7 +428,18 @@ function checkSurface(surface, readFile) {
   // declared builder must carry the preamble in its OWN function body — a
   // sibling builder's preamble does not cover it. This closes the file-level
   // masking hole (CLAUDE_COVERAGE_LESSONS.md lesson F).
+  //
+  // A builder entry is either a string (must self-carry the preamble) or
+  // `{ name, routePreamble: true }` — the latter for a builder whose preamble
+  // is injected at the route/service call site (e.g. `createQAPrompt`, whose
+  // route hardens the system prompt). A `routePreamble` builder is exempt from
+  // the in-body check but still counted for drift, so a NEW builder added to
+  // the file must be explicitly classified one way or the other.
   if (Array.isArray(surface.builders)) {
+    const declared = surface.builders.map((b) =>
+      typeof b === 'string' ? { name: b, routePreamble: false } : b,
+    );
+    const declaredNames = new Set(declared.map((d) => d.name));
     const segmentsByName = {};
     for (const f of surface.promptFiles || []) {
       const content = readFile(f);
@@ -413,28 +448,29 @@ function checkSurface(surface, readFile) {
         segmentsByName[name] = { file: f, seg };
       }
     }
-    for (const b of surface.builders) {
-      const hit = segmentsByName[b];
+    for (const d of declared) {
+      const hit = segmentsByName[d.name];
       if (!hit) {
         errors.push(
-          `${surface.id}: declared builder "${b}" not found as a top-level ` +
+          `${surface.id}: declared builder "${d.name}" not found as a top-level ` +
             "`export function` in the surface's prompt file(s).",
         );
         continue;
       }
       // Require the CALL form `buildUntrustedContentPreamble(` — a bare token
       // in a comment or string must not satisfy the gate.
-      if (!hit.seg.includes(`${PREAMBLE_MARKER}(`)) {
+      if (!d.routePreamble && !hit.seg.includes(`${PREAMBLE_MARKER}(`)) {
         errors.push(
-          `${surface.id}: builder "${b}" (${hit.file}) does not call ` +
+          `${surface.id}: builder "${d.name}" (${hit.file}) does not call ` +
             `${PREAMBLE_MARKER}() in its own body — a sibling builder's preamble ` +
-            'does not cover it (call-site-granular check).',
+            'does not cover it (call-site-granular check). If its preamble is ' +
+            'injected at the route, mark it `{ routePreamble: true }`.',
         );
       }
     }
     // Drift: a new prompt-builder export must be added to `builders`.
     for (const [name, hit] of Object.entries(segmentsByName)) {
-      if (BUILDER_NAME_RE.test(name) && !surface.builders.includes(name)) {
+      if (BUILDER_NAME_RE.test(name) && !declaredNames.has(name)) {
         errors.push(
           `${surface.id}: prompt builder "${name}" (${hit.file}) is not in the ` +
             "surface's `builders` list — add it so per-builder A7 coverage tracks it.",

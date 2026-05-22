@@ -247,6 +247,28 @@ function fakeReader(map) {
   );
 }
 
+// 9d. routePreamble: a builder whose preamble is injected at the route is
+// exempt from the in-body check when declared `{ routePreamble: true }`, but a
+// plain (string) sibling with no in-body preamble is still flagged.
+{
+  const content = [
+    'export function createSelfPrompt(t) { return `${buildUntrustedContentPreamble()} ${t}`; }',
+    'export function createRoutePrompt(t) { return `no in-body preamble, route adds it: ${t}`; }',
+  ].join('\n');
+  const surface = {
+    id: 'fx-route',
+    status: 'migrated',
+    promptFiles: ['p.js'],
+    callSiteFiles: ['c.js'],
+    builders: ['createSelfPrompt', { name: 'createRoutePrompt', routePreamble: true }],
+  };
+  const reader = fakeReader({ 'p.js': content, 'c.js': 'wrapUntrustedContent' });
+  assert(
+    'call-site-granular: a routePreamble builder is exempt from the in-body check',
+    checkSurface(surface, reader).errors.length === 0,
+  );
+}
+
 // ── findUnregisteredPromptFiles ───────────────────────────────────────────
 
 // 6. a prompt file referenced by no surface is reported.
@@ -297,4 +319,4 @@ if (failures > 0) {
   console.error(`\nprompt-injection-tagging self-test FAILED — ${failures} case(s).`);
   process.exit(1);
 }
-console.log('\nprompt-injection-tagging self-test OK — 14/14 cases.');
+console.log('\nprompt-injection-tagging self-test OK — 15/15 cases.');
