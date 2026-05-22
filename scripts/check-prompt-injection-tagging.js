@@ -64,13 +64,14 @@ const SURFACES = [
     promptFiles: ['shared/config/prompts/grant-reporting.js'],
     callSiteFiles: ['pages/api/grant-reporting/extract.js'],
   },
-  // ── Pending (later A7 Parts) ──────────────────────────────────────────
   {
     id: 'process-phase-i-writeup',
     inv: 1,
-    status: 'pending',
+    status: 'migrated',
     promptFiles: ['shared/config/prompts/phase-i-writeup.js'],
+    callSiteFiles: ['pages/api/process-phase-i-writeup.js'],
   },
+  // ── Pending (later A7 Parts) ──────────────────────────────────────────
   {
     id: 'process-phase-i',
     inv: 2,

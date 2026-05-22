@@ -267,6 +267,30 @@ describe('/api/process-phase-i-writeup payload boundary', () => {
       truncated: true,
     }));
   });
+
+  // A7 Part 5: both Claude calls wrap the proposal text in nonce-bearing
+  // untrusted-content sentinels and carry the hardening preamble.
+  test('wraps proposal text in untrusted-content sentinels with the hardening preamble', async () => {
+    mockedPdfText = `${'A'.repeat(2_000)} proposal body`;
+
+    await runRoute(
+      '../../pages/api/process-phase-i-writeup',
+      { files: [{ filename: 'writeup.pdf', url: 'https://test.public.blob.vercel-storage.com/writeup.pdf' }] },
+      ['phase-i-writeup']
+    );
+
+    expect(sentUserMessages.length).toBe(2);
+    for (const prompt of sentUserMessages) {
+      // Hardening preamble present.
+      expect(prompt).toContain('UNTRUSTED CONTENT RULES:');
+      // Nonce-bearing open + close sentinels both present.
+      const open = prompt.match(/\[\[WMKF-UNTRUSTED-CONTENT nonce=([0-9a-f]{24})/);
+      expect(open).not.toBeNull();
+      expect(prompt).toContain(`[[/WMKF-UNTRUSTED-CONTENT nonce=${open[1]}]]`);
+      // The preamble names the exact nonce in play.
+      expect(prompt).toContain(open[1]);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
