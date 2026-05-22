@@ -15,4 +15,4 @@ When weighing "new child entity" vs "expand an enum / add a discriminator on an 
 - When sketching new schema, ask "could this be a choice value, lookup, or discriminator column on an existing entity?" before proposing a new entity.
 - New entities are still right when they have a different parent, different lifecycle, or genuinely different shape (e.g., `wmkf_proposalbudgetline` per-amount as a new entity, vs. roster as an extension of the existing `wmkf_apprequestperson` junction — the 2026-05-14 schema review applied the principle and chose extension for roster, new entity for budget; see `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`).
 - When you do recommend a new entity, name the human-legibility cost explicitly in the trade-off so it's visible in the decision.
-- This principle aligns with the broader `[[project_dynamics_as_prompt_ground_truth]]` posture: Dataverse content should be browseable by non-technical staff, not just queryable by code.
+- This principle aligns with the broader `[[project-dynamics-as-prompt-ground-truth]]` posture: Dataverse content should be browseable by non-technical staff, not just queryable by code.

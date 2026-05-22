@@ -12,7 +12,7 @@ The reviewer pipeline has the same institution-dedup hazard as the intake portal
 - Contact promotion at acceptance (per [[project-contact-promotion-permission]] — "send-emails fully links potentialreviewer → contact") is the path that touches `contact.parentcustomerid` (lookup → `account`). This is the load-bearing join for "what institution does this person belong to in our org graph."
 - A reviewer-facing affiliation-correction UI may or may not exist yet; user (S168) is unsure, my memory says Stage 2a doesn't collect this. Treat as forward work, not a live surface.
 
-**Why:** without enforced matching, `contact.parentcustomerid` ends up pointing at fragmented or auto-created junk accounts. This is the failure mode already sample-observed in [[project-reviewer-identity-fragmentation]] (S158: ≥4 disjoint stores per reviewer, no shared key). Cleanup post-hoc is staff-expensive and AI-confounding (name-match ≠ GUID-match, per the contact-divergence finding in `docs/atlas/dataverse-akoya-request.md`).
+**Why:** without enforced matching, `contact.parentcustomerid` ends up pointing at fragmented or auto-created junk accounts. This is the failure mode already sample-observed in [[reviewer-identity-fragmentation]] (S158: ≥4 disjoint stores per reviewer, no shared key). Cleanup post-hoc is staff-expensive and AI-confounding (name-match ≠ GUID-match, per the contact-divergence finding in `docs/atlas/dataverse-akoya-request.md`).
 
 **How to apply** (touch points in priority order):
 1. **Contact promotion (highest impact).** When `wmkf_potentialreviewer` → `contact` promotion happens (currently in `send-emails.js`), set `contact.parentcustomerid` to a matched `account` GUID, not a free-text fill. Use the same fuzzy-match primitive as the intake portal ([[project-intake-portal-institution-match]]): Dataverse Search over `accounts.{name, akoya_aka, wmkf_legalname, wmkf_abbreviation}`. Match-first, create-as-last-resort with a "Did you mean…?" interstitial for staff (this path is staff-driven, not applicant-driven, so the interstitial can be a tooltip on the send-emails confirmation).
@@ -21,4 +21,4 @@ The reviewer pipeline has the same institution-dedup hazard as the intake portal
 
 **Cross-cutting:** the same fuzzy-match service should serve both the intake portal and the reviewer pipeline. Build it once. Reuse extends to any future flow where free-text institution names enter Dataverse (PA flows, Bill.com sync, etc.).
 
-Related: [[project-intake-portal-institution-match]] (same primitive, applicant-side), [[project-reviewer-identity-fragmentation]] (the failure mode being prevented), [[project-contact-promotion-permission]] (current promotion code path).
+Related: [[project-intake-portal-institution-match]] (same primitive, applicant-side), [[reviewer-identity-fragmentation]] (the failure mode being prevented), [[project-contact-promotion-permission]] (current promotion code path).

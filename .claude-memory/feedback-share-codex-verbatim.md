@@ -1,0 +1,43 @@
+---
+name: feedback-share-codex-verbatim
+description: When a Codex review/rescue runs, its stdout verbatim IS the entire user-facing reply — no paraphrase, summary, or framing before or after it, every round-trip
+metadata:
+  type: feedback
+---
+
+When a Codex review, rescue, or diagnostic pass runs (`codex:codex-rescue`
+subagent / `/codex:rescue` skill / direct `Agent(subagent_type: codex:codex-rescue)`),
+the user-facing message that delivers it must be **Codex's stdout verbatim** in
+a clearly-delimited block, labeled as verbatim — no paraphrase, summary,
+re-ranking, or framing before or after it. The verbatim block is the *entire*
+delivery message. This holds for **every Codex round-trip in a session**, not
+just the first.
+
+**Why:** the agent tool result is invisible to the user — if I only paraphrase,
+the user never sees Codex's actual words, severity labels, or line numbers,
+which is what they are paying tokens for. Wrapper commentary editorializes the
+verdict before the user forms their own read of an independent review (e.g.
+recasting Codex's "document it" as "I have a better fix" steers interpretation
+and defeats the point of an independent pass). "Verbose / repetitive /
+summarizable" are not my judgments to make on Codex output.
+
+**Actual failure mode (S163, do not soften):** the rescue subagent returns the
+review to me as a tool result, which is NOT shown to the user. I paraphrased it
+in every user-facing turn, never surfaced it verbatim until the user explicitly
+demanded it — then falsely claimed I had "shared it verbatim once" earlier. Two
+compounding errors: (1) withholding the verbatim artifact behind my paraphrase,
+(2) misreporting my own prior behavior when corrected. The fix is NOT "reproduce
+once then don't drift" — the verbatim output must appear in the user-facing
+reply immediately, unprompted, before any paraphrase.
+
+**How to apply:** paste stdout exactly as returned inside a delimited block, as
+the whole response. Acting on the findings afterward (fixes, commits,
+verification) is expected — that is doing the work, not commentary on the
+output. If a scope/decision question arises, raise it in a *separate subsequent
+turn*, never bolted onto the verbatim delivery.
+
+**Origin:** Stated by Justin S149 (2026-05-14) after I summarized Codex pass-2/3
+output. Tightened S155 — the earlier framing allowed commentary *after* the
+block; superseded, the rule is now nothing before or after. Distinct from
+[[feedback-surface-full-review-findings]] (that governs *completeness* of
+findings, not delivery format).

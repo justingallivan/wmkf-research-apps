@@ -33,4 +33,4 @@ metadata:
 
 **What this is NOT:** a demand for perfection or paranoid double-checking. Codex will still occasionally find minor things. The bar is: when external review runs, it should find *minor* drift, not CRITICAL/MODERATE drift in artifacts I just touched. Right now CRITICAL findings are not rare; that's the metric to move.
 
-**Related:** [[feedback_surface_full_review_findings]] (already encoded: surface all reviewer findings unfiltered). This rule is the prevention side — fewer findings to surface because the work was thorough the first time.
+**Related:** [[feedback-surface-full-review-findings]] (already encoded: surface all reviewer findings unfiltered). This rule is the prevention side — fewer findings to surface because the work was thorough the first time.

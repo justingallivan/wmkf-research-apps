@@ -30,4 +30,4 @@ Wave 1 closed out cleanly on **2026-05-12**.
 - If a future Wave-2 or pilot-portal schema-apply script runs, it uses the *still-present* elevations on the app user. No action needed unless someone has reverted them in the meantime — verify with the role-check command in `docs/WAVE1_REVERT_TEMP_ELEVATIONS.md` § Verification.
 - Recovery story: Neon PITR window is 7 days, so until ~2026-05-19, a snapshot restore is feasible if Dataverse fails catastrophically. After that, no recovery — but the prod system has been on Dataverse for 9+ days at that point.
 
-**Related memories:** [[project_wave1_onboarding]] (next phase; not yet built).
+**Related memories:** [[project-wave1-onboarding]] (next phase; not yet built).

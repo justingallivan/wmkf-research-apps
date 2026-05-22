@@ -10,4 +10,4 @@ metadata:
 - **16 licensed staff users** (Read-Write, `@wmkeck.org`) + ~180 Microsoft service accounts
 - All staff already have Dynamics licenses — an OBO flow would not require additional licensing, but is not recommended due to complexity
 
-**How to apply:** When evaluating impersonation or delegation approaches, the licensing constraint is not the limiting factor. Complexity of OBO token flows is. See [[project_dynamics_identity_reconciliation]] for the shipped approach (MSCRMCallerID via Delegate role).
+**How to apply:** When evaluating impersonation or delegation approaches, the licensing constraint is not the limiting factor. Complexity of OBO token flows is. See [[project-dynamics-identity-reconciliation]] for the shipped approach (MSCRMCallerID via Delegate role).

@@ -1,10 +1,10 @@
 ---
 name: Intake portal pilot — decisions locked 2026-05-06
-description: Six-decision walkthrough of CONNOR_INTAKE_PORTAL_SYNC.md with Connor present; all six resolved plus several architectural meta-decisions. Items 2 (reviewer-consumable artifact) and 6 (structured-tables scope) SUPERSEDED by project_intake_portal_pilot_decisions_2026-05-13.md.
+description: Six-decision walkthrough of CONNOR_INTAKE_PORTAL_SYNC.md with Connor present; all six resolved plus several architectural meta-decisions. Items 2 (reviewer-consumable artifact) and 6 (structured-tables scope) SUPERSEDED by project-intake-portal-pilot-decisions-2026-05-13.md.
 type: project
 originSessionId: 3c35888d-8da4-46e3-83ac-31a25bbdc4e4
 ---
-> **2026-05-13 update**: Items 2 and 6 below were changed at the 2026-05-13 Track 1 sync — see `project_intake_portal_pilot_decisions_2026-05-13.md`. Item 2 reversed to Option 2 (PA-built packet). Item 6 narrowed from four entities to two (budget + roster only; milestone + priorsupport deferred). All other 2026-05-06 items remain authoritative.
+> **2026-05-13 update**: Items 2 and 6 below were changed at the 2026-05-13 Track 1 sync — see `project-intake-portal-pilot-decisions-2026-05-13.md`. Item 2 reversed to Option 2 (PA-built packet). Item 6 narrowed from four entities to two (budget + roster only; milestone + priorsupport deferred). All other 2026-05-06 items remain authoritative.
 
 Walked through `docs/archive/CONNOR_INTAKE_PORTAL_SYNC.md` with Connor in the room on 2026-05-06. All six decisions resolved.
 
