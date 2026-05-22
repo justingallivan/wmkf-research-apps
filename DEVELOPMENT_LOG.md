@@ -10,6 +10,24 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## May 2026 — Prompt-injection hardening (A7) shipped across all LLM surfaces (Sessions 173–176)
+
+**Milestone:** A7 — the LLM01 prompt-injection hardening initiative — is complete. Every one of the 24 LLM-input surfaces in the codebase now wraps attacker/applicant-influenced text in nonce-bearing, forge-resistant sentinels (`wrapUntrustedContent`) with a system-prompt hardening preamble; high-consequence JSON sinks validate parsed model output against per-app schemas (`validateAiJson`). A registry CI gate (`check:prompt-injection-tagging`) makes the coverage durable. Origin: the 2026-05-21 Codex security audit, item A7.
+
+**Sessions:** 173 (inventory + plan, two Codex plan reviews), 174 (Parts 0–4: primitives, gate, Dynamics-writeback + agentic + peer-review surfaces), 176 (Parts 5–6: the remaining 16 surfaces + the live Dataverse deploy + a full Codex re-audit of A1–A8 + follow-up remediation).
+
+**Ship state:**
+- `check:prompt-injection-tagging` reports 24 migrated / 0 pending; the gate gained a `multimodal` flag (preamble-only, for image/document content blocks) and 11 self-test cases.
+- New primitives: `wrapUntrustedContent` (nonce-on-both-sentinels + sentinel scrubbing), `buildUntrustedContentPreamble`, `validateAiJson` — the latter gained a `record` node type for dynamic-keyed LLM-output maps (rejects prototype-pollution keys). Six per-app output-schema files added.
+- Codex re-audit of A1–A8 confirmed all original audit findings closed or tracked; it caught a real residual — #8/#15 hardened only their entry points, re-feeding prior-stage LLM output and U-EXT results unwrapped. Follow-up steps 1/2a/2b closed that HIGH finding; steps 2c/3/4/5 (VRP output schemas, Executor output validation, call-site-granular gate, mop-up) carry to Session 177.
+- Collateral: a systemic stale-model bug found and fixed — 6 prompt-seed scripts hard-coded `claude-sonnet-4-20250514`; all live `wmkf_ai_prompts` rows re-seeded to the `sonnet` tier key (auto-tracks the current model).
+
+**Why it matters:** Untrusted document/form/external content reaching an LLM was previously interpolated raw — no delimiter, no instruction boundary. A7 establishes boundary-tagging as the standard and the registry gate prevents silent regression. The Codex re-audit also proved the gate's original file-granular design could false-green (one hardened call masking an unhardened sibling) — step 4 next session hardens that.
+
+**Pointers:** `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md`; `docs/security-audit/SECURITY_AUDIT_2026-05-21.md`; `lib/utils/ai-payload-boundary.js`, `lib/utils/ai-output-schema.js`, `scripts/check-prompt-injection-tagging.js`. Commits `adf8df5`·`e79460a`·`0a80da5`·`bc51233`·`5bae845`·`aa0a16d`·`04979f2` (S173–174); `2ad5297`→`f0f3fbd` (S176, 18 commits).
+
+---
+
 ## May 2026 — Structural drift-prevention gates shipped (Session 167)
 
 **Milestone:** Two new CI gates close two long-standing recurring doc-drift families. `check:drain-table-mentions` (reviewer-domain Postgres-vs-Dataverse drift across all 6 drained tables) and `check:prompt-storage-mentions` (the `wmkf_prompt_template` rename — the table that never shipped under that name) now fail loud on any unannotated mention. Both have constrained file-purpose markers (visible in-doc, path-scoped — abuse-resistant) replacing the invisible-allowlist pattern that hid drift. Companion: `check:canonical-pointers` + generated `docs/CANONICAL_COUNTS.md` close the G normalization arc started against `check:fact-consistency`.

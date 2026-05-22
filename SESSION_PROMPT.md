@@ -1,97 +1,118 @@
-# Session 176 Prompt: A7 Parts 5–6 (from the new repo location)
+# Session 177 Prompt: A7 follow-up — finish the Codex-review remediation (steps 2c–5)
 
-## ⚠️ Read first — the repo moved
+## Session 176 Summary
 
-Work now happens from **`~/Code/WMKF_Apps`** (this clone). The old copy at
-`~/Documents/Programming/Claude_Projects/WMKF_Apps` is **abandoned** — its `.git`
-is on a cloud-synced path and `git fsck`/`gc` hang there. Justin will delete it
-once a clean session from here is confirmed. Do not work in the old copy.
+A long, productive session. A7 (prompt-injection hardening) went from Parts 0–4
+to **fully shipped**, then a full Codex re-audit of all the security work drove a
+follow-up remediation that is ~60% done.
 
-## Session 175 Summary
+### What Was Completed
 
-Session 175 diverted entirely from A7 to diagnose and fix a root-cause
-infrastructure failure. A7 Parts 5–6 were **not touched** and remain the work.
+1. **A7 Parts 5 + 6 — all 16 remaining LLM-input surfaces hardened.**
+   Routes #1–#6, #8, #9, #10, #11, #13, #14, #15, #16, #21, #22, #24. Each wraps
+   untrusted text with `wrapUntrustedContent` (or carries the multimodal preamble
+   for image/document content blocks); JSON sinks validate via `validateAiJson`.
+   `check:prompt-injection-tagging` gained a `multimodal` surface flag. Gate now
+   **24 migrated / 0 pending**. A7 plan marked Parts 0–6 SHIPPED.
 
-### What Was Done (infrastructure fix)
+2. **A7 Part 2 deploy done.** `seed-phase-i-summary-prompt.js --execute` re-run;
+   live `wmkf_ai_prompts` row `d4201d8e-…` now declares `proposal_text`
+   `untrusted: true`.
 
-1. **Diagnosed the `git fsck`/`gc` hang.** Cause CONFIRMED: the repo lived under
-   `~/Documents`, which a cloud File Provider (OneDrive Folder Backup / Google
-   Drive) managed in place — it offloaded cold `.git` loose objects to macOS
-   `dataless` placeholders, so any full-object-walk command blocked in `mmap()`
-   downloading them. The S174 reboot did NOT fix it, disproving the
-   "stale OS links" theory. See memory [[env-broken-git-autogc]].
+3. **Stale-model bug found + fixed (systemic).** 6 prompt-seed scripts
+   hard-coded `claude-sonnet-4-20250514` (Sonnet 4.0). `resolveModel()` passes
+   concrete ids through unchanged, so every deployed prompt row was pinned to a
+   year-old model. Switched 5 to the `sonnet` tier key; `echo-parity` kept a
+   pinned concrete id (parity-test requirement) bumped to `claude-sonnet-4-6`.
+   **All 10 live `wmkf_ai_prompts` rows re-seeded** (phase-i, phase-ii ×4,
+   peer-review ×2, reviewer-finder ×2, echo-parity).
 
-2. **Reconciled the memory store.** The git-tracked `.claude-memory/` store and
-   the per-machine harness store had diverged (11 recent entries lived only in
-   the harness store). Merged all 11 in, renamed every entry snake→kebab-case,
-   collapsed the obsolete memory-propagation entries into `memory-store-propagation.md`.
-   82 entries, all links verified. Commit `988f17b`.
+4. **Codex re-audit of A1–A8** (`SECURITY_AUDIT_2026-05-21.md` as baseline).
+   Verdict: all original findings closed or tracked. Caught a real residual —
+   see below.
 
-3. **Moved the repo off the cloud path.** Fresh clone to `~/Code/WMKF_Apps`.
-   `git fsck` here = 0.165s (vs. infinite hang in the old copy). Local-only
-   files carried over; `npm install` done.
+5. **A7 follow-up steps 1/2a/2b** (Codex-verified correct):
+   - **1** — added a `record` node type to `validateAiJson` (dynamic-keyed maps;
+     rejects `__proto__`/`constructor`/`prototype`).
+   - **2a** — #8 (`evaluate-multi-perspective`): wrapped the re-fed
+     concept/literature/perspective blocks; all 4 JSON sinks schema-validated
+     (`shared/config/multi-perspective-output-schema.js`).
+   - **2b** — #15 (`virtual-review-panel`): wrapped every re-fed block (search
+     results, claim data, intelligence, prior reviews); added the preamble
+     `createPanelSynthesisPrompt` was missing entirely.
 
-4. **Consolidated memory via symlink.** `~/.claude/projects/<slug>/memory` →
-   `~/Code/WMKF_Apps/.claude-memory`, so harness memory writes are git-tracked
-   and propagate. Added a drift-detection check to the `/start` skill. Commit
-   `90ab31e`.
+### The Codex residual (HIGH) — now closed by 1/2a/2b
 
-### Commits (S175, `main`, pushed)
-- `988f17b` Reconcile memory into a single git-tracked kebab-case store
-- `90ab31e` Add memory-store consolidation check to /start skill
-- (this `/stop`) — Session 176 prompt
+A7 Parts 5–6 hardened #8/#15 only at their *entry points* — both still re-fed
+prior-stage LLM output and U-EXT results into later LLM calls **unwrapped**
+(preamble present, but no sentinels around the data). Steps 2a/2b fixed it; a
+second Codex pass confirmed no remaining unwrapped re-feed path in either file.
 
-### Work-machine (other Mac) setup
-A setup checklist was drafted (clone off-cloud → create memory symlink →
-`vercel env pull .env.local` → `npm install` → `/start`). The symlink step is
-required and per-machine — `/start` will flag if it's missing.
+### Commits (S176, `main`, pushed — 18 + this doc commit)
+`2ad5297`·`af80cae`·`cc1b36b`·`84a1d30`·`5a0f5e7`·`cb8da14`·`f4cac7f`·`51cdbf7`·`c1f5282`·`c133656` (A7 Parts 5–6) · `d1cfd4d` (deploy) · `ad348a8`·`0ce8514` (model fix) · `8e05fb5`·`4e390d8`·`f0f3fbd` (follow-up 1/2a/2b)
 
-## Potential Next Steps — A7 Parts 5–6 (the real pending work)
+## Potential Next Steps — A7 follow-up steps 2c–5
 
-Per `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md`. Parts 0–4 shipped in
-S174. Same pattern for each surface: wrap untrusted text with
-`wrapUntrustedContent`, prepend `buildUntrustedContentPreamble`, validate JSON
-sinks with `validateAiJson`, move the surface to `migrated` in the
-`check:prompt-injection-tagging` registry.
+The Codex review produced an explicit, ordered next-session plan. **Do them in
+order.** Full detail: re-read the Codex output in the S176 transcript, or the
+findings below.
 
-### A. A7 Part 5 — remaining U-FILE routes
-Routes #1–#6, #8, #11, #13, #15, #16, #22. #8/#11 also need the multimodal
-preamble (image/document content blocks).
+### 0. FIRST — fix `validateStage()` fallback semantics
+`pages/api/evaluate-multi-perspective.js` `validateStage()` returns the **raw**
+parsed object on a validation failure — that bypasses the key-dropping. Make it
+return the cleaned/stripped value (or throw). Do this before copying the pattern
+into 2c/3.
 
-### B. A7 Part 6 — remaining U-EXT routes
-Routes #9, #10, #14, #21, #24.
+### 1. Step 2c — VRP output-schema validation
+`lib/services/panel-review-service.js`: add `validateAiJson()` at every
+`parseJSONResponse()` site (lines ~362, 505, 598, 634, 669, 697). New schema
+file for the 6–7 stage outputs (claim extraction, collation, intelligence
+synthesis, claim verification, structured review, devil's advocate, synthesis).
+Synthesis `ratingMatrix` is dynamic reviewer-keyed → use the `record` node.
 
-### C. Owed deploy step (A7 Part 2)
-Re-run `scripts/seed-phase-i-summary-prompt.js --execute` so the live
-`wmkf_ai_prompts` row carries the `untrusted: true` declaration on
-`proposal_text`. Until then the Executor wraps nothing for that prompt.
+### 2. Step 3 — Executor output-schema validation
+`lib/services/execute-prompt.js`: after `JSON.parse` (~line 480), before
+`persistOutputs()` (~540). JSON mode currently only checks `jsonSchema.required`
+then writes to `akoya_request`. Validate via `validateAiJson` against a
+declarative schema from the prompt row. **Raw mode must stay untouched** — the
+seeded `phase-i.summary` prompt is raw mode.
 
-### D. Slice-0 schema deploy — still parked
-Destructive carryover; verify before acting. Connor field-review + Justin
-go-ahead pending. See memory [[slice0-deactivate-not-delete-recalc]].
+### 3. Step 4 — make `check:prompt-injection-tagging` call-site-granular
+File-granular `content.includes()` lets one hardened call mask an unhardened
+sibling in the same file (this is how #8/#15 false-greened). Per-function
+inspection: per registered builder, assert its body contains the marker calls.
+Mandatory: add a self-test fixture `shared/config/prompts/fx-sibling.js` with a
+safe + an unsafe builder; assert the gate fails on the unsafe one.
 
-## Gotchas (current)
+### 4. Step 5 — mop-up
+- `contact-enrichment-service.js` `claudeWebSearch()` (~line 600): migrate the
+  raw Anthropic `fetch` to `LLMClient` (keep web-search tool support).
+- `wrapUntrustedContent` label escaping (`ai-payload-boundary.js`): strip/escape
+  `]]` in `label`, not just `"`.
 
-- 🟢 Git is healthy in this clone — `gc.auto` is default, `fsck` fast.
-- 🟡 The old `~/Documents` copy still exists with `gc.auto 0` set — harmless,
-  delete it after a clean session here.
-- 🟡 **A7 Part 2 deploy owed** — the seed re-run (step C).
-- 🟢 Memory is consolidated: `.claude-memory/` is the single store, kebab-case,
-  committed by `/stop`. `/start` Step 1.5 verifies the symlink.
+### Also add (Codex): invalid-but-parseable-JSON self-tests at each new schema
+boundary — not only happy-path wrapping tests.
+
+### Parked (unchanged): Slice-0 schema deploy
+Destructive carryover; Connor field-review + Justin go-ahead pending. See memory
+[[slice0-deactivate-not-delete-recalc]]. Verify before acting.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/utils/ai-payload-boundary.js` | `wrapUntrustedContent` + preamble (A7 Part 0) |
-| `lib/utils/ai-output-schema.js` | `validateAiJson` schema validator (A7 Part 0) |
-| `scripts/check-prompt-injection-tagging.js` | A7 coverage gate + registry |
-| `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md` | A7 plan — Parts 0–4 done, 5–6 pending |
+| `lib/utils/ai-payload-boundary.js` | `wrapUntrustedContent` + preamble; `DATA_CLASSES` |
+| `lib/utils/ai-output-schema.js` | `validateAiJson` — incl. the new `record` node |
+| `scripts/check-prompt-injection-tagging.js` | A7 coverage gate (step 4 target) |
+| `lib/services/panel-review-service.js` | VRP stage orchestration (step 2c target) |
+| `lib/services/execute-prompt.js` | Executor (step 3 target) |
+| `shared/config/multi-perspective-output-schema.js` | #8 output schemas (pattern for 2c) |
+| `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md` | A7 plan — Parts 0–6 SHIPPED |
 
 ## Testing
 
 ```bash
 npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging:self-test
-npx jest                                     # 603 passed as of S174
+npx jest                                     # 645 passed as of S176
 npm run build                                # green
 ```
