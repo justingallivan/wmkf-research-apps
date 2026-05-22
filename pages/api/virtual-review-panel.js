@@ -19,7 +19,7 @@ import { resolveAllowedProviders } from '../../lib/utils/vrp-providers';
 import {
   DATA_CLASSES,
   VIRTUAL_REVIEW_PANEL_PROPOSAL_MAX_CHARS,
-  buildBoundedTextPayload,
+  wrapUntrustedContent,
 } from '../../lib/utils/ai-payload-boundary';
 import pdf from 'pdf-parse';
 
@@ -178,11 +178,12 @@ export default async function handler(req, res) {
     // a single application covers all downstream prompt builders. The DB hash
     // above was taken over the original (full) text so the audit trail of
     // what was uploaded stays intact; the model context never sees the tail.
-    const proposalPayload = buildBoundedTextPayload({
+    const proposalPayload = wrapUntrustedContent({
       text: proposalText,
       source: 'virtual-review-panel.run.proposalText',
       dataClass: DATA_CLASSES.PROPOSAL_TEXT,
       maxChars: VIRTUAL_REVIEW_PANEL_PROPOSAL_MAX_CHARS,
+      label: 'research proposal',
     });
     sendEvent('payload_boundary', {
       filename: file.filename,

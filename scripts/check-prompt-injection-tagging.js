@@ -164,8 +164,9 @@ const SURFACES = [
   {
     id: 'virtual-review-panel',
     inv: 15,
-    status: 'pending',
+    status: 'migrated',
     promptFiles: ['shared/config/prompts/virtual-review-panel.js'],
+    callSiteFiles: ['pages/api/virtual-review-panel.js'],
   },
   {
     id: 'reviewer-finder-analyze',

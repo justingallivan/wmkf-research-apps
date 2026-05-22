@@ -347,4 +347,36 @@ describe('/api/virtual-review-panel payload boundary', () => {
     expect(stage0a).toBeDefined();
     expect(devilsAdvocate).toBeDefined();
   });
+
+  // A7 Part 5: every proposal-bearing stage prompt carries the hardening
+  // preamble and the proposal text sits inside nonce-bearing sentinels.
+  test('every proposal-bearing stage carries the untrusted-content preamble + sentinels', async () => {
+    mockedPdfText = `${'A'.repeat(2_000)} proposal body`;
+
+    const handler = (await import('../../pages/api/virtual-review-panel')).default;
+    const req = createMockReq({
+      method: 'POST',
+      headers: { origin: 'http://localhost:3000', host: 'localhost:3000' },
+      body: {
+        files: [{ filename: 'p.pdf', url: 'https://test.public.blob.vercel-storage.com/p.pdf' }],
+        providers: ['claude', 'openai'],
+        includeClaimVerification: true,
+        includeIntelligencePass: false,
+        includeDevilsAdvocate: true,
+      },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+
+    const proposalCarrying = llmCalls.filter(c =>
+      c.prompt.includes('[[WMKF-UNTRUSTED-CONTENT nonce=')
+    );
+    expect(proposalCarrying.length).toBeGreaterThanOrEqual(5); // CV×2 + review×2 + DA
+    for (const call of proposalCarrying) {
+      expect(call.prompt).toContain('UNTRUSTED CONTENT RULES:');
+      const open = call.prompt.match(/\[\[WMKF-UNTRUSTED-CONTENT nonce=([0-9a-f]{24})/);
+      expect(open).not.toBeNull();
+      expect(call.prompt).toContain(`[[/WMKF-UNTRUSTED-CONTENT nonce=${open[1]}]]`);
+    }
+  });
 });

@@ -6,7 +6,16 @@
  * - Stage 1 (optional): Claim verification across all selected LLMs
  * - Stage 2: Structured review (WMKF reviewer form) across all selected LLMs
  * - Synthesis: Claude panel summary with consensus, disagreements, questions
+ *
+ * A7 prompt-injection hardening (Part 5): the `proposalText` argument to every
+ * stage builder is the applicant-authored proposal already wrapped by
+ * `wrapUntrustedContent` at the route boundary (bounded once, propagated to all
+ * stages). Each builder opens with the untrusted-content preamble — the
+ * general (no-nonce) form, since the wrapped block carries its own nonce and
+ * threading it through the multi-stage service is unnecessary.
  */
+
+import { buildUntrustedContentPreamble } from '../../../lib/utils/ai-payload-boundary';
 
 /**
  * WMKF Reviewer Form — the 11 questions human reviewers answer.
@@ -85,7 +94,9 @@ export const REVIEWER_FORM_QUESTIONS = [
  * from the proposal. Output drives database searches in Stage 0b.
  */
 export function createClaimExtractionPrompt(proposalText) {
-  return `You are extracting search queries from a research proposal for use in academic literature databases. Do not evaluate the proposal — just extract searchable terms.
+  return `${buildUntrustedContentPreamble()}
+
+You are extracting search queries from a research proposal for use in academic literature databases. Do not evaluate the proposal — just extract searchable terms.
 
 From the proposal text below, extract:
 1. All novelty claims — phrases where the proposers claim something is "first," "novel," "unprecedented," "new," or "unique." For each, write a short (3-6 word) search string that captures the core claim in terms a database would match.
@@ -117,7 +128,9 @@ ${proposalText}`;
  * into a structured summary for downstream use.
  */
 export function createSearchCollationPrompt(proposalText, claimData, rawSearchResults) {
-  return `You are collating academic database search results for grant reviewers. You have raw results from PubMed, arXiv, bioRxiv, ChemRxiv, and Google Scholar. Organize them into a structured briefing.
+  return `${buildUntrustedContentPreamble()}
+
+You are collating academic database search results for grant reviewers. You have raw results from PubMed, arXiv, bioRxiv, ChemRxiv, and Google Scholar. Organize them into a structured briefing.
 
 PROPOSAL CONTEXT:
 Field: ${claimData.field}
@@ -173,7 +186,9 @@ Be precise. Only include papers that are actually relevant — do not pad the li
  * to fill gaps, identify active groups, and provide broader context.
  */
 export function createIntelligenceSynthesisPrompt(proposalText, claimData, collatedResults) {
-  return `You are a research intelligence analyst preparing a briefing for grant reviewers at the W. M. Keck Foundation. You have access to web search AND the results of database searches already completed. Your job is to FILL GAPS in the existing search results, not repeat what's already been found.
+  return `${buildUntrustedContentPreamble()}
+
+You are a research intelligence analyst preparing a briefing for grant reviewers at the W. M. Keck Foundation. You have access to web search AND the results of database searches already completed. Your job is to FILL GAPS in the existing search results, not repeat what's already been found.
 
 PROPOSAL FIELD: ${claimData.field}
 PIs: ${claimData.piNames?.join(', ')}
@@ -280,7 +295,9 @@ Landscape summary: ${intelligenceBlock.landscapeSummary}
 Additional context: ${intelligenceBlock.additionalContext}
 ` : '';
 
-  return `You are a senior scientist conducting due diligence on a research grant proposal submitted to the W. M. Keck Foundation. The Foundation funds high-risk, high-reward science — projects that push boundaries and may not have extensive preliminary data. Your job is to contextualize the claims in this proposal fairly, identifying both what is genuinely novel and where claims may be overstated.
+  return `${buildUntrustedContentPreamble()}
+
+You are a senior scientist conducting due diligence on a research grant proposal submitted to the W. M. Keck Foundation. The Foundation funds high-risk, high-reward science — projects that push boundaries and may not have extensive preliminary data. Your job is to contextualize the claims in this proposal fairly, identifying both what is genuinely novel and where claims may be overstated.
 
 Before evaluating any claims, classify this proposal by its primary nature. Choose the best fit from:
 - experimental/empirical — tests hypotheses by measuring physical, biological, or chemical systems
@@ -353,7 +370,9 @@ ${JSON.stringify({
 Do not re-search for information already provided above. Use your search capabilities only to fill gaps, follow up on specific uncertainties, or verify claims not covered by the pre-search.
 ` : '';
 
-  return `You are a senior scientist with web search capabilities, conducting due diligence on a research grant proposal submitted to the W. M. Keck Foundation. The Foundation funds high-risk, high-reward science. Your job is to map the research landscape around this proposal — both to verify claims and to understand what makes this work distinctive.
+  return `${buildUntrustedContentPreamble()}
+
+You are a senior scientist with web search capabilities, conducting due diligence on a research grant proposal submitted to the W. M. Keck Foundation. The Foundation funds high-risk, high-reward science. Your job is to map the research landscape around this proposal — both to verify claims and to understand what makes this work distinctive.
 
 Before evaluating any claims, classify this proposal by its primary nature. Choose the best fit from:
 - experimental/empirical — tests hypotheses by measuring physical, biological, or chemical systems
@@ -430,7 +449,9 @@ Field context: ${intelligenceBlock.landscapeSummary}
 ${intelligenceBlock.additionalContext ? `Additional context: ${intelligenceBlock.additionalContext}` : ''}
 ` : '';
 
-  return `You are a seasoned peer reviewer evaluating a research grant proposal for the W. M. Keck Foundation. The Foundation funds high-risk, high-reward research that opens new scientific directions — roughly $1M grants for work that would NOT be funded by traditional agencies like NSF or NIH.
+  return `${buildUntrustedContentPreamble()}
+
+You are a seasoned peer reviewer evaluating a research grant proposal for the W. M. Keck Foundation. The Foundation funds high-risk, high-reward research that opens new scientific directions — roughly $1M grants for work that would NOT be funded by traditional agencies like NSF or NIH.
 
 You are answering the same questions asked of human expert reviewers. Your review will be read by Foundation staff making funding decisions, so it must be substantive, specific, and balanced.
 
@@ -502,7 +523,9 @@ PI publication record: ${JSON.stringify(intelligenceBlock.piPublicationSummary, 
 Field landscape: ${intelligenceBlock.landscapeSummary}
 ` : '';
 
-  return `Your sole job is to identify the strongest reasons this proposal should NOT be funded. Do not balance concerns with praise. Assume the Foundation has a limited budget and this proposal is competing against stronger alternatives. What would a skeptical domain expert say? Be specific — name the experiment, assumption, or claim that is most vulnerable.
+  return `${buildUntrustedContentPreamble()}
+
+Your sole job is to identify the strongest reasons this proposal should NOT be funded. Do not balance concerns with praise. Assume the Foundation has a limited budget and this proposal is competing against stronger alternatives. What would a skeptical domain expert say? Be specific — name the experiment, assumption, or claim that is most vulnerable.
 
 You are playing devil's advocate for a grant review panel at the W. M. Keck Foundation. The panel has already produced balanced reviews. Your role is different: you are the dedicated skeptic. Your critique will be presented as a labeled "skeptical review" alongside the balanced reviews — it will NOT be averaged in or treated as a typical review.
 
