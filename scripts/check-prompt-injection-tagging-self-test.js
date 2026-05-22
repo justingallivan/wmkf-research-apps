@@ -141,6 +141,38 @@ function fakeReader(map) {
   );
 }
 
+// 5b. multimodal surface — preamble present, no wrapper. Passes: the untrusted
+// content is an image/document content block, so there is no text to wrap.
+{
+  const surface = {
+    id: 'fx-multimodal',
+    status: 'migrated',
+    multimodal: true,
+    promptFiles: ['p.js'],
+  };
+  const reader = fakeReader({ 'p.js': 'only buildUntrustedContentPreamble here' });
+  assert(
+    'multimodal surface with preamble only (no wrapper) passes',
+    checkSurface(surface, reader).errors.length === 0,
+  );
+}
+
+// 5c. multimodal surface still REQUIRES the preamble — missing it is flagged.
+{
+  const surface = {
+    id: 'fx-multimodal-no-preamble',
+    status: 'migrated',
+    multimodal: true,
+    promptFiles: ['p.js'],
+  };
+  const reader = fakeReader({ 'p.js': 'a multimodal prompt with no hardening' });
+  const errs = checkSurface(surface, reader).errors;
+  assert(
+    'multimodal surface missing the preamble is still flagged',
+    errs.length === 1 && /buildUntrustedContentPreamble/.test(errs[0]),
+  );
+}
+
 // ── findUnregisteredPromptFiles ───────────────────────────────────────────
 
 // 6. a prompt file referenced by no surface is reported.
@@ -191,4 +223,4 @@ if (failures > 0) {
   console.error(`\nprompt-injection-tagging self-test FAILED — ${failures} case(s).`);
   process.exit(1);
 }
-console.log('\nprompt-injection-tagging self-test OK — 9/9 cases.');
+console.log('\nprompt-injection-tagging self-test OK — 11/11 cases.');

@@ -20,6 +20,12 @@
  *     `execute-prompt.js`.) If a migrated surface loses either marker, this
  *     gate fails (a regression caught mechanically).
  *
+ *     A surface flagged `multimodal: true` sends its untrusted content as
+ *     Anthropic image/document content blocks — there is NO text string to
+ *     wrap, so `wrapUntrustedContent` does not apply. Such a surface is
+ *     required to carry the preamble only (the documented multimodal sibling
+ *     control — see `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md`).
+ *
  *   - status 'pending'  — not yet hardened (a later A7 Part). Tracked, not
  *     enforced. As Parts 2-6 land, surfaces move pending -> migrated here in
  *     the same commit.
@@ -129,7 +135,10 @@ const SURFACES = [
   {
     id: 'evaluate-multi-perspective',
     inv: 8,
-    status: 'pending',
+    status: 'migrated',
+    // Multimodal: the Stage-1 concept page is an Anthropic document content
+    // block — no text to wrap. The A7 control is the multimodal preamble.
+    multimodal: true,
     promptFiles: ['shared/config/prompts/multi-perspective-evaluator.js'],
   },
   {
@@ -144,7 +153,16 @@ const SURFACES = [
     status: 'pending',
     promptFiles: ['shared/config/prompts/funding-gap-analyzer.js'],
   },
-  { id: 'process-expenses', inv: 11, status: 'pending' },
+  {
+    // Route-local prompt. The image path is multimodal (receipt image
+    // content block, preamble-controlled); the PDF path embeds extracted
+    // text, which the route wraps — so this surface has a genuine wrap site
+    // and is NOT multimodal-flagged. Both markers live in the route file.
+    id: 'process-expenses',
+    inv: 11,
+    status: 'migrated',
+    callSiteFiles: ['pages/api/process-expenses.js'],
+  },
   {
     id: 'expertise-finder',
     inv: 13,
@@ -259,7 +277,10 @@ function checkSurface(surface, readFile) {
     if (content.includes(PREAMBLE_MARKER)) sawPreamble = true;
   }
 
-  if (!sawWrap) {
+  // Multimodal surfaces send untrusted content as image/document content
+  // blocks — there is no text to wrap, so the wrap marker is not required.
+  // The preamble (below) is still mandatory.
+  if (!sawWrap && !surface.multimodal) {
     errors.push(
       `${surface.id}: no registered file references ${WRAP_MARKER} ` +
         '(migrated surface lost its untrusted-content wrapping).',
