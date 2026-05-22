@@ -82,6 +82,11 @@ Recommendation:
 - For sensitive or user-owned content, use private blobs plus record-aware download proxies.
 - Keep generic public uploads only for explicitly shared organizational assets.
 
+Remediation status (A5, 2026-05-21):
+
+- **Partially addressed.** The two generic endpoints were consolidated to one: `SettingsModal` migrated off the legacy server-multipart `/api/upload-file` to the `/api/upload-handler` client-token flow, and `/api/upload-file` was retired. This removes the weaker `access: 'public'` server endpoint flagged for removal in `docs/SECURITY_ARCHITECTURE.md`.
+- **Open residual.** The surviving `/api/upload-handler` still mints tokens for `access: 'public'` blobs, and the shared `FileUploaderSimple` (used by 15+ document-processing apps — proposals, peer reviews, expense receipts, research papers) uploads them publicly. Grant proposals are not "explicitly shared organizational assets", so the core P2 concern persists. Genuinely closing it requires private blobs + an authenticated record-aware download proxy, with all 15+ consuming apps updated to read through it — a scoped initiative tracked at `docs/security-audit/P2_PRIVATE_BLOB_MIGRATION.md`.
+
 ### P2 - `requireAuthWithProfile()` fails open if disabled-account DB check errors
 
 `requireAuthWithProfile()` checks `user_profiles.is_active`, but allows the request if that database check fails.

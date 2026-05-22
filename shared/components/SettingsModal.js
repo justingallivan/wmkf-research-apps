@@ -11,6 +11,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { upload } from '@vercel/blob/client';
 import EmailTemplateEditor from './EmailTemplateEditor';
 import { STORAGE_KEYS } from './EmailSettingsPanel';
 import { useProfile } from '../context/ProfileContext';
@@ -428,25 +429,16 @@ export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
 
     setUploadingTemplate(true);
     try {
-      // Upload to Vercel Blob via the upload handler
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch('/api/upload-file', {
-        method: 'POST',
-        body: formData,
+      // Upload to Vercel Blob via the client-token flow (/api/upload-handler).
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/upload-handler',
       });
-
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      const { url } = await response.json();
 
       // Update grant cycle with the blob URL
       setGrantCycle(prev => ({
         ...prev,
-        reviewTemplateBlobUrl: url,
+        reviewTemplateBlobUrl: blob.url,
         reviewTemplateFilename: file.name
       }));
       setSaveStatus(null);
@@ -475,19 +467,11 @@ export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
 
     setUploadingAdditional(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch('/api/upload-file', {
-        method: 'POST',
-        body: formData,
+      // Upload to Vercel Blob via the client-token flow (/api/upload-handler).
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/upload-handler',
       });
-
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      const { url } = await response.json();
 
       // Add to additional attachments array
       setGrantCycle(prev => ({
@@ -495,7 +479,7 @@ export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
         additionalAttachments: [
           ...(prev.additionalAttachments || []),
           {
-            blobUrl: url,
+            blobUrl: blob.url,
             filename: file.name,
             contentType: file.type || 'application/octet-stream'
           }

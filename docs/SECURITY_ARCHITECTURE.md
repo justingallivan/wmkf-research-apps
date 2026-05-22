@@ -591,7 +591,7 @@
 | **Access control** | Blob URLs accessed via authenticated proxy (`/api/blob-proxy`) |
 | **Proxy validation** | URL hostname verified against pattern `[a-z0-9]+\.public\.blob\.vercel-storage\.com`, HTTPS enforced |
 | **Upload auth** | File uploads require authenticated session via `requireAuth()` |
-| **Upload endpoints** | Primary: `/api/upload-handler` (client-side token flow). Legacy: `/api/upload-file` (server-side multipart via busboy) — same auth and file restrictions, but returns raw blob URLs instead of proxied URLs. Legacy endpoint should be removed once migration is confirmed complete. |
+| **Upload endpoints** | Single endpoint: `/api/upload-handler` (client-side token flow). The legacy server-multipart `/api/upload-file` was retired 2026-05-21 (security audit A5) after `SettingsModal` — its last caller — migrated to the token flow. Uploaded blobs are still `access: 'public'`; migrating to private blobs + proxied downloads is the open residual of security-audit P2. |
 
 ### Environment Variable Management
 

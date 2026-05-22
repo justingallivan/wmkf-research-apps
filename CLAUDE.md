@@ -263,7 +263,7 @@ User-scoping convention: shared tables for organization-wide reference data; per
 
 ## API Endpoints
 
-The full route catalogue lives in **`docs/API_ROUTE_SECURITY_MATRIX.md`** ([86](docs/CANONICAL_COUNTS.md#api-route-file-count) route files, CI-gated via `npm run check:api-routes` — PRs touching `pages/api/**` fail without a matrix update). Source files in `pages/api/<app>/` are authoritative for behavior.
+The full route catalogue lives in **`docs/API_ROUTE_SECURITY_MATRIX.md`** ([85](docs/CANONICAL_COUNTS.md#api-route-file-count) route files, CI-gated via `npm run check:api-routes` — PRs touching `pages/api/**` fail without a matrix update). Source files in `pages/api/<app>/` are authoritative for behavior.
 
 Conventions:
 - App-specific routes use `requireAppAccess(req, res, 'app-key')`. App keys live in `shared/config/appRegistry.js`.
@@ -279,7 +279,7 @@ Conventions:
 Operational docs to know about (others in `docs/` are design backdrop, roadmaps, or point-in-time audits — find via grep when relevant):
 
 - **`docs/EXECUTOR_CONTRACT.md`** — shared spec PA `ExecutePrompt` and Vercel `executePrompt()` both implement. Read before any prompt work.
-- **`docs/API_ROUTE_SECURITY_MATRIX.md`** — [86](docs/CANONICAL_COUNTS.md#api-route-file-count)-route catalogue, CI-gated.
+- **`docs/API_ROUTE_SECURITY_MATRIX.md`** — [85](docs/CANONICAL_COUNTS.md#api-route-file-count)-route catalogue, CI-gated.
 - **`docs/SECURITY_OPERATING_PLAN.md`** — weekly/monthly/quarterly security cadence + watch-item escalation thresholds.
 - **`docs/CREDENTIALS_RUNBOOK.md`** — env vars, secret rotation, diagnostics.
 - **`docs/AUTHENTICATION_SETUP.md`** — Azure AD configuration.
