@@ -1,7 +1,7 @@
 ---
 name: start
 description: Start a new session by reviewing SESSION_PROMPT.md and CLAUDE.md
-allowed-tools: Read, Bash(git status, git fetch:*, git pull:*, git rev-parse:*, git log:*, npm run check\:*)
+allowed-tools: Read, Bash(git status, git fetch:*, git pull:*, git rev-parse:*, git log:*, npm run check\:*, readlink:*, ls:*, pwd)
 ---
 
 # Session Start
@@ -33,6 +33,33 @@ Before reading any files, ensure the repository is in sync:
 4. **Check for stale changes** - If there are uncommitted changes, warn the user:
    - These may be leftover from a previous session
    - Ask if they should be committed, stashed, or discarded
+
+## Step 1.5: Verify the memory store is consolidated
+
+Durable memory lives in the git-tracked `.claude-memory/` directory. The harness
+auto-memory feature writes to `~/.claude/projects/<slug>/memory/`, where `<slug>`
+is the repo's absolute path with `/` and `_` replaced by `-`. That path MUST be a
+symlink into `.claude-memory/`, or memory silently diverges per-machine (see the
+`memory-store-propagation` memory entry).
+
+Check it:
+```bash
+SLUG=$(pwd | sed 's#/#-#g; s#_#-#g')
+readlink "$HOME/.claude/projects/$SLUG/memory"
+```
+
+- If `readlink` prints a path ending in `/.claude-memory` → consolidated, good.
+- If it prints nothing AND `~/.claude/projects/$SLUG/memory` is a **regular
+  directory** → memory is diverging. STOP and report: the symlink must be
+  (re)created before any memory is written this session. Recreate with:
+  `ln -s "<repo>/.claude-memory" "$HOME/.claude/projects/$SLUG/memory"` (move any
+  unique entries out of the regular dir first).
+- If neither path exists yet → first session at this path; create the symlink.
+
+This is per-machine and breaks whenever the repo moves (the slug changes).
+Never put `.git` or the working tree in a cloud-synced folder (iCloud / OneDrive
+Folder Backup / Google Drive mirror) — it offloads `.git` objects to placeholders
+and hangs `git fsck`/`gc`.
 
 ## Step 2: Run rubric-enforcement gates
 
