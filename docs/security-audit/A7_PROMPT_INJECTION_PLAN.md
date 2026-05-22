@@ -1,8 +1,8 @@
 # A7: LLM01 prompt-injection hardening — inventory & remediation plan
 
-**Status:** Planned / not started. Created 2026-05-21 (Session 173).
-Revised 2026-05-21 (Session 174) after a Codex review against the live codebase
-— see "Revision log" at the foot of this doc.
+**Status:** Parts 0–1 SHIPPED 2026-05-21 (Session 174); Parts 2–6 pending.
+Created 2026-05-21 (Session 173). Revised 2026-05-21 (Session 174) after a
+Codex review against the live codebase — see "Revision log" at the foot.
 **Origin:** Security audit 2026-05-21 (`SECURITY_AUDIT_2026-05-21.md`), item A7.
 **Scope:** Harden against prompt injection in attacker/applicant-influenced
 content that reaches an LLM — boundary-tagging of untrusted content,
@@ -155,16 +155,16 @@ outputs can't be schema-validated; their control is the boundary + preamble.
 > **Nomenclature:** A7's units are called **Parts** (Part 0 … Part 6) to avoid
 > collision with the unrelated schema-deploy "Slice-0" work tracked elsewhere.
 
-0. **Shared primitives** — extend `ai-payload-boundary.js` with
-   `wrapUntrustedContent` (nonce-on-both-sides, strip/escape, forged-close
-   tests); add the general schema-validator primitive; document the multimodal
-   preamble; **build a complete LLM call-site manifest** (every `LLMClient` /
-   `MultiLLMService` / direct Anthropic call — the inventory above is the
-   seed) and the `check:prompt-injection-tagging` gate over **call sites**,
-   not just the prompts dir. No route changes. Unit-test everything.
-1. **Proof: `grant-reporting/extract` (#12)** — has the amplification bug,
-   already uses `buildBoundedTextPayload`, `JSON.parse`s, and has an existing
-   payload-boundary test to extend. Demonstrates all three controls end to end.
+0. **Shared primitives** — ✅ SHIPPED (S174). `wrapUntrustedContent` +
+   `buildUntrustedContentPreamble` in `lib/utils/ai-payload-boundary.js`
+   (nonce-on-both-sides, sentinel/nonce scrubbing, forged-close tests); the
+   `validateAiJson` schema-validator primitive in `lib/utils/ai-output-schema.js`;
+   the `check:prompt-injection-tagging` registry gate + self-test (the registry
+   IS the call-site manifest — every prompt file must be registered).
+1. **Proof: `grant-reporting/extract` (#12)** — ✅ SHIPPED (S174). All three
+   prompts wrap untrusted text + carry the preamble; the "AUTHORITATIVE
+   header" amplification vector fixed; parsed output validated against
+   per-app schemas (`shared/config/grant-reporting-output-schema.js`).
 2. **Dynamics writeback path: `phase-i-dynamics/summarize-v2` + legacy
    `summarize` + Executor (#18, #19, #20)** — highest consequence (CRM write).
    Must also cover the Executor's **Dataverse prompt rows**: update the seed

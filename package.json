@@ -28,7 +28,9 @@
     "check:drain-table-mentions": "node scripts/check-drain-table-mentions.js",
     "check:drain-table-mentions:self-test": "node scripts/check-drain-table-mentions-self-test.js",
     "check:prompt-storage-mentions": "node scripts/check-prompt-storage-mentions.js",
-    "check:prompt-storage-mentions:self-test": "node scripts/check-prompt-storage-mentions-self-test.js"
+    "check:prompt-storage-mentions:self-test": "node scripts/check-prompt-storage-mentions-self-test.js",
+    "check:prompt-injection-tagging": "node scripts/check-prompt-injection-tagging.js",
+    "check:prompt-injection-tagging:self-test": "node scripts/check-prompt-injection-tagging-self-test.js"
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",
