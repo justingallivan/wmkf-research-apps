@@ -37,8 +37,14 @@ import {
   DATA_CLASSES,
   GRANT_REPORTING_REPORT_MAX_CHARS,
   GRANT_REPORTING_PROPOSAL_MAX_CHARS,
-  buildBoundedTextPayload,
+  wrapUntrustedContent,
 } from '../../../lib/utils/ai-payload-boundary';
+import { validateAiJson } from '../../../lib/utils/ai-output-schema';
+import {
+  GRANT_REPORT_EXTRACTION_SCHEMA,
+  GOALS_ASSESSMENT_SCHEMA,
+  FIELD_REGEN_SCHEMA,
+} from '../../../shared/config/grant-reporting-output-schema';
 
 const APP_KEY = 'grant-reporting';
 const limiter = nextRateLimiter({ max: 5 });
@@ -201,13 +207,19 @@ async function handleRegenerate({ res, access, apiKey, reportRef, fieldKey, curr
   const model = getModelForApp(APP_KEY);
   const fallback = getFallbackModelForApp(APP_KEY);
 
-  const reportPayload = buildBoundedTextPayload({
+  const reportPayload = wrapUntrustedContent({
     text: reportLoad.text,
     source: 'grant-reporting.regenerate.reportText',
     dataClass: DATA_CLASSES.GRANT_REPORT_TEXT,
     maxChars: GRANT_REPORTING_REPORT_MAX_CHARS,
+    label: 'grant report',
   });
-  const prompt = createFieldRegenerationPrompt(reportPayload.text, fieldKey, currentValues);
+  const prompt = createFieldRegenerationPrompt({
+    wrappedReport: reportPayload.text,
+    fieldKey,
+    currentValues,
+    nonces: [reportPayload.nonce],
+  });
   const temperature = fieldKey === 'implications_for_future_grantmaking' ? 0.6 : 0.1;
 
   const start = Date.now();
@@ -245,17 +257,26 @@ async function handleRegenerate({ res, access, apiKey, reportRef, fieldKey, curr
   });
 
   const parsed = parseJsonResponse(result.text);
+  const isPublication = fieldKey === 'publication_1' || fieldKey === 'publication_2';
+  const validated = validateAndStrip(
+    parsed,
+    isPublication ? FIELD_REGEN_SCHEMA.publication : FIELD_REGEN_SCHEMA.string,
+    `regenerate.${fieldKey}`,
+  );
+  const value =
+    validated.value ??
+    (isPublication ? { citation: '', abstract: '', source: 'verbatim' } : '');
 
   await tryLogAiRun({
     requestGuid,
     model: result.modelUsed,
     status: 'completed',
-    rawOutput: { fieldKey, value: parsed.value ?? '' },
+    rawOutput: { fieldKey, value },
     notes: `Grant Reporting regenerate (${fieldKey})`,
     actingUserSystemId,
   });
 
-  return res.status(200).json({ value: parsed.value ?? '' });
+  return res.status(200).json({ value });
 }
 
 async function handleRegenerateGoals({
@@ -313,13 +334,18 @@ export async function extractReport({
   requestGuid = null,
   actingUserSystemId = null,
 }) {
-  const reportPayload = buildBoundedTextPayload({
+  const reportPayload = wrapUntrustedContent({
     text: reportText,
     source: 'grant-reporting.extract.reportText',
     dataClass: DATA_CLASSES.GRANT_REPORT_TEXT,
     maxChars: GRANT_REPORTING_REPORT_MAX_CHARS,
+    label: 'grant report',
   });
-  const prompt = createGrantReportExtractionPrompt(reportPayload.text, headerFromDynamics);
+  const prompt = createGrantReportExtractionPrompt({
+    wrappedReport: reportPayload.text,
+    headerFromDynamics,
+    nonces: [reportPayload.nonce],
+  });
   const start = Date.now();
   let result;
   try {
@@ -355,17 +381,22 @@ export async function extractReport({
   });
 
   const parsed = parseJsonResponse(result.text);
+  const validated = validateAndStrip(
+    parsed,
+    GRANT_REPORT_EXTRACTION_SCHEMA,
+    'extraction',
+  );
 
   await tryLogAiRun({
     requestGuid,
     model: result.modelUsed,
     status: 'completed',
-    rawOutput: parsed,
+    rawOutput: validated,
     notes: 'Grant Reporting extraction (full report fields)',
     actingUserSystemId,
   });
 
-  return parsed;
+  return validated;
 }
 
 /**
@@ -388,23 +419,26 @@ export async function compareProposalToReport({
   actingUserSystemId = null,
   logContext = 'goals-assessment',
 }) {
-  const proposalPayload = buildBoundedTextPayload({
+  const proposalPayload = wrapUntrustedContent({
     text: proposalText,
     source: 'grant-reporting.goals.proposalText',
     dataClass: DATA_CLASSES.PROPOSAL_TEXT,
     maxChars: GRANT_REPORTING_PROPOSAL_MAX_CHARS,
+    label: 'original proposal',
   });
-  const reportPayload = buildBoundedTextPayload({
+  const reportPayload = wrapUntrustedContent({
     text: reportText,
     source: 'grant-reporting.goals.reportText',
     dataClass: DATA_CLASSES.GRANT_REPORT_TEXT,
     maxChars: GRANT_REPORTING_REPORT_MAX_CHARS,
+    label: 'grant report',
   });
   const prompt = createGoalsAssessmentPrompt({
-    proposalText: proposalPayload.text,
-    reportText: reportPayload.text,
+    wrappedProposal: proposalPayload.text,
+    wrappedReport: reportPayload.text,
     headerContext,
     currentNarratives,
+    nonces: [proposalPayload.nonce, reportPayload.nonce],
   });
 
   const start = Date.now();
@@ -442,7 +476,11 @@ export async function compareProposalToReport({
   });
 
   const parsed = parseJsonResponse(result.text);
-  const goalsAssessment = parsed.goalsAssessment ?? parsed;
+  const goalsAssessment = validateAndStrip(
+    parsed.goalsAssessment ?? parsed,
+    GOALS_ASSESSMENT_SCHEMA,
+    logContext,
+  );
 
   await tryLogAiRun({
     requestGuid,
@@ -515,6 +553,24 @@ function parseJsonResponse(text) {
       throw httpError(502, `Failed to parse JSON response from Claude: ${err.message}`);
     }
   }
+}
+
+/**
+ * Validate parsed LLM JSON against a schema (A7 Part 1). Undeclared keys are
+ * dropped; enum values are coerced to safe defaults; type mismatches are a
+ * hard error. The model is given an explicit schema and untrusted text is
+ * sentinel-wrapped, so a validation failure here means genuinely malformed
+ * structured output — surfaced as a 502 rather than passed on to staff.
+ */
+function validateAndStrip(parsed, schema, context) {
+  const result = validateAiJson(parsed, schema);
+  if (!result.ok) {
+    console.error(
+      `[GrantReporting:extract] Output schema validation failed (${context}): ${result.errors.join('; ')}`,
+    );
+    throw httpError(502, `Claude returned structurally invalid ${context} output`);
+  }
+  return result.value;
 }
 
 // Fire-and-log wrapper around DynamicsService.logAiRun. Writeback is best-effort

@@ -142,7 +142,7 @@ objects (`execute-prompt.js:447`, `:525`).
 
 Pattern to generalize: `lib/external/review-form-schema.js` (hand-rolled,
 `{ partial: true }` support — keeps the dependency surface flat; no zod). The
-Slice 0 validator primitive must be general enough for **all** the sinks
+Part 0 validator primitive must be general enough for **all** the sinks
 above, not just grant-reporting/expertise.
 
 Highest-consequence sinks are #18, #19 (writeback to
@@ -150,7 +150,10 @@ Highest-consequence sinks are #18, #19 (writeback to
 output — never write unvalidated structured output to Dynamics. Free-text
 outputs can't be schema-validated; their control is the boundary + preamble.
 
-## Slice ordering
+## Part ordering
+
+> **Nomenclature:** A7's units are called **Parts** (Part 0 … Part 6) to avoid
+> collision with the unrelated schema-deploy "Slice-0" work tracked elsewhere.
 
 0. **Shared primitives** — extend `ai-payload-boundary.js` with
    `wrapUntrustedContent` (nonce-on-both-sides, strip/escape, forged-close
@@ -196,9 +199,9 @@ outputs can't be schema-validated; their control is the boundary + preamble.
 
 ## CI gates
 
-- `check:api-routes` — every slice touching `pages/api/**` needs an
+- `check:api-routes` — every part touching `pages/api/**` needs an
   `API_ROUTE_SECURITY_MATRIX.md` update.
-- `check:atlas` / `:atlas:self-test` — Slice 2 touches `execute-prompt.js` +
+- `check:atlas` / `:atlas:self-test` — Part 2 touches `execute-prompt.js` +
   the Dynamics writeback surface; run sequentially (fixture-path hazard).
 - `check:fact-consistency` / `check:doc-currency` — if docs restate scalars.
 - **Recommended new gate** `check:prompt-injection-tagging` — must scan **LLM
@@ -209,7 +212,7 @@ outputs can't be schema-validated; their control is the boundary + preamble.
   route-local prompts (`pages/api/**`) and service-local prompts
   (`lib/services/**`), not only the prompts dir. **Known blind spot:**
   Dataverse-stored Executor prompt bodies (#20) are not in source — the gate
-  cannot see them; that surface is covered by the Slice 2 seed-script + runtime
+  cannot see them; that surface is covered by the Part 2 seed-script + runtime
   control instead, and the gate's self-test should document this exemption.
   Ship the gate with a self-test, per the CLAUDE.md mandatory gate order
   (lesson catalog → self-test fixture → gate → commit together). This is the
@@ -217,9 +220,9 @@ outputs can't be schema-validated; their control is the boundary + preamble.
 
 ## Effort
 
-Initiative-sized — ~24 LLM-input surfaces across 7 slices. Slices 0–1 are a
+Initiative-sized — ~24 LLM-input surfaces across 7 parts. Parts 0–1 are a
 self-contained first session (primitives + proof). The recommended new gate
-should land with Slice 0 so later slices can't regress.
+should land with Part 0 so later parts can't regress.
 
 ## Revision log
 
@@ -232,9 +235,9 @@ should land with Slice 0 so later slices can't regress.
   writeback (#19) from v2 (#18); (c) output-schema validation broadened from 5
   routes to all `JSON.parse` sinks incl. the Executor; (d) the new gate
   re-scoped from "prompts dir" to "LLM call sites" with route-local /
-  service-local coverage and a documented Dataverse blind spot; (e) Slice 2
+  service-local coverage and a documented Dataverse blind spot; (e) Part 2
   expanded to include Executor Dataverse prompt-row controls + seed scripts;
-  (f) agentic Dynamics Explorer surface resequenced earlier (Slice 3);
+  (f) agentic Dynamics Explorer surface resequenced earlier (Part 3);
   (g) multimodal image/document inputs given an explicit preamble control.
   A second Codex pass caught two residual misses, now also fixed: #2
   (`process-phase-i`) is a `JSON.parse` sink and #8 sends a document content
