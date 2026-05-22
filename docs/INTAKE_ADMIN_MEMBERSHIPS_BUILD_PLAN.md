@@ -1,6 +1,6 @@
 # Intake Admin — Membership Approval Build Plan
 
-**Status:** Draft v4 (2026-05-13). Revised against three Codex review passes (`INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN_CODEX_REVIEW.md` + `_V2.md` + `_V3.md`). v4 closes the last 2 MOD + 2 LOW + 1 NIT findings: prior-decision persisted as a Dataverse field (no inference), §9 disposition table promoted to entry point, `noFallback` threading specified end-to-end, status codes split (403 for unmapped staff, 503 for env misconfig), and `getRecord` named consistently. Ready to build once `wmkf_portal_membership` exists in Dataverse (slice 0).
+**Status:** Draft v4 (2026-05-13). Revised against three Codex review passes (`INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN_CODEX_REVIEW.md` + `_V2.md` + `_V3.md`). v4 closes the last 2 MOD + 2 LOW + 1 NIT findings: prior-decision persisted as a Dataverse field (no inference), §9 disposition table promoted to entry point, `noFallback` threading specified end-to-end, status codes split (403 for unmapped staff, 503 for env misconfig), and `getRecord` named consistently. Ready to build once `wmkf_portalmembership` exists in Dataverse (slice 0).
 
 **Predecessor:** `docs/INTAKE_PORTAL_DESIGN.md` (schema + Option A decision near line 557, captured 2026-05-13).
 
@@ -10,7 +10,7 @@
 
 ## 1. Scope of this slice
 
-Staff-facing surface that approves or rejects pending **`wmkf_portal_membership`** rows from the applicant-side institution-claim flow.
+Staff-facing surface that approves or rejects pending **`wmkf_portalmembership`** rows from the applicant-side institution-claim flow.
 
 In scope:
 - New app key `intake-admin` in `shared/config/appRegistry.js`.
@@ -22,7 +22,7 @@ In scope:
 Not in scope:
 - Applicant-side claim UX (separate slice; the cross-slice contract it must honor lives in § 9).
 - Submitted-requests admin, opportunity status (post-Sarah-inventory slices).
-- `wmkf_portal_membership` entity creation in Dataverse — hard prerequisite (slice 0), not optional. The admin slice cannot exercise real GET/approve/reject without entity, alternate key, navigation-property names, and choice values existing.
+- `wmkf_portalmembership` entity creation in Dataverse — hard prerequisite (slice 0), not optional. The admin slice cannot exercise real GET/approve/reject without entity, alternate key, navigation-property names, and choice values existing.
 - Email notifications on approve/reject — PA-trigger, Connor's plate.
 
 **Why this slice first:** the applicant entry path depends on staff acting on pending rows. Building admin before applicant UX also validates the row-state machine (`requested` → `approved`/`rejected`/`revoked`) before any user-facing flow writes rows.
@@ -31,7 +31,7 @@ Not in scope:
 
 ## 2. Schema (no new fields — entity must exist)
 
-This slice assumes `wmkf_portal_membership` already exists in Dataverse with the shape locked at `INTAKE_PORTAL_DESIGN.md` line 100. Deploy follows the gotcha checklist at `project_dataverse_schema_deploy_gotchas.md`.
+This slice assumes `wmkf_portalmembership` already exists in Dataverse with the shape locked at `INTAKE_PORTAL_DESIGN.md` line 100. Deploy follows the gotcha checklist at `project_dataverse_schema_deploy_gotchas.md`.
 
 ### Slice-0 addition: `wmkf_priordecisionstatus`
 
@@ -53,13 +53,13 @@ Reusing `_wmkf_approvedby_value` / `wmkf_approvedat` to carry rejection state ch
 | `wmkf_approvedat` | "Approved at" | **Decided at** — UTC timestamp of either disposition | Same rename |
 | `wmkf_rejectionreason` | "Rejection reason" | Populated only when `wmkf_approvalstatus='rejected'`; null otherwise | Unchanged |
 
-Any downstream PA flow or report reading these fields **must filter on `wmkf_approvalstatus`** — "approvals last week" is `approvalstatus='approved' AND approvedat >= last_week`, not `approvedat IS NOT NULL`. Document this in `docs/atlas/dataverse-wmkf-portal-membership.md` at slice 0.
+Any downstream PA flow or report reading these fields **must filter on `wmkf_approvalstatus`** — "approvals last week" is `approvalstatus='approved' AND approvedat >= last_week`, not `approvedat IS NOT NULL`. Document this in `docs/atlas/dataverse-wmkf-portalmembership.md` at slice 0.
 
 ### Fields touched
 
 | Field | Read (GET) | Write (approve) | Write (reject) |
 |---|---|---|---|
-| `wmkf_portal_membershipid` | ✓ | — | — |
+| `wmkf_portalmembershipid` | ✓ | — | — |
 | `_wmkf_contact_value` | ✓ (+ `$expand`) | — | — |
 | `_wmkf_account_value` | ✓ (+ `$expand`) | — | — |
 | `wmkf_role` | ✓ | — | — |
@@ -261,7 +261,7 @@ await IntakeAuditService.log({
   actorOid: access.session.user.azureId,    // session shape per [...nextauth].js:284
   actorType: 'staff',
   action: 'membership.approve',             // or 'membership.reject'
-  targetEntity: 'wmkf_portal_membership',
+  targetEntity: 'wmkf_portalmembership',
   targetId: membershipId,
   payload: { priorStatus, newStatus, rejectionReason },  // service sha256-hashes
   metadata: { actingUserSystemId },
@@ -405,7 +405,7 @@ CI gates fold into the slices that introduce them — no deferred "gate" slices.
 
 | # | Slice | CI gate landing same commit | Risk |
 |---|---|---|---|
-| 0 | **Pre-req — `wmkf_portal_membership` entity creation** in Dataverse, including the v4-added `wmkf_priordecisionstatus` choice field (values: `null` / `'rejected'` / `'revoked'` / `'approved'`). Connor design-reviews shape. Catalog in `INTAKE_PORTAL_SCHEMA_CHANGES.md` + new Atlas page `docs/atlas/dataverse-wmkf-portal-membership.md` (records bind keys, semantic contract, alt-key, choice values for both `wmkf_approvalstatus` and `wmkf_priordecisionstatus`). Update `MEMORY.md` note. | `check:atlas` | Low |
+| 0 | **Pre-req — `wmkf_portalmembership` entity creation** in Dataverse, including the v4-added `wmkf_priordecisionstatus` choice field (values: `null` / `'rejected'` / `'revoked'` / `'approved'`). Connor design-reviews shape. Catalog in `INTAKE_PORTAL_SCHEMA_CHANGES.md` + new Atlas page `docs/atlas/dataverse-wmkf-portalmembership.md` (records bind keys, semantic contract, alt-key, choice values for both `wmkf_approvalstatus` and `wmkf_priordecisionstatus`). Update `MEMORY.md` note. | `check:atlas` | Low |
 | 1 | App key + middleware carve-out (exact-or-slash) + skeleton `/apply/admin/memberships` page (empty state). No API yet. | none | Low |
 | 2 | `GET /api/apply/admin/memberships` + table render. Verifies `queryRecords` shape, `$expand`, etag projection. Includes `priorDecision` inference for re-applied rows. | `check:api-routes` row added | Low |
 | 3 | `dynamics-service` `updateRecord` `{ noFallback }` extension. `POST /approve` endpoint + UI button. End-to-end with `If-Match`, 412→409, 503 impersonation gate, 403 impersonation-rejected, audit log. | `check:api-routes` row added | Medium |
@@ -433,7 +433,7 @@ End-to-end target: seed `requested` → approve → seed another `requested` →
 
 Built before applicant-side claim slice. The applicant slice must honor this row-state contract:
 
-**Entry point — disposition table.** When an applicant claims membership at an institution where they already have a `wmkf_portal_membership` row, the applicant slice branches on the row's current `wmkf_approvalstatus` **first**, then applies the per-branch rules. There is no universal "always upsert to requested" rule — Codex v3 flagged that approved rows must not be reset.
+**Entry point — disposition table.** When an applicant claims membership at an institution where they already have a `wmkf_portalmembership` row, the applicant slice branches on the row's current `wmkf_approvalstatus` **first**, then applies the per-branch rules. There is no universal "always upsert to requested" rule — Codex v3 flagged that approved rows must not be reset.
 
 | Prior `approvalStatus` | Action | Audit |
 |---|---|---|

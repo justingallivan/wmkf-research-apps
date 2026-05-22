@@ -10,7 +10,7 @@
 
 **Per-year, per-category budget rows for an intake-portal proposal.** Child of `akoya_request` (parental, cascade delete). Drained from the applicant intake portal at submit; the status-gated PA recompute (Item 6 A+B hybrid) keeps the `akoya_request` aggregates in sync on post-submit edits. Authoritative spec: `docs/BUDGET_FORM_SPEC.md` v3 + `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` 2026-05-14 entry.
 
-**Cost-share lives here too** (no separate `wmkf_proposalcostshare` entity — withdrawn). The forever-filter cost: WMKF-spend aggregate queries MUST filter `wmkf_category NOT IN (100000006, 100000007, 100000008)`; the cost-share aggregate (`akoya_request.wmkf_totalothersources`) uses the inverse `IN` set.
+**Cost-share lives here too** (no separate `wmkf_proposalcostshare` entity — withdrawn). The forever-filter cost: WMKF-spend aggregate queries MUST filter `wmkf_category NOT IN (100000007, 100000008, 100000009)`; the cost-share aggregate (`akoya_request.wmkf_totalothersources`) uses the inverse `IN` set.
 
 ## Fields
 
@@ -23,9 +23,9 @@ Lookup (PascalCase nav-property for `@odata.bind`; lowercase logical for plain r
 
 Data:
 - `wmkf_year` (Integer 1..10, ApplicationRequired) — program year; Integer not Choice (forward-compatible across program lengths).
-- `wmkf_category` (Picklist, ApplicationRequired) — 9 values, integers **reserved S150, do not renumber**:
-  - `100000000=Personnel`, `100000001=Equipment`, `100000002=Supplies`, `100000003=Travel`, `100000004=Other Direct`, `100000005=Indirect` (WMKF-spend; Indirect reserved, always $0)
-  - `100000006=Waived Indirect`, `100000007=Waived Tuition`, `100000008=Other Cost Share` (cost-share). Labels verbatim from `INTAKE_PORTAL_SCHEMA_CHANGES.md:79-81`; normalized to spaced form 2026-05-18 (S163, Justin decision — prior camelCase inconsistency resolved/closed). Filter-predicate shorthand in BUDGET_FORM_SPEC / ITEM_6 still writes the old camelCase tokens — integer-backed category references, not the label; integers authoritative for every guard.
+- `wmkf_category` (Picklist, ApplicationRequired) — 10 values, integers **reserved S150 (Tuition added at 100000005 pre-deploy S178, cost-share block shifted up by 1); do not renumber after deploy**:
+  - `100000000=Personnel`, `100000001=Equipment`, `100000002=Supplies`, `100000003=Travel`, `100000004=Other Direct`, `100000005=Tuition`, `100000006=Indirect` (WMKF-spend; Indirect reserved, always $0)
+  - `100000007=Waived Indirect`, `100000008=Waived Tuition`, `100000009=Other Cost Share` (cost-share). Labels verbatim from `INTAKE_PORTAL_SCHEMA_CHANGES.md:80-82`; normalized to spaced form 2026-05-18 (S163, Justin decision — prior camelCase inconsistency resolved/closed). Filter-predicate shorthand in BUDGET_FORM_SPEC / ITEM_6 still writes the old camelCase tokens — integer-backed category references, not the label; integers authoritative for every guard.
 - `wmkf_description` (String 500) — free-text line-item description.
 - `wmkf_amount` (Money, USD; MinValue 0) — amount for this line. Negative rejected by the drain server-side before `createRecord` (Dataverse Money won't enforce; drain is the authoritative guard).
 - `wmkf_lineorder` (Integer 0..100000) — display order within `(request, year, category)`.
@@ -47,8 +47,8 @@ Data:
 
 | Target | Mapping |
 |---|---|
-| `akoya_request` (`Money`, "Requested Amount") | Sum of WMKF-spend `wmkf_amount` (categories NOT IN 100000006–8), all years. |
-| `akoya_request.wmkf_totalothersources` (`Money`) | Sum of cost-share `wmkf_amount` (categories IN 100000006–8). |
+| `akoya_request` (`Money`, "Requested Amount") | Sum of WMKF-spend `wmkf_amount` (categories NOT IN 100000007–9), all years. |
+| `akoya_request.wmkf_totalothersources` (`Money`) | Sum of cost-share `wmkf_amount` (categories IN 100000007–9). |
 | `akoya_expenses` (`Money`, "Total Project Budget") | `akoya_request + wmkf_totalothersources`. |
 
 ## Migration disposition

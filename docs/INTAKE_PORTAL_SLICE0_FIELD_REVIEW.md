@@ -4,7 +4,7 @@ Pre-deploy review. Lists every field/entity that will be created on `--execute`,
 
 **Four things land at deploy:**
 1. New entity: `wmkf_proposalbudgetline` (budget rows)
-2. New entity: `wmkf_portal_membership` (contact↔account join with approval state)
+2. New entity: `wmkf_portalmembership` (contact↔account join with approval state)
 3. Three new fields on existing `wmkf_apprequestperson` (roster extensions)
 4. One new field on existing `akoya_request` (`wmkf_totalothersources`)
 
@@ -25,7 +25,7 @@ Per-year, per-category budget rows. Child of `akoya_request` (parental, cascade 
 | Schema name | Display | Type | Required | Range / Length | Notes |
 |---|---|---|---|---|---|
 | `wmkf_Year` | Year | Integer | ✅ | 1–10 | Program year (1-based) |
-| `wmkf_Category` | Category | Picklist | ✅ | (see below) | 9-value option set |
+| `wmkf_Category` | Category | Picklist | ✅ | (see below) | 10-value option set |
 | `wmkf_Description` | Description | String | — | max 500 | Free text line-item |
 | `wmkf_Amount` | Amount | Money | — | 0 – 1,000,000,000 USD | One value per row |
 | `wmkf_LineOrder` | Line Order | Integer | — | 0 – 100,000 | Display order within (request, year, category) |
@@ -42,12 +42,13 @@ Per-year, per-category budget rows. Child of `akoya_request` (parental, cascade 
 | `100000002` | Supplies | WMKF-spend |
 | `100000003` | Travel | WMKF-spend |
 | `100000004` | Other Direct | WMKF-spend |
-| `100000005` | Indirect | WMKF-spend (reserved, always $0) |
-| `100000006` | Waived Indirect | Cost-share |
-| `100000007` | Waived Tuition | Cost-share |
-| `100000008` | Other Cost Share | Cost-share |
+| `100000005` | Tuition | WMKF-spend |
+| `100000006` | Indirect | WMKF-spend (reserved, always $0) |
+| `100000007` | Waived Indirect | Cost-share |
+| `100000008` | Waived Tuition | Cost-share |
+| `100000009` | Other Cost Share | Cost-share |
 
-WMKF-spend aggregate filters `wmkf_Category NOT IN (100000006, 100000007, 100000008)`. Cost-share aggregate uses the inverse `IN` set, summed into `akoya_request.wmkf_totalothersources` (§4).
+WMKF-spend aggregate filters `wmkf_Category NOT IN (100000007, 100000008, 100000009)`. Cost-share aggregate uses the inverse `IN` set, summed into `akoya_request.wmkf_totalothersources` (§4).
 
 ### Relationship — N:1 to `akoya_request`
 
@@ -58,14 +59,14 @@ WMKF-spend aggregate filters `wmkf_Category NOT IN (100000006, 100000007, 100000
 
 ---
 
-## 2. New entity — `wmkf_portal_membership`
+## 2. New entity — `wmkf_portalmembership`
 
 Contact↔account join with approval state. One row per (person, institution) pair regardless of approval state (alt key prevents duplicates). Re-applying after rejection updates the existing row.
 
-🟡 **Naming deviation:** logical name is `wmkf_portal_membership` **with internal underscores** — a deliberate deviation from sibling `wmkf_App*` entities (`wmkf_apprequestperson` etc. have none). Underscore form is hardcoded across the build plan + design + reserved integers. Flag if you want it renamed before deploy.
+**Naming:** logical name `wmkf_portalmembership` — no internal underscores, matching the sibling `wmkf_App*` convention (`wmkf_apprequestperson` etc.). An earlier draft used `wmkf_portal_membership`; renamed to the no-underscore form pre-deploy (S178, Justin decision), build plan + design + atlas updated in the same pass.
 
-**Logical / Display:** `wmkf_portal_membership` / "Portal Membership"
-**Schema name:** `wmkf_Portal_Membership`
+**Logical / Display:** `wmkf_portalmembership` / "Portal Membership"
+**Schema name:** `wmkf_PortalMembership`
 **Primary name attr:** `wmkf_Name` (max 200, required) — synthesized `{contact} @ {account} ({role})`
 
 ### Fields
@@ -116,10 +117,10 @@ Nullable. Snapshot of prior `wmkf_ApprovalStatus` on re-application.
 
 | Kind | Schema | → Entity | Lookup attr | Display | Required |
 |---|---|---|---|---|---|
-| N:1 | `wmkf_portal_membership_contact` | `contact` | `wmkf_Contact` | Contact | ✅ |
-| N:1 | `wmkf_portal_membership_account` | `account` | `wmkf_Account` | Account | ✅ |
-| N:1 | `wmkf_portal_membership_requestedby` | `contact` | `wmkf_RequestedBy` | Requested By | — |
-| N:1 | `wmkf_portal_membership_approvedby` | `systemuser` | `wmkf_ApprovedBy` | Approved By | — |
+| N:1 | `wmkf_portalmembership_contact` | `contact` | `wmkf_Contact` | Contact | ✅ |
+| N:1 | `wmkf_portalmembership_account` | `account` | `wmkf_Account` | Account | ✅ |
+| N:1 | `wmkf_portalmembership_requestedby` | `contact` | `wmkf_RequestedBy` | Requested By | — |
+| N:1 | `wmkf_portalmembership_approvedby` | `systemuser` | `wmkf_ApprovedBy` | Approved By | — |
 
 ### Alternate key
 
@@ -167,8 +168,8 @@ Aggregate semantics: `akoya_expenses = akoya_request + wmkf_totalothersources`. 
 
 ## What I'd specifically want your eyes on
 
-1. **`wmkf_portal_membership` underscore-in-name** (§2 banner) — deliberate but a deviation from sibling naming. OK to ship as-is, or rename to `wmkf_portalmembership` before deploy?
-2. **Picklist integer reservations** (§1 `wmkf_Category` 9 values, §2 `wmkf_ApprovalStatus` 4 values + `wmkf_PriorDecisionStatus` 3 values, §3 `wmkf_role` slots 100000002–100000004). These lock at deploy and downstream PAs / drain guards / packet builder will hardcode them. Flag any value you'd rather see different.
+1. **`wmkf_portalmembership` entity name** (§2) — RESOLVED S178: normalized to the no-underscore form matching sibling `wmkf_App*` entities. No open question; noted here only so the entity name is on your radar for the shape review.
+2. **Picklist integer reservations** (§1 `wmkf_Category` 10 values, §2 `wmkf_ApprovalStatus` 4 values + `wmkf_PriorDecisionStatus` 3 values, §3 `wmkf_role` slots 100000002–100000004). These lock at deploy and downstream PAs / drain guards / packet builder will hardcode them. Flag any value you'd rather see different.
 3. **`wmkf_Category` cost-share labels** were normalized to spaced form ("Waived Indirect" / "Waived Tuition" / "Other Cost Share") S163. Filter-predicate shorthand in some other docs still uses camelCase (`WaivedIndirect` etc.) — those are integer-backed semantic references, not display labels. Comfortable with this split?
 4. **Cascade.Delete: Cascade on `wmkf_proposalbudgetline_request`** — administrative whole-request deletion is the only intended use; drain reconciliation deactivates, never deletes. OK as specced?
 5. **`wmkf_Amount` MinValue=0 at Dataverse level** — drain server-side is the authoritative guard against negative values. Two-layer enforcement OK?
@@ -182,7 +183,7 @@ Nothing else here should surprise you — these are the 2026-05-14 schema-review
 Authoritative specs (do not re-author — these are what `apply-dataverse-schema.js --wave=4` deploys):
 
 - `lib/dataverse/schema/wave4/wmkf_proposalbudgetline.json`
-- `lib/dataverse/schema/wave4/wmkf_portal_membership.json`
+- `lib/dataverse/schema/wave4/wmkf_portalmembership.json`
 - `lib/dataverse/schema/wave4-existing/wmkf_apprequestperson-roster-fields.json`
 - `lib/dataverse/schema/wave4-existing/akoya_request-intake-aggregates.json`
 - `scripts/extend-apprequestperson-role-picklist.mjs` (the `wmkf_role` enum extension)

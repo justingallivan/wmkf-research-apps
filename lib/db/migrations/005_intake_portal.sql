@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS intake_audit (
   actor_oid       TEXT,                              -- Entra OID for applicants; azure_id for staff; null for system
   actor_type      TEXT NOT NULL,                     -- 'applicant' | 'staff' | 'system'
   action          TEXT NOT NULL,                     -- 'draft.upsert' | 'draft.delete' | 'submit' | 'attachment.upload' | 'attachment.delete' | 'membership.request' | 'membership.approve' | 'membership.reject' | 'membership.revoke' | etc.
-  target_entity   TEXT,                              -- 'akoya_request' | 'wmkf_portal_membership' | 'intake_drafts' | 'attachment'
+  target_entity   TEXT,                              -- 'akoya_request' | 'wmkf_portalmembership' | 'intake_drafts' | 'attachment'
   target_id       TEXT,                              -- GUID or local id
   payload_digest  TEXT,                              -- sha256 hex of payload; no payload itself stored
   metadata        JSONB NOT NULL DEFAULT '{}'::jsonb,-- small structured context (no PII)

@@ -128,8 +128,8 @@ const CHILD_ENTITY_MAP = {
   budget_lines: {
     // RESOLVED 2026-05-14: new wmkf_proposalbudgetline entity, unified cost-share
     // via wmkf_category enum (WaivedIndirect / WaivedTuition / OtherCostShare added
-    // to Personnel/Equipment/Supplies/Travel/Other Direct/Indirect). Mapper update
-    // blocked on Item 6 (writer for parent aggregates not yet decided).
+    // to Personnel/Equipment/Supplies/Travel/Other Direct/Tuition/Indirect). Mapper
+    // update blocked on Item 6 (writer for parent aggregates not yet decided).
     entitySet: 'wmkf_proposalbudgetlines',
     needsConnor: false,
     blockedOn: 'item-6',

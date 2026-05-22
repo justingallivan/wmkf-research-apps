@@ -1,10 +1,10 @@
-# Atlas: `wmkf_portal_membership` (Dataverse, WMKF pilot entity)
+# Atlas: `wmkf_portalmembership` (Dataverse, WMKF pilot entity)
 
 **Last verified:** 2026-05-15 (S155) — **spec'd, NOT yet deployed.** Slice-0 entity; deploy target 2026-05-19.
 **Live row count:** 0 (entity not yet created in Dataverse)
-**Entity set:** `wmkf_portal_memberships`
-**Schema spec:** `lib/dataverse/schema/wave4/wmkf_portal_membership.json`
-**Naming:** logical name carries internal underscores (`wmkf_portal_membership`) — a deliberate deviation from sibling `wmkf_app*` entities; hardcoded across `docs/INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN.md` (incl. `targetEntity:'wmkf_portal_membership'`). Connor reviews this one entity's shape before creation.
+**Entity set:** `wmkf_portalmemberships`
+**Schema spec:** `lib/dataverse/schema/wave4/wmkf_portalmembership.json`
+**Naming:** logical name `wmkf_portalmembership` — no internal underscores, matching the sibling `wmkf_app*` convention. An earlier draft used `wmkf_portal_membership`; renamed to the no-underscore form pre-deploy (S178). Connor reviews this one entity's shape before creation.
 
 ## Source of truth
 
@@ -15,7 +15,7 @@ One row per `(contact, account)` pair regardless of approval state (alt key) —
 ## Fields
 
 Identity:
-- `wmkf_portal_membershipid` (PK)
+- `wmkf_portalmembershipid` (PK)
 - `wmkf_name` (String 200, ApplicationRequired) — synthesized `{contact} @ {account} ({role})`; display only.
 
 Lookups (PascalCase nav-property for `@odata.bind`; lowercase logical for plain reads) — **exact bind keys to record at deploy** per `docs/INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN.md`:80-85:
@@ -40,7 +40,7 @@ Alternate key:
 ## Read paths
 
 - **(Future, separate slice)** `/api/apply/admin/memberships*` GET — staff approval queue (waiting-on-approval vs. cut-off), reads `wmkf_approvalstatus` + `wmkf_priordecisionstatus` for `priorDecision.status`.
-- **(Future)** Applicant-side submit-authority check — `akoya_request._wmkf_account_value` must equal an `account` for which the authenticated `contact` has an **approved + active** `wmkf_portal_membership`.
+- **(Future)** Applicant-side submit-authority check — `akoya_request._wmkf_account_value` must equal an `account` for which the authenticated `contact` has an **approved + active** `wmkf_portalmembership`.
 
 ## Write paths
 
@@ -62,8 +62,8 @@ Net-new pilot entity (slice 0). No backfill — forward-only via the applicant c
 
 ## Open questions / gotchas
 
-- **Entity-set name confirmed at deploy.** `wmkf_portal_memberships` is the expected pluralization; verify via metadata post-deploy and correct here.
-- **Underscore naming is intentional and load-bearing.** `wmkf_portal_membership` (not `wmkf_portalmembership`) is hardcoded in the admin build plan. Do not "normalize" it to the sibling-entity convention.
+- **Entity-set name confirmed at deploy.** `wmkf_portalmemberships` is the expected pluralization; verify via metadata post-deploy and correct here.
+- **Naming normalized to the no-underscore form (S178).** Logical name is `wmkf_portalmembership` (not `wmkf_portal_membership`), matching the sibling `wmkf_app*` convention. The earlier underscore form was renamed pre-deploy; the admin build plan and design docs were updated in the same pass.
 - **Record exact `@odata.bind` keys at deploy** (`wmkf_Contact` / `wmkf_Account` / `wmkf_RequestedBy` / `wmkf_ApprovedBy`) — the admin + applicant slices depend on them; lowercase keys produce `0x80048d19`.
 - **`wmkf_priordecisionstatus` is nullable by design** — no "none" option value; absence is the fourth state. Don't add a 4th option to make queries simpler.
 - **Connor shape review before `--execute`** — this is the one entity that gets design review (`project_dataverse_creator_privileges`, summary-after model).

@@ -1,6 +1,6 @@
 # WMKF Grant Intake Portal — Design Document
 
-**Status:** Design v2 (2026-05-02), status banner refreshed 2026-05-12. **Entra External ID foundation SHIPPED S129** (tenant provisioned, `entra-external` NextAuth provider, `/apply` route round-trip verified) — no longer the external blocker. Sarah is back from conference travel. Remaining work is iterative pilot build: form field inventory with Sarah, structured-tables persistence pattern (defer or implement), `wmkf_portal_membership` entity creation under delegated authority (`project_dataverse_creator_privileges`, summary-after model), virus scanning wiring, PA trigger confirmation. See "Open questions / open work" for full list.
+**Status:** Design v2 (2026-05-02), status banner refreshed 2026-05-12. **Entra External ID foundation SHIPPED S129** (tenant provisioned, `entra-external` NextAuth provider, `/apply` route round-trip verified) — no longer the external blocker. Sarah is back from conference travel. Remaining work is iterative pilot build: form field inventory with Sarah, structured-tables persistence pattern (defer or implement), `wmkf_portalmembership` entity creation under delegated authority (`project_dataverse_creator_privileges`, summary-after model), virus scanning wiring, PA trigger confirmation. See "Open questions / open work" for full list.
 
 **Related:**
 - `docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md` — reference implementation pattern for token-authenticated public surface
@@ -32,7 +32,7 @@ The pilot is sized like the **external reviewer intake portal**, not like a GOap
   4. **Auto-generated submission PDF.** What we deferred. Cleanest reviewer experience, most build cost.
   Default assumption is option 1 unless Connor wants option 2. Tracked as a launch blocker in "Open questions."
 - **Minimal admin UI.** Collaborator approval, list of submitted requests, opportunity status. Anything else can be a script or out-of-band staff action for pilot.
-- **Schema-light.** Pilot uses fields on existing entities + one new table (`wmkf_portal_membership`). The four-new-table model is for Phase 1+ expansion, not pilot.
+- **Schema-light.** Pilot uses fields on existing entities + one new table (`wmkf_portalmembership`). The four-new-table model is for Phase 1+ expansion, not pilot.
 - **GOapply runs in parallel** for at least 12 months. The win is "no new applications enter GOapply" first; "GOapply turned off" comes only after all programs have migrated AND in-flight apps complete.
 
 ## Non-goals (explicit)
@@ -63,7 +63,7 @@ DynamicsService.createRecord / updateRecord
       ├─ akoya_request                 (canonical Request row; new fields)
       ├─ account                       (Constituent / institution; existing)
       ├─ contact                       (named individuals; new wmkf_portal_oid field)
-      └─ wmkf_portal_membership (NEW)  (person ↔ institution join, with role)
+      └─ wmkf_portalmembership (NEW)  (person ↔ institution join, with role)
       │
       ▼
 GraphService.uploadFile → SharePoint akoya_request library
@@ -97,11 +97,11 @@ The original planning doc proposed four new entities. We deferred three of them;
 
 ### One new entity
 
-**`wmkf_portal_membership`** — contact ↔ account join
+**`wmkf_portalmembership`** — contact ↔ account join
 
 | Field | Type | Notes |
 |---|---|---|
-| `wmkf_portal_membershipid` | PK | |
+| `wmkf_portalmembershipid` | PK | |
 | `_wmkf_contact_value` | lookup → contact | |
 | `_wmkf_account_value` | lookup → account | |
 | `wmkf_role` | choice | `'submitter'` \| `'contributor'` (see permissions matrix below) |
@@ -137,10 +137,10 @@ A submitter is authorized at the **institution** level, not the **request** leve
 
 Reasoning at pilot scale (~25 applicants, mostly one PI per institution):
 - Universities with multiple in-flight proposals already trust their sponsored-research office to gate submissions; the portal mirrors that trust model.
-- Adding request-level allowed-submitters now means designing an invite/assignment surface, persisting it on `wmkf_portal_membership` or a sibling table, and threading it through `/api/intake/submit` — all before we know whether the multi-proposal-per-institution case is common enough to warrant it.
+- Adding request-level allowed-submitters now means designing an invite/assignment surface, persisting it on `wmkf_portalmembership` or a sibling table, and threading it through `/api/intake/submit` — all before we know whether the multi-proposal-per-institution case is common enough to warrant it.
 - The request ownership guard (above) still prevents cross-institution writes; this only widens authority *within* one institution.
 
-**Phase 1 follow-up:** when we see real institutions with concurrent submitters from different labs, add request-level allowed-submitters (likely a many-to-many on `wmkf_portal_membership` × `akoya_request`, or a `wmkf_request_collaborator` child entity). Until then, the submitter role grants institution-wide submit authority and the design doc says so plainly.
+**Phase 1 follow-up:** when we see real institutions with concurrent submitters from different labs, add request-level allowed-submitters (likely a many-to-many on `wmkf_portalmembership` × `akoya_request`, or a `wmkf_request_collaborator` child entity). Until then, the submitter role grants institution-wide submit authority and the design doc says so plainly.
 
 ### Schema deferred to Phase 1+ expansion
 
@@ -152,7 +152,7 @@ These are real but not pilot-required. We add them when the second phase or seco
 
 ### Schema ownership
 
-We own the pilot schema work directly (same pattern we used for the reviewer-suggestion fields shipped 2026-04-29). Connor is looped in for design review on `wmkf_portal_membership` before creation, since it's the one new entity and the shape will persist beyond pilot. Anything beyond pilot — `wmkf_opportunity`, `wmkf_phase`, `wmkf_status_tracking` — gets full Connor design review before creation, even though we may still do the actual creation work.
+We own the pilot schema work directly (same pattern we used for the reviewer-suggestion fields shipped 2026-04-29). Connor is looped in for design review on `wmkf_portalmembership` before creation, since it's the one new entity and the shape will persist beyond pilot. Anything beyond pilot — `wmkf_opportunity`, `wmkf_phase`, `wmkf_status_tracking` — gets full Connor design review before creation, even though we may still do the actual creation work.
 
 ---
 
@@ -199,7 +199,7 @@ EIN is not a clean key. To prevent duplicate `account` creation:
 1. Applicant enters institution name AND EIN (EIN optional for international).
 2. Portal queries Dynamics: exact EIN match → exact name match → fuzzy name match (Dataverse Search).
 3. Portal returns 0..N candidate accounts to the applicant.
-4. Applicant picks "yes, that's us" → creates a `wmkf_portal_membership` request → routes to staff approval.
+4. Applicant picks "yes, that's us" → creates a `wmkf_portalmembership` request → routes to staff approval.
 5. Or "none of these — create new" → also routes to staff approval; on approval, `account` is created and membership granted.
 
 For pilot (~25 applicants), strict staff approval on every new account is fine. We can relax this later with confidence thresholds once we see real data.
@@ -208,7 +208,7 @@ For pilot (~25 applicants), strict staff approval on every new account is fine. 
 
 Even with a valid membership, applicants must not be able to submit against arbitrary `akoya_request` rows. Server-side rule on every `/api/intake/submit` and `/api/intake/draft` call:
 
-> The target `akoya_request._wmkf_account_value` must equal an `account_id` for which the authenticated `contact` has an **approved + active** `wmkf_portal_membership`.
+> The target `akoya_request._wmkf_account_value` must equal an `account_id` for which the authenticated `contact` has an **approved + active** `wmkf_portalmembership`.
 
 This is a server-side authorization check, not a UI affordance. Applies to both draft writes and final submission. Without it, a contact with one valid institution membership could enumerate `akoya_request` GUIDs and overwrite another institution's request.
 
@@ -413,7 +413,7 @@ Portal owns **every write that originates from an applicant action.** PA owns **
 |---|---|
 | Create `account` (Constituent) when staff approves new institution | Notify program staff of submission |
 | Create / update `contact` rows | SharePoint subfolder structure on first submission |
-| Create / update `wmkf_portal_membership` | Phase advancement (next phase becomes available) |
+| Create / update `wmkf_portalmembership` | Phase advancement (next phase becomes available) |
 | Update `akoya_request` form fields on submission | Reviewer pipeline kickoff at Phase II Pending |
 | Set `akoya_requeststatus` to `'Phase II Pending'` on submission | Move `akoya_requeststatus` forward after staff decision |
 | Upload attachments to SharePoint | Notification emails for phase advancement / denial |
@@ -500,7 +500,7 @@ Each phase is roughly a quarter of work; numbers are illustrative not committed.
 
 | Phase | Scope | Outcome |
 |---|---|---|
-| **0. Foundation** (now → June 2026) | Entra tenant provisioning, schema (fields + `wmkf_portal_membership`), `/apply` skeleton, auth flow, EIN reconciliation, Phase II Research 2026-06 form, draft staging, admin UI minimum | Pilot ships |
+| **0. Foundation** (now → June 2026) | Entra tenant provisioning, schema (fields + `wmkf_portalmembership`), `/apply` skeleton, auth flow, EIN reconciliation, Phase II Research 2026-06 form, draft staging, admin UI minimum | Pilot ships |
 | **1. Research expansion** (Q3 2026) | Add Phase I Research form. Concept Research form (if concepts still exist post-redesign). Multi-phase navigation. Migration of next Research cycle entirely off GOapply. Add `wmkf_status_tracking` table. | Research program fully on portal |
 | **2. Second funding line** (Q4 2026) | Whichever program is next-easiest. Patterns start to surface. Add `wmkf_opportunity` + `wmkf_phase` tables (the per-cycle config moves out of code). | Second program migrated |
 | **3. Remaining programs** (2027) | Migrate remaining funding lines one at a time | All new applications enter portal, GOapply still running for in-flight |
@@ -570,7 +570,7 @@ New env var: `CLOUDMERSIVE_API_KEY`. Pilot uses the free tier; production cycle 
 | Person | Role | Timing |
 |---|---|---|
 | **Justin** | Build, design decisions, schema work | Continuous |
-| **Connor** | PA flows, schema review, AkoyaGO context, form requirements | Engaged now; reviews `wmkf_portal_membership` shape before creation; reviews any Phase 1+ schema work in full |
+| **Connor** | PA flows, schema review, AkoyaGO context, form requirements | Engaged now; reviews `wmkf_portalmembership` shape before creation; reviews any Phase 1+ schema work in full |
 | **Sarah** | Form field requirements, UI wishlist, machine-legible capture priorities | Engaged on return from conference; circle back once Connor has rough field inventory |
 | **DFT (IT)** | Entra tenant provisioning | DONE — tenant provisioned, foundation shipped S129. No further IT block. |
 | **Foundation staff (broader)** | Pilot dry-run, applicant communication for cycle | Engage 2-3 weeks before pilot launch (mid-May) |
@@ -588,7 +588,7 @@ New env var: `CLOUDMERSIVE_API_KEY`. Pilot uses the free tier; production cycle 
 **Resolved (decisions made, build remaining):**
 
 - ~~Reviewer-consumable artifact~~ — **2026-05-13 reversal: PA-built review packet on `'Phase II Pending'` flip, dropped in `Reviewer_Downloads/`** (Option 2). Connor owns the build. Supersedes the 2026-05-06 Option 1 (staff-rendered on demand) decision. The structured-data layout for the cover-doc template is now upstream of his packet build.
-- ~~`wmkf_portal_membership` shape sign-off~~ — **shape approved as drafted 2026-05-13**, ships under existing delegated authority with summary-after model. Institution-claim approval workflow lives in the portal's `/apply/admin/*` (Option A) — `intake-admin` app key + `/apply/admin/memberships` page on Justin/Claude's plate. Connor's plate unchanged by the approval-workflow decision.
+- ~~`wmkf_portalmembership` shape sign-off~~ — **shape approved as drafted 2026-05-13**, ships under existing delegated authority with summary-after model. Institution-claim approval workflow lives in the portal's `/apply/admin/*` (Option A) — `intake-admin` app key + `/apply/admin/memberships` page on Justin/Claude's plate. Connor's plate unchanged by the approval-workflow decision.
 - ~~PA trigger confirmation (`'Phase II Pending'`)~~ — **Connor states the existing flows are origin-agnostic and work as-is for portal-originated rows.** No `wmkf_originatingsystem` field needed for pilot. Verification: manually flip a throwaway test request at the **2026-05-26 dry-run** and watch what fires. Flow list request emailed to Connor 2026-05-13, target turnaround 2026-05-15.
 - ~~Structured-tables persistence~~ — **2026-05-13: real child entities for pilot, scoped to budget + roster.** **2026-05-14 refinement:** budget = new `wmkf_proposalbudgetline` entity (cost-share unified into its `wmkf_category` enum, no separate `wmkf_proposalcostshare`); roster = extension of existing `wmkf_apprequestperson` junction (3 nullable fields + 3 new role enum values), not a new `wmkf_proposalroster` entity. Driver: human-legibility schema principle. Authoritative spec: `docs/BUDGET_FORM_SPEC.md` v3 + `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` 2026-05-14 entry. Milestones → narrative field for pilot, prior-support → attached PDF for pilot.
 - ~~Child-entity naming alignment~~ — **2026-05-14: closed.** No new entity for cost-share (unified into budget enum); no new entity for roster (extends `wmkf_apprequestperson`). Only one new entity name to lock: `wmkf_proposalbudgetline` (working name from 2026-05-13 catalog kept).
@@ -623,8 +623,8 @@ This list lives here, not in `scripts/`, because passing the smokes is necessary
 
 1. ~~**Wait for IT response on Entra tenant.**~~ Done — foundation shipped S129. `/apply` route auth round-trip verified.
 2. **Sarah session** — Phase II Research field inventory; structured-vs-narrative tradeoffs per field; UI must-haves. (Sarah is back from conference travel.)
-3. **Connor light-touch sync** — `wmkf_portal_membership` shape walkthrough (summary-after model per `project_dataverse_creator_privileges`); reviewer-consumable artifact decision; PA trigger confirmation; structured-tables persistence pattern.
-4. **Schema work** — under existing delegated authority, create `wmkf_portal_membership` + `contact.wmkf_portal_oid` + `akoya_request.wmkf_phaseiisubmittedat` / `wmkf_phaseiisubmittedby` + form fields. Catalog in `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`.
+3. **Connor light-touch sync** — `wmkf_portalmembership` shape walkthrough (summary-after model per `project_dataverse_creator_privileges`); reviewer-consumable artifact decision; PA trigger confirmation; structured-tables persistence pattern.
+4. **Schema work** — under existing delegated authority, create `wmkf_portalmembership` + `contact.wmkf_portal_oid` + `akoya_request.wmkf_phaseiisubmittedat` / `wmkf_phaseiisubmittedby` + form fields. Catalog in `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`.
 5. **Form module + `/apply` dashboard build-out** — first form (`phase-ii-research-2026-06`) iteratively. Aim for end-to-end click-through (auth → dashboard → form → submit → land in Dynamics) before polishing any single screen.
 
 Hard target: pilot accepting submissions by **2026-06-01** for the mid-June Phase II Research cycle. The external (IT) blocker is resolved; remaining slip risk is the Sarah field inventory + Connor sync timing.

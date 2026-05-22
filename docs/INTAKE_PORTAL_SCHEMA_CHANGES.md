@@ -56,7 +56,7 @@ Live Dataverse probe 2026-05-14: 577 attributes on `akoya_request`; 0 collisions
 
 Downstream patches landed 2026-05-14: `pages/api/grant-reporting/lookup-grant.js` no longer falls back to `akoya_request` as award amount when `akoya_grant` is null (drain-written requested amount would otherwise display as award amount on pre-decision records).
 
-### `wmkf_portal_membership` — `wmkf_priordecisionstatus` add
+### `wmkf_portalmembership` — `wmkf_priordecisionstatus` add
 
 | Field | Type | Notes |
 |---|---|---|
@@ -66,7 +66,7 @@ Downstream patches landed 2026-05-14: `pages/api/grant-reporting/lookup-grant.js
 
 Microsoft custom option-set convention: values start at `100000000` and increment by 1 within a single option set. Reserved 2026-05-14 (S150) so the JSON specs can be written with stable integers and Atlas reads identically across consumers. **Do not renumber after slice 0 deploys** — third-party consumers (Connor's PAs, drain guards, packet builder) will hardcode these.
 
-**`wmkf_proposalbudgetline.wmkf_category`** (new option set, 9 values total):
+**`wmkf_proposalbudgetline.wmkf_category`** (new option set, 10 values total):
 
 | Integer | Label | Class |
 |---|---|---|
@@ -75,14 +75,16 @@ Microsoft custom option-set convention: values start at `100000000` and incremen
 | `100000002` | `Supplies` | WMKF-spend |
 | `100000003` | `Travel` | WMKF-spend |
 | `100000004` | `Other Direct` | WMKF-spend |
-| `100000005` | `Indirect` | WMKF-spend (reserved, always $0) |
-| `100000006` | `Waived Indirect` | Cost-share |
-| `100000007` | `Waived Tuition` | Cost-share |
-| `100000008` | `Other Cost Share` | Cost-share |
+| `100000005` | `Tuition` | WMKF-spend |
+| `100000006` | `Indirect` | WMKF-spend (reserved, always $0) |
+| `100000007` | `Waived Indirect` | Cost-share |
+| `100000008` | `Waived Tuition` | Cost-share |
+| `100000009` | `Other Cost Share` | Cost-share |
 
+> **`Tuition` added at `100000005` 2026-05-22 (S178, Justin decision)** — net-new WMKF-spend direct-cost category; the cost-share block (`Waived Indirect` / `Waived Tuition` / `Other Cost Share`) and `Indirect` shifted up by 1. Done **pre-deploy**, so the "do not renumber" rule above is not yet in force — slice 0 has not been applied. After deploy this table is frozen.
 > **Labels normalized to spaced form 2026-05-18 (S163, Justin decision)** — resolves the prior camelCase-vs-spaced inconsistency with the WMKF-spend labels; this table stays the verbatim source for `wmkf_proposalbudgetline.json`'s option labels. Filter-predicate shorthand elsewhere (`wmkf_category NOT IN (WaivedIndirect, …)` in BUDGET_FORM_SPEC / ITEM_6 / this doc's lines 22-26) still uses the old camelCase tokens — those are **integer-backed category references, not the display label**, and the integers are authoritative for every guard, so they are intentionally left as semantic shorthand.
 
-WMKF-spend aggregate queries filter `wmkf_category NOT IN (100000006, 100000007, 100000008)`. Cost-share aggregate (`wmkf_totalothersources`) uses the inverse `IN` set.
+WMKF-spend aggregate queries filter `wmkf_category NOT IN (100000007, 100000008, 100000009)`. Cost-share aggregate (`wmkf_totalothersources`) uses the inverse `IN` set.
 
 **`wmkf_apprequestperson.wmkf_role`** (existing option set, extending from 2 → 5 values):
 
@@ -96,7 +98,7 @@ WMKF-spend aggregate queries filter `wmkf_category NOT IN (100000006, 100000007,
 
 Existing readers (contact-history, generate-emails, external review context, acceptance-w4) already filter `wmkf_role IN (100000000, 100000001)` per the 2026-05-14 source-scope patch, so the enum expansion is non-breaking by construction.
 
-**`wmkf_portal_membership.wmkf_priordecisionstatus`** (new option set, 3 values; field is nullable so "no prior decision" is represented by absence, not a fourth value):
+**`wmkf_portalmembership.wmkf_priordecisionstatus`** (new option set, 3 values; field is nullable so "no prior decision" is represented by absence, not a fourth value):
 
 | Integer | Label |
 |---|---|
@@ -108,7 +110,7 @@ Existing readers (contact-history, generate-emails, external review context, acc
 
 - **Item 6 — drain-vs-PA aggregate write conflict.** Decision locked 2026-05-14 as A+B hybrid; rule-exception edit landed S150 (`INTAKE_PORTAL_DESIGN.md` § "Power Automate boundary" → "Exception — intake portal aggregate fields on `akoya_request`"). **Updated 2026-05-18 (S163, corrected post-Codex): Item 6 gate SHRANK to one open pre-deploy item — P1-Update.** Connor's S162 ruling dissolved P2 + P1-Delete (no Delete trigger) and P3 landed S150, but the residual **P1-Update** — does the parent-status trigger filter bind/fire on a `statecode`-only deactivation Update — is **unverified** and **remains a pre-deploy gate** (an earlier S163 draft wrongly called it "the docs' clean case, post-deploy"; that was a Codex-flagged overstatement, now corrected). Clearable only by Connor maker-portal validation **or** an explicitly recorded team risk waiver — neither has happened. The old "Tests 1+2 (Connor — pending) gate slice 0" framing is superseded by this narrower one-item gate — see `INTAKE_PORTAL_ITEM_6_DISCUSSION.md` § 0 "Update 2026-05-18 (S163)" + `INTAKE_PORTAL_DESIGN.md` § "Power Automate boundary" → "Preconditions — current model" for the authoritative status + the corrected Option B drain lifecycle.
 - ~~**`submission_jobs` migration** — missing from `005_intake_portal.sql`; add `009_submission_jobs.sql` before slice 0.~~ Landed S150 as `lib/db/migrations/009_submission_jobs.sql` (+ V30 inline block in `scripts/setup-database.js`). Table not yet applied to prod — runs with the slice 0 deploy.
-- ~~**Numeric integer values for new enum entries**~~ — reserved S150, see above. Transcribe to new `dataverse-wmkf-proposalbudgetline.md` Atlas page at slice 0 + amend `dataverse-wmkf-portal-membership.md` (if created) / inline note in design doc otherwise.
+- ~~**Numeric integer values for new enum entries**~~ — reserved S150, see above. Transcribe to new `dataverse-wmkf-proposalbudgetline.md` Atlas page at slice 0 + amend `dataverse-wmkf-portalmembership.md` (if created) / inline note in design doc otherwise.
 - ~~**Live-probe verification of `wmkf_apprequestperson.wmkf_role` before deploy.**~~ **Verified CLEAR 2026-05-15 (S155).** Both the option-set definition and live row data were probed: definition has exactly 2 values (PI=`100000000`, Co-PI=`100000001`); live data distribution is 4,488 PI + 1,073 Co-PI = 5,561 rows with **zero** rows occupying `100000002`–`100000004`. Slice 0's enum extension is non-breaking on this axis. **Correct tool is `node scripts/probe-apprequestperson-role-data.js`** (definition + row-data probe, exit 0=CLEAR / 3=BLOCK / 1=ERROR) — *not* `scripts/dynamics-schema-diff.js`, which is a Dynamics-Explorer annotation-coverage diff that cannot target `wmkf_apprequestperson` (not in `TABLE_ANNOTATIONS`) and never inspects row data. **Re-run the probe at deploy time (target 2026-05-19)** — live data can change between now and then; the CLEAR result is point-in-time, not durable. (`scripts/probe-picklist.js wmkf_apprequestperson.wmkf_role` covers the definition half alone if only that is needed.)
 - ~~**Attribute-name collision check on existing entities** (`akoya_request` + `wmkf_apprequestperson`).~~ **Verified CLEAR 2026-05-18 (S163)** via `scripts/probe-slice0-attr-collision.mjs` (read-only metadata GET — NOT a Connor/`Get-CrmEntityAttributes` dependency; the `INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md` § "Connor runs it" framing is superseded). Net-new surface is 1 field on `akoya_request` (`wmkf_totalothersources`; the other two aggregates reuse existing AkoyaGO fields) + 3 on `wmkf_apprequestperson` (`wmkf_effortpct`/`wmkf_biosketchurl`/`wmkf_lineorder`) — all clear against 577 / 35 live attrs respectively. Re-run at deploy (point-in-time).
 - **Atlas pages:** new `docs/atlas/dataverse-wmkf-proposalbudgetline.md`; amend `docs/atlas/dataverse-wmkf-apprequestperson.md` for new fields + expanded enum (apprequestperson page amended S150 for the expanded enum; new-fields amendment lands at slice 0).
@@ -123,7 +125,7 @@ Existing readers (contact-history, generate-emails, external review context, acc
 
 **Status:** Queued — JSON specs to be drafted by Justin/Claude under `lib/dataverse/schema/intake/` for Connor design review by **2026-05-15**. Apply to prod by **2026-05-18** (idempotent reruns + 30s-backoff retry per recent gotchas). Names below are working — naming alignment with the 2026-05-06 suggestions (`wmkf_budgetline` / `wmkf_personnel`) is itself an open question for Connor's review.
 
-### `wmkf_portal_membership` — contact ↔ account join with approval state
+### `wmkf_portalmembership` — contact ↔ account join with approval state
 
 Shape approved 2026-05-13 as drafted in `INTAKE_PORTAL_DESIGN.md` "One new entity" section. No changes from the 2026-05-06 baseline. Institution-claim approval workflow lives portal-side at `/apply/admin/memberships` (Option A); Connor's PA is not on the approval path.
 
@@ -135,7 +137,7 @@ Shape approved 2026-05-13 as drafted in `INTAKE_PORTAL_DESIGN.md` "One new entit
 | `wmkf_name` | Text(160) | Synthesized: `Y{year} — {category}: {description}` |
 | `_wmkf_request_value` | Lookup → `akoya_request` | Parental, cascade delete |
 | `wmkf_year` | Whole number (1–10) | Int, not Choice (forward-compatible across program lengths) |
-| `wmkf_category` | Choice | Pilot values: Personnel, Equipment, Supplies, Travel, Other Direct, Indirect (reserved) |
+| `wmkf_category` | Choice | Pilot values: Personnel, Equipment, Supplies, Travel, Other Direct, Tuition, Indirect (reserved) — full 10-value set + cost-share above |
 | `wmkf_description` | Text(500) | Line-item description |
 | `wmkf_amount` | Money (USD) | |
 | `wmkf_lineorder` | Whole number | Display order within `(request, year, category)` |

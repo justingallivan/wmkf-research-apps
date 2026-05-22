@@ -1,8 +1,8 @@
 {
-  "name": "wmkf_portal_membership",
+  "name": "wmkf_portalmembership",
   "kind": "new-entity",
-  "schemaName": "wmkf_Portal_Membership",
-  "_comment": "Intake-portal slice 0. The ONE new pilot entity (contact <-> account join with approval state). NAMING: logical name is wmkf_portal_membership WITH internal underscores — a deliberate deviation from sibling wmkf_App* entities (wmkf_apprequestperson etc. have none). The underscore form is hardcoded across docs/INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN.md (incl. targetEntity:'wmkf_portal_membership' line 264) + design + reserved integers; deviating would break the build-plan contract. Connor reviews this one entity's shape before creation (project_dataverse_creator_privileges, summary-after). Shape locked: docs/INTAKE_PORTAL_DESIGN.md:98-117. ATLAS must record exact @odata.bind keys at deploy (wmkf_Contact / wmkf_Account / wmkf_RequestedBy / wmkf_ApprovedBy) per build plan line 80-85.",
+  "schemaName": "wmkf_PortalMembership",
+  "_comment": "Intake-portal slice 0. The ONE new pilot entity (contact <-> account join with approval state). NAMING: logical name is wmkf_portalmembership (no internal underscores), matching the sibling wmkf_App* convention (wmkf_apprequestperson etc.). An earlier draft used wmkf_portal_membership with underscores; renamed to the no-underscore form pre-deploy (S178, Justin decision) — done while still pre-deploy so no Dataverse rename is involved, and all docs/build-plan references were updated in the same pass. Connor reviews this one entity's shape before creation (project_dataverse_creator_privileges, summary-after). Shape locked: docs/INTAKE_PORTAL_DESIGN.md:98-117. ATLAS must record exact @odata.bind keys at deploy (wmkf_Contact / wmkf_Account / wmkf_RequestedBy / wmkf_ApprovedBy) per build plan line 80-85.",
   "displayName": "Portal Membership",
   "displayCollectionName": "Portal Memberships",
   "description": "Applicant-portal institution-claim membership: a contact's claimed association with an account (institution), with self-service request + staff approval state. Alt key (contact, account) — one row per (person, institution) pair regardless of approval state; re-applying after rejection updates the existing row. Pending vs. revoked vs. rejected are distinct (wmkf_approvalstatus carries the distinction; statecode alone cannot). Admin approve/reject surface is a SEPARATE downstream slice (docs/INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN.md) — only the entity is slice 0.",
@@ -84,7 +84,7 @@
   "relationships": [
     {
       "kind": "N:1",
-      "schemaName": "wmkf_portal_membership_contact",
+      "schemaName": "wmkf_portalmembership_contact",
       "referencedEntity": "contact",
       "lookupSchemaName": "wmkf_Contact",
       "lookupDisplayName": "Contact",
@@ -93,7 +93,7 @@
     },
     {
       "kind": "N:1",
-      "schemaName": "wmkf_portal_membership_account",
+      "schemaName": "wmkf_portalmembership_account",
       "referencedEntity": "account",
       "lookupSchemaName": "wmkf_Account",
       "lookupDisplayName": "Account",
@@ -102,7 +102,7 @@
     },
     {
       "kind": "N:1",
-      "schemaName": "wmkf_portal_membership_requestedby",
+      "schemaName": "wmkf_portalmembership_requestedby",
       "referencedEntity": "contact",
       "lookupSchemaName": "wmkf_RequestedBy",
       "lookupDisplayName": "Requested By",
@@ -111,7 +111,7 @@
     },
     {
       "kind": "N:1",
-      "schemaName": "wmkf_portal_membership_approvedby",
+      "schemaName": "wmkf_portalmembership_approvedby",
       "referencedEntity": "systemuser",
       "lookupSchemaName": "wmkf_ApprovedBy",
       "lookupDisplayName": "Approved By",

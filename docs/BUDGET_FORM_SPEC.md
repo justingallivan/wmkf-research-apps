@@ -222,6 +222,9 @@ Both round-up and round-down targets are always shown. In practice, the differen
 | At least one budget line item must have a value > 0 | On submit | "Budget cannot be empty" |
 | Headcount must be a whole number ≥ 0 | On blur | "Enter a whole number (0 or more)" |
 | % Effort must be > 0 if any WMKF amount > 0 | On blur | "Enter the effort percentage for this role" |
+| **Tuition (category `100000005`) capped — `[DECISION TBD]`** | Live + on submit | _Message pending cap decision_ |
+
+> **Tuition cap — OPEN POLICY DECISION (S178).** The Foundation historically did **not** allow tuition as a fundable expense; this is now reversed — applicants may request a *modest* tuition amount under category `Tuition` (`100000005`). The amount is capped, but the cap form is **undecided**: either (a) a fixed maximum dollar amount, or (b) a percentage of the total budget. Once decided, this becomes a concrete validation rule (client-side live check + drain server-side hard gate, mirroring the $100K-multiple trust-boundary pattern). Until then, no Tuition-specific enforcement ships. The form should keep the Tuition field visible regardless — same "visible but governed" pattern as the restricted Facilities/Overhead row (§ Operations).
 
 ---
 
@@ -323,7 +326,7 @@ When the submit endpoint queues a `submission_jobs` row, the drain cron's `dynam
 | `budget.projectYears` | `akoya_request.wmkf_numberofyearsoffunding` (Picklist; existing field, options 100000000=1 … 100000004=5) | One field write. Pilot maps {1,2,3} → {100000000, 100000001, 100000002} |
 | Cumulative totals (derived) | `akoya_request.akoya_request` (WMKF-requested), `akoya_request.wmkf_totalothersources` (cost-share), `akoya_request.akoya_expenses` (total) — see § Aggregate fields | Writer for these three is gated on **Item 6** resolution; drain may not be the writer in the final design |
 
-**Category mapping from JSONB to catalog enum.** The catalog's `wmkf_category` enum is a fixed pilot set: `Personnel / Equipment / Supplies / Travel / Other Direct / Indirect`. The form's Operations section has six fixed sub-rows; they map as:
+**Category mapping from JSONB to catalog enum.** The catalog's `wmkf_category` WMKF-spend values are `Personnel / Equipment / Supplies / Travel / Other Direct / Tuition / Indirect` (cost-share values listed in § Aggregate fields). The form's Operations section has six fixed sub-rows; they map as:
 
 | Form row code | `wmkf_category` |
 |---|---|
@@ -334,7 +337,7 @@ When the submit endpoint queues a `submission_jobs` row, the drain cron's `dynam
 | `renovations` | `Other Direct` |
 | `facilities-overhead` | `Indirect` (reserved category — WMKF doesn't pay; always 0) |
 
-Dynamic "Other Operations" rows also map to `Other Direct`. The applicant-facing label collapses 4 categories into one "Other Direct" bucket on the Dataverse side — Connor's cover-doc PA can group by `wmkf_category` for reviewer display, and the applicant-facing `wmkf_description` carries the specific line identity.
+Dynamic "Other Operations" rows also map to `Other Direct`. The `Tuition` category (`100000005`) has no Operations sub-row — it is a newly-allowed direct-cost category (see § Validation Rules, "Tuition cap"); the form-side tuition input and its JSONB→category mapping are open form-integration items, blocked on the cap decision. The applicant-facing label collapses 4 categories into one "Other Direct" bucket on the Dataverse side — Connor's cover-doc PA can group by `wmkf_category` for reviewer display, and the applicant-facing `wmkf_description` carries the specific line identity.
 
 The original spec proposed a parent `wmkf_budgetsubmission` table with its own `wmkf_status`. **That table is intentionally dropped** — `akoya_request` already serves as the parent, and the draft/submitted state machine is handled by `intake_drafts` (draft) → `submission_jobs` (in-flight) → externalization (terminal).
 
@@ -348,7 +351,7 @@ Pre-committed catalog shape from `INTAKE_PORTAL_SCHEMA_CHANGES.md` line 22 + thr
 | `wmkf_name` | Text(160) | catalog | Synthesized: `Y{year} — {category}: {description}` |
 | `_wmkf_request_value` | Lookup → `akoya_request` | catalog | Parental, cascade delete. Bound via nav-property `@odata.bind` on write — exact bind key (likely `wmkf_Request@odata.bind`) recorded at slice 0 deploy |
 | `wmkf_year` | Whole Number (1–10) | catalog | Forward-compatible across program lengths; pilot writes 1/2/3 |
-| `wmkf_category` | Choice | catalog + v3 expansion | Numeric option-set values per `lib/services/dynamics-service.js:930` convention. Values (v3 — 9 total): WMKF-spend categories — `Personnel / Equipment / Supplies / Travel / Other Direct / Indirect`; cost-share categories — `WaivedIndirect / WaivedTuition / OtherCostShare`. **WMKF-spend aggregate queries MUST filter `wmkf_category NOT IN (WaivedIndirect, WaivedTuition, OtherCostShare)`** — this is the forever-filter cost of the v3 unified-table decision. Numeric mapping table recorded in Atlas at slice 0 |
+| `wmkf_category` | Choice | catalog + v3 expansion | Numeric option-set values per `lib/services/dynamics-service.js:930` convention. Values (v3 — 10 total, `Tuition` added S178): WMKF-spend categories — `Personnel / Equipment / Supplies / Travel / Other Direct / Tuition / Indirect`; cost-share categories — `WaivedIndirect / WaivedTuition / OtherCostShare`. **WMKF-spend aggregate queries MUST filter `wmkf_category NOT IN (WaivedIndirect, WaivedTuition, OtherCostShare)`** — this is the forever-filter cost of the v3 unified-table decision. Numeric mapping table recorded in Atlas at slice 0 |
 | `wmkf_description` | Text(500) | catalog | Line-item description. For fixed rows: the static label ("Principal Investigators", "Consumable Supplies"). For dynamic rows: applicant-entered text |
 | `wmkf_amount` | Money (USD) | catalog | Single value per row (this row IS one year) |
 | `wmkf_lineorder` | Whole Number | catalog | Display order within `(request, year, category)` |
@@ -392,7 +395,7 @@ v1 stated delete-and-replace "inside a single Dataverse `$batch` request." **Cod
 
 **Per-attempt drain sequence inside the `dynamics_patched` step:**
 
-1. **Recompute aggregates from the payload.** `cumulativeWMKF = sum(rows where category IN (Personnel, Equipment, Supplies, Travel, Other Direct, Indirect))`, `cumulativeOther = sum(rows where category IN (WaivedIndirect, WaivedTuition, OtherCostShare))`. Note the `IN` (not `NOT IN`) construction matches the unified-table v3 decision. Server-side hard gate: if `cumulativeWMKF % 100_000 !== 0`, mark the job `status='failed'` (permanent — not a transient retry), audit-log `budget.validation.failed`, notify staff. The client-side $100K-multiple validation is a UX optimization; this is the trust boundary.
+1. **Recompute aggregates from the payload.** `cumulativeWMKF = sum(rows where category IN (Personnel, Equipment, Supplies, Travel, Other Direct, Tuition, Indirect))`, `cumulativeOther = sum(rows where category IN (WaivedIndirect, WaivedTuition, OtherCostShare))`. Note the `IN` (not `NOT IN`) construction matches the unified-table v3 decision. Server-side hard gate: if `cumulativeWMKF % 100_000 !== 0`, mark the job `status='failed'` (permanent — not a transient retry), audit-log `budget.validation.failed`, notify staff. The client-side $100K-multiple validation is a UX optimization; this is the trust boundary.
 2. **Query existing children for this `request_id`** in `wmkf_proposalbudgetline` via `queryRecords` filtered on `_wmkf_request_value` (single entity since v3 unified cost-share). Returns the GUID set to delete.
 3. **Delete existing children one-by-one** via `deleteRecord`. After each successful delete, append the GUID to `submission_jobs.dynamics_patches.deletedChildIds`. If the cron tick times out mid-delete, the next tick reads the marker, skips already-deleted GUIDs, and resumes.
 4. **Insert new children one-by-one** via `createRecord` with `MSCRMCallerID` = WMK app user systemuserid. After each successful insert, append `{ guid, year, category, rolecode }` to `submission_jobs.dynamics_patches.insertedChildren`. Resumable across cron ticks the same way.
@@ -498,7 +501,7 @@ v1 had a 7-row table from Justin's morning session. v2 keeps 5 of those as-is, o
 Schema deploy (a separate slice) ships under the existing delegated authority, summary-after model. The Atlas page `docs/atlas/dataverse-wmkf-proposalbudgetline.md` (one page, not two — v3 single-table) is created at deploy and records:
 
 - Exact `@odata.bind` keys (likely `wmkf_Request@odata.bind`)
-- Numeric option-set values for the full 9-value `wmkf_category` enum, including the three new cost-share values
+- Numeric option-set values for the full 10-value `wmkf_category` enum, including the three new cost-share values
 - The WMK app user systemuserid (drain reads this from one canonical place)
 - The category-mapping table from § Externalized layer
 - The forever-filter idiom (NOT IN cost-share categories) so every downstream consumer reads it the same way

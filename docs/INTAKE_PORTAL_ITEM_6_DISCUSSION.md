@@ -183,7 +183,7 @@ Until this is resolved, Option A handles Create and Update cleanly but Delete is
 
 | Field | Rollup definition |
 |---|---|
-| `akoya_request` | Sum of `wmkf_proposalbudgetline.wmkf_amount` WHERE `wmkf_category IN (Personnel, Equipment, Supplies, Travel, Other Direct, Indirect)` |
+| `akoya_request` | Sum of `wmkf_proposalbudgetline.wmkf_amount` WHERE `wmkf_category IN (Personnel, Equipment, Supplies, Travel, Other Direct, Tuition, Indirect)` |
 | `wmkf_totalothersources` | Sum of `wmkf_proposalbudgetline.wmkf_amount` WHERE `wmkf_category IN (WaivedIndirect, WaivedTuition, OtherCostShare)` |
 | `akoya_expenses` | Sum of `wmkf_proposalbudgetline.wmkf_amount` (no category filter — math collapses: `sum(WMKF-spend) + sum(cost-share) = sum(all)`) |
 
@@ -304,10 +304,10 @@ With Q1+Q2 locked, the schema slice can move toward deploy provided the three pr
 
 Pre-sync, the brief framing of next steps was: "Slice 0 schema deploy is waiting on Item 6 — locking unblocks:
 
-- `wmkf_proposalbudgetline` entity creation (9-value `wmkf_category` enum)
+- `wmkf_proposalbudgetline` entity creation (10-value `wmkf_category` enum)
 - `wmkf_apprequestperson` extension (3 nullable fields, 5-value role enum)
 - `wmkf_totalothersources` field on `akoya_request` (only net-new aggregate field)
-- `wmkf_priordecisionstatus` field on `wmkf_portal_membership`
+- `wmkf_priordecisionstatus` field on `wmkf_portalmembership`
 
 Two other prerequisites remain regardless of Item 6:
 - `submission_jobs` Postgres migration (missing from `005_intake_portal.sql`)
