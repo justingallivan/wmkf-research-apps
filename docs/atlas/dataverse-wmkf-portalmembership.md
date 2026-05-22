@@ -1,10 +1,11 @@
 # Atlas: `wmkf_portalmembership` (Dataverse, WMKF pilot entity)
 
-**Last verified:** 2026-05-15 (S155) — **spec'd, NOT yet deployed.** Slice-0 entity; deploy target 2026-05-19.
-**Live row count:** 0 (entity not yet created in Dataverse)
-**Entity set:** `wmkf_portalmemberships`
+**Last verified:** 2026-05-22 (S178) — **DEPLOYED to prod Dataverse.** Slice-0 entity, created via `apply-dataverse-schema.js --wave=4 --execute`.
+**Live row count:** 0 (entity created, no rows yet — drain/portal code not built)
+**Entity set:** `wmkf_portalmemberships` (confirmed live, HTTP 200, 2026-05-22)
 **Schema spec:** `lib/dataverse/schema/wave4/wmkf_portalmembership.json`
-**Naming:** logical name `wmkf_portalmembership` — no internal underscores, matching the sibling `wmkf_app*` convention. An earlier draft used `wmkf_portal_membership`; renamed to the no-underscore form pre-deploy (S178). Connor reviews this one entity's shape before creation.
+**Naming:** logical name `wmkf_portalmembership` — no internal underscores, matching the sibling `wmkf_app*` convention. An earlier draft used `wmkf_portal_membership`; renamed to the no-underscore form pre-deploy (S178).
+**Lookup `@odata.bind` keys** (confirmed from live metadata 2026-05-22): `wmkf_Contact` (→ `contact`), `wmkf_Account` (→ `account`), `wmkf_RequestedBy` (→ `contact`), `wmkf_ApprovedBy` (→ `systemuser`) — all PascalCase; bind as `wmkf_Contact@odata.bind`, etc.
 
 ## Source of truth
 
@@ -62,8 +63,8 @@ Net-new pilot entity (slice 0). No backfill — forward-only via the applicant c
 
 ## Open questions / gotchas
 
-- **Entity-set name confirmed at deploy.** `wmkf_portalmemberships` is the expected pluralization; verify via metadata post-deploy and correct here.
+- **Entity-set name CONFIRMED post-deploy (2026-05-22).** `wmkf_portalmemberships` — live, HTTP 200.
 - **Naming normalized to the no-underscore form (S178).** Logical name is `wmkf_portalmembership` (not `wmkf_portal_membership`), matching the sibling `wmkf_app*` convention. The earlier underscore form was renamed pre-deploy; the admin build plan and design docs were updated in the same pass.
-- **Record exact `@odata.bind` keys at deploy** (`wmkf_Contact` / `wmkf_Account` / `wmkf_RequestedBy` / `wmkf_ApprovedBy`) — the admin + applicant slices depend on them; lowercase keys produce `0x80048d19`.
+- **`@odata.bind` keys CONFIRMED from live metadata (2026-05-22):** `wmkf_Contact` / `wmkf_Account` / `wmkf_RequestedBy` / `wmkf_ApprovedBy` — all PascalCase. The admin + applicant slices depend on them; lowercase keys produce `0x80048d19`.
 - **`wmkf_priordecisionstatus` is nullable by design** — no "none" option value; absence is the fourth state. Don't add a 4th option to make queries simpler.
 - **Connor shape review before `--execute`** — this is the one entity that gets design review (`project_dataverse_creator_privileges`, summary-after model).
