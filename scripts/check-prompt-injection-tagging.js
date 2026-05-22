@@ -38,6 +38,14 @@
  *     file-level: builders wrap via per-file helper indirection, so a
  *     per-builder body slice cannot see the wrap call.
  *
+ *     `builders` is opt-in per surface and only applies where each builder
+ *     calls `buildUntrustedContentPreamble()` directly in its own body.
+ *     Surfaces that instead inject the preamble at the route/service call
+ *     site (peer-reviewer, proposal-summarizer{,-legacy}, expertise-finder's
+ *     `buildUserPrompt`) cannot use it — there the single call-site preamble
+ *     is not a per-builder concern, and those surfaces keep the file-level
+ *     check. Adopt `builders` for any new self-carrying multi-builder file.
+ *
  *   - status 'pending'  — not yet hardened (a later A7 Part). Tracked, not
  *     enforced. As Parts 2-6 land, surfaces move pending -> migrated here in
  *     the same commit.
@@ -81,6 +89,11 @@ const SURFACES = [
     status: 'migrated',
     promptFiles: ['shared/config/prompts/grant-reporting.js'],
     callSiteFiles: ['pages/api/grant-reporting/extract.js'],
+    builders: [
+      'createGrantReportExtractionPrompt',
+      'createFieldRegenerationPrompt',
+      'createGoalsAssessmentPrompt',
+    ],
   },
   {
     id: 'process-phase-i-writeup',
@@ -169,6 +182,11 @@ const SURFACES = [
     inv: 9,
     status: 'migrated',
     promptFiles: ['shared/config/prompts/literature-analyzer.js'],
+    builders: [
+      'createPaperExtractionPrompt',
+      'createSynthesisPrompt',
+      'createComparisonPrompt',
+    ],
   },
   {
     id: 'analyze-funding-gap',
@@ -176,6 +194,11 @@ const SURFACES = [
     status: 'migrated',
     promptFiles: ['shared/config/prompts/funding-gap-analyzer.js'],
     callSiteFiles: ['pages/api/analyze-funding-gap.js'],
+    builders: [
+      'createFundingExtractionPrompt',
+      'createFundingAnalysisPrompt',
+      'createBatchFundingSummaryPrompt',
+    ],
   },
   {
     // Route-local prompt. The image path is multimodal (receipt image
@@ -235,6 +258,8 @@ const SURFACES = [
       'shared/config/prompts/reviewer-finder-dynamics.js',
     ],
     callSiteFiles: ['lib/services/claude-reviewer-service.js'],
+    // reviewer-finder-dynamics.js has no prompt builders of its own.
+    builders: ['createAnalysisPrompt', 'createDiscoveredReasoningPrompt'],
   },
   {
     id: 'dynamics-explorer-chat',
@@ -281,6 +306,7 @@ const SURFACES = [
     // context is assembled inside the builder), so both markers live there.
     promptFiles: ['shared/config/prompts/email-reviewer.js'],
     callSiteFiles: ['pages/api/reviewer-finder/generate-emails.js'],
+    builders: ['createPersonalizationPrompt', 'createSubjectPrompt'],
   },
   {
     id: 'dynamics-explorer-export',
@@ -396,10 +422,12 @@ function checkSurface(surface, readFile) {
         );
         continue;
       }
-      if (!hit.seg.includes(PREAMBLE_MARKER)) {
+      // Require the CALL form `buildUntrustedContentPreamble(` — a bare token
+      // in a comment or string must not satisfy the gate.
+      if (!hit.seg.includes(`${PREAMBLE_MARKER}(`)) {
         errors.push(
           `${surface.id}: builder "${b}" (${hit.file}) does not call ` +
-            `${PREAMBLE_MARKER} in its own body — a sibling builder's preamble ` +
+            `${PREAMBLE_MARKER}() in its own body — a sibling builder's preamble ` +
             'does not cover it (call-site-granular check).',
         );
       }
