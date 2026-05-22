@@ -212,8 +212,11 @@ const SURFACES = [
   {
     id: 'reviewer-finder-emails',
     inv: 22,
-    status: 'pending',
+    status: 'migrated',
+    // email-reviewer.js wraps its own untrusted blocks in-builder (candidate
+    // context is assembled inside the builder), so both markers live there.
     promptFiles: ['shared/config/prompts/email-reviewer.js'],
+    callSiteFiles: ['pages/api/reviewer-finder/generate-emails.js'],
   },
   {
     id: 'dynamics-explorer-export',
