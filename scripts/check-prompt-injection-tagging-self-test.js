@@ -269,6 +269,27 @@ function fakeReader(map) {
   );
 }
 
+// 9e. noCallSite: a builder exported but wired to no live LLM call site is
+// likewise exempt from the in-body check, and still drift-tracked.
+{
+  const content = [
+    'export function createSelfPrompt(t) { return `${buildUntrustedContentPreamble()} ${t}`; }',
+    'export function createDeadPrompt(t) { return `exported but no route calls this: ${t}`; }',
+  ].join('\n');
+  const surface = {
+    id: 'fx-deadcode',
+    status: 'migrated',
+    promptFiles: ['p.js'],
+    callSiteFiles: ['c.js'],
+    builders: ['createSelfPrompt', { name: 'createDeadPrompt', noCallSite: true }],
+  };
+  const reader = fakeReader({ 'p.js': content, 'c.js': 'wrapUntrustedContent' });
+  assert(
+    'call-site-granular: a noCallSite builder is exempt from the in-body check',
+    checkSurface(surface, reader).errors.length === 0,
+  );
+}
+
 // ── findUnregisteredPromptFiles ───────────────────────────────────────────
 
 // 6. a prompt file referenced by no surface is reported.
@@ -319,4 +340,4 @@ if (failures > 0) {
   console.error(`\nprompt-injection-tagging self-test FAILED — ${failures} case(s).`);
   process.exit(1);
 }
-console.log('\nprompt-injection-tagging self-test OK — 15/15 cases.');
+console.log('\nprompt-injection-tagging self-test OK — 16/16 cases.');

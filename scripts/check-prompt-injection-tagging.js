@@ -38,10 +38,14 @@
  *     file-level: builders wrap via per-file helper indirection, so a
  *     per-builder body slice cannot see the wrap call.
  *
- *     `builders` is opt-in per surface. A builder that injects its preamble at
- *     the route/service call site rather than in its own body is declared as
- *     `{ name, routePreamble: true }` — exempt from the in-body check but
- *     still drift-tracked. The only multi-builder surface still on the plain
+ *     `builders` is opt-in per surface. A builder exempt from the in-body
+ *     check is declared `{ name, routePreamble: true }` (preamble injected at
+ *     the route) or `{ name, noCallSite: true }` (exported but wired to no
+ *     live LLM call site); both stay drift-tracked. A multi-builder prompt
+ *     file only needs ONE surface to declare its `builders` — other surfaces
+ *     sharing that file inherit the granular coverage (e.g. process-phase-ii
+ *     references proposal-summarizer.js but the `qa` surface owns its
+ *     `builders` list). The one multi-builder surface still on the plain
  *     file-level check is peer-reviewer, whose two prompt files build one
  *     preamble in the route and reuse it for every builder (no per-builder
  *     concern). Adopt `builders` for any new multi-builder prompt file.
@@ -126,13 +130,14 @@ const SURFACES = [
     status: 'migrated',
     promptFiles: ['shared/config/prompts/proposal-summarizer-legacy.js'],
     callSiteFiles: ['pages/api/process-legacy.js'],
-    // Mixed file: the summary/extraction builders self-carry the preamble; the
-    // refinement/Q&A builders get it from their route.
+    // The summary/extraction builders self-carry the preamble and are called
+    // by process-legacy.js; the refinement/Q&A builders are exported but wired
+    // to no live route (noCallSite).
     builders: [
       'createSummarizationPrompt',
       'createStructuredDataExtractionPrompt',
-      { name: 'createRefinementPrompt', routePreamble: true },
-      { name: 'createQAPrompt', routePreamble: true },
+      { name: 'createRefinementPrompt', noCallSite: true },
+      { name: 'createQAPrompt', noCallSite: true },
     ],
   },
   {
@@ -146,12 +151,17 @@ const SURFACES = [
     // same file but adds phase-ii-dynamics.js, so it stays file-level).
     promptFiles: ['shared/config/prompts/proposal-summarizer.js'],
     callSiteFiles: ['pages/api/qa.js'],
+    // createSummarizationPrompt / createStructuredDataExtractionPrompt
+    // (called by process.js) and createQASystemPrompt (called by qa.js) all
+    // self-carry the preamble. createRefinementPrompt / createQAPrompt are
+    // exported but wired to no live route (noCallSite) — refine.js uses its
+    // own route-local REFINEMENT_PROMPT, not the shared builder.
     builders: [
       'createSummarizationPrompt',
       'createStructuredDataExtractionPrompt',
       'createQASystemPrompt',
-      { name: 'createRefinementPrompt', routePreamble: true },
-      { name: 'createQAPrompt', routePreamble: true },
+      { name: 'createRefinementPrompt', noCallSite: true },
+      { name: 'createQAPrompt', noCallSite: true },
     ],
   },
   {
@@ -429,12 +439,19 @@ function checkSurface(surface, readFile) {
   // sibling builder's preamble does not cover it. This closes the file-level
   // masking hole (CLAUDE_COVERAGE_LESSONS.md lesson F).
   //
-  // A builder entry is either a string (must self-carry the preamble) or
-  // `{ name, routePreamble: true }` — the latter for a builder whose preamble
-  // is injected at the route/service call site (e.g. `createQAPrompt`, whose
-  // route hardens the system prompt). A `routePreamble` builder is exempt from
-  // the in-body check but still counted for drift, so a NEW builder added to
-  // the file must be explicitly classified one way or the other.
+  // A builder entry is either a string (must self-carry the preamble) or an
+  // object with one exemption flag:
+  //   { name, routePreamble: true } — preamble injected at the route/service
+  //     call site (e.g. expertise-finder's `buildUserPrompt`, hardened by the
+  //     system prompt the route builds first).
+  //   { name, noCallSite: true }   — the builder is exported but wired to NO
+  //     live LLM call site (e.g. proposal-summarizer's `createRefinementPrompt`
+  //     / `createQAPrompt` — re-exported from shared/config/index.js but
+  //     called by no route; their text was captured into Dataverse-seeded
+  //     prompts). A7-inert today; declared only so drift tracking forces a
+  //     conscious decision if one is ever wired up.
+  // Both flags exempt the builder from the in-body preamble check but still
+  // count it for drift, so a NEW builder must be explicitly classified.
   if (Array.isArray(surface.builders)) {
     const declared = surface.builders.map((b) =>
       typeof b === 'string' ? { name: b, routePreamble: false } : b,
@@ -459,7 +476,7 @@ function checkSurface(surface, readFile) {
       }
       // Require the CALL form `buildUntrustedContentPreamble(` — a bare token
       // in a comment or string must not satisfy the gate.
-      if (!d.routePreamble && !hit.seg.includes(`${PREAMBLE_MARKER}(`)) {
+      if (!d.routePreamble && !d.noCallSite && !hit.seg.includes(`${PREAMBLE_MARKER}(`)) {
         errors.push(
           `${surface.id}: builder "${d.name}" (${hit.file}) does not call ` +
             `${PREAMBLE_MARKER}() in its own body — a sibling builder's preamble ` +
