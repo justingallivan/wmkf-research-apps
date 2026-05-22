@@ -32,7 +32,8 @@ import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-conte
 import {
   DATA_CLASSES,
   BATCH_PHASE_I_PROPOSAL_MAX_CHARS,
-  buildBoundedTextPayload,
+  wrapUntrustedContent,
+  buildUntrustedContentPreamble,
 } from '../../../lib/utils/ai-payload-boundary';
 
 const APP_KEY = 'batch-phase-i-summaries';
@@ -105,18 +106,22 @@ export default async function handler(req, res) {
 
     const fileLoad = await loadFile(fileRef);
     const model = getModelForApp('batch-phase-i');
-    const proposalPayload = buildBoundedTextPayload({
+    // A7 Part 2: the proposal is grantee-authored — wrap it in nonce-bearing
+    // sentinels and prepend the hardening preamble so instructions embedded in
+    // the proposal cannot hijack a summary that writes back to Dynamics.
+    const proposalPayload = wrapUntrustedContent({
       text: fileLoad.text,
       source: 'phase-i-dynamics.summarize.proposalText',
       dataClass: DATA_CLASSES.PROPOSAL_TEXT,
       maxChars: BATCH_PHASE_I_PROPOSAL_MAX_CHARS,
+      label: 'proposal',
     });
-    const prompt = createPhaseISummarizationPrompt(
+    const prompt = `${buildUntrustedContentPreamble([proposalPayload.nonce])}\n\n${createPhaseISummarizationPrompt(
       proposalPayload.text,
       summaryLength,
       summaryLevel,
       KECK_GUIDELINES,
-    );
+    )}`;
 
     // ─── Call Claude ────────────────────────────────────────────────────────
     // Routed through the canonical LLMClient: SSRF allowlist, abortable

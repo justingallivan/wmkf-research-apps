@@ -1,8 +1,11 @@
 # A7: LLM01 prompt-injection hardening — inventory & remediation plan
 
-**Status:** Parts 0–1 SHIPPED 2026-05-21 (Session 174); Parts 2–6 pending.
+**Status:** Parts 0–2 SHIPPED 2026-05-21 (Session 174); Parts 3–6 pending.
 Created 2026-05-21 (Session 173). Revised 2026-05-21 (Session 174) after a
 Codex review against the live codebase — see "Revision log" at the foot.
+**Owed deploy step:** re-run `scripts/seed-phase-i-summary-prompt.js --execute`
+so the live `wmkf_ai_prompts` row carries the new `untrusted: true` declaration
+on `proposal_text` (Part 2; the Executor honours it once the row is updated).
 **Origin:** Security audit 2026-05-21 (`SECURITY_AUDIT_2026-05-21.md`), item A7.
 **Scope:** Harden against prompt injection in attacker/applicant-influenced
 content that reaches an LLM — boundary-tagging of untrusted content,
@@ -166,11 +169,13 @@ outputs can't be schema-validated; their control is the boundary + preamble.
    header" amplification vector fixed; parsed output validated against
    per-app schemas (`shared/config/grant-reporting-output-schema.js`).
 2. **Dynamics writeback path: `phase-i-dynamics/summarize-v2` + legacy
-   `summarize` + Executor (#18, #19, #20)** — highest consequence (CRM write).
-   Must also cover the Executor's **Dataverse prompt rows**: update the seed
-   scripts so stored prompt bodies declare which variables are untrusted, and
-   add a runtime validation step in `executePrompt()` — a source-scanning gate
-   cannot reach these rows.
+   `summarize` + Executor (#18, #19, #20)** — ✅ SHIPPED (S174). The Executor
+   honours an `untrusted: true` variable declaration — wraps the value with
+   `wrapUntrustedContent` and injects `buildUntrustedContentPreamble` into the
+   composed system prompt. `seed-phase-i-summary-prompt.js` declares
+   `proposal_text` untrusted (Dataverse row re-seed owed — see Status above).
+   Legacy `summarize.js` wraps + prepends the preamble directly. summarize-v2
+   needed no route change — the Executor declaration drives it.
 3. **Agentic surface: `dynamics-explorer/chat` (#17, #23)** — moved earlier
    than the original plan: `tool_result` text is re-fed into an agent loop, a
    higher-leverage injection target than batch document routes.

@@ -12,10 +12,13 @@
  * call-site inventory over a fragile static scan. The registry below mirrors
  * the plan's inventory table. Each surface is either:
  *
- *   - status 'migrated' — its prompt file(s) MUST reference
- *     `buildUntrustedContentPreamble` and its call-site file(s) MUST
- *     reference `wrapUntrustedContent`. If a migrated surface loses either
- *     marker, this gate fails (a regression caught mechanically).
+ *   - status 'migrated' — across the union of its `promptFiles` and
+ *     `callSiteFiles`, at least one file MUST reference `wrapUntrustedContent`
+ *     and at least one MUST reference `buildUntrustedContentPreamble`. (Union,
+ *     not per-list: a route+prompt split keeps the wrapper in the route and
+ *     the preamble in the prompt; an Executor-driven surface keeps both in
+ *     `execute-prompt.js`.) If a migrated surface loses either marker, this
+ *     gate fails (a regression caught mechanically).
  *
  *   - status 'pending'  — not yet hardened (a later A7 Part). Tracked, not
  *     enforced. As Parts 2-6 land, surfaces move pending -> migrated here in
@@ -153,13 +156,28 @@ const SURFACES = [
     promptFiles: ['shared/config/prompts/dynamics-explorer.js'],
   },
   {
+    // Executor-driven (summarize-v2). Hardening lives in execute-prompt.js
+    // (wrapper + preamble injection); the proposal_text variable is declared
+    // untrusted:true in scripts/seed-phase-i-summary-prompt.js, deployed to
+    // the live wmkf_ai_prompts row separately (a Dataverse deploy step).
     id: 'phase-i-dynamics-v2',
     inv: 18,
-    status: 'pending',
+    status: 'migrated',
     promptFiles: ['shared/config/prompts/phase-i-dynamics.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
   },
-  { id: 'phase-i-dynamics-legacy', inv: 19, status: 'pending' },
-  { id: 'execute-prompt-executor', inv: 20, status: 'pending' },
+  {
+    id: 'phase-i-dynamics-legacy',
+    inv: 19,
+    status: 'migrated',
+    callSiteFiles: ['pages/api/phase-i-dynamics/summarize.js'],
+  },
+  {
+    id: 'execute-prompt-executor',
+    inv: 20,
+    status: 'migrated',
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+  },
   { id: 'contact-enrichment', inv: 21, status: 'pending' },
   {
     id: 'reviewer-finder-emails',
@@ -189,27 +207,31 @@ function checkSurface(surface, readFile) {
   const errors = [];
   if (surface.status !== 'migrated') return { id: surface.id, errors };
 
-  for (const f of surface.promptFiles || []) {
+  const files = [...(surface.promptFiles || []), ...(surface.callSiteFiles || [])];
+  let sawWrap = false;
+  let sawPreamble = false;
+
+  for (const f of files) {
     const content = readFile(f);
     if (content == null) {
-      errors.push(`${surface.id}: prompt file missing: ${f}`);
-    } else if (!content.includes(PREAMBLE_MARKER)) {
-      errors.push(
-        `${surface.id}: prompt file ${f} does not reference ${PREAMBLE_MARKER} ` +
-          '(migrated surface lost its hardening preamble).',
-      );
+      errors.push(`${surface.id}: registered file missing: ${f}`);
+      continue;
     }
+    if (content.includes(WRAP_MARKER)) sawWrap = true;
+    if (content.includes(PREAMBLE_MARKER)) sawPreamble = true;
   }
-  for (const f of surface.callSiteFiles || []) {
-    const content = readFile(f);
-    if (content == null) {
-      errors.push(`${surface.id}: call-site file missing: ${f}`);
-    } else if (!content.includes(WRAP_MARKER)) {
-      errors.push(
-        `${surface.id}: call-site file ${f} does not reference ${WRAP_MARKER} ` +
-          '(migrated surface lost its untrusted-content wrapping).',
-      );
-    }
+
+  if (!sawWrap) {
+    errors.push(
+      `${surface.id}: no registered file references ${WRAP_MARKER} ` +
+        '(migrated surface lost its untrusted-content wrapping).',
+    );
+  }
+  if (!sawPreamble) {
+    errors.push(
+      `${surface.id}: no registered file references ${PREAMBLE_MARKER} ` +
+        '(migrated surface lost its hardening preamble).',
+    );
   }
   return { id: surface.id, errors };
 }

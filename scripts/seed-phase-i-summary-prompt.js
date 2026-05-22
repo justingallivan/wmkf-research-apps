@@ -125,13 +125,19 @@ const promptVariables = {
       cacheable: true,
       placement: 'user',
       // Data classification + payload boundary (added 2026-05-04). The
-      // Executor applies buildBoundedTextPayload uniformly when both fields
+      // Executor applies a payload boundary uniformly when both fields
       // are declared. Source string in audit logs / prompts:
       //   executor.phase-i.summary.proposal_text
       // Cap matches BATCH_PHASE_I_PROPOSAL_MAX_CHARS so callers no longer
       // need to apply their own substring before passing the value.
       dataClass: 'proposal_text',
       maxChars: 100000,
+      // A7 Part 2: the proposal is grantee-authored — untrusted. The Executor
+      // wraps it in nonce-bearing sentinels (wrapUntrustedContent) and injects
+      // the hardening preamble into the system prompt so embedded instructions
+      // in the proposal cannot hijack the summarization. Re-run this seed with
+      // --execute to push the declaration to the live wmkf_ai_prompts row.
+      untrusted: true,
     },
     {
       name: 'summary_length',

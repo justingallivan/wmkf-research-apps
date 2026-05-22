@@ -94,7 +94,8 @@ function fakeReader(map) {
   );
 }
 
-// 4. migrated surface, a registered file does not exist → error.
+// 4. migrated surface, a registered file does not exist → error. The present
+// file carries both markers so the missing-file error is the only one.
 {
   const surface = {
     id: 'fx-missing-file',
@@ -102,11 +103,32 @@ function fakeReader(map) {
     promptFiles: ['gone.js'],
     callSiteFiles: ['c.js'],
   };
-  const reader = fakeReader({ 'c.js': 'uses wrapUntrustedContent' });
+  const reader = fakeReader({
+    'c.js': 'uses wrapUntrustedContent and buildUntrustedContentPreamble',
+  });
   const errs = checkSurface(surface, reader).errors;
   assert(
     'migrated surface with a missing file is flagged',
     errs.length === 1 && /missing/.test(errs[0]),
+  );
+}
+
+// 4b. union logic — preamble in the prompt file, wrapper in the call-site
+// file: the surface passes even though no single file has both markers.
+{
+  const surface = {
+    id: 'fx-union',
+    status: 'migrated',
+    promptFiles: ['p.js'],
+    callSiteFiles: ['c.js'],
+  };
+  const reader = fakeReader({
+    'p.js': 'only buildUntrustedContentPreamble here',
+    'c.js': 'only wrapUntrustedContent here',
+  });
+  assert(
+    'markers split across prompt + call-site files pass (union)',
+    checkSurface(surface, reader).errors.length === 0,
   );
 }
 
@@ -169,4 +191,4 @@ if (failures > 0) {
   console.error(`\nprompt-injection-tagging self-test FAILED — ${failures} case(s).`);
   process.exit(1);
 }
-console.log('\nprompt-injection-tagging self-test OK — 8/8 cases.');
+console.log('\nprompt-injection-tagging self-test OK — 9/9 cases.');
