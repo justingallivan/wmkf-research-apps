@@ -1,6 +1,7 @@
 # A7: LLM01 prompt-injection hardening — inventory & remediation plan
 
-**Status:** Parts 0–4 SHIPPED 2026-05-21 (Session 174); Parts 5–6 pending.
+**Status:** Parts 0–5 SHIPPED (Parts 0–4 Session 174 2026-05-21; Part 5
+Session 176 2026-05-22); Part 6 pending.
 Created 2026-05-21 (Session 173). Revised 2026-05-21 (Session 174) after a
 Codex review against the live codebase — see "Revision log" at the foot.
 **Owed deploy step:** re-run `scripts/seed-phase-i-summary-prompt.js --execute`
@@ -187,8 +188,15 @@ outputs can't be schema-validated; their control is the boundary + preamble.
    `wrapUntrustedContent` (also the first length bound on that path —
    `PEER_REVIEW_TEXT_MAX_CHARS`); both prompt calls (main analysis + fallback
    questions) carry the preamble.
-5. **Remaining U-FILE routes** — #1–#6, #8 + #11 (incl. multimodal preamble),
-   #13, #15, #16, #22.
+5. **Remaining U-FILE routes** — ✅ SHIPPED (S176). #1–#6, #8, #11, #13, #15,
+   #16, #22 all wrap untrusted text with `wrapUntrustedContent` (or, for the
+   #8 document block and the #11 image path, carry the multimodal preamble)
+   and open their prompts with `buildUntrustedContentPreamble`. New per-app
+   output schemas added for the #1–#4 / #13 / #11 JSON sinks. The
+   `check:prompt-injection-tagging` gate gained a `multimodal: true` surface
+   flag (preamble-only, no wrapper) with self-test fixtures. Deferred: per-stage
+   output-schema validation for the multi-stage #15 and #8 pipelines (their
+   JSON outputs feed a display, not a Dynamics/DB write — see commit notes).
 6. **Remaining U-EXT routes** — #9 (incl. multimodal preamble), #10, #14, #21,
    #24.
 
