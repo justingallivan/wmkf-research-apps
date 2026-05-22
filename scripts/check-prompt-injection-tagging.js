@@ -96,8 +96,22 @@ const SURFACES = [
     promptFiles: ['shared/config/prompts/proposal-summarizer-legacy.js'],
     callSiteFiles: ['pages/api/process-legacy.js'],
   },
-  { id: 'qa', inv: 5, status: 'pending' },
-  { id: 'refine', inv: 6, status: 'pending' },
+  {
+    id: 'qa',
+    inv: 5,
+    status: 'migrated',
+    // createQASystemPrompt lives in proposal-summarizer.js (also #3's file);
+    // the route supplies the wrapper, the prompt file supplies the preamble.
+    promptFiles: ['shared/config/prompts/proposal-summarizer.js'],
+    callSiteFiles: ['pages/api/qa.js'],
+  },
+  {
+    id: 'refine',
+    inv: 6,
+    status: 'migrated',
+    // Route-local REFINEMENT_PROMPT — wrapper + preamble both live in refine.js.
+    callSiteFiles: ['pages/api/refine.js'],
+  },
   {
     id: 'process-peer-reviews',
     inv: 7,

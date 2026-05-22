@@ -102,5 +102,35 @@ describe('/api/qa payload boundary', () => {
     expect(events.some(e => e.event === 'text_delta' && e.data.text === 'answer')).toBe(true);
     expect(events.some(e => e.event === 'complete')).toBe(true);
   });
+
+  // A7 Part 5: the system prompt wraps proposal text + summary in
+  // nonce-bearing untrusted-content sentinels and carries the preamble.
+  test('wraps proposal + summary in untrusted-content sentinels with the hardening preamble', async () => {
+    mockAuthenticatedUser(7, ['phase-ii-writeup']);
+    const handler = (await import('../../pages/api/qa')).default;
+
+    const req = createMockReq({
+      method: 'POST',
+      headers: { origin: 'http://localhost:3000', host: 'localhost:3000' },
+      body: {
+        question: 'What are the risks?',
+        proposalText: 'proposal body text',
+        summaryText: 'generated summary text',
+        filename: 'qa.pdf',
+        messages: [],
+      },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+
+    const systemText = capturedStreamArgs?.system?.[0]?.text || '';
+    expect(systemText).toContain('UNTRUSTED CONTENT RULES:');
+    // Two distinct wrapped blocks: proposal + summary, each with its own nonce.
+    const nonces = [...systemText.matchAll(/\[\[WMKF-UNTRUSTED-CONTENT nonce=([0-9a-f]{24})/g)].map(m => m[1]);
+    expect(new Set(nonces).size).toBe(2);
+    for (const n of nonces) {
+      expect(systemText).toContain(`[[/WMKF-UNTRUSTED-CONTENT nonce=${n}]]`);
+    }
+  });
 });
 

@@ -15,7 +15,8 @@ import { createQASystemPrompt } from '../../shared/config/prompts/proposal-summa
 import {
   DATA_CLASSES,
   QA_PROPOSAL_CONTEXT_MAX_CHARS,
-  buildBoundedTextPayload,
+  QA_SUMMARY_MAX_CHARS,
+  wrapUntrustedContent,
 } from '../../lib/utils/ai-payload-boundary';
 
 export const config = {
@@ -66,11 +67,19 @@ export default async function handler(req, res) {
 
     const userProfileId = access.profileId;
 
-    const proposalPayload = buildBoundedTextPayload({
+    const proposalPayload = wrapUntrustedContent({
       text: proposalText || '',
       source: 'qa.system.proposalText',
       dataClass: DATA_CLASSES.PROPOSAL_TEXT,
       maxChars: QA_PROPOSAL_CONTEXT_MAX_CHARS,
+      label: 'research proposal',
+    });
+    const summaryPayload = wrapUntrustedContent({
+      text: summaryText || '',
+      source: 'qa.system.summaryText',
+      dataClass: DATA_CLASSES.PROPOSAL_TEXT,
+      maxChars: QA_SUMMARY_MAX_CHARS,
+      label: 'generated summary',
     });
     sendEvent('payload_boundary', {
       message: proposalPayload.metadata.truncated
@@ -82,8 +91,9 @@ export default async function handler(req, res) {
     // Build system prompt with proposal context
     const systemPrompt = createQASystemPrompt(
       proposalPayload.text,
-      summaryText || '',
-      filename || 'Unknown'
+      summaryPayload.text,
+      filename || 'Unknown',
+      [proposalPayload.nonce, summaryPayload.nonce],
     );
 
     // Build conversation messages — trim to last 6 messages (3 exchanges)
