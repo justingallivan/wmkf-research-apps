@@ -30,6 +30,11 @@ import { withDynamicsContext } from '../../../lib/services/dynamics-context';
 import { GraphService } from '../../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../../lib/utils/sharepoint-buckets';
 import { buildSystemPrompt, TOOL_DEFINITIONS, TABLE_ANNOTATIONS } from '../../../shared/config/prompts/dynamics-explorer';
+import {
+  DATA_CLASSES,
+  wrapUntrustedContent,
+  buildUntrustedContentPreamble,
+} from '../../../lib/utils/ai-payload-boundary';
 import { getModelForApp, getFallbackModelForApp } from '../../../shared/config/baseConfig';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
@@ -52,6 +57,10 @@ const limiter = nextRateLimiter({ max: 10 });
 
 const MAX_TOOL_ROUNDS = 15;
 const MAX_RESULT_CHARS = 16000;
+// A7 Part 3: cap for the untrusted-content wrapper applied to CRM records in
+// the AI export pass. Generous — a 15-record batch of serialized rows — but
+// finite so a runaway payload cannot ride through unbounded.
+const DYNEXP_EXPORT_MAX_CHARS = 500_000;
 
 // Per-tool char limits — composite tools return compact text and need more room
 const TOOL_CHAR_LIMITS = {
@@ -110,7 +119,13 @@ export default async function handler(req, res) {
     ]);
     const requestId = crypto.randomUUID();
     return await withDynamicsContext({ restrictions, requestId }, async () => {
-    const systemPrompt = buildSystemPrompt({ userRole, restrictions });
+    // A7 Part 3: CRM records returned as tool_result are untrusted — applicant-
+    // and staff-authored free-text fields can carry injection payloads that get
+    // re-fed into the agent loop. Each tool_result content string is wrapped in
+    // nonce sentinels (see executeOne); the preamble tells the model that
+    // sentinel-delimited tool output is data, not instructions. A fresh nonce
+    // per round means the preamble carries the general rule, not a nonce list.
+    const systemPrompt = `${buildUntrustedContentPreamble()}\n\n${buildSystemPrompt({ userRole, restrictions })}`;
 
     // Only send the last few user/assistant exchanges to stay within token limits
     const claudeMessages = trimConversation(messages);
@@ -202,7 +217,17 @@ export default async function handler(req, res) {
         const charLimit = TOOL_CHAR_LIMITS[name] || MAX_RESULT_CHARS;
         const resultStr = truncateResult(resultForModel, charLimit);
 
-        return { type: 'tool_result', tool_use_id: id, content: resultStr };
+        // A7 Part 3: wrap the CRM tool output in nonce sentinels so injection
+        // text in a record field cannot pose as an instruction to the agent.
+        const wrapped = wrapUntrustedContent({
+          text: resultStr,
+          source: `dynamics-explorer.tool_result.${name}`,
+          dataClass: DATA_CLASSES.CRM_RECORD_TEXT,
+          maxChars: charLimit,
+          label: `${name} result`,
+        });
+
+        return { type: 'tool_result', tool_use_id: id, content: wrapped.text };
       };
 
       const settled = await Promise.allSettled(toolBlocks.map(executeOne));
@@ -1784,7 +1809,19 @@ async function callClaudeBatch({ systemPrompt, userMessage, userProfileId }) {
  * Returns { sampleOutput: { col1: val1, ... }, usage }.
  */
 async function runSampleProcessing(record, processInstruction, userProfileId) {
-  const systemPrompt = `You are a data processing assistant. The user will give you a record from a CRM database and an instruction for what to extract or analyze.
+  // A7 Part 3: the CRM record is untrusted data — wrap it so injection text
+  // in a record field cannot override the extraction instruction.
+  const recordWrapped = wrapUntrustedContent({
+    text: JSON.stringify(record, null, 2),
+    source: 'dynamics-explorer.export.sample-record',
+    dataClass: DATA_CLASSES.CRM_RECORD_TEXT,
+    maxChars: DYNEXP_EXPORT_MAX_CHARS,
+    label: 'CRM record',
+  });
+
+  const systemPrompt = `${buildUntrustedContentPreamble([recordWrapped.nonce])}
+
+You are a data processing assistant. The user will give you a record from a CRM database and an instruction for what to extract or analyze.
 
 Return ONLY a JSON object with your results. Choose descriptive snake_case column names based on the instruction (e.g., "keywords", "research_area", "summary"). Keep values concise — suitable for spreadsheet cells.
 
@@ -1792,8 +1829,8 @@ Example output: {"keywords": "fungi, enzyme catalysis, bioremediation", "researc
 
   const userMessage = `Instruction: ${processInstruction}
 
-Record:
-${JSON.stringify(record, null, 2)}`;
+Record (untrusted data):
+${recordWrapped.text}`;
 
   const { text, usage } = await callClaudeBatch({ systemPrompt, userMessage, userProfileId });
 
@@ -1827,7 +1864,11 @@ async function processRecordsBatch(records, processInstruction, sendEvent, userP
   );
   const columnNames = Object.keys(sampleOutput);
 
-  const systemPrompt = `You are a data processing assistant. Process each record according to the instruction and return a JSON array of objects.
+  // A7 Part 3: a fresh nonce is generated per batch (below), so the system
+  // prompt carries the general untrusted-content rule, not a nonce list.
+  const systemPrompt = `${buildUntrustedContentPreamble()}
+
+You are a data processing assistant. Process each record according to the instruction and return a JSON array of objects.
 
 Each object in the array must have exactly these columns: ${JSON.stringify(columnNames)}
 Return one object per input record, in the same order. Keep values concise — suitable for spreadsheet cells.
@@ -1861,10 +1902,17 @@ Return ONLY the JSON array, no other text.`;
           index: idx + 1,
           ...serializeDynamicsExplorerRecordForModel(r),
         }));
+        const recordsWrapped = wrapUntrustedContent({
+          text: JSON.stringify(batchRecords, null, 1),
+          source: 'dynamics-explorer.export.batch',
+          dataClass: DATA_CLASSES.CRM_RECORD_TEXT,
+          maxChars: DYNEXP_EXPORT_MAX_CHARS,
+          label: 'CRM records',
+        });
         const userMessage = `Instruction: ${processInstruction}
 
-Records (${batchRecords.length}):
-${JSON.stringify(batchRecords, null, 1)}`;
+Records (${batchRecords.length}) — untrusted data:
+${recordsWrapped.text}`;
 
         let result;
         try {

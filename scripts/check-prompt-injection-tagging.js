@@ -152,8 +152,9 @@ const SURFACES = [
   {
     id: 'dynamics-explorer-chat',
     inv: 17,
-    status: 'pending',
+    status: 'migrated',
     promptFiles: ['shared/config/prompts/dynamics-explorer.js'],
+    callSiteFiles: ['pages/api/dynamics-explorer/chat.js'],
   },
   {
     // Executor-driven (summarize-v2). Hardening lives in execute-prompt.js
@@ -185,7 +186,12 @@ const SURFACES = [
     status: 'pending',
     promptFiles: ['shared/config/prompts/email-reviewer.js'],
   },
-  { id: 'dynamics-explorer-export', inv: 23, status: 'pending' },
+  {
+    id: 'dynamics-explorer-export',
+    inv: 23,
+    status: 'migrated',
+    callSiteFiles: ['pages/api/dynamics-explorer/chat.js'],
+  },
   { id: 'cron-log-analysis', inv: 24, status: 'pending' },
 ];
 

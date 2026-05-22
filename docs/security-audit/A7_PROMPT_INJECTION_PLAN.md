@@ -1,6 +1,6 @@
 # A7: LLM01 prompt-injection hardening — inventory & remediation plan
 
-**Status:** Parts 0–2 SHIPPED 2026-05-21 (Session 174); Parts 3–6 pending.
+**Status:** Parts 0–3 SHIPPED 2026-05-21 (Session 174); Parts 4–6 pending.
 Created 2026-05-21 (Session 173). Revised 2026-05-21 (Session 174) after a
 Codex review against the live codebase — see "Revision log" at the foot.
 **Owed deploy step:** re-run `scripts/seed-phase-i-summary-prompt.js --execute`
@@ -176,9 +176,12 @@ outputs can't be schema-validated; their control is the boundary + preamble.
    `proposal_text` untrusted (Dataverse row re-seed owed — see Status above).
    Legacy `summarize.js` wraps + prepends the preamble directly. summarize-v2
    needed no route change — the Executor declaration drives it.
-3. **Agentic surface: `dynamics-explorer/chat` (#17, #23)** — moved earlier
-   than the original plan: `tool_result` text is re-fed into an agent loop, a
-   higher-leverage injection target than batch document routes.
+3. **Agentic surface: `dynamics-explorer/chat` (#17, #23)** — ✅ SHIPPED
+   (S174). Each CRM `tool_result` content string is wrapped with
+   `wrapUntrustedContent`; the agent system prompt carries the preamble
+   (general rule — fresh nonce per round). The AI export pass (#23) wraps the
+   record JSON in both the sample and batch calls and hardens both
+   route-local system prompts.
 4. **External-influenced content: `process-peer-reviews` (#7)** — carries
    reviewer-submitted text and is not even length-bounded; fix **both** prompt
    calls (main + fallback questions).
