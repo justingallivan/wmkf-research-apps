@@ -171,11 +171,12 @@ const SURFACES = [
   {
     id: 'reviewer-finder-analyze',
     inv: 16,
-    status: 'pending',
+    status: 'migrated',
     promptFiles: [
       'shared/config/prompts/reviewer-finder.js',
       'shared/config/prompts/reviewer-finder-dynamics.js',
     ],
+    callSiteFiles: ['lib/services/claude-reviewer-service.js'],
   },
   {
     id: 'dynamics-explorer-chat',
