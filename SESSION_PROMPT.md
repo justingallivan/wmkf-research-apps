@@ -1,87 +1,143 @@
-# Session 172 Prompt: security-audit remediation in progress; slice-0 still parked
+# Session 173 Prompt: security-audit remediation continues (A4–A8); slice-0 still parked
 
-## Session 171 Summary
+## Session 172 Summary
 
-Security-audit remediation session. Justin supplied `docs/security-audit/SECURITY_AUDIT_2026-05-21.md` (OWASP Top 10 / ASVS 5.0 / LLM Top 10). I reviewed it, spot-verified its claims (all four sampled findings were accurate), produced a sequenced remediation plan, and shipped the first three items. Slice-0 deploy remains parked exactly where S170 left it.
+Continued the S171 security-audit remediation. Shipped the next three items (A1–A3)
+from the sequenced plan in `docs/security-audit/SECURITY_AUDIT_2026-05-21.md`, in
+order. Slice-0 deploy remains parked exactly where S170/S171 left it.
 
 ### What Was Completed
 
-1. **P2-a — disabled-account check now fails closed (commit `ba90d41`).**
-   - `requireAuthWithProfile()` in `lib/utils/auth.js` previously allowed the request through if the `user_profiles.is_active` revocation query threw ("If DB check fails, allow through"). A transient Postgres blip could therefore honor a disabled-account session, compounded by the 2-min cache TTL.
-   - Now responds `503` + returns `null` on DB error; `console.warn` → `console.error`.
-   - `requireAppAccess()` was already effective-fail-closed (its `Promise.all` lets DB errors propagate to a 500) — no change needed there.
-   - New test helper `mockIsActiveLookupFailure()` in `tests/helpers/auth-mock.js`; new test in `tests/unit/utils/auth.test.js` asserts the 503.
+1. **A1 — `middleware.js` → `proxy.js` (Next 16 proxy file convention).**
+   - `git mv` preserved history; inner `function middleware()` → `function proxy()`.
+   - The deprecated `middleware` convention still worked but warned on build.
+   - Proxy defaults to the **Node.js runtime** in Next 16 (the `runtime` config
+     option is disallowed for proxy files). All primitives used (jose,
+     `crypto.getRandomValues`, `btoa`, `Headers`, `NextResponse`) are Node-safe —
+     no functional regression expected.
+   - Doc references updated + now-stale "Edge Runtime" claims corrected across
+     `CLAUDE.md`, `AUTHENTICATION_SETUP.md`, `SECURITY_ARCHITECTURE.md`,
+     `API_ROUTE_SECURITY_MATRIX.md`, `EXTERNAL_REVIEWER_INTAKE_PLAN.md`,
+     `lib/utils/auth-policy.js`. No code imports the root module; no test/gate
+     references the filename — verified by grep.
 
-2. **P1 — `next` upgraded 16.1.6 → 16.2.6 (commit `ba90d41`).**
-   - `npm audit` confirmed all 7 high-severity advisories genuinely apply to the `16.1.6` pin: 4× middleware/proxy bypass, WebSocket-upgrade SSRF, 2× DoS. One (`GHSA-26hh-7cqf-hhc6`) is only patched at 16.2.6, not 16.2.5.
-   - Minor in-major bump, no migration. `npm audit --audit-level=high` now reports **0 high** (9 moderate remain — unrelated transitive deps).
-   - `npm run build` passes; CI Tests run `26258381758` is **green** (full integration suite, which the local Mac SWC issue blocks).
+2. **A2 — P2-c: `phase-i-dynamics/summarize.js` migrated to `llm-client.js`.**
+   - Replaced the direct `fetch(BASE_CONFIG.CLAUDE.API_URL)` (the last direct
+     Anthropic fetch in `pages/api/`) with `createLLMClient().complete()`.
+   - Gains: SSRF allowlist, abortable timeout, 429/529 retry + fallback,
+     API-key redaction, success+failure usage logging (via `appName`).
+   - Removed the now-redundant manual `logUsage` call + `usage-logger` import.
+   - Both failure-path `tryLogAiRun()` calls now pass explicit
+     `rawOutputRetention: 'full'` (was the implicit default — now intentional).
+   - Updated the integration test's stale header comment (test still mocks
+     `global.fetch`, which `safeFetch` delegates to).
 
-3. **P3 — Jest/local hygiene (commit `ba90d41`).**
-   - `jest.config.js`: added `*.nosync` paths to `testPathIgnorePatterns` **and** a new `modulePathIgnorePatterns` block (the haste-map collision was a *module*-path scan, not a test-path scan).
-   - `.gitignore`: added `*.nosync/`.
-   - Result: the `node_modules.nosync/` duplicate-package collision is gone. `test:ci` still fails locally on the **separate, pre-documented Mac SWC binding issue** (integration suites only — unit tests transform fine; 486 pass). CI remains authoritative for the full suite.
+3. **A3 — Omission 1: `EMERGENCY_AUTH_BYPASS` production monitoring.**
+   - New `lib/utils/auth-bypass-monitor.js` — shared check: raises a CRITICAL
+     `system_alerts` row (+ structured log + admin email) while the lever is
+     set in production; `AlertService.autoResolve` once cleared. Best-effort,
+     never throws. Node-runtime only — deliberately NOT imported by the
+     Edge-bundle-constrained `auth-policy.js`.
+   - New `instrumentation.js` — Next `register()` cold-start hook, nodejs-runtime
+     guarded, dynamic-imports the monitor.
+   - New `pages/api/cron/auth-bypass-check.js` — daily re-assert (07:30 UTC),
+     registered in `vercel.json`.
+   - Route count 84 → 86: `CANONICAL_COUNTS.md` regenerated; `[84]` pointers in
+     `CLAUDE.md` + `docs/atlas/postgres-reviewer-suggestions.md` bumped to `[86]`;
+     historical `fact-consistency:ignore` marker added to the S171 audit doc.
 
-4. **Audit doc committed (commit `cc5b676`).** `docs/security-audit/SECURITY_AUDIT_2026-05-21.md` added to the repo.
+### Commits (S172, `main`)
 
-### Commits (S171, `main`, all pushed)
+- `30aaa51` Security audit A1–A3: proxy.js rename, llm-client migration, auth-bypass monitor
+- (this `/stop`) — Document Session 172 + Session 173 prompt
 
-- `ba90d41` Security: fail-closed account check, next 16.2.6 upgrade, Jest hygiene
-- `cc5b676` Docs: add 2026-05-21 security audit report
-- (this `/stop`) — Document Session 171 + Session 172 prompt
+### Verification status
+
+- 🟢 **All 13 doc/structure CI gates green** (atlas, atlas:self-test, doc-currency
+  ×2, api-routes, fact-consistency ×2, canonical-pointers ×2, drain-table ×2,
+  prompt-storage ×2).
+- 🟢 All new/changed JS files syntax-check clean; AGENTS.md symlink intact.
+- 🔴 **`npm run build` and `jest` could NOT run locally** — both hang in the Mac
+  SWC native-binding issue (build sat 42 min at 0% CPU; jest hangs in the
+  `@swc/jest` transform even on 2 unit files this session — worse than S171's
+  "unit tests run fine"). **CI is authoritative.** Confirm on CI: (a) the
+  `middleware` deprecation warning is gone and `proxy.js` is picked up,
+  (b) `phase-i-dynamics-summarize-payload-boundary.test.js` still passes.
 
 ## Potential Next Steps
 
-### A. SECURITY-AUDIT REMEDIATION — 6 items + 3 omissions still open
-The full sequenced plan was produced in S171. Remaining items, in the recommended order:
+### A. SECURITY-AUDIT REMEDIATION — A4–A8 still open (continue in order)
+- **A4. Omission 3 — `EXTERNAL_LINK_SECRET` rotation.** Dual-secret verification
+  window in `lib/services/external-token.js` + runbook cadence + one drill. ~4h.
+- **A5. P2-b — generic public-Blob uploads.** `/api/upload-file` IS load-bearing
+  (callers: `FileUploaderSimple.js`, `SettingsModal.js`, `review-manager.js`) —
+  do NOT retire it. `/api/upload-handler` had no server-side callers found —
+  ⚠️ destructive-carryover: grep-verify live callers before retiring. Then add
+  `appKey` gating + private-blob mode to `upload-file`. Behind a flag.
+- **A6. P3-b — rate-limit `/api/external/review/[token]/*`.** Pilot-blocking
+  (pilot opens 2026-06-01). Per-token + per-IP buckets; `system_alerts` on
+  repeated invalid-token attempts.
+- **A7. Omission 2 — LLM01 prompt injection** on applicant-supplied docs.
+  Largest scope: inventory first, then boundary-tagging + system-prompt
+  hardening + output-schema validation. Its own initiative.
+- **A8. 9 moderate `npm audit` items** (`exceljs` is a semver-major fix) —
+  separate `npm audit fix` pass when convenient.
 
-- **A1. `next` 16.x deprecates `middleware.js` → `proxy.js`.** Build warns (`The "middleware" file convention is deprecated`); middleware still works. Renaming this project's *primary auth gate* deserves its own scoped task — read the Next migration note before touching it. Not a blocker.
-- **A2. P2-c — migrate `pages/api/phase-i-dynamics/summarize.js:125` off the direct `fetch(BASE_CONFIG.CLAUDE.API_URL)` to `llm-client.js`.** Verified this is the *only* remaining direct Anthropic fetch in `pages/api/`. Small (2–3h). Also ensure both success + failure `tryLogAiRun()` calls pass explicit `rawOutputRetention`.
-- **A3. Omission 1 — `EMERGENCY_AUTH_BYPASS` prod monitoring.** Alert (structured log + `system_alerts` row) at cold-start if set in production; daily cron re-assert. Cheap, ~3h.
-- **A4. Omission 3 — `EXTERNAL_LINK_SECRET` rotation.** Dual-secret verification window in `lib/services/external-token.js` + runbook cadence + one drill. ~4h.
-- **A5. P2-b — generic public-Blob uploads.** `/api/upload-file` IS load-bearing (callers: `FileUploaderSimple.js`, `SettingsModal.js`, `review-manager.js`) — do NOT retire it. `/api/upload-handler` had no server-side callers found — probe and retire if vestigial. Then add `appKey` gating + private-blob mode to `upload-file`. Behind a flag; touches many apps.
-- **A6. P3-b — rate-limit `/api/external/review/[token]/*`.** Pilot-blocking (pilot opens 2026-06-01). Lightweight per-token + per-IP buckets; `system_alerts` on repeated invalid-token attempts.
-- **A7. Omission 2 — LLM01 prompt injection** on applicant-supplied docs (Phase I/II writeup, intake extraction). Largest scope: inventory first, then boundary-tagging + system-prompt hardening + output-schema validation. Its own initiative.
-- **A8. 9 moderate `npm audit` items** (`exceljs` is a semver-major fix) — separate `npm audit fix` pass when convenient.
-
-### B. SLICE-0 SCHEMA DEPLOY — still parked, unchanged from S169/S170 (destructive carryover, pre-flight verify)
-Justin go-ahead + Connor review-of-`SLICE0_FIELD_REVIEW.md` still pending. Sequence per `docs/INTAKE_PORTAL_ITEM_6_STATUS.md` §5 steps 1–6. Pre-flight: `node scripts/probe-apprequestperson-role-data.js` + `node scripts/probe-slice0-attr-collision.mjs` must be CLEAR **at deploy time**, not just historically. Grep for live callers. No autonomous action; explicit in-session go-ahead required.
+### B. SLICE-0 SCHEMA DEPLOY — still parked (destructive carryover, pre-flight verify)
+Unchanged from S169–S172. Justin go-ahead + Connor review-of-`SLICE0_FIELD_REVIEW.md`
+still pending. Sequence per `docs/INTAKE_PORTAL_ITEM_6_STATUS.md` §5 steps 1–6.
+Pre-flight `node scripts/probe-apprequestperson-role-data.js` +
+`node scripts/probe-slice0-attr-collision.mjs` must be CLEAR **at deploy time**.
+No autonomous action; explicit in-session go-ahead required.
 
 ### C. CONNOR P4 — after schema deploys. Unchanged.
-
 ### D. CONNOR FIELD-REVIEW RESPONSE on `SLICE0_FIELD_REVIEW.md` — passive watch. Unchanged.
-
-### E. ENV-0 — Other-Mac memory propagation still unverified. Unchanged from S168–S170.
-
-### F. Cross-cycle Reviewer Finder dedup — observed-only, no fix yet. Unchanged from S170 §F.
+### E. ENV-0 — Other-Mac memory propagation still unverified. Unchanged.
+### F. Cross-cycle Reviewer Finder dedup — observed-only, no fix yet. Unchanged.
 
 ## Calendar Checkpoints (soft — report factually, not "overdue")
-- **2026-05-19** slice-0 deploy target — missed. **2026-05-26** dry-run / Connor field-review window. **2026-05-30** go/no-go. **2026-06-01** pilot opens (A6 rate-limiting should land before this). **≥2026-07-01** post-pilot drain-table drop.
+- **2026-05-19** slice-0 deploy target — missed. **2026-05-26** dry-run / Connor
+  field-review window. **2026-05-30** go/no-go. **2026-06-01** pilot opens (A6
+  rate-limiting should land before this). **≥2026-07-01** post-pilot drain-table drop.
 
 ## Gotchas (current)
 
-- 🟢 **CI green on `main`.** Tests run `26258381758` (commit `cc5b676`) passed — `next@16.2.6` confirmed safe on the full integration suite.
-- 🟢 **`requireAuthWithProfile()` now fails closed.** A Postgres blip will 503 every route using it until the DB recovers — correct trade vs. honoring a disabled-account session. The 503 message tells the client to retry.
-- 🟡 **`next@16.2.6` deprecates `middleware.js`.** Build emits a deprecation warning; still functional. Plan item A1 — don't rename casually.
-- 🔴 **`test:ci` still fails locally** on the Mac SWC binding issue (`Failed to load bindings`) — pre-existing, integration suites only, NOT introduced this session. Unit tests run fine (`npx jest tests/unit` → 486 pass). CI is authoritative.
-- 🔴 **All S170 slice-0 gotchas still hold**: AGENTS.md symlink, slice-0 destructive-carryover classification, drain-table + prompt-storage gates, memory two-stores. Connor field-review + Justin go-ahead still gate `--execute`.
+- 🔴 **Local `npm run build` and `jest` hang** on the Mac SWC binding issue —
+  worse this session than S171 documented (jest hangs even on unit tests).
+  `jest --listTests` works (fast); running tests hangs in the transform. Do NOT
+  burn time re-running locally — CI is authoritative. Confirm CI green before
+  treating A1/A2 as fully verified.
+- 🟡 **`30aaa51` build unverified.** If CI shows the build still warns or fails,
+  `proxy.js` may need attention — but the rename is mechanical and the proxy
+  doc was followed exactly.
+- 🟢 **`proxy.js` runs on the Node.js runtime now** (Next 16 proxy default), not
+  Edge. No functional change expected — all primitives are Node-safe.
+- 🟡 **`.next/` is untracked and not gitignored.** Build artifact; S171 added
+  `*.nosync/` to `.gitignore` but not `.next`. Harmless (untracked doesn't
+  propagate) but worth a one-line `.gitignore` fix.
+- 🟡 **`docs/INTAKE_PORTAL_ITEM_6_CONNOR_EMAIL.md`** — untracked since before
+  S172, not this session's work. Left alone (carryover hygiene). Decide whether
+  to commit or discard.
+- 🔴 **All slice-0 gotchas still hold**: AGENTS.md symlink, slice-0
+  destructive-carryover classification, drain-table + prompt-storage gates,
+  memory two-stores. Connor field-review + Justin go-ahead still gate `--execute`.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/utils/auth.js` | `requireAuthWithProfile()` is_active check now fails closed (503) on DB error |
-| `tests/helpers/auth-mock.js` | New `mockIsActiveLookupFailure()` helper |
-| `tests/unit/utils/auth.test.js` | New test: 503 on is_active DB error |
-| `jest.config.js` | `*.nosync` excluded from `testPathIgnorePatterns` + new `modulePathIgnorePatterns` |
-| `.gitignore` | `*.nosync/` added |
-| `package.json` | `next` → `16.2.6` |
-| `docs/security-audit/SECURITY_AUDIT_2026-05-21.md` | The audit report driving the A-series next steps |
+| `proxy.js` | Server-side auth gate — renamed from `middleware.js` (Next 16 proxy convention) |
+| `instrumentation.js` | Next `register()` cold-start hook — runs the EMERGENCY_AUTH_BYPASS monitor |
+| `lib/utils/auth-bypass-monitor.js` | Shared raise/auto-resolve logic for the bypass alert (cold-start + cron) |
+| `pages/api/cron/auth-bypass-check.js` | Daily cron — re-asserts the bypass lever, auto-resolves when cleared |
+| `pages/api/phase-i-dynamics/summarize.js` | Claude call now routed through `llm-client.js` (A2) |
+| `lib/utils/auth-policy.js` | Header comment updated for the proxy rename |
+| `docs/security-audit/SECURITY_AUDIT_2026-05-21.md` | The audit driving the A-series; A4–A8 remain |
 
 ## Testing
 
 ```bash
-# 13 sequential gates (run in order, never parallel):
+# 13 sequential gates (run in order, never parallel — all green as of S172):
 npm run check:atlas && npm run check:atlas:self-test && \
 npm run check:doc-currency && npm run check:doc-currency:self-test && \
 npm run check:api-routes && \
@@ -94,13 +150,7 @@ npm run check:prompt-storage-mentions:self-test && npm run check:prompt-storage-
 test -L AGENTS.md && readlink AGENTS.md     # must be: CLAUDE.md
 git rev-parse HEAD && git status --porcelain # iCloud .git-corruption tripwire
 
-# Unit tests (transform fine locally; integration blocked by Mac SWC issue):
-npx jest tests/unit                          # 486 pass
-npm run test:ci                              # full suite — CI is authoritative
-
-# Security re-checks:
-npm audit --audit-level=high                 # should report 0 high
-
-# At slice-0 deploy time (BOTH must be CLEAR):
-node scripts/probe-apprequestperson-role-data.js && node scripts/probe-slice0-attr-collision.mjs
+# Build / tests — DO NOT rely on local runs (Mac SWC hang). CI is authoritative.
+npm run test:ci                              # CI authoritative
+npm audit --audit-level=high                 # should report 0 high (A8 = 9 moderate)
 ```

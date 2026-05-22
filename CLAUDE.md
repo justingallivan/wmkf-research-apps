@@ -56,6 +56,7 @@ A multi-application document processing system using Claude AI for grant-related
 ```
 /
 ├── proxy.js                    # Server-side auth gate (Next 16 proxy convention, withAuth/jose)
+├── instrumentation.js          # Next register() cold-start hook — EMERGENCY_AUTH_BYPASS monitor
 ├── pages/                     # Next.js pages and API routes
 │   ├── api/                   # API endpoints
 │   └── *.js                   # Frontend pages
