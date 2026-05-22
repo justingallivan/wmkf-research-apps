@@ -31,6 +31,25 @@ import { logUsage } from '../../lib/utils/usage-logger';
 import { LLMClient } from '../../lib/services/llm-client';
 import { nextRateLimiter } from '../../shared/api/middleware/rateLimiter';
 import { safeFetch } from '../../lib/utils/safe-fetch';
+import { validateAiJson } from '../../lib/utils/ai-output-schema';
+import {
+  INITIAL_ANALYSIS_SCHEMA,
+  PROPOSAL_SUMMARY_SCHEMA,
+  PERSPECTIVE_SCHEMAS,
+  INTEGRATOR_SCHEMA,
+} from '../../shared/config/multi-perspective-output-schema';
+
+// A7 follow-up: validate a parsed stage output against its schema. On success
+// returns the cleaned value (undeclared keys dropped — the anti-injection
+// property). On a type-level validation failure it logs and returns the raw
+// parse: the sentinel-wrapping at each re-feed site is the primary injection
+// defense, so this schema pass is best-effort defense-in-depth.
+function validateStage(parsed, schema, label) {
+  const r = validateAiJson(parsed, schema);
+  if (r.ok) return r.value;
+  console.warn(`[MultiPerspective] ${label} failed schema validation: ${r.errors.join('; ')}`);
+  return parsed;
+}
 
 // Import search services
 const { PubMedService } = require('../../lib/services/pubmed-service');
@@ -419,7 +438,9 @@ async function callPerspective(name, createPromptFn, initialAnalysis, literature
     if (jsonMatch) {
       jsonStr = jsonMatch[1].trim();
     }
-    return JSON.parse(jsonStr);
+    const schema = PERSPECTIVE_SCHEMAS[name];
+    const parsed = JSON.parse(jsonStr);
+    return schema ? validateStage(parsed, schema, `${name} perspective`) : parsed;
   } catch (parseError) {
     console.error(`Failed to parse ${name} perspective JSON:`, parseError);
     return {
@@ -461,7 +482,7 @@ async function performIntegration(initialAnalysis, optimistResult, skepticResult
     if (jsonMatch) {
       jsonStr = jsonMatch[1].trim();
     }
-    return JSON.parse(jsonStr);
+    return validateStage(JSON.parse(jsonStr), INTEGRATOR_SCHEMA, 'integrator');
   } catch (parseError) {
     console.error('Failed to parse integrator JSON:', parseError);
     return {
@@ -499,7 +520,7 @@ async function generateProposalSummary(initialAnalysis, literatureResults, apiKe
     if (jsonMatch) {
       jsonStr = jsonMatch[1].trim();
     }
-    return JSON.parse(jsonStr);
+    return validateStage(JSON.parse(jsonStr), PROPOSAL_SUMMARY_SCHEMA, 'proposal summary');
   } catch (error) {
     console.error('Failed to generate proposal summary:', error);
     return {
@@ -661,7 +682,7 @@ async function performInitialAnalysis(base64Pdf, apiKey, userProfileId) {
     if (jsonMatch) {
       jsonStr = jsonMatch[1].trim();
     }
-    return JSON.parse(jsonStr);
+    return validateStage(JSON.parse(jsonStr), INITIAL_ANALYSIS_SCHEMA, 'initial analysis');
   } catch (parseError) {
     console.error('Failed to parse initial analysis JSON:', parseError);
     return {
