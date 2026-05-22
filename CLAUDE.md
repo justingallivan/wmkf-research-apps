@@ -55,7 +55,7 @@ A multi-application document processing system using Claude AI for grant-related
 
 ```
 /
-├── middleware.js               # Server-side auth gate (Edge Runtime, withAuth/jose)
+├── proxy.js                    # Server-side auth gate (Next 16 proxy convention, withAuth/jose)
 ├── pages/                     # Next.js pages and API routes
 │   ├── api/                   # API endpoints
 │   └── *.js                   # Frontend pages
@@ -152,7 +152,7 @@ For multi-Mac development, see `docs/MULTI_MAC_SETUP.md`.
 
 Three-layer defense-in-depth:
 
-1. **Server-side middleware** (`middleware.js`) — Edge Runtime `withAuth`/`jose` validates JWT before any HTML/JS is served. Unauthenticated users never see the app. Respects `AUTH_REQUIRED` kill switch. Excludes `/api/auth/*`, `/api/cron/*` (`CRON_SECRET`), and `/api/irs/*` (`IRS_VERIFY_SECRET` shared-secret header for PowerAutomate).
+1. **Server-side proxy** (`proxy.js`) — `withAuth`/`jose` validates JWT before any HTML/JS is served. (Formerly `middleware.js`; renamed to the Next 16 `proxy` file convention. Runs on the Node.js runtime.) Unauthenticated users never see the app. Respects `AUTH_REQUIRED` kill switch. Excludes `/api/auth/*`, `/api/cron/*` (`CRON_SECRET`), and `/api/irs/*` (`IRS_VERIFY_SECRET` shared-secret header for PowerAutomate).
 2. **API route auth** (`lib/utils/auth.js`) — App-specific endpoints use `requireAppAccess(req, res, ...appKeys)` which combines CSRF origin check + auth + `is_active` check + app access in one call. Returns `{ profileId, session }` on success; sends 401/403 on failure. Uses in-memory cache with 2-min TTL (includes `isActive` flag). Disabled accounts blocked before superuser bypass. Infrastructure endpoints (auth, admin, health) use `requireAuth()` or `requireAuthWithProfile()`.
 3. **Client-side guards** (`RequireAuth`, `RequireAppAccess`) — Defense in depth for navigation/UI.
 
@@ -229,7 +229,7 @@ Located in `lib/external/` (external-reviewer flow):
 
 Located in `lib/utils/`:
 - `cron-auth.js` - Vercel cron secret verification
-- `auth-policy.js` - Edge-compatible `isAuthRequired()` shared between `middleware.js` and `lib/utils/auth.js`. Reads only `process.env`, no Node-only imports. Production fails closed unless `EMERGENCY_AUTH_BYPASS=true`. Misconfig warnings memoized once per process.
+- `auth-policy.js` - Edge-compatible `isAuthRequired()` shared between `proxy.js` and `lib/utils/auth.js`. Reads only `process.env`, no Node-only imports. Production fails closed unless `EMERGENCY_AUTH_BYPASS=true`. Misconfig warnings memoized once per process.
 - `health-checker.js` - Reusable health check logic (7 services incl. Microsoft Graph)
 - `file-loader.js` - Shared FileRef loader (upload/SharePoint → PDF/DOCX text) used by Grant Reporting and Phase I Dynamics
 - `sharepoint-buckets.js` - `getRequestSharePointBuckets(requestId, requestNumber)` — walks active + archive libraries for a request
@@ -261,13 +261,13 @@ User-scoping convention: shared tables for organization-wide reference data; per
 
 ## API Endpoints
 
-The full route catalogue lives in **`docs/API_ROUTE_SECURITY_MATRIX.md`** ([84](docs/CANONICAL_COUNTS.md#api-route-file-count) route files, CI-gated via `npm run check:api-routes` — PRs touching `pages/api/**` fail without a matrix update). Source files in `pages/api/<app>/` are authoritative for behavior.
+The full route catalogue lives in **`docs/API_ROUTE_SECURITY_MATRIX.md`** ([86](docs/CANONICAL_COUNTS.md#api-route-file-count) route files, CI-gated via `npm run check:api-routes` — PRs touching `pages/api/**` fail without a matrix update). Source files in `pages/api/<app>/` are authoritative for behavior.
 
 Conventions:
 - App-specific routes use `requireAppAccess(req, res, 'app-key')`. App keys live in `shared/config/appRegistry.js`.
 - Infrastructure routes use `requireAuth()` / `requireAuthWithProfile()` / `requireSuperuser()`.
 - `/api/cron/*` authenticates via `CRON_SECRET`, not session JWT.
-- `/api/external/*` token-authenticated (HMAC JWT); public, allowlisted in `middleware.js`. See `docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md`.
+- `/api/external/*` token-authenticated (HMAC JWT); public, allowlisted in `proxy.js`. See `docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md`.
 - Streaming endpoints use SSE; convention is `text/event-stream` with `data: {...}` frames.
 
 ---
@@ -277,7 +277,7 @@ Conventions:
 Operational docs to know about (others in `docs/` are design backdrop, roadmaps, or point-in-time audits — find via grep when relevant):
 
 - **`docs/EXECUTOR_CONTRACT.md`** — shared spec PA `ExecutePrompt` and Vercel `executePrompt()` both implement. Read before any prompt work.
-- **`docs/API_ROUTE_SECURITY_MATRIX.md`** — [84](docs/CANONICAL_COUNTS.md#api-route-file-count)-route catalogue, CI-gated.
+- **`docs/API_ROUTE_SECURITY_MATRIX.md`** — [86](docs/CANONICAL_COUNTS.md#api-route-file-count)-route catalogue, CI-gated.
 - **`docs/SECURITY_OPERATING_PLAN.md`** — weekly/monthly/quarterly security cadence + watch-item escalation thresholds.
 - **`docs/CREDENTIALS_RUNBOOK.md`** — env vars, secret rotation, diagnostics.
 - **`docs/AUTHENTICATION_SETUP.md`** — Azure AD configuration.

@@ -25,7 +25,7 @@ Only two credentials expire automatically. Everything else is stable until manua
 | `NEXTAUTH_URL` | Production URL for OAuth callbacks | Your Vercel domain | Set to `https://wmkfresearch.vercel.app` — no rotation needed |
 | `NEXTAUTH_SECRET` | Signs JWT session tokens | Self-generated | `openssl rand -base64 32` — rotating logs out all users |
 | `AUTH_REQUIRED` | Enable/disable SSO (`true`/`false`) | Manual | Kill switch — see `EMERGENCY_AUTH_BYPASS` for production |
-| `EMERGENCY_AUTH_BYPASS` | Required to disable auth in production (`true`/`false`) | Manual | Production fails closed unless this is `true` even when `AUTH_REQUIRED=false` |
+| `EMERGENCY_AUTH_BYPASS` | Required to disable auth in production (`true`/`false`) | Manual | Production fails closed unless this is `true` even when `AUTH_REQUIRED=false`. **Monitored:** while set in production, a CRITICAL `system_alerts` row is raised at every server cold start (`instrumentation.js`) and re-asserted daily by `/api/cron/auth-bypass-check`; the alert auto-resolves once the variable is unset. Never leave it set after an incident. |
 | `AZURE_AD_CLIENT_ID` | SSO app registration ID | Azure Portal → App registrations → Overview | Never changes |
 | `AZURE_AD_CLIENT_SECRET` | SSO app secret | Azure Portal → App registrations → Certificates & secrets | See [Rotating Azure AD Secrets](#rotating-azure-ad-secrets) |
 | `AZURE_AD_TENANT_ID` | Organization tenant | Azure Portal → Azure AD → Properties | Never changes |

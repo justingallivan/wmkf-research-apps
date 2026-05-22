@@ -5,7 +5,7 @@ This guide explains how to configure Azure AD (Microsoft Entra ID) authenticatio
 ## Overview
 
 The app uses Microsoft Entra ID (Azure AD) for single sign-on (SSO). When enabled:
-- A **server-side middleware gate** (`middleware.js`, Edge Runtime + `next-auth/middleware`) validates the session JWT before any HTML/JS is served — unauthenticated users are redirected before the app code is reachable.
+- A **server-side proxy gate** (`proxy.js`, Next 16 `proxy` file convention + `next-auth/middleware`) validates the session JWT before any HTML/JS is served — unauthenticated users are redirected before the app code is reachable.
 - All API endpoints additionally enforce auth via `lib/utils/auth.js` (`requireAuth`, `requireAuthWithProfile`, `requireAppAccess`, `requireSuperuser`).
 - Client-side guards (`RequireAuth`, `RequireAppAccess`) provide UX-level defense-in-depth.
 
@@ -269,19 +269,19 @@ View sign-in logs in Azure Portal:
 
 | Resource | Protection Method |
 |----------|-------------------|
-| All non-API routes | `middleware.js` (Edge Runtime `withAuth`) — fails closed before page code runs |
+| All non-API routes | `proxy.js` (`withAuth`) — fails closed before page code runs |
 | App-specific API routes | `requireAppAccess(req, res, 'app-key')` — combines CSRF origin check + auth + `is_active` check + per-app grant |
 | Infrastructure API routes (auth/admin/health) | `requireAuth()` / `requireAuthWithProfile()` / `requireSuperuser()` |
-| Cron routes (`/api/cron/*`) | `CRON_SECRET` (not session JWT) — excluded from middleware |
-| External-reviewer routes (`/api/external/*`) | HMAC JWT (`EXTERNAL_LINK_SECRET`) — public, allowlisted in middleware |
-| Auth routes (`/api/auth/*`) | Public (required for OAuth flow) — excluded from middleware |
+| Cron routes (`/api/cron/*`) | `CRON_SECRET` (not session JWT) — excluded from proxy |
+| External-reviewer routes (`/api/external/*`) | HMAC JWT (`EXTERNAL_LINK_SECRET`) — public, allowlisted in proxy |
+| Auth routes (`/api/auth/*`) | Public (required for OAuth flow) — excluded from proxy |
 | Client UI | `RequireAuth` / `RequireAppAccess` (defense-in-depth, not the security boundary) |
 
 ### Key Files
 
 | File | Purpose |
 |------|---------|
-| `middleware.js` | Server-side auth gate (Edge Runtime, `withAuth`/`jose`) + CSP nonce generation |
+| `proxy.js` | Server-side auth gate (Next 16 `proxy` convention, `withAuth`/`jose`) + CSP nonce generation |
 | `lib/utils/auth-policy.js` | Edge-compatible `isAuthRequired()` — production fails closed unless `EMERGENCY_AUTH_BYPASS=true` |
 | `lib/utils/auth.js` | Server-side auth helpers (`requireAuth`, `requireAuthWithProfile`, `requireAppAccess`, `requireSuperuser`) — 2-min in-memory cache including `isActive` flag |
 | `pages/api/auth/[...nextauth].js` | NextAuth dual-provider configuration (`azure-ad` + `entra-external`) |

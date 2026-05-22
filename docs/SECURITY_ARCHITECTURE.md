@@ -633,13 +633,13 @@
 
 ### 5.3 Three-Layer Auth Enforcement
 
-Authentication is enforced at three levels — edge middleware, API route middleware, and client-side guards:
+Authentication is enforced at three levels — the server-side proxy, API route middleware, and client-side guards:
 
-**Layer 1: Edge Runtime Middleware (`middleware.js`)**
+**Layer 1: Server-side Proxy (`proxy.js`)**
 
 | Attribute | Detail |
 |-----------|--------|
-| **Runtime** | Vercel Edge Runtime (not Node.js) |
+| **Runtime** | Node.js runtime (Next 16 `proxy` convention default; the `runtime` config option is not available for proxy files) |
 | **Library** | `next-auth/middleware` `withAuth` (function form) + `jose` for JWT validation |
 | **Scope** | All routes except `_next/static`, `_next/image`, `favicon.ico`, `apple-touch-icon*`, `/api/auth/*`, `/api/cron/*` |
 | **Behavior** | Validates JWT cookie; checks `token.azureId` (rejects empty tokens from idle expiry); checks `lastActivity` for 2-hour idle timeout (defense-in-depth); redirects unauthenticated/idle users to `/auth/signin`. Generates per-request CSP nonce (see [Section 7.4](#74-security-headers)). |
@@ -899,7 +899,7 @@ Every Dynamics tool execution is logged to `dynamics_query_log`:
 | Control | Implementation |
 |---------|---------------|
 | **User authentication** | Azure AD SSO via NextAuth.js (OAuth 2.0 Authorization Code) |
-| **Edge middleware** | `withAuth`/`jose` JWT validation in Vercel Edge Runtime — unauthenticated users never see the app |
+| **Server-side proxy** | `withAuth`/`jose` JWT validation in `proxy.js` (Next 16 `proxy` convention) — unauthenticated users never see the app |
 | **API route protection** | `requireAppAccess()` on app-specific endpoints; `requireAuthWithProfile()` on infrastructure endpoints; `requireAuth()` on system endpoints |
 | **App-level access control** | Per-user app grants via Dataverse `wmkf_appuserappaccesses` *(formerly Postgres `user_app_access`, dropped 2026-05-12)*; new users get only `dynamics-explorer` by default |
 | **Superuser bypass** | Users with `role = 'superuser'` in `dynamics_user_roles` bypass all app access checks |
@@ -933,7 +933,7 @@ Every Dynamics tool execution is logged to `dynamics_query_log`:
 | `X-Powered-By` | Suppressed (`poweredByHeader: false`) |
 | `X-Robots-Tag` | `noindex, nofollow, noarchive` |
 
-**Dynamic Content Security Policy** set per-request by middleware (`middleware.js`):
+**Dynamic Content Security Policy** set per-request by the proxy (`proxy.js`):
 
 The middleware generates a unique cryptographic nonce for each request via `crypto.randomUUID()` → Base64. The nonce is passed to `pages/_document.js` via the `x-nonce` request header, which propagates it to `<Head>` and `<NextScript>` so Next.js applies it to all framework-injected `<script>` tags.
 
@@ -1232,7 +1232,7 @@ _(Historical as-of-finding paths. `evaluate-concepts.js` was later archived to `
 
 **Recommendation:** Migrate to nonce-based CSP when feasible. Note: Next.js requires `unsafe-eval` in development mode; consider a stricter policy for production only.
 
-**Status: REMEDIATED.** CSP is now generated dynamically per-request in `middleware.js` with a unique cryptographic nonce. Production `script-src` no longer includes `'unsafe-inline'` or `'unsafe-eval'` — only `'self'`, the per-request nonce, and `https://va.vercel-scripts.com` (Vercel Analytics). The nonce is propagated to framework scripts via `pages/_document.js`. `'unsafe-inline'` is retained only in `style-src` (no script execution vector). Development mode retains `'unsafe-inline'` and `'unsafe-eval'` for Turbopack HMR compatibility. Static CSP removed from `next.config.js`.
+**Status: REMEDIATED.** CSP is now generated dynamically per-request in `proxy.js` with a unique cryptographic nonce. Production `script-src` no longer includes `'unsafe-inline'` or `'unsafe-eval'` — only `'self'`, the per-request nonce, and `https://va.vercel-scripts.com` (Vercel Analytics). The nonce is propagated to framework scripts via `pages/_document.js`. `'unsafe-inline'` is retained only in `style-src` (no script execution vector). Development mode retains `'unsafe-inline'` and `'unsafe-eval'` for Turbopack HMR compatibility. Static CSP removed from `next.config.js`.
 
 #### L6: Rate Limiter Uses In-Memory Storage
 
@@ -1291,7 +1291,7 @@ Four Vercel Cron jobs run automated maintenance, monitoring, and analysis:
 | `/api/cron/secret-check` | Daily 8:00 AM UTC | Secret expiration alerts |
 | `/api/cron/log-analysis` | Every 6 hours | Vercel error log analysis |
 
-**Authentication:** Cron endpoints are excluded from the edge middleware JWT check (`middleware.js` matcher skips `/api/cron/*`) since Vercel cron requests carry `CRON_SECRET`, not a session cookie. Each handler verifies `Authorization: Bearer <CRON_SECRET>` via `lib/utils/cron-auth.js`. In development mode, auth is bypassed for local testing. Vercel automatically sends the `CRON_SECRET` header for configured cron jobs.
+**Authentication:** Cron endpoints are excluded from the proxy JWT check (`proxy.js` matcher skips `/api/cron/*`) since Vercel cron requests carry `CRON_SECRET`, not a session cookie. Each handler verifies `Authorization: Bearer <CRON_SECRET>` via `lib/utils/cron-auth.js`. In development mode, auth is bypassed for local testing. Vercel automatically sends the `CRON_SECRET` header for configured cron jobs.
 
 **Audit trail:** Maintenance jobs record results in `maintenance_runs` table. Health checks store results in `health_check_history`. All crons create alerts in `system_alerts` for dashboard visibility.
 

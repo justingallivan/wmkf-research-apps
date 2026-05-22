@@ -24,7 +24,7 @@ import {
   createPhaseISummarizationPrompt,
   PHASE_I_PROMPT_VERSION,
 } from '../../../shared/config/prompts/phase-i-summaries';
-import { logUsage } from '../../../lib/utils/usage-logger';
+import { createLLMClient } from '../../../lib/services/llm-client';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { loadFile } from '../../../lib/utils/file-loader';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
@@ -119,53 +119,36 @@ export default async function handler(req, res) {
     );
 
     // ─── Call Claude ────────────────────────────────────────────────────────
-    const start = Date.now();
-    let summaryText, usage, modelUsed;
+    // Routed through the canonical LLMClient: SSRF allowlist, abortable
+    // timeout, 429/529 retry + fallback, API-key redaction, and usage logging
+    // (success + failure) all handled by the client — appName drives logUsage.
+    let summaryText, modelUsed;
     try {
-      const resp = await fetch(BASE_CONFIG.CLAUDE.API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey.trim(),
-          'anthropic-version': BASE_CONFIG.CLAUDE.ANTHROPIC_VERSION,
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: BASE_CONFIG.MODEL_PARAMS.DEFAULT_MAX_TOKENS,
-          temperature: BASE_CONFIG.MODEL_PARAMS.SUMMARIZATION_TEMPERATURE,
-          messages: [{ role: 'user', content: prompt }],
-        }),
+      const llm = createLLMClient({
+        apiKey,
+        model,
+        appName: 'batch-phase-i',
+        userProfileId: access.profileId,
       });
-      if (!resp.ok) {
-        const body = await resp.text();
-        throw new Error(`Claude API error (${resp.status}): ${body}`);
-      }
-      const data = await resp.json();
-      summaryText = data.content?.[0]?.text || '';
-      usage = data.usage || null;
-      modelUsed = data.model || model;
+      const resp = await llm.complete({
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: BASE_CONFIG.MODEL_PARAMS.DEFAULT_MAX_TOKENS,
+        temperature: BASE_CONFIG.MODEL_PARAMS.SUMMARIZATION_TEMPERATURE,
+      });
+      summaryText = resp.text || '';
+      modelUsed = resp.model || model;
     } catch (err) {
       await tryLogAiRun({
         requestGuid,
         model,
         status: 'failed',
         rawOutput: { error: err.message },
+        rawOutputRetention: 'full',
         notes: `Phase I Dynamics summarize — Claude call failed (${fileLoad.filename})`,
         actingUserSystemId,
       });
       throw err;
     }
-    const latencyMs = Date.now() - start;
-
-    logUsage({
-      userProfileId: access.profileId,
-      appName: 'batch-phase-i',
-      model: modelUsed,
-      inputTokens: usage?.input_tokens || 0,
-      outputTokens: usage?.output_tokens || 0,
-      latencyMs,
-      status: 'success',
-    });
 
     if (!summaryText || summaryText.trim().length < 20) {
       await tryLogAiRun({
@@ -173,6 +156,7 @@ export default async function handler(req, res) {
         model: modelUsed,
         status: 'failed',
         rawOutput: { error: 'empty-summary', raw: summaryText },
+        rawOutputRetention: 'full',
         notes: `Phase I Dynamics summarize — empty summary (${fileLoad.filename})`,
         actingUserSystemId,
       });

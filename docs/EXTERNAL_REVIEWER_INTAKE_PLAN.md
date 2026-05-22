@@ -369,8 +369,8 @@ The existing `/api/review-manager/send-emails` already renders + sends. Changes:
 
 - `lib/services/external-token.js` — `mintToken()`, `verifyToken()`,
   `hashToken()`. Uses `jose` for JWT.
-- `middleware.js` — add `/external/*` and `/api/external/*` to the auth-bypass
-  matcher (alongside `/api/cron/*`).
+- `proxy.js` (formerly `middleware.js`) — add `/external/*` and `/api/external/*`
+  to the auth-bypass matcher (alongside `/api/cron/*`).
 - Tests: signature failure, expired, revoked, hash mismatch, wrong-secret,
   malformed.
 

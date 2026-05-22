@@ -1,5 +1,8 @@
 /**
- * Next.js Middleware - Server-side Authentication Gate + Nonce-based CSP
+ * Next.js Proxy - Server-side Authentication Gate + Nonce-based CSP
+ *
+ * (Formerly `middleware.js`; renamed to the `proxy` file convention in
+ * Next.js 16 — the deprecated `middleware` convention still works but warns.)
  *
  * Intercepts all requests before any page content or JS bundle is delivered.
  * Unauthenticated users are redirected to /auth/signin before seeing anything.
@@ -11,8 +14,9 @@
  * Respects AUTH_REQUIRED kill switch — when disabled, all requests pass through.
  * NextAuth's own routes (/api/auth/*) are excluded so the login flow works.
  *
- * Uses withAuth from next-auth/middleware (Edge Runtime compatible, uses jose
- * instead of Node.js crypto).
+ * Uses withAuth from next-auth/middleware (uses jose instead of Node.js crypto).
+ * Proxy defaults to the Node.js runtime in Next 16; all primitives used here
+ * (jose, crypto.getRandomValues, btoa, Headers, NextResponse) run there fine.
  */
 
 import { NextResponse } from 'next/server';
@@ -20,7 +24,7 @@ import { withAuth } from 'next-auth/middleware';
 import { isAuthRequired } from './lib/utils/auth-policy';
 
 export default withAuth(
-  function middleware(req) {
+  function proxy(req) {
     // Generate a unique nonce for this request
     const nonceBytes = new Uint8Array(16);
     crypto.getRandomValues(nonceBytes);
@@ -85,7 +89,7 @@ export default withAuth(
         // External-party paths (reviewer magic-link, etc.) authenticate at the
         // route level via a signed token in the URL — see lib/services/external-token.js.
         // We bypass NextAuth here so the page/API can run without an AzureAD session,
-        // but stay inside the middleware function so CSP headers are still applied.
+        // but stay inside the proxy function so CSP headers are still applied.
         if (pathname?.startsWith('/external/') || pathname?.startsWith('/api/external/')) return true;
         // Single source of truth shared with API routes — fails closed in
         // production if AUTH_REQUIRED is missing or credentials are absent.

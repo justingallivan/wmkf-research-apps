@@ -8,8 +8,9 @@
  * boundary by mocking `loadFile` + `fetch` and asserting the prompt body sent
  * to Claude contains the source marker and not the over-cap tail.
  *
- * The route uses direct `fetch(BASE_CONFIG.CLAUDE.API_URL, ...)` rather than
- * LLMClient (a known P2 legacy path), so we mock the global `fetch`.
+ * The route routes its Claude call through `LLMClient`, which fetches via
+ * `safeFetch` → the global `fetch`. Mocking the global `fetch` therefore still
+ * captures the request body the client emits.
  */
 
 import { BATCH_PHASE_I_PROPOSAL_MAX_CHARS } from '../../lib/utils/ai-payload-boundary';

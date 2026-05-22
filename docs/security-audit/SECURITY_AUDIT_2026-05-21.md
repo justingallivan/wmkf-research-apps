@@ -31,7 +31,7 @@ npm audit --audit-level=high
 
 Results:
 
-- `npm run check:api-routes` passed: API route security matrix covers 85 route files.
+- `npm run check:api-routes` passed: API route security matrix covers 85 route files. <!-- fact-consistency:ignore fact=api-route-file-count as-of=2026-05-21 -->
 - `npm run check:atlas` passed: Atlas coverage OK for 28 Postgres tables and 29 Dataverse entity sets.
 - `npm run check:atlas:self-test` passed: 12/12 coverage patterns detected.
 - `npm run test:ci` did not execute tests because local untracked `node_modules.nosync/` caused Jest haste-map package-name collisions. This appears to be a local worktree/environment issue, not an app-code test failure.

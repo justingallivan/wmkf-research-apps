@@ -48,6 +48,10 @@
     {
       "path": "/api/cron/sweep-stale-invites",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/auth-bypass-check",
+      "schedule": "30 7 * * *"
     }
   ]
 }
