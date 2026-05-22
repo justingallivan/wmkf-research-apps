@@ -26,6 +26,18 @@
  *     required to carry the preamble only (the documented multimodal sibling
  *     control — see `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md`).
  *
+ *     A surface may additionally declare a `builders` list — the names of the
+ *     prompt-builder functions in its prompt file(s). When present, the gate
+ *     adds a CALL-SITE-GRANULAR layer: it slices the prompt file at top-level
+ *     `export function` boundaries and asserts EACH declared builder carries
+ *     `buildUntrustedContentPreamble` in its own body (a sibling builder's
+ *     preamble does not cover it), and that every `create*Prompt` export is
+ *     declared (a new sibling cannot escape). This closes the file-level
+ *     `content.includes()` masking hole that false-greened #8/#15 — see
+ *     `docs/CLAUDE_COVERAGE_LESSONS.md` lesson F. The wrap marker stays
+ *     file-level: builders wrap via per-file helper indirection, so a
+ *     per-builder body slice cannot see the wrap call.
+ *
  *   - status 'pending'  — not yet hardened (a later A7 Part). Tracked, not
  *     enforced. As Parts 2-6 land, surfaces move pending -> migrated here in
  *     the same commit.
@@ -139,6 +151,15 @@ const SURFACES = [
     // block — no text to wrap. The A7 control is the multimodal preamble.
     multimodal: true,
     promptFiles: ['shared/config/prompts/multi-perspective-evaluator.js'],
+    // Call-site-granular: every builder must carry the preamble in its own body.
+    builders: [
+      'createInitialAnalysisPrompt',
+      'createProposalSummaryPrompt',
+      'createOptimistPrompt',
+      'createSkepticPrompt',
+      'createNeutralPrompt',
+      'createIntegratorPrompt',
+    ],
   },
   {
     // Stage 1 paper extraction is multimodal (PDF document block); Stage 2
@@ -191,6 +212,19 @@ const SURFACES = [
     status: 'migrated',
     promptFiles: ['shared/config/prompts/virtual-review-panel.js'],
     callSiteFiles: ['pages/api/virtual-review-panel.js'],
+    // Call-site-granular: every builder must carry the preamble in its own
+    // body. `createPanelSynthesisPrompt` once had none — the 7 sibling
+    // builders masked it at the file level (Codex S176).
+    builders: [
+      'createClaimExtractionPrompt',
+      'createSearchCollationPrompt',
+      'createIntelligenceSynthesisPrompt',
+      'createClaimVerificationPrompt',
+      'createPerplexityClaimVerificationPrompt',
+      'createStructuredReviewPrompt',
+      'createDevilsAdvocatePrompt',
+      'createPanelSynthesisPrompt',
+    ],
   },
   {
     id: 'reviewer-finder-analyze',
@@ -271,6 +305,35 @@ const PROMPT_FILE_ALLOWLIST = {
   'common.js': 'shared prompt fragments, not a standalone LLM surface',
 };
 
+// Matches a prompt-builder export name (`createXxxPrompt` / `buildXxxPrompt`).
+const BUILDER_NAME_RE = /^(?:create|build)[A-Za-z0-9_]*Prompt$/;
+
+/**
+ * Slice a prompt-builder source file into per-builder segments. Builders are
+ * top-level `export function NAME(...)` declarations (column 0); each segment
+ * runs from one such declaration to the next (or EOF). This deliberately does
+ * NOT brace-match — prompt files are full of literal `{`/`}` inside template
+ * literals (JSON examples), which would defeat a naive matcher. The slice
+ * relies only on the column-0 `export function` convention, so a non-exported
+ * helper sitting between two builders is attributed to the preceding segment;
+ * that is fine because the per-builder check only looks for the preamble call,
+ * which each builder makes directly in its own return template.
+ *
+ * @returns {Record<string,string>} builder name → segment text
+ */
+function sliceBuilders(content) {
+  const re = /^export function ([A-Za-z0-9_]+)\s*\(/gm;
+  const marks = [];
+  let m;
+  while ((m = re.exec(content))) marks.push({ name: m[1], start: m.index });
+  const out = {};
+  for (let i = 0; i < marks.length; i++) {
+    const end = i + 1 < marks.length ? marks[i + 1].start : content.length;
+    out[marks[i].name] = content.slice(marks[i].start, end);
+  }
+  return out;
+}
+
 /**
  * Validate one surface against the filesystem. Pure-ish: takes a `readFile`
  * so the self-test can drive it with synthetic content.
@@ -310,6 +373,48 @@ function checkSurface(surface, readFile) {
         '(migrated surface lost its hardening preamble).',
     );
   }
+
+  // Call-site-granular layer: when the surface declares `builders`, every
+  // declared builder must carry the preamble in its OWN function body — a
+  // sibling builder's preamble does not cover it. This closes the file-level
+  // masking hole (CLAUDE_COVERAGE_LESSONS.md lesson F).
+  if (Array.isArray(surface.builders)) {
+    const segmentsByName = {};
+    for (const f of surface.promptFiles || []) {
+      const content = readFile(f);
+      if (content == null) continue; // missing-file already flagged above
+      for (const [name, seg] of Object.entries(sliceBuilders(content))) {
+        segmentsByName[name] = { file: f, seg };
+      }
+    }
+    for (const b of surface.builders) {
+      const hit = segmentsByName[b];
+      if (!hit) {
+        errors.push(
+          `${surface.id}: declared builder "${b}" not found as a top-level ` +
+            "`export function` in the surface's prompt file(s).",
+        );
+        continue;
+      }
+      if (!hit.seg.includes(PREAMBLE_MARKER)) {
+        errors.push(
+          `${surface.id}: builder "${b}" (${hit.file}) does not call ` +
+            `${PREAMBLE_MARKER} in its own body — a sibling builder's preamble ` +
+            'does not cover it (call-site-granular check).',
+        );
+      }
+    }
+    // Drift: a new prompt-builder export must be added to `builders`.
+    for (const [name, hit] of Object.entries(segmentsByName)) {
+      if (BUILDER_NAME_RE.test(name) && !surface.builders.includes(name)) {
+        errors.push(
+          `${surface.id}: prompt builder "${name}" (${hit.file}) is not in the ` +
+            "surface's `builders` list — add it so per-builder A7 coverage tracks it.",
+        );
+      }
+    }
+  }
+
   return { id: surface.id, errors };
 }
 
@@ -388,4 +493,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { checkSurface, findUnregisteredPromptFiles, SURFACES };
+module.exports = { checkSurface, findUnregisteredPromptFiles, sliceBuilders, SURFACES };

@@ -173,6 +173,80 @@ function fakeReader(map) {
   );
 }
 
+// ── checkSurface — call-site-granular `builders` layer ────────────────────
+
+// 9. The masking bug: a surface with two builders in one file — one carries
+// the preamble, the sibling does not. The file-level union check passes (the
+// file DOES contain the marker), but the per-builder layer must flag the
+// unsafe sibling. This is the #8/#15 false-green that lesson F documents.
+{
+  const fxSibling = [
+    'export function createSafePrompt(text) {',
+    '  return `${buildUntrustedContentPreamble()} analyse: ${text}`;',
+    '}',
+    'export function createUnsafePrompt(text) {',
+    '  return `no hardening at all here: ${text}`;',
+    '}',
+  ].join('\n');
+  const surface = {
+    id: 'fx-sibling',
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/fx-sibling.js'],
+    callSiteFiles: ['c.js'],
+    builders: ['createSafePrompt', 'createUnsafePrompt'],
+  };
+  const reader = fakeReader({
+    'shared/config/prompts/fx-sibling.js': fxSibling,
+    'c.js': 'uses wrapUntrustedContent here',
+  });
+  const errs = checkSurface(surface, reader).errors;
+  assert(
+    'call-site-granular: an unsafe sibling builder missing the preamble is flagged',
+    errs.length === 1 && /createUnsafePrompt/.test(errs[0]),
+  );
+}
+
+// 9b. all builders carry the preamble in their own body → passes.
+{
+  const content = [
+    'export function createAPrompt(t) { return `${buildUntrustedContentPreamble()} ${t}`; }',
+    'export function createBPrompt(t) { return `${buildUntrustedContentPreamble()} ${t}`; }',
+  ].join('\n');
+  const surface = {
+    id: 'fx-all-safe',
+    status: 'migrated',
+    promptFiles: ['p.js'],
+    callSiteFiles: ['c.js'],
+    builders: ['createAPrompt', 'createBPrompt'],
+  };
+  const reader = fakeReader({ 'p.js': content, 'c.js': 'wrapUntrustedContent' });
+  assert(
+    'call-site-granular: every builder carrying the preamble passes',
+    checkSurface(surface, reader).errors.length === 0,
+  );
+}
+
+// 9c. drift: a prompt-builder export not in the `builders` list is flagged.
+{
+  const content = [
+    'export function createOnePrompt(t) { return `${buildUntrustedContentPreamble()} ${t}`; }',
+    'export function createTwoPrompt(t) { return `${buildUntrustedContentPreamble()} ${t}`; }',
+  ].join('\n');
+  const surface = {
+    id: 'fx-drift',
+    status: 'migrated',
+    promptFiles: ['p.js'],
+    callSiteFiles: ['c.js'],
+    builders: ['createOnePrompt'], // createTwoPrompt deliberately omitted
+  };
+  const reader = fakeReader({ 'p.js': content, 'c.js': 'wrapUntrustedContent' });
+  const errs = checkSurface(surface, reader).errors;
+  assert(
+    'call-site-granular: an undeclared sibling builder is flagged as drift',
+    errs.some((e) => /createTwoPrompt/.test(e) && /builders/.test(e)),
+  );
+}
+
 // ── findUnregisteredPromptFiles ───────────────────────────────────────────
 
 // 6. a prompt file referenced by no surface is reported.
@@ -223,4 +297,4 @@ if (failures > 0) {
   console.error(`\nprompt-injection-tagging self-test FAILED — ${failures} case(s).`);
   process.exit(1);
 }
-console.log('\nprompt-injection-tagging self-test OK — 11/11 cases.');
+console.log('\nprompt-injection-tagging self-test OK — 14/14 cases.');
