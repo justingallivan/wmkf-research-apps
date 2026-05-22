@@ -6,6 +6,12 @@ import { requireAppAccess } from '../../lib/utils/auth';
 import { LLMClient } from '../../lib/services/llm-client';
 import { nextRateLimiter } from '../../shared/api/middleware/rateLimiter';
 import { safeFetch } from '../../lib/utils/safe-fetch';
+import {
+  DATA_CLASSES,
+  PEER_REVIEW_TEXT_MAX_CHARS,
+  wrapUntrustedContent,
+  buildUntrustedContentPreamble,
+} from '../../lib/utils/ai-payload-boundary';
 
 const limiter = nextRateLimiter({ max: 5 });
 
@@ -205,8 +211,25 @@ async function analyzePeerReviews(reviewTexts, apiKey, userProfileId) {
       throw new Error(`No valid review texts to analyze. All files either failed to process or contained no extractable text.\n\nFile details:\n${errorDetails}`);
     }
 
+    // A7 Part 4: each review is reviewer-submitted (untrusted) and was not
+    // length-bounded before. Wrap every review in nonce sentinels and prepend
+    // the hardening preamble so injection text in a review body cannot hijack
+    // the analysis. The wrapped blocks (not raw text) go to the builders.
+    const wrappedReviews = validTexts.map((text, i) =>
+      wrapUntrustedContent({
+        text,
+        source: `peer-reviews.analyze.review-${i + 1}`,
+        dataClass: DATA_CLASSES.REVIEW_TEXT,
+        maxChars: PEER_REVIEW_TEXT_MAX_CHARS,
+        label: `peer review ${i + 1}`,
+      }),
+    );
+    const wrappedTexts = wrappedReviews.map((w) => w.text);
+    const reviewNonces = wrappedReviews.map((w) => w.nonce);
+    const preamble = buildUntrustedContentPreamble(reviewNonces);
+
     // Generate comprehensive analysis
-    const analysisPrompt = createPeerReviewAnalysisPrompt(validTexts);
+    const analysisPrompt = `${preamble}\n\n${createPeerReviewAnalysisPrompt(wrappedTexts)}`;
 
     const claude = new LLMClient({
       apiKey,
@@ -288,7 +311,7 @@ async function analyzePeerReviews(reviewTexts, apiKey, userProfileId) {
     if (!questions || questions.length < 50) {
       console.log('Questions not found or too short, making separate request...');
       try {
-        const questionsPrompt = createPeerReviewQuestionsPrompt(validTexts);
+        const questionsPrompt = `${preamble}\n\n${createPeerReviewQuestionsPrompt(wrappedTexts)}`;
 
         const { text: rawQuestions } = await claude.complete({
           messages: [{ role: 'user', content: questionsPrompt }],

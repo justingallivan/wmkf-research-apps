@@ -1,6 +1,6 @@
 # A7: LLM01 prompt-injection hardening — inventory & remediation plan
 
-**Status:** Parts 0–3 SHIPPED 2026-05-21 (Session 174); Parts 4–6 pending.
+**Status:** Parts 0–4 SHIPPED 2026-05-21 (Session 174); Parts 5–6 pending.
 Created 2026-05-21 (Session 173). Revised 2026-05-21 (Session 174) after a
 Codex review against the live codebase — see "Revision log" at the foot.
 **Owed deploy step:** re-run `scripts/seed-phase-i-summary-prompt.js --execute`
@@ -182,9 +182,11 @@ outputs can't be schema-validated; their control is the boundary + preamble.
    (general rule — fresh nonce per round). The AI export pass (#23) wraps the
    record JSON in both the sample and batch calls and hardens both
    route-local system prompts.
-4. **External-influenced content: `process-peer-reviews` (#7)** — carries
-   reviewer-submitted text and is not even length-bounded; fix **both** prompt
-   calls (main + fallback questions).
+4. **External-influenced content: `process-peer-reviews` (#7)** — ✅ SHIPPED
+   (S174). Every reviewer-submitted review is wrapped with
+   `wrapUntrustedContent` (also the first length bound on that path —
+   `PEER_REVIEW_TEXT_MAX_CHARS`); both prompt calls (main analysis + fallback
+   questions) carry the preamble.
 5. **Remaining U-FILE routes** — #1–#6, #8 + #11 (incl. multimodal preamble),
    #13, #15, #16, #22.
 6. **Remaining U-EXT routes** — #9 (incl. multimodal preamble), #10, #14, #21,

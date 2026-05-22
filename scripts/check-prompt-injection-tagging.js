@@ -97,11 +97,16 @@ const SURFACES = [
   {
     id: 'process-peer-reviews',
     inv: 7,
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/peer-reviewer.js'],
+    callSiteFiles: ['pages/api/process-peer-reviews.js'],
+  },
+  {
+    // Dynamics-variant peer-review prompt builder — separate, not yet migrated.
+    id: 'process-peer-reviews-dynamics',
+    inv: 7,
     status: 'pending',
-    promptFiles: [
-      'shared/config/prompts/peer-reviewer.js',
-      'shared/config/prompts/peer-reviewer-dynamics.js',
-    ],
+    promptFiles: ['shared/config/prompts/peer-reviewer-dynamics.js'],
   },
   {
     id: 'evaluate-multi-perspective',
