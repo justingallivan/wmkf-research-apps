@@ -39,16 +39,18 @@ import {
   INTEGRATOR_SCHEMA,
 } from '../../shared/config/multi-perspective-output-schema';
 
-// A7 follow-up: validate a parsed stage output against its schema. On success
-// returns the cleaned value (undeclared keys dropped — the anti-injection
-// property). On a type-level validation failure it logs and returns the raw
-// parse: the sentinel-wrapping at each re-feed site is the primary injection
-// defense, so this schema pass is best-effort defense-in-depth.
+// A7 follow-up (step 0): validate a parsed stage output against its schema.
+// On success returns the cleaned value (undeclared keys dropped — the
+// anti-injection property). On a validation failure it THROWS rather than
+// returning the raw parse: returning `parsed` would let an injected key ride
+// straight through the schema pass into the next stage's re-feed (the very
+// thing the schema is meant to strip). Every call site is inside a try/catch
+// that degrades to a safe fallback object, so a throw here routes the same
+// way an unparseable response does.
 function validateStage(parsed, schema, label) {
   const r = validateAiJson(parsed, schema);
   if (r.ok) return r.value;
-  console.warn(`[MultiPerspective] ${label} failed schema validation: ${r.errors.join('; ')}`);
-  return parsed;
+  throw new Error(`[MultiPerspective] ${label} failed schema validation: ${r.errors.join('; ')}`);
 }
 
 // Import search services
