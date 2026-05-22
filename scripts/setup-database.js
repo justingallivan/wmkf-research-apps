@@ -629,6 +629,21 @@ const v30Statements = [
   `CREATE INDEX IF NOT EXISTS idx_submission_jobs_created ON submission_jobs(created_at DESC)`,
 ];
 
+// V31: external-reviewer rate limiting (security audit A6).
+// Fixed-window counters for /api/external/review/[token]/* — per-token and
+// per-IP buckets. See migration 010_external_rate_limit.sql.
+const v31Statements = [
+  `CREATE TABLE IF NOT EXISTS external_rate_limit (
+    bucket_key    TEXT NOT NULL,
+    window_start  TIMESTAMPTZ NOT NULL,
+    hit_count     INTEGER NOT NULL DEFAULT 0,
+    invalid_count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (bucket_key, window_start)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_external_rate_limit_window
+     ON external_rate_limit(window_start)`,
+];
+
 // V28: Policy publish audit (append-only). See migration 006_policy_publish_audit.sql
 // for full rationale. Dedicated Postgres table rather than overloading wmkf_ai_run.
 const v28Statements = [
@@ -1411,6 +1426,25 @@ async function runMigration() {
           console.log(`[v30-${i + 1}/${v30Statements.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v30-${i + 1}/${v30Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V31 table creation (external-reviewer rate limiting — security audit A6)
+    console.log(`\nApplying v31 schema updates - External-reviewer rate limiting (${v31Statements.length} statements)...`);
+    for (let i = 0; i < v31Statements.length; i++) {
+      const statement = v31Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+
+      try {
+        await sql.query(statement);
+        console.log(`[v31-${i + 1}/${v31Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v31-${i + 1}/${v31Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v31-${i + 1}/${v31Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }

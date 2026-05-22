@@ -12,6 +12,7 @@ import Busboy from 'busboy';
 import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
 import { writeReviewFiles } from '../../../../../lib/services/review-upload';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
+import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB per file
 const MAX_FILES = 5;
@@ -29,7 +30,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const verified = await verifySuggestionToken(req.query.token);
+    const token = req.query.token;
+    const rl = await checkRateLimit(req, token);
+    if (!rl.ok) {
+      res.setHeader('Retry-After', String(rl.retryAfterSeconds));
+      return res.status(429).json({ ok: false, reason: 'rate_limited' });
+    }
+    const verified = await verifySuggestionToken(token);
+    await recordTokenOutcome(req, token, verified.ok);
     if (!verified.ok) {
       return res.status(verified.reason === 'not_found' ? 404 : 401).json({
         ok: false,

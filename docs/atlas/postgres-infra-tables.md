@@ -86,3 +86,7 @@ Cron-driven health checks (7 services), alert log, cron audit trail. `maintenanc
 ### `api_usage_log` (2,044 rows)
 **Source of truth:** Postgres-only.
 Per-Claude-call ledger (model, tokens, cost, latency). Written by `lib/services/llm-client.js` via `lib/utils/usage-logger.js` (`logUsage`, raw SQL INSERT at ≈line 64). Not routed through `DatabaseService`.
+
+### `external_rate_limit` (0 rows)
+**Source of truth:** Postgres-only. V031 migration / `010_external_rate_limit.sql` (S173, 2026-05-21, security audit A6).
+Fixed-window (60s) rate-limit counters for the public external-reviewer token routes `/api/external/review/[token]/*`. Two bucket scopes share the table, discriminated by the `bucket_key` prefix: `tok:<sha256(jwt)>` (per-token) and `ip:<addr>` (per-IP). `invalid_count` tracks per-IP token-verification failures and feeds an invalid-token-spike `system_alerts` entry. Written + read by `lib/external/rate-limit.js` (`checkRateLimit`, `recordTokenOutcome`); expired windows pruned opportunistically on write. Postgres-backed (not in-memory) because Vercel Fluid Compute spreads requests across instances. Fail-open: a DB error allows the request rather than locking out a reviewer.

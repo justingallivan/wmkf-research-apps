@@ -40,6 +40,7 @@ import { verifySuggestionToken } from '../../../../../lib/external/verify-sugges
 import { applyStage2aResponse } from '../../../../../lib/dataverse/adapters/reviewer-suggestion';
 import { getActivePolicies } from '../../../../../lib/external/policy-fetcher';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
+import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
 const REVIEW_STATUS_MATERIALS_SENT = 100000001;
@@ -54,7 +55,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const verified = await verifySuggestionToken(req.query.token);
+    const token = req.query.token;
+    const rl = await checkRateLimit(req, token);
+    if (!rl.ok) {
+      res.setHeader('Retry-After', String(rl.retryAfterSeconds));
+      return res.status(429).json({ ok: false, reason: 'rate_limited' });
+    }
+    const verified = await verifySuggestionToken(token);
+    await recordTokenOutcome(req, token, verified.ok);
     if (!verified.ok) {
       return res.status(verified.reason === 'not_found' ? 404 : 401).json({
         ok: false, reason: verified.reason,

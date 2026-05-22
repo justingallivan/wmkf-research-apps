@@ -22,6 +22,7 @@ import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics
 import { reviewFormSchema } from '../../../../../lib/external/review-form-schema';
 import { isReviewerMaterial } from '../../../../../lib/external/reviewer-materials';
 import { getActivePolicies } from '../../../../../lib/external/policy-fetcher';
+import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 
 // Slots Stage 2a renders. Hardcoded per build plan §4a.
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
@@ -43,7 +44,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const verified = await verifySuggestionToken(req.query.token);
+    const token = req.query.token;
+    const rl = await checkRateLimit(req, token);
+    if (!rl.ok) {
+      res.setHeader('Retry-After', String(rl.retryAfterSeconds));
+      return res.status(429).json({ ok: false, reason: 'rate_limited' });
+    }
+    const verified = await verifySuggestionToken(token);
+    await recordTokenOutcome(req, token, verified.ok);
     if (!verified.ok) {
       return res.status(verified.reason === 'not_found' ? 404 : 401).json({
         ok: false,

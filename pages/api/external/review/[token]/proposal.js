@@ -16,6 +16,7 @@ import { GraphService } from '../../../../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../../../../lib/utils/sharepoint-buckets';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
 import { isReviewerMaterial } from '../../../../../lib/external/reviewer-materials';
+import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -29,7 +30,13 @@ export default async function handler(req, res) {
   }
 
   try {
+    const rl = await checkRateLimit(req, token);
+    if (!rl.ok) {
+      res.setHeader('Retry-After', String(rl.retryAfterSeconds));
+      return res.status(429).json({ ok: false, reason: 'rate_limited' });
+    }
     const verified = await verifySuggestionToken(token);
+    await recordTokenOutcome(req, token, verified.ok);
     if (!verified.ok) {
       return res.status(verified.reason === 'not_found' ? 404 : 401).json({
         ok: false,
