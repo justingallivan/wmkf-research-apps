@@ -185,6 +185,89 @@ describe('external-token', () => {
     });
   });
 
+  describe('verifyToken — secret rotation window', () => {
+    // OTHER_SECRET stands in for the outgoing ("previous") secret; SECRET is
+    // the current one set by the outer beforeEach.
+    const THIRD_SECRET = 'third-secret-32-chars-min-ccccccccccc';
+
+    function signWith(secret, { expMs = Date.now() + 60_000 } = {}) {
+      return new SignJWT({ sub: SUGGESTION_ID, req: REQUEST_ID, ops: OPS })
+        .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+        .setIssuedAt()
+        .setExpirationTime(Math.floor(expMs / 1000))
+        .setJti('00000000000000000000000000000000')
+        .sign(new TextEncoder().encode(secret));
+    }
+
+    afterEach(() => {
+      delete process.env.EXTERNAL_LINK_SECRET_PREVIOUS;
+    });
+
+    test('accepts a token signed with the previous secret when PREVIOUS is set', async () => {
+      const oldToken = await signWith(OTHER_SECRET);
+      process.env.EXTERNAL_LINK_SECRET_PREVIOUS = OTHER_SECRET;
+      const r = await verifyToken(oldToken);
+      expect(r.valid).toBe(true);
+      expect(r.payload.suggestionId).toBe(SUGGESTION_ID);
+    });
+
+    test('rejects a previous-secret token when PREVIOUS is not set', async () => {
+      const oldToken = await signWith(OTHER_SECRET);
+      const r = await verifyToken(oldToken);
+      expect(r.valid).toBe(false);
+      expect(r.reason).toBe('invalid_signature');
+    });
+
+    test('still accepts a current-secret token while PREVIOUS is set', async () => {
+      process.env.EXTERNAL_LINK_SECRET_PREVIOUS = OTHER_SECRET;
+      const { jwt } = await mintToken({
+        suggestionId: SUGGESTION_ID,
+        requestId: REQUEST_ID,
+        ops: OPS,
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+      const r = await verifyToken(jwt);
+      expect(r.valid).toBe(true);
+    });
+
+    test('surfaces expiry of a previous-secret token (not invalid_signature)', async () => {
+      const expiredOld = await signWith(OTHER_SECRET, { expMs: Date.now() - 60_000 });
+      process.env.EXTERNAL_LINK_SECRET_PREVIOUS = OTHER_SECRET;
+      const r = await verifyToken(expiredOld);
+      expect(r.valid).toBe(false);
+      expect(r.reason).toBe('expired');
+    });
+
+    test('rejects a token signed with neither the current nor previous secret', async () => {
+      const strayToken = await signWith(THIRD_SECRET);
+      process.env.EXTERNAL_LINK_SECRET_PREVIOUS = OTHER_SECRET;
+      const r = await verifyToken(strayToken);
+      expect(r.valid).toBe(false);
+      expect(r.reason).toBe('invalid_signature');
+    });
+
+    test('ignores a too-short PREVIOUS secret (primary still verifies)', async () => {
+      process.env.EXTERNAL_LINK_SECRET_PREVIOUS = 'short';
+      const oldToken = await signWith(OTHER_SECRET);
+      expect((await verifyToken(oldToken)).reason).toBe('invalid_signature');
+      // The current secret is unaffected.
+      const { jwt } = await mintToken({
+        suggestionId: SUGGESTION_ID,
+        requestId: REQUEST_ID,
+        ops: OPS,
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+      expect((await verifyToken(jwt)).valid).toBe(true);
+    });
+
+    test('a malformed token stays malformed even with PREVIOUS set', async () => {
+      process.env.EXTERNAL_LINK_SECRET_PREVIOUS = OTHER_SECRET;
+      const r = await verifyToken('not-a-jwt');
+      expect(r.valid).toBe(false);
+      expect(r.reason).toBe('malformed');
+    });
+  });
+
   describe('hashToken', () => {
     test('produces stable 64-char hex digest', async () => {
       const { jwt } = await mintToken({

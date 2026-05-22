@@ -36,7 +36,8 @@ Only two credentials expire automatically. Everything else is stable until manua
 | Variable | Purpose | Source | Notes |
 |----------|---------|--------|-------|
 | `CRON_SECRET` | Authenticates `/api/cron/*` endpoints | Self-generated (`openssl rand -base64 32`) | Required for cron jobs (secret-check, retraction-watch, etc.) |
-| `EXTERNAL_LINK_SECRET` | HMAC-signs external-reviewer JWTs (`/api/external/*`) | Self-generated (32+ chars; `openssl rand -base64 32`) | **Must be separate from `NEXTAUTH_SECRET`**; used by `lib/external/token-lifecycle.js` |
+| `EXTERNAL_LINK_SECRET` | HMAC-signs external-reviewer JWTs (`/api/external/*`) | Self-generated (32+ chars; `openssl rand -base64 32`) | **Must be separate from `NEXTAUTH_SECRET`**; read by `lib/services/external-token.js`. Rotatable without breaking live links — see [Rotating EXTERNAL_LINK_SECRET](#rotating-external_link_secret). |
+| `EXTERNAL_LINK_SECRET_PREVIOUS` | Outgoing `EXTERNAL_LINK_SECRET` value during a rotation window | The previous `EXTERNAL_LINK_SECRET` | **Optional** — set only while rotating. `verifyToken` also accepts tokens signed with it; `mintToken` never uses it. Clear once all old tokens have expired. |
 | `VRP_ALLOWED_PROVIDERS` | Comma-separated allowlist for Virtual Review Panel | Manual (e.g., `claude,openai,gemini`) | Must include `claude`. Production fails closed if unset. Intersects with configured API keys |
 | `IRS_VERIFY_SECRET` | Authenticates PowerAutomate calls to `/api/irs/verify-ein` | Self-generated (32+ chars; `openssl rand -base64 32`) | **Must be separate from `CRON_SECRET`** — PA is not a Vercel cron. Sent by PA in the `x-irs-verify-secret` request header. |
 
@@ -148,6 +149,37 @@ This is the most common maintenance task. Both `AZURE_AD_CLIENT_SECRET` and `DYN
 
 ---
 
+## Rotating EXTERNAL_LINK_SECRET
+
+`EXTERNAL_LINK_SECRET` signs the magic-link JWTs that external reviewers use. A naïve rotation would invalidate every live reviewer link the instant it took effect. The dual-secret window avoids that: `verifyToken` accepts tokens signed with **either** the current secret or `EXTERNAL_LINK_SECRET_PREVIOUS`, while `mintToken` always uses the current one.
+
+**Cadence:** no fixed expiry. Rotate on suspected compromise, on staff offboarding with production env access, or routinely every 12 months. Track via `secret_rotation:external_link_secret`.
+
+### Step by step
+
+1. **Pick the window length.** It must be ≥ the longest-lived unexpired token — the latest reviewer due-date-plus-grace currently outstanding. When in doubt, 60 days covers a normal review cycle.
+2. **Generate a new secret:** `openssl rand -base64 32`.
+3. **Vercel Dashboard** → Settings → Environment Variables (Production scope):
+   - Set `EXTERNAL_LINK_SECRET_PREVIOUS` to the **current** `EXTERNAL_LINK_SECRET` value.
+   - Set `EXTERNAL_LINK_SECRET` to the **new** value.
+4. **Redeploy** (uncheck "Use existing Build Cache").
+5. **Verify** — an existing reviewer link still loads (old secret) and a freshly minted link works (new secret).
+6. **Set a calendar reminder** for the end of the rotation window.
+7. **At the end of the window:** delete `EXTERNAL_LINK_SECRET_PREVIOUS` and redeploy. Tokens signed with the old secret are now rejected (`invalid_signature`) — by then they have all expired anyway.
+
+### Drill
+
+`node scripts/drill-external-link-secret-rotation.mjs` exercises all three phases (before rotation / window open / window closed) in-process with throwaway secrets — it touches no real environment and no database. Run it before a real rotation, or any time as a regression check. Exit 0 means the mechanism is healthy.
+
+### Common mistakes
+
+- Setting `EXTERNAL_LINK_SECRET_PREVIOUS` to the **new** value instead of the outgoing one.
+- Closing the window before the longest-lived token has expired — this locks reviewers out mid-cycle.
+- Forgetting to **redeploy** after either the open or the close step.
+- Leaving `EXTERNAL_LINK_SECRET_PREVIOUS` set indefinitely — it widens the accepted-signature surface; clear it once the window closes.
+
+---
+
 ## Diagnosing Issues
 
 ### Quick checks
@@ -222,6 +254,7 @@ await setSetting('secret_rotation:azure_ad_client_secret', '2026-03-15');
 | `nextauth_secret` | NextAuth Secret | No expiry (rotate if compromised) |
 | `user_prefs_encryption_key` | Encryption Key | No expiry. **Rotation tooling pending Dataverse rewrite** — the legacy `scripts/rotate-encryption-key.js` was archived 2026-05-12 when the underlying `user_preferences` Postgres table was dropped. Until rewritten, key rotation requires reading all `wmkf_appuserpreferences` rows where `wmkf_isencrypted=true`, decrypting with the old key, re-encrypting with the new key, and PATCHing back via the dispatcher. |
 | `cron_secret` | Cron Secret | No expiry (rotate periodically) |
+| `external_link_secret` | External-Reviewer Link Secret | No expiry. Rotate on compromise / offboarding / ~12 months via the dual-secret window — see [Rotating EXTERNAL_LINK_SECRET](#rotating-external_link_secret). |
 
 ---
 

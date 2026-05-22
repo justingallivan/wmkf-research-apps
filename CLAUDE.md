@@ -128,6 +128,7 @@ Required for production-only paths:
 Notable optional flags:
 - `DYNAMICS_IMPERSONATION_ENABLED=true` — sends `MSCRMCallerID` on user-driven Dynamics writes; off by default for safe rollout (see `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md`)
 - `PROMPT_RESOLVER_STRICT=true` — disables bundled-prompt fallback for prompt-dev loops
+- `EXTERNAL_LINK_SECRET_PREVIOUS` — outgoing `EXTERNAL_LINK_SECRET` value, set only during a rotation window; `verifyToken` accepts it, `mintToken` never uses it (see `docs/CREDENTIALS_RUNBOOK.md` § "Rotating EXTERNAL_LINK_SECRET")
 - `WAVE1_BACKEND_SETTINGS` / `WAVE1_BACKEND_APP_ACCESS` / `WAVE1_BACKEND_PREFS` — Wave 1 backend dispatch flags. **Default is now Dataverse**; the legacy Postgres tables (`system_settings`, `user_app_access`, `user_preferences`) were dropped 2026-05-12. Setting any of these to `postgres` will fail loudly — kept only as an explicit opt-out signal.
 
 ## Per-App Model Configuration
