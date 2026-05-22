@@ -152,6 +152,25 @@ describe('/api/process payload boundary', () => {
       truncated: true,
     }));
   });
+
+  // A7 Part 5: both Claude calls wrap proposal text + carry the preamble.
+  test('wraps proposal text in untrusted-content sentinels with the hardening preamble', async () => {
+    mockedPdfText = `${'A'.repeat(2_000)} proposal body`;
+
+    await runRoute(
+      '../../pages/api/process',
+      { files: [{ filename: 'big.pdf', url: 'https://test.public.blob.vercel-storage.com/big.pdf' }] },
+      ['batch-proposal-summaries']
+    );
+
+    expect(sentUserMessages.length).toBe(2);
+    for (const prompt of sentUserMessages) {
+      expect(prompt).toContain('UNTRUSTED CONTENT RULES:');
+      const open = prompt.match(/\[\[WMKF-UNTRUSTED-CONTENT nonce=([0-9a-f]{24})/);
+      expect(open).not.toBeNull();
+      expect(prompt).toContain(`[[/WMKF-UNTRUSTED-CONTENT nonce=${open[1]}]]`);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -205,6 +224,25 @@ describe('/api/process-legacy payload boundary', () => {
     expect(sentUserMessages[1]).not.toContain('UNSENT_TAIL');
     expect(sentUserMessages[1]).toContain('AI payload boundary: legacy.extraction.proposalText');
   });
+
+  // A7 Part 5: both Claude calls wrap proposal text + carry the preamble.
+  test('wraps proposal text in untrusted-content sentinels with the hardening preamble', async () => {
+    mockedPdfText = `${'A'.repeat(2_000)} proposal body`;
+
+    await runRoute(
+      '../../pages/api/process-legacy',
+      { files: [{ filename: 'leg.pdf', url: 'https://test.public.blob.vercel-storage.com/leg.pdf' }] },
+      ['batch-proposal-summaries']
+    );
+
+    expect(sentUserMessages.length).toBe(2);
+    for (const prompt of sentUserMessages) {
+      expect(prompt).toContain('UNTRUSTED CONTENT RULES:');
+      const open = prompt.match(/\[\[WMKF-UNTRUSTED-CONTENT nonce=([0-9a-f]{24})/);
+      expect(open).not.toBeNull();
+      expect(prompt).toContain(`[[/WMKF-UNTRUSTED-CONTENT nonce=${open[1]}]]`);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -235,6 +273,25 @@ describe('/api/process-phase-i payload boundary', () => {
       transmittedChars: BATCH_PHASE_I_PROPOSAL_MAX_CHARS,
       truncated: true,
     }));
+  });
+
+  // A7 Part 5: both Claude calls wrap proposal text + carry the preamble.
+  test('wraps proposal text in untrusted-content sentinels with the hardening preamble', async () => {
+    mockedPdfText = `${'A'.repeat(2_000)} proposal body`;
+
+    await runRoute(
+      '../../pages/api/process-phase-i',
+      { files: [{ filename: 'phase1.pdf', url: 'https://test.public.blob.vercel-storage.com/phase1.pdf' }] },
+      ['batch-phase-i-summaries']
+    );
+
+    expect(sentUserMessages.length).toBe(2);
+    for (const prompt of sentUserMessages) {
+      expect(prompt).toContain('UNTRUSTED CONTENT RULES:');
+      const open = prompt.match(/\[\[WMKF-UNTRUSTED-CONTENT nonce=([0-9a-f]{24})/);
+      expect(open).not.toBeNull();
+      expect(prompt).toContain(`[[/WMKF-UNTRUSTED-CONTENT nonce=${open[1]}]]`);
+    }
   });
 });
 

@@ -9,8 +9,10 @@ import { safeFetch } from '../../lib/utils/safe-fetch';
 import {
   DATA_CLASSES,
   BATCH_PHASE_II_PROPOSAL_MAX_CHARS,
-  buildBoundedTextPayload,
+  wrapUntrustedContent,
 } from '../../lib/utils/ai-payload-boundary';
+import { validateAiJson } from '../../lib/utils/ai-output-schema';
+import { PROPOSAL_EXTRACTION_SCHEMA } from '../../shared/config/proposal-extraction-output-schema';
 
 const limiter = nextRateLimiter({ max: 5 });
 
@@ -117,11 +119,12 @@ export default async function handler(req, res) {
 
 async function generateSummary(text, filename, apiKey, summaryLength, userProfileId, sendUpdate = () => {}) {
   try {
-    const summaryPayload = buildBoundedTextPayload({
+    const summaryPayload = wrapUntrustedContent({
       text,
       source: 'batch-phase-ii.summary.proposalText',
       dataClass: DATA_CLASSES.PROPOSAL_TEXT,
       maxChars: BATCH_PHASE_II_PROPOSAL_MAX_CHARS,
+      label: 'research proposal',
     });
     sendUpdate({
       type: 'payload_boundary',
@@ -131,7 +134,7 @@ async function generateSummary(text, filename, apiKey, summaryLength, userProfil
         : `Proposal text bounded at ${summaryPayload.metadata.transmittedChars.toLocaleString()} characters before AI summarization`,
       aiPayloadBoundary: summaryPayload.metadata,
     });
-    const prompt = createSummarizationPrompt(summaryPayload.text, summaryLength);
+    const prompt = createSummarizationPrompt(summaryPayload.text, summaryLength, [summaryPayload.nonce]);
 
     const claude = new LLMClient({
       apiKey,
@@ -170,13 +173,18 @@ async function generateSummary(text, filename, apiKey, summaryLength, userProfil
 
 async function extractStructuredData(text, filename, summary, apiKey, userProfileId) {
   try {
-    const extractionPayload = buildBoundedTextPayload({
+    const extractionPayload = wrapUntrustedContent({
       text,
       source: 'batch-phase-ii.extraction.proposalText',
       dataClass: DATA_CLASSES.PROPOSAL_TEXT,
       maxChars: BATCH_PHASE_II_PROPOSAL_MAX_CHARS,
+      label: 'research proposal',
     });
-    const extractionPrompt = createStructuredDataExtractionPrompt(extractionPayload.text, filename);
+    const extractionPrompt = createStructuredDataExtractionPrompt(
+      extractionPayload.text,
+      filename,
+      [extractionPayload.nonce],
+    );
 
     const claude = new LLMClient({
       apiKey,
@@ -195,11 +203,20 @@ async function extractStructuredData(text, filename, summary, apiKey, userProfil
         // Strip markdown code fences if present (```json ... ``` or ``` ... ```)
         jsonText = jsonText.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
         const parsed = JSON.parse(jsonText);
-        return {
-          ...parsed,
-          timestamp: new Date().toISOString(),
-          wordCount: text.split(' ').length
-        };
+        // Validate against the per-app schema (A7 Part 5) — drop any keys an
+        // injected model added; bad types fall through to the basic fallback.
+        const validated = validateAiJson(parsed, PROPOSAL_EXTRACTION_SCHEMA);
+        if (validated.ok) {
+          return {
+            ...validated.value,
+            timestamp: new Date().toISOString(),
+            wordCount: text.split(' ').length
+          };
+        }
+        console.warn(
+          'Structured data failed schema validation, using fallback:',
+          validated.errors.join('; '),
+        );
       } catch (parseError) {
         console.warn('Failed to parse structured data, using fallback. Raw text:', jsonText.substring(0, 200));
       }
