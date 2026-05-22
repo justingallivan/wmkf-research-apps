@@ -161,3 +161,77 @@ describe('validateAiJson — arrays and nesting', () => {
     expect(r.errors[0]).toMatch(/goals\[0\]\.status/);
   });
 });
+
+describe('validateAiJson — record (dynamic-keyed map)', () => {
+  const ratingRecord = {
+    type: 'record',
+    maxEntries: 10,
+    keys: { maxLength: 60 },
+    of: { type: 'string', enum: ['Strong', 'Moderate', 'Weak'], coerceEnum: true, default: 'Moderate' },
+  };
+
+  test('accepts a dynamic-keyed map and validates each value', () => {
+    const r = validateAiJson({ 'Aim 1': 'Strong', 'Aim 2': 'Weak' }, ratingRecord);
+    expect(r).toEqual({ ok: true, value: { 'Aim 1': 'Strong', 'Aim 2': 'Weak' } });
+  });
+
+  test('coerces an out-of-enum value via the value node', () => {
+    const r = validateAiJson({ 'Aim 1': 'bogus' }, ratingRecord);
+    expect(r).toEqual({ ok: true, value: { 'Aim 1': 'Moderate' } });
+  });
+
+  test('rejects a non-object', () => {
+    const r = validateAiJson('not an object', ratingRecord);
+    expect(r.ok).toBe(false);
+    expect(r.errors[0]).toMatch(/must be an object/);
+  });
+
+  test('rejects prototype-pollution keys', () => {
+    const r = validateAiJson(
+      JSON.parse('{"__proto__":"Strong","constructor":"Weak","ok":"Strong"}'),
+      ratingRecord,
+    );
+    expect(r.ok).toBe(false);
+    expect(r.errors.some((e) => /forbidden key/.test(e))).toBe(true);
+  });
+
+  test('the result has a clean prototype (no pollution rode through)', () => {
+    // Even a rejected payload must not have mutated Object.prototype.
+    validateAiJson(JSON.parse('{"__proto__":{"polluted":true}}'), ratingRecord);
+    expect({}.polluted).toBeUndefined();
+  });
+
+  test('rejects an over-long key', () => {
+    const r = validateAiJson({ ['x'.repeat(61)]: 'Strong' }, ratingRecord);
+    expect(r.ok).toBe(false);
+    expect(r.errors[0]).toMatch(/key exceeds 60 characters/);
+  });
+
+  test('rejects too many entries', () => {
+    const big = {};
+    for (let i = 0; i < 11; i++) big[`k${i}`] = 'Strong';
+    const r = validateAiJson(big, ratingRecord);
+    expect(r.ok).toBe(false);
+    expect(r.errors[0]).toMatch(/max 10 entries/);
+  });
+
+  test('enforces a key pattern when declared', () => {
+    const schema = {
+      type: 'record',
+      keys: { pattern: '^[A-Za-z ]+$' },
+      of: { type: 'string' },
+    };
+    const r = validateAiJson({ 'Bad<key>': 'v' }, schema);
+    expect(r.ok).toBe(false);
+    expect(r.errors[0]).toMatch(/allowed pattern/);
+  });
+
+  test('nested record-of-record validates two levels deep', () => {
+    const schema = {
+      type: 'record',
+      of: { type: 'record', of: { type: 'string' } },
+    };
+    const r = validateAiJson({ impact: { Claude: 'Strong', GPT: 'Weak' } }, schema);
+    expect(r).toEqual({ ok: true, value: { impact: { Claude: 'Strong', GPT: 'Weak' } } });
+  });
+});
