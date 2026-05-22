@@ -200,7 +200,9 @@ const recordData = {
   wmkf_ai_promptbody: USER_PROMPT_TEMPLATE,
   wmkf_ai_promptvariables: JSON.stringify(promptVariables, null, 2),
   wmkf_ai_promptoutputschema: JSON.stringify(promptOutputSchema, null, 2),
-  wmkf_ai_model: 'claude-sonnet-4-20250514',
+  // Tier key, not a concrete id — the Executor's resolveModel() maps 'sonnet'
+  // to the current Sonnet (claude-sonnet-4-6), so the row never goes stale.
+  wmkf_ai_model: 'sonnet',
   wmkf_ai_temperature: 0.3,
   wmkf_ai_maxtokens: 16384,
   wmkf_ai_promptstatus: PROMPTSTATUS_PUBLISHED,

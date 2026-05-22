@@ -51,7 +51,7 @@ DynamicsService.bypassRestrictions('seed-peer-review-summarizer-prompts');
 
 const ENTITY_SET = 'wmkf_ai_prompts';
 const PROMPTSTATUS_PUBLISHED = 682090001;
-const MODEL = 'claude-sonnet-4-20250514'; // matches baseConfig['peer-review-summarizer']
+const MODEL = 'sonnet'; // tier key — resolveModel() maps to the current Sonnet (matches baseConfig['peer-review-summarizer'])
 
 const DRY = process.argv.includes('--dry-run');
 const EXECUTE = process.argv.includes('--execute');

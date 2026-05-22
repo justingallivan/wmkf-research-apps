@@ -267,7 +267,8 @@ const recordData = {
   // Sonnet 4 (1024-token cache threshold; matches phase-i.summary). With the
   // padding above the system block clears the threshold and cache_control
   // engages. See PADDING NOTE above the SYSTEM_PROMPT definition.
-  wmkf_ai_model: 'claude-sonnet-4-20250514',
+  // Tier key — resolveModel() maps 'sonnet' to the current Sonnet.
+  wmkf_ai_model: 'sonnet',
   wmkf_ai_temperature: 0,
   wmkf_ai_maxtokens: 256,
   wmkf_ai_promptstatus: PROMPTSTATUS_PUBLISHED,

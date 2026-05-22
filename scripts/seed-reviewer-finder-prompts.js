@@ -78,7 +78,7 @@ DynamicsService.bypassRestrictions('seed-reviewer-finder-prompts');
 
 const ENTITY_SET = 'wmkf_ai_prompts';
 const PROMPTSTATUS_PUBLISHED = 682090001; // confirmed Session 109 schema probe
-const REVIEWER_FINDER_MODEL = 'claude-sonnet-4-20250514'; // matches baseConfig['reviewer-finder']
+const REVIEWER_FINDER_MODEL = 'sonnet'; // tier key — resolveModel() maps to the current Sonnet (matches baseConfig['reviewer-finder'])
 
 const DRY = process.argv.includes('--dry-run');
 const EXECUTE = process.argv.includes('--execute');

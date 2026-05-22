@@ -101,7 +101,8 @@ const seedRecord = {
   wmkf_ai_promptbody: USER_PROMPT_TEMPLATE,
   wmkf_ai_promptvariables: seedVariables,
   wmkf_ai_promptoutputschema: seedOutputSchema,
-  wmkf_ai_model: 'claude-sonnet-4-20250514',
+  // Tier key — resolveModel() maps 'sonnet' to the current Sonnet.
+  wmkf_ai_model: 'sonnet',
   wmkf_ai_temperature: 0.3,
   wmkf_ai_maxtokens: 16384,
   // Excluded from diff (always changes / hardcoded):

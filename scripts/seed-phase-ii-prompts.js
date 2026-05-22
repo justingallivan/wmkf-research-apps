@@ -66,7 +66,7 @@ DynamicsService.bypassRestrictions('seed-phase-ii-prompts');
 
 const ENTITY_SET = 'wmkf_ai_prompts';
 const PROMPTSTATUS_PUBLISHED = 682090001;
-const MODEL = 'claude-sonnet-4-20250514'; // matches all 4 baseConfig entries
+const MODEL = 'sonnet'; // tier key — resolveModel() maps to the current Sonnet (matches all 4 baseConfig entries)
 
 const DRY = process.argv.includes('--dry-run');
 const EXECUTE = process.argv.includes('--execute');
