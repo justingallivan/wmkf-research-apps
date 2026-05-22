@@ -148,8 +148,12 @@ const SURFACES = [
   {
     id: 'expertise-finder',
     inv: 13,
-    status: 'pending',
+    status: 'migrated',
     promptFiles: ['shared/config/prompts/expertise-finder.js'],
+    callSiteFiles: [
+      'pages/api/expertise-finder/match.js',
+      'pages/api/expertise-finder/batch-match.js',
+    ],
   },
   {
     id: 'integrity-screener',

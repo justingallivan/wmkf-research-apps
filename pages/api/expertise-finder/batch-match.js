@@ -26,6 +26,13 @@ import { createHash } from 'crypto';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { GraphService } from '../../../lib/services/graph-service';
+import {
+  DATA_CLASSES,
+  EXPERTISE_FINDER_PROPOSAL_MAX_CHARS,
+  wrapUntrustedContent,
+} from '../../../lib/utils/ai-payload-boundary';
+import { validateAiJson } from '../../../lib/utils/ai-output-schema';
+import { EXPERTISE_MATCH_SCHEMA } from '../../../shared/config/expertise-finder-output-schema';
 
 const APP_KEY = 'expertise-finder';
 
@@ -134,7 +141,14 @@ export default async function handler(req, res) {
     // hardest — every proposal after the first reuses the same system
     // prefix (task + rules + roster + output spec).
     const systemPrompt = buildCacheableSystemPrompt(rosterResult.rows);
-    const userPrompt = buildUserPrompt(proposalText, additionalNotes);
+    const proposalPayload = wrapUntrustedContent({
+      text: proposalText,
+      source: 'expertise-finder.batch-match.proposalText',
+      dataClass: DATA_CLASSES.PROPOSAL_TEXT,
+      maxChars: EXPERTISE_FINDER_PROPOSAL_MAX_CHARS,
+      label: 'research proposal',
+    });
+    const userPrompt = buildUserPrompt(proposalPayload.text, additionalNotes);
 
     let result;
     let modelUsed = primaryModel;
@@ -164,6 +178,15 @@ export default async function handler(req, res) {
         rawResponse: result.content[0].text,
       });
     }
+
+    // Validate against the per-app schema (A7 Part 5) before persisting to
+    // expertise_matches — drop any keys an injected model added.
+    const validatedMatch = validateAiJson(matchResults, EXPERTISE_MATCH_SCHEMA);
+    if (!validatedMatch.ok) {
+      console.error('[ExpertiseFinder:Batch] Output schema validation failed:', validatedMatch.errors.join('; '));
+      return res.status(502).json({ error: 'Claude returned structurally invalid matching results', requestNumber });
+    }
+    matchResults = validatedMatch.value;
 
     // Step 6: Save to database
     const textHash = createHash('sha256').update(proposalText).digest('hex').substring(0, 64);
