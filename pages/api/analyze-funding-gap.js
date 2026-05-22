@@ -10,8 +10,10 @@ import { safeFetch } from '../../lib/utils/safe-fetch';
 import {
   DATA_CLASSES,
   FUNDING_GAP_PROPOSAL_MAX_CHARS,
-  buildBoundedTextPayload,
+  wrapUntrustedContent,
 } from '../../lib/utils/ai-payload-boundary';
+import { validateAiJson } from '../../lib/utils/ai-output-schema';
+import { FUNDING_EXTRACTION_SCHEMA } from '../../shared/config/funding-extraction-output-schema';
 
 export const config = {
   api: {
@@ -114,13 +116,17 @@ export default async function handler(req, res) {
         // Step 2: Use Claude to extract PI, institution, keywords
         sendProgress(`Extracting PI information and keywords from ${file.filename}...`, baseProgress + 5);
 
-        const extractionPayload = buildBoundedTextPayload({
+        const extractionPayload = wrapUntrustedContent({
           text: proposalText,
           source: 'funding-gap.extraction.proposalText',
           dataClass: DATA_CLASSES.PROPOSAL_TEXT,
           maxChars: FUNDING_GAP_PROPOSAL_MAX_CHARS,
+          label: 'research proposal',
         });
-        const extractionPrompt = createFundingExtractionPrompt(extractionPayload.text);
+        const extractionPrompt = createFundingExtractionPrompt(
+          extractionPayload.text,
+          [extractionPayload.nonce],
+        );
         let extractionResponse;
 
         try {
@@ -144,9 +150,18 @@ export default async function handler(req, res) {
           } else if (cleanedResponse.startsWith('```')) {
             cleanedResponse = cleanedResponse.replace(/```\n?/g, '');
           }
-          extraction = JSON.parse(cleanedResponse);
+          const parsedExtraction = JSON.parse(cleanedResponse);
+          // Validate against the per-app schema (A7 Part 6) — drop any keys an
+          // injected model added before the values drive federal-API queries.
+          const validatedExtraction = validateAiJson(parsedExtraction, FUNDING_EXTRACTION_SCHEMA);
+          if (!validatedExtraction.ok) {
+            throw new Error(
+              `Extraction failed schema validation: ${validatedExtraction.errors.join('; ')}`,
+            );
+          }
+          extraction = validatedExtraction.value;
 
-          if (!extraction.pi || !extraction.institution || !extraction.keywords) {
+          if (!extraction.pi || !extraction.institution || !extraction.keywords?.length) {
             throw new Error('Missing required fields in extraction');
           }
 

@@ -1,7 +1,8 @@
 # A7: LLM01 prompt-injection hardening — inventory & remediation plan
 
-**Status:** Parts 0–5 SHIPPED (Parts 0–4 Session 174 2026-05-21; Part 5
-Session 176 2026-05-22); Part 6 pending.
+**Status:** Parts 0–6 SHIPPED (Parts 0–4 Session 174 2026-05-21; Parts 5–6
+Session 176 2026-05-22). All 24 LLM-input surfaces in the registry are
+`migrated`; `check:prompt-injection-tagging` reports 0 pending.
 Created 2026-05-21 (Session 173). Revised 2026-05-21 (Session 174) after a
 Codex review against the live codebase — see "Revision log" at the foot.
 **Owed deploy step:** re-run `scripts/seed-phase-i-summary-prompt.js --execute`
@@ -197,8 +198,15 @@ outputs can't be schema-validated; their control is the boundary + preamble.
    flag (preamble-only, no wrapper) with self-test fixtures. Deferred: per-stage
    output-schema validation for the multi-stage #15 and #8 pipelines (their
    JSON outputs feed a display, not a Dynamics/DB write — see commit notes).
-6. **Remaining U-EXT routes** — #9 (incl. multimodal preamble), #10, #14, #21,
-   #24.
+6. **Remaining U-EXT routes** — ✅ SHIPPED (S176). #9 (Literature Analyzer:
+   multimodal preamble on the paper-extraction document block; synthesis +
+   comparison wrap the re-fed paper summaries), #10 (Funding Gap Analyzer:
+   proposal wrapped + NSF/NIH/USAspending API blocks wrapped + extraction
+   output schema-validated), #14 (Integrity Screener: PubPeer/news search
+   results wrapped + preamble in `integrity-service.js` — its CommonJS prompt
+   builder dynamically imports the ESM helpers), #21 (contact-enrichment:
+   candidate identity wrapped, system-prompt preamble, output schema-validated),
+   #24 (cron/log-analysis: error-log text wrapped + preamble).
 
 ## Test strategy
 

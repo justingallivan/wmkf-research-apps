@@ -122,15 +122,14 @@ const SURFACES = [
     id: 'process-peer-reviews',
     inv: 7,
     status: 'migrated',
-    promptFiles: ['shared/config/prompts/peer-reviewer.js'],
+    promptFiles: [
+      'shared/config/prompts/peer-reviewer.js',
+      // Dataverse-seeded Executor variant (only referenced by
+      // seed-peer-review-summarizer-prompts.js) — not a live route prompt, so
+      // it carries no source markers; the Executor (#20) handles its wrapping.
+      'shared/config/prompts/peer-reviewer-dynamics.js',
+    ],
     callSiteFiles: ['pages/api/process-peer-reviews.js'],
-  },
-  {
-    // Dynamics-variant peer-review prompt builder — separate, not yet migrated.
-    id: 'process-peer-reviews-dynamics',
-    inv: 7,
-    status: 'pending',
-    promptFiles: ['shared/config/prompts/peer-reviewer-dynamics.js'],
   },
   {
     id: 'evaluate-multi-perspective',
@@ -142,16 +141,20 @@ const SURFACES = [
     promptFiles: ['shared/config/prompts/multi-perspective-evaluator.js'],
   },
   {
+    // Stage 1 paper extraction is multimodal (PDF document block); Stage 2
+    // synthesis/comparison wrap the re-fed extracted-paper text in-builder,
+    // so this surface has a genuine wrap site and is not multimodal-flagged.
     id: 'analyze-literature',
     inv: 9,
-    status: 'pending',
+    status: 'migrated',
     promptFiles: ['shared/config/prompts/literature-analyzer.js'],
   },
   {
     id: 'analyze-funding-gap',
     inv: 10,
-    status: 'pending',
+    status: 'migrated',
     promptFiles: ['shared/config/prompts/funding-gap-analyzer.js'],
+    callSiteFiles: ['pages/api/analyze-funding-gap.js'],
   },
   {
     // Route-local prompt. The image path is multimodal (receipt image
@@ -174,10 +177,13 @@ const SURFACES = [
     ],
   },
   {
+    // integrity-screener.js is CommonJS (can't import the ESM boundary
+    // helpers); the wrap + preamble both live in the service call site.
     id: 'integrity-screener',
     inv: 14,
-    status: 'pending',
+    status: 'migrated',
     promptFiles: ['shared/config/prompts/integrity-screener.js'],
+    callSiteFiles: ['lib/services/integrity-service.js'],
   },
   {
     id: 'virtual-review-panel',
@@ -226,7 +232,13 @@ const SURFACES = [
     status: 'migrated',
     callSiteFiles: ['lib/services/execute-prompt.js'],
   },
-  { id: 'contact-enrichment', inv: 21, status: 'pending' },
+  {
+    // Service-local prompt — wrap + preamble live in the service.
+    id: 'contact-enrichment',
+    inv: 21,
+    status: 'migrated',
+    callSiteFiles: ['lib/services/contact-enrichment-service.js'],
+  },
   {
     id: 'reviewer-finder-emails',
     inv: 22,
@@ -242,7 +254,13 @@ const SURFACES = [
     status: 'migrated',
     callSiteFiles: ['pages/api/dynamics-explorer/chat.js'],
   },
-  { id: 'cron-log-analysis', inv: 24, status: 'pending' },
+  {
+    // Route-local prompt — wrap + preamble live in the route.
+    id: 'cron-log-analysis',
+    inv: 24,
+    status: 'migrated',
+    callSiteFiles: ['pages/api/cron/log-analysis.js'],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the

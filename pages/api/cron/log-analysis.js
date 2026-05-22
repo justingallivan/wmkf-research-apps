@@ -20,6 +20,11 @@ import NotificationService from '../../../lib/services/notification-service';
 import { redactLogText, redactErrorList } from '../../../lib/utils/log-redactor';
 import { LLMClient } from '../../../lib/services/llm-client';
 import MaintenanceService from '../../../lib/services/maintenance-service';
+import {
+  DATA_CLASSES,
+  wrapUntrustedContent,
+  buildUntrustedContentPreamble,
+} from '../../../lib/utils/ai-payload-boundary';
 
 const ERROR_THRESHOLD = 10; // minimum errors to trigger AI analysis
 const LOOKBACK_MS = 6 * 60 * 60 * 1000; // 6 hours
@@ -108,10 +113,20 @@ export default async function handler(req, res) {
         model: 'claude-haiku-4-5-20251001',
         appName: 'cron-log-analysis',
       });
+      // Log text can echo attacker-influenced request data (A7 Part 6) —
+      // wrap it in nonce-bearing sentinels and harden the system prompt.
+      const wrappedErrors = wrapUntrustedContent({
+        text: errorSummary,
+        source: 'cron-log-analysis.errorSummary',
+        dataClass: DATA_CLASSES.EXTERNAL_API_TEXT,
+        maxChars: 60_000,
+        label: 'error log entries',
+      });
       const { text } = await claude.complete({
+        system: buildUntrustedContentPreamble([wrappedErrors.nonce]),
         messages: [{
           role: 'user',
-          content: `You are a server ops assistant. Analyze these ${errors.length} error log entries from a Next.js application on Vercel. Identify patterns, probable root causes, and suggest fixes. Be concise.\n\n${errorSummary}`,
+          content: `You are a server ops assistant. Analyze these ${errors.length} error log entries from a Next.js application on Vercel. Identify patterns, probable root causes, and suggest fixes. Be concise.\n\n${wrappedErrors.text}`,
         }],
         maxTokens: 1024,
       });
