@@ -22,6 +22,7 @@ import {
   checkRateLimit,
   recordTokenOutcome,
   clientIp,
+  __resetLimiterHealthForTest,
 } from '../../lib/external/rate-limit.js';
 
 const TOKEN = 'reviewer-magic-link-jwt-value';
@@ -39,6 +40,9 @@ beforeEach(() => {
   randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
   sql.mockReset();
   AlertService.createAlert.mockReset();
+  // The degraded-limiter failure counter is module state — reset it so each
+  // test starts from a known health state.
+  __resetLimiterHealthForTest();
 });
 
 afterEach(() => {
@@ -148,5 +152,54 @@ describe('recordTokenOutcome', () => {
     await expect(
       recordTokenOutcome(reqWith('1.2.3.4'), TOKEN, false),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('degraded-limiter alerting', () => {
+  it('does not alert on a few isolated DB failures (below threshold)', async () => {
+    sql.mockRejectedValue(new Error('db down'));
+    for (let i = 0; i < 4; i++) {
+      await checkRateLimit(reqWith('1.2.3.4'), TOKEN);
+    }
+    expect(AlertService.createAlert).not.toHaveBeenCalled();
+  });
+
+  it('raises a deduplicated alert once consecutive DB failures cross the threshold', async () => {
+    sql.mockRejectedValue(new Error('db down'));
+    for (let i = 0; i < 5; i++) {
+      await checkRateLimit(reqWith('1.2.3.4'), TOKEN);
+    }
+    expect(AlertService.createAlert).toHaveBeenCalledTimes(1);
+    const arg = AlertService.createAlert.mock.calls[0][0];
+    expect(arg.autoResolveKey).toBe('external-rate-limit-db-degraded');
+    expect(arg.metadata.consecutiveFailures).toBe(5);
+    // Every checkRateLimit still failed open.
+    expect((await checkRateLimit(reqWith('1.2.3.4'), TOKEN))).toEqual({ ok: true });
+  });
+
+  it('a successful DB round trip resets the failure counter', async () => {
+    // 4 failures, then a success (resets), then 4 more failures — never 5 in a row.
+    for (let i = 0; i < 4; i++) {
+      sql.mockRejectedValueOnce(new Error('db down'));
+      await checkRateLimit(reqWith('1.2.3.4'), TOKEN);
+    }
+    sql.mockResolvedValueOnce({ rows: [{ bucket_key: tokKey, hit_count: 1 }] });
+    await checkRateLimit(reqWith('1.2.3.4'), TOKEN);
+    for (let i = 0; i < 4; i++) {
+      sql.mockRejectedValueOnce(new Error('db down'));
+      await checkRateLimit(reqWith('1.2.3.4'), TOKEN);
+    }
+    expect(AlertService.createAlert).not.toHaveBeenCalled();
+  });
+
+  it('counts recordTokenOutcome DB failures toward the same threshold', async () => {
+    sql.mockRejectedValue(new Error('db down'));
+    await checkRateLimit(reqWith('1.2.3.4'), TOKEN);   // failure 1
+    await checkRateLimit(reqWith('1.2.3.4'), TOKEN);   // failure 2
+    await checkRateLimit(reqWith('1.2.3.4'), TOKEN);   // failure 3
+    await recordTokenOutcome(reqWith('1.2.3.4'), TOKEN, false); // failure 4
+    expect(AlertService.createAlert).not.toHaveBeenCalled();
+    await recordTokenOutcome(reqWith('1.2.3.4'), TOKEN, false); // failure 5
+    expect(AlertService.createAlert).toHaveBeenCalledTimes(1);
   });
 });
