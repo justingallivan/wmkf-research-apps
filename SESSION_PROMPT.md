@@ -1,118 +1,89 @@
-# Session 177 Prompt: A7 follow-up — finish the Codex-review remediation (steps 2c–5)
+# Session 178 Prompt: open — A7 follow-up fully closed, pick next work
 
-## Session 176 Summary
+## Session 177 Summary
 
-A long, productive session. A7 (prompt-injection hardening) went from Parts 0–4
-to **fully shipped**, then a full Codex re-audit of all the security work drove a
-follow-up remediation that is ~60% done.
+A focused session: the A7 prompt-injection follow-up (steps 0, 2c–5 from the
+S176 Codex remediation plan) was implemented in full, then taken through
+**three** Codex review rounds to a **FULLY RESOLVED** verdict.
 
 ### What Was Completed
 
-1. **A7 Parts 5 + 6 — all 16 remaining LLM-input surfaces hardened.**
-   Routes #1–#6, #8, #9, #10, #11, #13, #14, #15, #16, #21, #22, #24. Each wraps
-   untrusted text with `wrapUntrustedContent` (or carries the multimodal preamble
-   for image/document content blocks); JSON sinks validate via `validateAiJson`.
-   `check:prompt-injection-tagging` gained a `multimodal` surface flag. Gate now
-   **24 migrated / 0 pending**. A7 plan marked Parts 0–6 SHIPPED.
+1. **Step 0 — `validateStage()` fallback fixed** (`evaluate-multi-perspective.js`)
+   Now throws on a schema-validation failure instead of returning the raw
+   parse — an injected key could otherwise ride through into the next stage's
+   re-feed. All call sites are inside try/catch that degrades safely.
 
-2. **A7 Part 2 deploy done.** `seed-phase-i-summary-prompt.js --execute` re-run;
-   live `wmkf_ai_prompts` row `d4201d8e-…` now declares `proposal_text`
-   `untrusted: true`.
+2. **Step 2c — VRP output-schema validation** (`panel-review-service.js`)
+   New `shared/config/virtual-review-panel-output-schema.js` (7 declarative
+   `validateAiJson` schemas). New `_validateStageOutput()` helper wired into
+   all 6 `parseJSONResponse` sites. Synthesis (the mandatory final stage) now
+   throws on a null/invalid summary rather than persisting `panelSummary: null`
+   under `status: 'completed'`.
 
-3. **Stale-model bug found + fixed (systemic).** 6 prompt-seed scripts
-   hard-coded `claude-sonnet-4-20250514` (Sonnet 4.0). `resolveModel()` passes
-   concrete ids through unchanged, so every deployed prompt row was pinned to a
-   year-old model. Switched 5 to the `sonnet` tier key; `echo-parity` kept a
-   pinned concrete id (parity-test requirement) bumped to `claude-sonnet-4-6`.
-   **All 10 live `wmkf_ai_prompts` rows re-seeded** (phase-i, phase-ii ×4,
-   peer-review ×2, reviewer-finder ×2, echo-parity).
+3. **Step 3 — Executor output-schema validation** (`execute-prompt.js`)
+   Prompt rows may declare an optional `validationSchema`; JSON mode validates
+   the parsed output against it before `persistOutputs()`. Additive — prompts
+   without it are unchanged; raw mode untouched. `EXECUTOR_CONTRACT.md`
+   documents the field.
 
-4. **Codex re-audit of A1–A8** (`SECURITY_AUDIT_2026-05-21.md` as baseline).
-   Verdict: all original findings closed or tracked. Caught a real residual —
-   see below.
+4. **Step 4 — `check:prompt-injection-tagging` is now call-site-granular**
+   A surface can declare a `builders` list; the gate slices the prompt file
+   per `export function` and asserts each builder carries the preamble in its
+   own body (closing the file-level masking hole that false-greened #8/#15).
+   Two exemption flags: `routePreamble` (preamble injected at the route) and
+   `noCallSite` (exported but A7-inert). 8 surfaces registered. Lesson F added
+   to `CLAUDE_COVERAGE_LESSONS.md`; self-test 16/16.
 
-5. **A7 follow-up steps 1/2a/2b** (Codex-verified correct):
-   - **1** — added a `record` node type to `validateAiJson` (dynamic-keyed maps;
-     rejects `__proto__`/`constructor`/`prototype`).
-   - **2a** — #8 (`evaluate-multi-perspective`): wrapped the re-fed
-     concept/literature/perspective blocks; all 4 JSON sinks schema-validated
-     (`shared/config/multi-perspective-output-schema.js`).
-   - **2b** — #15 (`virtual-review-panel`): wrapped every re-fed block (search
-     results, claim data, intelligence, prior reviews); added the preamble
-     `createPanelSynthesisPrompt` was missing entirely.
+5. **Step 5 — mop-up**
+   `wrapUntrustedContent` label now strips `[`/`]` (a `]]` could forge a
+   sentinel); `claudeWebSearch()` migrated from raw Anthropic fetch to
+   `LLMClient` (web_search tool preserved).
 
-### The Codex residual (HIGH) — now closed by 1/2a/2b
+### Codex review trail
+Round 1 → NEEDS FIXES (1 MEDIUM + 3 LOW + 1 NIT); round 2 → partial;
+round 3 → **FULLY RESOLVED**. Every finding closed (synthesis-failure-presents-
+as-success, fail-open schemaKey, `_truncated` provenance, includes-vs-call-form,
+multi-builder registry coverage, dead-builder misclassification).
 
-A7 Parts 5–6 hardened #8/#15 only at their *entry points* — both still re-fed
-prior-stage LLM output and U-EXT results into later LLM calls **unwrapped**
-(preamble present, but no sentinels around the data). Steps 2a/2b fixed it; a
-second Codex pass confirmed no remaining unwrapped re-feed path in either file.
+### Commits (S177, `main`, 8 — pushed)
+`22de5c7` step 0 · `8b9575c` step 2c · `95c0f4e` step 3 · `2d5c2bb` step 4 ·
+`4940681` step 5 · `f6c0011` Codex round-1 fixes · `7b37b9e` Codex round-2 fixes ·
+`b54e78b` Codex round-3 fixes
 
-### Commits (S176, `main`, pushed — 18 + this doc commit)
-`2ad5297`·`af80cae`·`cc1b36b`·`84a1d30`·`5a0f5e7`·`cb8da14`·`f4cac7f`·`51cdbf7`·`c1f5282`·`c133656` (A7 Parts 5–6) · `d1cfd4d` (deploy) · `ad348a8`·`0ce8514` (model fix) · `8e05fb5`·`4e390d8`·`f0f3fbd` (follow-up 1/2a/2b)
+## Potential Next Steps
 
-## Potential Next Steps — A7 follow-up steps 2c–5
+A7 and its follow-up are now fully shipped and Codex-verified — **no A7 work
+is pending.** Pick from the roadmap:
 
-The Codex review produced an explicit, ordered next-session plan. **Do them in
-order.** Full detail: re-read the Codex output in the S176 transcript, or the
-findings below.
+### 1. Slice-0 schema deploy (PARKED — destructive carryover, verify first)
+Connor field-review + Justin go-ahead still pending. See memory
+[[slice0-deactivate-not-delete-recalc]]. P1-Update (statecode-Update
+trigger-filter binding) is the single open pre-deploy gate. Verify live state
+before acting — do not treat the carryover as green-lit.
 
-### 0. FIRST — fix `validateStage()` fallback semantics
-`pages/api/evaluate-multi-perspective.js` `validateStage()` returns the **raw**
-parsed object on a validation failure — that bypasses the key-dropping. Make it
-return the cleaned/stripped value (or throw). Do this before copying the pattern
-into 2c/3.
+### 2. Staged Review Pipeline / Proposal Context Extraction
+Roadmap initiatives (see memory + `docs/PROPOSAL_CONTEXT_EXTRACTION_PLAN.md`).
 
-### 1. Step 2c — VRP output-schema validation
-`lib/services/panel-review-service.js`: add `validateAiJson()` at every
-`parseJSONResponse()` site (lines ~362, 505, 598, 634, 669, 697). New schema
-file for the 6–7 stage outputs (claim extraction, collation, intelligence
-synthesis, claim verification, structured review, devil's advocate, synthesis).
-Synthesis `ratingMatrix` is dynamic reviewer-keyed → use the `record` node.
-
-### 2. Step 3 — Executor output-schema validation
-`lib/services/execute-prompt.js`: after `JSON.parse` (~line 480), before
-`persistOutputs()` (~540). JSON mode currently only checks `jsonSchema.required`
-then writes to `akoya_request`. Validate via `validateAiJson` against a
-declarative schema from the prompt row. **Raw mode must stay untouched** — the
-seeded `phase-i.summary` prompt is raw mode.
-
-### 3. Step 4 — make `check:prompt-injection-tagging` call-site-granular
-File-granular `content.includes()` lets one hardened call mask an unhardened
-sibling in the same file (this is how #8/#15 false-greened). Per-function
-inspection: per registered builder, assert its body contains the marker calls.
-Mandatory: add a self-test fixture `shared/config/prompts/fx-sibling.js` with a
-safe + an unsafe builder; assert the gate fails on the unsafe one.
-
-### 4. Step 5 — mop-up
-- `contact-enrichment-service.js` `claudeWebSearch()` (~line 600): migrate the
-  raw Anthropic `fetch` to `LLMClient` (keep web-search tool support).
-- `wrapUntrustedContent` label escaping (`ai-payload-boundary.js`): strip/escape
-  `]]` in `label`, not just `"`.
-
-### Also add (Codex): invalid-but-parseable-JSON self-tests at each new schema
-boundary — not only happy-path wrapping tests.
-
-### Parked (unchanged): Slice-0 schema deploy
-Destructive carryover; Connor field-review + Justin go-ahead pending. See memory
-[[slice0-deactivate-not-delete-recalc]]. Verify before acting.
+### 3. Interim grant report auto-evaluation
+Unblocked; field/prompt/process design still needed (memory
+[[project-interim-report-automation]]).
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/utils/ai-payload-boundary.js` | `wrapUntrustedContent` + preamble; `DATA_CLASSES` |
-| `lib/utils/ai-output-schema.js` | `validateAiJson` — incl. the new `record` node |
-| `scripts/check-prompt-injection-tagging.js` | A7 coverage gate (step 4 target) |
-| `lib/services/panel-review-service.js` | VRP stage orchestration (step 2c target) |
-| `lib/services/execute-prompt.js` | Executor (step 3 target) |
-| `shared/config/multi-perspective-output-schema.js` | #8 output schemas (pattern for 2c) |
-| `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md` | A7 plan — Parts 0–6 SHIPPED |
+| `shared/config/virtual-review-panel-output-schema.js` | 7 VRP stage output schemas (S177) |
+| `lib/services/panel-review-service.js` | VRP orchestration — `_validateStageOutput()` |
+| `lib/services/execute-prompt.js` | Executor — optional `validationSchema` |
+| `scripts/check-prompt-injection-tagging.js` | A7 gate — call-site-granular `builders` layer |
+| `docs/CLAUDE_COVERAGE_LESSONS.md` | Lesson F: file-granular `content.includes()` masking |
+| `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md` | A7 plan — Parts 0–6 + follow-up SHIPPED |
 
 ## Testing
 
 ```bash
-npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging:self-test
-npx jest                                     # 645 passed as of S176
+npx jest                                     # 656 passed as of S177
 npm run build                                # green
+npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging:self-test  # 16/16
+npm run check:atlas && npm run check:api-routes && npm run check:fact-consistency
 ```
