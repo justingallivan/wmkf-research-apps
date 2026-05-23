@@ -52,6 +52,10 @@
     {
       "path": "/api/cron/auth-bypass-check",
       "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/cron/drain-submissions",
+      "schedule": "*/2 * * * *"
     }
   ]
 }

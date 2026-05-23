@@ -1,6 +1,6 @@
 # API Route Security Matrix
 
-Last updated: 2026-05-08
+Last updated: 2026-05-23
 
 ## Purpose
 
@@ -25,6 +25,7 @@ The matrix focuses on authorization, data ownership, and persistence (what each 
 | Superuser | Linked profile plus `dynamics_user_roles.role = 'superuser'`. | `requireAuthWithProfile` plus role check |
 | Cron | Vercel scheduled/background endpoint. | `verifyCronSecret` |
 | External token | Public magic-link route scoped by the token payload and server-side token verification. | `verifySuggestionToken` |
+| Applicant session | NextAuth session minted by the `entra-external` provider (separate Entra External ID tenant). Carries `contactOid` + `contactEmail`. Routes scope writes to data the contact owns, and may additionally gate on `wmkf_portalmembership` role/state. | `getServerSession` + `session.user.userType === 'applicant'` (+ optional role/membership check) |
 
 ## Resolved Baseline Findings
 
@@ -71,6 +72,7 @@ There are no open findings from the initial matrix pass as of this update. New f
 | `/api/cron/secret-check` | GET, POST | Cron | `verifyCronSecret` | Secret metadata | Writes `system_alerts` (PG); sends email | Low | Expiration metadata only. |
 | `/api/cron/spend-check` | GET, POST | Cron | `verifyCronSecret` | Usage/spend logs | Reads `api_usage_log`; writes `system_alerts` (PG); sends email via Dynamics | Low | Global monitoring. |
 | `/api/cron/sweep-stale-invites` | GET, POST | Cron | `verifyCronSecret` | Reviewer suggestions whose parent request's meeting date is past | Reads `akoya_requests` + `wmkf_appreviewersuggestions`; PATCHes stuck suggestions to `wmkf_responsetype=no_response` | Low | Daily sweep that closes silent reviewer invites past their meeting date. Idempotent; bounded by `maxBatch` (default 200). Ad-hoc backfill knobs: `?graceDays=N`, `?maxBatch=N`, `?dryRun=1`. |
+| `/api/cron/drain-submissions` | GET, POST | Cron | `verifyCronSecret` | Up to `DRAIN_BATCH_SIZE` non-terminal jobs (claim-leased) | Claims + advances rows in `submission_jobs` (PG); writes `intake_audit` (PG); writes `system_alerts` (PG) on corruption/anomaly/build-pending; Phase B will write Dataverse `akoya_requests`/children + SharePoint folders + status-flip PATCH | Medium | Applicant intake portal drain. Two-phase claim (`FOR UPDATE SKIP LOCKED` + `lease_token`), transactional state-transition+audit, classifier-driven retry taxonomy. Phase A wires `queued → scanning → request_created` with duplicate-PK recovery (read-back via GET). `files_moved`/`dynamics_patched`/`status_flipped`/`completed` BUILD-PENDING — park next_attempt_at +1h + alert. Schedule `*/2 * * * *` (≪ `DRAIN_LOCK_TTL_SECONDS=600s`). |
 | `/api/dataverse-export/download` | GET | App | `requireAppAccess('dataverse-bulk-export')` + signed `dvx-download` token | Private export artifact (own run) | Reads a PRIVATE Vercel Blob (no writes) | Medium | Gated proxy for the private .xlsx — two gates (app access + short-lived ≈1h signed token binding the blob pathname). Streams Content-Disposition: attachment. Closes the public-URL exposure gap (Codex S160 P1). |
 | `/api/dataverse-export/metadata` | GET | App | `requireAppAccess('dataverse-bulk-export')` | Live Dataverse taxonomies (akoya_program / wmkf_type / wmkf_grantprogram / distinct akoya_requeststatus) | Read-only Dataverse; no PG/DV writes | Low | Fail-loud on taxonomy fetch (502), never a stale/partial list (Living-taxonomy §9). Distinct statuses page to completion, never one page. |
 | `/api/dataverse-export/preview` | POST | App | `requireAppAccess('dataverse-bulk-export')` | Validated QuerySpec → compiled FetchXML + true aggregate count + era split | Read-only Dataverse (FetchXML aggregate counts only, NO rows); no writes | Low | §2.1 validation → 422 + violations. Mints a signed `resultToken` (HS256 / NEXTAUTH_SECRET) binding the exact validated spec. Never OData /$count. |
@@ -93,6 +95,7 @@ There are no open findings from the initial matrix pass as of this update. New f
 | `/api/grant-reporting/extract` | POST | App | `requireAppAccess('grant-reporting')` | Request payload / Dynamics | Writes `api_usage_log` (PG); writes `wmkf_ai_run` (DV) via logAiRun | Medium | AI and Dynamics data-boundary review. |
 | `/api/grant-reporting/lookup-grant` | POST | App | `requireAppAccess('grant-reporting', 'batch-phase-i-summaries')` | Staff app-wide Dynamics/SharePoint lookup by request number | Reads Dynamics + SharePoint (read-only) | Medium | Boundary documented inline. |
 | `/api/health` | GET | Authenticated | `requireAuth` | Service status | Read-only | Low | Avoid exposing to unauthenticated users. |
+| `/api/intake/submit` | POST | Applicant session | `getServerSession` + `userType === 'applicant'` + Submitter-role guard via Dataverse `wmkf_portalmemberships` (live = approved + active + `wmkf_role=100000000`) | One own draft → one own `submission_jobs` row | Single PG txn: INSERT `submission_jobs` (idempotency-keyed) + UPDATE `intake_drafts.request_id = generated GUID`; best-effort `intake_audit` write (`submit` happy path / `submit.blocked_terminal` on 409) | Medium | Applicant intake portal — submission entry point. Pre-generates the `akoya_request` GUID written to PG immediately, materialized in Dataverse later by the drain. Idempotent via `idempotency_key UNIQUE` (`DO UPDATE … RETURNING`). 409 + `previous_submission_terminal` on collision against a terminal-status prior job. Attachment-shape validator (`lib/utils/intake-attachment-shape.js`) + all-clean scan invariant at submit-entry. |
 | `/api/integrity-screener/dismiss` | POST, GET disallowed | App | `requireAppAccess('integrity-screener')` | Service layer | Writes `screening_dismissals`; updates `integrity_screenings` (PG) | Low | Method parsing looks safe; confirm service-level scope. |
 | `/api/integrity-screener/history` | GET, PATCH | App | `requireAppAccess('integrity-screener')` | `access.profileId` passed to service | GET reads `integrity_screenings`; PATCH updates `integrity_screenings.status/notes/reviewed_at` (PG) | Low | Good scoping pattern if service enforces it. |
 | `/api/integrity-screener/screen` | POST | App | `requireAppAccess('integrity-screener')` | `access.profileId` passed to service | Writes `integrity_screenings`, `api_usage_log` (PG) | Low | AI/search payload review. |
