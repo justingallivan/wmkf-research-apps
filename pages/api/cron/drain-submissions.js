@@ -46,7 +46,6 @@
 
 import crypto from 'crypto';
 import pkg from 'pg';
-import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { classify } from '../../../lib/utils/drain-error-classifier';
 import IntakeAuditService from '../../../lib/services/intake-audit-service';
@@ -519,8 +518,36 @@ async function processJob(client, job) {
 
 // ---------- handler ----------
 
+/**
+ * Strict CRON_SECRET check — no NODE_ENV=development bypass.
+ *
+ * Codex round-12 Q5: the shared `verifyCronSecret` bypasses auth entirely
+ * in dev mode (cron-auth.js:24). For routes that just write monitoring
+ * rows (health-check / spend-check / etc.) that's acceptable; this route
+ * advances real state machine rows and will, in Phase B, write to
+ * Dataverse + SharePoint. A developer pointing .env.local at prod-shaped
+ * connection strings could mutate prod data with an unauthenticated GET.
+ *
+ * For dev testing of this route, set CRON_SECRET in .env.local and call
+ * with the matching Bearer header — same shape as production.
+ */
+function verifyDrainCronSecret(req, res) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    console.error('[drain] CRON_SECRET not configured');
+    res.status(500).json({ error: 'CRON_SECRET not configured' });
+    return false;
+  }
+  const got = req.headers.authorization;
+  if (got !== `Bearer ${secret}`) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return false;
+  }
+  return true;
+}
+
 export default async function handler(req, res) {
-  if (!verifyCronSecret(req, res)) return;
+  if (!verifyDrainCronSecret(req, res)) return;
 
   const pool = getPool();
   const client = await pool.connect();

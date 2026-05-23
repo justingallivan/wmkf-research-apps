@@ -60,6 +60,14 @@ import { validateAttachmentShape } from '../../../lib/utils/intake-attachment-sh
 const { Pool } = pkg;
 
 const TERMINAL_STATUSES = new Set(['failed', 'cancelled']);
+const PG_UNIQUE_VIOLATION = '23505';
+// Index name from migration 011 — the partial-unique on submission_jobs
+// keyed (contact_oid, account_id, form_key) WHERE status NOT IN terminal.
+// A 23505 against THIS constraint means another active submit exists for
+// the same triple (two-tabs-different-keys race). Other 23505s (e.g., the
+// idempotency_key UNIQUE) are handled by the ON CONFLICT clause and never
+// surface as a thrown error.
+const ACTIVE_SUBMIT_UNIQUE_INDEX = 'idx_submission_jobs_one_active_per_contact_form';
 
 // ---------- helpers ----------
 
@@ -206,6 +214,44 @@ export default async function handler(req, res) {
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
+
+    // Codex round-12 Q1: 23505 on the partial-unique
+    // (contact_oid, account_id, form_key) WHERE status NOT IN terminal means
+    // a parallel submit (different idempotency_key, same triple) already
+    // claimed a non-terminal job row. Don't 500 the loser — surface a
+    // structured 409 the UI can poll against (mirrors the
+    // `previous_submission_terminal` 409 shape from §"Draft rotation on 409").
+    if (err?.code === PG_UNIQUE_VIOLATION && err?.constraint === ACTIVE_SUBMIT_UNIQUE_INDEX) {
+      try {
+        const existing = await client.query(
+          `SELECT id, request_id, status
+             FROM submission_jobs
+            WHERE contact_oid = $1 AND account_id = $2 AND form_key = $3
+              AND status NOT IN ('completed', 'failed', 'cancelled')
+            ORDER BY created_at DESC
+            LIMIT 1`,
+          [contactOid, accountId, formKey],
+        );
+        const prior = existing.rows[0];
+        IntakeAuditService.log({
+          actorOid: contactOid,
+          actorType: 'applicant',
+          action: 'submit.blocked_in_progress',
+          targetEntity: 'submission_jobs',
+          targetId: prior ? String(prior.id) : null,
+          payload: { priorJobId: prior?.id, priorStatus: prior?.status },
+        }).catch(() => {});
+        return jsonError(res, 409, 'submission_in_progress', {
+          priorJobId: prior?.id ?? null,
+          priorRequestId: prior?.request_id ?? null,
+          priorStatus: prior?.status ?? null,
+        });
+      } catch (lookupErr) {
+        // Lookup failed — fall through to the catch-all 500 below.
+        console.error('[intake/submit] in-progress lookup failed:', lookupErr);
+      }
+    }
+
     console.error('[intake/submit] txn failed:', err);
     return jsonError(res, 500, 'Submission failed; please retry');
   } finally {

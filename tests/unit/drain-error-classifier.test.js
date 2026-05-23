@@ -137,6 +137,32 @@ describe('classify — retryable / maxAttempts contract', () => {
   });
 });
 
+describe('classify — isTransient=false override (Codex round-12 Q3)', () => {
+  test('status=500 + isTransient=false → validation_400 (not transient_5xx)', () => {
+    expect(classify({ serviceName: 'dataverse', status: 500, isTransient: false }).category)
+      .toBe('validation_400');
+  });
+  test('config-bug stub (status:500 + isTransient:false, no body) → validation_400 terminal', () => {
+    // The shape buildServiceError emits for { status: 500 } with options.isTransient=false
+    const err = { serviceName: 'dataverse', status: 500, isTransient: false };
+    const r = classify(err);
+    expect(r.category).toBe('validation_400');
+    expect(r.retryable).toBe(false);
+  });
+  test('status=401 + isTransient=false → still auth_4xx (more specific category preserved)', () => {
+    expect(classify({ serviceName: 'dataverse', status: 401, isTransient: false }).category)
+      .toBe('auth_4xx');
+  });
+  test('status=404 + isTransient=false → still not_found_404', () => {
+    expect(classify({ serviceName: 'dataverse', status: 404, isTransient: false }).category)
+      .toBe('not_found_404');
+  });
+  test('isTransient=true (explicit) does NOT trigger the override path', () => {
+    expect(classify({ serviceName: 'dataverse', status: 502, isTransient: true }).category)
+      .toBe('transient_5xx');
+  });
+});
+
 describe('classify — defensive inputs', () => {
   test('null → unknown', () => {
     expect(classify(null).category).toBe('unknown');

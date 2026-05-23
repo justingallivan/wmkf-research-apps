@@ -768,6 +768,50 @@ The shared `BLOB_READ_WRITE_TOKEN` (public store `phase-ii-summaries-blob`) is *
 
 ---
 
+## Phase B deploy handoff — unpark BUILD-PENDING rows
+
+The Phase A drain (shipped S180 commit `d09886f`) routes states without
+handlers (`request_created`, `files_moved`, `dynamics_patched`,
+`status_flipped`) to `parkBuildPending`, which pushes `next_attempt_at`
+out by **1 hour** and clears the lease. Rationale: avoid burning cron
+ticks while the next state's code is unimplemented; a deduped
+`system_alerts` row keeps the parking visible to operators.
+
+**The catch (Codex round-12 Q4):** when a Phase B state handler ships,
+parked rows do not pick up on the next cron tick. They wait until their
+1-hour `next_attempt_at` expires. They are not stuck (the row stays
+non-terminal, the alert stays visible), but the deploy handoff needs an
+explicit unpark step or a test submission will appear inert post-deploy.
+
+**Unpark SQL — run right after each Phase B state handler deploys:**
+
+```sql
+-- Replace the target list with the state(s) the new handler now consumes.
+-- The WHERE next_attempt_at > now() clause avoids touching rows that are
+-- already ready; lease columns are belt-and-suspenders against an
+-- in-flight worker (cleared by parkBuildPending but defensive anyway).
+UPDATE submission_jobs
+   SET next_attempt_at = now(),
+       locked_until = NULL,
+       lease_token = NULL
+ WHERE status IN ('request_created')  -- or whatever ships
+   AND next_attempt_at > now()
+   AND status NOT IN ('completed', 'failed', 'cancelled');
+```
+
+**Verify after unpark:**
+
+```sql
+SELECT status, COUNT(*) FROM submission_jobs
+ WHERE status NOT IN ('completed', 'failed', 'cancelled')
+ GROUP BY status;
+```
+
+The deduped `intake_drain_build_pending` alert auto-resolves once no
+rows hit the parking path on the next cron tick.
+
+---
+
 ## Compliance-loop direction (out of v1 scope)
 
 Future v1.x: add `'awaiting_correction'` to the submission_jobs status CHECK; drain pauses; applicant edits via `/apply/submissions/[id]`; re-submits.
