@@ -706,8 +706,11 @@ const v26Statements = [
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_intake_drafts_unique_with_request
      ON intake_drafts (account_id, request_id, form_key)
      WHERE request_id IS NOT NULL`,
+  // Migration 012 (P3, v7): requestless drafts are contact-scoped. The single-phase
+  // pivot makes this branch dominant, so two applicants at the same institution must
+  // be able to hold active drafts for the same form independently.
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_intake_drafts_unique_no_request
-     ON intake_drafts (account_id, form_key)
+     ON intake_drafts (contact_oid, account_id, form_key)
      WHERE request_id IS NULL`,
   `CREATE INDEX IF NOT EXISTS idx_intake_drafts_contact_oid ON intake_drafts(contact_oid)`,
   `CREATE INDEX IF NOT EXISTS idx_intake_drafts_account ON intake_drafts(account_id)`,

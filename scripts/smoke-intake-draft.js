@@ -34,9 +34,12 @@ const REQUEST = '00000000-0000-0000-0000-000000000bbb';
 const CONTACT_OID = 'smoke-test-oid-' + Date.now();
 const FORM_KEY = 'phase-ii-research-2026-06';
 
+// Second contact for the contact-scoped requestless-branch tests added in P3.
+const CONTACT_OID_2 = 'smoke-test-oid-2-' + Date.now();
+
 async function cleanup() {
   await sql`DELETE FROM intake_drafts WHERE account_id = ${ACCOUNT}`;
-  await sql`DELETE FROM intake_audit WHERE actor_oid = ${CONTACT_OID}`;
+  await sql`DELETE FROM intake_audit WHERE actor_oid IN (${CONTACT_OID}, ${CONTACT_OID_2})`;
 }
 
 function check(label, cond, ...details) {
@@ -138,7 +141,65 @@ function check(label, cond, ...details) {
     const bad = await IntakeAuditService.log({ actorType: 'nonsense', action: 'x' });
     check('bad actorType → null', bad === null);
 
-    console.log('10. delete + listByContact empty');
+    console.log('10. P3 — requestless drafts are contact-scoped');
+    // Two contacts at the same institution can both hold active requestless drafts
+    // for the same form. Pre-P3, the second upsert would have collided with the first
+    // because the partial-unique was (account_id, form_key) — collapsing both contacts'
+    // drafts into one row. After P3, the index is (contact_oid, account_id, form_key).
+    const c1Requestless = await IntakeDraftService.upsert({
+      contactOid: CONTACT_OID,
+      accountId: ACCOUNT,
+      requestId: null,
+      formKey: FORM_KEY,
+      draftJson: { title: 'contact-1-draft' },
+      attachments: [],
+    });
+    check('contact 1 requestless draft created', !!c1Requestless?.id);
+
+    const c2Requestless = await IntakeDraftService.upsert({
+      contactOid: CONTACT_OID_2,
+      accountId: ACCOUNT,
+      requestId: null,
+      formKey: FORM_KEY,
+      draftJson: { title: 'contact-2-draft' },
+      attachments: [],
+    });
+    check('contact 2 requestless draft created at same (account,form)', !!c2Requestless?.id);
+    check('contact-scoped: distinct rows, not collapsed', c1Requestless.id !== c2Requestless.id);
+
+    // Repeated upsert from contact 1 updates contact 1's row only — does not
+    // touch contact 2's parallel row.
+    const c1Again = await IntakeDraftService.upsert({
+      contactOid: CONTACT_OID,
+      accountId: ACCOUNT,
+      requestId: null,
+      formKey: FORM_KEY,
+      draftJson: { title: 'contact-1-updated' },
+      attachments: [],
+    });
+    check('contact 1 re-upsert hits same row', c1Again.id === c1Requestless.id);
+    check('contact 1 row now has updated title', c1Again.draft_json.title === 'contact-1-updated');
+
+    const c2Untouched = await IntakeDraftService.getByKey({
+      contactOid: CONTACT_OID_2,
+      accountId: ACCOUNT,
+      requestId: null,
+      formKey: FORM_KEY,
+    });
+    check('contact 2 row untouched by contact 1 upsert',
+      c2Untouched?.draft_json?.title === 'contact-2-draft');
+
+    // getByKey requestless branch requires contactOid (P3 contract).
+    let threw = null;
+    try {
+      await IntakeDraftService.getByKey({ accountId: ACCOUNT, requestId: null, formKey: FORM_KEY });
+    } catch (e) { threw = e; }
+    check('getByKey requestless without contactOid throws', threw?.message?.includes('contactOid'));
+
+    await IntakeDraftService.delete(c1Requestless.id);
+    await IntakeDraftService.delete(c2Requestless.id);
+
+    console.log('11. delete + listByContact empty');
     await IntakeDraftService.delete(created.id);
     await IntakeDraftService.delete(second.id);
     const empty = await IntakeDraftService.listByContact(CONTACT_OID);
