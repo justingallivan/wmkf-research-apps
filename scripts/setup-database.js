@@ -585,9 +585,10 @@ const v29Statements = [
      ON irs_exempt_orgs(subsection, status)`,
 ];
 
-// V30: Intake Portal submission jobs queue. See migration 009_submission_jobs.sql
-// and docs/INTAKE_PORTAL_DESIGN.md § "Submission lifecycle". One row per submit
-// click (idempotency-keyed); drained by /api/cron/drain-submissions.
+// V30: Intake Portal submission jobs queue. See migrations 009_submission_jobs.sql
+// (initial) and 011_submission_jobs_states.sql (drain plan v7 state-machine + lease
+// expansion), plus docs/INTAKE_PORTAL_DRAIN_PLAN.md § P0. One row per submit click
+// (idempotency-keyed); drained by /api/cron/drain-submissions.
 const v30Statements = [
   `CREATE TABLE IF NOT EXISTS submission_jobs (
     id                SERIAL PRIMARY KEY,
@@ -596,6 +597,7 @@ const v30Statements = [
     contact_oid       TEXT NOT NULL,
     account_id        TEXT NOT NULL,
     request_id        TEXT NOT NULL,
+    akoya_requestnum  TEXT,                     -- server-assigned at request_created; for SharePoint folder name
     form_key          TEXT NOT NULL,
     status            TEXT NOT NULL DEFAULT 'queued',
     payload           JSONB NOT NULL,
@@ -604,10 +606,12 @@ const v30Statements = [
     attempts          INTEGER NOT NULL DEFAULT 0,
     last_error        TEXT,
     next_attempt_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    locked_until      TIMESTAMPTZ,              -- two-phase claim lease deadline
+    lease_token       UUID,                     -- stable per-claim ID; untouched by renewal
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     completed_at      TIMESTAMPTZ,
     CONSTRAINT submission_jobs_status_check CHECK (status IN (
-      'queued', 'scanning', 'files_moved', 'dynamics_patched',
+      'queued', 'scanning', 'request_created', 'files_moved', 'dynamics_patched',
       'status_flipped', 'completed', 'failed', 'cancelled'
     )),
     CONSTRAINT submission_jobs_attempts_nonneg CHECK (attempts >= 0),
@@ -615,11 +619,17 @@ const v30Statements = [
       (status IN ('completed', 'failed', 'cancelled')) = (completed_at IS NOT NULL)
     )
   )`,
-  `CREATE INDEX IF NOT EXISTS idx_submission_jobs_active_ready
-     ON submission_jobs (next_attempt_at, created_at)
+  // Drain claim query: WHERE status NOT IN terminal AND next_attempt_at <= now()
+  //   AND (locked_until IS NULL OR locked_until < now()) ORDER BY next_attempt_at.
+  // Predicate is status-only (PG rejects volatile fns like now() in index predicates);
+  // locked_until is in the indexed columns so the WHERE clause is still index-eligible.
+  `CREATE INDEX IF NOT EXISTS idx_submission_jobs_unlocked
+     ON submission_jobs (next_attempt_at, locked_until, created_at)
      WHERE status NOT IN ('completed', 'failed', 'cancelled')`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS idx_submission_jobs_one_active_per_request
-     ON submission_jobs (account_id, request_id, form_key)
+  // Belt-and-suspenders against fresh-UUID duplicate-submit-from-different-tab;
+  // idempotency_key UNIQUE is the primary guard.
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_submission_jobs_one_active_per_contact_form
+     ON submission_jobs (contact_oid, account_id, form_key)
      WHERE status NOT IN ('completed', 'failed', 'cancelled')`,
   `CREATE INDEX IF NOT EXISTS idx_submission_jobs_draft ON submission_jobs(draft_id)`,
   `CREATE INDEX IF NOT EXISTS idx_submission_jobs_request ON submission_jobs(request_id)`,

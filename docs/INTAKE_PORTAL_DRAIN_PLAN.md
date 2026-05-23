@@ -72,7 +72,7 @@ If a future plugin overrides client-supplied GUIDs at Create, fall back to plain
 
 ### P0 — `submission_jobs` schema migration (Codex round-1 §1.1; round-2 §1.1, §2.3, §6.1)
 
-Migration `010_submission_jobs_states.sql` (and **matching `setup-database.js` inline-block update at line 609**):
+Migration `011_submission_jobs_states.sql` (and **matching `setup-database.js` inline-block update at line 609**):
 
 ```sql
 -- Add new states for create-in-drain + scanning
@@ -199,7 +199,7 @@ Wave directory: `wave4-followup/contact-portal-oid.json`. Run with `--wave=4-fol
 
 **P3 has two parts, deployed together:**
 
-**P3a — Migration `011_intake_drafts_uniqueness.sql` (plus matching `setup-database.js:687` inline update):**
+**P3a — Migration `012_intake_drafts_uniqueness.sql` (plus matching `setup-database.js:687` inline update):**
 
 ```sql
 DROP INDEX idx_intake_drafts_unique_no_request;
