@@ -46,11 +46,19 @@
 
 import crypto from 'crypto';
 import pkg from 'pg';
+import { get as blobGet } from '@vercel/blob';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
+import { GraphService } from '../../../lib/services/graph-service';
 import { classify } from '../../../lib/utils/drain-error-classifier';
+import { buildNoResponseError } from '../../../lib/utils/service-error';
 import IntakeAuditService from '../../../lib/services/intake-audit-service';
 import AlertService from '../../../lib/services/alert-service';
 import { validateAttachmentShape } from '../../../lib/utils/intake-attachment-shape';
+import {
+  requestFolderName,
+  isAlreadyWritten,
+  guessContentType,
+} from '../../../lib/utils/drain-files-moved-helpers';
 
 const { Pool } = pkg;
 
@@ -65,7 +73,17 @@ const ADVANCED_STATES = new Set([
   'status_flipped', 'completed',
 ]);
 
-const BUILD_PENDING_STATES = new Set(['files_moved', 'dynamics_patched', 'status_flipped']);
+const BUILD_PENDING_STATES = new Set(['dynamics_patched', 'status_flipped']);
+
+// SharePoint destination — applicant uploads parallel the Reviewer_Uploads
+// convention (review-upload.js:128). Library is the akoya_request library
+// (allowlisted in graph-service.js); folder layout is
+// `{akoya_requestnum}_{requestGuid-no-hyphens-upper}/Applicant_Uploads/`.
+const SHAREPOINT_LIBRARY = 'akoya_request';
+const APPLICANT_UPLOADS_SUBFOLDER = 'Applicant_Uploads';
+// requestFolderName / isAlreadyWritten / guessContentType live in
+// lib/utils/drain-files-moved-helpers.js so they're unit-testable without
+// pulling in the pg module (which doesn't load in the jsdom test env).
 
 // (validateAttachmentShape imported from lib/utils/intake-attachment-shape.js
 //  — shared with /api/intake/submit so the contract has a single source of truth.)
@@ -443,6 +461,164 @@ async function recoverRequestCreated(client, job, originalError) {
 }
 
 /**
+ * request_created → files_moved. For each attachment:
+ *   1. Skip if already in sharepoint_paths (idempotency on retry).
+ *   2. Download from the PRIVATE intake Blob store (INTAKE_BLOB_RW_TOKEN).
+ *   3. Verify sha256 (defensive — blob content shouldn't change in-flight).
+ *   4. Upload to SharePoint at akoya_request/{folder}/Applicant_Uploads/.
+ *   5. Append to sharepoint_paths.
+ * Lease is renewed before each external HTTP call (drain plan §"Lease
+ * renewal trigger" item 1).
+ */
+async function handleRequestCreated(client, job) {
+  const blobToken = process.env.INTAKE_BLOB_RW_TOKEN;
+  if (!blobToken) {
+    // Config bug — terminal-fail with the structured isTransient=false
+    // marker so the classifier routes it correctly.
+    return await recordFailure(client, {
+      jobId: job.id,
+      leaseToken: job.lease_token,
+      category: 'validation_400',
+      errorMessage: 'INTAKE_BLOB_RW_TOKEN not configured — applicant attach store unreachable',
+      terminal: true,
+      retryable: false,
+    });
+  }
+  if (!job.akoya_requestnum) {
+    // Shouldn't happen — request_created always writes akoya_requestnum.
+    return await recordFailure(client, {
+      jobId: job.id,
+      leaseToken: job.lease_token,
+      category: 'validation_400',
+      errorMessage: `files_moved entered without akoya_requestnum (job ${job.id})`,
+      terminal: true,
+      retryable: false,
+    });
+  }
+
+  const payload = job.payload ?? {};
+  const attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
+  const folder = requestFolderName(job.akoya_requestnum, job.request_id);
+  const folderPath = `${folder}/${APPLICANT_UPLOADS_SUBFOLDER}`;
+
+  // Start from whatever the prior tick recorded, append as we go. JSONB merge
+  // happens at advance time — we hand the FULL array to advanceState.
+  const sharepointPaths = Array.isArray(job.sharepoint_paths) ? [...job.sharepoint_paths] : [];
+
+  for (let i = 0; i < attachments.length; i++) {
+    const att = attachments[i];
+    if (isAlreadyWritten(sharepointPaths, att)) continue;
+
+    // Lease renewal before each external call.
+    await renewLease(client, job.id, job.lease_token);
+
+    // 1. Download from private Blob store.
+    let blobBuffer;
+    let blobMeta;
+    try {
+      const result = await blobGet(att.pathname, {
+        access: 'private', useCache: false, token: blobToken,
+      });
+      if (!result || !result.stream) {
+        return await recordFailure(client, {
+          jobId: job.id,
+          leaseToken: job.lease_token,
+          category: 'not_found_404',
+          errorMessage: `files_moved: blob ${att.pathname} not found (expired or never written)`,
+          terminal: true,
+          retryable: false,
+        });
+      }
+      blobMeta = result.blob || {};
+      blobBuffer = Buffer.from(await new Response(result.stream).arrayBuffer());
+    } catch (err) {
+      // Most Blob get errors are no-response shaped; wrap defensively so the
+      // classifier sees a structured network category and retries.
+      const wrapped = err?.serviceName ? err : buildNoResponseError('blob', err);
+      const cls = classify(wrapped);
+      return await recordFailure(client, {
+        jobId: job.id,
+        leaseToken: job.lease_token,
+        category: cls.category,
+        errorMessage: `files_moved blobGet(${att.pathname}): ${err.message ?? err}`,
+        terminal: !cls.retryable,
+        retryable: cls.retryable,
+      });
+    }
+
+    // 2. Defensive sha256 check.
+    const actualSha = crypto.createHash('sha256').update(blobBuffer).digest('hex');
+    if (actualSha.toLowerCase() !== att.sha256.toLowerCase()) {
+      // Blob content drifted from what the applicant uploaded. Terminal
+      // validation failure + alert (corruption-class — operator triage).
+      await AlertService.createAlert({
+        type: 'intake_drain_attachment_drift',
+        severity: 'error',
+        title: `Drain: attachment sha256 mismatch (job ${job.id})`,
+        message: `${att.filename}: expected ${att.sha256}, got ${actualSha}`,
+        source: 'drain-submissions',
+        metadata: { jobId: job.id, requestId: job.request_id, pathname: att.pathname },
+      }).catch(() => {});
+      return await recordFailure(client, {
+        jobId: job.id,
+        leaseToken: job.lease_token,
+        category: 'validation_400',
+        errorMessage: `files_moved: sha256 mismatch on ${att.filename}`,
+        terminal: true,
+        retryable: false,
+      });
+    }
+
+    // 3. Lease renewal before SharePoint upload.
+    await renewLease(client, job.id, job.lease_token);
+
+    // 4. Upload to SharePoint. graph-service.uploadFile throws via
+    //    buildServiceError on non-2xx → classifier handles routing.
+    let item;
+    try {
+      const contentType = att.contentType || blobMeta?.contentType || guessContentType(att.filename);
+      item = await GraphService.uploadFile(
+        SHAREPOINT_LIBRARY,
+        folderPath,
+        att.filename,
+        blobBuffer,
+        contentType,
+      );
+    } catch (err) {
+      const cls = classify(err);
+      return await recordFailure(client, {
+        jobId: job.id,
+        leaseToken: job.lease_token,
+        category: cls.category,
+        errorMessage: `files_moved uploadFile(${att.filename}): ${err.message ?? err}`,
+        terminal: !cls.retryable,
+        retryable: cls.retryable,
+      });
+    }
+
+    sharepointPaths.push({
+      filename: att.filename,
+      sha256: att.sha256,
+      size: att.size,
+      library: SHAREPOINT_LIBRARY,
+      folder: folderPath,
+      item_id: item.id,
+      web_url: item.webUrl,
+      uploaded_at: new Date().toISOString(),
+    });
+  }
+
+  return await advanceState(client, {
+    jobId: job.id,
+    leaseToken: job.lease_token,
+    toStatus: 'files_moved',
+    action: 'drain.advance.files_moved',
+    payload: { fileCount: sharepointPaths.length, folder: folderPath },
+    extra: { sharepoint_paths: sharepointPaths },
+  });
+}
+
+/**
  * BUILD-PENDING handler — pushes next_attempt_at out by 1 hour to avoid
  * burning ticks while the next state's code is unimplemented. Leaves the
  * row at its current status. Alerts (deduped) so the parking is visible.
@@ -472,15 +648,13 @@ async function parkBuildPending(client, job) {
 const DISPATCH = {
   queued: handleQueued,
   scanning: handleScanning,
-  // BUILD-PENDING — handled by parkBuildPending fallback
+  request_created: handleRequestCreated,
+  // BUILD-PENDING — files_moved, dynamics_patched, status_flipped fall through
+  //                to parkBuildPending fallback
 };
 
 async function processJob(client, job) {
   if (BUILD_PENDING_STATES.has(job.status)) {
-    return await parkBuildPending(client, job);
-  }
-  // 'completed' state needs the cleanup handler — also BUILD-PENDING for now
-  if (job.status === 'request_created') {
     return await parkBuildPending(client, job);
   }
   const handler = DISPATCH[job.status];
@@ -587,8 +761,12 @@ export const _testing = {
   recordFailure,
   handleQueued,
   handleScanning,
+  handleRequestCreated,
   recoverRequestCreated,
   parkBuildPending,
+  isAlreadyWritten,
+  requestFolderName,
+  guessContentType,
   ADVANCED_STATES,
   BUILD_PENDING_STATES,
 };

@@ -11,6 +11,7 @@ const { validateAttachmentShape } = require('../../lib/utils/intake-attachment-s
 const validAttachment = {
   filename: 'budget.xlsx',
   blob_url: 'https://blob.vercel-storage.com/intake-applicant-private/abc.xlsx',
+  pathname: 'intake/draft-42/abc-budget.xlsx',
   sha256: 'a'.repeat(64),
   size: 12345,
   scan_result: 'clean',
@@ -32,7 +33,7 @@ describe('validateAttachmentShape — happy path', () => {
 });
 
 describe('validateAttachmentShape — missing required fields', () => {
-  for (const key of ['filename', 'blob_url', 'sha256', 'size', 'scan_result']) {
+  for (const key of ['filename', 'blob_url', 'pathname', 'sha256', 'size', 'scan_result']) {
     test(`missing ${key} throws`, () => {
       const att = { ...validAttachment };
       delete att[key];
