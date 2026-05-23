@@ -37,11 +37,27 @@ describe('buildServiceError', () => {
     expect(buildServiceError('dataverse', mockResp(504), '').isTransient).toBe(true);
   });
 
-  test('isTransient is false on 4xx (other than 429)', () => {
+  test('isTransient is false on 4xx (other than 408/429)', () => {
     expect(buildServiceError('dataverse', mockResp(400), '').isTransient).toBe(false);
     expect(buildServiceError('dataverse', mockResp(401), '').isTransient).toBe(false);
     expect(buildServiceError('dataverse', mockResp(403), '').isTransient).toBe(false);
     expect(buildServiceError('dataverse', mockResp(412), '').isTransient).toBe(false);
+  });
+
+  test('408 (request timeout) is transient (round-11 §1)', () => {
+    expect(buildServiceError('dataverse', mockResp(408), '').isTransient).toBe(true);
+  });
+
+  test('options.isTransient overrides the auto classification (round-11 §5)', () => {
+    // Missing-env config bug: 5xx-shape but should NOT be retried.
+    const e = buildServiceError('dataverse', mockResp(500), 'Missing env', { isTransient: false });
+    expect(e.status).toBe(500);
+    expect(e.isTransient).toBe(false);
+  });
+
+  test('options.isTransient = true forces transient on a normally non-transient status', () => {
+    const e = buildServiceError('dataverse', mockResp(400), '', { isTransient: true });
+    expect(e.isTransient).toBe(true);
   });
 
   test('parses Dataverse error envelope into dataverseCode / dataverseMessage', () => {
@@ -135,5 +151,19 @@ describe('buildNoResponseError', () => {
   test('handles non-Error causes (null, string)', () => {
     expect(buildNoResponseError('dataverse', null).message).toMatch(/no-response/);
     expect(buildNoResponseError('dataverse', 'bare string').message).toMatch(/bare string/);
+  });
+
+  test('does NOT double-wrap an already-structured no-response cause (round-11 §1)', () => {
+    // A nested fetch wrapper might already produce a structured no-response;
+    // re-wrapping would replace its specific causeKind with 'unknown' and
+    // change its serviceName to whatever the outer layer thinks. Short-circuit.
+    const inner = buildNoResponseError('graph', Object.assign(new Error('x'), { code: 'ETIMEDOUT' }));
+    expect(inner.causeKind).toBe('timeout');
+    expect(inner.serviceName).toBe('graph');
+
+    const outer = buildNoResponseError('dataverse', inner);
+    expect(outer).toBe(inner);                  // exact same instance
+    expect(outer.causeKind).toBe('timeout');    // preserved
+    expect(outer.serviceName).toBe('graph');    // preserved (NOT overwritten to 'dataverse')
   });
 });
