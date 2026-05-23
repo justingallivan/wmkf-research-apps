@@ -53,7 +53,7 @@ import { classify } from '../../../lib/utils/drain-error-classifier';
 import { buildNoResponseError } from '../../../lib/utils/service-error';
 import IntakeAuditService from '../../../lib/services/intake-audit-service';
 import AlertService from '../../../lib/services/alert-service';
-import { validateAttachmentShape } from '../../../lib/utils/intake-attachment-shape';
+import { validateAttachmentShape, validateAttachmentSet } from '../../../lib/utils/intake-attachment-shape';
 import {
   requestFolderName,
   isAlreadyWritten,
@@ -288,6 +288,7 @@ async function handleQueued(client, job) {
 
   try {
     attachments.forEach(validateAttachmentShape);
+    validateAttachmentSet(attachments); // Codex round-13 Q5 — filename uniqueness
   } catch (err) {
     // Terminal-fail + system_alerts
     await AlertService.createAlert({
@@ -884,6 +885,7 @@ export default async function handler(req, res) {
 // Test hooks — exposed so unit tests can probe without going through the cron.
 export const _testing = {
   validateAttachmentShape,
+  validateAttachmentSet,
   classify,
   claimBatch,
   advanceState,

@@ -10,12 +10,14 @@
 const queryRecordsMock = jest.fn();
 const updateRecordMock = jest.fn();
 const createRecordMock = jest.fn();
+const getEntityKeyMock = jest.fn();
 
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
     queryRecords: (...args) => queryRecordsMock(...args),
     updateRecord: (...args) => updateRecordMock(...args),
     createRecord: (...args) => createRecordMock(...args),
+    getEntityKey: (...args) => getEntityKeyMock(...args),
   },
 }));
 
@@ -24,6 +26,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 const {
   resolveContactForSession,
   _testing,
+  _resetAltKeyCacheForTests,
 } = require('../../lib/services/contact-bridge-service');
 
 const OID = '00000000-1111-2222-3333-444444444444';
@@ -42,6 +45,10 @@ beforeEach(() => {
   queryRecordsMock.mockReset();
   updateRecordMock.mockReset();
   createRecordMock.mockReset();
+  getEntityKeyMock.mockReset();
+  // Default: alt-key Active so existing tests don't need to opt in
+  getEntityKeyMock.mockResolvedValue({ EntityKeyIndexStatus: 'Active' });
+  _resetAltKeyCacheForTests();
 });
 
 describe('resolveContactForSession — invalid inputs', () => {
@@ -227,6 +234,101 @@ describe('resolveContactForSession — duplicate-PK race recovery', () => {
 
     await expect(resolveContactForSession({ oid: OID, email: EMAIL }))
       .rejects.toThrow('server explosion');
+  });
+});
+
+describe('alt-key Active probe (Codex round-13 Q3 BLOCKER)', () => {
+  test('Active alt-key → create proceeds', async () => {
+    setupQueueByOid([]);
+    setupQueueByEmail([]);
+    createRecordMock.mockResolvedValueOnce({ contactid: CONTACT_GUID });
+
+    const r = await resolveContactForSession({ oid: OID, email: EMAIL, name: NAME });
+    expect(r).toEqual({ ok: true, contactId: CONTACT_GUID, source: 'created' });
+    expect(getEntityKeyMock).toHaveBeenCalledWith('contact', 'wmkf_portaloid');
+  });
+  test('Pending alt-key → throws altKeyNotActive + does NOT createRecord', async () => {
+    getEntityKeyMock.mockReset();
+    getEntityKeyMock.mockResolvedValue({ EntityKeyIndexStatus: 'Pending' });
+    setupQueueByOid([]);
+    setupQueueByEmail([]);
+
+    await expect(resolveContactForSession({ oid: OID, email: EMAIL }))
+      .rejects.toMatchObject({
+        altKeyNotActive: true,
+        altKeyStatus: 'Pending',
+        isTransient: true, // retry-eligible — status is monotonic
+      });
+    expect(createRecordMock).not.toHaveBeenCalled();
+  });
+  test('alt-key probe failure → throws altKeyNotActive transient', async () => {
+    getEntityKeyMock.mockReset();
+    getEntityKeyMock.mockRejectedValue(new Error('probe boom'));
+    setupQueueByOid([]);
+    setupQueueByEmail([]);
+
+    await expect(resolveContactForSession({ oid: OID, email: EMAIL }))
+      .rejects.toMatchObject({ altKeyNotActive: true, isTransient: true });
+    expect(createRecordMock).not.toHaveBeenCalled();
+  });
+  test('alt-key absent (null) → throws non-transient (config issue)', async () => {
+    getEntityKeyMock.mockReset();
+    getEntityKeyMock.mockResolvedValue(null);
+    setupQueueByOid([]);
+    setupQueueByEmail([]);
+
+    await expect(resolveContactForSession({ oid: OID, email: EMAIL }))
+      .rejects.toMatchObject({ altKeyNotActive: true, isTransient: false });
+  });
+  test('alt-key Active cached — second call does not re-probe', async () => {
+    // First call: probe + create
+    setupQueueByOid([]);
+    setupQueueByEmail([]);
+    createRecordMock.mockResolvedValueOnce({ contactid: CONTACT_GUID });
+    await resolveContactForSession({ oid: OID, email: EMAIL });
+    expect(getEntityKeyMock).toHaveBeenCalledTimes(1);
+
+    // Second call: OID match (no create) — should still not re-probe
+    setupQueueByOid([{ contactid: CONTACT_GUID, wmkf_portaloid: OID }]);
+    await resolveContactForSession({ oid: OID, email: EMAIL });
+    expect(getEntityKeyMock).toHaveBeenCalledTimes(1); // still 1
+
+    // Third call: another create path — cache hit, no re-probe
+    setupQueueByOid([]);
+    setupQueueByEmail([]);
+    createRecordMock.mockResolvedValueOnce({ contactid: 'other-guid' });
+    await resolveContactForSession({ oid: 'other-oid', email: 'other@x.com' });
+    expect(getEntityKeyMock).toHaveBeenCalledTimes(1); // STILL 1 — cached
+  });
+  test('Pending status NOT cached — next call re-probes', async () => {
+    getEntityKeyMock.mockReset();
+    getEntityKeyMock.mockResolvedValueOnce({ EntityKeyIndexStatus: 'Pending' });
+    setupQueueByOid([]);
+    setupQueueByEmail([]);
+    await expect(resolveContactForSession({ oid: OID, email: EMAIL })).rejects.toMatchObject({
+      altKeyNotActive: true,
+    });
+
+    // Second call: alt-key transitioned to Active mid-process → should succeed
+    getEntityKeyMock.mockResolvedValueOnce({ EntityKeyIndexStatus: 'Active' });
+    setupQueueByOid([]);
+    setupQueueByEmail([]);
+    createRecordMock.mockResolvedValueOnce({ contactid: CONTACT_GUID });
+    const r = await resolveContactForSession({ oid: OID, email: EMAIL });
+    expect(r.ok).toBe(true);
+    expect(getEntityKeyMock).toHaveBeenCalledTimes(2);
+  });
+  test('OID-match path does NOT trigger alt-key probe (read-only)', async () => {
+    setupQueueByOid([{ contactid: CONTACT_GUID, wmkf_portaloid: OID }]);
+    await resolveContactForSession({ oid: OID, email: EMAIL });
+    expect(getEntityKeyMock).not.toHaveBeenCalled();
+  });
+  test('email-link path does NOT trigger alt-key probe (PATCH, not Create)', async () => {
+    setupQueueByOid([]);
+    setupQueueByEmail([{ contactid: CONTACT_GUID, wmkf_portaloid: null }]);
+    updateRecordMock.mockResolvedValueOnce(undefined);
+    await resolveContactForSession({ oid: OID, email: EMAIL });
+    expect(getEntityKeyMock).not.toHaveBeenCalled();
   });
 });
 

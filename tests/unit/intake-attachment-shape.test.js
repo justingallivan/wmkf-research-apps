@@ -6,7 +6,7 @@
  * delegate here, so this is the single contract test.
  */
 
-const { validateAttachmentShape } = require('../../lib/utils/intake-attachment-shape.js');
+const { validateAttachmentShape, validateAttachmentSet } = require('../../lib/utils/intake-attachment-shape.js');
 
 const validAttachment = {
   filename: 'budget.xlsx',
@@ -71,6 +71,40 @@ describe('validateAttachmentShape — type / format checks', () => {
   test('invalid scan_result enum → throws', () => {
     expect(() => validateAttachmentShape({ ...validAttachment, scan_result: 'pending' }, 0))
       .toThrow('invalid scan_result=pending');
+  });
+});
+
+describe('validateAttachmentSet — filename uniqueness (Codex round-13 Q5)', () => {
+  const a = { ...validAttachment, filename: 'budget.xlsx', sha256: 'a'.repeat(64) };
+  const b = { ...validAttachment, filename: 'biosketch.pdf', sha256: 'b'.repeat(64) };
+  test('empty set passes', () => {
+    expect(() => validateAttachmentSet([])).not.toThrow();
+  });
+  test('unique filenames pass', () => {
+    expect(() => validateAttachmentSet([a, b])).not.toThrow();
+  });
+  test('duplicate filenames + same sha → throws (would silently dedupe in SharePoint)', () => {
+    expect(() => validateAttachmentSet([a, { ...a }]))
+      .toThrow(/duplicate filename "budget\.xlsx"/);
+  });
+  test('duplicate filenames + DIFFERENT sha → throws (would overwrite in SharePoint)', () => {
+    const c = { ...a, sha256: 'c'.repeat(64) };
+    expect(() => validateAttachmentSet([a, c]))
+      .toThrow(/duplicate filename "budget\.xlsx"/);
+  });
+  test('error message pinpoints both indices', () => {
+    try {
+      validateAttachmentSet([a, b, { ...a }]);
+      throw new Error('should have thrown');
+    } catch (err) {
+      expect(err.message).toMatch(/at index 2 \(also at index 0\)/);
+    }
+  });
+  test('null filename skipped (per-row validator owns that error)', () => {
+    expect(() => validateAttachmentSet([{ filename: null }, { filename: null }])).not.toThrow();
+  });
+  test('non-array throws', () => {
+    expect(() => validateAttachmentSet('not-an-array')).toThrow('not an array');
   });
 });
 

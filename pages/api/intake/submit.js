@@ -56,7 +56,7 @@ import { hasSubmitterRole } from '../../../lib/services/membership-service';
 import IntakeDraftService from '../../../lib/services/intake-draft-service';
 import IntakeAuditService from '../../../lib/services/intake-audit-service';
 import { resolveContactForSession } from '../../../lib/services/contact-bridge-service';
-import { validateAttachmentShape } from '../../../lib/utils/intake-attachment-shape';
+import { validateAttachmentShape, validateAttachmentSet } from '../../../lib/utils/intake-attachment-shape';
 import { validateBudgetLineRow } from '../../../lib/utils/intake-budget-line-payload';
 
 const { Pool } = pkg;
@@ -126,6 +126,15 @@ export default async function handler(req, res) {
       name: session.user.contactName,
     });
   } catch (err) {
+    if (err?.altKeyNotActive) {
+      // Codex round-13 Q3: alt-key probe failed → identity service can't
+      // guarantee uniqueness. Fail-loud 503 with Retry-After hint.
+      console.warn('[intake/submit] bridge altKeyNotActive:', err.message);
+      res.setHeader('Retry-After', '30');
+      return jsonError(res, 503, 'identity_service_initializing', {
+        message: 'The identity service is still initializing. Please retry in a moment.',
+      });
+    }
     console.error('[intake/submit] bridge failed:', err);
     return jsonError(res, 502, 'Identity bridge failed; please retry');
   }
@@ -139,8 +148,13 @@ export default async function handler(req, res) {
         targetId: bridgeResult.existingContactId ?? null,
         payload: {
           message: bridgeResult.message,
+          // Single-contact conflict (email→different OID): existing* are
+          // populated. Multi-match conflict (email→N candidates): candidates
+          // is populated. Per Codex round-13 Q4, include both in the audit so
+          // staff triage distinguishes dedupe vs. stolen-identity cases.
           existingContactId: bridgeResult.existingContactId,
           existingOid: bridgeResult.existingOid,
+          candidates: bridgeResult.candidates,
         },
       }).catch(() => {});
       return jsonError(res, 409, 'identity_conflict', {
@@ -185,6 +199,7 @@ export default async function handler(req, res) {
   const attachments = Array.isArray(draft.attachments) ? draft.attachments : [];
   try {
     attachments.forEach(validateAttachmentShape);
+    validateAttachmentSet(attachments); // Codex round-13 Q5 — filename uniqueness
   } catch (err) {
     return jsonError(res, 422, err.message);
   }
