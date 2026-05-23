@@ -118,8 +118,7 @@ Prefer the admin dashboard (`/admin` → Models tab) for non-static overrides �
 | Variable | Purpose |
 |----------|---------|
 | `NOTIFICATION_EMAIL_FROM` | Sender mailbox for system-alert emails. Must be a Dynamics systemuser with Server-Side Sync enabled (resolvable via `internalemailaddress`). Recipients are resolved at send time via the per-category routing config in `/admin` → Alert Recipients (Dataverse setting `alertRecipientsByCategory`), falling back to the active superuser roster. |
-| `LOW_BALANCE_ALERT_CENTS` / `DAILY_SPEND_ALERT_CENTS` | Threshold tuning for alerts |
-| `ANTHROPIC_BALANCE_ANCHOR_CENTS` / `ANTHROPIC_BALANCE_ANCHOR_DATE` | Manual baseline for the Anthropic balance estimator (last known balance + date) |
+| `DAILY_SPEND_ALERT_CENTS` | Daily spend threshold for the runaway-cost alert in `/api/cron/spend-check` (default $10). Catches code wedged in a loop or a prompt mistakenly looping a large input — not normal usage. |
 | `VERCEL_API_TOKEN` / `VERCEL_PROJECT_ID` | Used by maintenance/health utilities that pull deployment metadata |
 
 ---
