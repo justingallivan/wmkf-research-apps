@@ -117,8 +117,7 @@ Prefer the admin dashboard (`/admin` → Models tab) for non-static overrides �
 
 | Variable | Purpose |
 |----------|---------|
-| `NOTIFICATION_EMAIL_FROM` | Sender mailbox for system-alert emails. Must be a Dynamics systemuser with Server-Side Sync enabled (resolvable via `internalemailaddress`). Recipients are queried at send time as the active superuser roster (`dynamics_user_roles` joined to `user_profiles`); no `NOTIFICATION_EMAIL_TO` is required. |
-| `SPEND_ALERT_EMAIL_FROM` / `SPEND_ALERT_EMAIL_TO` | Anthropic balance / daily-spend alert routing |
+| `NOTIFICATION_EMAIL_FROM` | Sender mailbox for system-alert emails. Must be a Dynamics systemuser with Server-Side Sync enabled (resolvable via `internalemailaddress`). Recipients are resolved at send time via the per-category routing config in `/admin` → Alert Recipients (Dataverse setting `alertRecipientsByCategory`), falling back to the active superuser roster. |
 | `LOW_BALANCE_ALERT_CENTS` / `DAILY_SPEND_ALERT_CENTS` | Threshold tuning for alerts |
 | `ANTHROPIC_BALANCE_ANCHOR_CENTS` / `ANTHROPIC_BALANCE_ANCHOR_DATE` | Manual baseline for the Anthropic balance estimator (last known balance + date) |
 | `VERCEL_API_TOKEN` / `VERCEL_PROJECT_ID` | Used by maintenance/health utilities that pull deployment metadata |

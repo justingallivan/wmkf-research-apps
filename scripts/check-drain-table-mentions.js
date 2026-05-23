@@ -103,11 +103,11 @@ const ALLOWLIST_FILES = new Set([
   'docs/W4_RECONCILE_CONTRACT.md',
   'docs/W4_ANOMALY_TRIAGE.md',
   // Memory entries SPECIFICALLY about the migration itself.
-  '.claude-memory/project_reviewer_postgres_to_dataverse_migration.md',
-  '.claude-memory/project_w6_table_drop_pending.md',
-  '.claude-memory/project_reviewer_finder_dataverse_entry_path.md',
-  '.claude-memory/project_reviewer_identity_fragmentation.md',
-  '.claude-memory/project_intake_portal_pilot_decisions_2026-05-06.md',
+  '.claude-memory/project-reviewer-postgres-to-dataverse-migration.md',
+  '.claude-memory/project-w6-table-drop-pending.md',
+  '.claude-memory/project-reviewer-finder-dataverse-entry-path.md',
+  '.claude-memory/reviewer-identity-fragmentation.md',
+  '.claude-memory/project-intake-portal-pilot-decisions-2026-05-06.md',
 ]);
 
 // Detect the table reference. Six shapes (broadened S167 pass-5 per Codex):

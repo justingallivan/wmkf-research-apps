@@ -1,13 +1,13 @@
 # Email Notifications — Unified Notification Service
 
-## Current Status (as of 2026-05-08)
+## Current Status (as of 2026-05-23)
 
-System-alert emails are wired to the Dynamics email transport (`DynamicsService.createAndSendEmail`). When `NOTIFICATION_EMAIL_FROM` is set, the notification service automatically emails the active App Suite admin roster on:
+System-alert emails are wired to the Dynamics email transport (`DynamicsService.createAndSendEmail`). When `NOTIFICATION_EMAIL_FROM` is set, the notification service automatically emails recipients on:
 
 - New user sign-ups (forced — admins need proactive visibility for app-access grants).
 - `error` / `critical` severity alerts (cron failures, secret expiration, log analysis, health degradation).
 
-Recipients are looked up dynamically as the set of active superusers (`dynamics_user_roles.role = 'superuser'` joined to `user_profiles`). No `NOTIFICATION_EMAIL_TO` env var is needed; the recipient list self-heals as superuser grants change in `/admin`.
+**Recipient routing (S181):** every `notify()` call tags an alert with a `category` (e.g. `spend`, `intake`, `ops`, `security`, `staff-onboarding`). Routing is configured in `/admin` → **Alert Recipients**, persisted as the `alertRecipientsByCategory` setting in `wmkf_appsystemsettings`. Resolution rule: `config[category]` → `config.default` → the active superuser roster (`dynamics_user_roles.role = 'superuser'` joined to `user_profiles`). The old `SPEND_ALERT_EMAIL_TO`/`SPEND_ALERT_EMAIL_FROM`/`NOTIFICATION_EMAIL_TO` env vars are removed — categorized routing supersedes them.
 
 The previous Microsoft Graph `Mail.Send` path was retired in S142. That permission was never granted, and the Dynamics transport (already shipped, working since Session 77) covers every current use case using already-granted privileges.
 
@@ -66,7 +66,7 @@ NotificationService.notify()
 
 Two failure modes the old Graph-based design didn't handle:
 
-1. **Mailbox vanishes** (personnel change with hard-coded `NOTIFICATION_EMAIL_TO`) — recipient list now derives from current admin roster, not a static env var.
+1. **Mailbox vanishes** (personnel change with hard-coded `NOTIFICATION_EMAIL_TO`) — recipient list now derives from per-category config in `/admin` with fallback to the current superuser roster, not a static env var.
 2. **Tribal knowledge vanishes** — a successor admin browsing Dynamics finds the App Suite admin roster via `user_profiles ↔ systemuser` bridge + `dynamics_user_roles`. The `/admin` dashboard surfaces the same data.
 
 Vercel envs are minimized: one durable variable (`NOTIFICATION_EMAIL_FROM`) instead of two coupled to a person.

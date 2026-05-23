@@ -117,6 +117,7 @@ export default async function handler(req, res) {
       message: summary,
       metadata: results,
       source: 'cron/maintenance',
+      category: 'ops',
     });
 
     return res.json({ ok: true, totalDeleted, results });
@@ -136,6 +137,7 @@ export default async function handler(req, res) {
       message: error.message,
       metadata: results,
       source: 'cron/maintenance',
+      category: 'ops',
     });
 
     return res.status(500).json({ error: 'Maintenance failed', message: error.message });

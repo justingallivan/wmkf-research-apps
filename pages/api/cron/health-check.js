@@ -56,6 +56,7 @@ export default async function handler(req, res) {
         message: `System recovered from ${prevStatus} state. ${resolved} alert(s) auto-resolved.`,
         metadata: { services: health.services, responseTimeMs: health.responseTimeMs },
         source: 'cron/health-check',
+        category: 'ops',
       });
     } else if (health.overall !== 'healthy') {
       // Find which services are unhealthy
@@ -99,6 +100,7 @@ export default async function handler(req, res) {
         },
         source: 'cron/health-check',
         autoResolveKey: resolveKey,
+        category: 'ops',
       });
     }
 

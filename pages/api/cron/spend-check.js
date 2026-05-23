@@ -21,6 +21,7 @@ import { sql } from '@vercel/postgres';
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import AlertService from '../../../lib/services/alert-service';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
+import AlertRecipients from '../../../lib/services/alert-recipients';
 
 const DAILY_THRESHOLD_DEFAULT_CENTS = 1000;    // $10
 const LOW_BALANCE_DEFAULT_CENTS = 500;         // $5
@@ -127,34 +128,44 @@ async function checkLowBalance() {
 }
 
 async function tryEmailLowBalance({ anchorCents, anchorDate, spentSinceAnchor, remainingCents }) {
-  const to = process.env.SPEND_ALERT_EMAIL_TO || process.env.NOTIFICATION_EMAIL_TO;
-  const from = process.env.SPEND_ALERT_EMAIL_FROM || process.env.NOTIFICATION_EMAIL_FROM;
-
-  if (!to || !from) {
-    console.log('[spend-check] low-balance email skipped — SPEND_ALERT_EMAIL_TO/FROM not set');
-    return;
-  }
-
-  const body = [
-    `<p>Estimated AI credit balance is low.</p>`,
-    `<ul>`,
-    `<li>Anchor: $${(anchorCents / 100).toFixed(2)} on ${anchorDate}</li>`,
-    `<li>Spent since anchor: $${(spentSinceAnchor / 100).toFixed(2)}</li>`,
-    `<li>Estimated remaining: <strong>$${(remainingCents / 100).toFixed(2)}</strong></li>`,
-    `</ul>`,
-    `<p>This is our own usage-log estimate, not authoritative Anthropic billing. ` +
-      `Top up the Anthropic console and update <code>ANTHROPIC_BALANCE_ANCHOR_CENTS</code> ` +
-      `and <code>ANTHROPIC_BALANCE_ANCHOR_DATE</code> to the new values.</p>`,
-  ].join('\n');
-
   try {
+    const from = process.env.NOTIFICATION_EMAIL_FROM;
+    if (!from) {
+      console.log('[spend-check] low-balance email skipped — NOTIFICATION_EMAIL_FROM not set');
+      return;
+    }
+
+    const { recipients, source, category } = await AlertRecipients.resolveRecipients('spend');
+    if (recipients.length === 0) {
+      console.log(`[spend-check] low-balance email skipped — no recipients resolved (category=${category})`);
+      return;
+    }
+
+    const body = [
+      `<p>Estimated AI credit balance is low.</p>`,
+      `<ul>`,
+      `<li>Anchor: $${(anchorCents / 100).toFixed(2)} on ${anchorDate}</li>`,
+      `<li>Spent since anchor: $${(spentSinceAnchor / 100).toFixed(2)}</li>`,
+      `<li>Estimated remaining: <strong>$${(remainingCents / 100).toFixed(2)}</strong></li>`,
+      `</ul>`,
+      `<p>This is our own usage-log estimate, not authoritative Anthropic billing. ` +
+        `Top up the Anthropic console and update <code>ANTHROPIC_BALANCE_ANCHOR_CENTS</code> ` +
+        `and <code>ANTHROPIC_BALANCE_ANCHOR_DATE</code> to the new values.</p>`,
+    ].join('\n');
+
     await DynamicsService.createAndSendEmail({
       subject: `[Keck AI] Estimated credit balance low: $${(remainingCents / 100).toFixed(2)} remaining`,
       body,
       from,
-      to,
+      to: recipients,
     });
+    console.log(
+      `[spend-check] low-balance email sent to ${recipients.length} recipient(s) [category=spend, source=${source}]`,
+    );
   } catch (err) {
+    // Email is best-effort: the system_alerts row is the durable record.
+    // Wrap covers resolver throws, env reads, and the Dynamics send call —
+    // a failure here must never fail the cron run.
     console.error('[spend-check] low-balance email failed (alert still stored):', err.message);
   }
 }

@@ -150,6 +150,7 @@ export default async function handler(req, res) {
         sampleErrors: errors.slice(0, 5),
       },
       source: 'cron/log-analysis',
+      category: 'ops',
     });
 
     await MaintenanceService.completeRun(runId, {
