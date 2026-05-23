@@ -1,6 +1,13 @@
-# Intake Portal — Postgres → Dataverse Drain Plan (v6)
+# Intake Portal — Postgres → Dataverse Drain Plan (v7)
 
-**Status:** S179 v6 (2026-05-22). Codex round-6 findings folded in (4 findings: 1 BLOCKER / 3 MOD/NEEDS-SPEC / 0 LOW; 2 questions returned CLEAN). Build-ready.
+**Status:** S179 v7 (2026-05-22). Codex round-7 findings folded in (5 findings: 0 BLOCKER / 5 MOD/GAPS / 0 LOW — narrow delta sanity check). Build-ready.
+
+**Changes from v6 (round-7-driven, sanity-check pass):**
+- **GAPS fix:** Duplicate-PK recovery's 0-rows-affected re-read only accepted `request_created` as a safe convergence state. Another worker could have advanced further (`files_moved` → `completed`) before this stale worker got there, which would have thrown spuriously. v7 accepts any state at-or-after `request_created` with `akoya_requestnum` populated.
+- **NEEDS-FIX:** "New draft = new idempotency_key" was hand-waved in v6; the current `intake-draft-service.js:68` upsert is keyed by (contact_oid, account_id, form_key) and doesn't auto-rotate keys. v7 specifies the actual rotation mechanism: (a) /apply landing filters out drafts tied to terminal jobs via an EXISTS sub-query, (b) /api/intake/submit populates `intake_drafts.request_id` in the same txn as the job INSERT so the terminal-tied draft moves outside the partial-unique index, (c) /apply/new then creates a fresh draft with a freshly-minted idempotency_key, (d) cleanup cron purges terminal-tied drafts after N days (out of v1 scope).
+- **GAPS fix:** Audit consistency model named pg failures generically as "feeding the taxonomy"; v7 adds an explicit pg-SQLSTATE table (`40P01` deadlock + `40001` serialization → `pg_transient` retryable; `08000`/`08006` → `network_no_response`; `23505` → `duplicate_pk`; other `23xxx` → `validation_400`). Also clarifies the transactional boundary: drain-side audits are transactional with the state UPDATE; endpoint-side audits (`'submit'`, `'bridge.conflict'`, `'draft.upsert'`, `'draft.attach'`) are best-effort with `system_alerts` fallback.
+- **GAPS fix:** Drain-entry attachment-shape validation_400 was indistinguishable from ordinary user-validation errors, but at that point the submit-entry validator has already passed so any failure is corruption / hand-editing / code regression. v7 says: terminal-fail AND write a `system_alerts` row of severity `error` so the operator sees the event.
+- **GAPS fix:** Cron registration timing was ambiguous (register before route → scheduled 404; route before registration → never fires); v7 says "same commit." Lease renewal trigger was hand-waved as "before slow calls"; v7 specifies (a) before each external HTTP call, (b) inside long loops every N iterations or `TTL/3` wall-clock, with a concrete `withLeaseRenewal` helper.
 
 **Changes from v5 (round-6-driven):**
 - **BLOCKER fix:** `/api/cron/drain-submissions` was not registered in `vercel.json` — production latency would have been unbounded because the drain never fires. Added explicit cron-registration spec at `*/2 * * * *` (below the 10-min lease TTL) with cadence rationale, worst-case latency analysis, and a verification-checklist item.
@@ -324,10 +331,11 @@ This matches the v1/`DESIGN.md:527` synchronous model and the form validator's `
   }
   ```
 
-  At submit-entry: fail-fast with 422 before INSERT.
-  At drain-entry (start of `scanning` state): fail to `validation_400` terminal.
+  At submit-entry: fail-fast with 422 before INSERT (this is a normal user-facing validation error — applicant re-uploads).
 
-  Belt-and-suspenders: the validator at submit catches malformed drafts before they're frozen; the validator at drain catches anything that slipped past (corrupted JSONB, hand-edited test rows, schema changes mid-flight).
+  At drain-entry (start of `scanning` state): fail to `validation_400` terminal **AND write a `system_alerts` row of severity `error`** (Codex round-7 §4). Rationale: by the time the drain sees a malformed attachment, the submit-entry validator already passed — so this is corruption, hand-editing, or a code regression, not normal user error. The terminal-failed job and the alert together let an operator triage without surprise: applicant sees "submission failed, contact support"; operator sees the alert and can inspect the JSONB.
+
+  Belt-and-suspenders: the validator at submit catches malformed drafts before they're frozen; the validator at drain catches anything that slipped past (corrupted JSONB, hand-edited test rows, schema changes mid-flight) and surfaces it as an operations-visible event rather than a silent user-facing terminal.
 - **GUID generation** (all UUIDv4):
   - 1 for `akoya_requestid`
   - 1 per `wmkf_proposalbudgetline` row
@@ -342,7 +350,26 @@ This matches the v1/`DESIGN.md:527` synchronous model and the form validator's `
   ```
 - **Terminal-collision handling** (Codex round-6 §1): the collision-returning pattern is correct for in-flight collisions (duplicate-submit-from-different-tab), but a collision against a row in terminal `failed` or `cancelled` state must NOT silently strand the applicant on the dead key. After the INSERT, inspect the returned `status`:
   - `status IN ('queued', 'scanning', 'request_created', 'files_moved', 'dynamics_patched', 'status_flipped', 'completed')` → return 200 with `{jobId, requestId, status}` as today.
-  - `status IN ('failed', 'cancelled')` → return **409 Conflict** with `{error: 'previous_submission_terminal', priorStatus, priorJobId, lastError}`. The frontend treats this as "your last submission ended in <reason>; start a fresh draft." Drafts are not auto-rotated server-side (the applicant might want to see what failed before reattempting); the new draft will generate a new `idempotency_key` and break the collision naturally.
+  - `status IN ('failed', 'cancelled')` → return **409 Conflict** with `{error: 'previous_submission_terminal', priorStatus, priorJobId, lastError}`.
+
+  **Draft rotation on 409 (Codex round-7 §2):** "new draft = new idempotency_key" is NOT automatic — the current `intake-draft-service.js:68` upsert is keyed by `(contact_oid, account_id, form_key)` (after P3) WHERE `request_id IS NULL`, so a user can only hold ONE active draft per institution-form combo at a time. The mechanism that breaks the collision is:
+
+  1. **Draft list filtering:** `/apply` landing's "your in-progress drafts" query filters OUT drafts whose `draft_json.idempotency_key` matches a `submission_jobs` row with `status IN ('failed', 'cancelled')`. The terminal-tied draft is hidden from the user's normal entry path.
+     ```sql
+     SELECT d.* FROM intake_drafts d
+     WHERE d.contact_oid = $1
+       AND NOT EXISTS (
+         SELECT 1 FROM submission_jobs j
+         WHERE j.idempotency_key = (d.draft_json->>'idempotency_key')
+           AND j.status IN ('failed', 'cancelled')
+       )
+     ORDER BY d.updated_at DESC;
+     ```
+  2. **Frontend on 409:** the 409 response triggers a one-shot UI that says "your last submission ended in <reason>" and offers a "Start a new submission" CTA → routes to `/apply/new` → creates a fresh `intake_drafts` row with a freshly-minted `idempotency_key` (the unique index on `(contact_oid, account_id, form_key) WHERE request_id IS NULL` permits this because the terminal-tied draft has `request_id` populated by then; see P3 + the request_id-on-submit step below).
+  3. **request_id-on-submit:** `/api/intake/submit` populates `intake_drafts.request_id` with the generated request GUID **in the same transaction as the `submission_jobs` INSERT**. This moves the terminal-tied draft outside the partial-unique index, so step 2's fresh draft creation succeeds.
+  4. **Cleanup (later):** an eventual cron purges drafts whose tied job is terminal AND older than N days; out of v1 scope, tracked in the risk register.
+
+  The applicant's old failed draft is therefore *visible-on-purpose* only via a direct URL (audit/forensics path) and is *invisible* to the standard /apply flow. No auto-deletion; no destructive server-side action on 409.
   - Audit the 409 path with `action: 'submit.blocked_terminal'`, payload = `{priorJobId, priorStatus}`.
 - Audit write (happy path): `action: 'submit'`, payload = `{jobId, requestId, accountId}`
 - Return 200 with `{ jobId, requestId, status }`
@@ -394,6 +421,26 @@ COMMIT;
 
 Phase 2 — process each claimed row independently. Each row's status transition is its own short transaction. **Lock renewal:** if a step is slow, drain bumps `locked_until` before doing the slow call — `lease_token` is NOT changed by renewal, only by a fresh claim. **Lock release on completion:** clear `locked_until` AND `lease_token`. **Crash recovery:** another worker picks the row up after the lease expires; the new claim writes a new `lease_token`, so any straggler UPDATE from the dead worker (guarded by its old token) will affect 0 rows.
 
+**Lease renewal trigger (Codex round-7 §5):** renewal is NOT continuous; it happens at two well-defined points:
+
+1. **Before each external HTTP call** (Dataverse POST/GET/PATCH, Graph upload, Cloudmersive scan): bump `locked_until = now() + DRAIN_LOCK_TTL_SECONDS`. The UPDATE is guarded by `lease_token` so a worker that's lost the lease won't accidentally extend someone else's claim.
+2. **Inside long-running internal loops** (e.g. iterating budget-line POSTs in `dynamics_patched` — there can be 10–30 per submission): every Nth iteration (N=5 default) or when wall-clock since last renewal exceeds `DRAIN_LOCK_TTL_SECONDS / 3`.
+
+Wrapper helper:
+
+```js
+async function withLeaseRenewal(job, fn) {
+  await pg.query(
+    `UPDATE submission_jobs SET locked_until = now() + ($1 || ' seconds')::INTERVAL
+       WHERE id=$2 AND lease_token=$3`,
+    [DRAIN_LOCK_TTL_SECONDS, job.id, job.lease_token]
+  );
+  return fn();
+}
+```
+
+This is concrete enough that drain code can implement it deterministically; the alternative — continuous background `setInterval` renewal — adds an out-of-band write path that complicates crash semantics and is unnecessary for the pilot's traffic profile.
+
 **Error taxonomy (depends on P1 broadening):**
 
 | Category | Behavior | Examples |
@@ -426,7 +473,19 @@ try {
 }
 ```
 
-Pg-side write failures (`network_no_response` against the pg pool, deadlock, etc.) classify the same way as Dataverse/Graph failures and feed into the retry taxonomy. Audit writes are NOT best-effort; the contract is "the audit table is the source of truth for what happened, and the state column is the source of truth for what to do next."
+Pg-side write failures feed into the retry taxonomy. **Explicit pg SQLSTATE mapping (Codex round-7 §3):**
+
+| Pg error | SQLSTATE | Taxonomy category | Behavior |
+|---|---|---|---|
+| Deadlock detected | `40P01` | `pg_transient` | Retry with exponential backoff; max_attempts=10 |
+| Serialization failure | `40001` | `pg_transient` | Retry with exponential backoff; max_attempts=10 |
+| Connection failure (no response, pool exhausted) | `08000`/`08006`/no SQLSTATE on `ETIMEDOUT`/etc. | `network_no_response` | Retry with backoff; same as Dataverse/Graph timeouts |
+| Unique-constraint violation | `23505` | `duplicate_pk` | State-specific recovery (see request_created); else success-advance |
+| Check-constraint / not-null / etc. | `23xxx` (other) | `validation_400` | Terminal `failed` |
+
+Wrap the pg client in `buildServiceError` / `buildNoResponseError` analogues so SQLSTATE is attached as `err.sqlState` and `err.isTransient = ['40P01','40001'].includes(err.sqlState) || err.noResponse`. Classifier reads this branch first when `err.serviceName === 'postgres'`.
+
+Audit writes are NOT best-effort; the contract is "the audit table is the source of truth for what happened, and the state column is the source of truth for what to do next." **Transactional scope is state-transition audits only** — endpoint-level audits (`'submit'` from `/api/intake/submit`, `'bridge.conflict'` from the contact bridge, `'draft.upsert'` / `'draft.attach'` from the draft endpoints) are written outside the drain's transactional boundary and follow ordinary best-effort semantics (failure logs to `system_alerts` but does not block the user response). The boundary is: **drain-side audits = same txn as state UPDATE; endpoint-side audits = best-effort.**
 
 **Per-state idempotency:**
 - `scanning`: read-only checks; safe to repeat
@@ -471,15 +530,26 @@ if (err.category === 'duplicate_pk' && state === 'request_created') {
     // We lost the lease (lease expired AND another worker re-claimed). Re-read to
     // distinguish "advanced by other worker" (safe — terminal for this tick) from
     // "still queued" (something is wrong; surface for diagnosis).
+    //
+    // CRITICAL (Codex round-7 §1): accept any state at-or-after request_created, not
+    // just request_created itself. Another worker could have completed recovery AND
+    // advanced further (files_moved, dynamics_patched, status_flipped, completed)
+    // before we got here. As long as akoya_requestnum is populated and status is
+    // beyond queued/scanning, convergence has succeeded.
+    const ADVANCED_STATES = new Set([
+      'request_created', 'files_moved', 'dynamics_patched',
+      'status_flipped', 'completed'
+    ]);
     const current = await pg.query(
       `SELECT status, akoya_requestnum FROM submission_jobs WHERE id=$1`,
       [job.id]
     );
-    if (current.rows[0]?.status === 'request_created' && current.rows[0]?.akoya_requestnum) {
-      return; // another worker completed recovery; we're done
+    const row = current.rows[0];
+    if (row && ADVANCED_STATES.has(row.status) && row.akoya_requestnum) {
+      return; // another worker completed recovery and may have advanced further; safe
     }
     throw buildServiceError('drain', { status: 500 },
-      `request_created recovery: lost lease but row not advanced for ${job.id}`);
+      `request_created recovery: lost lease but row not advanced for ${job.id} (status=${row?.status})`);
   }
   return; // advance
 }
@@ -494,7 +564,7 @@ not a "your own renewal made your snapshot stale" false-negative.
 
 **Cron protection:** `CRON_SECRET`.
 
-**Cron registration (Codex round-6 §3):** `/api/cron/drain-submissions` MUST be registered in `vercel.json` `crons:` array at build time. Without registration, the route exists but never fires and production drain latency is unbounded. Recommended schedule:
+**Cron registration (Codex round-6 §3, round-7 §5):** `/api/cron/drain-submissions` MUST be registered in `vercel.json` `crons:` array. Register **in the same commit as the route file lands** — registering an unregistered path in vercel.json would schedule 404s; landing the route without registration would never fire. Recommended schedule:
 
 ```jsonc
 {
