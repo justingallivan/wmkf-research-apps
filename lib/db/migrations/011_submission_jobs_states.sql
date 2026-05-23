@@ -16,8 +16,10 @@
 
 BEGIN;
 
--- 1) Status CHECK: add 'request_created' between 'scanning' and 'files_moved'
-ALTER TABLE submission_jobs DROP CONSTRAINT submission_jobs_status_check;
+-- 1) Status CHECK: add 'request_created' between 'scanning' and 'files_moved'.
+-- DROP CONSTRAINT IF EXISTS makes the migration safe to re-run even if a prior
+-- partial apply renamed/removed the constraint.
+ALTER TABLE submission_jobs DROP CONSTRAINT IF EXISTS submission_jobs_status_check;
 ALTER TABLE submission_jobs ADD CONSTRAINT submission_jobs_status_check CHECK (status IN (
   'queued',
   'scanning',
@@ -45,7 +47,7 @@ ALTER TABLE submission_jobs ADD COLUMN IF NOT EXISTS lease_token  UUID;
 --    index-eligible against the new column ordering. now() is NOT in the predicate
 --    (volatile fns are illegal in PG index predicates).
 DROP INDEX IF EXISTS idx_submission_jobs_active_ready;
-CREATE INDEX idx_submission_jobs_unlocked
+CREATE INDEX IF NOT EXISTS idx_submission_jobs_unlocked
   ON submission_jobs (next_attempt_at, locked_until, created_at)
   WHERE status NOT IN ('completed', 'failed', 'cancelled');
 
@@ -54,7 +56,7 @@ CREATE INDEX idx_submission_jobs_unlocked
 --    (contact_oid, account_id, form_key) prevents fresh-UUID duplicate-submit-from-
 --    different-tab; idempotency_key UNIQUE is still the primary collision guard.
 DROP INDEX IF EXISTS idx_submission_jobs_one_active_per_request;
-CREATE UNIQUE INDEX idx_submission_jobs_one_active_per_contact_form
+CREATE UNIQUE INDEX IF NOT EXISTS idx_submission_jobs_one_active_per_contact_form
   ON submission_jobs (contact_oid, account_id, form_key)
   WHERE status NOT IN ('completed', 'failed', 'cancelled');
 

@@ -589,6 +589,18 @@ const v29Statements = [
 // (initial) and 011_submission_jobs_states.sql (drain plan v7 state-machine + lease
 // expansion), plus docs/INTAKE_PORTAL_DRAIN_PLAN.md § P0. One row per submit click
 // (idempotency-keyed); drained by /api/cron/drain-submissions.
+//
+// IMPORTANT (Codex round-8 §4): This inline block uses CREATE TABLE IF NOT EXISTS.
+// On a FRESH database it lands the post-011 (v7) shape directly — no separate
+// migration run needed. On an EXISTING database with the pre-011 shape (older
+// status CHECK, no akoya_requestnum/locked_until/lease_token columns), the
+// CREATE TABLE is SKIPPED entirely, and the subsequent index creates would fail
+// against missing columns. setup-database.js does NOT carry ALTER TABLE / drop-
+// recreate logic for backward compat — that is intentional, the script's contract
+// is "fresh install only." Existing environments MUST apply migrations sequentially
+// (see lib/db/migrations/011_submission_jobs_states.sql). Running setup-database.js
+// against a stale-schema PG will produce an error on the index-create step rather
+// than silently diverging the schema — this is the loud-failure design choice.
 const v30Statements = [
   `CREATE TABLE IF NOT EXISTS submission_jobs (
     id                SERIAL PRIMARY KEY,
