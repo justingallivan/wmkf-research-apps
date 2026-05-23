@@ -1,6 +1,6 @@
 # Intake Portal — Postgres → Dataverse Drain Plan (v7)
 
-**Status:** S179 v7 (2026-05-22). Codex round-7 findings folded in (5 findings: 0 BLOCKER / 5 MOD/GAPS / 0 LOW — narrow delta sanity check). Build-ready.
+**Status:** S179 v7 (2026-05-22). Codex round-7 findings folded in (5 findings: 0 BLOCKER / 5 MOD/GAPS / 0 LOW — narrow delta sanity check). Rounds 8 + 9 reviewed the P0 build commit + the round-8 fold; round-9 caught 2 small doc-drift items (P0 SQL snippet had stale non-idempotent forms; no migration-apply runbook). Both folded into this v7. Build-ready.
 
 **Changes from v6 (round-7-driven, sanity-check pass):**
 - **GAPS fix:** Duplicate-PK recovery's 0-rows-affected re-read only accepted `request_created` as a safe convergence state. Another worker could have advanced further (`files_moved` → `completed`) before this stale worker got there, which would have thrown spuriously. v7 accepts any state at-or-after `request_created` with `akoya_requestnum` populated.
@@ -74,49 +74,73 @@ If a future plugin overrides client-supplied GUIDs at Create, fall back to plain
 
 Migration `011_submission_jobs_states.sql` (and **matching `setup-database.js` inline-block update at line 609**):
 
+The migration file is the source of truth — this block summarizes its shape so the plan reads coherently, but the actual SQL lives in `lib/db/migrations/011_submission_jobs_states.sql` (idempotent: `DROP CONSTRAINT IF EXISTS`, `ADD COLUMN IF NOT EXISTS`, `DROP INDEX IF EXISTS`, `CREATE [UNIQUE] INDEX IF NOT EXISTS`):
+
 ```sql
--- Add new states for create-in-drain + scanning
-ALTER TABLE submission_jobs DROP CONSTRAINT submission_jobs_status_check;
+BEGIN;
+
+-- 1) Status CHECK: add 'request_created' between 'scanning' and 'files_moved'
+ALTER TABLE submission_jobs DROP CONSTRAINT IF EXISTS submission_jobs_status_check;
 ALTER TABLE submission_jobs ADD CONSTRAINT submission_jobs_status_check CHECK (status IN (
-  'queued',
-  'scanning',
-  'request_created',
-  'files_moved',
-  'dynamics_patched',
-  'status_flipped',
-  'completed',
-  'failed',
-  'cancelled'
+  'queued', 'scanning', 'request_created', 'files_moved',
+  'dynamics_patched', 'status_flipped', 'completed', 'failed', 'cancelled'
 ));
 
--- Server-assigned request number captured during Create (for SharePoint folder name)
-ALTER TABLE submission_jobs ADD COLUMN akoya_requestnum TEXT;
+-- 2) Server-assigned request number captured during Create (for SharePoint folder name)
+ALTER TABLE submission_jobs ADD COLUMN IF NOT EXISTS akoya_requestnum TEXT;
 
--- Two-phase claim: claim sets locked_until + lease_token, releases after each step.
--- lease_token is a stable per-claim identifier (generated at claim time, persisted for
--- the duration of the worker's ownership, NOT changed by lease renewal). It exists so
--- that recovery UPDATEs can be guarded against stale-lease clobber without confusing
--- lease renewal (which mutates locked_until) for ownership change.
-ALTER TABLE submission_jobs ADD COLUMN locked_until TIMESTAMPTZ;
-ALTER TABLE submission_jobs ADD COLUMN lease_token UUID;
--- Partial-index predicate is status-only (PG rejects volatile fns like now() in predicates).
--- locked_until is in the indexed columns so the drain claim query's
--- "locked_until IS NULL OR locked_until < now()" filter is still index-eligible.
-CREATE INDEX idx_submission_jobs_unlocked
+-- 3) Two-phase claim: locked_until is the lease deadline; lease_token is a stable
+--    per-claim identifier (NOT changed by lease renewal, only by a fresh claim).
+ALTER TABLE submission_jobs ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
+ALTER TABLE submission_jobs ADD COLUMN IF NOT EXISTS lease_token  UUID;
+
+-- 4) Drain claim index. Predicate is status-only (PG rejects volatile fns like now()
+--    in index predicates); locked_until is in the indexed columns so the claim query's
+--    "locked_until IS NULL OR locked_until < now()" filter is still index-eligible.
+DROP INDEX IF EXISTS idx_submission_jobs_active_ready;
+CREATE INDEX IF NOT EXISTS idx_submission_jobs_unlocked
   ON submission_jobs (next_attempt_at, locked_until, created_at)
   WHERE status NOT IN ('completed', 'failed', 'cancelled');
 
--- The old partial unique on (account_id, request_id, form_key) is useless after the
--- pivot — every submit has a fresh request_id, so it never collides. Replace with
--- contact-scoped active-job uniqueness as belt-and-suspenders against fresh-UUID
--- duplicate-submit-from-different-tab. idempotency_key UNIQUE is still the primary guard.
-DROP INDEX idx_submission_jobs_one_active_per_request;
-CREATE UNIQUE INDEX idx_submission_jobs_one_active_per_contact_form
+-- 5) Partial-unique rekey. Old (account_id, request_id, form_key) never collided
+--    in single-phase; new (contact_oid, account_id, form_key) is belt-and-suspenders
+--    against fresh-UUID duplicate-submit-from-different-tab. idempotency_key UNIQUE
+--    remains the primary collision guard.
+DROP INDEX IF EXISTS idx_submission_jobs_one_active_per_request;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_submission_jobs_one_active_per_contact_form
   ON submission_jobs (contact_oid, account_id, form_key)
   WHERE status NOT IN ('completed', 'failed', 'cancelled');
+
+COMMIT;
 ```
 
-Mirror the same changes in `scripts/setup-database.js` inline block at line 609 (status CHECK) and immediately around it (add `akoya_requestnum`, `locked_until`, the new partial index, drop the old one).
+Mirror the same shape in `scripts/setup-database.js` v30 inline block (status CHECK + new columns inline; old indexes replaced with new ones). The inline-block contract is "fresh install only" — existing pre-011 PG environments MUST apply the migration file separately (see "Apply mechanism" below).
+
+**Apply mechanism (Codex round-9 §4):** This project has NO automated Postgres migration runner — migration files in `lib/db/migrations/*.sql` are reference-and-manual-apply documents. Fresh installs land directly in the post-011 shape via `node scripts/setup-database.js`. **Existing environments (dev Neon, prod Neon) must apply 011 manually:**
+
+```bash
+# Verify the migration is safe (dry-run inside BEGIN/ROLLBACK, no schema change persists):
+DATABASE_URL='<unpooled-url>' node -e '
+  const fs=require("fs"); const {Client}=require("pg");
+  (async()=>{
+    const c=new Client({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized:false}});
+    await c.connect();
+    const sql=fs.readFileSync("lib/db/migrations/011_submission_jobs_states.sql","utf8")
+      .replace(/^\s*BEGIN\s*;/im,"").replace(/\s*COMMIT\s*;\s*$/im,"");
+    try { await c.query("BEGIN"); await c.query(sql); console.log("OK"); }
+    finally { await c.query("ROLLBACK"); await c.end(); }
+  })();
+'
+
+# Apply for real (Neon: paste the file contents into the Neon SQL editor, OR pipe via psql):
+psql "$DATABASE_URL" -f lib/db/migrations/011_submission_jobs_states.sql
+
+# Verify post-apply:
+psql "$DATABASE_URL" -c "\d submission_jobs" | grep -E 'akoya_requestnum|locked_until|lease_token'
+psql "$DATABASE_URL" -c "SELECT indexname FROM pg_indexes WHERE tablename='submission_jobs';"
+```
+
+Apply order for dev → prod: dev Neon first; smoke-test drain code (when it lands) against dev; only then prod Neon. Migration is idempotent and safe to re-run.
 
 ### P1 — Structured-error shape across drain dependencies (Codex round-1 §3.1; round-2 §2.2)
 
@@ -746,7 +770,8 @@ Future v1.x: add `'awaiting_correction'` to the submission_jobs status CHECK; dr
 
 ## Verification checklist
 
-- [ ] **P0** applied: status CHECK includes `request_created`; `akoya_requestnum` + `locked_until` columns present; partial unique index rekeyed; `setup-database.js:609` inline block updated
+- [ ] **P0** applied to **dev Neon** (run `011_submission_jobs_states.sql` via `psql -f` or Neon SQL editor): status CHECK includes `request_created`; `akoya_requestnum` + `locked_until` + `lease_token` columns present; old indexes (`idx_submission_jobs_active_ready`, `idx_submission_jobs_one_active_per_request`) dropped; new indexes (`idx_submission_jobs_unlocked`, `idx_submission_jobs_one_active_per_contact_form`) present
+- [ ] **P0** applied to **prod Neon** (post-dev-smoke-test): same verification queries; `setup-database.js:609` inline block already updated so fresh-install consumers are aligned
 - [ ] **P1** applied: `createRecord` / `updateRecord` / `getRecord` / `queryRecords` (Dataverse) + `uploadFile` / etc. (Graph) all throw errors with `.status`, `.serviceName`, optional `.dataverseCode`; error-shape test passes
 - [ ] **P2** deployed: `contact.wmkf_portal_oid` + alternate key on prod
 - [ ] **P3** applied: index rekeyed to `(contact_oid, account_id, form_key)`; `intake-draft-service.js` upsert uses matching conflict target; `setup-database.js:687` inline block updated; `smoke-intake-draft.js` passes
