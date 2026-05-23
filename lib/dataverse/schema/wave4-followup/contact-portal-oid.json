@@ -1,0 +1,22 @@
+{
+  "name": "contact-portal-oid",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "contact",
+  "_comment": "Intake-portal slice-0 followup (drain plan v7 P2). The auth bridge in lib/services/contact-bridge-service.js (forthcoming) reads session.user.contactOid from the entra-external NextAuth provider and resolves it against `contact` rows via this column. The alternate key gives Dataverse-side defense-in-depth so no two contacts can share the same OID even if a race lets a bridge-create slip past the application-side guard. The portal_membership / draft / submit chain depends on a stable OID→contact join, so this column is load-bearing. Entra OIDs are GUIDs (36 chars); max 50 leaves headroom without committing to a specific identity scheme. Schema-apply is idempotent — re-running this spec is safe.",
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_PortalOid",
+      "displayName": "Portal OID",
+      "description": "Microsoft Entra External ID object identifier (oid claim) for the applicant-portal contact. Set by the auth bridge on first login; never edited by hand. Nullable for non-portal contacts.",
+      "maxLength": 50
+    }
+  ],
+  "alternateKeys": [
+    {
+      "schemaName": "wmkf_portaloid",
+      "displayName": "Portal OID",
+      "keyAttributes": ["wmkf_portaloid"]
+    }
+  ]
+}

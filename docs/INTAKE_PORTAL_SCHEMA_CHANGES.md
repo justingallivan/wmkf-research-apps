@@ -9,6 +9,32 @@ Per `project_dataverse_creator_privileges.md` (2026-05-06), Connor delegated ent
 
 ---
 
+## 2026-05-22 — Slice-0 followup: `contact.wmkf_portaloid` + alternate key (S179, drain plan v7 P2)
+
+**Scope:** One nullable string column + one alternate key on the OOB `contact` entity. Mini-deploy through `apply-dataverse-schema.js --wave=4-followup` (the `parseArgs` parser was extended to accept string-suffixed wave names so this fresh wave directory doesn't re-run wave 4 specs).
+
+**Rationale:** The forthcoming applicant-portal auth bridge (`lib/services/contact-bridge-service.js`) reads `session.user.contactOid` (Entra External ID `oid` claim) and resolves it to a Dataverse `contact` row. Without a dedicated column and a uniqueness constraint, the bridge would have to fall back to less reliable joins (email + lookup race-prone) and there would be no Dataverse-side defense against two portal contacts sharing the same OID. The alternate key is the Dataverse-side belt-and-suspenders behind the application-side guard.
+
+**Changes:**
+
+### `contact` — applicant-portal OID column + alt-key
+
+| Schema name | Logical name | Type | Length | Required | Notes |
+|---|---|---|---|---|---|
+| `wmkf_PortalOid` | `wmkf_portaloid` | String | 50 | None (nullable) | Entra External ID `oid` claim; set by auth bridge on first login; nullable so non-portal contacts (donors, foundation liaisons, etc.) are unaffected. |
+
+| Alt-key schema | Key attributes | Initial state |
+|---|---|---|
+| `wmkf_portaloid` | `[wmkf_portaloid]` | `EntityKeyIndexStatus=Pending`; transitions to `Active` async over a few minutes once Dataverse finishes building the unique index. Uniqueness is NOT enforced until `Active` — re-probe before the auth-bridge build relies on it. |
+
+**Naming convention reconciliation:** v7 draft text said `wmkf_portal_oid` (snake_case) and alt-key `wmkf_PortalOid_AlternateKey`. Deployed names dropped the internal underscore (matches the S178 `wmkf_portal_membership` → `wmkf_portalmembership` rename and the broader no-internal-underscore convention on `wmkf_*` logical names) and shortened the alt-key name to match the wave-2 single-column alt-key precedent (alt-key schema name = key column name). The plan was updated post-deploy to reflect the actual deployed names.
+
+**Verification:** `node scripts/verify-p2.mjs` (throwaway, run-and-delete) hit the live metadata API and confirmed both artifacts present with expected shape. Re-check the alt-key state later with a fresh GET on `EntityDefinitions(LogicalName='contact')/Keys`.
+
+**Status:** DEPLOYED to prod 2026-05-22. Drain plan v7 P2 checklist item ✓.
+
+---
+
 ## 2026-05-14 — Schema review w/ Connor — decisions superseding 2026-05-13 entries
 
 **Scope:** Live schema-decision walkthrough with Connor. Established "human-legibility over normalization purity" as the governing principle (memory `feedback_human_legibility_schema_principle`). Multiple proposed new entities collapsed into extensions of existing ones; live Dataverse probe found existing fields covering 3 of 4 proposed aggregate additions.

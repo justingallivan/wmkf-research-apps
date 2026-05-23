@@ -206,14 +206,25 @@ Test coverage: a small `tests/lib/services/error-shape.test.js` that pokes each 
 
 This is a small but cross-cutting patch — roughly half-day. Necessary for the drain's `request_created` duplicate-PK detection AND for the `files_moved` / `dynamics_patched` retry classification.
 
-### P2 — `contact.wmkf_portal_oid` + alternate key (Codex round-1 §1.3)
+### P2 — `contact.wmkf_portaloid` + alternate key (Codex round-1 §1.3)
+
+**Status (S179, 2026-05-22): DEPLOYED to prod ✓**
 
 Mini-deploy via `apply-dataverse-schema.js`:
-- `contact.wmkf_portal_oid` — String (max 50), nullable, indexed
-- **Alternate key** `wmkf_PortalOid_AlternateKey` on `(wmkf_portal_oid)` — Dataverse-side defense-in-depth for one-OID-per-contact
-- Atlas + catalog entries (`docs/atlas/dataverse-contact.md` if exists, else `INTAKE_PORTAL_SCHEMA_CHANGES.md` log)
+- `contact.wmkf_portaloid` — String (max 50, schema name `wmkf_PortalOid`), nullable; logical name has no internal underscore per the S178 `wmkf_portal_membership` → `wmkf_portalmembership` convention rename.
+- **Alternate key** `wmkf_portaloid` on `(wmkf_portaloid)` — Dataverse-side defense-in-depth for one-OID-per-contact. Naming matches the wave-2 alt-key precedent (alt-key schema name = single-column name), not the v6-draft `wmkf_PortalOid_AlternateKey` which didn't match the existing pattern.
+- Catalog entry added to `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`.
 
-Wave directory: `wave4-followup/contact-portal-oid.json`. Run with `--wave=4-followup` (existing apply script reads `wave{N}-existing/` and `wave{N}/`, so we use `wave4-followup` as a fresh wave).
+Wave directory: `lib/dataverse/schema/wave4-followup/contact-portal-oid.json`. Run with `--wave=4-followup`. The apply script's `parseArgs` was extended to accept string-suffixed wave names (previously `parseInt`-only) so followup waves can live in their own directory without re-running parent-wave specs.
+
+```bash
+node scripts/apply-dataverse-schema.js --target=prod --wave=4-followup           # dry-run
+node scripts/apply-dataverse-schema.js --target=prod --wave=4-followup --execute # apply
+```
+
+**Post-deploy verified live state:**
+- Column: `contact.wmkf_portaloid` (schema=`wmkf_PortalOid`), AttributeType=String, MaxLength=50, RequiredLevel=None.
+- Alternate key: `wmkf_portaloid` on `[wmkf_portaloid]`, `EntityKeyIndexStatus=Pending` immediately post-create — Dataverse builds the unique index asynchronously; transitions to `Active` in minutes. Uniqueness is only enforced once `Active`, so do NOT depend on the alt-key for the auth-bridge create-path race-protection guarantee until you re-probe and confirm `Active`.
 
 ### P3 — `intake_drafts` uniqueness redesign (schema + service patch) (Codex round-1 §2.3; round-2 §1.1, §3.1)
 
@@ -288,9 +299,9 @@ After P0–P4, build sequence is:
 Phrasing per Codex round-1 §2.4 + round-2 §6.2 (confirmed clean):
 
 - Read `session.user.contactOid` and `session.user.contactEmail` (set by the `entra-external` provider in `pages/api/auth/[...nextauth].js`)
-- Query Dataverse: `contact?$filter=wmkf_portal_oid eq '{contactOid}'` first
-- If no match: fall back to `contact?$filter=emailaddress1 eq '{contactEmail}' and wmkf_portal_oid eq null`
-- If still no match: create a new contact with `wmkf_portal_oid` set
+- Query Dataverse: `contact?$filter=wmkf_portaloid eq '{contactOid}'` first
+- If no match: fall back to `contact?$filter=emailaddress1 eq '{contactEmail}' and wmkf_portaloid eq null`
+- If still no match: create a new contact with `wmkf_portaloid` set
 - **Conflict route to staff** (`DESIGN.md:175`): if email lookup hits a contact with a different OID set, do NOT auto-link — surface via `intake_audit` with `action: 'bridge.conflict'` and a "needs staff resolution" error to the applicant.
 
 ### 2. Membership query (`lib/services/membership-service.js`)
@@ -709,10 +720,10 @@ Sent as one batched ask; doesn't block scaffolding through `dynamics_patched`.
 | `docs/atlas/dataverse-wmkf-proposalbudgetline.md` | Recompute description still mentions Phase II; update to Q1-answer value |
 | `docs/atlas/dataverse-wmkf-apprequestperson.md` | Still says "NOT yet deployed"; update to deployed-S178 |
 | `docs/BUDGET_FORM_SPEC.md` | "Phase II" mentions; `form_key` likely becomes `research-2026-XX` |
-| `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` | The planned-but-deferred `phaseiisubmittedat`/`by` entries are obsolete; add the `contact.wmkf_portal_oid` follow-up entry |
+| `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` | The planned-but-deferred `phaseiisubmittedat`/`by` entries are obsolete; add the `contact.wmkf_portaloid` follow-up entry |
 | `.claude-memory/slice0-deactivate-not-delete-recalc.md` | Reference Phase II status string in the lifecycle gate |
 | `.claude-memory/project-intake-portal-skinny-scope.md` | Still frames pilot as Phase II Research; uses old `wmkf_portal_membership` name |
-| `.claude-memory/project-slice0-scope.md` | 9-value enum (now 10) + old `wmkf_portal_membership` name + pre-deploy "doc-vs-catalog gap" framing for `contact.wmkf_portal_oid` |
+| `.claude-memory/project-slice0-scope.md` | 9-value enum (now 10) + old `wmkf_portal_membership` name + pre-deploy "doc-vs-catalog gap" framing for `contact.wmkf_portaloid` |
 
 ---
 
@@ -731,7 +742,7 @@ Sent as one batched ask; doesn't block scaffolding through `dynamics_patched`.
 | R9 | Concurrent cron invocations race | **handled** | Two-phase claim with `locked_until` lease |
 | R10 | Cloudmersive scanner unconfigured | MOD | `CLOUDMERSIVE_API_KEY` added to env-vars; fail-loud at startup |
 | R11 | Duplicate child-row writes on partial retry | **handled** | Pre-generated child GUIDs + duplicate-PK detection per child |
-| R12 | Two contacts collide on same OID | **handled by P2** | Dataverse alternate key on `wmkf_portal_oid` |
+| R12 | Two contacts collide on same OID | **handled by P2** | Dataverse alternate key on `wmkf_portaloid` |
 | R13 | Applicant attachments leak via public Blob | **handled by P4** | Dedicated private store + `INTAKE_BLOB_RW_TOKEN` |
 | R14 | Long-running drain step + lock expiry | MOD | Lease renewal in drain code; other workers honor `locked_until` |
 | R15 | Cloudmersive sync scan exceeds Vercel timeout for very large files | LOW | Pilot file sizes are small; stream-scan if needed for future larger uploads |
@@ -777,7 +788,7 @@ Future v1.x: add `'awaiting_correction'` to the submission_jobs status CHECK; dr
 - [ ] **P0** applied to **dev Neon** (run `011_submission_jobs_states.sql` via `psql -f` or Neon SQL editor): status CHECK includes `request_created`; `akoya_requestnum` + `locked_until` + `lease_token` columns present; old indexes (`idx_submission_jobs_active_ready`, `idx_submission_jobs_one_active_per_request`) dropped; new indexes (`idx_submission_jobs_unlocked`, `idx_submission_jobs_one_active_per_contact_form`) present
 - [ ] **P0** applied to **prod Neon** (post-dev-smoke-test): same verification queries; `setup-database.js:609` inline block already updated so fresh-install consumers are aligned
 - [ ] **P1** applied: `createRecord` / `updateRecord` / `getRecord` / `queryRecords` (Dataverse) + `uploadFile` / etc. (Graph) all throw errors with `.status`, `.serviceName`, optional `.dataverseCode`; error-shape test passes
-- [ ] **P2** deployed: `contact.wmkf_portal_oid` + alternate key on prod
+- [x] **P2** deployed (S179, 2026-05-22): `contact.wmkf_portaloid` column + alternate key `wmkf_portaloid` on prod; alt-key `EntityKeyIndexStatus` started `Pending` — re-probe and confirm `Active` before the auth-bridge build relies on Dataverse-side uniqueness enforcement
 - [ ] **P3** applied: index rekeyed to `(contact_oid, account_id, form_key)`; `intake-draft-service.js` upsert uses matching conflict target; `setup-database.js:687` inline block updated; `smoke-intake-draft.js` passes
 - [ ] **P4** provisioned: `intake-applicant-private` Blob store created; `INTAKE_BLOB_RW_TOKEN` set in production/preview/development; CREDENTIALS_RUNBOOK updated
 - [x] **P5** verified (S179, 2026-05-22): `wmkf_apprequestperson.wmkf_role` option set includes `100000002` (Senior Personnel) / `100000003` (Key Personnel) / `100000004` (Other) in prod; `extend-apprequestperson-role-picklist.mjs` exits 0 with "0 inserted this run"; live-data probe CLEAR (5,561 rows, all in 100000000-1)

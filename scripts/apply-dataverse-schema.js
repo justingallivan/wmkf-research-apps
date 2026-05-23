@@ -38,7 +38,13 @@ function parseArgs(argv) {
   for (const a of argv.slice(2)) {
     if (a === '--execute') out.execute = true;
     else if (a.startsWith('--target=')) out.target = a.slice('--target='.length);
-    else if (a.startsWith('--wave=')) out.wave = parseInt(a.slice('--wave='.length), 10);
+    else if (a.startsWith('--wave=')) {
+      // Accept integer waves (e.g. --wave=4) and string-suffixed followup waves
+      // (e.g. --wave=4-followup). String waves let small followup deploys live
+      // in their own wave directory without re-running the parent wave's specs.
+      const v = a.slice('--wave='.length);
+      out.wave = /^\d+$/.test(v) ? parseInt(v, 10) : v;
+    }
     else if (a === '--help' || a === '-h') {
       console.log('Usage: node scripts/apply-dataverse-schema.js [--target=sandbox|prod] [--wave=1] [--execute]');
       process.exit(0);
