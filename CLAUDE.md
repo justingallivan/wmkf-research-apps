@@ -254,6 +254,7 @@ Vercel Postgres. Authoritative source: `lib/db/schema.sql` + `lib/db/migrations/
 | `expertise_roster`, `expertise_matches` | Expertise Finder roster + match history |
 | `panel_reviews`, `panel_review_items` | Virtual Review Panel persistence |
 | `intake_drafts`, `intake_audit` | Applicant intake portal — drafts (Postgres-only, cleared on submit) + sha256-hashed audit |
+| `submission_jobs` | Applicant intake portal — async submission queue, idempotency-keyed, drained by `/api/cron/drain-submissions` (cron not yet built). See `docs/INTAKE_PORTAL_DRAIN_PLAN.md`. |
 | `system_alerts`, `health_check_history`, `maintenance_runs` | Monitoring + cron job audit trail |
 | `policy_publish_audit` | Append-only audit of `wmkf_policy` version publishes via `/api/admin/policies`. Pending row before mutation + final row after (paired by `request_id`). |
 

@@ -10,6 +10,24 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## May 2026 — Intake portal slice-0 schema deployed; single-phase architecture pivot (Session 178)
+
+**Milestone:** The intake-portal slice-0 Dataverse schema landed in prod, and the pilot architecture pivoted from "Phase II attaches to an existing `akoya_request`" to **single-phase submission** (drain creates a new request rather than updating one). Slice-0 had been gated for months on the Item-6 P1-Update verification; Connor's S169 maker-portal run closed it FAIL → Option A′ flow-body conditional fallback, with zero schema rework, unblocking the deploy.
+
+**Sessions:** 178 (single session; 4 commits). Two pre-deploy schema edits, the prod deploy, the architecture pivot, and a Codex-reviewed drain plan covering the Postgres→Dataverse pipeline.
+
+**Ship state:**
+- Deployed to prod Dataverse: `wmkf_proposalbudgetline` (10-value `wmkf_category` incl. new `Tuition`); `wmkf_portalmembership` (renamed pre-deploy from `wmkf_portal_membership` to match sibling convention); 4 new fields on existing entities; `wmkf_role` picklist 2→5; Postgres `submission_jobs` (V30). Entity sets live (HTTP 200); `@odata.bind` keys confirmed from metadata.
+- Live probe confirmed Dataverse accepts client-supplied GUIDs on `akoya_request` Create (HTTP 201, server returned identical GUID, against dummy account "New Cranberry Sauce"). Locks in "Option (ii)-refined" drain architecture: pre-generate UUIDv4 at submit, drain Creates with that GUID, retries naturally idempotent. No `submission_jobs` table changes needed; no sentinel field needed.
+- Pivot to single-phase eliminates the original request-picker dashboard, eligibility OData filter, and institution-wide visibility of existing requests. Build now centers on `/api/intake/submit` + `/api/cron/drain-submissions` creating a fresh `akoya_request` from a frozen Postgres payload.
+- `docs/INTAKE_PORTAL_DRAIN_PLAN.md` v3 written through two full Codex review rounds (32 findings folded: 7 BLOCKER / 17 MOD / 8 LOW). Round 3 inconclusive (Codex CLI exceeded agent response window); v3 treated as the working plan, first build step intentionally small for buildability sanity check.
+
+**Why it matters:** Slice-0 is the schema foundation for the entire intake portal — months of pre-deploy gating around Connor's PA-flow Option-A vs. Option-B work converged on this deploy. The architecture pivot saved building Phase-II-attach infrastructure that would be stale forever after this cycle. The drain plan (v3) is the canonical build plan for the next several sessions.
+
+**Pointers:** `docs/INTAKE_PORTAL_DRAIN_PLAN.md`; `docs/INTAKE_PORTAL_ITEM_6_STATUS.md`; `lib/dataverse/schema/wave4*`. Commits `279d556` (pre-deploy schema edits) · `7cec6da` (deploy) · `545aaed` (memory reconcile) · `1ee0fd3` (drain plan v3).
+
+---
+
 ## May 2026 — Prompt-injection hardening (A7) shipped across all LLM surfaces (Sessions 173–176)
 
 **Milestone:** A7 — the LLM01 prompt-injection hardening initiative — is complete. Every one of the 24 LLM-input surfaces in the codebase now wraps attacker/applicant-influenced text in nonce-bearing, forge-resistant sentinels (`wrapUntrustedContent`) with a system-prompt hardening preamble; high-consequence JSON sinks validate parsed model output against per-app schemas (`validateAiJson`). A registry CI gate (`check:prompt-injection-tagging`) makes the coverage durable. Origin: the 2026-05-21 Codex security audit, item A7.
