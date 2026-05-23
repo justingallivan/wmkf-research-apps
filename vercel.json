@@ -56,6 +56,14 @@
     {
       "path": "/api/cron/drain-submissions",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/pricing-canary",
+      "schedule": "0 10 * * 1"
+    },
+    {
+      "path": "/api/cron/pricing-refresh",
+      "schedule": "0 11 1 * *"
     }
   ]
 }

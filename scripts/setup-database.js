@@ -666,6 +666,30 @@ const v31Statements = [
      ON external_rate_limit(window_start)`,
 ];
 
+// V32: model pricing audit history (S181).
+// Monthly drift cron (/api/cron/pricing-refresh) writes one row per
+// (model, token_type) per run. Compared against lib/utils/model-pricing.js;
+// alerts on >5% delta. Backstop for the manually-maintained pricing table.
+const v32Statements = [
+  `CREATE TABLE IF NOT EXISTS model_pricing_audit (
+    id                  SERIAL PRIMARY KEY,
+    run_date            DATE NOT NULL,
+    model               TEXT NOT NULL,
+    token_type          TEXT NOT NULL,  -- 'input' | 'output' | 'cache_read' | 'cache_write_5m' | 'cache_write_1h'
+    period_start        TIMESTAMPTZ NOT NULL,
+    period_end          TIMESTAMPTZ NOT NULL,
+    anthropic_cost_cents NUMERIC(14,4) NOT NULL,
+    token_count         BIGINT NOT NULL,
+    derived_cents_per_mtok NUMERIC(14,4),
+    local_cents_per_mtok   NUMERIC(14,4),
+    delta_pct           NUMERIC(8,4),   -- (derived - local) / local
+    flagged             BOOLEAN NOT NULL DEFAULT false,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_model_pricing_audit_run ON model_pricing_audit(run_date DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_model_pricing_audit_model ON model_pricing_audit(model, token_type, run_date DESC)`,
+];
+
 // V28: Policy publish audit (append-only). See migration 006_policy_publish_audit.sql
 // for full rationale. Dedicated Postgres table rather than overloading wmkf_ai_run.
 const v28Statements = [
@@ -1470,6 +1494,24 @@ async function runMigration() {
           console.log(`[v31-${i + 1}/${v31Statements.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v31-${i + 1}/${v31Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V32 table creation (S181: model pricing audit history)
+    console.log(`\nApplying v32 schema updates - Model pricing audit (${v32Statements.length} statements)...`);
+    for (let i = 0; i < v32Statements.length; i++) {
+      const statement = v32Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v32-${i + 1}/${v32Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v32-${i + 1}/${v32Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v32-${i + 1}/${v32Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }

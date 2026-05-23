@@ -85,7 +85,11 @@ Cron-driven health checks (7 services), alert log, cron audit trail. `maintenanc
 
 ### `api_usage_log` (2,044 rows)
 **Source of truth:** Postgres-only.
-Per-Claude-call ledger (model, tokens, cost, latency). Written by `lib/services/llm-client.js` via `lib/utils/usage-logger.js` (`logUsage`, raw SQL INSERT at ≈line 64). Not routed through `DatabaseService`.
+Per-Claude-call ledger (model, tokens, cost, latency). Written by `lib/services/llm-client.js` via `lib/utils/usage-logger.js` (`logUsage`). Not routed through `DatabaseService`. Cost is computed locally from `lib/utils/model-pricing.js`; rows with an unknown model id land with `estimated_cost_cents = NULL` and are surfaced by the weekly `pricing-canary` cron.
+
+### `model_pricing_audit` (S181, V032)
+**Source of truth:** Postgres-only.
+Append-only history written by `/api/cron/pricing-refresh` (monthly, 1st of month). One row per (model, token_type) probed: stores Anthropic's authoritative cost from `/v1/organizations/cost_report`, our summed `api_usage_log` token count for the same window, the derived per-MTok price, the local table's price, and the delta. `flagged = true` rows are >5% out of tolerance and have triggered an `ops` alert. Backstop for the manually-maintained `lib/utils/model-pricing.js` table — the cron alerts; humans edit the table; no auto-overwrite. Requires `ANTHROPIC_ADMIN_API_KEY`.
 
 ### `external_rate_limit` (0 rows)
 **Source of truth:** Postgres-only. V031 migration / `010_external_rate_limit.sql` (S173, 2026-05-21, security audit A6).

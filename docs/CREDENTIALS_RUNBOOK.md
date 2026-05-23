@@ -119,6 +119,7 @@ Prefer the admin dashboard (`/admin` → Models tab) for non-static overrides �
 |----------|---------|
 | `NOTIFICATION_EMAIL_FROM` | Sender mailbox for system-alert emails. Must be a Dynamics systemuser with Server-Side Sync enabled (resolvable via `internalemailaddress`). Recipients are resolved at send time via the per-category routing config in `/admin` → Alert Recipients (Dataverse setting `alertRecipientsByCategory`), falling back to the active superuser roster. |
 | `DAILY_SPEND_ALERT_CENTS` | Daily spend threshold for the runaway-cost alert in `/api/cron/spend-check` (default $10). Catches code wedged in a loop or a prompt mistakenly looping a large input — not normal usage. |
+| `ANTHROPIC_ADMIN_API_KEY` | Separate `sk-ant-admin-…` key (NOT the regular `CLAUDE_API_KEY`). Mint at `console.anthropic.com/settings/admin-keys` — only org admins can. Read-only consumer is `/api/cron/pricing-refresh`, which compares Anthropic's authoritative `/cost_report` against `lib/utils/model-pricing.js` monthly and alerts on >5% drift. When unset, the cron skips with `status='skipped'`; no other code path requires it. |
 | `VERCEL_API_TOKEN` / `VERCEL_PROJECT_ID` | Used by maintenance/health utilities that pull deployment metadata |
 
 ---
