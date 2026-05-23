@@ -59,6 +59,10 @@ import {
   isAlreadyWritten,
   guessContentType,
 } from '../../../lib/utils/drain-files-moved-helpers';
+import {
+  validateBudgetLineRow,
+  buildBudgetLinePayload,
+} from '../../../lib/utils/intake-budget-line-payload';
 
 const { Pool } = pkg;
 
@@ -619,6 +623,128 @@ async function handleRequestCreated(client, job) {
 }
 
 /**
+ * files_moved → dynamics_patched. POST each pre-gen budget-line GUID;
+ * track written IDs in dynamics_patches.budget_lines so a mid-loop crash
+ * doesn't re-POST on retry. Idempotency: pre-gen GUIDs + duplicate_pk →
+ * success-advance per drain plan §"Per-state idempotency".
+ *
+ * Phase B step 2 scope: budget-lines only. Persons children (and parent
+ * aggregate PATCH) are deferred to the next commit — persons need
+ * Connor Q2 (PI/contact attribution) + a contact-resolution service.
+ * Until then, this handler advances to dynamics_patched if no persons
+ * are queued in payload.children.persons (the steady state for now).
+ */
+async function handleFilesMoved(client, job) {
+  if (!job.request_id) {
+    return await recordFailure(client, {
+      jobId: job.id,
+      leaseToken: job.lease_token,
+      category: 'validation_400',
+      errorMessage: `dynamics_patched entered without request_id (job ${job.id})`,
+      terminal: true,
+      retryable: false,
+    });
+  }
+
+  const payload = job.payload ?? {};
+  const children = payload.children ?? {};
+  const budgetLines = Array.isArray(children.budget_lines) ? children.budget_lines : [];
+  const persons = Array.isArray(children.persons) ? children.persons : [];
+
+  // Persons not yet supported — if any are queued, park (don't drop on the
+  // floor and silently advance). When the persons handler ships, the
+  // unpark SQL (plan §"Phase B deploy handoff") wakes these rows back up.
+  if (persons.length > 0) {
+    await AlertService.createAlert({
+      type: 'intake_drain_persons_pending',
+      severity: 'warning',
+      title: `Drain: persons handler not yet built (job ${job.id})`,
+      message: `Job ${job.id} has ${persons.length} person rows queued; waiting on Connor Q2 + contact-resolution service.`,
+      source: 'drain-submissions',
+      autoResolveKey: 'drain-pending-persons',
+      metadata: { jobId: job.id, personCount: persons.length, requestId: job.request_id },
+    }).catch(() => {});
+    await client.query(
+      `UPDATE submission_jobs
+          SET next_attempt_at = now() + INTERVAL '1 hour',
+              locked_until = NULL,
+              lease_token = NULL
+        WHERE id = $1 AND lease_token = $2`,
+      [job.id, job.lease_token],
+    );
+    return;
+  }
+
+  const patches = job.dynamics_patches ?? {};
+  const writtenIds = new Set(Array.isArray(patches.budget_lines) ? patches.budget_lines : []);
+
+  for (const row of budgetLines) {
+    if (writtenIds.has(row.id)) continue;
+
+    // Re-validate at drain-entry per drain plan §"Belt-and-suspenders".
+    // Submit already validated, so any failure here means corruption /
+    // hand-editing / regression — terminal_400 + alert (Codex round-7 §4 pattern).
+    try {
+      validateBudgetLineRow(row, budgetLines.indexOf(row));
+    } catch (err) {
+      await AlertService.createAlert({
+        type: 'intake_drain_corruption',
+        severity: 'error',
+        title: `Drain: malformed budget_line in job ${job.id}`,
+        message: err.message,
+        source: 'drain-submissions',
+        metadata: { jobId: job.id, requestId: job.request_id, rowId: row.id },
+      }).catch(() => {});
+      return await recordFailure(client, {
+        jobId: job.id,
+        leaseToken: job.lease_token,
+        category: 'validation_400',
+        errorMessage: `budget_line shape: ${err.message}`,
+        terminal: true,
+        retryable: false,
+      });
+    }
+
+    await renewLease(client, job.id, job.lease_token);
+
+    const body = buildBudgetLinePayload(row, job.request_id);
+    try {
+      await DynamicsService.createRecord('wmkf_proposalbudgetlines', body);
+    } catch (err) {
+      const cls = classify(err);
+      if (cls.category === 'duplicate_pk') {
+        // A prior tick already created this row — treat as success and
+        // advance. We rely on the pre-gen GUID + Dataverse's PK violation;
+        // no read-back needed because the row's data is fully reproducible
+        // from the frozen payload.
+        writtenIds.add(row.id);
+        continue;
+      }
+      return await recordFailure(client, {
+        jobId: job.id,
+        leaseToken: job.lease_token,
+        category: cls.category,
+        errorMessage: `dynamics_patched budget_line POST (${row.id}): ${err.message ?? err}`,
+        terminal: !cls.retryable,
+        retryable: cls.retryable,
+      });
+    }
+    writtenIds.add(row.id);
+  }
+
+  const updatedPatches = { ...patches, budget_lines: [...writtenIds] };
+
+  return await advanceState(client, {
+    jobId: job.id,
+    leaseToken: job.lease_token,
+    toStatus: 'dynamics_patched',
+    action: 'drain.advance.dynamics_patched',
+    payload: { budgetLineCount: budgetLines.length, personCount: persons.length },
+    extra: { dynamics_patches: updatedPatches },
+  });
+}
+
+/**
  * BUILD-PENDING handler — pushes next_attempt_at out by 1 hour to avoid
  * burning ticks while the next state's code is unimplemented. Leaves the
  * row at its current status. Alerts (deduped) so the parking is visible.
@@ -649,8 +775,11 @@ const DISPATCH = {
   queued: handleQueued,
   scanning: handleScanning,
   request_created: handleRequestCreated,
-  // BUILD-PENDING — files_moved, dynamics_patched, status_flipped fall through
-  //                to parkBuildPending fallback
+  files_moved: handleFilesMoved,
+  // BUILD-PENDING — dynamics_patched, status_flipped fall through to
+  //                parkBuildPending fallback (dynamics_patched parks because
+  //                persons + parent aggregates aren't built; status_flipped
+  //                because it needs Connor Q1).
 };
 
 async function processJob(client, job) {
@@ -762,11 +891,14 @@ export const _testing = {
   handleQueued,
   handleScanning,
   handleRequestCreated,
+  handleFilesMoved,
   recoverRequestCreated,
   parkBuildPending,
   isAlreadyWritten,
   requestFolderName,
   guessContentType,
+  validateBudgetLineRow,
+  buildBudgetLinePayload,
   ADVANCED_STATES,
   BUILD_PENDING_STATES,
 };

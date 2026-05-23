@@ -56,6 +56,7 @@ import { hasSubmitterRole } from '../../../lib/services/membership-service';
 import IntakeDraftService from '../../../lib/services/intake-draft-service';
 import IntakeAuditService from '../../../lib/services/intake-audit-service';
 import { validateAttachmentShape } from '../../../lib/utils/intake-attachment-shape';
+import { validateBudgetLineRow } from '../../../lib/utils/intake-budget-line-payload';
 
 const { Pool } = pkg;
 
@@ -158,11 +159,40 @@ export default async function handler(req, res) {
   //    and used by the drain as the akoya_request primary key for Dataverse Create.
   const requestGuid = crypto.randomUUID();
 
-  // 7) Frozen payload: snapshot of draft_json + attachments. The drain reads
-  //    only this, never intake_drafts (per migration 009's design comment).
+  // 6a) Pre-generate child GUIDs per drain plan §5 ("GUID generation: 1 per
+  //     wmkf_proposalbudgetline row; ...; all stored in the frozen payload
+  //     JSONB before queue"). Pre-generation gives the drain idempotent
+  //     duplicate-PK detection per child — a crash mid-POST is recoverable
+  //     because the next tick's POST uses the same GUID and Dataverse 412/409s,
+  //     which the classifier routes to duplicate_pk → skip-as-success.
+  //
+  //     Source: draft.draft_json.budget_lines — an array of flat rows
+  //     (pre-unrolled per year+category). Submit-side validation rejects
+  //     malformed rows with 422 before the row reaches submission_jobs.
+  const draftBudgetLines = Array.isArray(draft.draft_json?.budget_lines)
+    ? draft.draft_json.budget_lines
+    : [];
+  try {
+    draftBudgetLines.forEach(validateBudgetLineRow);
+  } catch (err) {
+    return jsonError(res, 422, err.message);
+  }
+  const budgetLines = draftBudgetLines.map((row) => ({
+    id: crypto.randomUUID(),
+    ...row,
+  }));
+
+  // 7) Frozen payload: snapshot of draft_json + attachments + pre-gen child
+  //    GUIDs. The drain reads only this, never intake_drafts (per migration
+  //    009's design comment).
   const payload = {
     draft_json: draft.draft_json ?? {},
     attachments,
+    children: {
+      budget_lines: budgetLines,
+      // persons: [] — will be added when the persons handler ships (blocked
+      // on Connor Q2 for parent PI attribution + contact-resolution service).
+    },
     idempotency_key: idempotencyKey,
     contact_oid: contactOid,
     account_id: accountId,
