@@ -1,6 +1,13 @@
-# Intake Portal — Postgres → Dataverse Drain Plan (v3)
+# Intake Portal — Postgres → Dataverse Drain Plan (v4)
 
-**Status:** S178 v3 (2026-05-22). Codex round-2 findings folded in (11 findings: 3 BLOCKER / 6 MOD / 2 LOW, plus 1 NIT confirming a v2 piece was already clean). Ready for round-3 re-review.
+**Status:** S179 v4 (2026-05-22). Codex round-3 findings folded in (4 findings: 2 BLOCKER / 2 MOD / 0 LOW). Round-4 Codex review stalled at 14m with no findings produced; Codex's last self-narration flagged two open lines of inquiry (token-acquisition coverage + lease-expiry during duplicate-PK recovery), both hand-checked and folded into this v4. Build-ready.
+
+**Changes from v3 (round-3-driven):**
+- **BLOCKER fix:** P0 partial-index predicate no longer references `now()` (volatile functions are illegal in PG index predicates and would have failed migration). `locked_until` moved into the indexed columns; predicate is now status-only.
+- **BLOCKER fix:** `request_created` state now has explicit duplicate-PK recovery: on collision, GET the parent row, persist `akoya_requestnum`, then advance. Closes the worker-crashes-between-Create-and-persist hole.
+- **MOD fix:** P-list now includes an explicit prerequisite (P5) confirming `scripts/extend-apprequestperson-role-picklist.mjs` has run in prod and option-set values `100000002`–`100000004` exist on `wmkf_apprequestperson.wmkf_role` before drain code writes roster rows.
+- **MOD fix:** P1 error-shape helper covers no-response throws (timeouts, aborts, DNS/socket resets, token-acquisition failures); error taxonomy adds `network_no_response` category and broadens `graph_timeout` semantics.
+- **Hand-check addenda (round-4 self-narration):** P1 site list expanded to include `getAccessToken` in both `dynamics-service.js` and `graph-service.js` (upstream of every P1-listed op; the original v4 list missed these); duplicate-PK recovery UPDATE is now lease-aware (`WHERE id=$1 AND locked_until=$2`) to prevent stale-tick clobber on parallel-worker recovery, with explicit 0-rows-affected = "another worker advanced" semantics.
 
 **Changes from v2 (round-2-driven):**
 - `scan_status` → `scan_result` (matches the deployed strict validator at `validate.js:153`)
@@ -68,10 +75,12 @@ ALTER TABLE submission_jobs ADD COLUMN akoya_requestnum TEXT;
 
 -- Two-phase claim: claim sets locked_until, releases after each step
 ALTER TABLE submission_jobs ADD COLUMN locked_until TIMESTAMPTZ;
+-- Partial-index predicate is status-only (PG rejects volatile fns like now() in predicates).
+-- locked_until is in the indexed columns so the drain claim query's
+-- "locked_until IS NULL OR locked_until < now()" filter is still index-eligible.
 CREATE INDEX idx_submission_jobs_unlocked
-  ON submission_jobs (next_attempt_at, created_at)
-  WHERE status NOT IN ('completed', 'failed', 'cancelled')
-    AND (locked_until IS NULL OR locked_until < now());
+  ON submission_jobs (next_attempt_at, locked_until, created_at)
+  WHERE status NOT IN ('completed', 'failed', 'cancelled');
 
 -- The old partial unique on (account_id, request_id, form_key) is useless after the
 -- pivot — every submit has a fresh request_id, so it never collides. Replace with
@@ -92,11 +101,12 @@ The drain's error-taxonomy classification (`duplicate_pk` / `validation_400` / `
 **Patch shape (mirror `updateRecord`'s 412 pattern across all sites):**
 
 ```js
-// Common helper, applied to every throw site below:
+// Common helper for responses (Dataverse/Graph returned an HTTP status):
 function buildServiceError(serviceName, resp, body) {
   const e = new Error(`${serviceName} failed (${resp.status}): ${body}`);
   e.status = resp.status;
   e.serviceName = serviceName;
+  e.isTransient = resp.status === 429 || (resp.status >= 500 && resp.status < 600);
   try {
     const parsed = JSON.parse(body);
     e.dataverseCode = parsed?.error?.code;
@@ -104,19 +114,45 @@ function buildServiceError(serviceName, resp, body) {
   } catch { /* non-JSON body */ }
   return e;
 }
+
+// Sibling helper for no-response throws (timeout, DNS/socket reset, AbortError,
+// token-acquisition failure — anything that throws BEFORE an HTTP response exists).
+// Every fetch site must wrap its catch so the taxonomy classifier sees a structured
+// error, not a bare Error. Without this, network failures bypass retry classification.
+function buildNoResponseError(serviceName, cause) {
+  const e = new Error(`${serviceName} no-response: ${cause?.message || cause}`);
+  e.serviceName = serviceName;
+  e.status = null;
+  e.cause = cause;
+  e.isTransient = true;   // network/timeouts are retryable by default
+  e.noResponse = true;
+  // Best-effort cause tagging for diagnostics:
+  if (cause?.name === 'AbortError') e.causeKind = 'abort';
+  else if (cause?.code === 'ETIMEDOUT' || cause?.code === 'UND_ERR_HEADERS_TIMEOUT') e.causeKind = 'timeout';
+  else if (cause?.code === 'ECONNRESET' || cause?.code === 'ECONNREFUSED') e.causeKind = 'socket';
+  else if (cause?.code === 'ENOTFOUND' || cause?.code === 'EAI_AGAIN') e.causeKind = 'dns';
+  else e.causeKind = 'unknown';
+  return e;
+}
+
+// Usage at each fetch site:
+//   try { const resp = await fetch(...); if (!resp.ok) throw buildServiceError(...); }
+//   catch (err) { if (err.serviceName) throw err; throw buildNoResponseError('dataverse', err); }
 ```
 
 Apply to all of:
 - `lib/services/dynamics-service.js`:
+  - **`getAccessToken` (lines 93-136) — UPSTREAM of every op below; without this the entire P1 chain leaks unstructured errors.** Wrap the `fetchWithTimeout` token call and the response-status throw on line 127; the missing-env throw on line 107 should also adopt `buildServiceError('dataverse', { status: 500 }, 'Missing env: …')` so callers see a consistent shape.
   - `createRecord` (line ~785)
   - `updateRecord` (already does 412 specifically — broaden to all non-2xx)
   - `getRecord` (~line 473)
   - `queryRecords` (~line 511)
 - `lib/services/graph-service.js`:
+  - **`getAccessToken` (lines 88-123) — same upstream treatment as Dynamics.**
   - `uploadFile` (~line 613)
   - any other throw the drain touches (search, list, download)
 
-Test coverage: a small `tests/lib/services/error-shape.test.js` that pokes each helper with a 404/429/500 mock and asserts `.status` and `.dataverseCode` attached.
+Test coverage: a small `tests/lib/services/error-shape.test.js` that pokes each helper with a 404/429/500 mock and asserts `.status` / `.dataverseCode` / `.isTransient` attached; plus a no-response case (mocked `AbortError` + `ETIMEDOUT`) asserting `.noResponse === true`, `.causeKind` set, `.isTransient === true`.
 
 This is a small but cross-cutting patch — roughly half-day. Necessary for the drain's `request_created` duplicate-PK detection AND for the `files_moved` / `dynamics_patched` retry classification.
 
@@ -156,6 +192,23 @@ DO UPDATE SET ...
 ```
 
 Plus `getByKey()`: change signature to take `(contactOid, accountId, formKey)` if any caller relies on contact-scoped lookup (verify before patch). Update `scripts/smoke-intake-draft.js` to use the new key and verify it passes.
+
+### P5 — `wmkf_apprequestperson.wmkf_role` option-set expansion verified in prod (Codex round-3 §3)
+
+**Background:** The plan writes 5 role values to `wmkf_apprequestperson` rows (`100000000`–`100000004` = PI / Co-PI / Senior / Key / Other). The deployed slice-0 schema only added the *fields*; the *option-set expansion* from the as-shipped 2-value enum to 5 values ships as a standalone idempotent script (`scripts/extend-apprequestperson-role-picklist.mjs`). If that script hasn't run in prod, drain writes of Senior/Key/Other roster rows fail as `validation_400`.
+
+**Verification (run before drain code goes live):**
+
+```bash
+# Read the live option set; expect entries for 100000000..100000004 inclusive.
+node scripts/extend-apprequestperson-role-picklist.mjs --check
+# If any missing:
+node scripts/extend-apprequestperson-role-picklist.mjs
+```
+
+The script is idempotent (`InsertOptionValue` is a no-op for existing values), so re-running on an already-expanded picklist is safe.
+
+**Acceptance:** GET on `wmkf_apprequestperson` EntityDefinitions returns OptionSet members with values `100000002`, `100000003`, `100000004` and matching display labels (`Senior`, `Key`, `Other`).
 
 ### P4 — Dedicated private Blob store for applicant attachments (Codex round-2 §4.1)
 
@@ -256,7 +309,8 @@ This matches the v1/`DESIGN.md:527` synchronous model and the form validator's `
 queued
   → scanning              (all attachments must be scan_result='clean'; else retry / fail per taxonomy)
   → request_created       (POST akoya_request with our GUID + required fields + Prefer: return=representation;
-                           capture server-assigned akoya_requestnum into submission_jobs.akoya_requestnum)
+                           capture server-assigned akoya_requestnum into submission_jobs.akoya_requestnum.
+                           On duplicate_pk: see "Duplicate-PK recovery in request_created" below.)
   → files_moved           (Blob → SharePoint; folder name = `{akoya_requestnum}_{requestGuid-no-hyphens-upper}`
                            per existing convention `review-upload.js:128`; record paths in sharepoint_paths JSONB)
   → dynamics_patched      (POST wmkf_proposalbudgetline children with pre-generated GUIDs;
@@ -297,26 +351,68 @@ Phase 2 — process each claimed row independently. Each row's status transition
 
 | Category | Behavior | Examples |
 |---|---|---|
-| `duplicate_pk` | Treat as success; advance state | Dataverse returns 412/409 on Create with our GUID (already created by prior tick) |
+| `duplicate_pk` | State-specific recovery (see below for `request_created`); else treat as success and advance | Dataverse returns 412/409 on Create with our GUID (already created by prior tick) |
 | `validation_400` | Terminal `failed` immediately | Required-field missing; type mismatch; option-set value not in enum |
 | `auth_4xx` (401/403) | Terminal `failed`; alert via `system_alerts` | Token expired beyond refresh; user lost permission mid-flow |
 | `not_found_404` | Terminal `failed` | Lookup target deleted (e.g. account removed between submit and drain) |
 | `throttle_429` | Retry with exponential backoff; max_attempts=10 | Dataverse / Graph rate limit |
 | `transient_5xx` | Retry with exponential backoff; max_attempts=10 | Dataverse 502/503/504; Graph transient |
-| `graph_timeout` | Retry; consult `sharepoint_paths` JSONB to skip already-written | Graph upload taking > N seconds |
+| `network_no_response` | Retry with exponential backoff; max_attempts=10; on `files_moved` step also consult `sharepoint_paths` JSONB to skip already-written | `err.noResponse=true` — fetch timeout, DNS, socket reset, abort, token-acquisition failure (any service) |
 | `scan_infected` | Terminal `failed` (rare — caught at upload time) | Cloudmersive returns infected post-queue |
 | `scan_error` | Retry up to max_attempts=3, then terminal `failed` | Cloudmersive 5xx |
 
 Each failure writes audit: `action: 'drain.error'`, payload = `{state, category, message, attempt}`.
 
-Classification uses `err.status` / `err.dataverseCode` attached by the P1 patch — not string-parsing.
+Classification uses `err.status` / `err.dataverseCode` / `err.noResponse` attached by the P1 patch — not string-parsing. `err.noResponse === true` ⇒ `network_no_response` category (the `graph_timeout` row from v3 collapses into this — timeouts against either Graph or Dataverse take the same path).
 
 **Per-state idempotency:**
 - `scanning`: read-only checks; safe to repeat
-- `request_created`: pre-generated GUID + duplicate-PK detection
+- `request_created`: pre-generated GUID + duplicate-PK detection with explicit recovery (below)
 - `files_moved`: track written paths in `sharepoint_paths`; skip already-written
 - `dynamics_patched`: pre-generated child GUIDs + duplicate-PK detection per child; aggregates re-summed (deterministic on same payload)
 - `status_flipped`: PATCH is naturally idempotent
+
+**Duplicate-PK recovery in `request_created` (Codex round-3 §2):**
+
+The transition is *two* persistence steps: Dataverse Create, then Postgres write of
+`status='request_created'` + `akoya_requestnum`. A worker crash between them leaves the row
+created in Dataverse but the job still `queued` (with no `akoya_requestnum` captured). The retry's
+Create fails with `duplicate_pk` and has no representation to read `akoya_requestnum` from — which
+the next state (`files_moved`) needs to name the SharePoint folder.
+
+Recovery flow (drain code, on `duplicate_pk` during `request_created`):
+
+```js
+if (err.category === 'duplicate_pk' && state === 'request_created') {
+  // The row exists from a prior tick. Read back what the server assigned.
+  const existing = await dynamics.getRecord(
+    'akoya_requests',
+    job.request_id,
+    { $select: 'akoya_requestnum' }
+  );
+  if (!existing?.akoya_requestnum) {
+    // Shouldn't happen — akoya_requestnum is server-autonumber. Treat as fatal.
+    throw buildServiceError('dataverse', { status: 500 },
+      `request_created recovery: row exists but akoya_requestnum missing for ${job.request_id}`);
+  }
+  // Lease-aware update: only the worker still holding the lease should advance the row.
+  // Two workers running this recovery in parallel both compute the same akoya_requestnum
+  // and both UPDATEs would be content-identical (idempotent), but guarding on locked_until
+  // prevents a stale tick from clobbering newer state.
+  await pg.query(
+    `UPDATE submission_jobs
+        SET status='request_created', akoya_requestnum=$1, locked_until=NULL
+        WHERE id=$2 AND locked_until=$3`,
+    [existing.akoya_requestnum, job.id, job.locked_until]
+  );
+  return; // advance
+}
+```
+
+This makes the boundary between Dataverse-side state and Postgres-side state explicit and
+recoverable on either side of the crash, without any new schema or sentinel field. If the
+lease-guarded UPDATE affects 0 rows (another worker already advanced), the caller treats
+that as success and moves on — both outcomes converge.
 
 **Cron protection:** `CRON_SECRET`.
 
@@ -348,7 +444,7 @@ Both child entities have ApplicationRequired primary-name attributes; a missing 
 {
   "wmkf_apprequestpersonid": "<pre-generated UUID>",
   "wmkf_AssignmentKey": "{request-num} — {role-label} — {position-index}",  // synthesized; <=200
-  "wmkf_role": <int>,                                          // PI/Co-PI/Senior/Key/Other
+  "wmkf_role": <int>,                                          // 100000000=PI, 100000001=Co-PI, 100000002=Senior, 100000003=Key, 100000004=Other — requires P5 picklist expansion
   "wmkf_effortpct": <int|null>,
   "wmkf_biosketchurl": <string|null>,
   "wmkf_lineorder": <int>,
@@ -491,6 +587,7 @@ Future v1.x: add `'awaiting_correction'` to the submission_jobs status CHECK; dr
 - [ ] **P2** deployed: `contact.wmkf_portal_oid` + alternate key on prod
 - [ ] **P3** applied: index rekeyed to `(contact_oid, account_id, form_key)`; `intake-draft-service.js` upsert uses matching conflict target; `setup-database.js:687` inline block updated; `smoke-intake-draft.js` passes
 - [ ] **P4** provisioned: `intake-applicant-private` Blob store created; `INTAKE_BLOB_RW_TOKEN` set in production/preview/development; CREDENTIALS_RUNBOOK updated
+- [ ] **P5** verified: `wmkf_apprequestperson.wmkf_role` option set includes `100000002`/`100000003`/`100000004` in prod; `extend-apprequestperson-role-picklist.mjs --check` is clean
 - [ ] Auth bridge: OID-first / email-fallback / conflict-routing behaves per spec; `intake_audit` action='bridge.conflict' on the conflict path
 - [ ] Membership query returns approved+active+role; Submitter-only guard enforced at `/api/intake/submit`
 - [ ] `/apply` skeleton: drafts list + new-submission flow click-through
@@ -508,14 +605,14 @@ Future v1.x: add `'awaiting_correction'` to the submission_jobs status CHECK; dr
 
 ---
 
-## What we're asking Codex (round 3) to look at
+## What we're asking Codex (round 4) to look at
 
-This is v3 after two review rounds (32 findings folded across rounds 1+2). Specifically:
+This is v4 after three review rounds (36 findings folded across rounds 1+2+3). Specifically:
 
-1. **Any round-2 finding I addressed incorrectly** — did a fix introduce a new gap?
-2. **New gaps the v3 changes create** — P1 broadening, two-phase claim with `locked_until`, P4 private Blob, synchronous scan, child payload shape, etc.
-3. **Sequencing across P0–P4** — are they truly independent, or do hidden dependencies remain?
-4. **The error taxonomy** — now that P1 covers more sites, is the classification table complete and consistently applicable?
-5. **Anything else genuinely concerning** that rounds 1–2 didn't surface
+1. **Did the v4 fixes introduce new gaps?** — Especially the duplicate-PK recovery code block (drain code now reads back `akoya_requestnum` via a fresh GET inside the `request_created` retry path), the new `buildNoResponseError` helper, the new P5 verification step.
+2. **Is the `network_no_response` category complete?** — Does collapsing `graph_timeout` into it lose any state-specific behavior (`files_moved` still needs the "consult `sharepoint_paths`" skip — keep that explicit)?
+3. **P5 sequencing** — Is the role-picklist verification at the right place in the prereq list, or does it actually need to land alongside P0 (since drain code is the first writer that depends on it)?
+4. **Index shape after the v4 fix** — `(next_attempt_at, locked_until, created_at)` with status-only predicate: is the claim query at `:282-291` still index-eligible? Row-count behavior with `FOR UPDATE SKIP LOCKED`?
+5. **Anything else genuinely concerning** that rounds 1–3 didn't surface.
 
-Specifically NOT asked: another exhaustive sweep. Round 1 was the broad pass; round 2 caught the v2-introduced issues. Round 3 should evaluate the deltas; if the plan is now clean enough for build, say so explicitly.
+Convergence trend: 21 → 11 → 4. If the plan is now clean enough for build, say so explicitly.
