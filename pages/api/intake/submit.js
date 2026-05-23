@@ -55,6 +55,7 @@ import { authOptions } from '../auth/[...nextauth]';
 import { hasSubmitterRole } from '../../../lib/services/membership-service';
 import IntakeDraftService from '../../../lib/services/intake-draft-service';
 import IntakeAuditService from '../../../lib/services/intake-audit-service';
+import { resolveContactForSession } from '../../../lib/services/contact-bridge-service';
 import { validateAttachmentShape } from '../../../lib/utils/intake-attachment-shape';
 import { validateBudgetLineRow } from '../../../lib/utils/intake-budget-line-payload';
 
@@ -112,12 +113,49 @@ export default async function handler(req, res) {
     return jsonError(res, 400, 'idempotencyKey is required');
   }
 
-  // 3) Membership / Submitter-role guard. The drain plan v7 §5 makes this a
-  //    Dataverse query at submit time; the membership service handles the
-  //    approved+active+Submitter triple-check in one filter.
+  // 3) Bridge: resolve the External ID OID to a Dataverse `contact` GUID
+  //    (auth-bridge slice — INTAKE_PORTAL_DESIGN.md:175). The membership
+  //    filter `_wmkf_contact_value eq <GUID>` requires the contact GUID,
+  //    NOT the OID. Calling hasSubmitterRole with an OID silently returns
+  //    false for every applicant (the bug this commit fixes).
+  let bridgeResult;
+  try {
+    bridgeResult = await resolveContactForSession({
+      oid: contactOid,
+      email: session.user.contactEmail,
+      name: session.user.contactName,
+    });
+  } catch (err) {
+    console.error('[intake/submit] bridge failed:', err);
+    return jsonError(res, 502, 'Identity bridge failed; please retry');
+  }
+  if (!bridgeResult.ok) {
+    if (bridgeResult.reason === 'conflict') {
+      IntakeAuditService.log({
+        actorOid: contactOid,
+        actorType: 'applicant',
+        action: 'bridge.conflict',
+        targetEntity: 'contact',
+        targetId: bridgeResult.existingContactId ?? null,
+        payload: {
+          message: bridgeResult.message,
+          existingContactId: bridgeResult.existingContactId,
+          existingOid: bridgeResult.existingOid,
+        },
+      }).catch(() => {});
+      return jsonError(res, 409, 'identity_conflict', {
+        message: 'Your account is already linked to a different portal identity. Please contact staff to resolve.',
+      });
+    }
+    return jsonError(res, 401, bridgeResult.message || 'Identity bridge invalid');
+  }
+  const contactId = bridgeResult.contactId;
+
+  // 4) Membership / Submitter-role guard. Now using the resolved contactId.
+  //    The membership service handles the approved+active+Submitter triple-check.
   let isSubmitter;
   try {
-    isSubmitter = await hasSubmitterRole(contactOid, accountId);
+    isSubmitter = await hasSubmitterRole(contactId, accountId);
   } catch (err) {
     console.error('[intake/submit] membership check failed:', err);
     return jsonError(res, 502, 'Membership lookup failed; please retry');
@@ -195,6 +233,10 @@ export default async function handler(req, res) {
     },
     idempotency_key: idempotencyKey,
     contact_oid: contactOid,
+    // Persisted in the frozen payload so the drain doesn't need to re-call
+    // the bridge for each tick — the OID→GUID mapping for the submitting
+    // contact is stable once written.
+    contact_id: contactId,
     account_id: accountId,
     form_key: formKey,
     submitted_at: new Date().toISOString(),
