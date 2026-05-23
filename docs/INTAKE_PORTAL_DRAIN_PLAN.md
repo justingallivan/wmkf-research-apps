@@ -282,11 +282,14 @@ The existing shared `BLOB_READ_WRITE_TOKEN` points at the public `phase-ii-summa
 Per the Vercel CLI gotcha documented in CLAUDE.md for DVX: connecting a 2nd Blob store under a custom env-var name requires manual provisioning (create store via CLI, then read its token from the Vercel dashboard and `vercel env add INTAKE_BLOB_RW_TOKEN` per environment).
 
 Provisioning steps:
-1. `vercel blob store add intake-applicant-private --access private`
-2. Read the token from the Vercel dashboard
-3. `vercel env add INTAKE_BLOB_RW_TOKEN <token> production preview development`
-4. Add to `docs/CREDENTIALS_RUNBOOK.md`
-5. Add a fail-loud check at intake-attach-endpoint startup: if `INTAKE_BLOB_RW_TOKEN` is unset and intake is enabled, refuse to start.
+1. `vercel blob create-store intake-applicant-private --access private` (CLI 54.x; the old `blob store add` subcommand was renamed)
+2. **Decline** the "Would you like to link this blob store to <project>?" prompt — auto-link tries to set `BLOB_READ_WRITE_TOKEN`, which collides with the shared public store's token. (Same gotcha as DVX in CLAUDE.md.)
+3. Read the token from the Vercel dashboard (Storage → store → `.env.local` tab → `BLOB_READ_WRITE_TOKEN` value)
+4. `vercel env add INTAKE_BLOB_RW_TOKEN production` / `preview` / `development` — prompts for the value; paste the dashboard token each time
+5. Add to `docs/CREDENTIALS_RUNBOOK.md` and CLAUDE.md (parallel to `DVX_BLOB_RW_TOKEN`)
+6. Add a fail-loud check at intake-attach-endpoint startup: if `INTAKE_BLOB_RW_TOKEN` is unset and intake is enabled, refuse to start.
+
+**Status (S180, 2026-05-23): DEPLOYED ✓.** Store `intake-applicant-private` created (id `store_Eaui32n6i2wYMS6E`, region `iad1`, access `private`). `INTAKE_BLOB_RW_TOKEN` set in production, preview, and development. Shared `BLOB_READ_WRITE_TOKEN` confirmed unchanged (100d-ago timestamp post-provisioning). Fail-loud startup check is build-time work, lands with `/api/intake/draft/attach`.
 
 ---
 

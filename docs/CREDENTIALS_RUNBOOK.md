@@ -66,7 +66,9 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | Variable | Purpose | Notes |
 |----------|---------|-------|
 | `POSTGRES_URL` | Database connection | Auto-set when Vercel Postgres is linked |
-| `BLOB_READ_WRITE_TOKEN` | File upload storage | Auto-set when Vercel Blob is linked |
+| `BLOB_READ_WRITE_TOKEN` | File upload storage (public shared store `phase-ii-summaries-blob`) | Auto-set when Vercel Blob is linked |
+| `DVX_BLOB_RW_TOKEN` | Dataverse Bulk Export private store (`dvx-export-private`) RW token | Manual — see CLAUDE.md for the CLI gotcha (decline auto-link, paste token from dashboard) |
+| `INTAKE_BLOB_RW_TOKEN` | Applicant intake drain private store (`intake-applicant-private`, `store_Eaui32n6i2wYMS6E`, `iad1`) RW token | Manual — same gotcha as DVX |
 | `NODE_ENV` | Environment flag | Auto-set (`production` on Vercel, `development` locally) |
 
 ### Optional — Dynamics Explorer
