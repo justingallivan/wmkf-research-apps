@@ -1,6 +1,6 @@
 ---
-name: Slice-0 wmkf_role pre-deploy probe — correct tool + 2026-05-15 CLEAR result
-description: Which script actually verifies wmkf_apprequestperson.wmkf_role before intake schema slice 0 (NOT the carryover-named dynamics-schema-diff.js), why, and the point-in-time CLEAR result
+name: Slice-0 wmkf_role probe + extension — VERIFIED 2026-05-22 (all 5 values present)
+description: Which script verifies wmkf_apprequestperson.wmkf_role for intake schema slice 0, the post-deploy verified state (extender ran during S178; 0 to insert on S179 re-run), and the live data distribution
 type: project
 originSessionId: S155
 ---
@@ -15,3 +15,8 @@ Intake-portal schema slice 0 extends `wmkf_apprequestperson.wmkf_role` from 2 �
 **Why:** Codex S150 flagged this as the only unverifiable slice-0 claim; the carryover then propagated the wrong tool name across handoffs without anyone running it — a stale-belief class the S154 audit was about.
 
 **How to apply:** The CLEAR result is point-in-time, not durable. **Re-run the probe at deploy time (target 2026-05-19)** — a non-zero exit blocks slice 0. Originating doc corrected S155 (item struck through, verified result inline). Related: `feedback_human_legibility_schema_principle.md` (why the enum expands instead of a new entity).
+
+**Post-deploy state (S179, 2026-05-22, drain plan v7 P5 verification):**
+- Data re-probe: 5,561 rows total (4,488 PI / 1,073 Co-PI / 0 Senior/Key/Other) — CLEAR, unchanged from S155.
+- Picklist extension: live OptionSet has all 5 values with correct labels (`PI`/`Co-PI`/`Senior Personnel`/`Key Personnel`/`Other`); `extend-apprequestperson-role-picklist.mjs` re-run reports `0 inserted this run; rest pre-existing`. The extender ran as part of S178's slice-0 deploy (not separately tracked at the time).
+- Drain plan v7 P5 verification checklist item: ✓ checked. The picklist is ready for `wmkf_apprequestperson` roster rows written by the drain's `dynamics_patched` state without risking `validation_400`.

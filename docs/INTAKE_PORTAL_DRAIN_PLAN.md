@@ -250,15 +250,19 @@ Plus `getByKey()`: change signature to take `(contactOid, accountId, formKey)` i
 **Verification (run before drain code goes live):**
 
 ```bash
-# Read the live option set; expect entries for 100000000..100000004 inclusive.
-node scripts/extend-apprequestperson-role-picklist.mjs --check
-# If any missing:
+# Pre-flight live-data probe: confirm no orphaned rows in 100000002-4 slots.
+node scripts/probe-apprequestperson-role-data.js   # exits 0=CLEAR, 3=BLOCK
+
+# Idempotent extender — skip-if-present logic at extend-apprequestperson-role-picklist.mjs:68.
+# No --check flag; the script's "0 inserted this run" output IS the check.
 node scripts/extend-apprequestperson-role-picklist.mjs
 ```
 
-The script is idempotent (`InsertOptionValue` is a no-op for existing values), so re-running on an already-expanded picklist is safe.
+The extender is idempotent (`InsertOptionValue` skip-if-already-present), so re-running on an already-expanded picklist is safe.
 
-**Acceptance:** GET on `wmkf_apprequestperson` EntityDefinitions returns OptionSet members with values `100000002`, `100000003`, `100000004` and matching display labels (`Senior`, `Key`, `Other`).
+**Acceptance:** GET on `wmkf_apprequestperson` EntityDefinitions returns OptionSet members with values `100000002`, `100000003`, `100000004` and matching display labels (`Senior Personnel`, `Key Personnel`, `Other`).
+
+**Status (S179, 2026-05-22): VERIFIED ✓.** Picklist is fully expanded in prod (all 5 values present with correct labels). Live data probe re-run post-S178 deploy: 5,561 rows total, all in 100000000/100000001, none in 100000002-4 (CLEAR). P5 was completed as part of the S178 schema deploy (0 inserted on the S179 re-run).
 
 ### P4 — Dedicated private Blob store for applicant attachments (Codex round-2 §4.1)
 
@@ -776,7 +780,7 @@ Future v1.x: add `'awaiting_correction'` to the submission_jobs status CHECK; dr
 - [ ] **P2** deployed: `contact.wmkf_portal_oid` + alternate key on prod
 - [ ] **P3** applied: index rekeyed to `(contact_oid, account_id, form_key)`; `intake-draft-service.js` upsert uses matching conflict target; `setup-database.js:687` inline block updated; `smoke-intake-draft.js` passes
 - [ ] **P4** provisioned: `intake-applicant-private` Blob store created; `INTAKE_BLOB_RW_TOKEN` set in production/preview/development; CREDENTIALS_RUNBOOK updated
-- [ ] **P5** verified: `wmkf_apprequestperson.wmkf_role` option set includes `100000002`/`100000003`/`100000004` in prod; `extend-apprequestperson-role-picklist.mjs --check` is clean
+- [x] **P5** verified (S179, 2026-05-22): `wmkf_apprequestperson.wmkf_role` option set includes `100000002` (Senior Personnel) / `100000003` (Key Personnel) / `100000004` (Other) in prod; `extend-apprequestperson-role-picklist.mjs` exits 0 with "0 inserted this run"; live-data probe CLEAR (5,561 rows, all in 100000000-1)
 - [ ] Auth bridge: OID-first / email-fallback / conflict-routing behaves per spec; `intake_audit` action='bridge.conflict' on the conflict path
 - [ ] Membership query returns approved+active+role; Submitter-only guard enforced at `/api/intake/submit`
 - [ ] `/apply` skeleton: drafts list + new-submission flow click-through
