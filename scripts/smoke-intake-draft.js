@@ -196,6 +196,21 @@ function check(label, cond, ...details) {
     } catch (e) { threw = e; }
     check('getByKey requestless without contactOid throws', threw?.message?.includes('contactOid'));
 
+    // Negative width check (round-10 §3): same contact at a DIFFERENT form_key
+    // should get a different row. Pre-P3 the index was (account_id, form_key) so
+    // the form-key distinction was already enforced; this assertion guards against
+    // a future too-narrow rekey (e.g., dropping form_key from the index by mistake).
+    const c1OtherForm = await IntakeDraftService.upsert({
+      contactOid: CONTACT_OID,
+      accountId: ACCOUNT,
+      requestId: null,
+      formKey: FORM_KEY + '-other',
+      draftJson: { title: 'contact-1-other-form' },
+      attachments: [],
+    });
+    check('same contact, different form_key → distinct row', c1OtherForm.id !== c1Requestless.id);
+    await IntakeDraftService.delete(c1OtherForm.id);
+
     await IntakeDraftService.delete(c1Requestless.id);
     await IntakeDraftService.delete(c2Requestless.id);
 
