@@ -1,6 +1,14 @@
-# Intake Portal — Postgres → Dataverse Drain Plan (v5)
+# Intake Portal — Postgres → Dataverse Drain Plan (v6)
 
-**Status:** S179 v5 (2026-05-22). Codex round-5 findings folded in (2 findings: 1 BLOCKER / 1 MOD / 0 LOW). Round 5 was run locally in the user's terminal (32-second turn-around — bypassing the broker-driven Codex CLI that stalled in round 4). Build-ready pending the round-6 sanity check on the lease-token mechanism.
+**Status:** S179 v6 (2026-05-22). Codex round-6 findings folded in (4 findings: 1 BLOCKER / 3 MOD/NEEDS-SPEC / 0 LOW; 2 questions returned CLEAN). Build-ready.
+
+**Changes from v5 (round-6-driven):**
+- **BLOCKER fix:** `/api/cron/drain-submissions` was not registered in `vercel.json` — production latency would have been unbounded because the drain never fires. Added explicit cron-registration spec at `*/2 * * * *` (below the 10-min lease TTL) with cadence rationale, worst-case latency analysis, and a verification-checklist item.
+- **NEEDS-SPEC fix:** Idempotency-key collision against a terminal-state row (`failed` / `cancelled`) would have returned the dead row's GUIDs to a re-submitting applicant and stranded them. Added explicit terminal-collision behavior: 409 + `previous_submission_terminal` response; new draft generates a new `idempotency_key` and breaks the collision naturally. Audit on the blocked path.
+- **MOD fix:** Audit consistency model was unspecified — could state advance without an audit row, or vice versa? Locked the contract: state UPDATE + audit INSERT in one Postgres transaction; rollback on either failure; pg-write failures classify into the same retry taxonomy as Dataverse/Graph.
+- **NEEDS-VALIDATOR fix:** `scanning` trusted `scan_result: 'clean'` but didn't validate the rest of each attachment object's shape. A malformed attachment (missing `blob_url`/`sha256`/`size`) could pass and fail later in `files_moved`. Added a runtime `validateAttachmentShape` that runs at BOTH submit-entry (fail-fast 422) and drain-entry (terminal `validation_400`).
+
+Two round-6 questions returned CLEAN: child-ordering within `dynamics_patched` (Q2 — child creates before parent aggregate PATCH is the natural retryable order), and membership role enum values matching the deployed schema (Q6 — `wmkf_portalmembership.wmkf_role` at `lib/dataverse/schema/wave4/wmkf_portalmembership.json:24` maps Submitter=100000000 / Contributor=100000001 as the submit guard expects).
 
 **Changes from v4 (round-5-driven):**
 - **BLOCKER fix:** v4's lease-aware UPDATE in duplicate-PK recovery guarded on `locked_until`, but the plan explicitly allows in-flight lease renewal. A worker that renewed its own lease mid-recovery would see a stale `job.locked_until` snapshot and the UPDATE would silently affect 0 rows — combined with v4's "0 rows = another worker advanced" semantics, this could skip advancement without persisting `akoya_requestnum`. v5 adds a stable `lease_token UUID` column (generated fresh at claim, untouched by renewal, cleared on completion); the recovery UPDATE guards on `lease_token` instead. 0-rows now requires a re-read disambiguation between "advanced by other worker" (safe) and "still queued" (fatal — surface for diagnosis).
@@ -296,7 +304,30 @@ This matches the v1/`DESIGN.md:527` synchronous model and the form validator's `
 ### 5. `/api/intake/submit`
 
 - **Auth guard:** authenticated contact + `wmkf_role = 100000000 (Submitter)` for the target `account_id`
-- **Payload validation:** form schema + budget math (the `$100K` multiple invariant per `BUDGET_FORM_SPEC.md:221,395`) + all attachments must be `scan_result: 'clean'`
+- **Payload validation:** form schema + budget math (the `$100K` multiple invariant per `BUDGET_FORM_SPEC.md:221,395`) + per-attachment **shape validator** (see below) + all attachments must be `scan_result: 'clean'`
+
+  **Attachment-shape validator (Codex round-6 §5):** A malformed attachment object that happens to carry `scan_result: 'clean'` but is missing other fields can pass the clean check and fail later in `files_moved` (where the drain reads `blob_url`/`sha256`/`size`). Run a runtime shape check at BOTH submit-entry and drain-entry over each item in `draft_json.attachments`:
+
+  ```js
+  function validateAttachmentShape(att) {
+    const required = ['filename', 'blob_url', 'sha256', 'size', 'scan_result'];
+    for (const k of required) {
+      if (att[k] === undefined || att[k] === null) {
+        throw new Error(`attachment shape: missing ${k}`);
+      }
+    }
+    if (!/^[a-f0-9]{64}$/i.test(att.sha256)) throw new Error('attachment shape: sha256 not 64-hex');
+    if (typeof att.size !== 'number' || att.size <= 0) throw new Error('attachment shape: size not positive number');
+    if (!['clean', 'infected', 'error'].includes(att.scan_result)) throw new Error('attachment shape: invalid scan_result');
+    // blob_url is asserted non-empty above; we don't constrain its host here because the
+    // Blob store URL format is provider-controlled and may change.
+  }
+  ```
+
+  At submit-entry: fail-fast with 422 before INSERT.
+  At drain-entry (start of `scanning` state): fail to `validation_400` terminal.
+
+  Belt-and-suspenders: the validator at submit catches malformed drafts before they're frozen; the validator at drain catches anything that slipped past (corrupted JSONB, hand-edited test rows, schema changes mid-flight).
 - **GUID generation** (all UUIDv4):
   - 1 for `akoya_requestid`
   - 1 per `wmkf_proposalbudgetline` row
@@ -309,7 +340,11 @@ This matches the v1/`DESIGN.md:527` synchronous model and the form validator's `
   DO UPDATE SET attempts = submission_jobs.attempts  -- no-op, lets RETURNING fire
   RETURNING id, request_id, status;
   ```
-- Audit write: `action: 'submit'`, payload = `{jobId, requestId, accountId}`
+- **Terminal-collision handling** (Codex round-6 §1): the collision-returning pattern is correct for in-flight collisions (duplicate-submit-from-different-tab), but a collision against a row in terminal `failed` or `cancelled` state must NOT silently strand the applicant on the dead key. After the INSERT, inspect the returned `status`:
+  - `status IN ('queued', 'scanning', 'request_created', 'files_moved', 'dynamics_patched', 'status_flipped', 'completed')` → return 200 with `{jobId, requestId, status}` as today.
+  - `status IN ('failed', 'cancelled')` → return **409 Conflict** with `{error: 'previous_submission_terminal', priorStatus, priorJobId, lastError}`. The frontend treats this as "your last submission ended in <reason>; start a fresh draft." Drafts are not auto-rotated server-side (the applicant might want to see what failed before reattempting); the new draft will generate a new `idempotency_key` and break the collision naturally.
+  - Audit the 409 path with `action: 'submit.blocked_terminal'`, payload = `{priorJobId, priorStatus}`.
+- Audit write (happy path): `action: 'submit'`, payload = `{jobId, requestId, accountId}`
 - Return 200 with `{ jobId, requestId, status }`
 
 ### 6. `/api/cron/drain-submissions`
@@ -377,6 +412,22 @@ Each failure writes audit: `action: 'drain.error'`, payload = `{state, category,
 
 Classification uses `err.status` / `err.dataverseCode` / `err.noResponse` attached by the P1 patch — not string-parsing. `err.noResponse === true` ⇒ `network_no_response` category (the `graph_timeout` row from v3 collapses into this — timeouts against either Graph or Dataverse take the same path).
 
+**Audit consistency model (Codex round-6 §4):** Every state-transition UPDATE on `submission_jobs` AND its companion `intake_audit` INSERT happen in **one short Postgres transaction**. If either fails, the entire transition is rolled back — the row stays in its prior state and the next cron tick retries. This avoids two divergence modes: (a) state advances but no audit row (silent gap in the audit trail); (b) audit says "advanced" but state didn't (audit lies). Implementation:
+
+```js
+await pg.query('BEGIN');
+try {
+  await pg.query(`UPDATE submission_jobs SET status=$1, ... WHERE id=$2 AND lease_token=$3`, [...]);
+  await pg.query(`INSERT INTO intake_audit (action, payload, ...) VALUES (...)`, [...]);
+  await pg.query('COMMIT');
+} catch (err) {
+  await pg.query('ROLLBACK');
+  throw err;  // taxonomy classifier sees a structured pg error
+}
+```
+
+Pg-side write failures (`network_no_response` against the pg pool, deadlock, etc.) classify the same way as Dataverse/Graph failures and feed into the retry taxonomy. Audit writes are NOT best-effort; the contract is "the audit table is the source of truth for what happened, and the state column is the source of truth for what to do next."
+
 **Per-state idempotency:**
 - `scanning`: read-only checks; safe to repeat
 - `request_created`: pre-generated GUID + duplicate-PK detection with explicit recovery (below)
@@ -442,6 +493,22 @@ still owns the row. 0-rows-affected is now an unambiguous "another worker re-cla
 not a "your own renewal made your snapshot stale" false-negative.
 
 **Cron protection:** `CRON_SECRET`.
+
+**Cron registration (Codex round-6 §3):** `/api/cron/drain-submissions` MUST be registered in `vercel.json` `crons:` array at build time. Without registration, the route exists but never fires and production drain latency is unbounded. Recommended schedule:
+
+```jsonc
+{
+  "path": "/api/cron/drain-submissions",
+  "schedule": "*/2 * * * *"   // every 2 minutes — well below the 10-min lease TTL
+}
+```
+
+Cadence rationale:
+- **Floor:** must be ≪ `DRAIN_LOCK_TTL_SECONDS` (600s) so an aborted worker's row is reclaimed promptly (≤2 cron firings after lease expiry).
+- **Ceiling for happy-path UX:** applicant sees `queued` for up to one cron interval before drain pickup. 2 min is acceptable for the pilot (single-phase submissions are not real-time).
+- **Vercel cron minimum on current plan:** 1 min. We use 2 min as a small buffer against thundering-herd if multiple cron firings overlap.
+
+Worst-case happy-path latency for one submission: `cron interval (2 min) + 7 state transitions × (Dataverse/Graph round-trip ~1-3s)` ≈ **2-3 min**. With network retries, can extend to `2 min + DRAIN_MAX_ATTEMPTS × backoff`.
 
 **Throttling:** `DRAIN_BATCH_SIZE` (default 5).
 
@@ -620,6 +687,7 @@ Future v1.x: add `'awaiting_correction'` to the submission_jobs status CHECK; dr
 - [ ] `/apply` skeleton: drafts list + new-submission flow click-through
 - [ ] `/api/intake/draft` autosave + attach (synchronous Cloudmersive scan) round-trip; attachments record `scan_result: 'clean' | 'infected' | 'error'`
 - [ ] `/api/intake/submit` returns `{jobId, requestId}` in <500ms with no Dataverse write; collision returns existing job's GUIDs via `DO UPDATE … RETURNING`
+- [ ] `vercel.json` `crons:` array includes `/api/cron/drain-submissions` at `*/2 * * * *` (or chosen cadence, below lease TTL)
 - [ ] Drain advances a real test submission against "New Cranberry Sauce" through all states to `completed`, including SharePoint folder with correct `{akoya_requestnum}_{requestGuid}` name
 - [ ] Retry test: kill drain mid-`request_created`, restart → no duplicate request (verify Dataverse query)
 - [ ] Retry test: kill drain mid-`dynamics_patched`, restart → no duplicate child rows
