@@ -20,8 +20,7 @@
 import { sql } from '@vercel/postgres';
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import AlertService from '../../../lib/services/alert-service';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
-import AlertRecipients from '../../../lib/services/alert-recipients';
+import NotificationService from '../../../lib/services/notification-service';
 
 const DAILY_THRESHOLD_DEFAULT_CENTS = 1000;    // $10
 const LOW_BALANCE_DEFAULT_CENTS = 500;         // $5
@@ -100,7 +99,11 @@ async function checkLowBalance() {
     return { status: 'ok', anchorCents, spentSinceAnchor, remainingCents };
   }
 
-  const alert = await AlertService.createAlert({
+  // notify() handles both the system_alerts row and the email send (via the
+  // unified template). It dedupes via autoResolveKey, returning null when an
+  // active alert with the same key already exists — same idempotency contract
+  // as the prior `createAlert + if (alert) email` pair.
+  const alert = await NotificationService.notify({
     type: 'spend_low_balance',
     severity: 'error',
     title: `Estimated AI credit balance below $${(lowThresholdCents / 100).toFixed(2)}`,
@@ -108,16 +111,14 @@ async function checkLowBalance() {
       `Anchor: $${(anchorCents / 100).toFixed(2)} on ${anchorDate}. ` +
       `Spent since anchor: $${(spentSinceAnchor / 100).toFixed(2)}. ` +
       `Estimated remaining: $${(remainingCents / 100).toFixed(2)}. ` +
-      `Note: this is our own usage-log estimate, not authoritative Anthropic billing.`,
+      `This is our own usage-log estimate, not authoritative Anthropic billing. ` +
+      `Top up the Anthropic console and update ANTHROPIC_BALANCE_ANCHOR_CENTS ` +
+      `and ANTHROPIC_BALANCE_ANCHOR_DATE to the new values.`,
     metadata: { anchorCents, anchorDate, spentSinceAnchor, remainingCents, lowThresholdCents },
     source: 'cron/spend-check',
     autoResolveKey: LOW_BALANCE_ALERT_KEY,
+    category: 'spend',
   });
-
-  // Only email on the transition (createAlert returns null when dedup'd)
-  if (alert) {
-    await tryEmailLowBalance({ anchorCents, anchorDate, spentSinceAnchor, remainingCents });
-  }
 
   return {
     status: alert ? 'alerting-new' : 'alerting-existing',
@@ -125,47 +126,4 @@ async function checkLowBalance() {
     spentSinceAnchor,
     remainingCents,
   };
-}
-
-async function tryEmailLowBalance({ anchorCents, anchorDate, spentSinceAnchor, remainingCents }) {
-  try {
-    const from = process.env.NOTIFICATION_EMAIL_FROM;
-    if (!from) {
-      console.log('[spend-check] low-balance email skipped — NOTIFICATION_EMAIL_FROM not set');
-      return;
-    }
-
-    const { recipients, source, category } = await AlertRecipients.resolveRecipients('spend');
-    if (recipients.length === 0) {
-      console.log(`[spend-check] low-balance email skipped — no recipients resolved (category=${category})`);
-      return;
-    }
-
-    const body = [
-      `<p>Estimated AI credit balance is low.</p>`,
-      `<ul>`,
-      `<li>Anchor: $${(anchorCents / 100).toFixed(2)} on ${anchorDate}</li>`,
-      `<li>Spent since anchor: $${(spentSinceAnchor / 100).toFixed(2)}</li>`,
-      `<li>Estimated remaining: <strong>$${(remainingCents / 100).toFixed(2)}</strong></li>`,
-      `</ul>`,
-      `<p>This is our own usage-log estimate, not authoritative Anthropic billing. ` +
-        `Top up the Anthropic console and update <code>ANTHROPIC_BALANCE_ANCHOR_CENTS</code> ` +
-        `and <code>ANTHROPIC_BALANCE_ANCHOR_DATE</code> to the new values.</p>`,
-    ].join('\n');
-
-    await DynamicsService.createAndSendEmail({
-      subject: `[Keck AI] Estimated credit balance low: $${(remainingCents / 100).toFixed(2)} remaining`,
-      body,
-      from,
-      to: recipients,
-    });
-    console.log(
-      `[spend-check] low-balance email sent to ${recipients.length} recipient(s) [category=spend, source=${source}]`,
-    );
-  } catch (err) {
-    // Email is best-effort: the system_alerts row is the durable record.
-    // Wrap covers resolver throws, env reads, and the Dynamics send call —
-    // a failure here must never fail the cron run.
-    console.error('[spend-check] low-balance email failed (alert still stored):', err.message);
-  }
 }
