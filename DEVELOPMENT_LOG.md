@@ -10,6 +10,24 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## May 2026 — Intake portal drain prereqs shipped (5 of 6); plan-to-code transition (Session 179)
+
+**Milestone:** The drain plan v3 from S178 went through 5 more Codex review rounds (v4→v7, 18 findings folded) and then transitioned from plan-only into concrete code. Five of six prerequisites landed in one session: schema migrations for the queue (P0) and the draft uniqueness rekey (P3), the `contact.wmkf_portaloid` column + alternate key deployed to prod Dataverse (P2), the `wmkf_apprequestperson.wmkf_role` picklist verified fully expanded in prod (P5), and the structured-error shape rolled out across `dynamics-service.js` + `graph-service.js` with full test coverage (P1).
+
+**Sessions:** 179 (single session; 14 commits across plan v4-v7 folds + P0/P1/P2/P3/P5 builds + their respective Codex-round folds).
+
+**Ship state:**
+- Postgres: migration `011_submission_jobs_states.sql` (status CHECK + `akoya_requestnum` / `locked_until` / `lease_token` columns, index rekey to support two-phase claim); migration `012_intake_drafts_uniqueness.sql` (requestless partial-unique rekeyed to `(contact_oid, account_id, form_key)`). Both idempotent, both dev-Neon-applied with smoke 23 ✓; prod-Neon apply per the documented runbook is pending.
+- Dataverse prod: `contact.wmkf_portaloid` (String 50) + alternate key `wmkf_portaloid` deployed; alt-key `EntityKeyIndexStatus` was `Pending` immediately post-create (Active soon). `wmkf_apprequestperson.wmkf_role` picklist verified fully expanded (5 values present; extender re-run reported `0 inserted`).
+- Structured error shape: `lib/utils/service-error.js` with `buildServiceError` + `buildNoResponseError`. Wired into every drain-dependent throw site (`getAccessToken`, `createRecord`, `updateRecord`, `getRecord`, `queryRecords`, `getSiteId`, `getDriveId`, `uploadFile`). `fetchWithTimeout` in both files wraps no-response throws automatically. 21 tests; full unit suite 612 ✓ / 0 failures. 412-aware callers preserved.
+- Drain plan: v4 through v7 plus round-8/9 (P0 review) plus round-10 (P3+P2) plus round-11 (P1). Convergence trail across 9 review rounds on real artifacts: 21→11→4→stalled→2→4→5→3→2→3→4. Round 8 was the first against code (caught migration idempotency bug); round 11 was the largest code review (4 MOD refinements, no correctness bugs).
+
+**Why it matters:** This is the inflection from "comprehensive plan with extensive review" to "shipping code." The plan was thoroughly stress-tested (32 findings in S178 + 18 in S179 = 50 review-driven changes before the first code commit) and the build phase began only when correctness questions stopped surfacing. Five of six prereqs done in one session demonstrates the build velocity the plan-heavy phase was paying for. Only manual P4 (private Blob store provisioning via Vercel CLI) remains before the drain endpoint code proper can be built.
+
+**Pointers:** `docs/INTAKE_PORTAL_DRAIN_PLAN.md` (v7); `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` (S179 P2 entry); `lib/utils/service-error.js`; `tests/unit/error-shape.test.js`. Commits `b8c1a96` (v4) · `8fadfb8` (v5) · `ed32e94` (v6) · `f24cae4` (v7) · `050ab85` (P0) · `bfadb63` (P0 round-8 fold) · `8d3047d` (round-9 fold) · `ad6a511` (P3) · `4150a7e` (P5) · `9a49ce2` (P2) · `ac73abd` (P3+P2 round-10) · `bb29283` (P1) · `afa61fb` (P1 round-11).
+
+---
+
 ## May 2026 — Intake portal slice-0 schema deployed; single-phase architecture pivot (Session 178)
 
 **Milestone:** The intake-portal slice-0 Dataverse schema landed in prod, and the pilot architecture pivoted from "Phase II attaches to an existing `akoya_request`" to **single-phase submission** (drain creates a new request rather than updating one). Slice-0 had been gated for months on the Item-6 P1-Update verification; Connor's S169 maker-portal run closed it FAIL → Option A′ flow-body conditional fallback, with zero schema rework, unblocking the deploy.
