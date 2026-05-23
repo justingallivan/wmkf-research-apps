@@ -1,6 +1,10 @@
-# Intake Portal — Postgres → Dataverse Drain Plan (v4)
+# Intake Portal — Postgres → Dataverse Drain Plan (v5)
 
-**Status:** S179 v4 (2026-05-22). Codex round-3 findings folded in (4 findings: 2 BLOCKER / 2 MOD / 0 LOW). Round-4 Codex review stalled at 14m with no findings produced; Codex's last self-narration flagged two open lines of inquiry (token-acquisition coverage + lease-expiry during duplicate-PK recovery), both hand-checked and folded into this v4. Build-ready.
+**Status:** S179 v5 (2026-05-22). Codex round-5 findings folded in (2 findings: 1 BLOCKER / 1 MOD / 0 LOW). Round 5 was run locally in the user's terminal (32-second turn-around — bypassing the broker-driven Codex CLI that stalled in round 4). Build-ready pending the round-6 sanity check on the lease-token mechanism.
+
+**Changes from v4 (round-5-driven):**
+- **BLOCKER fix:** v4's lease-aware UPDATE in duplicate-PK recovery guarded on `locked_until`, but the plan explicitly allows in-flight lease renewal. A worker that renewed its own lease mid-recovery would see a stale `job.locked_until` snapshot and the UPDATE would silently affect 0 rows — combined with v4's "0 rows = another worker advanced" semantics, this could skip advancement without persisting `akoya_requestnum`. v5 adds a stable `lease_token UUID` column (generated fresh at claim, untouched by renewal, cleared on completion); the recovery UPDATE guards on `lease_token` instead. 0-rows now requires a re-read disambiguation between "advanced by other worker" (safe) and "still queued" (fatal — surface for diagnosis).
+- **MOD fix:** P1 list expanded to include `getSiteId` and `getDriveId` in graph-service.js — both transitively upstream of `uploadFile`, both with throw sites that would have leaked unstructured errors (allowlist violations, URL parsing, drive resolution).
 
 **Changes from v3 (round-3-driven):**
 - **BLOCKER fix:** P0 partial-index predicate no longer references `now()` (volatile functions are illegal in PG index predicates and would have failed migration). `locked_until` moved into the indexed columns; predicate is now status-only.
@@ -73,8 +77,13 @@ ALTER TABLE submission_jobs ADD CONSTRAINT submission_jobs_status_check CHECK (s
 -- Server-assigned request number captured during Create (for SharePoint folder name)
 ALTER TABLE submission_jobs ADD COLUMN akoya_requestnum TEXT;
 
--- Two-phase claim: claim sets locked_until, releases after each step
+-- Two-phase claim: claim sets locked_until + lease_token, releases after each step.
+-- lease_token is a stable per-claim identifier (generated at claim time, persisted for
+-- the duration of the worker's ownership, NOT changed by lease renewal). It exists so
+-- that recovery UPDATEs can be guarded against stale-lease clobber without confusing
+-- lease renewal (which mutates locked_until) for ownership change.
 ALTER TABLE submission_jobs ADD COLUMN locked_until TIMESTAMPTZ;
+ALTER TABLE submission_jobs ADD COLUMN lease_token UUID;
 -- Partial-index predicate is status-only (PG rejects volatile fns like now() in predicates).
 -- locked_until is in the indexed columns so the drain claim query's
 -- "locked_until IS NULL OR locked_until < now()" filter is still index-eligible.
@@ -149,6 +158,8 @@ Apply to all of:
   - `queryRecords` (~line 511)
 - `lib/services/graph-service.js`:
   - **`getAccessToken` (lines 88-123) — same upstream treatment as Dynamics.**
+  - **`getSiteId` (throw sites at 150, 153, 168) — transitively upstream of every Graph op (called inside `getDriveId`); without this, allowlist-violation, URL-parse, and Graph-site-resolve failures all leak unstructured.**
+  - **`getDriveId` (throw sites at 192, 215) — transitively upstream of `uploadFile`; allowlist-violation and drive-list failures leak unstructured.**
   - `uploadFile` (~line 613)
   - any other throw the drain touches (search, list, download)
 
@@ -338,14 +349,15 @@ WITH claimable AS (
   FOR UPDATE SKIP LOCKED
 )
 UPDATE submission_jobs sj
-  SET locked_until = now() + INTERVAL '10 minutes'
+  SET locked_until = now() + INTERVAL '10 minutes',
+      lease_token = gen_random_uuid()         -- stable token for this claim's lifetime
   FROM claimable
   WHERE sj.id = claimable.id
   RETURNING sj.*;
 COMMIT;
 ```
 
-Phase 2 — process each claimed row independently. Each row's status transition is its own short transaction. Lock renewal: if a step is slow, drain bumps `locked_until` before doing the slow call. Lock release on completion: clear `locked_until`. Crash recovery: another worker picks the row up after the lease expires.
+Phase 2 — process each claimed row independently. Each row's status transition is its own short transaction. **Lock renewal:** if a step is slow, drain bumps `locked_until` before doing the slow call — `lease_token` is NOT changed by renewal, only by a fresh claim. **Lock release on completion:** clear `locked_until` AND `lease_token`. **Crash recovery:** another worker picks the row up after the lease expires; the new claim writes a new `lease_token`, so any straggler UPDATE from the dead worker (guarded by its old token) will affect 0 rows.
 
 **Error taxonomy (depends on P1 broadening):**
 
@@ -395,24 +407,39 @@ if (err.category === 'duplicate_pk' && state === 'request_created') {
     throw buildServiceError('dataverse', { status: 500 },
       `request_created recovery: row exists but akoya_requestnum missing for ${job.request_id}`);
   }
-  // Lease-aware update: only the worker still holding the lease should advance the row.
-  // Two workers running this recovery in parallel both compute the same akoya_requestnum
-  // and both UPDATEs would be content-identical (idempotent), but guarding on locked_until
-  // prevents a stale tick from clobbering newer state.
-  await pg.query(
+  // Lease-aware update guarded by the STABLE lease_token (not locked_until, which mutates
+  // on lease renewal). Two workers running this recovery in parallel can only both succeed
+  // if they hold the same lease_token, which is impossible — re-claim issues a fresh UUID.
+  const res = await pg.query(
     `UPDATE submission_jobs
-        SET status='request_created', akoya_requestnum=$1, locked_until=NULL
-        WHERE id=$2 AND locked_until=$3`,
-    [existing.akoya_requestnum, job.id, job.locked_until]
+        SET status='request_created', akoya_requestnum=$1, locked_until=NULL, lease_token=NULL
+        WHERE id=$2 AND lease_token=$3`,
+    [existing.akoya_requestnum, job.id, job.lease_token]
   );
+  if (res.rowCount === 0) {
+    // We lost the lease (lease expired AND another worker re-claimed). Re-read to
+    // distinguish "advanced by other worker" (safe — terminal for this tick) from
+    // "still queued" (something is wrong; surface for diagnosis).
+    const current = await pg.query(
+      `SELECT status, akoya_requestnum FROM submission_jobs WHERE id=$1`,
+      [job.id]
+    );
+    if (current.rows[0]?.status === 'request_created' && current.rows[0]?.akoya_requestnum) {
+      return; // another worker completed recovery; we're done
+    }
+    throw buildServiceError('drain', { status: 500 },
+      `request_created recovery: lost lease but row not advanced for ${job.id}`);
+  }
   return; // advance
 }
 ```
 
 This makes the boundary between Dataverse-side state and Postgres-side state explicit and
-recoverable on either side of the crash, without any new schema or sentinel field. If the
-lease-guarded UPDATE affects 0 rows (another worker already advanced), the caller treats
-that as success and moves on — both outcomes converge.
+recoverable on either side of the crash, without any new schema or sentinel field. The
+`lease_token` guard is the key difference from v4's first-pass timestamp guard: lease
+renewal mutates `locked_until` but NOT `lease_token`, so a worker that renews mid-recovery
+still owns the row. 0-rows-affected is now an unambiguous "another worker re-claimed" signal,
+not a "your own renewal made your snapshot stale" false-negative.
 
 **Cron protection:** `CRON_SECRET`.
 
