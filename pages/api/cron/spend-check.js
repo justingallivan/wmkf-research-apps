@@ -19,7 +19,12 @@ import { sql } from '@vercel/postgres';
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import AlertService from '../../../lib/services/alert-service';
 
-const DAILY_THRESHOLD_DEFAULT_CENTS = 1000;    // $10
+// Calibrated S183 from 60d prod spend data: max observed legitimate day
+// was $26.16 (a batch-processing day with 386 requests); avg active day
+// $1.85. $75 leaves ~3x headroom over the observed max while still
+// catching a true runaway (a loop hitting Claude at full rate burns
+// $75 in well under an hour). Override per-env via DAILY_SPEND_ALERT_CENTS.
+const DAILY_THRESHOLD_DEFAULT_CENTS = 7500;    // $75
 
 const DAILY_ALERT_KEY = 'spend:daily-threshold';
 
