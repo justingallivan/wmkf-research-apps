@@ -19,6 +19,7 @@
 import Busboy from 'busboy';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { writeReviewFiles } from '../../../lib/services/review-upload';
+import { respondForFailedReviewUpload } from '../../../lib/utils/review-upload-response';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -87,10 +88,7 @@ export default async function handler(req, res) {
     );
 
     if (!result.ok) {
-      const status = result.reason === 'validation' ? 400
-        : result.reason === 'not_found' ? 404
-        : 500;
-      return res.status(status).json(result);
+      return respondForFailedReviewUpload(res, result);
     }
 
     return res.status(200).json({

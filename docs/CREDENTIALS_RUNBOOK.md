@@ -112,6 +112,8 @@ Prefer the admin dashboard (`/admin` → Models tab) for non-static overrides �
 | `WAVE1_BACKEND_APP_ACCESS` | Dispatch flag for app-access backend. Default Dataverse since 2026-05-12. | `dataverse` (implicit) |
 | `WAVE1_BACKEND_PREFS` | Dispatch flag for user-preferences backend. Default Dataverse since 2026-05-12. | `dataverse` (implicit) |
 | `DEBUG_REVIEWER_FINDER` | Verbose logging for Reviewer Finder pipeline | unset |
+| `VIRUS_SCAN_ENABLED` | App-side Cloudmersive virus scanning on upload surfaces (today: reviewer uploads). Fail-closed when on — see [Virus scanning](#virus-scanning-virus_scan_enabled--cloudmersive_api_key) for the runbook. | unset (scanning skipped) |
+| `CLOUDMERSIVE_API_KEY` | Cloudmersive virus-scan API key. Required when `VIRUS_SCAN_ENABLED=true`. Free tier 800 scans/month. | unset |
 
 ### Optional — Notifications & Spend Alerts
 
@@ -178,6 +180,45 @@ This is the most common maintenance task. Both `AZURE_AD_CLIENT_SECRET` and `DYN
 - Closing the window before the longest-lived token has expired — this locks reviewers out mid-cycle.
 - Forgetting to **redeploy** after either the open or the close step.
 - Leaving `EXTERNAL_LINK_SECRET_PREVIOUS` set indefinitely — it widens the accepted-signature surface; clear it once the window closes.
+
+---
+
+## Virus scanning (`VIRUS_SCAN_ENABLED` + `CLOUDMERSIVE_API_KEY`)
+
+App-side malware scanning for user-uploaded files. Today: reviewer uploads (both external-token and staff session paths) via `lib/services/review-upload.js`. Future: intake-portal attach endpoint.
+
+**Default off.** Operators opt in by setting `VIRUS_SCAN_ENABLED=true` (and providing `CLOUDMERSIVE_API_KEY`). When on, the contract is fail-closed: a scanner outage or misconfiguration blocks uploads. This is intentional — the opt-in flag means the operator has explicitly accepted the scanner as a gatekeeper; partial degradation would defeat the point.
+
+**This is one of several upload paths into the SharePoint document library** (others: staff direct uploads via web/desktop sync, Power Automate flows, integrations). App-side scanning closes the path *we* control; coverage at the SharePoint / M365 layer is a separate question for DFT (see `docs/DFT_VIRUS_SCAN_QUESTIONS_DRAFT.md`).
+
+### Behavior reference
+
+| Situation | `VIRUS_SCAN_ENABLED=true` | `VIRUS_SCAN_ENABLED` unset/false |
+|---|---|---|
+| File scans clean | Upload proceeds | Upload proceeds (no scan performed) |
+| File flagged infected | 422 to caller, file rejected, no SharePoint write | n/a (no scan) |
+| Scanner returns 5xx, network error, or 429 (after 3 retries) | 503 to caller (`scan_unavailable`) | n/a |
+| Bad API key (401/403) or `CLOUDMERSIVE_API_KEY` missing | 500 to caller (`scan_misconfigured`) | n/a (no scan attempted) |
+
+Server-side, every scan failure is logged with structured Cloudmersive error context (`serviceName`, `status`, `isTransient`, `causeKind`). Client-facing messages are intentionally opaque.
+
+### Emergency bypass procedure
+
+If the scanner is down and uploads must be unblocked before Cloudmersive recovers:
+
+1. **Verify the outage is real and not a misconfiguration.** Run the smoke: `node scripts/smoke-virus-scan.mjs`. If it returns `scan_misconfigured`-class errors (4xx, missing key), fix that first — bypassing won't help.
+2. **In Vercel:** `vercel env rm VIRUS_SCAN_ENABLED <env>` for whichever environment is affected (preview or production). Or set it to `false`.
+3. **Redeploy.** The flag is read per-request via `lib/utils/virus-scan-config.js`, but the env var won't propagate to running functions without a deploy.
+4. **Annotate `system_alerts`** with the bypass reason + expected restoration time so the next operator on rotation can see why scanning is currently off.
+5. **Re-enable as soon as the scanner is healthy.** Bypass is a temporary measure, not a default.
+
+### Cost ceiling
+
+Free tier is 800 scans/month. Pilot-cycle estimate: ~150 reviewer uploads + (when intake portal launches) ~200 applicant attachments = ~350/cycle. Combined comfortably under the free tier; if cycle volume grows past 800/month, paid tier is ~$0.001/scan.
+
+### Verification smoke
+
+`scripts/smoke-virus-scan.mjs` posts an EICAR test string and a clean string against the real Cloudmersive endpoint. Run after rotating `CLOUDMERSIVE_API_KEY` or whenever you suspect the scanner integration is mis-wired.
 
 ---
 

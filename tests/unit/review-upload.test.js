@@ -271,6 +271,234 @@ describe('writeReviewFiles — failure paths', () => {
   });
 });
 
+describe('writeReviewFiles — virus scan integration', () => {
+  // We don't mock scanBytes itself — we mock global.fetch underneath it.
+  // Lets the real cloudmersive-scan.js exercise its own contract (env-var
+  // gate, isTransient classification, error wrapping) while we control
+  // what the scanner "sees."
+  const originalFetch = global.fetch;
+  const originalKey = process.env.CLOUDMERSIVE_API_KEY;
+  const originalEnabled = process.env.VIRUS_SCAN_ENABLED;
+
+  beforeEach(() => {
+    process.env.CLOUDMERSIVE_API_KEY = 'test-key';
+    // Caller-side beforeEach already installs the GraphService/DynamicsService
+    // mocks via installMocks(); we layer the fetch mock on top here.
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.CLOUDMERSIVE_API_KEY;
+    else process.env.CLOUDMERSIVE_API_KEY = originalKey;
+    if (originalEnabled === undefined) delete process.env.VIRUS_SCAN_ENABLED;
+    else process.env.VIRUS_SCAN_ENABLED = originalEnabled;
+  });
+
+  function mockScanResponses(responses) {
+    // responses: per-call output, in order. Each is either:
+    //   { status, body }  (a fetch response)
+    //   Error instance    (thrown by fetch)
+    let idx = 0;
+    global.fetch = jest.fn(async () => {
+      if (idx >= responses.length) {
+        throw new Error(`fetch called ${idx + 1}× but only ${responses.length} responses configured`);
+      }
+      const r = responses[idx++];
+      if (r instanceof Error) throw r;
+      return {
+        ok: r.status >= 200 && r.status < 300,
+        status: r.status,
+        text: async () => (typeof r.body === 'string' ? r.body : JSON.stringify(r.body ?? {})),
+        json: async () => r.body ?? {},
+      };
+    });
+  }
+
+  test('flag off → no scan happens, upload proceeds', async () => {
+    delete process.env.VIRUS_SCAN_ENABLED;
+    global.fetch = jest.fn(async () => { throw new Error('fetch should not be called when flag is off'); });
+    mockSuggestionFound();
+    const r = await writeReviewFiles(validInput());
+    expect(r.ok).toBe(true);
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(GraphService.uploadFile).toHaveBeenCalled();
+  });
+
+  test('flag off (empty string) → no scan happens', async () => {
+    process.env.VIRUS_SCAN_ENABLED = '';
+    global.fetch = jest.fn(async () => { throw new Error('fetch should not be called'); });
+    mockSuggestionFound();
+    const r = await writeReviewFiles(validInput());
+    expect(r.ok).toBe(true);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('flag off (literal "false") → no scan happens', async () => {
+    process.env.VIRUS_SCAN_ENABLED = 'false';
+    global.fetch = jest.fn(async () => { throw new Error('fetch should not be called'); });
+    mockSuggestionFound();
+    const r = await writeReviewFiles(validInput());
+    expect(r.ok).toBe(true);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('flag on + all clean → upload proceeds', async () => {
+    process.env.VIRUS_SCAN_ENABLED = 'true';
+    mockScanResponses([
+      { status: 200, body: { CleanResult: true, FoundViruses: [] } },
+    ]);
+    mockSuggestionFound();
+    const r = await writeReviewFiles(validInput());
+    expect(r.ok).toBe(true);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(GraphService.uploadFile).toHaveBeenCalled();
+  });
+
+  test('flag on + one of three infected → reason=infected, NO SharePoint write', async () => {
+    process.env.VIRUS_SCAN_ENABLED = 'true';
+    mockScanResponses([
+      { status: 200, body: { CleanResult: true, FoundViruses: [] } },
+      { status: 200, body: { CleanResult: false, FoundViruses: [{ FileName: 'b.pdf', VirusName: 'EICAR-Test-Signature' }] } },
+      { status: 200, body: { CleanResult: true, FoundViruses: [] } },
+    ]);
+    mockSuggestionFound();
+    const r = await writeReviewFiles(validInput({
+      files: [
+        { filename: 'a.pdf', buffer: PDF_BYTES },
+        { filename: 'b.pdf', buffer: PDF_BYTES },
+        { filename: 'c.pdf', buffer: PDF_BYTES },
+      ],
+    }));
+    expect(r).toEqual({
+      ok: false,
+      reason: 'infected',
+      errors: ['b.pdf: virus detected (EICAR-Test-Signature)'],
+    });
+    expect(GraphService.uploadFile).not.toHaveBeenCalled();
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('flag on + multiple infected → errors lists all detections', async () => {
+    process.env.VIRUS_SCAN_ENABLED = 'true';
+    mockScanResponses([
+      { status: 200, body: { CleanResult: false, FoundViruses: [{ FileName: 'a.pdf', VirusName: 'V1' }] } },
+      { status: 200, body: { CleanResult: false, FoundViruses: [{ FileName: 'b.pdf', VirusName: 'V2' }] } },
+    ]);
+    mockSuggestionFound();
+    const r = await writeReviewFiles(validInput({
+      files: [
+        { filename: 'a.pdf', buffer: PDF_BYTES },
+        { filename: 'b.pdf', buffer: PDF_BYTES },
+      ],
+    }));
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe('infected');
+    expect(r.errors).toEqual([
+      'a.pdf: virus detected (V1)',
+      'b.pdf: virus detected (V2)',
+    ]);
+  });
+
+  test('flag on + infected with missing virusName → falls back to "unknown signature"', async () => {
+    process.env.VIRUS_SCAN_ENABLED = 'true';
+    mockScanResponses([
+      { status: 200, body: { CleanResult: false, FoundViruses: [] } },
+    ]);
+    mockSuggestionFound();
+    const r = await writeReviewFiles(validInput());
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe('infected');
+    expect(r.errors[0]).toBe('review.pdf: virus detected (unknown signature)');
+  });
+
+  test('flag on + scanner 5xx-exhaust → reason=scan_unavailable, NO SharePoint write', async () => {
+    process.env.VIRUS_SCAN_ENABLED = 'true';
+    // cloudmersive-scan.js retries 5xx up to MAX_ATTEMPTS=3.
+    mockScanResponses([
+      { status: 503, body: 'down' },
+      { status: 503, body: 'down' },
+      { status: 503, body: 'down' },
+    ]);
+    mockSuggestionFound();
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const r = await writeReviewFiles(validInput());
+    expect(r).toEqual({ ok: false, reason: 'scan_unavailable' });
+    expect(GraphService.uploadFile).not.toHaveBeenCalled();
+    expect(errSpy).toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
+
+  test('flag on + scanner 401 → reason=scan_misconfigured, NO SharePoint write', async () => {
+    process.env.VIRUS_SCAN_ENABLED = 'true';
+    mockScanResponses([
+      { status: 401, body: 'bad key' },
+    ]);
+    mockSuggestionFound();
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const r = await writeReviewFiles(validInput());
+    expect(r).toEqual({ ok: false, reason: 'scan_misconfigured' });
+    expect(GraphService.uploadFile).not.toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
+
+  test('flag on + missing CLOUDMERSIVE_API_KEY → reason=scan_misconfigured', async () => {
+    process.env.VIRUS_SCAN_ENABLED = 'true';
+    delete process.env.CLOUDMERSIVE_API_KEY;
+    global.fetch = jest.fn(async () => { throw new Error('fetch should not be called when key missing'); });
+    mockSuggestionFound();
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const r = await writeReviewFiles(validInput());
+    expect(r).toEqual({ ok: false, reason: 'scan_misconfigured' });
+    expect(global.fetch).not.toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
+
+  test('flag on + mixed misconfig + outage → misconfigured wins (operator priority)', async () => {
+    process.env.VIRUS_SCAN_ENABLED = 'true';
+    mockScanResponses([
+      { status: 503, body: 'down' },
+      { status: 503, body: 'down' },
+      { status: 503, body: 'down' },
+      { status: 401, body: 'bad key' },
+    ]);
+    mockSuggestionFound();
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const r = await writeReviewFiles(validInput({
+      files: [
+        { filename: 'a.pdf', buffer: PDF_BYTES },
+        { filename: 'b.pdf', buffer: PDF_BYTES },
+      ],
+    }));
+    expect(r).toEqual({ ok: false, reason: 'scan_misconfigured' });
+    errSpy.mockRestore();
+  });
+
+  test('flag on + infected + outage in same batch → outage wins over infected', async () => {
+    // Rationale: if even one file failed to scan, we don't know if the
+    // un-scanned file is also infected; treating the partial as "infected
+    // for known + clean for unknown" would let an unscanned file through
+    // on a re-upload after the operator removes the flagged one. Surfacing
+    // the outage instead forces a clean retry once the scanner recovers.
+    process.env.VIRUS_SCAN_ENABLED = 'true';
+    mockScanResponses([
+      { status: 200, body: { CleanResult: false, FoundViruses: [{ VirusName: 'V1' }] } },
+      { status: 503, body: 'down' },
+      { status: 503, body: 'down' },
+      { status: 503, body: 'down' },
+    ]);
+    mockSuggestionFound();
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const r = await writeReviewFiles(validInput({
+      files: [
+        { filename: 'a.pdf', buffer: PDF_BYTES },
+        { filename: 'b.pdf', buffer: PDF_BYTES },
+      ],
+    }));
+    expect(r).toEqual({ ok: false, reason: 'scan_unavailable' });
+    errSpy.mockRestore();
+  });
+});
+
 describe('buildReviewerSubfolder', () => {
   const SID = '7f3a9c2e-1234-5678-9abc-def012345678';
   // First 8 chars of the GUID with hyphens stripped: '7f3a9c2e'

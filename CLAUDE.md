@@ -131,6 +131,8 @@ Notable optional flags:
 - `PROMPT_RESOLVER_STRICT=true` — disables bundled-prompt fallback for prompt-dev loops
 - `EXTERNAL_LINK_SECRET_PREVIOUS` — outgoing `EXTERNAL_LINK_SECRET` value, set only during a rotation window; `verifyToken` accepts it, `mintToken` never uses it (see `docs/CREDENTIALS_RUNBOOK.md` § "Rotating EXTERNAL_LINK_SECRET")
 - `WAVE1_BACKEND_SETTINGS` / `WAVE1_BACKEND_APP_ACCESS` / `WAVE1_BACKEND_PREFS` — Wave 1 backend dispatch flags. **Default is now Dataverse**; the legacy Postgres tables (`system_settings`, `user_app_access`, `user_preferences`) were dropped 2026-05-12. Setting any of these to `postgres` will fail loudly — kept only as an explicit opt-out signal.
+- `VIRUS_SCAN_ENABLED=true` — app-side Cloudmersive virus scanning across all upload surfaces (today: reviewer uploads via `lib/services/review-upload.js`; future: intake-portal attach). **Default off.** When on, fail-closed: scanner outage or missing `CLOUDMERSIVE_API_KEY` blocks the upload. Single source of truth is `lib/utils/virus-scan-config.js`. To bypass during an outage, set to `false` and redeploy — that's the emergency runbook. See `docs/CREDENTIALS_RUNBOOK.md` § "Virus scanning (VIRUS_SCAN_ENABLED + CLOUDMERSIVE_API_KEY)".
+- `CLOUDMERSIVE_API_KEY` — Cloudmersive virus-scan API key, required when `VIRUS_SCAN_ENABLED=true`. Free tier is 800 scans/month; pilot projection ~350/cycle across reviewer + intake combined. Missing this with the flag on causes upload responses to surface as `scan_misconfigured` (HTTP 500).
 
 ## Per-App Model Configuration
 

@@ -11,6 +11,7 @@
 import Busboy from 'busboy';
 import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
 import { writeReviewFiles } from '../../../../../lib/services/review-upload';
+import { respondForFailedReviewUpload } from '../../../../../lib/utils/review-upload-response';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 
@@ -81,10 +82,7 @@ export default async function handler(req, res) {
     );
 
     if (!result.ok) {
-      const status = result.reason === 'validation' ? 400
-        : result.reason === 'not_found' ? 404
-        : 500;
-      return res.status(status).json(result);
+      return respondForFailedReviewUpload(res, result);
     }
 
     return res.status(200).json({
