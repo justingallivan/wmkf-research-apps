@@ -10,6 +10,24 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## May 2026 — Spend-monitoring architecture rebuilt; per-category alert routing (Session 181)
+
+**Milestone:** Pivoted off the locally-anchored low-balance estimator (the Apr-2026 mechanism that motivated `api_credit_monitoring`) onto an Anthropic-native posture: auto-reload + native spend-limit notifications cover the failure modes; a monthly `/cost_report`-driven drift cron reconciles our local pricing table against authoritative billing. Separately, alert recipients moved from a hardcoded superuser roster to a per-category routing config editable in `/admin`, so different audiences (grants, finance, ops, security) can subscribe to different alert classes.
+
+**Sessions:** 181 (single session; 5 commits + 2 Codex review rounds).
+
+**Ship state:**
+- New `lib/utils/model-pricing.js` (extracted from `usage-logger.js`); longest-prefix-first matcher (was `.includes()`); `LAST_REVIEWED_AT` field; Haiku 4.5 and Opus 4.5/4.6/4.7 prices corrected (two material bugs); 1h cache write multiplier; unknown-model warning.
+- Two new crons: `pricing-canary` (weekly, no new auth — unknown-model + table-age check); `pricing-refresh` (monthly, requires `ANTHROPIC_ADMIN_API_KEY` — derives per-model price from `/cost_report`, alerts on >5% drift). V032 `model_pricing_audit` table for history.
+- Alert routing: `lib/services/alert-recipients.js` resolves category → emails via `wmkf_appsystemsettings`, fallback to superuser roster. Eight call sites tagged. Removed env vars `SPEND_ALERT_EMAIL_TO/_FROM`, `NOTIFICATION_EMAIL_TO`, `ANTHROPIC_BALANCE_ANCHOR_CENTS/_DATE`, `LOW_BALANCE_ALERT_CENTS`. Deleted `scripts/update-balance-anchor.sh`.
+- Pricing source of truth stays in code (no auto-overwrite — guards against billing-glitch corruption). 815 ✓ tests / 0 failing.
+
+**Why it matters:** Confirms production is correctly pointed at the WMKF work-org Anthropic account (the personal account from project start is dormant 30+ days). Replaces a load-bearing manual-maintenance vector (the pricing table) with self-monitoring. Decouples alert recipients from the superuser bit, enabling the grants admin to subscribe to intake-related alerts without seeing every cron failure.
+
+**Pointers:** `lib/utils/model-pricing.js`, `lib/services/alert-recipients.js`, `pages/api/cron/pricing-{canary,refresh}.js`, `.claude-memory/project-api-credit-monitoring.md` (rewritten); commits `ac4a4a7`, `cd2abb1`, `81124ea`, `0eec283`, `98b2a9e`.
+
+---
+
 ## May 2026 — Intake portal drain prereqs shipped (5 of 6); plan-to-code transition (Session 179)
 
 **Milestone:** The drain plan v3 from S178 went through 5 more Codex review rounds (v4→v7, 18 findings folded) and then transitioned from plan-only into concrete code. Five of six prerequisites landed in one session: schema migrations for the queue (P0) and the draft uniqueness rekey (P3), the `contact.wmkf_portaloid` column + alternate key deployed to prod Dataverse (P2), the `wmkf_apprequestperson.wmkf_role` picklist verified fully expanded in prod (P5), and the structured-error shape rolled out across `dynamics-service.js` + `graph-service.js` with full test coverage (P1).
