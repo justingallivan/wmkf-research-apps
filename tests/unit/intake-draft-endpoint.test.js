@@ -154,25 +154,24 @@ describe('intake/draft — body validation', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  test('any non-null requestId is rejected → 400 (Codex S183-round-8 BLOCKER)', async () => {
-    // The with-request branch is out of v1 scope and was an ownership-takeover
-    // vector. Endpoint MUST reject any requestId — even a syntactically valid
-    // UUID string — to prevent another Contributor at the same institution
-    // from overwriting/reassigning a request-bound draft.
-    const cases = [
-      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-      'any-string',
-      123,
-      true,
-      [],
-      {},
-    ];
-    for (const requestId of cases) {
-      const { req, res } = makeReqRes(validBody({ requestId }));
-      await handler(req, res);
-      expect(res.statusCode).toBe(400);
-      expect(res.body.error).toMatch(/requestId is not accepted/);
-    }
+  // Codex S183-round-8 BLOCKER + round-9 LOW (test.each diagnosability):
+  // The with-request branch is out of v1 scope and was an ownership-takeover
+  // vector. Endpoint MUST reject any requestId — even a syntactically valid
+  // UUID string — to prevent another Contributor at the same institution
+  // from overwriting/reassigning a request-bound draft. Split into one case
+  // per shape via test.each so a regression names the offending input.
+  test.each([
+    ['valid UUID', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'],
+    ['arbitrary string', 'any-string'],
+    ['number', 123],
+    ['boolean', true],
+    ['array', []],
+    ['object', {}],
+  ])('rejects requestId=%s → 400', async (_label, requestId) => {
+    const { req, res } = makeReqRes(validBody({ requestId }));
+    await handler(req, res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toMatch(/requestId is not accepted/);
   });
 
   test('requestId: null is fine (explicit null is allowed alongside the default-null contract)', async () => {
