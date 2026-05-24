@@ -1,191 +1,292 @@
-# Session 183 Prompt: Cloudmersive (real this time) + loose-end cleanup
+# Session 184 Prompt: Intake attach endpoint + DFT/Connor follow-throughs
 
-## Session 182 Summary
+## Session 183 Summary
 
-**Net code change: zero.** The session attempted to build a prompt-injection
-defense layer, shipped it, then reverted the commit after discovering the
-codebase already had a comprehensive, CI-gated injection-defense system
-(A7, sessions 173-177) that my initial investigation missed. Two memory
-entries written to prevent recurrence.
+**Net work: 9 commits, all defensive/security-shaped.** Built the
+Cloudmersive virus-scan service and wired it into the live reviewer-
+upload flow (gated off by default via `VIRUS_SCAN_ENABLED`). Built the
+intake-portal autosave endpoint. Reconciled the design tension between
+the design doc's "bytes never traverse" claim and the drain plan's
+"synchronous scan" requirement into a documented three-call dance for
+the upcoming attach endpoint. Calibrated the spend-alert threshold
+against 60d of real prod data. Drafted DFT and Connor emails (rewrote
+Connor's prior draft into stakeholder register after feedback). Three
+Codex review rounds (#8, #9, #10) caught + fixed 1 BLOCKER + 3 MODs +
+4 LOWs in the autosave endpoint before they shipped to anyone using it.
 
 ### What Was Completed
 
-1. **Threat-model + design conversation (`docs/PROMPT_INJECTION_DEFENSE_PLAN.md`,
-   later deleted).**
-   - Researched prompt-injection attack class via Medium article on PDF
-     hidden-text vectors.
-   - Three iterations of the plan (v1 three-tier defense → v2 Tier-1 only
-     → v3 prompt-hygiene only) with two Codex review rounds.
-   - Threat sizing settled on: closed-set submitters, multi-week
-     multi-person human review, AI as decision-support not decision-maker,
-     compliance attestation. Concluded baseline prompt hygiene was the
-     right scope.
+1. **Cloudmersive scanner service + EICAR smoke (`270fbe7`).**
+   - `lib/services/cloudmersive-scan.js` — `scanBytes(bytes, filename)`
+     returning `{scan_result, foundViruses, scannedAt, scanner}`. Uses
+     existing `buildServiceError`/`buildNoResponseError` so the drain
+     classifier already knows what to do with the structured errors.
+     30s timeout, 3-retry on 5xx/network with backoff, fails loud on
+     missing `CLOUDMERSIVE_API_KEY`.
+   - 12 unit tests + `scripts/smoke-virus-scan.mjs` (EICAR live-API
+     smoke; verified against real Cloudmersive endpoint).
 
-2. **Built then reverted parallel injection-defense system (commit
-   `04706f3` → revert `abe861e`).**
-   - New utility `lib/utils/prompt-injection-guard.js` with
-     `wrapDocumentContent` (XML wrapper + entity-encoded body +
-     nonce-suffixed close tag), shared preamble, file-loader integration.
-   - 9 new unit tests, 824/824 passing.
-   - **Reverted because:** the codebase already has `wrapUntrustedContent`
-     + `buildUntrustedContentPreamble` + `validateAiJson` in
-     `lib/utils/ai-payload-boundary.js` and `lib/utils/ai-output-schema.js`,
-     CI-gated by `npm run check:prompt-injection-tagging` with all 24
-     LLM-input surfaces migrated. My new code was duplicating A7 with a
-     weaker design and double-wrapping content in two routes that
-     already had A7 coverage (`phase-i-dynamics/summarize.js`,
-     `grant-reporting/extract.js`).
-   - Live-test inspection (Justin saw the "Proposal text bounded at
-     17,422 characters" message in the Phase I Writeup UI) surfaced the
-     duplication — that message comes from the existing A7 system, not
-     my new code.
+2. **Reviewer-upload integration (`1843b54`).**
+   - `lib/utils/virus-scan-config.js` — `isVirusScanEnabled()` single
+     source of truth reading `VIRUS_SCAN_ENABLED`. Default off.
+   - `lib/services/review-upload.js` — new `runVirusScans()` helper
+     called between structured-data validation and folder resolution.
+     `Promise.allSettled` parallelism (per Codex round-8). Three new
+     `ok:false` reasons: `infected`, `scan_misconfigured` (4xx/missing
+     key), `scan_unavailable` (5xx/network exhaust). Discriminated via
+     `err.isTransient`.
+   - `lib/utils/review-upload-response.js` — shared HTTP response mapper
+     so the two endpoints (staff session + external token) can't drift.
+     `infected` → 422, `scan_misconfigured` → 500, `scan_unavailable`
+     → 503; all client-facing messages opaque, structured details
+     logged server-side.
+   - 11 new shared-core tests + 7 mapper tests.
+   - CLAUDE.md + `docs/CREDENTIALS_RUNBOOK.md` env-var + runbook updates
+     (emergency bypass procedure documented).
 
-3. **Root cause + memory writes (commit `62335d7`).**
-   - Missed A7 because: (a) no memory entry pointed to it; (b)
-     `docs/security-audit/` wasn't in my top-level `ls docs/`; (c) I
-     grepped for article-jargon terms (white-on-white, OCR, canary)
-     instead of general-purpose terms (untrusted, sentinel, boundary).
-   - `project-a7-prompt-injection-hardening.md` — canonical pointer to
-     the A7 plan + primitives + CI gate. New "Security Infrastructure"
-     section in MEMORY.md.
-   - `feedback-grep-general-codebase-terms.md` — root-cause lesson:
-     "does the codebase have X" requires grepping general-purpose terms
-     (what the prior implementer would have used), not source-material
-     jargon. One empty grep is not proof; cross-check `docs/` subdirs +
-     `package.json` gates + `git log`.
+3. **DFT virus-scan questions draft (`1843b54`).**
+   - `docs/DFT_VIRUS_SCAN_QUESTIONS_DRAFT.md` — 5 focused questions for
+     IT about Defender for Office 365 / Safe Attachments / endpoint AV.
+     Answers determine whether app-side scanning is primary or
+     defense-in-depth. Verified the actual SharePoint URL
+     (`appriver3651007194.sharepoint.com/sites/akoyaGO`) — note the
+     AkoyaGO-tenant origin may mean DFT needs to bounce part to AkoyaGO.
+   - **Not sent yet.** Your action.
+
+4. **Connor Q1-Q4 email rewrite (`76b608a`).**
+   - Prior draft was over-technical ("semantically load-bearing",
+     "intake-portal drain"). Rewrote in stakeholder register: frames
+     every question from Connor's POV, leads with consequence not
+     mechanism, drops internal doc citations.
+   - Added `.claude-memory/feedback-stakeholder-email-tone.md` so the
+     register becomes default for Connor/Sarah/DFT drafts.
+   - **Sent.** Awaiting Connor's reply.
+
+5. **Intake-portal attach design reconciliation (`400551c`).**
+   - Codex round-7 design pass settled the architectural tension between
+     `INTAKE_PORTAL_DESIGN.md` ("bytes never traverse function") and
+     `INTAKE_PORTAL_DRAIN_PLAN.md` ("synchronous scan on attach"):
+     three-call dance — upload-token mints a path-scoped Blob token,
+     browser PUTs direct, attach downloads-and-scans from private Blob.
+   - Folded in 4 Codex-driven design changes: delete-on-infected (not
+     90-day keep); server-minted attachmentId + path; `pendingAttachments[]`
+     JSONB array on the draft for in-flight uploads; daily orphan-sweep
+     cron. All spec'd; **no code yet — that's S184's big build**.
+
+6. **Spend-alert calibration (`3fee411`).**
+   - 60d prod data: max legitimate day $26.16 (batch processing); avg
+     active day $1.85; threshold was firing on legitimate batch days.
+   - Code default changed $10 → $75 (~3× headroom over max while still
+     catching a true runaway within an hour).
+   - **Your action**: flip the prod env var to match
+     (`vercel env add DAILY_SPEND_ALERT_CENTS production` → `7500`).
+
+7. **Intake-portal autosave endpoint (`55080d7`).**
+   - `POST /api/intake/draft` — applicant-session-gated upsert for the
+     form's `draft_json`. Any-role membership (Contributors can edit).
+   - New `IntakeDraftService.upsertDraftJson()` — touches only
+     `draft_json`, never overwrites `attachments[]` (avoids the race
+     where an autosave between an `/attach` append and the UI's state
+     push would clobber the appended row).
+   - New `MembershipService.hasLiveMembership()` — any-role equivalent
+     of `hasSubmitterRole()`.
+   - Server owns `idempotency_key` lifecycle: minted on first autosave,
+     preserved across subsequent ones. Caller-supplied keys stripped.
+   - Bridge + identity_conflict handling mirrors `/submit`.
+   - 23 endpoint tests; security matrix updated (90 → 91 routes).
+
+8. **Codex rounds 8-10 fixes (`a5d69b2`, `d0e379a`, `abe63b6`).**
+   - **BLOCKER (round-8):** `requestId` ownership-takeover at
+     `/api/intake/draft`. The endpoint accepted `requestId` from the
+     body and the service's with-request branch reassigned `contact_oid`
+     on conflict — any Contributor at an institution who knew a request
+     GUID could overwrite/reassign another Contributor's draft. Fixed
+     by rejecting any non-null `requestId` at the endpoint (the
+     with-request branch is documented out-of-v1-scope).
+   - **MOD (round-8):** First-autosave two-tab race could mint two
+     different `idempotency_key`s. Fixed at SQL layer with `jsonb_set`
+     + `COALESCE` on the existing row's key.
+   - **MOD (round-9):** Round-8's COALESCE didn't distinguish SQL NULL
+     (key absent) from JSONB null (key present, value null) — the
+     latter would silently preserve JSON null. Fixed with `NULLIF`
+     against `'null'::jsonb` on both sides.
+   - **LOW (round-9 → round-10):** Service precondition originally just
+     required "non-empty string", which accepted whitespace, control
+     chars, 1KB strings. Tightened to UUIDv4 regex — the field is
+     internal infrastructure only minted by the endpoint via
+     `crypto.randomUUID()`.
+   - **Misc LOWs:** test.each refactor for diagnosability; metadata
+     shape assertion; new `tests/unit/intake-draft-service.test.js`
+     with 27 cases (req-arg + 16 shape-rejection + happy + uppercase).
+   - **Round-10 verdict:** all findings closed except one structural
+     LOW (mock can't validate SQL text — deferred to integration tests).
 
 ### Commits
 
-- `04706f3` — Prompt-injection hygiene: wrap applicant document content (S182)
-  **[REVERTED]**
-- `abe861e` — Revert "Prompt-injection hygiene: wrap applicant document content (S182)"
-- `62335d7` — Memory: A7 injection-hardening pointer + grep-general-terms lesson (S182)
-- (this) — Document Session 182 and create Session 183 prompt
+| Hash | Subject |
+|---|---|
+| `270fbe7` | Cloudmersive virus-scan service + EICAR smoke (S183) |
+| `1843b54` | Wire Cloudmersive scanner into reviewer-upload flow (S183) |
+| `76b608a` | Rewrite Connor Q1-Q4 email in stakeholder register (S183) |
+| `400551c` | Reconcile intake-portal attach design across DESIGN + DRAIN_PLAN (S183) |
+| `3fee411` | Calibrate DAILY_SPEND_ALERT_CENTS default $10 -> $75 (S183) |
+| `55080d7` | Add /api/intake/draft autosave endpoint (S183) |
+| `a5d69b2` | Fix /api/intake/draft Codex round-8 findings: BLOCKER + 1 MOD + 1 LOW (S183) |
+| `d0e379a` | Harden upsertDraftJson against JSON-null idempotency_key (S183) |
+| `abe63b6` | Tighten upsertDraftJson idempotency_key contract to UUIDv4 (S183) |
 
-### What stayed at S181 levels
+### What stayed green throughout
 
-- Unit test count: 815 (the 9 guard tests went with the revert).
-- All CI gates green: `check:atlas`, `check:atlas:self-test`,
+- All 7 CI gates: `check:atlas`, `check:atlas:self-test`,
   `check:api-routes`, `check:fact-consistency`,
-  `check:prompt-injection-tagging` (24 migrated, 0 pending).
+  `check:prompt-injection-tagging`, `check:canonical-pointers`,
+  `check:memory-drift` (advisory).
+- Unit suite grew from 815 (S181 baseline) → **898 passing**.
 
 ## Potential Next Steps
 
-The S182-original carryover is unchanged; the injection-defense detour
-ate the session but produced no working changes. Cloudmersive in
-particular is still the realistic next-build item.
+### 1. Intake attach endpoint — the big build (carried from S183)
 
-### 1. Cloudmersive virus-scan integration (carry from S181/S182)
+Fully spec'd this session (`docs/INTAKE_PORTAL_DRAIN_PLAN.md`
+§"Attachment upload — three-call dance"). Scope:
 
-Intake portal attach endpoint (`/api/intake/draft/attach`) is not yet
-built; per `docs/INTAKE_PORTAL_DESIGN.md:521-545` and
-`docs/INTAKE_PORTAL_DRAIN_PLAN.md:40`, Cloudmersive scans run
-synchronously at attach time, fail-closed. Drain-error-classifier
-already has a `cloudmersive` branch (`lib/utils/drain-error-classifier.js`,
-exercised at `tests/unit/drain-error-classifier.test.js:101-103`).
-Still missing:
-- Cloudmersive account + key minting.
-- `lib/services/cloudmersive-scan.js` (POST `/virus/scan/file`).
-- Wire into `/api/intake/draft/attach` (endpoint TBD).
-- EICAR smoke per `INTAKE_PORTAL_DESIGN.md:606`.
+- `POST /api/intake/draft/upload-token` — auth + membership + draft
+  ownership, mint `attachmentId = crypto.randomUUID()`, derive
+  server-controlled pathname (`drafts/{draftId}/{attachmentId}/{filename}`),
+  append `pendingAttachments[]` entry to the draft's JSONB, mint
+  Vercel Blob client-upload token scoped to that exact pathname +
+  field-config `maxBytes` + 1h `validUntil`. Return `{attachmentId,
+  token, pathname}`.
+- `POST /api/intake/draft/attach` — `{draftId, attachmentId}` only
+  (server derives the rest), look up pending entry, download bytes
+  from private Blob (`INTAKE_BLOB_RW_TOKEN`), recompute sha256/size,
+  magic-byte validate, `scanBytes`, branch:
+  - clean → atomic remove pending + append to `attachments[]`, 200
+  - infected → delete Blob + audit metadata + remove pending, 422
+  - scan_misconfigured → leave pending, 500 (operator fix unblocks retry)
+  - scan_unavailable → leave pending, 503 (cloudmersive recovery
+    unblocks retry; browser re-POSTs same attachmentId)
+- New `IntakeDraftService` helpers: `appendPending`,
+  `promoteToClean(attachmentId)`, `removePending(attachmentId)`.
+- Per-field `maxBytes` resolution from `shared/forms/<cycle>/schema.js`
+  — need to investigate the schema shape first.
+- Orphan-sweep cron handler in the existing maintenance cron: sweep
+  `pendingAttachments` older than 1h (past token expiry).
+- Tests for both endpoints + the cron sweep.
+- Same idempotency contract style as the autosave endpoint (server
+  owns identity, no trust of client metadata).
 
-Note: A7 already covers the *prompt-injection* angle on applicant
-content. Cloudmersive is the *binary-malware* layer — orthogonal, both
-needed.
+Expected scale: full session of focused work. Codex review round
+after the build.
 
-### 2. Connor Q1-Q4 email (still parked since S180)
+### 2. Connor's reply lands → wire status_flipped + persons handlers
 
-Drafted at `docs/INTAKE_PORTAL_CONNOR_Q1_Q4_DRAFT.md`. Q1 unblocks
-`status_flipped` handler; Q2 unblocks persons handler; Q3 unblocks
-pilot view filters; Q4 unblocks Connor's recompute PA flow.
+These were the two drain pieces blocked on Connor's Q1-Q4 answers.
+Once the reply lands:
+- **Q1** unblocks `status_flipped` drain handler (final state
+  transition).
+- **Q2** unblocks `wmkf_apprequestperson` POSTs + parent PI fields
+  at Create.
+- **Q3** unblocks pilot view filters (Connor + AkoyaGO admin work,
+  not ours).
+- **Q4** unblocks Connor's recompute flow ship.
 
-### 3. Verify `contact.wmkf_portaloid` alt-key Active in prod
+### 3. DFT reply (when it lands) — decide app-side scanning posture
 
-S179 deployment was `Pending → Active` over a few minutes. Re-probe
-before pilot opens:
-```bash
-node -e "
-const { DynamicsService } = require('./lib/services/dynamics-service');
-DynamicsService.getEntityKey('contact', 'wmkf_portaloid').then(k =>
-  console.log('Status:', k?.EntityKeyIndexStatus || 'NOT FOUND'));
-"
-```
+If DFT confirms Defender for Office 365 + Safe Attachments are on:
+scanning is defense-in-depth and the priority of any future scanning
+work (e.g., expanding to grant-reporting uploads) drops.
 
-### 4. Other intake portal pieces
+If DFT confirms they're NOT on: app-side is primary, and we should
+think about hardening other entry points (staff direct uploads, PA
+flows). That's a strategic conversation, not just code.
 
-- `/api/intake/draft/*` autosave endpoint
-- `/api/intake/jobs/[id]` polling endpoint for applicant status
-- `/apply` UI itself
-- `status_flipped` drain handler (after Connor Q1)
-- Persons handler + contact resolution (after Connor Q2)
-
-### 5. Loose ends from S181 (still parked)
-
-- `DAILY_SPEND_ALERT_CENTS` calibration ($10 may be low for June batches).
-- 1h cache write column split (only needed if we ever start using 1h
-  caching).
-
-### 6. Carryover (parked, dates not yet hit)
+### 4. Carryover, dates not yet hit
 
 - Wave 1 elevation revert on prod app user.
 - W6 reviewer Postgres DROP — fires ≥ 2026-07-01.
-- Archive intake meeting agenda — fires ≥ 2026-05-27 (4 days out).
+- ~~Archive intake meeting agenda~~ — fires ≥ 2026-05-27 (3 days
+  out from session end).
 
-### 7. Codex round (only after substantive new code)
+### 5. Stale loose ends from S181
 
-Don't run reviews back-to-back without new substantive surface. S182
-produced no surviving code, so the meter is unchanged from S181's
-"after Cloudmersive lands" guidance.
+- 1h cache write column split (only needed if we ever start using 1h
+  caching).
+
+## Your action items, not mine
+
+- Send the **DFT email** (`docs/DFT_VIRUS_SCAN_QUESTIONS_DRAFT.md`).
+- Flip prod env var: `vercel env add DAILY_SPEND_ALERT_CENTS production`
+  → `7500`.
+- When ready to start exercising the reviewer-upload scanner in
+  preview: `vercel env add VIRUS_SCAN_ENABLED preview` → `true`
+  (CLOUDMERSIVE_API_KEY is already set per S183 work). Verify with
+  a real reviewer upload + EICAR via the live `/external/review/*`
+  path.
 
 ## Key Files Reference
 
-### Memory entries added this session
+### New this session
 
 | File | Purpose |
 |---|---|
-| `.claude-memory/project-a7-prompt-injection-hardening.md` | Canonical pointer to A7 — read before any injection-related design |
-| `.claude-memory/feedback-grep-general-codebase-terms.md` | Root-cause lesson: grep general terms not domain jargon when checking codebase coverage |
-| `.claude-memory/MEMORY.md` | New "Security Infrastructure" section added |
+| `lib/services/cloudmersive-scan.js` | `scanBytes()` Cloudmersive client w/ structured errors + retries |
+| `lib/utils/virus-scan-config.js` | `isVirusScanEnabled()` kill-switch single source of truth |
+| `lib/utils/review-upload-response.js` | Shared HTTP mapper for reviewer-upload failure reasons |
+| `scripts/smoke-virus-scan.mjs` | EICAR + clean live-API round-trip smoke |
+| `pages/api/intake/draft.js` | Applicant autosave endpoint (NEW route 91) |
+| `tests/unit/cloudmersive-scan.test.js` | 12 cases |
+| `tests/unit/review-upload-response.test.js` | 7 cases |
+| `tests/unit/intake-draft-endpoint.test.js` | 25 cases |
+| `tests/unit/intake-draft-service.test.js` | 27 cases (new — service-level for upsertDraftJson) |
+| `docs/DFT_VIRUS_SCAN_QUESTIONS_DRAFT.md` | Drafted, not yet sent |
+| `.claude-memory/feedback-stakeholder-email-tone.md` | Connor/Sarah/DFT draft register |
 
-### Don't re-read this session's reverted artifacts
+### Materially edited this session
 
-| File | Status |
+| File | Change |
 |---|---|
-| `docs/PROMPT_INJECTION_DEFENSE_PLAN.md` | Deleted in revert. Reasoning chain preserved in commit history (`04706f3` → `abe861e`). Don't recreate — A7 plan is canonical. |
-| `lib/utils/prompt-injection-guard.js` | Deleted in revert. Use `wrapUntrustedContent` from `lib/utils/ai-payload-boundary.js` instead. |
-| `shared/config/prompts/_injection-guard-preamble.js` | Deleted in revert. Use `buildUntrustedContentPreamble` from same module. |
-
-### Canonical injection-defense pointers (existing infrastructure)
-
-| File | Purpose |
-|---|---|
-| `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md` | The plan + inventory of 24 surfaces + part ordering + status |
-| `lib/utils/ai-payload-boundary.js` | `wrapUntrustedContent`, `buildUntrustedContentPreamble`, `buildBoundedTextPayload` |
-| `lib/utils/ai-output-schema.js` | `validateAiJson` for every JSON output sink |
-| `scripts/check-prompt-injection-tagging.js` | Positive-coverage registry CI gate |
+| `lib/services/review-upload.js` | New `runVirusScans()` helper between structured-data validation and folder resolution |
+| `lib/services/intake-draft-service.js` | New `upsertDraftJson()` (draft_json only, idempotency_key UUIDv4 + jsonb_set + COALESCE + NULLIF) |
+| `lib/services/membership-service.js` | New `hasLiveMembership()` any-role guard |
+| `pages/api/cron/spend-check.js` | Default 1000 → 7500 cents |
+| `pages/api/review-manager/upload-review.js` | Uses shared response mapper |
+| `pages/api/external/review/[token]/upload.js` | Uses shared response mapper |
+| `docs/INTAKE_PORTAL_DESIGN.md` | "Bytes never traverse" softened; delete-on-infected; no-trust-client-metadata |
+| `docs/INTAKE_PORTAL_DRAIN_PLAN.md` | Three-call dance spec + pendingAttachments + orphan-sweep cron |
+| `docs/INTAKE_PORTAL_CONNOR_Q1_Q4_DRAFT.md` | Rewritten in stakeholder register |
+| `docs/API_ROUTE_SECURITY_MATRIX.md` | New `/api/intake/draft` row |
+| `docs/CREDENTIALS_RUNBOOK.md` | `VIRUS_SCAN_ENABLED` + `CLOUDMERSIVE_API_KEY` + spend calibration |
+| `CLAUDE.md` | Env-vars section updated; `INTAKE_BLOB_RW_TOKEN` description corrected for 3-call flow |
 
 ## Testing
 
 ```bash
 # All gates green pre-stop:
-npm run check:atlas             # 30 PG / 32 DV ✓
-npm run check:atlas:self-test   # 12/12 patterns ✓
-npm run check:api-routes        # 90 routes ✓
-npm run check:fact-consistency  # ✓
-npm run check:prompt-injection-tagging  # 24 migrated, 0 pending ✓
+npm run check:atlas                       # 30 PG / 32 DV ✓
+npm run check:atlas:self-test             # 12/12 patterns ✓
+npm run check:api-routes                  # 91 routes ✓ (up from 90)
+npm run check:fact-consistency            # ✓
+npm run check:prompt-injection-tagging    # 24 migrated, 0 pending ✓
+npm run check:canonical-pointers          # 9 pointers ✓
 
-# Full unit suite (back to S181 baseline after revert):
-npx jest tests/unit             # 815 ✓ / 0 failures
+# Full unit suite (S181 baseline 815 → S183 close 898):
+npx jest tests/unit                       # 898 ✓ / 0 failures
+
+# Live virus-scan smoke (needs CLOUDMERSIVE_API_KEY in .env.local):
+node scripts/smoke-virus-scan.mjs         # clean → clean, EICAR → infected
 ```
 
 ## Open Items (architectural, non-blocking)
 
-Unchanged from S182 start. The injection-defense detour produced no
-surviving change to this section.
-
-- **Connor Q1-Q4 email** — drafted, not yet sent. Same status as S180-S182 start.
-- **Cloudmersive account** — not yet set up; env var `CLOUDMERSIVE_API_KEY`
-  slot exists in design doc, not in Vercel yet.
-- **`ANTHROPIC_ADMIN_API_KEY`** — set in Vercel (S181). First monthly
-  drift cron fires Jun 1 @ 11:00 UTC.
-- **Auto-reload** — ON for the work Anthropic org.
+- **Connor Q1-Q4 reply** — sent this session, awaiting reply.
+- **DFT virus-scan questions** — drafted, not yet sent.
+- **Reviewer-upload scanning** — built but `VIRUS_SCAN_ENABLED` unset
+  in all envs. No behavior change in prod until flipped.
+- **Intake attach endpoint** — fully spec'd, no code yet. S184's
+  main build.
+- **Spend threshold prod env var** — code default bumped to $75,
+  prod env var still at the old value until manually updated.
+- **DAILY_SPEND_ALERT_CENTS** calibration — Codex round-10 noted
+  one residual LOW (mock can't validate SQL text) deferred to
+  whenever an intake-portal integration test harness is stood up.
