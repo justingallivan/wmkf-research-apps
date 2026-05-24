@@ -8,10 +8,22 @@
  *
  * Contract (drain plan v7 §"Build pieces" #4):
  *
- *   Request:  { accountId, formKey, draftJson, requestId?: null }
+ *   Request:  { accountId, formKey, draftJson }
  *   Auth:     external-id session with userType='applicant' + contactOid;
  *             any live membership (Submitter OR Contributor — Contributors
  *             can edit but cannot submit).
+ *
+ *   NOTE on requestId scoping: this endpoint does NOT accept requestId.
+ *   The requestless branch (request_id IS NULL) is the only branch in
+ *   v1 scope; the with-request branch is reserved for the future
+ *   compliance-loop flow (per intake-draft-service.js comments), which
+ *   needs an ownership model the autosave path doesn't provide. Accepting
+ *   requestId here was Codex S183-round-8 BLOCKER: any Contributor at an
+ *   institution could overwrite/reassign another Contributor's
+ *   request-bound draft just by knowing the request GUID, because the
+ *   with-request upsert keys on (account_id, request_id, form_key) and
+ *   reassigns contact_oid on conflict. Reject any requestId in the body
+ *   to close that exploit path.
  *
  *   Sequence:
  *     1. Auth → contactOid (from session)
@@ -72,7 +84,7 @@ export default async function handler(req, res) {
   }
 
   // 2) Body
-  const { accountId, formKey, draftJson, requestId = null } = req.body || {};
+  const { accountId, formKey, draftJson } = req.body || {};
   if (!accountId || typeof accountId !== 'string') {
     return jsonError(res, 400, 'accountId is required');
   }
@@ -82,8 +94,10 @@ export default async function handler(req, res) {
   if (draftJson == null || typeof draftJson !== 'object' || Array.isArray(draftJson)) {
     return jsonError(res, 400, 'draftJson must be an object');
   }
-  if (requestId !== null && typeof requestId !== 'string') {
-    return jsonError(res, 400, 'requestId must be a string or null');
+  // Reject any caller-supplied requestId — see header comment "NOTE on
+  // requestId scoping" for the ownership-takeover rationale.
+  if (req.body && req.body.requestId != null) {
+    return jsonError(res, 400, 'requestId is not accepted on this endpoint');
   }
 
   // 3) Bridge: OID → contactId. Same path as /submit.
@@ -149,7 +163,7 @@ export default async function handler(req, res) {
     existing = await IntakeDraftService.getByKey({
       contactOid,
       accountId,
-      requestId,
+      requestId: null,
       formKey,
     });
   } catch (err) {
@@ -172,7 +186,7 @@ export default async function handler(req, res) {
     row = await IntakeDraftService.upsertDraftJson({
       contactOid,
       accountId,
-      requestId,
+      requestId: null,
       formKey,
       draftJson: mergedDraftJson,
     });
@@ -192,7 +206,6 @@ export default async function handler(req, res) {
     metadata: {
       accountId,
       formKey,
-      requestId,
       isNew: !existing,
     },
   }).catch(() => {});

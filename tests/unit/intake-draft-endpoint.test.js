@@ -154,10 +154,44 @@ describe('intake/draft — body validation', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  test('requestId is a number → 400', async () => {
-    const { req, res } = makeReqRes(validBody({ requestId: 123 }));
+  test('any non-null requestId is rejected → 400 (Codex S183-round-8 BLOCKER)', async () => {
+    // The with-request branch is out of v1 scope and was an ownership-takeover
+    // vector. Endpoint MUST reject any requestId — even a syntactically valid
+    // UUID string — to prevent another Contributor at the same institution
+    // from overwriting/reassigning a request-bound draft.
+    const cases = [
+      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      'any-string',
+      123,
+      true,
+      [],
+      {},
+    ];
+    for (const requestId of cases) {
+      const { req, res } = makeReqRes(validBody({ requestId }));
+      await handler(req, res);
+      expect(res.statusCode).toBe(400);
+      expect(res.body.error).toMatch(/requestId is not accepted/);
+    }
+  });
+
+  test('requestId: null is fine (explicit null is allowed alongside the default-null contract)', async () => {
+    // The endpoint signature drops requestId entirely; an explicit null in the
+    // body should be treated as "not set" and proceed normally. Mocking the
+    // happy path here just so this test reaches handler completion.
+    getServerSession.mockResolvedValue({
+      user: {
+        userType: 'applicant',
+        contactOid: CONTACT_OID,
+        contactEmail: 'jane@example.org',
+        contactName: 'Jane Doe',
+      },
+    });
+    resolveContactForSession.mockResolvedValue({ ok: true, contactId: CONTACT_ID });
+    hasLiveMembership.mockResolvedValue(true);
+    const { req, res } = makeReqRes(validBody({ requestId: null }));
     await handler(req, res);
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(200);
   });
 });
 
@@ -312,6 +346,27 @@ describe('intake/draft — happy paths', () => {
     await handler(req, res);
     expect(res.statusCode).toBe(200);
     expect(IntakeDraftService.upsertDraftJson).toHaveBeenCalledTimes(1);
+  });
+
+  test('audit metadata is restricted to safe keys only (no draft content leak)', async () => {
+    // Codex S183-round-8 LOW: metadata is stored verbatim by IntakeAuditService
+    // (only `payload` is hashed). Lock the contract so future edits can't
+    // sneak applicant-content fields into metadata. Allowed keys:
+    //   accountId   — Dataverse GUID, not PII
+    //   formKey     — static identifier (e.g. 'phase-ii-2026-06')
+    //   isNew       — boolean
+    IntakeDraftService.getByKey.mockResolvedValue(null);
+    const { req, res } = makeReqRes(validBody({
+      draftJson: { projectTitle: 'Sensitive Title', narrative: 'Sensitive content' },
+    }));
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+
+    const auditArgs = IntakeAuditService.log.mock.calls[0][0];
+    expect(Object.keys(auditArgs.metadata).sort()).toEqual(['accountId', 'formKey', 'isNew']);
+    // Belt-and-suspenders: assert no draft-content values appear in metadata.
+    const metaJson = JSON.stringify(auditArgs.metadata);
+    expect(metaJson).not.toMatch(/Sensitive/);
   });
 
   test('audit failure does NOT block the response', async () => {
