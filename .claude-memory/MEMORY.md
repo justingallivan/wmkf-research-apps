@@ -14,6 +14,7 @@
 - [Dataverse schema-deploy gotchas](project-dataverse-schema-deploy-gotchas.md) — 429 throttling between metadata writes (wrap in 30s-backoff retry), `@odata.bind` keys are PascalCase nav-properties, queryAllRecords caps at 5000.
 - [Human-legibility schema principle](feedback-human-legibility-schema-principle.md) — prefer expanding enums on existing entities over proliferating obscure child tables; non-technical staff browse Dataverse, fewer tables wins.
 - [Grep general terms not domain jargon](feedback-grep-general-codebase-terms.md) — when checking "does the codebase have X", grep terms the prior implementer would have used (untrusted/sentinel/boundary), not article-jargon (S182 burned half a session missing A7 this way).
+- [Stakeholder email tone](feedback-stakeholder-email-tone.md) — drop insider jargon ("semantically load-bearing", subsystem names like "intake-portal drain") in Connor/Sarah/DFT emails; frame in their domain not the codebase's.
 
 ## Security Infrastructure
 - [A7 prompt-injection hardening — SHIPPED S173-S177](project-a7-prompt-injection-hardening.md) — all 24 LLM input surfaces are CI-gated and hardened (wrapUntrustedContent + preamble + validateAiJson + multimodal). Do NOT build a parallel system. Read `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md` before any injection-related design.

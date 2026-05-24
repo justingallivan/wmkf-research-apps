@@ -1,111 +1,83 @@
-# Connor email — drain critical path: 4 questions (DRAFT — S180, 2026-05-23)
+# Connor email — 4 questions on the portal-to-AkoyaGO handoff (DRAFT — S183, 2026-05-24)
 
-Send-ready. Same shape as the prior `INTAKE_PORTAL_ITEM_6_CONNOR_EMAIL.md` —
-specific asks with reply templates, no codebase access required.
+Send-ready. Plain-language rewrite of the S180 draft after feedback that
+the prior version leaned too hard on internal subsystem names and
+engineering abstractions.
 
 ---
 
 **To:** Connor
-**Subject:** Intake-portal drain — 4 questions blocking the last two state transitions
+**Subject:** Intake portal — 4 questions on what a portal-submitted application should look like in AkoyaGO
 
 Hi Connor,
 
-The intake-portal drain shipped 5 of the 7 state transitions this week — applicant submits land cleanly through to **dynamics_patched (budget-lines half)**. The remaining two transitions are blocked on answers only you can give. None of these need code from you (no PA flow work to do); the answers go straight into the drain configuration.
-
-**Current drain state machine (live on `main`):**
-
-```
-queued → scanning → request_created → files_moved → dynamics_patched (budget-lines)
-                                                                ↓
-                                                  [parks: persons + parent aggregates,
-                                                          waiting on Q2 + contact-resolution]
-                                                                ↓
-                                                  [status_flipped]    [completed]
-                                                     ↑ waits on Q1
-```
-
-A row that finishes the budget-lines half currently parks for 1 hour with a `system_alerts` warning; when your answers land, the unpark SQL in `docs/INTAKE_PORTAL_DRAIN_PLAN.md` §"Phase B deploy handoff" wakes them up.
+The intake portal can now take an applicant submission and create the matching `akoya_request` in AkoyaGO, along with the budget detail. Before we can finish the last two pieces — adding the project team (the PI and other roster people) and flipping the status so the right committee picks it up — we need your call on four things. None of this requires you to build anything; we just need the answers so we can wire the portal to set the right fields.
 
 ---
 
-## Q1 — Source picklist field for portal-submitted single-phase requests
+## Q1 — Which status should a fresh portal submission land in?
 
-**Background.** `akoya_request.akoya_requeststatus` is a **derived** string rollup (per `INTAKE_PORTAL_ITEM_6_STATUS.md:103-119`). The source-of-truth picklists are `wmkf_phaseistatus` (S/T: `wmkf_PhaseIStatus`) and `wmkf_phaseiistatus` (S/T: `wmkf_PhaseIIStatus`). With the single-phase pivot, there's no Phase I/II distinction — so we need to know which picklist (and which value on it) represents "applicant submitted via the portal, awaiting staff/committee review."
+When an applicant clicks Submit, the new `akoya_request` lands in AkoyaGO. Right now we'd leave its status blank, but that means it won't appear in any of the committee work queues until someone manually moves it.
 
-**What we need from you (all four):**
-
-1. **Field logical name** the drain should PATCH (`wmkf_phaseistatus`, `wmkf_phaseiistatus`, or something new).
-2. **Option integer value** for the post-portal-submit / pre-committee-review state.
-3. **Display label** (so the AkoyaGO views show it in plain English).
-4. **Existing-vs-new** — does this value exist on the chosen picklist today, or do you need to add it?
-
-**Reply template:**
+We need to know which field and which value represents "applicant submitted via the portal, waiting for staff/committee review." Historically that's been one of the phase status fields (`wmkf_phaseistatus` or `wmkf_phaseiistatus`), but with the move to single-phase submissions there's no Phase I/II split anymore — so it might be one of those repurposed, or a new value, or something else entirely. Your call.
 
 ```
 Q1.1 field logical name:    wmkf_______
 Q1.2 option integer:        ________
 Q1.3 display label:         "________"
-Q1.4 existing or new:       existing | needs-add-by-me
+Q1.4 already exists, or do you need to add it?:  existing | needs-add-by-me
 ```
 
 ---
 
-## Q2 — PI / contact attribution at parent Create
+## Q2 — Who's the PI, who's the contact, who's the research officer?
 
-**Background.** Three contact-role lookups on `akoya_request` are semantically load-bearing (per the institution-foundation-liaison memo at `.claude-memory/project-institution-foundation-liaison.md`):
+`akoya_request` has three contact-role fields that matter for downstream routing:
 
-- `wmkf_projectleader` — PI / scientific lead
-- `akoya_primarycontactid` — foundation liaison / steward (NOT the PI)
-- `wmkf_researchleader` — institutional research officer
+- `wmkf_projectleader` — the PI / scientific lead on the project
+- `akoya_primarycontactid` — the foundation's main point of contact at the institution (typically a grants officer or development director, not the PI)
+- `wmkf_researchleader` — the institution's research officer / VP for research
 
-The drain currently does a minimal `akoya_request` Create that sets only `akoya_Account@odata.bind`. It leaves all three PI fields null. Before we wire the persons children (`wmkf_apprequestperson`), we need to know how each of these three should be populated.
+In the portal, the applicant signing in (let's call her Jane) is a Submitter for, say, Stanford. **Jane isn't necessarily the PI** — she might be a grants administrator submitting on behalf of PI John Smith, who appears as a row on the project-team form.
 
-**Specific use case:** Jane Doe authenticates against the portal as a Submitter for Stanford. **Jane is not the PI** — she's submitting on behalf of PI John Smith, who appears as a roster row in the form.
+We need to know, for each of those three fields:
 
-**What we need from you (per each of the three fields):**
-
-1. **Exact lookup field name** and the entity each points to (`contact`? `systemuser`? both?).
-2. **Required at Create vs. optional** for portal-originated requests.
-3. **Source of value:** authenticated portal applicant (Jane)? account defaults? a roster row picked by name match? null-at-Create-fill-later by staff?
-4. **Fallback** when the source doesn't yield a value.
-
-**Reply template:**
+1. What entity it points to (`contact`? `systemuser`? both?).
+2. Whether it must be set at submission time, or can be filled in later by staff.
+3. Where the value should come from — the person signing in? a default tied to the institution? a row from the project-team form? leave blank for staff?
+4. What to do if that source doesn't yield a value.
 
 ```
 wmkf_projectleader:
   Q2.1 entity:                contact | systemuser
-  Q2.2 required at Create:    yes | no
-  Q2.3 source:                applicant | account-default | roster-row | null-fill-later
-  Q2.4 fallback:              ________
+  Q2.2 required at submission:  yes | no
+  Q2.3 source:                applicant | account-default | project-team-row | leave-blank
+  Q2.4 fallback if source empty:  ________
 
 akoya_primarycontactid:
   Q2.1 entity:                contact | systemuser
-  Q2.2 required at Create:    yes | no
-  Q2.3 source:                applicant | account-default | roster-row | null-fill-later
-  Q2.4 fallback:              ________
+  Q2.2 required at submission:  yes | no
+  Q2.3 source:                applicant | account-default | project-team-row | leave-blank
+  Q2.4 fallback if source empty:  ________
 
 wmkf_researchleader:
   Q2.1 entity:                contact | systemuser
-  Q2.2 required at Create:    yes | no
-  Q2.3 source:                applicant | account-default | roster-row | null-fill-later
-  Q2.4 fallback:              ________
+  Q2.2 required at submission:  yes | no
+  Q2.3 source:                applicant | account-default | project-team-row | leave-blank
+  Q2.4 fallback if source empty:  ________
 ```
-
-**Why this is on the critical path:** the drain's persons handler (`wmkf_apprequestperson` POSTs) needs to resolve roster rows to `contact` GUIDs. The answers here also determine whether the auth-bridge / contact-resolution service has to handle the parent's PI fields or just the persons children.
 
 ---
 
-## Q3 — AkoyaGO staff working-view filters
+## Q3 — Hiding portal-submitted rows from staff views until they're ready
 
-**Background.** Portal-submitted requests will start appearing in AkoyaGO immediately when each drain tick runs. Without an explicit view filter, they'll mix with staff-created requests and could confuse the review workflow.
+The moment an applicant submits, the new `akoya_request` will start showing up in AkoyaGO views — which means it'll mix in with staff-created requests in the same lists. Until staff have reviewed it for completeness, that's probably not what you want.
 
-**What we need from you:**
+Once Q1 is settled, we can add a "hide rows in this status" filter to the relevant views. We need:
 
-1. **View names** (system view vs. personal view, with owners) on `akoya_request` that might surface portal-submitted-but-not-staff-reviewed rows. The Q1 picklist value will gate the filter, but we need the view list to know **where** to add it.
-2. **Exact filter clause** to add before pilot opens — e.g. "`wmkf_______ NOT EQUAL <Q1 value>`" or equivalent.
-3. **Who applies the filter** — you in the maker portal, or do we need to coordinate with the AkoyaGO admin?
-
-**Reply template:**
+1. Which views (system or personal) should get the filter — basically, anywhere staff look when they want to see "requests that need our attention."
+2. The exact filter clause to add (something like "status NOT EQUAL <Q1 value>" or equivalent).
+3. Whether you'll apply the filter in the maker portal yourself or whether the AkoyaGO admin needs to do it.
 
 ```
 Q3.1 views needing the filter (one per line):
@@ -117,54 +89,49 @@ Q3.3 who applies:            connor | akoyago-admin (name: ____)
 
 ---
 
-## Q4 — Option A′ recompute-flow gate value
+## Q4 — Recompute-flow condition + verification
 
-**Background.** Option A′ (the conditional inside the recompute-flow body, per `docs/INTAKE_PORTAL_ITEM_6_STATUS.md`) gates the aggregate recompute on the parent's current status. It runs *after* the parent has been fetched via `Get a row by ID`, then checks whether the parent is in the post-submit lifecycle state we should recompute.
+You're building the recompute flow that updates the aggregate fields on `akoya_request` when a child row changes (the one we settled on in the 2026-05-14 sync). The flow checks the parent's status before recomputing, so it only runs on requests in the right lifecycle state — typically the same value as Q1.
 
-**What we need from you (all four):**
+What we need:
 
-1. **Exact condition expression** in the flow body, e.g.:
-   ```
-   @equals(body('Get_parent')?['<Q1 field logical name>'], <Q1 integer value>)
-   ```
-2. **Source field fetched** (matches Q1).
-3. **Integer value compared against** (matches Q1).
-4. **P4 evidence artifacts** on the real-schema re-run — same rubric as the original core-gate test:
-   - Run IDs (the flow run ID for the gate-pass and gate-skip cases)
-   - `SdkMessage` literals observed in the run history
-   - Parent-lookup GUIDs (the `akoya_requestid` used for each test row)
-   - Active-subset list (which child rows the recompute affected vs. left alone)
-
-**Reply template:**
+1. The exact condition expression you used in the flow body.
+2. The field it reads (should match Q1.1).
+3. The integer value it compares against (should match Q1.2).
+4. Test evidence from a real-schema run — same shape as the original core-gate test:
+   - The flow run IDs for one gate-pass case and one gate-skip case.
+   - The `SdkMessage` literals you saw in the run history.
+   - The `akoya_requestid` of the test requests used for each case.
+   - Which child rows the recompute affected vs. left alone.
 
 ```
 Q4.1 condition expression:   @equals(body('Get_parent')?['wmkf_______'], _____)
 Q4.2 source field:           wmkf_______       ← matches Q1.1
 Q4.3 integer value:          _____             ← matches Q1.2
-Q4.4 P4 evidence:
+Q4.4 test evidence:
        gate-pass run id:     ________
        gate-skip run id:     ________
        SdkMessage literals:  ________
        parent GUIDs:         pass=________  skip=________
-       active-subset rows:   ________
+       affected child rows:  ________
 ```
 
 ---
 
-## What unblocks when answers land
+## What each answer unblocks
 
 | Answer | Unblocks |
 |---|---|
-| Q1 | `status_flipped` drain handler (last state transition) |
-| Q2 | `wmkf_apprequestperson` POSTs + parent PI fields at Create |
-| Q3 | Pilot opening — staff views ready for portal-submitted rows |
-| Q4 | Connor's PA recompute flow ships → live aggregate maintenance |
+| Q1 | Portal can flip the status correctly when an applicant submits |
+| Q2 | Portal can populate PI / contact / research officer on the new request, and we can wire the project-team form |
+| Q3 | Staff views stay clean once portal submissions start arriving |
+| Q4 | Recompute flow ships and aggregate fields stay correct |
 
-You can answer them in any order; the drain build queues to whichever unblocks first. **Q1 + Q4 are paired** (both reference the same field/value) — easiest to do those together. **Q2 is the largest** because of the three-fields-times-four-questions matrix, but each cell is one decision.
+You can answer them in any order. **Q1 and Q4 are paired** (Q4 uses the same field and value as Q1, so it's easiest to do those together). **Q2 is the biggest** because it's three fields × four questions each, but each cell is one decision.
 
 ---
 
-**Reply by email or drop the filled-in templates in Teams** — whichever you prefer. No deadline pressure on our side; let me know your bandwidth and I'll plan the build queue around it.
+**Reply by email or drop the filled-in templates in Teams** — whichever is easier. No deadline pressure on our side; let me know when you have bandwidth and I'll plan the work around it.
 
 Thanks!
 Justin
