@@ -1,126 +1,108 @@
-# Session 182 Prompt: Cloudmersive + loose-end cleanup
+# Session 183 Prompt: Cloudmersive (real this time) + loose-end cleanup
 
-## Session 181 Summary
+## Session 182 Summary
 
-Pivot session — Connor email still unsent (parked), so worked through admin
-infrastructure cleanup. Five commits shipped covering alert routing,
-spend-monitoring posture shift, and a living pricing table.
+**Net code change: zero.** The session attempted to build a prompt-injection
+defense layer, shipped it, then reverted the commit after discovering the
+codebase already had a comprehensive, CI-gated injection-defense system
+(A7, sessions 173-177) that my initial investigation missed. Two memory
+entries written to prevent recurrence.
 
 ### What Was Completed
 
-1. **Per-category alert recipient routing** (`ac4a4a7`).
-   New service `lib/services/alert-recipients.js` resolves alert category →
-   email list via `wmkf_appsystemsettings` (key `alertRecipientsByCategory`),
-   with fallback to `default` → superuser roster. Seven seeded categories
-   (`default`, `security`, `spend`, `intake`, `ops`, `staff-onboarding`,
-   `support`). Admin panel UI in `pages/admin.js` (`AlertRecipientsSection`).
-   Eight existing alert call sites tagged. Removed env vars
-   `SPEND_ALERT_EMAIL_TO/_FROM` + `NOTIFICATION_EMAIL_TO`.
-   Codex round (0 BLOCKER / 10 MOD / 9 CLEAN) folded.
+1. **Threat-model + design conversation (`docs/PROMPT_INJECTION_DEFENSE_PLAN.md`,
+   later deleted).**
+   - Researched prompt-injection attack class via Medium article on PDF
+     hidden-text vectors.
+   - Three iterations of the plan (v1 three-tier defense → v2 Tier-1 only
+     → v3 prompt-hygiene only) with two Codex review rounds.
+   - Threat sizing settled on: closed-set submitters, multi-week
+     multi-person human review, AI as decision-support not decision-maker,
+     compliance attestation. Concluded baseline prompt hygiene was the
+     right scope.
 
-2. **Unified spend-check email path** (`cd2abb1`).
-   Spend-check low-balance email now goes through `NotificationService.notify`
-   with `category: 'spend'` — drops bespoke HTML, uses the unified
-   `_formatEmailBody` template.
+2. **Built then reverted parallel injection-defense system (commit
+   `04706f3` → revert `abe861e`).**
+   - New utility `lib/utils/prompt-injection-guard.js` with
+     `wrapDocumentContent` (XML wrapper + entity-encoded body +
+     nonce-suffixed close tag), shared preamble, file-loader integration.
+   - 9 new unit tests, 824/824 passing.
+   - **Reverted because:** the codebase already has `wrapUntrustedContent`
+     + `buildUntrustedContentPreamble` + `validateAiJson` in
+     `lib/utils/ai-payload-boundary.js` and `lib/utils/ai-output-schema.js`,
+     CI-gated by `npm run check:prompt-injection-tagging` with all 24
+     LLM-input surfaces migrated. My new code was duplicating A7 with a
+     weaker design and double-wrapping content in two routes that
+     already had A7 coverage (`phase-i-dynamics/summarize.js`,
+     `grant-reporting/extract.js`).
+   - Live-test inspection (Justin saw the "Proposal text bounded at
+     17,422 characters" message in the Phase I Writeup UI) surfaced the
+     duplication — that message comes from the existing A7 system, not
+     my new code.
 
-3. **Anchor-based low-balance estimator removed** (`81124ea`).
-   Anthropic auto-reload + native $500/mo spend-limit notifications cover
-   the failure modes the local estimator was monitoring. Justin enabled
-   auto-reload mid-session. Removed `checkLowBalance()`,
-   `scripts/update-balance-anchor.sh`, env vars
-   `ANTHROPIC_BALANCE_ANCHOR_CENTS/_DATE`, `LOW_BALANCE_ALERT_CENTS`.
-   Kept daily-spend threshold (different failure mode — runaway-cost bug
-   detection).
-
-4. **Living pricing table + drift cron** (`0eec283`).
-   Two material bug fixes: Haiku 4.5 was priced at Haiku 3.5's rates
-   ($0.80/$4 vs actual $1/$5); Opus 4.5/4.6/4.7 inherited Opus 4's $15/$75
-   via `.includes()` (actual $5/$25). Refactored to
-   `lib/utils/model-pricing.js` with longest-prefix-first matcher,
-   `LAST_REVIEWED_AT`, 1h cache write multiplier (2×), unknown-model
-   warning. New crons: `/api/cron/pricing-canary` (weekly Mon 10am UTC,
-   no new auth) and `/api/cron/pricing-refresh` (monthly 1st 11am UTC,
-   requires `ANTHROPIC_ADMIN_API_KEY`). New `model_pricing_audit`
-   table (V032).
-
-5. **Round-2 Codex fold** (`98b2a9e`). 1 BLOCKER + 4 MOD findings folded:
-   - **BLOCKER:** `pricing-refresh.js` was multiplying `amount` by 100
-     (treated cost-report values as dollars; they're cents). Would have
-     produced phantom 100× drift on first monthly run. Verified empirically
-     via live probe against newly-set Admin API key.
-   - **MOD A:** matcher now requires `-` delimiter after prefix, prevents
-     future sibling absorption (`claude-opus-4-10` won't swallow
-     `claude-opus-4-1`).
-   - **MOD B:** 1h cache write drift comparison skipped while local schema
-     blends 5m+1h tokens. Audit still written.
-   - **MOD C:** all-clear cron paths now use `AlertService.autoResolve`
-     directly (previous `notify(severity:'info', autoResolveKey:...)` never
-     actually resolved standing warnings).
-   - **MOD F:** test suite uses `toBe` identity assertions for every Opus
-     tier; sibling-absorption test added.
-
-### Other infra confirmations
-
-- **Production CLAUDE_API_KEY is on the work org** (S181 confirmed via key
-  "last used" timestamp comparison). The personal-account key has been
-  dormant 30+ days.
-- **`ANTHROPIC_ADMIN_API_KEY` is set in Vercel** across Production / Preview
-  / Development. Live probe returned HTTP 200.
-- **Auto-reload enabled on the work Anthropic org.** Card on file is
-  Justin's corporate card — finance person notification path being
-  separately resolved by email.
-- **Mystery $50 charge** likely a Claude.ai Teams org subscription Justin
-  isn't billing-admin for — investigating offline; doesn't affect code.
+3. **Root cause + memory writes (commit `62335d7`).**
+   - Missed A7 because: (a) no memory entry pointed to it; (b)
+     `docs/security-audit/` wasn't in my top-level `ls docs/`; (c) I
+     grepped for article-jargon terms (white-on-white, OCR, canary)
+     instead of general-purpose terms (untrusted, sentinel, boundary).
+   - `project-a7-prompt-injection-hardening.md` — canonical pointer to
+     the A7 plan + primitives + CI gate. New "Security Infrastructure"
+     section in MEMORY.md.
+   - `feedback-grep-general-codebase-terms.md` — root-cause lesson:
+     "does the codebase have X" requires grepping general-purpose terms
+     (what the prior implementer would have used), not source-material
+     jargon. One empty grep is not proof; cross-check `docs/` subdirs +
+     `package.json` gates + `git log`.
 
 ### Commits
 
-- `ac4a4a7` — Configurable per-category alert recipients
-- `cd2abb1` — Route spend-check low-balance email through NotificationService
-- `81124ea` — Remove anchor-based low-balance estimator
-- `0eec283` — Living pricing table + monthly drift cron
-- `98b2a9e` — Round-2 fold: Codex review of S181 pricing changes
-- (this) — Document Session 181
+- `04706f3` — Prompt-injection hygiene: wrap applicant document content (S182)
+  **[REVERTED]**
+- `abe861e` — Revert "Prompt-injection hygiene: wrap applicant document content (S182)"
+- `62335d7` — Memory: A7 injection-hardening pointer + grep-general-terms lesson (S182)
+- (this) — Document Session 182 and create Session 183 prompt
 
-### Test count growth
+### What stayed at S181 levels
 
-| Stage | Tests |
-|---|---|
-| Pre-S181 baseline | 754 ✓ |
-| After alert-recipients | 791 ✓ (+37) |
-| After model-pricing refactor | 813 ✓ (+22) |
-| After round-2 fold | **815 ✓** (+2) |
+- Unit test count: 815 (the 9 guard tests went with the revert).
+- All CI gates green: `check:atlas`, `check:atlas:self-test`,
+  `check:api-routes`, `check:fact-consistency`,
+  `check:prompt-injection-tagging` (24 migrated, 0 pending).
 
 ## Potential Next Steps
 
-### 1. Cloudmersive virus-scan integration
+The S182-original carryover is unchanged; the injection-defense detour
+ate the session but produced no working changes. Cloudmersive in
+particular is still the realistic next-build item.
 
-The intake portal attach endpoint (`/api/intake/draft/attach`) is not yet
+### 1. Cloudmersive virus-scan integration (carry from S181/S182)
+
+Intake portal attach endpoint (`/api/intake/draft/attach`) is not yet
 built; per `docs/INTAKE_PORTAL_DESIGN.md:521-545` and
-`docs/INTAKE_PORTAL_DRAIN_PLAN.md:40`, Cloudmersive scans run synchronously
-at attach time, fail-closed. ClamAV + commercial engines; ~$0.001/scan;
-free tier (800/mo) covers pilot. Env var `CLOUDMERSIVE_API_KEY` already in
-the design doc.
+`docs/INTAKE_PORTAL_DRAIN_PLAN.md:40`, Cloudmersive scans run
+synchronously at attach time, fail-closed. Drain-error-classifier
+already has a `cloudmersive` branch (`lib/utils/drain-error-classifier.js`,
+exercised at `tests/unit/drain-error-classifier.test.js:101-103`).
+Still missing:
+- Cloudmersive account + key minting.
+- `lib/services/cloudmersive-scan.js` (POST `/virus/scan/file`).
+- Wire into `/api/intake/draft/attach` (endpoint TBD).
+- EICAR smoke per `INTAKE_PORTAL_DESIGN.md:606`.
 
-The drain-error-classifier (`lib/utils/drain-error-classifier.js`) already
-has a `cloudmersive` branch — `tests/unit/drain-error-classifier.test.js:101-103`
-exercises it. So error taxonomy is ready; what's missing is:
-- Account setup + key minting at cloudmersive.com
-- `lib/services/cloudmersive-scan.js` (POST `/virus/scan/file` with file bytes)
-- Wire into `/api/intake/draft/attach` (TBD endpoint)
-- EICAR test file exercise per `INTAKE_PORTAL_DESIGN.md:606`
+Note: A7 already covers the *prompt-injection* angle on applicant
+content. Cloudmersive is the *binary-malware* layer — orthogonal, both
+needed.
 
-### 2. Send the Connor Q1-Q4 email
+### 2. Connor Q1-Q4 email (still parked since S180)
 
-Still drafted at `docs/INTAKE_PORTAL_CONNOR_Q1_Q4_DRAFT.md`. Send-ready
-since S180. Q1 unblocks `status_flipped` handler; Q2 unblocks persons
-handler; Q3 unblocks pilot view filters; Q4 unblocks Connor's recompute PA
-flow. Until these answers land, drain remains capped at the budget-lines
-half of `dynamics_patched`.
+Drafted at `docs/INTAKE_PORTAL_CONNOR_Q1_Q4_DRAFT.md`. Q1 unblocks
+`status_flipped` handler; Q2 unblocks persons handler; Q3 unblocks
+pilot view filters; Q4 unblocks Connor's recompute PA flow.
 
-### 3. Verify alt-key Active in prod
+### 3. Verify `contact.wmkf_portaloid` alt-key Active in prod
 
-S179 deployment of `contact.wmkf_portaloid` alt-key was `Pending → Active`
-over a few minutes. Re-probe before pilot opens:
+S179 deployment was `Pending → Active` over a few minutes. Re-probe
+before pilot opens:
 ```bash
 node -e "
 const { DynamicsService } = require('./lib/services/dynamics-service');
@@ -128,7 +110,6 @@ DynamicsService.getEntityKey('contact', 'wmkf_portaloid').then(k =>
   console.log('Status:', k?.EntityKeyIndexStatus || 'NOT FOUND'));
 "
 ```
-Expected: `Status: Active`.
 
 ### 4. Other intake portal pieces
 
@@ -138,61 +119,50 @@ Expected: `Status: Active`.
 - `status_flipped` drain handler (after Connor Q1)
 - Persons handler + contact resolution (after Connor Q2)
 
-### 5. Loose ends from S181
+### 5. Loose ends from S181 (still parked)
 
-- **`DAILY_SPEND_ALERT_CENTS` calibration** — currently $10. June Phase I
-  batches may push past this normally; consider raising once we have
-  one cycle's data to set a realistic ceiling.
-- **1h cache write column split** — only needed if we ever start using 1h
-  caching. Currently 0 cache_creation_tokens are 1h.
+- `DAILY_SPEND_ALERT_CENTS` calibration ($10 may be low for June batches).
+- 1h cache write column split (only needed if we ever start using 1h
+  caching).
 
-### 6. Carryover (parked)
+### 6. Carryover (parked, dates not yet hit)
 
-- Wave 1 elevation revert on prod app user (deferred until pilot iteration
-  settles).
+- Wave 1 elevation revert on prod app user.
 - W6 reviewer Postgres DROP — fires ≥ 2026-07-01.
 - Archive intake meeting agenda — fires ≥ 2026-05-27 (4 days out).
 
 ### 7. Codex round (only after substantive new code)
 
-Round-2 of S181 closed cleanly. Don't run reviews back-to-back without new
-substantive surface. Next candidate: after Cloudmersive lands.
+Don't run reviews back-to-back without new substantive surface. S182
+produced no surviving code, so the meter is unchanged from S181's
+"after Cloudmersive lands" guidance.
 
 ## Key Files Reference
 
-### New this session
+### Memory entries added this session
 
 | File | Purpose |
 |---|---|
-| `lib/services/alert-recipients.js` | Per-category email routing resolver |
-| `pages/api/admin/alert-recipients.js` | GET/PUT admin endpoint for the routing config |
-| `lib/utils/model-pricing.js` | Pricing table + matcher (extracted from usage-logger) |
-| `lib/services/anthropic-admin.js` | Thin client for Anthropic Admin API `/cost_report` |
-| `pages/api/cron/pricing-canary.js` | Weekly unknown-model + table-age check |
-| `pages/api/cron/pricing-refresh.js` | Monthly drift check against `/cost_report` |
-| `scripts/check-mtd-spend.js` | Terminal helper for ad-hoc spend queries |
-| `tests/unit/alert-recipients.test.js` | 37 tests for resolver + write validation |
-| `tests/unit/model-pricing.test.js` | 24 tests for matcher + arithmetic + bug-pins |
+| `.claude-memory/project-a7-prompt-injection-hardening.md` | Canonical pointer to A7 — read before any injection-related design |
+| `.claude-memory/feedback-grep-general-codebase-terms.md` | Root-cause lesson: grep general terms not domain jargon when checking codebase coverage |
+| `.claude-memory/MEMORY.md` | New "Security Infrastructure" section added |
 
-### Modified this session
+### Don't re-read this session's reverted artifacts
 
-| File | Change |
+| File | Status |
 |---|---|
-| `lib/services/notification-service.js` | `notify()` accepts `category`; routes via resolver |
-| `lib/utils/usage-logger.js` | Slim shim; imports pricing from new module |
-| `pages/api/cron/spend-check.js` | Removed low-balance estimator; uses NotificationService |
-| `pages/admin.js` | `AlertRecipientsSection` collapsible card |
-| 5 alert-emitting files | Tagged with category (`ops`, `security`, `staff-onboarding`) |
-| `vercel.json` | 2 new crons: pricing-canary, pricing-refresh |
-| `scripts/setup-database.js` | V032: `model_pricing_audit` table |
-| `CLAUDE.md`, `docs/CANONICAL_COUNTS.md` | Route count 87 → 90 |
-| `docs/CREDENTIALS_RUNBOOK.md` | Added `ANTHROPIC_ADMIN_API_KEY`; removed deprecated vars |
-| `docs/API_ROUTE_SECURITY_MATRIX.md` | +3 routes (alert-recipients, pricing-canary, pricing-refresh) |
-| `docs/atlas/postgres-infra-tables.md` | +`model_pricing_audit` |
-| `docs/TODO_EMAIL_NOTIFICATIONS.md` | Recipients now category-routed |
-| `.claude-memory/project-api-credit-monitoring.md` | Rewritten — auto-reload + drift cron architecture |
-| `.claude-memory/project-codex-recurring-review.md` | Broker-driven Codex back up (S180 guidance superseded) |
-| `scripts/check-drain-table-mentions.js` | Fix stale allowlist filenames (underscore → hyphen) |
+| `docs/PROMPT_INJECTION_DEFENSE_PLAN.md` | Deleted in revert. Reasoning chain preserved in commit history (`04706f3` → `abe861e`). Don't recreate — A7 plan is canonical. |
+| `lib/utils/prompt-injection-guard.js` | Deleted in revert. Use `wrapUntrustedContent` from `lib/utils/ai-payload-boundary.js` instead. |
+| `shared/config/prompts/_injection-guard-preamble.js` | Deleted in revert. Use `buildUntrustedContentPreamble` from same module. |
+
+### Canonical injection-defense pointers (existing infrastructure)
+
+| File | Purpose |
+|---|---|
+| `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md` | The plan + inventory of 24 surfaces + part ordering + status |
+| `lib/utils/ai-payload-boundary.js` | `wrapUntrustedContent`, `buildUntrustedContentPreamble`, `buildBoundedTextPayload` |
+| `lib/utils/ai-output-schema.js` | `validateAiJson` for every JSON output sink |
+| `scripts/check-prompt-injection-tagging.js` | Positive-coverage registry CI gate |
 
 ## Testing
 
@@ -202,30 +172,20 @@ npm run check:atlas             # 30 PG / 32 DV ✓
 npm run check:atlas:self-test   # 12/12 patterns ✓
 npm run check:api-routes        # 90 routes ✓
 npm run check:fact-consistency  # ✓
-npm run check:canonical-pointers # ✓
-npm run check:drain-table-mentions # ✓
-npm run check:prompt-storage-mentions # ✓
+npm run check:prompt-injection-tagging  # 24 migrated, 0 pending ✓
 
-# Full unit suite:
+# Full unit suite (back to S181 baseline after revert):
 npx jest tests/unit             # 815 ✓ / 0 failures
-
-# Ad-hoc spend query:
-node scripts/check-mtd-spend.js              # MTD by day/model/app
-node scripts/check-mtd-spend.js --backend90  # 90-day Backend breakdown
-
-# Live probe of Admin API (works in dev with key pulled):
-vercel env pull /tmp/.env.dev --environment=development --yes
-KEY=$(grep ANTHROPIC_ADMIN_API_KEY /tmp/.env.dev | sed 's/.*="//;s/"$//')
-curl -sS "https://api.anthropic.com/v1/organizations/cost_report?starting_at=2026-05-22T00:00:00Z&ending_at=2026-05-23T00:00:00Z&bucket_width=1d" \
-  -H "anthropic-version: 2023-06-01" -H "x-api-key: $KEY"
 ```
 
 ## Open Items (architectural, non-blocking)
 
-- **Connor Q1-Q4 email** — drafted, not yet sent. Same status as S180/S181 start.
-- **Cloudmersive account** — not yet set up (Justin); env var
-  `CLOUDMERSIVE_API_KEY` slot exists in design doc, not in Vercel yet.
-- **`ANTHROPIC_ADMIN_API_KEY`** — set in Vercel, live probe returned 200.
-  First monthly drift cron fires Jun 1 @ 11:00 UTC.
-- **Auto-reload** — ON for the work Anthropic org. Threshold + corporate
-  card resolution is a Justin/finance question, not a code one.
+Unchanged from S182 start. The injection-defense detour produced no
+surviving change to this section.
+
+- **Connor Q1-Q4 email** — drafted, not yet sent. Same status as S180-S182 start.
+- **Cloudmersive account** — not yet set up; env var `CLOUDMERSIVE_API_KEY`
+  slot exists in design doc, not in Vercel yet.
+- **`ANTHROPIC_ADMIN_API_KEY`** — set in Vercel (S181). First monthly
+  drift cron fires Jun 1 @ 11:00 UTC.
+- **Auto-reload** — ON for the work Anthropic org.
