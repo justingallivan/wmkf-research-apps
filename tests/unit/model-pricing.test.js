@@ -68,6 +68,38 @@ describe('lookupPricing — matcher semantics', () => {
     expect(lookupPricing('claude-opus-4-20240620')).toEqual({ input: 1500, output: 7500 });
   });
 
+  // S181 round-2 (Codex MOD F): identity-equality tests for every Opus tier
+  // so a future bug that routes Opus 4.7 to (e.g.) Opus 4.5's same-priced
+  // entry would still fail. toEqual would let that slip silently.
+  test('Opus tiers route by identity, not coincidental same-price', () => {
+    expect(lookupPricing('claude-opus-4-7-20260601')).toBe(MODEL_PRICING['claude-opus-4-7']);
+    expect(lookupPricing('claude-opus-4-6-20260201')).toBe(MODEL_PRICING['claude-opus-4-6']);
+    expect(lookupPricing('claude-opus-4-5-20251001')).toBe(MODEL_PRICING['claude-opus-4-5']);
+    expect(lookupPricing('claude-opus-4-1-20250805')).toBe(MODEL_PRICING['claude-opus-4-1']);
+    expect(lookupPricing('claude-opus-4-20240620')).toBe(MODEL_PRICING['claude-opus-4']);
+  });
+
+  // S181 round-2 (Codex MOD A): delimiter check — a future sibling id whose
+  // next character is not '-' must NOT match a same-prefix-different-tier
+  // entry. Fallback to a less-specific (still valid) prefix is fine — that's
+  // the closest-valid-prefix policy.
+  test('matcher prevents sibling absorption (Codex MOD A)', () => {
+    // If Anthropic ever ships `claude-opus-4-10`, it must NOT match
+    // `claude-opus-4-1` (sibling at a different tier). The delimiter check
+    // blocks that. Falling through to `claude-opus-4` (legacy Opus 4) is
+    // the closest valid prefix.
+    expect(lookupPricing('claude-opus-4-10-20270101')).toBe(MODEL_PRICING['claude-opus-4']);
+    expect(lookupPricing('claude-opus-4-10-20270101')).not.toBe(MODEL_PRICING['claude-opus-4-1']);
+
+    // `gpt-4o-miniature` must NOT swallow `gpt-4o-mini`. It falls through
+    // to `gpt-4o` (parent prefix), which IS correct closest-valid-prefix.
+    expect(lookupPricing('gpt-4o-miniature')).toBe(MODEL_PRICING['gpt-4o']);
+    expect(lookupPricing('gpt-4o-miniature')).not.toBe(MODEL_PRICING['gpt-4o-mini']);
+
+    // But `gpt-4o-mini-2024-07-18` MUST match `gpt-4o-mini`.
+    expect(lookupPricing('gpt-4o-mini-2024-07-18')).toBe(MODEL_PRICING['gpt-4o-mini']);
+  });
+
   test('dated Sonnet 4.x maps correctly regardless of dated suffix', () => {
     expect(lookupPricing('claude-sonnet-4-6-20260201')).toEqual({ input: 300, output: 1500 });
     expect(lookupPricing('claude-sonnet-4-5-20250929')).toEqual({ input: 300, output: 1500 });

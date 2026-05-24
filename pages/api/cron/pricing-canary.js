@@ -21,6 +21,7 @@
 import { sql } from '@vercel/postgres';
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import NotificationService from '../../../lib/services/notification-service';
+import AlertService from '../../../lib/services/alert-service';
 import { lookupPricing, LAST_REVIEWED_AT } from '../../../lib/utils/model-pricing';
 
 const STALE_DAYS = 60;
@@ -65,17 +66,13 @@ async function checkUnknownModels() {
   }
 
   if (unknown.length === 0) {
-    // Auto-resolve any standing alert from a prior week.
-    await NotificationService.notify({
-      type: 'pricing_canary',
-      severity: 'info',
-      title: 'Pricing canary: all models priced',
-      message: 'No unknown model ids in the last 7 days.',
-      source: 'cron/pricing-canary',
-      autoResolveKey: ALERT_KEY_UNKNOWN,
-      category: 'ops',
-    });
-    return { status: 'ok', unknownCount: 0 };
+    // S181 round-2 (Codex MOD C): real auto-resolve. The previous code
+    // called notify(severity:'info', autoResolveKey:...) on the all-clear
+    // path — but notify() only inserts/dedupes, never resolves. Use
+    // AlertService.autoResolve() directly so a standing warning from a
+    // prior week actually clears when the gap is filled.
+    const resolved = await AlertService.autoResolve(ALERT_KEY_UNKNOWN);
+    return { status: 'ok', unknownCount: 0, resolved };
   }
 
   const summary = unknown
@@ -105,16 +102,8 @@ async function checkTableAge() {
   const ageDays = Math.floor((Date.now() - reviewedAt.getTime()) / (24 * 60 * 60 * 1000));
 
   if (ageDays <= STALE_DAYS) {
-    await NotificationService.notify({
-      type: 'pricing_canary',
-      severity: 'info',
-      title: 'Pricing table age OK',
-      message: `LAST_REVIEWED_AT is ${ageDays} days old (threshold ${STALE_DAYS}).`,
-      source: 'cron/pricing-canary',
-      autoResolveKey: ALERT_KEY_STALE,
-      category: 'ops',
-    });
-    return { status: 'ok', ageDays };
+    const resolved = await AlertService.autoResolve(ALERT_KEY_STALE);
+    return { status: 'ok', ageDays, resolved };
   }
 
   await NotificationService.notify({
