@@ -338,17 +338,108 @@ Two consumers:
 - `idempotency_key` generated at draft creation, persisted in `draft_json.idempotency_key`, reused on all autosaves
 - Audit write: `action: 'draft.upsert'`, payload = `{draftId, changedFieldKeys}`
 
-**`POST /api/intake/draft/attach`** — file upload (synchronous scan).
-- Auth: same as draft (any role)
-- Stream upload to **private Blob store** (`INTAKE_BLOB_RW_TOKEN`)
-- Compute sha256 + size
-- **Synchronous** Cloudmersive virus scan (blocking the upload response). For pilot file sizes (typical biosketch/PDF: <10MB), this fits comfortably in a Vercel function timeout. Stream-scan-then-store if needed for larger files.
-- Append `attachments` JSONB entry: `{filename, blob_url, sha256, size, scanned_at, scan_result: 'clean' | 'infected' | 'error'}`
-- If `scan_result = 'infected'`: store the entry with the infected marker; return 422 to applicant; do NOT delete from Blob immediately (keep for audit until the draft expires)
-- If `scan_result = 'error'` (Cloudmersive 5xx, etc.): retry up to 3 times inline; if still failing, return 503 to applicant; do NOT persist a "clean" record
-- Audit write either way: `action: 'draft.attach'` or `action: 'draft.attach_scan_failed'`
+#### Attachment upload — three-call dance
 
-This matches the v1/`DESIGN.md:527` synchronous model and the form validator's `scan_result === 'clean'` check at `validate.js:153`.
+The "Bytes never traverse the function on the upload path" constraint (`DESIGN.md` § File handling) means a single attach endpoint can't do the whole job. The flow is split into three calls so the browser does the bulk upload directly to Blob and the function only handles authorization, scanning, and metadata.
+
+```
+Browser                         Function                      Blob (private store)
+   │                                │                                │
+   │ 1. POST /upload-token          │                                │
+   │    {draftId, filename,         │                                │
+   │     contentType, fieldKey}     │                                │
+   ├───────────────────────────────►│                                │
+   │                                │  auth + membership + draft     │
+   │                                │  ownership; mint               │
+   │                                │  attachmentId = uuid();        │
+   │                                │  derive pathname server-side;  │
+   │                                │  append pendingAttachments[]   │
+   │                                │  to draft.draft_json (atomic   │
+   │                                │  via jsonb ||); mint Blob      │
+   │                                │  client-upload token scoped    │
+   │                                │  to exact pathname + maxBytes  │
+   │ ◄──────────────────────────────┤                                │
+   │  {attachmentId, token,         │                                │
+   │   pathname}                    │                                │
+   │                                │                                │
+   │ 2. PUT bytes using token       │                                │
+   ├───────────────────────────────────────────────────────────────►│
+   │ ◄───────────────────────────────────────────────────────────────┤
+   │                                │                                │
+   │ 3. POST /attach                │                                │
+   │    {draftId, attachmentId}     │                                │
+   ├───────────────────────────────►│                                │
+   │                                │  auth + membership + draft;    │
+   │                                │  look up pending by            │
+   │                                │  attachmentId; download bytes  │
+   │                                │  from server-known pathname    │
+   │                                ├───────────────────────────────►│
+   │                                │ ◄──────────────────────────────┤
+   │                                │  recompute sha256 + size;      │
+   │                                │  magic-byte validate; check    │
+   │                                │  size ≤ field max; scanBytes() │
+   │                                │  branch:                       │
+   │                                │   clean → remove pending,      │
+   │                                │     append to attachments[];   │
+   │                                │   infected → delete Blob,      │
+   │                                │     audit, remove pending,422; │
+   │                                │   misconfig → leave pending,500│
+   │                                │   unavailable → leave pending, │
+   │                                │     503 (retryable);           │
+   │ ◄──────────────────────────────┤                                │
+```
+
+**`POST /api/intake/draft/upload-token`** — mint a scoped Blob client-upload token.
+- Auth: applicant session; membership check (`account_id ∈` contact's approved memberships, any role — Contributor can upload to drafts).
+- Draft ownership check: draft exists and `contact_oid` matches OR contact has membership for `account_id`.
+- Mint `attachmentId = crypto.randomUUID()`.
+- Derive **server-controlled** pathname: `drafts/{draftId}/{attachmentId}/{sanitizedFilename}`. Browser never picks the path.
+- Look up `fieldKey` in `shared/forms/<cycle>/schema.js`; reject 400 if unknown. Use the field's `maxBytes` for the token's `maximumSizeInBytes`.
+- Append to `draft_json.pendingAttachments[]` (atomic via `attachments = attachments || ...::jsonb` pattern in `IntakeDraftService`):
+  ```json
+  { "attachmentId": "<uuid>", "fieldKey": "<key>", "filename": "<sanitized>",
+    "pathname": "drafts/<draftId>/<attachmentId>/<filename>",
+    "createdAt": "<iso>" }
+  ```
+- Mint Vercel Blob client-upload token via `@vercel/blob/client` server SDK, scoped to that exact pathname + the field's maxBytes + 1h `validUntil`.
+- Audit: `action: 'draft.upload_token.mint'`, payload `{draftId, attachmentId, fieldKey}`.
+- Response: `{attachmentId, token, pathname}`.
+
+**`POST /api/intake/draft/attach`** — finalize the upload after the browser's direct PUT completes.
+- Auth: same shape as `upload-token`.
+- Payload: **only** `{draftId, attachmentId}` — every other piece of metadata is server-derived. Per Codex round-7 finding MOD-5, the server treats no client metadata as trusted.
+- Look up the pending entry in `draft_json.pendingAttachments[]` by `attachmentId`. If not found → 404 (`pending_not_found`). Possible causes: never minted, already attached (idempotent retry hit), expired and cleaned, or different draft.
+- Download bytes from the server-known pathname using `INTAKE_BLOB_RW_TOKEN`. If the Blob doesn't exist → 409 (`bytes_not_uploaded`).
+- Recompute `sha256` + `size` from the actual bytes (do not trust the client). Magic-byte validate via `lib/utils/file-magic.js` (extend extension allowlist beyond the current PDF/DOCX as needed for intake-portal field types — DOCX, XLSX, PDF for pilot).
+- Cross-check `size ≤ field's maxBytes`. If exceeded → 413 (`size_exceeds_field_max`) + delete the Blob (sanity backstop; the token's `maximumSizeInBytes` should prevent this from happening).
+- Gate on `isVirusScanEnabled()`. When off, skip scan; when on:
+  - `scanBytes(bytes, filename)` from `lib/services/cloudmersive-scan.js`.
+  - **clean** → atomic JSONB update: remove the pending entry, append to `attachments[]` with `{attachmentId, fieldKey, filename, pathname, blob_url, sha256, size, scan_result: 'clean', scanned_at, scanner}`. Audit `action: 'draft.attach'`. 200.
+  - **infected** → delete the Blob (`del()` with `INTAKE_BLOB_RW_TOKEN`); write audit row with full metadata (`action: 'draft.attach_infected'`, payload `{attachmentId, filename, sha256, size, scanner, virusName, scannedAt}`); remove the pending entry; 422.
+  - **scan_misconfigured** (cloudmersive 4xx, missing key) → leave pending entry intact; audit `action: 'draft.attach_scan_misconfigured'`; 500 with generic "scanner misconfigured, contact administrator" message. Operator fix unblocks retry.
+  - **scan_unavailable** (cloudmersive 5xx/network exhaust) → leave pending entry intact; audit `action: 'draft.attach_scan_unavailable'`; 503 with retry-friendly message. Once Cloudmersive recovers, browser can re-POST `/attach` with the same `attachmentId`.
+- When `VIRUS_SCAN_ENABLED` is off, the `'clean'` branch fires without the scan call; `scanner` field is set to `'skipped'` so the audit trail makes it explicit which uploads were unscanned.
+
+**Why the pending entry stays on scan errors** — letting the applicant retry the attach call once the scanner recovers is preferable to making them re-upload (which would orphan the original Blob and burn their bandwidth). The bytes are already in Blob; only the metadata/scan step failed.
+
+**Idempotency** — attach is idempotent on `attachmentId`. A retry after a successful clean response finds the pending entry already gone and returns 404 (`pending_not_found`); the browser interprets this as "already attached, no-op" by checking `attachments[]` for the same `attachmentId`. A retry during a scan error finds the pending entry still there and re-runs the download+scan; the Blob bytes haven't changed (the token only allows the original PUT), so the scan result is deterministic.
+
+#### Orphan cleanup cron
+
+The step-2-success / step-3-failure case happens (network drop, browser close, function timeout). Without sweeping, pending entries and their Blobs accumulate.
+
+Add a daily handler in the existing maintenance cron:
+- For each draft, walk `draft_json.pendingAttachments[]` for entries with `createdAt < now - 1h` (comfortably past the 1h token expiry; bytes can't be added after that anyway).
+- For each stale pending: attempt `del(pathname)` against the private Blob; ignore 404 (Blob may not exist if step 2 never completed). Remove from `pendingAttachments[]`.
+- Audit `action: 'draft.attach_orphan_swept'` per removed entry.
+
+#### Doc cross-references
+
+This three-call pattern reconciles two prior docs that read differently:
+- `DESIGN.md` § "File handling" said "Bytes never traverse a Vercel Function" — true on the **upload** path (step 2), but the scan path (step 3) does download bytes into the function. DESIGN.md updated in S183 to acknowledge both.
+- Earlier drafts of this drain plan described `/attach` as a single endpoint that streamed bytes — superseded by the three-call dance above.
+
+The submit-strict validator at `validate.js:153` (`scan_result === 'clean'` check on every attachment) is unchanged. The `scanning` state in the submission state machine remains a defense-in-depth re-verify — primary scan happens here, at attach time.
 
 ### 5. `/api/intake/submit`
 

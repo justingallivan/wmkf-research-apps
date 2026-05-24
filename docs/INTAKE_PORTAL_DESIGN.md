@@ -512,7 +512,9 @@ Each phase is roughly a quarter of work; numbers are illustrative not committed.
 
 ### File handling
 
-**Bytes never traverse a Vercel Function.** The Vercel Functions request-body limit is 4.5 MB; routing applicant uploads through a function body would cap files at that ceiling regardless of what Blob accepts. The intake portal uses Vercel Blob's client-upload pattern: the function mints a signed token, the browser PUTs bytes directly to Blob via the `@vercel/blob/client` SDK, and only metadata (`{ filename, blob_url, sha256, size, mime }`) ever crosses our function. End-to-end smoke (`scripts/smoke-blob-upload.js`) verifies a 25 MB round-trip against the actual Blob endpoint with byte-identity sha256 verification — proving the underlying capability before we wire the UI. Real per-file caps are set per field in `shared/forms/<cycle>/schema.js` (current Phase II Research draft: 20 MB for the project narrative, 5 MB for everything else, subject to Sarah/Connor refinement).
+**Bytes never traverse a Vercel Function on the upload path.** The Vercel Functions request-body limit is 4.5 MB; routing applicant uploads through a function body would cap files at that ceiling regardless of what Blob accepts. The intake portal uses Vercel Blob's client-upload pattern: the function mints a signed token, the browser PUTs bytes directly to Blob via the `@vercel/blob/client` SDK. End-to-end smoke (`scripts/smoke-blob-upload.js`) verifies a 25 MB round-trip against the actual Blob endpoint with byte-identity sha256 verification — proving the underlying capability before we wire the UI. Real per-file caps are set per field in `shared/forms/<cycle>/schema.js` (current Phase II Research draft: 20 MB for the project narrative, 5 MB for everything else, subject to Sarah/Connor refinement).
+
+**Bytes DO traverse a function on the scan path** — a deliberate pilot tradeoff. After the browser's direct-to-Blob PUT completes, a follow-up metadata POST to `/api/intake/draft/attach` causes the function to download the bytes from the private Blob (`INTAKE_BLOB_RW_TOKEN`), scan them via Cloudmersive, and only then append the attachment to the draft's JSONB. The 4.5 MB request-body limit doesn't apply (the limit is on incoming request bodies, not on what the function downloads); at ≤25 MB per file with Vercel functions defaulting to 1024 MB memory and 300s timeout, single-file scans fit comfortably. Costs are extra latency and double bandwidth (bytes uploaded once by the browser, downloaded once by the function); both are acceptable at pilot volume and inherent to synchronous-scan-on-attach. See `docs/INTAKE_PORTAL_DRAIN_PLAN.md` § "Build pieces" #4 for the three-call orchestration (upload-token → direct-PUT → attach).
 
 - Allowed file types per phase: PDF, DOCX, XLSX, plain text. Hard-block executable extensions.
 - Magic-byte validation, not just extension check (existing pattern in `lib/services/review-upload.js`).
@@ -525,24 +527,27 @@ Public applicant uploads are a different risk class than staff/reviewer uploads,
 | Question | Answer |
 |---|---|
 | **Where does scanning happen?** | While bytes are in Blob staging, **before** any move to SharePoint. Infected files never reach the canonical document library. |
-| **When does it fire?** | Immediately on upload completion, triggered by the metadata POST that follows the browser's direct-to-Blob PUT. Synchronous for pilot (1-3s per file is acceptable latency); switch to a `scan_jobs` queue if cycle-end bursts overwhelm the scanner. |
-| **What scanner?** | **Cloudmersive Virus Scan API.** ClamAV + commercial engines under the hood. ~$0.001/scan. Free tier (800 scans/month) covers pilot at 25 × 8 = 200 scans/cycle. TOS specifies no file retention. Privacy concerns rule out VirusTotal (file shared with 60+ AV vendors); Microsoft Defender via Graph isn't exposed for arbitrary file scanning. |
+| **When does it fire?** | Synchronously inside the `/api/intake/draft/attach` call, which follows the browser's direct-to-Blob PUT. The function downloads bytes from the private Blob, scans, and decides clean/infected/error before responding. 1–3s per file is acceptable pilot latency; switch to a `scan_jobs` queue if cycle-end bursts overwhelm the scanner. |
+| **What scanner?** | **Cloudmersive Virus Scan API.** ClamAV + commercial engines under the hood. ~$0.001/scan. Free tier (800 scans/month) covers pilot at ~350 scans/cycle (intake + reviewer combined). TOS specifies no file retention. Privacy concerns rule out VirusTotal (file shared with 60+ AV vendors); Microsoft Defender via Graph isn't exposed for arbitrary file scanning. |
 | **Where does the result live?** | On the draft's `attachments[].scan_result` JSON column. Submit-strict validator (already wired) requires `scan_result === 'clean'` on every file before allowing submission. |
 | **How does the scan job in the submission lifecycle relate?** | The `scanning` state in the submission state machine re-verifies that all attachments are `'clean'` before files move. This is a defense-in-depth check, not the primary scan — primary scan happened at upload. |
+
+**Client metadata is never trusted.** The attach endpoint takes only `{draftId, attachmentId}` from the client; everything else (filename, pathname, sha256, size, content-type) is derived server-side. `attachmentId` is server-minted at token-generation time and embedded in the server-controlled Blob pathname, so the attach call can verify the upload was the authorized one rather than a different file sneaked into the same draft. See `docs/INTAKE_PORTAL_DRAIN_PLAN.md` § "Build pieces" #4 for the three-call sequence.
 
 Failure modes — fail closed:
 
 | Scenario | Behavior |
 |---|---|
-| Scanner returns "infected" | Mark `scan_result='infected'`. UI surfaces: "we detected a virus in `filename`. Please run a local scan and re-upload." Submit blocked. |
-| Scanner 5xx / network error | Retry 3× with backoff. If still failing, mark `scan_result='error'` and notify staff. Submit blocked. |
+| Scanner returns "infected" | **Delete the Blob immediately.** Write an audit row with `{attachmentId, filename, sha256, size, scanner, virusName, scannedAt, draftId, contactOid}`. Remove the pending entry from the draft. Return 422; UI surfaces: "we detected a virus in `filename`. Please run a local scan and re-upload." The audit row is the durable evidence; the bytes are a liability with no audit value beyond what the metadata captures. |
+| Scanner 5xx / network error | `cloudmersive-scan.js` retries 3× with backoff inline. If still failing, return 503; the pending entry STAYS in the draft so the applicant can retry the attach call once the scanner recovers (the bytes are still in Blob). No "scan_result='error'" record persisted. |
 | Scanner timeout (>30s on a single file) | Treat as 5xx. |
-| Cloudmersive false positive | Staff admin endpoint marks the specific blob `scan_result='clean_override'` with a justification and audit trail. Validator accepts overrides; applicant sees "verified by WMKF staff" in UI. |
+| Bad/missing CLOUDMERSIVE_API_KEY or scanner auth failure (4xx) | Return 500 with `scan_misconfigured`. Pending entry stays in the draft (operator fix unblocks retry). Server-side log carries the structured Cloudmersive error for triage. |
+| Cloudmersive false positive | Staff admin endpoint accepts a re-upload with a documented justification; per-file override at the draft level. (Override mechanism deferred to whenever a real false positive surfaces; not pilot-blocking.) |
 | Scanner rate limit | Async scan queue (deferred to Phase 1 if pilot stays synchronous). |
 
-EICAR test file (the standardized harmless malware-detection probe) included in `scripts/smoke-virus-scan.js` to verify the scanner is wired and fails closed correctly.
+EICAR test file (the standardized harmless malware-detection probe) included in `scripts/smoke-virus-scan.mjs` to verify the scanner is wired and fails closed correctly.
 
-New env var: `CLOUDMERSIVE_API_KEY`. Pilot uses the free tier; production cycle cost ceiling ~$5.
+Env vars: `VIRUS_SCAN_ENABLED=true` to opt in (default off — when off, no scan, all uploads pass through). `CLOUDMERSIVE_API_KEY` for the scanner itself. Pilot uses the free tier; production cycle cost ceiling ~$5. See `docs/CREDENTIALS_RUNBOOK.md` § "Virus scanning" for the full runbook including emergency bypass.
 
 ### Withdrawal / staff cancellation
 - Applicants can withdraw an unsubmitted draft (deletes Postgres row).
