@@ -1,6 +1,6 @@
 # Atlas: Postgres infrastructure tables (compact)
 
-**Last verified:** 2026-05-07 via `scripts/audit-postgres-state.js`
+**Last verified (schema):** 2026-05-07. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
 
 Compact summary for the Postgres tables outside the reviewer-finder domain. Promote any of these to its own page on next significant touch.
 
@@ -32,11 +32,11 @@ Compact summary for the Postgres tables outside the reviewer-finder domain. Prom
 
 ## Dynamics Explorer state
 
-### `dynamics_query_log` (1,359 rows)
+### `dynamics_query_log` (1,417 rows)
 **Source of truth:** Postgres-only.
 Per-query log (NL → tool plan → result). Used by feedback flow.
 
-### `dynamics_feedback` (1 row)
+### `dynamics_feedback` (2 rows)
 **Source of truth:** Postgres-only.
 Thumbs up/down + auto-detected failures.
 
@@ -78,11 +78,11 @@ One row per applicant submit click (idempotency-keyed). `/api/intake/submit` INS
 
 ## Monitoring / observability
 
-### `health_check_history` (2,927 rows), `system_alerts` (110 rows), `maintenance_runs` (73 rows)
+### `health_check_history` (2,964 rows), `system_alerts` (150 rows), `maintenance_runs` (1,498 rows)
 **Source of truth:** Postgres-only.
 Cron-driven health checks (7 services), alert log, cron audit trail. `maintenance-service.js` writes; admin dashboard reads.
 
-### `api_usage_log` (2,044 rows)
+### `api_usage_log` (1,724 rows)
 **Source of truth:** Postgres-only.
 Per-Claude-call ledger (model, tokens, cost, latency). Written by `lib/services/llm-client.js` via `lib/utils/usage-logger.js` (`logUsage`). Not routed through `DatabaseService`. Cost is computed locally from `lib/utils/model-pricing.js`; rows with an unknown model id land with `estimated_cost_cents = NULL` and are surfaced by the weekly `pricing-canary` cron.
 

@@ -1,9 +1,9 @@
 # Atlas: `wmkf_ai_run` + `wmkf_ai_prompt` (Dataverse)
 
-**Last verified:** 2026-05-07 via `scripts/audit-dataverse-state.js`
+**Last verified:** 2026-05-25 via `scripts/reconcile-memory-claims.js`
 **Source spec:** `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` (canonical; v2 archived)
 
-## `wmkf_ai_run` (325 rows)
+## `wmkf_ai_run` (329 rows)
 
 **Source of truth:** Dataverse-only. Append-only audit ledger for every AI invocation against a grant request.
 
@@ -45,7 +45,7 @@ Both written by `execute-prompt.js` ≈lines 538/545. Migration plans touching e
 
 **Migration disposition:** stays in Dataverse. No Postgres counterpart. Per `project_dynamics_ai_writeback.md`: Justin owes the Dynamics Explorer schema-curation pass to **exclude `wmkf_ai_run` from search results + schema suggestions** — it's an operational log, not business data.
 
-## `wmkf_ai_prompt` (10 rows)
+## `wmkf_ai_prompt` (11 rows)
 
 **Source of truth:** Dataverse-only. Holds prompt rows for the Executor v3 contract.
 
@@ -68,7 +68,7 @@ Both written by `execute-prompt.js` ≈lines 538/545. Migration plans touching e
 
 These are independent. Don't conflate them.
 
-**Migration disposition:** strategic destination for staff-facing prompts (per memory: *"all staff-facing prompts (content readable/editable by non-technical staff). New prompts default there; migrate user-driven apps when touched"*). 10 rows means light current adoption; expand as Executor-mode apps land.
+**Migration disposition:** strategic destination for staff-facing prompts (per memory: *"all staff-facing prompts (content readable/editable by non-technical staff). New prompts default there; migrate user-driven apps when touched"*). 11 rows means light current adoption; expand as Executor-mode apps land.
 
 ## Naming gotcha
 

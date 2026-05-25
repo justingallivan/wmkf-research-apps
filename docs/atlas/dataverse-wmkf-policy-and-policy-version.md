@@ -1,7 +1,7 @@
 # Atlas: `wmkf_policy` + `wmkf_policyversion` (Dataverse)
 
-**Last verified:** 2026-05-09 (created S143)
-**Live row counts:** `wmkf_policy` = 2 (`reviewer-coi`, `reviewer-ai-use`); `wmkf_policyversion` = 2 (one Active child per parent)
+**Last verified:** 2026-05-25 via `scripts/reconcile-memory-claims.js`
+**Live row counts:** `wmkf_policy` = 2 (`reviewer-coi`, `reviewer-ai-use`); `wmkf_policyversion` = 8 (version history; one Active child per parent, prior versions retained)
 **Entity sets:** `wmkf_policies` (parent), `wmkf_policyversions` (child)
 **Schema manifests:**
 - `lib/dataverse/schema/wave3/01_wmkf_policy.json` (parent entity create)
@@ -65,7 +65,7 @@ The lookup chain (engagement → version → parent slot) preserves the exact po
 - **`POST /api/admin/policies` — Publish new version** (S145). Single application write path; staff-driven via `/admin` Policies section. Implementation in `pages/api/admin/policies.js`. Server-side allowlist (`VISIBLE_SLOT_CODES` at line 42) restricts visible/writable slot codes to `reviewer-coi` and `reviewer-ai-use`. Flow:
   1. Validate inputs (allowlist, lengths, date format, markdown via `shared/utils/policy-markdown.js`).
   2. Write a `pending` row to `policy_publish_audit` (Postgres, see migration `006_policy_publish_audit.sql`). Hard-abort on audit-write failure — audit availability is a precondition.
-  3. Resolve parent slot by code; fail loud on 0 or >1 rows (`slot_not_provisioned` / `duplicate_slot_rows`).
+  3. Resolve parent slot by code; fail loud on zero matches or more than one match (`slot_not_provisioned` / `duplicate_slot_rows`).
   4. Idempotency lookup by `(parentId, versionLabel)` against the alternate key `wmkf_policyversion_parent_label_unique`. Dispatch into `already_published` / `label_conflict` / resume-from-flip / fresh-publish branches.
   5. Create child `wmkf_policyversion` → PATCH parent `wmkf_activeversion` lookup with `If-Match: parentEtag` (412 → `concurrency_conflict`, child surfaced as orphan) → PATCH prior version statecode (best-effort).
   6. Write `final` audit row to `policy_publish_audit` with structured outcome JSON + warnings array. On finalize failure, raise `system_alerts` (alert_type=`policy_audit_finalize_failed`) and return `audit_finalize_failed` warning.

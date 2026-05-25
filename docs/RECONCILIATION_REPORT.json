@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-25T03:16:30.043Z",
+  "generated": "2026-05-25T03:20:23.171Z",
   "summary": {
     "total_claims": 157,
     "stale": 38,
@@ -21,30 +21,6 @@
     ],
     "stale_row_count": [
       {
-        "entity": "wmkf_ai_prompt",
-        "atlas_claim": 10,
-        "live_count": 11,
-        "source_file": "docs/atlas/dataverse-wmkf-ai-run-and-prompt.md"
-      },
-      {
-        "entity": "wmkf_ai_prompts",
-        "atlas_claim": 10,
-        "live_count": 11,
-        "source_file": "docs/atlas/dataverse-wmkf-ai-run-and-prompt.md"
-      },
-      {
-        "entity": "wmkf_ai_run",
-        "atlas_claim": 325,
-        "live_count": 329,
-        "source_file": "docs/atlas/dataverse-wmkf-ai-run-and-prompt.md"
-      },
-      {
-        "entity": "wmkf_ai_runs",
-        "atlas_claim": 325,
-        "live_count": 329,
-        "source_file": "docs/atlas/dataverse-wmkf-ai-run-and-prompt.md"
-      },
-      {
         "entity": "wmkf_app_request_person",
         "atlas_claim": 5561,
         "live_count": 5000,
@@ -55,18 +31,6 @@
         "atlas_claim": 5561,
         "live_count": 5000,
         "source_file": "docs/atlas/dataverse-akoya-request.md"
-      },
-      {
-        "entity": "wmkf_policy",
-        "atlas_claim": 1,
-        "live_count": 2,
-        "source_file": "docs/atlas/dataverse-wmkf-policy-and-policy-version.md"
-      },
-      {
-        "entity": "wmkf_policyversion",
-        "atlas_claim": 1,
-        "live_count": 8,
-        "source_file": "docs/atlas/dataverse-wmkf-policy-and-policy-version.md"
       }
     ],
     "doc_label_collision": [
