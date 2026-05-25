@@ -49,7 +49,6 @@ const MIGRATIONS_DIR = path.join(repoRoot, 'lib', 'db', 'migrations');
 // Postgres tables that are intentionally NOT in the Atlas (yet). Add a reason.
 // Empty by default — keep it that way.
 const ALLOWED_UNDOCUMENTED_TABLES = new Set([
-  'playing_with_neon', // test/scratch table, mentioned in postgres-other-reviewer-tables.md anyway
 ]);
 
 // Dataverse entity sets that are intentionally NOT in the Atlas. Standard

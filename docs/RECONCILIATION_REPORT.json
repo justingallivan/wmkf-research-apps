@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-25T04:26:48.653Z",
+  "generated": "2026-05-25T04:35:09.740Z",
   "summary": {
     "total_claims": 157,
     "stale": 38,
@@ -56,13 +56,7 @@
         ]
       }
     ],
-    "postgres_table_mismatch": [
-      {
-        "table": "playing_with_neon",
-        "in_schema_as_code": false,
-        "deployed": true
-      }
-    ]
+    "postgres_table_mismatch": []
   },
   "claim_audit": [
     {

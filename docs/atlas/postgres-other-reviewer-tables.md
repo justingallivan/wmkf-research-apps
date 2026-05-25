@@ -4,7 +4,7 @@
 
 **Last verified:** 2026-05-07 via `scripts/audit-postgres-state.js`. **Drain-status re-verified 2026-05-19 (S167)** via code grep + Codex independent verification — none of these tables have live application readers/writers.
 
-Covers four Postgres tables in the reviewer-finder domain that don't warrant individual pages: `researcher_keywords`, `proposal_searches`, `search_cache`, and the placeholder `playing_with_neon`.
+Covers three Postgres tables in the reviewer-finder domain that don't warrant individual pages: `researcher_keywords`, `proposal_searches`, `search_cache`. (`playing_with_neon` was a Neon-console tutorial scratch table dropped 2026-05-25 via migration 014; section retained below as a historical record.)
 
 ## `researcher_keywords` (1,028 rows)
 
@@ -42,6 +42,6 @@ Schema: `id`, `source`, `query_hash` (sha256), `query_text`, `results` (jsonb), 
 
 **Migration disposition:** Drop. Pure ephemeral cache; reconstitute via Dataverse cache-table or in-process LRU if needed.
 
-## `playing_with_neon` (10 rows)
+## `playing_with_neon` — DROPPED 2026-05-25
 
-Test/scratch table. Drop. No callers in source.
+Canonical Neon-console tutorial scratch table (10 rows of MD5-prefix names + random floats). Zero callers in source. Dropped via `lib/db/migrations/014_drop_playing_with_neon.sql` after S185 reconcile-script structural fixes surfaced it as the sole real entry in the `postgres_table_mismatch` bucket once the bucket's source-of-truth set was made complete (schema.sql + setup-database.js + migrations).
