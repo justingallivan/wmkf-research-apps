@@ -41,10 +41,13 @@ const ROOTS = ['docs', '.claude-memory'];
 const EXCLUDE_DIR = /(^|\/)(archive|node_modules)(\/|$)/;
 const POINT_IN_TIME_BASENAMES = new Set([
   'DOC_TRIAGE_2026-05-07.md',
-  'DOCS_GROUND_TRUTH_AUDIT_2026-05-19.md',
   'RECONCILIATION_REPORT.md',
 ]);
-const POINT_IN_TIME_PREFIXES = ['AUDIT_', 'CODEX_HANDOFF_REPORT_'];
+// Date-suffixed audit/handoff docs are point-in-time snapshots, not live
+// docs. Prefix-match both the old naming (DOCS_GROUND_TRUTH_AUDIT_<date>.md)
+// and the standardized naming (AUDIT_<topic>_<date>.md) so a new audit doc
+// doesn't need a hardcoded exception per gate.
+const POINT_IN_TIME_PREFIXES = ['AUDIT_', 'DOCS_GROUND_TRUTH_AUDIT_', 'CODEX_HANDOFF_REPORT_'];
 // CANONICAL_COUNTS.md is the generated source of truth — its literals are checked
 // by drift assertion against the registry, not by the prose pattern matcher.
 const GENERATED_LITERAL_FILE = CANONICAL_COUNTS_REL;

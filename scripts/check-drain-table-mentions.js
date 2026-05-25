@@ -73,10 +73,13 @@ const ROOTS = ['docs', '.claude-memory'];
 const EXCLUDE_DIR = /(^|\/)(archive|node_modules)(\/|$)/;
 const POINT_IN_TIME_BASENAMES = new Set([
   'DOC_TRIAGE_2026-05-07.md',
-  'DOCS_GROUND_TRUTH_AUDIT_2026-05-19.md',
   'RECONCILIATION_REPORT.md',
 ]);
-const POINT_IN_TIME_PREFIXES = ['AUDIT_', 'CODEX_HANDOFF_REPORT_'];
+// Date-suffixed audit/handoff docs are point-in-time snapshots. Prefix-match
+// both the old naming (DOCS_GROUND_TRUTH_AUDIT_<date>.md) and the standardized
+// naming (AUDIT_<topic>_<date>.md) so a new audit doc doesn't need a
+// hardcoded per-gate exception.
+const POINT_IN_TIME_PREFIXES = ['AUDIT_', 'DOCS_GROUND_TRUTH_AUDIT_', 'CODEX_HANDOFF_REPORT_'];
 
 // Files whose purpose IS describing the migration history end-to-end.
 // Allowlist is intentionally NARROW after Codex pass-5 review (S167):
