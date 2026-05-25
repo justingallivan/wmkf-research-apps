@@ -17,6 +17,7 @@
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { sweepStaleInvites } from '../../../lib/services/reviewer-suggestion-sweep';
+import MaintenanceService from '../../../lib/services/maintenance-service';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -28,6 +29,9 @@ export default async function handler(req, res) {
   const maxBatch = clampInt(req.query.maxBatch, 1, 1000, 200);
   const dryRun = req.query.dryRun === '1' || req.query.dryRun === 'true';
 
+  // Maintenance run AFTER auth guards (Codex pass-4 §5 + pass-5 Q4).
+  const runId = await MaintenanceService.startRun('sweep-stale-invites');
+
   try {
     const result = await bypassDynamicsRestrictions('cron-sweep-stale-invites', () =>
       sweepStaleInvites({ graceDays, maxBatch, dryRun }),
@@ -36,9 +40,22 @@ export default async function handler(req, res) {
     if (result.swept > 0 || result.errors.length > 0) {
       console.log(`[cron:sweep-stale-invites] scanned=${result.scanned} eligible=${result.eligible} swept=${result.swept} skipped=${result.skipped} errors=${result.errors.length} dryRun=${dryRun}`);
     }
+    await MaintenanceService.completeRun(runId, {
+      status: result.errors.length > 0 ? 'failed' : 'completed',
+      recordsProcessed: result.scanned ?? 0,
+      recordsDeleted: result.swept ?? 0,
+      details: { graceDays, maxBatch, dryRun, ...result },
+      errorMessage: result.errors.length > 0
+        ? `${result.errors.length} sweep error(s)`
+        : undefined,
+    });
     return res.json({ ok: true, graceDays, maxBatch, ...result });
   } catch (error) {
     console.error('[cron:sweep-stale-invites] error:', error);
+    await MaintenanceService.completeRun(runId, {
+      status: 'failed',
+      errorMessage: error.message,
+    });
     return res.status(500).json({ error: 'Sweep failed', message: error.message });
   }
 }

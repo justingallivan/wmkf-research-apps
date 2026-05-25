@@ -106,15 +106,28 @@ export default async function handler(req, res) {
       results.feedback = { error: error.message };
     }
 
-    // Record successful run
+    // Identify subtasks that failed (Codex pass-1 Q-P3 + pass-2 §3 #29).
+    // Without this, an `info`/`completed` outcome silently masked
+    // cleanupExpiredCache and intakePending failures for days. Treat thrown
+    // errors and non-zero counted errors as failed runs so object-shaped
+    // subtasks like cleanupBlobs / sweepIntakePending can't pass quietly.
+    const failedSubtasks = Object.entries(results)
+      .filter(([_, val]) => isFailedSubtaskResult(val))
+      .map(([key]) => key);
+    const hasSubtaskFailure = failedSubtasks.length > 0;
+
+    // Record run with status reflecting subtask outcomes
     await MaintenanceService.completeRun(runId, {
-      status: 'completed',
+      status: hasSubtaskFailure ? 'failed' : 'completed',
       recordsProcessed: totalDeleted,
       recordsDeleted: totalDeleted,
       details: results,
+      errorMessage: hasSubtaskFailure
+        ? `Subtask failures: ${failedSubtasks.join(', ')}`
+        : undefined,
     });
 
-    // Create info alert with summary
+    // Summary line is computed the same way regardless of outcome
     const summary = Object.entries(results)
       .map(([key, val]) => {
         if (typeof val === 'number') return `${key}: ${val} deleted`;
@@ -126,15 +139,22 @@ export default async function handler(req, res) {
 
     await NotificationService.notify({
       type: 'maintenance',
-      severity: 'info',
-      title: `Daily maintenance completed: ${totalDeleted} records cleaned`,
+      severity: hasSubtaskFailure ? 'error' : 'info',
+      title: hasSubtaskFailure
+        ? `Daily maintenance had ${failedSubtasks.length} subtask failure(s)`
+        : `Daily maintenance completed: ${totalDeleted} records cleaned`,
       message: summary,
-      metadata: results,
+      metadata: { ...results, failedSubtasks },
       source: 'cron/maintenance',
       category: 'ops',
     });
 
-    return res.json({ ok: true, totalDeleted, results });
+    return res.json({
+      ok: !hasSubtaskFailure,
+      totalDeleted,
+      results,
+      failedSubtasks,
+    });
   } catch (error) {
     console.error('Maintenance cron error:', error);
 
@@ -156,4 +176,14 @@ export default async function handler(req, res) {
 
     return res.status(500).json({ error: 'Maintenance failed', message: error.message });
   }
+}
+
+function isFailedSubtaskResult(val) {
+  if (!val || typeof val !== 'object') return false;
+  if (val.error) return true;
+  for (const key of ['errors', 'blobDelErrors', 'removePendingErrors']) {
+    const count = Array.isArray(val[key]) ? val[key].length : Number(val[key] || 0);
+    if (count > 0) return true;
+  }
+  return false;
 }

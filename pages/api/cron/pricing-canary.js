@@ -22,6 +22,7 @@ import { sql } from '@vercel/postgres';
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import NotificationService from '../../../lib/services/notification-service';
 import AlertService from '../../../lib/services/alert-service';
+import MaintenanceService from '../../../lib/services/maintenance-service';
 import { lookupPricing, LAST_REVIEWED_AT } from '../../../lib/utils/model-pricing';
 
 const STALE_DAYS = 60;
@@ -34,12 +35,25 @@ export default async function handler(req, res) {
   }
   if (!verifyCronSecret(req, res)) return;
 
+  // Maintenance run AFTER auth guards (Codex pass-4 §5 + pass-5 Q4).
+  const runId = await MaintenanceService.startRun('pricing-canary');
+
   try {
     const unknown = await checkUnknownModels();
     const stale = await checkTableAge();
+    const anyAlerting = unknown.status === 'alerting' || stale.status === 'alerting';
+    await MaintenanceService.completeRun(runId, {
+      status: 'completed',
+      recordsProcessed: unknown.totalChecked ?? 0,
+      details: { unknown, stale, anyAlerting },
+    });
     return res.json({ ok: true, unknown, stale });
   } catch (error) {
     console.error('pricing-canary cron error:', error);
+    await MaintenanceService.completeRun(runId, {
+      status: 'failed',
+      errorMessage: error.message,
+    });
     return res.status(500).json({ error: 'pricing-canary failed', message: error.message });
   }
 }
@@ -72,7 +86,7 @@ async function checkUnknownModels() {
     // AlertService.autoResolve() directly so a standing warning from a
     // prior week actually clears when the gap is filled.
     const resolved = await AlertService.autoResolve(ALERT_KEY_UNKNOWN);
-    return { status: 'ok', unknownCount: 0, resolved };
+    return { status: 'ok', totalChecked: result.rows.length, unknownCount: 0, resolved };
   }
 
   const summary = unknown
@@ -94,7 +108,7 @@ async function checkUnknownModels() {
     category: 'ops',
   });
 
-  return { status: 'alerting', unknownCount: unknown.length, unknown };
+  return { status: 'alerting', totalChecked: result.rows.length, unknownCount: unknown.length, unknown };
 }
 
 async function checkTableAge() {

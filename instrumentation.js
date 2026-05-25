@@ -21,6 +21,15 @@ export async function register() {
     );
     await checkEmergencyAuthBypass({ source: 'instrumentation/cold-start' });
   } catch (err) {
-    console.error('[instrumentation] register() failed:', err.message);
+    console.error('[instrumentation] auth-bypass-check failed:', err.message);
+  }
+
+  try {
+    // Migration-drift detection (Phase 0 Step 4c). Best-effort; raises a
+    // system_alerts row on drift or missing tracker, never throws.
+    const { detectMigrationDrift } = await import('./lib/utils/migration-drift');
+    await detectMigrationDrift();
+  } catch (err) {
+    console.warn('[instrumentation] migration-drift check failed:', err.message);
   }
 }

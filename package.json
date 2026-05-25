@@ -4,8 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/build-migrations-manifest.js",
     "build": "next build",
     "start": "next start",
+    "apply:migrations": "node scripts/apply-migrations.js",
+    "check:migrations-manifest": "node scripts/check-migrations-manifest.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

@@ -21,4 +21,10 @@ jobs:
       - run: npm run check:atlas:self-test
       - run: npm run check:doc-currency
       - run: npm run check:doc-currency:self-test
+      - run: npm run check:migrations-manifest
+      # Build re-runs prebuild (build-migrations-manifest); then assert the
+      # committed manifest is in sync. Catches "added a migration but forgot
+      # to regenerate the manifest" before it reaches prod.
+      - run: npm run build
+      - run: git diff --exit-code lib/db/migrations-manifest.json
       - run: npm run test:ci

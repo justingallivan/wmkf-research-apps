@@ -1,0 +1,17 @@
+{
+  "files": [
+    "002_contact_enrichment.sql",
+    "003_virtual_review_panel.sql",
+    "004_expertise_finder.sql",
+    "005_intake_portal.sql",
+    "006_policy_publish_audit.sql",
+    "007_drop_wave1_tables.sql",
+    "008_irs_exempt_orgs.sql",
+    "009_submission_jobs.sql",
+    "010_external_rate_limit.sql",
+    "011_submission_jobs_states.sql",
+    "012_intake_drafts_uniqueness.sql",
+    "013_intake_drafts_pending_attachments.sql",
+    "014_drop_playing_with_neon.sql"
+  ]
+}

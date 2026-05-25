@@ -18,6 +18,7 @@
 import { sql } from '@vercel/postgres';
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import AlertService from '../../../lib/services/alert-service';
+import MaintenanceService from '../../../lib/services/maintenance-service';
 
 // Calibrated S183 from 60d prod spend data: max observed legitimate day
 // was $26.16 (a batch-processing day with 386 requests); avg active day
@@ -35,11 +36,25 @@ export default async function handler(req, res) {
 
   if (!verifyCronSecret(req, res)) return;
 
+  // Maintenance run AFTER auth guards (Codex pass-4 §5 + pass-5 Q4) so
+  // rejected requests don't write spurious rows; authenticated runs always
+  // pair start↔complete.
+  const runId = await MaintenanceService.startRun('spend-check');
+
   try {
     const dailyThreshold = await checkDailyThreshold();
+    await MaintenanceService.completeRun(runId, {
+      status: 'completed',
+      recordsProcessed: dailyThreshold.requestCount ?? 0,
+      details: dailyThreshold,
+    });
     return res.json({ ok: true, dailyThreshold });
   } catch (error) {
     console.error('Spend-check cron error:', error);
+    await MaintenanceService.completeRun(runId, {
+      status: 'failed',
+      errorMessage: error.message,
+    });
     return res.status(500).json({ error: 'Spend check failed', message: error.message });
   }
 }
