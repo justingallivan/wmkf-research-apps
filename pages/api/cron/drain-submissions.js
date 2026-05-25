@@ -71,7 +71,10 @@ const { Pool } = pkg;
 
 const DRAIN_BATCH_SIZE = parseInt(process.env.DRAIN_BATCH_SIZE || '5', 10);
 const DRAIN_LOCK_TTL_SECONDS = parseInt(process.env.DRAIN_LOCK_TTL_SECONDS || '600', 10);
-const DRAIN_MAX_ATTEMPTS_DEFAULT = parseInt(process.env.DRAIN_MAX_ATTEMPTS || '10', 10);
+// Per-category retry caps live in lib/utils/drain-error-classifier.js (`CAPS`)
+// and are consumed by recordFailure via `cls.maxAttempts`. There is no global
+// override — overriding only the unknown-category default would be incoherent
+// when each category has a meaningful cap (e.g. scan_error=3, transient=10).
 
 const ADVANCED_STATES = new Set([
   'request_created', 'files_moved', 'dynamics_patched',
@@ -230,10 +233,35 @@ async function advanceState(client, args) {
 /**
  * Failure path: bump attempts, set next_attempt_at, record last_error.
  * Does NOT change status (unless terminal). Audit-paired.
+ *
+ * Decision contract (Codex S187 pre-impl review):
+ *   - `retryable=false`  → terminal (category-driven, e.g. validation_400, scan_infected).
+ *   - `retryable=true` AND `priorAttempts + 1 >= maxAttempts` → terminal (cap exhausted).
+ *     A cap-exhausted terminal emits an `intake_drain_retry_exhausted` alert
+ *     AFTER the UPDATE/audit/COMMIT succeed, so a lost lease does not produce
+ *     a false-alarm alert. Alerts are dedup-keyed by category so a coordinated
+ *     outage produces one active alert per category, not per job.
+ *   - Otherwise → retry with exponential backoff: 60 * 2^priorAttempts capped
+ *     at 3600s (1h). priorAttempts=0 → 60s, =5 → 1920s, ≥6 → 3600s.
+ *
+ * Fail-loud guard: a retryable call site MUST pass a finite numeric
+ * `maxAttempts`. A missing/NaN value with `retryable=true` would silently
+ * disable cap exhaustion and retry forever — we throw at the boundary so the
+ * outer safety net records the structured failure.
  */
-async function recordFailure(client, { jobId, leaseToken, category, errorMessage, terminal, retryable }) {
-  const backoffSeconds = terminal ? 0 : Math.min(60 * Math.pow(2, 0), 3600); // simple v1; refined later
-  // Note: real exponential backoff key off attempts; we read it back below.
+async function recordFailure(client, { job, leaseToken, category, errorMessage, retryable, maxAttempts }) {
+  const priorAttempts = Number.isFinite(job?.attempts) ? job.attempts : 0;
+  const nextAttempts = priorAttempts + 1;
+
+  if (retryable && !Number.isFinite(maxAttempts)) {
+    throw new Error(
+      `recordFailure misuse: retryable=true requires finite maxAttempts (got ${maxAttempts}) for job ${job?.id} category ${category}`,
+    );
+  }
+
+  const capExhausted = retryable && nextAttempts >= maxAttempts;
+  const terminal = !retryable || capExhausted;
+  const backoffSeconds = terminal ? 0 : Math.min(60 * Math.pow(2, priorAttempts), 3600);
 
   try {
     await client.query('BEGIN');
@@ -246,12 +274,13 @@ async function recordFailure(client, { jobId, leaseToken, category, errorMessage
     if (newStatus) {
       sets.push(`status = $${i++}`, `completed_at = now()`);
       vals.push(newStatus);
-    } else if (retryable) {
+    } else {
+      // retryable && !capExhausted — push next_attempt_at out exponentially.
       sets.push(`next_attempt_at = now() + ($${i++} || ' seconds')::INTERVAL`);
       vals.push(backoffSeconds);
     }
     sets.push('locked_until = NULL', 'lease_token = NULL');
-    vals.push(jobId, leaseToken);
+    vals.push(job.id, leaseToken);
 
     const updRes = await client.query(
       `UPDATE submission_jobs SET ${sets.join(', ')} WHERE id = $${i++} AND lease_token = $${i}`,
@@ -265,14 +294,38 @@ async function recordFailure(client, { jobId, leaseToken, category, errorMessage
       `INSERT INTO intake_audit (actor_type, action, target_entity, target_id, payload_digest)
        VALUES ('system', 'drain.error', 'submission_jobs', $1,
                encode(digest($2, 'sha256'), 'hex'))`,
-      [String(jobId), JSON.stringify({ category, message: errorMessage })],
+      [String(job.id), JSON.stringify({ category, message: errorMessage })],
     );
     await client.query('COMMIT');
-    return true;
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     throw err;
   }
+
+  // Post-COMMIT: cap-exhausted retryable terminals are the silent class —
+  // emit an alert so an operator sees we gave up. Inherently terminal
+  // categories already get bespoke alerts at the call site for the shapes
+  // that need them (intake_drain_corruption, attachment drift, etc.).
+  if (capExhausted) {
+    await AlertService.createAlert({
+      type: 'intake_drain_retry_exhausted',
+      severity: 'error',
+      title: `Drain: retry cap reached (${category})`,
+      message: `Job ${job.id} hit maxAttempts=${maxAttempts} for category ${category}. Last error: ${errorMessage}`,
+      source: 'drain-submissions',
+      autoResolveKey: `intake-drain-retry-exhausted-${category}`,
+      metadata: {
+        jobId: job.id,
+        requestId: job.request_id,
+        category,
+        attempts: nextAttempts,
+        maxAttempts,
+        lastError: typeof errorMessage === 'string' ? errorMessage.slice(0, 500) : String(errorMessage).slice(0, 500),
+      },
+    }).catch(() => {});
+  }
+
+  return true;
 }
 
 // ---------- state handlers ----------
@@ -301,24 +354,24 @@ async function handleQueued(client, job) {
       metadata: { jobId: job.id, requestId: job.request_id },
     }).catch(() => {});
     return await recordFailure(client, {
-      jobId: job.id,
+      job,
       leaseToken: job.lease_token,
       category: 'validation_400',
       errorMessage: `attachment-shape: ${err.message}`,
-      terminal: true,
       retryable: false,
+      maxAttempts: 0,
     });
   }
 
   const unclean = attachments.filter((a) => a.scan_result !== 'clean');
   if (unclean.length) {
     return await recordFailure(client, {
-      jobId: job.id,
+      job,
       leaseToken: job.lease_token,
       category: 'scan_infected',
       errorMessage: `unclean attachments: ${unclean.length}`,
-      terminal: true,
       retryable: false,
+      maxAttempts: 0,
     });
   }
 
@@ -362,12 +415,12 @@ async function handleScanning(client, job) {
     if (!akoyaRequestnum) {
       // Shouldn't happen — akoya_requestnum is server-autonumber. Treat as fatal.
       return await recordFailure(client, {
-        jobId: job.id,
+        job,
         leaseToken: job.lease_token,
         category: 'validation_400',
         errorMessage: `request_created: akoya_requestnum missing from Create response (request_id=${job.request_id})`,
-        terminal: true,
         retryable: false,
+        maxAttempts: 0,
       });
     }
     return await advanceState(client, {
@@ -386,12 +439,12 @@ async function handleScanning(client, job) {
       return await recoverRequestCreated(client, job, err);
     }
     return await recordFailure(client, {
-      jobId: job.id,
+      job,
       leaseToken: job.lease_token,
       category: cls.category,
       errorMessage: err.message,
-      terminal: !cls.retryable,
       retryable: cls.retryable,
+      maxAttempts: cls.maxAttempts,
     });
   }
 }
@@ -413,22 +466,22 @@ async function recoverRequestCreated(client, job, originalError) {
   } catch (err) {
     const cls = classify(err);
     return await recordFailure(client, {
-      jobId: job.id,
+      job,
       leaseToken: job.lease_token,
       category: cls.category,
       errorMessage: `request_created recovery getRecord failed: ${err.message}`,
-      terminal: !cls.retryable,
       retryable: cls.retryable,
+      maxAttempts: cls.maxAttempts,
     });
   }
   if (!existing?.akoya_requestnum) {
     return await recordFailure(client, {
-      jobId: job.id,
+      job,
       leaseToken: job.lease_token,
       category: 'validation_400',
       errorMessage: `request_created recovery: row exists but akoya_requestnum missing for ${job.request_id}`,
-      terminal: true,
       retryable: false,
+      maxAttempts: 0,
     });
   }
 
@@ -482,23 +535,23 @@ async function handleRequestCreated(client, job) {
     // Config bug — terminal-fail with the structured isTransient=false
     // marker so the classifier routes it correctly.
     return await recordFailure(client, {
-      jobId: job.id,
+      job,
       leaseToken: job.lease_token,
       category: 'validation_400',
       errorMessage: 'INTAKE_BLOB_RW_TOKEN not configured — applicant attach store unreachable',
-      terminal: true,
       retryable: false,
+      maxAttempts: 0,
     });
   }
   if (!job.akoya_requestnum) {
     // Shouldn't happen — request_created always writes akoya_requestnum.
     return await recordFailure(client, {
-      jobId: job.id,
+      job,
       leaseToken: job.lease_token,
       category: 'validation_400',
       errorMessage: `files_moved entered without akoya_requestnum (job ${job.id})`,
-      terminal: true,
       retryable: false,
+      maxAttempts: 0,
     });
   }
 
@@ -527,12 +580,12 @@ async function handleRequestCreated(client, job) {
       });
       if (!result || !result.stream) {
         return await recordFailure(client, {
-          jobId: job.id,
+          job,
           leaseToken: job.lease_token,
           category: 'not_found_404',
           errorMessage: `files_moved: blob ${att.pathname} not found (expired or never written)`,
-          terminal: true,
           retryable: false,
+          maxAttempts: 0,
         });
       }
       blobMeta = result.blob || {};
@@ -543,12 +596,12 @@ async function handleRequestCreated(client, job) {
       const wrapped = err?.serviceName ? err : buildNoResponseError('blob', err);
       const cls = classify(wrapped);
       return await recordFailure(client, {
-        jobId: job.id,
+        job,
         leaseToken: job.lease_token,
         category: cls.category,
         errorMessage: `files_moved blobGet(${att.pathname}): ${err.message ?? err}`,
-        terminal: !cls.retryable,
         retryable: cls.retryable,
+        maxAttempts: cls.maxAttempts,
       });
     }
 
@@ -566,12 +619,12 @@ async function handleRequestCreated(client, job) {
         metadata: { jobId: job.id, requestId: job.request_id, pathname: att.pathname },
       }).catch(() => {});
       return await recordFailure(client, {
-        jobId: job.id,
+        job,
         leaseToken: job.lease_token,
         category: 'validation_400',
         errorMessage: `files_moved: sha256 mismatch on ${att.filename}`,
-        terminal: true,
         retryable: false,
+        maxAttempts: 0,
       });
     }
 
@@ -593,12 +646,12 @@ async function handleRequestCreated(client, job) {
     } catch (err) {
       const cls = classify(err);
       return await recordFailure(client, {
-        jobId: job.id,
+        job,
         leaseToken: job.lease_token,
         category: cls.category,
         errorMessage: `files_moved uploadFile(${att.filename}): ${err.message ?? err}`,
-        terminal: !cls.retryable,
         retryable: cls.retryable,
+        maxAttempts: cls.maxAttempts,
       });
     }
 
@@ -639,12 +692,12 @@ async function handleRequestCreated(client, job) {
 async function handleFilesMoved(client, job) {
   if (!job.request_id) {
     return await recordFailure(client, {
-      jobId: job.id,
+      job,
       leaseToken: job.lease_token,
       category: 'validation_400',
       errorMessage: `dynamics_patched entered without request_id (job ${job.id})`,
-      terminal: true,
       retryable: false,
+      maxAttempts: 0,
     });
   }
 
@@ -698,12 +751,12 @@ async function handleFilesMoved(client, job) {
         metadata: { jobId: job.id, requestId: job.request_id, rowId: row.id },
       }).catch(() => {});
       return await recordFailure(client, {
-        jobId: job.id,
+        job,
         leaseToken: job.lease_token,
         category: 'validation_400',
         errorMessage: `budget_line shape: ${err.message}`,
-        terminal: true,
         retryable: false,
+        maxAttempts: 0,
       });
     }
 
@@ -723,12 +776,12 @@ async function handleFilesMoved(client, job) {
         continue;
       }
       return await recordFailure(client, {
-        jobId: job.id,
+        job,
         leaseToken: job.lease_token,
         category: cls.category,
         errorMessage: `dynamics_patched budget_line POST (${row.id}): ${err.message ?? err}`,
-        terminal: !cls.retryable,
         retryable: cls.retryable,
+        maxAttempts: cls.maxAttempts,
       });
     }
     writtenIds.add(row.id);
@@ -806,15 +859,29 @@ async function processJob(client, job) {
   } catch (err) {
     // Last-resort safety net — any unhandled throw becomes a recorded failure.
     // The classifier sees the structured error and routes terminal/retry.
-    const cls = classify(err);
     console.error('[drain] unhandled error in handler:', err);
+
+    // Special-case the recordFailure misuse guard (Codex S187 post-impl Q1).
+    // The throw shape is `recordFailure misuse: retryable=true requires
+    // finite maxAttempts (...)` and indicates a deterministic call-site bug,
+    // NOT a transient outage. Without this branch the classifier would route
+    // it through `unknown` (retryable, maxAttempts=10) and burn 10 retries
+    // hiding a programmer error. Hard-terminal the job and let the
+    // cap-exhausted-alert path (which only fires on retryable terminals) NOT
+    // fire — the bespoke validation_400 entry + console.error above is the
+    // signal an operator follows back to the bad call site.
+    const isMisuse = typeof err?.message === 'string' && err.message.startsWith('recordFailure misuse:');
+    const cls = isMisuse
+      ? { category: 'validation_400', retryable: false, maxAttempts: 0 }
+      : classify(err);
+
     await recordFailure(client, {
-      jobId: job.id,
+      job,
       leaseToken: job.lease_token,
       category: cls.category,
       errorMessage: err.message,
-      terminal: !cls.retryable,
       retryable: cls.retryable,
+      maxAttempts: cls.maxAttempts,
     }).catch((auditErr) => {
       console.error('[drain] recordFailure itself failed:', auditErr);
     });
@@ -897,6 +964,7 @@ export const _testing = {
   handleFilesMoved,
   recoverRequestCreated,
   parkBuildPending,
+  processJob,
   isAlreadyWritten,
   requestFolderName,
   guessContentType,

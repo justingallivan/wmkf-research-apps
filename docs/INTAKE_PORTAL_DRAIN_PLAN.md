@@ -730,7 +730,7 @@ Cadence rationale:
 - **Ceiling for happy-path UX:** applicant sees `queued` for up to one cron interval before drain pickup. 2 min is acceptable for the pilot (single-phase submissions are not real-time).
 - **Vercel cron minimum on current plan:** 1 min. We use 2 min as a small buffer against thundering-herd if multiple cron firings overlap.
 
-Worst-case happy-path latency for one submission: `cron interval (2 min) + 7 state transitions × (Dataverse/Graph round-trip ~1-3s)` ≈ **2-3 min**. With network retries, can extend to `2 min + DRAIN_MAX_ATTEMPTS × backoff`.
+Worst-case happy-path latency for one submission: `cron interval (2 min) + 7 state transitions × (Dataverse/Graph round-trip ~1-3s)` ≈ **2-3 min**. With network retries, can extend by `Σ min(60 · 2^attempt, 3600)` seconds across retries; the per-category retry caps (transient/network/throttle/pg = 10; scan_error = 3) live in `lib/utils/drain-error-classifier.js` (`CAPS`).
 
 **Throttling:** `DRAIN_BATCH_SIZE` (default 5).
 
@@ -871,8 +871,9 @@ Sent as one batched ask; doesn't block scaffolding through `dynamics_patched`.
 | `CRON_SECRET` | Drain cron auth | Required (existing) |
 | `DRAIN_BATCH_SIZE` | Drain throughput tuning | Optional; default `5` |
 | `DRAIN_LOCK_TTL_SECONDS` | Two-phase claim lease length | Optional; default `600` (10 min) |
-| `DRAIN_MAX_ATTEMPTS` | Per-state retry cap | Optional; default `10` (transient categories); per-category overrides in code |
 | `INTAKE_ENABLED` | Master kill switch | Optional; defaults `false` until pilot opens |
+
+> Retry caps are **per category** (`lib/utils/drain-error-classifier.js` → `CAPS`), not a single env-var knob: transient/network/throttle/pg = 10, scan_error = 3, duplicate_pk = 1, inherently-terminal categories = 0. A retryable failure that reaches its category cap is terminal-failed and emits an `intake_drain_retry_exhausted` alert (dedup-keyed by category).
 
 The shared `BLOB_READ_WRITE_TOKEN` (public store `phase-ii-summaries-blob`) is **not** used by intake. Reviewer-finder / uploads / maintenance continue to use it; intake gets its own private store.
 
