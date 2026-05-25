@@ -56,6 +56,21 @@ afterEach(() => {
   sql.mockImplementation(async () => ({ rows: [] }));
 });
 
+describe('getById', () => {
+  test('returns the row when found', async () => {
+    const row = { id: DRAFT_ID, contact_oid: 'oid-x', account_id: 'acct-x' };
+    sql.mockResolvedValueOnce({ rows: [row] });
+    const result = await IntakeDraftService.getById(DRAFT_ID);
+    expect(result).toEqual(row);
+  });
+
+  test('returns null when not found', async () => {
+    sql.mockResolvedValueOnce({ rows: [] });
+    const result = await IntakeDraftService.getById(999);
+    expect(result).toBeNull();
+  });
+});
+
 describe('appendPending', () => {
   test('happy path returns the new pending array', async () => {
     const entry = pendingEntry();
