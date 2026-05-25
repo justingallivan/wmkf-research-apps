@@ -66,4 +66,4 @@ There is no Dataverse counterpart entity for the bulk IRS extract; the bulk data
 
 - IRS CSV encoding is not formally declared by the agency. We use `csv-parse` with `bom: true` to handle any UTF-8 BOMs; if Latin-1 content surfaces (older orgs with non-ASCII names from accented characters), the import may need a `latin1` encoding pass. Watch for first-run anomalies in the `maintenance_runs` log.
 - The Pub 78 (charity search) and Auto-Revocation lists are NOT loaded — BMF alone answers "currently exempt?". If a real edge case surfaces where an org appears in BMF but is actually revoked (race condition between IRS file publishes), pull Auto-Revocation as a secondary check.
-- `wmkf_originatingsystem` field on `akoya_request` (portal vs. GOapply) is a related but separate question — see `docs/INTAKE_PORTAL_MEETING_AGENDA_2026-05-13.md` Track 1B.
+- `wmkf_originatingsystem` field on `akoya_request` (portal vs. GOapply) is a related but separate question — see `docs/archive/INTAKE_PORTAL_MEETING_AGENDA_2026-05-13.md` Track 1B.

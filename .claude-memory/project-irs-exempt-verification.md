@@ -34,7 +34,7 @@ metadata:
 - ~~**First load not yet run.**~~ **DONE 2026-05-14** — 1.26M rows live in `irs_exempt_orgs`. Quarterly refresh cron runs as scheduled.
 - **CSV encoding.** Not formally declared by the IRS. We use `csv-parse` with `bom: true`; if Latin-1 (e.g. accented org names) surfaces, the importer may need an encoding pass. Watch refresh-cron logs.
 - **Pub 78 + Auto-Revocation List are NOT loaded.** BMF alone answers "currently exempt?" (removal from BMF = effectively revoked per the data dictionary). Add if a real edge case surfaces.
-- **PA timing decision still owed.** When does PA fire the verification — on `account` create, on submit, or on `'Phase II Pending'` flip? Connor's call; sub-question under intake portal Track 1B (`docs/INTAKE_PORTAL_MEETING_AGENDA_2026-05-13.md`).
+- **PA timing decision still owed.** When does PA fire the verification — on `account` create, on submit, or on `'Phase II Pending'` flip? Connor's call; sub-question under intake portal Track 1B (`docs/archive/INTAKE_PORTAL_MEETING_AGENDA_2026-05-13.md`).
 - **EIN form field on the intake form.** Required so the `account` row gets the EIN at submission time. Add to Sarah's field inventory at the 2026-05-13 meeting.
 
 Related: [[w6-table-drop-pending]] (other Postgres reference-data work), [[reviewer-postgres-to-dataverse-migration]] (the strategic reframing this verification path benefits from).

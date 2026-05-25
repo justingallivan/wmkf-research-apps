@@ -33,9 +33,6 @@
 ## Wave 2 Pending Tail Items
 - [W6 Postgres table-drop pending (fire ≥ 2026-07-01)](project-w6-table-drop-pending.md) — drain-only reviewer tables (researchers / researcher_keywords / publications / proposal_searches) await one-shot DELETE + DROP. P0 start-of-session item if today ≥ 2026-07-01 and tables still exist.
 
-## Repo Hygiene Triggers
-- [Archive intake meeting agenda (fire ≥ 2026-05-27)](project-intake-meeting-agenda-cleanup.md) — `git mv` `docs/INTAKE_PORTAL_MEETING_AGENDA_2026-05-13.md` to `docs/archive/` once meeting decisions have landed in design + schema-changes docs.
-
 ## Planned Capabilities
 - [IRS tax-exempt verification](project-irs-exempt-verification.md) — bulk CSVs in Postgres, PA→Vercel lookup endpoint, verified result written back to Dynamics `account`.
 
@@ -52,6 +49,7 @@
 
 ## Intake Portal (GOapply replacement)
 - [External ID auth foundation SHIPPED (S129)](project-intake-portal-external-id-foundation.md) — tenant `04a1406b...`, NextAuth `entra-external` provider, `/apply` route auth round-trip verified.
+- [Intake portal UI TODOs (deferred to UI-design session)](project-intake-portal-ui-todo.md) — S187 surfaced two UX bugs while smoke-testing DR8: (1) sign-out silently re-authenticates via Entra and (2) Entra sign-up flow collects irrelevant City/State/DisplayName fields. Both held for a dedicated UI session.
 - [Skinny pilot scope, not feature-for-feature](project-intake-portal-skinny-scope.md) — pilot sized like external reviewer intake; Phase II Research mid-June 2026; design doc at `docs/INTAKE_PORTAL_DESIGN.md`
 - [Capture machine-legible structured data](project-machine-legible-form-capture.md) — split budgets/rosters/milestones into structured fields, not narrative; Sarah + Connor own form wishlists
 - [Match institution against existing accounts at intake](project-intake-portal-institution-match.md) — match-first, create-as-last-resort against `accounts.{name, akoya_aka, wmkf_legalname, wmkf_abbreviation}`. Free-text input pollutes the canonical institution registry ("Stafnord" → "Stanford"). GOverify doesn't dedup.
