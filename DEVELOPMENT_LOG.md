@@ -10,6 +10,23 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## May 2026 — Three-call browser-direct attachment dance shipped end-to-end (Session 184)
+
+**Milestone:** Replaced the planned single-call attachment model (file passes through the Vercel function on upload) with a three-call browser-direct architecture: `/upload-token` pre-issues a path-scoped Vercel Blob client token, the browser PUTs bytes straight to the private intake Blob store, then `/attach` downloads-and-scans on the function. Reconciles the design tension between "bytes never traverse a function" (efficiency / cold-start) and "synchronous virus scan at attach time" (security). Cardinality enforcement moves from app-level TOCTOU to a SQL `UPDATE WHERE` clause that's atomic under Postgres EvalPlanQual.
+
+**Sessions:** 184 (single session; 14 commits + 8 Codex review rounds — pre-impl AND post-impl per chunk).
+
+**Ship state:**
+- Migration 013: `intake_drafts.pending_attachments JSONB` column (server-managed, never overwritten by autosave).
+- Two new endpoints: `POST /api/intake/draft/upload-token` (auth + ownership + cardinality + sanitizer + Blob token mint + pending append + audit) and `POST /api/intake/draft/attach` (A2 dual-lookup + Blob download + magic-byte + size + scan + 4-branch result mapping). Route count 91 → 93.
+- `IntakeDraftService` pending helpers — `getById`, `appendPending`, `selectPendingForDraft`, `promoteToClean` (SQL-level cardinality gate via 3rd `UPDATE WHERE` clause), `removePending`, `listPendingOlderThan`. The race-safety property — `removePending` first, then del — is the concurrency gate against `/attach.promoteToClean`'s shared opaque pathname.
+- `MaintenanceService.sweepIntakePending` (2h cutoff per A6) wired as task #6 in the daily maintenance cron — runs BEFORE `cleanupBlobs` so sweep-del failures feed into the next task's cleanup pass on the same tick. `/api/intake/submit` rejects 409 `pending_attachments_present` if pending non-empty (A1).
+- Locked contract amendments A1-A7 documented in `INTAKE_ATTACH_BUILD_SCOPING.md`; per-chunk design docs (`INTAKE_ATTACH_CHUNK{3,4,5,6}_DESIGN.md`) capture every Codex pre-impl + post-impl finding. Unit suite 898 → ~1100.
+
+**Why it matters:** First pilot-blocking applicant-facing build to ship end-to-end through the design → Codex pre-impl → implement → Codex post-impl loop. The loop's marquee catch was the chunk-5 cardinality race: post-impl Codex flagged a TOCTOU; original framing was "acceptable for pilot, last-writer-wins"; user pushed back; the SQL-level fix landed in two follow-up commits and is the only race-safe layer. Pattern captured in `.claude-memory/project-codex-design-pre-impl-iteration.md` and `feedback-real-fix-not-design-note.md`. Endpoints are LIVE but no UI calls them yet — applicant-form rewrite to the three-call pattern is the S185 build.
+
+**Pointers:** `docs/INTAKE_ATTACH_BUILD_SCOPING.md`, `docs/INTAKE_ATTACH_CHUNK{3,4,5,6}_DESIGN.md`, `docs/INTAKE_PORTAL_DRAIN_PLAN.md` § "Attachment upload — three-call dance" (S184 amendments). Commits `1b88b21` → `975e589` on `main`.
+
 ## May 2026 — Spend-monitoring architecture rebuilt; per-category alert routing (Session 181)
 
 **Milestone:** Pivoted off the locally-anchored low-balance estimator (the Apr-2026 mechanism that motivated `api_credit_monitoring`) onto an Anthropic-native posture: auto-reload + native spend-limit notifications cover the failure modes; a monthly `/cost_report`-driven drift cron reconciles our local pricing table against authoritative billing. Separately, alert recipients moved from a hardcoded superuser roster to a per-category routing config editable in `/admin`, so different audiences (grants, finance, ops, security) can subscribe to different alert classes.
