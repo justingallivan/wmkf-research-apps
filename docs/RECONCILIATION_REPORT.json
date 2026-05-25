@@ -1,62 +1,24 @@
 {
-  "generated": "2026-05-19T19:48:19.842Z",
+  "generated": "2026-05-25T03:16:30.043Z",
   "summary": {
     "total_claims": 157,
     "stale": 38,
     "verified": 88,
     "unknown": 31,
-    "probe_errors": 1
+    "probe_errors": 0
   },
   "probe_notes": {
     "dataverse": "completed",
     "postgres": "completed"
   },
   "drift_buckets": {
-    "spec_without_entity": [
-      {
-        "entity": "wmkf_app_grant_cycle",
-        "spec_file": "lib/dataverse/schema/wave2/wmkf_app_grant_cycle.json",
-        "severity": "high",
-        "evidence": "Dataverse probe returned probe_404; treat as drift, not proof of non-existence"
-      },
+    "spec_without_entity": [],
+    "entity_without_atlas": [
       {
         "entity": "wmkf_app_proposal_search",
-        "spec_file": "lib/dataverse/schema/wave2/wmkf_app_proposal_search.json",
-        "severity": "high",
-        "evidence": "Dataverse probe returned probe_404; treat as drift, not proof of non-existence"
-      },
-      {
-        "entity": "wmkf_app_publication",
-        "spec_file": "lib/dataverse/schema/wave2/wmkf_app_publication.json",
-        "severity": "high",
-        "evidence": "Dataverse probe returned probe_404; treat as drift, not proof of non-existence"
-      },
-      {
-        "entity": "wmkf_app_request_person",
-        "spec_file": "lib/dataverse/schema/wave2/wmkf_app_request_person.json",
-        "severity": "high",
-        "evidence": "Dataverse probe returned probe_404; treat as drift, not proof of non-existence"
-      },
-      {
-        "entity": "wmkf_app_researcher",
-        "spec_file": "lib/dataverse/schema/wave2/wmkf_app_researcher.json",
-        "severity": "high",
-        "evidence": "Dataverse probe returned probe_404; treat as drift, not proof of non-existence"
-      },
-      {
-        "entity": "wmkf_app_reviewer_suggestion",
-        "spec_file": "lib/dataverse/schema/wave2/wmkf_app_reviewer_suggestion.json",
-        "severity": "high",
-        "evidence": "Dataverse probe returned probe_404; treat as drift, not proof of non-existence"
-      },
-      {
-        "entity": "wmkf_app_publication_author",
-        "spec_file": "lib/dataverse/schema/wave2/wmkf_app_z_publication_author.json",
-        "severity": "high",
-        "evidence": "Dataverse probe returned probe_404; treat as drift, not proof of non-existence"
+        "row_count": 0
       }
     ],
-    "entity_without_atlas": [],
     "stale_row_count": [
       {
         "entity": "wmkf_ai_prompt",
@@ -81,6 +43,12 @@
         "atlas_claim": 325,
         "live_count": 329,
         "source_file": "docs/atlas/dataverse-wmkf-ai-run-and-prompt.md"
+      },
+      {
+        "entity": "wmkf_app_request_person",
+        "atlas_claim": 5561,
+        "live_count": 5000,
+        "source_file": "docs/atlas/dataverse-akoya-request.md"
       },
       {
         "entity": "wmkf_apprequestpersons",
@@ -186,6 +154,11 @@
         "deployed": true
       },
       {
+        "table": "model_pricing_audit",
+        "in_schema_sql": false,
+        "deployed": true
+      },
+      {
         "table": "panel_review_items",
         "in_schema_sql": false,
         "deployed": true
@@ -212,6 +185,11 @@
       },
       {
         "table": "screening_dismissals",
+        "in_schema_sql": false,
+        "deployed": true
+      },
+      {
+        "table": "submission_jobs",
         "in_schema_sql": false,
         "deployed": true
       },

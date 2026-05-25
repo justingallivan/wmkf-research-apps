@@ -102,11 +102,25 @@ function logicalFromSchemaName(schemaName) {
 function loadWave2Specs() {
   const specs = [];
   if (!fs.existsSync(wave2Dir)) return specs;
+  // Strip internal underscores while preserving the publisher prefix
+  // underscore. Dataverse logical names follow `<prefix>_<entityname>`
+  // where the entity name has no internal underscores in the deployed
+  // form, even when the Wave 2 spec file uses snake_case (e.g. spec
+  // `wmkf_app_grant_cycle` → deployed `wmkf_appgrantcycle` →
+  // entity set `wmkf_appgrantcycles`). Without this variant the
+  // candidate loop never tries the actually-deployed name.
+  const stripInternalUnderscores = (s) => {
+    if (!s) return null;
+    const idx = s.indexOf('_');
+    if (idx === -1) return s;
+    return `${s.slice(0, idx)}_${s.slice(idx + 1).replace(/_/g, '')}`;
+  };
   for (const f of fs.readdirSync(wave2Dir).filter((x) => x.endsWith('.json')).sort()) {
     const file = path.join(wave2Dir, f);
     try {
       const spec = JSON.parse(fs.readFileSync(file, 'utf8'));
       const logicalName = logicalFromSchemaName(spec.schemaName) || spec.name;
+      const stripped = stripInternalUnderscores(logicalName || spec.name);
       specs.push({
         entity: logicalName,
         spec_name: spec.name || logicalName,
@@ -115,6 +129,8 @@ function loadWave2Specs() {
         candidate_entity_sets: [
           spec.entitySetName,
           spec.entitySet,
+          stripped && `${stripped}s`,
+          stripped && `${stripped}es`,
           spec.name && `${spec.name.replace(/_/g, '')}s`,
           logicalName && `${logicalName.replace(/_/g, '')}s`,
           logicalName && `${logicalName.replace(/_/g, '')}es`,
@@ -286,23 +302,43 @@ async function resolveEntitySet(token, logicalName, candidates) {
     if (r.status && r.status !== 404) return { metadata_status: r.status, metadata_error: (await r.text()).slice(0, 200) };
   }
 
+  // Probe candidates in order. A probe_404 means "this candidate entity-set
+  // name doesn't exist" — do NOT early-return on it, because Wave 2 schema
+  // files use underscored logical names (`wmkf_app_grant_cycle`) while
+  // deployed entity sets use no-underscore plurals (`wmkf_appgrantcycles`),
+  // so the first candidate often 404s while a later candidate is the real
+  // deployed set. Only return on a successful probe (200). If every
+  // candidate 404s, fall through to the final 404 with the last attempted
+  // set name so the report still reads coherently.
+  let lastProbe404 = null;
   for (const c of candidates || []) {
     const r = await probeEntitySetCount(token, c);
-    if (r.status === 200 || r.status === 'probe_404') return { entitySet: c, direct_probe: r };
+    if (r.status === 200) return { entitySet: c, direct_probe: r };
+    if (r.status === 'probe_404') lastProbe404 = { entitySet: c, direct_probe: r };
   }
+  if (lastProbe404) return lastProbe404;
   return { entitySet: (candidates || [])[0] || logicalName, metadata_status: 404 };
 }
 
 async function probeEntitySetCount(token, entitySet) {
+  const base = `${process.env.DYNAMICS_URL}/api/data/v9.2/${entitySet}`;
+  let exists;
   try {
-    const base = `${process.env.DYNAMICS_URL}/api/data/v9.2/${entitySet}`;
-    const exists = await fetchWithTimeout(`${base}?$top=1`, {
+    exists = await fetchWithTimeout(`${base}?$top=1`, {
       method: 'GET',
       headers: dynamicsHeaders(token),
     });
-    if (exists.status === 404) return { status: 'probe_404', entitySet, row_count: null };
-    if (!exists.ok) return { status: 'unknown', entitySet, error: `${exists.status} ${(await exists.text()).slice(0, 200)}` };
+  } catch (e) {
+    return { status: 'unknown', entitySet, row_count: null, error: e.name === 'AbortError' ? 'timeout' : e.message };
+  }
+  if (exists.status === 404) return { status: 'probe_404', entitySet, row_count: null };
+  if (!exists.ok) return { status: 'unknown', entitySet, error: `${exists.status} ${(await exists.text()).slice(0, 200)}` };
 
+  // The entity exists; $count is best-effort. A timeout on huge tables
+  // (e.g. akoya_requests with 5M+ rows) must NOT downgrade the entity
+  // probe to 'unknown' — that would trip the memory-drift gate's
+  // probe_errors blocker over an operationally-uninteresting slow count.
+  try {
     const count = await fetchWithTimeout(`${base}/$count`, {
       method: 'GET',
       headers: dynamicsHeaders(token, 'text/plain'),
@@ -310,7 +346,7 @@ async function probeEntitySetCount(token, entitySet) {
     if (!count.ok) return { status: 200, entitySet, row_count: null, count_error: `${count.status} ${(await count.text()).slice(0, 200)}` };
     return { status: 200, entitySet, row_count: Number(await count.text()) };
   } catch (e) {
-    return { status: 'unknown', entitySet, row_count: null, error: e.name === 'AbortError' ? 'timeout' : e.message };
+    return { status: 200, entitySet, row_count: null, count_error: e.name === 'AbortError' ? 'timeout' : e.message };
   }
 }
 
