@@ -210,7 +210,7 @@ Located in `lib/services/`. Source files are authoritative; entries below descri
 - `llm-client.js` — Canonical Anthropic API wrapper (`complete()` + `stream()`). SSRF allowlist, abortable timeouts, 429/529 retry, single fallback-model swap, usage logging, API-key redaction. Replaced 14 ad-hoc fetch sites
 - `dynamics-context.js` — AsyncLocalStorage restriction context for per-request scoping; legacy static-method shims deprecated but retained for unmigrated scripts
 - `external-token.js` — HS256 HMAC JWT primitive for external-reviewer magic links; hash-only storage for cheap revocation
-- `intake-draft-service.js`, `intake-audit-service.js` — Applicant intake portal (drafts with attachment JSONB ops; append-only sha256-hashed audit)
+- `intake-draft-service.js`, `intake-audit-service.js` — Applicant intake portal (drafts with attachment JSONB ops; append-only sha256-hashed audit). S184: added `pending_attachments` JSONB column for the three-call attach dance + helpers (`getById`, `appendPending`, `selectPendingForDraft`, `promoteToClean` with SQL-level cardinality gate, `removePending`, `listPendingOlderThan`). `MaintenanceService.sweepIntakePending` (2h cutoff, race-safe via removePending-first) wired into the daily maintenance cron.
 - `review-upload.js` — Shared `writeReviewFiles` core for staff and reviewer-self upload paths; SharePoint write + Dataverse PATCH + rollback on failure
 - `execute-prompt.js` — Implementation of the Executor contract (`docs/EXECUTOR_CONTRACT.md`); mirrors the PA `ExecutePrompt` child flow
 - `multi-llm-service.js`, `panel-review-service.js` — Virtual Review Panel (Claude / GPT / Gemini / Perplexity)
@@ -239,6 +239,10 @@ Located in `lib/utils/`:
 - `file-loader.js` - Shared FileRef loader (upload/SharePoint → PDF/DOCX text) used by Grant Reporting and Phase I Dynamics
 - `sharepoint-buckets.js` - `getRequestSharePointBuckets(requestId, requestNumber)` — walks active + archive libraries for a request
 - `cycle-code.js` - Grant cycle code helpers (`Jxx`/`Dxx` from June/December meeting dates). `meetingDateToCycleCode(d)`, `parseCycleCode(s)`, `cycleCodeToOdataFilter(code, field)` for Dataverse range queries.
+- `file-magic.js` - Magic-byte sniffing + extension/MIME validation. `validateReviewFile(filename, buf)` (PDF/DOCX/DOC) for reviewer uploads; `validateIntakeAttachment(filename, buf, allowedMimeTypes)` (PDF/DOCX/XLSX, parameterized over field `accept[]`) for the intake-portal three-call dance.
+- `blob-filename.js` - `sanitizeBlobFilename(input)` for intake-portal applicant-supplied filenames. NFKC normalize, reject `..` segments (incl. whitespace-padded + fullwidth `．．`), strip control chars + path separators, 200-codepoint cap preserving extension. Fail-loud on empty/non-string input.
+- `intake-blob.js` - `getIntakeBlobToken()` reads `INTAKE_BLOB_RW_TOKEN` (NOT the shared `BLOB_READ_WRITE_TOKEN`). Single source of truth for the four Blob call sites (upload-token mint, attach get + del, sweep del); fail-loud on missing/whitespace-only.
+- `form-schema.js` - Intake-portal form schema loader. Static import map (`SCHEMAS[formKey]`), `findFileField(schema, fieldKey)` walker (one-level nested-group depth), `countFieldEntries(draft, fieldKey)` cardinality helper used by `/upload-token` + `/attach` cardinality gates.
 
 ---
 
@@ -256,7 +260,7 @@ Vercel Postgres. Authoritative source: `lib/db/schema.sql` + `lib/db/migrations/
 | `dynamics_feedback` | Dynamics Explorer thumbs + auto-detected failures |
 | `expertise_roster`, `expertise_matches` | Expertise Finder roster + match history |
 | `panel_reviews`, `panel_review_items` | Virtual Review Panel persistence |
-| `intake_drafts`, `intake_audit` | Applicant intake portal — drafts (Postgres-only, cleared on submit) + sha256-hashed audit |
+| `intake_drafts`, `intake_audit` | Applicant intake portal — drafts (Postgres-only, cleared on submit) + sha256-hashed audit. S184: added `pending_attachments JSONB` column (migration 013) for the three-call attach dance; server-managed, never overwritten by autosave; swept at 2h cutoff by daily maintenance cron. |
 | `submission_jobs` | Applicant intake portal — async submission queue, idempotency-keyed, drained by `/api/cron/drain-submissions` (cron not yet built). See `docs/INTAKE_PORTAL_DRAIN_PLAN.md`. |
 | `system_alerts`, `health_check_history`, `maintenance_runs` | Monitoring + cron job audit trail |
 | `policy_publish_audit` | Append-only audit of `wmkf_policy` version publishes via `/api/admin/policies`. Pending row before mutation + final row after (paired by `request_id`). |
@@ -292,6 +296,7 @@ Operational docs to know about (others in `docs/` are design backdrop, roadmaps,
 - **`docs/REVIEWER_INTERACTION_DESIGN.md`** — full reviewer journey design (six stages from invitation through post-submit).
 - **`docs/REVIEWER_STAGE_2A_BUILD_PLAN.md`** — Stage 2a invitation-landing slice. Read before touching `/external/review/[token]` or `/api/external/review/[token]/*`.
 - **`docs/INTAKE_PORTAL_DESIGN.md`** — applicant intake portal pilot (mid-June 2026 Phase II Research).
+- **`docs/INTAKE_ATTACH_BUILD_SCOPING.md`** + **chunk-3 / chunk-4 / chunk-5 / chunk-6 design docs** — S184's 6-chunk three-call attach build. Scoping doc has the locked A1-A7 contract amendments; per-chunk design docs capture Codex pre-impl + post-impl review outcomes. Read these before touching `/api/intake/draft/upload-token`, `/api/intake/draft/attach`, the `pending_attachments` column, or `MaintenanceService.sweepIntakePending`.
 - **`docs/POSTGRES_TO_DATAVERSE_MIGRATION.md`** — Wave 1+ migration plan.
 - **`docs/GRANT_CYCLE_LIFECYCLE.md`** — proposal lifecycle stages, statuses, triggers.
 - **`DEVELOPMENT_LOG.md`** — session-by-session history.
