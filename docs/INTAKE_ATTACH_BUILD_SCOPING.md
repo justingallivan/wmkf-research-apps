@@ -303,7 +303,7 @@ Each chunk is ~one logical commit with green tests before moving on.
    `getIntakeBlobToken` to `lib/utils/intake-blob.js`. Pure logic.
 3. **IntakeDraftService — pending helpers** — `appendPending`,
    `removePending`, `promoteToClean` (atomic pending→attachments
-   move), `listPendingOlderThan(ms)`, `selectPendingForDraft(draftId)`.
+   move), `listPendingOlderThan(cutoffIso)`, `selectPendingForDraft(draftId)`.
    Service-level tests with mocked postgres.
 4. **`/api/intake/draft/upload-token`** — auth + membership + draft
    ownership + `request_id IS NOT NULL` reject + fieldKey resolution
