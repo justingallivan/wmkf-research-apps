@@ -10,8 +10,8 @@
  *   queued
  *     → scanning              (attachments shape + scan_result='clean' for all)
  *     → request_created       (Dataverse Create akoya_request; capture akoya_requestnum)
- *     → files_moved           (Blob → SharePoint)                          [BUILD-PENDING]
- *     → dynamics_patched      (children POSTs + aggregates)                [BUILD-PENDING]
+ *     → files_moved           (Blob → SharePoint)
+ *     → dynamics_patched      (children POSTs + aggregates)
  *     → status_flipped        (PATCH source picklist — Connor Q1)          [BUILD-PENDING]
  *     → completed             (clear draft; audit)                         [BUILD-PENDING]
  *
@@ -24,24 +24,24 @@
  *   Phase 2 (advance): one short txn per state transition (UPDATE +
  *                    intake_audit INSERT). All lease-guarded.
  *
- * What this commit implements (Phase A):
+ * What is implemented:
  *   - Cron auth (CRON_SECRET)
  *   - Two-phase claim + lease renewal helper
  *   - Error classifier dispatch (taxonomy → terminal/retry decision)
- *   - State handlers: queued→scanning, scanning→request_created
+ *   - State handlers: queued→scanning, scanning→request_created,
+ *     request_created→files_moved, files_moved→dynamics_patched
  *   - Duplicate-PK recovery in request_created (Codex round-3 §2, round-7 §1)
  *   - Transactional state-transition+audit (Codex round-6 §4)
  *
- * BUILD-PENDING (Phase B — later sessions):
- *   - files_moved (lib/services/graph-service.js Blob→SharePoint)
- *   - dynamics_patched (child entity POSTs + aggregate PATCH)
- *   - status_flipped (awaits Connor Q1)
- *   - completed (draft cleanup)
+ * BUILD-PENDING (later sessions) — see BUILD_PENDING_STATES below:
+ *   - dynamics_patched → status_flipped (awaits Connor Q1)
+ *   - status_flipped → completed (draft cleanup)
  *
- * When the drain encounters a BUILD-PENDING state, it pushes
- * next_attempt_at out by 1 hour and writes a system_alerts row, but does
- * NOT terminal-fail the row. This keeps in-flight test submissions
- * recoverable when the next state handler ships.
+ * When the drain encounters a job whose current status is in
+ * BUILD_PENDING_STATES, it pushes next_attempt_at out by 1 hour and
+ * writes a system_alerts row, but does NOT terminal-fail the row. This
+ * keeps in-flight test submissions recoverable when the next state
+ * handler ships.
  */
 
 import crypto from 'crypto';
