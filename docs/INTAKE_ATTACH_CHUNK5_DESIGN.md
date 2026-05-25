@@ -144,12 +144,21 @@ Numbered for parity with chunk-4's design § 2.
     | Scanner throws transient + retries exhausted | 503 `scan_unavailable`. Pending intact. Audit `draft.attach_scan_unavailable`. |
     | Scanner throws non-transient | 500 `scan_misconfigured`. Pending intact. Audit `draft.attach_scan_misconfigured`. |
 
-19. **`promoteToClean` result mapping** (chunk-3 return contract):
+19. **`promoteToClean` result mapping** (chunk-3 return contract — updated post-impl to include `cap_exceeded_race`):
+
+    Signature: `promoteToClean(draftId, attachmentId, cleanRow, fieldCardinality)`.
+    `fieldCardinality = {fieldKey, cap}` — required (post-impl real-fix).
+    For single-valued fields, endpoint passes `cap: 1`; for multi-valued
+    fields, `cap: field.maxFiles` (falling back to 1 if `maxFiles` is
+    missing/invalid). The cardinality gate moves from in-endpoint TOCTOU
+    to SQL-level — race-safe against concurrent attaches to the same
+    fieldKey.
 
     | Reason | Response |
     |---|---|
     | `{promoted: true}` | 200 `{status: 'attached', attachmentId}` + audit `draft.attach`. |
     | `{promoted: false, reason: 'race_already_promoted'}` | 200 `{status: 'already_attached', attachmentId}`. Treat as A2 idempotency — the racing call already promoted; we're done. No audit (the racing caller already wrote one). |
+    | `{promoted: false, reason: 'cap_exceeded_race', fieldCount, cap}` | 422 (`field_already_has_attachment` for single-valued, `field_max_files_exceeded` for multi-valued) with `{cap, current: fieldCount}` in response body. Delete Blob + removePending. If `del()` throws, audit `draft.attach_cap_race_del_failed` so the operator sees the orphaned clean bytes (mirror of `infected_del_failed` posture). |
     | `{promoted: false, reason: 'pending_not_found'}` | 404 `pending_not_found`. The cron swept it between dual-lookup and promote (race window ≤ ms; in practice impossible at 2h cutoff, but defensive). No audit. |
     | `{promoted: false, reason: 'draft_not_found'}` | 404 `draft_not_found`. Draft deleted between load and promote. No audit. |
 
@@ -245,6 +254,7 @@ rather than defining a separate `errorClass` enum.
 | `draft.attach_blob_misconfigured` | non-transient blobGet throw | `{draftId, attachmentId, fieldKey, pathname, contentType, serviceName, status, isTransient}` (no sha256/size — bytes never read) | `{filename}` |
 | `draft.attach_magic_mismatch` | byte signature mismatches declared MIME | `{draftId, attachmentId, fieldKey, pathname, sha256, size, declaredContentType, sniffedType, accept}` | `{filename}` |
 | `draft.attach_size_exceeded` | computed size > pending.maxBytes | `{draftId, attachmentId, fieldKey, pathname, sha256, size, maxBytes, contentType}` | `{filename}` |
+| `draft.attach_cap_race_del_failed` | cap_exceeded_race AND `del()` threw | `{draftId, attachmentId, fieldKey, pathname, cap, fieldCount, delError: {serviceName, status, isTransient, message}}` | `{filename}` |
 | `draft.attach.ownership_denied` | 403 path | `{draftId, attachmentId, accountIdAttempted}` | `{}` |
 
 Validation-path rejections NOT audited:

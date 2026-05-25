@@ -197,6 +197,17 @@ describe('promoteToClean', () => {
     ).rejects.toThrow(/fieldCardinality/);
   });
 
+  test('field_count returned as a numeric string from PG is coerced to Number (Codex Q4)', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ in_attachments: false, in_pending: true, field_count: '7' }] });
+    const result = await IntakeDraftService.promoteToClean(
+      DRAFT_ID, ATTACHMENT_ID, cleanRow(), { fieldKey: 'co_investigator_biosketches', cap: 5 },
+    );
+    expect(result.fieldCount).toBe(7); // not '7'
+    expect(typeof result.fieldCount).toBe('number');
+  });
+
   test('cap parameter is passed into the SQL bind values', async () => {
     sql.mockResolvedValueOnce({ rows: [{ id: DRAFT_ID }] });
     await IntakeDraftService.promoteToClean(

@@ -606,7 +606,7 @@ describe('promoteToClean result mapping', () => {
     );
   });
 
-  test('cap_exceeded_race → 422 + del + removePending + cap reason', async () => {
+  test('cap_exceeded_race → 422 + del + removePending + cap reason + response carries {cap, current} (Codex Q4)', async () => {
     IntakeDraftService.promoteToClean.mockResolvedValue({
       promoted: false, reason: 'cap_exceeded_race', fieldCount: 1, cap: 1,
     });
@@ -614,8 +614,46 @@ describe('promoteToClean result mapping', () => {
     await handler(req, res);
     expect(res.statusCode).toBe(422);
     expect(res.body.error).toBe('field_already_has_attachment');
+    expect(res.body.cap).toBe(1);
+    expect(res.body.current).toBe(1);
     expect(blobDel).toHaveBeenCalled();
     expect(IntakeDraftService.removePending).toHaveBeenCalled();
+  });
+
+  test('cap_exceeded_race + del() throws → 422 + audit cap_race_del_failed (Codex Q6)', async () => {
+    IntakeDraftService.promoteToClean.mockResolvedValue({
+      promoted: false, reason: 'cap_exceeded_race', fieldCount: 1, cap: 1,
+    });
+    blobDel.mockRejectedValue(Object.assign(new Error('blob 5xx'), {
+      serviceName: 'blob', status: 503, isTransient: true,
+    }));
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(422);
+    expect(IntakeAuditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'draft.attach_cap_race_del_failed' }),
+    );
+  });
+
+  test('multi-valued field with missing maxFiles → endpoint falls back to cap:1 (Codex Q4)', async () => {
+    findFileField.mockReturnValue({
+      key: 'co_investigator_biosketches',
+      type: 'file',
+      accept: ['application/pdf'],
+      maxSizeMb: 10,
+      multiple: true,
+      // maxFiles intentionally missing
+    });
+    IntakeDraftService.promoteToClean.mockResolvedValue({ promoted: true });
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(IntakeDraftService.promoteToClean).toHaveBeenCalledWith(
+      DRAFT_ID,
+      ATTACHMENT_ID,
+      expect.any(Object),
+      expect.objectContaining({ cap: 1 }), // fallback
+    );
   });
 
   test('multi-valued cap_exceeded_race → 422 field_max_files_exceeded', async () => {

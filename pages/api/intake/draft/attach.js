@@ -546,8 +546,33 @@ export default async function handler(req, res) {
       // Delete the Blob (bytes are unused at this point) + remove
       // pending entry (cardinality slot was already taken — applicant
       // can't legitimately retry this attachment).
-      await delBlobSilent();
+      const delErr = await delBlobSilent();
       await removePendingSilent();
+      if (delErr) {
+        // Codex Q6 catch: without this audit, orphan clean bytes sit
+        // silently in private Blob until the 2h sweep. Operator wants
+        // visibility (mirrors `infected_del_failed` posture from
+        // chunk-5 Q3 reversal).
+        auditFireAndForget({
+          actorOid: contactOid,
+          actorType: 'applicant',
+          action: 'draft.attach_cap_race_del_failed',
+          targetEntity: 'intake_drafts',
+          targetId: draftId,
+          payload: { filename: pending.filename },
+          metadata: {
+            draftId, attachmentId, fieldKey: pending.fieldKey, pathname: pending.pathname,
+            cap: promotion.cap,
+            fieldCount: promotion.fieldCount,
+            delError: {
+              serviceName: delErr.serviceName,
+              status: delErr.status,
+              isTransient: delErr.isTransient,
+              message: delErr.message,
+            },
+          },
+        });
+      }
       const code = field.multiple === true
         ? 'field_max_files_exceeded'
         : 'field_already_has_attachment';
