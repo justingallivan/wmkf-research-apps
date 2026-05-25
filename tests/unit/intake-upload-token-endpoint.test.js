@@ -126,7 +126,12 @@ function setHappyDefaults() {
   getFormSchema.mockReturnValue({ sections: [] });
   findFileField.mockReturnValue(SINGLE_FILE_FIELD);
   countFieldEntries.mockReturnValue(0);
-  IntakeDraftService.appendPending.mockResolvedValue({ pending: [] });
+  // Echo the entry back in `pending` so the LOW-4 invariant check (the
+  // endpoint verifies its minted attachmentId appears in the helper's
+  // returned array) passes for happy-path tests.
+  IntakeDraftService.appendPending.mockImplementation((_id, entry) =>
+    Promise.resolve({ pending: [entry] })
+  );
   generateClientTokenFromReadWriteToken.mockResolvedValue('mock-blob-token-xyz');
   resolveContactForSession.mockResolvedValue({ ok: true, contactId: CONTACT_ID });
   hasLiveMembership.mockResolvedValue(true);
@@ -169,6 +174,18 @@ describe('method + auth', () => {
 describe('body validation', () => {
   beforeEach(() => mockApplicantSession());
 
+  test('null body → 400', async () => {
+    const { req, res } = makeReqRes(null);
+    await handler(req, res);
+    expect(res.statusCode).toBe(400);
+  });
+
+  test('array body → 400', async () => {
+    const { req, res } = makeReqRes([]);
+    await handler(req, res);
+    expect(res.statusCode).toBe(400);
+  });
+
   test('missing draftId → 400', async () => {
     const { req, res } = makeReqRes(validBody({ draftId: undefined }));
     await handler(req, res);
@@ -179,6 +196,38 @@ describe('body validation', () => {
     const { req, res } = makeReqRes(validBody({ draftId: 'forty-two' }));
     await handler(req, res);
     expect(res.statusCode).toBe(400);
+  });
+
+  test('zero draftId → 400 (boundary)', async () => {
+    const { req, res } = makeReqRes(validBody({ draftId: 0 }));
+    await handler(req, res);
+    expect(res.statusCode).toBe(400);
+  });
+
+  test('negative draftId → 400', async () => {
+    const { req, res } = makeReqRes(validBody({ draftId: -1 }));
+    await handler(req, res);
+    expect(res.statusCode).toBe(400);
+  });
+
+  test('float draftId → 400', async () => {
+    const { req, res } = makeReqRes(validBody({ draftId: 1.5 }));
+    await handler(req, res);
+    expect(res.statusCode).toBe(400);
+  });
+
+  test('unsafe-integer draftId → 400 (MOD-2)', async () => {
+    // Number.MAX_SAFE_INTEGER + 1 — beyond safe-integer range
+    const { req, res } = makeReqRes(validBody({ draftId: Number.MAX_SAFE_INTEGER + 1 }));
+    await handler(req, res);
+    expect(res.statusCode).toBe(400);
+  });
+
+  test('unexpected extra field → 400 (LOW-2)', async () => {
+    const { req, res } = makeReqRes({ ...validBody(), bogus: 'value' });
+    await handler(req, res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toMatch(/bogus/);
   });
 
   test.each([
@@ -215,6 +264,13 @@ describe('draft load + ownership', () => {
     const { req, res } = makeReqRes(validBody());
     await handler(req, res);
     expect(res.statusCode).toBe(404);
+  });
+
+  test('getById throws → 500 Draft lookup failed (MOD-3)', async () => {
+    IntakeDraftService.getById.mockRejectedValue(new Error('pg down'));
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(500);
   });
 
   test('direct owner skips bridge + membership entirely', async () => {
@@ -377,6 +433,47 @@ describe('filename sanitizer + Blob mint + pending append', () => {
     await handler(req, res);
     expect(res.statusCode).toBe(404);
   });
+
+  test('appendPending throws → 500 pending_append_failed (MOD-4)', async () => {
+    IntakeDraftService.appendPending.mockRejectedValue(new Error('pg down'));
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(500);
+    expect(res.body.error).toBe('pending_append_failed');
+  });
+
+  test('appendPending returns array WITHOUT the minted attachmentId → 500 invariant (LOW-4)', async () => {
+    // Helper regression / collision: caller contract violated.
+    IntakeDraftService.appendPending.mockResolvedValue({ pending: [] });
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(500);
+    expect(res.body.error).toBe('pending_append_invariant_violated');
+  });
+});
+
+describe('schema completeness guards (MOD-1)', () => {
+  beforeEach(setHappyDefaults);
+
+  test('schema field missing maxSizeMb → 500 form_schema_field_invalid', async () => {
+    findFileField.mockReturnValue({
+      key: 'pi_biosketch',
+      type: 'file',
+      accept: ['application/pdf'],
+      // maxSizeMb intentionally missing
+    });
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(500);
+    expect(res.body.error).toBe('form_schema_field_invalid');
+  });
+
+  test('schema field maxSizeMb <= 0 → 500 form_schema_field_invalid', async () => {
+    findFileField.mockReturnValue({ ...SINGLE_FILE_FIELD, maxSizeMb: 0 });
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(500);
+  });
 });
 
 describe('happy path', () => {
@@ -395,7 +492,7 @@ describe('happy path', () => {
     expect(typeof res.body.validUntil).toBe('number');
   });
 
-  test('mint audit row has A3 metadata/payload split', async () => {
+  test('mint audit row has A3 metadata/payload split (incl. draftId per MOD-5)', async () => {
     const { req, res } = makeReqRes(validBody());
     await handler(req, res);
     expect(IntakeAuditService.log).toHaveBeenCalledWith(
@@ -405,6 +502,7 @@ describe('happy path', () => {
         targetId: DRAFT_ID,
         payload: expect.objectContaining({ filename: 'biosketch.pdf' }),
         metadata: expect.objectContaining({
+          draftId: DRAFT_ID,
           fieldKey: 'pi_biosketch',
           contentType: 'application/pdf',
           maxBytes: 10 * 1024 * 1024,
@@ -413,9 +511,11 @@ describe('happy path', () => {
     );
   });
 
-  test('Blob token mint called with tightened content type + max bytes', async () => {
+  test('Blob token mint called with tightened content type + max bytes + 1h validUntil (LOW-3)', async () => {
+    const before = Date.now();
     const { req, res } = makeReqRes(validBody());
     await handler(req, res);
+    const after = Date.now();
     expect(generateClientTokenFromReadWriteToken).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: expect.stringMatching(/^drafts\/42\//),
@@ -426,6 +526,11 @@ describe('happy path', () => {
         token: 'vercel_blob_rw_fake_token',
       }),
     );
+    // validUntil is now + 1h, accommodating clock drift across the test
+    // call window.
+    const callArgs = generateClientTokenFromReadWriteToken.mock.calls[0][0];
+    expect(callArgs.validUntil).toBeGreaterThanOrEqual(before + 3600_000);
+    expect(callArgs.validUntil).toBeLessThanOrEqual(after + 3600_000);
   });
 
   test('appendPending called with full entry shape', async () => {

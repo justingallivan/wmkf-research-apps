@@ -48,6 +48,16 @@ const FORBIDDEN_FIELDS = [
   'draftJson',
 ];
 
+// Closed-set allow-list — any field not here is rejected with 400.
+// Codex chunk-4 post-impl LOW-2: permissive request shape hides client
+// drift; explicit allow-list catches it.
+const ALLOWED_FIELDS = new Set([
+  'draftId',
+  'fieldKey',
+  'filename',
+  'contentType',
+]);
+
 function jsonError(res, status, error, extra = {}) {
   return res.status(status).json({ error, ...extra });
 }
@@ -68,16 +78,25 @@ export default async function handler(req, res) {
     return jsonError(res, 401, 'Session missing contactOid');
   }
 
-  // 3) Body validation + forbidden-field guard
-  const body = req.body || {};
+  // 3) Body validation + forbidden-field guard + closed-set allow-list
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
   for (const f of FORBIDDEN_FIELDS) {
     if (body[f] != null) {
       return jsonError(res, 400, `${f} is not accepted on this endpoint`);
     }
   }
+  // Reject any unexpected fields — Codex post-impl LOW-2.
+  for (const k of Object.keys(body)) {
+    if (!ALLOWED_FIELDS.has(k) && !FORBIDDEN_FIELDS.includes(k)) {
+      return jsonError(res, 400, `unexpected field: ${k}`);
+    }
+  }
   const { draftId, fieldKey, filename, contentType } = body;
-  if (typeof draftId !== 'number' || !Number.isInteger(draftId) || draftId <= 0) {
-    return jsonError(res, 400, 'draftId must be a positive integer');
+  // Codex post-impl MOD-2: require safe integer so very large JSON
+  // numbers can't round during JSON parse and silently target a
+  // different draft.
+  if (typeof draftId !== 'number' || !Number.isSafeInteger(draftId) || draftId <= 0) {
+    return jsonError(res, 400, 'draftId must be a positive safe integer');
   }
   if (typeof fieldKey !== 'string' || !fieldKey) {
     return jsonError(res, 400, 'fieldKey is required');
@@ -129,7 +148,11 @@ export default async function handler(req, res) {
           message: 'Your account is already linked to a different portal identity. Please contact staff to resolve.',
         });
       }
-      return jsonError(res, 401, bridgeResult.message || 'Identity bridge invalid');
+      // Codex post-impl LOW-1: don't surface bridgeResult.message (may
+      // contain operator-oriented identity text). Log server-side, return
+      // a stable applicant-safe message.
+      console.warn('[upload-token] bridge ok:false reason=' + bridgeResult.reason, bridgeResult.message);
+      return jsonError(res, 401, 'identity_bridge_invalid');
     }
     const contactId = bridgeResult.contactId;
 
@@ -150,7 +173,7 @@ export default async function handler(req, res) {
         targetEntity: 'intake_drafts',
         targetId: draftId,
         payload: {},
-        metadata: { fieldKey, accountIdAttempted: draft.account_id },
+        metadata: { draftId, fieldKey, accountIdAttempted: draft.account_id },
       }).catch(() => {});
       return jsonError(res, 403, 'No live membership on this institution');
     }
@@ -198,16 +221,24 @@ export default async function handler(req, res) {
     }
   }
 
-  // 12) Filename sanitization
+  // 12) Filename sanitization. Don't leak sanitizer's internal error
+  //     message — return a stable code instead. Codex post-impl LOW-5.
   let sanitizedFilename;
   try {
     sanitizedFilename = sanitizeBlobFilename(filename);
   } catch (err) {
-    return jsonError(res, 422, 'filename_invalid', { detail: err.message });
+    console.warn('[upload-token] sanitizer rejected:', err.message);
+    return jsonError(res, 422, 'filename_invalid');
   }
 
-  // 13) maxBytes
-  const maxBytes = (typeof field.maxSizeMb === 'number' ? field.maxSizeMb : 10) * 1024 * 1024;
+  // 13) maxBytes — missing maxSizeMb is a SCHEMA bug, not a defaultable
+  //     condition; fail loud so an operator catches it instead of accepting
+  //     the silent 10MB fallback. Codex chunk-4 post-impl MOD-1.
+  if (typeof field.maxSizeMb !== 'number' || field.maxSizeMb <= 0) {
+    console.error(`[upload-token] schema field ${fieldKey} missing maxSizeMb`);
+    return jsonError(res, 500, 'form_schema_field_invalid', { detail: 'maxSizeMb missing' });
+  }
+  const maxBytes = field.maxSizeMb * 1024 * 1024;
 
   // 14) Mint identifiers
   const attachmentId = crypto.randomUUID();
@@ -240,7 +271,7 @@ export default async function handler(req, res) {
       targetEntity: 'intake_drafts',
       targetId: draftId,
       payload: { filename: sanitizedFilename },
-      metadata: { fieldKey, attachmentId, pathname, contentType, maxBytes, validUntil: validUntilIso },
+      metadata: { draftId, fieldKey, attachmentId, pathname, contentType, maxBytes, validUntil: validUntilIso },
     }).catch(() => {});
     return jsonError(res, 500, 'upload_token_mint_failed');
   }
@@ -268,8 +299,23 @@ export default async function handler(req, res) {
     // Blob compensation needed — bytes haven't been PUT.
     return jsonError(res, 404, 'draft_not_found');
   }
+  // Codex post-impl LOW-4: verify the helper's caller contract — the
+  // returned pending array MUST contain the freshly-minted attachmentId.
+  // If it doesn't, the helper regressed or a duplicate-collision elided
+  // the append; either way, returning a token for an entry /attach
+  // can't find later is worse than a 500 here.
+  const inPending = Array.isArray(appendResult.pending)
+    && appendResult.pending.some(p => p && p.attachmentId === attachmentId);
+  if (!inPending) {
+    console.error('[upload-token] appendPending returned without minted attachmentId', { draftId, attachmentId });
+    return jsonError(res, 500, 'pending_append_invariant_violated');
+  }
 
-  // 17) Audit (best-effort, never blocks the response)
+  // 17) Audit (best-effort, never blocks the response). Codex post-impl
+  //     MOD-5: include draftId in metadata for forensics queries even
+  //     though it's also on targetId — A3 classifies draftId as
+  //     queryable, and a query that filters only on attachmentId across
+  //     all rows shouldn't need to JOIN targetId.
   IntakeAuditService.log({
     actorOid: contactOid,
     actorType: 'applicant',
@@ -277,7 +323,7 @@ export default async function handler(req, res) {
     targetEntity: 'intake_drafts',
     targetId: draftId,
     payload: { filename: sanitizedFilename },
-    metadata: { fieldKey, attachmentId, pathname, contentType, maxBytes, validUntil: validUntilIso },
+    metadata: { draftId, fieldKey, attachmentId, pathname, contentType, maxBytes, validUntil: validUntilIso },
   }).catch(() => {});
 
   // 18) Response
