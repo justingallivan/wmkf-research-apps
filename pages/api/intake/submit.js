@@ -17,11 +17,13 @@
  *     2. Membership guard: hasSubmitterRole(contactOid, accountId)
  *     3. Load draft: IntakeDraftService.getByKey({ contactOid, accountId,
  *        formKey, requestId: null }) — requestless branch (single-phase)
- *     4. Validate attachments shape (every att in draft_json.attachments)
+ *     4. S184 A1 guard: reject 409 if draft.pending_attachments is non-empty
+ *        (a Blob upload is mid-flight; refuse to submit and orphan the bytes).
+ *     5. Validate attachments shape (every att in draft.attachments)
  *        + all scan_result === 'clean'
- *     5. Generate request GUID (UUIDv4) — written to akoya_request later
+ *     6. Generate request GUID (UUIDv4) — written to akoya_request later
  *        by drain at request_created
- *     6. Single Postgres transaction:
+ *     7. Single Postgres transaction:
  *          INSERT submission_jobs (idempotency_key, ..., payload, request_id, status='queued')
  *            ON CONFLICT (idempotency_key) DO UPDATE SET attempts=attempts  -- no-op for RETURNING
  *            RETURNING id, request_id, status

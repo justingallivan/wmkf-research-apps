@@ -168,6 +168,60 @@ describe('sweepIntakePending — race + error paths', () => {
   });
 });
 
+describe('sweepIntakePending — additional edge cases (Codex Q5)', () => {
+  test('mixed two-entry: one race-loss + one normal completion', async () => {
+    IntakeDraftService.listPendingOlderThan.mockResolvedValue([
+      { draftId: DRAFT_ID, entry: STALE_ENTRY({ attachmentId: 'aaa', pathname: PATHNAME_A }) },
+      { draftId: 99, entry: STALE_ENTRY({ attachmentId: 'bbb', pathname: PATHNAME_B }) },
+    ]);
+    IntakeDraftService.removePending
+      .mockResolvedValueOnce({ removed: false })  // first: race-lost
+      .mockResolvedValueOnce({ removed: true });  // second: normal
+    const result = await MaintenanceService.sweepIntakePending();
+    expect(result.deleted).toBe(1);
+    expect(result.scanned).toBe(2);
+    // Exactly one del + one audit (the second entry only).
+    expect(del).toHaveBeenCalledTimes(1);
+    expect(del).toHaveBeenCalledWith(PATHNAME_B, expect.any(Object));
+    expect(IntakeAuditService.log).toHaveBeenCalledTimes(1);
+  });
+
+  test('isBlobNotFound: status-only-404 (no "not found" in message) is swallowed', async () => {
+    IntakeDraftService.listPendingOlderThan.mockResolvedValue([
+      { draftId: DRAFT_ID, entry: STALE_ENTRY() },
+    ]);
+    del.mockRejectedValue(Object.assign(new Error('some-other-message'), { status: 404 }));
+    const result = await MaintenanceService.sweepIntakePending();
+    expect(result.blobDelErrors).toBe(0);
+    expect(result.deleted).toBe(1);
+  });
+
+  test('isBlobNotFound: message-only-404 (no status) is swallowed', async () => {
+    IntakeDraftService.listPendingOlderThan.mockResolvedValue([
+      { draftId: DRAFT_ID, entry: STALE_ENTRY() },
+    ]);
+    del.mockRejectedValue(new Error('blob: 404 not found at this pathname'));
+    const result = await MaintenanceService.sweepIntakePending();
+    expect(result.blobDelErrors).toBe(0);
+    expect(result.deleted).toBe(1);
+  });
+
+  test('listPendingOlderThan throws → propagates (cron handler catches at the wrapper)', async () => {
+    IntakeDraftService.listPendingOlderThan.mockRejectedValue(new Error('pg connection refused'));
+    await expect(MaintenanceService.sweepIntakePending()).rejects.toThrow(/connection refused/);
+  });
+
+  test('entry without pathname → skip del, still removePending + audit', async () => {
+    IntakeDraftService.listPendingOlderThan.mockResolvedValue([
+      { draftId: DRAFT_ID, entry: STALE_ENTRY({ pathname: undefined }) },
+    ]);
+    const result = await MaintenanceService.sweepIntakePending();
+    expect(result.deleted).toBe(1);
+    expect(del).not.toHaveBeenCalled();
+    expect(IntakeAuditService.log).toHaveBeenCalled();
+  });
+});
+
 describe('sweepIntakePending — contract details', () => {
   test('default cutoff is 2 hours back from now', async () => {
     const before = Date.now();

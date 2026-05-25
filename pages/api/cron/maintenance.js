@@ -76,25 +76,11 @@ export default async function handler(req, res) {
       results.alerts = { error: error.message };
     }
 
-    // 6. Blob cleanup (actual deletion, not dry run)
-    try {
-      results.blobs = await MaintenanceService.cleanupBlobs(config.blob_days, false);
-      totalDeleted += results.blobs.deleted;
-    } catch (error) {
-      results.blobs = { error: error.message };
-    }
-
-    // 7. Dynamics feedback cleanup (resolved entries older than 180 days)
-    try {
-      results.feedback = await FeedbackService.cleanupOldFeedback(180);
-      totalDeleted += results.feedback;
-    } catch (error) {
-      results.feedback = { error: error.message };
-    }
-
-    // 8. Intake-portal pending-attachment sweep (S184 chunk 6). Cleans
-    //    up stale pending entries (and their Blobs) that the three-call
-    //    /attach dance left behind. 2h cutoff per A6.
+    // 6. Intake-portal pending-attachment sweep (S184 chunk 6). Runs
+    //    BEFORE cleanupBlobs so any sweep `del()` failures that leave
+    //    orphan Blob references feed into the next task's cleanup pass
+    //    on the same tick (per scoping doc § 6 "Cron sweep ordering").
+    //    2h cutoff per A6.
     try {
       results.intakePending = await MaintenanceService.sweepIntakePending();
       if (typeof results.intakePending?.deleted === 'number') {
@@ -102,6 +88,22 @@ export default async function handler(req, res) {
       }
     } catch (error) {
       results.intakePending = { error: error.message };
+    }
+
+    // 7. Blob cleanup (actual deletion, not dry run)
+    try {
+      results.blobs = await MaintenanceService.cleanupBlobs(config.blob_days, false);
+      totalDeleted += results.blobs.deleted;
+    } catch (error) {
+      results.blobs = { error: error.message };
+    }
+
+    // 8. Dynamics feedback cleanup (resolved entries older than 180 days)
+    try {
+      results.feedback = await FeedbackService.cleanupOldFeedback(180);
+      totalDeleted += results.feedback;
+    } catch (error) {
+      results.feedback = { error: error.message };
     }
 
     // Record successful run
