@@ -502,6 +502,7 @@ describe('scanner posture (A7)', () => {
       DRAFT_ID,
       ATTACHMENT_ID,
       expect.objectContaining({ scanner: 'skipped', scan_result: 'clean' }),
+      expect.objectContaining({ fieldKey: 'pi_biosketch', cap: 1 }),
     );
   });
 
@@ -587,7 +588,7 @@ describe('scanner posture (A7)', () => {
 describe('promoteToClean result mapping', () => {
   beforeEach(setHappyDefaults);
 
-  test('promoted: true → 200 attached + audit draft.attach', async () => {
+  test('promoted: true → 200 attached + audit draft.attach + passes cardinality', async () => {
     IntakeDraftService.promoteToClean.mockResolvedValue({ promoted: true });
     const { req, res } = makeReqRes(validBody());
     await handler(req, res);
@@ -596,6 +597,51 @@ describe('promoteToClean result mapping', () => {
     expect(IntakeAuditService.log).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'draft.attach' }),
     );
+    // Verify cardinality opts were passed (post-impl real fix)
+    expect(IntakeDraftService.promoteToClean).toHaveBeenCalledWith(
+      DRAFT_ID,
+      ATTACHMENT_ID,
+      expect.any(Object),
+      { fieldKey: 'pi_biosketch', cap: 1 },
+    );
+  });
+
+  test('cap_exceeded_race → 422 + del + removePending + cap reason', async () => {
+    IntakeDraftService.promoteToClean.mockResolvedValue({
+      promoted: false, reason: 'cap_exceeded_race', fieldCount: 1, cap: 1,
+    });
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(422);
+    expect(res.body.error).toBe('field_already_has_attachment');
+    expect(blobDel).toHaveBeenCalled();
+    expect(IntakeDraftService.removePending).toHaveBeenCalled();
+  });
+
+  test('multi-valued cap_exceeded_race → 422 field_max_files_exceeded', async () => {
+    findFileField.mockReturnValue(MULTI_FILE_FIELD);
+    IntakeDraftService.promoteToClean.mockResolvedValue({
+      promoted: false, reason: 'cap_exceeded_race', fieldCount: 15, cap: 15,
+    });
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(422);
+    expect(res.body.error).toBe('field_max_files_exceeded');
+    // Verify cap=15 was passed for the multi-valued field
+    expect(IntakeDraftService.promoteToClean).toHaveBeenCalledWith(
+      DRAFT_ID,
+      ATTACHMENT_ID,
+      expect.any(Object),
+      { fieldKey: 'pi_biosketch', cap: 15 },
+    );
+  });
+
+  test('promoteToClean throws → 500 promote_failed', async () => {
+    IntakeDraftService.promoteToClean.mockRejectedValue(new Error('pg down'));
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(500);
+    expect(res.body.error).toBe('promote_failed');
   });
 
   test('race_already_promoted → 200 already_attached, NO audit', async () => {
@@ -659,5 +705,83 @@ describe('A3 audit shape on happy path', () => {
         }),
       }),
     );
+  });
+
+  test('magic_mismatch audit includes sniffedType (chunk-5 post-impl drift fix)', async () => {
+    blobGet.mockResolvedValue(mockBlobStream(Buffer.from('not a pdf — plain text')));
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(422);
+    expect(IntakeAuditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'draft.attach_magic_mismatch',
+        metadata: expect.objectContaining({
+          sniffedType: 'unknown',
+          declaredContentType: 'application/pdf',
+        }),
+      }),
+    );
+  });
+});
+
+describe('chunk-5 post-impl fixes', () => {
+  beforeEach(setHappyDefaults);
+
+  test('blob_url missing → 500 blob_url_missing (no promote, no delete)', async () => {
+    blobGet.mockResolvedValue({
+      // blob.url omitted
+      blob: {},
+      stream: new ReadableStream({
+        start(controller) { controller.enqueue(new Uint8Array(PDF_MAGIC)); controller.close(); },
+      }),
+    });
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(500);
+    expect(res.body.error).toBe('blob_url_missing');
+    expect(IntakeDraftService.promoteToClean).not.toHaveBeenCalled();
+    expect(blobDel).not.toHaveBeenCalled();
+  });
+
+  test('scanned_at missing in scanner result → falls back to ISO now()', async () => {
+    scanBytes.mockResolvedValue({
+      scan_result: 'clean',
+      foundViruses: [],
+      // scannedAt missing
+      scanner: 'cloudmersive',
+    });
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    const cleanRow = IntakeDraftService.promoteToClean.mock.calls[0][2];
+    expect(typeof cleanRow.scanned_at).toBe('string');
+    expect(cleanRow.scanned_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  test('removePending throws → swallowed silently (does not propagate)', async () => {
+    scanBytes.mockResolvedValue({
+      scan_result: 'infected',
+      foundViruses: [{ virusName: 'X' }],
+      scannedAt: '2026-05-24T20:00:30.000Z',
+      scanner: 'cloudmersive',
+    });
+    IntakeDraftService.removePending.mockRejectedValue(new Error('pg blip'));
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(422);
+    expect(res.body.error).toBe('infected');
+  });
+
+  test('Response(stream).arrayBuffer() throws → 503 blob_unavailable', async () => {
+    blobGet.mockResolvedValue({
+      blob: { url: 'https://x' },
+      stream: new ReadableStream({
+        start(controller) { controller.error(new Error('stream broken')); },
+      }),
+    });
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(503);
+    expect(res.body.error).toBe('blob_unavailable');
   });
 });

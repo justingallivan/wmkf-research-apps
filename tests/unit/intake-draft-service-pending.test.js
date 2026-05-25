@@ -123,42 +123,89 @@ describe('selectPendingForDraft', () => {
 });
 
 describe('promoteToClean', () => {
+  const CARDINALITY = { fieldKey: 'pi_biosketch', cap: 1 };
+
   test('happy path: UPDATE returns 1 row → {promoted: true}', async () => {
     sql.mockResolvedValueOnce({ rows: [{ id: DRAFT_ID }] });
-    const result = await IntakeDraftService.promoteToClean(DRAFT_ID, ATTACHMENT_ID, cleanRow());
+    const result = await IntakeDraftService.promoteToClean(
+      DRAFT_ID, ATTACHMENT_ID, cleanRow(), CARDINALITY,
+    );
     expect(result).toEqual({ promoted: true });
-    // Only the UPDATE ran; the probe SELECT was not needed.
     expect(sql).toHaveBeenCalledTimes(1);
   });
 
-  test('race already promoted: 0 rows from UPDATE, probe shows in attachments[]', async () => {
+  test('race already promoted: 0 rows, probe shows in attachments[]', async () => {
     sql
-      .mockResolvedValueOnce({ rows: [] }) // UPDATE 0 rows
-      .mockResolvedValueOnce({ rows: [{ in_attachments: true, in_pending: false }] }); // probe
-    const result = await IntakeDraftService.promoteToClean(DRAFT_ID, ATTACHMENT_ID, cleanRow());
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ in_attachments: true, in_pending: false, field_count: '1' }] });
+    const result = await IntakeDraftService.promoteToClean(
+      DRAFT_ID, ATTACHMENT_ID, cleanRow(), CARDINALITY,
+    );
     expect(result).toEqual({ promoted: false, reason: 'race_already_promoted' });
   });
 
-  test('pending swept: 0 rows from UPDATE, probe shows in neither', async () => {
+  test('cap exceeded race: 0 rows, probe shows still in pending + field at cap', async () => {
+    // Cardinality gate blocked UPDATE; entry still pending.
     sql
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ in_attachments: false, in_pending: false }] });
-    const result = await IntakeDraftService.promoteToClean(DRAFT_ID, ATTACHMENT_ID, cleanRow());
+      .mockResolvedValueOnce({ rows: [{ in_attachments: false, in_pending: true, field_count: '1' }] });
+    const result = await IntakeDraftService.promoteToClean(
+      DRAFT_ID, ATTACHMENT_ID, cleanRow(), CARDINALITY,
+    );
+    expect(result).toEqual({
+      promoted: false, reason: 'cap_exceeded_race', fieldCount: 1, cap: 1,
+    });
+  });
+
+  test('pending swept: 0 rows, probe shows in neither', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ in_attachments: false, in_pending: false, field_count: '0' }] });
+    const result = await IntakeDraftService.promoteToClean(
+      DRAFT_ID, ATTACHMENT_ID, cleanRow(), CARDINALITY,
+    );
     expect(result).toEqual({ promoted: false, reason: 'pending_not_found' });
   });
 
-  test('draft not found: 0 rows from UPDATE, probe returns no row', async () => {
+  test('draft not found: 0 rows, probe returns no row', async () => {
     sql
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] });
-    const result = await IntakeDraftService.promoteToClean(999, ATTACHMENT_ID, cleanRow());
+    const result = await IntakeDraftService.promoteToClean(
+      999, ATTACHMENT_ID, cleanRow(), CARDINALITY,
+    );
     expect(result).toEqual({ promoted: false, reason: 'draft_not_found' });
   });
 
   test('throws on missing attachmentId', async () => {
     await expect(
-      IntakeDraftService.promoteToClean(DRAFT_ID, '', cleanRow()),
+      IntakeDraftService.promoteToClean(DRAFT_ID, '', cleanRow(), CARDINALITY),
     ).rejects.toThrow(/attachmentId/);
+  });
+
+  test('throws on missing fieldCardinality', async () => {
+    await expect(
+      IntakeDraftService.promoteToClean(DRAFT_ID, ATTACHMENT_ID, cleanRow()),
+    ).rejects.toThrow(/fieldCardinality/);
+  });
+
+  test('throws on fieldCardinality cap < 1', async () => {
+    await expect(
+      IntakeDraftService.promoteToClean(
+        DRAFT_ID, ATTACHMENT_ID, cleanRow(), { fieldKey: 'x', cap: 0 },
+      ),
+    ).rejects.toThrow(/fieldCardinality/);
+  });
+
+  test('cap parameter is passed into the SQL bind values', async () => {
+    sql.mockResolvedValueOnce({ rows: [{ id: DRAFT_ID }] });
+    await IntakeDraftService.promoteToClean(
+      DRAFT_ID, ATTACHMENT_ID, cleanRow(), { fieldKey: 'pi_biosketch', cap: 5 },
+    );
+    // Tagged-template invocation: interpolated values follow the strings array.
+    const interpolated = sql.mock.calls[0].slice(1);
+    expect(interpolated).toContain('pi_biosketch');
+    expect(interpolated).toContain(5);
   });
 });
 

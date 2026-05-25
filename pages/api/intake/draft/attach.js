@@ -41,7 +41,7 @@ import IntakeAuditService from '../../../../lib/services/intake-audit-service';
 import { resolveContactForSession } from '../../../../lib/services/contact-bridge-service';
 import { scanBytes } from '../../../../lib/services/cloudmersive-scan';
 import { isVirusScanEnabled } from '../../../../lib/utils/virus-scan-config';
-import { validateIntakeAttachment } from '../../../../lib/utils/file-magic';
+import { validateIntakeAttachment, sniffFileType } from '../../../../lib/utils/file-magic';
 import { getIntakeBlobToken } from '../../../../lib/utils/intake-blob';
 import { getFormSchema, findFileField, countFieldEntries } from '../../../../lib/utils/form-schema';
 import { buildNoResponseError } from '../../../../lib/utils/service-error';
@@ -300,6 +300,13 @@ export default async function handler(req, res) {
     // Blob NOT deleted (operator-decision posture per scoping doc).
     // Pending entry removed so the cardinality slot frees up.
     await removePendingSilent();
+    // sniffedType: re-run the bare sniffer to report what the bytes
+    // actually look like (Codex chunk-5 post-impl drift catch). Best
+    // effort — if the sniff itself throws, skip the field.
+    let sniffedType = null;
+    try {
+      sniffedType = sniffFileType(buffer);
+    } catch (_) { /* swallow */ }
     auditFireAndForget({
       actorOid: contactOid,
       actorType: 'applicant',
@@ -311,6 +318,7 @@ export default async function handler(req, res) {
         draftId, attachmentId, fieldKey: pending.fieldKey, pathname: pending.pathname,
         sha256, size,
         declaredContentType: pending.contentType,
+        sniffedType,
         accept,
         reason: magic.reason,
       },
@@ -451,24 +459,56 @@ export default async function handler(req, res) {
     return jsonError(res, 422, 'infected');
   }
 
-  // 19) Clean → promote
+  // 19) Clean → promote.
+  //
+  // Codex chunk-5 post-impl: fail-loud on missing blob_url. The drain
+  // reads `blob_url` to copy bytes to SharePoint; landing `null` here
+  // surfaces as an NPE far from the root cause. Better to 500 here.
+  const blobUrl = blobResult?.blob?.url;
+  if (typeof blobUrl !== 'string' || !blobUrl) {
+    console.error('[attach] blobResult.blob.url missing — refusing to promote', {
+      draftId, attachmentId, pathname: pending.pathname,
+    });
+    // Don't delete the Blob — bytes may be recoverable; operator decides.
+    return jsonError(res, 500, 'blob_url_missing');
+  }
+
+  // Codex chunk-5 post-impl: coerce missing scanner.scannedAt to now()
+  // ISO so the JSONB field is never absent. `JSON.stringify` omits
+  // undefined values entirely, which would leave the column with the
+  // field missing rather than null.
+  const scannedAt = typeof scanResult.scannedAt === 'string' && scanResult.scannedAt
+    ? scanResult.scannedAt
+    : new Date().toISOString();
+
   const cleanRow = {
     attachmentId,
     fieldKey: pending.fieldKey,
     filename: pending.filename,
     pathname: pending.pathname,
-    blob_url: blobResult?.blob?.url ?? null,
+    blob_url: blobUrl,
     sha256,
     size,
     contentType: pending.contentType,
     scan_result: 'clean',
     scanner: scanResult.scanner,
-    scanned_at: scanResult.scannedAt,
+    scanned_at: scannedAt,
   };
+
+  // Cardinality opts for promoteToClean's SQL-level gate. Single-valued
+  // fields pass cap=1; multi-valued pass field.maxFiles (or default 1
+  // if missing — defensive, schema-validation catches missing maxFiles
+  // at upload-token mint time).
+  const cardinalityCap = field.multiple === true
+    ? (typeof field.maxFiles === 'number' && field.maxFiles >= 1 ? field.maxFiles : 1)
+    : 1;
+  const fieldCardinality = { fieldKey: pending.fieldKey, cap: cardinalityCap };
 
   let promotion;
   try {
-    promotion = await IntakeDraftService.promoteToClean(draftId, attachmentId, cleanRow);
+    promotion = await IntakeDraftService.promoteToClean(
+      draftId, attachmentId, cleanRow, fieldCardinality,
+    );
   } catch (err) {
     console.error('[attach] promoteToClean failed:', err);
     return jsonError(res, 500, 'promote_failed');
@@ -487,7 +527,7 @@ export default async function handler(req, res) {
         sha256, size,
         scanner: scanResult.scanner,
         scan_result: scanResult.scan_result,
-        scannedAt: scanResult.scannedAt,
+        scannedAt,
         contentType: pending.contentType,
       },
     });
@@ -500,6 +540,22 @@ export default async function handler(req, res) {
       // A2 idempotency through racing call — original draft.attach row
       // exists, no audit needed.
       return res.status(200).json({ status: 'already_attached', attachmentId });
+    case 'cap_exceeded_race': {
+      // SQL cardinality gate blocked the promote — another concurrent
+      // attach for the same fieldKey beat us and filled the slot.
+      // Delete the Blob (bytes are unused at this point) + remove
+      // pending entry (cardinality slot was already taken — applicant
+      // can't legitimately retry this attachment).
+      await delBlobSilent();
+      await removePendingSilent();
+      const code = field.multiple === true
+        ? 'field_max_files_exceeded'
+        : 'field_already_has_attachment';
+      return jsonError(res, 422, code, {
+        cap: promotion.cap,
+        current: promotion.fieldCount,
+      });
+    }
     case 'pending_not_found':
       // Sweep removed entry during scan window. No audit.
       return jsonError(res, 404, 'pending_not_found');

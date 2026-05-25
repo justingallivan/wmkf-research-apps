@@ -98,7 +98,18 @@ WHERE id = ${draftId};
 
 **Return:** `<array>` if draft exists (possibly `[]`); `null` if not.
 
-### 3.3 `promoteToClean(draftId, attachmentId, cleanRow)`
+### 3.3 `promoteToClean(draftId, attachmentId, cleanRow, fieldCardinality)`
+
+**S184 chunk-5 post-impl extension:** added the required
+`fieldCardinality: {fieldKey, cap}` parameter. The cardinality
+gate moves from in-endpoint TOCTOU (chunk-5 v0) to a SQL-level WHERE
+clause that gives true atomic correctness against concurrent
+promotions to the same fieldKey. See chunk-5 design § 19 for the
+caller-side handling of the new `cap_exceeded_race` reason.
+
+#### Original (now obsolete) signature
+
+`promoteToClean(draftId, attachmentId, cleanRow)`
 
 Atomic move in a single statement. The existence checks live in the
 UPDATE's `WHERE` clause (NOT in a CTE) — at READ COMMITTED, Postgres'
