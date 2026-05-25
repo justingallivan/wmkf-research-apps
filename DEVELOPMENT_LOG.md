@@ -10,6 +10,23 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## May 2026 — Backend battle-readiness audit + Phase 0 migration tracker (Session 186)
+
+**Milestone:** Audit uncovered three live P0 issues that source-side gates couldn't see — migrations 011 and 013 had never been applied to prod Postgres (drain silently erroring every 2 min since deploy; intake portal endpoints 500 on first call), and the daily maintenance cron's `cleanupExpiredCache` had been failing daily but masking as `status='completed'`. Phase 0 closed all three plus the structural cause (no migration tracker existed). Six-round Codex review iteration on the execution plan before any code ran; GREENLIT at v6.
+
+**Sessions:** 186 (single session; 2 commits + 6 Codex plan-review rounds + 1 post-execution Codex review with 4 in-place fixes).
+
+**Ship state:**
+- Migration 011 (`submission_jobs.{locked_until, lease_token, akoya_requestnum}` + status CHECK + partial-unique index swap) applied to prod with `LOCK TABLE ACCESS EXCLUSIVE` + tracker write in single tx. Drain stops erroring.
+- Migration 013 (`intake_drafts.pending_attachments JSONB`) applied same pattern. S184 three-call attach dance now functional in prod.
+- `schema_migrations` tracker + `scripts/apply-migrations.js` (canonical forward path) + committed `lib/db/migrations-manifest.json` + `lib/utils/migration-drift.js` cold-start drift check (bidirectional, distinct `migration_tracker_missing` alert for SQLSTATE 42P01) + CI gate (`check:migrations-manifest` + `git diff --exit-code` post-build). Trusts tracker rather than IF-NOT-EXISTS guards (007 isn't re-runnable).
+- `lib/services/maintenance-service.js:13` — CommonJS named-export destructure fix (was importing whole module). Daily `cleanupExpiredCache` failure root-caused. `pages/api/cron/maintenance.js` — `isFailedSubtaskResult` covers all error shapes; status='failed' + severity='error' on any subtask failure (was masking as `completed`/`info` for days).
+- Three silent crons (`pricing-canary`, `spend-check`, `sweep-stale-invites`) gained `MaintenanceService.startRun/completeRun` placed AFTER auth guards — now write durable heartbeats; absence of a row henceforth is provably "Vercel didn't invoke," not "ran healthy."
+
+**Why it matters:** First time a source-side CI sweep's blind spot was named structurally. The pre-S186 gates (`check:atlas`, `check:api-routes`, `check:fact-consistency`, etc.) all verify source-vs-source consistency; none verified source-vs-live-state. 13 commits + ~200 unit tests of S184 attach-dance work + 14 commits of S179 drain work were both non-functional in prod because no one noticed migrations didn't ship. The new tracker + manifest pipeline + cold-start drift check converts that class of drift into a `system_alerts` row at next cold start.
+
+**Pointers:** `docs/READINESS_AUDIT_2026-05-25.md`, `docs/READINESS_AUDIT_2026-05-25_CODEX_REPORT.md`, `docs/READINESS_AUDIT_PHASE0_PLAN.md` (plan v6 GREENLIT). Commits `ffe1dec` (Phase 0 main), `c35a4f2` (closeout: jose dep + CLAUDE.md schema text correction).
+
 ## May 2026 — Three-call browser-direct attachment dance shipped end-to-end (Session 184)
 
 **Milestone:** Replaced the planned single-call attachment model (file passes through the Vercel function on upload) with a three-call browser-direct architecture: `/upload-token` pre-issues a path-scoped Vercel Blob client token, the browser PUTs bytes straight to the private intake Blob store, then `/attach` downloads-and-scans on the function. Reconciles the design tension between "bytes never traverse a function" (efficiency / cold-start) and "synchronous virus scan at attach time" (security). Cardinality enforcement moves from app-level TOCTOU to a SQL `UPDATE WHERE` clause that's atomic under Postgres EvalPlanQual.
