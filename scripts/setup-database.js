@@ -731,6 +731,7 @@ const v26Statements = [
   // V33 / migration 013: pending_attachments column for the three-call attach dance.
   // Mirrors the V26 base table for fresh installs; existing environments apply migration 013.
   `ALTER TABLE intake_drafts ADD COLUMN IF NOT EXISTS pending_attachments JSONB NOT NULL DEFAULT '[]'::jsonb`,
+  `COMMENT ON COLUMN intake_drafts.pending_attachments IS 'In-flight attachment uploads (three-call dance). Server-managed; never overwritten by autosave. See docs/INTAKE_ATTACH_BUILD_SCOPING.md § Q1 + A5 + A6.'`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_intake_drafts_unique_with_request
      ON intake_drafts (account_id, request_id, form_key)
      WHERE request_id IS NOT NULL`,

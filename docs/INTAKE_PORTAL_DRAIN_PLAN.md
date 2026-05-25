@@ -404,34 +404,40 @@ Browser                         Function                      Blob (private stor
 
 **`POST /api/intake/draft/upload-token`** — mint a scoped Blob client-upload token.
 - Auth: applicant session; membership check (`account_id ∈` contact's approved memberships, any role — Contributor can upload to drafts).
-- Draft ownership check: draft exists and `contact_oid` matches OR contact has membership for `account_id`.
+- Draft ownership check: draft exists and `contact_oid` matches OR contact has membership for `account_id`. **(S184 Q4)** Reject 409 if `request_id IS NOT NULL` — submitted drafts are append-only frozen.
 - Mint `attachmentId = crypto.randomUUID()`.
-- Derive **server-controlled** pathname: `drafts/{draftId}/{attachmentId}/{sanitizedFilename}`. Browser never picks the path.
-- Look up `fieldKey` in `shared/forms/<cycle>/schema.js`; reject 400 if unknown. Use the field's `maxBytes` for the token's `maximumSizeInBytes`.
-- Append to `draft_json.pendingAttachments[]` (atomic via `attachments = attachments || ...::jsonb` pattern in `IntakeDraftService`):
+- Derive **server-controlled, opaque** pathname: `drafts/{draftId}/{attachmentId}` (S184 A5 — no filename component). Browser never picks the path.
+- Look up `fieldKey` in `shared/forms/<cycle>/schema.js`; reject 400 if unknown. Use the field's `maxBytes` for the token's `maximumSizeInBytes`. Sanitize the client-supplied `filename` via `sanitizeBlobFilename()` (S184 Q3) before storing it — the filename rides in the pending entry's `filename` slot, not in the pathname.
+- Append to the **`pending_attachments` column** (S184 Q1 — top-level JSONB column, NOT `draft_json`; column added in migration 013) atomically via the same `col = col || ...::jsonb` pattern as `IntakeDraftService.addAttachment`:
   ```json
   { "attachmentId": "<uuid>", "fieldKey": "<key>", "filename": "<sanitized>",
-    "pathname": "drafts/<draftId>/<attachmentId>/<filename>",
-    "createdAt": "<iso>" }
+    "pathname": "drafts/<draftId>/<attachmentId>",
+    "contentType": "<mime>", "maxBytes": <int>,
+    "createdAt": "<iso>", "validUntil": "<iso, createdAt + 1h>" }
   ```
-- Mint Vercel Blob client-upload token via `@vercel/blob/client` server SDK, scoped to that exact pathname + the field's maxBytes + 1h `validUntil`.
-- Audit: `action: 'draft.upload_token.mint'`, payload `{draftId, attachmentId, fieldKey}`.
-- Response: `{attachmentId, token, pathname}`.
+- Mint Vercel Blob client-upload token via `@vercel/blob` `generateClientTokenFromReadWriteToken({pathname, maximumSizeInBytes, allowedContentTypes, validUntil})` (S184 Q2). Use `getIntakeBlobToken()` from `lib/utils/intake-blob.js` to read `INTAKE_BLOB_RW_TOKEN` — never the SDK default (S184 A4).
+- Audit row (S184 A3 field split): `action: 'draft.upload_token.mint'`; `metadata: {attachmentId, draftId, fieldKey, pathname, contentType, maxBytes, validUntil}`; `payload_digest: sha256({filename})`.
+- Response: `{attachmentId, token, pathname, filename}`.
 
 **`POST /api/intake/draft/attach`** — finalize the upload after the browser's direct PUT completes.
-- Auth: same shape as `upload-token`.
+- Auth: same shape as `upload-token` (including the Q4 `request_id IS NOT NULL` reject).
 - Payload: **only** `{draftId, attachmentId}` — every other piece of metadata is server-derived. Per Codex round-7 finding MOD-5, the server treats no client metadata as trusted.
-- Look up the pending entry in `draft_json.pendingAttachments[]` by `attachmentId`. If not found → 404 (`pending_not_found`). Possible causes: never minted, already attached (idempotent retry hit), expired and cleaned, or different draft.
-- Download bytes from the server-known pathname using `INTAKE_BLOB_RW_TOKEN`. If the Blob doesn't exist → 409 (`bytes_not_uploaded`).
-- Recompute `sha256` + `size` from the actual bytes (do not trust the client). Magic-byte validate via `lib/utils/file-magic.js` (extend extension allowlist beyond the current PDF/DOCX as needed for intake-portal field types — DOCX, XLSX, PDF for pilot).
-- Cross-check `size ≤ field's maxBytes`. If exceeded → 413 (`size_exceeds_field_max`) + delete the Blob (sanity backstop; the token's `maximumSizeInBytes` should prevent this from happening).
-- Gate on `isVirusScanEnabled()`. When off, skip scan; when on:
-  - `scanBytes(bytes, filename)` from `lib/services/cloudmersive-scan.js`.
-  - **clean** → atomic JSONB update: remove the pending entry, append to `attachments[]` with `{attachmentId, fieldKey, filename, pathname, blob_url, sha256, size, scan_result: 'clean', scanned_at, scanner}`. Audit `action: 'draft.attach'`. 200.
-  - **infected** → delete the Blob (`del()` with `INTAKE_BLOB_RW_TOKEN`); write audit row with full metadata (`action: 'draft.attach_infected'`, payload `{attachmentId, filename, sha256, size, scanner, virusName, scannedAt}`); remove the pending entry; 422.
-  - **scan_misconfigured** (cloudmersive 4xx, missing key) → leave pending entry intact; audit `action: 'draft.attach_scan_misconfigured'`; 500 with generic "scanner misconfigured, contact administrator" message. Operator fix unblocks retry.
-  - **scan_unavailable** (cloudmersive 5xx/network exhaust) → leave pending entry intact; audit `action: 'draft.attach_scan_unavailable'`; 503 with retry-friendly message. Once Cloudmersive recovers, browser can re-POST `/attach` with the same `attachmentId`.
-- When `VIRUS_SCAN_ENABLED` is off, the `'clean'` branch fires without the scan call; `scanner` field is set to `'skipped'` so the audit trail makes it explicit which uploads were unscanned.
+- **(S184 A2)** Dual lookup of `attachmentId`, in order:
+  - In `attachments[]` (already promoted) → 200 `{status: 'already_attached', attachmentId}`. Server-side idempotency; client doesn't disambiguate.
+  - In the `pending_attachments` column → run the normal scan flow below.
+  - Neither → 404 `pending_not_found`.
+- Download bytes from the server-known opaque pathname using `getIntakeBlobToken()` (S184 A4). If the Blob doesn't exist → 409 (`bytes_not_uploaded`); leave the pending entry for the cron sweep.
+- Recompute `sha256` + `size` from the actual bytes (do not trust the client). Magic-byte validate via `validateIntakeAttachment(filename, buf, field.accept)` (S184 — new function next to `validateReviewFile`, accepts PDF/DOCX/XLSX per the pilot form schema).
+- Cross-check `size ≤ field's maxBytes`. If exceeded → 413 (`size_exceeds_field_max`) + delete the Blob (sanity backstop; the token's `maximumSizeInBytes` should prevent this from happening). Remove the pending entry.
+- Gate on `isVirusScanEnabled()` (S184 A7 — see the 2×2 flag/key table in the scoping doc):
+  - Flag off → skip scan; treat as clean below; audit `scanner: 'skipped'`.
+  - Flag on, `CLOUDMERSIVE_API_KEY` missing → fail-loud at endpoint startup; return 500 `scan_misconfigured`; pending entry intact.
+  - Flag on, key present → `scanBytes(bytes, filename)` from `lib/services/cloudmersive-scan.js`.
+- Map scan result:
+  - **clean** → atomic JSONB update: remove the pending entry from `pending_attachments`, append to `attachments[]` with `{attachmentId, fieldKey, filename, pathname, blob_url, sha256, size, scan_result: 'clean', scanned_at, scanner}`. Audit row (S184 A3 split): `action: 'draft.attach'`; `metadata: {attachmentId, draftId, fieldKey, pathname, sha256, size, scanner, scan_result, scannedAt, contentType}`; `payload_digest: sha256({filename})`. 200.
+  - **infected** → delete the Blob (`del()` via `getIntakeBlobToken()`); remove the pending entry. Audit row: `action: 'draft.attach_infected'`; `metadata: {attachmentId, draftId, fieldKey, pathname, sha256, size, scanner, scan_result: 'infected', virusName, scannedAt, contentType}`; `payload_digest: sha256({filename})`. 422.
+  - **scan_misconfigured** (cloudmersive 4xx, missing key) → leave pending entry intact; audit `action: 'draft.attach_scan_misconfigured'` with the same A3 split; 500 with generic "scanner misconfigured, contact administrator" message. Operator fix unblocks retry.
+  - **scan_unavailable** (cloudmersive 5xx/network exhaust) → leave pending entry intact; audit `action: 'draft.attach_scan_unavailable'` with the same A3 split; 503 with retry-friendly message. Once Cloudmersive recovers, browser can re-POST `/attach` with the same `attachmentId`; the A2 dual-lookup will find it still pending and re-scan.
 
 **Why the pending entry stays on scan errors** — letting the applicant retry the attach call once the scanner recovers is preferable to making them re-upload (which would orphan the original Blob and burn their bandwidth). The bytes are already in Blob; only the metadata/scan step failed.
 

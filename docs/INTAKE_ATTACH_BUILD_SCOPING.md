@@ -295,7 +295,8 @@ Each chunk is ~one logical commit with green tests before moving on.
 
 1. **Migration + schema doc** — add `pending_attachments` column;
    update `lib/db/schema.sql` + new migration file; update
-   `docs/atlas/postgres-intake-drafts.md`. Zero behavior change.
+   `docs/atlas/postgres-infra-tables.md` (intake_drafts lives in the
+   infra-tables collective page, not a per-table file). Zero behavior change.
 2. **Magic-byte extension + filename sanitizer** — add
    `validateIntakeAttachment` to `lib/utils/file-magic.js`; add
    `sanitizeBlobFilename` to `lib/utils/blob-filename.js`; add
