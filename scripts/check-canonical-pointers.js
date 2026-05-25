@@ -23,27 +23,16 @@ const fs = require('fs');
 const path = require('path');
 const { repoRoot, CANONICAL_FACTS } = require('./lib/canonical-facts');
 const { CANONICAL_COUNTS_REL } = require('./lib/canonical-counts-render');
+const { isPointInTimeBasename } = require('./lib/point-in-time-files');
 
 const SINGLE_FILES = ['CLAUDE.md', 'SESSION_PROMPT.md', 'README.md', 'GEMINI.md'];
 const ROOTS = ['docs', '.claude-memory'];
 const EXCLUDE_DIR = /(^|\/)(archive|node_modules)(\/|$)/;
-const POINT_IN_TIME_BASENAMES = new Set([
-  'DOC_TRIAGE_2026-05-07.md',
-  'RECONCILIATION_REPORT.md',
-]);
-// Date-suffixed audit/handoff docs are point-in-time snapshots. Prefix-match
-// both the old naming (DOCS_GROUND_TRUTH_AUDIT_<date>.md) and the standardized
-// naming (AUDIT_<topic>_<date>.md) so a new audit doc doesn't need a
-// hardcoded per-gate exception.
-const POINT_IN_TIME_PREFIXES = ['AUDIT_', 'DOCS_GROUND_TRUTH_AUDIT_', 'CODEX_HANDOFF_REPORT_'];
+// Point-in-time doc classification: see scripts/lib/point-in-time-files.js.
 
 function hasPointInTimeFrontmatter(text) {
   const m = text.match(/^---\n([\s\S]*?)\n---/);
   return Boolean(m && /^fact_consistency:\s*point-in-time\s*$/m.test(m[1]));
-}
-
-function isPointInTimeBasename(base) {
-  return POINT_IN_TIME_BASENAMES.has(base) || POINT_IN_TIME_PREFIXES.some((prefix) => base.startsWith(prefix));
 }
 
 function collectFiles() {
