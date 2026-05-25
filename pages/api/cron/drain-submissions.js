@@ -11,7 +11,8 @@
  *     → scanning              (attachments shape + scan_result='clean' for all)
  *     → request_created       (Dataverse Create akoya_request; capture akoya_requestnum)
  *     → files_moved           (Blob → SharePoint)
- *     → dynamics_patched      (children POSTs + aggregates)
+ *     → dynamics_patched      (budget-line POSTs only — persons children +
+ *                              parent aggregate PATCH deferred; await Connor Q2)
  *     → status_flipped        (PATCH source picklist — Connor Q1)          [BUILD-PENDING]
  *     → completed             (clear draft; audit)                         [BUILD-PENDING]
  *

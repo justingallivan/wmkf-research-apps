@@ -1,0 +1,113 @@
+/**
+ * Tests for probeEntitySetCount in scripts/reconcile-memory-claims.js.
+ *
+ * Covers the three failure modes the script must distinguish, since
+ * conflating them broke check:memory-drift:
+ *
+ *   - $top=1 OR $count timeout — DIFFERENT outcomes:
+ *       $top=1 timeout → status:'unknown' (entity-exists not proven)
+ *       $count timeout → status:200 with count_error:'timeout'
+ *                        (huge tables like akoya_requests legitimately
+ *                        exceed the 15s timeout on $count alone;
+ *                        Codex S185 confirmed this is the desired
+ *                        downgrade)
+ *
+ *   - $count NON-timeout exception (TLS/DNS/etc) — MUST remain
+ *     status:'unknown' so it surfaces in probe_errors. Original fix
+ *     silently swallowed this; Codex S185 caught the regression.
+ *
+ *   - $top=1 404 — status:'probe_404' (entity set does not exist).
+ *
+ *   - $top=1 200 + $count 200 — status:200 with row_count populated.
+ */
+
+const { probeEntitySetCount } = require('../../scripts/reconcile-memory-claims.js');
+
+// Minimal Response-shaped stub. fetchWithTimeout returns a Response;
+// the production code reads .status, .ok, and .text() on it.
+function makeResponse({ status = 200, body = '' } = {}) {
+  return {
+    status,
+    ok: status >= 200 && status < 300,
+    text: async () => body,
+  };
+}
+
+function makeAbortError() {
+  const e = new Error('aborted');
+  e.name = 'AbortError';
+  return e;
+}
+
+const TOKEN = 'test-token';
+const ENTITY = 'wmkf_appgrantcycles';
+const OPTS_BASE = { _baseUrl: 'https://example.test/api/data/v9.2' };
+
+describe('probeEntitySetCount', () => {
+  test('returns status:200 with row count when both probes succeed', async () => {
+    const _fetch = jest.fn()
+      .mockResolvedValueOnce(makeResponse({ status: 200 }))         // $top=1
+      .mockResolvedValueOnce(makeResponse({ status: 200, body: '42' })); // $count
+    const r = await probeEntitySetCount(TOKEN, ENTITY, { ...OPTS_BASE, _fetch });
+    expect(r).toEqual({ status: 200, entitySet: ENTITY, row_count: 42 });
+    expect(_fetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('returns probe_404 when $top=1 returns 404 (no $count call)', async () => {
+    const _fetch = jest.fn()
+      .mockResolvedValueOnce(makeResponse({ status: 404 }));
+    const r = await probeEntitySetCount(TOKEN, ENTITY, { ...OPTS_BASE, _fetch });
+    expect(r).toEqual({ status: 'probe_404', entitySet: ENTITY, row_count: null });
+    expect(_fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('returns unknown when $top=1 returns a non-404 error status', async () => {
+    const _fetch = jest.fn()
+      .mockResolvedValueOnce(makeResponse({ status: 503, body: 'Service Unavailable' }));
+    const r = await probeEntitySetCount(TOKEN, ENTITY, { ...OPTS_BASE, _fetch });
+    expect(r.status).toBe('unknown');
+    expect(r.entitySet).toBe(ENTITY);
+    expect(r.error).toMatch(/503/);
+  });
+
+  test('returns unknown when $top=1 throws (network) — timeout-tagged on AbortError', async () => {
+    const _fetch = jest.fn().mockRejectedValueOnce(makeAbortError());
+    const r = await probeEntitySetCount(TOKEN, ENTITY, { ...OPTS_BASE, _fetch });
+    expect(r).toEqual({ status: 'unknown', entitySet: ENTITY, row_count: null, error: 'timeout' });
+  });
+
+  test('returns unknown when $top=1 throws (network) — preserves non-timeout error message', async () => {
+    const _fetch = jest.fn().mockRejectedValueOnce(new Error('TLS handshake failed'));
+    const r = await probeEntitySetCount(TOKEN, ENTITY, { ...OPTS_BASE, _fetch });
+    expect(r).toEqual({ status: 'unknown', entitySet: ENTITY, row_count: null, error: 'TLS handshake failed' });
+  });
+
+  // The Codex-caught regression case: $count AbortError must downgrade to
+  // status:200/count_error, but NON-AbortError $count failures must remain
+  // status:'unknown' so they surface in probe_errors.
+  test('returns status:200 with count_error:timeout when $count aborts (huge-table case)', async () => {
+    const _fetch = jest.fn()
+      .mockResolvedValueOnce(makeResponse({ status: 200 }))   // $top=1 ok
+      .mockRejectedValueOnce(makeAbortError());                // $count timeout
+    const r = await probeEntitySetCount(TOKEN, ENTITY, { ...OPTS_BASE, _fetch });
+    expect(r).toEqual({ status: 200, entitySet: ENTITY, row_count: null, count_error: 'timeout' });
+  });
+
+  test('returns status:unknown when $count throws a non-AbortError (TLS/network)', async () => {
+    const _fetch = jest.fn()
+      .mockResolvedValueOnce(makeResponse({ status: 200 }))                  // $top=1 ok
+      .mockRejectedValueOnce(new Error('ECONNRESET socket hang up'));        // $count network err
+    const r = await probeEntitySetCount(TOKEN, ENTITY, { ...OPTS_BASE, _fetch });
+    expect(r).toEqual({ status: 'unknown', entitySet: ENTITY, row_count: null, error: 'ECONNRESET socket hang up' });
+  });
+
+  test('returns status:200 with count_error when $count returns a non-ok response (entity still exists)', async () => {
+    const _fetch = jest.fn()
+      .mockResolvedValueOnce(makeResponse({ status: 200 }))                      // $top=1 ok
+      .mockResolvedValueOnce(makeResponse({ status: 500, body: 'Server error' })); // $count 500
+    const r = await probeEntitySetCount(TOKEN, ENTITY, { ...OPTS_BASE, _fetch });
+    expect(r.status).toBe(200);
+    expect(r.row_count).toBeNull();
+    expect(r.count_error).toMatch(/500/);
+  });
+});

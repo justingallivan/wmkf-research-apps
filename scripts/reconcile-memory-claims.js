@@ -320,11 +320,16 @@ async function resolveEntitySet(token, logicalName, candidates) {
   return { entitySet: (candidates || [])[0] || logicalName, metadata_status: 404 };
 }
 
-async function probeEntitySetCount(token, entitySet) {
-  const base = `${process.env.DYNAMICS_URL}/api/data/v9.2/${entitySet}`;
+async function probeEntitySetCount(token, entitySet, opts = {}) {
+  // opts._fetch — test injection point. Defaults to fetchWithTimeout.
+  // Signature: (url, init) => Promise<Response>. Tests inject a mock to
+  // exercise the timeout-vs-error branches without hitting the network.
+  const fetchFn = opts._fetch || fetchWithTimeout;
+  const baseUrl = opts._baseUrl || `${process.env.DYNAMICS_URL}/api/data/v9.2`;
+  const base = `${baseUrl}/${entitySet}`;
   let exists;
   try {
-    exists = await fetchWithTimeout(`${base}?$top=1`, {
+    exists = await fetchFn(`${base}?$top=1`, {
       method: 'GET',
       headers: dynamicsHeaders(token),
     });
@@ -334,19 +339,26 @@ async function probeEntitySetCount(token, entitySet) {
   if (exists.status === 404) return { status: 'probe_404', entitySet, row_count: null };
   if (!exists.ok) return { status: 'unknown', entitySet, error: `${exists.status} ${(await exists.text()).slice(0, 200)}` };
 
-  // The entity exists; $count is best-effort. A timeout on huge tables
+  // The entity exists; $count is best-effort. A *timeout* on huge tables
   // (e.g. akoya_requests with 5M+ rows) must NOT downgrade the entity
   // probe to 'unknown' — that would trip the memory-drift gate's
   // probe_errors blocker over an operationally-uninteresting slow count.
+  // But genuine non-timeout failures (network/TLS/etc.) MUST keep
+  // surfacing as 'unknown' so they show up in probe_errors — silently
+  // swallowing them was a Codex-caught regression from the initial
+  // timeout-only fix.
   try {
-    const count = await fetchWithTimeout(`${base}/$count`, {
+    const count = await fetchFn(`${base}/$count`, {
       method: 'GET',
       headers: dynamicsHeaders(token, 'text/plain'),
     });
     if (!count.ok) return { status: 200, entitySet, row_count: null, count_error: `${count.status} ${(await count.text()).slice(0, 200)}` };
     return { status: 200, entitySet, row_count: Number(await count.text()) };
   } catch (e) {
-    return { status: 200, entitySet, row_count: null, count_error: e.name === 'AbortError' ? 'timeout' : e.message };
+    if (e.name === 'AbortError') {
+      return { status: 200, entitySet, row_count: null, count_error: 'timeout' };
+    }
+    return { status: 'unknown', entitySet, row_count: null, error: e.message };
   }
 }
 
@@ -515,8 +527,14 @@ async function main() {
   if (postgres.skipped) console.warn(`Postgres probe skipped: ${postgres.reason}`);
 }
 
-main().catch((e) => {
-  console.error(`FATAL: ${e.message}`);
-  if (process.env.DEBUG) console.error(e.stack);
-  process.exit(1);
-});
+// Export testable helpers for unit tests. Guard main() so requiring this
+// module does not auto-run the script.
+module.exports = { probeEntitySetCount };
+
+if (require.main === module) {
+  main().catch((e) => {
+    console.error(`FATAL: ${e.message}`);
+    if (process.env.DEBUG) console.error(e.stack);
+    process.exit(1);
+  });
+}
