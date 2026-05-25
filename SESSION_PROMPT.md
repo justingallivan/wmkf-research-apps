@@ -1,279 +1,326 @@
-# Session 185 Prompt: Pilot wiring + UI rewrite for the three-call attach dance
+# Session 186 Prompt: Battle-readiness review of the backend before user-facing work
 
-## Session 184 Summary
+## Mandate
 
-**Net work: 14 commits — the full S184 6-chunk intake-attach build,
-all chunks Codex-reviewed pre-impl AND post-impl.** Shipped the
-three-call applicant-attachment dance end-to-end: migration, utilities,
-service helpers, two endpoints, orphan-sweep cron, and the
-submit-side A1 guard. Plus a race fix at the SQL level when the
-chunk-5 post-impl review caught a TOCTOU in the cardinality gate.
-Route count 91 → 93. Unit suite gained ~200 cases.
+**Act as a senior engineer with a clear and critical eye. The
+user has been doing behind-the-scenes work for many sessions and
+has not been able to exercise the backend directly. Before any
+user-facing UI work resumes (the S185 carryover was the applicant
+intake form), every load-bearing backend surface should be
+audited for "ready for battle" — not just "passes unit tests" or
+"the gates are green."**
 
-### What Was Completed
+The S185 audit pass restored documentation/memory/atlas ground
+truth. This session's mandate is the next layer down:
+**operational/code/database ground truth**. The threat model is
+"a real user hits this flow tomorrow morning" — not "the test
+suite passes."
 
-**Chunks 1-6 of the three-call attach dance**:
+## Mode
 
-1. **Migration + scoping (chunks 1 + 1-follow-up)**.
-   `pending_attachments JSONB NOT NULL DEFAULT '[]'::jsonb` column on
-   `intake_drafts` (migration 013). Drain plan amendments A1-A7
-   reconciled paragraph-by-paragraph (Codex round-1 catch: the
-   callout-box deferral wasn't enough — actual contradictions had to
-   be fixed line by line per `feedback-reconcile-dont-append-docs`).
+1. **Investigation first.** Read source, run probes, exercise
+   real endpoints where safe. No code edits in the first half of
+   the session.
+2. **Produce a prioritized findings list.** Group by class
+   (correctness / latent bugs / undocumented drift / operational
+   gaps / dead code). Tag each finding with confidence
+   (CONFIRMED / SUSPECTED / WORTH PROBING).
+3. **Get explicit user approval** before executing any
+   non-trivial fix. Some findings will need to be triaged to
+   future sessions; not all need fixing in S186.
+4. **Then execute** the items the user greenlights.
 
-2. **Utilities (chunks 2 + 2-follow-up)**. Three new modules:
-   - `lib/utils/file-magic.js` → `validateIntakeAttachment` (PDF/DOCX/XLSX,
-     parameterized over field `accept[]`)
-   - `lib/utils/blob-filename.js` → `sanitizeBlobFilename` (NFKC,
-     whitespace-padded `..` rejection, codepoint-aware truncation —
-     Codex round-2 caught both real attack vectors)
-   - `lib/utils/intake-blob.js` → `getIntakeBlobToken` (fail-loud on
-     missing/whitespace-only `INTAKE_BLOB_RW_TOKEN`)
+## What "ready for battle" means
 
-3. **Service helpers (chunk 3 + chunk 5 race-fix)**.
-   `IntakeDraftService.{getById, appendPending, selectPendingForDraft,
-   promoteToClean, removePending, listPendingOlderThan}`.
-   `promoteToClean` carries a SQL-level cardinality gate (third
-   `UPDATE WHERE` clause counts `attachments[]` filtered by `fieldKey`,
-   blocks if `>= cap`). Codex pre-impl caught the CTE-vs-WHERE EvalPlanQual
-   confusion; chunk-5 post-impl caught the cardinality race that this
-   gate now fixes at the only race-safe layer.
+A senior engineer looking at this would ask, for each load-bearing
+surface:
 
-4. **`POST /api/intake/draft/upload-token` (chunks 4 + 4-follow-up)**.
-   Auth + direct-owner-short-circuit + bridge + cardinality + sanitizer
-   + Blob token mint (BEFORE pending append so a mint failure doesn't
-   orphan) + audit. Codex post-impl caught: missing `Number.isSafeInteger`
-   on `draftId`, missing `maxSizeMb` 500, post-`appendPending` invariant
-   verify, audit `metadata` missing `draftId`. 50 unit tests.
+- Has this been exercised end-to-end **recently**, or has it just
+  been "shipped" weeks ago and untouched since? Stale-but-shipped
+  is the biggest hazard.
+- If a real user hits this flow at 9 AM Monday, does it work? What
+  fails and how loud is the failure? What's the recovery path?
+- Are the audit/observability hooks actually being read by anyone?
+  An alert into a table no one queries is not an alert.
+- Is the production env genuinely configured? Are secrets set?
+  Have we verified, or just listed them in `CREDENTIALS_RUNBOOK.md`?
 
-5. **`POST /api/intake/draft/attach` (chunks 5 + two follow-ups)**.
-   19-step sequence with 5 outcome branches + 9 audit actions.
-   `removePending`-first concurrency gate via `promoteToClean`'s SQL.
-   Magic-mismatch keeps Blob (operator-decision); size/infected/cap-race
-   delete Blob. Codex post-impl caught the TOCTOU cardinality race +
-   `blob_url: null` fail-loud + `scanned_at` fallback + `sniffedType`
-   in magic-mismatch audit. 61 unit tests.
+## Review buckets
 
-6. **Orphan-sweep cron + A1 submit guard (chunks 6 + 6-follow-up)**.
-   `MaintenanceService.sweepIntakePending()` runs `removePending`-first
-   (concurrency gate against `/attach.promoteToClean`'s shared opaque
-   pathname per A5). Wired as task #6 in the daily maintenance cron
-   (BEFORE `cleanupBlobs` so sweep-del failures feed into the next
-   cleanup task on the same tick). Submit endpoint rejects 409
-   `pending_attachments_present` if `intake_drafts.pending_attachments`
-   non-empty. 15 unit tests + 4 A1 guard tests.
+### 1. Load-bearing backend surfaces that haven't been exercised end-to-end recently
 
-**Memory + CLAUDE.md closeout (commit 14)**:
-   - `.claude-memory/feedback-real-fix-not-design-note.md` — user
-     pushback on "acceptable for pilot" framing; default to "real fix
-     + cost".
-   - `.claude-memory/project-codex-design-pre-impl-iteration.md` —
-     the 14-commit iteration pattern that worked.
-   - CLAUDE.md updated: intake-draft-service entry, 4 new utility-class
-     entries, database schema row, Extended Documentation pointer to
-     scoping + per-chunk design docs.
+These are systems that have shipped but may not have been
+touched live in the past 2-4 weeks. Each needs an end-to-end
+smoke OR a confidence-justifying read:
 
-### Commits
+- **S184 three-call attach dance** (`pages/api/intake/draft/upload-token.js`,
+  `/attach.js`, `MaintenanceService.sweepIntakePending`,
+  `/submit` A1 guard). Unit-tested ~200 cases. **No integration
+  test against real Blob + real Postgres + real Cloudmersive.**
+  Worth a real-environment smoke before any UI work calls it.
+  Specifically check: cardinality SQL gate's EvalPlanQual behavior
+  in real Postgres, orphan-sweep race against `/attach.promoteToClean`,
+  virus-scan timeout handling, idempotency under retry.
+- **Drain submission cron** (`pages/api/cron/drain-submissions.js`).
+  Handlers built for `queued→scanning→request_created→files_moved
+  →dynamics_patched`. `dynamics_patched→status_flipped` and
+  `status_flipped→completed` are `BUILD_PENDING_STATES`. **If a
+  real submission lands TODAY, it advances four states and parks
+  at `dynamics_patched` (pings `system_alerts`).** Is this the
+  intended deferral behavior? Will the parked job survive being
+  resumed when the next handler ships? `next_attempt_at` push-out
+  logic correct?
+- **External reviewer flow** (shipped 2026-05-03). Token mint
+  via `lib/external/token-lifecycle.js`, magic links, SharePoint
+  upload via `lib/services/review-upload.js`, post-submission
+  token extension. **No recent exercise; has the auth or storage
+  config drifted?**
+- **Reviewer Finder Dataverse-native** (W3-W6 cutover complete
+  2026-05-12). Last touched ~2 weeks ago. Picker + save-candidates
+  + per-user state. Hit it? Confirm it still works against
+  `wmkf_appreviewersuggestion` / `wmkf_appresearcher`.
+- **Review Manager email flow** — uses `grant-cycles-dataverse.js`
+  adapter. Worked at cutover; still works against current Dataverse
+  state?
+- **Phase I Dynamics writeback** (`/api/phase-i-dynamics/summarize-v2`).
+  Live Executor route. Pre-flight overwrite guard. Last manual
+  test?
+- **Virtual Review Panel** (multi-LLM). 4 provider keys; has the
+  allowlist (`VRP_ALLOWED_PROVIDERS`) been verified in prod?
 
-| Hash | Subject |
-|---|---|
-| `1b88b21` | Chunk 1/6: intake_drafts.pending_attachments column + S184 scoping (A1-A7) |
-| `6bc1780` | Chunk 1 follow-up: reconcile drain-plan paragraphs + 2 nits (Codex) |
-| `29018d6` | Chunk 2/6: three intake-attach utilities (file-magic, sanitizer, blob token) |
-| `573c7c0` | Chunk 2 follow-up: 2 sanitizer/token fixes + 3 tests (Codex round-2) |
-| `baaf0f7` | Chunk 3/6: IntakeDraftService pending-attachment helpers |
-| `1933509` | Chunk 4/6: POST /api/intake/draft/upload-token |
-| `d46d7f7` | Chunk 4 follow-up: 5 MODs + 4 LOWs (Codex post-impl review) |
-| `fa3fb3b` | Chunk 5/6: POST /api/intake/draft/attach |
-| `ef43140` | Chunk 5 follow-up: SQL-level cardinality race fix + 3 MODs + 4 tests |
-| `49dd321` | Chunk 5 race-fix follow-up: Codex Q4+Q6 catches |
-| `3a1859b` | Chunk 6/6: orphan-sweep cron + /api/intake/submit A1 guard |
-| `04d4980` | Chunk 6 follow-up: Codex Q5+Q7 catches |
-| `975e589` | CLAUDE.md: S184 intake-attach build references + memory entries |
+### 2. Database health beyond reconcile-memory-claims
 
-### What stayed green throughout
+The audit-B work made the reconcile script reflect ground truth.
+But its coverage is bounded. A senior engineer would also check:
 
-- All 7 CI gates: `check:atlas`, `check:atlas:self-test`,
-  `check:api-routes` (91 → 93), `check:fact-consistency`,
-  `check:prompt-injection-tagging`, `check:canonical-pointers`,
-  `check:drain-table-mentions`, `check:prompt-storage-mentions`.
-- Unit suite: 898 (S183 baseline) → ~1100 (+~200 cases).
+- **Untracked Postgres state.** `playing_with_neon` was caught by
+  the migration audit. Are there other tables / indexes / columns
+  that exist in prod but aren't in any declared schema? Run
+  `information_schema.tables` ∩ `information_schema.columns` ∩
+  `information_schema.indexes` against `setup-database.js` + all
+  migrations + `schema.sql`. Anything undeclared deserves a
+  decision (drop / declare / allowlist).
+- **Migration ordering and gaps.** Migrations are 002-014; no 001
+  exists. Is that intentional (renumbered) or a missing migration?
+- **Migration idempotency.** Each migration claims to be idempotent
+  (`IF NOT EXISTS`, conditional ALTERs). Verify by simulated
+  re-run (or `EXPLAIN ANALYZE` of the conditional path).
+- **Dataverse undocumented entities.** The audit caught
+  `wmkf_appproposalsearchs` (deployed with unconventional plural).
+  Run a structural sweep: every entity that exists in Dataverse
+  but has no atlas page. Use the entity-set list from the audit
+  probe + spot-check `wmkf_*` entities individually.
+- **Schema drift between source-of-truth files.** `schema.sql`
+  is a stale subset of `setup-database.js`. Decision pending:
+  delete `schema.sql` entirely, or sync them, or accept divergence
+  as documented?
+- **Backup / restore.** Has anyone tested a Postgres restore
+  recently? Dataverse backup posture documented anywhere?
 
-## Potential Next Steps
+### 3. Production environment integrity
 
-### 1. Preview-environment wiring (S183 carryovers still pending + S184 follow-up)
+Env vars listed in CLAUDE.md as required for production-only
+paths. **Listed ≠ verified.**
 
-Three env-var actions queued from prior sessions; chunks 4-5 endpoints
-are SHIPPED but unreachable through the preview UI without these:
+- `INTAKE_BLOB_RW_TOKEN` — S184 chunks 4/5 endpoints fail-loud
+  without it. **Not yet verified in prod** (per S184 carryover).
+- `CLOUDMERSIVE_API_KEY` + `VIRUS_SCAN_ENABLED` — DFT email never
+  sent, prod env not configured.
+- `CRON_SECRET`, `EXTERNAL_LINK_SECRET`, `IRS_VERIFY_SECRET` —
+  rotation cadence on each? Have any rotated since deployment?
+  `EXTERNAL_LINK_SECRET_PREVIOUS` set during current rotation? If
+  not, would a rotation today break in-flight magic links?
+- `DYNAMICS_IMPERSONATION_ENABLED` — default off. **Should it be
+  on in prod for the impersonation contract to actually work?**
+  Per memory entry, S129 smoke PASS, but is the flag on?
+- `VRP_ALLOWED_PROVIDERS` — must intersect with configured API
+  keys; production fails closed if unset. Verified?
+- `AUTH_REQUIRED` kill switch — set correctly? `EMERGENCY_AUTH_BYPASS`
+  unset in prod?
+- Per-app model overrides — admin-configurable via Dataverse
+  `wmkf_appsystemsettings`. **What's the current effective model
+  per app?** Any stale ones pointing at retired model IDs?
 
-- Send the **DFT virus-scan questions email** (drafted in S183 at
-  `docs/DFT_VIRUS_SCAN_QUESTIONS_DRAFT.md`, not sent yet — applicant-
-  side scanning posture decision depends on DFT's answer).
-- `vercel env add CLOUDMERSIVE_API_KEY production` (already in
-  preview per S184 wiring test; not yet in prod).
-- `vercel env add VIRUS_SCAN_ENABLED production` → `true` once DFT
-  question is resolved.
-- Confirm `INTAKE_BLOB_RW_TOKEN` is set in prod (S184 chunk 4+5
-  endpoints fail-loud without it). Production env was not exercised
-  during the build session.
+### 4. Observability — is anyone reading the signals?
 
-### 2. Build the applicant form UI + wire to the three-call dance — the BIG carryover
+- `system_alerts` (149 rows). Who reads it? Email / Slack
+  hookup? If the drain parks a real job tomorrow, will anyone
+  notice?
+- `health_check_history` (2,964 rows). Cron writes to it; is
+  failure-alerting wired?
+- `maintenance_runs` (1,498 rows). Daily maintenance cron audit
+  trail. Recent failure rate?
+- `api_usage_log` (1,724 rows). LLM cost ledger. Burning down
+  cleanly?
+- `model_pricing_audit` (0 rows). Monthly cron writes here on
+  `flagged = true`. Has it ever fired? If not, has the canary
+  actually been running?
+- `intake_audit` (0 rows). Will start accumulating once intake
+  goes live. SHA256-hashed; retention policy / rotation?
+- `dynamics_query_log`, `dynamics_feedback` — Dynamics Explorer
+  feedback loop. Is anyone reviewing thumbs-down rows?
 
-The chunks 4-5 endpoints are LIVE but no UI calls them yet. **There
-is no form code to "rewrite"** — `/apply` (`pages/apply/index.js`)
-is currently just a smoke-test landing page that confirms the
-External ID OAuth round-trip works; it has no form, no file uploader,
-no draft staging. The earlier framing ("rewrite `shared/components/intake/`
-from single-call to three-call") was wrong: that directory doesn't
-exist (S185 Codex-audit catch, 2026-05-25-B).
+### 5. Auth integrity
 
-The actual next build is: **construct the applicant form UI from
-scratch** (form modules, draft autosave, institution selection,
-file-input fields) and wire every file input to the three-call
-attach dance the S184 backend expects:
+- `proxy.js` (Next 16 `proxy` convention) — covers all 93 routes
+  correctly? Run a coverage check: every route either has a
+  `requireAppAccess` / `requireAuth` / `requireSuperuser` call,
+  is in the cron-secret-protected `/api/cron/*` allowlist, or is
+  an external-token-protected `/api/external/*`.
+- Dual-provider NextAuth (staff `azure-ad` + applicant
+  `entra-external`). Cross-provider non-crossing enforced? Test:
+  staff session hits `/apply/*` → middleware blocks; applicant
+  session hits non-`/apply` → middleware blocks.
+- Disabled-user blocking — `is_active=false` blocked before
+  superuser bypass per the auth.js contract. Recent test?
+- External Entra ID OTP flow — has anyone actually completed
+  the round-trip recently? Provider config drift?
 
-1. UI mints `{draftId, fieldKey, filename, contentType}` → POST
-   `/api/intake/draft/upload-token`.
-2. UI uses `@vercel/blob/client` `put(pathname, file, {token, access:'private', ...})`
-   with the returned token to PUT bytes directly.
-3. UI POSTs `{draftId, attachmentId}` to `/api/intake/draft/attach`,
-   handles the 7+ response shapes (200 attached, 200 already_attached,
-   404, 409, 413, 422 infected/magic_mismatch/cap, 500, 503).
+### 6. Memory / docs that may be stale
 
-UX considerations:
-- Progress bar via `@vercel/blob/client` `put()`'s `onUploadProgress`
-  callback.
-- Retry-friendly: 503 `scan_unavailable` / `blob_unavailable` should
-  show "try again in a moment" not "upload failed."
-- Idempotent retry: 200 `already_attached` should be a silent success,
-  not a duplicate-upload warning.
-- Cardinality errors (`field_max_files_exceeded` / `field_already_has_attachment`)
-  need field-level UI feedback, not a generic toast.
+The S185 audit fixed some, but a senior engineer would re-check:
 
-This is more than one session of work — likely a multi-chunk build
-(form rendering + draft service wiring + file-input three-call
-integration + per-field cardinality + UX) similar in shape to the
-S184 backend build. Realistic scoping conversation needed before
-starting (which form modules ship first, schema-driven vs.
-hand-rolled, etc.). Per the existing skinny-pilot memory entry, the
-first ship is mid-June 2026 Phase II Research, so the surface area
-is constrained.
+- Memory entries dated 2026-04 or earlier — anything overtaken
+  by W3-W6 cutover that we haven't caught?
+- Atlas pages with `Last verified` dates >30 days old.
+- CLAUDE.md long doc — every entity reference still maps to
+  live code? Spot-check 10 random ones.
+- `docs/INTAKE_PORTAL_DRAIN_PLAN.md` — kept in sync through
+  14 chunks; verify against what actually shipped.
+- `docs/EXECUTOR_CONTRACT.md` — match `lib/services/execute-prompt.js`
+  current behavior?
 
-### 3. Smoke the live endpoints on preview
+### 7. Code smells / dead code
 
-Before UI work: write a small smoke script that exercises the three-
-call dance against `https://wmkfresearchapps-preview.vercel.app` using
-a real applicant session. Confirms:
-- Token mint includes the right `allowedContentTypes` + `validUntil`.
-- Browser-direct PUT succeeds against `INTAKE_BLOB_RW_TOKEN`'s store.
-- `/attach` returns 200 attached + populates `attachments[]` + audit
-  row lands with the right A3 split.
-- A1 submit guard fires when pending non-empty.
+A senior engineer would prune:
 
-### 4. Connor's Q1-Q4 reply → status_flipped + persons handlers
+- `lib/services/prompt-resolver.js` — declared legacy in CLAUDE.md;
+  used by some scripts. Confirm the script callers are still
+  needed; if not, full retire.
+- Wave 1 dispatcher dead-code Postgres branch in
+  `settings-service.js` / `app-access-service.js` / `dataverse-prefs-service.js`.
+  Postgres tables dropped 2026-05-12. Is the conditional still
+  worth keeping for "loud failure on misconfiguration", or just
+  remove the branch?
+- `docs/archive/` — accumulating; anything actually useful vs.
+  could be deleted entirely?
+- Unused npm dependencies — `npm ls` clean? `depcheck` find
+  anything?
+- Tests that have rotted — `npx jest --listFailingTests`? Any
+  silently `describe.skip`'d?
 
-Carryover from S183. When the reply lands:
-- Q1 unblocks `status_flipped` drain handler.
-- Q2 unblocks `wmkf_apprequestperson` POSTs + parent PI fields at
-  Create.
-- Q3 unblocks pilot view filters (Connor + AkoyaGO admin work, not
-  ours).
-- Q4 unblocks Connor's recompute flow ship.
+### 8. Operational dry-runs worth doing
 
-### 5. Carryover, dates not yet hit
+Things a senior engineer would actually exercise:
 
-- Wave 1 elevation revert on prod app user (no fire-by date).
+- **Submit a test intake draft via curl, run the cron manually,
+  watch state transitions through `intake_audit`.** Even with no
+  UI, the backend path is exercisable.
+- **Manually invoke `MaintenanceService.sweepIntakePending`** with
+  a known pending row; confirm the race-safe ordering holds.
+- **Mint an external reviewer token, walk a fake reviewer through
+  the full flow** on preview. Confirms storage + auth + form
+  submit.
+- **Trigger `/api/cron/health-check`** manually; confirm what
+  fires when a service is intentionally broken.
+- **Send a test `/api/admin/policies` publish** and verify the
+  policy_publish_audit row + Dynamics PATCH ordering.
+
+## Out of scope for this session
+
+- **No UI work.** The applicant intake form is the next big
+  build (S185 carryover #2), but it's deliberately blocked on
+  this readiness pass.
+- **No new features.** Bug fixes only, and only ones the user
+  greenlights after the findings list.
+- **No memory-drift gate silencing.** Field Set D stays red
+  until Connor.
+
+## What the user wants out of the session
+
+A document at `docs/READINESS_AUDIT_<DATE>.md` similar in shape
+to Codex's audit reports, but written from a senior-engineer
+perspective. It should:
+
+1. Cover every bucket above (with explicit "CLEAR" verdicts on
+   items that check out — silence is not success).
+2. Surface findings the user can decide on individually (small
+   numbered list, severity-tagged).
+3. Recommend a fix order with effort estimates.
+
+Then the user picks the fixes worth doing this session vs.
+deferring.
+
+## Carryover from S185 prompt (still valid; not the focus this session)
+
+- Build the applicant form UI + wire to three-call dance —
+  deliberately deferred to a post-readiness session.
+- Connor's Q1-Q4 reply unblocks `status_flipped` + persons
+  handlers.
 - W6 reviewer Postgres DROP — fires ≥ 2026-07-01.
-- Archive intake meeting agenda — fires ≥ 2026-05-27 (TOMORROW from
-  session end on 2026-05-24).
+- Archive intake meeting agenda — fires ≥ 2026-05-27 (TOMORROW).
+- Field Set D — Connor.
 
-### 6. Stale loose ends from S181
+## Session 185 summary (10 commits)
 
-- 1h cache write column split (only needed if we ever start using
-  1h caching).
+Two consecutive Codex ground-truth audits, two complete response
+passes, plus structural reconcile-script fixes that revealed real
+drift hidden behind regex misfires and stale source-of-truth.
 
-## Your action items, not mine
+| Hash | Bucket | What |
+|---|---|---|
+| `992ea22` | A | drain-submissions current-state docs reconciled |
+| `5a3f4e8` | C | audit-doc exclusion prefix-matched in 4 gates |
+| `5d560c2` | B1+B2 | 3 reconcile bugs (resolver loop / candidate generator / $count timeout) |
+| `f132f12` | B3 | atlas counts refreshed + policy-page regex false-positive |
+| `44d8232` | Codex#1 | narrower $count exception handling + dynamics_patched accuracy + injectable-fetch test |
+| `ebeb69b` | refactor | POINT_IN_TIME_BASENAMES/PREFIXES extracted to scripts/lib/ |
+| `f33711e` | Codex#2 | reconcile structural fixes — capped-probe detection + schema-as-code completeness + bucket_meta + CREATE_TABLE_RE tightening |
+| `0e76bd5` | hygiene | archived the two ground-truth audit docs |
+| `b000a8c` | cleanup | dropped playing_with_neon from prod via migration 014 |
 
-- Send the DFT email.
-- `vercel env add VIRUS_SCAN_ENABLED production` → `true` AFTER DFT.
-- `vercel env add CLOUDMERSIVE_API_KEY production`.
-- Verify `INTAKE_BLOB_RW_TOKEN` is set in production (check via
-  `vercel env ls | grep INTAKE_BLOB_RW_TOKEN`).
+Final state:
 
-## Key Files Reference
+- **All gates green** except the intentional Field Set D
+  `doc_label_collision` (awaits Connor).
+- **All four reconcile drift buckets at 0** (was 2 hidden + 24
+  noise + 1 real before; now 0 everywhere).
+- **Reconcile report `bucket_meta` is self-documenting** —
+  future auditors don't need to read the gate code to know what
+  blocks vs. informs.
+- **`probeEntitySetCount` is unit-tested** via injectable fetch
+  (10 cases) — covers timeout / cap / error / 404 / annotation
+  paths.
+- **Schema-as-code source-of-truth set is complete** (schema.sql
+  ∪ setup-database.js ∪ migrations) — no more false-positive
+  postgres_table_mismatch entries.
+- **`wmkf_appproposalsearchs` reclassified** in Atlas (deployed
+  empty, unconventional plural — the entity exists, the entity
+  set name doesn't follow the English `-ch → -ches` rule).
 
-### New this session
-
-| File | Purpose |
-|---|---|
-| `lib/db/migrations/013_intake_drafts_pending_attachments.sql` | `pending_attachments` column |
-| `lib/utils/file-magic.js` (extended) | `validateIntakeAttachment` for intake fields |
-| `lib/utils/blob-filename.js` (NEW) | `sanitizeBlobFilename` for applicant-supplied filenames |
-| `lib/utils/intake-blob.js` (NEW) | `getIntakeBlobToken` helper |
-| `lib/utils/form-schema.js` (NEW) | Schema loader + `findFileField` + `countFieldEntries` |
-| `lib/services/intake-draft-service.js` (extended) | 6 new pending-attachment helpers |
-| `lib/services/maintenance-service.js` (extended) | `sweepIntakePending` |
-| `pages/api/intake/draft/upload-token.js` (NEW) | Three-call dance leg 1 |
-| `pages/api/intake/draft/attach.js` (NEW) | Three-call dance leg 3 |
-| `pages/api/intake/submit.js` (extended) | A1 guard |
-| `pages/api/cron/maintenance.js` (extended) | Task #6 wired |
-| `docs/INTAKE_ATTACH_BUILD_SCOPING.md` | Scoping doc (locked) |
-| `docs/INTAKE_ATTACH_CHUNK3_DESIGN.md` | Chunk 3 design |
-| `docs/INTAKE_ATTACH_CHUNK4_DESIGN.md` | Chunk 4 design |
-| `docs/INTAKE_ATTACH_CHUNK5_DESIGN.md` | Chunk 5 design |
-| `docs/INTAKE_ATTACH_CHUNK6_DESIGN.md` | Chunk 6 design |
-| `tests/unit/intake-attach-utils.test.js` (NEW) | 31 cases |
-| `tests/unit/intake-draft-service-pending.test.js` (NEW) | 26 cases |
-| `tests/unit/intake-upload-token-endpoint.test.js` (NEW) | 50 cases |
-| `tests/unit/intake-attach-endpoint.test.js` (NEW) | 61 cases |
-| `tests/unit/intake-submit-pending-guard.test.js` (NEW) | 4 cases |
-| `tests/unit/intake-pending-sweep.test.js` (NEW) | 16 cases |
-| `.claude-memory/feedback-real-fix-not-design-note.md` (NEW) | User pushback rule |
-| `.claude-memory/project-codex-design-pre-impl-iteration.md` (NEW) | The iteration pattern |
-
-### Materially edited this session
-
-| File | Change |
-|---|---|
-| `CLAUDE.md` | intake-draft-service entry expanded; 4 new utility classes; database schema row; Extended Docs pointer; route count 91 → 93 |
-| `docs/API_ROUTE_SECURITY_MATRIX.md` | 2 new rows (upload-token + attach); count 91 → 93 |
-| `docs/CANONICAL_COUNTS.md` | api-route-file-count 91 → 93 |
-| `docs/INTAKE_PORTAL_DRAIN_PLAN.md` | A1-A7 callout + line-by-line reconciliation of three-call dance section |
-| `docs/atlas/postgres-infra-tables.md` | intake_drafts row mentions pending_attachments + 2h sweep |
-| `docs/INTAKE_ATTACH_BUILD_SCOPING.md` | Codex round-1 + round-2 fold-ins; `cutoffIso` rename |
-| `scripts/setup-database.js` | pending_attachments in CREATE TABLE + idempotent ALTER + COMMENT |
+Working tree clean. 9 commits ahead of `origin/main`. Push when
+ready.
 
 ## Testing
 
 ```bash
-# Run all gates pre-stop (all green):
+# Full gate sweep — all green except memory-drift on Field Set D:
 npm run check:atlas                       # 30 PG / 32 DV ✓
-npm run check:atlas:self-test             # 12/12 patterns ✓
-npm run check:api-routes                  # 93 routes ✓ (up from 91)
+npm run check:atlas:self-test             # 12/12 ✓
+npm run check:api-routes                  # 93 ✓
 npm run check:fact-consistency            # ✓
-npm run check:prompt-injection-tagging    # 24 migrated, 0 pending ✓
+npm run check:fact-consistency:self-test  # ✓
 npm run check:canonical-pointers          # 9 pointers ✓
+npm run check:canonical-pointers:self-test # ✓
 npm run check:drain-table-mentions        # ✓
+npm run check:drain-table-mentions:self-test # ✓
 npm run check:prompt-storage-mentions     # ✓
+npm run check:prompt-storage-mentions:self-test # ✓
+npm run check:prompt-injection-tagging    # 24 ✓
+npm run check:doc-currency                # 8 ✓
+npm run check:memory-drift:no-write       # FAIL on Field Set D only (intentional)
 
-# Run the full intake-attach test surface:
-npx jest tests/unit/intake-               # ~250 cases ✓
+# Unit tests for the S185 helpers:
+npx jest tests/unit/reconcile-probe-entity-set-count.test.js tests/unit/point-in-time-files.test.js
+# 19/19 pass
 ```
-
-## Open Items (architectural, non-blocking)
-
-- **The endpoints are LIVE but no UI calls them yet** — chunks 4-5
-  ship the API; the form-side rewrite to the three-call pattern is
-  the next big build (Next Step #2).
-- **No integration tests for the actual SQL** — chunk 3's
-  `promoteToClean` cardinality gate's atomicity is unit-tested only
-  via mocks. Real-PG EvalPlanQual behavior is documented Postgres
-  semantics, but a real integration test would close the last gap.
-  Not blocking pilot; worth doing post-launch.
-- **A1 guard non-fire tests are weak scaffolding** (pg.Pool not
-  mocked). Full `/api/intake/submit` endpoint test suite is a
-  separate session of work; flagged in chunk-6 Codex post-impl review.
-- **Audit-failure invisibility** — `sweepIntakePending` uses fire-and-
-  forget audit writes; a persistent `intake_audit` outage produces
-  clean-looking sweep results. Matches the broader best-effort audit
-  contract; noted but no action taken.
