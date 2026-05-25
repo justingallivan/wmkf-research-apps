@@ -1,134 +1,154 @@
-# Session 187 Prompt: Phase A + Phase B closeout, pilot prep
+# Session 188 Prompt: Intake portal UI build (or back to backend backlog)
 
 ## ⏰ S186 Phase 0 verification — check these crons before other work
 
-Quick query of `maintenance_runs` for the first post-deploy fire of each:
+Quick query of `maintenance_runs` for the first post-deploy fire of each (deploy landed ~2026-05-25 18:00 UTC):
 
-- **`daily-maintenance`** — fires 03:00 UTC daily. Want: `status='completed'` with no `cleanupExpiredCache` error in the message, OR if it failed, severity=`error` (not the old masked `info`). First post-deploy fire: 2026-05-26 03:00 UTC.
-- **`sweep-stale-invites`** — fires 09:00 UTC daily. Want: a `maintenance_runs` row exists (S186 added the heartbeat). First post-deploy fire: 2026-05-26 09:00 UTC.
-- **`pricing-canary`** — fires Mondays 10:00 UTC. Want: row exists; `records_processed` = distinct-model count, not `unknownCount`. First post-deploy fire: 2026-06-01 10:00 UTC.
+- **`daily-maintenance`** — fires 03:00 UTC daily. Want: `status='completed'` with no `cleanupExpiredCache` error in the message, OR if it failed, severity=`error` (not the old masked `info`). First post-deploy fire should be visible by 2026-05-26 03:00 UTC.
+- **`sweep-stale-invites`** — fires 09:00 UTC daily. Want: a `maintenance_runs` row exists. First post-deploy fire 2026-05-26 09:00 UTC.
+- **`pricing-canary`** — fires Mondays 10:00 UTC. Want: row exists; `records_processed` = distinct-model count, not `unknownCount`. First post-deploy fire 2026-06-01 10:00 UTC.
 - **`drain-submissions`** — every 2 min, doesn't write `maintenance_runs`. Tail Vercel logs for the function to confirm no column-doesn't-exist errors. Optional unless intake traffic appears in `submission_jobs`.
 
-Deploy landed ~2026-05-25 18:00 UTC (S187 start). `spend-check` already confirmed wiring works.
+`spend-check` already confirmed wiring works in S187.
 
-## Session 186 Summary
+## Session 187 Summary
 
-S186 was the backend battle-readiness audit. It uncovered three live P0 issues that S183-S185's source-side gates couldn't see: **migration 011 and 013 had never been applied to prod Postgres** (drain has been silently erroring every 2 min since deploy; intake portal endpoints 500 on first call), and the **daily maintenance cron's `cleanupExpiredCache` had been failing daily but the cron was masking it as `status='completed'`**.
-
-Phase 0 closed all three plus the structural cause (no migration tracker existed). Six rounds of Codex review iterated the execution plan before any code ran; Codex GREENLIT at v6 and found 4 in-place fixes post-execution.
+S187 closed the Phase B backend-hardening backlog from S186's readiness audit (four chunks shipped through full Codex pre-impl + post-impl cadence) AND unblocked the DR8 applicant-auth flow that smoke-testing surfaced as silently broken in deployed environments.
 
 ### What was completed
 
-1. **Audit + plan + 6-round Codex iteration**
-   - `docs/READINESS_AUDIT_2026-05-25.md` — 8-bucket audit, 30+ findings, P0/P1/P2 tiered
-   - `docs/READINESS_AUDIT_2026-05-25_CODEX_REPORT.md` — self-contained second-pass briefing
-   - `docs/READINESS_AUDIT_PHASE0_PLAN.md` — execution plan, v1→v6 (Codex GREENLIT)
+1. **Drain recordFailure rewrite — items #5+#6+#30** (`0865bbc`)
+   - Real exponential backoff: `60 * 2^priorAttempts` capped at 3600s (was always 60s)
+   - Per-category `maxAttempts` from `drain-error-classifier.js` `CAPS` now consumed; dead `DRAIN_MAX_ATTEMPTS_DEFAULT` env-var escape hatch removed
+   - Retryable failures hitting their category cap emit a post-COMMIT `intake_drain_retry_exhausted` alert (severity=error, autoResolveKey dedup by category)
+   - All 16 call sites updated; `recordFailure({job, ...retryable, maxAttempts})` signature; fail-loud guard throws on retryable+missing maxAttempts; `processJob` safety net special-cases the misuse throw shape so a Patch-B regression terminal-fails instead of misclassifying as transient
+   - 11 deterministic tests in `tests/unit/drain-record-failure.test.js`
 
-2. **DB executed against prod** (via ad-hoc scripts, then deleted)
-   - `schema_migrations` tracker created + probe-backfilled with 11 rows (002-010, 012, 014)
-   - Migration 011 applied: `submission_jobs.{locked_until, lease_token, akoya_requestnum}` + status check expansion + partial-unique index swap. `LOCK TABLE ACCESS EXCLUSIVE` inside the apply transaction. **Drain stops erroring at the next 2-min tick.**
-   - Migration 013 applied: `intake_drafts.pending_attachments JSONB`. **S184 three-call attach dance is now functional in prod.**
+2. **Intake portal rate limiting — item #4** (`415a54d`)
+   - New `lib/intake/rate-limit.js` mirrors `lib/external/rate-limit.js` (A6) for OAuth-session-keyed buckets
+   - Three buckets per request, ALL must pass: per-applicant per-route, per-applicant aggregate (`...:all`), per-IP
+   - Caps: `upload-token`/`attach` @ 20/min; `submit` @ 5/min; aggregate 100/min; per-IP 120/min
+   - `draft` autosave gets a DEDICATED per-IP bucket (`intake:ip:<addr>:draft`) so keystroke-debounce can't starve other endpoints
+   - Single round-trip multi-row VALUES upsert with composite-PK ON CONFLICT (race-free); opportunistic 2% pruning; fail-open with degraded-alert at 5 consecutive PG failures (autoResolveKey `intake-rate-limit-db-degraded`)
+   - Wired into all 4 handler files AFTER session+contactOid extraction, BEFORE any body validation / draft fetch / Blob mint / virus scan / transaction
+   - 17 deterministic tests in `tests/unit/intake-rate-limit.test.js` including SQL-shape regression assertion for the multi-bucket upsert
 
-3. **Tracker infrastructure committed** (`ffe1dec`)
-   - `scripts/apply-migrations.js` — canonical forward apply path. Trusts tracker (007 isn't re-runnable). Strips line-anchored `^BEGIN;`/`^COMMIT;` only (verified preserves 007's PL/pgSQL DO-block `BEGIN`s).
-   - `scripts/build-migrations-manifest.js` + `scripts/check-migrations-manifest.js` + committed `lib/db/migrations-manifest.json` (deterministic, no timestamp).
-   - `lib/utils/migration-drift.js` — cold-start hook reads manifest + tracker; bidirectional drift detection; distinct `migration_tracker_missing` alert for SQLSTATE 42P01; auto-resolves stale alerts on clean state.
-   - `instrumentation.js` — wires `detectMigrationDrift` after `auth-bypass-monitor`.
-   - `package.json` — `prebuild`, `apply:migrations`, `check:migrations-manifest`.
-   - `.github/workflows/test.yml` — `check:migrations-manifest` + `npm run build` + `git diff --exit-code lib/db/migrations-manifest.json` gate.
+3. **Intake private-Blob GC — item #7** (`dc6057a`)
+   - New `MaintenanceService.cleanupIntakePrivateBlobs({retentionHours=72})` sweeps orphan bytes in the `intake-applicant-private` store left after successful drains
+   - Active-pathname sources (union of 3 via UNION ALL + JS Set):
+     - `intake_drafts.attachments[].pathname WHERE request_id IS NULL` (pre-submit only — Codex pre-impl Q2 catch; otherwise post-submit drafts would keep bytes "active" forever)
+     - `intake_drafts.pending_attachments[].pathname`
+     - `submission_jobs.payload->'attachments'->>'pathname' WHERE status NOT IN ('completed','failed','cancelled') AND jsonb_typeof = 'array'`
+   - Defensive paths: missing token soft-fail, invalid `uploadedAt` skipped, `isBlobNotFound` swallowed as skipped, non-404 errors counted; `{token, prefix:'drafts/'}` on both list/del
+   - Wired into daily maintenance cron as step 7.5
+   - 12 deterministic tests in `tests/unit/maintenance-cleanup-intake-private-blobs.test.js`
 
-4. **Maintenance correctness** (`ffe1dec`)
-   - `lib/services/maintenance-service.js:13` — `{ DatabaseService }` destructure fix (was importing whole module object). Root cause of daily `cleanupExpiredCache` failure.
-   - `pages/api/cron/maintenance.js` — `isFailedSubtaskResult` covers `error` field, numeric `errors` count, array-shaped `errors`, and nested `blobDelErrors`/`removePendingErrors` (per Codex post-execution review). Records `status='failed'` + severity `error` on any subtask failure.
-   - `pages/api/cron/{pricing-canary,spend-check,sweep-stale-invites}.js` — `MaintenanceService.startRun/completeRun` placed AFTER auth guards. `pricing-canary.recordsProcessed` uses `totalChecked` (distinct models), not the bad-outcome `unknownCount`.
+4. **intake_audit retention + retention-override hardening — item #11** (`38343de`)
+   - New `MaintenanceService.cleanupIntakeAudit(retentionDays=730)` — forensic-grade 2y retention, Dataverse-overridable via `retention:intake_audit_days`
+   - Wired as step 4.5 in maintenance cron (grouped with the other PG time-series DELETEs)
+   - **Bonus hardening (Codex post-impl)**: `getRetentionConfig` override parser now rejects 0/negative/NaN values across ALL six retention keys. Before this, a misconfigured `retention:foo_days=0` would translate to "delete everything older than 0 days" = whole-table immediate wipe.
+   - 10 deterministic tests in `tests/unit/maintenance-cleanup-intake-audit.test.js`
 
-5. **Phase 0 closeout adjacent items** (`c35a4f2`)
-   - `jose@^4.15.9` declared as direct dep (was only transitively via `next-auth`); production external-reviewer + DVX-result-token paths depend on it.
-   - `CLAUDE.md` §"Database Schema" rewritten — now points at `setup-database.js` (fresh install) + migrations + manifest + tracker + `apply-migrations.js`. Prior text claimed `schema.sql + migrations/` was authoritative but `schema.sql` is a 5-table legacy subset.
-   - Env-var verification via `vercel env ls production`: `INTAKE_BLOB_RW_TOKEN` ✅, `DVX_BLOB_RW_TOKEN` ✅, model overrides probe = 0 entries (no stale retired model IDs), `VRP_ALLOWED_PROVIDERS` missing but moot (only `CLAUDE_API_KEY` set in prod; VRP needs ≥2 providers and is admin-assigned anyway).
+5. **#10 closed as already-shipped** (`47f4211`)
+   - S186 audit item #10 (Dynamics feedback admin surface) had a stale premise. Verified `DynamicsFeedbackSection` in `pages/admin.js:1645` + the `/api/dynamics-explorer/feedback` GET/PATCH endpoint already exists end-to-end. Memory entry written so future audits don't relist.
+
+6. **DR8 surfaced + unblocked** (operator-side, no code changes)
+   - Smoke test against preview discovered that **production AND preview were both missing the `entra-external` provider** because the three `EXTERNAL_AZURE_AD_*` env vars had never been deployed (S129 worked locally; never propagated)
+   - Tenant verified: WM Keck Foundation Grant Application Portal (`04a1406b-...`), External tier, free 50k MAU well above our pilot scale, "Premium required" and "subscription state" warnings are non-blocking (analytics-dashboard gate + SLA-support-only)
+   - App registration `WMKF Grant Application Portal` confirmed in External tenant; Client ID `0677b40a-f9d9-44cd-9d6d-e95921711b7c`; redirect URIs `https://wmkfresearch.vercel.app/api/auth/callback/entra-external` + localhost already configured
+   - User provisioned the 3 env vars in Vercel production + fresh client secret; production now returns both `azure-ad` AND `entra-external` from `/api/auth/providers`
+   - Justin completed a real OTP round-trip end-to-end: signed in as `nick_sludge.78@icloud.com` (OID `3bba39e3-2712-4c06-ae2a-9646afd3d6ce`), `/apply` welcome page rendered correctly with claims populated
+   - **Two UI bugs surfaced during the round-trip, logged for a future UI session** (`.claude-memory/project-intake-portal-ui-todo.md`): sign-out silently re-authenticates via Entra (NextAuth `signOut` only clears the local cookie, not the IdP session); Entra sign-up flow collects irrelevant City/State/DisplayName
+
+7. **Cloudmersive verified** (operator-side)
+   - User added `CLOUDMERSIVE_API_KEY` to Vercel production as a sensitive var (correctly — that's why `vercel env pull` shows it empty; sensitive vars are masked from out-of-band retrieval but the runtime value is intact)
+   - Local key pulled into `.env.local`; `scripts/smoke-virus-scan.mjs` round-trip green: 7/7 assertions pass including EICAR detection
+
+8. **Repo hygiene closeout** (`01bf89e`)
+   - `git mv docs/INTAKE_PORTAL_MEETING_AGENDA_2026-05-13.md docs/archive/` (2 days early; meeting decisions landed in design/schema-changes docs)
+   - Updated active references in atlas + IRS memory; left the historical S154 audit doc reference intact
+   - Removed the done carryover memory; UI-TODO memory file landed alongside
 
 ### Commits
 
-- `ffe1dec` — S186 Phase 0: apply mig 011/013, schema_migrations tracker, maintenance fixes
-- `c35a4f2` — Phase 0 closeout: declare jose direct dep + correct CLAUDE.md schema source
+- `0865bbc` — S187 #5+#6+#30: real exponential backoff + per-category cap + retry-exhausted alerts
+- `415a54d` — S187 #4: intake portal rate limiting
+- `dc6057a` — S187 #7: intake private Blob GC
+- `38343de` — S187 #11: intake_audit retention + retention-override hardening
+- `47f4211` — S187 session bookkeeping: #10 stale-premise closeout + cron verification reminder
+- `01bf89e` — Archive 2026-05-13 intake portal meeting agenda + log UI TODOs
 
-## Open user-action items from S186 (no code involved)
+## Open user-action items from S187
 
-**Virus scan posture: ENABLE CLOUDMERSIVE** (user-chosen at S186 closeout). The integration is already wired fail-closed. Operator-side enablement:
+None active. Both Cloudmersive (sensitive in prod) and the External ID env vars (3 vars in prod) are wired and verified.
 
-```bash
-# After getting a Cloudmersive API key:
-vercel env add CLOUDMERSIVE_API_KEY production   # paste key
-vercel env add VIRUS_SCAN_ENABLED production     # value: true
-# Redeploy (push or trigger)
-```
+## Potential next steps for S188
 
-Free tier is 800 scans/month; audit projects ~350/cycle across reviewer + intake combined. Failure mode is fail-closed (upload rejected on scanner outage). Monitor free-tier usage.
+S188 has two natural shapes; the choice depends on how Justin wants to spend the session.
 
-## Potential next steps for S187
+### Path A — Start S185 intake portal UI (the big remaining piece)
 
-S187 should pick the next chunk based on what feels most urgent — Phase A (pre-pilot smoke) and Phase B (drain hardening + intake portal protection) are the two main directions. The four Phase B items pair well; the two Phase A dry-runs can run alongside.
+This is the original deliverable that S186/S187 cleared the path for. With auth shipped (DR8 ✓), all four backend endpoints hardened (rate-limit ✓, drain ✓, virus scan ✓, GC ✓, audit retention ✓), and the form-schema/draft/submit primitives long-shipped (S178/S184), the UI build is fully unblocked.
 
-### Phase A — pre-pilot smoke tests (separate exercise per item)
+Justin mentioned wanting to dedicate dedicated sessions to design + UI work. This is that. Naturally folds in the two UI bugs in `.claude-memory/project-intake-portal-ui-todo.md`:
 
-1. **DR1 — Intake submission e2e against preview env.** Submit a fixture draft via curl → upload-token → PUT to Blob → attach → submit → watch drain advance through `queued → scanning → request_created → files_moved → dynamics_patched`. Validates the full path now that migrations are live. Creates a real (test) `akoya_request` + SharePoint folder in preview's connected tenant.
-2. **DR8 — External Entra ID OTP round-trip on preview.** Send a magic-link OTP to a fixture applicant email, complete sign-in, confirm session `userType='applicant'` + `contactOid` + non-crossing enforcement against staff surfaces. Validates S129 provider config hasn't drifted.
+1. **Sign-out doesn't actually sign user out** — UX layer (`/apply/signed-out` no-auto-redirect page) + federated sign-out layer (hit Entra's logout endpoint with `post_logout_redirect_uri`).
+2. **Entra "Add details" page collects irrelevant City/State/DisplayName** — portal config fix only (External Identities → User flows → User attributes), no code.
 
-### Phase B — drain hardening + intake portal protection
+Sub-shapes within Path A:
+- **A1** — Design / wireframe / state-machine session for the applicant flow (institution selection, draft staging, attachment upload UX, submit confirmation). Pure design, no code.
+- **A2** — Build the institution-selection step (fuzzy-match against existing accounts per memory `project-intake-portal-institution-match.md`; reuse the primitive that's also needed for reviewer affiliation match).
+- **A3** — Build the form renderer over the existing form-schema primitive (`shared/forms/phase-ii-research-2026-06/`).
+- **A4** — The sign-out fix as a tiny standalone chunk (mostly de-risks the OAuth scaffolding before bigger UI work lands on top).
 
-3. **#4 — Intake portal rate limiting.** Build `lib/intake/rate-limit.js` mirroring `lib/external/rate-limit.js`. Keyed on `(contactOid, route)` for endpoint-specific abuse + a coarser `applicant:{contactOid}:all` for aggregate. Fail-open with degraded-state alerting. Apply to `/api/intake/draft/{upload-token,attach}` and `/api/intake/submit`. **Effort M.**
-4. **#5 + #6 + #30 — Drain backoff + classifier `maxAttempts`.** Replace `Math.pow(2, 0)` with `Math.pow(2, job.attempts)` in `recordFailure`; consume `cls.maxAttempts` from `drain-error-classifier.js` (transient 10, scan 3) instead of dropping it; terminal-fail on cap with a `system_alerts` row. **Effort S, small contained patch.**
-5. **#7 — Intake private Blob GC.** Drain `handleFilesMoved` doesn't delete source bytes after SharePoint upload; `cleanupBlobs` only scans the shared store. Extend daily maintenance with a private-store sweep keyed on `INTAKE_BLOB_RW_TOKEN` that reaps blobs not in any active draft's `attachments[]` or `pending_attachments[]`. **Effort M.**
+### Path B — Continue picking off the backend backlog
 
-### Other P1 follow-ups
+If S188 doesn't want to be a UI session, there's plenty of non-UI work:
 
-6. **#10 — Dynamics feedback review surface.** `dynamics_feedback` and `dynamics_query_log` are written by the Dynamics Explorer thumbs UI but no admin page reads them. Either small `/admin/dynamics-feedback` page or remove the thumbs-down UI. **Effort M.**
-7. **#11 — `intake_audit` retention policy.** No retention configured today; will grow forever once intake goes live. Add `retention:intake_audit_days` (e.g. 730) + a `cleanupIntakeAudit` method + a daily-maintenance call. **Effort S.**
+5. **Backend automation vision** — design and build the PowerAutomate-triggered surfaces (interim report auto-eval; staged review pipeline). Multi-session.
+6. **Proposal Context Extraction** — pre-extract structured fields so downstream calls use ~1.5K-token curated extracts instead of ~7K-token full proposals. Design doc at `docs/PROPOSAL_CONTEXT_EXTRACTION_PLAN.md`.
+7. **Dataverse Power Tools Track B Phase 2** — API + builder UI + Blob on top of the S160 deterministic spine.
 
-### After Phase A+B lands, the intake portal UI itself (S185 carryover)
+### Carryover dates to track in S188
 
-The applicant intake form (HTML) — the original S185 build that S186 deliberately gated on this readiness pass. With migrations live, virus scanning enabled, rate limiting + Blob GC done, the UI build is unblocked.
-
-## Carryover items to verify, not act on
-
-- **W6 reviewer Postgres DROP** — fires ≥ 2026-07-01 per `project-w6-table-drop-pending.md`. Today is 2026-05-25; not yet.
-- **Archive intake meeting agenda** — fires ≥ 2026-05-27 (day after tomorrow). `git mv docs/INTAKE_PORTAL_MEETING_AGENDA_2026-05-13.md docs/archive/`.
-- **Field Set D doc collision** — still blocked on Connor; not for S187.
+- **W6 reviewer Postgres DROP** — fires ≥ 2026-07-01 (5 weeks out). Drain-only tables `researchers`, `researcher_keywords`, `publications`, `proposal_searches`. Per CLAUDE.md carryover hygiene, will need a pre-flight grep before any DROP.
+- **`EXTERNAL_AZURE_AD_*` provisioning for preview deploys** — out-of-scope for pilot but worth noting: Vercel preview URLs are per-deployment, so DR8 testing on preview would 400 on Microsoft's redirect-URI check. For pilot scope, test against prod only.
 
 ## Key files reference
 
 | File | Purpose |
 |------|---------|
-| `docs/READINESS_AUDIT_2026-05-25.md` | Full audit findings + dry-run results |
-| `docs/READINESS_AUDIT_2026-05-25_CODEX_REPORT.md` | Codex-discussion briefing |
-| `docs/READINESS_AUDIT_PHASE0_PLAN.md` | Execution plan v6 (GREENLIT, executed) |
-| `scripts/apply-migrations.js` | Canonical forward apply path |
-| `scripts/build-migrations-manifest.js` + `scripts/check-migrations-manifest.js` | Manifest pipeline |
-| `lib/db/migrations-manifest.json` | Committed deterministic file list |
-| `lib/utils/migration-drift.js` | Cold-start drift detection |
-| `pages/api/cron/maintenance.js` | Subtask-failure detection lives here |
-| `pages/api/cron/{pricing-canary,spend-check,sweep-stale-invites}.js` | Now write `maintenance_runs` heartbeats |
+| `lib/intake/rate-limit.js` | NEW — applicant-portal rate limiting (mirrors lib/external/rate-limit.js) |
+| `lib/services/maintenance-service.js` | NEW METHODS: cleanupIntakeAudit + cleanupIntakePrivateBlobs; HARDENING: getRetentionConfig override-value guard |
+| `pages/api/cron/drain-submissions.js` | recordFailure rewritten; processJob misuse-guard branch |
+| `pages/api/cron/maintenance.js` | Steps 4.5 + 7.5 wiring |
+| `pages/api/intake/{draft,submit}.js`, `pages/api/intake/draft/{upload-token,attach}.js` | Rate-limit insertion points (after contactOid extraction) |
+| `.claude-memory/project-intake-portal-ui-todo.md` | The two /apply UI bugs to fold into a future UI session |
+| `.claude-memory/project-dynamics-feedback-admin-shipped.md` | S186 #10 closeout: surface already shipped, don't relist |
+| `pages/apply/index.js` | Current applicant landing page (smoke-test only; needs design work) |
 
 ## Testing
 
 ```bash
-# Phase 0 verification gates
+# Session-start sanity gates
 npm run check:atlas                       # 30 PG / 32 DV ✓
 npm run check:api-routes                  # 93 ✓
+npm run check:fact-consistency            # registered scalars current ✓
 npm run check:migrations-manifest         # 13 files ✓
-npm run apply:migrations                  # idempotent — all 13 skipped on second run ✓
 
-# Confirm DB state matches expectations
-node -e "/* connect; SELECT name FROM schema_migrations ORDER BY name; */"
-# expect 13 rows: 002-014 inclusive
+# S187 new test suites
+npx jest tests/unit/drain-record-failure.test.js                      # 11 pass
+npx jest tests/unit/intake-rate-limit.test.js                         # 17 pass
+npx jest tests/unit/maintenance-cleanup-intake-private-blobs.test.js  # 12 pass
+npx jest tests/unit/maintenance-cleanup-intake-audit.test.js          # 10 pass
 
-# Tomorrow morning, confirm Phase 0's behavior changes landed:
-# - Daily maintenance cron at 03:00 UTC should record status='completed' (no
-#   cleanupExpiredCache or intakePending errors); future failures will record
-#   status='failed' + severity='error'.
-# - Drain cron at every 2 min should exit cleanly (0-row claims) instead of
-#   the silent column-doesn't-exist errors.
-# - pricing-canary / spend-check / sweep-stale-invites should write fresh
-#   maintenance_runs rows at their schedules. If still missing → Vercel-side
-#   cron config issue, not handler.
+# All unit tests
+npx jest tests/unit                       # 1155 pass, 1 skipped, 63 suites
+
+# Operational verification (preview/prod)
+vercel curl https://wmkfresearch.vercel.app/api/auth/providers
+# Expect: {"azure-ad":{...}, "entra-external":{...}}
+
+node scripts/smoke-virus-scan.mjs         # Cloudmersive round-trip, EICAR + clean
+node scripts/smoke-intake-draft.js        # DB-layer intake primitives
 ```
