@@ -60,6 +60,7 @@ import IntakeAuditService from '../../../lib/services/intake-audit-service';
 import { resolveContactForSession } from '../../../lib/services/contact-bridge-service';
 import { validateAttachmentShape, validateAttachmentSet } from '../../../lib/utils/intake-attachment-shape';
 import { validateBudgetLineRow } from '../../../lib/utils/intake-budget-line-payload';
+import { checkIntakeRateLimit } from '../../../lib/intake/rate-limit';
 
 const { Pool } = pkg;
 
@@ -101,6 +102,15 @@ export default async function handler(req, res) {
   const contactOid = session.user.contactOid;
   if (!contactOid) {
     return jsonError(res, 401, 'Session missing contactOid');
+  }
+
+  // Rate limit BEFORE body validation / membership check / draft fetch /
+  // submission_jobs transaction. Submit cap is tight (5/min/applicant) —
+  // resubmits should be rare.
+  const rl = await checkIntakeRateLimit(req, contactOid, 'submit');
+  if (!rl.ok) {
+    res.setHeader('Retry-After', String(rl.retryAfterSeconds));
+    return jsonError(res, 429, 'rate_limited', { scope: rl.scope });
   }
 
   // 2) Body

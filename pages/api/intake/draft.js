@@ -62,6 +62,7 @@ import { hasLiveMembership } from '../../../lib/services/membership-service';
 import IntakeDraftService from '../../../lib/services/intake-draft-service';
 import IntakeAuditService from '../../../lib/services/intake-audit-service';
 import { resolveContactForSession } from '../../../lib/services/contact-bridge-service';
+import { checkIntakeRateLimit } from '../../../lib/intake/rate-limit';
 
 function jsonError(res, status, error, extra = {}) {
   return res.status(status).json({ error, ...extra });
@@ -81,6 +82,15 @@ export default async function handler(req, res) {
   const contactOid = session.user.contactOid;
   if (!contactOid) {
     return jsonError(res, 401, 'Session missing contactOid');
+  }
+
+  // Rate limit — draft autosave gets a dedicated per-IP bucket (no
+  // per-applicant cap so keystroke-debounced autosave can't UX-fail).
+  // contactOid omitted intentionally for the 'draft' routeKey.
+  const rl = await checkIntakeRateLimit(req, contactOid, 'draft');
+  if (!rl.ok) {
+    res.setHeader('Retry-After', String(rl.retryAfterSeconds));
+    return jsonError(res, 429, 'rate_limited', { scope: rl.scope });
   }
 
   // 2) Body

@@ -45,6 +45,7 @@ import { validateIntakeAttachment, sniffFileType } from '../../../../lib/utils/f
 import { getIntakeBlobToken } from '../../../../lib/utils/intake-blob';
 import { getFormSchema, findFileField, countFieldEntries } from '../../../../lib/utils/form-schema';
 import { buildNoResponseError } from '../../../../lib/utils/service-error';
+import { checkIntakeRateLimit } from '../../../../lib/intake/rate-limit';
 
 const ALLOWED_FIELDS = new Set(['draftId', 'attachmentId']);
 
@@ -87,6 +88,13 @@ export default async function handler(req, res) {
   const contactOid = session.user.contactOid;
   if (!contactOid) {
     return jsonError(res, 401, 'Session missing contactOid');
+  }
+
+  // Rate limit BEFORE body validation / draft fetch / Blob fetch / virus scan.
+  const rl = await checkIntakeRateLimit(req, contactOid, 'attach');
+  if (!rl.ok) {
+    res.setHeader('Retry-After', String(rl.retryAfterSeconds));
+    return jsonError(res, 429, 'rate_limited', { scope: rl.scope });
   }
 
   // 3) Body validation + forbidden-field guard + closed-set allow-list

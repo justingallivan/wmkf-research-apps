@@ -36,6 +36,7 @@ import IntakeAuditService from '../../../../lib/services/intake-audit-service';
 import { resolveContactForSession } from '../../../../lib/services/contact-bridge-service';
 import { sanitizeBlobFilename } from '../../../../lib/utils/blob-filename';
 import { getIntakeBlobToken } from '../../../../lib/utils/intake-blob';
+import { checkIntakeRateLimit } from '../../../../lib/intake/rate-limit';
 import { getFormSchema, findFileField, countFieldEntries } from '../../../../lib/utils/form-schema';
 
 const FORBIDDEN_FIELDS = [
@@ -76,6 +77,13 @@ export default async function handler(req, res) {
   const contactOid = session.user.contactOid;
   if (!contactOid) {
     return jsonError(res, 401, 'Session missing contactOid');
+  }
+
+  // Rate limit BEFORE any body validation, draft fetch, or token mint.
+  const rl = await checkIntakeRateLimit(req, contactOid, 'upload-token');
+  if (!rl.ok) {
+    res.setHeader('Retry-After', String(rl.retryAfterSeconds));
+    return jsonError(res, 429, 'rate_limited', { scope: rl.scope });
   }
 
   // 3) Body validation + forbidden-field guard + closed-set allow-list
