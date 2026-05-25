@@ -1,5 +1,16 @@
 # Session 187 Prompt: Phase A + Phase B closeout, pilot prep
 
+## ⏰ S186 Phase 0 verification — check these crons before other work
+
+Quick query of `maintenance_runs` for the first post-deploy fire of each:
+
+- **`daily-maintenance`** — fires 03:00 UTC daily. Want: `status='completed'` with no `cleanupExpiredCache` error in the message, OR if it failed, severity=`error` (not the old masked `info`). First post-deploy fire: 2026-05-26 03:00 UTC.
+- **`sweep-stale-invites`** — fires 09:00 UTC daily. Want: a `maintenance_runs` row exists (S186 added the heartbeat). First post-deploy fire: 2026-05-26 09:00 UTC.
+- **`pricing-canary`** — fires Mondays 10:00 UTC. Want: row exists; `records_processed` = distinct-model count, not `unknownCount`. First post-deploy fire: 2026-06-01 10:00 UTC.
+- **`drain-submissions`** — every 2 min, doesn't write `maintenance_runs`. Tail Vercel logs for the function to confirm no column-doesn't-exist errors. Optional unless intake traffic appears in `submission_jobs`.
+
+Deploy landed ~2026-05-25 18:00 UTC (S187 start). `spend-check` already confirmed wiring works.
+
 ## Session 186 Summary
 
 S186 was the backend battle-readiness audit. It uncovered three live P0 issues that S183-S185's source-side gates couldn't see: **migration 011 and 013 had never been applied to prod Postgres** (drain has been silently erroring every 2 min since deploy; intake portal endpoints 500 on first call), and the **daily maintenance cron's `cleanupExpiredCache` had been failing daily but the cron was masking it as `status='completed'`**.

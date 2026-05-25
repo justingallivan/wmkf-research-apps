@@ -71,6 +71,7 @@
 - [Tool-result serializer SHIPPED](project-dynamics-explorer-serializer-deferred.md) — `lib/utils/dynamics-explorer-serializer.js` redacts sensitive fields + caps long strings
 - [Dataverse Search API + perf optimizations](project-dynamics-explorer-details.md) — Search API enabled (77K+ docs), inline schemas, parallel execution, SSE streaming
 - [Schema discovery: prefer the diff tool](project-dynamics-explorer-schema-diff.md) — `scripts/dynamics-schema-diff.js` enumerates ALL Dataverse attributes; older `dynamics-schema-map.js` silently drops sparsely-populated fields
+- [Thumbs feedback admin surface SHIPPED](project-dynamics-feedback-admin-shipped.md) — `DynamicsFeedbackSection` in `pages/admin.js` + `/api/dynamics-explorer/feedback` GET/PATCH already exists. S186 audit #10 "no admin page reads feedback" was stale-premise; don't rebuild.
 
 ## Dynamics CRM
 - [CRM users + licensing](project-dynamics-crm-users.md) — 16 licensed staff (@wmkeck.org) + ~180 service accounts; OBO not recommended due to complexity
