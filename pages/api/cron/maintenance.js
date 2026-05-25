@@ -68,6 +68,17 @@ export default async function handler(req, res) {
       results.healthHistory = { error: error.message };
     }
 
+    // 4.5. Intake audit retention (S187 #11). Append-only audit trail of
+    //      applicant-facing portal actions. Default 730d (Dataverse-
+    //      overridable via retention:intake_audit_days). Grouped with the
+    //      other Postgres time-series DELETEs.
+    try {
+      results.intakeAudit = await MaintenanceService.cleanupIntakeAudit(config.intake_audit_days);
+      totalDeleted += results.intakeAudit;
+    } catch (error) {
+      results.intakeAudit = { error: error.message };
+    }
+
     // 5. Old alerts cleanup
     try {
       results.alerts = await AlertService.cleanupOldAlerts(config.alert_days);
