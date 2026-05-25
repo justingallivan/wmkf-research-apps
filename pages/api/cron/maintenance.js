@@ -98,6 +98,21 @@ export default async function handler(req, res) {
       results.blobs = { error: error.message };
     }
 
+    // 7.5. Intake private-Blob sweep (S187 #7). Reaps orphan bytes in the
+    //      `intake-applicant-private` store left after successful drains
+    //      (handleFilesMoved doesn't inline-del). Distinct store + token
+    //      from step 7 (cleanupBlobs runs against the shared public store).
+    //      Sources to keep "active": pre-submit drafts.attachments[],
+    //      pending_attachments[], and non-terminal submission_jobs payload.
+    try {
+      results.intakePrivateBlobs = await MaintenanceService.cleanupIntakePrivateBlobs({});
+      if (typeof results.intakePrivateBlobs?.deleted === 'number') {
+        totalDeleted += results.intakePrivateBlobs.deleted;
+      }
+    } catch (error) {
+      results.intakePrivateBlobs = { error: error.message };
+    }
+
     // 8. Dynamics feedback cleanup (resolved entries older than 180 days)
     try {
       results.feedback = await FeedbackService.cleanupOldFeedback(180);
