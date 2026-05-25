@@ -118,6 +118,10 @@ describe('sanitizeBlobFilename', () => {
     expect(() => sanitizeBlobFilename('．．/etc/passwd')).toThrow(/\.\./);
   });
 
+  test('rejects whitespace-padded traversal `  ../x.pdf` (Codex round-2 catch)', () => {
+    expect(() => sanitizeBlobFilename('  ../x.pdf')).toThrow(/\.\./);
+  });
+
   test('strips leading dots (hidden-file convention)', () => {
     expect(sanitizeBlobFilename('.htaccess')).toBe('htaccess');
   });
@@ -158,6 +162,19 @@ describe('sanitizeBlobFilename', () => {
     // Fullwidth `ｆｉｌｅ.pdf` normalizes to `file.pdf`
     expect(sanitizeBlobFilename('ｆｉｌｅ.pdf')).toBe('file.pdf');
   });
+
+  test('truncation is codepoint-aware (no split surrogate pairs)', () => {
+    // 🎉 is a non-BMP codepoint (2 UTF-16 code units). 300 of them =
+    // 600 code units, but only 300 codepoints. Truncation must be by
+    // codepoint, not code unit, so the result is well-formed UTF-16.
+    const long = '🎉'.repeat(300) + '.pdf';
+    const result = sanitizeBlobFilename(long);
+    expect(Array.from(result).length).toBe(200);
+    expect(result.endsWith('.pdf')).toBe(true);
+    // Round-trip through JSON serialization to confirm no split-surrogate
+    // artifact (a split surrogate becomes `�` or throws).
+    expect(JSON.parse(JSON.stringify(result))).toBe(result);
+  });
 });
 
 describe('getIntakeBlobToken', () => {
@@ -183,6 +200,11 @@ describe('getIntakeBlobToken', () => {
 
   test('throws fail-loud when empty string', () => {
     process.env.INTAKE_BLOB_RW_TOKEN = '';
+    expect(() => getIntakeBlobToken()).toThrow(/not configured/);
+  });
+
+  test('throws fail-loud when whitespace-only (Codex round-2 catch)', () => {
+    process.env.INTAKE_BLOB_RW_TOKEN = '   \t  \n  ';
     expect(() => getIntakeBlobToken()).toThrow(/not configured/);
   });
 });
