@@ -92,6 +92,18 @@ export default async function handler(req, res) {
       results.feedback = { error: error.message };
     }
 
+    // 8. Intake-portal pending-attachment sweep (S184 chunk 6). Cleans
+    //    up stale pending entries (and their Blobs) that the three-call
+    //    /attach dance left behind. 2h cutoff per A6.
+    try {
+      results.intakePending = await MaintenanceService.sweepIntakePending();
+      if (typeof results.intakePending?.deleted === 'number') {
+        totalDeleted += results.intakePending.deleted;
+      }
+    } catch (error) {
+      results.intakePending = { error: error.message };
+    }
+
     // Record successful run
     await MaintenanceService.completeRun(runId, {
       status: 'completed',

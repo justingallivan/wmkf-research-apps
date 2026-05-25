@@ -195,6 +195,19 @@ export default async function handler(req, res) {
     return jsonError(res, 400, 'No draft found for this (account, form)');
   }
 
+  // 4a) S184 A1: reject if a Blob upload is still in-flight. Without
+  //     this guard, submit could succeed mid-/attach and orphan the
+  //     in-flight Blob bytes (no path back into the application). The
+  //     applicant is told to wait for the upload or remove the in-flight
+  //     item before retrying.
+  const pendingAttachments = Array.isArray(draft.pending_attachments) ? draft.pending_attachments : [];
+  if (pendingAttachments.length > 0) {
+    return jsonError(res, 409, 'pending_attachments_present', {
+      pendingCount: pendingAttachments.length,
+      message: 'An upload is still in progress. Wait for it to finish, or refresh and remove the in-flight item before submitting.',
+    });
+  }
+
   // 5) Validate attachments — shape + scan_result === 'clean' for all
   const attachments = Array.isArray(draft.attachments) ? draft.attachments : [];
   try {
