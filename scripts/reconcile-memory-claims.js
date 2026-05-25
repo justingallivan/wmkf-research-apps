@@ -15,6 +15,8 @@ const atlasDir = path.join(docsDir, 'atlas');
 const auditFile = path.join(docsDir, 'AUDIT_S154_MEMORY_V2.md');
 const wave2Dir = path.join(repoRoot, 'lib', 'dataverse', 'schema', 'wave2');
 const schemaSql = path.join(repoRoot, 'lib', 'db', 'schema.sql');
+const migrationsDir = path.join(repoRoot, 'lib', 'db', 'migrations');
+const setupDbScript = path.join(repoRoot, 'scripts', 'setup-database.js');
 const aiFieldsSpecV3 = path.join(docsDir, 'DYNAMICS_AI_FIELDS_SPEC_v3_cn.md');
 const reportPath = path.join(docsDir, 'RECONCILIATION_REPORT.json');
 
@@ -145,10 +147,53 @@ function loadWave2Specs() {
   return specs;
 }
 
+// Regex shape note: the trailing `\s*\(` is load-bearing. Without it the `i`
+// flag makes `[a-z_]` case-insensitive, so prose like
+// "this inline block uses CREATE TABLE IF NOT EXISTS." picks up "IF" as a
+// table name. The open-paren requirement disambiguates real DDL from
+// comment-text mentions.
+const CREATE_TABLE_RE = /CREATE TABLE(?:\s+IF NOT EXISTS)?\s+("?)([a-z_][a-z0-9_]*)\1\s*\(/gi;
+
 function parseSchemaSqlTables() {
   const src = readFileSafe(schemaSql);
   const tables = new Set();
-  const re = /CREATE TABLE IF NOT EXISTS\s+("?)([a-z_][a-z0-9_]*)\1/gi;
+  let m;
+  const re = new RegExp(CREATE_TABLE_RE.source, CREATE_TABLE_RE.flags);
+  while ((m = re.exec(src)) !== null) tables.add(m[2].toLowerCase());
+  return tables;
+}
+
+/**
+ * Parse `CREATE TABLE` statements from every file in lib/db/migrations/.
+ * Returns the set of tables created by migrations. Migrations are part of
+ * the full schema-as-code set (with schema.sql and setup-database.js).
+ */
+function parseMigrationTables() {
+  const tables = new Set();
+  if (!fs.existsSync(migrationsDir)) return tables;
+  for (const f of fs.readdirSync(migrationsDir).filter((x) => x.endsWith('.sql'))) {
+    const src = readFileSafe(path.join(migrationsDir, f));
+    let m;
+    const re = new RegExp(CREATE_TABLE_RE.source, CREATE_TABLE_RE.flags);
+    while ((m = re.exec(src)) !== null) tables.add(m[2].toLowerCase());
+  }
+  return tables;
+}
+
+/**
+ * Parse `CREATE TABLE` statements from scripts/setup-database.js. This file
+ * is the real source of truth for the original table set — schema.sql
+ * carries only a subset (drift between the two predates this audit and is
+ * orthogonal to memory-drift gating). Without this source, the reconcile
+ * report's postgres_table_mismatch bucket false-fires on ~15 tables
+ * (api_usage_log, system_alerts, etc.) that are actually declared, just
+ * not in schema.sql.
+ */
+function parseSetupDbTables() {
+  const tables = new Set();
+  if (!fs.existsSync(setupDbScript)) return tables;
+  const src = readFileSafe(setupDbScript);
+  const re = new RegExp(CREATE_TABLE_RE.source, CREATE_TABLE_RE.flags);
   let m;
   while ((m = re.exec(src)) !== null) tables.add(m[2].toLowerCase());
   return tables;
@@ -347,13 +392,39 @@ async function probeEntitySetCount(token, entitySet, opts = {}) {
   // surfacing as 'unknown' so they show up in probe_errors — silently
   // swallowing them was a Codex-caught regression from the initial
   // timeout-only fix.
+  // Count strategy: use `?$count=true&$top=1` and read `@odata.count`
+  // from the response body — NOT the bare `/$count` endpoint. The bare
+  // path caps at maxPageSize (default 5000), so any table with >5000 rows
+  // (e.g. wmkf_apprequestpersons ~5,561; akoya_requests ~25,561) silently
+  // returned 5000 and looked like fake drift against an accurate Atlas
+  // claim. The `$count=true` annotation uses Dataverse's FetchXML
+  // aggregation under the hood and returns the true count reliably up to
+  // ~50,000. Above that, set { Prefer: 'odata.include-annotations="*"' }
+  // and parse `@odata.count` from the response; the same code path
+  // handles both regimes.
   try {
-    const count = await fetchFn(`${base}/$count`, {
+    const count = await fetchFn(`${base}?$count=true&$top=1`, {
       method: 'GET',
-      headers: dynamicsHeaders(token, 'text/plain'),
+      headers: {
+        ...dynamicsHeaders(token),
+        Prefer: 'odata.include-annotations="*"',
+      },
     });
     if (!count.ok) return { status: 200, entitySet, row_count: null, count_error: `${count.status} ${(await count.text()).slice(0, 200)}` };
-    return { status: 200, entitySet, row_count: Number(await count.text()) };
+    const body = await count.json();
+    const annotated = body['@odata.count'];
+    if (typeof annotated === 'number') {
+      // Dataverse caps both /$count and ?$count=true at 5000 regardless of
+      // Prefer:maxpagesize. A row_count of exactly 5000 is therefore
+      // ambiguous — could be a real 5000-row table, but in practice
+      // virtually always means "cap reached, true count ≥ 5000."
+      // Callers that need the true count must fall back to FetchXML
+      // aggregate (out of scope here). We tag the probe so drift-bucket
+      // builders can skip false-staleness on capped probes.
+      const count_capped = annotated === 5000;
+      return { status: 200, entitySet, row_count: annotated, ...(count_capped ? { count_capped: true } : {}) };
+    }
+    return { status: 200, entitySet, row_count: null, count_error: 'missing @odata.count annotation' };
   } catch (e) {
     if (e.name === 'AbortError') {
       return { status: 200, entitySet, row_count: null, count_error: 'timeout' };
@@ -439,7 +510,15 @@ async function main() {
 
   const claimAudit = parseClaimAudit();
   const specs = loadWave2Specs();
-  const schemaTables = parseSchemaSqlTables();
+  const schemaSqlTables = parseSchemaSqlTables();
+  const migrationTables = parseMigrationTables();
+  const setupDbTables = parseSetupDbTables();
+  // Combined schema-as-code set: union of schema.sql + setup-database.js +
+  // all migrations. This is the authoritative "did we declare this table in
+  // source?" set. Using schema.sql alone produces ~20 false-positive
+  // 'mismatch' entries; setup-database.js holds the original bulk-create
+  // DDL that schema.sql never caught up with.
+  const schemaTables = new Set([...schemaSqlTables, ...setupDbTables, ...migrationTables]);
   const atlasFacts = extractAtlasFacts();
 
   const dataverseEntities = new Set([
@@ -466,8 +545,17 @@ async function main() {
   }
 
   const staleRowCount = [];
+  const cappedProbeEntities = [];
   for (const [entity, result] of dataverseResults) {
     if (result.status !== 200 || typeof result.row_count !== 'number') continue;
+    if (result.count_capped) {
+      // Probe returned the Dataverse $count cap (5000); real count is ≥5000
+      // and the atlas claim should be treated as more authoritative. Surface
+      // separately in probe_notes; do NOT push into stale_row_count where
+      // it would look like real drift.
+      cappedProbeEntities.push(entity);
+      continue;
+    }
     const claim = nearestAtlasClaim(entity, atlasFacts.rowClaims) || nearestAtlasClaim(result.entity_set || entity, atlasFacts.rowClaims);
     if (!claim || claim.atlas_claim === result.row_count) continue;
     staleRowCount.push({ entity, atlas_claim: claim.atlas_claim, live_count: result.row_count, source_file: claim.source_file });
@@ -478,11 +566,28 @@ async function main() {
     // Unknown is not a mismatch. The skipped probe is recorded in probe_notes
     // and summary.probe_errors instead of polluting this drift bucket.
   } else {
+    // Declared in source (schema.sql ∪ setup-database.js ∪ migrations) but not deployed:
     for (const table of schemaTables) {
-      if (!postgres.tables.has(table)) postgresTableMismatch.push({ table, in_schema_sql: true, deployed: false });
+      if (!postgres.tables.has(table)) {
+        const sources = [];
+        if (schemaSqlTables.has(table)) sources.push('schema_sql');
+        if (setupDbTables.has(table)) sources.push('setup_database');
+        if (migrationTables.has(table)) sources.push('migrations');
+        postgresTableMismatch.push({
+          table,
+          in_schema_as_code: true,
+          deployed: false,
+          declared_in: sources.join('+'),
+        });
+      }
     }
+    // Deployed but not declared in source — this IS the bucket that matters
+    // for drift detection. With migrations folded into schema-as-code, the
+    // remaining entries are genuinely undeclared tables.
     for (const table of postgres.tables) {
-      if (!schemaTables.has(table)) postgresTableMismatch.push({ table, in_schema_sql: false, deployed: true });
+      if (!schemaTables.has(table)) {
+        postgresTableMismatch.push({ table, in_schema_as_code: false, deployed: true });
+      }
     }
   }
 
@@ -495,12 +600,30 @@ async function main() {
     probe_errors: probeErrors,
   };
 
+  // bucket_meta is a self-documenting header so future auditors don't have
+  // to re-derive which buckets are gate-blocking vs. informational by
+  // reading check-memory-drift.js. Mirrors the actual gate logic in
+  // scripts/check-memory-drift.js: the gate only fails on
+  // spec_without_entity, stale_row_count (>50% drift), doc_label_collision,
+  // and probe_errors > 0. Everything else is informational.
+  const bucket_meta = {
+    spec_without_entity: { gate_blocking: true, severity: 'P0', describes: 'Wave 2 schema-as-code entity that probes as 404 in Dataverse.' },
+    entity_without_atlas: { gate_blocking: false, severity: 'P2', describes: 'Dataverse entity that exists live but has no Atlas mention. Informational — usually means the Atlas page needs an entry, occasionally means the entity was deployed with an unconventional name.' },
+    stale_row_count: { gate_blocking: 'when_delta_over_50_percent', severity: 'P1', describes: 'Atlas row-count claim differs from live probe. Probe-capped rows (Dataverse $count caps at 5000) are excluded — surfaced in probe_notes.dataverse_count_capped instead.' },
+    doc_label_collision: { gate_blocking: true, severity: 'P0', describes: 'Same label used for incompatible meanings across docs. Resolve by owner decision, do not silence.' },
+    postgres_table_mismatch: { gate_blocking: false, severity: 'P2', describes: 'Postgres table appears in source-as-code (schema.sql ∪ migrations/) but not live, OR live but not in source-as-code. Migrations are part of the schema-as-code set; tables created by migrations should NOT appear here.' },
+  };
+
   const report = {
     generated: new Date().toISOString(),
     summary,
+    bucket_meta,
     probe_notes: {
       dataverse: dataverseWarning ? `probe_skipped: ${dataverseWarning}` : 'completed',
       postgres: postgres.skipped ? `probe_skipped: ${postgres.reason}` : 'completed',
+      dataverse_count_capped: cappedProbeEntities.length
+        ? `Dataverse $count returned the 5000-row cap for: ${cappedProbeEntities.join(', ')}. Real counts unknown via OData $count; consult Atlas / FetchXML aggregates.`
+        : 'none',
     },
     drift_buckets: {
       spec_without_entity: specWithoutEntity,

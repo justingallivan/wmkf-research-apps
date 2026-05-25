@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-25T03:53:23.022Z",
+  "generated": "2026-05-25T04:26:48.653Z",
   "summary": {
     "total_claims": 157,
     "stale": 38,
@@ -7,32 +7,42 @@
     "unknown": 31,
     "probe_errors": 0
   },
+  "bucket_meta": {
+    "spec_without_entity": {
+      "gate_blocking": true,
+      "severity": "P0",
+      "describes": "Wave 2 schema-as-code entity that probes as 404 in Dataverse."
+    },
+    "entity_without_atlas": {
+      "gate_blocking": false,
+      "severity": "P2",
+      "describes": "Dataverse entity that exists live but has no Atlas mention. Informational — usually means the Atlas page needs an entry, occasionally means the entity was deployed with an unconventional name."
+    },
+    "stale_row_count": {
+      "gate_blocking": "when_delta_over_50_percent",
+      "severity": "P1",
+      "describes": "Atlas row-count claim differs from live probe. Probe-capped rows (Dataverse $count caps at 5000) are excluded — surfaced in probe_notes.dataverse_count_capped instead."
+    },
+    "doc_label_collision": {
+      "gate_blocking": true,
+      "severity": "P0",
+      "describes": "Same label used for incompatible meanings across docs. Resolve by owner decision, do not silence."
+    },
+    "postgres_table_mismatch": {
+      "gate_blocking": false,
+      "severity": "P2",
+      "describes": "Postgres table appears in source-as-code (schema.sql ∪ migrations/) but not live, OR live but not in source-as-code. Migrations are part of the schema-as-code set; tables created by migrations should NOT appear here."
+    }
+  },
   "probe_notes": {
     "dataverse": "completed",
-    "postgres": "completed"
+    "postgres": "completed",
+    "dataverse_count_capped": "Dataverse $count returned the 5000-row cap for: akoya_requests, wmkf_app_request_person, wmkf_apprequestpersons. Real counts unknown via OData $count; consult Atlas / FetchXML aggregates."
   },
   "drift_buckets": {
     "spec_without_entity": [],
-    "entity_without_atlas": [
-      {
-        "entity": "wmkf_app_proposal_search",
-        "row_count": 0
-      }
-    ],
-    "stale_row_count": [
-      {
-        "entity": "wmkf_app_request_person",
-        "atlas_claim": 5561,
-        "live_count": 5000,
-        "source_file": "docs/atlas/dataverse-akoya-request.md"
-      },
-      {
-        "entity": "wmkf_apprequestpersons",
-        "atlas_claim": 5561,
-        "live_count": 5000,
-        "source_file": "docs/atlas/dataverse-akoya-request.md"
-      }
-    ],
+    "entity_without_atlas": [],
+    "stale_row_count": [],
     "doc_label_collision": [
       {
         "label": "Field Set D",
@@ -48,123 +58,8 @@
     ],
     "postgres_table_mismatch": [
       {
-        "table": "api_usage_log",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "dynamics_feedback",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "dynamics_query_log",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "dynamics_restrictions",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "dynamics_user_roles",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "expertise_matches",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "expertise_roster",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "grant_cycles",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "health_check_history",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "intake_audit",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "intake_drafts",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "integrity_screenings",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "irs_exempt_orgs",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "maintenance_runs",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "model_pricing_audit",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "panel_review_items",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "panel_reviews",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
         "table": "playing_with_neon",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "policy_publish_audit",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "retractions",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "screening_dismissals",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "submission_jobs",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "system_alerts",
-        "in_schema_sql": false,
-        "deployed": true
-      },
-      {
-        "table": "user_profiles",
-        "in_schema_sql": false,
+        "in_schema_as_code": false,
         "deployed": true
       }
     ]

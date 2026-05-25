@@ -28,12 +28,13 @@ Deployed custom attrs (11): `wmkf_appgrantcycleid`, `wmkf_displayname` (primary)
 
 **Callers:** `lib/services/grant-cycles-dataverse.js` is the live read/write path. Consumed by `pages/api/reviewer-finder/grant-cycles.js`, `pages/api/review-manager/render-emails.js`, `pages/api/review-manager/send-emails.js`, and `lib/services/maintenance-service.js` (blob cleanup, via `wmkf_reviewtemplateurl`). Postgres `grant_cycles` is drain-only post-W3 cutover; see `docs/atlas/postgres-grant-cycles.md` for the cross-reference. Post-pilot drop of the Postgres table is destructive-carryover-gated (≥2026-07-01).
 
-## `wmkf_appproposalsearch` — NOT DEPLOYED
+## `wmkf_appproposalsearch` — DEPLOYED (empty), unconventional plural
 
-**Live row count:** N/A (404 on `wmkf_appproposalsearches` entity set, 2026-05-07)
+**Live row count:** 0 (re-probed 2026-05-25)
+**Entity set:** `wmkf_appproposalsearchs` — **NOT** the expected `wmkf_appproposalsearches`. Dataverse's auto-pluralization for this entity used `+s` (not the English `-ch → -ches` rule); attempting `?$top=1` on `wmkf_appproposalsearches` returns 404, on `wmkf_appproposalsearchs` returns 200 empty.
 **Schema-as-code:** `lib/dataverse/schema/wave2/wmkf_app_proposal_search.json`
 
-The schema-as-code defines the entity but `apply-dataverse-schema.js` was never run for it (or it ran and failed silently — TBD). Postgres `proposal_searches` is also 0 rows; writer is dead. Defer indefinitely.
+S185 audit catch (2026-05-25-B): the prior "NOT DEPLOYED" claim (from 2026-05-07) was based on a probe of only the `-es` variant. The reconcile-memory-claims candidate generator's broader probe (commit `5d560c2`) found the actual `-s` entity set. The entity exists, has no rows, has no writer code, and no read path uses it. Postgres `proposal_searches` is also 0 rows; writer is dead. Defer indefinitely — but the deployment status row in the migration-plan table below is now ✅ deployed (empty), not ❌.
 
 ## `wmkf_app_z_publication_author` — NOT DEPLOYED
 
@@ -52,7 +53,7 @@ Junction for `wmkf_apppublication ↔ wmkf_appresearcher`. Defer until publicati
 | `wmkf_appreviewersuggestion` | (extension manifest only) | ✅ | ✅ (336 rows) |
 | `wmkf_apppublication` | ✅ | ✅ | empty |
 | `wmkf_appgrantcycle` | ✅ (partial) | ✅ | 10 rows (Dataverse-primary post-2026-05-12) |
-| `wmkf_appproposalsearch` | ✅ | ❌ | n/a |
+| `wmkf_appproposalsearch` | ✅ | ✅ (entity set is `wmkf_appproposalsearchs`, NOT `-es`) | empty |
 | `wmkf_app_z_publication_author` | ✅ | ❌ | n/a |
 
 The "as-built vs. as-designed" reconciliation Codex round-3 #5 asked for is captured here.

@@ -117,13 +117,20 @@ are SHIPPED but unreachable through the preview UI without these:
   endpoints fail-loud without it). Production env was not exercised
   during the build session.
 
-### 2. UI rewrite for the three-call dance — the BIG carryover
+### 2. Build the applicant form UI + wire to the three-call dance — the BIG carryover
 
-The chunks 4-5 endpoints are LIVE but no UI calls them yet. The form
-code in `shared/components/intake/` is still on the old single-call
-attachment model (file passes through the function). Rewriting the
-applicant-portal form's file-input flow to the three-call pattern is
-the next big build:
+The chunks 4-5 endpoints are LIVE but no UI calls them yet. **There
+is no form code to "rewrite"** — `/apply` (`pages/apply/index.js`)
+is currently just a smoke-test landing page that confirms the
+External ID OAuth round-trip works; it has no form, no file uploader,
+no draft staging. The earlier framing ("rewrite `shared/components/intake/`
+from single-call to three-call") was wrong: that directory doesn't
+exist (S185 Codex-audit catch, 2026-05-25-B).
+
+The actual next build is: **construct the applicant form UI from
+scratch** (form modules, draft autosave, institution selection,
+file-input fields) and wire every file input to the three-call
+attach dance the S184 backend expects:
 
 1. UI mints `{draftId, fieldKey, filename, contentType}` → POST
    `/api/intake/draft/upload-token`.
@@ -143,8 +150,14 @@ UX considerations:
 - Cardinality errors (`field_max_files_exceeded` / `field_already_has_attachment`)
   need field-level UI feedback, not a generic toast.
 
-This is probably a full session of focused frontend work + manual
-preview-environment smoke + Codex review.
+This is more than one session of work — likely a multi-chunk build
+(form rendering + draft service wiring + file-input three-call
+integration + per-field cardinality + UX) similar in shape to the
+S184 backend build. Realistic scoping conversation needed before
+starting (which form modules ship first, schema-driven vs.
+hand-rolled, etc.). Per the existing skinny-pilot memory entry, the
+first ship is mid-June 2026 Phase II Research, so the surface area
+is constrained.
 
 ### 3. Smoke the live endpoints on preview
 

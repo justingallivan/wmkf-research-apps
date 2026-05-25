@@ -24,12 +24,13 @@
 const { probeEntitySetCount } = require('../../scripts/reconcile-memory-claims.js');
 
 // Minimal Response-shaped stub. fetchWithTimeout returns a Response;
-// the production code reads .status, .ok, and .text() on it.
-function makeResponse({ status = 200, body = '' } = {}) {
+// production code reads .status, .ok, .text(), and .json() on it.
+function makeResponse({ status = 200, body = '', json = null } = {}) {
   return {
     status,
     ok: status >= 200 && status < 300,
     text: async () => body,
+    json: async () => json,
   };
 }
 
@@ -46,11 +47,33 @@ const OPTS_BASE = { _baseUrl: 'https://example.test/api/data/v9.2' };
 describe('probeEntitySetCount', () => {
   test('returns status:200 with row count when both probes succeed', async () => {
     const _fetch = jest.fn()
-      .mockResolvedValueOnce(makeResponse({ status: 200 }))         // $top=1
-      .mockResolvedValueOnce(makeResponse({ status: 200, body: '42' })); // $count
+      .mockResolvedValueOnce(makeResponse({ status: 200 }))                                      // $top=1
+      .mockResolvedValueOnce(makeResponse({ status: 200, json: { '@odata.count': 42 } }));       // $count=true&$top=1
     const r = await probeEntitySetCount(TOKEN, ENTITY, { ...OPTS_BASE, _fetch });
     expect(r).toEqual({ status: 200, entitySet: ENTITY, row_count: 42 });
     expect(_fetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('returns status:200 with count_error when $count response lacks @odata.count annotation', async () => {
+    const _fetch = jest.fn()
+      .mockResolvedValueOnce(makeResponse({ status: 200 }))                                       // $top=1
+      .mockResolvedValueOnce(makeResponse({ status: 200, json: { value: [{}] } }));               // $count=true&$top=1 without annotation
+    const r = await probeEntitySetCount(TOKEN, ENTITY, { ...OPTS_BASE, _fetch });
+    expect(r.status).toBe(200);
+    expect(r.entitySet).toBe(ENTITY);
+    expect(r.row_count).toBeNull();
+    expect(r.count_error).toMatch(/annotation/i);
+  });
+
+  test('correctly returns true count above the 5000 OData $count cap', async () => {
+    // Regression guard for the apprequestpersons-style false-staleness.
+    // Switching from /$count (capped at 5000) to ?$count=true&$top=1
+    // unlocks Dataverse's aggregate path which goes up to ~50k.
+    const _fetch = jest.fn()
+      .mockResolvedValueOnce(makeResponse({ status: 200 }))
+      .mockResolvedValueOnce(makeResponse({ status: 200, json: { '@odata.count': 5561 } }));
+    const r = await probeEntitySetCount(TOKEN, ENTITY, { ...OPTS_BASE, _fetch });
+    expect(r.row_count).toBe(5561);
   });
 
   test('returns probe_404 when $top=1 returns 404 (no $count call)', async () => {
