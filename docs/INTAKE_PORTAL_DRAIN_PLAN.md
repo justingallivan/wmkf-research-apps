@@ -340,6 +340,19 @@ Two consumers:
 
 #### Attachment upload — three-call dance
 
+> **S184 contract amendments (authoritative — see `docs/INTAKE_ATTACH_BUILD_SCOPING.md` § Locked decisions + § Contract amendments A1–A7).** The S183 spec below is preserved for context; the amendments below supersede the conflicting bits. Implementation work in S184 follows the amended contract.
+>
+> - **Q1.** `pendingAttachments` lives in a **new top-level `pending_attachments JSONB` column** on `intake_drafts` (migration 013), **not** inside `draft_json`. Reason: `upsertDraftJson` (S183) overwrites `draft_json` wholesale, preserving only `idempotency_key`; an autosave between `/upload-token` and `/attach` would clobber the pending entry. The pre-issued Blob client-upload token uses `@vercel/blob` v2.3's `generateClientTokenFromReadWriteToken` (`pathname`, `maximumSizeInBytes`, `allowedContentTypes`, `validUntil`); the browser uses `put()` from `@vercel/blob/client`.
+> - **A1.** `/api/intake/submit` MUST reject 409 (`pending_attachments_present`) if `intake_drafts.pending_attachments` is non-empty. Submit was originally said to be "unchanged" — the column was new at the time. Without this guard, submit can succeed mid-upload and orphan the pending Blob.
+> - **A2.** `/attach` retry-after-success returns **`{status: 'already_attached', attachmentId}`** (HTTP 200), not a bare 404. The endpoint looks up `attachmentId` in BOTH `attachments[]` (already-promoted → short-circuit) and `pending_attachments[]` (still pending → run the normal scan flow). Genuinely-not-found returns 404 `pending_not_found`. Idempotency is server-side, not client-disambiguated.
+> - **A3.** Audit row field split: `intake_audit.metadata` is queryable JSONB; `payload_digest` is the sha256 of a payload that is NEVER stored. Forensics-relevant fields (`attachmentId`, `draftId`, `fieldKey`, `pathname`, `sha256`, `size`, `scanner`, `scan_result`, `virusName`, `scannedAt`, `contentType`, `validUntil`) live in `metadata`. Only `filename` (potentially PII-bearing) is digested. The audit table at migration 005 has both slots; we use them for what they were designed for.
+> - **A4.** All Blob calls in the new endpoints + sweep route through `lib/utils/intake-blob.js` `getIntakeBlobToken()` (reads `INTAKE_BLOB_RW_TOKEN`, fail-louds on missing). The SDK defaults to `BLOB_READ_WRITE_TOKEN` — silently hitting the wrong store is the failure mode this helper prevents.
+> - **A5.** Blob pathname is **opaque**: `drafts/{draftId}/{attachmentId}` — no filename component. The original sanitized filename is returned to the browser in the `/upload-token` response, stored in `pending_attachments[].filename` / `attachments[].filename`, and digested under `payload` in audit rows. Decouples Blob storage from filename PII; lets `pathname` live safely in queryable `metadata`.
+> - **A6.** Orphan sweep cutoff is **2h**, not 1h. The Blob token expires at 1h (prevents new PUTs), but the pending entry survives an additional hour so a slow `/attach` can still complete. After 2h the entry is genuinely abandoned; the Blob bytes are deleted.
+> - **A7.** Scanner flag/key posture is a 2×2 table. `VIRUS_SCAN_ENABLED=false` → skip scan (`scanner:'skipped'`), happy path. `VIRUS_SCAN_ENABLED=true` + key present → run scan, map result. `VIRUS_SCAN_ENABLED=true` + key missing → fail-loud at endpoint startup; `/attach` returns 500 `scan_misconfigured`; pending entry intact. These are independent envvars and must be reasoned about as two distinct branches.
+>
+> The diagram + endpoint paragraphs below pre-date these amendments; treat the scoping doc as authoritative where they disagree.
+
 The "Bytes never traverse the function on the upload path" constraint (`DESIGN.md` § File handling) means a single attach endpoint can't do the whole job. The flow is split into three calls so the browser does the bulk upload directly to Blob and the function only handles authorization, scanning, and metadata.
 
 ```
@@ -422,16 +435,16 @@ Browser                         Function                      Blob (private stor
 
 **Why the pending entry stays on scan errors** — letting the applicant retry the attach call once the scanner recovers is preferable to making them re-upload (which would orphan the original Blob and burn their bandwidth). The bytes are already in Blob; only the metadata/scan step failed.
 
-**Idempotency** — attach is idempotent on `attachmentId`. A retry after a successful clean response finds the pending entry already gone and returns 404 (`pending_not_found`); the browser interprets this as "already attached, no-op" by checking `attachments[]` for the same `attachmentId`. A retry during a scan error finds the pending entry still there and re-runs the download+scan; the Blob bytes haven't changed (the token only allows the original PUT), so the scan result is deterministic.
+**Idempotency** — attach is idempotent on `attachmentId`, server-side. **(S184 A2)** A retry after a successful clean response finds the entry already in `attachments[]` and returns 200 `{status: 'already_attached', attachmentId}` — the client doesn't need to disambiguate. A retry during a scan error finds the entry still in `pending_attachments[]` and re-runs the download+scan; the Blob bytes haven't changed (the token only allows the original PUT), so the scan result is deterministic. Only a genuinely-unknown `attachmentId` returns 404 `pending_not_found`.
 
 #### Orphan cleanup cron
 
 The step-2-success / step-3-failure case happens (network drop, browser close, function timeout). Without sweeping, pending entries and their Blobs accumulate.
 
 Add a daily handler in the existing maintenance cron:
-- For each draft, walk `draft_json.pendingAttachments[]` for entries with `createdAt < now - 1h` (comfortably past the 1h token expiry; bytes can't be added after that anyway).
-- For each stale pending: attempt `del(pathname)` against the private Blob; ignore 404 (Blob may not exist if step 2 never completed). Remove from `pendingAttachments[]`.
-- Audit `action: 'draft.attach_orphan_swept'` per removed entry.
+- For each draft, walk the **`pending_attachments` column** (S184 Q1) for entries with `createdAt < now - 2h` (S184 A6 — 1h Blob token expiry + 1h safety margin so slow `/attach` calls don't get falsely 404'd by a sweep that races a legitimate-but-delayed retry).
+- For each stale pending: attempt `del(pathname)` against the private Blob via `getIntakeBlobToken()` (S184 A4); ignore 404 (Blob may not exist if step 2 never completed). Remove from `pending_attachments[]`.
+- Audit `action: 'draft.attach_orphan_swept'` per removed entry (S184 Q5 + A3 field split — `attachmentId`/`draftId`/`pathname` in `metadata`).
 
 #### Doc cross-references
 
@@ -439,7 +452,7 @@ This three-call pattern reconciles two prior docs that read differently:
 - `DESIGN.md` § "File handling" said "Bytes never traverse a Vercel Function" — true on the **upload** path (step 2), but the scan path (step 3) does download bytes into the function. DESIGN.md updated in S183 to acknowledge both.
 - Earlier drafts of this drain plan described `/attach` as a single endpoint that streamed bytes — superseded by the three-call dance above.
 
-The submit-strict validator at `validate.js:153` (`scan_result === 'clean'` check on every attachment) is unchanged. The `scanning` state in the submission state machine remains a defense-in-depth re-verify — primary scan happens here, at attach time.
+The submit-strict validator at `validate.js:153` (`scan_result === 'clean'` check on every attachment in `attachments[]`) is unchanged. **(S184 A1)** `/api/intake/submit` ADDITIONALLY rejects with 409 `pending_attachments_present` if `intake_drafts.pending_attachments` is non-empty — otherwise submit can succeed mid-upload and orphan the in-flight Blob. The `scanning` state in the submission state machine remains a defense-in-depth re-verify — primary scan happens here, at attach time.
 
 ### 5. `/api/intake/submit`
 

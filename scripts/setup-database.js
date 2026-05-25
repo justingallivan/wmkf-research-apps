@@ -717,16 +717,20 @@ const v28Statements = [
 // V26: Intake Portal — draft staging + audit
 const v26Statements = [
   `CREATE TABLE IF NOT EXISTS intake_drafts (
-    id            SERIAL PRIMARY KEY,
-    contact_oid   TEXT NOT NULL,
-    account_id    TEXT NOT NULL,
-    request_id    TEXT,
-    form_key      TEXT NOT NULL,
-    draft_json    JSONB NOT NULL DEFAULT '{}'::jsonb,
-    attachments   JSONB NOT NULL DEFAULT '[]'::jsonb,
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    id                   SERIAL PRIMARY KEY,
+    contact_oid          TEXT NOT NULL,
+    account_id           TEXT NOT NULL,
+    request_id           TEXT,
+    form_key             TEXT NOT NULL,
+    draft_json           JSONB NOT NULL DEFAULT '{}'::jsonb,
+    attachments          JSONB NOT NULL DEFAULT '[]'::jsonb,
+    pending_attachments  JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
   )`,
+  // V33 / migration 013: pending_attachments column for the three-call attach dance.
+  // Mirrors the V26 base table for fresh installs; existing environments apply migration 013.
+  `ALTER TABLE intake_drafts ADD COLUMN IF NOT EXISTS pending_attachments JSONB NOT NULL DEFAULT '[]'::jsonb`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_intake_drafts_unique_with_request
      ON intake_drafts (account_id, request_id, form_key)
      WHERE request_id IS NOT NULL`,
