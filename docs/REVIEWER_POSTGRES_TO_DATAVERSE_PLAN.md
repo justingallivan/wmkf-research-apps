@@ -417,6 +417,8 @@ Confirm `wmkf_appreviewersuggestion` (where reviewer-portal data lives — see "
 
 ## Reviewer suggestions backfill
 
+> **HISTORICAL — backfill, reconciliation, and W5 reader cutover all SHIPPED 2026-05-12.** The parity probe, anomaly triage, identity contract, and execution model below describe the planned approach; the work has run and the readers (`generate-emails.js`, `my-proposals.js`, `database-service.js`) are all Dataverse-only per the spec-vs-built table at top.
+
 ### Parity probe result (2026-05-06 baseline, REFRESH AT W4 START)
 
 The Wave 2 backfill was a known forward task per memory entry `project_reviewer_history_data_quality.md`, which previously cited *"the Wave 2 backfill (333 Postgres rows → Dataverse)"*. The parity probe confirms what that memory implied — most rows already match.
@@ -588,7 +590,7 @@ Audit: are there other 100-char (or other) caps elsewhere in the adapter set? Ru
 
 ## Dependency order
 
-> **HISTORICAL — items 1–11 below all shipped 2026-05-12 (W3 + W4 + W5 + W6 step 1).** The numbered queue describes the original ordering; the only post-pilot tail items still active are: cleanup cron real-mode (item 14, deferred to post-pilot per W6-step-2 footnote in the schedule below) and match-on-discovery / add-candidate-manual / contact-form-subgrid (slip-eligible enhancements, also deferred to post-pilot). See "Spec'd vs. built" table at top for current per-deliverable state.
+> **HISTORICAL — items 1–11 below all shipped 2026-05-12 (W3 + W4 + W5 + W6 step 1).** The numbered queue describes the original ordering. Tail items still pending: the post-pilot one-shot Postgres table drop + restore script (W6 step 2, deferred per §"Post-pilot one-shot cleanup" at line 191 and the post-pilot row of the schedule below; one-shot script, NOT a cron — earlier framings that called this a cron were wrong) and match-on-discovery / add-candidate-manual / contact-form-subgrid (slip-eligible enhancements, deferred to post-pilot). See "Spec'd vs. built" table at top for current per-deliverable state.
 
 Hard constraints (each blocks the step after it):
 
@@ -635,6 +637,8 @@ Hard constraints (each blocks the step after it):
 7. **`is_archived` on `grant_cycles`** — **resolved 2026-05-06**: column does not exist in Postgres; spec corrected (`is_active` handles active/archive distinction). Original Codex concern was a false alarm.
 
 ## Rollback strategy
+
+> **HISTORICAL — W3 cutover method was locked as Option B (hard cutover, no flags) per §"W3 cutover method" at line 181; W3–W6 cutovers all shipped 2026-05-12 via Option B with no rollback needed.** The Option A vs Option B decision below is preserved as the planning-time reasoning. Future migration waves (if any) should re-decide per-table at their own start, not consult this section as live guidance.
 
 ### No dual-write — single-source-of-truth flips
 
@@ -803,7 +807,7 @@ Every item below must have a check + date + owner before the relevant cutover st
 
 ### Updated forward schedule
 
-> **HISTORICAL — W3–W6 (step 1) all SHIPPED 2026-05-12 ahead of original cadence.** W3 grant-cycles + W4 reviewer-suggestion alignment + W5 reader cutover + W6 step 1 (researchers.js retirement) landed together. The "NOT slip-eligible" gate list below describes acceptance gates that have all been passed. Pilot launch (W7) remains forward work — mid-June 2026 Phase II Research cycle, with post-pilot tail items (one-shot table drop ≥ 2026-07-01, enhancements) tracked in the W6-step-2 and Post-pilot rows.
+> **HISTORICAL — W3–W6 (step 1) all SHIPPED 2026-05-12 ahead of original cadence.** W3 grant-cycles + W4 reviewer-suggestion alignment + W5 reader cutover + W6 step 1 (researchers.js retirement) landed together. The "NOT slip-eligible" gate list below was the planning gate list; most of those gates passed at cutover, but two items in that list are still pending: the post-pilot one-shot Postgres table drop (W6 step 2 — fires ≥ 2026-07-01) and the `scripts/restore-postgres-drain-table-backup.js` script that must be written before that drop runs. Pilot launch (W7) also remains forward work — mid-June 2026 Phase II Research cycle.
 
 Slip-eligible items (history badges UI, add-candidate-manual, match-on-discovery wiring, contact form subgrid) are explicitly moved to a "Post-pilot enhancements" block below the table so they don't crowd critical-path weeks. The one-shot cleanup/table-drop path is post-pilot regardless. Each week below carries one major theme plus its safety prerequisites.
 
