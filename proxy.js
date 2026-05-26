@@ -133,7 +133,12 @@ export const config = {
      * - /api/auth/* (NextAuth routes must be accessible for login flow)
      * - /api/cron/* (Vercel cron jobs authenticate via CRON_SECRET, not JWT)
      * - /api/irs/* (PowerAutomate authenticates via IRS_VERIFY_SECRET header, not JWT)
+     * - /api/webhooks/bill (BILL.com x-bill-sha-signature HMAC). Exact
+     *   match anchored with `$` — `/api/webhooks/billing` or
+     *   `/api/webhooks/bill/sub-route` would NOT be exempted, forcing
+     *   any future webhook route to be added here explicitly with its
+     *   own per-route auth review.
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|apple-touch-icon|api/auth|api/cron|api/irs).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|apple-touch-icon|api/auth|api/cron|api/irs|api/webhooks/bill$).*)',
   ],
 };

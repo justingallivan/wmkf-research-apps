@@ -139,6 +139,7 @@ There are no open findings from the initial matrix pass as of this update. New f
 | `/api/user-preferences` | GET, POST, PUT, DELETE | Profile | `requireAuthWithProfile` | `profileId` | Reads/writes `wmkf_appuserpreferences` (DV) via dispatcher | Low | Intended user-owned settings. |
 | `/api/user-profiles` | GET, PATCH, DELETE | Profile / Superuser | `requireAuthWithProfile`; `?all=true` uses `getUserRole` | Own profile; all profiles for superuser | Reads/updates/archives `user_profiles` (PG) | Low | `POST` intentionally unsupported; profile creation flows through `/api/auth/link-profile`. |
 | `/api/virtual-review-panel` | GET, POST | App | `requireAppAccess('virtual-review-panel')` | Request payload | Writes `panel_reviews`, `panel_review_items`, `api_usage_log` (PG); calls multi-LLM providers | Low | AI payload review. |
+| `/api/webhooks/bill` | POST | Shared secret (HMAC) | `x-bill-sha-signature` HMAC-SHA256 verified against `BILL_WEBHOOK_SECRET` env var (constant-time comparison) | BILL.com subscription scope | Writes `bill_webhook_events` (PG) for dedup; logs raw payload (sandbox-discovery slice); **no Dataverse writes yet** — `vendor.updated` → PATCH lands in follow-up slice once payload shape is sandbox-confirmed | Medium | BILL.com webhook scaffold (slice 1 of reviewer-honorarium onboarding). Allowlisted in `proxy.js` (no NextAuth session). 256 KB body cap; missing-correlator deliveries return 200 (to keep BILL from auto-disabling subscription). See `docs/BILL_LIB_DESIGN.md` v3. |
 
 ## Regular Maintenance Process
 

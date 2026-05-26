@@ -79,6 +79,15 @@ export default async function handler(req, res) {
       results.intakeAudit = { error: error.message };
     }
 
+    // 4.6. BILL.com webhook dedup table (S188). Default 7d TTL —
+    //      comfortably exceeds any plausible BILL retry horizon.
+    try {
+      results.billWebhookEvents = await MaintenanceService.cleanupBillWebhookEvents(config.bill_webhook_events_days);
+      totalDeleted += results.billWebhookEvents;
+    } catch (error) {
+      results.billWebhookEvents = { error: error.message };
+    }
+
     // 5. Old alerts cleanup
     try {
       results.alerts = await AlertService.cleanupOldAlerts(config.alert_days);

@@ -10,7 +10,7 @@
 
 ## TL;DR
 
-When a reviewer clicks **accept** on their invitation in our reviewer portal, that single action will (1) record their acceptance + policy acknowledgments [already shipped Stage 2a], (2) capture their payment address, (3) create the honorarium `akoya_request` row in Dataverse with proper provenance back to the grant they're reviewing, and (4) trigger BILL.com vendor onboarding silently in the background. **No GOapply form, no separate trip, no manual staff step.** The integration needs Connor to add one optional Dataverse lookup (Q5) and answer five other small questions; everything else writes to existing fields.
+When a reviewer clicks **accept** on their invitation in our reviewer portal, that single action will (1) record their acceptance + policy acknowledgments [already shipped Stage 2a], (2) capture their payment address, (3) create the honorarium `akoya_request` row in Dataverse with proper provenance back to the grant they're reviewing, and (4) trigger BILL.com vendor onboarding silently in the background. **No GOapply form, no separate trip; manual staff step contingent on Q1 sandbox finding** (if BILL doesn't auto-email non-network reviewers, Steph does a one-time manual outreach per such reviewer — see `docs/BILL_LIB_DESIGN.md` Q1). The integration needs Connor to add one optional Dataverse lookup (Q5) and answer five other small questions; everything else writes to existing fields.
 
 ---
 
@@ -65,7 +65,7 @@ Since the portal owns the reviewer journey end-to-end going forward, we skip the
 | `wmkf_emailaddressonbillcomaccount` | String | Reviewer email used for BILL account | The reviewer's email (from contact) |
 | `wmkf_organizationnameonbillcomaccount` | String | For individuals, the person's own name | The reviewer's full name |
 | `wmkf_billcomstreet1/2`, `wmkf_billcomcity`, `wmkf_billcomstate`, `wmkf_billcomzipcode`, `wmkf_billcomcountry` | String × 6 | Address block | Reviewer's address (from contact) |
-| `wmkf_exisitngbillcomaccount` | Picklist (Yes/No/Recently Confirmed) | Used across grantee flow (385 non-null) | Yes if found in BILL network, No if invitation emailed, Recently Confirmed after webhook (Q4a) |
+| `wmkf_exisitngbillcomaccount` | Picklist (Yes/No/Recently Confirmed) | Used across grantee flow (385 non-null) | Yes if found in BILL network (exact-match + zip disambiguation), No if not found, Recently Confirmed after webhook (Q4a) |
 | `wmkf_authorizationtoremitpaymentflag` | Boolean | Staff pay-authorization gate | **We never touch this** — staff retains final approval |
 | `wmkf_vendorverified`, `wmkf_paymentcontactconfirmed` | Picklist | Grantee-org concerns (tax status; payment contact) | **We never touch these** — see Q4b + appendix |
 
@@ -95,13 +95,19 @@ Since the portal owns the reviewer journey end-to-end going forward, we skip the
    • NEW: createRecord('akoya_requests', { ...honorarium body with provenance })
    • NEW: fire-and-await /api/bill/onboard-reviewer with the new request id
 5. /api/bill/onboard-reviewer:
-   • Read contact.wmkf_billcomid — short-circuit if present (known vendor)
-   • Else: BILL POST /v3/vendors → write vendorId to contact.wmkf_billcomid
-   • BILL GET /v3/network?email=... → write wmkf_exisitngbillcomaccount Yes/No
-   • BILL POST /v3/network/invitation → direct-connect or email invite
-   • Write wmkf_paymentnetworkidpni to honorarium request
+   • Read contact.wmkf_billcomid
+     → populated: SOFT short-circuit — skip vendor create, reuse the id; still run search + invite + PNI write below
+     → empty: BILL POST /v3/vendors → write vendorId to contact.wmkf_billcomid
+   • BILL GET /v3/network?name=<reviewer full name>&scope=BILL&zipOrPostalCode=<zip>
+     → if exactly one high-confidence match: POST /v3/network/invitation/vendor/{vendorId}
+       (direct-connect to existing BILL network member); write wmkf_exisitngbillcomaccount = Yes;
+       write PNI to wmkf_paymentnetworkidpni
+     → else: write wmkf_exisitngbillcomaccount = No; log "no auto-connect"
+   • Whether BILL auto-emails non-network vendors is a sandbox-time open question
+     (see `docs/BILL_LIB_DESIGN.md` Q1 — hard-gates the UX promise of "no separate trip
+     to a staff-only flow")
 6. (Async, hours/days later) Reviewer completes BILL setup
-7. BILL webhook → /api/webhooks/bill → update wmkf_exisitngbillcomaccount to "Recently Confirmed"
+7. BILL webhook → /api/webhooks/bill → (slice 1: verify signature + dedup + log + 200, no Dataverse write yet) → (later slice, after sandbox reveals payload shape): update wmkf_exisitngbillcomaccount to "Recently Confirmed"
 8. Reviewer does the actual review; staff later flips wmkf_authorizationtoremitpaymentflag = true; payment routes
 ```
 
@@ -136,9 +142,12 @@ The grant request id is on the suggestion row (`wmkf_appreviewersuggestion`) the
 | Failure | Handling |
 |---|---|
 | BILL API down / 5xx | Honorarium request still created; alert sent ("BILL onboarding pending for #X"); Steph retries manually OR we add a small retry job later |
+| BILL hourly rate-limit hit (`BDC_1144`) | Honorarium request still created; alert sent immediately ("BILL onboarding throttled — retry after quota reset"); per `lib/bill.js` policy we do NOT retry futilely against a 60-min window |
+| BILL network search returns ambiguous match (multiple John Smiths) | Skip auto-connect; `wmkf_exisitngbillcomaccount = "No"`; alert Steph for manual confirmation |
 | Reviewer's address incomplete on form | Form-level validation prevents submit; address is required for accept |
-| `wmkf_billcomid` already populated (returning reviewer) | Short-circuit — skip BILL create+search; still write PNI to honorarium row |
+| `wmkf_billcomid` already populated (returning reviewer) | Soft short-circuit — skip BILL vendor create (reuse stored id); still run network search + invite + PNI write (network state may have changed since last cycle) |
 | Webhook signature invalid | 401, log, no state change |
+| Webhook duplicate delivery (BILL retry-replay) | Postgres dedup gate on `(subscription_id, event_id)` → 200, no further processing |
 | Duplicate honorarium create (retry race) | Pre-generated GUID + duplicate-PK recovery (pattern already in `pages/api/cron/drain-submissions.js`) |
 | Reviewer opts out of honorarium | Skip honorarium create + BILL entirely; suggestion-row accept still goes through |
 
@@ -148,7 +157,7 @@ The grant request id is on the suggestion row (`wmkf_appreviewersuggestion`) the
 
 ### Q1. OK if our portal writes to `contact.wmkf_billcomid` on first-time BILL onboarding?
 
-Today this field is empty for every reviewer we sampled. Writing it gives future cycles a clean short-circuit — next time a reviewer accepts a new honorarium assignment, the portal reads the contact, skips the BILL API call entirely.
+Today this field is empty for every reviewer we sampled. Writing it lets future cycles skip the vendor-create round-trip (network search + invite still happen, so network state stays fresh — see failure-modes table for the exact soft-short-circuit semantics).
 
 Sub-question: also flip `contact.akoya_isvendor = true` at the same time, or leave for staff?
 
@@ -166,10 +175,10 @@ Staff currently enters this by hand; the values are inconsistent (proper 16-digi
 
 ### Q4a. OK if our portal writes to `wmkf_exisitngbillcomaccount` on the honorarium request?
 
-The Yes/No/Recently Confirmed semantics map directly onto BILL's `GET /v3/network` response:
-- Reviewer found in BILL Network → **Yes**
-- Not found, email invite sent → **No**
-- `vendor.updated` webhook fires confirming setup → **Recently Confirmed**
+The Yes/No/Recently Confirmed semantics map onto BILL's `GET /v3/network` response (searched by name + zip, NOT email — API constraint):
+- Reviewer found in BILL Network and auto-connect sent → **Yes**
+- Not found (or ambiguous match) → **No**
+- `vendor.updated` webhook fires with `networkStatus = "CONNECTED"` → **Recently Confirmed**
 
 Gives Steph a real status picklist she can filter on, using a field she already understands from the grantee side.
 
@@ -203,7 +212,7 @@ Downstream payoff:
 - Catches the data-quality "ghost honorarium" case (honorarium with no corresponding grant assignment)
 - Personalized BILL invitation emails can mention the proposal being reviewed
 
-**This question is the only one that blocks code on our side** — without the field, we lose provenance we know at create time. Everything else can ship while you're deciding.
+**This question is the only one that blocks the portal-extension slice (chunk 4)** — without the field, we lose provenance we know at create time. The earlier `lib/bill.js` + webhook-scaffold slice (chunks 2, 3, 7a) doesn't depend on Q5 and can ship while you're deciding.
 
 **Our recommendation:** Yes. One small Dataverse change, ongoing value.
 
@@ -242,8 +251,9 @@ No recommendation — just inputs to our portal design.
 | 4 | Extend `respond.js` accept path: address fields in contactEdits, PATCH contact.address1_*, create honorarium `akoya_request` with provenance | Vercel | Chunk 1 |
 | 5 | Extend Stage 2a accept UI with address inputs (country picker, validation, prefill from existing contact) | Vercel | Chunk 4 |
 | 6 | New `/api/bill/onboard-reviewer` endpoint; wire into accept handler | Vercel | Chunks 2 + 4 |
-| 7 | `/api/webhooks/bill` for `vendor.updated` | Vercel | Chunk 2 |
-| 8 | End-to-end test against BILL sandbox + synthetic reviewer | Vercel + Justin | Chunks 4–7; BILL sandbox |
+| 7a | `/api/webhooks/bill` scaffold (verify + dedup + log + 200; no Dataverse writes) | Vercel | Chunk 2 |
+| 7b | Wire `vendor.updated` → PATCH `wmkf_exisitngbillcomaccount` to "Recently Confirmed" (lands once sandbox reveals payload shape so correlator is concrete) | Vercel | Chunk 7a + sandbox observation |
+| 8 | End-to-end test against BILL sandbox + synthetic reviewer | Vercel + Justin | Chunks 4, 5, 6, 7a, 7b; BILL sandbox |
 
 **Dataverse schema changes:** one optional lookup (Q5). Everything else writes to existing fields.
 
