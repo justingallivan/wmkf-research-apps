@@ -10,15 +10,7 @@
 
 import { requireSuperuser } from '../../../lib/utils/auth';
 import { listSettingsWithMeta, setSetting } from '../../../lib/services/settings-service';
-
-// Secrets we track
-const TRACKED_SECRETS = [
-  { key: 'azure_ad_client_secret', name: 'Azure AD Client Secret' },
-  { key: 'dynamics_client_secret', name: 'Dynamics CRM Client Secret' },
-  { key: 'nextauth_secret', name: 'NextAuth Secret' },
-  { key: 'user_prefs_encryption_key', name: 'User Preferences Encryption Key' },
-  { key: 'cron_secret', name: 'Cron Secret' },
-];
+import { TRACKED_SECRETS } from '../../../lib/utils/tracked-secrets';
 
 export default async function handler(req, res) {
   const gate = await requireSuperuser(req, res);

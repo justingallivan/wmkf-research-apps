@@ -21,41 +21,15 @@ import NotificationService from '../../../lib/services/notification-service';
 import { listSettings } from '../../../lib/services/settings-service';
 import AlertService from '../../../lib/services/alert-service';
 import MaintenanceService from '../../../lib/services/maintenance-service';
+import { TRACKED_SECRETS } from '../../../lib/utils/tracked-secrets';
 
-// Secrets we track — display name + settings key suffix.
-//
 // Cadence enforcement: this cron alerts ONLY against an explicit
 // `secret_expiration:<key>` setting in Dataverse `wmkf_appsystemsettings`.
 // HMAC-style secrets (no vendor-side expiration) won't fire unless an
 // operator-set rotation cadence is recorded as a synthetic expiration
-// (e.g. last_rotation + 180d). Adding an entry here is half the work; the
-// other half is setting `secret_expiration:<key>` in Dataverse for the
-// rotation-cadence enforcement to kick in. (Tracked separately per B3-F1
-// readiness-audit finding — full rotation-cadence wiring is a follow-up
-// slice; this list addition is the structural pre-req.)
-const TRACKED_SECRETS = [
-  // Vendor-issued (have real expiration dates)
-  { key: 'azure_ad_client_secret', name: 'Azure AD Client Secret' },
-  { key: 'dynamics_client_secret', name: 'Dynamics CRM Client Secret' },
-  { key: 'external_azure_ad_client_secret', name: 'External Entra ID Client Secret (applicant intake)' },
-
-  // HMAC / shared secrets (no vendor expiration — rotation cadence only)
-  { key: 'nextauth_secret', name: 'NextAuth Secret' },
-  { key: 'cron_secret', name: 'Cron Secret' },
-  { key: 'user_prefs_encryption_key', name: 'User Preferences Encryption Key' },
-  { key: 'external_link_secret', name: 'External Reviewer Link Secret (HMAC for JWT)' },
-  { key: 'irs_verify_secret', name: 'IRS Verify Secret (PowerAutomate shared)' },
-  { key: 'bill_integration_secret', name: 'BILL Integration Secret (PA/portal → /api/bill/onboard-reviewer)' },
-  { key: 'bill_webhook_secret', name: 'BILL Webhook Secret (HMAC for /api/webhooks/bill)' },
-
-  // Blob store tokens (Vercel-issued; no expiration, but worth tracking for rotation cadence)
-  { key: 'blob_read_write_token', name: 'Vercel Blob RW Token (shared store)' },
-  { key: 'dvx_blob_rw_token', name: 'Vercel Blob RW Token (dvx-export-private)' },
-  { key: 'intake_blob_rw_token', name: 'Vercel Blob RW Token (intake-applicant-private)' },
-
-  // Conditional / feature-gated
-  { key: 'cloudmersive_api_key', name: 'Cloudmersive API Key (virus scan — active when VIRUS_SCAN_ENABLED=true)' },
-];
+// (e.g. last_rotation + 180d). The TRACKED_SECRETS list is the canonical
+// source (lib/utils/tracked-secrets.js); admin secrets endpoint + runbook
+// reference the same list.
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {

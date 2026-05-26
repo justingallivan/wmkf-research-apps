@@ -137,9 +137,17 @@ Output:
 
 ## Postgres backup / restore
 
-The application's Postgres database is provisioned via Vercel's Neon integration. Neon provides **automatic point-in-time recovery (PITR) snapshots** with a rolling retention window — no application-side backup job to run; recovery happens by spinning up a branch from a past timestamp.
+The application's Postgres database is provisioned via Vercel's Neon integration. Neon retains **WAL history**, not discrete snapshots — recovery happens by branching the live database at a past timestamp (a fast, copy-on-write operation), not by restoring from a backup file. There's no application-side backup job to run.
 
-**Retention window:** Vercel's free Neon tier provides ~7 days of PITR history; paid tiers extend the window. Verify current retention via the Vercel project dashboard → Storage → Neon Postgres → Settings. If we move to a paid tier, document the new window here.
+**Retention window depends on the Neon tier.** As of 2026-05 (verify against current Neon docs):
+
+| Tier | PITR / restore reach |
+|---|---|
+| Free | **6 hours** |
+| Launch | 7 days |
+| Scale | 30 days |
+
+**Verify the current tier via** Vercel project dashboard → Storage → Neon Postgres → Settings. If we're on the Free tier, the recovery reach is much narrower than what most operators intuitively assume — any restore plan needs to fit inside the 6-hour window. When changing tiers, update both the dashboard expectation and this table.
 
 **Recovery procedure** (use when a table is corrupted or critical data is lost):
 

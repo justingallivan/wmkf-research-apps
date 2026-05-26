@@ -289,14 +289,25 @@ await setSetting('secret_rotation:azure_ad_client_secret', '2026-03-15');
 
 ### Tracked Secrets
 
-| Key | Name | Typical Expiry |
-|-----|------|---------------|
-| `azure_ad_client_secret` | Azure AD Client Secret | 90 days |
-| `dynamics_client_secret` | Dynamics CRM Client Secret | 90 days |
-| `nextauth_secret` | NextAuth Secret | No expiry (rotate if compromised) |
-| `user_prefs_encryption_key` | Encryption Key | No expiry. **Rotation tooling pending Dataverse rewrite** — the legacy `scripts/rotate-encryption-key.js` was archived 2026-05-12 when the underlying `user_preferences` Postgres table was dropped. Until rewritten, key rotation requires reading all `wmkf_appuserpreferences` rows where `wmkf_isencrypted=true`, decrypting with the old key, re-encrypting with the new key, and PATCHing back via the dispatcher. |
-| `cron_secret` | Cron Secret | No expiry (rotate periodically) |
-| `external_link_secret` | External-Reviewer Link Secret | No expiry. Rotate on compromise / offboarding / ~12 months via the dual-secret window — see [Rotating EXTERNAL_LINK_SECRET](#rotating-external_link_secret). |
+Canonical list lives in `lib/utils/tracked-secrets.js` — both `pages/api/cron/secret-check.js` (daily threshold alerts) and `pages/api/admin/secrets.js` (superuser UI) import from it. Update that file when adding/removing entries; this table mirrors it manually.
+
+| Key (lowercase, used in `secret_expiration:<key>`) | Display name | Tier | Typical expiry / cadence |
+|---|---|---|---|
+| `azure_ad_client_secret` | Azure AD Client Secret | vendor | 90 days (vendor-issued) |
+| `dynamics_client_secret` | Dynamics CRM Client Secret | vendor | 90 days (vendor-issued) |
+| `external_azure_ad_client_secret` | External Entra ID Client Secret (applicant intake) | vendor | 90 days (vendor-issued) |
+| `nextauth_secret` | NextAuth Secret | hmac | No expiry. Rotate periodically or on compromise |
+| `cron_secret` | Cron Secret | hmac | No expiry. Rotate periodically |
+| `user_prefs_encryption_key` | User Preferences Encryption Key | hmac | No expiry. **Rotation tooling pending Dataverse rewrite** — the legacy `scripts/rotate-encryption-key.js` was archived 2026-05-12 when the underlying `user_preferences` Postgres table was dropped. Until rewritten, key rotation requires reading all `wmkf_appuserpreferences` rows where `wmkf_isencrypted=true`, decrypting with the old key, re-encrypting with the new key, and PATCHing back via the dispatcher. |
+| `external_link_secret` | External-Reviewer Link Secret (HMAC for JWT) | hmac | No expiry. Rotate on compromise / offboarding / ~12 months via the dual-secret window — see [Rotating EXTERNAL_LINK_SECRET](#rotating-external_link_secret). |
+| `irs_verify_secret` | IRS Verify Secret (PowerAutomate shared) | hmac | No expiry. Rotate on PA-flow rebuild or compromise |
+| `bill_webhook_secret` | BILL Webhook Secret (HMAC for /api/webhooks/bill) | hmac | Per-subscription `securityKey` from BILL. Rotate via `POST /v3/subscriptions/{id}/security-key` |
+| `claude_api_key` | Anthropic Claude API Key | vendor | No vendor expiry, but rotate on compromise or staff offboarding |
+| `cloudmersive_api_key` | Cloudmersive API Key (virus scan; gated by VIRUS_SCAN_ENABLED) | vendor | Pilot uses free tier (800 scans/mo); rotate on compromise |
+| `blob_read_write_token` | Vercel Blob RW Token (shared store) | blob | Vercel-issued; no expiry; rotate via Vercel dashboard if compromised |
+| `dvx_blob_rw_token` | Vercel Blob RW Token (dvx-export-private) | blob | Same as above |
+| `intake_blob_rw_token` | Vercel Blob RW Token (intake-applicant-private) | blob | Same as above |
+| `bill_integration_secret` | BILL Integration Secret (portal → /api/bill/onboard-reviewer) | forward | Forward-declared — consumer ships in upcoming slice; will be HMAC shared secret like IRS_VERIFY_SECRET |
 
 ---
 
