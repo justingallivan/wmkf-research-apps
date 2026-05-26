@@ -1,5 +1,7 @@
 # Connor email — 4 questions on the portal-to-AkoyaGO handoff (DRAFT — S183, 2026-05-24)
 
+**Status:** Connor sign-off received in S189 walkthrough 2026-05-26. Answers folded inline under each question. Email never sent — superseded by live walkthrough.
+
 Send-ready. Plain-language rewrite of the S180 draft after feedback that
 the prior version leaned too hard on internal subsystem names and
 engineering abstractions.
@@ -27,6 +29,16 @@ Q1.2 option integer:        ________
 Q1.3 display label:         "________"
 Q1.4 already exists, or do you need to add it?:  existing | needs-add-by-me
 ```
+
+**Connor's answer (2026-05-26, walkthrough):**
+```
+Q1.1 field logical name:    wmkf_phaseistatus
+Q1.2 option integer:        100000000
+Q1.3 display label:         "Pending Committee Review"
+Q1.4 already exists, or do you need to add it?:  existing
+```
+
+Verified live via `node scripts/probe-picklist.js akoya_request.wmkf_phaseistatus` (13 options total on the field).
 
 ---
 
@@ -67,6 +79,21 @@ wmkf_researchleader:
   Q2.4 fallback if source empty:  ________
 ```
 
+**Connor's answer (2026-05-26, walkthrough):** Uniform across all three fields:
+
+```
+All three (wmkf_projectleader, akoya_primarycontactid, wmkf_researchleader):
+  Q2.1 entity:                contact
+  Q2.2 required at submission:  yes
+  Q2.3 source:                project-team-row
+  Q2.4 fallback if source empty:  none — submission validation blocks; applicant cannot submit if any of the three are missing
+```
+
+**Implementation impact:**
+- Project-team form must require designating exactly one row each as PI, primary-foundation-contact, and research-officer (UI affordance: role picker per row, or three named pickers that select from the project-team list).
+- All three rows must resolve to a Dataverse `contact` GUID at submit time. Resolution path: portal institution-match → existing contact (match) OR portal creates a new `contact` (no match) — same primitive used elsewhere ([reviewer-institution-match](../.claude-memory/project-reviewer-institution-match.md), [intake-portal-institution-match](../.claude-memory/project-intake-portal-institution-match.md)).
+- Server-side submit guard rejects with a field-level error if any of the three is unset.
+
 ---
 
 ## Q3 — Hiding portal-submitted rows from staff views until they're ready
@@ -86,6 +113,13 @@ Q3.1 views needing the filter (one per line):
 Q3.2 exact filter clause:    ________
 Q3.3 who applies:            connor | akoyago-admin (name: ____)
 ```
+
+**Connor's answer (2026-05-26, walkthrough):** N/A — Q3 is moot for our portal build. Visibility to staff is gated by a **separate check-in flag** on `akoya_request`, flipped by an existing PA-triggered flow after some automated post-submission processing. The portal's only contract here is to create the row with `wmkf_phaseistatus = 100000000`; the flag-flip + view filtering is Connor-owned and already exists upstream.
+
+**Implementation impact:**
+- Portal does NOT touch any check-in flag at create time.
+- Field name of the check-in flag TBD — capture it during build (or via Connor) so the portal's create body explicitly leaves it unset (defensive against a future schema change).
+- No view edits needed from our side.
 
 ---
 
@@ -115,6 +149,15 @@ Q4.4 test evidence:
        parent GUIDs:         pass=________  skip=________
        affected child rows:  ________
 ```
+
+**Connor's answer (2026-05-26, walkthrough):** Flow not built yet. **Does not gate the portal build.** Deferred to later in the build cycle — capture evidence post-build.
+
+Expected values once built:
+- Q4.2 source field: `wmkf_phaseistatus` (matches Q1.1)
+- Q4.3 integer value: `100000000` / "Pending Committee Review" (matches Q1.2)
+- Q4.1 + Q4.4: TBD when Connor ships the prod Option A′ flow against real `wmkf_proposalbudgetline`
+
+**Reminder:** Surface this in S189+ session prompts (and on the build-table residuals list) until evidence is captured. Tracks the P4 post-deploy re-verify item from slice-0 — see [[slice0-deactivate-not-delete-recalc]].
 
 ---
 
