@@ -210,8 +210,6 @@ The `dynamics_query_log` half remains without a dedicated admin widget. Trade-of
 
 (Original audit framing was correct that no readers existed in `pages/api/admin/*` — but the admin surface for feedback is wired via `/api/dynamics-explorer/feedback`, not under `/admin/`, which is why the original grep missed it. Path-narrow grep failure, not a real gap.)
 
-Fix: small `/admin/dynamics-feedback` page reading the last N thumbs-down rows. Or remove the thumbs-down UI from Dynamics Explorer if no one's reviewing.
-
 ### B4-F2 — `model_pricing_audit` at 0 rows: ambiguous between healthy and silent. **(WORTH PROBING, S)**
 
 Per memory + session prompt, `model_pricing_audit` has 0 rows since deployment. The monthly `pricing-refresh` cron writes here on `flagged=true`. 0 rows could mean (a) pricing is genuinely stable across runs (good) or (b) the monthly cron is mis-scheduled / failing silently (bad). The weekly `pricing-canary` cron writes alerts to `system_alerts`, not this table, so it doesn't help distinguish.

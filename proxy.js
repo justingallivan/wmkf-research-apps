@@ -99,9 +99,11 @@ export default withAuth(
         // `lastActivity` is treated as expired (B5-F2 audit hardening).
         //
         // Production safety verified (Codex sweep, S188): `lastActivity` was
-        // introduced 2026-03-11 (commit 8671425); default NextAuth JWT TTL is
-        // 30 days; any token issued before that date has already expired by
-        // JWT TTL. Today no legitimate production session lacks lastActivity.
+        // introduced 2026-03-11 (commit 8671425). Our configured JWT `maxAge`
+        // is 8 hours (`pages/api/auth/[...nextauth].js:301-304`), so any
+        // session existing today was issued within the last 8h — i.e., long
+        // after the lastActivity set-sites landed. No legitimate production
+        // session lacks lastActivity.
         //
         // The fail-closed gate is therefore pure defense-in-depth for hypothetical
         // future code paths that might issue a token without going through one of
