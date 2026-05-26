@@ -2,7 +2,7 @@
 
 **Author:** Justin Gallivan
 **Date:** 2026-05-25
-**Status:** Pre-build design; needs Connor sign-off on six small questions before code
+**Status:** Connor sign-off received 2026-05-26 (Q1, Q2, Q4a, Q4b, Q5 with refinement, Q6, Q7). Confidentiality wording refinement deferred to UI session (no significant code impact expected). Build can proceed.
 **Target:** Ready by 2026-06-10 for the cycle whose reviewer invitations go out ≥ 2026-06-17
 **Context:** Ops team meeting 2026-05-23 approved the BILL integration concept. Background in `docs/BILL_integration_handoff.md`. Probe of live Dataverse + review of already-shipped Stage 2a reviewer-portal primitives (2026-05-25) reshaped the architecture from a PA-triggered backend-only flow into a portal-integrated flow.
 
@@ -21,7 +21,7 @@ Two distinct concepts both stored in the `akoya_request` table — easy to confu
 | Term | What it is | Discriminator |
 |---|---|---|
 | **Grant request** | A proposal from a university asking for funding | `akoya_program ≠ "Research Reviewer"` |
-| **Honorarium request** | A payment record for an individual who reviewed a grant request | `akoya_program = "Research Reviewer"` AND `wmkf_grantprogram = "Honorarium"` AND `wmkf_type = "Individual"` |
+| **Honorarium request** | A payment record for an individual who reviewed a grant request | `akoya_program = "Research Reviewer"` AND `wmkf_grantprogram = "Honorarium"` AND `wmkf_type = "Individual"` AND `wmkf_request_type = "Individual"` |
 
 Example: Utah State submitted **grant request** #1002238. Amy Gladfelter agreed to review it and was issued **honorarium request** #1002764 for $250. The two are separate `akoya_request` rows. **Today they have no data link between them**; Q5 below proposes a small schema add that preserves the linkage going forward.
 
@@ -122,13 +122,24 @@ If a reviewer opts out of the honorarium (`honorariumOptOut = true`), step 4's h
   'wmkf_GrantProgram@odata.bind': '/wmkf_grantprograms(<Honorarium GUID>)',
   'wmkf_Type@odata.bind': '/wmkf_types(<Individual GUID>)',
   'akoya_PrimaryContactId@odata.bind': `/contacts(${reviewerContactId})`,
-  'wmkf_HonorariumForRequest@odata.bind': `/akoya_requests(${grantRequestId})`,  // Q5
+  // Q5 (per Connor 2026-05-26): link lives on the junction, not on this honorarium row.
+  // After the honorarium request is created, we PATCH wmkf_potentialreviewer(${suggestionId})
+  // with { 'wmkf_HonorariumRequest@odata.bind': '/akoya_requests(<new honorarium id>)' }.
   akoya_request: <honorarium amount, e.g. 250>,
   wmkf_meetingdate: <cycle meeting date from suggestion>,
 }
 ```
 
 The grant request id is on the suggestion row (`wmkf_appreviewersuggestion`) the token resolves to — so we capture provenance trivially at create time. Without Q5's new field, the linkage is thrown away even though we know it.
+
+### Post-create PowerAutomate enrichment (Connor-owned, non-gating)
+
+After our portal creates the honorarium `akoya_request`, Connor will build a PowerAutomate flow that fires on create and populates additional fields on the request that we don't have at portal-accept time (or that are easier to derive Dataverse-side). Trigger: create of an `akoya_request` matching the honorarium discriminator (`akoya_program = "Research Reviewer"` + `wmkf_grantprogram = "Honorarium"` + `wmkf_type = "Individual"` + `wmkf_request_type = "Individual"`).
+
+- **Owner:** Connor
+- **Field list:** TBD by Connor
+- **Gating:** Does **not** gate our portal build. Our integration creates the row with the fields enumerated above; Connor's flow enriches the rest async.
+- **Reminder:** Surface this in S189+ session prompts until the flow is built, so it doesn't get lost.
 
 ### Deliberately omitted
 
@@ -163,6 +174,8 @@ Sub-question: also flip `contact.akoya_isvendor = true` at the same time, or lea
 
 **Our recommendation:** Yes to writing `wmkf_billcomid`. Defer `akoya_isvendor` to staff (we don't know downstream consumers of that boolean).
 
+**Connor's answer (2026-05-26):** Yes — write `wmkf_billcomid` on first-time onboarding, AND also flip `contact.akoya_isvendor = true` at the same time.
+
 ---
 
 ### Q2. OK if our portal writes to `wmkf_paymentnetworkidpni` on the honorarium request?
@@ -170,6 +183,8 @@ Sub-question: also flip `contact.akoya_isvendor = true` at the same time, or lea
 Staff currently enters this by hand; the values are inconsistent (proper 16-digit PNIs, "N/A", "5", `u`-prefix international format). Our integration would only write validated BILL-API-returned values on net-new portal-created rows. Steph's existing entries on the 8 partially-touched 2026-06-04 honoraria stay untouched (different create path).
 
 **Our recommendation:** Yes, write to the existing field.
+
+**Connor's answer (2026-05-26):** Yes.
 
 ---
 
@@ -184,6 +199,8 @@ Gives Steph a real status picklist she can filter on, using a field she already 
 
 **Our recommendation:** Yes.
 
+**Connor's answer (2026-05-26):** Yes.
+
 ---
 
 ### Q4b. Leave `wmkf_vendorverified` and `wmkf_paymentcontactconfirmed` alone on honorarium rows?
@@ -195,17 +212,21 @@ Defensive recommendation: leave both null so a future workflow change doesn't ac
 
 **Our recommendation:** Yes, leave both untouched.
 
+**Connor's answer (2026-05-26):** Yes — leave both `wmkf_vendorverified` and `wmkf_paymentcontactconfirmed` untouched on honorarium rows.
+
 ---
 
 ### Q5. Add `wmkf_honorariumforrequest` lookup on `akoya_request` to capture honorarium↔grant provenance?
 
 Today Amy's honorarium #1002764 has zero data link back to grant #1002238 (the Utah State proposal she reviewed). Our portal **knows** which grant the reviewer is reviewing (it's on the suggestion row the token resolves to), so we can populate this at create time — but only if the field exists.
 
-Proposed new optional Lookup field on `akoya_request`:
-- Name: `wmkf_honorariumforrequest`
-- Target entity: `akoya_request` (self-referential)
+Proposed new optional Lookup field (per Connor 2026-05-26, refined):
+- Name: `wmkf_HonorariumRequest`
+- **Lives on:** `wmkf_potentialreviewer` (the reviewer/request junction) — NOT on `akoya_request`
+- **Target entity:** `akoya_request` (the honorarium row)
+- **Direction:** junction → honorarium (the junction row points at its honorarium)
 - Required: no
-- Populated by: our portal on honorarium-request creation. Backfill: out of scope.
+- Populated by: our portal at honorarium-request creation time — PATCH the junction row with the new honorarium request id. Backfill: out of scope.
 
 Downstream payoff:
 - "How much did we spend on reviewers for the Medical Research cycle?" becomes a single query instead of a five-lookup join
@@ -216,6 +237,10 @@ Downstream payoff:
 
 **Our recommendation:** Yes. One small Dataverse change, ongoing value.
 
+**Connor's answer (2026-05-26):** Yes, but with a refinement — the more important link is between the **reviewer/request junction record and the honorarium request**, not honorarium → grant request directly. The junction already carries the grant request, so we still get provenance to the grant via one hop, AND we preserve which specific reviewer-of-this-proposal assignment the honorarium pays out.
+
+**Final shape (Connor 2026-05-26):** new lookup `wmkf_HonorariumRequest` **on `wmkf_potentialreviewer`**, target `akoya_request`. The junction row points at its honorarium. Our portal PATCHes the junction with the new honorarium id at create time (we already have the junction id — it's what the token resolves to).
+
 ---
 
 ### Q6. Adopt "grant request" vs "honorarium request" as canonical staff terminology?
@@ -223,6 +248,8 @@ Downstream payoff:
 Both are `akoya_request` rows but they describe very different things. Worth a small alignment exercise so you, Steph, and the staff use the two terms distinctly in tickets, emails, and conversation. No-op if you'd rather keep current phrasing — we just need to be precise in code/docs regardless.
 
 **Our recommendation:** Yes.
+
+**Connor's answer (2026-05-26):** Yes — adopt internally to avoid confusion.
 
 ---
 
@@ -238,6 +265,25 @@ Four sub-questions:
 
 No recommendation — just inputs to our portal design.
 
+**Connor's answer (2026-05-26):** Form definition JSON shared (`Phase_160354dd-3feb-f011-8543-6045bd02b4cc_FormDefinition_2026-02-26T18-24-28Z.json`). Concrete contents:
+
+**a. Fields collected** (all map to existing Dataverse — already covered by our portal extension):
+- **Contact panel** (dynamic, → `contact`): salutation, firstname, middlename, lastname, emailaddress1, adx_organizationname, jobtitle, telephone1, address1_line1, address1_line2, address1_city, address1_stateorprovince, address1_postalcode, address1_country
+- **"Do you have a Bill.com account?"** radio (Yes / No, **required**)
+- **BILL.com block** (all optional text — staff infers from radio above): organization_name_on_bill_com_account, email_address_on_bill_com_account, payment_network_id__pni_, bill_com_street_1/2/city/state/zip_code/country
+- **No banking fields** (account/routing) — confirms BILL.com handles all banking detail; Dataverse stores only onboarding-status + PNI pointer (matches the [no-banking-PII-in-Dataverse](../.claude-memory/project-no-banking-pii-in-dataverse.md) constraint)
+- **Hidden fields** auto-write to `akoya_request`:
+  - `akoya_recommendedamount` defaulted to `$250`
+  - `wmkf_request_type` defaulted to `Individual` (`682090001`) — confirms our discriminator update earlier in this doc
+
+**b. Acceptance gate:** No separate "I accept the honorarium" gate. The form has a **required 4-checkbox confidentiality block** (`question4`) that gates submission — items cover confidentiality of proposal contents, AI/LLM training prohibition, no sharing with colleagues, destroy copies after review. Form submission with all four checked = implicit acceptance. Our portal already covers this with the policy-ack cards (Stage 2a).
+
+**c. Legal text:** No W-9 / 1099 disclosure / banking ToS — just the four-item confidentiality + AI-use terms (full text preserved in `question4.choices` in the JSON if we ever need to mirror the exact wording).
+
+**d. Link delivery:** Connor 2026-05-26 — "more or less" confirms the PowerAutomate-on-honorarium-create trigger model. Exact wiring isn't material to our build: our portal delivers the magic link itself via the existing Review Manager invite, so the GOapply trigger path is being retired alongside the form.
+
+**Portal-coverage takeaway:** The GOapply form is fully subsumed by our portal-extension plan. Contact panel ≡ existing `contactEdits` + new address fields. BILL block ≡ our `/api/bill/onboard-reviewer` integration (we replace manual data entry with API-returned PNI). Confidentiality block ≡ existing Stage 2a policy-ack cards. Hidden field defaults ($250 + `wmkf_request_type=Individual`) ≡ our honorarium-create body. No new fields to add to the portal beyond what's already in the plan.
+
 ---
 
 ## What gets built
@@ -245,7 +291,8 @@ No recommendation — just inputs to our portal design.
 | # | Chunk | Owner | Depends on |
 |---|---|---|---|
 | 0 | This design doc → Connor sign-off | Connor | (none) |
-| 1 | Connor adds `wmkf_honorariumforrequest` lookup (Q5) | Connor | Q5 answered yes |
+| 1 | Connor adds `wmkf_HonorariumRequest` lookup on `wmkf_potentialreviewer` → `akoya_request` (Q5) | Connor | Q5 answered yes |
+| 1b | Connor builds post-create PowerAutomate enrichment flow on honorarium `akoya_request` (non-gating; field list TBD) | Connor | (none — parallel) |
 | 2 | `lib/bill.js` — session, create vendor, search/invite network, against a mocked BILL response | Vercel | (none — parallel with Connor) |
 | 3 | Unit tests for `lib/bill.js` | Vercel | Chunk 2 |
 | 4 | Extend `respond.js` accept path: address fields in contactEdits, PATCH contact.address1_*, create honorarium `akoya_request` with provenance | Vercel | Chunk 1 |
