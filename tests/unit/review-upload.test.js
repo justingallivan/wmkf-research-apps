@@ -10,6 +10,7 @@ import { jest } from '@jest/globals';
 import { GraphService } from '../../lib/services/graph-service.js';
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import NotificationService from '../../lib/services/notification-service.js';
+import { clearResolverCache } from '../../lib/services/program-director-resolver.js';
 import { writeReviewFiles, buildReviewerSubfolder } from '../../lib/services/review-upload.js';
 
 // Replace specific methods with jest.fn() before each test, restore afterwards.
@@ -370,11 +371,11 @@ describe('writeReviewFiles — virus scan integration', () => {
         { filename: 'c.pdf', buffer: PDF_BYTES },
       ],
     }));
-    expect(r).toEqual({
+    expect(r).toEqual(expect.objectContaining({
       ok: false,
       reason: 'infected',
       errors: ['b.pdf: virus detected (EICAR-Test-Signature)'],
-    });
+    }));
     expect(GraphService.uploadFile).not.toHaveBeenCalled();
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
@@ -423,7 +424,7 @@ describe('writeReviewFiles — virus scan integration', () => {
     mockSuggestionFound();
     const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const r = await writeReviewFiles(validInput());
-    expect(r).toEqual({ ok: false, reason: 'scan_unavailable' });
+    expect(r).toEqual(expect.objectContaining({ ok: false, reason: "scan_unavailable" }));
     expect(GraphService.uploadFile).not.toHaveBeenCalled();
     expect(errSpy).toHaveBeenCalled();
     errSpy.mockRestore();
@@ -437,7 +438,7 @@ describe('writeReviewFiles — virus scan integration', () => {
     mockSuggestionFound();
     const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const r = await writeReviewFiles(validInput());
-    expect(r).toEqual({ ok: false, reason: 'scan_misconfigured' });
+    expect(r).toEqual(expect.objectContaining({ ok: false, reason: "scan_misconfigured" }));
     expect(GraphService.uploadFile).not.toHaveBeenCalled();
     errSpy.mockRestore();
   });
@@ -449,7 +450,7 @@ describe('writeReviewFiles — virus scan integration', () => {
     mockSuggestionFound();
     const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const r = await writeReviewFiles(validInput());
-    expect(r).toEqual({ ok: false, reason: 'scan_misconfigured' });
+    expect(r).toEqual(expect.objectContaining({ ok: false, reason: "scan_misconfigured" }));
     expect(global.fetch).not.toHaveBeenCalled();
     errSpy.mockRestore();
   });
@@ -470,16 +471,18 @@ describe('writeReviewFiles — virus scan integration', () => {
         { filename: 'b.pdf', buffer: PDF_BYTES },
       ],
     }));
-    expect(r).toEqual({ ok: false, reason: 'scan_misconfigured' });
+    expect(r).toEqual(expect.objectContaining({ ok: false, reason: "scan_misconfigured" }));
     errSpy.mockRestore();
   });
 
-  test('flag on + infected + outage in same batch → outage wins over infected', async () => {
-    // Rationale: if even one file failed to scan, we don't know if the
-    // un-scanned file is also infected; treating the partial as "infected
-    // for known + clean for unknown" would let an unscanned file through
-    // on a re-upload after the operator removes the flagged one. Surfacing
-    // the outage instead forces a clean retry once the scanner recovers.
+  test('flag on + infected + outage in same batch → outage wins over infected (response-reason precedence)', async () => {
+    // Response-reason precedence: if any file failed to scan, the user-facing
+    // response is `scan_unavailable` rather than `infected` — we don't know
+    // whether the un-scanned file is also infected, so we force a clean
+    // rescan once the scanner recovers. The detection alert path is
+    // separately exercised by 'fires alert for known infected files even
+    // when the response wins as scan_unavailable' below; the two concerns
+    // are decoupled per Codex 2026-05-26 review.
     process.env.VIRUS_SCAN_ENABLED = 'true';
     mockScanResponses([
       { status: 200, body: { CleanResult: false, FoundViruses: [{ VirusName: 'V1' }] } },
@@ -495,7 +498,7 @@ describe('writeReviewFiles — virus scan integration', () => {
         { filename: 'b.pdf', buffer: PDF_BYTES },
       ],
     }));
-    expect(r).toEqual({ ok: false, reason: 'scan_unavailable' });
+    expect(r).toEqual(expect.objectContaining({ ok: false, reason: 'scan_unavailable' }));
     errSpy.mockRestore();
   });
 });
@@ -515,6 +518,9 @@ describe('writeReviewFiles — detection alert (B1)', () => {
     process.env.CLOUDMERSIVE_API_KEY = 'test-key';
     process.env.VIRUS_SCAN_ENABLED = 'true';
     notifySpy = jest.spyOn(NotificationService, 'notify').mockResolvedValue(null);
+    // PD resolver caches per-process; clear so each test's mocked Dataverse
+    // chain is exercised rather than the prior test's cached null.
+    clearResolverCache();
   });
 
   afterEach(() => {
@@ -598,6 +604,121 @@ describe('writeReviewFiles — detection alert (B1)', () => {
     errSpy.mockRestore();
   });
 
+  test('mixed batch (infected + outage) still fires alert for the known infected file', async () => {
+    // Response-reason precedence promotes the outage to scan_unavailable
+    // (covered separately above). The detection alert must still fire for
+    // the file we know was infected — pre-S190 Codex review caught that
+    // the alert path was gated on `reason === 'infected'`, which silently
+    // suppressed alerts on mixed batches.
+    mockScan([
+      { status: 200, body: { CleanResult: false, FoundViruses: [{ VirusName: 'EICAR' }] } },
+      { status: 503, body: 'down' },
+      { status: 503, body: 'down' },
+      { status: 503, body: 'down' },
+    ]);
+    mockSuggestionFound();
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const r = await writeReviewFiles(validInput({
+      files: [
+        { filename: 'infected.pdf', buffer: PDF_BYTES },
+        { filename: 'unscanned.pdf', buffer: PDF_BYTES },
+      ],
+    }));
+    expect(r.reason).toBe('scan_unavailable');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(notifySpy).toHaveBeenCalledTimes(1);
+    const call = notifySpy.mock.calls[0][0];
+    expect(call.type).toBe('virus_detection_reviewer');
+    expect(call.metadata.fileDetections).toEqual([
+      'infected.pdf: virus detected (EICAR)',
+    ]);
+    errSpy.mockRestore();
+  });
+
+  test('successful PD resolution → explicitRecipients contains the PD email', async () => {
+    // Mock the 3-step PD lookup chain explicitly: suggestion read,
+    // akoya_request read, systemusers query. Earlier tests in this block
+    // share the suggestion-shaped mock for every getRecord call which
+    // gracefully resolves PD as null — useful for the category-only path
+    // but not for verifying the success path.
+    mockScan([
+      { status: 200, body: { CleanResult: false, FoundViruses: [{ VirusName: 'EICAR' }] } },
+    ]);
+    const PD_GUID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+    DynamicsService.getRecord
+      // 1. fireReviewDetectionAlert: load suggestion (with expand)
+      .mockResolvedValueOnce({
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        _wmkf_request_value: REQUEST_ID,
+        wmkf_Request: { akoya_requestid: REQUEST_ID, akoya_requestnum: REQUEST_NUMBER, akoya_title: 'Test' },
+        wmkf_PotentialReviewer: { wmkf_lastname: 'Patel', wmkf_name: 'A. Patel', wmkf_emailaddress: 'a@ex.org' },
+      })
+      // 2. resolveProgramDirectorEmailForRequest: load akoya_request
+      .mockResolvedValueOnce({
+        _wmkf_programdirector_value: PD_GUID,
+      })
+      // 3. resolveProgramDirectorEmailForRequest: load systemuser
+      .mockResolvedValueOnce({
+        internalemailaddress: 'pd@example.org',
+        isdisabled: false,
+      });
+
+    const r = await writeReviewFiles(validInput());
+    expect(r.reason).toBe('infected');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(notifySpy).toHaveBeenCalledTimes(1);
+    const call = notifySpy.mock.calls[0][0];
+    expect(call.category).toBe('virus-detection');
+    expect(call.explicitRecipients).toEqual(['pd@example.org']);
+  });
+
+  test('PD resolver failure still fires the alert with empty explicitRecipients (category fallback)', async () => {
+    // The detection alert must remain durable even if any step of the PD
+    // chain throws — the category-routed foundation address still gets
+    // notified via category routing.
+    mockScan([
+      { status: 200, body: { CleanResult: false, FoundViruses: [{ VirusName: 'EICAR' }] } },
+    ]);
+    DynamicsService.getRecord.mockRejectedValue(new Error('Dataverse 503'));
+
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const r = await writeReviewFiles(validInput());
+    expect(r.reason).toBe('infected');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(notifySpy).toHaveBeenCalledTimes(1);
+    const call = notifySpy.mock.calls[0][0];
+    expect(call.category).toBe('virus-detection');
+    expect(call.explicitRecipients).toEqual([]);
+    warnSpy.mockRestore();
+  });
+
+  test('PD chain falls back to _wmkf_request_value when expand is missing akoya_requestid', async () => {
+    // Codex 2026-05-26: if the expand returns wmkf_Request without
+    // akoya_requestid populated, we still have _wmkf_request_value from
+    // the top-level $select. Use it rather than silently skipping the
+    // PD lookup.
+    mockScan([
+      { status: 200, body: { CleanResult: false, FoundViruses: [{ VirusName: 'EICAR' }] } },
+    ]);
+    const PD_GUID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+    DynamicsService.getRecord
+      .mockResolvedValueOnce({
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        _wmkf_request_value: REQUEST_ID,
+        // Note: wmkf_Request omitted (expand flaked)
+      })
+      .mockResolvedValueOnce({ _wmkf_programdirector_value: PD_GUID })
+      .mockResolvedValueOnce({ internalemailaddress: 'pd@example.org', isdisabled: false });
+
+    await writeReviewFiles(validInput());
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(notifySpy.mock.calls[0][0].explicitRecipients).toEqual(['pd@example.org']);
+  });
+
   test('NotificationService throwing does NOT alter the client rejection', async () => {
     mockScan([
       { status: 200, body: { CleanResult: false, FoundViruses: [{ VirusName: 'EICAR' }] } },
@@ -606,11 +727,11 @@ describe('writeReviewFiles — detection alert (B1)', () => {
     notifySpy.mockRejectedValue(new Error('notification service down'));
     const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const r = await writeReviewFiles(validInput());
-    expect(r).toEqual({
+    expect(r).toEqual(expect.objectContaining({
       ok: false,
       reason: 'infected',
       errors: ['review.pdf: virus detected (EICAR)'],
-    });
+    }));
     await Promise.resolve();
     await Promise.resolve();
     errSpy.mockRestore();

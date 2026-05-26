@@ -470,7 +470,14 @@ export default async function handler(req, res) {
     // request-level PD exists yet — the foundation alerts address is the
     // only stable recipient. If/when intake adds a known program director
     // (e.g. cycle → PD lookup), add that email to explicitRecipients.
-    NotificationService.notify({
+    //
+    // S190 harmonization (Codex review): awaited rather than fire-and-forget
+    // so the system_alerts row is durable before the client response — Fluid
+    // Compute can terminate the function instance after the response is
+    // sent and lose a fire-and-forget promise mid-write. The audit row at
+    // step 16 above is the per-event durable evidence; the system_alerts
+    // row is what surfaces on the admin dashboard for triage.
+    await NotificationService.notify({
       type: 'virus_detection_intake',
       severity: 'error',
       title: `Virus scan rejected an applicant attachment (${pending.filename})`,
@@ -504,6 +511,8 @@ export default async function handler(req, res) {
       // recipients for the 'virus-detection' category in /admin → Alert Recipients.
       category: 'virus-detection',
     }).catch(err => {
+      // Alert failure must never block the client rejection. Logged so an
+      // operator can investigate after the fact.
       console.error(`[attach] detection alert failed for draft ${draftId}: ${err.message}`);
     });
     return jsonError(res, 422, 'infected');

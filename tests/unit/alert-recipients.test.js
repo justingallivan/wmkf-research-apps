@@ -231,7 +231,7 @@ describe('writeConfig — validation', () => {
 describe('SEED_CATEGORIES', () => {
   test('includes the categories we tagged at call sites', () => {
     const keys = AlertRecipients.SEED_CATEGORIES.map((c) => c.key);
-    for (const expected of ['default', 'security', 'spend', 'intake', 'ops', 'staff-onboarding', 'support']) {
+    for (const expected of ['default', 'security', 'virus-detection', 'spend', 'intake', 'ops', 'staff-onboarding', 'support']) {
       expect(keys).toContain(expected);
     }
   });
