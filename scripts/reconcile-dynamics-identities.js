@@ -33,7 +33,8 @@ for (const envFile of ['.env', '.env.local']) {
 
 const { reconcileProfile, reconcileBatch } = await import('../lib/services/dynamics-identity-service.js');
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
-DynamicsService.bypassRestrictions('reconcile-dynamics-identities');
+const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
+enterDynamicsBypassForScript('reconcile-dynamics-identities');
 
 const args = process.argv.slice(2);
 const allFlag = args.includes('--all');

@@ -40,7 +40,8 @@ const { sql } = require('@vercel/postgres');
 
   // Resolve every distinct request_number against Dataverse → GUID
   const { DynamicsService } = await import('../lib/services/dynamics-service.js');
-  DynamicsService.bypassRestrictions('inspect');
+  const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
+  enterDynamicsBypassForScript('inspect');
   const resolved = [];
   const missed = [];
   for (const { request_number: rn } of reqs.rows) {

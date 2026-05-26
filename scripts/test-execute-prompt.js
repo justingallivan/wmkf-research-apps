@@ -65,11 +65,12 @@ const RESTORE = (() => {
 })();
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 const { GraphService } = await import('../lib/services/graph-service.js');
 const { getRequestSharePointBuckets } = await import('../lib/utils/sharepoint-buckets.js');
 const { extractTextFromBuffer } = await import('../lib/utils/file-loader.js');
 const { executePrompt } = await import('../lib/services/execute-prompt.js');
-DynamicsService.bypassRestrictions('test-execute-prompt');
+enterDynamicsBypassForScript('test-execute-prompt');
 
 // Look up the request GUID by number
 const lookup = await DynamicsService.queryRecords('akoya_requests', {

@@ -32,10 +32,11 @@ const LIMIT = limitArg ? parseInt(limitArg.split('=')[1] || args[args.indexOf(li
 
 (async () => {
   const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+  const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
   const potentialReviewerAdapter = await import('../lib/dataverse/adapters/potential-reviewer.js');
   const researcherAdapter = await import('../lib/dataverse/adapters/researcher.js');
   const suggestionAdapter = await import('../lib/dataverse/adapters/reviewer-suggestion.js');
-  DynamicsService.bypassRestrictions('backfill-postgres-to-dataverse');
+  enterDynamicsBypassForScript('backfill-postgres-to-dataverse');
 
   console.log(`Mode: ${DRY_RUN ? 'DRY-RUN (no writes)' : 'LIVE'}${LIMIT ? `  limit=${LIMIT}` : ''}`);
 

@@ -52,6 +52,7 @@ if (!REQUEST_GUID || !FILENAME) {
 }
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 const { GraphService } = await import('../lib/services/graph-service.js');
 const { createPhaseISummarizationPrompt } = await import('../shared/config/prompts/phase-i-summaries.js');
 const { KECK_GUIDELINES } = await import('../shared/config/keck-guidelines.js');
@@ -60,7 +61,7 @@ const { getRequestSharePointBuckets } = await import('../lib/utils/sharepoint-bu
 const { loadFile } = await import('../lib/utils/file-loader.js');
 const { BASE_CONFIG, getModelForApp, loadModelOverrides } = await import('../shared/config/baseConfig.js');
 
-DynamicsService.bypassRestrictions('ab-phase-i');
+enterDynamicsBypassForScript('ab-phase-i');
 await loadModelOverrides();
 
 const model = getModelForApp('batch-phase-i');

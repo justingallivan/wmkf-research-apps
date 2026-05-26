@@ -21,7 +21,8 @@ fs.readFileSync(path.join(__dirname, '..', '.env.local'), 'utf8').split('\n').fo
 
 (async () => {
   const { DynamicsService } = await import('../lib/services/dynamics-service.js');
-  DynamicsService.bypassRestrictions('probe-fiscal-year');
+  const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
+  enterDynamicsBypassForScript('probe-fiscal-year');
 
   // Sample 200 recent requests that have a fiscal year set
   const result = await DynamicsService.queryRecords('akoya_requests', {

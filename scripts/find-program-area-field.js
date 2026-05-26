@@ -28,13 +28,14 @@ if (fs.existsSync(envPath)) {
 }
 
 const { DynamicsService } = require('../lib/services/dynamics-service');
+const { enterDynamicsBypassForScript } = require('../lib/services/dynamics-context');
 
 async function main() {
   const TABLE = 'akoya_request';
   const NEEDLE = 'Program Area Served';
 
   // Bypass the user-scoped restriction system for this admin-only one-off.
-  DynamicsService.bypassRestrictions('find-program-area-field-script');
+  enterDynamicsBypassForScript('find-program-area-field-script');
 
   console.log(`Fetching attributes for ${TABLE}...`);
   const attrs = await DynamicsService.getEntityAttributes(TABLE);

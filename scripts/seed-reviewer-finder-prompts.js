@@ -68,13 +68,14 @@ for (const envFile of ['.env', '.env.local']) {
 }
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 const {
   ANALYZE_SYSTEM_PROMPT,
   ANALYZE_USER_PROMPT_TEMPLATE,
   SCORE_CANDIDATES_SYSTEM_PROMPT,
   SCORE_CANDIDATES_USER_PROMPT_TEMPLATE,
 } = await import('../shared/config/prompts/reviewer-finder-dynamics.js');
-DynamicsService.bypassRestrictions('seed-reviewer-finder-prompts');
+enterDynamicsBypassForScript('seed-reviewer-finder-prompts');
 
 const ENTITY_SET = 'wmkf_ai_prompts';
 const PROMPTSTATUS_PUBLISHED = 682090001; // confirmed Session 109 schema probe

@@ -58,7 +58,8 @@ const FLOOR = 2048;
   {
     const { PromptResolver } = await import('../lib/services/prompt-resolver.js');
     const { DynamicsService } = await import('../lib/services/dynamics-service.js');
-    DynamicsService.bypassRestrictions('audit');
+    const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
+    enterDynamicsBypassForScript('audit');
     const p = await PromptResolver.getPrompt('phase-i-dynamics-v2');
     const sys = PromptResolver.interpolate(p.systemPrompt, {
       summary_length: 1,

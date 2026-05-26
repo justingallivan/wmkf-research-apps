@@ -52,6 +52,7 @@ for (const envFile of ['.env', '.env.local']) {
 }
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 const {
   SUMMARIZE_SYSTEM_PROMPT,
   SUMMARIZE_USER_PROMPT_TEMPLATE,
@@ -62,7 +63,7 @@ const {
   REFINE_SYSTEM_PROMPT,
   REFINE_USER_PROMPT_TEMPLATE,
 } = await import('../shared/config/prompts/phase-ii-dynamics.js');
-DynamicsService.bypassRestrictions('seed-phase-ii-prompts');
+enterDynamicsBypassForScript('seed-phase-ii-prompts');
 
 const ENTITY_SET = 'wmkf_ai_prompts';
 const PROMPTSTATUS_PUBLISHED = 682090001;

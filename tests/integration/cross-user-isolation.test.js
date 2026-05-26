@@ -94,12 +94,12 @@ describe('/api/review-manager/send-emails cross-user isolation', () => {
   let handler;
 
   beforeAll(async () => {
-    // The Dataverse-backed handler imports DynamicsService at module load.
-    // Mock with the static-method shape the handler actually uses.
+    // The Dataverse-backed handler imports DynamicsService at module load
+    // and invokes its static methods inside a real `bypassDynamicsRestrictions`
+    // ALS scope. We only need to mock the static methods the handler actually
+    // calls; the ALS wrapper runs unmocked.
     jest.doMock('../../lib/services/dynamics-service', () => ({
       DynamicsService: {
-        bypassRestrictions: jest.fn(),
-        setRestrictions: jest.fn(),
         executeQuery: jest.fn(() => Promise.resolve({ value: [] })),
         getRecord: jest.fn(() => Promise.resolve(null)),
       },

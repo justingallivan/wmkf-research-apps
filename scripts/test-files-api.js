@@ -52,9 +52,10 @@ const keepFile = args.includes('--keep'); // skip delete for manual inspection
   } else {
     console.log('No --pdf provided; fetching SUNY Stony Brook Phase I from SharePoint...');
     const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+    const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
     const { GraphService } = await import('../lib/services/graph-service.js');
     const { getRequestSharePointBuckets } = await import('../lib/utils/sharepoint-buckets.js');
-    DynamicsService.bypassRestrictions('test-files-api');
+    enterDynamicsBypassForScript('test-files-api');
 
     const lookup = await DynamicsService.queryRecords('akoya_requests', {
       select: 'akoya_requestid',

@@ -21,7 +21,8 @@ for (const envFile of ['.env', '.env.local']) {
 }
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
-DynamicsService.bypassRestrictions('verify-impersonation-attribution');
+const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
+enterDynamicsBypassForScript('verify-impersonation-attribution');
 
 const RUN_NUMS = process.argv.slice(2);
 if (!RUN_NUMS.length) {

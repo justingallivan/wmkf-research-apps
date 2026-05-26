@@ -60,7 +60,8 @@ if (!DRY && !EXECUTE) {
 }
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
-DynamicsService.bypassRestrictions('backfill-request-person-junction');
+const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
+enterDynamicsBypassForScript('backfill-request-person-junction');
 
 // Picklist values from lib/dataverse/schema/wave2/wmkf_app_request_person.json
 const ROLE_PI = 100000000;

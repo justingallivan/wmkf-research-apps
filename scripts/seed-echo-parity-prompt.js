@@ -48,7 +48,8 @@ for (const envFile of ['.env', '.env.local']) {
 }
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
-DynamicsService.bypassRestrictions('seed-echo-parity-prompt');
+const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
+enterDynamicsBypassForScript('seed-echo-parity-prompt');
 
 const PROMPT_NAME = 'executor.echo-parity';
 const ENTITY_SET = 'wmkf_ai_prompts';

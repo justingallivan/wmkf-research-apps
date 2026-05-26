@@ -26,10 +26,11 @@ const RESEARCH_KEYWORDS = /university|institute|college of medicine|laboratory|r
 
 (async () => {
   const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+  const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
   const { GraphService } = await import('../lib/services/graph-service.js');
   const { getRequestSharePointBuckets } = await import('../lib/utils/sharepoint-buckets.js');
 
-  DynamicsService.bypassRestrictions('find-research');
+  enterDynamicsBypassForScript('find-research');
 
   // Pull recent requests
   const result = await DynamicsService.queryRecords('akoya_requests', {

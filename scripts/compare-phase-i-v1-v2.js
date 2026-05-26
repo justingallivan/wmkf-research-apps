@@ -62,6 +62,7 @@ const AUDIENCE_DESCRIPTIONS = {
 
 (async () => {
   const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+  const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
   const { GraphService } = await import('../lib/services/graph-service.js');
   const { getRequestSharePointBuckets } = await import('../lib/utils/sharepoint-buckets.js');
   const { loadFile } = await import('../lib/utils/file-loader.js');
@@ -71,7 +72,7 @@ const AUDIENCE_DESCRIPTIONS = {
   const { BASE_CONFIG, getModelForApp, loadModelOverrides } = await import('../shared/config/baseConfig.js');
 
   await loadModelOverrides();
-  DynamicsService.bypassRestrictions('compare-phase-i');
+  enterDynamicsBypassForScript('compare-phase-i');
 
   const apiKey = process.env.CLAUDE_API_KEY;
   if (!apiKey) { console.error('CLAUDE_API_KEY not set'); process.exit(1); }

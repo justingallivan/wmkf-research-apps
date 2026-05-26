@@ -32,10 +32,11 @@ const CONCEPT_EXCLUDE_REGEX = /concept/i;
 
 (async () => {
   const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+  const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
   const { GraphService } = await import('../lib/services/graph-service.js');
   const { getRequestSharePointBuckets } = await import('../lib/utils/sharepoint-buckets.js');
 
-  DynamicsService.bypassRestrictions('find-2025-phase-i');
+  enterDynamicsBypassForScript('find-2025-phase-i');
 
   const allHits = [];
   for (const w of WINDOWS) {

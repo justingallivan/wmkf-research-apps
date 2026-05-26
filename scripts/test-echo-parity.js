@@ -46,8 +46,9 @@ const ECHO_TEXT = (() => {
 })();
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 const { executePrompt } = await import('../lib/services/execute-prompt.js');
-DynamicsService.bypassRestrictions('test-echo-parity');
+enterDynamicsBypassForScript('test-echo-parity');
 
 const lookup = await DynamicsService.queryRecords('akoya_requests', {
   select: 'akoya_requestid,akoya_requestnum',

@@ -89,15 +89,13 @@ jest.mock('../../lib/services/database-service', () => ({
   })),
 }));
 
-// Dynamics service
-// DynamicsService is used via static methods (bypassRestrictions / setRestrictions /
-// executeQuery / etc.). The mock must provide them on the class itself, not on
-// instances — otherwise routes that call DynamicsService.bypassRestrictions(...)
-// at handler entry throw "is not a function".
+// Dynamics service — routes scope their Dataverse calls inside an ALS context
+// from `lib/services/dynamics-context.js` (most via `bypassDynamicsRestrictions`;
+// `/api/dynamics-explorer/chat` uses `withDynamicsContext` to thread per-user
+// restrictions). The ALS wrapper runs unmocked; inside the scope the routes
+// call the static methods below on DynamicsService, which we mock.
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
-    bypassRestrictions: jest.fn(),
-    setRestrictions: jest.fn(),
     executeQuery: jest.fn(() => Promise.resolve({ value: [] })),
     resolveLogicalName: jest.fn((name) => name),
     checkRestriction: jest.fn(),

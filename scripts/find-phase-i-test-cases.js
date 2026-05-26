@@ -30,10 +30,11 @@ if (fs.existsSync(envPath)) {
 
 (async () => {
   const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+  const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
   const { getRequestSharePointBuckets } = await import('../lib/utils/sharepoint-buckets.js');
   const { GraphService } = await import('../lib/services/graph-service.js');
 
-  DynamicsService.bypassRestrictions('find-test-cases');
+  enterDynamicsBypassForScript('find-test-cases');
 
   // Sample by request number ranges. Lower numbers tend to be pre-akoya
   // migrations and often live in RequestArchive1/2/3. Known archive case:

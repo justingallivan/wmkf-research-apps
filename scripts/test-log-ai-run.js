@@ -41,7 +41,8 @@ for (const envFile of ['.env', '.env.local']) {
 // We're writing (not querying) but queryRecords() is used to look up the test
 // request, so seed empty restrictions.
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
-DynamicsService.bypassRestrictions('test-log-ai-run');
+const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
+enterDynamicsBypassForScript('test-log-ai-run');
 
 const args = process.argv.slice(2);
 const rIdx = args.indexOf('--request');

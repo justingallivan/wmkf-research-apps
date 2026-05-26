@@ -28,10 +28,11 @@ const CANDIDATES = [
 
 (async () => {
   const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+  const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
   const { GraphService } = await import('../lib/services/graph-service.js');
   const { getRequestSharePointBuckets } = await import('../lib/utils/sharepoint-buckets.js');
 
-  DynamicsService.bypassRestrictions('list-pdfs');
+  enterDynamicsBypassForScript('list-pdfs');
 
   for (const requestNum of CANDIDATES) {
     const lookup = await DynamicsService.queryRecords('akoya_requests', {

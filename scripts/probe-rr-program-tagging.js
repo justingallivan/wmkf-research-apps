@@ -24,7 +24,8 @@ for (const envFile of ['.env', '.env.local']) {
 }
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
-DynamicsService.bypassRestrictions('probe-rr-program');
+const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
+enterDynamicsBypassForScript('probe-rr-program');
 
 console.log('\n=== 1. Find akoya_program rows matching "Reviewer" or "RR" ===');
 const programs = await DynamicsService.queryRecords('akoya_programs', {

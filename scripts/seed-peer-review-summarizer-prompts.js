@@ -41,13 +41,14 @@ for (const envFile of ['.env', '.env.local']) {
 }
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 const {
   ANALYZE_SYSTEM_PROMPT,
   ANALYZE_USER_PROMPT_TEMPLATE,
   QUESTIONS_SYSTEM_PROMPT,
   QUESTIONS_USER_PROMPT_TEMPLATE,
 } = await import('../shared/config/prompts/peer-reviewer-dynamics.js');
-DynamicsService.bypassRestrictions('seed-peer-review-summarizer-prompts');
+enterDynamicsBypassForScript('seed-peer-review-summarizer-prompts');
 
 const ENTITY_SET = 'wmkf_ai_prompts';
 const PROMPTSTATUS_PUBLISHED = 682090001;

@@ -43,9 +43,10 @@ for (const envFile of ['.env', '.env.local']) {
 
 const { sql } = await import('@vercel/postgres');
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 const potentialReviewerAdapter = await import('../lib/dataverse/adapters/potential-reviewer.js');
 const reviewerSuggestionAdapter = await import('../lib/dataverse/adapters/reviewer-suggestion.js');
-DynamicsService.bypassRestrictions('parity-report');
+enterDynamicsBypassForScript('parity-report');
 
 const GRACE_DAYS = 14;
 const NOW = new Date();

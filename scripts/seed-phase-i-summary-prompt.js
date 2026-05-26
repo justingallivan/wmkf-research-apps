@@ -84,10 +84,11 @@ for (const envFile of ['.env', '.env.local']) {
 }
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 const { SYSTEM_PROMPT, USER_PROMPT_TEMPLATE } = await import(
   '../shared/config/prompts/phase-i-dynamics.js'
 );
-DynamicsService.bypassRestrictions('seed-phase-i-summary-prompt');
+enterDynamicsBypassForScript('seed-phase-i-summary-prompt');
 
 const PROMPT_NAME = 'phase-i.summary';
 const ENTITY_SET = 'wmkf_ai_prompts';

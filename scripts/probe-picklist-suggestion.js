@@ -7,7 +7,8 @@ require('./../lib/dataverse/client').loadEnvLocal();
 
 (async () => {
   const { DynamicsService } = await import('../lib/services/dynamics-service.js');
-  DynamicsService.bypassRestrictions('probe');
+  const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
+  enterDynamicsBypassForScript('probe');
 
   const token = await DynamicsService.getAccessToken();
   const baseUrl = process.env.DYNAMICS_URL;

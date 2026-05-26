@@ -22,6 +22,7 @@ if (fs.existsSync(envPath)) {
 }
 
 const { DynamicsService } = require('../lib/services/dynamics-service');
+const { enterDynamicsBypassForScript } = require('../lib/services/dynamics-context');
 
 const REQUEST_NUMBER = process.argv[2] || '992408';
 
@@ -66,7 +67,7 @@ const RESEARCH_LABELS = {
 };
 
 async function main() {
-  DynamicsService.bypassRestrictions('lookup-program-area-script');
+  enterDynamicsBypassForScript('lookup-program-area-script');
 
   const result = await DynamicsService.queryRecords('akoya_requests', {
     select: 'akoya_requestid,akoya_requestnum,wmkf_programareaserved_research,wmkf_programareaserved_socal,wmkf_programareaservedmisc',
