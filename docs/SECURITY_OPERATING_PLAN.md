@@ -135,6 +135,33 @@ Output:
   - What needs code?
   - What needs IT/admin action?
 
+## Postgres backup / restore
+
+The application's Postgres database is provisioned via Vercel's Neon integration. Neon provides **automatic point-in-time recovery (PITR) snapshots** with a rolling retention window — no application-side backup job to run; recovery happens by spinning up a branch from a past timestamp.
+
+**Retention window:** Vercel's free Neon tier provides ~7 days of PITR history; paid tiers extend the window. Verify current retention via the Vercel project dashboard → Storage → Neon Postgres → Settings. If we move to a paid tier, document the new window here.
+
+**Recovery procedure** (use when a table is corrupted or critical data is lost):
+
+1. Identify the target timestamp — when the data was last known to be intact.
+2. In the Vercel/Neon dashboard, create a **branch** from that timestamp. Neon creates a new database snapshot at that point-in-time — fast (seconds) because Neon's storage is copy-on-write.
+3. Connect to the branch using the branch's connection string (separate from prod). Verify the data is intact.
+4. Decide on recovery strategy:
+   - **Partial restore** (single table, single row): dump the affected rows from the branch using `pg_dump --table=...` or `psql -c "COPY ..."`, then restore into prod. Lowest-risk option; prod stays live.
+   - **Full restore** (catastrophic loss): promote the branch to be the new primary. Coordinates downtime; rare.
+5. After restore is verified, delete the branch (cleans up storage).
+
+**Restore-test cadence:** Quarterly. Pick a date, branch the prod DB to that timestamp, query a known-stable table to verify recoverability, then delete the branch. This is a low-effort drill — under 10 minutes per quarter — that catches "snapshot retention quietly stopped working" type failures before a real incident.
+
+**Log restore-test runs in `system_alerts`** with category `ops` and severity `info`, message format `quarterly-restore-test passed (PITR target: YYYY-MM-DD)`. Lets us audit cadence from the maintenance dashboard.
+
+**Out-of-scope of Neon's PITR:**
+- Vercel Blob (separate retention/recovery model — see [blob lifecycle docs](https://vercel.com/docs/storage/vercel-blob))
+- Dataverse (Microsoft-managed; restore procedures live with Connor / AkoyaGO admin)
+- SharePoint (Microsoft-managed; Graph API content is not part of our backup posture)
+
+**B2-F5 readiness-audit finding closed S188.**
+
 ## Current Watch Items
 
 ### `wmkf_ai_run` Retention

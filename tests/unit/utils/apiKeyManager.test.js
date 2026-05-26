@@ -2,6 +2,7 @@
  * Unit tests for API Key Manager utilities
  */
 
+import crypto from 'crypto';
 import { ApiKeyManager, getApiKeyManager } from '../../../shared/utils/apiKeyManager';
 
 // Mock environment variables
@@ -56,20 +57,20 @@ describe('ApiKeyManager', () => {
       expect(encrypted1.iv).not.toBe(encrypted2.iv);
     });
 
-    test.skip('handles encryption errors gracefully', () => {
-      // Create a new instance with broken crypto
-      const brokenApiKeyManager = new ApiKeyManager();
-      
-      // Mock scryptSync to throw error for this test
-      const originalScrypt = global.crypto.scryptSync;
-      global.crypto.scryptSync = jest.fn(() => { 
-        throw new Error('Crypto error'); 
+    test('handles encryption errors gracefully', () => {
+      // Spy on the imported `crypto` module — Node's crypto is a singleton,
+      // so the spy applies to the same instance apiKeyManager.js imported.
+      // (The pre-S188 skipped version mocked `global.crypto.scryptSync`,
+      // which is not what apiKeyManager.js calls — hence the skip.)
+      const spy = jest.spyOn(crypto, 'scryptSync').mockImplementation(() => {
+        throw new Error('Crypto error');
       });
-      
-      expect(() => brokenApiKeyManager.encryptForClient('test')).toThrow('Failed to encrypt API key');
-      
-      // Restore original
-      global.crypto.scryptSync = originalScrypt;
+      try {
+        const brokenApiKeyManager = new ApiKeyManager();
+        expect(() => brokenApiKeyManager.encryptForClient('test')).toThrow('Failed to encrypt API key');
+      } finally {
+        spy.mockRestore();
+      }
     });
   });
 
