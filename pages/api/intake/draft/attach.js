@@ -46,6 +46,8 @@ import { getIntakeBlobToken } from '../../../../lib/utils/intake-blob';
 import { getFormSchema, findFileField, countFieldEntries } from '../../../../lib/utils/form-schema';
 import { buildNoResponseError } from '../../../../lib/utils/service-error';
 import { checkIntakeRateLimit } from '../../../../lib/intake/rate-limit';
+import NotificationService from '../../../../lib/services/notification-service';
+import { VIRUS_DETECTION_ALERT_EMAIL } from '../../../../lib/utils/virus-scan-config';
 
 const ALLOWED_FIELDS = new Set(['draftId', 'attachmentId']);
 
@@ -463,6 +465,44 @@ export default async function handler(req, res) {
         scannedAt: scanResult.scannedAt,
         contentType: pending.contentType,
       },
+    });
+    // Fire a system_alerts row + admin email. Drafts are pre-submission
+    // (request_id is null here per the guard at step 8), so no
+    // request-level PD exists yet — the foundation alerts address is the
+    // only stable recipient. If/when intake adds a known program director
+    // (e.g. cycle → PD lookup), add that email to explicitRecipients.
+    NotificationService.notify({
+      type: 'virus_detection_intake',
+      severity: 'error',
+      title: `Virus scan rejected an applicant attachment (${pending.filename})`,
+      message: [
+        `The virus scanner blocked an applicant draft attachment.`,
+        `Form: ${draft.form_key}.`,
+        `Field: ${pending.fieldKey}.`,
+        `Applicant: ${session.user?.contactName || 'unknown'} <${session.user?.contactEmail || 'unknown'}> (oid ${contactOid}).`,
+        '',
+        `Detection: ${pending.filename}: virus detected (${virusName}).`,
+        '',
+        "The bytes were not stored. The applicant's draft form is preserved; they have been asked to scan their machine and try a clean copy.",
+      ].join('\n'),
+      metadata: {
+        draftId, attachmentId,
+        fieldKey: pending.fieldKey,
+        filename: pending.filename,
+        formKey: draft.form_key,
+        accountId: draft.account_id,
+        contactOid,
+        contactEmail: session.user?.contactEmail || null,
+        contactName: session.user?.contactName || null,
+        virusName,
+        scanner: scanResult.scanner,
+        scannedAt: scanResult.scannedAt,
+        sha256, size,
+      },
+      source: 'intake-attach',
+      explicitRecipients: [VIRUS_DETECTION_ALERT_EMAIL],
+    }).catch(err => {
+      console.error(`[attach] detection alert failed for draft ${draftId}: ${err.message}`);
     });
     return jsonError(res, 422, 'infected');
   }

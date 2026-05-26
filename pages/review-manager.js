@@ -822,6 +822,7 @@ function UploadReviewModal({ isOpen, onClose, reviewer, onUploaded }) {
   const formRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [errors, setErrors] = useState(null);
+  const [infectedDetail, setInfectedDetail] = useState(null);
 
   if (!isOpen || !reviewer) return null;
 
@@ -835,6 +836,7 @@ function UploadReviewModal({ isOpen, onClose, reviewer, onUploaded }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrors(null);
+    setInfectedDetail(null);
 
     const formData = new FormData(formRef.current);
     formData.append('suggestionId', reviewer.suggestionId);
@@ -853,7 +855,11 @@ function UploadReviewModal({ isOpen, onClose, reviewer, onUploaded }) {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) {
-        setErrors(data.errors || [data.reason || 'Upload failed.']);
+        if (data.reason === 'infected') {
+          setInfectedDetail(Array.isArray(data.errors) ? data.errors : []);
+        } else {
+          setErrors(data.errors || [data.reason || 'Upload failed.']);
+        }
         return;
       }
       if (onUploaded) onUploaded(reviewer.suggestionId, data);
@@ -913,6 +919,25 @@ function UploadReviewModal({ isOpen, onClose, reviewer, onUploaded }) {
               <ul className="list-disc list-inside mt-1 space-y-0.5">
                 {errors.map((err, i) => (<li key={i}>{err}</li>))}
               </ul>
+            </div>
+          )}
+
+          {infectedDetail && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-900 space-y-2">
+              <p className="font-semibold">Virus scanner rejected the file</p>
+              <p>
+                The uploaded file was flagged as potentially malicious and was not stored.
+                The review-form fields above are preserved — replace just the file and try again.
+                The Program Director on this proposal has been notified automatically.
+              </p>
+              {infectedDetail.length > 0 && (
+                <details>
+                  <summary className="cursor-pointer text-red-800 underline">Detection detail</summary>
+                  <ul className="list-disc list-inside mt-1 space-y-0.5">
+                    {infectedDetail.map((err, i) => (<li key={i}>{err}</li>))}
+                  </ul>
+                </details>
+              )}
             </div>
           )}
 

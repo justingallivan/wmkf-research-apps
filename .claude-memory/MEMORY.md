@@ -21,6 +21,7 @@
 
 ## Security Infrastructure
 - [A7 prompt-injection hardening — SHIPPED S173-S177](project-a7-prompt-injection-hardening.md) — all 24 LLM input surfaces are CI-gated and hardened (wrapUntrustedContent + preamble + validateAiJson + multimodal). Do NOT build a parallel system. Read `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md` before any injection-related design.
+- [Virus scanning IT context (S190)](project-virus-scanning-it-context.md) — WMKF tenant has NO MDO / no Safe Attachments; workstation Defender + Huntress only. App-side Cloudmersive is the PRIMARY defense for reviewer + intake (external upload paths). DFT does NOT need per-detection emails (no quarantine to investigate). Internal alerts route to the PD on the related request/cycle. Sender UX preserves form text on detection.
 
 ## Collaboration Notes
 - [Concepts vs Phase I are different grant stages](feedback-concepts-vs-phase-i.md) — hard-exclude `/concept/i` files from Phase I prompt pipelines

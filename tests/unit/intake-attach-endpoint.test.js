@@ -41,6 +41,7 @@ jest.mock('../../lib/services/cloudmersive-scan', () => ({
 }));
 jest.mock('../../lib/utils/virus-scan-config', () => ({
   isVirusScanEnabled: jest.fn(() => true),
+  VIRUS_DETECTION_ALERT_EMAIL: 'alerts@wmkeck.org',
 }));
 jest.mock('../../lib/utils/intake-blob', () => ({
   getIntakeBlobToken: jest.fn(() => 'vercel_blob_rw_fake_token'),
@@ -49,6 +50,12 @@ jest.mock('../../lib/utils/form-schema', () => ({
   getFormSchema: jest.fn(),
   findFileField: jest.fn(),
   countFieldEntries: jest.fn(() => 0),
+}));
+jest.mock('../../lib/services/notification-service', () => ({
+  __esModule: true,
+  default: {
+    notify: jest.fn(() => Promise.resolve(null)),
+  },
 }));
 
 import { getServerSession } from 'next-auth/next';
@@ -61,6 +68,7 @@ import { scanBytes } from '../../lib/services/cloudmersive-scan';
 import { isVirusScanEnabled } from '../../lib/utils/virus-scan-config';
 import { getIntakeBlobToken } from '../../lib/utils/intake-blob';
 import { getFormSchema, findFileField, countFieldEntries } from '../../lib/utils/form-schema';
+import NotificationService from '../../lib/services/notification-service';
 import handler from '../../pages/api/intake/draft/attach';
 
 const CONTACT_OID = 'oid-applicant-1';
@@ -513,7 +521,7 @@ describe('scanner posture (A7)', () => {
     expect(res.body.status).toBe('attached');
   });
 
-  test('scan infected → 422 + del + removePending + audit infected', async () => {
+  test('scan infected → 422 + del + removePending + audit infected + NotificationService.notify', async () => {
     scanBytes.mockResolvedValue({
       scan_result: 'infected',
       foundViruses: [{ virusName: 'Eicar-Test', fileName: 'biosketch.pdf' }],
@@ -532,6 +540,25 @@ describe('scanner posture (A7)', () => {
         metadata: expect.objectContaining({ virusName: 'Eicar-Test' }),
       }),
     );
+
+    // B2 detection alert: system_alerts + admin email via virus-detection category.
+    // Yield microtasks so the fire-and-forget notify settles.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(NotificationService.notify).toHaveBeenCalledTimes(1);
+    const call = NotificationService.notify.mock.calls[0][0];
+    expect(call.type).toBe('virus_detection_intake');
+    expect(call.severity).toBe('error');
+    expect(call.source).toBe('intake-attach');
+    expect(call.explicitRecipients).toEqual(['alerts@wmkeck.org']);
+    expect(call.metadata).toEqual(expect.objectContaining({
+      draftId: DRAFT_ID,
+      attachmentId: ATTACHMENT_ID,
+      filename: 'biosketch.pdf',
+      formKey: FORM_KEY,
+      contactOid: CONTACT_OID,
+      virusName: 'Eicar-Test',
+    }));
   });
 
   test('scan infected + del() throws → 422 + audit infected_del_failed (Q3)', async () => {

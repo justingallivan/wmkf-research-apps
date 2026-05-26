@@ -120,11 +120,13 @@ function UploadCard({ data, token, alreadySubmitted }) {
   const formRef = useRef(null);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState(null);
+  const [infectedDetail, setInfectedDetail] = useState(null);
   const [success, setSuccess] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setErrors(null);
+    setInfectedDetail(null);
     setSuccess(false);
 
     const form = formRef.current;
@@ -145,7 +147,15 @@ function UploadCard({ data, token, alreadySubmitted }) {
       });
       const json = await resp.json().catch(() => ({}));
       if (!resp.ok || !json.ok) {
-        setErrors(json.errors || [json.reason || 'Upload failed. Please try again.']);
+        if (json.reason === 'infected') {
+          // Form fields are uncontrolled and remain populated — the typed
+          // review is preserved automatically. Surface a dedicated banner
+          // so the reviewer understands the file was rejected (not their
+          // review text) and what to do next.
+          setInfectedDetail(Array.isArray(json.errors) ? json.errors : []);
+        } else {
+          setErrors(json.errors || [json.reason || 'Upload failed. Please try again.']);
+        }
       } else {
         setSuccess(true);
         setTimeout(() => window.location.reload(), 1500);
@@ -193,6 +203,30 @@ function UploadCard({ data, token, alreadySubmitted }) {
                 <li key={i}>{err}</li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {infectedDetail && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-900 space-y-2">
+            <p className="font-semibold">We could not accept that file</p>
+            <p>
+              Our virus scanner flagged what you uploaded as potentially malicious, so it was not stored.
+              Your typed review on this page has been preserved — please replace just the file and resubmit.
+            </p>
+            <p>
+              Before uploading again, please run an antivirus scan on your computer.
+              If you keep seeing this message with a file you believe is safe, contact The Foundation and we can help.
+            </p>
+            {infectedDetail.length > 0 && (
+              <details className="mt-1">
+                <summary className="cursor-pointer text-red-800 underline">Technical detail</summary>
+                <ul className="list-disc list-inside mt-1 space-y-0.5">
+                  {infectedDetail.map((err, i) => (
+                    <li key={i}>{err}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </div>
         )}
 

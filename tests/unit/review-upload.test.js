@@ -9,6 +9,7 @@
 import { jest } from '@jest/globals';
 import { GraphService } from '../../lib/services/graph-service.js';
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
+import NotificationService from '../../lib/services/notification-service.js';
 import { writeReviewFiles, buildReviewerSubfolder } from '../../lib/services/review-upload.js';
 
 // Replace specific methods with jest.fn() before each test, restore afterwards.
@@ -495,6 +496,122 @@ describe('writeReviewFiles — virus scan integration', () => {
       ],
     }));
     expect(r).toEqual({ ok: false, reason: 'scan_unavailable' });
+    errSpy.mockRestore();
+  });
+});
+
+describe('writeReviewFiles — detection alert (B1)', () => {
+  // The shared install/restore in this file mocks GraphService + DynamicsService.
+  // The detection alert calls NotificationService.notify with an explicit-recipients
+  // payload (PD email may be null, in which case the recipients array is empty
+  // and category routing handles it). We spy on notify rather than the upstream
+  // PD resolver so the test asserts the contract the operator actually receives.
+  const originalKey = process.env.CLOUDMERSIVE_API_KEY;
+  const originalEnabled = process.env.VIRUS_SCAN_ENABLED;
+  const originalFetch = global.fetch;
+  let notifySpy;
+
+  beforeEach(() => {
+    process.env.CLOUDMERSIVE_API_KEY = 'test-key';
+    process.env.VIRUS_SCAN_ENABLED = 'true';
+    notifySpy = jest.spyOn(NotificationService, 'notify').mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    notifySpy.mockRestore();
+    global.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.CLOUDMERSIVE_API_KEY;
+    else process.env.CLOUDMERSIVE_API_KEY = originalKey;
+    if (originalEnabled === undefined) delete process.env.VIRUS_SCAN_ENABLED;
+    else process.env.VIRUS_SCAN_ENABLED = originalEnabled;
+  });
+
+  function mockScan(responses) {
+    let idx = 0;
+    global.fetch = jest.fn(async () => {
+      const r = responses[idx++];
+      return {
+        ok: r.status >= 200 && r.status < 300,
+        status: r.status,
+        text: async () => JSON.stringify(r.body ?? {}),
+        json: async () => r.body ?? {},
+      };
+    });
+  }
+
+  test('infected → NotificationService.notify called once with detection metadata', async () => {
+    mockScan([
+      { status: 200, body: { CleanResult: false, FoundViruses: [{ VirusName: 'EICAR' }] } },
+    ]);
+    mockSuggestionFound();
+    const r = await writeReviewFiles(validInput());
+    expect(r.reason).toBe('infected');
+
+    // Yield a microtask so the fire-and-forget alert promise settles
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(notifySpy).toHaveBeenCalledTimes(1);
+    const call = notifySpy.mock.calls[0][0];
+    expect(call.type).toBe('virus_detection_reviewer');
+    expect(call.severity).toBe('error');
+    expect(call.source).toBe('review-upload');
+    expect(call.metadata).toEqual(expect.objectContaining({
+      suggestionId: SUGGESTION_ID,
+      requestId: REQUEST_ID,
+      requestNumber: REQUEST_NUMBER,
+      source: 'reviewer_self_token',
+    }));
+    expect(call.metadata.fileDetections).toEqual([
+      'review.pdf: virus detected (EICAR)',
+    ]);
+    // The foundation alerts address is always present (single source of
+    // truth: VIRUS_DETECTION_ALERT_EMAIL). PD email is added when the
+    // request lookup yields one; mocked suggestion here has no PD, so
+    // the list is just the foundation address.
+    expect(call.explicitRecipients).toContain('alerts@wmkeck.org');
+  });
+
+  test('scan_misconfigured does NOT fire a detection alert', async () => {
+    // Returning 401 fails-loud as a config bug; not a per-event detection.
+    mockScan([{ status: 401, body: 'bad key' }]);
+    mockSuggestionFound();
+    const r = await writeReviewFiles(validInput());
+    expect(r.reason).toBe('scan_misconfigured');
+    await Promise.resolve();
+    expect(notifySpy).not.toHaveBeenCalled();
+  });
+
+  test('scan_unavailable does NOT fire a detection alert', async () => {
+    mockScan([
+      { status: 503, body: 'down' },
+      { status: 503, body: 'down' },
+      { status: 503, body: 'down' },
+    ]);
+    mockSuggestionFound();
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const r = await writeReviewFiles(validInput());
+    expect(r.reason).toBe('scan_unavailable');
+    await Promise.resolve();
+    expect(notifySpy).not.toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
+
+  test('NotificationService throwing does NOT alter the client rejection', async () => {
+    mockScan([
+      { status: 200, body: { CleanResult: false, FoundViruses: [{ VirusName: 'EICAR' }] } },
+    ]);
+    mockSuggestionFound();
+    notifySpy.mockRejectedValue(new Error('notification service down'));
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const r = await writeReviewFiles(validInput());
+    expect(r).toEqual({
+      ok: false,
+      reason: 'infected',
+      errors: ['review.pdf: virus detected (EICAR)'],
+    });
+    await Promise.resolve();
+    await Promise.resolve();
     errSpy.mockRestore();
   });
 });
