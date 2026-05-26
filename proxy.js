@@ -95,9 +95,18 @@ export default withAuth(
         // production if AUTH_REQUIRED is missing or credentials are absent.
         if (!isAuthRequired()) return true;
 
-        // Idle timeout — applies to both surfaces. Empty token from the JWT
-        // callback's idle bail returns {} which fails the userType check below.
-        if (token?.lastActivity && Date.now() - token.lastActivity > 2 * 60 * 60 * 1000) {
+        // Idle timeout — applies to both surfaces. **Fail-closed:** missing
+        // `lastActivity` is treated as expired (B5-F2 audit hardening). The
+        // existing JWT-callback idle bail returns `{}`, which is already
+        // rejected by the userType/azureId checks below — this inversion is
+        // defense-in-depth for any future code path that issues a token but
+        // skips the three lastActivity set-sites in
+        // pages/api/auth/[...nextauth].js (sign-in / refresh / post-idle reset).
+        // Pre-S188 shape was `if (token?.lastActivity && ...)` which silently
+        // exempted any lastActivity-less token from idle timeout.
+        const IDLE_MS = 2 * 60 * 60 * 1000;
+        const lastActivity = token?.lastActivity;
+        if (!lastActivity || Date.now() - lastActivity > IDLE_MS) {
           return false;
         }
 
