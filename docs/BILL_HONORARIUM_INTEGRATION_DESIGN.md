@@ -1,0 +1,291 @@
+# Reviewer Honorarium Onboarding — Design Doc for Connor
+
+**Author:** Justin Gallivan
+**Date:** 2026-05-25
+**Status:** Pre-build design; needs Connor sign-off on six small questions before code
+**Target:** Ready by 2026-06-10 for the cycle whose reviewer invitations go out ≥ 2026-06-17
+**Context:** Ops team meeting 2026-05-23 approved the BILL integration concept. Background in `docs/BILL_integration_handoff.md`. Probe of live Dataverse + review of already-shipped Stage 2a reviewer-portal primitives (2026-05-25) reshaped the architecture from a PA-triggered backend-only flow into a portal-integrated flow.
+
+---
+
+## TL;DR
+
+When a reviewer clicks **accept** on their invitation in our reviewer portal, that single action will (1) record their acceptance + policy acknowledgments [already shipped Stage 2a], (2) capture their payment address, (3) create the honorarium `akoya_request` row in Dataverse with proper provenance back to the grant they're reviewing, and (4) trigger BILL.com vendor onboarding silently in the background. **No GOapply form, no separate trip, no manual staff step.** The integration needs Connor to add one optional Dataverse lookup (Q5) and answer five other small questions; everything else writes to existing fields.
+
+---
+
+## Nomenclature (please use these terms throughout)
+
+Two distinct concepts both stored in the `akoya_request` table — easy to confuse:
+
+| Term | What it is | Discriminator |
+|---|---|---|
+| **Grant request** | A proposal from a university asking for funding | `akoya_program ≠ "Research Reviewer"` |
+| **Honorarium request** | A payment record for an individual who reviewed a grant request | `akoya_program = "Research Reviewer"` AND `wmkf_grantprogram = "Honorarium"` AND `wmkf_type = "Individual"` |
+
+Example: Utah State submitted **grant request** #1002238. Amy Gladfelter agreed to review it and was issued **honorarium request** #1002764 for $250. The two are separate `akoya_request` rows. **Today they have no data link between them**; Q5 below proposes a small schema add that preserves the linkage going forward.
+
+---
+
+## Current state (from live Dataverse probe + already-shipped portal primitives)
+
+### Already shipped on the reviewer portal (Stage 2a, 2026-05-09)
+
+- Magic-link landing at `pages/external/review/[token].js`
+- Accept/decline endpoint at `pages/api/external/review/[token]/respond.js` with state machine, optimistic locking, idempotency, audit, rate limit
+- `contactEdits` capture (firstName, lastName, nickname, title, affiliation, email, orcid) → PATCHed to `contact`
+- `honorariumOptOut` boolean captured at accept time
+- Policy acknowledgments (COI + AI-use) gating accept
+
+### What this honorarium integration adds
+
+A small extension to the same Stage 2a accept handler:
+
+- Three or four new address fields in `contactEdits` (line1, city, state, postal code, country) → PATCHed to `contact.address1_*`
+- A new "create honorarium `akoya_request`" step in the accept path
+- An inline call to a new `/api/bill/onboard-reviewer` endpoint that runs the BILL.com vendor create + network search + invitation
+
+### Why no GOapply replacement is needed
+
+Today's "Reviewer Information Form" in GOapply (record `001020`, phase "Reviewer Payment Info") collects reviewer payment info that AkoyaGO syncs into `akoya_request` + `contact`. Probe survey (85 honoraria for the 2026-06-04 meeting):
+
+- **84/85 (98.8%) of reviewer contacts have full address** on `contact.address1_*` (line1 + postal code); 1 has city + country only; 0 are empty
+- 0 paid honoraria ever (last cycle was first cycle; 77 paid via Excel, Steph back-filling Dataverse for bookkeeping; 8 partially populated)
+- BILL fields on the honorarium request itself are 9% populated; the rest is Steph's manual backfill
+
+Since the portal owns the reviewer journey end-to-end going forward, we skip the GOapply hop entirely. Reviewers from cycles starting ≥ 2026-06-17 onboard via our portal; the 8 already-touched 2026-06-04 honoraria remain on Steph's manual path.
+
+### Existing Dataverse fields the integration writes
+
+**On `akoya_request` (the honorarium request we create):**
+
+| Field | Type | Today's use | Our use |
+|---|---|---|---|
+| `wmkf_paymentnetworkidpni` | String | BILL Payment Network ID; staff-entered, free-text | Validated PNI from BILL `GET /v3/network` response |
+| `wmkf_emailaddressonbillcomaccount` | String | Reviewer email used for BILL account | The reviewer's email (from contact) |
+| `wmkf_organizationnameonbillcomaccount` | String | For individuals, the person's own name | The reviewer's full name |
+| `wmkf_billcomstreet1/2`, `wmkf_billcomcity`, `wmkf_billcomstate`, `wmkf_billcomzipcode`, `wmkf_billcomcountry` | String × 6 | Address block | Reviewer's address (from contact) |
+| `wmkf_exisitngbillcomaccount` | Picklist (Yes/No/Recently Confirmed) | Used across grantee flow (385 non-null) | Yes if found in BILL network, No if invitation emailed, Recently Confirmed after webhook (Q4a) |
+| `wmkf_authorizationtoremitpaymentflag` | Boolean | Staff pay-authorization gate | **We never touch this** — staff retains final approval |
+| `wmkf_vendorverified`, `wmkf_paymentcontactconfirmed` | Picklist | Grantee-org concerns (tax status; payment contact) | **We never touch these** — see Q4b + appendix |
+
+**On `contact`:**
+
+| Field | Type | Today's use | Our use |
+|---|---|---|---|
+| `wmkf_billcomid` | String | BILL vendor ID — **empty for every sampled reviewer** | We write the vendor ID returned from `POST /v3/vendors` (Q1) |
+| `address1_line1`, `address1_city`, `address1_stateorprovince`, `address1_postalcode`, `address1_country` | String × 5 | Already 98.8% populated for current reviewers | We PATCH if the reviewer updates address on the accept form |
+| `akoya_isvendor` | Boolean | "Send payments directly to this individual" | Deferred to staff (Q1) |
+
+---
+
+## Proposed integration
+
+### End-to-end flow
+
+```
+1. Staff invites reviewer (existing Review Manager flow → magic-link email)
+2. Reviewer clicks link → /external/review/[token]   [shipped]
+3. Reviewer reviews proposal context, sees policy cards, accepts   [shipped]
+   • plus, NEW: enters/confirms payment address
+   • plus, NEW: honorariumOptOut checkbox (already exists; default unchecked)
+4. POST /api/external/review/[token]/respond { action: 'accept', ... }
+   • Existing: state machine, lock, contactEdits PATCH, policy ack, audit
+   • NEW: PATCH contact.address1_* if changed
+   • NEW: createRecord('akoya_requests', { ...honorarium body with provenance })
+   • NEW: fire-and-await /api/bill/onboard-reviewer with the new request id
+5. /api/bill/onboard-reviewer:
+   • Read contact.wmkf_billcomid — short-circuit if present (known vendor)
+   • Else: BILL POST /v3/vendors → write vendorId to contact.wmkf_billcomid
+   • BILL GET /v3/network?email=... → write wmkf_exisitngbillcomaccount Yes/No
+   • BILL POST /v3/network/invitation → direct-connect or email invite
+   • Write wmkf_paymentnetworkidpni to honorarium request
+6. (Async, hours/days later) Reviewer completes BILL setup
+7. BILL webhook → /api/webhooks/bill → update wmkf_exisitngbillcomaccount to "Recently Confirmed"
+8. Reviewer does the actual review; staff later flips wmkf_authorizationtoremitpaymentflag = true; payment routes
+```
+
+If a reviewer opts out of the honorarium (`honorariumOptOut = true`), step 4's honorarium-create + step 5 are skipped entirely.
+
+### Honorarium `akoya_request` create body
+
+```js
+{
+  akoya_requestid: <new GUID we pre-generate>,
+  'akoya_ProgramId@odata.bind': '/akoya_programs(<Research Reviewer GUID>)',
+  'wmkf_GrantProgram@odata.bind': '/wmkf_grantprograms(<Honorarium GUID>)',
+  'wmkf_Type@odata.bind': '/wmkf_types(<Individual GUID>)',
+  'akoya_PrimaryContactId@odata.bind': `/contacts(${reviewerContactId})`,
+  'wmkf_HonorariumForRequest@odata.bind': `/akoya_requests(${grantRequestId})`,  // Q5
+  akoya_request: <honorarium amount, e.g. 250>,
+  wmkf_meetingdate: <cycle meeting date from suggestion>,
+}
+```
+
+The grant request id is on the suggestion row (`wmkf_appreviewersuggestion`) the token resolves to — so we capture provenance trivially at create time. Without Q5's new field, the linkage is thrown away even though we know it.
+
+### Deliberately omitted
+
+- **No queue / retry sophistication.** ~85 reviewers/cycle = small N; alert-and-manual-retry is fine. We've built the heavyweight intake-portal drain pattern (`submission_jobs`); we deliberately don't reuse it here.
+- **No GOapply replacement work.** The 8 already-touched 2026-06-04 honoraria stay on Steph's manual backfill path; the 77 are bookkeeping-only.
+- **No 1099 / threshold tracking.** Worth designing later as a `contact`-level rollup of YTD honoraria. IRS threshold recently raised to $2K (from $600); buys runway.
+- **No `wmkf_vendorverified` / `wmkf_paymentcontactconfirmed` writes.** Empirically not payment gates (appendix) but defensively untouched.
+
+### Failure modes + handling
+
+| Failure | Handling |
+|---|---|
+| BILL API down / 5xx | Honorarium request still created; alert sent ("BILL onboarding pending for #X"); Steph retries manually OR we add a small retry job later |
+| Reviewer's address incomplete on form | Form-level validation prevents submit; address is required for accept |
+| `wmkf_billcomid` already populated (returning reviewer) | Short-circuit — skip BILL create+search; still write PNI to honorarium row |
+| Webhook signature invalid | 401, log, no state change |
+| Duplicate honorarium create (retry race) | Pre-generated GUID + duplicate-PK recovery (pattern already in `pages/api/cron/drain-submissions.js`) |
+| Reviewer opts out of honorarium | Skip honorarium create + BILL entirely; suggestion-row accept still goes through |
+
+---
+
+## Six questions for Connor
+
+### Q1. OK if our portal writes to `contact.wmkf_billcomid` on first-time BILL onboarding?
+
+Today this field is empty for every reviewer we sampled. Writing it gives future cycles a clean short-circuit — next time a reviewer accepts a new honorarium assignment, the portal reads the contact, skips the BILL API call entirely.
+
+Sub-question: also flip `contact.akoya_isvendor = true` at the same time, or leave for staff?
+
+**Our recommendation:** Yes to writing `wmkf_billcomid`. Defer `akoya_isvendor` to staff (we don't know downstream consumers of that boolean).
+
+---
+
+### Q2. OK if our portal writes to `wmkf_paymentnetworkidpni` on the honorarium request?
+
+Staff currently enters this by hand; the values are inconsistent (proper 16-digit PNIs, "N/A", "5", `u`-prefix international format). Our integration would only write validated BILL-API-returned values on net-new portal-created rows. Steph's existing entries on the 8 partially-touched 2026-06-04 honoraria stay untouched (different create path).
+
+**Our recommendation:** Yes, write to the existing field.
+
+---
+
+### Q4a. OK if our portal writes to `wmkf_exisitngbillcomaccount` on the honorarium request?
+
+The Yes/No/Recently Confirmed semantics map directly onto BILL's `GET /v3/network` response:
+- Reviewer found in BILL Network → **Yes**
+- Not found, email invite sent → **No**
+- `vendor.updated` webhook fires confirming setup → **Recently Confirmed**
+
+Gives Steph a real status picklist she can filter on, using a field she already understands from the grantee side.
+
+**Our recommendation:** Yes.
+
+---
+
+### Q4b. Leave `wmkf_vendorverified` and `wmkf_paymentcontactconfirmed` alone on honorarium rows?
+
+- `wmkf_vendorverified` = tax-status verification for 501(c)(3); doesn't apply to individual reviewers; empirically NOT a payment gate (see appendix).
+- `wmkf_paymentcontactconfirmed` = grantee-org concern (who at the institution handles payments); doesn't translate to individuals.
+
+Defensive recommendation: leave both null so a future workflow change doesn't accidentally interpret an integration-set value.
+
+**Our recommendation:** Yes, leave both untouched.
+
+---
+
+### Q5. Add `wmkf_honorariumforrequest` lookup on `akoya_request` to capture honorarium↔grant provenance?
+
+Today Amy's honorarium #1002764 has zero data link back to grant #1002238 (the Utah State proposal she reviewed). Our portal **knows** which grant the reviewer is reviewing (it's on the suggestion row the token resolves to), so we can populate this at create time — but only if the field exists.
+
+Proposed new optional Lookup field on `akoya_request`:
+- Name: `wmkf_honorariumforrequest`
+- Target entity: `akoya_request` (self-referential)
+- Required: no
+- Populated by: our portal on honorarium-request creation. Backfill: out of scope.
+
+Downstream payoff:
+- "How much did we spend on reviewers for the Medical Research cycle?" becomes a single query instead of a five-lookup join
+- Catches the data-quality "ghost honorarium" case (honorarium with no corresponding grant assignment)
+- Personalized BILL invitation emails can mention the proposal being reviewed
+
+**This question is the only one that blocks code on our side** — without the field, we lose provenance we know at create time. Everything else can ship while you're deciding.
+
+**Our recommendation:** Yes. One small Dataverse change, ongoing value.
+
+---
+
+### Q6. Adopt "grant request" vs "honorarium request" as canonical staff terminology?
+
+Both are `akoya_request` rows but they describe very different things. Worth a small alignment exercise so you, Steph, and the staff use the two terms distinctly in tickets, emails, and conversation. No-op if you'd rather keep current phrasing — we just need to be precise in code/docs regardless.
+
+**Our recommendation:** Yes.
+
+---
+
+### Q7 (informational, not blocking). What does the GOapply "Reviewer Information Form" you built capture?
+
+We tried to enumerate the fields from Dataverse and couldn't (GOapply form responses aren't persisted as discrete rows; `akoya_akoyaapplyresponse` is empty across the org). Since the portal owns the reviewer journey going forward, replicating the GOapply form 1:1 isn't required — but knowing what reviewers were being asked helps us decide what to include in the portal form.
+
+Four sub-questions:
+- a. What fields does the form collect? (Identity / address / phone / banking / other?)
+- b. Is there an "I accept the honorarium" gate, or is form submission alone the implicit acceptance?
+- c. Any legal text? (W-9 collection, 1099 disclosure, terms of agreement.)
+- d. How does the reviewer get the link? (Email triggered by what event?)
+
+No recommendation — just inputs to our portal design.
+
+---
+
+## What gets built
+
+| # | Chunk | Owner | Depends on |
+|---|---|---|---|
+| 0 | This design doc → Connor sign-off | Connor | (none) |
+| 1 | Connor adds `wmkf_honorariumforrequest` lookup (Q5) | Connor | Q5 answered yes |
+| 2 | `lib/bill.js` — session, create vendor, search/invite network, against a mocked BILL response | Vercel | (none — parallel with Connor) |
+| 3 | Unit tests for `lib/bill.js` | Vercel | Chunk 2 |
+| 4 | Extend `respond.js` accept path: address fields in contactEdits, PATCH contact.address1_*, create honorarium `akoya_request` with provenance | Vercel | Chunk 1 |
+| 5 | Extend Stage 2a accept UI with address inputs (country picker, validation, prefill from existing contact) | Vercel | Chunk 4 |
+| 6 | New `/api/bill/onboard-reviewer` endpoint; wire into accept handler | Vercel | Chunks 2 + 4 |
+| 7 | `/api/webhooks/bill` for `vendor.updated` | Vercel | Chunk 2 |
+| 8 | End-to-end test against BILL sandbox + synthetic reviewer | Vercel + Justin | Chunks 4–7; BILL sandbox |
+
+**Dataverse schema changes:** one optional lookup (Q5). Everything else writes to existing fields.
+
+**External provisioning (operator-side, parallel):**
+- BILL.com sandbox access — Steph (Director of Operations) + BILL.com support
+- Env vars in Vercel: `BILL_DEV_KEY`, `BILL_USERNAME`, `BILL_PASSWORD`, `BILL_ORG_ID`, `BILL_BASE_URL`, `BILL_WEBHOOK_SECRET`
+
+---
+
+## Timeline
+
+- **2026-06-10** — ready
+- **2026-06-17 (no earlier)** — first real reviewer invitation goes out
+
+Sequencing between those two dates is flexible and depends on when Connor's Q5 schema add lands and when Steph's BILL sandbox is provisioned. Build chunks are listed in the prior section in dependency order; nothing about the order is calendar-pinned.
+
+**Fallback if BILL sandbox isn't ready in time:** ship in "alert-only mode" — portal creates the honorarium request, emails Steph "manual BILL onboarding needed for #X"; flip on real BILL calls when sandbox lands. The reviewer-facing experience is identical either way.
+
+---
+
+## Appendix — `wmkf_vendorverified` field-gating audit
+
+Probe 2026-05-25 confirmed `wmkf_vendorverified=No` does NOT silently block payment.
+
+**Evidence layer 1: paid grant requests with `vv=No` on the parent.** Five direct examples — all five have an `akoya_requestpayment` child with `akoya_folio = "PAID"`:
+
+```
+#1002814  paid=$2000  vv=No  →  payment #0024025  folio=PAID
+#1002779  paid=$200   vv=No  →  payment #0023976  folio=PAID
+#1002799  paid=$2500  vv=No  →  payment #0024022  folio=PAID
+#1002060  paid=$2500  vv=No  →  payment #0023661  folio=PAID
+#1002795  paid=$1000  vv=No  →  payment #0024020  folio=PAID
+```
+
+**Evidence layer 2: population scan.** Sampled 500 `akoya_requestpayment` rows where `akoya_paymentsent` is populated. Of 473 distinct parent grant requests: **473 null, 0 Yes, 0 No, 0 Recently Confirmed.**
+
+**Evidence layer 3: reverse direction.** Across all `akoya_request` rows ever, only **4 total** are `vv=Yes` AND still unpaid. No "approved but not yet paid" queue exists.
+
+**Real gates observed elsewhere (not our concern, documented):**
+- `wmkf_executivedirectorapproval` (DateTime on `akoya_requestpayment`) — ED has to sign off per payment
+- `wmkf_authorizationtoremitpaymentflag` (Boolean on `akoya_request`) — staff explicit pay authorization
+
+**Naming gotcha:** `akoya_paymentsent` (DateTime, "Payment Sent") is null on all 5 sampled paid grants. The actual issued-marker is `akoya_folio = "PAID"`. If querying for actual payment events, use `akoya_folio` not `akoya_paymentsent`.
+
+**Conclusion:** `wmkf_vendorverified` doesn't gate payment. Defensive recommendation in Q4b stands: integration leaves it null on honorarium rows.

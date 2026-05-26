@@ -96,6 +96,11 @@
 - [Reviewer history data quality](project-reviewer-history-data-quality.md) — pre-J26 proposals have no Postgres rows; zeros are "unknown", not "0 invited"
 - [Match reviewer affiliation against existing accounts](project-reviewer-institution-match.md) — `wmkf_appresearcher.wmkf_primaryaffiliation` is uncurated free text today; promotion to `contact.parentcustomerid` is the load-bearing join. Reuse the intake-portal fuzzy-match primitive at save-candidates, contact promotion, and any future reviewer self-edit.
 
+## Honoraria / BILL.com
+- [Reviewer honorarium onboarding (portal-integrated)](project-bill-honorarium-integration.md) — extends already-shipped Stage 2a accept endpoint to capture address + create honorarium akoya_request + trigger BILL.com inline. Target ready 2026-06-10; reviewers ≥ 2026-06-17. Design doc at `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`, 6 Connor questions + 1 informational.
+- [Grant request vs honorarium request nomenclature](akoya-request-honorarium-nomenclature.md) — both stored as `akoya_request` rows but mean very different things; no data link between them by default; use precise terms always.
+- [akoya_request/payment field-gating semantics](akoya-payment-field-semantics.md) — `wmkf_vendorverified` is NOT a payment gate (empirical, S188); `akoya_paymentsent` misleading — use `akoya_folio="PAID"` instead.
+
 ## App Infrastructure
 - [App-level access control](project-app-access-control.md) — Dataverse `wmkf_appuserappaccesses`; appRegistry.js source of truth; `requireAppAccess()` coverage is checked by `check:fact-consistency`
 - [Admin dashboard + API keys](project-admin-dashboard.md) — centralized server-side keys; usage logged to `api_usage_log`; Justin (id=2) is superuser
