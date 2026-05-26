@@ -82,6 +82,8 @@ To prevent scope creep — destructive carryover items that name "drop Postgres 
 
 ## Where the migration actually stands today
 
+> **HISTORICAL — supersede with the spec-vs-built table (line 13) + ground-truth banner (line 42) for current state.** The W3-W6 cutovers shipped 2026-05-12 (W3 grant cycles; W4 reviewer-suggestion alignment; W5 reader cutover incl. `generate-emails.js` / `my-proposals.js` / `extract-summary.js` retirement / `maintenance-service.js` blob-scanner / `database-service.js` gut; W6 step 1 `researchers.js` retirement). Body of this section was written pre-cutover; the "Migrate", "rewriting endpoints", "Review Manager is mostly Dataverse but partially Postgres" framings are the planning state, not the live state. Drop-pending tail items still real: post-pilot one-shot Postgres table drop, restore script, match-on-discovery, add-candidate-manual.
+
 **Already in Dataverse (live)** — three custom entities + extensions on `wmkf_potentialreviewer` (vendor-pattern existing entity):
 
 - `wmkf_potentialreviewer` — global per-person identity (by email). One person across N proposals = ONE row. Source: pre-existing entity, extended per `lib/dataverse/schema/wave2-existing/wmkf_potentialreviewers-extensions.json`.
@@ -252,7 +254,9 @@ The reviewer-history surface for a contact is `wmkf_appreviewersuggestion` rows 
 
 ## New work in scope
 
-### 1. `wmkf_appgrantcycle` entity — preflight, patch schema-as-code, then deploy
+> **§1 below is HISTORICAL — SHIPPED W3 2026-05-12.** The schema patch (`wmkf_ShortCode`, `wmkf_ProgramName`, `wmkf_CustomFields`), the preference-shape migration (Postgres integer ID → `wmkf_shortcode`), the alt-keys, and all three-file endpoint rewrites (`grant-cycles.js`, `render-emails.js`, `send-emails.js`) all shipped at W3 cutover. Sections §2–§6 below ("Match-on-discovery", "Contact form view", "Add candidate by hand", "wmkf_apprequestperson junction", "Reviewer-portal field audit") remain in-scope as planned post-pilot or in-cycle work.
+
+### 1. `wmkf_appgrantcycle` entity — preflight, patch schema-as-code, then deploy (HISTORICAL — SHIPPED W3)
 
 **Status (verified 2026-05-07 via `scripts/audit-dataverse-state.js` + EntityDefinitions metadata probe):** the entity IS already deployed (10 custom attrs live), but **with 0 rows and a partial schema** — see [`docs/atlas/postgres-grant-cycles.md`](atlas/postgres-grant-cycles.md) and [`docs/atlas/dataverse-wmkf-apppublication-and-appgrantcycle.md`](atlas/dataverse-wmkf-apppublication-and-appgrantcycle.md). This work is NOT a fresh deploy of the schema-as-code; it's a **schema patch** to add fields the deployed entity is missing.
 
@@ -543,6 +547,8 @@ Audit: are there other 100-char (or other) caps elsewhere in the adapter set? Ru
 
 ## Endpoint rewrite scope
 
+> **HISTORICAL — all rewrites in this section shipped W3 + W5 (2026-05-12).** See "Drain-target endpoint inventory" (line 38) and "Spec'd vs. built" (line 13) for the current per-file shipped status. The dispositions below ("Read from X; write Y", "Rewrite all sites", "Retire entirely") describe the intent at planning time; the post-shipping state lives in the inventory table at top.
+
 | Endpoint | Today | Migration work |
 |---|---|---|
 | `pages/api/reviewer-finder/discover.js` | Cache lookup via `DatabaseService.findResearcher` (Postgres `researchers`) | Replace cache lookup with match-on-discovery against `contact`. Drop Postgres dependency. |
@@ -581,6 +587,8 @@ Audit: are there other 100-char (or other) caps elsewhere in the adapter set? Ru
 - **ID format sweep** — Postgres researcher IDs were `INTEGER`; Dataverse equivalents are GUIDs. Audit anywhere a researcher ID is used as a React key, compared with `===`, or coerced via `parseInt`.
 
 ## Dependency order
+
+> **HISTORICAL — items 1–11 below all shipped 2026-05-12 (W3 + W4 + W5 + W6 step 1).** The numbered queue describes the original ordering; the only post-pilot tail items still active are: cleanup cron real-mode (item 14, deferred to post-pilot per W6-step-2 footnote in the schedule below) and match-on-discovery / add-candidate-manual / contact-form-subgrid (slip-eligible enhancements, also deferred to post-pilot). See "Spec'd vs. built" table at top for current per-deliverable state.
 
 Hard constraints (each blocks the step after it):
 
@@ -715,6 +723,8 @@ Pre-cutover baselines captured during W4 dry-run; documented in the watch dashbo
 
 ## Acceptance tests + reconciliation reports
 
+> **HISTORICAL — describes the gates that were planned and have all been passed.** W3/W4/W5/W6-step-1 acceptance tests + reconciliation reports were executed at cutover (2026-05-12). The body below remains useful as a checklist template if a future migration wave needs similar gates, but is not pending work.
+
 Pre-cutover and post-cutover, run a reconciliation script (`scripts/reconcile-reviewer-migration.js`) that produces a parity report. **Cutover blocks until parity is clean** for active-cycle data.
 
 | Check | Postgres source | Dataverse equivalent | Tolerance |
@@ -745,6 +755,8 @@ Pre-cutover and post-cutover, run a reconciliation script (`scripts/reconcile-re
 - Negative test: an applicant or external token hitting `/api/reviewer-finder/*` is still rejected.
 
 ## Dataverse readiness checklist
+
+> **HISTORICAL — all items below shipped or were verified at W3-W6 cutover 2026-05-12.** Pilot-launch readiness items (cleanup cron real-mode, etc.) live in the W6/post-pilot rows of the schedule table below; everything else here is closed.
 
 Every item below must have a check + date + owner before the relevant cutover step depends on it. Dates aligned to the refreshed W3–W7 schedule below.
 
@@ -790,6 +802,8 @@ Every item below must have a check + date + owner before the relevant cutover st
 - Anomaly-triage decisions on the 8 parity outliers
 
 ### Updated forward schedule
+
+> **HISTORICAL — W3–W6 (step 1) all SHIPPED 2026-05-12 ahead of original cadence.** W3 grant-cycles + W4 reviewer-suggestion alignment + W5 reader cutover + W6 step 1 (researchers.js retirement) landed together. The "NOT slip-eligible" gate list below describes acceptance gates that have all been passed. Pilot launch (W7) remains forward work — mid-June 2026 Phase II Research cycle, with post-pilot tail items (one-shot table drop ≥ 2026-07-01, enhancements) tracked in the W6-step-2 and Post-pilot rows.
 
 Slip-eligible items (history badges UI, add-candidate-manual, match-on-discovery wiring, contact form subgrid) are explicitly moved to a "Post-pilot enhancements" block below the table so they don't crowd critical-path weeks. The one-shot cleanup/table-drop path is post-pilot regardless. Each week below carries one major theme plus its safety prerequisites.
 
