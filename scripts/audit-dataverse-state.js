@@ -93,8 +93,15 @@ const CUSTOM_ENTITIES = [
   { entitySet: 'wmkf_appreviewersuggestions', describe: 'Suggestion lifecycle ledger ((reviewer, request) pairs)' },
   { entitySet: 'wmkf_apppublications', describe: 'Publication records (per Wave 2 schema-as-code)' },
   { entitySet: 'wmkf_appgrantcycles', describe: 'Grant cycle definitions (per Wave 2 schema-as-code)' },
-  { entitySet: 'wmkf_appproposalsearches', describe: 'Proposal search history (per Wave 2 schema-as-code)' },
-  { entitySet: 'wmkf_app_z_publication_authors', describe: 'Publication ↔ researcher junction' },
+  // NOTE unconventional plural: entity-set is `wmkf_appproposalsearchs` (no `e` before `s`)
+  // because the singular logical name is `wmkf_appproposalsearch` (auto-pluralized).
+  // S188 audit caught the script previously using `wmkf_appproposalsearches` and 404-ing.
+  { entitySet: 'wmkf_appproposalsearchs', describe: 'Proposal search history (per Wave 2 schema-as-code)' },
+  // INTENTIONALLY NOT DEPLOYED per docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md:113 —
+  // zero data on both sides + the consuming researchers.js admin UI was retired.
+  // Probe stays as a presence-confirmation guard: a 404 here is the EXPECTED state;
+  // a 200 would signal someone deployed it without updating the atlas.
+  { entitySet: 'wmkf_app_z_publication_authors', describe: 'Publication ↔ researcher junction (EXPECTED 404 — not deployed)' },
   // Wave 1 — user/access foundation (live entity sets, no underscore between app and <name>)
   { entitySet: 'wmkf_appsystemsettings', describe: 'Wave 1: system_settings → Dataverse (flag flipped 2026-05-03)' },
   { entitySet: 'wmkf_appuserpreferences', describe: 'Wave 1: user_preferences → Dataverse' },

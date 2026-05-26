@@ -42,7 +42,7 @@ The canonical reference for the live state of the application's data layer.
 | `wmkf_potentialreviewers` (vendor + ext.) | 4,267 | per-person scratch+history (one-shot post-pilot DELETE plan replaces the earlier cleanup-cron design; no cron exists) | [dataverse-wmkf-potentialreviewers.md](atlas/dataverse-wmkf-potentialreviewers.md) |
 | `wmkf_apppublication` | 0 | deployed, no callers | [dataverse-wmkf-apppublication-and-appgrantcycle.md](atlas/dataverse-wmkf-apppublication-and-appgrantcycle.md) |
 | `wmkf_appgrantcycle` | 10 | Dataverse-primary post-W3 (2026-05-12); full 11-attr schema deployed; consumed by reviewer-finder/grant-cycles + review-manager render/send-emails + maintenance-service blob-cleanup | same page |
-| `wmkf_appproposalsearch` | n/a | NOT DEPLOYED (schema-as-code only) | same page |
+| `wmkf_appproposalsearch` | 0 | DEPLOYED (S185), entity set is the unconventional `wmkf_appproposalsearchs`; verified S188 audit re-sweep 2026-05-25 | same page |
 | `wmkf_app_z_publication_author` | n/a | NOT DEPLOYED | same page |
 | `wmkf_apprequestperson` | 5,561 | active junction (S139); awaiting Connor PA dual-write | [dataverse-wmkf-apprequestperson.md](atlas/dataverse-wmkf-apprequestperson.md) |
 
@@ -156,7 +156,7 @@ Useful summary of how Postgres ↔ Dataverse currently join (or will join post-c
 | `wmkf_appreviewersuggestion` | extension manifest | ✅ 52 attrs | ✅ 336 rows |
 | `wmkf_apppublication` | ✅ 14 attrs | ✅ 14 attrs | empty |
 | `wmkf_appgrantcycle` | ✅ 8 attrs | ✅ 10 attrs (different gap from Postgres) | ✅ 10 rows (2026-05-14 audit) |
-| `wmkf_appproposalsearch` | ✅ | ❌ NOT DEPLOYED | n/a |
+| `wmkf_appproposalsearch` | ✅ | ✅ (entity set `wmkf_appproposalsearchs`, NOT `-es`) | empty |
 | `wmkf_app_z_publication_author` | ✅ | ❌ NOT DEPLOYED | n/a |
 
 ## Known gaps in this Atlas (v1)

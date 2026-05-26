@@ -26,7 +26,7 @@ Schema: 20 columns including `proposal_title`, `proposal_hash`, `claude_suggesti
 
 **JOIN retired 2026-05-12 (W3 cutover):** Previously `pages/api/reviewer-finder/grant-cycles.js` did `LEFT JOIN proposal_searches`. That route is now Dataverse-only (verified 2026-05-14 — header says "W3 cutover (2026-05-12) — Dataverse-only"; no `proposal_searches` reference in source). The JOIN site is gone. `proposal_searches` Postgres table has no remaining application-code readers — drop is unblocked.
 
-**Dataverse counterpart:** `wmkf_appproposalsearch` schema-as-code exists at `lib/dataverse/schema/wave2/wmkf_app_proposal_search.json` but **the entity is NOT deployed** (404 on entity set query 2026-05-07). Codex round-3 finding confirmed.
+**Dataverse counterpart:** `wmkf_appproposalsearch` schema-as-code exists at `lib/dataverse/schema/wave2/wmkf_app_proposal_search.json`. Live state (S188 audit re-sweep 2026-05-25): **DEPLOYED, 0 rows**. Entity-set name is the unconventional `wmkf_appproposalsearchs` (no `e` before `s` — Dataverse auto-pluralized with `+s` rather than `-ches`). Earlier "NOT deployed" framing (2026-05-07) was a string-mismatch against the wrong entity-set name; same trap the audit script hit and S188 fixed.
 
 **Migration disposition:** Skip — the Postgres table is empty and the Dataverse entity isn't deployed. Drop the Postgres table during cleanup; defer Dataverse deployment until a real use case appears.
 

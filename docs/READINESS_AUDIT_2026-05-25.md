@@ -121,9 +121,16 @@ Probe: stage a snapshot DB, apply migrations sequentially, then apply 003-014 a 
 
 Fix: add a §"Postgres backup / restore" section to `docs/SECURITY_OPERATING_PLAN.md` capturing Neon's snapshot retention window, the steps to spin up a branch-restore for a point-in-time recovery, and a recommended quarterly restore-test cadence. No code change.
 
-### B2-F6 — Undocumented Dataverse entities: known mitigation, periodic re-sweep recommended. **(WORTH PROBING, M)**
+### B2-F6 — Undocumented Dataverse entities: known mitigation, periodic re-sweep recommended. **(RE-SWEPT + DOC-RECONCILED — closed S188)**
 
 S185 caught `wmkf_appproposalsearchs` (deployed, unconventional plural). `wmkf_app_request_person` / `wmkf_apprequestpersons` was a stale-row-count drift behind a capped probe (since reclassified). Both fixed. But the underlying risk — Connor deploys an entity under WMKF schema-deploy delegate privileges, atlas page never gets written — remains structural.
+
+**S188 re-sweep:** ran `scripts/audit-dataverse-state.js`. Two artifacts surfaced that needed reconciliation:
+- The audit script itself was hitting 404 on `wmkf_appproposalsearches` because of the unconventional pluralization (entity-set is `wmkf_appproposalsearchs` — no `e` before `s`). Fixed the script to use the live entity-set name and added an inline comment explaining the trap.
+- `docs/POSTGRES_TO_DATAVERSE_MIGRATION.md:16`, `docs/APPLICATION_STATE_ATLAS.md:45,159`, and `docs/atlas/postgres-other-reviewer-tables.md:29` all still said `wmkf_appproposalsearch` was NOT DEPLOYED. The deep atlas page at `docs/atlas/dataverse-wmkf-apppublication-and-appgrantcycle.md` was correct (DEPLOYED + correct entity-set name). Reconciled all three stale references to match.
+- `wmkf_app_z_publication_authors` 404 is the expected state (per `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md:113` — intentionally not deployed). Added a clarifying comment in the audit script so the 404 reads as "presence-confirmation guard hitting expected state" rather than a real miss.
+
+Underlying structural risk still applies — re-run `scripts/audit-dataverse-state.js` quarterly or before any data-layer commits per CLAUDE.md guidance.
 
 Fix: extend `scripts/audit-dataverse-state.js` (already exists) to emit "entity exists in DV, no matching atlas page" warnings as a CI gate input, similar to the Postgres side. Until that ships, schedule a manual DV entity sweep at the start of each major build cycle (or quarterly).
 
