@@ -46,11 +46,17 @@ Spend the first pass building inventories, not forming opinions.
    - Identify partially completed migrations.
 
 2. **Documentation Drift**
-   - Compare `AGENTS.md` / `CLAUDE.md`, `SESSION_PROMPT.md`, `docs/`, `docs/atlas/`, and implementation.
+   - Compare `GEMINI.md`, `AGENTS.md` / `CLAUDE.md`, `SESSION_PROMPT.md`, `docs/`, `docs/atlas/`, and implementation.
    - Find stale claims about data ownership, Dataverse entities, Postgres tables, Blob stores, auth, env vars, app registry entries, API routes, and cron jobs.
-   - Identify docs that should be canonical but are contradicted by code.
+   - Identify docs that should be canonical but are contradicted by code (e.g., location of `clearAppAccessCache`).
 
-3. **Data Layer Consistency**
+3. **Critical Logic & Migration Audit**
+   - Audit the migration state of `DynamicsService`: verify the transition from module-level restrictions to `AsyncLocalStorage` (`dynamics-context.js`).
+   - Find logic that bypasses the "Fail-Closed" model (e.g., check if `updateRecord` or metadata methods skip `checkRestriction`).
+   - Audit manual parsers (`splitExpandSegments`) for edge cases or logic leakage.
+   - Identify "shadow" auth logic or utilities that diverge from `lib/utils/auth.js`.
+
+4. **Data Layer Consistency**
    - Audit Dataverse vs Postgres source-of-truth claims.
    - Check schema/entity names against implementation.
    - Find routes/services that still use retired tables or stale assumptions.
