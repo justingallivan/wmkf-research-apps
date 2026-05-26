@@ -246,11 +246,11 @@ Per S129 memory + carryover, the dual-provider NextAuth is wired and the round-t
 
 **S187 exercised this end-to-end.** Smoke-testing of preview DR8 surfaced that production AND preview were both missing the `entra-external` provider because the three `EXTERNAL_AZURE_AD_*` env vars had never been deployed. Operator (Justin) provisioned the env vars in Vercel production with a fresh client secret; production then returned both `azure-ad` AND `entra-external` from `/api/auth/providers`. Justin completed a real OTP round-trip end-to-end: signed in as `nick_sludge.78@icloud.com` (OID `3bba39e3-2712-4c06-ae2a-9646afd3d6ce`), `/apply` welcome page rendered correctly with claims populated. Two UI bugs surfaced during the round-trip — sign-out silently re-authenticates, and Entra sign-up flow collects irrelevant City/State/DisplayName — both held for a dedicated UI session (memory `project-intake-portal-ui-todo`).
 
-### B5-F2 — Idle-timeout depends on `token.lastActivity` being set. **(CONFIRMED minor, S)**
+### B5-F2 — Idle-timeout depends on `token.lastActivity` being set. **(FIXED — closed S188)**
 
-`proxy.js:100-102` only fires the 2h idle bounce if `token?.lastActivity && ...`. `pages/api/auth/[...nextauth].js` sets lastActivity at lines 217 (sign-in), 226 (token refresh / bridge update), 232 (post-idle reset). Three set-sites cover every JWT callback path, so in practice every issued token carries it.
+Original framing: `proxy.js:100-102` only fired the 2h idle bounce if `token?.lastActivity && ...` — fail-open if `lastActivity` was absent. Three set-sites in `pages/api/auth/[...nextauth].js` (sign-in / token refresh / post-idle reset) covered every JWT callback path, so in practice every issued token already carried it; defensive hardening rather than a bug.
 
-However: the guard is "fail-open if absent" — a future code path that issued a token without going through the lastActivity-set lines would silently exempt that session from idle timeout. Better: invert to `if (!token?.lastActivity || Date.now() - lastActivity > IDLE)`, treating missing as expired. Minor — defensive hardening, not a bug.
+S188 inverted the check to fail-closed at `proxy.js:117` (`if (!lastActivity || Date.now() - lastActivity > IDLE_MS)`). Production-safety verified empirically: `lastActivity` was introduced 2026-03-11 (commit 8671425); JWT `maxAge` is 8 h (`pages/api/auth/[...nextauth].js:301-304`); any session existing today was issued long after the set-sites landed, so the fail-closed flip force-logs-out zero legitimate sessions.
 
 ### B5-C1 — CLEAR: dual-provider non-crossing enforced at proxy layer.
 
@@ -462,7 +462,7 @@ Severity rubric: **P0** blocks "user lands tomorrow morning"; **P1** is correctn
 | 7 | **B1-F4** No GC for intake private Blob store after successful submission | SUSPECTED | M |
 | 8 | **B3-F1** secret-check tracking list missing 7 production-required secrets | CONFIRMED | S |
 | 9 | **B3-F4** DYNAMICS_IMPERSONATION_ENABLED still off (every DV write attributed to service principal) | SUSPECTED | S |
-| 10 | **B4-F1** dynamics_feedback / dynamics_query_log have no review surface | CONFIRMED | M |
+| 10 | **B4-F1** dynamics_feedback / dynamics_query_log have no review surface | PARTIALLY STALE (closed S188) — dynamics_feedback admin surface was already shipped via `/api/dynamics-explorer/feedback`; dynamics_query_log widget remains an acknowledged trade-off at pilot scale | M |
 | 11 | **B4-F3** intake_audit has no retention policy | CONFIRMED | S |
 
 ### P2 — Hygiene / documentation / forward-looking
@@ -472,7 +472,7 @@ Severity rubric: **P0** blocks "user lands tomorrow morning"; **P1** is correctn
 | 12 | **B2-F1 / B6-F1** CLAUDE.md misstates Postgres schema source-of-truth | CONFIRMED | S |
 | 13 | **B2-F2** `lib/db/schema-v2.sql` orphaned (delete) | CONFIRMED | S |
 | 14 | **B2-F5** Backup / restore posture undocumented | CONFIRMED | S |
-| 15 | **B5-F2** Idle-timeout `lastActivity && ...` guard is fail-open if absent | CONFIRMED minor | S |
+| 15 | **B5-F2** Idle-timeout `lastActivity && ...` guard is fail-open if absent | FIXED (S188) — inverted to fail-closed at `proxy.js:117` | S |
 | 16 | **B1-F5** Drain `handleScanning` creates near-empty `akoya_request` (intended per Connor Q1/Q2) | WORTH PROBING | M |
 | 17 | **B4-F2** `model_pricing_audit` at 0 rows: probe canary actually running | WORTH PROBING | S |
 | 18 | **B6-F2** EXECUTOR_CONTRACT.md draft spec vs shipped `execute-prompt.js` drift | WORTH PROBING | M |
@@ -513,13 +513,13 @@ Goal: close the P0s so a real submission tomorrow morning works and is observabl
 8. **#8 — extend secret-check TRACKED_SECRETS** (S).
 9. **#9 — decide on DYNAMICS_IMPERSONATION_ENABLED for pilot** (S) — flip + spot-check or document deferral.
 10. **#11 — intake_audit retention** (S).
-11. **#10 — Dynamics feedback review surface** (M) — small `/admin/dynamics-feedback` page OR remove the thumbs-down UI.
+11. **#10 — Dynamics feedback review surface** (PARTIALLY CLOSED S188 — feedback half shipped; query_log widget remains an open trade-off at pilot scale).
 
 ### Phase D — "Docs + hygiene catch-up" (~half a session)
 
 12. **#12 + #13 + #14** CLAUDE.md schema text + delete schema-v2.sql + add backup docs (S+S+S).
 13. **#19** simplify Wave 1 dispatcher (S).
-14. **#15** invert idle-timeout guard (S).
+14. **#15** invert idle-timeout guard (S) — SHIPPED S188.
 15. **#20 + #21** archive review + unskip test (S+S).
 
 ### Deferred (track but don't block)
