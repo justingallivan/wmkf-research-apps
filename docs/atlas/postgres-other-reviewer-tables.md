@@ -28,7 +28,7 @@ Schema: 20 columns including `proposal_title`, `proposal_hash`, `claude_suggesti
 
 **Dataverse counterpart:** `wmkf_appproposalsearch` schema-as-code exists at `lib/dataverse/schema/wave2/wmkf_app_proposal_search.json`. Live state (S188 audit re-sweep 2026-05-25): **DEPLOYED, 0 rows**. Entity-set name is the unconventional `wmkf_appproposalsearchs` (no `e` before `s` — Dataverse auto-pluralized with `+s` rather than `-ches`). Earlier "NOT deployed" framing (2026-05-07) was a string-mismatch against the wrong entity-set name; same trap the audit script hit and S188 fixed.
 
-**Migration disposition:** Skip — the Postgres table is empty and the Dataverse entity isn't deployed. Drop the Postgres table during cleanup; defer Dataverse deployment until a real use case appears.
+**Migration disposition:** Drop the Postgres table during cleanup. The Dataverse counterpart is already deployed (S185, 0 rows) and sits empty awaiting a future feature need — no migration of data required since both sides are empty.
 
 ## `search_cache` (0 rows)
 

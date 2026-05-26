@@ -96,12 +96,18 @@ export default withAuth(
         if (!isAuthRequired()) return true;
 
         // Idle timeout — applies to both surfaces. **Fail-closed:** missing
-        // `lastActivity` is treated as expired (B5-F2 audit hardening). The
-        // existing JWT-callback idle bail returns `{}`, which is already
-        // rejected by the userType/azureId checks below — this inversion is
-        // defense-in-depth for any future code path that issues a token but
-        // skips the three lastActivity set-sites in
-        // pages/api/auth/[...nextauth].js (sign-in / refresh / post-idle reset).
+        // `lastActivity` is treated as expired (B5-F2 audit hardening).
+        //
+        // Production safety verified (Codex sweep, S188): `lastActivity` was
+        // introduced 2026-03-11 (commit 8671425); default NextAuth JWT TTL is
+        // 30 days; any token issued before that date has already expired by
+        // JWT TTL. Today no legitimate production session lacks lastActivity.
+        //
+        // The fail-closed gate is therefore pure defense-in-depth for hypothetical
+        // future code paths that might issue a token without going through one of
+        // the three set-sites in pages/api/auth/[...nextauth].js (sign-in at
+        // :217 / :226, post-idle refresh at :232).
+        //
         // Pre-S188 shape was `if (token?.lastActivity && ...)` which silently
         // exempted any lastActivity-less token from idle timeout.
         const IDLE_MS = 2 * 60 * 60 * 1000;

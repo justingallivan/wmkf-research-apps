@@ -204,11 +204,11 @@ Cold-start hook in `instrumentation.js` raises a CRITICAL alert when set; daily 
 
 ### B4-F1 — `dynamics_feedback` and `dynamics_query_log` have no review surface. **(PARTIALLY STALE — closed S188)**
 
-The `dynamics_feedback` half of this finding was already shipped at audit time: `DynamicsFeedbackSection` exists at `pages/admin.js:1646` (rendered at line 2282), backed by `/api/dynamics-explorer/feedback` (GET/PATCH on `dynamics_feedback` rows, superuser-only). Negative-feedback rows from thumbs-down votes AND auto-detected failures (`autoDetected: true` rows the explorer service writes when it hits known failure patterns) BOTH land here for staff triage.
+The `dynamics_feedback` half was already shipped at audit time: `DynamicsFeedbackSection` exists at `pages/admin.js:1646` (rendered at line 2282), backed by `/api/dynamics-explorer/feedback` (GET/PATCH on `dynamics_feedback` rows, superuser-only). The `autoDetected` boolean column on `dynamics_feedback` exists in the schema and is accepted by the POST endpoint — but write is client-driven, not server-side auto-promotion (Codex S188 sweep confirmed `FeedbackService` has no `recordAutoFailure` or equivalent method).
 
-The `dynamics_query_log` half is left intentionally without a dedicated admin widget: the high-signal subset (failed queries) auto-promotes into `dynamics_feedback` via `FeedbackService.recordAutoFailure`, and the raw log is ad-hoc-diagnostic-only — not high-value enough to justify a constant widget. Closed without further action.
+The `dynamics_query_log` half remains without a dedicated admin widget. Trade-off acknowledged: failure-pattern review currently relies on a thumbs-down click from a user OR ad-hoc Postgres queries against `dynamics_query_log` for forensic work. A small admin widget that surfaces "recent queries where `error_message IS NOT NULL` + linked context" would close the gap if the volume ever justifies it — pilot scale doesn't yet.
 
-(Original audit framing was correct that no readers existed in `pages/api/admin/*` — but the admin surface for feedback is wired via `/api/dynamics-explorer/feedback`, not under `/admin/`, which is why the grep missed it. Path-narrow grep failure, not a real gap.)
+(Original audit framing was correct that no readers existed in `pages/api/admin/*` — but the admin surface for feedback is wired via `/api/dynamics-explorer/feedback`, not under `/admin/`, which is why the original grep missed it. Path-narrow grep failure, not a real gap.)
 
 Fix: small `/admin/dynamics-feedback` page reading the last N thumbs-down rows. Or remove the thumbs-down UI from Dynamics Explorer if no one's reviewing.
 
