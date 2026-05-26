@@ -859,6 +859,7 @@ Sent as one batched ask; doesn't block scaffolding through `dynamics_patched`.
 | R13 | Applicant attachments leak via public Blob | **handled by P4** | Dedicated private store + `INTAKE_BLOB_RW_TOKEN` |
 | R14 | Long-running drain step + lock expiry | MOD | Lease renewal in drain code; other workers honor `locked_until` |
 | R15 | Cloudmersive sync scan exceeds Vercel timeout for very large files | LOW | Pilot file sizes are small; stream-scan if needed for future larger uploads |
+| R16 | **First real submission lands as a near-empty `akoya_request` row** | **expected, not a bug** | `handleScanning` in `pages/api/cron/drain-submissions.js` writes only `akoya_requestid`, `akoya_Account@odata.bind`, and `...draftJson.dataverseFields` (per Connor Q1 / Q2 deferral). The submit endpoint freezes the full draft JSON in `payload.draft_json`, but only the `dataverseFields` subset reaches Dataverse until the parent-aggregate PATCH and persons-children handlers ship. **Operational implication:** anyone reading the request in Dataverse the day after pilot launches sees an effectively empty row pointing only to an institution. Real test submit needed to map exactly which form fields land vs which stay Postgres-side; until then, treat the near-empty state as the intended Phase B drain output. (B1-F5 audit closeout S188.) |
 
 ---
 

@@ -195,11 +195,13 @@ Cold-start hook in `instrumentation.js` raises a CRITICAL alert when set; daily 
 
 ## Bucket 4: Observability — is anyone reading the signals?
 
-### B4-F1 — `dynamics_feedback` and `dynamics_query_log` have no review surface. **(CONFIRMED, M)**
+### B4-F1 — `dynamics_feedback` and `dynamics_query_log` have no review surface. **(PARTIALLY STALE — closed S188)**
 
-`lib/services/feedback-service.js` writes both tables (Dynamics Explorer thumbs-up/down and auto-detected failures). Grep for readers across `pages/api/admin/*` and `shared/components/*` returns zero hits — no admin dashboard widget surfaces these. Net effect: users can vote thumbs-down on bad Dynamics Explorer responses, the rows accumulate in Postgres, but no one will ever look at them unless they query the table directly.
+The `dynamics_feedback` half of this finding was already shipped at audit time: `DynamicsFeedbackSection` exists at `pages/admin.js:1646` (rendered at line 2282), backed by `/api/dynamics-explorer/feedback` (GET/PATCH on `dynamics_feedback` rows, superuser-only). Negative-feedback rows from thumbs-down votes AND auto-detected failures (`autoDetected: true` rows the explorer service writes when it hits known failure patterns) BOTH land here for staff triage.
 
-Either an admin dashboard widget should surface "recent thumbs-down + linked query/result" for triage, or the feedback collection should be turned off (collecting and not reading is the worst-of-both: noise without signal).
+The `dynamics_query_log` half is left intentionally without a dedicated admin widget: the high-signal subset (failed queries) auto-promotes into `dynamics_feedback` via `FeedbackService.recordAutoFailure`, and the raw log is ad-hoc-diagnostic-only — not high-value enough to justify a constant widget. Closed without further action.
+
+(Original audit framing was correct that no readers existed in `pages/api/admin/*` — but the admin surface for feedback is wired via `/api/dynamics-explorer/feedback`, not under `/admin/`, which is why the grep missed it. Path-narrow grep failure, not a real gap.)
 
 Fix: small `/admin/dynamics-feedback` page reading the last N thumbs-down rows. Or remove the thumbs-down UI from Dynamics Explorer if no one's reviewing.
 
@@ -289,9 +291,11 @@ The 2 ground-truth audit docs (`AUDIT_DOCS_GROUND_TRUTH_2026-05-25-{A,B}.md` in 
 
 ## Bucket 7: Code smells / dead code
 
-### B7-F1 — Wave 1 dispatcher Postgres branches: dead code, retained as kill-switch. **(CONFIRMED, S)**
+### B7-F1 — Wave 1 dispatcher Postgres branches: dead code, retained as kill-switch. **(VERIFIED INTENTIONAL — closed S188)**
 
 `lib/services/settings-service.js`, `app-access-service.js`, and `dataverse-prefs-service.js` each carry a `useDataverse() → bool` branch that defaults to Dataverse but falls through to raw Postgres SQL if `WAVE1_BACKEND_*=postgres` is set. The underlying tables were dropped 2026-05-12. The branches remain "as an explicit opt-out signal" — running the Postgres path would 500 with `relation does not exist`.
+
+**S188 disposition:** keep as-is. The existing inline comment at each dispatcher (`app-access-service.js:34` and parallel sites) already labels intent — "Default Dataverse; explicit 'postgres' fails loudly (table dropped 2026-05-12)". The loud-failure mode is genuinely diagnostic (an operator who flips the env var as a panic measure discovers immediately that Postgres is gone, not silently corrupted). Replacing with a startup throw would lose the diagnostic surface for marginal LOC savings. The cleaner-throw variant proposed below is documented but not adopted.
 
 This works as intended but carries ~30 lines of dead SQL per service. Cleaner: replace the dispatch helper with a startup throw when the env var is `postgres`:
 
@@ -307,11 +311,9 @@ Then delete the inline Postgres branches. Same loud-failure semantic, less code 
 
 3 scripts still depend on it: `scripts/audit-system-prompt-sizes.js`, `scripts/compare-phase-i-v1-v2.js`, `scripts/ab-phase-i-prompts.js`. Live API routes have all migrated to the Executor. Per memory and CLAUDE.md, this is documented; don't retire `prompt-resolver.js` until those 3 scripts are either retired or migrated to the Executor.
 
-### B7-F3 — `docs/archive/` is accumulating. **(CONFIRMED, S)**
+### B7-F3 — `docs/archive/` is accumulating. **(DEFERRED — S188 triage)**
 
-49 files including code-review snapshots from 2026-03-10 (8+ weeks old, multiple per topic), older audit docs, point-in-time briefings. Some retain value as historical record (e.g. `CODE_REVIEW_RESPONSE_2026-04-30.md`); most don't.
-
-Fix: review pass — delete strictly-historical reviewer feedback that's been actioned + summarized in DEVELOPMENT_LOG.md; keep the 2-3 docs that capture architecturally-load-bearing decisions. Out of scope for S186 unless prioritized.
+S188 re-survey: 50 files / 532 KB. Not a disk-or-grep problem at this size. Per-file delete-vs-keep is user-judgment work (which 2026-03 code-review threads still hold architectural context? which IT-correspondence threads are referenced by current docs? etc.) and not autonomous-fixable. Aging policy proposal (apply when archive grows another ~25 files or hits 1 MB): default-delete files whose mtime is >6 months old AND whose contents are point-in-time correspondence/reviews superseded by current docs; default-keep architectural-decision records regardless of age. Out of scope this slice.
 
 ### B7-F4 — One skipped test in `tests/unit/utils/apiKeyManager.test.js:59`. **(CONFIRMED, S)**
 
