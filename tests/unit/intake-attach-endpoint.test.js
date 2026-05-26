@@ -41,7 +41,6 @@ jest.mock('../../lib/services/cloudmersive-scan', () => ({
 }));
 jest.mock('../../lib/utils/virus-scan-config', () => ({
   isVirusScanEnabled: jest.fn(() => true),
-  VIRUS_DETECTION_ALERT_EMAIL: 'alerts@wmkeck.org',
 }));
 jest.mock('../../lib/utils/intake-blob', () => ({
   getIntakeBlobToken: jest.fn(() => 'vercel_blob_rw_fake_token'),
@@ -550,7 +549,9 @@ describe('scanner posture (A7)', () => {
     expect(call.type).toBe('virus_detection_intake');
     expect(call.severity).toBe('error');
     expect(call.source).toBe('intake-attach');
-    expect(call.explicitRecipients).toEqual(['alerts@wmkeck.org']);
+    // Recipients come from the 'virus-detection' category config in
+    // /admin → Alert Recipients; intake has no per-event PD to add.
+    expect(call.category).toBe('virus-detection');
     expect(call.metadata).toEqual(expect.objectContaining({
       draftId: DRAFT_ID,
       attachmentId: ATTACHMENT_ID,

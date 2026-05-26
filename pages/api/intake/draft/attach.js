@@ -47,7 +47,6 @@ import { getFormSchema, findFileField, countFieldEntries } from '../../../../lib
 import { buildNoResponseError } from '../../../../lib/utils/service-error';
 import { checkIntakeRateLimit } from '../../../../lib/intake/rate-limit';
 import NotificationService from '../../../../lib/services/notification-service';
-import { VIRUS_DETECTION_ALERT_EMAIL } from '../../../../lib/utils/virus-scan-config';
 
 const ALLOWED_FIELDS = new Set(['draftId', 'attachmentId']);
 
@@ -500,7 +499,10 @@ export default async function handler(req, res) {
         sha256, size,
       },
       source: 'intake-attach',
-      explicitRecipients: [VIRUS_DETECTION_ALERT_EMAIL],
+      // Drafts are pre-submission so there's no request-level PD to route to.
+      // Category routing handles the foundation alerts address — configure
+      // recipients for the 'virus-detection' category in /admin → Alert Recipients.
+      category: 'virus-detection',
     }).catch(err => {
       console.error(`[attach] detection alert failed for draft ${draftId}: ${err.message}`);
     });

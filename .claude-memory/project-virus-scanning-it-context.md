@@ -17,7 +17,11 @@ DFT email exchange 2026-05-26 — locked context for the `VIRUS_SCAN_ENABLED` ro
 
 **DFT does NOT need per-detection notifications.** Our scan happens in app memory before any SharePoint write. On detection we reject and discard bytes — nothing to quarantine, nothing for DFT to investigate, nothing in any system they administer. DFT's original ask for their support email as detection notification target was framed against an MDO/Safe-Attachments quarantine model that doesn't apply here. Future cadence: aggregate stats once a cycle, not per-event.
 
-**Internal notification design — locked S190.** Per-detection: write a `system_alerts` row AND send an email. Recipients = `alerts@wmkeck.org` (always, hardcoded as `VIRUS_DETECTION_ALERT_EMAIL` in `lib/utils/virus-scan-config.js`) PLUS the PD on the related `akoya_request` (when resolvable). Reviewer path: PD resolved via suggestion → request → wmkf_programdirector → systemuser.internalemailaddress. Intake path: PD-of-request is N/A at scan time (drafts are pre-submission, request_id is null), so just `alerts@wmkeck.org`. Routing bypasses the category mechanism — `explicitRecipients` on `NotificationService.notify` takes precedence over category resolution.
+**Internal notification design — locked S190.** Per-detection: write a `system_alerts` row AND send an email. Recipients are the **union** of:
+1. The `'virus-detection'` category configured in `/admin → Alert Recipients` (stored in `wmkf_appsystemsettings.alertRecipientsByCategory`). Set to `alerts@wmkeck.org` for production. **Admin must configure this in the dashboard before detection alerts will email anyone.**
+2. `explicitRecipients` per-event: the PD on the related `akoya_request` when resolvable. Reviewer path: PD resolved via suggestion → request → wmkf_programdirector → systemuser.internalemailaddress. Intake path: PD-of-request is N/A (drafts are pre-submission, request_id is null) so explicitRecipients is empty there.
+
+`NotificationService.sendAdminEmail` was changed S190 from "explicit-bypasses-category" semantics to "explicit-unions-with-category" so this design works. See [[memory-store-propagation]] for how this lives across sessions.
 
 **Sender UX design — locked S190.** Server rejects on detection (no backend redesign). Client preserves typed review/form text in form state and surfaces: "We scanned your upload and detected what appears to be malware. Your text has been preserved here — please replace the file with a clean copy from a scanned-clean machine and try again."
 

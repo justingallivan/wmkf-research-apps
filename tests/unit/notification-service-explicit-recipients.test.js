@@ -1,12 +1,16 @@
 /**
- * Coverage for NotificationService.sendAdminEmail's explicitRecipients branch.
+ * Coverage for NotificationService.sendAdminEmail's recipient resolution.
  *
- * Added S190 as part of the virus-scan-detection alert wiring. The
- * branch lets callers route per-event (e.g. the program director on a
- * specific akoya_request) without configuring a category mapping in
- * `/admin → Alert Recipients`. When the list is empty/falsy, category
- * routing applies — the test below pins that fallback so a future
- * refactor can't silently swap "no recipients" for "skip the email."
+ * Recipients are the UNION of:
+ *   - category-routed recipients (resolved by AlertRecipients), and
+ *   - explicit per-event recipients (e.g. the PD on a specific request).
+ *
+ * Both are optional. Either alone is sufficient. Both empty → skipped.
+ *
+ * Added S190 as part of the virus-scan-detection alert wiring. The union
+ * semantics let detection alerts route a static foundation address via
+ * the admin-dashboard category config AND a dynamic per-event PD email
+ * resolved at call time.
  *
  * @jest-environment node
  */
@@ -32,14 +36,15 @@ const AlertRecipients = require('../../lib/services/alert-recipients');
 
 const ORIGINAL_FROM = process.env.NOTIFICATION_EMAIL_FROM;
 
+function getResolveMock() {
+  return AlertRecipients.resolveRecipients
+    || AlertRecipients.default?.resolveRecipients;
+}
+
 beforeEach(() => {
   process.env.NOTIFICATION_EMAIL_FROM = 'alerts@example.org';
   DynamicsService.createAndSendEmail.mockClear();
-  // The module exports the class with these as static methods via `module.exports`.
-  // Provide both module-default and named exports because lib code reads either.
-  const resolve = AlertRecipients.resolveRecipients
-    || AlertRecipients.default?.resolveRecipients;
-  resolve.mockReset();
+  getResolveMock().mockReset();
 });
 
 afterAll(() => {
@@ -47,31 +52,42 @@ afterAll(() => {
   else process.env.NOTIFICATION_EMAIL_FROM = ORIGINAL_FROM;
 });
 
-describe('sendAdminEmail — explicitRecipients branch', () => {
-  test('non-empty explicitRecipients → sends to that list, never calls category resolver', async () => {
+describe('sendAdminEmail — category + explicit recipient union', () => {
+  test('category recipients only → sends to those', async () => {
+    getResolveMock().mockResolvedValue({
+      recipients: ['ops@example.org'],
+      source: 'config',
+      category: 'ops',
+    });
+
     await NotificationService.sendAdminEmail({
       subject: 'test',
       htmlBody: '<p>body</p>',
-      category: 'virus-detection',
+      category: 'ops',
+    });
+
+    expect(getResolveMock()).toHaveBeenCalledWith('ops');
+    expect(DynamicsService.createAndSendEmail.mock.calls[0][0].to).toEqual([
+      'ops@example.org',
+    ]);
+  });
+
+  test('explicit recipients only (no category) → sends to those, never calls resolver', async () => {
+    await NotificationService.sendAdminEmail({
+      subject: 'test',
+      htmlBody: '<p>body</p>',
       explicitRecipients: ['pd@example.org'],
     });
 
-    expect(DynamicsService.createAndSendEmail).toHaveBeenCalledTimes(1);
-    const call = DynamicsService.createAndSendEmail.mock.calls[0][0];
-    expect(call.to).toEqual(['pd@example.org']);
-    expect(call.from).toBe('alerts@example.org');
-    expect(call.subject).toBe('test');
-
-    const resolve = AlertRecipients.resolveRecipients
-      || AlertRecipients.default?.resolveRecipients;
-    expect(resolve).not.toHaveBeenCalled();
+    expect(getResolveMock()).not.toHaveBeenCalled();
+    expect(DynamicsService.createAndSendEmail.mock.calls[0][0].to).toEqual([
+      'pd@example.org',
+    ]);
   });
 
-  test('falsy entries in explicitRecipients are filtered → falls through to category routing', async () => {
-    const resolve = AlertRecipients.resolveRecipients
-      || AlertRecipients.default?.resolveRecipients;
-    resolve.mockResolvedValue({
-      recipients: ['fallback@example.org'],
+  test('category + explicit → unioned and deduped', async () => {
+    getResolveMock().mockResolvedValue({
+      recipients: ['alerts@example.org', 'shared@example.org'],
       source: 'config',
       category: 'virus-detection',
     });
@@ -80,32 +96,62 @@ describe('sendAdminEmail — explicitRecipients branch', () => {
       subject: 'test',
       htmlBody: '<p>body</p>',
       category: 'virus-detection',
-      explicitRecipients: [null, '', '   '],
+      explicitRecipients: ['pd@example.org', 'shared@example.org'], // 'shared@' overlaps
     });
 
-    expect(resolve).toHaveBeenCalledWith('virus-detection');
+    const to = DynamicsService.createAndSendEmail.mock.calls[0][0].to;
+    expect(to).toEqual(['alerts@example.org', 'shared@example.org', 'pd@example.org']);
+    expect(to).toHaveLength(3); // shared@ deduped to one entry
+  });
+
+  test('falsy entries in explicitRecipients are filtered', async () => {
+    getResolveMock().mockResolvedValue({
+      recipients: ['alerts@example.org'],
+      source: 'config',
+      category: 'virus-detection',
+    });
+
+    await NotificationService.sendAdminEmail({
+      subject: 'test',
+      htmlBody: '<p>body</p>',
+      category: 'virus-detection',
+      explicitRecipients: [null, '', '   ', undefined],
+    });
+
     expect(DynamicsService.createAndSendEmail.mock.calls[0][0].to).toEqual([
-      'fallback@example.org',
+      'alerts@example.org',
     ]);
   });
 
-  test('empty explicitRecipients + empty category resolution → skipped (no email)', async () => {
-    const resolve = AlertRecipients.resolveRecipients
-      || AlertRecipients.default?.resolveRecipients;
-    resolve.mockResolvedValue({ recipients: [], source: 'roster', category: 'default' });
+  test('category resolution empty + no explicit → skipped, no email', async () => {
+    getResolveMock().mockResolvedValue({
+      recipients: [],
+      source: 'roster',
+      category: 'default',
+    });
 
     const sent = await NotificationService.sendAdminEmail({
       subject: 'test',
       htmlBody: '<p>body</p>',
       category: 'virus-detection',
-      explicitRecipients: [],
     });
 
     expect(sent).toBe(false);
     expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
   });
 
-  test('no NOTIFICATION_EMAIL_FROM → skipped even with explicit recipients', async () => {
+  test('no category and no explicit → skipped (resolver never called)', async () => {
+    const sent = await NotificationService.sendAdminEmail({
+      subject: 'test',
+      htmlBody: '<p>body</p>',
+    });
+
+    expect(sent).toBe(false);
+    expect(getResolveMock()).not.toHaveBeenCalled();
+    expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('no NOTIFICATION_EMAIL_FROM → skipped even with recipients available', async () => {
     delete process.env.NOTIFICATION_EMAIL_FROM;
     const sent = await NotificationService.sendAdminEmail({
       subject: 'test',

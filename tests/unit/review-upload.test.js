@@ -556,6 +556,7 @@ describe('writeReviewFiles — detection alert (B1)', () => {
     expect(call.type).toBe('virus_detection_reviewer');
     expect(call.severity).toBe('error');
     expect(call.source).toBe('review-upload');
+    expect(call.category).toBe('virus-detection');
     expect(call.metadata).toEqual(expect.objectContaining({
       suggestionId: SUGGESTION_ID,
       requestId: REQUEST_ID,
@@ -565,11 +566,11 @@ describe('writeReviewFiles — detection alert (B1)', () => {
     expect(call.metadata.fileDetections).toEqual([
       'review.pdf: virus detected (EICAR)',
     ]);
-    // The foundation alerts address is always present (single source of
-    // truth: VIRUS_DETECTION_ALERT_EMAIL). PD email is added when the
-    // request lookup yields one; mocked suggestion here has no PD, so
-    // the list is just the foundation address.
-    expect(call.explicitRecipients).toContain('alerts@wmkeck.org');
+    // The foundation alerts address comes from category routing
+    // ('virus-detection' in /admin → Alert Recipients), not from this
+    // call. explicitRecipients carries the per-event PD email when
+    // resolvable; the mocked suggestion here has no PD, so it's empty.
+    expect(call.explicitRecipients).toEqual([]);
   });
 
   test('scan_misconfigured does NOT fire a detection alert', async () => {
