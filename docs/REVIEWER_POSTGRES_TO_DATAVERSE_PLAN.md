@@ -807,7 +807,7 @@ Every item below must have a check + date + owner before the relevant cutover st
 
 ### Updated forward schedule
 
-> **HISTORICAL — W3–W6 (step 1) all SHIPPED 2026-05-12 ahead of original cadence.** W3 grant-cycles + W4 reviewer-suggestion alignment + W5 reader cutover + W6 step 1 (researchers.js retirement) landed together. The "NOT slip-eligible" gate list below was the planning gate list; most of those gates passed at cutover, but two items in that list are still pending: the post-pilot one-shot Postgres table drop (W6 step 2 — fires ≥ 2026-07-01) and the `scripts/restore-postgres-drain-table-backup.js` script that must be written before that drop runs. Pilot launch (W7) also remains forward work — mid-June 2026 Phase II Research cycle.
+> **HISTORICAL — W3–W6 (step 1) all SHIPPED 2026-05-12 ahead of original cadence.** W3 grant-cycles + W4 reviewer-suggestion alignment + W5 reader cutover + W6 step 1 (researchers.js retirement) landed together. The "NOT slip-eligible" gate list below was the planning gate list; most of those gates passed at cutover. One gate item is still pending: `scripts/restore-postgres-drain-table-backup.js` must be written before the post-pilot one-shot table drop runs (the drop itself is tracked in the Post-pilot row of the schedule table, not as a slip-eligible-gate). Pilot launch (W7) also remains forward work — mid-June 2026 Phase II Research cycle.
 
 Slip-eligible items (history badges UI, add-candidate-manual, match-on-discovery wiring, contact form subgrid) are explicitly moved to a "Post-pilot enhancements" block below the table so they don't crowd critical-path weeks. The one-shot cleanup/table-drop path is post-pilot regardless. Each week below carries one major theme plus its safety prerequisites.
 
@@ -824,7 +824,7 @@ Slip-eligible items (history badges UI, add-candidate-manual, match-on-discovery
 - History badges + match-on-discovery wiring (additive UX)
 - `add-candidate-manual` endpoint + UI (PDs save via discovery flow only during pilot)
 - Contact form "Reviewer history" subgrid (Connor's separate build)
-- Cleanup cron real-mode (post-pilot regardless)
+- Post-pilot one-shot Postgres table drop (NOT a cron — see §"Post-pilot one-shot cleanup" at line 191 + Post-pilot row of the schedule above; deferred to post-pilot regardless of W7 timing)
 
 **What's NOT slip-eligible** (gate cutover; must complete by W6):
 - 8 parity-anomaly triage decisions documented (recover or accept loss, per row)
