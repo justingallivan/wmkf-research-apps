@@ -543,7 +543,7 @@ The intake portal isn't on a public URL. Drain runs every 2 min — choose an ap
 
 ## Phase 0 closeout list (separate follow-ups after Phase 0)
 
-1. **Env-var verification (P0)**: `vercel env ls production | grep -E 'INTAKE_BLOB_RW_TOKEN|VRP_ALLOWED_PROVIDERS'` + read `wmkf_appsystemsettings` for `model_for_app:*` keys.
+1. **Env-var verification (P0)**: `vercel env ls production | grep -E 'INTAKE_BLOB_RW_TOKEN|VRP_ALLOWED_PROVIDERS'` + read `wmkf_appsystemsettings` for `model_override:*` keys.
 2. **Virus scanning posture (P0 user decision)**: A (off, document); B (Cloudmersive); C (in-house, deferred).
 3. **`jose` direct dep (P1)**: `npm install jose@<resolved>` + commit `package.json` + lockfile.
 4. **CLAUDE.md schema-source-of-truth correction (P2)**: rewrite §"Database Schema" to point at `setup-database.js` (fresh) + `apply-migrations.js` (canonical apply) + `schema_migrations` (per-env source of truth).

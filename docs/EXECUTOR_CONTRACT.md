@@ -1,8 +1,9 @@
 # Executor Contract
 
-**Status:** Draft spec, May 1 2026 cycle target
+**Status:** SHIPPED on the Vercel side — this doc describes the contract that `lib/services/execute-prompt.js` implements in production today (consumed by `/api/phase-i-dynamics/summarize-v2`). PowerAutomate implementation is Connor's; pacing tracked outside this doc. The original "May 1 2026 cycle target" framing is historical; that target has passed.
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
-**Owners:** Justin (Vercel implementation), Connor (PowerAutomate implementation)
+**Last status update:** 2026-05-25 (S188, B6-F2 readiness-audit drift refresh)
+**Owners:** Justin (Vercel implementation — shipped), Connor (PowerAutomate implementation)
 **Related docs:** `docs/PROMPT_STORAGE_DESIGN.md`, `docs/BACKEND_AUTOMATION_PLAN.md`, `docs/WORKFLOW_CHAINING_DESIGN.md`, `docs/GRANT_CYCLE_LIFECYCLE.md`
 
 ---
@@ -77,7 +78,7 @@ Executor throws (Vercel) or sets failure status (PA) on: prompt not found, varia
 
 | # | Step | PA action | Vercel equivalent |
 |---|---|---|---|
-| 1 | Resolve prompt | HTTP GET `wmkf_ai_prompts?$filter=wmkf_ai_promptname eq '<name>' and wmkf_ai_iscurrent eq true&$top=1` | `PromptResolver.getPrompt(name)` (to be extended) |
+| 1 | Resolve prompt | HTTP GET `wmkf_ai_prompts?$filter=wmkf_ai_promptname eq '<name>' and wmkf_ai_iscurrent eq true&$top=1` | `execute-prompt.js` queries `wmkf_ai_prompts` directly via Dataverse (NOT via `PromptResolver` — that's the legacy `wmkf_ai_runs` scratch-row path, used now only by audit scripts) |
 | 2 | Parse variable declarations | Parse JSON on `wmkf_ai_promptvariables` | `JSON.parse(row.wmkf_ai_promptvariables)` |
 | 3 | Resolve variable values | Apply-to-each + Switch on `source.kind` | Loop + switch; source kinds handled by dedicated resolvers |
 | 4 | **Preflight output guards** | For each output with `guard != "always-overwrite"`, GET target field. If populated AND `forceOverwrite = false` → write `wmkf_ai_run` with status `Needs Review`, return `{ blocked: true, conflicts, runId }`. Capture `@odata.etag` per target for step 8's `If-Match`. | Same. Skip steps 5–8 on block. |
@@ -137,7 +138,7 @@ Executor throws (Vercel) or sets failure status (PA) on: prompt not found, varia
 | `prior_output` | Value from a field a prior Execution wrote (implicit chaining via Dynamics) | Phase 1 |
 | `context_block` | Recursively assemble another prompt row tagged as `Context` | Phase 2 |
 
-**Preprocess hints (Phase 0):** `pdf_to_text`, `docx_to_text`. Additional hints (`truncate_tokens:N`, `strip_images`) may be added in later phases. Both Executors implement the same set; adding a new hint requires updating both.
+**Preprocess hints (Phase 0):** `pdf_to_text` only — the live `execute-prompt.js` throws on any other hint. `docx_to_text`, `truncate_tokens:N`, `strip_images` are deferred until needed. Adding a new hint requires updating both Executor implementations.
 
 **Placement attribute (Phase 0 — present but single-valued):** v0 only supports `placement: "user"`. Phase 2 adds `placement: "system"` for context-block variables that need to be part of the cacheable system-array prefix.
 
@@ -207,8 +208,9 @@ Callers no longer need to apply their own substring before passing values via `o
 | Kind | Meaning |
 |---|---|
 | `akoya_request` | PATCH a field on the `akoya_request` row identified by `requestId`. `jsonPath` optional — used when multiple outputs share a JSON Memo field (e.g., `wmkf_ai_dataextract`). |
-| `wmkf_ai_run` | Write to a field on the Execution row being created in step 9. |
 | `none` | Output is computed but not persisted (consumer is the caller's return value only). |
+
+`wmkf_ai_run` was previously listed here as a target kind but is not supported by the live `execute-prompt.js` (which throws on any kind other than `akoya_request` or `none`). The Execution row's own fields are written by step 9 automatically; callers do not need to declare them as outputs.
 
 **Output guards (Phase 0):**
 
@@ -332,24 +334,24 @@ If either assertion fails, the two implementations have drifted and must be reco
 
 ---
 
-## Phase 0 concrete scope (May 1 2026)
+## Phase 0 concrete scope (originally targeted May 1 2026 — SHIPPED)
 
-**Built for May 1 (Vercel-only):**
-- `executePrompt()` service function implementing steps 1–10
+**Built for the May 1 milestone (Vercel-only) — all SHIPPED:**
+- `executePrompt()` service function implementing steps 1–10 — `lib/services/execute-prompt.js`
 - Variable source resolvers: `dynamics`, `sharepoint`, `override`
 - Preprocessor: `pdf_to_text` (via existing `lib/utils/file-loader.js`)
 - Target writer: `akoya_request` (including JSON-path set for `wmkf_ai_dataextract`)
 - Output guards: `skip-if-populated` (default for `akoya_request` field-targets) and `always-overwrite`
 - `forceOverwrite` input on the Executor; `parseMode: "raw"` and `parseMode: "json"` on output schemas
-- Reference route: `pages/api/phase-i-dynamics/summarize-v2.js` becomes a ~30-line call into `executePrompt()`
+- Reference route: `pages/api/phase-i-dynamics/summarize-v2.js` — calls into `executePrompt()`
 - First prompt row: `phase-i.summary` (system/body split, single raw-text output to `wmkf_ai_summary`, `guard: "skip-if-populated"`)
 
-**Explicitly deferred:**
-- PowerAutomate `ExecutePrompt` child flow (Phase 1)
-- Context blocks + `context_block` source kind + `placement: system` (Phase 2)
-- `prior_output` source kind (Phase 1)
-- `overridePromptBody` input (Phase 2+)
+**Still deferred (post-May 1 status — re-verify before consuming):**
+- PowerAutomate `ExecutePrompt` child flow — Connor-owned, pacing tracked outside this doc
+- Context blocks + `context_block` source kind + `placement: system`
+- `prior_output` source kind
+- `overridePromptBody` input
 - Streaming Executor variant
-- Publish-time structural lint + test-run gate (manual review for Phase 0)
+- Publish-time structural lint + test-run gate (manual review still the current process)
 
-**Phase 0 caching note:** within-prompt cache hits only. Running summary then compliance on the same request in Phase 0 does NOT share cache on the document block — both calls pay full price. That's acceptable for the May cycle budget.
+**Caching note:** within-prompt cache hits only. Running summary then compliance on the same request does NOT share cache on the document block — both calls pay full price. Worth revisiting when proposal-context-extraction (`docs/PROPOSAL_CONTEXT_EXTRACTION_PLAN.md`) ships.

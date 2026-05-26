@@ -183,7 +183,7 @@ Fix: `vercel env add DYNAMICS_IMPERSONATION_ENABLED true` (prod), redeploy, watc
 
 VRP fails closed if `VRP_ALLOWED_PROVIDERS` is missing OR `claude` isn't in it. The handler enforces both. Just needs `vercel env ls | grep VRP_ALLOWED_PROVIDERS` to confirm value.
 
-Per-app model overrides live in Dataverse `wmkf_appsystemsettings`. CLAUDE.md notes admin-configurable; nobody's audited the live values recently. A retired model ID (e.g., a Sonnet 3.x string) would silently fail at call time, surface as an opaque 500. Run `scripts/audit-system-prompt-sizes.js` or write a quick query of `wmkf_appsystemsettings` filtered to `model_for_app:*` keys.
+Per-app model overrides live in Dataverse `wmkf_appsystemsettings`. CLAUDE.md notes admin-configurable; nobody's audited the live values recently. A retired model ID (e.g., a Sonnet 3.x string) would silently fail at call time, surface as an opaque 500. Run `scripts/audit-system-prompt-sizes.js` or write a quick query of `wmkf_appsystemsettings` filtered to `model_override:*` keys (the live prefix per `lib/services/model-override-loader.js:44` — the earlier text in this audit said `model_for_app:` which is wrong). S188 probe: 43 entries, all 4.x family, no retired 3.x strings; two older versions (`claude-opus-4-6`, `claude-opus-4-5-20251101`) worth review.
 
 ### B3-C1 — CLEAR: `EMERGENCY_AUTH_BYPASS` monitoring.
 
@@ -489,7 +489,7 @@ This is a suggested sequencing — the user picks. Effort uses the legend at the
 Goal: close the P0s so a real submission tomorrow morning works and is observable.
 
 1. **#1 — verify INTAKE_BLOB_RW_TOKEN in prod** (S) — single `vercel env ls`. Likely already set; just confirm.
-2. **#3 — verify VRP_ALLOWED_PROVIDERS + spot-check model overrides** (S) — `vercel env ls | grep VRP`, then read `wmkf_appsystemsettings` for `model_for_app:*` keys.
+2. **#3 — verify VRP_ALLOWED_PROVIDERS + spot-check model overrides** (S) — `vercel env ls | grep VRP`, then read `wmkf_appsystemsettings` for `model_override:*` keys.
 3. **#2 — decide on virus scanning posture for pilot** (M) — either (a) accept "no scanning during pilot, document explicitly" + clean up the misleading `scanner='skipped'` audit row label, or (b) commit to enabling Cloudmersive before pilot launch.
 4. **B8-DR1 / DR8 — preview-env smoke tests** for intake + Entra OTP (M).
 
