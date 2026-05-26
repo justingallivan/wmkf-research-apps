@@ -242,9 +242,11 @@ Every cron uses `MaintenanceService.startRun`/`completeRun`. `getLastRuns()` sur
 
 ## Bucket 5: Auth integrity
 
-### B5-F1 — External Entra ID OTP flow not exercised recently. **(WORTH PROBING, S)**
+### B5-F1 — External Entra ID OTP flow not exercised recently. **(EXERCISED — closed S188)**
 
 Per S129 memory + carryover, the dual-provider NextAuth is wired and the round-trip was verified at deployment. No exercise since. Provider config can drift (tenant client-secret expiry, callback URL mismatch on a redeploy). Worth a real round-trip before any first applicant lands. Bucket 8 covers this as a dry-run candidate.
+
+**S187 exercised this end-to-end.** Smoke-testing of preview DR8 surfaced that production AND preview were both missing the `entra-external` provider because the three `EXTERNAL_AZURE_AD_*` env vars had never been deployed. Operator (Justin) provisioned the env vars in Vercel production with a fresh client secret; production then returned both `azure-ad` AND `entra-external` from `/api/auth/providers`. Justin completed a real OTP round-trip end-to-end: signed in as `nick_sludge.78@icloud.com` (OID `3bba39e3-2712-4c06-ae2a-9646afd3d6ce`), `/apply` welcome page rendered correctly with claims populated. Two UI bugs surfaced during the round-trip — sign-out silently re-authenticates, and Entra sign-up flow collects irrelevant City/State/DisplayName — both held for a dedicated UI session (memory `project-intake-portal-ui-todo`).
 
 ### B5-F2 — Idle-timeout depends on `token.lastActivity` being set. **(CONFIRMED minor, S)**
 
