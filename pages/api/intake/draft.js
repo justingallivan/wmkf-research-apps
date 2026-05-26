@@ -62,6 +62,7 @@ import { hasLiveMembership } from '../../../lib/services/membership-service';
 import IntakeDraftService from '../../../lib/services/intake-draft-service';
 import IntakeAuditService from '../../../lib/services/intake-audit-service';
 import { resolveContactForSession } from '../../../lib/services/contact-bridge-service';
+import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { checkIntakeRateLimit } from '../../../lib/intake/rate-limit';
 
 function jsonError(res, status, error, extra = {}) {
@@ -113,11 +114,13 @@ export default async function handler(req, res) {
   // 3) Bridge: OID → contactId. Same path as /submit.
   let bridgeResult;
   try {
-    bridgeResult = await resolveContactForSession({
-      oid: contactOid,
-      email: session.user.contactEmail,
-      name: session.user.contactName,
-    });
+    bridgeResult = await bypassDynamicsRestrictions('intake-draft-bridge', () =>
+      resolveContactForSession({
+        oid: contactOid,
+        email: session.user.contactEmail,
+        name: session.user.contactName,
+      })
+    );
   } catch (err) {
     if (err?.altKeyNotActive) {
       console.warn('[intake/draft] bridge altKeyNotActive:', err.message);
@@ -155,7 +158,9 @@ export default async function handler(req, res) {
   // 4) Membership — any role accepted (Contributor or Submitter)
   let allowed;
   try {
-    allowed = await hasLiveMembership(contactId, accountId);
+    allowed = await bypassDynamicsRestrictions('intake-draft-membership', () =>
+      hasLiveMembership(contactId, accountId)
+    );
   } catch (err) {
     console.error('[intake/draft] membership check failed:', err);
     return jsonError(res, 502, 'Membership lookup failed; please retry');

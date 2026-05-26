@@ -39,6 +39,7 @@ import { hasLiveMembership } from '../../../../lib/services/membership-service';
 import IntakeDraftService from '../../../../lib/services/intake-draft-service';
 import IntakeAuditService from '../../../../lib/services/intake-audit-service';
 import { resolveContactForSession } from '../../../../lib/services/contact-bridge-service';
+import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
 import { scanBytes } from '../../../../lib/services/cloudmersive-scan';
 import { isVirusScanEnabled } from '../../../../lib/utils/virus-scan-config';
 import { validateIntakeAttachment, sniffFileType } from '../../../../lib/utils/file-magic';
@@ -136,11 +137,13 @@ export default async function handler(req, res) {
     // 6) Bridge
     let bridgeResult;
     try {
-      bridgeResult = await resolveContactForSession({
-        oid: contactOid,
-        email: session.user.contactEmail,
-        name: session.user.contactName,
-      });
+      bridgeResult = await bypassDynamicsRestrictions('intake-attach-bridge', () =>
+        resolveContactForSession({
+          oid: contactOid,
+          email: session.user.contactEmail,
+          name: session.user.contactName,
+        })
+      );
     } catch (err) {
       if (err?.altKeyNotActive) {
         console.warn('[attach] bridge altKeyNotActive:', err.message);
@@ -166,7 +169,9 @@ export default async function handler(req, res) {
     // 7) Membership
     let allowed;
     try {
-      allowed = await hasLiveMembership(contactId, draft.account_id);
+      allowed = await bypassDynamicsRestrictions('intake-attach-membership', () =>
+        hasLiveMembership(contactId, draft.account_id)
+      );
     } catch (err) {
       console.error('[attach] membership check failed:', err);
       return jsonError(res, 502, 'Membership lookup failed; please retry');

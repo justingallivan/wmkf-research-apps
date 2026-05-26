@@ -58,6 +58,7 @@ import { hasSubmitterRole } from '../../../lib/services/membership-service';
 import IntakeDraftService from '../../../lib/services/intake-draft-service';
 import IntakeAuditService from '../../../lib/services/intake-audit-service';
 import { resolveContactForSession } from '../../../lib/services/contact-bridge-service';
+import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { validateAttachmentShape, validateAttachmentSet } from '../../../lib/utils/intake-attachment-shape';
 import { validateBudgetLineRow } from '../../../lib/utils/intake-budget-line-payload';
 import { checkIntakeRateLimit } from '../../../lib/intake/rate-limit';
@@ -132,11 +133,13 @@ export default async function handler(req, res) {
   //    false for every applicant (the bug this commit fixes).
   let bridgeResult;
   try {
-    bridgeResult = await resolveContactForSession({
-      oid: contactOid,
-      email: session.user.contactEmail,
-      name: session.user.contactName,
-    });
+    bridgeResult = await bypassDynamicsRestrictions('intake-submit-bridge', () =>
+      resolveContactForSession({
+        oid: contactOid,
+        email: session.user.contactEmail,
+        name: session.user.contactName,
+      })
+    );
   } catch (err) {
     if (err?.altKeyNotActive) {
       // Codex round-13 Q3: alt-key probe failed → identity service can't
@@ -181,7 +184,9 @@ export default async function handler(req, res) {
   //    The membership service handles the approved+active+Submitter triple-check.
   let isSubmitter;
   try {
-    isSubmitter = await hasSubmitterRole(contactId, accountId);
+    isSubmitter = await bypassDynamicsRestrictions('intake-submit-membership', () =>
+      hasSubmitterRole(contactId, accountId)
+    );
   } catch (err) {
     console.error('[intake/submit] membership check failed:', err);
     return jsonError(res, 502, 'Membership lookup failed; please retry');

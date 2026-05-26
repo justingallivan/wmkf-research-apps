@@ -49,6 +49,7 @@ import crypto from 'crypto';
 import pkg from 'pg';
 import { get as blobGet } from '@vercel/blob';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
+import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { GraphService } from '../../../lib/services/graph-service';
 import { classify } from '../../../lib/utils/drain-error-classifier';
 import { buildNoResponseError } from '../../../lib/utils/service-error';
@@ -458,10 +459,12 @@ async function handleScanning(client, job) {
 async function recoverRequestCreated(client, job, originalError) {
   let existing;
   try {
-    existing = await DynamicsService.getRecord(
-      'akoya_requests',
-      job.request_id,
-      { select: 'akoya_requestnum' },
+    existing = await bypassDynamicsRestrictions('drain-recover-request-created', () =>
+      DynamicsService.getRecord(
+        'akoya_requests',
+        job.request_id,
+        { select: 'akoya_requestnum' },
+      )
     );
   } catch (err) {
     const cls = classify(err);

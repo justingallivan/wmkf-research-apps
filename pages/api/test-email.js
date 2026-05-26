@@ -8,6 +8,7 @@
 
 import { requireAppAccess } from '../../lib/utils/auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
+import { bypassDynamicsRestrictions } from '../../lib/services/dynamics-context';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -33,13 +34,15 @@ export default async function handler(req, res) {
 
   try {
     if (sendMode === 'send') {
-      const { emailId } = await DynamicsService.createAndSendEmail({
-        subject,
-        body,
-        from,
-        to,
-        actingUserSystemId,
-      });
+      const { emailId } = await bypassDynamicsRestrictions('test-email-send', () =>
+        DynamicsService.createAndSendEmail({
+          subject,
+          body,
+          from,
+          to,
+          actingUserSystemId,
+        })
+      );
 
       return res.json({
         success: true,
@@ -49,13 +52,15 @@ export default async function handler(req, res) {
       });
     } else {
       // Draft only
-      const emailId = await DynamicsService.createEmailActivity({
-        subject,
-        body,
-        from,
-        to,
-        actingUserSystemId,
-      });
+      const emailId = await bypassDynamicsRestrictions('test-email-draft', () =>
+        DynamicsService.createEmailActivity({
+          subject,
+          body,
+          from,
+          to,
+          actingUserSystemId,
+        })
+      );
 
       return res.json({
         success: true,
