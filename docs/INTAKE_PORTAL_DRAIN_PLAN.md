@@ -528,7 +528,7 @@ The submit-strict validator at `validate.js:153` (`scan_result === 'clean'` chec
 
 ### 6. `/api/cron/drain-submissions`
 
-**State machine:**
+**State machine (TARGET; current shipped state below):**
 
 ```
 queued
@@ -538,11 +538,31 @@ queued
                            On duplicate_pk: see "Duplicate-PK recovery in request_created" below.)
   → files_moved           (Blob → SharePoint; folder name = `{akoya_requestnum}_{requestGuid-no-hyphens-upper}`
                            per existing convention `review-upload.js:128`; record paths in sharepoint_paths JSONB)
-  → dynamics_patched      (POST wmkf_proposalbudgetline children with pre-generated GUIDs;
+  → dynamics_patched      (TARGET: POST wmkf_proposalbudgetline children with pre-generated GUIDs;
                            POST wmkf_apprequestperson roster rows; PATCH parent aggregates)
-  → status_flipped        (PATCH the source picklist — Connor Q1 — NOT akoya_requeststatus directly)
+  → status_flipped        (TARGET: PATCH the source picklist — Connor Q1 — NOT akoya_requeststatus directly)
   → completed             (set completed_at; clear intake_draft; audit write)
 ```
+
+**Currently shipped (as of S190; verify against `pages/api/cron/drain-submissions.js`):**
+
+- `queued → scanning → request_created → files_moved` are built and live.
+- `dynamics_patched` is **partially built**: `handleFilesMoved` writes
+  **budget-line children only** (`wmkf_proposalbudgetlines`). If the frozen
+  payload's `children.persons` array is non-empty, the job is **parked** at
+  `files_moved` with an `intake_drain_persons_pending` alert until the persons
+  handler ships (awaiting Connor Q2 + contact-resolution service). The parent
+  aggregate PATCH is not implemented in any form.
+- `dynamics_patched` and `status_flipped` are listed in `BUILD_PENDING_STATES`
+  (`drain-submissions.js:85`); both fall through to `parkBuildPending`, which
+  pushes `next_attempt_at` out by 1 hour and emits a deduped
+  `intake_drain_build_pending` alert. So a job that successfully reaches
+  `dynamics_patched` will park there indefinitely until the next-state
+  handlers ship (Connor Q1 unblocks `status_flipped`; the post-status cleanup
+  closes out `completed`).
+- Operational consequence at pilot launch: real submissions land as a
+  near-empty `akoya_request` row pointing at the institution, with budget-line
+  children attached. See `R16` below for the operator-facing framing.
 
 Terminal: `failed`, `cancelled`.
 
