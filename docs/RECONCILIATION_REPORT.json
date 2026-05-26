@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-25T04:35:09.740Z",
+  "generated": "2026-05-26T18:00:53.860Z",
   "summary": {
     "total_claims": 157,
     "stale": 38,
@@ -43,20 +43,20 @@
     "spec_without_entity": [],
     "entity_without_atlas": [],
     "stale_row_count": [],
-    "doc_label_collision": [
+    "doc_label_collision": [],
+    "postgres_table_mismatch": [
       {
-        "label": "Field Set D",
-        "sources": [
-          "docs/atlas/dataverse-akoya-request.md: 107 instead says Field Set D = PD Assignment (writes existing wmkfprogramdirector, no new akoyarequest fields)",
-          "docs/atlas/dataverse-akoya-request.md#2: memory-drift stays red by design on this doclabelcollision",
-          "docs/atlas/dataverse-akoya-request.md#3: ready",
-          "docs/atlas/dataverse-akoya-request.md#4: the deployment isn't in doubt, the label is",
-          "docs/atlas/dataverse-akoya-request.md#5: wmkfaifitassessment (Picklist) + wmkfaifitrationale (Memo) — ready",
-          "docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md: PD Assignment"
-        ]
+        "table": "bill_webhook_events",
+        "in_schema_as_code": true,
+        "deployed": false,
+        "declared_in": "migrations"
+      },
+      {
+        "table": "schema_migrations",
+        "in_schema_as_code": false,
+        "deployed": true
       }
-    ],
-    "postgres_table_mismatch": []
+    ]
   },
   "claim_audit": [
     {

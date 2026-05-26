@@ -6,8 +6,7 @@
 **Live row count:** **~25,561** (FetchXML aggregate, 2026-05-15). ⚠️ OData `/$count` returns **5,000** — Dataverse caps `$count` at 5,000; the "5,000" figure is the cap, not the total. Use FetchXML aggregate / RetrieveTotalRecordCount for the true count.
 **Entity set:** `akoya_requests`
 
-> 🔴 **BLOCKED — owner decision required: "Field Set D" label collision (UNRESOLVED).**
-> This page labels `wmkf_ai_fitassessment` + `wmkf_ai_fitrationale` as **Field Set D** (line ~52). `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md:107` instead says **Field Set D** = PD Assignment (writes existing `wmkf_programdirector`, no new `akoya_request` fields). Both fit-assessment fields are deployed and populated live — **the deployment is not in doubt; the label is.** Until Connor resolves this: **name concrete `wmkf_ai_*` fields in any plan/code — never "Field Set D" by label.** `npm run check:memory-drift` stays **red by design** on this `doc_label_collision`; do **not** silence it to go green (CLAUDE.md memory-drift gate rule). Tracked as audit Finding #3 / register P0 (`docs/DOCS_GROUND_TRUTH_AUDIT_2026-05-19.md`).
+> ✅ **Label collision resolved 2026-05-26 (Connor walkthrough).** Set D now exclusively means PD Assignment (canonical: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md`). The `wmkf_ai_fitassessment` + `wmkf_ai_fitrationale` pair has been relabeled to Set E — fields and deployment unchanged. Cross-doc references updated in this session; `check:memory-drift` should clear on next run.
 
 ## Source of truth
 
@@ -52,7 +51,7 @@ WMKF AI writeback fields (canonical: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` —
 - `wmkf_ai_summary` (Memo) — Phase I summary text. **Field Set A: ready, live writeback active.**
 - `wmkf_ai_dataextract` (Memo, JSON) — domain tags / structured extract. **Field Set A: ready.**
 - `wmkf_ai_complianceissues` (Memo, JSON), `wmkf_ai_compliancesummary` (Memo). **Field Set C: ready.** (v3 also reuses existing `akoya_submissionaccepted`.) Note: live probe shows a numeric `wmkf_ai_compliancecheck` field on the entity; per the v3 spec this is part of an earlier draft that Connor is reconciling — do not write to `compliancecheck`, write to `complianceissues` + `compliancesummary`.
-- `wmkf_ai_fitassessment` (Picklist) + `wmkf_ai_fitrationale` (Memo) — **Field Set D: ready.** *(⚠️ Label collision pending Connor confirmation: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md:107` says Field Set D is PD Assignment and writes to existing `wmkf_programdirector` with no new fields. Both fit-assessment fields are deployed and populated live — the deployment isn't in doubt, the label is. Resolve before writing code that targets "Field Set D" by name.)*
+- `wmkf_ai_fitassessment` (Picklist) + `wmkf_ai_fitrationale` (Memo) — **Field Set E: ready**. Relabeled 2026-05-26 (Connor walkthrough) from the prior overloaded "Set D" label; canonical Set D now means PD Assignment only. Written live by the Phase I Dynamics summarize-v2 Executor path.
 
 **Workflow-chaining fields (S139, deployed `b536121`)** — cached extractions so downstream prompts don't re-parse the narrative:
 - `wmkf_ai_keywords` (Memo, JSON array, 4000), `wmkf_ai_methodologies` (Memo, JSON array, 4000), `wmkf_ai_riskflags` (Memo, JSON array, 4000)

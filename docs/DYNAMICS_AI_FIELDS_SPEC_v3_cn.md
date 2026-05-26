@@ -112,6 +112,21 @@ A `wmkf_ai_run` row is still created with `wmkf_ai_tasktype = 682090003` (PD Ass
 
 ---
 
+## Field Set E — Fit Assessment
+
+**Renamed from "Field Set D" on 2026-05-26 (Connor walkthrough)** to resolve the prior label collision with PD Assignment. Fields and deployment are unchanged — only the label moved.
+
+Fields on `akoya_request`. Written live by the Phase I Dynamics summarize-v2 Executor path.
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `wmkf_ai_fitassessment` | Picklist | AI's assessment of how well the proposal fits Keck program priorities |
+| `wmkf_ai_fitrationale` | Memo | AI-generated rationale supporting the fit assessment |
+
+Both fields are deployed and populated in prod (verified `akoya_request` 1002787, others).
+
+---
+
 ## Field Set B — Grant Report Extraction
 
 **Status: cleared to build (2026-05-07).** Connor approved building the skeleton as currently spec'd; expect iteration as staff feedback comes in. Schema additions logged to `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`.
