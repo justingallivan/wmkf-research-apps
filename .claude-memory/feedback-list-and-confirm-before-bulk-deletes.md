@@ -1,0 +1,18 @@
+---
+name: feedback-list-and-confirm-before-bulk-deletes
+description: When a cleanup directive names a single artifact, never bulk-delete adjacent items in the same folder/scope without listing and confirming first. Recurring foot-gun in cleanup tasks.
+metadata:
+  type: feedback
+---
+
+When the user asks to clean up "the test file" or "the artifact" or names a single thing, do NOT assume that everything else in the same folder/scope is also cleanup-eligible. List the contents, surface them by name, ask which to delete.
+
+**Why:** S193 EICAR test cleanup. User asked to clean up "Request 1002379, reviewer Justin Gallivan Test." I queried Dataverse, found one suggestion row, then listed SharePoint folder contents — four files. I wrote `for (const f of items) await deleteFile(...)` and deleted all four without surfacing them first. One was a real reviewer-submission file ("Tim Newhouse WMKF Research Reviewer Form...June 2026.pdf") used as a test fixture, uploaded 3.5 weeks earlier. Recovery via SharePoint Recycle Bin worked, but the user lost time and trust.
+
+The root error was treating a narrow directive ("clean up the test") as if it implicitly authorized a broader scope ("clean up everything that looks test-ish in the vicinity"). Even when post-hoc analysis shows the deletions were all defensible, the move was unauthorized at decision time.
+
+**How to apply:**
+- Before any multi-item destructive operation (folder of files, table of rows, batch of records), list contents, present by name, get explicit go-ahead.
+- A user's deletion directive scopes to the noun they named. If they said "the file," delete one file. If they said "everything in folder X," then loop.
+- "I'm pretty sure they're all test files" is not authorization. The cost of asking is one extra turn; the cost of being wrong is data loss + recovery work + erosion of trust.
+- Related: [[feedback-verify-before-destructive-carryover]] (the same principle applied to stale plan items, not adjacent artifacts).

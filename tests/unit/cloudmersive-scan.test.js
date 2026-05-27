@@ -78,9 +78,17 @@ describe('scanBytes — happy path', () => {
     expect(typeof out.scannedAt).toBe('string');
     expect(out.scannedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(fetchCalls).toHaveLength(1);
-    expect(fetchCalls[0].url).toBe('https://api.cloudmersive.com/virus/scan/file');
+    expect(fetchCalls[0].url).toBe('https://api.cloudmersive.com/virus/scan/file/advanced');
     expect(fetchCalls[0].init.method).toBe('POST');
     expect(fetchCalls[0].init.headers.Apikey).toBe('test-key-not-real');
+    // /advanced flag headers — defensive defaults except allowHtml.
+    expect(fetchCalls[0].init.headers.allowExecutables).toBe('false');
+    expect(fetchCalls[0].init.headers.allowMacros).toBe('false');
+    expect(fetchCalls[0].init.headers.allowScripts).toBe('false');
+    expect(fetchCalls[0].init.headers.allowOleEmbeddedObject).toBe('false');
+    expect(fetchCalls[0].init.headers.allowUnsafeArchives).toBe('false');
+    expect(fetchCalls[0].init.headers.allowHtml).toBe('true');
+    expect(out.detectedThreats).toEqual([]);
   });
 
   test('Uint8Array input is accepted', async () => {
@@ -120,6 +128,72 @@ describe('scanBytes — infected', () => {
     const out = await scanBytes(Buffer.from('x'), 'x');
     expect(out.scan_result).toBe('infected');
     expect(out.foundViruses).toEqual([]);
+    expect(out.detectedThreats).toEqual([]);
+  });
+
+  test('CleanResult=false + ContainsMacros=true → infected with synthesized foundViruses', async () => {
+    mockFetchSequence([
+      () => ({
+        status: 200,
+        body: {
+          CleanResult: false,
+          FoundViruses: [],
+          ContainsMacros: true,
+          VerifiedFileFormat: 'docx',
+        },
+      }),
+    ]);
+    const { scanBytes } = await loadService();
+    const out = await scanBytes(Buffer.from('x'), 'macro.docx');
+    expect(out.scan_result).toBe('infected');
+    expect(out.foundViruses).toEqual([
+      { fileName: 'macro.docx', virusName: 'embedded macro' },
+    ]);
+    expect(out.detectedThreats).toEqual(['embedded macro']);
+    expect(out.verifiedFileFormat).toBe('docx');
+  });
+
+  test('multiple Contains* flags → detectedThreats lists all, foundViruses uses first (executable > macros priority)', async () => {
+    mockFetchSequence([
+      () => ({
+        status: 200,
+        body: {
+          CleanResult: false,
+          FoundViruses: [],
+          ContainsExecutable: true,
+          ContainsMacros: true,
+          ContainsScript: true,
+        },
+      }),
+    ]);
+    const { scanBytes } = await loadService();
+    const out = await scanBytes(Buffer.from('x'), 'multi.docx');
+    expect(out.scan_result).toBe('infected');
+    expect(out.foundViruses).toEqual([
+      { fileName: 'multi.docx', virusName: 'embedded executable' },
+    ]);
+    expect(out.detectedThreats).toEqual(['embedded executable', 'embedded macro', 'embedded script']);
+  });
+
+  test('signature match wins precedence over Contains* synthesis', async () => {
+    mockFetchSequence([
+      () => ({
+        status: 200,
+        body: {
+          CleanResult: false,
+          FoundViruses: [{ FileName: 'eicar.com', VirusName: 'EICAR-Test-Signature' }],
+          ContainsMacros: true,
+        },
+      }),
+    ]);
+    const { scanBytes } = await loadService();
+    const out = await scanBytes(Buffer.from('x'), 'mixed.docx');
+    expect(out.scan_result).toBe('infected');
+    // Real signature kept, NOT overwritten by synthesized macro entry.
+    expect(out.foundViruses).toEqual([
+      { fileName: 'eicar.com', virusName: 'EICAR-Test-Signature' },
+    ]);
+    expect(out.detectedThreats).toEqual(['embedded macro']);
   });
 });
 

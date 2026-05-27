@@ -2,6 +2,7 @@
 
 ## Operational
 - [Verify before destructive carryover](feedback-verify-before-destructive-carryover.md) — drop/remove/retire/archive items from carryover lists must be grep-verified first. Carryover lists go stale; one nearly broke Reviewer Finder on 2026-05-03.
+- [List and confirm before bulk deletes](feedback-list-and-confirm-before-bulk-deletes.md) — narrow cleanup directive ≠ implicit authorization to delete adjacent items. S193: deleted 4 files in a folder when user asked about 1; one was a restorable-but-real reviewer-form fixture.
 - [Check memory before asking the user](feedback-check-memory-before-asking-user.md) — pre-send "has X happened" items are lookup tasks, not user-confirm tasks. Scan MEMORY.md + recent commits first; rewrite stale doc framing without asking.
 - [Red CI gates are P0 blockers, not side-notes](feedback-red-gates-are-p0.md) — run `check:atlas` + `check:api-routes` manually at session start. A red gate means the rubric is being violated right now — fix before any data-layer commits.
 - [Surface every finding from external reviewers, don't filter](feedback-surface-full-review-findings.md) — when Codex / code-reviewer / similar raises issues, list ALL findings using the reviewer's own labels. My recommendations come after the full set, not instead of it.
@@ -22,6 +23,7 @@
 ## Security Infrastructure
 - [A7 prompt-injection hardening — SHIPPED S173-S177](project-a7-prompt-injection-hardening.md) — all 24 LLM input surfaces are CI-gated and hardened (wrapUntrustedContent + preamble + validateAiJson + multimodal). Do NOT build a parallel system. Read `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md` before any injection-related design.
 - [Virus scanning IT context (S190)](project-virus-scanning-it-context.md) — WMKF tenant has NO MDO / no Safe Attachments; workstation Defender + Huntress only. App-side Cloudmersive is the PRIMARY defense for reviewer + intake (external upload paths). DFT does NOT need per-detection emails (no quarantine to investigate). Internal alerts route to the PD on the related request/cycle. Sender UX preserves form text on detection.
+- [Cloudmersive /advanced endpoint (S193)](project-cloudmersive-advanced-endpoint.md) — scan uses /virus/scan/file/advanced not /basic; /basic was a no-op for our threat model (can't see container contents). Contains* flags synthesized into foundViruses[0].virusName.
 
 ## Collaboration Notes
 - [Concepts vs Phase I are different grant stages](feedback-concepts-vs-phase-i.md) — hard-exclude `/concept/i` files from Phase I prompt pipelines
