@@ -245,6 +245,25 @@ export function _setModelResolver(fn) {
   if (typeof fn === 'function') _resolveModel = fn;
 }
 
+// Local tier-key set used only for the drift warning below. Kept inline
+// (not imported from model-resolver) so client bundles that import
+// BASE_CONFIG don't transitively pull /v1/models machinery.
+const _TIER_KEYS_FOR_DRIFT_WARN = new Set(['opus', 'sonnet', 'haiku']);
+const _warnedAppKeys = new Set();
+function _warnUnresolvedTier(appKey, type, value) {
+  // Server-only: window check avoids noisy logs in any code path that
+  // somehow runs the getter in a browser bundle.
+  if (typeof window !== 'undefined') return;
+  const sig = `${appKey}:${type}`;
+  if (_warnedAppKeys.has(sig)) return;
+  _warnedAppKeys.add(sig);
+  console.warn(
+    `[baseConfig] getModelForApp('${appKey}', '${type}') returning unresolved tier key '${value}'. ` +
+    `The handler likely forgot to import lib/services/model-override-loader and call loadModelOverrides(). ` +
+    `Anthropic will 404 on this id.`,
+  );
+}
+
 /**
  * Get the appropriate Claude model for a specific app, resolved to a
  * concrete Anthropic model id.
@@ -265,7 +284,11 @@ export function _setModelResolver(fn) {
  */
 export function getModelForApp(appKey, type = 'model') {
   const raw = _getModelForAppRaw(appKey, type);
-  return _resolveModel(raw) || raw;
+  const resolved = _resolveModel(raw) || raw;
+  if (typeof resolved === 'string' && _TIER_KEYS_FOR_DRIFT_WARN.has(resolved.toLowerCase())) {
+    _warnUnresolvedTier(appKey, type, resolved);
+  }
+  return resolved;
 }
 
 /**

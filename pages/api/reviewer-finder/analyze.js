@@ -18,6 +18,7 @@ import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { safeFetch } from '../../../lib/utils/safe-fetch';
 import { ClaudeReviewerService } from '../../../lib/services/claude-reviewer-service';
+import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -41,6 +42,8 @@ export default async function handler(req, res) {
 
   const allowed = await limiter(req, res);
   if (allowed !== true) return;
+
+  await loadModelOverrides();
 
   // Set up SSE headers
   res.setHeader('Content-Type', 'text/event-stream');

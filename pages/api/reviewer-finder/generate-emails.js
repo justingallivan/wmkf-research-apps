@@ -29,6 +29,7 @@ import { createPersonalizationPrompt } from '../../../shared/config/prompts/emai
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { LLMClient } from '../../../lib/services/llm-client';
+import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { BASE_CONFIG, getModelForApp } from '../../../shared/config/baseConfig';
 import { safeFetch, isAllowedUrl } from '../../../lib/utils/safe-fetch';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
@@ -188,6 +189,8 @@ export default async function handler(req, res) {
   if (allowed !== true) return;
 
   const userProfileId = access.profileId;
+
+  await loadModelOverrides();
 
   // Set up SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
