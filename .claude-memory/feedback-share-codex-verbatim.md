@@ -41,3 +41,14 @@ output. Tightened S155 — the earlier framing allowed commentary *after* the
 block; superseded, the rule is now nothing before or after. Distinct from
 [[feedback-surface-full-review-findings]] (that governs *completeness* of
 findings, not delivery format).
+
+**Recurring-failure mode (S192, 2026-05-27 — same session both directions):**
+ran two Codex rounds (pre-impl + post-impl review of BILL chunk 6).
+Paraphrased both into bullets, dropped the agentId/usage footers, prepended
+framing ("Clean P1 set, no P0..."), and went straight into folding catches.
+User called it out only after the second violation. **Diagnostic:** the rule
+keeps failing when there's session momentum (folding the catches is more
+salient than the delivery format). Mitigation: treat the verbatim paste as
+a tool-output mechanical step, NOT a writing task — copy the entire Agent
+tool result inside a delimited block, then end the message. Folding happens
+in the next turn, not the same one.
