@@ -17,6 +17,7 @@
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import { reconcileBatch } from '../../../lib/services/dynamics-identity-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import MaintenanceService from '../../../lib/services/maintenance-service';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -25,10 +26,18 @@ export default async function handler(req, res) {
 
   if (!verifyCronSecret(req, res)) return;
 
+  const runId = await MaintenanceService.startRun('reconcile-identities');
+
   try {
     const result = await bypassDynamicsRestrictions('cron-reconcile-identities', () =>
       reconcileBatch({ staleDays: 30, includeNull: true }),
     );
+
+    await MaintenanceService.completeRun(runId, {
+      status: 'completed',
+      recordsProcessed: result.totalScanned,
+      details: { summary: result.summary },
+    });
 
     return res.json({
       ok: true,
@@ -37,6 +46,10 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('Reconcile identities cron error:', error);
+    await MaintenanceService.completeRun(runId, {
+      status: 'failed',
+      errorMessage: error.message,
+    });
     return res.status(500).json({ error: 'Reconciliation failed', message: error.message });
   }
 }
