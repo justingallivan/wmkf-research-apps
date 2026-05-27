@@ -197,66 +197,22 @@ Located in `shared/config/`:
 
 ### Service Classes
 
-Located in `lib/services/`. Source files are authoritative; entries below describe purpose at one-line resolution.
+Catalog at **`docs/SERVICE_AND_UTILITY_CATALOG.md`** (one-line index per file across `lib/services/`, `lib/external/`, `lib/bill/`, `lib/utils/`). Source-file headers are authoritative for per-file contracts, safety posture, storage source-of-truth, and migration/drop history.
 
-- `claude-reviewer-service.js` — legacy Claude wrapper with retry/fallback (new code uses `llm-client.js`)
-- `discovery-service.js` — Multi-database literature search orchestration
-- `deduplication-service.js` — Name matching, COI filtering
-- `contact-enrichment-service.js` — 5-tier contact lookup
-- `database-service.js` — Vercel Postgres operations; Wave 1 dispatch lives here
-- `pubmed-service.js`, `arxiv-service.js`, `biorxiv-service.js`, `chemrxiv-service.js`, `orcid-service.js`, `serp-contact-service.js` — external research-DB clients
-- `integrity-service.js`, `integrity-matching-service.js` — Integrity Screener orchestration + name matching
-- `dynamics-service.js` — Dynamics 365 / Dataverse client (OAuth, OData, Dataverse Search, email activities, `updateIfEmpty`, `logAiRun`). Impersonation contract (`actingUserSystemId` + `MSCRMCallerID` + privilege intersection) is documented in `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md`
-- `graph-service.js` — Microsoft Graph (SharePoint files, listing/download, content search)
-- `feedback-service.js`, `alert-service.js`, `notification-service.js`, `maintenance-service.js` — admin/monitoring services
-- `execute-prompt.js` — Live prompt-execution Executor (the canonical path). Reads current prompt rows from Dataverse entity set `wmkf_ai_prompts` and writes audit rows to `wmkf_ai_runs`. Used in production by `/api/phase-i-dynamics/summarize-v2`. Implements the contract in `docs/EXECUTOR_CONTRACT.md`.
-- `prompt-resolver.js` — **Legacy** Session 103 holdover. Reads prompts from a scratch row on `wmkf_ai_runs` (GUID `a03f77d9-913a-f111-88b5-000d3a3065b8`, fields `wmkf_ai_notes` + `wmkf_ai_rawoutput`), 5-min cache, `{{var}}` interpolation, bundled `.js` fallback on Dynamics failure (60s cache TTL). `PROMPT_RESOLVER_STRICT=true` disables fallback. Currently used only by scripts (e.g. `scripts/audit-system-prompt-sizes.js`, `scripts/ab-phase-i-prompts.js`); no live API route depends on it.
-- `program-director-resolver.js` — Email → Dynamics `systemuser` bridge for Reviewer Finder's PD-filtered picker
-- `llm-client.js` — Canonical Anthropic API wrapper (`complete()` + `stream()`). SSRF allowlist, abortable timeouts, 429/529 retry, single fallback-model swap, usage logging, API-key redaction. Replaced 14 ad-hoc fetch sites
-- `dynamics-context.js` — AsyncLocalStorage restriction context for per-request scoping. `withDynamicsContext` / `bypassDynamicsRestrictions` for route + library callers (callback-scoped, safe under Fluid Compute concurrency); `enterDynamicsBypassForScript` for top-level scripts (uses ALS `enterWith`, single-process only). `DynamicsService.checkRestriction()` fails closed when no context is set — every caller must opt in explicitly.
-- `external-token.js` — HS256 HMAC JWT primitive for external-reviewer magic links; hash-only storage for cheap revocation
-- `intake-draft-service.js`, `intake-audit-service.js` — Applicant intake portal (drafts with attachment JSONB ops; append-only sha256-hashed audit). S184: added `pending_attachments` JSONB column for the three-call attach dance + helpers (`getById`, `appendPending`, `selectPendingForDraft`, `promoteToClean` with SQL-level cardinality gate, `removePending`, `listPendingOlderThan`). `MaintenanceService.sweepIntakePending` (2h cutoff, race-safe via removePending-first) wired into the daily maintenance cron.
-- `review-upload.js` — Shared `writeReviewFiles` core for staff and reviewer-self upload paths; SharePoint write + Dataverse PATCH + rollback on failure
-- `execute-prompt.js` — Implementation of the Executor contract (`docs/EXECUTOR_CONTRACT.md`); mirrors the PA `ExecutePrompt` child flow
-- `multi-llm-service.js`, `panel-review-service.js` — Virtual Review Panel (Claude / GPT / Gemini / Perplexity)
-- `literature-search-service.js` — Multi-database literature search shared by Lit Analyzer + panel claim verification
-- `settings-service.js` / `dataverse-settings-service.js` — Dataverse `wmkf_appsystemsettings`. Wave 1 dispatch retained as dead-code Postgres branch (table dropped 2026-05-12); default Dataverse.
-- `app-access-service.js` / `dataverse-app-access-service.js` — Dataverse `wmkf_appuserappaccesses`. Wave 1 dispatch retained; default Dataverse.
-- `dataverse-prefs-service.js` — Dataverse `wmkf_appuserpreferences` adapter. Postgres `user_preferences` dropped 2026-05-12; default Dataverse.
-- `dataverse-identity-map.js`, `dynamics-identity-service.js` — `user_profiles` ↔ Dynamics `systemuser` bridge; reconciliation CLI at `scripts/reconcile-dynamics-identities.js`
-- `model-override-loader.js` / `model-resolver.js` — Per-app model overrides for `baseConfig.js` (loader caches DB-backed overrides; resolver computes the effective model per app at call time)
-- `grant-cycles-dataverse.js` — Dataverse `wmkf_appgrantcycle` read/write adapter. Replaced Postgres `grant_cycles` at W3 cutover (2026-05-12); consumed by Reviewer Finder + Review Manager (`render-emails`, `send-emails`) + `maintenance-service` blob cleanup.
-- `irs-bmf-service.js` — IRS Business Master File (501(c)(3)) lookup for EIN verification; used by `/api/irs/verify-ein` (PowerAutomate-callable via `IRS_VERIFY_SECRET`).
-- `dataverse-export/` (subdirectory) — Dataverse Bulk Export (Track B) services. Deterministic QuerySpec→FetchXML translation, paging, trust-bounded Excel emission. See `docs/DATAVERSE_POWER_TOOLS_TRACK_B_BUILD_PLAN.md`.
-
-Located in `lib/external/` (external-reviewer flow):
-- `token-lifecycle.js` — `mintAndStore` / `revoke` / `ensureToken` (idempotent) / `extendForPostSubmissionWindow` / `buildExternalUrl`
-- `verify-suggestion-token.js` — Combined JWT + suggestion-row check; discriminated result with reason codes
-- `reviewer-materials.js` — Enforces "files outside `Reviewer_Downloads/` are invisible to reviewers" at list + download
-- `review-form-schema.js` — 4 structured fields (affiliation, impact, risk, overallRating); supports `{ partial: true }` validation
-
-Located in `lib/bill/` (BILL.com reviewer-honorarium onboarding — S188 slice 1):
-- `index.js` — public API: `createBillVendor`, `searchBillNetwork` (by name + zip per BILL constraint, NOT email), `sendNetworkInvitation`, `verifyBillWebhook`
-- `session.js` — module-level session cache with cold-start serialization + failed-promise clearing (8h validity under BILL's 35-min inactivity timeout doesn't quite fit; 30-min ceiling used)
-- `classify.js` — BDC error classification (BDC_1144 hourly = fail-loud, BDC_1322 concurrent = retry, BDC_1109 session-expired = internal reauth-and-retry)
-- `errors.js` — `BillError` + `BillAuthError` / `BillRateLimitError` / `BillValidationError` / `BillServerError` (public) + `BillSessionError` (internal)
-- `redact.js` — devKey/password/sessionId + JWT/base64 token sweep
-- See `docs/BILL_LIB_DESIGN.md` (v3) + `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md` for design + Connor questions.
+High-risk pointers:
+- Prompt execution: `lib/services/execute-prompt.js` implements `docs/EXECUTOR_CONTRACT.md`; legacy `prompt-resolver.js` is script-only.
+- Dynamics restriction context: `lib/services/dynamics-context.js` + `DynamicsService.checkRestriction()` fail closed unless callers enter an explicit context.
+- External reviewer flow: `lib/external/` owns HMAC token lifecycle, token+row verification, reviewer-visible SharePoint materials, and review-form schema.
+- BILL.com wrapper: `lib/bill/` owns vendor/network/webhook primitives; design details in `docs/BILL_LIB_DESIGN.md` and `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`.
 
 ### Utility Classes
 
-Located in `lib/utils/`:
-- `cron-auth.js` - Vercel cron secret verification
-- `auth-policy.js` - Edge-compatible `isAuthRequired()` shared between `proxy.js` and `lib/utils/auth.js`. Reads only `process.env`, no Node-only imports. Production fails closed unless `EMERGENCY_AUTH_BYPASS=true`. Misconfig warnings memoized once per process.
-- `health-checker.js` - Reusable health check logic (7 services incl. Microsoft Graph)
-- `file-loader.js` - Shared FileRef loader (upload/SharePoint → PDF/DOCX text) used by Grant Reporting and Phase I Dynamics
-- `sharepoint-buckets.js` - `getRequestSharePointBuckets(requestId, requestNumber)` — walks active + archive libraries for a request
-- `cycle-code.js` - Grant cycle code helpers (`Jxx`/`Dxx` from June/December meeting dates). `meetingDateToCycleCode(d)`, `parseCycleCode(s)`, `cycleCodeToOdataFilter(code, field)` for Dataverse range queries.
-- `file-magic.js` - Magic-byte sniffing + extension/MIME validation. `validateReviewFile(filename, buf)` (PDF/DOCX/DOC) for reviewer uploads; `validateIntakeAttachment(filename, buf, allowedMimeTypes)` (PDF/DOCX/XLSX, parameterized over field `accept[]`) for the intake-portal three-call dance.
-- `blob-filename.js` - `sanitizeBlobFilename(input)` for intake-portal applicant-supplied filenames. NFKC normalize, reject `..` segments (incl. whitespace-padded + fullwidth `．．`), strip control chars + path separators, 200-codepoint cap preserving extension. Fail-loud on empty/non-string input.
-- `intake-blob.js` - `getIntakeBlobToken()` reads `INTAKE_BLOB_RW_TOKEN` (NOT the shared `BLOB_READ_WRITE_TOKEN`). Single source of truth for the four Blob call sites (upload-token mint, attach get + del, sweep del); fail-loud on missing/whitespace-only.
-- `form-schema.js` - Intake-portal form schema loader. Static import map (`SCHEMAS[formKey]`), `findFileField(schema, fieldKey)` walker (one-level nested-group depth), `countFieldEntries(draft, fieldKey)` cardinality helper used by `/upload-token` + `/attach` cardinality gates.
-- `tracked-secrets.js` - Canonical `TRACKED_SECRETS` list for rotation/expiration alerting. Single source of truth consumed by `pages/api/cron/secret-check.js` (daily threshold alerts) AND `pages/api/admin/secrets.js` (superuser UI). 15 entries with `tier` metadata (`vendor` / `hmac` / `blob` / `forward`); see `docs/CREDENTIALS_RUNBOOK.md` for the mirrored runbook table.
+Catalog at same `docs/SERVICE_AND_UTILITY_CATALOG.md`.
+
+Load-bearing utility gotchas:
+- `auth-policy.js` is shared by `proxy.js` and Node auth helpers; must stay bundle-safe and production-fail-closed.
+- `intake-blob.js` must use `INTAKE_BLOB_RW_TOKEN`, not shared `BLOB_READ_WRITE_TOKEN`, for intake private Blob calls.
+- `tracked-secrets.js` is the canonical tracked-secret list; `docs/CREDENTIALS_RUNBOOK.md` mirrors it by hand.
 
 ---
 
