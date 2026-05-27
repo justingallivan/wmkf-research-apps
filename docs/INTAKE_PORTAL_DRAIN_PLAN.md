@@ -659,12 +659,12 @@ Wrap the pg client in `buildServiceError` / `buildNoResponseError` analogues so 
 
 Audit writes are NOT best-effort; the contract is "the audit table is the source of truth for what happened, and the state column is the source of truth for what to do next." **Transactional scope is state-transition audits only** — endpoint-level audits (`'submit'` from `/api/intake/submit`, `'bridge.conflict'` from the contact bridge, `'draft.upsert'` / `'draft.attach'` from the draft endpoints) are written outside the drain's transactional boundary and follow ordinary best-effort semantics (failure logs to `system_alerts` but does not block the user response). The boundary is: **drain-side audits = same txn as state UPDATE; endpoint-side audits = best-effort.**
 
-**Per-state idempotency:**
-- `scanning`: read-only checks; safe to repeat
-- `request_created`: pre-generated GUID + duplicate-PK detection with explicit recovery (below)
-- `files_moved`: track written paths in `sharepoint_paths`; skip already-written
-- `dynamics_patched`: pre-generated child GUIDs + duplicate-PK detection per child; aggregates re-summed (deterministic on same payload)
-- `status_flipped`: PATCH is naturally idempotent
+**Per-state idempotency (target — shipped status varies per state):**
+- `scanning` (shipped): read-only checks; safe to repeat
+- `request_created` (shipped): pre-generated GUID + duplicate-PK detection with explicit recovery (below)
+- `files_moved` (shipped): track written paths in `sharepoint_paths`; skip already-written
+- `dynamics_patched` (TARGET; partially shipped): pre-generated child GUIDs + duplicate-PK detection per child (live for `wmkf_proposalbudgetlines`; persons-children handler not built — jobs with non-empty `children.persons` park); aggregates re-summed (TARGET — parent aggregate PATCH not implemented)
+- `status_flipped` (TARGET; not shipped): PATCH is naturally idempotent — handler unbuilt, pending Connor Q1
 
 **Duplicate-PK recovery in `request_created` (Codex round-3 §2):**
 
@@ -902,12 +902,19 @@ The shared `BLOB_READ_WRITE_TOKEN` (public store `phase-ii-summaries-blob`) is *
 
 ## Phase B deploy handoff — unpark BUILD-PENDING rows
 
-The Phase A drain (shipped S180 commit `d09886f`) routes states without
-handlers (`request_created`, `files_moved`, `dynamics_patched`,
-`status_flipped`) to `parkBuildPending`, which pushes `next_attempt_at`
-out by **1 hour** and clears the lease. Rationale: avoid burning cron
-ticks while the next state's code is unimplemented; a deduped
-`system_alerts` row keeps the parking visible to operators.
+The Phase A drain (originally shipped S180 commit `d09886f`) routes
+states without handlers to `parkBuildPending`, which pushes
+`next_attempt_at` out by **1 hour** and clears the lease. Rationale:
+avoid burning cron ticks while the next state's code is unimplemented;
+a deduped `system_alerts` row keeps the parking visible to operators.
+
+As of S190, `request_created` and `files_moved` handlers have shipped;
+the live `parkBuildPending` set is `{dynamics_patched, status_flipped}`
+(`pages/api/cron/drain-submissions.js:85`, `:832-845`). Jobs that reach
+`files_moved` advance into `dynamics_patched` (budget-line children
+only) and park there awaiting the persons-children handler + parent
+aggregate PATCH; jobs that successfully complete `dynamics_patched`
+park at `status_flipped` awaiting Connor Q1.
 
 **The catch (Codex round-12 Q4):** when a Phase B state handler ships,
 parked rows do not pick up on the next cron tick. They wait until their

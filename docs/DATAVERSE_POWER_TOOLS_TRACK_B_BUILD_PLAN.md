@@ -50,8 +50,9 @@ The invariant that keeps this from regressing into "Explorer 2": **a structured 
                           + Methods/Provenance sheet (baked-in honesty)
                                       ▼
    ONE POST /run = an SSE response: emits progress while paging/building,
-   writes the .xlsx to Vercel Blob, terminal {ready,downloadUrl} →
-   browser fetches the short-lived Blob URL. No base64. No second model.
+   writes the .xlsx to a PRIVATE Vercel Blob store, terminal {ready,downloadUrl}
+   → browser GETs the authenticated /api/dataverse-export/download?t=<token>
+   proxy. No base64. No public Blob URL. No second model.
 ```
 
 **`QuerySpec`** (the seam — versioned JSON):
