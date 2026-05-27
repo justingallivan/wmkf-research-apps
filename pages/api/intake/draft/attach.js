@@ -508,6 +508,9 @@ export default async function handler(req, res) {
         virusName,
         scanner: scanResult.scanner,
         scannedAt: scanResult.scannedAt,
+        // S193: structured detection details for admin-dashboard analytics.
+        detectedThreats: Array.isArray(scanResult.detectedThreats) ? scanResult.detectedThreats : [],
+        verifiedFileFormat: scanResult.verifiedFileFormat ?? null,
         sha256, size,
       },
       source: 'intake-attach',
