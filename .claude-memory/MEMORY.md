@@ -55,6 +55,7 @@
 ## Intake Portal (GOapply replacement)
 - [External ID auth foundation SHIPPED (S129)](project-intake-portal-external-id-foundation.md) — tenant `04a1406b...`, NextAuth `entra-external` provider, `/apply` route auth round-trip verified.
 - [Intake portal UI TODOs (deferred to UI-design session)](project-intake-portal-ui-todo.md) — S187 surfaced two UX bugs while smoke-testing DR8: (1) sign-out silently re-authenticates via Entra and (2) Entra sign-up flow collects irrelevant City/State/DisplayName fields. Both held for a dedicated UI session.
+- [Intake portal virus-scan e2e — DEFERRED](project-intake-portal-virus-scan-e2e-deferred.md) — S193 verified reviewer path; intake path skipped (Entra sign-up rough). MUST run EICAR-style e2e through /apply before pilot goes live (mid-June 2026).
 - [Skinny pilot scope, not feature-for-feature](project-intake-portal-skinny-scope.md) — pilot sized like external reviewer intake; Phase II Research mid-June 2026; design doc at `docs/INTAKE_PORTAL_DESIGN.md`
 - [Capture machine-legible structured data](project-machine-legible-form-capture.md) — split budgets/rosters/milestones into structured fields, not narrative; Sarah + Connor own form wishlists
 - [Match institution against existing accounts at intake](project-intake-portal-institution-match.md) — match-first, create-as-last-resort against `accounts.{name, akoya_aka, wmkf_legalname, wmkf_abbreviation}`. Free-text input pollutes the canonical institution registry ("Stafnord" → "Stanford"). GOverify doesn't dedup.
