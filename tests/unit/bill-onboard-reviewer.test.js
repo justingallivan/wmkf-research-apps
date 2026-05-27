@@ -80,6 +80,11 @@ describe('onboardReviewer — happy paths', () => {
     expect(result.vendorId).toBe('009OLD');
     expect(deps.billClient.createBillVendor).not.toHaveBeenCalled();
     expect(notifyCalls).toEqual([]);
+    // Post-impl P1 #1: pre-read uses { select } shape, not array.
+    expect(deps.dynamics.getRecord).toHaveBeenCalledWith(
+      'contacts', BASE_INPUT.reviewerContactId,
+      { select: 'wmkf_billcomid,akoya_isvendor' },
+    );
   });
 
   test('no network match → status: no_match (no alert)', async () => {
@@ -234,6 +239,87 @@ describe('onboardReviewer — Dataverse PATCH failures', () => {
     const reqCalls = updateRecord.mock.calls.filter(c => c[0] === 'akoya_requests');
     expect(reqCalls).toHaveLength(1);
     expect(result.status).toBe('partial');
+    expect(result.intendedStatus).toBe('onboarded');
+  });
+
+  test('no_match path: request PATCH failure → status=partial, intendedStatus=no_match', async () => {
+    const updateRecord = jest.fn().mockImplementation((entitySet) => {
+      if (entitySet === 'akoya_requests') throw new Error('dv 500');
+      return Promise.resolve();
+    });
+    const { notifyCalls, deps } = makeDeps({
+      dynamics: {
+        getRecord: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
+        updateRecord,
+      },
+      billClient: {
+        createBillVendor: jest.fn().mockResolvedValue({ vendorId: '009ABC' }),
+        searchBillNetwork: jest.fn().mockResolvedValue({ exactMatchCount: 0, pni: null, networkId: null, allResults: [] }),
+        sendNetworkInvitation: jest.fn(),
+      },
+    });
+    const result = await onboardReviewer(BASE_INPUT, deps);
+    expect(result.status).toBe('partial');
+    expect(result.intendedStatus).toBe('no_match');
+    expect(notifyCalls.filter(c => c.type === 'bill_request_patch_failed')).toHaveLength(1);
+  });
+
+  test('ambiguous_match + PATCH failure → status=partial, intendedStatus=ambiguous_match, ambiguous-alert still emits', async () => {
+    const updateRecord = jest.fn().mockImplementation((entitySet) => {
+      if (entitySet === 'akoya_requests') throw new Error('dv 500');
+      return Promise.resolve();
+    });
+    const { notifyCalls, deps } = makeDeps({
+      dynamics: {
+        getRecord: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
+        updateRecord,
+      },
+      billClient: {
+        createBillVendor: jest.fn().mockResolvedValue({ vendorId: '009ABC' }),
+        searchBillNetwork: jest.fn().mockResolvedValue({
+          exactMatchCount: 2, pni: null, networkId: null,
+          allResults: [{ id: 'A' }, { id: 'B' }],
+        }),
+        sendNetworkInvitation: jest.fn(),
+      },
+    });
+    const result = await onboardReviewer(BASE_INPUT, deps);
+    expect(result.status).toBe('partial');
+    expect(result.intendedStatus).toBe('ambiguous_match');
+    expect(notifyCalls.some(c => c.type === 'bill_request_patch_failed')).toBe(true);
+    expect(notifyCalls.some(c => c.type === 'bill_ambiguous_match')).toBe(true);
+  });
+});
+
+describe('onboardReviewer — safeNotify (P1 #4)', () => {
+  beforeEach(() => { process.env.BILL_ENABLED = 'true'; });
+  afterEach(() => { delete process.env.BILL_ENABLED; });
+
+  test('notification-system failure does not crash the orchestrator', async () => {
+    const updateRecord = jest.fn().mockImplementation((entitySet) => {
+      if (entitySet === 'akoya_requests') throw new Error('dv 500');
+      return Promise.resolve();
+    });
+    const broken = {
+      notify: jest.fn().mockRejectedValue(new Error('alert backend down')),
+    };
+    const deps = {
+      notifications: broken,
+      dynamics: {
+        getRecord: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
+        updateRecord,
+      },
+      billClient: {
+        createBillVendor: jest.fn().mockResolvedValue({ vendorId: '009ABC' }),
+        searchBillNetwork: jest.fn().mockResolvedValue({ exactMatchCount: 1, pni: 'P', networkId: 'P', allResults: [{ id: 'P' }] }),
+        sendNetworkInvitation: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+    // Should not throw, and the warnings array should record the alert failure.
+    const result = await onboardReviewer(BASE_INPUT, deps);
+    expect(result.ok).toBe(true);
+    expect(result.status).toBe('partial');
+    expect(result.warnings.some(w => w.startsWith('alert_failed:'))).toBe(true);
   });
 });
 
@@ -290,5 +376,13 @@ describe('verifyInternalCall (HMAC)', () => {
     const r = verifyInternalCall({ rawBody: body, headers, secret: '', nowSeconds: nowSec });
     expect(r.ok).toBe(false);
     expect(r.reason).toBe('secret_missing');
+  });
+
+  test('short secret (<32 chars) fails closed', () => {
+    const shortSecret = 'a'.repeat(31);
+    const headers = makeHeaders({ useSecret: shortSecret });
+    const r = verifyInternalCall({ rawBody: body, headers, secret: shortSecret, nowSeconds: nowSec });
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe('secret_too_short');
   });
 });

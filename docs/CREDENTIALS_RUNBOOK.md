@@ -336,7 +336,7 @@ Canonical list lives in `lib/utils/tracked-secrets.js` — both `pages/api/cron/
 | `blob_read_write_token` | Vercel Blob RW Token (shared store) | blob | Vercel-issued; no expiry; rotate via Vercel dashboard if compromised |
 | `dvx_blob_rw_token` | Vercel Blob RW Token (dvx-export-private) | blob | Same as above |
 | `intake_blob_rw_token` | Vercel Blob RW Token (intake-applicant-private) | blob | Same as above |
-| `bill_integration_secret` | BILL Integration Secret (portal → /api/bill/onboard-reviewer) | forward | Forward-declared — consumer ships in upcoming slice; will be HMAC shared secret like IRS_VERIFY_SECRET |
+| `bill_integration_secret` | BILL Integration Secret (respond.js → /api/bill/onboard-reviewer) | hmac | Env var: `BILL_INTEGRATION_SECRET`. **≥32 chars required** — endpoint fails closed below that (`lib/bill/internal-call-auth.js`). HMAC-SHA256 over canonical `v1:${timestamp}:${nonce}:${rawBody}` with ±300s skew window. Generate with `openssl rand -base64 48`. Rotation cadence: 12mo (same as `external_link_secret`). Distinct from `bill_webhook_secret` (BILL→us) and `cron_secret`. |
 
 ---
 

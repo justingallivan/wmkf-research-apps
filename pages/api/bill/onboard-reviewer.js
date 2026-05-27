@@ -14,6 +14,7 @@
 
 import { verifyInternalCall } from '../../../lib/bill/internal-call-auth';
 import { onboardReviewer } from '../../../lib/bill/onboard-reviewer-service';
+import NotificationService from '../../../lib/services/notification-service';
 
 export const config = {
   api: { bodyParser: false },
@@ -32,6 +33,10 @@ export default async function handler(req, res) {
     if (!secret) {
       console.error('[bill-onboard-reviewer] BILL_INTEGRATION_SECRET not configured');
       return res.status(500).json({ error: 'Integration secret not configured' });
+    }
+    if (secret.length < 32) {
+      console.error('[bill-onboard-reviewer] BILL_INTEGRATION_SECRET too short (<32 chars)');
+      return res.status(500).json({ error: 'Integration secret misconfigured' });
     }
   }
 
@@ -73,10 +78,32 @@ export default async function handler(req, res) {
     const result = await onboardReviewer(body);
     return res.status(200).json(result);
   } catch (err) {
-    console.error('[bill-onboard-reviewer] unhandled:', err?.message || String(err));
+    const msg = err?.message || String(err);
+    console.error('[bill-onboard-reviewer] unhandled:', msg);
+    // Codex post-impl P1 #3: surface the unhandled error as an ops alert.
+    // The body is validated by this point, so identifiers are safe to include.
+    // Notification is best-effort; never let it convert a 500 into something
+    // worse (e.g., a notification-system failure should still return 500).
+    try {
+      await NotificationService.notify({
+        type: 'bill_unhandled_error',
+        severity: 'error',
+        title: 'BILL onboarding endpoint: unhandled exception',
+        message: msg,
+        metadata: {
+          honorariumRequestId: body.honorariumRequestId,
+          reviewerContactId: body.reviewerContactId,
+          phase: 'route_handler',
+        },
+        source: 'bill/onboard-reviewer',
+        category: 'spend',
+      });
+    } catch (notifyErr) {
+      console.error('[bill-onboard-reviewer] notify() failed during 500 path:', notifyErr?.message || notifyErr);
+    }
     return res.status(500).json({
       ok: false,
-      error: { code: 'unhandled', message: err?.message || String(err) },
+      error: { code: 'unhandled', message: msg },
     });
   }
 }
