@@ -27,7 +27,7 @@ The mandatory fan-in for code-derived scalars that get denormalized across docs 
 - **Operating rule:** run before claiming any fact-level doc/memory fix "done." Do not emit "DONE"/"✅" markers for such work until green.
 - Bounded slice by design — only crisply derivable, drift-prone scalars. Not a complete semantic-drift solution.
 
-### `check:prompt-storage-mentions` — stale `wmkf_prompt_template` claims (S167)
+### `check:prompt-storage-mentions` — stale `wmkf_prompt_template` claims (S167) <!-- prompt-storage:ignore reason=self-referential-gate-description -->
 
 The live Dataverse prompt-storage entity is `wmkf_ai_prompt` (entity set `wmkf_ai_prompts`); `wmkf_prompt_template` was a 2025-era proposal that never shipped. The Executor (`lib/services/execute-prompt.js`) reads from `wmkf_ai_prompts` and writes audit rows to `wmkf_ai_runs`.
 

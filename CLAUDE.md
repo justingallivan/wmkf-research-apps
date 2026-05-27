@@ -39,7 +39,8 @@ The **Application State Atlas** at `docs/APPLICATION_STATE_ATLAS.md` (with per-e
 **Drift gates** (also fail-loud, lower scope):
 - `:fact-consistency` — registered scalar drift across docs/memory; **run before any fact-level doc/memory fix is marked "done."**
 - `:drain-table-mentions` — stale "data lives in PG" claims for the reviewer-domain drain tables.
-- `:prompt-storage-mentions` — stale `wmkf_prompt_template` references (the entity is `wmkf_ai_prompt` / set `wmkf_ai_prompts`).
+- `:prompt-storage-mentions` — stale `wmkf_prompt_template` references (the entity is `wmkf_ai_prompt` / set `wmkf_ai_prompts`). <!-- prompt-storage:ignore reason=self-referential-gate-description -->
+
 - `:canonical-pointers` — anchor rot in `[N](docs/CANONICAL_COUNTS.md#<fact-id>)` pointers.
 - `:memory-drift` (advisory) — memory↔code drift.
 
