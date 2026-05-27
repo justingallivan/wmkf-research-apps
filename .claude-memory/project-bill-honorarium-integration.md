@@ -35,13 +35,13 @@ Sequencing between is flexible and depends on Connor's Q5 schema add + Steph's B
 
 **Build chunks:**
 - 0: design doc → Connor sign-off
-- 1: Connor schema add (Q5)
-- 2-3: `lib/bill.js` + unit tests against mock (parallel with Connor, no dependency)
-- 4: extend `respond.js` accept path
-- 5: extend Stage 2a accept UI with address inputs
-- 6: `/api/bill/onboard-reviewer` endpoint + wire into accept handler
-- 7: `/api/webhooks/bill`
-- 8: end-to-end test against BILL sandbox
+- 1: Connor schema add (Q5) — still pending
+- ~~2-3: `lib/bill.js` + unit tests against mock~~ **SHIPPED S188** — primitives at `lib/bill/{index,session,classify,errors,redact}.js` (vendor / network / invitation / webhook-verify); see `docs/BILL_LIB_DESIGN.md` v3.
+- 4: extend `respond.js` accept path — blocked on Q5 lookup field
+- 5: extend Stage 2a accept UI with address inputs — can ship in parallel
+- 6: `/api/bill/onboard-reviewer` endpoint + wire into accept handler — can ship in parallel
+- ~~7a: `/api/webhooks/bill` scaffold~~ **SHIPPED S188** at `pages/api/webhooks/bill.js`; event-dispatch + Dataverse PATCH still pending
+- 8: end-to-end test against BILL sandbox — blocked on Steph's sandbox provisioning
 
 **Q3 (PA + shared-secret) is dropped from the doc.** The portal calls our BILL endpoint directly; no PA trigger needed.
 

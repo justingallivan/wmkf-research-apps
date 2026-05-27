@@ -4,7 +4,7 @@ description: Codex AI_DATA_FLOW_MATRIX P1 #2 (Dynamics Explorer agentic-loop rec
 type: project
 originSessionId: 86703e2a-1188-4182-8ea8-fcc124398944
 ---
-Shipped in Session 130 (commit pending in same session as activation work). Implemented as `lib/utils/dynamics-explorer-serializer.js` and wired into `pages/api/dynamics-explorer/chat.js` at three points: tool results before they're appended as Claude `tool_result` messages, Dataverse Search highlights field-by-field, and export AI-processing record paths.
+Shipped in Session 130, commit `06e682b` (`Add Dynamics Explorer model-context serializer`). Implemented as `lib/utils/dynamics-explorer-serializer.js` and wired into `pages/api/dynamics-explorer/chat.js` at three points: tool results before they're appended as Claude `tool_result` messages, Dataverse Search highlights field-by-field, and export AI-processing record paths.
 
 **Framing — important for future readers:** This is **model-context minimization, not a Dataverse permission layer.** The 16 staff users have full CRM access by design; the serializer's job is to keep generated content (`wmkf_ai_summary`, `wmkf_ai_rawoutput`, `wmkf_ai_promptoverride`), large narrative memos (`description`, `notetext`, `body`, `documentbody`), and credential-shaped fields out of the agent loop where they would inflate cost and risk loopback. The original "sensitive field" framing in Codex's matrix was preventive against a threat model staff-side RBAC already covers — the real value is reducing token spend and Claude-citing-AI-output-as-truth.
 

@@ -14,7 +14,7 @@ Intake-portal schema slice 0 extends `wmkf_apprequestperson.wmkf_role` from 2 �
 
 **Why:** Codex S150 flagged this as the only unverifiable slice-0 claim; the carryover then propagated the wrong tool name across handoffs without anyone running it — a stale-belief class the S154 audit was about.
 
-**How to apply:** The CLEAR result is point-in-time, not durable. **Re-run the probe at deploy time (target 2026-05-19)** — a non-zero exit blocks slice 0. Originating doc corrected S155 (item struck through, verified result inline). Related: `feedback_human_legibility_schema_principle.md` (why the enum expands instead of a new entity).
+**How to apply:** Deploy-time blocker is CLOSED — post-deploy verification ran S179 (see below) and confirmed the extension is non-breaking. Re-run only before code that writes Senior/Key/Other roster rows if live state may have drifted (probe is read-only and cheap). Related: `feedback_human_legibility_schema_principle.md` (why the enum expands instead of a new entity).
 
 **Post-deploy state (S179, 2026-05-22, drain plan v7 P5 verification):**
 - Data re-probe: 5,561 rows total (4,488 PI / 1,073 Co-PI / 0 Senior/Key/Other) — CLEAR, unchanged from S155.

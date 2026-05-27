@@ -30,12 +30,12 @@ If the current date is past that threshold and the tables still exist, surface t
    ```
    Pipe `RETURNING *` rows into a JSONL file per table, upload to Blob with a path like `cleanup-backup/2026-07-XX/researchers.jsonl`. Tools-of-choice: a thin Node script under `scripts/`, name it `scripts/drain-only-table-drop.js`. Write the restore script (~30 lines, reads JSONL, INSERTs back) alongside it before running for real.
 
-3. **DROP TABLE in dependency order.** `researcher_keywords` (FK to `researchers`) first, then `researchers`. `publications` and `proposal_searches` are independent. Be aware of `proposal_searches` JOIN site mentioned in `docs/atlas/postgres-other-reviewer-tables.md:25` — that JOIN was in `grant-cycles.js`; verify (re-read the atlas note) that it was killed in W3.
+3. **DROP TABLE in dependency order.** `researcher_keywords` (FK to `researchers`) first, then `researchers`. `publications` and `proposal_searches` are independent. Be aware of the `proposal_searches` JOIN site that was in `pages/api/reviewer-finder/grant-cycles.js`; grep `proposal_searches` in that file and re-read `docs/atlas/postgres-other-reviewer-tables.md` to verify the JOIN was killed in W3 before dropping the table.
 
 4. **Update Atlas pages** to remove the dropped tables: `docs/atlas/postgres-researchers.md`, `docs/atlas/postgres-other-reviewer-tables.md`. Add a one-line history note in the plan's "Spec'd vs. built" table.
 
 5. **Re-run CI gates.** `npm run check:atlas` should still pass — atlas-coverage is based on what's referenced in source, and we removed source readers in W5/W6.
 
-**Related memory:** [[reviewer-postgres-to-dataverse-migration]] — strategic context for the whole migration.
+**Related memory:** [[project-reviewer-postgres-to-dataverse-migration]] — strategic context for the whole migration.
 
 **Cancel condition:** If the pilot was rolled back, or if a post-pilot review found a dead-code reader these tables actually serve, surface that fact rather than proceeding. The trigger is "date passed" not "drop these now no matter what."

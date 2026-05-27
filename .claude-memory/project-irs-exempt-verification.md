@@ -14,7 +14,7 @@ metadata:
 - **Migration 008:** `irs_exempt_orgs` Postgres table (`lib/db/migrations/008_irs_exempt_orgs.sql`, also inlined as v29 in `scripts/setup-database.js`). PK on EIN, partial index on state, composite on (subsection, status).
 - **Service:** `lib/services/irs-bmf-service.js` exports `refresh()` (atomic-swap import) and `verifyEin()` (single-EIN lookup). Stream-parses CSV via `csv-parse` and streams into a staging table via `pg-copy-streams`. Both Vercel cron and the CLI call the same `refresh()`.
 - **Cron handler:** `pages/api/cron/refresh-irs-bmf.js`, scheduled `0 6 15 1,4,7,10 *` in `vercel.json` (15th of Jan/Apr/Jul/Oct, 06:00 UTC). `maxDuration: 300` override (download + COPY of ~1.95M rows). `CRON_SECRET` auth. Audited via `maintenance_runs`; failure raises `system_alerts` row.
-- **Verify endpoint:** `pages/api/irs/verify-ein.js`. `x-irs-verify-secret` shared-secret header (`IRS_VERIFY_SECRET` env var). Allowlisted in `middleware.js` so it does not require an NextAuth session.
+- **Verify endpoint:** `pages/api/irs/verify-ein.js`. `x-irs-verify-secret` shared-secret header (`IRS_VERIFY_SECRET` env var). Allowlisted in `proxy.js` (Next 16 proxy convention; was `middleware.js`) so it does not require an NextAuth session.
 - **CLI:** `scripts/import-irs-bmf.js` — `--commit` flag for manual runs (local dev, ad-hoc refresh outside the cron cadence).
 
 ## Refresh cadence rationale
@@ -37,4 +37,4 @@ metadata:
 - **PA timing decision still owed.** When does PA fire the verification — on `account` create, on submit, or on `'Phase II Pending'` flip? Connor's call; sub-question under intake portal Track 1B (`docs/archive/INTAKE_PORTAL_MEETING_AGENDA_2026-05-13.md`).
 - **EIN form field on the intake form.** Required so the `account` row gets the EIN at submission time. Add to Sarah's field inventory at the 2026-05-13 meeting.
 
-Related: [[w6-table-drop-pending]] (other Postgres reference-data work), [[reviewer-postgres-to-dataverse-migration]] (the strategic reframing this verification path benefits from).
+Related: [[project-w6-table-drop-pending]] (other Postgres reference-data work), [[project-reviewer-postgres-to-dataverse-migration]] (the strategic reframing this verification path benefits from).

@@ -30,4 +30,4 @@ DFT email exchange 2026-05-26 — locked context for the `VIRUS_SCAN_ENABLED` ro
 **How to apply:**
 - Before flipping `VIRUS_SCAN_ENABLED=true`, ship the three workstreams (sender UX + internal alert + operational enable) as a unit.
 - Do NOT build a DFT-recipient email path — it adds operational overhead with no signal value.
-- See [[bill-honorarium-integration]] for parallel pattern on integrating external services with internal notification routing.
+- See [[project-bill-honorarium-integration]] for parallel pattern on integrating external services with internal notification routing.
