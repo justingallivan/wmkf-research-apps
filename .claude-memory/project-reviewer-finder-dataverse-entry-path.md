@@ -16,8 +16,8 @@ originSessionId: 97cd3044-49bb-4f67-b000-5d32980d6faa
 - `pages/api/reviewer-finder/generate-emails.js` — zero `@vercel/postgres` imports (verified 2026-05-14).
 - `pages/api/reviewer-finder/my-proposals.js` — Dataverse-only, builds OData filter on `akoya_request`.
 
-**How to apply:** when planning Reviewer Finder work, do not rebuild the picker or save-candidates writeback — they're done. The four drain-only Postgres tables (`researchers`, `researcher_keywords`, `publications`, `proposal_searches`) are scheduled for one-shot DELETE per `project_w6_table_drop_pending.md` (trigger ≥ 2026-07-01). Earlier "do NOT drop the Postgres reviewer tables" framing is now stale — drop is the planned next step, not a forbidden one.
-- **Identity bridge (`user_profiles` → `systemuser`)** — the original direction listed this as a prerequisite. It's working in prod (the picker uses it via `program-director-resolver.js`), but the broader identity-reconciliation TODO in `project_dynamics_identity_reconciliation.md` covers attribution on Dataverse writes and joined reporting, which is a different scope and still open.
+**How to apply:** when planning Reviewer Finder work, do not rebuild the picker or save-candidates writeback — they're done. The four drain-only Postgres tables (`researchers`, `researcher_keywords`, `publications`, `proposal_searches`) are scheduled for one-shot DELETE per `project-w6-table-drop-pending.md` (trigger ≥ 2026-07-01). Earlier "do NOT drop the Postgres reviewer tables" framing is now stale — drop is the planned next step, not a forbidden one.
+- **Identity bridge (`user_profiles` → `systemuser`)** — the original direction listed this as a prerequisite. It's working in prod (the picker uses it via `program-director-resolver.js`), but the broader identity-reconciliation TODO in `project-dynamics-identity-reconciliation.md` covers attribution on Dataverse writes and joined reporting, which is a different scope and still open.
 
 **Verification commands** (if status ever needs to be re-confirmed):
 - `grep -n "ProposalPickerCard\|FileUploaderSimple" pages/reviewer-finder.js` — both should be present, picker as default tab.

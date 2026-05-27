@@ -1,6 +1,6 @@
 ---
 name: Intake portal pilot — Track 1 decisions 2026-05-13
-description: Sarah+Connor sync Track 1 closed all four agenda items. Two notable deltas from 2026-05-06: 1C reversed to PA-built packet, 1D narrowed to two entities. **SUPERSEDED in part by 2026-05-14 schema review** — see top-of-file banner.
+description: Sarah+Connor sync Track 1 closed all four agenda items. Two notable deltas from 2026-05-06: 1C reversed to PA-built packet, 1D narrowed scope (deployed S178 as wmkf_proposalbudgetline + wmkf_apprequestperson extensions, not the in-meeting "two new entities" sketch). See top-of-file banner.
 type: project
 originSessionId: 3c35888d-8da4-46e3-83ac-31a25bbdc4e4
 ---
@@ -16,7 +16,7 @@ Sarah+Connor sync 2026-05-13. Track 1 (Connor-side decisions, 4 items) ran to co
 
 | # | Resolution | Delta from 2026-05-06 |
 |---|---|---|
-| **1A** `wmkf_portal_membership` shape | Approved as drafted. Ships under existing delegated authority, summary-after model. **Institution-claim approval = Option A**, lives portal-side at `/apply/admin/memberships` (new `intake-admin` app key). Connor's plate unchanged. | Re-confirmation of 2026-05-06; Option A clarifies the approval-workflow owner (was implicit). |
+| **1A** Membership shape (deployed as `wmkf_portalmembership`, no underscore — `wmkf_portal_membership` form was dropped pre-deploy) | Approved as drafted. Ships under existing delegated authority, summary-after model. **Institution-claim approval = Option A**, lives portal-side at `/apply/admin/memberships` (new `intake-admin` app key). Connor's plate unchanged. | Re-confirmation of 2026-05-06; Option A clarifies the approval-workflow owner (was implicit). |
 | **1B** PA flows on `'Phase II Pending'` | Connor states flows are **origin-agnostic** and work as-is for portal-originated rows. No `wmkf_originatingsystem` field needed for pilot. Verification: smoke-test at 2026-05-26 dry-run. Flow-list email sent 2026-05-13 (turnaround target 2026-05-15). | Net-new — wasn't on the 2026-05-06 list. |
 | **1C** Reviewer-consumable artifact | **REVERSAL**: PA-built review packet on `'Phase II Pending'` flip, dropped in `Reviewer_Downloads/` (Option 2). Connor owns the build. Structured-data layout becomes upstream of his packet build. | **Supersedes 2026-05-06 Option 1** (staff-rendered Word/PDF on demand). |
 | **1D** Structured-tables persistence | Real child entities (Option 1) — **narrowed scope to budget + roster only**. **As-deployed S178 (2026-05-22):** budget = new `wmkf_proposalbudgetline` entity; roster = EXTENSIONS on existing `wmkf_apprequestperson` (3 nullable fields + 3 new role enum values) — the `wmkf_proposalroster` entity name proposed during the meeting was withdrawn pre-deploy. Milestones → narrative field for pilot; prior support → attached PDF for pilot. | **Narrows 2026-05-06** which included `wmkf_priorsupport` and `wmkf_milestone`. |

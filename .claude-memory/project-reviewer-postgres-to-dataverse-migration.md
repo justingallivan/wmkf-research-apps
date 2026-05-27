@@ -19,7 +19,7 @@ Significant migration was already shipped before S136. Live in Dataverse:
 
 1. **1:1 model is correct, not a compromise.** Researchers are cycle-bounded transient candidate scratch (~25/proposal). Permanent reviewer identity lives in `contact` via promotion. No researcher pool table — Wave 1 doc's pool design is superseded.
 2. **No new role-tracking child entity.** Engaged `wmkf_appreviewersuggestion` rows linked via `wmkf_potentialreviewer.wmkf_contact` ARE the per-contact reviewer history. The one-shot cleanup DELETE (cron deferred — see item 3) is what turns the table from "scratch" into "history."
-3. **Cleanup cron deferred per Codex recommendation 2026-05-12.** Originally specified as a weekly cron acting twice a year on stale slot rows. Replaced with one-shot DELETE matching Wave 1 precedent — see `project_w6_table_drop_pending.md`. No cron exists or is planned; `lib/services/maintenance-service.js` contains no reviewer cleanup. Cascade-drop logic moves into the one-shot script when fired.
+3. **Cleanup cron deferred per Codex recommendation 2026-05-12.** Originally specified as a weekly cron acting twice a year on stale slot rows. Replaced with one-shot DELETE matching Wave 1 precedent — see `project-w6-table-drop-pending.md`. No cron exists or is planned; `lib/services/maintenance-service.js` contains no reviewer cleanup. Cascade-drop logic moves into the one-shot script when fired.
 4. **Postgres tables drain, mostly don't migrate.** Real numbers (verified 2026-05-06 via `scripts/db-row-counts.js`): publications=0 (dead writer), proposal_searches=0, researchers=331, researcher_keywords=1028, reviewer_suggestions=337, grant_cycles=13. All <12 months old. Only `grant_cycles` migrates (→ `wmkf_appgrantcycle`, 10 rows live as of 2026-05-14 audit); rest drain via one-shot DELETE post-pilot (cleanup cron deferred per item 3) + cycle close.
 5. **Naming follows live convention** `wmkf_app<name>` (no underscore), NOT the Wave 1 doc's proposed `wmkf_app_<name>`.
 
@@ -45,7 +45,7 @@ Codex review found three top concerns + many smaller gaps. Plan rewritten end-to
 
 | Q | Resolution |
 |---|---|
-| Cleanup predicate (S136-locked; cron later deferred — see item 3, now a one-shot DELETE) | 8 signals across slot + suggestion: contact, emailsentat, responsetype, selected, ExternalTokenIssued, ProposalFirstAccessed, ReviewSharePointFolder, any review-form picklist. The predicate logic is still authoritative; only the delivery mechanism changed (cron → one-shot DELETE in `project_w6_table_drop_pending.md`). |
+| Cleanup predicate (S136-locked; cron later deferred — see item 3, now a one-shot DELETE) | 8 signals across slot + suggestion: contact, emailsentat, responsetype, selected, ExternalTokenIssued, ProposalFirstAccessed, ReviewSharePointFolder, any review-form picklist. The predicate logic is still authoritative; only the delivery mechanism changed (cron → one-shot DELETE in `project-w6-table-drop-pending.md`). |
 | Grace period | **14 days** (matches Wave 1 stability-clock pattern) |
 | `researchers.js` | **Retire**. Database tab loses meaning under 1:1 model. Replaced by net-new "Add candidate by hand" feature in My Candidates tab |
 | New suggestion fields | Add `wmkf_DeclineReason` (text) + `wmkf_ResponseReceivedAt` (datetime). Late/on-time + response-latency derive |
@@ -81,7 +81,7 @@ Plan was updated against live data, not assumptions. Key findings:
 - Treat the Wave 1 doc's "Wave 2 — preview spec" as historical. Live model differs structurally (1:1 vs. pool) and naming-wise (no underscore). Read `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` instead.
 - When working on Reviewer Finder code: confirm live state matches what the plan doc says. If something on the Postgres-only list got migrated independently, update both this memory and the plan.
 - Don't propose adding a `wmkf_iscontactreviewer` boolean or similar denormalized role flag. Decision is engaged-slot-history; flags lose data the history preserves.
-- Don't propose dropping Postgres reviewer tables ad hoc. The drain is intentional and gated on the post-pilot one-shot DELETE path documented in `project_w6_table_drop_pending.md` (trigger ≥ 2026-07-01), not a cron.
+- Don't propose dropping Postgres reviewer tables ad hoc. The drain is intentional and gated on the post-pilot one-shot DELETE path documented in `project-w6-table-drop-pending.md` (trigger ≥ 2026-07-01), not a cron.
 - **Re-run `scripts/audit-postgres-state.js` before any migration work begins** to confirm state hasn't drifted from S136 ground truth.
 
 ## RR program code (probed S136)

@@ -35,7 +35,7 @@ letters of support, full budget justification narrative). Structured content
 that's currently inside narrative or spreadsheets should become real fields.
 
 This compounds with the broader strategic direction (Dynamics as ground truth
-long-term — `project_strategy_direction.md`).
+long-term — `project-strategy-direction.md`).
 
 **Note:** Sarah is a Foundation colleague who has form wishlists for this
 work; Connor is also a stakeholder. Their input shapes the field inventory

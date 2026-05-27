@@ -16,7 +16,7 @@ Two related problems that share the same underlying architectural question: how 
 
 Connor (2026-05-01) is open to eventually replacing GOapply (the Bromelkamp applicant portal) and bringing applicant intake in-house too. Strategy: build reviewer-side first (smaller N, async, email fallback exists), then extend the same primitive to applicants if it proves out.
 
-**Status (2026-05-03): SHIPPED.** Token utility, middleware allowlist for `/external/*`, tokenized proposal download endpoint, tokenized upload endpoint with SharePoint write + Dataverse writeback, and per-recipient token minting in Review Manager email render are all live. Vercel Blob review download path was retired 2026-05-03 (commit `2277d23`). Token expiry is now event-driven (90-day mint ceiling, 7-day post-submission modify window via `extendForPostSubmissionWindow`).
+**Status (2026-05-03): SHIPPED.** Token utility, proxy (Next 16 `proxy.js` convention; was `middleware.js`) allowlist for `/external/*`, tokenized proposal download endpoint, tokenized upload endpoint with SharePoint write + Dataverse writeback, and per-recipient token minting in Review Manager email render are all live. Vercel Blob review download path was retired 2026-05-03 (commit `2277d23`). Token expiry is now event-driven (90-day mint ceiling, 7-day post-submission modify window via `extendForPostSubmissionWindow`).
 
 **How to apply:**
 - Don't rebuild any of the above. Reuse the `lib/external/*` primitives (`token-lifecycle`, `verify-suggestion-token`, `reviewer-materials`, `review-form-schema`) for new external-facing flows.

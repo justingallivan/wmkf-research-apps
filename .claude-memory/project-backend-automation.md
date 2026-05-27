@@ -12,7 +12,7 @@ Leadership wants key processing tasks automated on the backend — no manual upl
 
 **Write-back strategy:** PowerAutomate handles CRM writes initially (it already has full Dynamics access). Direct API writes from our app later when IT grants write permissions on app registration.
 
-**New custom fields needed on `akoya_request`:** v3 spec names (`wmkf_ai_summary`, `wmkf_ai_dataextract` — formerly `wmkf_ai_structured_data` in v2; renamed per Connor 2026-04-14). Run timestamps + model + version moved to the `wmkf_ai_run` child table (`createdon`, `wmkf_ai_model`, `wmkf_ai_promptversion`). All deployed. See `project_dynamics_ai_writeback.md` for canonical v3 field list.
+**New custom fields needed on `akoya_request`:** v3 spec names (`wmkf_ai_summary`, `wmkf_ai_dataextract` — formerly `wmkf_ai_structured_data` in v2; renamed per Connor 2026-04-14). Run timestamps + model + version moved to the `wmkf_ai_run` child table (`createdon`, `wmkf_ai_model`, `wmkf_ai_promptversion`). All deployed. See `project-dynamics-ai-writeback.md` for canonical v3 field list.
 
 **Configurable prompts:** Prompts should be editable by admins via the dashboard (DB-backed with versioning), not requiring code deploys. Both automatic and manual flows use the same prompt system.
 

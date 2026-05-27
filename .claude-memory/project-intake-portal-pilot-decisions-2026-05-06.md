@@ -16,7 +16,7 @@ Walked through `docs/archive/CONNOR_INTAKE_PORTAL_SYNC.md` with Connor in the ro
 
 | # | Resolution |
 |---|---|
-| 1. `wmkf_portal_membership` schema | Approved as drafted in CONNOR_INTAKE_PORTAL_SYNC.md. AO + Liaison live on `account` instead of membership — `wmkf_role` choice stays `submitter \| contributor`. `account` adds `wmkf_authorized_official_contactid` + `wmkf_liaison_contactid` lookups. |
+| 1. Membership schema (deployed as `wmkf_portalmembership`, no underscore — `wmkf_portal_membership` form was dropped pre-deploy) | Approved as drafted in CONNOR_INTAKE_PORTAL_SYNC.md. AO + Liaison live on `account` instead of membership — `wmkf_role` choice stays `submitter \| contributor`. `account` adds `wmkf_authorized_official_contactid` + `wmkf_liaison_contactid` lookups. |
 | 2. Reviewer-consumable artifact | **SUPERSEDED 2026-05-13** → PA-built review packet on `'Phase II Pending'` flip; Connor owns the build. Original Option 1 (staff-rendered Word/PDF on demand from `/apply/admin/*`, dropped into `Reviewer_Downloads/`) is no longer the plan. See `project-intake-portal-pilot-decisions-2026-05-13.md` item 1C. |
 | 3a. Bucket 1 (structured promotions) | All approved: budget rows, biosketches per-roster-row (with optional CV file per row), Co-Is as roster table, prior support as per-person rows. |
 | 3b. Bucket 2 (friction cuts) | All approved with revisions. T&C moved to post-acceptance with new lifecycle stage; Calendly scheduling step added; AO+Liaison institutional contacts on `account` (Liaison is institutional admin POC, role-based, person can change but role stays); govt-unit/group-exempt/Governing Board/Declaration of Status all institution-level on `account`; Bill.com post-acceptance only; EIN-match autofill confirmed. |
@@ -29,12 +29,12 @@ Walked through `docs/archive/CONNOR_INTAKE_PORTAL_SYNC.md` with Connor in the ro
 
 ## Architectural meta-decisions
 
-- **Reviewer Postgres → Dataverse migration is now prerequisite for pilot.** Connor: "let's pull the band-aid off." Aggressive timeline; mid-June pilot date does not slip. Top priority. Per-proposal lifecycle is already Dataverse-native (shipped); the org-wide enrichment pool (`researchers`, `publications`, `proposal_searches`, `grant_cycles`, `reviewer_suggestions` Postgres tables) is what migrates. See companion memory `project_reviewer_postgres_to_dataverse_migration.md`.
+- **Reviewer Postgres → Dataverse migration is now prerequisite for pilot.** Connor: "let's pull the band-aid off." Aggressive timeline; mid-June pilot date does not slip. Top priority. Per-proposal lifecycle is already Dataverse-native (shipped); the org-wide enrichment pool (`researchers`, `publications`, `proposal_searches`, `grant_cycles`, `reviewer_suggestions` Postgres tables) is what migrates. See companion memory `project-reviewer-postgres-to-dataverse-migration.md`.
 - **T&C signing pattern**: magic link (HMAC token primitive, not Entra External ID auth) sent to AO + Liaison on entry to `Awaiting T&C` state. Whichever clicks first sees the T&Cs, types name+title in a web form, clicks "I agree." Audit row + token-storage entry. Reuses `lib/external/token-lifecycle.js` with a new claim type. **Not** DocuSign / Adobe Sign.
 - **Calendly** for the post-T&C scheduling call. New lifecycle state `Awaiting Scheduling Call` between T&C signed and Award Issued. PI is authenticated; Calendly link can land in their portal view, email is just a notification.
 - **Staff approval emails are one-click magic links across the board** — membership approval, account creation, institutional document updates, AO/Liaison change. Approve = single click; Reject = link to a small form for rejection reason. Token scoped to specific record + specific staff azure_id, single-use, 24-48h TTL.
 - **AO/Liaison are stored as `contact` rows on `account`, not authenticated portal users.** Earlier proposed Entra External ID registration for AO was rolled back in favor of magic-link-only T&C signing. AO/Liaison contacts updated at portal registration, confirmed each cycle.
-- **Schema-creation authority delegated.** Connor approved Justin/Claude creating new Dataverse entities directly via creator privileges, with summary-after model. See `project_dataverse_creator_privileges.md`.
+- **Schema-creation authority delegated.** Connor approved Justin/Claude creating new Dataverse entities directly via creator privileges, with summary-after model. See `project-dataverse-creator-privileges.md`.
 
 ## Lifecycle stage additions on `akoya_request`
 

@@ -18,7 +18,7 @@ Strategic notes per app (Justin 2026-04-25), affecting Session 111+ planning:
 
 - **Peer Review Summarizer** — single-output. Easy migration when it comes up.
 
-- **Phase I summary app** — winding down post-May-2026 (see `project_phase_i_summary_app_winddown.md`).
+- **Phase I summary app** — winding down post-May-2026 (see `project-phase-i-summary-app-winddown.md`).
 
 **Why this matters now:**
 - Several apps that look "user-driven" today are actually **dual-caller in waiting** — they want a backend-triggered version once the Executor extensions land. The Executor design (Pattern A: same prompt row, two callers) supports this directly.

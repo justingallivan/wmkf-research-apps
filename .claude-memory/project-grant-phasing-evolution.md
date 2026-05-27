@@ -10,7 +10,7 @@ originSessionId: 8d412c2f-d6c6-4080-a43c-79e0e04e9653
 - Concept stage → Phase I (separate shorter narrative document) → Phase II (longer document, new submission). Each stage is a distinct document the applicant submits.
 - Reviewer finding happens at Phase II.
 
-**Concepts are going away.** Future cycles will not have a concept stage. Already noted broadly in `project_strategy_direction.md` ("Grant cycle is being redesigned").
+**Concepts are going away.** Future cycles will not have a concept stage. Already noted broadly in `project-strategy-direction.md` ("Grant cycle is being redesigned").
 
 **Next cycle (post-J26/D26):** Single-package submission, but internal phasing remains.
 - Applicants submit **once** — one document called "Phase I." No separate Phase II document.
