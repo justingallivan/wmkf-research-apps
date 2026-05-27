@@ -21,21 +21,23 @@ Sarah+Connor sync 2026-05-13. Track 1 (Connor-side decisions, 4 items) ran to co
 | **1C** Reviewer-consumable artifact | **REVERSAL**: PA-built review packet on `'Phase II Pending'` flip, dropped in `Reviewer_Downloads/` (Option 2). Connor owns the build. Structured-data layout becomes upstream of his packet build. | **Supersedes 2026-05-06 Option 1** (staff-rendered Word/PDF on demand). |
 | **1D** Structured-tables persistence | Real child entities (Option 1) — **narrowed scope to budget + roster only**. **As-deployed S178 (2026-05-22):** budget = new `wmkf_proposalbudgetline` entity; roster = EXTENSIONS on existing `wmkf_apprequestperson` (3 nullable fields + 3 new role enum values) — the `wmkf_proposalroster` entity name proposed during the meeting was withdrawn pre-deploy. Milestones → narrative field for pilot; prior support → attached PDF for pilot. | **Narrows 2026-05-06** which included `wmkf_priorsupport` and `wmkf_milestone`. |
 
-## Naming alignment is open
+## Naming alignment — RESOLVED S178 (2026-05-22)
 
-2026-05-06 suggested `wmkf_budgetline` and `wmkf_personnel`. 2026-05-13 sketch (during the meeting) used `wmkf_proposalbudgetline` and `wmkf_proposalroster`. Final names land at Connor's 2026-05-15 schema design review — don't write the JSON specs at the new names without resolving this.
+Deployed names: `wmkf_proposalbudgetline` (NEW entity, the meeting sketch) + `wmkf_apprequestperson` extensions (NOT a new entity — the `wmkf_proposalroster` sketch was withdrawn pre-deploy) + `wmkf_portalmembership` (NO underscore; the `wmkf_portal_membership` form was dropped pre-deploy). The 2026-05-06 sketch names (`wmkf_budgetline`/`wmkf_personnel`) are superseded.
 
-## What carries to next session
+## What carried to next session — closed
 
-- **Track 2 — Sarah field inventory** wasn't reached. Schedule a Sarah-only session before the 2026-05-19 checkpoint.
-- **Connor's flow-list response** (1B email) — target 2026-05-15. Watch for replies that reveal a GOapply-coupled flow we missed.
-- ~~**Two JSON schema specs** under `lib/dataverse/schema/intake/` (budget + roster) — draft after naming resolves with Connor.~~ **DONE S178** — landed under `lib/dataverse/schema/wave4/` (budget = `wmkf_proposalbudgetline.json`, membership = `wmkf_portalmembership.json`) and `lib/dataverse/schema/wave4-existing/` (roster extensions = `wmkf_apprequestperson-roster-fields.json`). The `lib/dataverse/schema/intake/` directory does not exist.
-- **`/apply/admin/memberships`** UI + endpoints (Option A path).
+- ~~**Track 2 — Sarah field inventory**~~ — see Sarah session work, separately tracked.
+- ~~**Connor's flow-list response** (1B email)~~ — handled; PA flows are origin-agnostic per 1B decision.
+- ~~**Two JSON schema specs** under `lib/dataverse/schema/intake/` (budget + roster)~~ **DONE S178** — landed under `lib/dataverse/schema/wave4/` (budget = `wmkf_proposalbudgetline.json`, membership = `wmkf_portalmembership.json`) and `lib/dataverse/schema/wave4-existing/` (roster extensions = `wmkf_apprequestperson-roster-fields.json`). The `lib/dataverse/schema/intake/` directory does not exist.
+- **`/apply/admin/memberships`** UI + endpoints (Option A path) — ongoing pilot work.
 
-## Calendar checkpoints (from agenda § 3B)
+## Calendar checkpoints (historical — slice 0 deployed S178 2026-05-22)
 
-- **2026-05-15** — naming + flow-list response from Connor; budget+roster schema specs drafted.
-- **2026-05-19** — checkpoint: schema applied, form-module skeleton renders, end-to-end smoke working.
-- **2026-05-26** — dry-run; manually flip a throwaway test request to `'Phase II Pending'` and watch which PA flows fire.
-- **2026-05-30** — go/no-go review.
-- **2026-06-01** — pilot accepting submissions.
+Original soft-target schedule from agenda § 3B; preserved for historical reference. Slice-0 deploy completed 2026-05-22.
+
+- 2026-05-15 — naming + flow-list response from Connor; budget+roster schema specs drafted.
+- 2026-05-19 — checkpoint: schema applied, form-module skeleton renders, end-to-end smoke working.
+- 2026-05-26 — dry-run; manually flip a throwaway test request to `'Phase II Pending'` and watch which PA flows fire.
+- 2026-05-30 — go/no-go review.
+- 2026-06-01 — pilot accepting submissions.

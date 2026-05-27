@@ -29,7 +29,7 @@ External ID auth foundation for the applicant intake portal is live in code as o
 1. Membership / institution selection (search by name+EIN, candidate list, request flow)
 2. Form schema rendering (Phase II Research forms-as-code module exists at `shared/forms/phase-ii-research-2026-06/`)
 3. Draft staging via `intake-draft-service.js` (Postgres, autosave, attachments)
-4. Submission → Dynamics writes (akoya_request + wmkf_portal_membership)
+4. Submission → Dynamics writes (akoya_request + wmkf_portalmembership)
 5. `/apply/admin/*` for staff triage (collaborator approval, submitted list)
 
 **Watch out:**

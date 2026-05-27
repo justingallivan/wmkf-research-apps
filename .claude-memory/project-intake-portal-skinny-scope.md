@@ -25,8 +25,8 @@ features that have no value. Skinny pilot proves the architecture in one cycle
   requests). Opportunity/phase config can be code/seed data for pilot.
 - Schema: prefer fields on existing entities over new tables. Pilot adds
   fields to `contact` and `akoya_request`, plus one new entity
-  `wmkf_portal_membership`. The four-table model in the original planning doc
-  is for Phase 1+ expansion, not pilot.
+  `wmkf_portalmembership` (no underscore in deployed name). The four-table
+  model in the original planning doc is for Phase 1+ expansion, not pilot.
 
 Strategic doc: `docs/INTAKE_PORTAL_DESIGN.md` (still skewed toward the larger
 target — pilot section needs to be tightened to reflect this skinny scope).

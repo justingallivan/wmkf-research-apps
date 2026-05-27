@@ -50,8 +50,8 @@ Accepted → Awaiting T&C → T&C Signed → Awaiting Scheduling Call → Call S
 
 Single-phase cycle (2 cycles out) keeps `'Phase II Pending'` as the submitted status. Concept and Phase I stages disappear from the applicant flow but the downstream status name stays — same Phase II infrastructure, just no upstream gates. This was Connor's explicit call.
 
-## Doc/file follow-ups owed
+## Doc/file follow-ups — closed
 
-- Update `docs/INTAKE_PORTAL_DESIGN.md` to reflect resolved decisions (or mark CONNOR_INTAKE_PORTAL_SYNC.md as resolved).
-- Draft `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` (next session — pre-pilot prerequisite).
-- Draft `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` — single audit-trail catalog for every Dataverse change in pilot, since Connor delegated.
+- ~~Update `docs/INTAKE_PORTAL_DESIGN.md` to reflect resolved decisions~~ — live.
+- ~~Draft `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`~~ — live (W3-W6 cutover plan, executed 2026-05-12).
+- ~~Draft `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`~~ — live (slice-0 catalog).
