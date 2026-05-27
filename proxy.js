@@ -155,7 +155,11 @@ export const config = {
      *   `/api/webhooks/bill/sub-route` would NOT be exempted, forcing
      *   any future webhook route to be added here explicitly with its
      *   own per-route auth review.
+     * - /api/bill/onboard-reviewer (internal HMAC; called by respond.js
+     *   server-side, which has no staff NextAuth session). Same anchored-
+     *   match safety as the webhook; auth is HMAC-of-body via
+     *   BILL_INTEGRATION_SECRET. See lib/bill/internal-call-auth.js.
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|apple-touch-icon|api/auth|api/cron|api/irs|api/webhooks/bill$).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|apple-touch-icon|api/auth|api/cron|api/irs|api/webhooks/bill$|api/bill/onboard-reviewer$).*)',
   ],
 };
