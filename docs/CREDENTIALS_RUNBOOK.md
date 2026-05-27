@@ -67,8 +67,8 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 |----------|---------|-------|
 | `POSTGRES_URL` | Database connection | Auto-set when Vercel Postgres is linked |
 | `BLOB_READ_WRITE_TOKEN` | File upload storage (public shared store `phase-ii-summaries-blob`) | Auto-set when Vercel Blob is linked |
-| `DVX_BLOB_RW_TOKEN` | Dataverse Bulk Export private store (`dvx-export-private`) RW token | Manual — see CLAUDE.md for the CLI gotcha (decline auto-link, paste token from dashboard) |
-| `INTAKE_BLOB_RW_TOKEN` | Applicant intake drain private store (`intake-applicant-private`, `store_Eaui32n6i2wYMS6E`, `iad1`) RW token | Manual — same gotcha as DVX |
+| `DVX_BLOB_RW_TOKEN` | Dataverse Bulk Export private store (`dvx-export-private`) RW token | Manual — see "Private Blob store provisioning" below |
+| `INTAKE_BLOB_RW_TOKEN` | Applicant intake drain private store (`intake-applicant-private`, `store_Eaui32n6i2wYMS6E`, `iad1`) RW token | Manual — same provisioning shape as DVX |
 | `NODE_ENV` | Environment flag | Auto-set (`production` on Vercel, `development` locally) |
 
 ### Optional — Dynamics Explorer
@@ -180,6 +180,35 @@ This is the most common maintenance task. Both `AZURE_AD_CLIENT_SECRET` and `DYN
 - Closing the window before the longest-lived token has expired — this locks reviewers out mid-cycle.
 - Forgetting to **redeploy** after either the open or the close step.
 - Leaving `EXTERNAL_LINK_SECRET_PREVIOUS` set indefinitely — it widens the accepted-signature surface; clear it once the window closes.
+
+---
+
+## Private Blob store provisioning (`DVX_BLOB_RW_TOKEN`, `INTAKE_BLOB_RW_TOKEN`)
+
+Both env vars hold RW tokens for **dedicated PRIVATE** Vercel Blob stores. They are deliberately separate from the shared `BLOB_READ_WRITE_TOKEN` (which is bound to the public `phase-ii-summaries-blob` store used by uploads / reviewer-finder / review-manager / maintenance) and must NOT be conflated. Apps that PUT or GET against a private store with the public token will fail at the Blob API layer.
+
+| Var | Store name | Store ID | Region |
+|-----|-----------|----------|--------|
+| `DVX_BLOB_RW_TOKEN` | `dvx-export-private` | (read from dashboard) | `iad1` |
+| `INTAKE_BLOB_RW_TOKEN` | `intake-applicant-private` | `store_Eaui32n6i2wYMS6E` | `iad1` |
+
+### Why the CLI workflow is awkward
+
+The Vercel CLI (53.x + 54.x) cannot connect a *second* Blob store under a custom env-var name. It always tries to write the token into `BLOB_READ_WRITE_TOKEN`, which would clobber the shared-store token. So the provisioning dance is:
+
+1. Create the store via CLI: `vercel blob create-store dvx-export-private --access private` (or `intake-applicant-private`).
+2. **Decline the auto-link prompt** when CLI offers to connect it to the project — accepting overwrites `BLOB_READ_WRITE_TOKEN`.
+3. Open the Vercel dashboard → Storage → the new store → Copy the RW token.
+4. Set the token under the correct custom env name per env: `vercel env add DVX_BLOB_RW_TOKEN` (or `INTAKE_BLOB_RW_TOKEN`), pasting the token at the prompt. Repeat for `production`, `preview`, and `development`.
+
+### Where they're consumed in code
+
+- **DVX:** `pages/api/dataverse-export/run.js` writes (`access: 'private'`); `pages/api/dataverse-export/download.js` reads via the authenticated proxy. Missing token → pre-stream fail-loud 502 `BLOB_STORE_UNCONFIGURED`.
+- **Intake:** `pages/api/intake/draft/upload-token.js` mints a path-scoped client-upload token; `pages/api/intake/draft/attach.js` GETs + DELETEs for the synchronous virus-scan step; `MaintenanceService.sweepIntakePending` reaps stale pending attachments. Single source of truth for token reads is `lib/utils/intake-blob.js` (fail-loud on missing/whitespace).
+
+### Sender constraints
+
+Both stores are private — direct browser fetches against their Blob URLs return 404/403. Retrieval MUST go through an authenticated server-side proxy (`/api/dataverse-export/download?t=<token>` for DVX; the drain's three-call attach dance for intake). The "shipping a short-lived public Blob URL to the browser" pattern is explicitly NOT used for these stores; see the Track B build plan §5 for the rationale.
 
 ---
 
