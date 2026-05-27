@@ -255,42 +255,58 @@ export function parseAnalysisResponse(response) {
   }
 
   // Parse reviewer suggestions
-  const reviewerBlocks = response.split(/REVIEWER:/i).slice(1);
+  // Tolerate markdown decoration on the REVIEWER header — newer Claude
+  // generations emit `**REVIEWER:**`, `**REVIEWER 1:**`, `### REVIEWER 1`,
+  // and similar variants. Same flexibility as the metadata regex above.
+  // Header tail is tight: only allow an optional number (`REVIEWER 1`) and
+  // an optional trailing colon — NOT arbitrary words, otherwise a REASONING
+  // line like "REVIEWER is especially qualified..." would falsely split the
+  // block. Bullet prefix also accepts numbered-list markers (`1. REVIEWER:`).
+  const reviewerHeaderRegex = /^[ \t]*(?:[-*]\s*|\d+[.)]\s*)?(?:#{1,6}\s*)?\*{0,2}REVIEWER(?:\s+\d+)?\s*:?\*{0,2}[ \t]*$/gim;
+  const reviewerBlocks = response.split(reviewerHeaderRegex).slice(1);
 
   if (DEBUG_REVIEWER_FINDER) {
     console.log('[parseAnalysisResponse] Found', reviewerBlocks.length, 'reviewer blocks');
   }
 
+  // Per-field regex that tolerates leading list markers + markdown bold,
+  // e.g. `- **NAME:** Dr. Foo`, `**NAME**: Dr. Foo`, plain `NAME: Dr. Foo`.
+  const fieldRegex = (field) =>
+    new RegExp(`^[ \\t]*(?:[-*]\\s*)?\\*{0,2}${field}\\*{0,2}\\s*:\\*{0,2}\\s*(.+?)\\s*\\*{0,2}$`, 'im');
+  // Multi-line variant for fields like REASONING that may wrap.
+  const multiFieldRegex = (field, terminators) =>
+    new RegExp(`^[ \\t]*(?:[-*]\\s*)?\\*{0,2}${field}\\*{0,2}\\s*:\\*{0,2}\\s*([\\s\\S]+?)(?=^[ \\t]*(?:[-*]\\s*)?\\*{0,2}(?:${terminators})\\*{0,2}\\s*:|\\n---|$(?![\\r\\n]))`, 'im');
+
   for (const block of reviewerBlocks) {
     const reviewer = {};
 
-    const nameMatch = block.match(/NAME:\s*(.+?)(?:\n|$)/i);
+    const nameMatch = block.match(fieldRegex('NAME'));
     if (nameMatch) {
-      reviewer.name = nameMatch[1].trim();
+      reviewer.name = nameMatch[1].replace(/\*+$/, '').trim();
       if (DEBUG_REVIEWER_FINDER) {
         console.log('[parseAnalysisResponse] Parsed name:', reviewer.name, '| Raw match:', nameMatch[1]);
       }
     }
 
-    const institutionMatch = block.match(/INSTITUTION:\s*(.+?)(?:\n|$)/i);
-    if (institutionMatch) reviewer.suggestedInstitution = institutionMatch[1].trim();
+    const institutionMatch = block.match(fieldRegex('INSTITUTION'));
+    if (institutionMatch) reviewer.suggestedInstitution = institutionMatch[1].replace(/\*+$/, '').trim();
 
-    const expertiseMatch = block.match(/EXPERTISE:\s*(.+?)(?:\n|$)/i);
+    const expertiseMatch = block.match(fieldRegex('EXPERTISE'));
     if (expertiseMatch) {
-      reviewer.expertiseAreas = expertiseMatch[1].split(',').map(e => e.trim());
+      reviewer.expertiseAreas = expertiseMatch[1].replace(/\*+$/, '').split(',').map(e => e.trim());
     }
 
-    const seniorityMatch = block.match(/SENIORITY:\s*(.+?)(?:\n|$)/i);
-    if (seniorityMatch) reviewer.seniorityEstimate = seniorityMatch[1].trim();
+    const seniorityMatch = block.match(fieldRegex('SENIORITY'));
+    if (seniorityMatch) reviewer.seniorityEstimate = seniorityMatch[1].replace(/\*+$/, '').trim();
 
-    const reasoningMatch = block.match(/REASONING:\s*(.+?)(?=POTENTIAL_CONCERNS:|SOURCE:|REVIEWER:|$)/is);
-    if (reasoningMatch) reviewer.reasoning = reasoningMatch[1].trim();
+    const reasoningMatch = block.match(multiFieldRegex('REASONING', 'POTENTIAL_CONCERNS|SOURCE|REVIEWER'));
+    if (reasoningMatch) reviewer.reasoning = reasoningMatch[1].replace(/\*+$/, '').trim();
 
-    const concernsMatch = block.match(/POTENTIAL_CONCERNS:\s*(.+?)(?:\n|SOURCE:|$)/i);
-    if (concernsMatch) reviewer.potentialConcerns = concernsMatch[1].trim();
+    const concernsMatch = block.match(multiFieldRegex('POTENTIAL_CONCERNS', 'SOURCE|REVIEWER'));
+    if (concernsMatch) reviewer.potentialConcerns = concernsMatch[1].replace(/\*+$/, '').trim();
 
-    const sourceMatch = block.match(/SOURCE:\s*(.+?)(?:\n|$)/i);
-    if (sourceMatch) reviewer.source = sourceMatch[1].trim();
+    const sourceMatch = block.match(fieldRegex('SOURCE'));
+    if (sourceMatch) reviewer.source = sourceMatch[1].replace(/\*+$/, '').trim();
 
     if (reviewer.name) {
       result.reviewerSuggestions.push(reviewer);
