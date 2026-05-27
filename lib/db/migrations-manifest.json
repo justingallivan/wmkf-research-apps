@@ -13,6 +13,7 @@
     "012_intake_drafts_uniqueness.sql",
     "013_intake_drafts_pending_attachments.sql",
     "014_drop_playing_with_neon.sql",
-    "015_bill_webhook_events.sql"
+    "015_bill_webhook_events.sql",
+    "016_maintenance_runs_timestamptz.sql"
   ]
 }
