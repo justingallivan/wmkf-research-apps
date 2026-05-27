@@ -91,6 +91,7 @@
 - [SharePoint document integration](project-sharepoint-integration.md) — site URL, folder pattern, multi-library layout (akoya_request + 3 archives), Graph API service, Sites.Selected permissions
 
 ## Reviewer Lifecycle
+- [Reviewer apps redesign direction (S194)](project-reviewer-apps-redesign-direction.md) — Finder + Manager slated to be replaced by request-scoped Reviewer Workbench + standalone Reviewer Pool. Architecture decisions locked; build deferred. Don't propose incremental Finder/Manager cleanup as the path forward.
 - [Reviewer lifecycle automation plan](project-reviewer-lifecycle.md) — phased plan (A-D); Phase A (CRM send) is foundation
 - [Lifecycle tracking → automation goal](project-reviewer-lifecycle-automation.md) — schema's manual timestamp/status fields designed for cron-driven reminders + state machine in Wave 2
 - [Accept/decline magic links](project-reviewer-accept-decline-links.md) — HMAC primitive shipped; build atop existing token, don't add new secret
