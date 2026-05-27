@@ -10,7 +10,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### AI / prompt execution
 
-- **`llm-client.js`** — Canonical Anthropic API wrapper (`complete()` + `stream()`). SSRF allowlist, abortable timeouts, 429/529 retry, single fallback-model swap, usage logging, API-key redaction. Replaced 14 ad-hoc fetch sites.
+- **`llm-client.js`** — Canonical Anthropic API wrapper (`complete()` + `stream()`). SSRF allowlist, abortable timeouts, 429/529 retry, single fallback-model swap, usage logging, API-key redaction. **Use this — not ad-hoc `fetch`** for new Anthropic API calls.
 - **`execute-prompt.js`** — Live prompt-execution Executor implementing `docs/EXECUTOR_CONTRACT.md`. Reads current prompt rows from Dataverse entity set `wmkf_ai_prompts` and writes audit rows to `wmkf_ai_runs`. Used in production by `/api/phase-i-dynamics/summarize-v2`.
 - **`prompt-resolver.js`** — Legacy Session 103 holdover. Reads prompts from a scratch row on `wmkf_ai_runs`, 5-min cache, `{{var}}` interpolation, bundled `.js` fallback. `PROMPT_RESOLVER_STRICT=true` disables fallback. Currently used only by scripts; no live API route depends on it.
 - **`model-resolver.js`** / **`model-override-loader.js`** — Per-app model overrides for `baseConfig.js`. Resolver computes effective model per app at call time; loader caches DB-backed overrides.
@@ -109,7 +109,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### Health / files
 
-- **`health-checker.js`** — Reusable health-check logic (7 services incl. Microsoft Graph).
+- **`health-checker.js`** — Reusable health-check logic spanning all currently-monitored upstream services (incl. Microsoft Graph). Source file is the live list.
 - **`file-loader.js`** — Shared FileRef loader (upload/SharePoint → PDF/DOCX text) used by Grant Reporting and Phase I Dynamics.
 - **`sharepoint-buckets.js`** — `getRequestSharePointBuckets(requestId, requestNumber)` — walks active + archive libraries for a request.
 - **`cycle-code.js`** — Grant cycle code helpers (`Jxx`/`Dxx` from June/December meeting dates). Helpers: `meetingDateToCycleCode`, `parseCycleCode`, `cycleCodeToOdataFilter`.

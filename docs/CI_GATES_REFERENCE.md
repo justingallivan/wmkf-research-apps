@@ -72,9 +72,9 @@ Together with `:fact-consistency`, scalar values + the generated doc + cross-doc
 
 Added S154. Runs `scripts/reconcile-memory-claims.js`. Fails on `spec_without_entity`, large `stale_row_count`, `doc_label_collision`, or any `probe_errors`.
 
-- The Set D label collision that previously kept it red was resolved 2026-05-26 (Connor walkthrough — fit-assessment fields relabeled to Set E); the gate now runs green.
-- The Codex-flagged `incompatible_shape` drift bucket is not yet built.
-- Promotion to the P0 set above is reasonable once the bucket lands and the gate has been green continuously.
+- Historical hazard: the Set D label collision that previously kept this gate red was resolved 2026-05-26 (Connor walkthrough — fit-assessment fields relabeled to Set E). Current state is whatever `npm run check:memory-drift` shows — verify before assuming.
+- The Codex-flagged `incompatible_shape` drift bucket is a planned addition (not yet built).
+- Promotion to the P0 set above is reasonable once the bucket lands AND the gate has been green continuously for a stretch of sessions.
 - For routine memory audits that must not dirty the tracked report, use `npm run check:memory-drift:no-write` (read-only; never regenerates `docs/RECONCILIATION_REPORT.json`).
 
 ## Coverage tool self-tests (binding contract)
