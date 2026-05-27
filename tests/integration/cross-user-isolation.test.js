@@ -58,6 +58,10 @@ jest.mock('../../shared/config/baseConfig', () => ({
   getModelForApp: jest.fn(() => 'claude-sonnet-4-20250514'),
   getFallbackModelForApp: jest.fn(() => 'claude-haiku-4-5-20251001'),
   loadModelOverrides: jest.fn(() => Promise.resolve()),
+  _setModelResolver: jest.fn(),
+  _setOverridesCache: jest.fn(),
+  _shouldReloadOverrides: jest.fn(() => false),
+  clearModelOverridesCache: jest.fn(),
 }));
 
 jest.mock('../../lib/utils/email-generator', () => ({
