@@ -234,7 +234,7 @@ flowchart TD
 
 **`wmkf_appresearcher` is structural redundancy.** Originally split off as a "bibliometric sidecar" to keep h-index refreshes from churning the identity row. With no historical-snapshot requirement and `wmkf_potentialreviewer` confirmed custom (not vendor — see metadata probe results), the bibliometric fields could live directly on `wmkf_potentialreviewer` with no structural loss. The sparse-row pattern is already the norm there (applicant-source rows have minimal data); adding nullable bibliometric attrs continues that pattern, doesn't introduce it.
 
-**Slated for post-pilot collapse.** Roughly half a day of work: schema add (~24 attrs to `wmkf_potentialreviewer`), backfill 334 rows from `wmkf_appresearcher`, fold `adapters/researcher.js` into `adapters/potential-reviewer.js`, update 4 read paths + 3 write paths, drop the entity. Not done mid-pilot because mid-pilot churn risks correctness over a small cleanup benefit.
+**Slated for post-pilot collapse.** Full plan: `docs/APPRESEARCHER_COLLAPSE_PLAN.md` (Codex-reviewed S196). Schema add (17 fields to `wmkf_potentialreviewer`), backfill 334 rows from `wmkf_appresearcher`, fold `adapters/researcher.js` into `adapters/potential-reviewer.js`, update 4 live app callers (Reviewer Finder save-candidates + my-candidates, Review Manager reviewers, contact-enrichment-service) + 8 scripts, drop the entity. ~8 hours of focused work. Not done mid-pilot because mid-pilot churn risks correctness over a small cleanup benefit.
 
 ---
 

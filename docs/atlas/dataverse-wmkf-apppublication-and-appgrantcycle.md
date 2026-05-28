@@ -36,12 +36,13 @@ Deployed custom attrs (11): `wmkf_appgrantcycleid`, `wmkf_displayname` (primary)
 
 S185 audit catch (2026-05-25-B): the prior "NOT DEPLOYED" claim (from 2026-05-07) was based on a probe of only the `-es` variant. The reconcile-memory-claims candidate generator's broader probe (commit `5d560c2`) found the actual `-s` entity set. The entity exists, has no rows, has no writer code, and no read path uses it. Postgres `proposal_searches` is also 0 rows; writer is dead. Defer indefinitely — but the deployment status row in the migration-plan table below is now ✅ deployed (empty), not ❌.
 
-## `wmkf_app_z_publication_author` — NOT DEPLOYED
+## `wmkf_apppublicationauthor` — DEPLOYED (empty)
 
-**Live row count:** N/A (404 on `wmkf_app_z_publication_authors` entity set, 2026-05-07)
-**Schema-as-code:** `lib/dataverse/schema/wave2/wmkf_app_z_publication_author.json`
+**Live row count:** 0 (re-probed S196 2026-05-28)
+**Entity set:** `wmkf_apppublicationauthors`
+**Schema-as-code:** `lib/dataverse/schema/wave2/wmkf_app_z_publication_author.json` (file name has `_z_` artifact; deployed entity logical name is `wmkf_apppublicationauthor` without the `_z_`)
 
-Junction for `wmkf_apppublication ↔ wmkf_appresearcher`. Defer until publications start landing.
+Junction for `wmkf_apppublication ↔ wmkf_appresearcher`. Originally marked NOT DEPLOYED in the 2026-05-07 probe — that was wrong (the probe used the `_z_`-named entity set, which doesn't exist). The deployed entity uses the no-`_z_` logical name. Both publication entities are deployed with 0 rows; both are slated for drop in the appresearcher collapse (see `docs/APPRESEARCHER_COLLAPSE_PLAN.md`).
 
 ## What this means for the migration plan
 
