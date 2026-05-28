@@ -42,6 +42,9 @@ Outreach timestamps:
 Review status: `wmkf_reviewstatus` (Picklist: `accepted=100000000 | materials_sent | under_review | review_received | complete=100000004`).
 - `complete` (S196 claim): set by Request Workbench when PD closes out — drops the row off the PD dashboard. Paired with `wmkf_completedat` (DateTime, added 2026-05-28).
 
+Honorarium linkage (BILL chunk 1, added by Connor 2026-05-28):
+- `wmkf_honorariumrequest` (Lookup → `akoya_request`) + `wmkf_honorariumrequestname` (virtual denorm) — points at the honorarium `akoya_request` row created when the reviewer accepted. Optional; populated by the portal at honorarium-request create time. No backfill on historical engagements.
+
 External-reviewer intake (S128–S130):
 - `wmkf_externaltokenhash`, `wmkf_externaltokenissued`, `wmkf_externaltokenexpires`, `wmkf_externaltokenrevoked`
 - `wmkf_proposalfirstaccessed`

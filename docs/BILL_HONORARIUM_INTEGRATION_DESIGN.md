@@ -293,7 +293,7 @@ No recommendation — just inputs to our portal design.
 | # | Chunk | Owner | Depends on |
 |---|---|---|---|
 | 0 | This design doc → Connor sign-off | Connor | (none) |
-| 1 | Connor adds `wmkf_HonorariumRequest` lookup on `wmkf_appreviewersuggestion` → `akoya_request` (Q5) | Connor | Q5 answered yes |
+| 1 | ✅ SHIPPED 2026-05-28 — Connor added `wmkf_HonorariumRequest` lookup on `wmkf_appreviewersuggestion` → `akoya_request`, RequiredLevel=None | Connor | Q5 answered yes |
 | 1b | Connor builds post-create PowerAutomate enrichment flow on honorarium `akoya_request` (non-gating; field list TBD) | Connor | (none — parallel) |
 | 2 | `lib/bill.js` — session, create vendor, search/invite network, against a mocked BILL response | Vercel | (none — parallel with Connor) |
 | 3 | Unit tests for `lib/bill.js` | Vercel | Chunk 2 |

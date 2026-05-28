@@ -7,8 +7,8 @@
 
 ### BILL reviewer-honorarium build status (unchanged)
 - **Chunks SHIPPED:** 2-3, 6, 7a.
-- **Chunks PENDING:** 4 (extend respond.js — blocked on Connor), 5 (Stage 2a UI address inputs — held), 8 (E2E sandbox test — blocked on Steph).
-- **Connor still owes:** `wmkf_HonorariumRequest` lookup on `wmkf_potentialreviewer`.
+- **Chunks PENDING:** 4 (extend respond.js — now UNBLOCKED, Connor shipped the schema 2026-05-28), 5 (Stage 2a UI address inputs — held), 8 (E2E sandbox test — blocked on Steph).
+- **Connor's schema work: ✅ SHIPPED 2026-05-28** — `wmkf_HonorariumRequest` lookup on `wmkf_appreviewersuggestion` (the per-engagement junction; the earlier "potentialreviewer" framing was BILL-doc terminology drift, patched same session).
 - **Target ready:** 2026-06-10. First reviewer invitations ≥ 2026-06-17.
 - **S195 clarification:** Chunk 5 is NOT absorbed by the Request Workbench. Stage 2a address-capture lives on `/external/review/[token]/accept` (reviewer side, not PD side). Chunk 5 ships on its own timeline.
 
@@ -75,8 +75,8 @@ None. Pure design.
 ### 1. Lock the tab structure (PRIMARY)
 3-tab (Find + Roster + Closeout) vs 4-tab (Find / Invite / Track / Closeout). User returning with instinct after overnight.
 
-### 2. Name the closeout status field for Connor
-PD marks review closed → status flips on `wmkf_potentialreviewer` (or downstream entity) to trigger BILL flow. Field name should be locked (something rhyming with `payable`) so Connor can add it alongside the still-owed `wmkf_HonorariumRequest` lookup.
+### 2. ✅ CLOSED — closeout status modeling resolved (S196)
+Final model: PD closeout = quality read, not a payment gate. Reviewer submission flips `wmkf_reviewstatus = review_received` (payment-eligible for Steph). PD click "Close out" → `wmkf_reviewstatus = complete` (the previously-unused enum value, Connor confirmed) + new `wmkf_completedat` DateTime. Row drops off PD dashboard. Subpar/withhold case = PD pings Steph out-of-band (no schema). Shipped: `wmkf_completedat` on `wmkf_appreviewersuggestion`, `wmkf_HonorariumRequest` lookup also shipped (Connor).
 
 ### 3. Draft `docs/REQUEST_WORKBENCH_SCOPING.md`
 Connor/Sarah-shareable. Once 1 and 2 are decided, structure is:
