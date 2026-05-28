@@ -1,98 +1,102 @@
-# Session 195 Prompt: Reviewer Workbench redesign — continue scoping
+# Session 196 Prompt: Request Workbench scoping — lock tab structure, then write the doc
 
 ## ⏰ Time-sensitive carryovers
 
-### Operator-side action items (still pending)
-1. **Send DFT courtesy email** — draft written in S193 (in transcript). Still unsent.
-2. **Intake portal virus-scan e2e** — DEFERRED to pre-pilot. Must run EICAR through `/apply` flow before mid-June 2026 Phase II Research pilot. Recipe in [`project-intake-portal-virus-scan-e2e-deferred`](.claude-memory/project-intake-portal-virus-scan-e2e-deferred.md).
+### Operator-side action items
+1. **Intake portal virus-scan e2e** — DEFERRED to pre-pilot. Must run EICAR through `/apply` flow before mid-June 2026 Phase II Research pilot. Recipe in [`project-intake-portal-virus-scan-e2e-deferred`](.claude-memory/project-intake-portal-virus-scan-e2e-deferred.md).
 
-### BILL reviewer-honorarium build status (unchanged from S193)
+### BILL reviewer-honorarium build status (unchanged)
 - **Chunks SHIPPED:** 2-3, 6, 7a.
 - **Chunks PENDING:** 4 (extend respond.js — blocked on Connor), 5 (Stage 2a UI address inputs — held), 8 (E2E sandbox test — blocked on Steph).
 - **Connor still owes:** `wmkf_HonorariumRequest` lookup on `wmkf_potentialreviewer`.
 - **Target ready:** 2026-06-10. First reviewer invitations ≥ 2026-06-17.
-- **Note:** chunk 5 (Stage 2a UI) is the most likely candidate to *pivot into Reviewer Workbench scope* if the redesign starts soon. Discuss before building it standalone.
+- **S195 clarification:** Chunk 5 is NOT absorbed by the Request Workbench. Stage 2a address-capture lives on `/external/review/[token]/accept` (reviewer side, not PD side). Chunk 5 ships on its own timeline.
 
-## Session 194 Summary
+## Session 195 Summary
 
-Two threads: a demo-failure bug hunt that turned into two real fixes, and a redesign-direction conversation that reframes the next major project.
+No code this session — pure design conversation that produced a substantially larger reframe than S194 anticipated.
 
-### What was completed
+### What was decided
 
-1. **Reviewer Finder model-resolver 404 hotfix** (`6ccb221`, `34bfe8a`)
-   - Justin demoed Reviewer Finder to colleagues; it failed with `Claude API error 404: model: sonnet`.
-   - Root cause: `shared/config/baseConfig.js` stores per-app values as tier keys (`'sonnet'`, `'opus'`, `'haiku'`). The tier→concrete-id resolver is injected as a side-effect of importing `lib/services/model-override-loader.js`. None of the three reviewer-finder Claude routes (`analyze.js`, `discover.js`, `generate-emails.js`) imported the loader, so `_resolveModel` stayed as identity and the literal string `'sonnet'` reached Anthropic.
-   - Fix: added the import + `await loadModelOverrides()` to all three routes (mirrors `evaluate-multi-perspective.js` pattern). Plus a defense-in-depth warn-log in `baseConfig.js` that fires once per `(appKey, type)` when `getModelForApp()` is about to return an unresolved tier key — kept inline tier-key set so client bundles don't pull `model-resolver`.
-   - Codex pre-impl review: no findings.
-   - Justin's earlier admin-panel changes (setting tier keys per app) were correct values, but weren't being consulted at all because the loader wasn't running. Now they resolve correctly.
-   - test:ci then failed on the `cross-user-isolation` integration test (its `baseConfig` mock was missing `_setModelResolver` / `_setOverridesCache` / `_shouldReloadOverrides` / `clearModelOverridesCache` — internals that `model-override-loader.js` destructures at top-level). Patched the mock; 1350/1350 passing.
+1. **Reviewer Workbench → Request Workbench.** Holistic per-request surface for the entire PD workflow, not a narrow reviewer-lifecycle slice. URL pattern `/workbench/[requestId]/...`. Every existing per-request operation (`phase-ii-writeup`, `peer-review-summarizer`, `multi-perspective-evaluator`, integrity screener, funding-gap, virtual review panel, …) is a tab/affordance, not a separate app the PD navigates to.
 
-2. **Reviewer Finder parser format drift** (`4531ba4`)
-   - First test after the resolver fix: `Found 0 suggestions, 11 queries`. Claude call succeeded, parser ate the queries but no reviewers.
-   - Diagnosis: sonnet-4-6 emits reviewer block headers as `**REVIEWER:**` / `**REVIEWER 1:**` / `### REVIEWER 1` with markdown decoration. The strict `/REVIEWER:/i` split didn't match. Metadata parser had already been made tolerant for the same kinds of decorations; the reviewer block parser hadn't been.
-   - Fix:
-     - `shared/config/prompts/reviewer-finder.js`: header regex now matches optional bullet (`-`, `*`, `1.`), heading hashes, bold markers, and trailing number. Tail tightly constrained to `(?:\s+\d+)?\s*:?` so a REASONING line starting with "Reviewer is especially qualified..." cannot accidentally split the block (Codex pre-impl catch).
-     - Per-field regexes (`NAME`, `INSTITUTION`, etc.) accept the same `[-*]?\s*\*{0,2}FIELD\*{0,2}` decoration shape as metadata.
-     - `lib/services/claude-reviewer-service.js`: when 0 suggestions parse, log `responseLength` + `containsReviewerToken` + `firstReviewerOffset` unconditionally; raw response window only if `DEBUG_REVIEWER_FINDER=true` (REASONING text can echo proposal content, so the bytes are treated as proposal-derived for logging).
-   - Codex pre-impl review caught 2 issues + suggested test cases (header tail too permissive; 1200-char prod snippet likely contains proposal text). Both folded into the final commit. 9 unit tests cover plain, `**REVIEWER:**`, `**REVIEWER 1:**`, `### REVIEWER 1`, `- REVIEWER:`, `1. REVIEWER:`, REASONING prose containing "REVIEWER", trailing-whitespace headers, and queries-coexistence.
-   - **Verified in prod:** Justin reran upload after the deploy → reviewers parsed successfully.
+2. **Workbench is a display + refinement surface, not a console.** Backend automation tier (event-driven: `proposal-submitted`, `phase-advanced`, `review-submitted`) auto-materializes artifacts (summary, draft writeup, peer-review summary, integrity screen, reviewer longlist, etc.). The Workbench reads state; the PD intervenes where judgment matters. PD-triggered regenerate is exception, not default.
 
-3. **Sidebar diagnostic on `Proposal text bounded at 17,048 characters`**
-   - Confirmed: `REVIEWER_FINDER_PROPOSAL_MAX_CHARS = 100_000` (`lib/utils/ai-payload-boundary.js:36`). "Bounded" wording means *not* truncated; 17,048 chars was the full proposal. Documented in the conversation but no code change.
+3. **This unifies five initiatives that were sitting separate in memory** into the automation tier feeding the Workbench:
+   - `project-backend-automation`
+   - `project-staged-review-pipeline`
+   - `project-proposal-context-extraction`
+   - `project-prompt-storage-strategy` (+ Executor Contract)
+   - `project-new-ai-capabilities`
 
-4. **Reviewer apps redesign conversation** — captured in [`project-reviewer-apps-redesign-direction`](.claude-memory/project-reviewer-apps-redesign-direction.md) memory entry. Headline: Reviewer Finder + Reviewer Manager are archaeological (built across different constraint regimes — pre-Dataverse, single-user, ad-hoc cycle tracking, .eml downloads) and need to be replaced, not cleaned up. New shape:
-   - **Reviewer Workbench** (request-scoped, URL `/reviewer-workbench/[requestId]/...`) replaces Finder + Manager as a unified per-request lifecycle view.
-   - **Reviewer Pool** (request-agnostic) — standalone surface, browse roster with richer Dataverse context than the W6-retired Database tab.
-   - `akoya_request` is the spine; every sub-view operates in request context.
-   - PD landing dashboard: cycle dropdown (defaults to current open), scope dropdown (My-lead / My-lead-or-backup / All — defaults to My-lead), `isActionableForPD(request)` policy function for status filter (rules deferred), strict cycle filter.
-   - Honorarium kickoff fits naturally as a Workbench tab.
-   - **Build deferred.** Justin closing out at end-of-day; will think more at home; S195 likely continues the design conversation. No code yet — goal is a scoping doc shareable with Connor / Sarah first.
+4. **Phase I sunsetting simplifies the trigger model.** J26 is the last Phase I cohort. Going forward: single submission with full materials at the start; "long list → short list" winnowing happens on one submission. Don't over-design dual-phase branching; build for single-submission with internal staging labels.
 
-### Commits this session (3, all pushed)
-```
-4531ba4 Tolerate markdown-decorated reviewer blocks in analysis parser
-34bfe8a Add missing baseConfig internals to cross-user-isolation mock
-6ccb221 Wire model-override-loader into reviewer-finder Claude routes
-```
+5. **Build sequence locked:**
+   - **Now (→ mid-June 2026):** reviewer-lifecycle slice as Workbench v1 + Reviewer Pool. URL pattern is the holistic one even though only one functional area lands.
+   - **Next cycle:** automation tier + writeup tab + analyses tabs + triage surface. Runway: doesn't need to be live until next cycle accepts submissions.
 
-## Potential next steps for S195
+6. **Honorarium is NOT a PD-facing tab.** It's a downstream automation consequence of Closeout: PD marks review closed → status flips to payable → BILL flow runs.
 
-### Path A — Continue Reviewer Workbench design [PRIMARY, USER-DRIVEN]
-Justin closing S194 to think more at home. Likely returning with refined direction. Next conversational beats from where we paused:
-- **Row content** on the dashboard (bare title/PI/institution vs. richer at-a-glance lifecycle state).
-- **Workbench tab layout** (how Find / Invite / Track / Honorarium fit together as sub-views).
-- **Reviewer Pool surface** (which Dataverse fields, what filters/sorts, what actions from there).
-- **Status policy function rules** (`isActionableForPD` — internal-recommendation state vs. official board-signoff state).
+7. **Workbench tabs (working list, structure still open):**
+   - **Find** — candidate discovery (request-aware)
+   - **Invite** — shortlist + dispatch
+   - **Track** — confirmed/pending/declined, materials, review-in-progress, overdue
+   - **Closeout** — read returned review, mark closed → triggers honorarium downstream
 
-Once enough decisions are locked, produce a scoping doc (`docs/REVIEWER_WORKBENCH_SCOPING.md` or similar) shareable with Connor / Sarah BEFORE any code.
+### Workflow signals surfaced
 
-### Path B — Continue BILL chunk 5 standalone
-Stage 2a UI with address inputs. If the redesign is going to absorb this surface, holding chunk 5 is the right move. If S195 confirms redesign-from-scratch isn't starting for weeks, chunk 5 can ship as a standalone increment.
+- Connor maintains a parallel SharePoint folder per cycle (`<Institution>_<RequestNumber>`) because AkoyaGo's proposal-reading UX is painful. Workbench obviates this entirely (proposal viewer + writeup composed in-app eliminates both the read-pain and the filename-as-join-key brittleness).
+- `00_All Staff Versions/` PA-merged PDFs are already automated (intake docs + DB-derived cover page).
+- `0_MR Scored Write Ups/` Word docs are PA-templated; filename-keyed routing back to per-request folder; brittle convention the Workbench-composed writeup eliminates.
+- MR = Medical Research, SE = Science and Engineering. May blur in coming years — don't hardcode program assumptions.
 
-### Path C — Operator items
-- Send the DFT courtesy email drafted in S193.
+### Conversational landing position (where we stopped)
+
+User asked for time to think about one specific structural question:
+
+**Tab structure: Find / Invite / Track / Closeout (4-tab) vs Find + Roster + Closeout (3-tab).** In the 3-tab world, Roster consolidates Invite + Track into one list where actions vary by row state (un-invited row → "Invite"; invited → "Resend" / "Mark declined manually"; confirmed → "Send materials"; etc.). Find stays separate as the search affordance.
+
+User is thinking overnight; S196 picks up here.
+
+### Dashboard left-column compaction (deferred mid-conversation)
+
+Before the holistic reframe, user proposed compacting the existing Reviewer Manager row structure:
+- `#1002279  J26` on one line (number + cycle, both DB-derived) → saves a column
+- Institution above PI line: `PI: Mike Pluth` → saves a column ("the Oregon proposal, not the Pluth proposal")
+- Same compact identity unit becomes the persistent left-side header on every Workbench tab.
+
+This was deferred when we shifted from chrome to workflow ("form follows function"). Worth coming back to once tab structure locks.
+
+## Commits this session
+None. Pure design.
+
+## Potential next steps for S196
+
+### 1. Lock the tab structure (PRIMARY)
+3-tab (Find + Roster + Closeout) vs 4-tab (Find / Invite / Track / Closeout). User returning with instinct after overnight.
+
+### 2. Name the closeout status field for Connor
+PD marks review closed → status flips on `wmkf_potentialreviewer` (or downstream entity) to trigger BILL flow. Field name should be locked (something rhyming with `payable`) so Connor can add it alongside the still-owed `wmkf_HonorariumRequest` lookup.
+
+### 3. Draft `docs/REQUEST_WORKBENCH_SCOPING.md`
+Connor/Sarah-shareable. Once 1 and 2 are decided, structure is:
+- Holistic architecture (three tiers: global / cycle-scoped / per-request)
+- Phasing change + simplified trigger model
+- Reviewer-lifecycle slice as v1 (URL, tabs, what they do, what they replace, integration points with already-shipped reviewer infra)
+- Artifact-storage inventory pass (what's in Dataverse already, what's missing)
+- Explicit out-of-scope for v1 (writeup, analyses tabs, triage surface, automation tier)
+
+### 4. Other open items (deferred — pick up after scoping doc)
+- Row content on the cycle dashboard (compaction direction set, specifics open)
+- `isActionableForPD` policy function rules (internal-recommendation state vs official board-signoff state)
+- Reviewer Pool surface design (which Dataverse fields, what filters/sorts, what actions)
 
 ## Key files reference
 
 | File | Purpose |
 |------|---------|
-| `pages/api/reviewer-finder/{analyze,discover,generate-emails}.js` | MODIFIED S194 — added `loadModelOverrides()` call so tier keys resolve |
-| `shared/config/baseConfig.js` | MODIFIED S194 — drift warn-log when `getModelForApp` is about to return an unresolved tier key |
-| `tests/integration/cross-user-isolation.test.js` | MODIFIED S194 — baseConfig mock now exposes the four internals model-override-loader destructures |
-| `shared/config/prompts/reviewer-finder.js` | MODIFIED S194 — markdown-tolerant reviewer block + field parser |
-| `lib/services/claude-reviewer-service.js` | MODIFIED S194 — forensic logging on 0-parse, DEBUG-gated raw window |
-| `tests/unit/reviewer-finder-parse-analysis.test.js` | NEW S194 — 9 cases locking in parser tolerance shape |
-| `.claude-memory/project-reviewer-apps-redesign-direction.md` | NEW S194 — captures the redesign direction conversation, decisions locked, what's still open |
+| `.claude-memory/project-reviewer-apps-redesign-direction.md` | UPDATED S195 — holistic reframe, build sequence, open tab-structure question |
+| `docs/REQUEST_WORKBENCH_SCOPING.md` | TO BE WRITTEN S196 (or later) — Connor/Sarah-shareable scoping doc |
 
-## Testing (sanity gates)
-
-```bash
-npm run check:atlas                            # 31 PG / 32 DV ✓
-npm run check:api-routes                       # 95 ✓
-npx jest tests/unit/reviewer-finder-parse-analysis  # 9/9 ✓
-npm run test:ci                                # 1359/1359 ✓
-```
-
-## Codex cadence notes
-
-S194 used the Codex pre-impl review loop twice on the two hotfix patches. First round: no findings (resolver wiring). Second round: 2 real issues caught (header regex tail too permissive; 1200-char prod snippet likely contains proposal text) + 4 test-coverage suggestions. Both rounds reviewed quickly because the patches were small and well-scoped. Continue this cadence for the reviewer-workbench build when it starts — design-then-pre-impl-then-impl-then-post-impl per [`project-codex-design-pre-impl-iteration`](.claude-memory/project-codex-design-pre-impl-iteration.md).
+## Testing
+N/A this session (no code changes).
