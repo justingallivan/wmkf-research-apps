@@ -122,9 +122,11 @@ If a reviewer opts out of the honorarium (`honorariumOptOut = true`), step 4's h
   'wmkf_GrantProgram@odata.bind': '/wmkf_grantprograms(<Honorarium GUID>)',
   'wmkf_Type@odata.bind': '/wmkf_types(<Individual GUID>)',
   'akoya_PrimaryContactId@odata.bind': `/contacts(${reviewerContactId})`,
-  // Q5 (per Connor 2026-05-26): link lives on the junction, not on this honorarium row.
-  // After the honorarium request is created, we PATCH wmkf_potentialreviewer(${suggestionId})
-  // with { 'wmkf_HonorariumRequest@odata.bind': '/akoya_requests(<new honorarium id>)' }.
+  // Q5 (per Connor 2026-05-26): link lives on the engagement junction
+  // (wmkf_appreviewersuggestion), not on this honorarium row.
+  // After the honorarium request is created, we PATCH
+  // wmkf_appreviewersuggestions(${suggestionId}) with
+  // { 'wmkf_HonorariumRequest@odata.bind': '/akoya_requests(<new honorarium id>)' }.
   akoya_request: <honorarium amount, e.g. 250>,
   wmkf_meetingdate: <cycle meeting date from suggestion>,
 }
@@ -222,7 +224,7 @@ Today Amy's honorarium #1002764 has zero data link back to grant #1002238 (the U
 
 Proposed new optional Lookup field (per Connor 2026-05-26, refined):
 - Name: `wmkf_HonorariumRequest`
-- **Lives on:** `wmkf_potentialreviewer` (the reviewer/request junction) — NOT on `akoya_request`
+- **Lives on:** `wmkf_appreviewersuggestion` (the per-(reviewer, request) engagement junction) — NOT on `akoya_request`, and NOT on `wmkf_potentialreviewer` (which is the per-person record, not the per-engagement junction; an earlier draft of this doc conflated the two)
 - **Target entity:** `akoya_request` (the honorarium row)
 - **Direction:** junction → honorarium (the junction row points at its honorarium)
 - Required: no
@@ -239,7 +241,7 @@ Downstream payoff:
 
 **Connor's answer (2026-05-26):** Yes, but with a refinement — the more important link is between the **reviewer/request junction record and the honorarium request**, not honorarium → grant request directly. The junction already carries the grant request, so we still get provenance to the grant via one hop, AND we preserve which specific reviewer-of-this-proposal assignment the honorarium pays out.
 
-**Final shape (Connor 2026-05-26):** new lookup `wmkf_HonorariumRequest` **on `wmkf_potentialreviewer`**, target `akoya_request`. The junction row points at its honorarium. Our portal PATCHes the junction with the new honorarium id at create time (we already have the junction id — it's what the token resolves to).
+**Final shape (Connor 2026-05-26; host entity reconfirmed S196 2026-05-28):** new lookup `wmkf_HonorariumRequest` **on `wmkf_appreviewersuggestion`** (the per-(reviewer, request) engagement junction), target `akoya_request`. The junction row points at its honorarium. Our portal PATCHes the junction with the new honorarium id at create time (we already have the junction id — it's what the token resolves to). Connor owns creating the field.
 
 ---
 
@@ -291,7 +293,7 @@ No recommendation — just inputs to our portal design.
 | # | Chunk | Owner | Depends on |
 |---|---|---|---|
 | 0 | This design doc → Connor sign-off | Connor | (none) |
-| 1 | Connor adds `wmkf_HonorariumRequest` lookup on `wmkf_potentialreviewer` → `akoya_request` (Q5) | Connor | Q5 answered yes |
+| 1 | Connor adds `wmkf_HonorariumRequest` lookup on `wmkf_appreviewersuggestion` → `akoya_request` (Q5) | Connor | Q5 answered yes |
 | 1b | Connor builds post-create PowerAutomate enrichment flow on honorarium `akoya_request` (non-gating; field list TBD) | Connor | (none — parallel) |
 | 2 | `lib/bill.js` — session, create vendor, search/invite network, against a mocked BILL response | Vercel | (none — parallel with Connor) |
 | 3 | Unit tests for `lib/bill.js` | Vercel | Chunk 2 |

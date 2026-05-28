@@ -12,7 +12,7 @@ Build the standalone HTTP endpoint that turns "we just created an honorarium `ak
 
 Explicit non-goals:
 - Not creating the honorarium row (chunk 4)
-- Not PATCHing `wmkf_potentialreviewer.wmkf_HonorariumRequest` (chunk 4)
+- Not PATCHing `wmkf_appreviewersuggestion.wmkf_HonorariumRequest` (chunk 4)
 - Not changing the Stage 2a UI (chunk 5)
 - Not implementing the webhook event-dispatch / Dataverse PATCH for `vendor.updated` → "Recently Confirmed" (chunk 7b)
 - Not building a queue / retry job (parent doc deliberately omits this)
