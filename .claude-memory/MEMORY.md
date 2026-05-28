@@ -92,6 +92,7 @@
 
 ## Reviewer Lifecycle
 - [Reviewer apps redesign direction (S194)](project-reviewer-apps-redesign-direction.md) — Finder + Manager slated to be replaced by request-scoped Reviewer Workbench + standalone Reviewer Pool. Architecture decisions locked; build deferred. Don't propose incremental Finder/Manager cleanup as the path forward.
+- [Appresearcher collapse pending post-pilot](project-appresearcher-collapse-post-pilot.md) — `wmkf_appresearcher` 1:1 sidecar is structural redundancy; collapse bibliometric fields into `wmkf_potentialreviewer` post-pilot. Don't act mid-pilot.
 - [Reviewer lifecycle automation plan](project-reviewer-lifecycle.md) — phased plan (A-D); Phase A (CRM send) is foundation
 - [Lifecycle tracking → automation goal](project-reviewer-lifecycle-automation.md) — schema's manual timestamp/status fields designed for cron-driven reminders + state machine in Wave 2
 - [Accept/decline magic links](project-reviewer-accept-decline-links.md) — HMAC primitive shipped; build atop existing token, don't add new secret

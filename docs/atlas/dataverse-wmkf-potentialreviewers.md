@@ -1,4 +1,6 @@
-# Atlas: `wmkf_potentialreviewers` (Dataverse, vendor entity + extensions)
+# Atlas: `wmkf_potentialreviewers` (Dataverse, custom Foundation entity)
+
+<!-- Prior versions of this page labeled this a "vendor entity + extensions." That was wrong. Live EntityDefinitions metadata: IsCustomEntity=true, IsManaged=false → custom Foundation entity, built by/for WMKF (not AkoyaGo). The only true vendor entity in the reviewer stack is akoya_request. Corrected 2026-05-28. -->
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
