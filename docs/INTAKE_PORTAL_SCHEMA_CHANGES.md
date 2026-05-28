@@ -9,6 +9,30 @@ Per `project_dataverse_creator_privileges.md` (2026-05-06), Connor delegated ent
 
 ---
 
+## 2026-05-28 — Request Workbench prep: `wmkf_appreviewersuggestion.wmkf_completedat` (S196)
+
+**Scope:** One DateTime field on `wmkf_appreviewersuggestion`. Deployed via `apply-dataverse-schema.js --wave=5 --execute` against prod. New wave directory (`lib/dataverse/schema/wave5/`) opened to separate Request Workbench prep from intake-portal work.
+
+**Rationale:** The Request Workbench (S195 design reframe, scoped in S196) needs a per-engagement "PD has closed this out" signal so the PD dashboard can filter `wmkf_reviewstatus != complete` and show "closed out N days ago." The existing `wmkf_reviewstatus` picklist already has a `complete` value (100000004) that was previously unused (Connor confirmed S196) — the Workbench claims it for "PD has read the review and is done paying attention" semantics. The new `wmkf_completedat` field pairs with that state, closing the only transition on the row that previously had no paired timestamp (existing pattern: `emailsentat`, `materialssentat`, `responsereceivedat`, `reviewreceivedat`, `thankyousentat`).
+
+Distinct from `wmkf_reviewreceivedat`: that field marks when the *reviewer* submitted (payment-eligibility signal for Steph); `wmkf_completedat` marks when the *PD* finished processing.
+
+**Changes:**
+
+### `wmkf_appreviewersuggestion` — Workbench closeout timestamp
+
+| Schema name | Logical name | Type | Required | Notes |
+|---|---|---|---|---|
+| `wmkf_CompletedAt` | `wmkf_completedat` | DateTime | None (nullable) | Set by the Request Workbench when PD clicks "Close out." No PA / no downstream automation reacts to it; pure record-keeping + dashboard surface. |
+
+**Verification:** Live metadata GET on `EntityDefinitions(LogicalName='wmkf_appreviewersuggestion')/Attributes?$filter=LogicalName eq 'wmkf_completedat'` confirmed `AttributeType=DateTime, IsCustomAttribute=true`. Throwaway verification script (run-and-delete pattern).
+
+**Companion schema work (Connor-owned, not in this deploy):** `wmkf_HonorariumRequest` lookup on the same entity (`wmkf_appreviewersuggestion`), target `akoya_request`, optional. Confirmed host entity with Connor S196 — supersedes the prose in `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md` lines 126/225, which referred to `wmkf_potentialreviewer` due to terminology drift. The BILL doc should be patched separately.
+
+**Status:** DEPLOYED to prod 2026-05-28.
+
+---
+
 ## 2026-05-22 — Slice-0 followup: `contact.wmkf_portaloid` + alternate key (S179, drain plan v7 P2)
 
 **Scope:** One nullable string column + one alternate key on the OOB `contact` entity. Mini-deploy through `apply-dataverse-schema.js --wave=4-followup` (the `parseArgs` parser was extended to accept string-suffixed wave names so this fresh wave directory doesn't re-run wave 4 specs).

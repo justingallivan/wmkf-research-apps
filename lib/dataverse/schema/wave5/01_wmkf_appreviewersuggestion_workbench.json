@@ -1,0 +1,14 @@
+{
+  "name": "wmkf_appreviewersuggestion-workbench",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_appreviewersuggestion",
+  "_comment": "Request Workbench prep (S196). One DateTime field paired with the existing wmkf_reviewstatus = complete (100000004) enum value, which the Workbench claims for 'PD has read the review and is done paying attention' semantics. Closes the only transition timestamp gap on this row (existing pattern: emailsentat, materialssentat, responsereceivedat, reviewreceivedat, thankyousentat — complete had no paired stamp). Connor confirmed 'complete' is unused and the host entity for the (separate) wmkf_HonorariumRequest lookup is also wmkf_appreviewersuggestion; Connor is creating that lookup himself.",
+  "attributes": [
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_CompletedAt",
+      "displayName": "Completed At",
+      "description": "Timestamp when the PD closed out this engagement on the Request Workbench (wmkf_reviewstatus → complete). Distinct from wmkf_reviewreceivedat, which marks when the reviewer submitted their work. Engagement drops off the PD's Workbench dashboard at this stamp."
+    }
+  ]
+}
