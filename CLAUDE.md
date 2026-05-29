@@ -274,7 +274,7 @@ Operational docs to know about (others in `docs/` are design backdrop, roadmaps,
 - **`docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md`** — token primitive, magic-link landing, SharePoint upload flow.
 - **`docs/REVIEWER_INTERACTION_DESIGN.md`** — full reviewer journey design (six stages from invitation through post-submit).
 - **`docs/REVIEWER_STAGE_2A_BUILD_PLAN.md`** — Stage 2a invitation-landing slice. Read before touching `/external/review/[token]` or `/api/external/review/[token]/*`.
-- **`docs/INTAKE_PORTAL_DESIGN.md`** — applicant intake portal pilot (mid-June 2026 Phase II Research).
+- **`docs/INTAKE_PORTAL_DESIGN.md`** — applicant intake portal, being built for the **next cycle's Phase I intake** (single applicant submission). Its body describes the now-superseded June 2026 Phase II Research pilot; live direction is `docs/SYSTEM_MODEL.md`.
 - **`docs/INTAKE_ATTACH_BUILD_SCOPING.md`** + **chunk-3 / chunk-4 / chunk-5 / chunk-6 design docs** — S184's 6-chunk three-call attach build. Scoping doc has the locked A1-A7 contract amendments; per-chunk design docs capture Codex pre-impl + post-impl review outcomes. Read these before touching `/api/intake/draft/upload-token`, `/api/intake/draft/attach`, the `pending_attachments` column, or `MaintenanceService.sweepIntakePending`.
 - **`docs/POSTGRES_TO_DATAVERSE_MIGRATION.md`** — Wave 1+ migration plan.
 - **`docs/GRANT_CYCLE_LIFECYCLE.md`** — proposal lifecycle stages, statuses, triggers.

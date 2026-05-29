@@ -3,7 +3,7 @@
 ## ⏰ Time-sensitive carryovers
 
 ### Operator-side action items
-1. **Intake portal virus-scan e2e** — DEFERRED to pre-pilot. Must run EICAR through `/apply` flow before mid-June 2026 Phase II Research pilot. Recipe in [`project-intake-portal-virus-scan-e2e-deferred`](.claude-memory/project-intake-portal-virus-scan-e2e-deferred.md).
+1. **Intake portal virus-scan e2e** — DEFERRED to pre-launch. Must run EICAR through `/apply` flow before the **next cycle's Phase I intake** goes live (the June 2026 Phase II Research pilot is superseded — see `docs/SYSTEM_MODEL.md`). Recipe in [`project-intake-portal-virus-scan-e2e-deferred`](.claude-memory/project-intake-portal-virus-scan-e2e-deferred.md).
 
 ### BILL reviewer-honorarium build status
 - **Chunks SHIPPED:** 2-3, 6, 7a, **1 (Connor's `wmkf_HonorariumRequest` lookup, S196)**.

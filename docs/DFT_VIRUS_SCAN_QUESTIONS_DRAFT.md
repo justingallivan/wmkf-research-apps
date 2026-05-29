@@ -87,7 +87,7 @@ Q5.1 endpoint AV on staff machines:  defender-for-endpoint | other: ___ | none
 
 We have multiple upload paths into the SharePoint site:
 
-- **Our apps' writes:** reviewer file uploads (active today, ~150/cycle), applicant intake portal (launching mid-June 2026, ~200/cycle), grant-reporting attachments, expense receipts.
+- **Our apps' writes:** reviewer file uploads (active today, ~150/cycle), applicant intake portal (launching next cycle, ~200/cycle), grant-reporting attachments, expense receipts.
 - **Staff direct:** SharePoint web UI, OneDrive desktop sync, Outlook "save attachment," Teams shares.
 - **Integrations:** Power Automate flows, GOapply (until we retire it), historical migrations.
 

@@ -12,7 +12,8 @@ reviewer intake portal: skinny, focused, leverages existing infra.
 donor management, third-party contributor, payment processing, Canada charity
 DB) that WMKF doesn't use. Replicating it would be multi-quarter work for
 features that have no value. Skinny pilot proves the architecture in one cycle
-(Phase II Research, mid-June 2026, ~25 proposals).
+(the next cycle's Phase I intake, ~25 proposals; originally scoped for the
+now-superseded June 2026 Phase II Research pilot — see [[project-system-model]]).
 
 **How to apply:**
 - When sizing pilot work, anchor on "external reviewer intake but for

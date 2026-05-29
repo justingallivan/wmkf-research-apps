@@ -18,7 +18,7 @@ Six systems support WMKF's grant workflow:
 
 5. **SharePoint** — Cloud document storage. Two primary areas: the AkoyaGO site (where AkoyaGO stores documents, not meant for direct user access) and the WMKF site (shared staff documents with multiple sub-sites).
 
-6. **Vercel App Suite** (this project) — 17 purpose-built tools that summarize proposals, find reviewers, screen applicant integrity, explore CRM data, and more. Originally standalone, now with expanding connections to the other systems. The applicant intake portal (`/apply/*`) is in pilot scoping for mid-June 2026 (Phase II Research) — see `docs/INTAKE_PORTAL_DESIGN.md`.
+6. **Vercel App Suite** (this project) — 17 purpose-built tools that summarize proposals, find reviewers, screen applicant integrity, explore CRM data, and more. Originally standalone, now with expanding connections to the other systems. The applicant intake portal (`/apply/*`) is being built for the **next cycle's Phase I intake** — a single applicant submission entered as Phase I (the earlier "mid-June 2026 Phase II Research pilot" framing is superseded; see `docs/SYSTEM_MODEL.md`).
 
 ---
 
@@ -105,7 +105,7 @@ Now we have read access to Dynamics and SharePoint, and leadership buy-in to use
 | **Connor's PA flows** — `akoya_request` create/update flows (file org, AI check-in, staff version) + PA-side `ExecutePrompt` parity oracle | Connor's queue |
 | **Status-driven triggers** — auto-start processing when proposals reach certain stages | Connor's PA flows above; cycle redesign signal |
 | **Cycle-redesigned Reviewer Finder + Staged Pipeline** — adapt to single-package cycle, build fit-screen → intelligence → panel pipeline | Cycle redesign locking with Sarah/Connor |
-| **Intake portal pilot** — applicant submission via `/apply/*` for mid-June 2026 Phase II Research | Form schema + child entity creation + Calendly integration; auth foundation SHIPPED S129 |
+| **Intake portal** — applicant submission via `/apply/*` for the **next cycle's Phase I intake** (single submission; the June 2026 Phase II Research pilot is superseded — see `docs/SYSTEM_MODEL.md`) | Form schema + child entity creation + Calendly integration; auth foundation SHIPPED S129 |
 
 ---
 

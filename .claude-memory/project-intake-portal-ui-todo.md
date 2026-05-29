@@ -37,4 +37,4 @@ Justin (2026-05-25): "I want to dedicate some future sessions to designing the p
 
 ## Why it matters
 
-These are visible to the first real applicants the moment the pilot opens (mid-June 2026). The registration page in particular is the very first impression an applicant gets of WMKF. Worth solving before any pilot user touches the flow.
+These are visible to the first real applicants the moment the next cycle's Phase I intake opens. The registration page in particular is the very first impression an applicant gets of WMKF. Worth solving before any applicant touches the flow.

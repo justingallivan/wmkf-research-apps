@@ -9,7 +9,7 @@ S193 verified the virus-scan reject + system_alerts row + email path end-to-end 
 
 **Why:** Both paths share `lib/services/cloudmersive-scan.js`'s `scanBytes()`. Unit tests cover the intake-attach consume path. Metadata propagation (detectedThreats / verifiedFileFormat) was patched into both paths in S193. So the verification gap is real but small.
 
-**How to apply:** When intake portal work resumes (mid-June 2026 Phase II Research pilot), before going live to real applicants:
+**How to apply:** When intake portal work resumes (the next cycle's Phase I intake; the June 2026 Phase II Research pilot is superseded — see [[project-system-model]]), before going live to real applicants:
 - Sign in via Entra External as a fake applicant (or use a test contact already in the External ID tenant).
 - Create a draft, get to the file-upload step.
 - Upload `/tmp/eicar-test-exe.docx` (Python recipe: zipfile.ZipFile docx-shaped with `/bin/ls` bytes as `word/embedded/payload.bin`) OR any docx with embedded executable bytes.

@@ -1,6 +1,6 @@
 # WMKF Grant Intake Portal — Design Document
 
-**Status:** Design v2 (2026-05-02), status banner refreshed 2026-05-12. **Entra External ID foundation SHIPPED S129** (tenant provisioned, `entra-external` NextAuth provider, `/apply` route round-trip verified) — no longer the external blocker. Sarah is back from conference travel. Remaining work is iterative pilot build: form field inventory with Sarah, structured-tables persistence pattern (defer or implement), `wmkf_portalmembership` entity creation under delegated authority (`project_dataverse_creator_privileges`, summary-after model), virus scanning wiring, PA trigger confirmation. See "Open questions / open work" for full list.
+**Status:** ⚠️ **SUPERSEDED PLAN — retained as design reference.** This document describes the cancelled **June 2026 Phase II Research intake pilot**. The live direction is a **single Phase I intake for the next cycle** (one applicant submission entered as Phase I; "Phase II" is an internal status flip with no separate submission) — see `docs/SYSTEM_MODEL.md` and `docs/INTAKE_PORTAL_DRAIN_PLAN.md` for current state. The detailed design below has NOT been rewritten to the new model; treat it as a record of the earlier pilot pending the next-cycle form redesign. The budget-form scoping in `docs/BUDGET_FORM_SPEC.md` carries forward. Foundation pieces remain valid: **Entra External ID foundation SHIPPED S129** (tenant provisioned, `entra-external` NextAuth provider, `/apply` route round-trip verified). Sarah is back from conference travel. Remaining work is iterative pilot build: form field inventory with Sarah, structured-tables persistence pattern (defer or implement), `wmkf_portalmembership` entity creation under delegated authority (`project_dataverse_creator_privileges`, summary-after model), virus scanning wiring, PA trigger confirmation. See "Open questions / open work" for full list.
 
 **Related:**
 - `docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md` — reference implementation pattern for token-authenticated public surface
@@ -14,7 +14,7 @@
 ## Goals
 
 1. **Long-term target:** full GOapply replacement across all funding lines, on a 12-18 month horizon.
-2. **Pilot:** the **mid-June 2026 Phase II Research submission** (~25 proposals vs. typical 300). Lower volume + a known applicant cohort = forgiving first cut.
+2. **First cut:** the **next cycle's Phase I intake** — a single applicant submission entered as Phase I; low volume + a known applicant cohort = forgiving first cut. *(Written for the now-superseded June 2026 Phase II Research pilot — see Status banner.)*
 3. Eliminate the GOapply mapping/translation layer entirely. Portal writes directly to Dynamics with WMKF's own schema.
 4. Hand off cleanly to the existing reviewer pipeline (Reviewer Finder → Review Manager → External Reviewer Intake) at Phase II Pending status.
 5. Capture **machine-legible structured data** wherever possible (budgets, rosters, milestones as structured fields), not narrative text or PDFs that downstream AI tools have to re-extract.
@@ -23,7 +23,7 @@
 
 The pilot is sized like the **external reviewer intake portal**, not like a GOapply rewrite. Long-term goal is replacement, but every pilot decision should anchor on "external reviewer intake but for applicants" rather than "GOapply but better." Specifics:
 
-- **One funding line, one phase.** Phase II Research, mid-June 2026. Hard cap ~25 proposals.
+- **One funding line, one phase.** The next cycle's Phase I intake. Hard cap ~25 proposals. *(Originally scoped for the superseded June 2026 Phase II Research pilot.)*
 - **Forms-as-code.** No form builder UI. Each cycle = a new versioned form module + deploy. Acceptable for ~6 cycles/year.
 - **No submission PDF generator for pilot — but the reviewer-consumable artifact still has to be defined.** The external reviewer flow today exposes curated SharePoint files under `Reviewer_Downloads/`. If applicant content lives only as Dynamics fields + uploaded attachments, reviewers won't see the structured body of the proposal. Pilot decision needed before launch — options, in rough order of effort:
   1. **Staff-rendered Word/PDF on demand.** Admin clicks "generate review packet" in `/apply/admin/*`; portal renders the form (read-only HTML → Word via existing pattern, or print-to-PDF) and drops it in `Reviewer_Downloads/`. Cheapest; keeps the "no auto-generator" stance.

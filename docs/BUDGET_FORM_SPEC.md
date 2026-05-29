@@ -230,7 +230,7 @@ Both round-up and round-down targets are always shown. In practice, the differen
 
 ## Data wiring
 
-The budget form is **one section** of the larger Phase II Research intake form. It follows the same Postgres-first / async-drain pattern as the rest of the intake portal (see `docs/INTAKE_PORTAL_DESIGN.md` § "Draft staging" and § "Submission lifecycle"). There is no standalone "budget submission" entity — `akoya_request` is the parent.
+The budget form is a planned section of the applicant intake form. *(It was scoped for the now-superseded June 2026 Phase II Research pilot, but the scoping carries forward as planning for the next cycle's Phase I intake form — see `docs/SYSTEM_MODEL.md`.)* It follows the same Postgres-first / async-drain pattern as the rest of the intake portal (see `docs/INTAKE_PORTAL_DESIGN.md` § "Draft staging" and § "Submission lifecycle"). There is no standalone "budget submission" entity — `akoya_request` is the parent.
 
 ### Editing layer — Postgres `intake_drafts.draft_json`
 

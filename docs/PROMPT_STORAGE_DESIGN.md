@@ -48,7 +48,7 @@ These came out of the design conversation in Session 99. Listed here so a fresh 
 
 1. **Storage location: Microsoft Dynamics / Dataverse.** A new table, `wmkf_ai_prompt`, is the single source of truth for both PA and Next.js.
 2. **PowerAutomate composes Claude calls itself** (not dumb-trigger Next.js). This is the reason Dynamics storage wins over Postgres — PA reads Dataverse natively.
-3. **Next.js reads the same Dynamics table** via OData, with aggressive in-process cache (5-min TTL pattern, same as the app-access dispatcher) and a git-backed seed file as fallback for outages.
+3. **Next.js reads the same Dynamics table** via OData. *(Target/unbuilt: the originally-planned in-process cache (5-min TTL) + git-backed seed fallback were never built. Current reality: the live Executor `execute-prompt.js` reads Dataverse on every call and throws on a missing current prompt row — no cache, no bundled fallback. A TTL cache + bundled fallback exist only in the legacy `prompt-resolver.js`, gated by `PROMPT_RESOLVER_STRICT`, which the v2 Executor does not use.)*
 4. **Append-only versions.** A published version is immutable. Any edit produces a new version row. Never mutate a published `wmkf_ai_promptbody`.
 5. **Draft / publish flow.** Edits create a `status=draft` row. An explicit publish step transitions it to `status=published` and swaps the `is_current` pointer. Old `published` versions stay queryable as `status=retired`.
 6. **Dashboard access model:**

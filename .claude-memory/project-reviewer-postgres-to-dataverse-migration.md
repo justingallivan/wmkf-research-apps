@@ -4,7 +4,7 @@ description: Migration scope, model decisions, and feature scope locked 2026-05-
 type: project
 originSessionId: 064dffdf-ba31-44c3-81f2-73bf4d3b908f
 ---
-**Status as of 2026-05-06 (S136)**: Plan rewritten against ground truth. Authoritative doc: `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`. Pilot deadline mid-June 2026 stands.
+**Status as of 2026-05-06 (S136)**: Plan rewritten against ground truth. Authoritative doc: `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`. (The reviewer migration shipped W3–W6 2026-05-12; the "mid-June 2026 pilot deadline" rationale is superseded — that intake pilot was cancelled, see [[project-system-model]].)
 
 ## Ground truth (what's already done)
 

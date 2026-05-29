@@ -3,7 +3,7 @@
 **Created:** 2026-05-06 (Session 136)
 **Last revision:** 2026-05-25 (S188) — stale W3-W5 forward-tense language reconciled across §"Endpoint rewrite scope", §"Dependency-ordered queue", and the W3-W7 schedule table. Whole-doc one-pass sweep, not site-by-site patches.
 **Status:** **Active build, late shipping.** Schema deployed (`wmkf_potentialreviewer` extended, `wmkf_appresearcher`, `wmkf_appreviewersuggestion`, `wmkf_apprequestperson`, `wmkf_appgrantcycle`). `save-candidates` / `my-candidates` / `load-proposal` / `contact-history` live in prod. W3 grant-cycle cutover, W4 reviewer-suggestion data alignment, and the full W5 reader-cutover wave (generate-emails, my-proposals, extract-summary retirement, maintenance blob-scanner) all shipped. W6 step 1 — `researchers.js` retirement + Database tab UI removal — shipped 2026-05-12. Remaining: post-pilot one-shot cleanup/drop script; restore-from-backup script **(⚠️ was double-booked for two unrelated restores; RESOLVED S164 → distinct filenames — see the `restore-reviewer-suggestion-cleanup-backup.js` row in the "Spec'd vs. built" table)**; match-on-discovery wiring + UI (post-pilot); `add-candidate-manual` (post-pilot). See "Spec'd vs. built" table below for the line-by-line state.
-**Priority:** Top — gates the intake portal pilot (mid-June 2026 Phase II Research)
+**Priority:** Top (historical) — was the gate for the intake portal pilot; the reviewer migration shipped W3–W6 2026-05-12, and that pilot is superseded (the live direction is a single Phase I intake for the next cycle — see `docs/SYSTEM_MODEL.md`).
 **Target environment:** Prod (Dataverse Wave 2 schema is live)
 
 ## Read this first: ground truth lives in the Atlas
