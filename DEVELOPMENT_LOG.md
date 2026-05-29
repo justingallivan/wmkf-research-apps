@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## May 2026 — Canonical system model + falsification guardrails + drift reconciliation (Session 197)
+
+**Milestone:** Turned chronic doc/memory nomenclature drift into durable infrastructure. Named the recurring root failure — *searching to confirm, not to falsify* — and built a forcing function for it, plus the project's first canonical conceptual model. Two multi-agent evaluation workflows (drift audit, 10-front codebase eval), each independently Codex-reviewed.
+
+**Sessions:** 197 (single session; 11 commits; 5 Codex review round-trips; 2 background workflows).
+
+**Ship state:**
+- `docs/SYSTEM_MODEL.md` — canonical conceptual model (rote/thinking principle, automation vs record-maturity axes, capabilities/trunk/substrate, Mode 1/2, doc-resolution provenance tiers). Codex-reviewed twice; built-vs-target honesty enforced.
+- **Falsification guardrails (permanent):** PreToolUse hook `.claude/hooks/scope-claim-reminder.js` (wired in `.claude/settings.json`) nags on scope/quantity claims into durable artifacts; Codex stop-time review gate enabled project-wide; protocol in `.claude-memory/feedback-falsify-not-confirm.md`.
+- **Drift reconciled:** the defunct "mid-June 2026 Phase II Research intake pilot" framing rewritten across 16 files (intake is a Phase I build for the next cycle); 142 live `Phase II Pending` status rows + form-module paths left untouched (dual-meaning hazard respected). No-judgment findings + Codex-caught siblings fixed.
+- `docs/CODEBASE_EVALUATION_2026-05-29.md` — read-only 10-front eval (36 agents, 94 retained findings), Codex-corrected; for triage, not applied.
+
+**Why it matters:** S186 named the source-vs-live blind spot; S197 names the agent-vs-its-own-premise blind spot. Self-review can't catch errors baked into its own premise, so the fix is a forcing function (hook) + independent backstop (Codex gate), not willpower. The canonical model gives planning an anchor that prior sessions lacked, which is what let the drift be *reconciled* rather than re-litigated.
+
+**Pointers:** `docs/SYSTEM_MODEL.md`, `docs/CODEBASE_EVALUATION_2026-05-29.md`, `.claude-memory/{project-system-model,feedback-falsify-not-confirm}.md`. Commits `d4e61e9`→`7332da3`.
+
 ## May 2026 — Backend battle-readiness audit + Phase 0 migration tracker (Session 186)
 
 **Milestone:** Audit uncovered three live P0 issues that source-side gates couldn't see — migrations 011 and 013 had never been applied to prod Postgres (drain silently erroring every 2 min since deploy; intake portal endpoints 500 on first call), and the daily maintenance cron's `cleanupExpiredCache` had been failing daily but masking as `status='completed'`. Phase 0 closed all three plus the structural cause (no migration tracker existed). Six-round Codex review iteration on the execution plan before any code ran; GREENLIT at v6.
