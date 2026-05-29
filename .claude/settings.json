@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scope-claim-reminder.js\" 2>/dev/null || true",
+            "timeout": 10,
+            "statusMessage": "scope-claim check"
+          }
+        ]
+      }
+    ]
+  }
+}
