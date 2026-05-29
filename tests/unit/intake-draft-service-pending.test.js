@@ -132,6 +132,11 @@ describe('promoteToClean', () => {
     );
     expect(result).toEqual({ promoted: true });
     expect(sql).toHaveBeenCalledTimes(1);
+    // The UPDATE must carry the frozen-draft guard so an attach can never
+    // append into a submitted draft (Codex: assert the SQL, not just the
+    // mocked return shape). sql.mock.calls[0][0] is the template strings array.
+    const updateSql = sql.mock.calls[0][0].join(' ');
+    expect(updateSql).toContain('request_id IS NULL');
   });
 
   test('race already promoted: 0 rows, probe shows in attachments[]', async () => {
@@ -175,6 +180,32 @@ describe('promoteToClean', () => {
       999, ATTACHMENT_ID, cleanRow(), CARDINALITY,
     );
     expect(result).toEqual({ promoted: false, reason: 'draft_not_found' });
+  });
+
+  // Codebase eval 2026-05-29: the UPDATE now carries `AND request_id IS NULL`,
+  // so an /attach that lands after /submit froze the draft cannot append into
+  // the submitted draft. The probe disambiguates this from the cap gate via
+  // request_id.
+  test('draft submitted (frozen) before promote: 0 rows, probe shows is_submitted → draft_submitted', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ is_submitted: true, in_attachments: false, in_pending: true, field_count: '0' }] });
+    const result = await IntakeDraftService.promoteToClean(
+      DRAFT_ID, ATTACHMENT_ID, cleanRow(), CARDINALITY,
+    );
+    expect(result).toEqual({ promoted: false, reason: 'draft_submitted' });
+  });
+
+  test('already promoted before freeze wins over draft_submitted (idempotent outcome)', async () => {
+    // Entry made it into attachments[] before /submit froze the draft — that
+    // is the benign idempotent case, not a draft_submitted refusal.
+    sql
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ is_submitted: true, in_attachments: true, in_pending: false, field_count: '1' }] });
+    const result = await IntakeDraftService.promoteToClean(
+      DRAFT_ID, ATTACHMENT_ID, cleanRow(), CARDINALITY,
+    );
+    expect(result).toEqual({ promoted: false, reason: 'race_already_promoted' });
   });
 
   test('throws on missing attachmentId', async () => {

@@ -663,6 +663,44 @@ describe('promoteToClean result mapping', () => {
     );
   });
 
+  test('draft_submitted (frozen mid-attach) → 409 + del orphan bytes + removePending', async () => {
+    // promoteToClean refused because /submit froze the draft after our
+    // entry-time request_id check. Clean bytes are now an orphan — del + drop
+    // pending, and tell the applicant the draft is no longer editable.
+    IntakeDraftService.promoteToClean.mockResolvedValue({
+      promoted: false, reason: 'draft_submitted',
+    });
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(409);
+    expect(res.body.error).toBe('draft_submitted');
+    expect(blobDel).toHaveBeenCalled();
+    expect(IntakeDraftService.removePending).toHaveBeenCalled();
+    // Clean refusal — no draft.attach success audit.
+    const draftAttachCalls = IntakeAuditService.log.mock.calls.filter(
+      ([row]) => row.action === 'draft.attach',
+    );
+    expect(draftAttachCalls).toHaveLength(0);
+  });
+
+  test('draft_submitted + del() throws → 409 + audit attach_submitted_race_del_failed', async () => {
+    IntakeDraftService.promoteToClean.mockResolvedValue({
+      promoted: false, reason: 'draft_submitted',
+    });
+    blobDel.mockRejectedValue(Object.assign(new Error('blob 5xx'), {
+      serviceName: 'blob', status: 503, isTransient: true,
+    }));
+    const { req, res } = makeReqRes(validBody());
+    await handler(req, res);
+    expect(res.statusCode).toBe(409);
+    expect(res.body.error).toBe('draft_submitted');
+    expect(IntakeAuditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'draft.attach_submitted_race_del_failed' }),
+    );
+    // removePending must still run even though the Blob del threw (Codex).
+    expect(IntakeDraftService.removePending).toHaveBeenCalled();
+  });
+
   test('multi-valued field with missing maxFiles → endpoint falls back to cap:1 (Codex Q4)', async () => {
     findFileField.mockReturnValue({
       key: 'co_investigator_biosketches',

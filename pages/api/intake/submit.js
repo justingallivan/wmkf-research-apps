@@ -321,12 +321,51 @@ export default async function handler(req, res) {
     // Move the draft out of the requestless partial-unique by binding it to
     // the request_id we just claimed. Guarded by request_id IS NULL so a
     // concurrent retry that already advanced is a no-op.
-    await client.query(
+    //
+    // Optimistic-concurrency guard (Codebase eval 2026-05-29 #2 P1): we also
+    // require the draft to be UNCHANGED since we snapshotted it for `payload`
+    // at load-time — pending still empty AND the attachments count unchanged.
+    // The payload's attachments[] is frozen from the load-time read; if a
+    // concurrent /attach promotes a file into the draft between then and now,
+    // committing would queue a submission that omits that file, orphaning it
+    // (it sits in intake_drafts.attachments[] with no path into the request).
+    // No LIVE intake route removes from attachments[] — the only writer is
+    // promoteToClean (append-only); IntakeDraftService.removeAttachment exists
+    // but is script-only — so on the live paths a count change means a
+    // concurrent promote, making count-equality an exact guard. (A
+    // microsecond-vs-millisecond mismatch makes an updated_at equality guard
+    // unsafe for this timestamptz column, hence the count check. If a
+    // remove-attachment route is ever added, revisit this to a stronger guard.)
+    const freezeRes = await client.query(
       `UPDATE intake_drafts
           SET request_id = $1, updated_at = now()
-        WHERE id = $2 AND request_id IS NULL`,
-      [jobRow.request_id, draft.id],
+        WHERE id = $2
+          AND request_id IS NULL
+          AND jsonb_array_length(COALESCE(attachments, '[]'::jsonb)) = $3
+          AND jsonb_array_length(COALESCE(pending_attachments, '[]'::jsonb)) = 0`,
+      [jobRow.request_id, draft.id, attachments.length],
     );
+
+    if (freezeRes.rowCount === 0) {
+      // The freeze didn't apply. Disambiguate: an already-frozen draft
+      // (idempotent retry of the same key, or a parallel submit that won) is
+      // benign — fall through and COMMIT, since the ON CONFLICT INSERT
+      // returned the authoritative existing job. A still-NULL request_id
+      // means our guard tripped on a concurrent mutation: roll back (don't
+      // queue a stale payload) and have the client re-submit against the
+      // fresh draft.
+      const recheck = await client.query(
+        'SELECT request_id FROM intake_drafts WHERE id = $1',
+        [draft.id],
+      );
+      const frozenRequestId = recheck.rows[0]?.request_id ?? null;
+      if (frozenRequestId === null) {
+        await client.query('ROLLBACK');
+        return jsonError(res, 409, 'draft_changed_retry', {
+          message: 'An upload finished while you were submitting. Refresh and submit again so the file is included.',
+        });
+      }
+    }
 
     await client.query('COMMIT');
   } catch (err) {

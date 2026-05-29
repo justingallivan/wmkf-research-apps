@@ -648,6 +648,38 @@ export default async function handler(req, res) {
         current: promotion.fieldCount,
       });
     }
+    case 'draft_submitted': {
+      // The draft was frozen by /submit between our entry-time request_id
+      // check (step 8) and promoteToClean. promoteToClean's `request_id IS
+      // NULL` guard refused to append into the submitted draft. The scanned
+      // bytes are now a clean orphan — del them and drop the pending entry
+      // (the submission has already snapshotted; this attachment can't join
+      // it). Mirrors the cap_exceeded_race cleanup + del-failure audit.
+      const delErr = await delBlobSilent();
+      await removePendingSilent();
+      if (delErr) {
+        auditFireAndForget({
+          actorOid: contactOid,
+          actorType: 'applicant',
+          action: 'draft.attach_submitted_race_del_failed',
+          targetEntity: 'intake_drafts',
+          targetId: draftId,
+          payload: { filename: pending.filename },
+          metadata: {
+            draftId, attachmentId, fieldKey: pending.fieldKey, pathname: pending.pathname,
+            delError: {
+              serviceName: delErr.serviceName,
+              status: delErr.status,
+              isTransient: delErr.isTransient,
+              message: delErr.message,
+            },
+          },
+        });
+      }
+      return jsonError(res, 409, 'draft_submitted', {
+        message: 'This draft has been submitted and is no longer editable.',
+      });
+    }
     case 'pending_not_found':
       // Sweep removed entry during scan window. No audit.
       return jsonError(res, 404, 'pending_not_found');
