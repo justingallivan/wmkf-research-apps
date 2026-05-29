@@ -127,24 +127,30 @@ hangs off events and state transitions:
    **Executor contract** is implemented **twice, independently** — Vercel JS `executePrompt()` (the
    reference implementation) and a PA child flow. **Neither calls the other**; both read the prompt
    from Dataverse and call the Claude API directly, kept aligned by the spec + a byte-identical
-   conformance test.
+   conformance test. *(Verified in-repo on the Vercel side at `execute-prompt.js`; the PA
+   implementation is Connor's, off-repo, so "neither calls the other" is per-contract, not
+   repo-verified.)*
    - *Operational risk (un-hand-waved):* two independent implementations means **release ordering,
      version compatibility, drift detection, and rollback** across runtimes are real concerns. The
      conformance test is the drift detector; release-ordering/rollback ownership is **not yet
      defined** and should be before the PA side ships broadly.
-   - *Status:* contract shipped (Vercel); **~1 of ~19 LLM surfaces** read their prompt from
-     Dataverse today — the rest use bundled in-repo prompts. **Prompt migration is a named
-     workstream, not a background detail.** Migration is **demand-driven**: a prompt moves to
-     Dataverse when it becomes **shared** (a second caller, esp. PA). *(Open fork: does
-     staff-editability* also *force a Dataverse home, or only cross-surface sharing? — unresolved.)*
+   - *Status:* contract shipped (Vercel). Today **one live route** (`/api/phase-i-dynamics/summarize-v2`)
+     reads its prompt from Dataverse via the Executor; the rest still use bundled in-repo prompts
+     (`shared/config/prompts/`). **Prompt migration is a named workstream, not a background detail.**
+     Migration is **demand-driven**: a prompt moves to Dataverse when it becomes **shared** (a second
+     caller, esp. PA). *(Open fork: does staff-editability* also *force a Dataverse home, or only
+     cross-surface sharing? — unresolved.)* (Counts: the canonical **app count is 17**; the A7
+     prompt-injection **input-surface registry is 24** — different denominators, don't conflate.)
 2. **Identity & access scoping** — who sees what (per-app grants, active-user checks, superuser;
    dual-provider auth for staff vs. applicants). **Applies to documents too** (see resolution).
 
 ## Domain services (grant-domain-specific shared services)
 
 3. **Document resolution over SharePoint** — resolves "the *proposal* for request X" to a specific
-   file and presents a clean link, instead of dumping the user into a noisy folder. This is a
+   file and presents a clean link, instead of dumping the user into a noisy folder. Intended as a
    **stateful domain service**, not a primitive — see "Document resolution: the failure-mode model."
+   **Target-state:** today's code is path-based (`GraphService.downloadFileByPath` resolves by
+   library/folder/filename); the provenance-tier index below is design, not built.
 4. **Per-user personalization** — the layer over shared cores (a PD's preferred reviewer-email
    wording, model choice, settings). Lets "same shared prompt, my email voice, only my records"
    coexist without forking the shared prompt. Prompt resolution is the same shape (below).
@@ -196,8 +202,12 @@ to Dataverse); *turn-by-turn judgment* → stays user-facing (Mode 2).
   normalization, history migration — is under-specified; define when built.)*
 - **In-repo bundled** — built-in default prompts (single-surface, not yet shared).
 
-**Prompt resolution** (layered exactly like personalization):
+**Prompt resolution — TARGET/conceptual layering** (no single current code path implements it):
 `Postgres per-user override → Dataverse canonical/shared → in-repo bundled default`.
+*Current reality:* the Executor (`execute-prompt.js:215`) reads Dataverse and **throws if no current
+prompt row exists — there is no bundled fallback in that path**. A bundled fallback exists only in the
+*legacy* `prompt-resolver.js` (gated by `PROMPT_RESOLVER_STRICT`), and the **Postgres per-user override
+tier is not built**. The three-tier order above is the intended end-state, not today's behavior.
 
 **Two interaction modes** (orthogonal to origin/destination; the mode decides whether the prompt
 machinery even applies):
@@ -220,7 +230,12 @@ docs → in-context LLM) end-to-end. Also doubles as the document-correction sur
 
 ## Document resolution: the failure-mode model
 
-Resolution is a **stateful domain service**. Every resolution carries a **provenance tier**, and the
+> **Target-state design, NOT current implementation.** Today resolution is path-based
+> (`GraphService.downloadFileByPath` resolves by library/folder/filename; `sharepoint-buckets.js`
+> returns `{library, folder, source}`). The provenance-tier index, driveItem-ID pointers, and
+> tier-gated automation below are the *intended* design — none is built yet.
+
+Resolution should be a **stateful domain service**. Every resolution carries a **provenance tier**, and the
 *tier — not the file — gates how it may be used*:
 
 | Tier | Origin | Safe for |
