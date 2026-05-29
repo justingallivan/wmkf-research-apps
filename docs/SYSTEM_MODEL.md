@@ -135,8 +135,9 @@ hangs off events and state transitions:
      conformance test is the drift detector; release-ordering/rollback ownership is **not yet
      defined** and should be before the PA side ships broadly.
    - *Status:* contract shipped (Vercel). Today **one live route** (`/api/phase-i-dynamics/summarize-v2`)
-     reads its prompt from Dataverse via the Executor; the rest still use bundled in-repo prompts
-     (`shared/config/prompts/`). **Prompt migration is a named workstream, not a background detail.**
+     reads its prompt from Dataverse via the Executor; the rest still use bundled in-repo prompts —
+     which live in **three places** per the A7 surface taxonomy: `shared/config/prompts/`,
+     route-local, and service-local (e.g. `panel-review-service.js`). **Prompt migration is a named workstream, not a background detail.**
      Migration is **demand-driven**: a prompt moves to Dataverse when it becomes **shared** (a second
      caller, esp. PA). *(Open fork: does staff-editability* also *force a Dataverse home, or only
      cross-surface sharing? — unresolved.)* (Counts: the canonical **app count is 17**; the A7
@@ -220,9 +221,10 @@ machinery even applies):
 | Examples | proposal summary, Phase I writeup, integrity screen | "consult LLM on this proposal"; NL CRM chat; Phase II "ask questions" |
 | Governed by | Executor contract, prompt migration, dual-caller | context assembly + ephemerality only |
 
-**"Consult LLM" (Mode 2 exemplar + de-risking first slice):** in the Workbench the proposal is
-already linked; a PD clicks "consult LLM" → a chat opens with the proposal auto-attached (from the
-document index) → ephemeral output (transcript/export/download, *not* Dataverse). Low-dependency (no
+**"Consult LLM" (Mode 2 exemplar + de-risking first slice — target-state):** in the Workbench the
+proposal is already linked; a PD clicks "consult LLM" → a chat opens with the proposal auto-attached
+(from the document index — *which isn't built yet; see the target-state banner under "Document
+resolution"*) → ephemeral output (transcript/export/download, *not* Dataverse). Low-dependency (no
 state machine, no payments, no prompt migration) but exercises the highest-value plumbing (linked
 docs → in-context LLM) end-to-end. Also doubles as the document-correction surface (below).
 
