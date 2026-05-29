@@ -88,6 +88,18 @@ export default async function handler(req, res) {
       results.billWebhookEvents = { error: error.message };
     }
 
+    // 4.7. maintenance_runs audit retention (eval #3 follow-up). The
+    //      drain-submissions cron writes here on every active/failed tick;
+    //      without a sweep the table grows unbounded. Default 90d
+    //      (Dataverse-overridable via retention:maintenance_runs_days). The
+    //      current run's own row (started just now) is never reaped.
+    try {
+      results.maintenanceRuns = await MaintenanceService.cleanupMaintenanceRuns(config.maintenance_runs_days);
+      totalDeleted += results.maintenanceRuns;
+    } catch (error) {
+      results.maintenanceRuns = { error: error.message };
+    }
+
     // 5. Old alerts cleanup
     try {
       results.alerts = await AlertService.cleanupOldAlerts(config.alert_days);
