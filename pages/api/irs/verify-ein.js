@@ -9,7 +9,7 @@
  * Auth: shared secret in the `x-irs-verify-secret` request header,
  *   matching the `IRS_VERIFY_SECRET` env var. PowerAutomate sends this
  *   header from its connector configuration. The endpoint is allowlisted
- *   in `middleware.js` so it does not require an NextAuth session JWT.
+ *   in `proxy.js` so it does not require an NextAuth session JWT.
  *
  * Request:
  *   GET /api/irs/verify-ein?ein=XX-XXXXXXX

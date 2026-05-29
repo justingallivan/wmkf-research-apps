@@ -1,6 +1,6 @@
 /**
- * Auth policy — pin the contract that middleware.js (Edge) and lib/utils/auth.js
- * (Node) now share. Before this consolidation, middleware used a one-liner
+ * Auth policy — pin the contract that proxy.js (Node.js runtime) and lib/utils/auth.js
+ * now share. Before this consolidation, middleware used a one-liner
  *
  *     if (process.env.AUTH_REQUIRED !== 'true') return true;
  *

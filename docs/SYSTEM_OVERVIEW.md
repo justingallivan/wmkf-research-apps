@@ -42,9 +42,8 @@ All applications are AI-powered, using Anthropic's Claude models. _(This list is
 
 | Metric | Value |
 |--------|-------|
-| Applications | 13 |
-| API endpoints | 34 |
-| Lines of code | ~54,000 |
+| Applications | 17 |
+| API route files | 95 |
 | Source files | 144 |
 | Service modules | 14 |
 | External integrations | 8 services |

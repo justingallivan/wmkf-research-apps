@@ -1071,7 +1071,7 @@ All new server-side outbound HTTP requests should use `safeFetch` from `lib/util
 
 **Risk:** If an XSS vulnerability exists anywhere in the application, stored API keys can be exfiltrated.
 
-**Recommendation:** Remove the localStorage fallback entirely, or use the Web Crypto API (`SubtleCrypto`) for client-side encryption. Prefer server-side-only key storage via the `user_preferences` encrypted path.
+**Recommendation:** Remove the localStorage fallback entirely, or use the Web Crypto API (`SubtleCrypto`) for client-side encryption. Prefer server-side-only key storage via the Dataverse `wmkf_appuserpreferences` encrypted path (Postgres `user_preferences` was dropped 2026-05-12).
 
 **Status: REMEDIATED.** localStorage fallback removed from `ApiKeyManager.js`, `ApiSettingsPanel.js`, `expense-reporter.js`, and `reviewer-finder.js`. API keys now require a user profile for storage (encrypted in database). Migration flow cleans up any legacy localStorage entries. Note: legacy Base64-encoded keys may still exist in users' browsers until they trigger the migration prompt.
 

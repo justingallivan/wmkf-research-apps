@@ -163,8 +163,8 @@ The run log already exists (Connor's side). Three additions for override and pro
 |---|---|---|
 | `wmkf_ai_promptversion` | Integer | Existing. Points at the base version the call started from, even when overridden. |
 | `wmkf_ai_promptoverride` | Memo (nullable) | Full override text if the user modified the prompt for this run. NULL if the call used the published body unmodified. Same memo cap as `wmkf_ai_promptbody`. **Live** (truncated to 4000 chars at write time per `lib/services/execute-prompt.js`). |
-| `wmkf_ai_promptoverridden` | Bool | Denormalized flag for fast filtering ("show me all runs that used overrides"). **Live** (`execute-prompt.js:549/553`). |
-| `wmkf_ai_runsource` | Choice | Picklist value mapped from `RUN_SOURCE` (e.g., `Vercel User`, `Vercel Interactive`, `PowerAutomate Auto`). Distinguishes PA auto-drafts from user overrides from superuser test-runs, used for cost attribution and eval filtering. **Live** (`execute-prompt.js:535`). |
+| `wmkf_ai_promptoverridden` | Bool | Denormalized flag for fast filtering ("show me all runs that used overrides"). **Live** (`execute-prompt.js` `writeRunRow()`). |
+| `wmkf_ai_runsource` | Choice | Picklist value mapped from `RUN_SOURCE` (e.g., `Vercel User`, `Vercel Interactive`, `PowerAutomate Auto`). Distinguishes PA auto-drafts from user overrides from superuser test-runs, used for cost attribution and eval filtering. **Live** (`execute-prompt.js` `writeRunRow()`). |
 
 ## What PowerAutomate inherits by composing Claude calls itself
 

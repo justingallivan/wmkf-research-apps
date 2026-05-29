@@ -172,7 +172,7 @@ function isApplyPath(cb) {
 
 // Prevent authenticated users from seeing this page.
 //
-// Uses the same strict checks as middleware.js (azureId present + not idle)
+// Uses the same strict checks as proxy.js (azureId present + not idle)
 // to avoid a redirect loop: middleware rejects stale tokens, but getSession()
 // treats an empty-but-decodable JWT as a valid session. When the two disagree,
 // the browser bounces between /auth/signin and / until it gives up ("Too many
