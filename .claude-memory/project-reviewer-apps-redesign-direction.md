@@ -25,7 +25,7 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 
 **This unifies several initiatives that were sitting separate in memory:** [[project-backend-automation]], [[project-staged-review-pipeline]], [[project-proposal-context-extraction]], [[project-prompt-storage-strategy]], [[project-new-ai-capabilities]]. They are the **automation tier** feeding the Workbench, not separate projects.
 
-**Phase I is sunsetting** ([[project-grant-phasing-evolution]]). J26 is the last Phase I cohort. Going forward: single submission with full materials at the start; "long list → short list" winnowing still happens but on one submission. **This simplifies the trigger model** — don't over-design dual-phase branching; build the pipeline for single-submission with internal staging labels.
+**The two-stage submission *process* is sunsetting** ([[project-grant-phasing-evolution]]): J26 is the last cohort with a *separate* Phase I → Phase II submission. Going forward there is **one submission, entered as Phase I**, with "Phase II" as an internal status flip (no Phase II uploads) — full materials arrive at the start; "long list → short list" winnowing still happens but on that one submission. **This simplifies the trigger model** — don't over-design dual-phase branching; build the pipeline for single-submission with internal staging labels.
 
 ---
 

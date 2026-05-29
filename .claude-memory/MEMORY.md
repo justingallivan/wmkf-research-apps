@@ -43,6 +43,7 @@
 - [IRS tax-exempt verification](project-irs-exempt-verification.md) — bulk CSVs in Postgres, PA→Vercel lookup endpoint, verified result written back to Dynamics `account`.
 
 ## Strategic Direction
+- [Whole-system conceptual model](project-system-model.md) — canonical model at `docs/SYSTEM_MODEL.md`: rote/thinking principle, two orthogonal axes (automation vs record-maturity), app = prompt×adapter, backend-automation-is-a-PA-dependency-not-a-capability, two interaction modes, doc-resolution provenance tiers, reviewer state machine = backbone. Read before cross-capability planning. Intake "Phase II pilot" is DEFUNCT; drift sweep + sequencing pending.
 - [Strategy direction + key decisions](project-strategy-direction.md) — AkoyaGO posture (minimize, not replace), Dynamics as ground truth, backend triggers, Connor collaboration. See `docs/STRATEGY.md` for full doc.
 - [Backend Automation Vision](project-backend-automation.md) — PowerAutomate-triggered processing, configurable prompts, Dynamics write-back
 - [Interim grant report auto-evaluation](project-interim-report-automation.md) — backend job to evaluate yearly interim reports + write to Dynamics. Unblocked; field/prompt/process design still needed.
