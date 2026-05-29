@@ -138,6 +138,7 @@ function Dispatcher({ data, token, viewOverride, onRequestDecline, onRequestFlip
       return (
         <DeclineFormView
           token={token}
+          etag={data.etag}
           onCancel={onCancelOverride}
           onDeclined={onResponseSubmitted}
         />

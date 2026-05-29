@@ -43,6 +43,38 @@ import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
+
+// Per-field caps for reviewer-supplied contact corrections. Dataverse enforces
+// its own column limits (an oversized value would surface as a 500 from the
+// PATCH), so this is defense-in-depth that returns a clean 400 instead. The
+// affiliation cap matches review-form-schema.js (`maxLength: 300`).
+const CONTACT_EDIT_MAX = {
+  firstName: 100, lastName: 100, nickname: 100, title: 200,
+  affiliation: 300, email: 320, orcid: 64,
+};
+
+/**
+ * Validate reviewer-supplied contactEdits. Returns null if valid, or a
+ * { reason, field } describing the first violation (caller sends 400).
+ * Only fields actually present are checked; null/'' are allowed (they clear).
+ */
+function validateContactEdits(edits) {
+  if (edits === undefined || edits === null) return null;
+  if (typeof edits !== 'object' || Array.isArray(edits)) {
+    return { reason: 'invalid_contact_edits' };
+  }
+  for (const [k, v] of Object.entries(edits)) {
+    if (!(k in CONTACT_EDIT_MAX)) return { reason: 'unknown_contact_field', field: k };
+    if (v === null || v === undefined || v === '') continue; // clears the field
+    if (typeof v !== 'string') return { reason: 'invalid_contact_field', field: k };
+    if (v.length > CONTACT_EDIT_MAX[k]) return { reason: 'contact_field_too_long', field: k };
+    // Minimal email shape check: a single @ with non-empty local + domain.
+    if (k === 'email' && !/^[^@\s]+@[^@\s]+$/.test(v)) {
+      return { reason: 'invalid_email', field: k };
+    }
+  }
+  return null;
+}
 const REVIEW_STATUS_MATERIALS_SENT = 100000001;
 const RESPONSE_TYPE_ACCEPTED = 100000000;
 const RESPONSE_TYPE_DECLINED = 100000001;
@@ -73,6 +105,12 @@ export default async function handler(req, res) {
     const body = req.body || {};
     if (body.action !== 'accept' && body.action !== 'decline') {
       return res.status(400).json({ ok: false, reason: 'invalid_action' });
+    }
+
+    // Validate reviewer-supplied contact corrections before any write.
+    const contactErr = validateContactEdits(body.contactEdits);
+    if (contactErr) {
+      return res.status(400).json({ ok: false, ...contactErr });
     }
 
     // ── State machine guard ────────────────────────────────────────────────

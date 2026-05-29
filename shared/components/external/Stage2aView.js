@@ -83,7 +83,12 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
       }
       const resp = await fetch(`/api/external/review/${encodeURIComponent(token)}/respond`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          // Optimistic lock: round-trip the suggestion _etag from page load so
+          // a concurrent staff edit is caught with a 412 (handled below).
+          ...(data.etag ? { 'If-Match': data.etag } : {}),
+        },
         body: JSON.stringify({
           action: 'accept',
           contactEdits: Object.keys(contactEdits).length ? contactEdits : undefined,

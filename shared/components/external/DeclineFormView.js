@@ -19,7 +19,7 @@ const DECLINE_REASONS = [
   { value: 'other', label: 'Other' },
 ];
 
-export default function DeclineFormView({ token, onCancel, onDeclined }) {
+export default function DeclineFormView({ token, etag, onCancel, onDeclined }) {
   const [referral, setReferral] = useState('');
   const [reasonPicklist, setReasonPicklist] = useState('');
   const [reasonText, setReasonText] = useState('');
@@ -38,7 +38,12 @@ export default function DeclineFormView({ token, onCancel, onDeclined }) {
     try {
       const resp = await fetch(`/api/external/review/${encodeURIComponent(token)}/respond`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          // Optimistic lock: round-trip the suggestion _etag from page load so
+          // a concurrent staff edit is caught with a 412 (handled below).
+          ...(etag ? { 'If-Match': etag } : {}),
+        },
         body: JSON.stringify({ action: 'decline', decline }),
       });
       const json = await resp.json().catch(() => ({}));

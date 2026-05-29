@@ -64,6 +64,10 @@ export default async function handler(req, res) {
     // Engagement state — drives which view the page renders.
     const engagementState = computeEngagementState(suggestion);
 
+    // Optimistic-lock token returned to the client (round-tripped as If-Match
+    // on /respond). Starts as the row's etag at verify time.
+    let etag = suggestion._etag || null;
+
     // Best-effort first-access stamp. (Existing behavior preserved.)
     if (!suggestion.wmkf_proposalfirstaccessed) {
       try {
@@ -74,8 +78,28 @@ export default async function handler(req, res) {
             { wmkf_proposalfirstaccessed: new Date().toISOString() },
           ),
         );
+        // The stamp bumped the row's etag; the one we read pre-stamp is now
+        // stale. Re-read it so the client's round-tripped If-Match matches
+        // current state — otherwise EVERY first-visit accept/decline would
+        // false-412. If the re-read fails, return null (disable the lock for
+        // this one response) rather than hand back a known-stale etag.
+        try {
+          const fresh = await bypassDynamicsRestrictions('external-context-refetch-etag', () =>
+            DynamicsService.getRecord(
+              'wmkf_appreviewersuggestions',
+              suggestion.wmkf_appreviewersuggestionid,
+              { select: 'wmkf_appreviewersuggestionid' },
+            ),
+          );
+          etag = fresh?._etag || null;
+        } catch (e2) {
+          console.error('[external context] etag re-read after first-access failed:', e2.message);
+          etag = null;
+        }
       } catch (e) {
         console.error('[external context] failed to stamp first-accessed:', e.message);
+        // Stamp failed → the row was not changed → the pre-stamp etag is still
+        // valid, so `etag` is left as-is.
       }
     }
 
@@ -152,6 +176,14 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       engagementState,
+      // Optimistic-concurrency token: the suggestion row's _etag at page-load
+      // time (processAnnotations renames @odata.etag → _etag). The client
+      // round-trips this as an If-Match header on /respond so a concurrent
+      // staff edit (e.g. materials-sent) is caught with a 412 instead of being
+      // silently clobbered. Null-safe: a missing etag just disables the check.
+      // Reflects the post-first-access-stamp row (re-read above) so first
+      // visits don't false-412.
+      etag,
       proposal: {
         title: request.akoya_title || 'Untitled proposal',
         requestNumber: request.akoya_requestnum,

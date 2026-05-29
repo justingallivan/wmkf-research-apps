@@ -17,6 +17,7 @@ import { DynamicsService } from '../../lib/services/dynamics-service';
 import { GraphService } from '../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../lib/utils/sharepoint-buckets';
 import { writeReviewFiles } from '../../lib/services/review-upload';
+import { applyStage2aResponse } from '../../lib/dataverse/adapters/reviewer-suggestion';
 
 jest.mock('../../lib/external/verify-suggestion-token', () => ({
   verifySuggestionToken: jest.fn(),
@@ -70,6 +71,10 @@ jest.mock('../../lib/services/review-upload', () => ({
   writeReviewFiles: jest.fn(),
 }));
 
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
+  applyStage2aResponse: jest.fn(async () => ({})),
+}));
+
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
 }));
@@ -78,6 +83,7 @@ const verifiedSuggestion = {
   ok: true,
   suggestion: {
     wmkf_appreviewersuggestionid: 'suggestion-1',
+    _etag: 'W/"1001"',
     wmkf_externaltokenexpires: '2026-06-01T00:00:00.000Z',
     wmkf_proposalfirstaccessed: null,
     wmkf_reviewreceivedat: null,
@@ -183,6 +189,59 @@ describe('/api/external/review/[token]/context', () => {
         library: 'akoya_request',
       }),
     ]);
+  });
+
+  it('surfaces the suggestion _etag (returning visitor, no first-access stamp) so the client can round-trip it as If-Match (eval #2)', async () => {
+    // Already-accessed row → no stamp → the verify-time etag is returned as-is.
+    verifySuggestionToken.mockResolvedValue({
+      ...verifiedSuggestion,
+      suggestion: { ...verifiedSuggestion.suggestion, wmkf_proposalfirstaccessed: '2026-05-01T00:00:00.000Z' },
+    });
+    getRequestSharePointBuckets.mockResolvedValue([]);
+
+    const req = createMockReq({ method: 'GET', query: { token: 'good-token' } });
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res._data.etag).toBe('W/"1001"');
+    // No stamp on a returning visit.
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  it('first visit: returns the POST-stamp etag (re-read after first-access), not the stale pre-stamp one (Codex P1)', async () => {
+    // verifiedSuggestion has wmkf_proposalfirstaccessed: null → stamp fires,
+    // bumping the row etag. The handler must re-read and return the new etag,
+    // not the stale 'W/"1001"' it read before stamping.
+    verifySuggestionToken.mockResolvedValue(verifiedSuggestion);
+    getRequestSharePointBuckets.mockResolvedValue([]);
+    DynamicsService.updateRecord.mockResolvedValue({});
+    DynamicsService.getRecord.mockResolvedValueOnce({
+      wmkf_appreviewersuggestionid: 'suggestion-1',
+      _etag: 'W/"2002"',
+    });
+
+    const req = createMockReq({ method: 'GET', query: { token: 'good-token' } });
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(DynamicsService.updateRecord).toHaveBeenCalled(); // stamp fired
+    expect(res._data.etag).toBe('W/"2002"'); // post-stamp re-read, not 'W/"1001"'
+  });
+
+  it('first visit: a failed etag re-read returns null (disables the lock for this response) rather than a stale etag', async () => {
+    verifySuggestionToken.mockResolvedValue(verifiedSuggestion);
+    getRequestSharePointBuckets.mockResolvedValue([]);
+    DynamicsService.updateRecord.mockResolvedValue({});
+    DynamicsService.getRecord.mockRejectedValueOnce(new Error('transient'));
+
+    const req = createMockReq({ method: 'GET', query: { token: 'good-token' } });
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res._data.etag).toBeNull();
   });
 });
 
@@ -296,6 +355,118 @@ describe('/api/external/review/[token]/upload', () => {
     expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'expired' });
     expect(req.pipe).not.toHaveBeenCalled();
     expect(writeReviewFiles).not.toHaveBeenCalled();
+  });
+});
+
+describe('/api/external/review/[token]/respond', () => {
+  let handler;
+
+  beforeAll(async () => {
+    const mod = await import('../../pages/api/external/review/[token]/respond');
+    handler = mod.default;
+  });
+
+  // A fresh pre-materials engagement: accept/decline/flip all permitted.
+  const fresh = {
+    ok: true,
+    suggestion: {
+      wmkf_appreviewersuggestionid: 'suggestion-1',
+      _etag: 'W/"1001"',
+      wmkf_reviewstatus: null,
+      wmkf_responsetype: null,
+      wmkf_accepted: false,
+      wmkf_declined: false,
+    },
+    request: { akoya_requestid: 'request-1', akoya_requestnum: 'REQ-001' },
+    reviewer: {},
+  };
+
+  it('forwards the client If-Match header to the adapter as the optimistic lock (eval #2)', async () => {
+    verifySuggestionToken.mockResolvedValue(fresh);
+    const req = createMockReq({
+      method: 'POST',
+      query: { token: 'good-token' },
+      headers: { 'if-match': 'W/"1001"' },
+      body: { action: 'decline', decline: {} },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(applyStage2aResponse).toHaveBeenCalledWith(
+      'suggestion-1',
+      expect.objectContaining({ action: 'decline' }),
+      expect.objectContaining({ ifMatch: 'W/"1001"' }),
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('maps a 412 from the adapter to a clean concurrent_modification response', async () => {
+    verifySuggestionToken.mockResolvedValue(fresh);
+    applyStage2aResponse.mockRejectedValueOnce(Object.assign(new Error('Update failed (412)'), { status: 412 }));
+    const req = createMockReq({
+      method: 'POST',
+      query: { token: 'good-token' },
+      headers: { 'if-match': 'W/"stale"' },
+      body: { action: 'decline', decline: {} },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(412);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'concurrent_modification' });
+  });
+
+  it('rejects an over-long contactEdits field with 400 and never writes (eval #6)', async () => {
+    verifySuggestionToken.mockResolvedValue(fresh);
+    const req = createMockReq({
+      method: 'POST',
+      query: { token: 'good-token' },
+      headers: {},
+      body: { action: 'decline', contactEdits: { firstName: 'x'.repeat(101) } },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'contact_field_too_long', field: 'firstName' }));
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed email in contactEdits with 400', async () => {
+    verifySuggestionToken.mockResolvedValue(fresh);
+    const req = createMockReq({
+      method: 'POST',
+      query: { token: 'good-token' },
+      headers: {},
+      body: { action: 'decline', contactEdits: { email: 'not-an-email' } },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'invalid_email', field: 'email' }));
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown contactEdits field with 400', async () => {
+    verifySuggestionToken.mockResolvedValue(fresh);
+    const req = createMockReq({
+      method: 'POST',
+      query: { token: 'good-token' },
+      headers: {},
+      body: { action: 'decline', contactEdits: { ssn: '123' } },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'unknown_contact_field', field: 'ssn' }));
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
   });
 });
 
