@@ -1,50 +1,55 @@
-# Session 198 Prompt: Triage the codebase-evaluation findings
+# Session 199 Prompt: Continue from the S198 eval-triage / hardening pass
 
-## ⏰ Standing context / guardrails added S197
-- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`, wired in `.claude/settings.json`). It fires a non-blocking reminder on any scope/quantity word (only/all/none/every/never/always, "the rest", "N of M", "source of truth") written into `docs/`, `.claude-memory/`, `CLAUDE.md`, `SESSION_PROMPT.md`, `AGENTS.md`. Run the *disconfirming* query before asserting. Tunable via `/hooks`. Rationale: [[feedback-falsify-not-confirm]].
-- **Codex stop-time review gate is ENABLED** for this project — Codex independently reviews before a turn is considered done.
-- **Phasing is locked:** one applicant submission entered as Phase I; "Phase II" = internal status flip (no Phase II uploads). The "mid-June 2026 Phase II Research intake pilot" is **defunct** — intake is a Phase I build for the next cycle. Canonical: `docs/SYSTEM_MODEL.md` + [[project-system-model]].
+## ⏰ Standing context / guardrails (carried from S197–S198)
+- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Fires a non-blocking reminder on scope/quantity words written into `docs/`, `.claude-memory/`, `CLAUDE.md`, `SESSION_PROMPT.md`, `AGENTS.md`. Run the *disconfirming* query before asserting. It paid off twice in S198 (two Explore over-claims caught — see below).
+- **Codex stop-time review gate is ENABLED.** S198 also ran Codex per-item as an active reviewer (implement → test → Codex → fold → commit); that loop caught a P1 in the optimistic-locking work.
+- **Run `check:fact-consistency` after ANY guard/route change, not just `check:api-routes`.** S198 lesson: switching `test-email` to `requireSuperuser` dropped the code-derived `requireappaccess-endpoint-count` (52→51); committing without refreshing `CANONICAL_COUNTS.md` turned the gate red. Caught + fixed same session, but avoidable.
+- **Phasing locked:** one applicant submission entered as Phase I; "Phase II" = internal status flip. The "mid-June 2026 Phase II Research pilot" is **defunct**. Canonical: `docs/SYSTEM_MODEL.md`.
 
-### BILL reviewer-honorarium build (carryover)
-- Chunk 4 (extend `respond.js` accept path: create honorarium `akoya_request` + PATCH the junction's `wmkf_HonorariumRequest` lookup) is **unblocked schema-side**, Vercel work. NOTE the eval flagged `wmkf_honorariumrequest` is documented-deployed but absent from schema-as-code + `reviewer-suggestion.js` `FIELD_SELECT` — that's chunk-4 territory.
+## Session 198 Summary
 
-### Intake virus-scan e2e (carryover, pre-launch)
-- Run EICAR through `/apply` before the next cycle's Phase I intake goes live. Recipe in [[project-intake-portal-virus-scan-e2e-deferred]].
+Triaged the S197 codebase evaluation (`docs/CODEBASE_EVALUATION_2026-05-29.md`) — drove every **actionable, in-my-hands** finding to a tested + Codex-reviewed fix. 11 commits, suite 1359→1425 green, all 7 CI gates green throughout.
 
-## Session 197 Summary
+### What was completed (by eval finding)
+1. **Test-coverage gaps** (`be432ae`) — first direct `proxy.js` test (CSP nonce + `authorized` callback), CSRF referer-fallback, executor impersonation threading. +29 tests. (The audit's "tests failing in sandbox" premise was falsified — suite was already green; the gaps were *missing* tests.)
+2. **#3 drain telemetry** (`9993fd5`) + **maintenance_runs retention** (`15513c5`) — drain now writes `maintenance_runs` (idle ticks skipped to avoid ~720 rows/day flood; failures always recorded), and a new `cleanupMaintenanceRuns` daily step bounds the table.
+3. **#5 is_active TTL** (`8931bb8`) — `is_active` + superuser role now read **fresh every request** (only app grants cached); a deactivated account loses access on the next request, not after 2 min. Reconciled the stale "is_active cached" claims across `SECURITY_ARCHITECTURE.md`, `AUTHENTICATION_SETUP.md`, `CLAUDE.md`.
+4. **#2 intake orphan race** (`5b188d2`) — `promoteToClean` gained `request_id IS NULL`; `submit.js` freeze gained an optimistic count-guard (timestamptz µs-vs-ms ruled out an `updated_at` guard) → `409 draft_changed_retry`. Closes the attach-after-submit orphan both windows.
+5. **#6/#7/#9 legibility** (`9a4d38b`) — README re-anchored to the multi-app system; SYSTEM_MODEL.md glossary gained drain/slice-0/Mode 1·2; CLAUDE.md surfaces SYSTEM_MODEL.md.
+6. **#11 test-email** (`f2a5e96`) — tightened `requireAppAccess('dynamics-explorer')` → `requireSuperuser` (it could send mail from the caller's Dynamics identity). +6 tests.
+7. **Deep-pass** (`8032793`) — wired reviewer **optimistic locking** end-to-end (etag was dead code: surfaced `_etag`, client sends `If-Match`, 412 handled; Codex P1 caught — first-access stamp staleness → post-stamp re-read) + `contactEdits` validation.
+8. **#10 Atlas drift** (`3dd9937`) — execute-prompt citations → symbol anchors; stripped 16 drift-prone `≈line` hints; reconciled the count P0.
+9. **BILL hardening prep** (`efd38c1`) — verified `POST /v3/vendors` has **no idempotency-key header**; wrote the durable-vendorId + resume-marker design into the findings doc for chunk-4.
 
-Started on the appresearcher collapse (correctly flagged as post-pilot-gated), pivoted to chronic **nomenclature/model drift**, and turned it into durable infrastructure.
+### Codex caught (folded): role-failure test gap (#5), the optimistic-locking first-access-stamp P1, cron-wiring test gap (retention), README accuracy (thin-adapter/api-capabilities/env), + two pre-existing CLAUDE.md contradictions. Two Explore **false positives** rejected on verification: BILL "PII leak" (ops needs that data to onboard manually) and respond.js "locking missing" (it was wired server-side, just never exercised).
 
-### What was completed
-1. **Canonical system model** — `docs/SYSTEM_MODEL.md` (rote/thinking principle, two orthogonal axes, capabilities vs trunk vs substrate, Mode 1/2, doc-resolution provenance tiers). Codex-reviewed twice; target-vs-built honesty enforced.
-2. **Falsification defense-in-depth** for the confirm-vs-falsify failure mode: the **PreToolUse hook** (above) + [[feedback-falsify-not-confirm]] protocol + the **Codex stop-gate** (enabled). Hook proven live via sentinel.
-3. **Drift audit + reconciliation** — a find→adversarial-verify→synthesize workflow; fixed no-judgment drift + Codex-caught siblings; reconciled the **defunct Phase II pilot cluster** across 16 files per 3 user decisions (rewrite-in-place; form module shelved; budget spec preserved). 142 live `Phase II Pending` rows + form-module paths left untouched.
-4. **10-front codebase evaluation** (read-only workflow, 36 agents) → `docs/CODEBASE_EVALUATION_2026-05-29.md`, Codex-reviewed + corrected. All CI gates green throughout.
+## Potential Next Steps
 
-### Commits
-- `d4e61e9` system model + memory · `f147d8b` drain-table gate fix · `5ee0b4d` iterate (don't overstate) · `cb1bee2` re-confirm fixes · `67666e7` falsification hook + memory · `37bfa5b` no-judgment drift fixes · `a84aee9` sibling reconcile · `6504333` Phase II pilot drift (16 files) · `04685e1` mark reconciled · `7332da3` gitignore outputs/ · (+ this closeout)
+### 1. Verify-live-first (eval #1 — needs prod creds, NOT a build task)
+- Migrations 011 + 013 are almost certainly **already applied** (DEV_LOG S186) — probe prod for `submission_jobs.locked_until` + `intake_drafts.pending_attachments`, confirm, close. Do NOT re-apply blindly.
+- `vercel env ls production` — confirm `INTAKE_BLOB_RW_TOKEN` set + `VRP_ALLOWED_PROVIDERS` includes `claude`.
 
-## Potential next steps for S198
+### 2. BILL chunk-4 (the real build the prep is for)
+Create honorarium `akoya_request` + PATCH junction `wmkf_HonorariumRequest` + call onboard, building in the **idempotent-create + resume-marker** design from `docs/REVIEWER_BILL_HARDENING_FINDINGS.md` (the deferred P1s: duplicate-vendor-on-retry, torn cross-system state). Money-adjacent; flow goes live for reviewers ≥ 2026-06-17. Also: `wmkf_honorariumrequest` is documented-deployed but absent from schema-as-code + `reviewer-suggestion.js` FIELD_SELECT (eval #8).
 
-### 1. Triage the evaluation findings (PRIMARY) — `docs/CODEBASE_EVALUATION_2026-05-29.md`
-Verified, safe-to-act: **drain-submissions has no `startRun`/`completeRun` telemetry** (silent failure invisible to audit — highest operational); **no direct `proxy.js` test** (idle-timeout, CSP nonce) + untested referer fallback; **app-access 2-min TTL** also caches `is_active` (deactivated account keeps access 2 min); **README** stale Phase II framing; **entry points don't reference SYSTEM_MODEL.md / glossary**; **`APPLICATION_STATE_ATLAS.md` line-citation drift** (re-verify ~80, prefer symbols).
-Verify-live-first (prod claims are S186-aged): migrations 011/013 are **almost certainly already applied** (DEV_LOG S186) — verify-and-close, don't re-apply; `INTAKE_BLOB_RW_TOKEN` + `VRP_ALLOWED_PROVIDERS` — `vercel env ls production`.
+### 3. Deferred lower-severity reviewer/BILL opens (`docs/REVIEWER_BILL_HARDENING_FINDINGS.md`)
+no-match PATCH retry, notify()-failure escalation, contact-PATCH backoff. Deliberate tradeoffs (rate-limit fail-open, HMAC 5-min skew) left as-is with in-code rationale.
 
-### 2. The eval's "Likely under-covered" deep passes
-External-reviewer state machine (`respond.js`), drain-submissions internals, BILL partial-failure handling — areas the excerpt-based eval mischaracterized by shape; each warrants a *focused* read, not a broad fan-out.
+### 4. Parked initiatives (unchanged)
+Appresearcher collapse (gated on reviewer-Workbench), dependency/sequencing pass, intake virus-scan EICAR e2e before Phase I intake goes live.
 
-### 3. Parked initiatives (unchanged)
-- **Appresearcher collapse** — gated on reviewer-Workbench stabilization (NOT the intake pilot — mis-anchor corrected S197). `docs/APPRESEARCHER_COLLAPSE_PLAN.md`.
-- **Dependency/sequencing pass** — the capability graph in goal/order terms (deferred from S197 start).
-- **BILL chunk 4** (above).
-
-## Key files reference
+## Key Files Reference
 | File | Purpose |
 |------|---------|
-| `docs/SYSTEM_MODEL.md` | Canonical conceptual model (NEW S197) |
-| `docs/CODEBASE_EVALUATION_2026-05-29.md` | 10-front eval, Codex-corrected (NEW S197) |
-| `.claude/hooks/scope-claim-reminder.js` + `.claude/settings.json` | Falsification hook (NEW S197) |
-| `.claude-memory/project-system-model.md`, `feedback-falsify-not-confirm.md` | Durable model + protocol (NEW S197) |
+| `docs/CODEBASE_EVALUATION_2026-05-29.md` | The eval this session triaged (point-in-time) |
+| `docs/REVIEWER_BILL_HARDENING_FINDINGS.md` | Deep-pass findings + chunk-4 BILL hardening design (NEW S198) |
+| `lib/utils/auth.js` | `requireAppAccess` — is_active/superuser now fresh-per-request |
+| `pages/api/intake/submit.js` + `lib/services/intake-draft-service.js` | Freeze optimistic guard + `promoteToClean` request_id guard |
+| `pages/api/external/review/[token]/{context,respond}.js` + `shared/components/external/{Stage2aView,DeclineFormView}.js` | Reviewer optimistic-locking wiring |
 
 ## Testing
-N/A (docs/model/eval session). All CI gates green: `check:atlas`, `check:api-routes`, `check:fact-consistency`, `check:drain-table-mentions`, `check:prompt-storage-mentions`, `check:canonical-pointers`.
+```bash
+npx jest                       # 1425 tests, 91 suites
+npm run check:atlas && npm run check:api-routes && npm run check:fact-consistency
+# After ANY guard/route change: also run check:fact-consistency (count drift).
+```
