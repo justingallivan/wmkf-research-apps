@@ -40,6 +40,8 @@ proposals-for-migration.csv
 # Generated schema output (may contain tokens)
 scripts/dynamics-schema-output.json
 scripts/dynamics-schema-diff.json
+# Generated artifacts (presentation/deck builds, etc.)
+outputs/
 .git.nosync
 # iCloud-exclusion artifacts (local-only build/dep dirs)
 *.nosync/
