@@ -55,7 +55,7 @@ Methods:
 ## Read paths
 
 - `pages/api/review-manager/send-emails.js` — outreach
-- `pages/api/review-manager/render-emails.js` (≈line 85) — `DynamicsService.getRecord('wmkf_potentialreviewerses', personId)` to hydrate person fields per email draft
+- `pages/api/review-manager/render-emails.js` — `DynamicsService.getRecord('wmkf_potentialreviewerses', personId)` to hydrate person fields per email draft
 - `pages/api/review-manager/reviewers.js` `fetchPotentialReviewers` — chunked OR-chain on `wmkf_potentialreviewersid` to hydrate the Review Manager reviewer list
 - `pages/api/reviewer-finder/{save-candidates,my-candidates}.js`
 - (Indirectly via `wmkf_appresearcher` lookup — every researcher row has a 1:1 to here)
@@ -63,7 +63,7 @@ Methods:
 ## Write paths
 
 - Endpoints: same as read (via `upsertByEmail` / `update` / `setContactLink`)
-- `scripts/backfill-postgres-to-dataverse.js` (≈line 189) — `upsertByEmail` against the Postgres `researchers` pool during Wave 2 backfill.
+- `scripts/backfill-postgres-to-dataverse.js` — `upsertByEmail` against the Postgres `researchers` pool during Wave 2 backfill.
 
 ## Cross-system
 

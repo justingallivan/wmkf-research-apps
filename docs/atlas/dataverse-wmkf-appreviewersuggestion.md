@@ -102,22 +102,22 @@ Picklist maps live in the adapter (`RESPONSE_TYPE_MAP`, `REVIEW_STATUS_MAP`). Ca
 ## Read / write paths
 
 Read:
-- `pages/api/review-manager/{render-emails,send-emails,reviewers,download-review,regenerate-token}.js` — `download-review.js` resolves the SharePoint folder; `regenerate-token.js` reads the suggestion (≈line 62) before minting a replacement token
+- `pages/api/review-manager/{render-emails,send-emails,reviewers,download-review,regenerate-token}.js` — `download-review.js` resolves the SharePoint folder; `regenerate-token.js` reads the suggestion before minting a replacement token
 - `pages/api/reviewer-finder/{save-candidates,my-candidates}.js`
 - `lib/external/verify-suggestion-token.js` — load-bearing for every `/external/review/*` endpoint; reads with `$expand=wmkf_Request($select=...),wmkf_PotentialReviewer($select=...)` to hydrate the reviewer landing page in one round trip
 - `pages/api/external/review/[token]/context.js` — reader (via `verify-suggestion-token`) AND best-effort writer (`wmkf_proposalfirstaccessed` stamp on first access; non-fatal on failure)
 
 Write (verified 2026-05-07):
 - `pages/api/reviewer-finder/save-candidates.js` — adapter `upsert` (per-(reviewer,request) suggestion creation)
-- `pages/api/reviewer-finder/my-candidates.js` — adapter `updateLifecycle` (single suggestion lifecycle PATCH), `bulkUpdateByRequest` (per-proposal cycle/program-area assignment), `softDelete` (`wmkf_selected = false`); when `accepted` flips to `true` (≈line 354) calls `ensureToken` from `lib/external/token-lifecycle.js` which is idempotent but may write `wmkf_externaltoken*` fields if no usable token exists
+- `pages/api/reviewer-finder/my-candidates.js` — adapter `updateLifecycle` (single suggestion lifecycle PATCH), `bulkUpdateByRequest` (per-proposal cycle/program-area assignment), `softDelete` (`wmkf_selected = false`); when `accepted` flips to `true` calls `ensureToken` from `lib/external/token-lifecycle.js` which is idempotent but may write `wmkf_externaltoken*` fields if no usable token exists
 - `pages/api/review-manager/render-emails.js` — `mintAndStore` from `lib/external/token-lifecycle.js`; mints + stores HMAC token hash on `wmkf_externaltokenhash` + `wmkf_externaltokenissued` + `wmkf_externaltokenexpires` per recipient before email render
 - `pages/api/review-manager/send-emails.js` — adapter `updateLifecycle` (sets `wmkf_emailsentat`, etc.)
 - `pages/api/review-manager/regenerate-token.js` — `mintAndStore` from `lib/external/token-lifecycle.js`; sets `wmkf_externaltoken*` fields
 - `pages/api/review-manager/revoke-token.js` — `revoke` from same; flips `wmkf_externaltokenrevoked`
 - `pages/api/review-manager/mark-received-no-file.js` — direct `DynamicsService.updateRecord('wmkf_appreviewersuggestions', ...)` for review-received marker
-- `lib/services/review-upload.js` `writeReviewFiles` — direct `DynamicsService.updateRecord` setting `wmkf_reviewsharepointfolder` + `wmkf_reviewfilename` + `wmkf_reviewreceivedat` + `wmkf_reviewuploadedbystaff` after SharePoint write (with rollback). Also calls `extendForPostSubmissionWindow` (≈line 191) which patches `wmkf_externaltokenexpires` to enable the 7-day post-submission edit window.
+- `lib/services/review-upload.js` `writeReviewFiles` — direct `DynamicsService.updateRecord` setting `wmkf_reviewsharepointfolder` + `wmkf_reviewfilename` + `wmkf_reviewreceivedat` + `wmkf_reviewuploadedbystaff` after SharePoint write (with rollback). Also calls `extendForPostSubmissionWindow` which patches `wmkf_externaltokenexpires` to enable the 7-day post-submission edit window.
 - `pages/api/external/review/[token]/context.js` — best-effort `wmkf_proposalfirstaccessed` stamp on first reviewer access (non-fatal on failure)
-- `scripts/backfill-postgres-to-dataverse.js` — `suggestionAdapter.upsert` (≈line 216) and `updateLifecycle` (≈line 229) for Wave 2 backfill, preserving outreach/reminder timestamps
+- `scripts/backfill-postgres-to-dataverse.js` — `suggestionAdapter.upsert` and `updateLifecycle` for Wave 2 backfill, preserving outreach/reminder timestamps
 
 ## Cross-system
 

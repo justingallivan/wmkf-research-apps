@@ -58,7 +58,7 @@ Per-applicant screening history. `retractions` (68,248 rows) is the Retraction W
 
 ### `retractions` (68,248 rows)
 **Source of truth:** Postgres (manually refreshed via script — no live cron).
-**Read paths (verified 2026-05-07):** `lib/services/integrity-service.js` (≈line 223) — searches `retractions.authors_normalized` for overlap with screened applicants, falls back to text match.
+**Read paths (verified 2026-05-07):** `lib/services/integrity-service.js` — searches `retractions.authors_normalized` for overlap with screened applicants, falls back to text match.
 **Write paths:** `scripts/import-retraction-watch.js` — DELETE all + INSERT bulk from Retraction Watch CSV. **No `/api/cron/refresh-retractions` route exists** (Atlas v1 mis-cited this).
 
 ## Virtual Review Panel

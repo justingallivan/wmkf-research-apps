@@ -53,10 +53,10 @@ Alternate keys: `wmkf_orcid`, `wmkf_potentialreviewer` (1:1 enforcement).
 ## Write paths
 
 - `pages/api/reviewer-finder/save-candidates.js` — `upsertByPotentialReviewer` (fill-if-empty for identity, overwrite for metrics)
-- `pages/api/reviewer-finder/my-candidates.js` — **two paths:** `upsertByPotentialReviewer` for the per-proposal save, and `updateById` (≈line 387) for staff edits to the bibliometric sidecar (affiliation/website/h-index corrections)
+- `pages/api/reviewer-finder/my-candidates.js` — **two paths:** `upsertByPotentialReviewer` for the per-proposal save, and `updateById` for staff edits to the bibliometric sidecar (affiliation/website/h-index corrections)
 - `pages/api/review-manager/reviewers.js` — read-only (no writes)
-- `lib/services/contact-enrichment-service.js` (≈line 539) — `upsertByPotentialReviewer` writeback after bibliometric enrichment runs (W5 migration target)
-- `scripts/backfill-postgres-to-dataverse.js` (≈line 197) — `upsertByPotentialReviewer` for Wave 2 bibliometric backfill (script slated for retirement; Postgres source dropped 2026-05-12)
+- `lib/services/contact-enrichment-service.js` — `upsertByPotentialReviewer` writeback after bibliometric enrichment runs (W5 migration target)
+- `scripts/backfill-postgres-to-dataverse.js` — `upsertByPotentialReviewer` for Wave 2 bibliometric backfill (script slated for retirement; Postgres source dropped 2026-05-12)
 
 > **Note (S196):** This entity is slated for collapse into `wmkf_potentialreviewer` post-pilot. See `docs/APPRESEARCHER_COLLAPSE_PLAN.md`. Once collapsed, the bibliometric fields move to the person record and the read/write paths above all switch to `lib/dataverse/adapters/potential-reviewer.js`.
 

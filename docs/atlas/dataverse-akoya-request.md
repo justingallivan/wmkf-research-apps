@@ -78,17 +78,17 @@ Sample row had **364 total fields** (vendor + WMKF + standard Dataverse audit fi
 - `pages/api/grant-reporting/*` — final-report extraction + writeback
 - `pages/api/phase-i-dynamics/summarize.js` — Phase I summary writeback
 - `pages/api/review-manager/*` — reviewer lifecycle
-- `pages/api/reviewer-finder/{load-proposal,my-candidates,save-candidates}.js` — `load-proposal.js` (≈line 73) `getRecord('akoya_requests', requestId, { select: 'akoya_requestid,akoya_requestnum' })` to resolve request number for the SharePoint proposal lookup that follows
+- `pages/api/reviewer-finder/{load-proposal,my-candidates,save-candidates}.js` — `load-proposal.js` `getRecord('akoya_requests', requestId, { select: 'akoya_requestid,akoya_requestnum' })` to resolve request number for the SharePoint proposal lookup that follows
 - `pages/api/grant-reporting/lookup-grant.js` — request lookup for Grant Reporting (`reviewer-finder/lookup-grant.js` does not exist; the original Atlas citation was wrong)
-- `pages/api/reviewer-finder/my-proposals.js` (≈lines 80, 131) — `DynamicsService.queryAllRecords('akoya_requests', ...)` to list Phase-II-Pending proposals for the picker; cycle and PD filters applied
+- `pages/api/reviewer-finder/my-proposals.js` — `DynamicsService.queryAllRecords('akoya_requests', ...)` to list Phase-II-Pending proposals for the picker; cycle and PD filters applied
 - `pages/api/expertise-finder/*`
 - (NOT `pages/api/integrity-screener/*`, NOT `pages/api/virtual-review-panel.js` — both read no Dataverse. `integrity-service.js` imports only Postgres `sql`; `virtual-review-panel.js` is a single file (not a directory) that's PDF-upload-driven and Postgres-backed via `PanelReviewService`.)
 - `lib/dataverse/adapters/reviewer-suggestion.js` `findByPD` — joins requests by lead PD
 
 ## Write paths (verified 2026-05-07)
 
-- `pages/api/phase-i-dynamics/summarize.js` — writes ONLY `wmkf_ai_summary` (≈line 192) with pre-flight overwrite guard. The endpoint header comment defers `wmkf_ai_dataextract` (structured JSON) to "a later pass" — do not assume it writes structured fields.
-- `lib/services/execute-prompt.js` (≈line 511) — Executor contract writer. **Dynamically writes to whichever `akoya_request` field the prompt's `target.field` declares.** Used by `pages/api/phase-i-dynamics/summarize-v2.js`. Same overwrite-guard pattern. This is the canonical AI writeback path going forward; phase-i-dynamics/summarize.js is the legacy direct path.
+- `pages/api/phase-i-dynamics/summarize.js` — writes ONLY `wmkf_ai_summary` with pre-flight overwrite guard. The endpoint header comment defers `wmkf_ai_dataextract` (structured JSON) to "a later pass" — do not assume it writes structured fields.
+- `lib/services/execute-prompt.js` (`persistOutputs()` → `DynamicsService.updateRecord`) — Executor contract writer. **Dynamically writes to whichever `akoya_request` field the prompt's `target.field` declares.** Used by `pages/api/phase-i-dynamics/summarize-v2.js`. Same skip-if-populated overwrite-guard pattern (`preflightGuards()`). This is the canonical AI writeback path going forward; phase-i-dynamics/summarize.js is the legacy direct path.
 - (Dynamics Explorer does NOT write — its 11 tools are read-only: search, get_entity, get_related, describe_table, query_records, count_records, aggregate, find_reports_due, list_documents, search_documents, export_csv. The `dynamics_restrictions` table exists but no write-tools are wired in.)
 
 > **Codex R7 corrections (2026-05-07):**

@@ -18,7 +18,7 @@ are machine-verified — `N` against the derive, the anchor against this registr
 
 ## requireappaccess-endpoint-count
 
-- **Live value:** 52
+- **Live value:** 51
 - **Description:** pages/api files with requireAppAccess() call sites
 - **Derive:** `pages/api/**/*.{js,mjs,cjs,jsx,ts,tsx}` → count of files containing at least one `requireAppAccess(...)` call
 

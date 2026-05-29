@@ -29,7 +29,7 @@
 | created_at | timestamp | default `now()` |
 | last_updated | timestamp | default `now()` |
 | last_checked | timestamp | "last verified" stamp |
-| metrics_updated_at | timestamp | added by `setup-database.js`; was written on h-index/citations updates by `pages/api/reviewer-finder/researchers.js` (≈line 601, retired W6 step 1 2026-05-12) |
+| metrics_updated_at | timestamp | added by `setup-database.js`; was written on h-index/citations updates by `pages/api/reviewer-finder/researchers.js` (retired W6 step 1 2026-05-12) |
 | email_source | varchar(100) | M002 — `pubmed \| orcid \| claude_search \| manual` |
 | email_year | integer | M002 — pub year where email was found (recency signal) |
 | email_verified_at | timestamp | M002 |

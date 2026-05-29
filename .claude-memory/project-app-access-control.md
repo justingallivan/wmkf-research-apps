@@ -11,4 +11,4 @@ metadata:
 - **`shared/config/appRegistry.js`** — single source of truth for all [17](../docs/CANONICAL_COUNTS.md#app-definition-count) app definitions (keys, names, icons, categories, descriptions); used by Layout nav, home page, admin dashboard, and access control
 - **`shared/context/AppAccessContext.js`** — React context; fetches `/api/app-access` on mount, exposes `hasAccess(appKey)` and `isSuperuser`
 - New users get only `dynamics-explorer` by default (configured in `DEFAULT_APP_GRANTS` in `appRegistry.js`)
-- **API-level enforcement active** — `requireAppAccess(req, res, ...appKeys)` on [52](../docs/CANONICAL_COUNTS.md#requireappaccess-endpoint-count) app endpoints (was ~48 at S154 2026-05-14; the pointer target is regenerated from live code)
+- **API-level enforcement active** — `requireAppAccess(req, res, ...appKeys)` on [51](../docs/CANONICAL_COUNTS.md#requireappaccess-endpoint-count) app endpoints (was ~48 at S154 2026-05-14, then 52 until test-email→requireSuperuser at S198; the pointer target is regenerated from live code)

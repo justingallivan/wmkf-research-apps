@@ -21,7 +21,7 @@ Outreach timestamps: `email_sent_at` (43/13%), `email_opened_at` (0%), `response
 
 External-reviewer intake: `proposal_url` (16/5%), `proposal_password` (16/5%).
 
-Blob attachments: `summary_blob_url` (184/337 = 55% populated) — Vercel Blob URL of the extracted summary page(s). Written by `pages/api/reviewer-finder/extract-summary.js` (≈line 89) as part of save-candidates. **Legacy field** — was load-bearing for the deprecated `generate-emails` flow; the active `pages/api/review-manager/send-emails.js` flow attaches `grant_cycles.review_template_blob_url` (≈line 176, 379) instead. Migration can drop this column safely once `generate-emails` is retired.
+Blob attachments: `summary_blob_url` (184/337 = 55% populated) — Vercel Blob URL of the extracted summary page(s). Written by `pages/api/reviewer-finder/extract-summary.js` as part of save-candidates. **Legacy field** — was load-bearing for the deprecated `generate-emails` flow; the active `pages/api/review-manager/send-emails.js` flow attaches `grant_cycles.review_template_blob_url` (379) instead. Migration can drop this column safely once `generate-emails` is retired.
 
 User scoping: `user_profile_id` (337/100%), `program_area` (337/100%), `grant_cycle_id` (337/100%, FK grant_cycles.id).
 
