@@ -55,6 +55,7 @@ import { classify } from '../../../lib/utils/drain-error-classifier';
 import { buildNoResponseError } from '../../../lib/utils/service-error';
 import IntakeAuditService from '../../../lib/services/intake-audit-service';
 import AlertService from '../../../lib/services/alert-service';
+import MaintenanceService from '../../../lib/services/maintenance-service';
 import { validateAttachmentShape, validateAttachmentSet } from '../../../lib/utils/intake-attachment-shape';
 import {
   requestFolderName,
@@ -929,9 +930,22 @@ export default async function handler(req, res) {
   const stats = { claimed: 0, processed: 0, errors: 0 };
   const startedAt = Date.now();
 
+  // maintenance_runs telemetry (Codebase eval 2026-05-29 #3 — the drain had no
+  // run telemetry, so a silent drain failure was invisible to the cron audit
+  // trail). We deliberately diverge from cron/maintenance.js (which always
+  // opens a run row): this route ticks every 2 minutes, so logging idle ticks
+  // (claimed:0) would add ~720 rows/day to maintenance_runs, which has no
+  // retention sweep. Instead we open a row only when there's work to report,
+  // and ALWAYS record fatal failures (see the catch) so no failure is silent.
+  let runId = null;
+
   try {
     const claimed = await claimBatch(client, DRAIN_BATCH_SIZE);
     stats.claimed = claimed.length;
+
+    if (stats.claimed > 0) {
+      runId = await MaintenanceService.startRun('drain-submissions');
+    }
 
     for (const job of claimed) {
       try {
@@ -944,12 +958,36 @@ export default async function handler(req, res) {
     }
   } catch (err) {
     console.error('[drain] fatal:', err);
+    // Record the fatal even if claimBatch threw before we opened a run row.
+    // startRun/completeRun both fail soft (swallow DB errors), so this can
+    // never turn a drain failure into a 200 or mask the original error.
+    if (!runId) runId = await MaintenanceService.startRun('drain-submissions');
+    await MaintenanceService.completeRun(runId, {
+      status: 'failed',
+      errorMessage: err.message,
+      details: { ...stats, elapsedMs: Date.now() - startedAt, phase: 'fatal' },
+    });
     client.release();
     return res.status(500).json({ error: 'drain fatal', message: err.message });
   }
 
   client.release();
   const elapsedMs = Date.now() - startedAt;
+
+  // Close the audit row for ticks that did work. Per-job failures mark the run
+  // 'failed' (mirrors daily-maintenance's subtask-failure convention). Numeric
+  // columns: records_processed = jobs claimed this tick, records_deleted =
+  // jobs successfully advanced; the unambiguous breakdown lives in details.
+  if (runId) {
+    await MaintenanceService.completeRun(runId, {
+      status: stats.errors > 0 ? 'failed' : 'completed',
+      recordsProcessed: stats.claimed,
+      recordsDeleted: stats.processed,
+      details: { ...stats, elapsedMs },
+      errorMessage: stats.errors > 0 ? `${stats.errors} job(s) failed to advance` : undefined,
+    });
+  }
+
   return res.status(200).json({ ok: true, ...stats, elapsedMs });
 }
 
