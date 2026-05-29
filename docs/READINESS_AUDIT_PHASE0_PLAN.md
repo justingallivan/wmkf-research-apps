@@ -1,3 +1,6 @@
+---
+fact_consistency: point-in-time
+---
 # Phase 0 Emergency Closeout Plan — S186 (v6, post-Codex pass-5 reconciliation)
 
 **Status:** Tightened after Codex pass 5

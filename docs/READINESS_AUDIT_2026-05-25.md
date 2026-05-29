@@ -1,3 +1,6 @@
+---
+fact_consistency: point-in-time
+---
 # Backend Battle-Readiness Audit — 2026-05-25 (S186)
 
 > **Senior-engineer perspective. Threat model: "a real user hits this flow tomorrow morning."** Not "the test suite passes."

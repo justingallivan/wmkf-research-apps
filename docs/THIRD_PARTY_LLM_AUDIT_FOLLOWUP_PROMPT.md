@@ -1,3 +1,6 @@
+---
+fact_consistency: point-in-time
+---
 # Third-Party LLM Audit Follow-Up Prompt
 
 Use this prompt as a response request to the third-party LLM after its `AUDIT_REPORT_2026_05_26.md` review. The goal is to make it correct its prior mistakes, re-verify high-impact claims, and produce a tighter amended report.

@@ -39,11 +39,11 @@ The live Dataverse prompt-storage entity is `wmkf_ai_prompt` (entity set `wmkf_a
 Reviewer-domain Postgres tables (`researchers`, `publications`, `researcher_keywords`, `reviewer_suggestions`, `grant_cycles`, `proposal_searches`) are drain-only post-W3-W6 cutover (2026-05-12); live source of truth is Dataverse (`wmkf_appresearcher`, `wmkf_potentialreviewer`, `wmkf_appreviewersuggestion`, `wmkf_appgrantcycle`).
 
 **Detection (7-shape, per Codex review):**
-1. Backticked identifier (` `proposal_searches` `)
-2. Single-quoted (`'proposal_searches'`)
-3. Double-quoted (`"proposal_searches"`)
+1. Backticked identifier (` `X` `)
+2. Single-quoted (`'X'`)
+3. Double-quoted (`"X"`)
 4. `Postgres X` prefix
-5. Dotted column ref (`researchers.email`)
+5. Dotted column ref (`X.email`)
 6. Bare identifier + db-noun (`X schema` / `X row` / `X table` / etc.)
 7. SQL shape (`reads from X` / `writes to X` / `from X` / `into X` / etc.)
 
