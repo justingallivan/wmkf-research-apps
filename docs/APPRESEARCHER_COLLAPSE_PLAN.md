@@ -50,8 +50,8 @@ Lower-priority than the live app callers but need to be reconciled. Most are smo
 
 | File | Role | Likely disposition |
 |---|---|---|
-| `scripts/audit-dataverse-state.js` | CI audit lists `wmkf_appresearchers` as a tracked entity set (line 92) | Update: remove the entry when entity is dropped |
-| `scripts/backfill-postgres-to-dataverse.js` | Wave 2 backfill (Postgres → Dataverse) | Likely retire — Postgres reviewer tables already dropped 2026-05-12 per Wave 1 closeout; this script's purpose is largely historical |
+| `scripts/audit-dataverse-state.js` | Standalone audit (NOT a CI gate per package.json — round-3 correction) lists `wmkf_appresearchers` as a tracked entity set (line 92) | Update: remove the entry when entity is dropped |
+| `scripts/backfill-postgres-to-dataverse.js` | Wave 2 backfill (Postgres → Dataverse) | Decide at execution time. Postgres reviewer tables (`researchers`, `researcher_keywords`, `proposal_searches`) are **drain-only**, not yet dropped (per `project-w6-table-drop-pending`; drop trigger ≥ 2026-07-01). If they've been dropped by the time this collapse executes, retire the script. Otherwise, leave alone — its source still exists. |
 | `scripts/check-doc-currency.js` | Doc-convention check; references appresearcher naming (line 50) | Update reference |
 | `scripts/check-drain-table-mentions.js` | CI gate; mentions appresearcher as a source of truth (line 11) | Update reference |
 | `scripts/probe-bill-vendor-fields.js` | BILL field probe; appresearcher in its `TABLES` list (line 75) | Update list |
@@ -239,24 +239,26 @@ Switch each caller in order:
 - Update the response payload (lines 191-198): drop `researcherId`; keep `affiliation`, `website`, `hIndex`, `totalCitations` (resolved from the person record). Verify the frontend doesn't depend on `researcherId` — if it does, drop it from frontend reads too.
 - Note: the response previously fell through to `person.wmkf_organizationname` when `researcher?.wmkf_primaryaffiliation` was null (line 194). Post-collapse this is just `person.wmkf_PrimaryAffiliation` — no fallback needed (the field is on the same row).
 
-### 4.5 Script audit + update (with CI-gate elevation per Codex round 2)
+### 4.5 Script audit + update (CI-gate framing corrected S196 round 3)
 
-Two scripts in this set are **CI gates**, not throwaway probes — they run on every PR. If they encode `wmkf_appresearcher` as live truth, the CI signal goes stale (false-clean or false-fail) the moment the entity is dropped. **Treat their updates as blocking for Phase 5.**
+Two scripts in this set ARE CI gates with `npm run` targets that block PRs (verified against `package.json`). If they encode `wmkf_appresearcher` as live truth, the CI signal goes stale post-drop. **Treat their updates as blocking for Phase 5.**
 
-**CI gates (must update before Phase 5 entity drop, not after):**
-- `scripts/audit-dataverse-state.js` (`npm run` target wired into CI) — remove `wmkf_appresearchers` from the tracked entity-set list (line 92). Without this, `check:atlas` will fail or pass-stale post-drop.
-- `scripts/check-drain-table-mentions.js` — drop appresearcher from the "source of truth" enumeration (line 11 + 305). Without this, the drain-tables gate produces stale assertions.
+**CI gates (npm targets verified — must update before Phase 5 entity drop):**
+- `scripts/check-drain-table-mentions.js` (gate: `npm run check:drain-table-mentions`) — drop appresearcher from the "source of truth" enumeration (line 11 + 305). Self-test target also exists.
+- `scripts/check-doc-currency.js` (gate: `npm run check:doc-currency`) — remove the appresearcher naming convention check (line 50). Self-test target also exists.
+
+**Standalone audit utility (NOT a CI gate, but referenced by atlas pages):**
+- `scripts/audit-dataverse-state.js` — listed in atlas pages as the source for "Last verified" probe dates (line 92 has `wmkf_appresearchers` in tracked entity-set list). Update to remove the entry. Round-2 framing of this as a "CI gate" was wrong — Codex round 3 caught the `package.json` check; no `npm run` target wires it into CI.
 
 **Other scripts (update in-place, not gate-critical):**
-- `scripts/check-doc-currency.js` — remove the appresearcher naming convention check (line 50)
 - `scripts/probe-bill-vendor-fields.js` — drop `wmkf_appresearcher` from the `TABLES` list (line 75)
 
 **Retire (purpose obsolete):**
-- `scripts/backfill-postgres-to-dataverse.js` — Postgres reviewer tables dropped 2026-05-12; backfill source no longer exists. Delete file.
+- `scripts/backfill-postgres-to-dataverse.js` — Postgres reviewer tables are drain-only (not yet dropped — drop is post-pilot per `project-w6-table-drop-pending` and `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`). This collapse may or may not coincide with the W6 table drop. If W6 drops have happened by then, retire this script; if not, leave alone (its Postgres source still exists). **Decision deferred to execution time.** Round-2 framing that the source was "already dropped" was wrong.
 - `scripts/wave2-reshape-drop.js` — Wave 2 reshape utility, purpose served. Delete file.
 - `scripts/smoke-find-by-name.js`, `scripts/smoke-recent-suggestions.js` — Re-evaluate: if still actively used, update to query the new combined entity; if abandoned, delete.
 
-**Validation:** Re-run `grep -rln "appresearcher\|adapters/researcher" pages/ lib/ scripts/` after the audit. Should return zero matches in `pages/` and `lib/`; scripts may have transitional notes but no live references. Run `npm run check:atlas` and `npm run check:drain-table-mentions` — both must pass green BEFORE Phase 5 begins.
+**Validation:** Re-run `grep -rln "appresearcher\|adapters/researcher" pages/ lib/ scripts/` after the audit. Should return zero matches in `pages/` and `lib/`; scripts may have transitional notes but no live references. Run `npm run check:drain-table-mentions` and `npm run check:doc-currency` — both must pass green BEFORE Phase 5 begins.
 
 After each switchover: smoke-test the affected app. Phase 4 is not done until **all four live callers** (Reviewer Finder save-candidates + my-candidates, Review Manager reviewers, Contact Enrichment) are switched AND smoke-tested.
 
@@ -288,17 +290,17 @@ Branch on 200 vs 404. Only DELETE-then-DROP if 200. Log skip-with-reason if 404.
 
 ### 5.2 Drop sequence
 
-**Order corrected S196 round 2 per Codex P1 (ordering).** Original draft deleted local schema manifests BEFORE Dataverse entity drops — that removes the recovery reference if a destructive drop fails mid-flight. Corrected order: drop Dataverse entities FIRST (point of no return), then delete local references.
+**Recovery-reference principle:** Local schema manifests are the rollback reference if a Dataverse drop fails mid-flight (they document what to recreate). They MUST survive until the Dataverse drops succeed. The adapter file (`lib/dataverse/adapters/researcher.js`) is NOT part of the recovery surface — it's just code that calls the entity; deleting it cannot orphan the recovery path. Both files get deleted, but manifests come last.
 
-**Within Dataverse: junction before referenced entity** (FK constraints). The `wmkf_apppublicationauthor.wmkf_researcher` lookup → `wmkf_appresearcher` is live, not just schema-file (Codex round 2 verified `Targets=[wmkf_appresearcher]`).
+**Within Dataverse:** junction before referenced entity (FK constraints). The `wmkf_apppublicationauthor.wmkf_researcher` lookup → `wmkf_appresearcher` is live, not just schema-file (Codex round 2 verified `Targets=[wmkf_appresearcher]`).
 
-1. Delete `lib/dataverse/adapters/researcher.js` (no live callers post-Phase-4; deleting this first surfaces any missed caller as an immediate import error rather than at runtime).
+1. Delete `lib/dataverse/adapters/researcher.js` (no live callers post-Phase-4; deleting this first surfaces any missed caller as an immediate import error rather than at runtime — recovery-safe because the adapter is not a recovery reference).
 2. Drop Dataverse entities in this order:
    - DELETE all rows from `wmkf_apppublicationauthors` then DROP the entity
    - DELETE all rows from `wmkf_apppublications` then DROP the entity
    - DELETE all rows from `wmkf_appresearchers` then DROP the entity
 3. Re-probe Dataverse: all three entity logical names should return 404 from EntityDefinitions.
-4. **Only after Dataverse drops succeed:** delete the wave2 manifest files for dropped entities:
+4. **Only after Dataverse drops succeed:** delete the wave2 manifest files for dropped entities (these were the recovery references):
    - `lib/dataverse/schema/wave2/wmkf_app_z_publication_author.json` (file name; deployed as `wmkf_apppublicationauthor`)
    - `lib/dataverse/schema/wave2/wmkf_app_publication.json` (verify exact file name at execution time)
    - `lib/dataverse/schema/wave2/wmkf_app_researcher.json` (file name; deployed as `wmkf_appresearcher`)

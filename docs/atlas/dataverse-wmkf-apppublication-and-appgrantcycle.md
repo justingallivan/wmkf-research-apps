@@ -1,4 +1,4 @@
-# Atlas: `wmkf_apppublication`, `wmkf_appgrantcycle`, and undeployed Wave 2 entities
+# Atlas: `wmkf_apppublication`, `wmkf_appgrantcycle`, `wmkf_apppublicationauthor` (empty Wave 2 entities)
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
@@ -14,7 +14,7 @@ Custom attrs (14, all confirmed deployed): `wmkf_apppublicationid` (PK), `wmkf_t
 
 **No adapter exists** (no `lib/dataverse/adapters/publication.js`). No callers anywhere.
 
-**Migration disposition:** Postgres `publications` is also empty (0 rows). Wave 2 plan is to retire the Postgres table and only start writing here when discovery is rewired. The schema-as-code calls out that authorship goes through a junction (`wmkf_app_publication_author`), but that junction is **NOT deployed** (404 on entity set). Defer junction deployment until publications start landing.
+**Migration disposition:** Postgres `publications` is also empty (0 rows). Wave 2 plan was to retire the Postgres table and only start writing here when discovery is rewired. The schema-as-code calls out that authorship goes through a junction; the deployed entity logical name is `wmkf_apppublicationauthor` (no `_z_` — that's only in the schema-as-code FILE name). **S196 update:** both `wmkf_apppublication` and `wmkf_apppublicationauthor` are slated for drop in the appresearcher collapse (see `docs/APPRESEARCHER_COLLAPSE_PLAN.md`); both are deployed, empty, and unused. The earlier "junction NOT deployed" claim was based on a probe of the wrong logical name.
 
 ## `wmkf_appgrantcycle` — DEPLOYED, DATAVERSE-PRIMARY (W3 cutover 2026-05-12)
 
@@ -55,6 +55,6 @@ Junction for `wmkf_apppublication ↔ wmkf_appresearcher`. Originally marked NOT
 | `wmkf_apppublication` | ✅ | ✅ | empty |
 | `wmkf_appgrantcycle` | ✅ (partial) | ✅ | 10 rows (Dataverse-primary post-2026-05-12) |
 | `wmkf_appproposalsearch` | ✅ | ✅ (entity set is `wmkf_appproposalsearchs`, NOT `-es`) | empty |
-| `wmkf_app_z_publication_author` | ✅ | ❌ | n/a |
+| `wmkf_apppublicationauthor` (file: `wmkf_app_z_publication_author.json`) | ✅ | ✅ | empty (slated for drop in appresearcher collapse) |
 
 The "as-built vs. as-designed" reconciliation Codex round-3 #5 asked for is captured here.
