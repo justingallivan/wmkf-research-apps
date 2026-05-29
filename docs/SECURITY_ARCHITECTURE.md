@@ -556,7 +556,7 @@
 | **Region** | US East (co-located with Vercel functions) |
 | **Backups** | Neon automated point-in-time recovery |
 
-**Application-level encryption:** API keys stored in `user_preferences` are encrypted with AES-256-GCM before database insertion (see [Section 5.4](#54-api-key-encryption)).
+**Application-level encryption:** API keys are encrypted with AES-256-GCM at the app layer *before* persistence to Dataverse `wmkf_appuserpreferences` (see [Section 5.4](#54-api-key-encryption)). (The Postgres `user_preferences` table was dropped 2026-05-12, so the Neon at-rest/PITR mechanics in the table above no longer apply to this entity — the encrypted value now lives in Dataverse/SQL Server at rest.)
 
 **Database schema overview:**
 

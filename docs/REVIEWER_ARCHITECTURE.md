@@ -1,6 +1,6 @@
 # Reviewer Architecture — Mental Model
 
-## The three Dataverse tables (Wave 2 target)
+## The three Dataverse tables (live in prod — cutover W3–W6 complete 2026-05-12)
 
 ```
 wmkf_potentialreviewers     ← person identity (one row per real human)
@@ -68,6 +68,6 @@ The split exists so updating someone's h-index doesn't churn their identity row,
 
 When a reviewer is "assigned" to a proposal, they appear in both: a slot lookup on the request, and a `selected=true` suggestion row.
 
-## Today (Postgres) → Tomorrow (Dataverse) — same model
+## Same model across Postgres (now drain-only) and Dataverse (live source of truth, post-W6 2026-05-12)
 
-The current Postgres schema (`researchers`, `reviewer_suggestions`, plus a flatter person concept) maps onto the same three-table shape. Wave 2 adapters are live in `/api/reviewer-finder/save-candidates` (writes to Dataverse `wmkf_potentialreviewer`, `wmkf_appresearcher`, `wmkf_appreviewersuggestion`). `/my-candidates` is **Dataverse-backed** (W3-W6 / S164) — reads suggestions via `suggestionAdapter.findByPD()` and resolves grant-cycle data through `grant-cycles-dataverse`. The remaining Postgres reviewer tables are drain-only post-W6; per-row reconciliation status lives in `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`.
+The legacy Postgres schema (`researchers`, `reviewer_suggestions`, plus a flatter person concept) maps onto the same three-table shape. Wave 2 adapters are live in `/api/reviewer-finder/save-candidates` (writes to Dataverse `wmkf_potentialreviewer`, `wmkf_appresearcher`, `wmkf_appreviewersuggestion`). `/my-candidates` is **Dataverse-backed** (W3-W6 / S164) — reads suggestions via `suggestionAdapter.findByPD()` and resolves grant-cycle data through `grant-cycles-dataverse`. The remaining Postgres reviewer tables are drain-only post-W6; per-row reconciliation status lives in `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`.

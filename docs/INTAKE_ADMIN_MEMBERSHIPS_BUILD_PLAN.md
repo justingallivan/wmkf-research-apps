@@ -110,7 +110,7 @@ Do **not** hard-code bind keys in this plan until slice 0 lands them; reference 
 
 ## 4. Middleware carve-out
 
-Today `middleware.js` line 100 routes `/apply/*` as applicant-only. Add a staff-admin exception **before** that check, with exact-or-slash matching:
+Today `proxy.js` routes `/apply/*` (and `/api/apply/*`) as applicant-only via the `isApplicantSurface` check (the gate was renamed `middleware.js` → `proxy.js` per the Next 16 convention). Add a staff-admin exception **before** that check, with exact-or-slash matching:
 
 ```js
 const isStaffAdminSurface =

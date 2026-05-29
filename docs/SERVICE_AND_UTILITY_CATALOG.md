@@ -104,7 +104,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### Auth / cron
 
-- **`auth-policy.js`** — Edge-compatible `isAuthRequired()` shared between `proxy.js` and `lib/utils/auth.js`. Reads only `process.env`, no Node-only imports. **Production fails closed** unless `EMERGENCY_AUTH_BYPASS=true`. Misconfig warnings memoized once per process.
+- **`auth-policy.js`** — proxy-bundle-safe `isAuthRequired()` shared between `proxy.js` (Node.js runtime in Next 16) and `lib/utils/auth.js`. Reads only `process.env`, no Node-only / `@vercel/postgres` / `next-auth` imports. **Production fails closed** unless `EMERGENCY_AUTH_BYPASS=true`. Misconfig warnings memoized once per process.
 - **`cron-auth.js`** — Vercel cron `CRON_SECRET` verification (Bearer header). Dev-mode bypass.
 
 ### Health / files

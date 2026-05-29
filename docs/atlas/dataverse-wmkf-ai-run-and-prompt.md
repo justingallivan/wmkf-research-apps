@@ -19,9 +19,9 @@
 - `wmkf_ai_promptversion` (Integer)
 - `wmkf_ai_rawoutput` (Memo, **1,000,000 char cap** per Connor 2026-04-14)
 - `wmkf_ai_notes` (Memo, 2000 char default — keep notes short)
-- `wmkf_ai_runsource` (Picklist) — written by execute-prompt ≈line 535 from `RUN_SOURCE` map (which surface invoked the prompt)
-- `wmkf_ai_promptoverridden` (Boolean) — true when caller passed an override payload at runtime; written by execute-prompt ≈line 549/553
-- `wmkf_ai_promptoverride` (Memo, 4000 char truncation) — JSON of the override redacted; written ≈line 551
+- `wmkf_ai_runsource` (Picklist) — written by `execute-prompt.js` `writeRunRow()` from `RUN_SOURCE` map (which surface invoked the prompt)
+- `wmkf_ai_promptoverridden` (Boolean) — true when caller passed an override payload at runtime; written by `writeRunRow()`
+- `wmkf_ai_promptoverride` (Memo, 4000 char truncation) — JSON of the override redacted; written by `writeRunRow()`
 - Built-in `createdon` is the run timestamp. **Do not write `wmkf_ai_rundatetime`** — vestigial.
 
 **Privileges:** App registration `d2e73696-537a-483b-bb63-4a4de6aa5d45` has `prvCreate`/`prvUpdate` (no `prvDelete` — append-only by design). [VERIFIED 2026-04-14]
@@ -32,7 +32,7 @@
 
 **Write paths:**
 - `lib/services/dynamics-service.js` `logAiRun` — canonical writer. Truncates `wmkf_ai_rawoutput` with `…[truncated N chars]` marker as safety valve.
-- `lib/services/execute-prompt.js` `_writeAiRun` (≈line 535) — Executor contract; logs every prompt run with `wmkf_ai_Prompt@odata.bind` + `wmkf_ai_Request@odata.bind` (both capital — see nav-prop case warning above)
+- `lib/services/execute-prompt.js` `writeRunRow()` — Executor contract; logs every prompt run with `wmkf_ai_Prompt@odata.bind` + `wmkf_ai_Request@odata.bind` (both capital — see nav-prop case warning above)
 - `pages/api/phase-i-dynamics/summarize.js` — Phase I summarization
 - `pages/api/grant-reporting/extract.js` — Grant Reporting writeback
 - `scripts/probe-impersonation-resmoke.js`, `scripts/probe-impersonation-as-user.js` — write sentinel rows during impersonation testing (S135). Filter `wmkf_ai_model='impersonation-resmoke'` to find them.
@@ -41,7 +41,7 @@
 **Cross-system links from `wmkf_ai_run`:**
 - `wmkf_ai_Prompt@odata.bind` → `wmkf_ai_prompt` (which prompt was used)
 - `wmkf_ai_Request@odata.bind` → `akoya_request` (which grant request was processed)
-Both written by `execute-prompt.js` ≈lines 538/545. Migration plans touching either entity must preserve these foreign keys.
+Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching either entity must preserve these foreign keys.
 
 **Migration disposition:** stays in Dataverse. No Postgres counterpart. Per `project_dynamics_ai_writeback.md`: Justin owes the Dynamics Explorer schema-curation pass to **exclude `wmkf_ai_run` from search results + schema suggestions** — it's an operational log, not business data.
 
@@ -51,10 +51,10 @@ Both written by `execute-prompt.js` ≈lines 538/545. Migration plans touching e
 
 **Entity set:** `wmkf_ai_prompts`
 
-**Schema (verified 2026-05-07 via `execute-prompt.js:198`):** `wmkf_ai_promptid`, `wmkf_ai_promptname`, `wmkf_ai_systemprompt` (Memo), `wmkf_ai_promptbody` (Memo), `wmkf_ai_promptvariables` (Memo, JSON), `wmkf_ai_promptoutputschema` (Memo, JSON), `wmkf_ai_model` (String — per-prompt model override), `wmkf_ai_temperature` (Decimal), `wmkf_ai_maxtokens` (Integer), `wmkf_promptversion` (Integer — note: NO `_ai_` infix), `wmkf_ai_iscurrent` (Boolean — `fetchCurrentPrompt` filters on this), `wmkf_ai_promptstatus` (Picklist — seed scripts write `PROMPTSTATUS_PUBLISHED`). Full attr list deferrable; probe `EntityDefinitions(LogicalName='wmkf_ai_prompt')` if more fields surface.
+**Schema (verified 2026-05-07 via `execute-prompt.js` `fetchCurrentPrompt`, L204):** `wmkf_ai_promptid`, `wmkf_ai_promptname`, `wmkf_ai_systemprompt` (Memo), `wmkf_ai_promptbody` (Memo), `wmkf_ai_promptvariables` (Memo, JSON), `wmkf_ai_promptoutputschema` (Memo, JSON), `wmkf_ai_model` (String — per-prompt model override), `wmkf_ai_temperature` (Decimal), `wmkf_ai_maxtokens` (Integer), `wmkf_promptversion` (Integer — note: NO `_ai_` infix), `wmkf_ai_iscurrent` (Boolean — `fetchCurrentPrompt` filters on this), `wmkf_ai_promptstatus` (Picklist — seed scripts write `PROMPTSTATUS_PUBLISHED`). Full attr list deferrable; probe `EntityDefinitions(LogicalName='wmkf_ai_prompt')` if more fields surface.
 
 **Read paths (verified 2026-05-07):**
-- `lib/services/execute-prompt.js` `fetchCurrentPrompt` (line 193+) — reads via direct `DynamicsService.queryRecords('wmkf_ai_prompts', { filter: \`wmkf_ai_promptname eq '...'\` })`. **Does NOT go through `prompt-resolver.js`.**
+- `lib/services/execute-prompt.js` `fetchCurrentPrompt` (L204) — reads via direct `DynamicsService.queryRecords('wmkf_ai_prompts', { filter: \`wmkf_ai_promptname eq '...'\` })`. **Does NOT go through `prompt-resolver.js`.**
 
 **Write paths:**
 - Connor edits in Dynamics directly (per `project_dynamics_as_prompt_ground_truth.md` — staff-readable/editable prompts).

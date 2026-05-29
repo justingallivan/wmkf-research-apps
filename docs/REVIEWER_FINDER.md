@@ -114,7 +114,7 @@ This is a limitation of the .eml format - it's designed for message import/expor
 
 ## Settings Storage
 
-Reviewer Finder settings are stored per-user in the database when a profile is selected, with localStorage fallback when no profile is active.
+Reviewer Finder settings are stored per-profile in Dataverse (`wmkf_appuserpreferences`, via the `database-service.js` dispatcher) when a profile is selected, with localStorage fallback when no profile is active. (The Postgres `user_preferences` table was retired 2026-05-12 — see Behavior below.)
 
 **Settings stored per-profile:**
 
