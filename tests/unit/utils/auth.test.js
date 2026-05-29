@@ -123,6 +123,139 @@ describe('requireAuth', () => {
 });
 
 // ---------------------------------------------------------------------------
+// validateOrigin — CSRF Referer-fallback + degenerate-config branches
+//
+// auth.js:33-79. Prior tests cover Origin-match, Origin-mismatch, and the
+// no-header cases. These pin the branches the Codebase eval (2026-05-29 #4)
+// flagged as untested: the `origin || referer` fallback (auth.js:66), the
+// malformed-URL rejection (:71), and the skip-validation escapes when
+// NEXTAUTH_URL is unset or unparseable (:53-55, :61-63). All exercised
+// through requireAuth on a state-changing (POST) request.
+// ---------------------------------------------------------------------------
+describe('validateOrigin — Referer fallback + config edge cases', () => {
+  const ORIGINAL_NEXTAUTH_URL = process.env.NEXTAUTH_URL;
+  afterEach(() => {
+    if (ORIGINAL_NEXTAUTH_URL === undefined) delete process.env.NEXTAUTH_URL;
+    else process.env.NEXTAUTH_URL = ORIGINAL_NEXTAUTH_URL;
+  });
+
+  it('falls back to Referer when Origin is absent and the Referer origin matches', async () => {
+    mockAuthenticatedUser(1, []);
+    process.env.NEXTAUTH_URL = 'https://our-app.vercel.app';
+
+    const req = createMockReq({
+      method: 'POST',
+      headers: { referer: 'https://our-app.vercel.app/some/page' },
+    });
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeTruthy();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('rejects when Origin is absent and the Referer origin mismatches', async () => {
+    mockAuthenticatedUser(1, []);
+    process.env.NEXTAUTH_URL = 'https://our-app.vercel.app';
+
+    const req = createMockReq({
+      method: 'POST',
+      headers: { referer: 'https://evil.com/landing' },
+    });
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('Origin takes precedence over Referer — a bad Origin is rejected even if Referer would match', async () => {
+    mockAuthenticatedUser(1, []);
+    process.env.NEXTAUTH_URL = 'https://our-app.vercel.app';
+
+    const req = createMockReq({
+      method: 'POST',
+      headers: {
+        origin: 'https://evil.com',
+        referer: 'https://our-app.vercel.app/page',
+      },
+    });
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('rejects a malformed Referer (unparseable URL) on the fallback path', async () => {
+    mockAuthenticatedUser(1, []);
+    process.env.NEXTAUTH_URL = 'https://our-app.vercel.app';
+
+    const req = createMockReq({
+      method: 'POST',
+      headers: { referer: 'not-a-valid-url' },
+    });
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('rejects a malformed Origin (unparseable URL)', async () => {
+    mockAuthenticatedUser(1, []);
+    process.env.NEXTAUTH_URL = 'https://our-app.vercel.app';
+
+    const req = createMockReq({
+      method: 'POST',
+      headers: { origin: ':::not a url' },
+    });
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('skips validation (allows) when NEXTAUTH_URL is unset, even on an Origin mismatch', async () => {
+    mockAuthenticatedUser(1, []);
+    delete process.env.NEXTAUTH_URL;
+
+    const req = createMockReq({
+      method: 'POST',
+      headers: { origin: 'https://evil.com' },
+    });
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeTruthy();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('skips validation (allows) when NEXTAUTH_URL is itself unparseable', async () => {
+    mockAuthenticatedUser(1, []);
+    process.env.NEXTAUTH_URL = 'not-a-url';
+
+    const req = createMockReq({
+      method: 'POST',
+      headers: { origin: 'https://evil.com' },
+    });
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeTruthy();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // requireAuthWithProfile
 // ---------------------------------------------------------------------------
 describe('requireAuthWithProfile', () => {
