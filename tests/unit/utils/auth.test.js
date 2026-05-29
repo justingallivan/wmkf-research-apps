@@ -425,6 +425,52 @@ describe('requireAppAccess', () => {
     expect(result).toBeNull();
     expect(res.status).toHaveBeenCalledWith(403);
   });
+
+  // Codebase eval 2026-05-29 #5: is_active was cached on the 2-min app-access
+  // TTL, so a deactivated account kept access for up to 2 minutes. is_active is
+  // now checked fresh on every request while app grants stay cached.
+  it('blocks a deactivated account immediately — is_active is NOT held for the cache TTL', async () => {
+    // First request: active + granted. This populates the app-grant cache.
+    mockAuthenticatedUser(1, ['reviewer-finder']);
+    const first = await requireAppAccess(createMockReq(), createMockRes(), 'reviewer-finder');
+    expect(first).toBeTruthy();
+
+    // Account is disabled between requests; the app grant is still cached
+    // (clearAppAccessCache is only called in beforeEach, not here), so this
+    // exercises the fresh is_active read rather than a cache reload.
+    mockDisabledUser(1);
+    const res = createMockRes();
+    const second = await requireAppAccess(createMockReq(), res, 'reviewer-finder');
+
+    expect(second).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.stringContaining('disabled') })
+    );
+  });
+
+  it('fails closed with 503 when the fresh is_active check errors', async () => {
+    mockIsActiveLookupFailure(7);
+    const res = createMockRes();
+
+    const result = await requireAppAccess(createMockReq(), res, 'reviewer-finder');
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(503);
+  });
+
+  it('fails closed with 503 when the fresh superuser-role check errors', async () => {
+    // is_active resolves fine; the parallel role query rejects. The shared
+    // Promise.all catch must still fail closed rather than fall through.
+    mockAuthenticatedUser(5, ['reviewer-finder']);
+    mockRoleLookupFailure();
+    const res = createMockRes();
+
+    const result = await requireAppAccess(createMockReq(), res, 'reviewer-finder');
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(503);
+  });
 });
 
 // ---------------------------------------------------------------------------
