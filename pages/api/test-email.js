@@ -6,7 +6,7 @@
  * that the Dynamics email privileges are working.
  */
 
-import { requireAppAccess } from '../../lib/utils/auth';
+import { requireSuperuser, getSession } from '../../lib/utils/auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../lib/services/dynamics-context';
 
@@ -15,8 +15,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const access = await requireAppAccess(req, res, 'dynamics-explorer');
-  if (!access) return;
+  // Superuser-only (matches this file's stated intent). Previously gated by
+  // requireAppAccess('dynamics-explorer'), which let any dynamics-explorer user
+  // send mail from their own Dynamics identity to arbitrary recipients — wider
+  // than intended for a privilege-verification test endpoint (eval #11).
+  const gate = await requireSuperuser(req, res);
+  if (!gate) return;
+
+  // requireSuperuser returns only { profileId }; fetch the session for the
+  // sender identity (it was already validated by the gate above).
+  const session = await getSession(req, res);
 
   const { to, subject, body, sendMode, from: bodyFrom } = req.body;
 
@@ -25,12 +33,12 @@ export default async function handler(req, res) {
   }
 
   // Sender: authenticated user's email, or body param in dev mode
-  const from = access.session?.user?.azureEmail || bodyFrom;
+  const from = session?.user?.azureEmail || bodyFrom;
   if (!from) {
     return res.status(400).json({ error: 'Could not determine sender email from session' });
   }
 
-  const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
+  const actingUserSystemId = session?.user?.dynamicsSystemuserId || null;
 
   try {
     if (sendMode === 'send') {
