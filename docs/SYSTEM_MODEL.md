@@ -6,7 +6,7 @@ together*. For the live feature catalog see `docs/SYSTEM_OVERVIEW.md`; for the s
 see `docs/STRATEGY.md`; for the system-of-record matrix see `docs/APPLICATION_STATE_ATLAS.md` (+
 `docs/atlas/`). **Where this doc conflicts with an older doc on the points below, this doc wins** —
 but a full reconciliation of stale "pilot"/phasing references across the repo is **still pending**
-(see "Known drift, not yet reconciled").
+(see "Drift reconciliation status").
 
 ---
 
@@ -316,15 +316,25 @@ mandate). A stakeholder pass is owed, especially around BILL payout and records/
 
 ---
 
-## Known drift, not yet reconciled
+## Drift reconciliation status
 
-Persisting this model is **step 1** of the anti-drift work. **Not yet done:**
-- The repo-wide sweep of stale **"mid-June 2026 Phase II Research pilot"** references (that milestone
-  is **defunct** — intake is a Phase I build for the *next* cycle). ~dozen memory entries + ~40 docs
-  reference "pilot"/"post-pilot" against the dead milestone or with an ambiguous referent.
-- Re-anchoring "post-pilot" gates to **goal-milestones** (e.g., reviewer cleanup gates on "Workbench
-  stabilized," not a date).
-- A glossary + this model should propagate term definitions to kill the jargon-legibility gap.
+A drift-audit workflow + grep inventory drove the cleanup (S197). **Done:**
+- The stale **"mid-June 2026 Phase II Research pilot"** cluster is reconciled across the high-impact
+  current-state surfaces (CLAUDE.md, MEMORY.md, STRATEGY.md, SESSION_PROMPT.md, the intake memories,
+  the atlas page, BUDGET_FORM_SPEC, REVIEWER_POSTGRES plan). `INTAKE_PORTAL_DESIGN.md` carries an
+  authoritative SUPERSEDED banner (its 56KB body is a record of the cancelled pilot, not rewritten —
+  pending the next-cycle form redesign). The dual-meaning hazard was respected: the live J26
+  reviewer peer-review "mid-June 2026" deadline refs and the 142 live `Phase II Pending` status refs
+  were left untouched.
+- The earlier no-judgment drift findings (dropped-Wave-1-table pointers, reviewer pre-cutover
+  framing, Next-16 `middleware.js`→`proxy.js` / Edge→Node renames, stale `execute-prompt.js` line
+  pointers) are fixed.
+
+**Residual (intentional):** dated/historical snapshots (e.g., REVIEWER_POSTGRES schedule rows, a
+Connor Q&A record) and the `phase-ii-research-2026-06` form-module *path* references (a real built
+artifact — see "Open / deferred").
+
+**Still open:** a glossary propagating the term definitions to kill the jargon-legibility gap.
 
 ## Open / deferred
 
