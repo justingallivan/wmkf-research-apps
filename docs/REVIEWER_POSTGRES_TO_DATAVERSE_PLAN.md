@@ -114,7 +114,7 @@ The migration question is therefore **"do we deploy what's already designed, or 
 |---|---|---|
 | `publications` | 0 | **Retire** (deploy decision: skip). Writer is dead and reader `DatabaseService.getRecentPublications` (line 313) has **zero external callers** (verified 2026-05-07 via repo-wide grep — Codex R3 #7 resolved). The Dataverse counterpart `wmkf_apppublication` is deployed (14 custom attrs verified live 2026-05-07) with 0 rows; the junction `wmkf_apppublicationauthor` is also deployed with 0 rows (S196 verification — earlier draft claimed undeployed under the `_z_` name, which is the schema-as-code FILE name, not the deployed entity logical name). With zero data on either side and the `researchers.js` admin UI being retired, both publication entities are slated for drop in the appresearcher collapse (`docs/APPRESEARCHER_COLLAPSE_PLAN.md`). Reviewer Finder discovery already rescrapes per-search; no need for a cached table. |
 | `proposal_searches` | 0 | **Drain (no app readers remain).** `pages/api/reviewer-finder/extract-summary.js` retired W5 (2026-05-12) per row 49 above + `docs/atlas/postgres-other-reviewer-tables.md:25`. The W3 grant-cycles JOIN dropped at the same cutover. Remaining touches are admin scripts only. The Dataverse counterpart `wmkf_appproposalsearch` IS deployed (S185, 0 rows, entity-set `wmkf_appproposalsearchs`) and sits empty awaiting a future feature need. Postgres table drop unblocked. |
-| `researchers` | 331 | **Drain.** Don't migrate. `researchers.js` admin UI retired 2026-05-12 (W6 step 1); no live application readers/writers remain. Cleanup cron will empty on cycle close. |
+| `researchers` | 331 | **Drain.** Don't migrate. `researchers.js` admin UI retired 2026-05-12 (W6 step 1); no live application readers/writers remain. The post-pilot one-shot DELETE/table-drop path handles cleanup after the staleness probe passes (≥2026-07-01), matching the W6 row below. |
 | `researcher_keywords` | 1,028 | **Drain.** Coverage moves to `wmkf_appresearcher.wmkf_keywords` for new rows. Live readers/writers gone with `researchers.js` retirement (W6 step 1). |
 | `reviewer_suggestions` | 337 | **Backfill spec needed** — see "Reviewer suggestions backfill" section below. Naive "active-cycle migrate, closed-cycle discard" is not enough. |
 | `grant_cycles` | 13 | **Migrate** to net-new `wmkf_appgrantcycle`. Field-by-field mapping in "Grant cycle field mapping" section below — Postgres has more fields than the original §1 spec captured. |
@@ -173,7 +173,7 @@ So one John Smith on 5 proposals = 1 `wmkf_potentialreviewer` + 1 `wmkf_appresea
 
 This model is **consistent across both** the live deployed entities AND the schema-as-code in `wave2/`. Earlier drafts of this plan framed a "pool vs 1:1" decision as an open fork — that was based on misreading the Wave 1 design doc's text rather than checking the schema-as-code in the repo. The schema-as-code already has the 1:1 design. There was never a real fork.
 
-**Cleanup-cron implications** (corrected from "slot" framing in earlier drafts):
+**Cleanup implications** (corrected from "slot" framing in earlier drafts; delivery later changed from cron to one-shot DELETE):
 - Drops `wmkf_appreviewersuggestion` rows (per-proposal scratch), NOT `wmkf_potentialreviewer` rows. Dropping a potentialreviewer would erase the whole person.
 - The 1:1 sidecar is between potentialreviewer and appresearcher, NOT between either of those and a proposal.
 - Orphan-potentialreviewer policy (a person with zero remaining suggestions): defer; persist as stub for future re-suggestion.
@@ -606,11 +606,11 @@ Hard constraints (each blocks the step after it):
 8. **`my-proposals.js` lifecycle counts** (`pages/api/reviewer-finder/my-proposals.js:153`). Cutover after step 6 verifies.
 9. **`maintenance-service.js` blob orphan scanner.** **SHIPPED W5 (2026-05-12).** `cleanupBlobs()` reads Dataverse `wmkf_appgrantcycle.wmkf_reviewtemplateurl` and `wmkf_appreviewersuggestion` blob URLs (per row 54 of "Spec'd vs. built"). Original Postgres reads (`proposal_searches`, `grant_cycles`, `reviewer_suggestions`) are gone; `proposal_searches.full_proposal_blob_url` intentionally omitted (table empty).
 10. **`lib/services/database-service.js` researcher/publication/keyword methods.** Either gut (if no remaining callers) or rewrite to delegate to Dataverse adapters. Codex 5 — heavy consumer. Reachable from `discovery-service.js`, `deduplication-service.js`, `contact-enrichment-service.js`.
-11. **Cleanup cron (engaged predicate).** Build with backup-on-delete logic; dry-run mode only until 14+ days post-cutover.
+11. **Cleanup predicate + backup contract.** Historical queue item later changed from cron to one-shot DELETE; keep the engaged predicate and backup-on-delete requirement, but execute through the post-pilot table-drop path.
 12. **Match-on-discovery service + discovery-service.js wiring.** Read-only; ships anytime after step 7.
 13. **`WAVE2_BACKEND_*` decision for W4+ drain targets.** W3 is locked as Option B (see §"W3 cutover method"). For each W4+ table, decide A vs B at the start of its window, not as a blanket call.
 14. **Cutover (W4+ drain targets).** Service layer flips per-table. Method depends on step 13 decision.
-15. **Cleanup cron real-mode.** Earliest 14 days post-cutover. **`scripts/restore-reviewer-suggestion-cleanup-backup.js` must exist before this step.**
+15. **Cleanup real-mode.** Historical queue item later changed from cron to one-shot DELETE. Earliest 14 days post-cutover. **`scripts/restore-reviewer-suggestion-cleanup-backup.js` must exist before this step.**
 16. **Decommission.** Drop Postgres tables after 14+ days clean.
 
 **Post-pilot enhancements (descoped from critical path):**
@@ -624,7 +624,7 @@ Hard constraints (each blocks the step after it):
 
 ## Open questions for Connor
 
-1. **Cleanup cron predicate** — **resolved S136 2026-05-06**: locked as-is (8 signals across slot + suggestion: `wmkf_contact`, `wmkf_emailsentat`, `wmkf_responsetype`, `selected`, `ExternalTokenIssued`, `ProposalFirstAccessed`, `ReviewSharePointFolder`, any review-form picklist). Per memory `project_reviewer_postgres_to_dataverse_migration`.
+1. **Cleanup predicate** — **resolved S136 2026-05-06**: locked as-is (8 signals across slot + suggestion: `wmkf_contact`, `wmkf_emailsentat`, `wmkf_responsetype`, `selected`, `ExternalTokenIssued`, `ProposalFirstAccessed`, `ReviewSharePointFolder`, any review-form picklist). Per memory `project_reviewer_postgres_to_dataverse_migration`. Delivery later changed from cron to one-shot DELETE.
 2. **14-day grace period** — **resolved S136 2026-05-06**: locked (matches Wave 1 stability-clock pattern).
 3. **`researchers.js` admin UI** — **resolved 2026-05-06**: retire. Database tab goes away. Replaced by "Add candidate by hand" feature (§4 above).
 4. **Net-new reviewer-portal columns on `wmkf_appreviewersuggestion`** — **resolved 2026-05-06**: add `wmkf_DeclineReason` (multi-line text) + `wmkf_ResponseReceivedAt` (datetime). Late/on-time flag and response-latency hours derive at query time.
@@ -674,7 +674,7 @@ The previous framing of this section conflated two separate read paths. Correcte
 
 1. Schema creation: delete table from solution; no prod impact.
 2. Match-on-discovery + history: read-only; turn off via feature flag (`REVIEWER_FINDER_HISTORY_BADGES=false`) — no data implications.
-3. Cleanup cron: dry-run mode logs what it would delete without acting. Run dry-run for one full cycle before turning on for real. Once acting, pre-delete export to blob with 30-day retention provides manual restore path. **Restore script** (`scripts/restore-reviewer-suggestion-cleanup-backup.js`): reads the JSON blob, re-CREATEs the `wmkf_appreviewersuggestion` rows via `reviewerSuggestionAdapter.upsert`. Re-runnable via the adapter's find-then-update/create (sequential single-instance reruns safe; NOT concurrent-safe; NOT a true Dataverse alternate-key PATCH). (Slots and sidecars are never deleted by the cron — only suggestion rows — so the restore path is suggestion-only too.) Half-day to write; **must exist before cron's first real-mode run.**
+3. Cleanup one-shot: dry-run mode logs what it would delete without acting. At real-mode time, pre-delete export to blob with 30-day retention provides manual restore path. **Restore script** (`scripts/restore-reviewer-suggestion-cleanup-backup.js`): reads the JSON blob, re-CREATEs the `wmkf_appreviewersuggestion` rows via `reviewerSuggestionAdapter.upsert`. Re-runnable via the adapter's find-then-update/create (sequential single-instance reruns safe; NOT concurrent-safe; NOT a true Dataverse alternate-key PATCH). (Slots and sidecars are never deleted by the one-shot cleanup — only suggestion rows — so the restore path is suggestion-only too.) Half-day to write; **must exist before first real-mode run.**
 4. Endpoint rewrites: see Option A vs B above; rollback path differs depending on which.
 5. Cutover: Postgres tables set read-only but not dropped. If cutover regresses, re-enable Postgres path, investigate.
 6. Decommission: only after 14 days clean. Final blob backup.
@@ -760,7 +760,7 @@ Pre-cutover and post-cutover, run a reconciliation script (`scripts/reconcile-re
 
 ## Dataverse readiness checklist
 
-> **HISTORICAL — all items below shipped or were verified at W3-W6 cutover 2026-05-12.** Pilot-launch readiness items (cleanup cron real-mode, etc.) live in the W6/post-pilot rows of the schedule table below; everything else here is closed.
+> **HISTORICAL — all items below shipped or were verified at W3-W6 cutover 2026-05-12.** Pilot-launch readiness items (post-pilot one-shot cleanup real-mode, etc.) live in the W6/post-pilot rows of the schedule table below; everything else here is closed.
 
 Every item below must have a check + date + owner before the relevant cutover step depends on it. Dates aligned to the refreshed W3–W7 schedule below.
 

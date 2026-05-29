@@ -9,7 +9,7 @@
 **Plan history:**
 
 - S196 2026-05-28 round 1 — initial draft, Codex review folded in. Caught P0 missing caller (Review Manager), wrong logical name for publication-author, invalid `String (no cap)` decision, missing pre-drop backup gate, forward-doc reconciliation. Pre-flight expanded with 5 additional checks.
-- S196 2026-05-28 round 2 — Codex re-review with live Dataverse access. **VERIFIED** items pinned below. Net-new findings folded in: Phase 5 manifest-vs-entity drop order swap (P1), Phase 2 pre-backfill orphan/dupe gate (P1), explicit elevation of `audit-dataverse-state.js` and `check-drain-table-mentions.js` as CI gates (P2), `docs/atlas/dataverse-wmkf-appresearcher.md` read-path omission fix (WRONG-NOW).
+- S196 2026-05-28 round 2 — Codex re-review with live Dataverse access. **VERIFIED** items pinned below. Net-new findings folded in: Phase 5 manifest-vs-entity drop order swap (P1), Phase 2 pre-backfill orphan/dupe gate (P1), script-audit updates for CI gates vs standalone probes (P2; see Phase 4.5), `docs/atlas/dataverse-wmkf-appresearcher.md` read-path omission fix (WRONG-NOW).
 
 **Ground-truth checkpoints (Codex round 2 with live Dataverse, 2026-05-28):**
 
@@ -51,7 +51,7 @@ Lower-priority than the live app callers but need to be reconciled. Most are smo
 | File | Role | Likely disposition |
 |---|---|---|
 | `scripts/audit-dataverse-state.js` | Standalone audit (NOT a CI gate per package.json — round-3 correction) lists `wmkf_appresearchers` as a tracked entity set (line 92) | Update: remove the entry when entity is dropped |
-| `scripts/backfill-postgres-to-dataverse.js` | Wave 2 backfill (Postgres → Dataverse) | Decide at execution time. Postgres reviewer tables (`researchers`, `researcher_keywords`, `proposal_searches`) are **drain-only**, not yet dropped (per `project-w6-table-drop-pending`; drop trigger ≥ 2026-07-01). If they've been dropped by the time this collapse executes, retire the script. Otherwise, leave alone — its source still exists. |
+| `scripts/backfill-postgres-to-dataverse.js` | Wave 2 backfill (Postgres → Dataverse) | Decide at execution time. Its actual Postgres source tables are `reviewer_suggestions`, `researchers`, `researcher_keywords`, and `grant_cycles` (not `publications`). Relevant reviewer drain tables are **drain-only**, not yet dropped (per `project-w6-table-drop-pending`; drop trigger ≥ 2026-07-01). If those sources have been dropped by the time this collapse executes, retire the script. Otherwise, leave alone — its source still exists. |
 | `scripts/check-doc-currency.js` | Doc-convention check; references appresearcher naming (line 50) | Update reference |
 | `scripts/check-drain-table-mentions.js` | CI gate; mentions appresearcher as a source of truth (line 11) | Update reference |
 | `scripts/probe-bill-vendor-fields.js` | BILL field probe; appresearcher in its `TABLES` list (line 75) | Update list |
@@ -63,13 +63,13 @@ Lower-priority than the live app callers but need to be reconciled. Most are smo
 
 ### Docs that need updates (Phase 6)
 
-WRONG-NOW (fix now, before this plan executes — Codex flagged):
-- `docs/REVIEWER_DATA_MODEL.md` line 237: "~24 attrs" → actually 17 fields migrate per Phase 1
-- `docs/atlas/dataverse-wmkf-apppublication-and-appgrantcycle.md` lines 39-44: claim publication-author is "not deployed" → actually deployed with 0 rows
-- `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` line 578: claims `contact-enrichment-service.js` writes Postgres via `DatabaseService` → actually writes via `researcherAdapter`
-- `.claude-memory/project-appresearcher-collapse-post-pilot.md` "caller count is 3" → 4 (Review Manager)
-- `.claude-memory/project-reviewer-postgres-to-dataverse-migration.md` lines 12-13: calls `wmkf_potentialreviewer` a "per-proposal slot" → actually global per-person per atlas
-- `docs/APPRESEARCHER_COLLAPSE_PLAN.md` (this file): publication-author logical name corrected, caller count corrected
+WRONG-NOW items fixed during S196 rounds 2/3 (confirmed 2026-05-28):
+- ✓ `docs/REVIEWER_DATA_MODEL.md` line 237: corrected to 17 fields, 4 live app callers, and 8 scripts.
+- ✓ `docs/atlas/dataverse-wmkf-apppublication-and-appgrantcycle.md` lines 39-45: publication-author now documented as deployed with 0 rows.
+- ✓ `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` line 578: `contact-enrichment-service.js` now documented as Dataverse-backed via `researcherAdapter`.
+- ✓ `.claude-memory/project-appresearcher-collapse-post-pilot.md`: caller count corrected to 4 (Review Manager included).
+- ✓ `.claude-memory/project-reviewer-postgres-to-dataverse-migration.md` lines 12-13: `wmkf_potentialreviewer` corrected to global per-person, not per-proposal slot.
+- ✓ `docs/APPRESEARCHER_COLLAPSE_PLAN.md` (this file): publication-author logical name corrected, caller count corrected.
 
 WRONG-AFTER (touched in Phase 6, after execution):
 - `docs/atlas/dataverse-wmkf-appresearcher.md` → delete
@@ -254,7 +254,7 @@ Two scripts in this set ARE CI gates with `npm run` targets that block PRs (veri
 - `scripts/probe-bill-vendor-fields.js` — drop `wmkf_appresearcher` from the `TABLES` list (line 75)
 
 **Retire (purpose obsolete):**
-- `scripts/backfill-postgres-to-dataverse.js` — Postgres reviewer tables are drain-only (not yet dropped — drop is post-pilot per `project-w6-table-drop-pending` and `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`). This collapse may or may not coincide with the W6 table drop. If W6 drops have happened by then, retire this script; if not, leave alone (its Postgres source still exists). **Decision deferred to execution time.** Round-2 framing that the source was "already dropped" was wrong.
+- `scripts/backfill-postgres-to-dataverse.js` — this script reads `reviewer_suggestions`, `researchers`, `researcher_keywords`, and `grant_cycles` (not `publications`). Relevant reviewer drain tables are not yet dropped — drop is post-pilot per `project-w6-table-drop-pending` and `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`. This collapse may or may not coincide with the W6 table drop. If those source tables have been dropped by then, retire this script; if not, leave alone. **Decision deferred to execution time.** Round-2 framing that the source was "already dropped" was wrong.
 - `scripts/wave2-reshape-drop.js` — Wave 2 reshape utility, purpose served. Delete file.
 - `scripts/smoke-find-by-name.js`, `scripts/smoke-recent-suggestions.js` — Re-evaluate: if still actively used, update to query the new combined entity; if abandoned, delete.
 
