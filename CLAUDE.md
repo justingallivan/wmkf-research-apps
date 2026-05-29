@@ -149,7 +149,7 @@ Defaults live in `shared/config/baseConfig.js` (`getModelForApp()`); admin can o
 npm install              # Install dependencies
 npm run dev              # Run development server
 npm run build            # Build for production
-node scripts/setup-database.js  # Run database migrations
+node scripts/apply-migrations.js  # Apply DB migrations (existing env; setup-database.js is fresh-install only)
 ```
 
 See `scripts/README.md` for database utility scripts.
@@ -163,7 +163,7 @@ For multi-Mac development, see `docs/MULTI_MAC_SETUP.md`.
 Three-layer defense-in-depth:
 
 1. **Server-side proxy** (`proxy.js`) — `withAuth`/`jose` validates JWT before any HTML/JS is served. (Formerly `middleware.js`; renamed to the Next 16 `proxy` file convention. Runs on the Node.js runtime.) Unauthenticated users never see the app. Respects `AUTH_REQUIRED` kill switch. Excludes `/api/auth/*`, `/api/cron/*` (`CRON_SECRET`), and `/api/irs/*` (`IRS_VERIFY_SECRET` shared-secret header for PowerAutomate).
-2. **API route auth** (`lib/utils/auth.js`) — App-specific endpoints use `requireAppAccess(req, res, ...appKeys)` which combines CSRF origin check + auth + `is_active` check + app access in one call. Returns `{ profileId, session }` on success; sends 401/403 on failure. Uses in-memory cache with 2-min TTL (includes `isActive` flag). Disabled accounts blocked before superuser bypass. Infrastructure endpoints (auth, admin, health) use `requireAuth()` or `requireAuthWithProfile()`.
+2. **API route auth** (`lib/utils/auth.js`) — App-specific endpoints use `requireAppAccess(req, res, ...appKeys)` which combines CSRF origin check + auth + `is_active` check + app access in one call. Returns `{ profileId, session }` on success; sends 401/403 on failure. App grants are cached in-memory (2-min TTL); `is_active` and the superuser role are checked **fresh every request** (never cached), so a revoked/disabled account loses access immediately. Disabled accounts blocked before superuser bypass. Infrastructure endpoints (auth, admin, health) use `requireAuth()` or `requireAuthWithProfile()`.
 3. **Client-side guards** (`RequireAuth`, `RequireAppAccess`) — Defense in depth for navigation/UI.
 
 **Important:** When adding new app-specific API endpoints, use `requireAppAccess(req, res, 'app-key')` with the correct app key from `appRegistry.js`. For infrastructure endpoints, use `requireAuthWithProfile()` for user-scoped data. Superuser-only routes use `requireSuperuser(req, res)` (returns `{ profileId }` or null after sending 401/403); the lower-level `getUserRole(profileId)` is available when a route needs role beyond just superuser. Never accept `profileId` from query/body params — derive it from `access.profileId` or the session.
@@ -265,6 +265,7 @@ Conventions:
 
 Operational docs to know about (others in `docs/` are design backdrop, roadmaps, or point-in-time audits — find via grep when relevant):
 
+- **`docs/SYSTEM_MODEL.md`** — the canonical conceptual model (rote-vs-thinking principle, the two orthogonal axes, capabilities vs. trunk vs. substrate, the two interaction modes, doc-resolution provenance tiers) and the **Glossary** defining load-bearing terms (Executor, Mode 1/Mode 2, drain, slice-0, thin adapter). Read before cross-capability planning.
 - **`docs/EXECUTOR_CONTRACT.md`** — shared spec PA `ExecutePrompt` and Vercel `executePrompt()` both implement. Read before any prompt work.
 - **`docs/API_ROUTE_SECURITY_MATRIX.md`** — [95](docs/CANONICAL_COUNTS.md#api-route-file-count)-route catalogue, CI-gated.
 - **`docs/SECURITY_OPERATING_PLAN.md`** — weekly/monthly/quarterly security cadence + watch-item escalation thresholds.

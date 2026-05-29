@@ -283,7 +283,7 @@ View sign-in logs in Azure Portal:
 |------|---------|
 | `proxy.js` | Server-side auth gate (Next 16 `proxy` convention, `withAuth`/`jose`) + CSP nonce generation |
 | `lib/utils/auth-policy.js` | proxy-bundle-safe `isAuthRequired()` (shared by `proxy.js` Node.js runtime + `lib/utils/auth.js`) — production fails closed unless `EMERGENCY_AUTH_BYPASS=true` |
-| `lib/utils/auth.js` | Server-side auth helpers (`requireAuth`, `requireAuthWithProfile`, `requireAppAccess`, `requireSuperuser`) — 2-min in-memory cache including `isActive` flag |
+| `lib/utils/auth.js` | Server-side auth helpers (`requireAuth`, `requireAuthWithProfile`, `requireAppAccess`, `requireSuperuser`) — app grants cached 2-min in-memory; `is_active` + superuser role read fresh each request (never cached) |
 | `pages/api/auth/[...nextauth].js` | NextAuth dual-provider configuration (`azure-ad` + `entra-external`) |
 | `pages/api/auth/status.js` | Auth status endpoint (checks kill switch) |
 | `shared/components/RequireAuth.js` | Client-side auth guard |

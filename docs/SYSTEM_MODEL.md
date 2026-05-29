@@ -43,6 +43,21 @@ them):
   shared prompt; what's left of an "app" once the prompt lives in Dataverse.
 - **Sidecar entity** — a 1:1 satellite table holding extra fields for a parent record (e.g., the
   reviewer bibliometric sidecar slated for collapse).
+- **Mode 1 / Mode 2** — the two interaction modes (orthogonal to where data comes from). **Mode 1**
+  is a *declarative task*: a fixed canonical prompt → a defined Dataverse/SharePoint output, governed
+  by the Executor contract. **Mode 2** is an *interactive session*: an open-ended chat/agent loop with
+  ephemeral output. The mode decides whether the prompt machinery applies at all. See
+  "Storage tiers + two interaction modes" below.
+- **drain** — moving data *out of* Postgres toward Dataverse (the system of record). Two related
+  senses: (1) **drain-only** describes a Postgres table that is no longer authoritative — its rows
+  were migrated to Dataverse and the table is kept only as historical/staging (e.g., the reviewer
+  tables, `grant_cycles`); (2) the **submission drain** (`/api/cron/drain-submissions`) is the cron
+  that advances queued intake `submission_jobs` one state at a time and lands them in Dataverse.
+- **slice-0** — the foundational schema increment for the intake-portal pilot: the first set of
+  Dataverse schema changes (such as institution membership, roster rollup, and the request-person
+  role picklist) that the drain + portal build sits on. Deployed to prod Dataverse 2026-05-22. The
+  relevant slice-0 entries are cataloged in `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` (which also tracks
+  later, non-slice-0 schema work).
 
 ---
 

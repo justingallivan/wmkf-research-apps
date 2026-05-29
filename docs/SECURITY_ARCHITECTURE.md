@@ -629,7 +629,7 @@
 | **JWT payload** | azureId, azureEmail, profileId, profileName, avatarColor, needsLinking, lastActivity |
 | **Session refresh** | `SessionProvider` configured with `refetchOnWindowFocus` — refreshes `lastActivity` when the user returns to the tab, but does not poll in the background (which would defeat idle timeout) |
 | **Debug mode** | `debug: process.env.NODE_ENV === 'development'` — disabled in production |
-| **Session revocation** | Setting `user_profiles.is_active = false` blocks requests within 2-minute cache TTL. Checked in `requireAppAccess()` (cached, parallel query) and `requireAuthWithProfile()` (direct query). Disabled accounts are blocked before superuser bypass. |
+| **Session revocation** | Setting `user_profiles.is_active = false` blocks requests on the **next request** — `is_active` is checked fresh every request (never cached) in both `requireAppAccess()` (parallel with the superuser-role query) and `requireAuthWithProfile()`. Only app grants are cached (2-min TTL). Disabled accounts are blocked before superuser bypass. |
 
 ### 5.3 Three-Layer Auth Enforcement
 
@@ -650,7 +650,7 @@ Authentication is enforced at three levels — the server-side proxy, API route 
 
 | Function | Behavior | Used by |
 |----------|----------|---------|
-| `requireAppAccess(req, res, ...appKeys)` | CSRF origin check + auth + profile + `is_active` check + app grant (OR logic). Returns `{ profileId, session }` or sends 401/403. Uses in-memory cache with 2-minute TTL (includes `isActive` flag). Disabled accounts blocked before superuser bypass. | App-specific API endpoints |
+| `requireAppAccess(req, res, ...appKeys)` | CSRF origin check + auth + profile + `is_active` check + app grant (OR logic). Returns `{ profileId, session }` or sends 401/403. App grants are cached in-memory (2-min TTL); `is_active` and the superuser role are read fresh every request (never cached). Disabled accounts blocked before superuser bypass. | App-specific API endpoints |
 | `requireAuthWithProfile(req, res)` | Auth + linked profile + `is_active` check (direct DB query, fail-open). Returns `profileId` or sends 401/403. Blocks request-body `profileId` injection in production. | User-scoped infrastructure (admin, preferences, app-access) |
 | `requireAuth(req, res)` | CSRF origin check + auth. Returns session or sends 401. | System endpoints (health, file upload, blob proxy) |
 | `optionalAuth(req, res)` | Returns session or null; no error response. | Public-optional routes |
@@ -689,7 +689,7 @@ Authentication is enforced at three levels — the server-side proxy, API route 
 | **Database** | Dataverse `wmkf_appuserappaccesses` (per-user app grants). The Postgres `user_app_access` table that previously enforced this via a `(user_profile_id, app_key)` unique constraint was dropped 2026-05-12 at the Wave 1 cutover. |
 | **Default grants** | New users receive only `dynamics-explorer`; all other apps require explicit superuser grant |
 | **Superuser bypass** | Users with `role = 'superuser'` in `dynamics_user_roles` bypass all app checks |
-| **Caching** | In-memory `Map` with 2-minute TTL; invalidated on grant/revoke via `clearAppAccessCache()` |
+| **Caching** | App grants only — in-memory `Map` with 2-minute TTL, invalidated on grant/revoke via `clearAppAccessCache()`. `is_active` and superuser role are never cached (read fresh each request). |
 | **Admin UI** | Checkbox grid on `/admin` — superusers manage per-user app grants |
 | **Always-accessible paths** | `/`, `/admin`, `/guide`, `/profile-settings`, `/auth/signin`, `/auth/error` |
 
@@ -906,7 +906,7 @@ Every Dynamics tool execution is logged to `dynamics_query_log`:
 | **CRM authentication** | OAuth 2.0 Client Credentials, server-side only |
 | **ORCID authentication** | OAuth 2.0 Client Credentials (`/read-public` scope), server-side only |
 | **CSRF protection** | Origin header validation on state-changing methods (POST/PUT/PATCH/DELETE) in `requireAuth()` and `requireAppAccess()` |
-| **Session revocation** | `is_active` check on `user_profiles` in `requireAppAccess()` (cached, 2-min TTL) and `requireAuthWithProfile()` (direct query) |
+| **Session revocation** | `is_active` check on `user_profiles`, read fresh every request (never cached) in both `requireAppAccess()` and `requireAuthWithProfile()` |
 | **Kill switch** | `AUTH_REQUIRED=false` disables user auth (emergency use only) |
 | **Production guard** | Auth bypass returns 403 in production for profile-scoped routes |
 
@@ -1194,7 +1194,7 @@ _(Historical as-of-finding paths. `evaluate-concepts.js` was later archived to `
 
 **Recommendation:** Check `is_active` status during request authorization.
 
-**Status: REMEDIATED.** `requireAppAccess()` now includes an `is_active` query in its parallel fetch (zero additional latency), cached alongside `apps` and `isSuperuser` with 2-minute TTL. Disabled accounts are blocked before the superuser bypass. `requireAuthWithProfile()` performs a direct `is_active` check (wraps in try/catch — session still valid if DB fails). Revocation effective within 2-minute cache window.
+**Status: REMEDIATED.** `requireAppAccess()` includes an `is_active` query in its parallel fetch (alongside the superuser-role query; zero additional latency). Originally `is_active` was cached on the 2-minute app-grant TTL, leaving a stale-after-revoke window; as of 2026-05-29 it is read **fresh every request** (never cached), so a disabled account is blocked on its next request. Only app grants remain cached. Disabled accounts are blocked before the superuser bypass. `requireAuthWithProfile()` performs the same fresh `is_active` check (wrapped in try/catch — fails closed with 503 if the DB read errors).
 
 ### Low
 
