@@ -7,6 +7,8 @@
     "prebuild": "node scripts/build-migrations-manifest.js",
     "build": "next build",
     "start": "next start",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "apply:migrations": "node scripts/apply-migrations.js",
     "check:migrations-manifest": "node scripts/check-migrations-manifest.js",
     "test": "jest",
@@ -74,6 +76,8 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "autoprefixer": "^10.4.27",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.6",
     "jest": "^30.1.1",
     "jest-environment-jsdom": "^30.1.1",
     "postcss": "^8.5.6"

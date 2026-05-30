@@ -19,7 +19,6 @@ process.env.BILLCOM_ACCOUNT_YES_VALUE = '100000000';
 process.env.BILLCOM_ACCOUNT_NO_VALUE = '100000001';
 process.env.BILLCOM_ACCOUNT_RECENTLY_CONFIRMED_VALUE = '100000002';
 
-// eslint-disable-next-line import/first
 const { onboardReviewer } = require('../../lib/bill/onboard-reviewer-service.js');
 
 const BASE_INPUT = {

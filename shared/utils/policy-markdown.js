@@ -62,7 +62,6 @@ function getDOMPurify() {
   if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
     return createDOMPurify(window);
   }
-  // eslint-disable-next-line no-eval
   const nodeRequire = eval('require');
   const { JSDOM } = nodeRequire('jsdom');
   const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');

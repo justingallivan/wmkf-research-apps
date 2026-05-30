@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useContext } from 'react';
 import DOMPurify from 'dompurify';
 import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import HelpButton from '../shared/components/HelpButton';
-import { useProfile } from '../shared/context/ProfileContext';
+import ProfileContext from '../shared/context/ProfileContext';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 
 // ─── Markdown table parser ───
@@ -135,10 +135,9 @@ function DynamicsExplorer() {
   const pendingFileExportsRef = useRef([]);
   const pendingDocumentLinksRef = useRef([]);
 
-  let profileContext = null;
-  try {
-    profileContext = useProfile();
-  } catch (e) {}
+  // useContext returns null when no ProfileProvider is mounted (non-public
+  // pages always have one — see pages/_app.js); unconditional hook call.
+  const profileContext = useContext(ProfileContext);
   const currentProfile = profileContext?.currentProfile;
 
   // Fetch user role on mount

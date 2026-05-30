@@ -9,6 +9,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 
 const DISMISSED_KEY = 'welcome_modal_dismissed';
 
@@ -52,9 +53,9 @@ export default function WelcomeModal() {
           <p className="text-gray-600 mb-6 leading-relaxed">
             You currently have access to the <strong>WMKF Akoya Chatbot</strong>.
             Check out the{' '}
-            <a href="/guide" className="text-indigo-600 hover:text-indigo-800 underline">
+            <Link href="/guide" className="text-indigo-600 hover:text-indigo-800 underline">
               User Guide
-            </a>{' '}
+            </Link>{' '}
             to learn how it works. To request access to additional applications, please email{' '}
             <a
               href="mailto:jgallivan@wmkeck.org"

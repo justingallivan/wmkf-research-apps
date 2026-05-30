@@ -14,7 +14,7 @@
  * there is no longer a shared researcher pool to browse.)
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import HelpButton from '../shared/components/HelpButton';
 import FileUploaderSimple from '../shared/components/FileUploaderSimple';
@@ -24,7 +24,7 @@ import SettingsModal from '../shared/components/SettingsModal';
 import { getModelDisplayName } from '../shared/utils/modelNames';
 import { BASE_CONFIG } from '../shared/config/baseConfig';
 import { resolveStoredCycle, formatCycleForStorage } from '../shared/config/reviewerFinderPreferences';
-import { useProfile } from '../shared/context/ProfileContext';
+import ProfileContext from '../shared/context/ProfileContext';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 
 // Helper to extract email from affiliation string (fallback when email field is null)
@@ -3467,13 +3467,10 @@ function ReviewerFinderPage() {
     };
   }, []);
 
-  // Get current profile ID for user scoping
-  let profileContext = null;
-  try {
-    profileContext = useProfile();
-  } catch (e) {
-    // ProfileProvider not available
-  }
+  // Get current profile ID for user scoping. useContext returns null when no
+  // ProfileProvider is mounted (non-public pages always have one — see
+  // pages/_app.js); unconditional hook call satisfies rules-of-hooks.
+  const profileContext = useContext(ProfileContext);
   const userProfileId = profileContext?.currentProfile?.id || null;
 
   // Lifted state from NewSearchTab to persist across tab switches

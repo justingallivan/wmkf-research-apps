@@ -18,11 +18,6 @@ import ProfileLinkingDialog from './ProfileLinkingDialog';
 
 export default function RequireAuth({ children }) {
   const router = useRouter();
-
-  // Never wrap NextAuth's own pages — they handle auth state themselves
-  if (router.pathname.startsWith('/auth/')) {
-    return children;
-  }
   const { data: session, status } = useSession();
   const [showLinkingDialog, setShowLinkingDialog] = useState(false);
   // Start as false on both server and client — avoids hydration mismatch
@@ -55,6 +50,14 @@ export default function RequireAuth({ children }) {
       setShowLinkingDialog(true);
     }
   }, [status, session?.user?.needsLinking]);
+
+  // Never wrap NextAuth's own pages — they handle auth state themselves.
+  // (In practice pages/_app.js already excludes /auth/* from RequireAuth;
+  // this is belt-and-suspenders. Placed after all hooks so hook order is
+  // unconditional — see react-hooks/rules-of-hooks.)
+  if (router.pathname.startsWith('/auth/')) {
+    return children;
+  }
 
   // If auth is not enabled, just render children
   if (!authEnabled) {

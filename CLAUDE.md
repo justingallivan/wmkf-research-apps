@@ -35,6 +35,7 @@ The **Application State Atlas** at `docs/APPLICATION_STATE_ATLAS.md` (with per-e
 - `npm run check:atlas` — Postgres tables + Dataverse entity sets referenced in source must be in some Atlas page; gates `pages/api/**`, `lib/dataverse/**`, `lib/db/**`, `lib/services/{dynamics,database,execute-prompt}*`, `scripts/audit-*`, `docs/atlas/**`, `docs/APPLICATION_STATE_ATLAS.md`.
 - `npm run check:atlas:self-test` — exercises every Atlas detection pattern against synthetic fixtures. Same gating scope as `:atlas`.
 - `npm run check:api-routes` — API route security matrix coverage; gates `pages/api/**`.
+- `npm run lint` — ESLint flat config (`eslint.config.mjs`, `eslint-config-next/core-web-vitals`); repo-wide. Blocks on **errors only** (warnings don't fail exit), so the calibrated warn-level rules (React-Compiler-eligibility, exhaustive-deps) surface without gating. `next lint` was removed in Next 16; this is its replacement. `npm run lint:fix` auto-fixes. Wired into `.github/workflows/test.yml`.
 
 **Drift gates** (also fail-loud, lower scope):
 - `:fact-consistency` — registered scalar drift across docs/memory; **run before any fact-level doc/memory fix is marked "done."**

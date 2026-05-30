@@ -14,7 +14,6 @@ process.env.HONORARIUM_PROGRAM_ID = '00000000-0000-0000-0000-0000000000aa';
 process.env.HONORARIUM_GRANTPROGRAM_ID = '00000000-0000-0000-0000-0000000000bb';
 process.env.HONORARIUM_TYPE_ID = '00000000-0000-0000-0000-0000000000cc';
 
-// eslint-disable-next-line import/first
 const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
 
 const SUGGESTION_ID = 'sug-1111';
