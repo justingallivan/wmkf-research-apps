@@ -19,6 +19,30 @@ function PhaseIWriteup() {
     setResults(null);
   }, []);
 
+  const handleWordExport = async (filename, result) => {
+    try {
+      const { generateMarkdownDocument } = await import('../shared/utils/word-export');
+      const sections = [{ title: '', content: result.formatted || '' }];
+      const cleanFilename = filename.replace(/\.[^/.]+$/, '');
+      const timestamp = new Date().toISOString().split('T')[0];
+      const blob = await generateMarkdownDocument(sections, {
+        title: 'Phase I Writeup Draft',
+        subtitle: `${cleanFilename} — ${timestamp}`,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${cleanFilename.replace(/[^a-zA-Z0-9-_]/g, '_')}_Phase_I_Writeup.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Word export failed:', err);
+      setError('Failed to generate Word document');
+    }
+  };
+
   const processProposals = async () => {
     if (selectedFiles.length === 0) {
       setError('Please select PDF files first');
@@ -187,6 +211,7 @@ function PhaseIWriteup() {
             results={results}
             showActions={false}
             exportFormats={['markdown', 'json']}
+            onWordExport={handleWordExport}
           />
         </div>
       )}
