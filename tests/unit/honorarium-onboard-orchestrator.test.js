@@ -131,6 +131,23 @@ describe('ensureHonorariumOnboarding', () => {
     });
   });
 
+  it('contact address PATCH failure is non-fatal — honorarium still created + onboarded (Codex post-impl)', async () => {
+    const deps = makeDeps({
+      dynamics: {
+        createRecord: jest.fn().mockResolvedValue({ akoya_requestid: 'HON' }),
+        getRecord: jest.fn().mockResolvedValue(null),
+        updateRecord: jest.fn().mockImplementation(async (entitySet) => {
+          if (entitySet === 'contacts') throw new Error('address PATCH 500');
+        }),
+      },
+    });
+    const res = await ensureHonorariumOnboarding(baseArgs(), deps);
+    expect(deps.dynamics.createRecord).toHaveBeenCalled();
+    expect(deps.suggestions.setHonorariumRequest).toHaveBeenCalled();
+    expect(deps.onboard).toHaveBeenCalled();
+    expect(res.honorariumRequestId).toBe(`det-${SUGGESTION_ID}`);
+  });
+
   it('amount unavailable → propagates (caller treats as skip + alert)', async () => {
     const err = Object.assign(new Error('down'), { code: 'honorarium_amount_unavailable' });
     const deps = makeDeps({ getAmount: jest.fn().mockRejectedValue(err) });

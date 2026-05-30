@@ -479,6 +479,20 @@ describe('/api/external/review/[token]/respond', () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ idempotent: true }));
   });
 
+  it('re-accept honors the PERSISTED opt-out (body omits the flag) — orchestrator NOT run (Codex post-impl F2)', async () => {
+    const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
+    ensureHonorariumOnboarding.mockClear();
+    verifySuggestionToken.mockResolvedValue({
+      ...fresh,
+      suggestion: { ...fresh.suggestion, wmkf_accepted: true, wmkf_declined: false, wmkf_honorariumoptout: true },
+    });
+    const req = createMockReq({ method: 'POST', query: { token: 'good-token' }, headers: {}, body: { action: 'accept' } });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
   it('orchestrator failure is non-fatal: accept still 200 + alert fired', async () => {
     const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
     const NotificationService = require('../../lib/services/notification-service');

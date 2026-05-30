@@ -248,7 +248,12 @@ export default async function handler(req, res) {
     // Runs on both fresh accept and re-accept; gated on opt-out. Any failure
     // alerts and is left for the resume sweep / a later re-accept — it never
     // converts a committed accept into a 500.
-    if (body.honorariumOptOut !== true) {
+    //
+    // Opt-out honors BOTH the request body AND the persisted flag (Codex
+    // post-impl F2): a re-accept whose body omits honorariumOptOut must not
+    // mint a honorarium for a reviewer who opted out on the original accept.
+    const optedOut = body.honorariumOptOut === true || suggestion.wmkf_honorariumoptout === true;
+    if (!optedOut) {
       try {
         await bypassDynamicsRestrictions('external-honorarium', () =>
           ensureHonorariumOnboarding({ suggestion, request, reviewer, body }),

@@ -20,6 +20,7 @@ jest.mock('../../lib/services/intake-audit-service', () => ({ log: jest.fn() }))
 jest.mock('../../lib/services/notification-service', () => ({ notify: jest.fn().mockResolvedValue({ id: 1 }) }));
 jest.mock('../../lib/bill/onboarding-state', () => ({
   listPending: jest.fn(),
+  listStuck: jest.fn().mockResolvedValue([]),
   clearDynamicsPending: jest.fn().mockResolvedValue(undefined),
   bumpAttempt: jest.fn().mockResolvedValue(1),
   cleanupCompleted: jest.fn().mockResolvedValue(0),
@@ -42,6 +43,7 @@ beforeEach(() => {
   optionSet.assertOptionSetValuesConfigured.mockImplementation(() => {});
   DynamicsService.updateRecord.mockResolvedValue(undefined);
   onboardingState.bumpAttempt.mockResolvedValue(1);
+  onboardingState.listStuck.mockResolvedValue([]);
 });
 
 const ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
@@ -50,8 +52,20 @@ describe('sweepBillOnboarding', () => {
   it('no pending rows → resumed 0, scanned 0, no Dynamics writes', async () => {
     onboardingState.listPending.mockResolvedValueOnce([]);
     const r = await MaintenanceService.sweepBillOnboarding();
-    expect(r).toEqual({ resumed: 0, scanned: 0, errors: 0, failedClosed: 0 });
+    expect(r).toEqual({ resumed: 0, scanned: 0, errors: 0, failedClosed: 0, stuck: 0 });
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  it('stuck reconcile: stranded pending/partial rows past the threshold fire a manual-reconcile alert', async () => {
+    onboardingState.listPending.mockResolvedValueOnce([]);
+    onboardingState.listStuck.mockResolvedValueOnce([
+      { honorarium_request_id: ID, bill_status: 'partial', vendor_id: '009ORPHAN' },
+    ]);
+    const r = await MaintenanceService.sweepBillOnboarding();
+    expect(r.stuck).toBe(1);
+    expect(NotificationService.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'bill_onboarding_stuck' }),
+    );
   });
 
   it('matched torn row (pending_match=true) → writes PNI + "Yes", clears marker', async () => {

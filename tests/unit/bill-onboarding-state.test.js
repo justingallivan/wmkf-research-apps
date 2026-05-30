@@ -106,12 +106,24 @@ describe('listPending', () => {
   });
 });
 
+describe('listStuck', () => {
+  it('selects stranded pending/partial rows older than the threshold', async () => {
+    sql.mockResolvedValueOnce({ rows: [{ honorarium_request_id: ID, bill_status: 'partial' }] });
+    const rows = await store.listStuck({ thresholdHours: 24 });
+    expect(rows).toHaveLength(1);
+    expect(sqlText(0)).toMatch(/dynamics_pending = FALSE/i);
+    expect(sqlText(0)).toMatch(/bill_status IN \('pending', 'partial'\)/i);
+  });
+});
+
 describe('cleanupCompleted', () => {
-  it('DELETEs only non-pending rows older than retention; returns count', async () => {
+  it('DELETEs only TERMINAL (resolved) rows older than retention; returns count', async () => {
     sql.mockResolvedValueOnce({ rowCount: 4 });
     const n = await store.cleanupCompleted(30);
     expect(n).toBe(4);
     expect(sqlText(0)).toMatch(/DELETE FROM bill_onboarding_state/i);
     expect(sqlText(0)).toMatch(/dynamics_pending = FALSE/i);
+    // Must NOT reap 'pending'/'partial' rows that still hold a staged vendor_id.
+    expect(sqlText(0)).toMatch(/bill_status = ANY/i);
   });
 });
