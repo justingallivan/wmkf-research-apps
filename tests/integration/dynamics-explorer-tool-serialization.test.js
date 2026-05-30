@@ -8,6 +8,9 @@ import {
 
 const mockStream = jest.fn();
 const mockQueryRecords = jest.fn();
+const mockCountRecords = jest.fn();
+const mockAggregateRecords = jest.fn();
+const mockQueryAllRecords = jest.fn();
 const mockResolveEntitySetName = jest.fn();
 const mockGetEntityAttributes = jest.fn();
 const mockBuildResolvedTaxonomyPromptBlock = jest.fn(() => Promise.resolve('resolved taxonomy'));
@@ -61,6 +64,9 @@ jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
     resolveEntitySetName: (...args) => mockResolveEntitySetName(...args),
     queryRecords: (...args) => mockQueryRecords(...args),
+    countRecords: (...args) => mockCountRecords(...args),
+    aggregateRecords: (...args) => mockAggregateRecords(...args),
+    queryAllRecords: (...args) => mockQueryAllRecords(...args),
     getEntityAttributes: (...args) => mockGetEntityAttributes(...args),
   },
 }));
@@ -107,6 +113,14 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
       { logicalName: 'akoya_requestid', displayName: 'Request', type: 'Uniqueidentifier', description: '' },
       { logicalName: 'akoya_requestnum', displayName: 'Request Number', type: 'String', description: '' },
       { logicalName: 'wmkf_live_only_field', displayName: 'Live Only Field', type: 'String', description: 'Absent from curated annotations' },
+      { logicalName: 'description', displayName: 'Description', type: 'Memo', description: '' },
+      { logicalName: 'wmkf_abstract', displayName: 'Abstract', type: 'Memo', description: '' },
+      { logicalName: 'normal_field', displayName: 'Normal', type: 'String', description: '' },
+      { logicalName: 'statecode', displayName: 'Status', type: 'State', description: '' },
+      { logicalName: 'createdon', displayName: 'Created On', type: 'DateTime', description: '' },
+      { logicalName: '_regardingobjectid_value', displayName: 'Regarding', type: 'Lookup', description: '' },
+      { logicalName: '_wmkf_potentialreviewer1_value', displayName: 'Potential Reviewer 1', type: 'Lookup', description: '' },
+      { logicalName: 'wmkf_secret', displayName: 'Secret', type: 'String', description: '' },
     ]);
     mockQueryRecords.mockResolvedValue({
       records: [
@@ -465,5 +479,71 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
       m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
     );
     expect(toolResultMessage.content[0].content).toContain('Access denied');
+  });
+
+  test('OData validator returns a precise tool_result for wrong fields before Dynamics call', async () => {
+    mockStream
+      .mockReset()
+      .mockResolvedValueOnce({
+        content: [
+          { type: 'tool_use', id: 'tool-1', name: 'query_records', input: { table_name: 'akoya_request', select: 'akoya_name' } },
+        ],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      })
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'Corrected.' }],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      });
+
+    const req = createMockReq({ method: 'POST', body: { messages: [{ role: 'user', content: 'bad field' }] } });
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(mockQueryRecords).not.toHaveBeenCalled();
+    const toolResult = mockStream.mock.calls[1][0].messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    ).content[0].content;
+    expect(toolResult).toContain('akoya_name');
+    expect(toolResult).toContain('does not exist on akoya_request');
+  });
+
+  test('OData validator denies restricted fields in filter before checkRestriction would see them', async () => {
+    setMockSqlResults({
+      dynamics_restrictions: {
+        rows: [{ table_name: 'akoya_request', field_name: 'wmkf_secret', restriction_type: 'field', reason: 'sensitive' }],
+      },
+    });
+    mockStream
+      .mockReset()
+      .mockResolvedValueOnce({
+        content: [
+          { type: 'tool_use', id: 'tool-1', name: 'query_records', input: { table_name: 'akoya_request', select: 'akoya_requestnum', filter: "wmkf_secret eq 'x'" } },
+        ],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      })
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'Denied.' }],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      });
+
+    const req = createMockReq({ method: 'POST', body: { messages: [{ role: 'user', content: 'restricted filter' }] } });
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(mockQueryRecords).not.toHaveBeenCalled();
+    const toolResult = mockStream.mock.calls[1][0].messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    ).content[0].content;
+    expect(toolResult).toContain('DENIED');
+    expect(toolResult).toContain('wmkf_secret');
+    expect(toolResult).toContain('restricted');
   });
 });

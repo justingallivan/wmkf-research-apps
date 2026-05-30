@@ -46,6 +46,7 @@ import {
   serializeDynamicsExplorerToolResult,
 } from '../../../lib/utils/dynamics-explorer-serializer';
 import { buildResolvedTaxonomyPromptBlock } from '../../../lib/services/dynamics-explorer-taxonomy';
+import { validateODataCall } from '../../../lib/services/dynamics-odata-validator';
 
 export const config = {
   api: {
@@ -210,12 +211,27 @@ export default async function handler(req, res) {
         }
         const executionTime = Date.now() - startTime;
 
-        const recordCount = result?.records?.length || result?.results?.length || result?.count || result?.searchCount || (result?.error ? -1 : 0);
+        const recordCount = result?._validatorReject
+          ? 0
+          : result?.records?.length || result?.results?.length || result?.count || result?.searchCount || (result?.error ? -1 : 0);
         console.log(`[DynExp] Round ${round} ${name} → ${recordCount} records, ${executionTime}ms`);
 
-        logQuery({ userProfileId, sessionId, queryType: name, tableName: input.table_name || null, queryParams: input, recordCount, executionTime, wasDenied: false });
+        logQuery({
+          userProfileId,
+          sessionId,
+          queryType: name,
+          tableName: input.table_name || null,
+          queryParams: input,
+          recordCount,
+          executionTime,
+          wasDenied: false,
+          denialReason: result?._validatorReject ? `ODATA_VALIDATOR_REJECT: ${result.error}` : null,
+        });
 
-        const resultForModel = serializeDynamicsExplorerToolResult(result, { toolName: name });
+        const resultForModel = serializeDynamicsExplorerToolResult(
+          result?._validatorReject ? { error: result.error } : result,
+          { toolName: name }
+        );
         const charLimit = TOOL_CHAR_LIMITS[name] || MAX_RESULT_CHARS;
         const resultStr = truncateResult(resultForModel, charLimit);
 
@@ -465,19 +481,34 @@ async function executeTool(name, input, sendEvent, userProfileId, restrictions =
       return await searchRecords(input);
 
     case 'get_entity':
+      {
+        const validation = await validateEffectiveODataCall(name, input, restrictions);
+        if (validation.reject) return validatorReject(validation.reject);
+      }
       return await getEntity(input);
 
     case 'get_related':
+      {
+        const validation = await validateEffectiveODataCall(name, input, restrictions);
+        if (validation.reject) return validatorReject(validation.reject);
+      }
       return await getRelated(input);
 
     case 'describe_table':
       return await describeTable(input, restrictions);
 
     case 'query_records': {
-      const entitySet = await DynamicsService.resolveEntitySetName(input.table_name);
-      const result = await DynamicsService.queryRecords(entitySet, {
+      const effectiveInput = {
+        ...input,
         select: sanitizeSelect(input.select),
         filter: applyActiveOnlyFilter(input.filter, input.include_inactive),
+      };
+      const validation = await validateEffectiveODataCall(name, effectiveInput, restrictions);
+      if (validation.reject) return validatorReject(validation.reject);
+      const entitySet = await DynamicsService.resolveEntitySetName(input.table_name);
+      const result = await DynamicsService.queryRecords(entitySet, {
+        select: effectiveInput.select,
+        filter: effectiveInput.filter,
         orderby: input.orderby,
         top: input.top || 50,
         expand: input.expand,
@@ -487,20 +518,32 @@ async function executeTool(name, input, sendEvent, userProfileId, restrictions =
     }
 
     case 'count_records': {
+      const effectiveInput = {
+        ...input,
+        filter: applyActiveOnlyFilter(input.filter, input.include_inactive),
+      };
+      const validation = await validateEffectiveODataCall(name, effectiveInput, restrictions);
+      if (validation.reject) return validatorReject(validation.reject);
       const entitySet = await DynamicsService.resolveEntitySetName(input.table_name);
       const count = await DynamicsService.countRecords(
         entitySet,
-        applyActiveOnlyFilter(input.filter, input.include_inactive),
+        effectiveInput.filter,
       );
       return { count };
     }
 
     case 'aggregate': {
+      const effectiveInput = {
+        ...input,
+        filter: applyActiveOnlyFilter(input.filter, input.include_inactive),
+      };
+      const validation = await validateEffectiveODataCall(name, effectiveInput, restrictions);
+      if (validation.reject) return validatorReject(validation.reject);
       const entitySet = await DynamicsService.resolveEntitySetName(input.table_name);
       const result = await DynamicsService.aggregateRecords(entitySet, {
         field: input.field,
         operation: input.operation,
-        filter: applyActiveOnlyFilter(input.filter, input.include_inactive),
+        filter: effectiveInput.filter,
         groupBy: input.group_by,
       });
       if (result.results) result.results = result.results.map(stripEmpty);
@@ -532,11 +575,24 @@ async function executeTool(name, input, sendEvent, userProfileId, restrictions =
     }
 
     case 'export_csv':
-      return await exportCsv(input, sendEvent, userProfileId);
+      return await exportCsv(input, sendEvent, userProfileId, restrictions);
 
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
+}
+
+async function validateEffectiveODataCall(name, input, restrictions) {
+  return await validateODataCall(name, input, {
+    tableAnnotations: TABLE_ANNOTATIONS,
+    getEntityAttributes: tableName => DynamicsService.getEntityAttributes(tableName),
+    restrictions,
+    entityConfigs: ENTITY_TYPE_CONFIGS,
+  });
+}
+
+function validatorReject(message) {
+  return { error: message, _validatorReject: true };
 }
 
 /**
@@ -1735,10 +1791,17 @@ const MAX_XLSX_BYTES = 3 * 1024 * 1024; // 3MB buffer limit (~4MB base64)
  * 2. process_instruction without confirmed → estimate mode
  * 3. process_instruction with confirmed: true → full AI batch processing + export
  */
-async function exportCsv({ table_name, select, filter, orderby, filename, process_instruction, confirmed, include_inactive }, sendEvent, userProfileId) {
+async function exportCsv({ table_name, select, filter, orderby, filename, process_instruction, confirmed, include_inactive }, sendEvent, userProfileId, restrictions = []) {
   const cleanSelect = sanitizeSelect(select);
-  const entitySet = await DynamicsService.resolveEntitySetName(table_name);
   const effectiveFilter = applyActiveOnlyFilter(filter, include_inactive);
+  const validation = await validateEffectiveODataCall('export_csv', {
+    table_name,
+    select: cleanSelect,
+    filter: effectiveFilter,
+    orderby,
+  }, restrictions);
+  if (validation.reject) return validatorReject(validation.reject);
+  const entitySet = await DynamicsService.resolveEntitySetName(table_name);
 
   // ─── Branch 1: No AI processing — straight export (unchanged) ───
   if (!process_instruction) {

@@ -22,7 +22,7 @@ export const TABLE_ANNOTATIONS = {
       akoya_requesttype: 'string — vendor field, nearly always "Grant". Ignore.',
       akoya_title: 'string — proposal/project title',
       akoya_submitdate: 'datetime — Phase II submission date',
-      akoya_fiscalyear: 'string — grant cycle label like "June 2025" (NOT calendar year)',
+      akoya_fiscalyear: 'string — grant cycle label like "December 2026" (NOT calendar year)',
       akoya_loireceived: 'datetime — Phase I proposal (Letter of Inquiry) received date',
       // Status fields
       wmkf_phaseistatus: 'string — Phase I outcome: "Invited", "Not Invited", " Ineligible" (note leading space in data), "Request Withdrawn", "Rescinded Grant", "Incomplete", "Pending Committee Review", "Recommended Invite"',
@@ -100,7 +100,7 @@ export const TABLE_ANNOTATIONS = {
     },
     rules: [
       'DEFAULT FILTER: Unless the user explicitly asks about concepts, site visits, office visits, phone calls, or "all records", ALWAYS add wmkf_request_type eq 100000001 to filter to grant applications only. This excludes ~9K non-grant records.',
-      'FISCAL YEAR: akoya_fiscalyear stores labels like "June 2025". When filtering by year, use OR: (contains(akoya_fiscalyear,\'2025\') or (akoya_submitdate ge 2025-01-01T00:00:00Z and akoya_submitdate lt 2026-01-01T00:00:00Z))',
+      'FISCAL YEAR: akoya_fiscalyear stores labels like "December 2026" (full month name + four-digit year). When filtering by year, use OR: (contains(akoya_fiscalyear,\'2026\') or (akoya_submitdate ge 2026-01-01T00:00:00Z and akoya_submitdate lt 2027-01-01T00:00:00Z))',
       'Lookup _value fields return GUIDs; _formatted versions auto-return display names. Only $select the _value field — never $select _formatted (causes API error).',
       'Null fields are stripped from results. Only $select fields you will display.',
       'PROGRAM DIRECTOR: _wmkf_programdirector_value is a lookup to systemuser. To filter by director name, first query systemusers to get the GUID, then filter requests by _wmkf_programdirector_value eq {guid}.',
