@@ -1,9 +1,11 @@
 # Dynamics Explorer — Path A Plan: Live Ground Truth
 
-**Status:** DRAFT, Codex-reviewed + folded (S200, 2026-05-29). Pre-implementation design.
+**Status:** DRAFT, Codex-reviewed ×2 + folded (S200, 2026-05-29). Slice 1 (A1+A2) specified and ready to implement pending green-light. Pre-implementation design.
 **Scope:** Incremental hardening of the existing agentic Dynamics Explorer. Keeps the LLM-tool-use paradigm; does NOT build the deterministic structured-query tool (that is **Path B**, a separate additive tier that reuses the same live primitives this plan wires in).
 
-> **Codex review folded (S200).** The first draft made three factual API errors (now corrected): `picklistOptions` is **not** exported from `live-taxonomy.js`; `live-taxonomy` has **no** cache; and `count_records` uses `/$count` (which *throws* on complex filters), not `@odata.count` (the `@odata.count` 5,000-row silent cap lives in `queryRecords`/export estimate mode). Review also: A3 is deferred (needs OData→FetchXML), A1 reworked to cover inline-schema tables, and cache/restriction/token-budget/prompt-injection risks added. See §6 + §9.
+> **Codex review round 1 folded (S200).** First draft made three factual API errors (now corrected): `picklistOptions` is **not** exported from `live-taxonomy.js`; `live-taxonomy` has **no** cache; and `count_records` uses `/$count` (which *throws* on complex filters), not `@odata.count` (the `@odata.count` 5,000-row silent cap lives in `queryRecords`/export estimate mode). Also: A3 deferred (needs OData→FetchXML), A1 reworked to cover inline-schema tables, cache/restriction/token-budget/prompt-injection risks added.
+>
+> **Codex review round 2 folded (S200).** Round 1 left A1b and A2-security as open "decide in review" items → round 2 returned NO-GO because those gate the implementation. Both now **decided** per Codex rec (§8): A1b = soften the inline rule; A2 security = whitelist the fixed taxonomy surface + restriction guard. Added: `describe_table({full:true})` tool-schema/handler change, a concrete prompt-injection contract (not just "escape"), and an optional `countdistinct` interim for counts. Slice 1 is now specified.
 
 ---
 
@@ -43,9 +45,10 @@ Ordered by leverage ÷ paradigm-risk. **Slice 1 = A1 + A2.** A3 deferred (prereq
 
 ### A1 — Live schema into the model (highest leverage) — REWORKED
 The first draft only touched `describe_table`, but the prompt tells the model that **inline-schema tables already have "full field details" and should query directly** (`prompts:537-538`), and `akoya_request` — the largest-gap table — is one of the five inline tables (`prompts:470`). So `describe_table`-only changes miss exactly the worst case. A1 therefore has two parts:
-- **A1a (describe_table):** for a known table, return curated `fields`+`rules` verbatim **plus** a compact `additionalLiveFields` summary from `getEntityAttributes` (logicalName/type for `IsValidForRead` attrs not in the curated set). Allow fall-through to live attributes for tables not in `TABLE_ANNOTATIONS` (respecting restrictions). **Gate the full field list behind `describe_table({ full: true })`** (Codex rec); default response = curated + `additionalLiveFieldCount`, staying within the 12k-char result cap (`chat.js:65-73`).
-- **A1b (inline tables):** soften the "you already know the fields, query directly" rule so the model knows it can call `describe_table` for fields beyond the curated inline set — OR augment the inline schema blocks themselves with a capped live-field addendum. Decide in review; without A1b, the five inline tables keep guessing.
-- **Test:** `describe_table('akoya_request', {full:true})` surfaces a real field absent from annotations; restriction enforced; default response stays under the char cap.
+- **A1a (describe_table):** for a known table, return curated `fields`+`rules` verbatim **plus** a compact `additionalLiveFields` summary from `getEntityAttributes` (logicalName/type for `IsValidForRead` attrs not in the curated set). Allow fall-through to live attributes for tables not in `TABLE_ANNOTATIONS` (respecting restrictions). **Gate the full field list behind `describe_table({ full: true })`**; default response = curated + `additionalLiveFieldCount`, staying within the 12k-char result cap (`chat.js:65-73`).
+  - **Tool-schema + handler change (required, Codex MINOR):** `describe_table`'s `input_schema` currently declares only `table_name` (`prompts:709`) and the handler ignores other keys (`chat.js:597`). A1a must add the `full` boolean to both the schema and `describeTable(...)`.
+- **A1b (inline tables) — DECIDED (Codex rec): soften the inline rule, do NOT add live-field addenda to the system prompt.** Change `prompts:537` so the model is told the inline schemas are *curated/common* fields and it should call `describe_table` when a needed field is absent or uncertain. This fixes the bad "you already know the fields, query directly" instruction without growing the already-large inline prompt (`prompts:643`).
+- **Test:** `describe_table('akoya_request', {full:true})` surfaces a real field absent from annotations; restriction enforced; default response stays under the char cap; an inline-table query for a non-curated field now routes through `describe_table` first.
 
 ### A2 — Live program / option-set resolution (kills the stale-constant class; shared with Path B)
 Replace baked GUIDs/codes with values resolved live at request time.
@@ -53,11 +56,15 @@ Replace baked GUIDs/codes with values resolved live at request time.
 - Use the **actually-exported** API (`fetchLiveTaxonomy` + `buildResolver`); export `picklistOptions` only if a direct option-set call is needed.
 - **Inject a server-side resolved prompt block** (small canonical name→GUID + name→optionvalue mappings) replacing `prompts:552-572`. Do **not** inject raw unrestricted taxonomy wholesale; **escape** live names (they come from Dataverse records — see prompt-injection risk §6). Drop the "VOCABULARY FIRST trust the GUIDs" framing.
 - Add an **adapter** mapping resolver field names → OData lookup `_value` fields.
+- **Security policy — DECIDED (Codex rec):** whitelist exactly this small taxonomy surface for Explorer — `akoya_programs`, `wmkf_grantprograms`, `wmkf_types`, `akoya_request.wmkf_request_type`, and distinct `akoya_requeststatus`. Add a guard that **omits/rejects any taxonomy source matching an active table-level restriction** before injection, because `live-taxonomy`/`fetch-client` bypass `checkRestriction` (`live-taxonomy.js:29`, `fetch-client.js:196`). This keeps the bypass acceptable: the surface is a fixed, non-PII reference set, restriction-checked at the gate.
+- **Prompt-injection contract (Codex MAJOR):** "escape" is not enough. Injected names go into the *system* prompt, which the untrusted-content boundary does NOT wrap (`chat.js:220` wraps tool results only). Contract: resolved names are emitted as a **fixed-format key→value table** (program label → GUID), values validated to the expected shape (GUID regex for lookups, integer for option-set values), labels length-capped and control-char-stripped; a label failing validation is dropped from the block (logged), never passed through raw. The model is told this block is system-provided reference, not user content.
 - **Couple prompt changes with prompt-contract tests** (A2 edits the `buildSystemPrompt` path, `chat.js:128`).
-- **Test:** a rotated GUID no longer breaks a program filter; resolved codes drive `wmkf_request_type`; fail-loud on taxonomy fetch failure.
+- **Test:** a rotated GUID no longer breaks a program filter; resolved codes drive `wmkf_request_type`; fail-loud on taxonomy fetch failure; a restricted taxonomy source is omitted from the injected block; a malformed live label is dropped.
 
 ### A3 — Robust counts — DEFERRED (prerequisite required)
-`count_records` (`/$count`, throws on complex filters) and `@odata.count`-based estimates (silent 5,000 cap) are both unreliable, and `fetchXmlAggregateCount` is the robust replacement (true count, fail-loud past the aggregate limit) — **but it takes FetchXML, and Explorer produces OData `$filter` strings.** A3 is therefore **blocked on an OData-filter→FetchXML shim** (a focused converter, or selective reuse of `compiler.js` condition-building). **Defer A3** until that shim is scoped as its own sub-phase; do not attempt it in slice 1.
+`count_records` (`/$count`, throws on complex filters) and `@odata.count`-based estimates (silent 5,000 cap) are both unreliable, and `fetchXmlAggregateCount` is the robust replacement (true count, fail-loud past the aggregate limit) — **but it takes FetchXML, and Explorer produces OData `$filter` strings.** The full robust path is therefore **blocked on an OData-filter→FetchXML shim** (a focused converter, or selective reuse of `compiler.js` condition-building). **Defer the FetchXML path** until that shim is scoped as its own sub-phase; do not attempt it in slice 1.
+
+**Interim (Codex rec, optional — not slice 1):** `aggregateRecords` *already* accepts an OData filter and builds `$apply=filter(...)/aggregate(...)` (`dynamics-service.js:543`), and the tool schema already exposes `countdistinct` (`prompts:757`). For `count_records` where the table's primary key is known, an OData `$apply` `countdistinct` on the PK is a cheap interim that avoids `/$count`'s complex-filter failure — **fail loud / fall back to the existing error path when it can't compile**, and note it is still subject to the 50k `$apply` aggregate limit (not unbounded). This is a smaller step than the full FetchXML count and can land independently of the shim.
 
 ### A4 — Footgun guardrails from `constants.js` (replace `_note` guesses)
 Fold the probe-verified domain facts into the prompt's domain guidance + disambiguation logic, **imported by reference** from `constants.js:379-404` (generate an Explorer prompt summary; don't copy values):
@@ -82,9 +89,9 @@ A2's cached-taxonomy layer is the **shared foundation with Path B**.
 ## 6. Risks (expanded per review)
 
 - **Token budget (HIGH):** `describe_table` 12k-char cap (`chat.js:65-73`), `maxTokens: 2048` responses (`:415-420`), five inline schemas already in the system prompt. Resolved maps + live fields can crowd out useful context → need a field-budget strategy + the `full:true` gate.
-- **Restriction inconsistency (HIGH):** `live-taxonomy`/`fetch-client` bypass `checkRestriction` (direct fetch), while Explorer fails closed without `withDynamicsContext` (`dynamics-context.js:4-8`). A2 must define a **security policy**: does resolved taxonomy expose restricted table names/labels? Route reuse through the restriction context or whitelist the program/request-type/status taxonomy as non-sensitive.
+- **Restriction inconsistency (HIGH) — resolved by §8.4:** `live-taxonomy`/`fetch-client` bypass `checkRestriction` (direct fetch), while Explorer fails closed without `withDynamicsContext` (`dynamics-context.js:4-8`). Mitigation: fixed whitelisted taxonomy surface + a restriction guard at the injection gate (§8.4).
 - **Cache correctness (MEDIUM):** A2 must own the taxonomy cache (TTL, invalidation, fail-loud) since the source module has none.
-- **Prompt-injection (MEDIUM):** live program/type **names** from Dataverse records injected into the *system prompt*; the current untrusted-content boundary wraps only tool results (`chat.js:220-230`), not system-prompt metadata. Escape/validate injected names.
+- **Prompt-injection (MEDIUM) — resolved by A2 contract:** live program/type **names** from Dataverse records injected into the *system prompt*; the current untrusted-content boundary wraps only tool results (`chat.js:220-230`), not system-prompt metadata. Mitigation: fixed key→value table, shape-validated values, malformed labels dropped (A2 "Prompt-injection contract").
 - **Test breakage (MEDIUM):** integration tests mock `buildSystemPrompt`/`TOOL_DEFINITIONS`/`TABLE_ANNOTATIONS` (`tests/integration/dynamics-explorer-tool-serialization.test.js:30-34`); live paths need new tests, not just the mocks.
 - **Do not delete `TABLE_ANNOTATIONS`** — curated dirty-data rules have no live-metadata equivalent.
 
@@ -94,13 +101,14 @@ Per-phase unit/integration tests on the existing harness. Each phase ships with 
 
 ## 8. Decisions (Codex recommendations adopted)
 
-1. **A1 token cost:** gate full live fields behind `describe_table({ full: true })`; default = curated + `additionalLiveFieldCount`.
-2. **A2 surface:** server-side resolved prompt block for the small canonical mappings; escape live names; prompt-contract tests. No wholesale taxonomy injection.
-3. **Slice scope:** ship **A1 + A2** first; **defer A3** until the OData→FetchXML shim is scoped.
-4. **A4 provenance:** import `constants.js:379-404` exports by reference; generate an Explorer-specific summary, don't duplicate values.
+1. **A1 token cost:** gate full live fields behind `describe_table({ full: true })`; default = curated + `additionalLiveFieldCount`. Add the `full` param to the tool schema + handler.
+2. **A1b:** **soften the inline "query directly" rule** (`prompts:537`) so the model calls `describe_table` for fields beyond the curated inline set — do NOT add live-field addenda to the system prompt.
+3. **A2 surface:** server-side resolved prompt block for the small canonical mappings as a fixed key→value table with shape-validated values; no wholesale taxonomy injection; prompt-contract tests.
+4. **A2 security:** whitelist the fixed taxonomy surface (`akoya_programs`, `wmkf_grantprograms`, `wmkf_types`, `akoya_request.wmkf_request_type`, distinct `akoya_requeststatus`) + a restriction guard that omits any source matching an active table-level restriction.
+5. **Slice scope:** ship **A1 + A2** first; **defer A3's FetchXML path** until the OData→FetchXML shim is scoped (optional `countdistinct` interim available independently).
+6. **A4 provenance:** import `constants.js:379-404` exports by reference; generate an Explorer-specific summary, don't duplicate values.
 
 ## 9. Remaining open questions
 
-- **A1b:** soften the inline-"query directly" rule, or augment the inline schema blocks with capped live fields? (Determines whether the five biggest-gap tables benefit.)
-- **A3 shim:** purpose-built OData→FetchXML converter vs. selective `compiler.js` reuse — scope as its own design.
-- **A2 security:** confirm program/request-type/status taxonomy is non-restricted, or route through `withDynamicsContext`.
+- **A3 shim:** purpose-built OData→FetchXML converter vs. selective `compiler.js` reuse — scope as its own design (the `countdistinct` interim is an independent stop-gap, not a substitute).
+- **A5 typed errors:** the shape of the error-classification layer (parse Dataverse error bodies vs. a pre-validation field check against A1's live attribute list).
