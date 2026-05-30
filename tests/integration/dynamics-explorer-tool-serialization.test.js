@@ -331,6 +331,50 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     expect(toolResult).toContain('akoya_requestnum');
   });
 
+  test('describe_table redacts a restricted field name from rules/descriptions', async () => {
+    // wmkf_request_type appears in the mock annotation as both a field AND in
+    // the DEFAULT FILTER rule. Restricting it must drop the field AND redact
+    // its name from the rule prose (not just the field list).
+    setMockSqlResults({
+      dynamics_restrictions: {
+        rows: [{ table_name: 'akoya_request', field_name: 'wmkf_request_type', restriction_type: 'field', reason: 'sensitive' }],
+      },
+    });
+
+    mockStream
+      .mockReset()
+      .mockResolvedValueOnce({
+        content: [
+          { type: 'tool_use', id: 'tool-1', name: 'describe_table', input: { table_name: 'akoya_request', full: true } },
+        ],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      })
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'Schema loaded.' }],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      });
+
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'describe request fields' }] },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    const secondCall = mockStream.mock.calls[1][0];
+    const toolResultMessage = secondCall.messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    );
+    const toolResult = toolResultMessage.content[0].content;
+    expect(toolResult).not.toContain('wmkf_request_type');
+    expect(toolResult).toContain('[restricted]');
+  });
+
   test('describe_table default stays compact while reporting live-field count', async () => {
     mockGetEntityAttributes.mockResolvedValue([
       { logicalName: 'akoya_requestid', displayName: 'Request', type: 'Uniqueidentifier', description: '' },

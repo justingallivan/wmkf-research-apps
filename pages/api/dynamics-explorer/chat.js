@@ -597,11 +597,37 @@ function truncateResult(result, charLimit) {
  * Return annotated and live field metadata for a table, or list all annotated
  * tables if no table is requested.
  */
+function restrictedFieldsForTable(tableName, restrictions) {
+  return new Set(
+    restrictions
+      .filter(r => r.field_name && r.table_name === tableName)
+      .map(r => r.field_name)
+  );
+}
+
+// Redact restricted field NAMES wherever they appear in free text (table
+// descriptions, rules, other fields' descriptions). Dropping a restricted
+// field from the field list is not enough — its logical name can still be
+// referenced in prose ("filter by wmkf_x ..."), which leaks its existence.
+// Token-bounded so a restricted name isn't matched inside a longer logical
+// name (logical names are [A-Za-z0-9_]).
+function redactRestrictedFieldNames(text, restrictedFieldNames) {
+  if (!text || restrictedFieldNames.size === 0) return text;
+  let out = String(text);
+  for (const name of restrictedFieldNames) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(?<![A-Za-z0-9_])${escaped}(?![A-Za-z0-9_])`, 'g');
+    out = out.replace(re, '[restricted]');
+  }
+  return out;
+}
+
 async function describeTable({ table_name, full = false }, restrictions = []) {
   if (!table_name) {
-    const tables = Object.entries(TABLE_ANNOTATIONS).map(([name, info]) =>
-      `${name} (${info.entitySet}) — ${info.description}`
-    );
+    const tables = Object.entries(TABLE_ANNOTATIONS).map(([name, info]) => {
+      const restricted = restrictedFieldsForTable(name, restrictions);
+      return `${name} (${info.entitySet}) — ${redactRestrictedFieldNames(info.description, restricted)}`;
+    });
     return {
       tables: tables.join('\n'),
       count: tables.length,
@@ -613,12 +639,9 @@ async function describeTable({ table_name, full = false }, restrictions = []) {
   // restrictions (a wholly-restricted table is blocked upstream by
   // checkRestriction), so a field-level restriction would otherwise leak the
   // restricted attribute's name/metadata through this listing. Drop any field
-  // restricted for this table from both the curated and live field sets.
-  const restrictedFieldNames = new Set(
-    restrictions
-      .filter(r => r.field_name && r.table_name === table_name)
-      .map(r => r.field_name)
-  );
+  // restricted for this table from both the curated and live field sets, and
+  // redact its name from all remaining free text (descriptions + rules).
+  const restrictedFieldNames = restrictedFieldsForTable(table_name, restrictions);
 
   const table = TABLE_ANNOTATIONS[table_name];
   const liveAttributes = await DynamicsService.getEntityAttributes(table_name);
@@ -630,9 +653,9 @@ async function describeTable({ table_name, full = false }, restrictions = []) {
     .filter(attr => !curatedNames.has(attr.logicalName) && !restrictedFieldNames.has(attr.logicalName))
     .map(attr => ({
       logicalName: attr.logicalName,
-      displayName: attr.displayName,
+      displayName: redactRestrictedFieldNames(attr.displayName, restrictedFieldNames),
       type: attr.type,
-      description: attr.description,
+      description: redactRestrictedFieldNames(attr.description, restrictedFieldNames),
     }));
 
   // Apply the same inline-render sanitizers used by buildInlineSchemas so the
@@ -650,9 +673,12 @@ async function describeTable({ table_name, full = false }, restrictions = []) {
   const result = {
     table: table_name,
     entitySet: table?.entitySet || null,
-    description: table?.description || 'Live Dataverse table metadata. No curated annotation is available for this table.',
-    fields: fieldLines.join('\n'),
-    rules: rulesBlock,
+    description: redactRestrictedFieldNames(
+      table?.description || 'Live Dataverse table metadata. No curated annotation is available for this table.',
+      restrictedFieldNames,
+    ),
+    fields: redactRestrictedFieldNames(fieldLines.join('\n'), restrictedFieldNames),
+    rules: redactRestrictedFieldNames(rulesBlock, restrictedFieldNames),
     additionalLiveFieldCount: additionalLiveFields.length,
   };
 
