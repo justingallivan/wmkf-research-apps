@@ -201,6 +201,16 @@ export function mockIsActiveLookupFailure(profileId) {
   process.env.AZURE_AD_TENANT_ID = 'test-tenant-id';
 }
 
+/**
+ * Merge additional preset rows into the `sql` mock, keyed by a query-text
+ * fragment (e.g. 'dynamics_restrictions'). Call AFTER mockAuthenticatedUser
+ * (which resets _mockSqlResults). Value shape matches @vercel/postgres:
+ * `{ rows: [...] }`, or an Error to simulate a query failure.
+ */
+export function setMockSqlResults(extra = {}) {
+  _mockSqlResults = { ..._mockSqlResults, ...extra };
+}
+
 // ---------------------------------------------------------------------------
 // Request / Response helpers
 // ---------------------------------------------------------------------------

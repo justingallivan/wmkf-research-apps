@@ -201,7 +201,7 @@ export default async function handler(req, res) {
         const startTime = Date.now();
         let result;
         try {
-          result = await executeTool(name, input, sendEvent, userProfileId);
+          result = await executeTool(name, input, sendEvent, userProfileId, restrictions);
         } catch (err) {
           const errMsg = err.message || 'Unknown error';
           console.log(`[DynExp] Round ${round} ${name} ERROR:`, errMsg.substring(0, 200));
@@ -459,7 +459,7 @@ function applyActiveOnlyFilter(userFilter, includeInactive) {
   return userFilter ? `(${userFilter}) and ${active}` : active;
 }
 
-async function executeTool(name, input, sendEvent, userProfileId) {
+async function executeTool(name, input, sendEvent, userProfileId, restrictions = []) {
   switch (name) {
     case 'search':
       return await searchRecords(input);
@@ -471,7 +471,7 @@ async function executeTool(name, input, sendEvent, userProfileId) {
       return await getRelated(input);
 
     case 'describe_table':
-      return await describeTable(input);
+      return await describeTable(input, restrictions);
 
     case 'query_records': {
       const entitySet = await DynamicsService.resolveEntitySetName(input.table_name);
@@ -597,7 +597,7 @@ function truncateResult(result, charLimit) {
  * Return annotated and live field metadata for a table, or list all annotated
  * tables if no table is requested.
  */
-async function describeTable({ table_name, full = false }) {
+async function describeTable({ table_name, full = false }, restrictions = []) {
   if (!table_name) {
     const tables = Object.entries(TABLE_ANNOTATIONS).map(([name, info]) =>
       `${name} (${info.entitySet}) — ${info.description}`
@@ -609,12 +609,25 @@ async function describeTable({ table_name, full = false }) {
     };
   }
 
+  // Field-level restriction gate. getEntityAttributes only checks TABLE-level
+  // restrictions (a wholly-restricted table is blocked upstream by
+  // checkRestriction), so a field-level restriction would otherwise leak the
+  // restricted attribute's name/metadata through this listing. Drop any field
+  // restricted for this table from both the curated and live field sets.
+  const restrictedFieldNames = new Set(
+    restrictions
+      .filter(r => r.field_name && r.table_name === table_name)
+      .map(r => r.field_name)
+  );
+
   const table = TABLE_ANNOTATIONS[table_name];
   const liveAttributes = await DynamicsService.getEntityAttributes(table_name);
-  const curatedFields = table?.fields || {};
+  const curatedFields = Object.fromEntries(
+    Object.entries(table?.fields || {}).filter(([field]) => !restrictedFieldNames.has(field))
+  );
   const curatedNames = new Set(Object.keys(curatedFields));
   const additionalLiveFields = liveAttributes
-    .filter(attr => !curatedNames.has(attr.logicalName))
+    .filter(attr => !curatedNames.has(attr.logicalName) && !restrictedFieldNames.has(attr.logicalName))
     .map(attr => ({
       logicalName: attr.logicalName,
       displayName: attr.displayName,

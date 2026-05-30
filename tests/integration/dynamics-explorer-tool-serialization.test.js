@@ -3,6 +3,7 @@ import {
   createMockReq,
   createMockRes,
   mockAuthenticatedUser,
+  setMockSqlResults,
 } from '../helpers/auth-mock';
 
 const mockStream = jest.fn();
@@ -284,6 +285,50 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     // path (they were replaced by the resolved-taxonomy block in A2).
     expect(toolResult).not.toContain('100000001');
     expect(toolResult).toContain('SERVER-SIDE RESOLVED TAXONOMY');
+  });
+
+  test('describe_table full:true omits field-restricted live metadata', async () => {
+    // A field-level restriction must not leak the attribute via describe_table
+    // (getEntityAttributes only enforces table-level restrictions).
+    setMockSqlResults({
+      dynamics_restrictions: {
+        rows: [{ table_name: 'akoya_request', field_name: 'wmkf_live_only_field', restriction_type: 'field', reason: 'sensitive' }],
+      },
+    });
+
+    mockStream
+      .mockReset()
+      .mockResolvedValueOnce({
+        content: [
+          { type: 'tool_use', id: 'tool-1', name: 'describe_table', input: { table_name: 'akoya_request', full: true } },
+        ],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      })
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'Schema loaded.' }],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      });
+
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'describe request fields' }] },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    const secondCall = mockStream.mock.calls[1][0];
+    const toolResultMessage = secondCall.messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    );
+    const toolResult = toolResultMessage.content[0].content;
+    expect(toolResult).not.toContain('wmkf_live_only_field');
+    // A non-restricted live field still comes through.
+    expect(toolResult).toContain('akoya_requestnum');
   });
 
   test('describe_table default stays compact while reporting live-field count', async () => {
