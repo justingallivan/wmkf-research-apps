@@ -13,7 +13,7 @@
  */
 
 import { verifyInternalCall } from '../../../lib/bill/internal-call-auth';
-import { onboardReviewer } from '../../../lib/bill/onboard-reviewer-service';
+import { onboardReviewer, validateOnboardInput } from '../../../lib/bill/onboard-reviewer-service';
 import NotificationService from '../../../lib/services/notification-service';
 
 export const config = {
@@ -68,7 +68,9 @@ export default async function handler(req, res) {
   } catch {
     return res.status(400).json({ error: 'Invalid JSON' });
   }
-  const validationError = validateBody(body);
+  // Shared validator (same gate the in-process caller applies) — one definition,
+  // no drift between the HTTP and in-process entry points.
+  const validationError = validateOnboardInput(body);
   if (validationError) {
     return res.status(400).json({ error: 'Invalid body', detail: validationError });
   }
@@ -106,37 +108,6 @@ export default async function handler(req, res) {
       error: { code: 'unhandled', message: msg },
     });
   }
-}
-
-function validateBody(body) {
-  if (!body || typeof body !== 'object') return 'body must be an object';
-  if (typeof body.honorariumRequestId !== 'string' || !isGuid(body.honorariumRequestId)) {
-    return 'honorariumRequestId must be a GUID';
-  }
-  if (typeof body.reviewerContactId !== 'string' || !isGuid(body.reviewerContactId)) {
-    return 'reviewerContactId must be a GUID';
-  }
-  if (typeof body.reviewerName !== 'string' || body.reviewerName.trim().length < 1 || body.reviewerName.length > 100) {
-    return 'reviewerName required (1-100 chars)';
-  }
-  if (body.reviewerEmail !== undefined && typeof body.reviewerEmail !== 'string') {
-    return 'reviewerEmail must be a string if provided';
-  }
-  if (body.reviewerPhone !== undefined && typeof body.reviewerPhone !== 'string') {
-    return 'reviewerPhone must be a string if provided';
-  }
-  const a = body.address;
-  if (!a || typeof a !== 'object') return 'address required';
-  if (typeof a.line1 !== 'string' || a.line1.length === 0) return 'address.line1 required';
-  if (typeof a.city !== 'string' || a.city.length === 0) return 'address.city required';
-  if (typeof a.zipOrPostalCode !== 'string' || a.zipOrPostalCode.length === 0) return 'address.zipOrPostalCode required';
-  if (typeof a.country !== 'string' || a.country.length !== 2) return 'address.country must be ISO2';
-  if (a.state !== undefined && typeof a.state !== 'string') return 'address.state must be a string if provided';
-  return null;
-}
-
-function isGuid(s) {
-  return typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 }
 
 // Lifted from pages/api/webhooks/bill.js — same raw-body pattern for HMAC verify.

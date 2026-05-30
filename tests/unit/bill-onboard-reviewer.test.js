@@ -440,6 +440,33 @@ describe('onboardReviewer — durable-state hardening (chunk-4)', () => {
     await onboardReviewer(BASE_INPUT, deps);
     expect(deps.onboardingState.setStatus).toHaveBeenCalledWith(BASE_INPUT.honorariumRequestId, 'onboarded');
   });
+
+  test('invalid input (in-process caller) → status invalid_input, no reservation, no BILL calls', async () => {
+    const { notifyCalls, deps } = makeDeps();
+    const bad = { ...BASE_INPUT, address: { line1: '1 St', city: 'T', country: 'US' } }; // missing zipOrPostalCode
+    const result = await onboardReviewer(bad, deps);
+    expect(result.status).toBe('invalid_input');
+    expect(result.ok).toBe(false);
+    expect(deps.onboardingState.reserveOnboarding).not.toHaveBeenCalled();
+    expect(deps.billClient.createBillVendor).not.toHaveBeenCalled();
+    expect(notifyCalls.some(c => c.type === 'bill_invalid_input')).toBe(true);
+  });
+});
+
+describe('validateOnboardInput (shared gate)', () => {
+  const { validateOnboardInput } = require('../../lib/bill/onboard-reviewer-service.js');
+  it('accepts a well-formed input', () => {
+    expect(validateOnboardInput(BASE_INPUT)).toBeNull();
+  });
+  it('rejects a non-GUID honorariumRequestId', () => {
+    expect(validateOnboardInput({ ...BASE_INPUT, honorariumRequestId: 'nope' })).toMatch(/honorariumRequestId/);
+  });
+  it('rejects a missing address', () => {
+    expect(validateOnboardInput({ ...BASE_INPUT, address: undefined })).toMatch(/address required/);
+  });
+  it('rejects a non-ISO2 country', () => {
+    expect(validateOnboardInput({ ...BASE_INPUT, address: { ...BASE_INPUT.address, country: 'USA' } })).toMatch(/ISO2/);
+  });
 });
 
 describe('verifyInternalCall (HMAC)', () => {
