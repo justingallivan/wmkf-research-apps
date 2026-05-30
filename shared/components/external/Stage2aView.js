@@ -32,11 +32,51 @@ import { COUNTRIES } from '../../config/countries';
 // line2 + state stay optional (many countries have no sub-national state, and
 // the downstream BILL contract treats both as optional). Mirrors the server's
 // validateAddress field set in respond.js.
-const REQUIRED_ADDRESS_FIELDS = ['line1', 'city', 'postalCode', 'country'];
+export const REQUIRED_ADDRESS_FIELDS = ['line1', 'city', 'postalCode', 'country'];
 
-function missingAddressFields(address) {
-  return REQUIRED_ADDRESS_FIELDS.filter((k) => !(address[k] || '').trim());
+// Server-side address fields that can be flagged inline when /respond rejects
+// a value (keys match respond.js ADDRESS_MAX exactly).
+const ADDRESS_FIELD_KEYS = new Set(['line1', 'line2', 'city', 'state', 'postalCode', 'country']);
+
+/**
+ * Required address fields that are empty OR (for country) not a 2-char code.
+ * The country guard makes the client contract explicit even though the closed
+ * <select> only ever emits valid ISO-2 codes — server requires length === 2.
+ */
+export function missingAddressFields(address) {
+  return REQUIRED_ADDRESS_FIELDS.filter((k) => {
+    const v = (address[k] || '').trim();
+    if (!v) return true;
+    if (k === 'country' && !/^[A-Za-z]{2}$/.test(v)) return true;
+    return false;
+  });
 }
+
+/** Trimmed, non-empty address fields only — the shape POSTed to /respond. */
+export function buildAddressPayload(address) {
+  const out = {};
+  for (const [k, v] of Object.entries(address)) {
+    const trimmed = (v || '').trim();
+    if (trimmed) out[k] = trimmed;
+  }
+  return out;
+}
+
+// Maps a /respond 400 validation reason to reviewer-facing copy. Covers the
+// address branches of validateAddress + the contact branches of
+// validateContactEdits so a rejected submit explains itself instead of
+// collapsing into the generic failure message.
+const VALIDATION_REASON_COPY = {
+  invalid_country: 'Please select a valid country.',
+  address_field_too_long: 'One of your mailing-address fields is too long. Please shorten it.',
+  unknown_address_field: 'We couldn’t read part of your mailing address. Please re-check it.',
+  invalid_address: 'Please re-check your mailing address.',
+  invalid_address_field: 'Please re-check your mailing address.',
+  invalid_email: 'That email address doesn’t look right. Please re-check it.',
+  invalid_contact_field: 'Please re-check your contact details.',
+  contact_field_too_long: 'One of your contact fields is too long. Please shorten it.',
+  unknown_contact_field: 'We couldn’t read part of your contact details. Please re-check it.',
+};
 
 export default function Stage2aView({ data, token, onRequestDecline, onAccepted }) {
   const prefill = data.prefill || {};
@@ -135,11 +175,7 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
       // trimmed fields (required-field completeness was checked above).
       let addressPayload;
       if (!honorariumOptOut) {
-        const trimmedAddress = {};
-        for (const [k, v] of Object.entries(address)) {
-          const trimmed = (v || '').trim();
-          if (trimmed) trimmedAddress[k] = trimmed;
-        }
+        const trimmedAddress = buildAddressPayload(address);
         if (Object.keys(trimmedAddress).length) addressPayload = trimmedAddress;
       }
       const resp = await fetch(`/api/external/review/${encodeURIComponent(token)}/respond`, {
@@ -168,6 +204,13 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
           setError('Someone else updated this invitation while you were viewing it. Please refresh and try again.');
         } else if (json.reason === 'policy_misconfigured') {
           setError('We hit a configuration error on our end. The Foundation has been notified.');
+        } else if (resp.status === 400 && VALIDATION_REASON_COPY[json.reason]) {
+          // Surface the specific server validation reason and, when it points at
+          // a named address field, flag that field inline.
+          if (json.field && ADDRESS_FIELD_KEYS.has(json.field)) {
+            setAddressErrors([json.field]);
+          }
+          setError(VALIDATION_REASON_COPY[json.reason]);
         } else {
           setError('Could not submit your response. Please try again.');
         }
@@ -345,7 +388,8 @@ function ContactConfirmCard({ contact, affiliationHint, onUpdate, disabled }) {
   );
 }
 
-function Field({ label, value, onChange, type = 'text', placeholder, disabled, fullWidth, hint, required, error }) {
+function Field({ label, value, onChange, type = 'text', placeholder, disabled, fullWidth, hint, required, error, name, errorMessage }) {
+  const errorId = error && name ? `${name}-error` : undefined;
   return (
     <label className={`block text-sm ${fullWidth ? 'sm:col-span-2' : ''}`}>
       <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
@@ -360,10 +404,14 @@ function Field({ label, value, onChange, type = 'text', placeholder, disabled, f
         disabled={disabled}
         required={required}
         aria-invalid={error || undefined}
+        aria-describedby={errorId}
         className={`mt-1 block w-full rounded-lg border px-3 py-2 text-sm text-gray-900 focus:ring-0 disabled:bg-gray-50 ${
           error ? 'border-red-400 focus:border-red-500' : 'border-gray-300 focus:border-gray-900'
         }`}
       />
+      {errorId && (
+        <span id={errorId} className="block text-xs text-red-600 mt-1">{errorMessage}</span>
+      )}
       {hint && <span className="block text-xs text-gray-500 mt-1">{hint}</span>}
     </label>
   );
@@ -381,24 +429,27 @@ function AddressCard({ address, errors, onUpdate, disabled, prefilled }) {
       </p>
       <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field
-          label="Street address" value={address.line1} onChange={(v) => onUpdate('line1', v)}
+          name="line1" label="Street address" value={address.line1} onChange={(v) => onUpdate('line1', v)}
           disabled={disabled} fullWidth required error={hasError('line1')}
+          errorMessage="Street address is required."
         />
         <Field
-          label="Apt, suite, etc. (optional)" value={address.line2} onChange={(v) => onUpdate('line2', v)}
+          name="line2" label="Apt, suite, etc. (optional)" value={address.line2} onChange={(v) => onUpdate('line2', v)}
           disabled={disabled} fullWidth
         />
         <Field
-          label="City" value={address.city} onChange={(v) => onUpdate('city', v)}
+          name="city" label="City" value={address.city} onChange={(v) => onUpdate('city', v)}
           disabled={disabled} required error={hasError('city')}
+          errorMessage="City is required."
         />
         <Field
-          label="State / Province (optional)" value={address.state} onChange={(v) => onUpdate('state', v)}
+          name="state" label="State / Province (optional)" value={address.state} onChange={(v) => onUpdate('state', v)}
           disabled={disabled}
         />
         <Field
-          label="Postal code" value={address.postalCode} onChange={(v) => onUpdate('postalCode', v)}
+          name="postalCode" label="Postal code" value={address.postalCode} onChange={(v) => onUpdate('postalCode', v)}
           disabled={disabled} required error={hasError('postalCode')}
+          errorMessage="Postal code is required."
         />
         <CountrySelect
           value={address.country} onChange={(v) => onUpdate('country', v)}
@@ -410,6 +461,7 @@ function AddressCard({ address, errors, onUpdate, disabled, prefilled }) {
 }
 
 function CountrySelect({ value, onChange, disabled, error }) {
+  const errorId = error ? 'country-error' : undefined;
   return (
     <label className="block text-sm">
       <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
@@ -422,6 +474,7 @@ function CountrySelect({ value, onChange, disabled, error }) {
         disabled={disabled}
         required
         aria-invalid={error || undefined}
+        aria-describedby={errorId}
         className={`mt-1 block w-full rounded-lg border px-3 py-2 text-sm text-gray-900 bg-white focus:ring-0 disabled:bg-gray-50 ${
           error ? 'border-red-400 focus:border-red-500' : 'border-gray-300 focus:border-gray-900'
         }`}
@@ -431,6 +484,9 @@ function CountrySelect({ value, onChange, disabled, error }) {
           <option key={c.code} value={c.code}>{c.name}</option>
         ))}
       </select>
+      {errorId && (
+        <span id={errorId} className="block text-xs text-red-600 mt-1">Please select a country.</span>
+      )}
     </label>
   );
 }

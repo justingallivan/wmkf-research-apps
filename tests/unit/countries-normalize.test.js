@@ -10,11 +10,19 @@ import { COUNTRIES, normalizeCountryToIso2, isIso2Country } from '../../shared/c
 
 describe('countries config', () => {
   describe('COUNTRIES list integrity', () => {
-    it('has unique uppercase 2-char codes', () => {
+    it('has unique uppercase alpha-2 codes', () => {
       const codes = COUNTRIES.map((c) => c.code);
       expect(new Set(codes).size).toBe(codes.length);
       for (const code of codes) {
         expect(code).toMatch(/^[A-Z]{2}$/);
+      }
+    });
+
+    it('has unique uppercase alpha-3 codes', () => {
+      const codes = COUNTRIES.map((c) => c.code3);
+      expect(new Set(codes).size).toBe(codes.length);
+      for (const code of codes) {
+        expect(code).toMatch(/^[A-Z]{3}$/);
       }
     });
 
@@ -25,9 +33,23 @@ describe('countries config', () => {
       }
     });
 
+    it('is the complete officially-assigned ISO 3166-1 set (no curated subset)', () => {
+      // Guards the stop-time finding: a curated list omitted valid regions and
+      // hard-blocked reviewers. The full assigned set is 249 codes.
+      expect(COUNTRIES.length).toBe(249);
+    });
+
     it('includes the common reviewer countries', () => {
       const codes = new Set(COUNTRIES.map((c) => c.code));
       for (const expected of ['US', 'GB', 'CA', 'AU', 'DE', 'FR', 'CN', 'JP', 'IN']) {
+        expect(codes.has(expected)).toBe(true);
+      }
+    });
+
+    it('includes the territories the curated list previously omitted', () => {
+      const codes = new Set(COUNTRIES.map((c) => c.code));
+      // A representative sample of the territories Codex flagged as missing.
+      for (const expected of ['PR', 'GU', 'VI', 'MO', 'GL', 'FO', 'JE', 'GG', 'IM', 'AW', 'AS', 'MP']) {
         expect(codes.has(expected)).toBe(true);
       }
     });
@@ -45,6 +67,22 @@ describe('countries config', () => {
       expect(normalizeCountryToIso2('  united states  ')).toBe('US');
       expect(normalizeCountryToIso2('United Kingdom')).toBe('GB');
       expect(normalizeCountryToIso2('Canada')).toBe('CA');
+      expect(normalizeCountryToIso2('Puerto Rico')).toBe('PR');
+    });
+
+    it('maps alpha-3 codes to alpha-2 (case-insensitive)', () => {
+      expect(normalizeCountryToIso2('USA')).toBe('US');
+      expect(normalizeCountryToIso2('GBR')).toBe('GB');
+      expect(normalizeCountryToIso2('can')).toBe('CA');
+      expect(normalizeCountryToIso2('DEU')).toBe('DE');
+      expect(normalizeCountryToIso2('PRI')).toBe('PR');
+    });
+
+    it('passes through alpha-2 territory codes', () => {
+      for (const code of ['PR', 'GU', 'VI', 'MO', 'GL']) {
+        expect(normalizeCountryToIso2(code)).toBe(code);
+        expect(normalizeCountryToIso2(code.toLowerCase())).toBe(code);
+      }
     });
 
     it('maps known aliases', () => {
