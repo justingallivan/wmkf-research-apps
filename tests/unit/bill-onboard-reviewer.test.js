@@ -352,19 +352,33 @@ describe('onboardReviewer — durable-state hardening (chunk-4)', () => {
   beforeEach(() => { process.env.BILL_ENABLED = 'true'; });
   afterEach(() => { delete process.env.BILL_ENABLED; });
 
-  test('concurrent caller (reservation lost) → in_progress, no BILL calls', async () => {
+  test('concurrent caller, reservation lost BEFORE a vendor exists → in_progress, no BILL calls', async () => {
     const { notifyCalls, deps } = makeDeps({
       onboardingState: makeOnboardingStateFake({
-        reserveOnboarding: jest.fn().mockResolvedValue({ reserved: false, row: { vendor_id: '009OWNED' } }),
+        reserveOnboarding: jest.fn().mockResolvedValue({ reserved: false, row: { vendor_id: null } }),
       }),
     });
     const result = await onboardReviewer(BASE_INPUT, deps);
     expect(result.status).toBe('in_progress');
-    expect(result.vendorId).toBe('009OWNED');
     expect(deps.billClient.createBillVendor).not.toHaveBeenCalled();
     expect(deps.billClient.searchBillNetwork).not.toHaveBeenCalled();
     expect(deps.dynamics.getRecord).not.toHaveBeenCalled();
     expect(notifyCalls).toEqual([]);
+  });
+
+  test('re-accept of a STRANDED row (reservation lost but vendor_id staged) RESUMES — reuses vendor, completes writeback', async () => {
+    const { deps } = makeDeps({
+      onboardingState: makeOnboardingStateFake({
+        reserveOnboarding: jest.fn().mockResolvedValue({ reserved: false, row: { vendor_id: '009STRANDED' } }),
+      }),
+    });
+    const result = await onboardReviewer(BASE_INPUT, deps);
+    // Resumes: no new vendor created, but search/invite/writeback complete.
+    expect(deps.billClient.createBillVendor).not.toHaveBeenCalled();
+    expect(deps.billClient.searchBillNetwork).toHaveBeenCalled();
+    expect(deps.billClient.sendNetworkInvitation).toHaveBeenCalled();
+    expect(result.status).toBe('reused_existing');
+    expect(result.vendorId).toBe('009STRANDED');
   });
 
   test('staged vendor_id present → reuse, skip vendor create', async () => {
