@@ -14,7 +14,7 @@
  * there is no longer a shared researcher pool to browse.)
  */
 
-import { useState, useEffect, useRef, useContext } from 'react';
+import { useState, useEffect, useRef, useContext, useCallback } from 'react';
 import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import HelpButton from '../shared/components/HelpButton';
 import FileUploaderSimple from '../shared/components/FileUploaderSimple';
@@ -2598,7 +2598,7 @@ function MyCandidatesTab({ refreshTrigger, userProfileId }) {
     }
   };
 
-  const fetchCandidates = async () => {
+  const fetchCandidates = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     setSelectedForDeletion(new Set());
@@ -2633,15 +2633,17 @@ function MyCandidatesTab({ refreshTrigger, userProfileId }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedCycleId, userProfileId]);
 
   useEffect(() => {
     fetchCycles();
   }, []);
 
+  // fetchCandidates is memoized on [selectedCycleId, userProfileId], so listing
+  // it covers those inputs; refreshTrigger stays as the manual re-fetch signal.
   useEffect(() => {
     fetchCandidates();
-  }, [refreshTrigger, selectedCycleId, userProfileId]);
+  }, [refreshTrigger, fetchCandidates]);
 
   // Handle cycle filter change
   const handleCycleChange = (value) => {

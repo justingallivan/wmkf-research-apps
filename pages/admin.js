@@ -1411,6 +1411,8 @@ function AppAccessSection() {
       .finally(() => setLoading(false));
   };
 
+  // Mount-only initial load; fetchGrants reads no reactive state (setters only).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchGrants(); }, []);
 
   if (loading) {
@@ -1665,6 +1667,8 @@ function DynamicsFeedbackSection() {
       .finally(() => setLoading(false));
   };
 
+  // Mount-only initial load; later filter changes call fetchFeedback explicitly.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchFeedback(); }, []);
 
   const handleAction = async (id, status) => {

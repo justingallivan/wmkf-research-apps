@@ -74,43 +74,39 @@ export default function EmailTemplateEditor({
   initialTemplate = null,
   compact = false
 }) {
-  const { currentProfile, preferences, setPreference } = useProfile();
+  const { status, currentProfile, preferences, setPreference } = useProfile();
 
   const [template, setTemplate] = useState(initialTemplate || DEFAULT_TEMPLATE);
   const [showPreview, setShowPreview] = useState(!compact);
   const [saveStatus, setSaveStatus] = useState(null);
 
-  // Track if migration has been attempted
-  const migrationAttemptedRef = useRef(false);
-
-  // Load template on mount or when profile changes
+  // Reload when initialTemplate/profile change OR when the profile/preferences
+  // session is ready. ProfileContext guarantees that once status is 'ready',
+  // the currentProfile and preferences are atomically aligned.
   useEffect(() => {
+    if (status !== 'ready') return;
+    
     if (!initialTemplate) {
       loadTemplate();
     }
-  }, [initialTemplate, currentProfile?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTemplate, status, currentProfile?.id, preferences[PREFERENCE_KEYS.EMAIL_TEMPLATE]]);
 
   const loadTemplate = () => {
     try {
       let loadedTemplate = null;
 
-      // Check profile preferences first
-      if (currentProfile && preferences && preferences[PREFERENCE_KEYS.EMAIL_TEMPLATE]) {
+      // 1. Try Profile preferences
+      if (currentProfile && preferences[PREFERENCE_KEYS.EMAIL_TEMPLATE]) {
         try {
           loadedTemplate = JSON.parse(preferences[PREFERENCE_KEYS.EMAIL_TEMPLATE]);
         } catch (e) {
           console.warn('Failed to parse email template from profile:', e);
         }
-
-        // Attempt migration from localStorage if profile has no template yet
-        if (!loadedTemplate && !migrationAttemptedRef.current) {
-          migrationAttemptedRef.current = true;
-          migrateFromLocalStorage();
-        }
       }
 
-      // Fallback to localStorage
-      if (!loadedTemplate) {
+      // 2. Fallback to localStorage ONLY if no profile is active.
+      if (!loadedTemplate && !currentProfile) {
         const stored = localStorage.getItem(STORAGE_KEYS.EMAIL_TEMPLATE);
         if (stored) {
           loadedTemplate = JSON.parse(atob(stored));
@@ -122,28 +118,12 @@ export default function EmailTemplateEditor({
         if (onTemplateChange) {
           onTemplateChange(loadedTemplate);
         }
+      } else {
+        // Reset to default if no settings found
+        setTemplate(DEFAULT_TEMPLATE);
       }
     } catch (error) {
       console.error('Failed to load email template:', error);
-    }
-  };
-
-  // Migrate template from localStorage to profile preferences
-  const migrateFromLocalStorage = async () => {
-    if (!currentProfile) return;
-
-    try {
-      // Check if profile already has template
-      if (preferences[PREFERENCE_KEYS.EMAIL_TEMPLATE]) return;
-
-      const stored = localStorage.getItem(STORAGE_KEYS.EMAIL_TEMPLATE);
-      if (stored) {
-        const decoded = JSON.parse(atob(stored));
-        await setPreference(PREFERENCE_KEYS.EMAIL_TEMPLATE, JSON.stringify(decoded));
-        console.log('Migrated email template to profile');
-      }
-    } catch (error) {
-      console.error('Failed to migrate email template from localStorage:', error);
     }
   };
 
@@ -215,9 +195,9 @@ export default function EmailTemplateEditor({
     // Clear from profile or localStorage
     if (currentProfile) {
       await setPreference(PREFERENCE_KEYS.EMAIL_TEMPLATE, '');
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.EMAIL_TEMPLATE);
     }
+    // Always purge legacy localStorage so reopen cannot resurrect the cleared value.
+    localStorage.removeItem(STORAGE_KEYS.EMAIL_TEMPLATE);
 
     setSaveStatus(null);
     if (onTemplateChange) {

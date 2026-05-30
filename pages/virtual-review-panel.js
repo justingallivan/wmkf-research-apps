@@ -1116,6 +1116,9 @@ function VirtualReviewPanelContent() {
     } finally {
       setProcessing(false);
     }
+    // handleEvent is a stable useCallback ([] deps); it's also declared below,
+    // so listing it here would hit the TDZ. Omission is intentional and safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [files, selectedProviders, includeClaimVerification, includeIntelligencePass, includeDevilsAdvocate]);
 
   const handleEvent = useCallback((data) => {

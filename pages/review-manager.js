@@ -1487,11 +1487,16 @@ function ReviewManagerPage() {
     } finally {
       setLoading(false);
     }
+    // Granular selectedProposal?.proposalId dep is intentional — only the id is
+    // read; depending on the whole object would rebuild on unrelated field changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCycleCode, profileId, selectedProposal?.proposalId]);
 
+  // Reload reviewers only when the cycle filter changes. Adding loadReviewers
+  // would also refetch on every proposal selection (its proposalId dep).
   useEffect(() => {
     loadReviewers();
-  }, [selectedCycleCode]);
+  }, [selectedCycleCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRefresh = () => {
     loadReviewers();

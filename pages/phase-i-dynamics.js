@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import FileUploaderSimple from '../shared/components/FileUploaderSimple';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
@@ -33,10 +33,10 @@ function PhaseIDynamics() {
   const [error, setError] = useState(null);
   const [conflict, setConflict] = useState(null); // {existingLength, existingPreview, recordModifiedOn}
 
-  const findFileByKey = (key) => {
+  const findFileByKey = useCallback((key) => {
     if (!key || !lookup?.documents?.files) return null;
     return lookup.documents.files.find(f => `${f.library}::${f.folder}::${f.name}` === key) || null;
-  };
+  }, [lookup]);
 
   const fileRef = useMemo(() => {
     if (uploaded) {
@@ -47,7 +47,7 @@ function PhaseIDynamics() {
       return { source: 'sharepoint', library: f.library, folder: f.folder, filename: f.name };
     }
     return null;
-  }, [uploaded, pick, lookup]);
+  }, [uploaded, pick, findFileByKey]);
 
   const canSummarize = !!fileRef && !!lookup?.requestId && !processing;
 

@@ -48,12 +48,13 @@ function ProposalSummarizer() {
   });
   const [isGeneratingWord, setIsGeneratingWord] = useState(false);
 
-  // Initialize staff lead from profile name
+  // Initialize staff lead from profile name. Intentionally keyed on profileName
+  // only: adding staffLead would re-fire and re-populate after a user clears it.
   useEffect(() => {
     if (profileName && !staffLead) {
       setStaffLead(profileName);
     }
-  }, [profileName]);
+  }, [profileName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFilesUploaded = useCallback((uploadedFiles) => {
     setSelectedFiles(uploadedFiles);

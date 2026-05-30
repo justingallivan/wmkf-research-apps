@@ -35,7 +35,7 @@ const DEFAULT_SETTINGS = {
 };
 
 export default function EmailSettingsPanel({ onSettingsChange, initialExpanded = false }) {
-  const { currentProfile, preferences, setPreference } = useProfile();
+  const { status, currentProfile, preferences, setPreference } = useProfile();
 
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -43,21 +43,21 @@ export default function EmailSettingsPanel({ onSettingsChange, initialExpanded =
   const [saveStatus, setSaveStatus] = useState(null);
   const [newFieldName, setNewFieldName] = useState('');
 
-  // Track if migration has been attempted
-  const migrationAttemptedRef = useRef(false);
-
-  // Load settings on mount or when profile changes
+  // Reload settings when the profile/preferences session is ready.
+  // ProfileContext guarantees that once status is 'ready', the currentProfile
+  // and preferences are atomically aligned.
   useEffect(() => {
+    if (status !== 'ready') return;
     loadSettings();
-  }, [currentProfile?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, currentProfile?.id, preferences[PREFERENCE_KEYS.SENDER_INFO], preferences[PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS]]);
 
   const loadSettings = () => {
     try {
       let loadedSettings = null;
 
-      // Check profile preferences first
-      if (currentProfile && preferences) {
-        // Build settings from individual profile preferences
+      // 1. Try Profile preferences
+      if (currentProfile) {
         let hasAnyProfileSettings = false;
 
         if (preferences[PREFERENCE_KEYS.SENDER_INFO]) {
@@ -86,16 +86,12 @@ export default function EmailSettingsPanel({ onSettingsChange, initialExpanded =
             console.warn('Failed to parse grant cycle from profile:', e);
           }
         }
-
-        // Attempt migration if profile has no settings yet
-        if (!hasAnyProfileSettings && !migrationAttemptedRef.current) {
-          migrationAttemptedRef.current = true;
-          migrateFromLocalStorage();
-        }
       }
 
-      // Fallback to localStorage
-      if (!loadedSettings) {
+      // 2. Fallback to localStorage ONLY if no profile is active.
+      // If a profile IS active, ProfileContext has already handled migration
+      // and purged localStorage, so we don't need to check it here.
+      if (!loadedSettings && !currentProfile) {
         const stored = localStorage.getItem(STORAGE_KEYS.EMAIL_SETTINGS);
         if (stored) {
           loadedSettings = JSON.parse(atob(stored));
@@ -108,38 +104,13 @@ export default function EmailSettingsPanel({ onSettingsChange, initialExpanded =
         if (onSettingsChange) {
           onSettingsChange(loadedSettings);
         }
+      } else {
+        // Reset to defaults if no settings found
+        setSettings(DEFAULT_SETTINGS);
+        setHasStoredSettings(false);
       }
     } catch (error) {
       console.error('Failed to load email settings:', error);
-    }
-  };
-
-  // Migrate settings from localStorage to profile preferences
-  const migrateFromLocalStorage = async () => {
-    if (!currentProfile) return;
-
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.EMAIL_SETTINGS);
-      if (stored) {
-        const decoded = JSON.parse(atob(stored));
-
-        // Save as individual preferences
-        if (decoded.senderName || decoded.senderEmail || decoded.signature) {
-          await setPreference(PREFERENCE_KEYS.SENDER_INFO, JSON.stringify({
-            name: decoded.senderName || '',
-            email: decoded.senderEmail || '',
-            signature: decoded.signature || ''
-          }));
-        }
-
-        if (decoded.grantCycle) {
-          await setPreference(PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS, JSON.stringify(decoded.grantCycle));
-        }
-
-        console.log('Migrated email settings to profile');
-      }
-    } catch (error) {
-      console.error('Failed to migrate email settings from localStorage:', error);
     }
   };
 
@@ -257,9 +228,9 @@ export default function EmailSettingsPanel({ onSettingsChange, initialExpanded =
       // Clear from profile preferences
       await setPreference(PREFERENCE_KEYS.SENDER_INFO, '');
       await setPreference(PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS, '');
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.EMAIL_SETTINGS);
     }
+    // Always purge legacy localStorage so reopen cannot resurrect the cleared value.
+    localStorage.removeItem(STORAGE_KEYS.EMAIL_SETTINGS);
 
     setSettings(DEFAULT_SETTINGS);
     setHasStoredSettings(false);

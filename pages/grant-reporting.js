@@ -78,10 +78,10 @@ function GrantReporting() {
   // name appearing in two different libraries (e.g. akoya_request and
   // RequestArchive3) or two different subfolders (e.g. Year 1/Report.docx vs
   // Year 2/Report.docx) can each be disambiguated by the dropdown.
-  const findFileByKey = (key) => {
+  const findFileByKey = useCallback((key) => {
     if (!key || !lookup?.documents?.files) return null;
     return lookup.documents.files.find(f => `${f.library}::${f.folder}::${f.name}` === key) || null;
-  };
+  }, [lookup]);
 
   const proposalRef = useMemo(() => {
     if (uploadedProposal) {
@@ -92,7 +92,7 @@ function GrantReporting() {
       return { source: 'sharepoint', library: f.library, folder: f.folder, filename: f.name };
     }
     return null;
-  }, [uploadedProposal, proposalPick, lookup]);
+  }, [uploadedProposal, proposalPick, findFileByKey]);
 
   const reportRef = useMemo(() => {
     if (uploadedReport) {
@@ -103,7 +103,7 @@ function GrantReporting() {
       return { source: 'sharepoint', library: f.library, folder: f.folder, filename: f.name };
     }
     return null;
-  }, [uploadedReport, reportPick, lookup]);
+  }, [uploadedReport, reportPick, findFileByKey]);
 
   const canExtract = !!reportRef && !processing;
 

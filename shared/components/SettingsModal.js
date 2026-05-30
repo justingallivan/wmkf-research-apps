@@ -50,7 +50,7 @@ const DEFAULT_SENDER = {
 const CURRENT_CYCLE_KEY = 'reviewer_finder_current_cycle';
 
 export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
-  const { currentProfile, preferences, setPreference } = useProfile();
+  const { status, currentProfile, preferences, setPreference } = useProfile();
 
   const [activeSection, setActiveSection] = useState('sender');
   const [grantCycle, setGrantCycle] = useState(DEFAULT_GRANT_CYCLE);
@@ -67,22 +67,19 @@ export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
   const [cycleFormData, setCycleFormData] = useState({});
   const [savingCycle, setSavingCycle] = useState(false);
 
-  // Track if migration has been attempted
-  const migrationAttemptedRef = useRef(false);
-
-  // Load settings on mount or when profile changes
+  // Reload when opened OR when the profile/preferences session is ready.
+  // ProfileContext guarantees that once status is 'ready', the currentProfile
+  // and preferences are atomically aligned.
   useEffect(() => {
-    if (isOpen) {
-      loadSettings();
-      loadCycles();
-    }
-  }, [isOpen, currentProfile?.id]);
+    if (!isOpen) return;
+    if (status !== 'ready') return;
+    
+    loadSettings();
+    loadCycles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, status, currentProfile?.id, preferences[PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS], preferences[PREFERENCE_KEYS.SENDER_INFO], preferences[PREFERENCE_KEYS.CURRENT_CYCLE_ID]]);
 
   // Normalize the stored cycle preference once cycles are loaded.
-  // Tolerant-reader pattern (Codex S147): legacy integer-shape values are
-  // resolved to a cycle row, then `currentCycleId` is rewritten to the
-  // shortcode shape AND opportunistically written back to whichever backend
-  // (Dataverse pref OR localStorage) originally supplied the value.
   useEffect(() => {
     if (!currentCycleId || cycles.length === 0) return;
 
@@ -93,9 +90,9 @@ export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
       setCurrentCycleId(null);
       if (currentProfile) {
         setPreference(PREFERENCE_KEYS.CURRENT_CYCLE_ID, '').catch(() => {});
-      } else {
-        localStorage.removeItem(CURRENT_CYCLE_KEY);
       }
+      // Always purge localStorage stale value on both paths.
+      localStorage.removeItem(CURRENT_CYCLE_KEY);
       return;
     }
 
@@ -119,9 +116,8 @@ export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
       let loadedSender = DEFAULT_SENDER;
       let loadedCycleId = null;
 
-      // Check profile preferences first, then fallback to localStorage
-      if (currentProfile && preferences) {
-        // Load from profile preferences if available
+      // 1. Try Profile preferences
+      if (currentProfile) {
         if (preferences[PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS]) {
           try {
             const decoded = JSON.parse(preferences[PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS]);
@@ -141,40 +137,26 @@ export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
         }
 
         if (preferences[PREFERENCE_KEYS.CURRENT_CYCLE_ID]) {
-          // Hold the raw stored value; the post-load useEffect resolves it
-          // against the cycle list via `resolveStoredCycle()` once cycles
-          // arrive (handles both legacy integer-shape and new shortcode-shape).
           loadedCycleId = String(preferences[PREFERENCE_KEYS.CURRENT_CYCLE_ID]);
-        }
-
-        // Attempt migration from localStorage if profile has no settings yet
-        if (!migrationAttemptedRef.current) {
-          migrationAttemptedRef.current = true;
-          migrateFromLocalStorage();
         }
       }
 
-      // Fallback to localStorage if no profile data
-      if (loadedGrantCycle === DEFAULT_GRANT_CYCLE) {
+      // 2. Fallback to localStorage ONLY if no profile is active.
+      if (!currentProfile) {
         const storedCycle = localStorage.getItem(STORAGE_KEYS.GRANT_CYCLE);
         if (storedCycle) {
           const decoded = JSON.parse(atob(storedCycle));
           loadedGrantCycle = { ...DEFAULT_GRANT_CYCLE, ...decoded };
         }
-      }
 
-      if (loadedSender === DEFAULT_SENDER) {
         const storedSender = localStorage.getItem(STORAGE_KEYS.SENDER_INFO);
         if (storedSender) {
           const decoded = JSON.parse(atob(storedSender));
           loadedSender = { ...DEFAULT_SENDER, ...decoded };
         }
-      }
 
-      if (loadedCycleId === null) {
         const storedCycleId = localStorage.getItem(CURRENT_CYCLE_KEY);
         if (storedCycleId) {
-          // Same raw-value handling as the Dataverse pref above.
           loadedCycleId = String(storedCycleId);
         }
       }
@@ -184,61 +166,6 @@ export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
       setCurrentCycleId(loadedCycleId);
     } catch (error) {
       console.error('Failed to load settings:', error);
-    }
-  };
-
-  // Migrate settings from localStorage to profile preferences
-  const migrateFromLocalStorage = async () => {
-    if (!currentProfile) return;
-
-    try {
-      // Check if profile already has settings - if so, don't overwrite
-      const hasProfileSettings =
-        preferences[PREFERENCE_KEYS.SENDER_INFO] ||
-        preferences[PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS] ||
-        preferences[PREFERENCE_KEYS.CURRENT_CYCLE_ID];
-
-      if (hasProfileSettings) return;
-
-      // Migrate grant cycle
-      const storedCycle = localStorage.getItem(STORAGE_KEYS.GRANT_CYCLE);
-      if (storedCycle) {
-        const decoded = JSON.parse(atob(storedCycle));
-        await setPreference(PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS, JSON.stringify(decoded));
-        console.log('Migrated grant cycle settings to profile');
-      }
-
-      // Migrate sender info
-      const storedSender = localStorage.getItem(STORAGE_KEYS.SENDER_INFO);
-      if (storedSender) {
-        const decoded = JSON.parse(atob(storedSender));
-        await setPreference(PREFERENCE_KEYS.SENDER_INFO, JSON.stringify(decoded));
-        console.log('Migrated sender info to profile');
-      }
-
-      // Migrate current cycle ID. Normalize legacy integer-shape values to
-      // shortcode BEFORE writing to Dataverse (Codex S147 re-review #3): the
-      // localStorage→Dataverse migration must not propagate the legacy shape.
-      //
-      // If cycles haven't loaded yet we skip — the post-load useEffect picks
-      // this up on the next interaction. This is only safe because
-      // `loadSettings()` also reads `STORAGE_KEYS.CURRENT_CYCLE` raw into
-      // `currentCycleId` state, which the post-load resolver useEffect then
-      // normalizes + writes back. **If that load-time localStorage fallback
-      // is ever removed, the `cycles.length === 0` skip below must be
-      // revisited** (Codex S147 review #3 MODERATE finding on migration-
-      // timing coupling).
-      const storedCycleId = localStorage.getItem(CURRENT_CYCLE_KEY);
-      if (storedCycleId && cycles.length > 0) {
-        const { cycle } = resolveStoredCycle(storedCycleId, cycles);
-        const normalized = cycle ? formatCycleForStorage(cycle) : '';
-        if (normalized) {
-          await setPreference(PREFERENCE_KEYS.CURRENT_CYCLE_ID, normalized);
-          console.log(`Migrated current cycle ID to profile (normalized: ${storedCycleId} → ${normalized})`);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to migrate settings from localStorage:', error);
     }
   };
 
@@ -332,6 +259,9 @@ export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
     // Always write shortcode (never integer ID) — Codex S147 writer policy.
     if (currentProfile) {
       await setPreference(PREFERENCE_KEYS.CURRENT_CYCLE_ID, value || '');
+      if (!value) {
+        localStorage.removeItem(CURRENT_CYCLE_KEY);
+      }
     } else {
       if (value) {
         localStorage.setItem(CURRENT_CYCLE_KEY, value);

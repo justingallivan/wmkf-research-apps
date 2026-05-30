@@ -54,7 +54,7 @@ export default function EmailGeneratorModal({
   onEmailsGenerated, // Callback to refresh candidates after generation
   isFollowUp = false // Whether this is a follow-up/re-invite email
 }) {
-  const { currentProfile, preferences } = useProfile();
+  const { status, currentProfile, preferences } = useProfile();
 
   const [step, setStep] = useState(STEPS.REVIEW);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -79,8 +79,8 @@ export default function EmailGeneratorModal({
   // Single initialization effect - only runs once when modal mounts
   // The parent only renders this component when showEmailModal is true
   useEffect(() => {
-    // Only initialize once per mount
-    if (hasInitializedRef.current) return;
+    // Only initialize once per mount AND once ProfileContext is ready
+    if (hasInitializedRef.current || status !== 'ready') return;
     hasInitializedRef.current = true;
 
     // Reset UI state
@@ -102,8 +102,8 @@ export default function EmailGeneratorModal({
       };
       let loadedTemplate = isFollowUp ? DEFAULT_FOLLOWUP_TEMPLATE : DEFAULT_TEMPLATE;
 
-      // Check profile preferences first
-      if (currentProfile && preferences) {
+      // 1. Try Profile preferences
+      if (currentProfile) {
         // Load grant cycle settings from profile
         if (preferences[PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS]) {
           try {
@@ -142,8 +142,10 @@ export default function EmailGeneratorModal({
         }
       }
 
-      // Fallback to localStorage for any missing settings
-      if (!loadedSettings.grantCycle?.programName) {
+      // 2. Fallback to localStorage ONLY if no profile is active.
+      // If a profile IS active, ProfileContext has already handled migration
+      // and purged localStorage, so we don't need to check it here.
+      if (!currentProfile) {
         const storedSettings = localStorage.getItem(STORAGE_KEYS.EMAIL_SETTINGS);
         if (storedSettings) {
           loadedSettings = { ...loadedSettings, ...JSON.parse(atob(storedSettings)) };
@@ -162,9 +164,7 @@ export default function EmailGeneratorModal({
             attachConfig.additionalAttachments = grantCycle.additionalAttachments || [];
           }
         }
-      }
 
-      if (!loadedSettings.senderEmail) {
         const storedSender = localStorage.getItem(STORAGE_KEYS.SENDER_INFO);
         if (storedSender) {
           const sender = JSON.parse(atob(storedSender));
@@ -172,10 +172,7 @@ export default function EmailGeneratorModal({
           loadedSettings.senderEmail = sender.email || loadedSettings.senderEmail;
           loadedSettings.signature = sender.signature || loadedSettings.signature;
         }
-      }
 
-      // Fallback to localStorage for template if not loaded from profile
-      if (loadedTemplate === DEFAULT_TEMPLATE || loadedTemplate === DEFAULT_FOLLOWUP_TEMPLATE) {
         if (isFollowUp) {
           const storedFollowUpTemplate = localStorage.getItem(STORAGE_KEYS.EMAIL_TEMPLATE + '_followup');
           if (storedFollowUpTemplate) {
@@ -195,7 +192,8 @@ export default function EmailGeneratorModal({
     } catch (error) {
       console.error('Failed to load email settings:', error);
     }
-  }, []); // Empty deps - only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]); // Only depend on status; parent ensures mount timing is correct.
 
   // Track if generation has been triggered to prevent double-calls
   const generationTriggeredRef = useRef(false);
