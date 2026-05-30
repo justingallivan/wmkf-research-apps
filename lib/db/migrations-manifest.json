@@ -14,6 +14,7 @@
     "013_intake_drafts_pending_attachments.sql",
     "014_drop_playing_with_neon.sql",
     "015_bill_webhook_events.sql",
-    "016_maintenance_runs_timestamptz.sql"
+    "016_maintenance_runs_timestamptz.sql",
+    "017_bill_onboarding_state.sql"
   ]
 }

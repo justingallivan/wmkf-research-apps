@@ -34,6 +34,7 @@ import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
+import { getHonorariumAmount } from '../../../lib/services/honorarium-config';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import { mintAndStore } from '../../../lib/external/token-lifecycle';
 
@@ -104,6 +105,18 @@ export default async function handler(req, res) {
     )];
     const cycleByCode = await loadCycleConfigs(distinctCycleCodes);
 
+    // Honorarium amount is a single Dataverse ground-truth (decided S199);
+    // read once server-side and override any client/cycle value so the
+    // {{customField:honorarium}} placeholder can't drift per-user. On a read
+    // failure, leave the existing customFields value rather than fail the whole
+    // render (email is lower-stakes than the money-stamping create path).
+    let honorariumOverride = {};
+    try {
+      honorariumOverride = { honorarium: String(await getHonorariumAmount()) };
+    } catch (e) {
+      console.warn('[render-emails] honorarium amount read failed; using existing customField:', e.message);
+    }
+
     // Mint external links only when the template body actually references
     // them — avoids churning the stored hash for templates (thankyou,
     // older customs) that don't use the placeholder. Each render produces
@@ -172,7 +185,7 @@ export default async function handler(req, res) {
         grantCycle: {
           programName: cycle.program_name || '',
           reviewDeadline: cycle.review_deadline || null,
-          customFields: { ...(cycle.custom_fields || {}), ...(settings.customFields || {}) },
+          customFields: { ...(cycle.custom_fields || {}), ...(settings.customFields || {}), ...honorariumOverride },
         },
       };
 

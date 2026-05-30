@@ -31,6 +31,16 @@ const BASE_INPUT = {
   address: { line1: '1 Test St', city: 'Testville', zipOrPostalCode: '94000', country: 'US' },
 };
 
+function makeOnboardingStateFake(overrides = {}) {
+  return {
+    reserveOnboarding: jest.fn().mockResolvedValue({ reserved: true, row: { vendor_id: null } }),
+    setVendorId: jest.fn().mockResolvedValue(undefined),
+    markDynamicsPending: jest.fn().mockResolvedValue(undefined),
+    setStatus: jest.fn().mockResolvedValue(undefined),
+    ...overrides,
+  };
+}
+
 function makeDeps(overrides = {}) {
   const notifyCalls = [];
   return {
@@ -48,6 +58,9 @@ function makeDeps(overrides = {}) {
         searchBillNetwork: jest.fn().mockResolvedValue({ exactMatchCount: 1, pni: 'PNI1', networkId: 'PNI1', allResults: [{ id: 'PNI1' }] }),
         sendNetworkInvitation: jest.fn().mockResolvedValue(undefined),
       },
+      onboardingState: overrides.onboardingState || makeOnboardingStateFake(),
+      // No-op sleep so request-PATCH retry+backoff is instant in tests.
+      sleep: async () => {},
     },
   };
 }
@@ -220,7 +233,7 @@ describe('onboardReviewer — Dataverse PATCH failures', () => {
     expect(result.warnings.some(w => w.startsWith('contact_patch_failed'))).toBe(true);
   });
 
-  test('akoya_request PATCH failure → warning severity, no retry', async () => {
+  test('akoya_request PATCH failure → retry+backoff then torn-state marker + warning alert', async () => {
     const updateRecord = jest.fn().mockImplementation((entitySet) => {
       if (entitySet === 'akoya_requests') throw new Error('dataverse 500');
       return Promise.resolve();
@@ -235,9 +248,14 @@ describe('onboardReviewer — Dataverse PATCH failures', () => {
     const requestAlerts = notifyCalls.filter(c => c.type === 'bill_request_patch_failed');
     expect(requestAlerts).toHaveLength(1);
     expect(requestAlerts[0].severity).toBe('warning');
-    // akoya_request PATCH should only have been called once (no retry).
+    // Fix #3: request PATCH now retries with backoff (3 attempts) before giving up.
     const reqCalls = updateRecord.mock.calls.filter(c => c[0] === 'akoya_requests');
-    expect(reqCalls).toHaveLength(1);
+    expect(reqCalls).toHaveLength(3);
+    // Durable torn-state marker written for the resume sweep (matched path).
+    expect(deps.onboardingState.markDynamicsPending).toHaveBeenCalledWith(
+      BASE_INPUT.honorariumRequestId,
+      expect.objectContaining({ pendingMatch: true, pendingPni: 'PNI1' }),
+    );
     expect(result.status).toBe('partial');
     expect(result.intendedStatus).toBe('onboarded');
   });
@@ -262,6 +280,11 @@ describe('onboardReviewer — Dataverse PATCH failures', () => {
     expect(result.status).toBe('partial');
     expect(result.intendedStatus).toBe('no_match');
     expect(notifyCalls.filter(c => c.type === 'bill_request_patch_failed')).toHaveLength(1);
+    // No-match torn state → pending_match=false (sweep writes "No").
+    expect(deps.onboardingState.markDynamicsPending).toHaveBeenCalledWith(
+      BASE_INPUT.honorariumRequestId,
+      expect.objectContaining({ pendingMatch: false }),
+    );
   });
 
   test('ambiguous_match + PATCH failure → status=partial, intendedStatus=ambiguous_match, ambiguous-alert still emits', async () => {
@@ -314,12 +337,85 @@ describe('onboardReviewer — safeNotify (P1 #4)', () => {
         searchBillNetwork: jest.fn().mockResolvedValue({ exactMatchCount: 1, pni: 'P', networkId: 'P', allResults: [{ id: 'P' }] }),
         sendNetworkInvitation: jest.fn().mockResolvedValue(undefined),
       },
+      onboardingState: makeOnboardingStateFake(),
+      sleep: async () => {},
     };
     // Should not throw, and the warnings array should record the alert failure.
     const result = await onboardReviewer(BASE_INPUT, deps);
     expect(result.ok).toBe(true);
     expect(result.status).toBe('partial');
     expect(result.warnings.some(w => w.startsWith('alert_failed:'))).toBe(true);
+  });
+});
+
+describe('onboardReviewer — durable-state hardening (chunk-4)', () => {
+  beforeEach(() => { process.env.BILL_ENABLED = 'true'; });
+  afterEach(() => { delete process.env.BILL_ENABLED; });
+
+  test('concurrent caller (reservation lost) → in_progress, no BILL calls', async () => {
+    const { notifyCalls, deps } = makeDeps({
+      onboardingState: makeOnboardingStateFake({
+        reserveOnboarding: jest.fn().mockResolvedValue({ reserved: false, row: { vendor_id: '009OWNED' } }),
+      }),
+    });
+    const result = await onboardReviewer(BASE_INPUT, deps);
+    expect(result.status).toBe('in_progress');
+    expect(result.vendorId).toBe('009OWNED');
+    expect(deps.billClient.createBillVendor).not.toHaveBeenCalled();
+    expect(deps.billClient.searchBillNetwork).not.toHaveBeenCalled();
+    expect(deps.dynamics.getRecord).not.toHaveBeenCalled();
+    expect(notifyCalls).toEqual([]);
+  });
+
+  test('staged vendor_id present → reuse, skip vendor create', async () => {
+    const { deps } = makeDeps({
+      onboardingState: makeOnboardingStateFake({
+        reserveOnboarding: jest.fn().mockResolvedValue({ reserved: true, row: { vendor_id: '009STAGED' } }),
+      }),
+    });
+    const result = await onboardReviewer(BASE_INPUT, deps);
+    expect(result.vendorId).toBe('009STAGED');
+    expect(result.status).toBe('reused_existing');
+    expect(deps.billClient.createBillVendor).not.toHaveBeenCalled();
+  });
+
+  test('vendorId persisted to staging BEFORE the contact PATCH', async () => {
+    const order = [];
+    const onboardingState = makeOnboardingStateFake({
+      setVendorId: jest.fn().mockImplementation(async () => { order.push('setVendorId'); }),
+    });
+    const updateRecord = jest.fn().mockImplementation(async (entitySet) => {
+      if (entitySet === 'contacts') order.push('contactPatch');
+    });
+    const { deps } = makeDeps({
+      onboardingState,
+      dynamics: {
+        getRecord: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
+        updateRecord,
+      },
+    });
+    await onboardReviewer(BASE_INPUT, deps);
+    expect(onboardingState.setVendorId).toHaveBeenCalledWith(BASE_INPUT.honorariumRequestId, '009ABC');
+    // Ordering: the durable vendorId write must precede the contact PATCH.
+    expect(order.indexOf('setVendorId')).toBeLessThan(order.indexOf('contactPatch'));
+  });
+
+  test('reservation store failure → fail closed (bill_unavailable, no create)', async () => {
+    const { deps } = makeDeps({
+      onboardingState: makeOnboardingStateFake({
+        reserveOnboarding: jest.fn().mockRejectedValue(new Error('pg down')),
+      }),
+    });
+    const result = await onboardReviewer(BASE_INPUT, deps);
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe('bill_unavailable');
+    expect(deps.billClient.createBillVendor).not.toHaveBeenCalled();
+  });
+
+  test('happy path records terminal status on the staging row', async () => {
+    const { deps } = makeDeps();
+    await onboardReviewer(BASE_INPUT, deps);
+    expect(deps.onboardingState.setStatus).toHaveBeenCalledWith(BASE_INPUT.honorariumRequestId, 'onboarded');
   });
 });
 

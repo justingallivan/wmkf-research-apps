@@ -41,6 +41,8 @@ import { applyStage2aResponse } from '../../../../../lib/dataverse/adapters/revi
 import { getActivePolicies } from '../../../../../lib/external/policy-fetcher';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
+import { ensureHonorariumOnboarding } from '../../../../../lib/bill/honorarium-onboard-orchestrator';
+import NotificationService from '../../../../../lib/services/notification-service';
 
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
 
@@ -75,6 +77,27 @@ function validateContactEdits(edits) {
   }
   return null;
 }
+
+// Reviewer mailing-address caps (chunk-4). Address is PATCHed to contact.address1_*
+// and fed to BILL vendor onboarding. Absent address is allowed here (the honorarium
+// row + provenance are still created; BILL onboarding degrades/alerts on missing
+// address); a malformed/oversized field returns a clean 400.
+const ADDRESS_MAX = { line1: 200, line2: 200, city: 100, state: 100, postalCode: 20, country: 2 };
+function validateAddress(address) {
+  if (address === undefined || address === null) return null;
+  if (typeof address !== 'object' || Array.isArray(address)) return { reason: 'invalid_address' };
+  for (const [k, v] of Object.entries(address)) {
+    if (!(k in ADDRESS_MAX)) return { reason: 'unknown_address_field', field: k };
+    if (v === null || v === undefined || v === '') continue;
+    if (typeof v !== 'string') return { reason: 'invalid_address_field', field: k };
+    if (v.length > ADDRESS_MAX[k]) return { reason: 'address_field_too_long', field: k };
+  }
+  const c = address.country;
+  if (c !== undefined && c !== null && c !== '' && c.length !== 2) {
+    return { reason: 'invalid_country', field: 'country' };
+  }
+  return null;
+}
 const REVIEW_STATUS_MATERIALS_SENT = 100000001;
 const RESPONSE_TYPE_ACCEPTED = 100000000;
 const RESPONSE_TYPE_DECLINED = 100000001;
@@ -100,7 +123,7 @@ export default async function handler(req, res) {
         ok: false, reason: verified.reason,
       });
     }
-    const { suggestion } = verified;
+    const { suggestion, request, reviewer } = verified;
 
     const body = req.body || {};
     if (body.action !== 'accept' && body.action !== 'decline') {
@@ -111,6 +134,11 @@ export default async function handler(req, res) {
     const contactErr = validateContactEdits(body.contactEdits);
     if (contactErr) {
       return res.status(400).json({ ok: false, ...contactErr });
+    }
+    // Validate the optional mailing address (used by honorarium onboarding).
+    const addrErr = validateAddress(body.address);
+    if (addrErr) {
+      return res.status(400).json({ ok: false, ...addrErr });
     }
 
     // ── State machine guard ────────────────────────────────────────────────
@@ -130,36 +158,54 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── Idempotency: repeat of current action ──────────────────────────────
-    // If reviewer is already in the requested state and not flipping, return
-    // success without re-stamping. Two-device clicks and double-submits land
-    // on the same outcome.
-    if (body.action === 'accept' && accepted && !declined) {
+    // ── Decline ────────────────────────────────────────────────────────────
+    if (body.action === 'decline') {
+      // Idempotent repeat: already declined and not flipping → no re-stamp.
+      if (declined && !accepted) {
+        return res.status(200).json({
+          ok: true,
+          idempotent: true,
+          engagementState: { view: 'declined', accepted: false, declined: true },
+        });
+      }
+      try {
+        await bypassDynamicsRestrictions('external-respond', () =>
+          applyStage2aResponse(suggestion.wmkf_appreviewersuggestionid, {
+            action: 'decline',
+            contactEdits: body.contactEdits,
+            honorariumOptOut: body.honorariumOptOut === true,
+            decline: body.decline,
+          }, { ifMatch: req.headers['if-match'] || undefined }),
+        );
+      } catch (e) {
+        const msg = e.message || '';
+        if (e.status === 412 || /\b412\b/.test(msg)) {
+          return res.status(412).json({ ok: false, reason: 'concurrent_modification' });
+        }
+        if (/unknown declineReason value/.test(msg)) {
+          return res.status(400).json({ ok: false, reason: 'invalid_decline_reason' });
+        }
+        throw e;
+      }
       return res.status(200).json({
         ok: true,
-        idempotent: true,
-        engagementState: { view: 'accepted-pre-materials', accepted: true, declined: false },
-      });
-    }
-    if (body.action === 'decline' && declined && !accepted) {
-      return res.status(200).json({
-        ok: true,
-        idempotent: true,
+        idempotent: false,
         engagementState: { view: 'declined', accepted: false, declined: true },
       });
     }
 
-    // ── Accept-specific validation ─────────────────────────────────────────
-    let acks = null;
-    if (body.action === 'accept') {
+    // ── Accept ─────────────────────────────────────────────────────────────
+    // A fresh accept stamps the suggestion row; a REPEAT accept (already
+    // accepted, not flipping) skips the stamp but STILL runs the honorarium
+    // step, which may not have completed on the first attempt (Codex pre-impl
+    // P1 #2). The honorarium step is itself idempotent.
+    const isAcceptRepeat = accepted && !declined;
+
+    if (!isAcceptRepeat) {
       const policyAcks = body.policyAcks || {};
       for (const slot of STAGE_2A_POLICY_SLOTS) {
         if (policyAcks[slot] !== true) {
-          return res.status(400).json({
-            ok: false,
-            reason: 'policy_ack_required',
-            slot,
-          });
+          return res.status(400).json({ ok: false, reason: 'policy_ack_required', slot });
         }
       }
       // Active-child sanity: re-fetch active versions at accept time.
@@ -170,55 +216,70 @@ export default async function handler(req, res) {
         policies = await getActivePolicies(STAGE_2A_POLICY_SLOTS);
       } catch (e) {
         console.error('[external respond] policy sanity failed:', e.message);
-        return res.status(500).json({
-          ok: false,
-          reason: 'policy_misconfigured',
-          message: e.message,
-        });
+        return res.status(500).json({ ok: false, reason: 'policy_misconfigured', message: e.message });
       }
-      acks = {
+      const acks = {
         coiVersionId: policies['reviewer-coi'].activeVersionId,
         aiUseVersionId: policies['reviewer-ai-use'].activeVersionId,
         ackedAt: new Date().toISOString(),
       };
+      try {
+        await bypassDynamicsRestrictions('external-respond', () =>
+          applyStage2aResponse(suggestion.wmkf_appreviewersuggestionid, {
+            action: 'accept',
+            contactEdits: body.contactEdits,
+            honorariumOptOut: body.honorariumOptOut === true,
+            acks,
+          }, {
+            // Optimistic lock — caller must round-trip the _etag from /context.
+            ifMatch: req.headers['if-match'] || undefined,
+          }),
+        );
+      } catch (e) {
+        const msg = e.message || '';
+        if (e.status === 412 || /\b412\b/.test(msg)) {
+          return res.status(412).json({ ok: false, reason: 'concurrent_modification' });
+        }
+        throw e;
+      }
     }
 
-    // ── Apply via adapter (single transaction-shaped PATCH) ────────────────
-    try {
-      await bypassDynamicsRestrictions('external-respond', () =>
-        applyStage2aResponse(suggestion.wmkf_appreviewersuggestionid, {
-          action: body.action,
-          contactEdits: body.contactEdits,
-          honorariumOptOut: body.honorariumOptOut === true,
-          acks,
-          decline: body.decline,
-        }, {
-          // Optimistic lock — caller must round-trip the _etag from /context.
-          ifMatch: req.headers['if-match'] || undefined,
-        }),
-      );
-    } catch (e) {
-      // Surface 412 (optimistic-lock conflict) cleanly. DynamicsService throws
-      // a generic Error with status code in the message; check both.
-      const msg = e.message || '';
-      if (e.status === 412 || /\b412\b/.test(msg)) {
-        return res.status(412).json({ ok: false, reason: 'concurrent_modification' });
+    // ── Honorarium onboarding (NON-FATAL to the accept) ────────────────────
+    // Runs on both fresh accept and re-accept; gated on opt-out. Any failure
+    // alerts and is left for the resume sweep / a later re-accept — it never
+    // converts a committed accept into a 500.
+    if (body.honorariumOptOut !== true) {
+      try {
+        await bypassDynamicsRestrictions('external-honorarium', () =>
+          ensureHonorariumOnboarding({ suggestion, request, reviewer, body }),
+        );
+      } catch (honErr) {
+        console.error('[external respond] honorarium onboarding failed (non-fatal):', honErr?.message || honErr);
+        try {
+          await NotificationService.notify({
+            type: 'honorarium_onboard_failed',
+            severity: 'warning',
+            emailAdmins: true,
+            title: 'Honorarium onboarding failed after reviewer accept',
+            message: honErr?.message || String(honErr),
+            metadata: {
+              suggestionId: suggestion.wmkf_appreviewersuggestionid,
+              requestNumber: request?.akoya_requestnum || null,
+              code: honErr?.code || null,
+            },
+            source: 'external/review/respond',
+            category: 'spend',
+          });
+        } catch (notifyErr) {
+          console.error('[external respond] honorarium alert failed:', notifyErr?.message || notifyErr);
+        }
       }
-      // Picklist-mapping errors from the adapter (unknown decline-reason value)
-      if (/unknown declineReason value/.test(msg)) {
-        return res.status(400).json({ ok: false, reason: 'invalid_decline_reason' });
-      }
-      throw e;
     }
 
     return res.status(200).json({
       ok: true,
-      idempotent: false,
-      engagementState: {
-        view: body.action === 'accept' ? 'accepted-pre-materials' : 'declined',
-        accepted: body.action === 'accept',
-        declined: body.action === 'decline',
-      },
+      idempotent: isAcceptRepeat,
+      engagementState: { view: 'accepted-pre-materials', accepted: true, declined: false },
     });
   } catch (e) {
     console.error('[external respond] unexpected error:', e);

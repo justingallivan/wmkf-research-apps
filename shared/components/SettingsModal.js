@@ -32,7 +32,8 @@ const DEFAULT_GRANT_CYCLE = {
   additionalAttachments: [], // Array of {blobUrl, filename, contentType}
   customFields: {
     proposalDueDate: '',
-    honorarium: '250',
+    // honorarium removed S199 — now a single Dataverse ground-truth
+    // (honorarium.default_amount) read server-side, not a per-user preference.
     proposalSendDate: '',
     commitDate: ''
   }
@@ -885,18 +886,9 @@ export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">
-                          Honorarium Amount ($)
-                        </label>
-                        <input
-                          type="text"
-                          value={grantCycle.customFields.honorarium}
-                          onChange={(e) => updateCustomField('honorarium', e.target.value)}
-                          placeholder="250"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
+                      {/* Honorarium Amount input removed S199 — the amount is now
+                          a single admin-managed Dataverse setting
+                          (honorarium.default_amount), not a per-user preference. */}
                     </div>
                   </div>
                 </div>

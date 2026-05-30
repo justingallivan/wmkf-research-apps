@@ -226,7 +226,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
     reviewDueDate: '',
     proposalSendDate: '',
     commitDate: '',
-    honorarium: '',
+    // honorarium removed S199 — now a Dataverse ground-truth read server-side.
   });
   // Attachments are per-template-type so switching templates (e.g. Materials
   // → Thank-you) doesn't carry over the proposal PDF or other type-specific files.
@@ -344,7 +344,8 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
             customFields: {
               proposalSendDate: emailFields.proposalSendDate || '',
               commitDate: emailFields.commitDate || '',
-              honorarium: emailFields.honorarium || '',
+              // honorarium intentionally omitted — render-emails injects the
+              // Dataverse ground-truth amount server-side (S199).
             },
           },
         }),
@@ -523,16 +524,11 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
                       className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-gray-400 focus:outline-none"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-0.5">Honorarium Amount</label>
-                    <input
-                      type="text"
-                      value={emailFields.honorarium}
-                      onChange={e => setEmailFields(prev => ({ ...prev, honorarium: e.target.value }))}
-                      placeholder="e.g. 500"
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-gray-400 focus:outline-none"
-                    />
-                  </div>
+                  {/* Honorarium amount removed from per-user input (S199): it is
+                      now a single Dataverse ground-truth (honorarium.default_amount)
+                      read server-side at email-render time. The
+                      {{customField:honorarium}} placeholder still works — it's
+                      filled by the server, not this form. */}
                 </div>
               </div>
 

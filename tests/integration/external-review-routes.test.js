@@ -79,6 +79,15 @@ jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
 }));
 
+// Honorarium onboarding (chunk-4) is exercised in its own unit test; here we
+// only assert respond.js invokes it on accept (and not on decline/opt-out).
+jest.mock('../../lib/bill/honorarium-onboard-orchestrator', () => ({
+  ensureHonorariumOnboarding: jest.fn().mockResolvedValue({ honorariumRequestId: 'hon-1' }),
+}));
+jest.mock('../../lib/services/notification-service', () => ({
+  notify: jest.fn().mockResolvedValue({ id: 1 }),
+}));
+
 const verifiedSuggestion = {
   ok: true,
   suggestion: {
@@ -416,6 +425,99 @@ describe('/api/external/review/[token]/respond', () => {
 
     expect(res.status).toHaveBeenCalledWith(412);
     expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'concurrent_modification' });
+  });
+
+  it('accept (fresh, not opted out) runs the honorarium orchestrator with suggestion/request/reviewer/body', async () => {
+    const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
+    ensureHonorariumOnboarding.mockClear();
+    verifySuggestionToken.mockResolvedValue(fresh);
+    const req = createMockReq({
+      method: 'POST',
+      query: { token: 'good-token' },
+      headers: {},
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'Town', postalCode: '94000', country: 'US' } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(applyStage2aResponse).toHaveBeenCalledWith('suggestion-1', expect.objectContaining({ action: 'accept' }), expect.anything());
+    expect(ensureHonorariumOnboarding).toHaveBeenCalledWith(expect.objectContaining({
+      suggestion: fresh.suggestion, request: fresh.request, reviewer: fresh.reviewer,
+    }));
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('accept with honorariumOptOut:true does NOT run the orchestrator', async () => {
+    const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
+    ensureHonorariumOnboarding.mockClear();
+    verifySuggestionToken.mockResolvedValue(fresh);
+    const req = createMockReq({
+      method: 'POST', query: { token: 'good-token' }, headers: {},
+      body: { action: 'accept', honorariumOptOut: true, policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('re-accept (already accepted) STILL runs the orchestrator but skips the suggestion PATCH (Codex P1 #2)', async () => {
+    const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
+    ensureHonorariumOnboarding.mockClear();
+    applyStage2aResponse.mockClear();
+    verifySuggestionToken.mockResolvedValue({
+      ...fresh,
+      suggestion: { ...fresh.suggestion, wmkf_accepted: true, wmkf_declined: false },
+    });
+    const req = createMockReq({
+      method: 'POST', query: { token: 'good-token' }, headers: {},
+      body: { action: 'accept' },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
+    expect(ensureHonorariumOnboarding).toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ idempotent: true }));
+  });
+
+  it('orchestrator failure is non-fatal: accept still 200 + alert fired', async () => {
+    const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
+    const NotificationService = require('../../lib/services/notification-service');
+    ensureHonorariumOnboarding.mockClear();
+    NotificationService.notify.mockClear();
+    ensureHonorariumOnboarding.mockRejectedValueOnce(new Error('honorarium boom'));
+    verifySuggestionToken.mockResolvedValue(fresh);
+    const req = createMockReq({
+      method: 'POST', query: { token: 'good-token' }, headers: {},
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US' } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({ type: 'honorarium_onboard_failed' }));
+  });
+
+  it('decline does NOT run the honorarium orchestrator', async () => {
+    const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
+    ensureHonorariumOnboarding.mockClear();
+    verifySuggestionToken.mockResolvedValue(fresh);
+    const req = createMockReq({
+      method: 'POST', query: { token: 'good-token' }, headers: {}, body: { action: 'decline', decline: {} },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed address with 400 before any write', async () => {
+    verifySuggestionToken.mockResolvedValue(fresh);
+    const req = createMockReq({
+      method: 'POST', query: { token: 'good-token' }, headers: {},
+      body: { action: 'accept', address: { country: 'U' } }, // ISO2 violation (len 1, passes the cap, fails ISO2 shape)
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'invalid_country', field: 'country' }));
   });
 
   it('rejects an over-long contactEdits field with 400 and never writes (eval #6)', async () => {

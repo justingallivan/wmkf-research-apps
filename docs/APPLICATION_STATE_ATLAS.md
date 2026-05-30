@@ -80,6 +80,7 @@ Promote any of these to a per-entity page if app code starts writing to it.
 | Virtual Review Panel | `panel_reviews`, `panel_review_items` | same |
 | Intake portal (pre-pilot) | `intake_drafts`, `intake_audit` | same |
 | Monitoring | `health_check_history`, `system_alerts`, `maintenance_runs`, `api_usage_log` | same |
+| BILL.com | `bill_webhook_events` (webhook dedup), `bill_onboarding_state` (honorarium onboarding durable state) | same |
 
 ## Adapter inventory (`lib/dataverse/adapters/`)
 

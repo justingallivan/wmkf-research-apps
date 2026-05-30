@@ -138,6 +138,8 @@ Notable optional flags:
 - `WAVE1_BACKEND_SETTINGS` / `WAVE1_BACKEND_APP_ACCESS` / `WAVE1_BACKEND_PREFS` — Wave 1 backend dispatch flags. **Default is now Dataverse**; the legacy Postgres tables (`system_settings`, `user_app_access`, `user_preferences`) were dropped 2026-05-12. Setting any of these to `postgres` will fail loudly — kept only as an explicit opt-out signal.
 - `VIRUS_SCAN_ENABLED=true` — app-side Cloudmersive virus scanning across all upload surfaces (reviewer uploads via `lib/services/review-upload.js`; intake-portal attach via `pages/api/intake/draft/attach.js`). **Default off.** When on, fail-closed: scanner outage or missing `CLOUDMERSIVE_API_KEY` blocks the upload. Single source of truth is `lib/utils/virus-scan-config.js`. To bypass during an outage, set to `false` and redeploy — that's the emergency runbook. See `docs/CREDENTIALS_RUNBOOK.md` § "Virus scanning (VIRUS_SCAN_ENABLED + CLOUDMERSIVE_API_KEY)" for the free-tier limits + per-cycle projection.
 - `CLOUDMERSIVE_API_KEY` — Cloudmersive virus-scan API key, required when `VIRUS_SCAN_ENABLED=true`. Missing with the flag on causes upload responses to surface as `scan_misconfigured` (HTTP 500).
+- `HONORARIUM_PROGRAM_ID` / `HONORARIUM_GRANTPROGRAM_ID` / `HONORARIUM_TYPE_ID` — Dataverse lookup GUIDs for the honorarium `akoya_request` discriminators (`akoya_program`="Research Reviewer" / `wmkf_grantprogram`="Honorarium" / `wmkf_type`="Individual"). Env-driven like `BILLCOM_ACCOUNT_*_VALUE` (env-specific GUIDs; resolve once with `scripts/probe-honorarium-discriminators.js`). Fail-loud: the chunk-4 honorarium-create path throws + alerts + skips if any is unset (accept still succeeds). Only read when a reviewer accepts without opting out. See `docs/BILL_CHUNK_4_DESIGN.md`.
+- **Honorarium amount** is NOT an env var — it's a single Dataverse setting `honorarium.default_amount` in `wmkf_appsystemsettings` (admin-editable at `/admin` → "Reviewer Honorarium Amount", documented fallback $250). Read live at portal honorarium-create + Review Manager email render; replaces the former per-user preference (S199). See `lib/services/honorarium-config.js`.
 
 ## Per-App Model Configuration
 
@@ -243,6 +245,7 @@ Run `node scripts/apply-migrations.js` (NOT `setup-database.js`) on any existing
 | `system_alerts`, `health_check_history`, `maintenance_runs` | Monitoring + cron job audit trail |
 | `policy_publish_audit` | Append-only audit of `wmkf_policy` version publishes via `/api/admin/policies`. Pending row before mutation + final row after (paired by `request_id`). |
 | `bill_webhook_events` | BILL.com webhook dedup gate. `UNIQUE(subscription_id, event_id)` backs atomic `INSERT ... ON CONFLICT DO NOTHING RETURNING id` check-and-insert. 7-day TTL via `cleanupBillWebhookEvents` (daily maintenance step 4.6). Migration `015_bill_webhook_events.sql`. |
+| `bill_onboarding_state` | BILL honorarium onboarding durable state (chunk-4), one row per honorarium `akoya_request` (PK `honorarium_request_id`). Reserve-before-create (PK race) + persist `vendor_id` before contact PATCH (no duplicate vendor on retry) + `dynamics_pending` torn-state marker resumed by `MaintenanceService.sweepBillOnboarding`. Written by `lib/bill/onboarding-state.js`. 30-day TTL via `cleanupBillOnboardingState`. Migration `017_bill_onboarding_state.sql`. See `docs/BILL_CHUNK_4_DESIGN.md`. |
 
 User-scoping convention: shared tables for organization-wide reference data; per-user tables for "my X" surfaces. Wave 1 (`system_settings`, `user_app_access`, `user_preferences`) was fully migrated to Dataverse and dropped from Postgres on 2026-05-12 — see `docs/POSTGRES_TO_DATAVERSE_MIGRATION.md` for the migration history.
 
@@ -250,7 +253,7 @@ User-scoping convention: shared tables for organization-wide reference data; per
 
 ## API Endpoints
 
-The full route catalogue lives in **`docs/API_ROUTE_SECURITY_MATRIX.md`** ([95](docs/CANONICAL_COUNTS.md#api-route-file-count) route files, CI-gated via `npm run check:api-routes` — PRs touching `pages/api/**` fail without a matrix update). Source files in `pages/api/<app>/` are authoritative for behavior.
+The full route catalogue lives in **`docs/API_ROUTE_SECURITY_MATRIX.md`** ([96](docs/CANONICAL_COUNTS.md#api-route-file-count) route files, CI-gated via `npm run check:api-routes` — PRs touching `pages/api/**` fail without a matrix update). Source files in `pages/api/<app>/` are authoritative for behavior.
 
 Conventions:
 - App-specific routes use `requireAppAccess(req, res, 'app-key')`. App keys live in `shared/config/appRegistry.js`.
@@ -267,7 +270,7 @@ Operational docs to know about (others in `docs/` are design backdrop, roadmaps,
 
 - **`docs/SYSTEM_MODEL.md`** — the canonical conceptual model (rote-vs-thinking principle, the two orthogonal axes, capabilities vs. trunk vs. substrate, the two interaction modes, doc-resolution provenance tiers) and the **Glossary** defining load-bearing terms (Executor, Mode 1/Mode 2, drain, slice-0, thin adapter). Read before cross-capability planning.
 - **`docs/EXECUTOR_CONTRACT.md`** — shared spec PA `ExecutePrompt` and Vercel `executePrompt()` both implement. Read before any prompt work.
-- **`docs/API_ROUTE_SECURITY_MATRIX.md`** — [95](docs/CANONICAL_COUNTS.md#api-route-file-count)-route catalogue, CI-gated.
+- **`docs/API_ROUTE_SECURITY_MATRIX.md`** — [96](docs/CANONICAL_COUNTS.md#api-route-file-count)-route catalogue, CI-gated.
 - **`docs/SECURITY_OPERATING_PLAN.md`** — weekly/monthly/quarterly security cadence + watch-item escalation thresholds.
 - **`docs/CREDENTIALS_RUNBOOK.md`** — env vars, secret rotation, diagnostics.
 - **`docs/AUTHENTICATION_SETUP.md`** — Azure AD configuration.

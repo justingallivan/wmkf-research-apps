@@ -100,6 +100,24 @@ export default async function handler(req, res) {
       results.maintenanceRuns = { error: error.message };
     }
 
+    // 4.8. BILL honorarium onboarding resume sweep (chunk-4 hardening, Fix #3).
+    //      Retries torn akoya_request writebacks (dynamics_pending rows) left by
+    //      a Dynamics blip after the BILL side succeeded. Idempotent; fails closed
+    //      on a malformed (pending_match NULL) marker. See docs/BILL_CHUNK_4_DESIGN.md.
+    try {
+      results.billOnboardingResume = await MaintenanceService.sweepBillOnboarding();
+    } catch (error) {
+      results.billOnboardingResume = { error: error.message };
+    }
+
+    // 4.9. BILL onboarding state TTL — prune completed (non-pending) rows.
+    try {
+      results.billOnboardingState = await MaintenanceService.cleanupBillOnboardingState(config.bill_onboarding_state_days);
+      if (typeof results.billOnboardingState === 'number') totalDeleted += results.billOnboardingState;
+    } catch (error) {
+      results.billOnboardingState = { error: error.message };
+    }
+
     // 5. Old alerts cleanup
     try {
       results.alerts = await AlertService.cleanupOldAlerts(config.alert_days);
