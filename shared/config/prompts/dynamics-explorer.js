@@ -6,6 +6,18 @@
  * rules live in TABLE_ANNOTATIONS and are returned on-demand via describe_table.
  */
 
+// A4 (Path A): the domain-guardrail block derives its lists BY REFERENCE from
+// the probe-verified Power Tools constants — the PI-bearing program set, the
+// terminal-no-award status set, and the migration-era cutover date. Importing
+// them (rather than transcribing values) means a fresh probe that updates
+// constants.js flows into the Explorer prompt with no second edit. constants.js
+// is pure data + pure functions (no server-only deps) → bundle-safe.
+import {
+  ERA_CUTOVER_DATE,
+  TERMINAL_NON_AWARD_STATUSES,
+  PER_PROGRAM_ANNOTATION,
+} from '../../../lib/services/dataverse-export/constants.js';
+
 /**
  * Annotated schema: per-table field metadata, types, semantic descriptions,
  * and OData rules. Returned by the describe_table tool on demand.
@@ -120,7 +132,7 @@ export const TABLE_ANNOTATIONS = {
       akoya_paymentdate: 'datetime — actual payment date',
       akoya_postingdate: 'datetime — posting/accounting date',
       akoya_estimatedgrantpaydate: 'datetime — estimated future payment date',
-      akoya_folio: 'string — payment status: "Paid", "Scheduled" (known future date), "Contingent" (awaiting condition per wmkf_contingencystatus on request), "Void", "Refund", "Ready To Pay". Note: case inconsistency in data ("Paid"/"PAID").',
+      akoya_folio: 'string — payment status. Observed values (probe scripts/probe-akoya-folio-casing.js 2026-05-30): "PAID" (issued; 9120 rows), "Void", "Scheduled" (known future date), "Ready To Send", "Contingent" (awaiting condition per wmkf_contingencystatus on request), "Ready To Pay", "Refund". The issued value is stored uppercase as "PAID" (no mixed-case "Paid" exists). Dataverse string eq is case-insensitive, so akoya_folio eq \'PAID\' is exact and casing-proof. Null on the ~13K reporting-requirement rows (akoya_type=true).',
       akoya_alternatepayee: 'boolean — true if payment goes to alternate payee org (not the applicant institution)',
       wmkf_billcompaymentid: 'string — Bill.com payment reference ID',
       // Requirement fields
@@ -138,7 +150,7 @@ export const TABLE_ANNOTATIONS = {
     rules: [
       'Use akoya_type eq false for payments only, akoya_type eq true for reporting requirements only. These are unrelated record types.',
       'wmkf_reporttype is an integer option set. Use the codes listed above (e.g. wmkf_reporttype eq 682090000 for Interim Report). Do NOT filter as string.',
-      'akoya_folio is a string field with inconsistent casing. Use contains() for safe matching (e.g. contains(akoya_folio,\'Paid\')).',
+      'akoya_folio: the issued-payment signal is akoya_folio eq \'PAID\'. Dataverse string equality is case-insensitive, so eq matches regardless of casing — prefer exact eq over contains() (contains risks substring false-matches). There is no mixed-case "Paid" value (probe 2026-05-30).',
     ],
   },
   contact: {
@@ -451,8 +463,8 @@ export const LEXICON = {
   ],
   'Payment status': [
     { triggers: ['scheduled payment', 'upcoming payment'], meaning: 'Payment with a known future disbursement date', field: 'akoya_folio eq \'Scheduled\' (on akoya_requestpayment)' },
-    { triggers: ['contingent payment', 'conditional payment'], meaning: 'Payment awaiting a condition to be met', field: 'contains(akoya_folio,\'Contingent\')' },
-    { triggers: ['has it been paid?', 'was it paid?', 'payment made'], meaning: 'Check whether disbursement occurred', field: 'contains(akoya_folio,\'Paid\') or akoya_paid gt 0 on request' },
+    { triggers: ['contingent payment', 'conditional payment'], meaning: 'Payment awaiting a condition to be met', field: 'akoya_folio eq \'Contingent\'' },
+    { triggers: ['has it been paid?', 'was it paid?', 'payment made'], meaning: 'Check whether disbursement occurred', field: 'akoya_folio eq \'PAID\' (case-insensitive) or akoya_paid gt 0 on request' },
     { triggers: ['voided', 'voided payment', 'cancelled payment'], meaning: 'Payment that was cancelled', field: 'akoya_folio eq \'Void\'' },
     { triggers: ['ready to pay'], meaning: 'Payment approved and awaiting disbursement', field: 'akoya_folio eq \'Ready To Pay\'' },
   ],
@@ -515,6 +527,22 @@ function buildLexiconSection() {
 }
 
 /**
+ * A4: probe-verified domain guardrails that override the model's surface
+ * guesses (the failure class Codex kept hand-patching). Lists are derived from
+ * constants.js so they cannot drift from the Power Tools ground truth.
+ */
+function buildDomainGuardrails() {
+  const piBearing = Object.entries(PER_PROGRAM_ANNOTATION)
+    .filter(([, a]) => a.pi_bearing)
+    .map(([name]) => name);
+  return `DOMAIN GUARDRAILS (probe-verified — trust over surface guesses):
+- CONTACT ROLES, do not conflate: _akoya_primarycontactid_value ("Primary Contact") is the institution's FOUNDATION LIAISON / grant steward (the President's office for large gifts) — NOT the principal investigator. The PI is _wmkf_projectleader_value. _wmkf_researchleader_value is the institution's senior research officer (e.g. VP for Research), also NOT the PI. Never present the primary contact (or research leader) as the researcher/PI.
+- PI IS PROGRAM-CONDITIONAL: _wmkf_projectleader_value (the PI) is populated almost only for research programs (${piBearing.join(', ')}); non-research/discretionary grants have no PI concept and leave it empty. A null project leader on a non-research grant means "no PI for this grant type" — NOT missing data. Do not confabulate "no PI found" or read an empty PI as the researcher being absent.
+- createdon IS NOT A BUSINESS DATE: ${ERA_CUTOVER_DATE} is a one-time bulk data-migration date (~22.5K rows imported that day), not a business event. NEVER slice business history ("grants over time", "since when") on createdon — use akoya_decisiondate, akoya_submitdate, wmkf_meetingdate, or akoya_loireceived. createdon is record-creation provenance only.
+- STATUS CLASSES: terminal NO-AWARD statuses (declines, ineligibilities, and equivalents) are exactly [${TERMINAL_NON_AWARD_STATUSES.join(', ')}]. "Active"/"Approved"/"Closed" are decided AWARDS. The "Pending" family ("Phase I Pending", "Phase II Pending", "Concept Pending", "Pending") is undecided/in-flight. Use these sets for "declined"/"awarded"/"in progress" questions instead of guessing status strings.`;
+}
+
+/**
  * Build the system prompt with inline schemas for top tables.
  * Detailed field semantics for other tables live in TABLE_ANNOTATIONS,
  * returned on-demand via describe_table.
@@ -560,6 +588,7 @@ RULES:
 - SERVER-SIDE RESOLVED TAXONOMY: When the user's query matches a program, grant program, request type, type, or request status in the resolved taxonomy block, use the provided OData field and value. For names not listed there, query the lookup table to get the GUID, then filter requests by the _value lookup field. Example: "Bridge Funding" → query akoya_programs for GUID → filter akoya_requests by _akoya_programid_value eq {guid}.
 
 ${resolvedTaxonomyBlock ? `${resolvedTaxonomyBlock}\n` : ''}
+${buildDomainGuardrails()}
 
 VOCABULARY — staff terms → correct fields:
 Record types:
@@ -620,7 +649,7 @@ Dates:
 - "grant end"/"end date" → akoya_enddate
 Payments & requirements:
 - akoya_requestpayment table holds BOTH payments and reporting requirements (unrelated record types in same table)
-- "payment" → akoya_type eq false. Status in akoya_folio: Paid, Scheduled, Contingent, Void, Refund, Ready To Pay.
+- "payment" → akoya_type eq false. Status in akoya_folio (eq is case-insensitive): "PAID" (issued), Scheduled, Contingent, Void, Refund, Ready To Pay, Ready To Send.
 - "report"/"requirement" → akoya_type eq true. Type in wmkf_reporttype: Interim Report (682090000), Final Report (682090001), Follow-up to Final Report (682090002), Contingency Update (682090003), No Cost Extension (682090004), Budget Reallocation (682090005), Deferral Update (682090007).
 - "report due"/"due date" → akoya_requirementdue
 - "payment date" → akoya_paymentdate

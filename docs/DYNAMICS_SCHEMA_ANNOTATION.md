@@ -153,7 +153,7 @@ Single table holding **two unrelated record types**:
 | `akoya_paymentdate` | Actual payment date |
 | `akoya_postingdate` | Posting/accounting date |
 | `akoya_estimatedgrantpaydate` | Estimated future payment date |
-| `akoya_folio` | Payment status: Paid, Scheduled (known date), Contingent (awaiting condition), Void, Refund, Ready To Pay. Note: case inconsistency ("Paid"/"PAID"). |
+| `akoya_folio` | Payment status. Stored values (probe `scripts/probe-akoya-folio-casing.js`, 2026-05-30): `PAID` (issued), `Void`, `Scheduled` (known date), `Ready To Send`, `Contingent` (awaiting condition), `Ready To Pay`, `Refund`. Issued value is uppercase `PAID` (no mixed-case "Paid"); Dataverse string `eq` is case-insensitive, so `akoya_folio eq 'PAID'` is exact and casing-proof — prefer `eq` over `contains()`. |
 | `akoya_alternatepayee` | True if payment goes to alternate payee org |
 | `wmkf_billcompaymentid` | Bill.com payment reference ID |
 | `akoya_postingoption` | Posting option |

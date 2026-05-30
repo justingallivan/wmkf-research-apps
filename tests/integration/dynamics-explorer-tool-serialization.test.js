@@ -62,6 +62,9 @@ jest.mock('../../shared/config/prompts/dynamics-explorer', () => {
 
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
+    // entity-set name → logical name (the real method is a static map lookup);
+    // A5 classifyToolError normalizes table_name through this.
+    resolveLogicalName: (s) => (s === 'akoya_requests' ? 'akoya_request' : s),
     resolveEntitySetName: (...args) => mockResolveEntitySetName(...args),
     queryRecords: (...args) => mockQueryRecords(...args),
     countRecords: (...args) => mockCountRecords(...args),
@@ -186,6 +189,65 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     expect(toolResult).toContain('_aiContextBoundary');
     expect(toolResult).not.toContain('FULL EMAIL OR MEMO BODY');
     expect(toolResult).not.toContain('UNSENT_TAIL');
+  });
+
+  // A5 — fail-loud typed errors. A Dynamics 400 for an unknown field must be
+  // classified into an actionable tool_result (errorType + hint + closest valid
+  // field names + describe_table pointer), not a bare error string.
+  test('classifies an unknown-field Dynamics error into an actionable hint', async () => {
+    mockQueryRecords.mockReset();
+    mockQueryRecords.mockRejectedValue(new Error(
+      "Count failed (400): Could not find a property named 'akoya_requestnumber' on type 'Microsoft.Dynamics.CRM.akoya_request'."
+    ));
+
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'show requests' }] },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+
+    const secondCall = mockStream.mock.calls[1][0];
+    const toolResultMessage = secondCall.messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    );
+    const toolResult = toolResultMessage.content[0].content;
+
+    expect(toolResult).toContain('unknown_field');
+    expect(toolResult).toContain('akoya_requestnumber');
+    // Closest valid field surfaced from live attributes.
+    expect(toolResult).toContain('akoya_requestnum');
+    // A5 alias normalization (Codex LOW, S202): the entity-set alias
+    // "akoya_requests" must be normalized to the logical name before fetching
+    // attributes, so enrichment fires and restriction filtering matches.
+    expect(mockGetEntityAttributes).toHaveBeenCalledWith('akoya_request');
+    // Deterministic correction pointer, not a re-guess.
+    expect(toolResult).toContain('describe_table');
+    expect(toolResult).toMatch(/Do NOT retry with a guessed name/i);
+  });
+
+  // A5 — the /$count Edm.Int32 false-positive must NOT be mislabeled as a bad
+  // field (it names a real field on type Edm.Int32).
+  test('does not misclassify the Edm.Int32 count error as an unknown field', async () => {
+    mockQueryRecords.mockReset();
+    mockQueryRecords.mockRejectedValue(new Error(
+      "Could not find a property named 'akoya_folio' on type 'Edm.Int32'."
+    ));
+
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'show requests' }] },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+
+    const secondCall = mockStream.mock.calls[1][0];
+    const toolResultMessage = secondCall.messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    );
+    const toolResult = toolResultMessage.content[0].content;
+    expect(toolResult).not.toContain('unknown_field');
+    expect(toolResult).toContain('Edm.Int32');
   });
 
   test('contact→requests searches PI and co-PI roles, not only primary contact', async () => {
