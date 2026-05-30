@@ -366,18 +366,27 @@ describe('onboardReviewer — durable-state hardening (chunk-4)', () => {
     expect(notifyCalls).toEqual([]);
   });
 
-  test('re-accept of a STRANDED row (reservation lost but vendor_id staged) RESUMES — reuses vendor, completes writeback', async () => {
+  test('re-accept of a STRANDED row (vendor_id staged) RESUMES without replaying BILL side effects', async () => {
+    const updateRecord = jest.fn().mockResolvedValue(undefined);
     const { deps } = makeDeps({
+      dynamics: {
+        getRecord: jest.fn().mockResolvedValue({ wmkf_billcomid: null, akoya_isvendor: null }),
+        updateRecord,
+      },
       onboardingState: makeOnboardingStateFake({
         reserveOnboarding: jest.fn().mockResolvedValue({ reserved: false, row: { vendor_id: '009STRANDED' } }),
       }),
     });
     const result = await onboardReviewer(BASE_INPUT, deps);
-    // Resumes: no new vendor created, but search/invite/writeback complete.
+    // Resume = idempotent contact PATCH ONLY. No vendor create, no network
+    // search, and crucially NO re-invite (terminal side effect must not replay).
     expect(deps.billClient.createBillVendor).not.toHaveBeenCalled();
-    expect(deps.billClient.searchBillNetwork).toHaveBeenCalled();
-    expect(deps.billClient.sendNetworkInvitation).toHaveBeenCalled();
-    expect(result.status).toBe('reused_existing');
+    expect(deps.billClient.searchBillNetwork).not.toHaveBeenCalled();
+    expect(deps.billClient.sendNetworkInvitation).not.toHaveBeenCalled();
+    const contactCalls = updateRecord.mock.calls.filter(c => c[0] === 'contacts');
+    expect(contactCalls.length).toBeGreaterThanOrEqual(1);
+    expect(contactCalls[0][2]).toMatchObject({ wmkf_billcomid: '009STRANDED', akoya_isvendor: true });
+    expect(result.status).toBe('resume_reconciled');
     expect(result.vendorId).toBe('009STRANDED');
   });
 
