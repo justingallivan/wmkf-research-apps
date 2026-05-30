@@ -416,7 +416,7 @@ export const LEXICON = {
     { triggers: ['deferral update'], meaning: 'Update on a deferred Phase II decision', field: 'wmkf_reporttype eq 682090007' },
     { triggers: ['contingency update'], meaning: 'Update on meeting contingent award conditions', field: 'wmkf_reporttype eq 682090003' },
     { triggers: ['cost share', 'matching funds', 'institutional match'], meaning: 'Institution\'s share of total project cost beyond the Keck grant', field: 'akoya_expenses minus akoya_grant (computed from two fields)' },
-    { triggers: ['LOI', 'letter of inquiry'], meaning: 'Phase I proposal submission', field: 'akoya_loireceived (date) or wmkf_request_type eq 100000001 with Phase I fields' },
+    { triggers: ['LOI', 'letter of inquiry'], meaning: 'Phase I proposal submission', field: 'akoya_loireceived (date) or Request value from SERVER-SIDE RESOLVED TAXONOMY with Phase I fields' },
   ],
   'Outcome / status phrases': [
     { triggers: ['was it funded?', 'did they get the grant?', 'awarded'], meaning: 'Grant was approved and funded', field: 'akoya_requeststatus in (\'Approved\', \'Active\', \'Closed\')' },
@@ -477,13 +477,27 @@ function buildInlineSchemas() {
   return INLINE_SCHEMA_TABLES.map(name => {
     const t = TABLE_ANNOTATIONS[name];
     const fields = Object.entries(t.fields)
-      .map(([f, desc]) => `  ${f}: ${desc}`)
+      .map(([f, desc]) => `  ${f}: ${formatInlineFieldDescription(name, f, desc)}`)
       .join('\n');
     const rules = t.rules.length > 0
-      ? '\n  RULES:\n' + t.rules.map(r => `  - ${r}`).join('\n')
+      ? '\n  RULES:\n' + t.rules.map(r => `  - ${formatInlineRule(name, r)}`).join('\n')
       : '';
     return `${name} (${t.entitySet}) — ${t.description}\n${fields}${rules}`;
   }).join('\n\n');
+}
+
+export function formatInlineFieldDescription(tableName, fieldName, description) {
+  if (tableName === 'akoya_request' && fieldName === 'wmkf_request_type') {
+    return 'int option set — record type. Use SERVER-SIDE RESOLVED TAXONOMY for Concept, Request, Office Visit, Site Visit, Phone Call, and Individual option values. DEFAULT: filter to the Request value unless user asks for concepts, visits, or all records.';
+  }
+  return description;
+}
+
+export function formatInlineRule(tableName, rule) {
+  if (tableName === 'akoya_request' && rule.startsWith('DEFAULT FILTER:')) {
+    return 'DEFAULT FILTER: Unless the user explicitly asks about concepts, site visits, office visits, phone calls, or "all records", filter wmkf_request_type to the Request value from SERVER-SIDE RESOLVED TAXONOMY. This excludes ~9K non-grant records.';
+  }
+  return rule;
 }
 
 /**
@@ -505,7 +519,7 @@ function buildLexiconSection() {
  * Detailed field semantics for other tables live in TABLE_ANNOTATIONS,
  * returned on-demand via describe_table.
  */
-export function buildSystemPrompt({ userRole = 'read_only', restrictions = [] } = {}) {
+export function buildSystemPrompt({ userRole = 'read_only', restrictions = [], resolvedTaxonomyBlock = '' } = {}) {
   const restrictionBlock = restrictions.length > 0
     ? `\nRESTRICTED: ${restrictions.map(r =>
         r.field_name ? `${r.table_name}.${r.field_name}` : r.table_name
@@ -520,8 +534,8 @@ TOOLS — choose the right one:
 - search: keyword/topic discovery across all tables ("find grants about fungi")
 - get_entity: fetch one record by name, number, or GUID ("tell me about request 1001585", "look up Stanford")
 - get_related: follow relationships — use for ANY "show me X for Y" query ("requests from Stanford", "emails for Stanford", "payments for request 1001585", "reviewers for request 1001585"). For contact→requests, it searches every grantee-side role: primary contact, PI/project leader, VPR, CEO, authorized official, payment contact, and co-PI slots.
-- describe_table: understand field names/types/meanings BEFORE building OData queries. Call ONLY for tables NOT listed in INLINE SCHEMAS below.
-- query_records: structured OData queries (date ranges, exact filters). For tables in INLINE SCHEMAS, you already know the fields — query directly.
+- describe_table: understand field names/types/meanings BEFORE building OData queries. For inline-schema tables, call it when a needed field is absent from the curated/common fields or you are uncertain.
+- query_records: structured OData queries (date ranges, exact filters). For tables in INLINE SCHEMAS, query directly only when the curated/common field you need is present and unambiguous.
 - count_records: count records with optional filter
 - aggregate: server-side sum/average/min/max/countdistinct. Use for "total", "average", "how much" questions. Optional group_by for breakdowns.
 - find_reports_due: all reporting requirements in a date range
@@ -534,7 +548,7 @@ RULES:
 - If a follow-up gives clarifying topic/institution/person terms after a failed search, prefer the highest-ranked plausible request hit and proceed; do not repeat broad searches with small wording changes.
 - When an exact multi-clause filter returns 0 records, do not conclude the record does not exist. Relax one constraint at a time or use search results to identify the request. Especially verify institution/account identity and person-role fields before telling the user a grant is missing.
 - If asked why an earlier search failed, do not invent a diagnosis. Only explain causes you can verify from tool results or the found record. If you cannot verify the cause, say so and describe the corrected search path.
-- For tables in INLINE SCHEMAS below, you already have full field details — query directly without describe_table.
+- For tables in INLINE SCHEMAS below, you have curated/common field details, not every live field. If the user needs a field not listed there, or you are unsure of a field name, call describe_table with full:true before query_records.
 - For OTHER tables, ALWAYS call describe_table BEFORE your first query_records. Do NOT guess field names — they are non-obvious (e.g. akoya_requestnum NOT akoya_requestnumber, akoya_program NOT akoya_name).
 - For org name lookups, review ALL results and pick the exact match.
 - Present results as markdown tables. Show totalCount if results are truncated.
@@ -543,16 +557,17 @@ RULES:
 - ACTIVE-ONLY DEFAULT: query_records, count_records, aggregate, find_reports_due, and export_csv automatically exclude inactive records (statecode eq 1). Do NOT add "statecode eq 0" to your $filter — it is injected for you. Pass include_inactive: true ONLY when the user explicitly asks for inactive/deactivated records (e.g. "include inactive", "show all including deactivated", "even closed-out records"). If you write your own statecode clause in $filter, the auto-injection is skipped and your clause is honored verbatim.
 - OData syntax: eq, ne, contains(field,'text'), gt, lt, ge, le, and, or, not. Dates: 2024-01-01T00:00:00Z
 - MATH: For totals, sums, averages, or "how much" questions, ALWAYS use aggregate — not query_records. Never fetch records and sum them yourself. The aggregate tool computes exact results server-side.
-- VOCABULARY FIRST: When the user's query matches a term in the VOCABULARY section (especially program names with hardcoded GUIDs), use those mappings directly — do NOT query lookup tables to re-derive GUIDs you already have. Only fall back to querying the lookup table if the hardcoded GUID returns no results or the user asks about a program not listed in VOCABULARY.
-- Lookup tables (like akoya_program, wmkf_grantprogram): to filter requests by program name, first query the lookup table to get the GUID, then filter requests by the _value lookup field. Example: "Bridge Funding" → query akoya_programs for GUID → filter akoya_requests by _akoya_programid_value eq {guid}.
+- SERVER-SIDE RESOLVED TAXONOMY: When the user's query matches a program, grant program, request type, type, or request status in the resolved taxonomy block, use the provided OData field and value. For names not listed there, query the lookup table to get the GUID, then filter requests by the _value lookup field. Example: "Bridge Funding" → query akoya_programs for GUID → filter akoya_requests by _akoya_programid_value eq {guid}.
+
+${resolvedTaxonomyBlock ? `${resolvedTaxonomyBlock}\n` : ''}
 
 VOCABULARY — staff terms → correct fields:
 Record types:
 - The akoya_request table holds ALL record types: grant applications (16K), concepts (3K), office visits (2.8K), site visits (1.5K), phone calls (914), individual grants (86).
-- DEFAULT: Always filter wmkf_request_type eq 100000001 (Request) unless user asks about concepts, visits, phone calls, or "all records".
-- "concept"/"concept paper" → wmkf_request_type eq 100000000
-- "site visit" → wmkf_request_type eq 100000003 (or filter by akoya_requeststatus)
-- "office visit" → wmkf_request_type eq 100000002
+- DEFAULT: filter to the Request value from SERVER-SIDE RESOLVED TAXONOMY unless user asks about concepts, visits, phone calls, or "all records".
+- "concept"/"concept paper" → wmkf_request_type equals the Concept value from SERVER-SIDE RESOLVED TAXONOMY
+- "site visit" → wmkf_request_type equals the Site Visit value from SERVER-SIDE RESOLVED TAXONOMY (or filter by akoya_requeststatus)
+- "office visit" → wmkf_request_type equals the Office Visit value from SERVER-SIDE RESOLVED TAXONOMY
 Status:
 - "status" → akoya_requeststatus (meta status: "Phase II Pending", "Active", "Closed", etc.)
 - "Phase I status/outcome" → wmkf_phaseistatus (Invited, Not Invited, Ineligible, Request Withdrawn, Rescinded Grant, Incomplete, Pending Committee Review)
@@ -564,12 +579,12 @@ Status:
 - STATUS FIELD DISAMBIGUATION: "Phase II Pending" is a pipeline position (akoya_requeststatus eq 'Phase II Pending'), NOT a wmkf_phaseiistatus value. wmkf_phaseiistatus has different values: "Phase II Pending Committee Review", "Approved", "Phase II Declined", "Phase II Withdrawn", "Phase II Deferred". When users say "Phase II Pending" or "pending Phase II", ALWAYS use akoya_requeststatus. Only use wmkf_phaseiistatus for specific outcomes like "approved", "declined", "deferred", "withdrawn".
 Programs:
 - "program" usually means S&E, MR, or SoCal
-- "S&E"/"SE"/"science and engineering" → _akoya_programid_value eq '8dcab30b-958f-ee11-8179-000d3a341e8f'
-- "MR"/"medical research" → _akoya_programid_value eq '94cab30b-958f-ee11-8179-000d3a341e8f'
-- "SoCal"/"Southern California" → _wmkf_grantprogram_value eq '8cf9c61d-a7cb-ee11-9079-000d3a341fd9' (broad category, NOT akoya_program)
-- "Research" (broad) → _wmkf_grantprogram_value eq 'c247b11a-a7cb-ee11-9078-000d3a341e8f'
-- "Undergraduate Education"/"UE" → _wmkf_grantprogram_value eq '139321fd-a6cb-ee11-9078-000d3a341e8f'
-- "Discretionary" → _wmkf_grantprogram_value eq '86e6422b-a7cb-ee11-9078-000d3a341e8f'
+- "S&E"/"SE"/"science and engineering" → use the Science & Engineering row from SERVER-SIDE RESOLVED TAXONOMY
+- "MR"/"medical research" → use the Medical Research row from SERVER-SIDE RESOLVED TAXONOMY
+- "SoCal"/"Southern California" → use the Southern California row from SERVER-SIDE RESOLVED TAXONOMY (broad category, NOT akoya_program)
+- "Research" (broad) → use the Research row from SERVER-SIDE RESOLVED TAXONOMY
+- "Undergraduate Education"/"UE" → use the Undergraduate Education row from SERVER-SIDE RESOLVED TAXONOMY
+- "Discretionary" → use the Discretionary row from SERVER-SIDE RESOLVED TAXONOMY
 - Hierarchy: wmkf_grantprogram (broad: Research, Southern California, UE, Discretionary) → akoya_program (specific: S&E, MR, Health Care, Chair's Grants, etc.)
 - MR/Medical Research is a specific akoya_program under broad Research. Do NOT explain an MR-filter miss as "it may be categorized as Research broadly" unless you have verified the found record's _akoya_programid_value is not Medical Research.
 - For other programs, query the lookup table first to get the GUID.
@@ -712,6 +727,7 @@ export const TOOL_DEFINITIONS = [
       type: 'object',
       properties: {
         table_name: { type: 'string', description: 'Table to describe (e.g. "akoya_request"). Omit or pass unknown name to get table listing.' },
+        full: { type: 'boolean', description: 'Default false. Set true to return the full live Dataverse field list beyond curated annotations.' },
       },
       required: [],
     },

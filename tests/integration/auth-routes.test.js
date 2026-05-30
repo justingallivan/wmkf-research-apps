@@ -114,6 +114,10 @@ jest.mock('../../shared/config/prompts/dynamics-explorer', () => ({
   TABLE_ANNOTATIONS: {},
 }));
 
+jest.mock('../../lib/services/dynamics-explorer-taxonomy', () => ({
+  buildResolvedTaxonomyPromptBlock: jest.fn(() => Promise.resolve('resolved taxonomy')),
+}));
+
 // ExcelJS
 jest.mock('exceljs', () => ({}));
 

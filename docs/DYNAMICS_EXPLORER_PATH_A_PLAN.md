@@ -1,6 +1,6 @@
 # Dynamics Explorer — Path A Plan: Live Ground Truth
 
-**Status:** DRAFT, Codex-reviewed ×2 + folded (S200, 2026-05-29). Slice 1 (A1+A2) specified and ready to implement pending green-light. Pre-implementation design.
+**Status:** Codex-reviewed ×2 + folded; **Slice 1 (A1+A2) IMPLEMENTED + reviewed (S200, 2026-05-29)** — Codex implemented, Claude reviewed (caught + fixed a `describe_table` sanitizer-leak gap). A3/A4/A5 remain. Suite 1516 green, all gates green.
 **Scope:** Incremental hardening of the existing agentic Dynamics Explorer. Keeps the LLM-tool-use paradigm; does NOT build the deterministic structured-query tool (that is **Path B**, a separate additive tier that reuses the same live primitives this plan wires in).
 
 > **Codex review round 1 folded (S200).** First draft made three factual API errors (now corrected): `picklistOptions` is **not** exported from `live-taxonomy.js`; `live-taxonomy` has **no** cache; and `count_records` uses `/$count` (which *throws* on complex filters), not `@odata.count` (the `@odata.count` 5,000-row silent cap lives in `queryRecords`/export estimate mode). Also: A3 deferred (needs OData→FetchXML), A1 reworked to cover inline-schema tables, cache/restriction/token-budget/prompt-injection risks added.

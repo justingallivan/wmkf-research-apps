@@ -29,7 +29,7 @@ import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { withDynamicsContext } from '../../../lib/services/dynamics-context';
 import { GraphService } from '../../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../../lib/utils/sharepoint-buckets';
-import { buildSystemPrompt, TOOL_DEFINITIONS, TABLE_ANNOTATIONS } from '../../../shared/config/prompts/dynamics-explorer';
+import { buildSystemPrompt, TOOL_DEFINITIONS, TABLE_ANNOTATIONS, formatInlineFieldDescription, formatInlineRule } from '../../../shared/config/prompts/dynamics-explorer';
 import {
   DATA_CLASSES,
   wrapUntrustedContent,
@@ -45,6 +45,7 @@ import {
   serializeDynamicsExplorerRecordForModel,
   serializeDynamicsExplorerToolResult,
 } from '../../../lib/utils/dynamics-explorer-serializer';
+import { buildResolvedTaxonomyPromptBlock } from '../../../lib/services/dynamics-explorer-taxonomy';
 
 export const config = {
   api: {
@@ -125,7 +126,8 @@ export default async function handler(req, res) {
     // nonce sentinels (see executeOne); the preamble tells the model that
     // sentinel-delimited tool output is data, not instructions. A fresh nonce
     // per round means the preamble carries the general rule, not a nonce list.
-    const systemPrompt = `${buildUntrustedContentPreamble()}\n\n${buildSystemPrompt({ userRole, restrictions })}`;
+    const resolvedTaxonomyBlock = await buildResolvedTaxonomyPromptBlock({ restrictions });
+    const systemPrompt = `${buildUntrustedContentPreamble()}\n\n${buildSystemPrompt({ userRole, restrictions, resolvedTaxonomyBlock })}`;
 
     // Only send the last few user/assistant exchanges to stay within token limits
     const claudeMessages = trimConversation(messages);
@@ -469,7 +471,7 @@ async function executeTool(name, input, sendEvent, userProfileId) {
       return await getRelated(input);
 
     case 'describe_table':
-      return describeTable(input);
+      return await describeTable(input);
 
     case 'query_records': {
       const entitySet = await DynamicsService.resolveEntitySetName(input.table_name);
@@ -592,36 +594,72 @@ function truncateResult(result, charLimit) {
 // ─── describe_table ───
 
 /**
- * Return annotated field metadata for a table, or list all tables if unknown.
+ * Return annotated and live field metadata for a table, or list all annotated
+ * tables if no table is requested.
  */
-function describeTable({ table_name }) {
-  if (!table_name || !TABLE_ANNOTATIONS[table_name]) {
-    // Return table listing
+async function describeTable({ table_name, full = false }) {
+  if (!table_name) {
     const tables = Object.entries(TABLE_ANNOTATIONS).map(([name, info]) =>
       `${name} (${info.entitySet}) — ${info.description}`
     );
     return {
       tables: tables.join('\n'),
       count: tables.length,
-      note: table_name ? `Unknown table "${table_name}". Available tables listed above.` : 'All available tables listed above. Call with a specific table_name for field details.',
+      note: 'All annotated tables listed above. Call with a specific table_name for field details, including live Dataverse fields.',
     };
   }
 
   const table = TABLE_ANNOTATIONS[table_name];
-  const fieldLines = Object.entries(table.fields).map(([field, desc]) =>
-    `  ${field}: ${desc}`
+  const liveAttributes = await DynamicsService.getEntityAttributes(table_name);
+  const curatedFields = table?.fields || {};
+  const curatedNames = new Set(Object.keys(curatedFields));
+  const additionalLiveFields = liveAttributes
+    .filter(attr => !curatedNames.has(attr.logicalName))
+    .map(attr => ({
+      logicalName: attr.logicalName,
+      displayName: attr.displayName,
+      type: attr.type,
+      description: attr.description,
+    }));
+
+  // Apply the same inline-render sanitizers used by buildInlineSchemas so the
+  // describe_table path can't leak stale hardcoded option-set codes (e.g.
+  // wmkf_request_type's baked 100000001) that A2 replaced with the resolved
+  // taxonomy block. Without this, describe_table('akoya_request') would still
+  // surface the raw annotation codes and conflict with the live resolution.
+  const fieldLines = Object.entries(curatedFields).map(([field, desc]) =>
+    `  ${field}: ${formatInlineFieldDescription(table_name, field, desc)}`
   );
-  const rulesBlock = table.rules.length > 0
-    ? `\nRULES:\n${table.rules.map(r => `  - ${r}`).join('\n')}`
+  const rulesBlock = table?.rules?.length > 0
+    ? `\nRULES:\n${table.rules.map(r => `  - ${formatInlineRule(table_name, r)}`).join('\n')}`
     : '';
 
-  return {
+  const result = {
     table: table_name,
-    entitySet: table.entitySet,
-    description: table.description,
+    entitySet: table?.entitySet || null,
+    description: table?.description || 'Live Dataverse table metadata. No curated annotation is available for this table.',
     fields: fieldLines.join('\n'),
     rules: rulesBlock,
+    additionalLiveFieldCount: additionalLiveFields.length,
   };
+
+  if (full) {
+    result.additionalLiveFields = additionalLiveFields;
+  } else {
+    result.additionalLiveFieldSample = additionalLiveFields.slice(0, 12);
+    result.note = additionalLiveFields.length > result.additionalLiveFieldSample.length
+      ? `There are ${additionalLiveFields.length} readable live fields beyond the curated annotations. Call describe_table with full:true for the complete additional list.`
+      : 'All additional live fields are shown in the sample.';
+  }
+
+  if (!table) {
+    result.fields = '';
+    result.note = full
+      ? 'Unknown to curated annotations; returned full live Dataverse readable fields.'
+      : 'Unknown to curated annotations; returned a live Dataverse readable-field sample. Call describe_table with full:true for the complete list.';
+  }
+
+  return result;
 }
 
 // ─── get_entity ───

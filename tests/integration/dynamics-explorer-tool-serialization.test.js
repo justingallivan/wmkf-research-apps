@@ -8,6 +8,8 @@ import {
 const mockStream = jest.fn();
 const mockQueryRecords = jest.fn();
 const mockResolveEntitySetName = jest.fn();
+const mockGetEntityAttributes = jest.fn();
+const mockBuildResolvedTaxonomyPromptBlock = jest.fn(() => Promise.resolve('resolved taxonomy'));
 
 jest.mock('../../shared/api/middleware/rateLimiter', () => ({
   nextRateLimiter: () => jest.fn(() => Promise.resolve(true)),
@@ -27,17 +29,43 @@ jest.mock('../../shared/config/baseConfig', () => ({
   getFallbackModelForApp: jest.fn(() => 'claude-fallback-test'),
 }));
 
-jest.mock('../../shared/config/prompts/dynamics-explorer', () => ({
-  buildSystemPrompt: jest.fn(() => 'system prompt'),
-  TOOL_DEFINITIONS: [{ name: 'query_records' }],
-  TABLE_ANNOTATIONS: {},
-}));
+jest.mock('../../shared/config/prompts/dynamics-explorer', () => {
+  // Use the REAL inline-render sanitizers so the describe_table no-leak
+  // assertion actually exercises them (chat.js now applies them to curated
+  // fields/rules). buildSystemPrompt/TOOL_DEFINITIONS/TABLE_ANNOTATIONS stay
+  // mocked.
+  const actual = jest.requireActual('../../shared/config/prompts/dynamics-explorer');
+  return {
+    buildSystemPrompt: jest.fn(() => 'system prompt'),
+    TOOL_DEFINITIONS: [{ name: 'query_records' }],
+    formatInlineFieldDescription: actual.formatInlineFieldDescription,
+    formatInlineRule: actual.formatInlineRule,
+    TABLE_ANNOTATIONS: {
+      akoya_request: {
+        entitySet: 'akoya_requests',
+        description: 'Requests',
+        fields: {
+          akoya_requestid: 'guid — primary key',
+          akoya_requestnum: 'string — unique request number',
+          // Carries the stale hardcoded option-set code the A2 sanitizer must strip.
+          wmkf_request_type: 'int option set — 100000001="Request". DEFAULT: filter to wmkf_request_type eq 100000001.',
+        },
+        rules: ['curated rule', 'DEFAULT FILTER: add wmkf_request_type eq 100000001 to filter to grants only.'],
+      },
+    },
+  };
+});
 
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
     resolveEntitySetName: (...args) => mockResolveEntitySetName(...args),
     queryRecords: (...args) => mockQueryRecords(...args),
+    getEntityAttributes: (...args) => mockGetEntityAttributes(...args),
   },
+}));
+
+jest.mock('../../lib/services/dynamics-explorer-taxonomy', () => ({
+  buildResolvedTaxonomyPromptBlock: (...args) => mockBuildResolvedTaxonomyPromptBlock(...args),
 }));
 
 jest.mock('../../lib/services/dynamics-context', () => ({
@@ -74,6 +102,11 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
 
     mockAuthenticatedUser(9, ['dynamics-explorer']);
     mockResolveEntitySetName.mockResolvedValue('akoya_requests');
+    mockGetEntityAttributes.mockResolvedValue([
+      { logicalName: 'akoya_requestid', displayName: 'Request', type: 'Uniqueidentifier', description: '' },
+      { logicalName: 'akoya_requestnum', displayName: 'Request Number', type: 'String', description: '' },
+      { logicalName: 'wmkf_live_only_field', displayName: 'Live Only Field', type: 'String', description: 'Absent from curated annotations' },
+    ]);
     mockQueryRecords.mockResolvedValue({
       records: [
         {
@@ -205,5 +238,143 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     const toolResult = toolResultMessage.content[0].content;
     expect(toolResult).toContain('993791');
     expect(toolResult).toContain('PI');
+  });
+
+  test('describe_table full:true surfaces live fields absent from annotations', async () => {
+    mockStream
+      .mockReset()
+      .mockResolvedValueOnce({
+        content: [
+          {
+            type: 'tool_use',
+            id: 'tool-1',
+            name: 'describe_table',
+            input: { table_name: 'akoya_request', full: true },
+          },
+        ],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      })
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'Schema loaded.' }],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      });
+
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'describe live-only request fields' }] },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(mockGetEntityAttributes).toHaveBeenCalledWith('akoya_request');
+    const secondCall = mockStream.mock.calls[1][0];
+    const toolResultMessage = secondCall.messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    );
+    const toolResult = toolResultMessage.content[0].content;
+    expect(toolResult).toContain('wmkf_live_only_field');
+    expect(toolResult).toContain('Absent from curated annotations');
+    // describe_table must apply the same inline sanitizers as the system prompt
+    // so the stale hardcoded wmkf_request_type codes can't leak back via this
+    // path (they were replaced by the resolved-taxonomy block in A2).
+    expect(toolResult).not.toContain('100000001');
+    expect(toolResult).toContain('SERVER-SIDE RESOLVED TAXONOMY');
+  });
+
+  test('describe_table default stays compact while reporting live-field count', async () => {
+    mockGetEntityAttributes.mockResolvedValue([
+      { logicalName: 'akoya_requestid', displayName: 'Request', type: 'Uniqueidentifier', description: '' },
+      { logicalName: 'akoya_requestnum', displayName: 'Request Number', type: 'String', description: '' },
+      ...Array.from({ length: 150 }, (_, i) => ({
+        logicalName: `wmkf_extra_${i}`,
+        displayName: `Extra ${i}`,
+        type: 'String',
+        description: 'additional live field',
+      })),
+    ]);
+    mockStream
+      .mockReset()
+      .mockResolvedValueOnce({
+        content: [
+          {
+            type: 'tool_use',
+            id: 'tool-1',
+            name: 'describe_table',
+            input: { table_name: 'akoya_request' },
+          },
+        ],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      })
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'Schema loaded.' }],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      });
+
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'describe request' }] },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    const secondCall = mockStream.mock.calls[1][0];
+    const toolResultMessage = secondCall.messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    );
+    const toolResult = toolResultMessage.content[0].content;
+    expect(toolResult).toContain('additionalLiveFieldCount');
+    expect(toolResult).toContain('additionalLiveFieldSample');
+    expect(toolResult).not.toContain('wmkf_extra_149');
+    expect(toolResult.length).toBeLessThanOrEqual(12000 + 1000); // wrapper adds boundary metadata
+  });
+
+  test('describe_table surfaces live metadata restriction failures', async () => {
+    mockGetEntityAttributes.mockRejectedValueOnce(new Error('Access denied: table "akoya_request" is restricted'));
+    mockStream
+      .mockReset()
+      .mockResolvedValueOnce({
+        content: [
+          {
+            type: 'tool_use',
+            id: 'tool-1',
+            name: 'describe_table',
+            input: { table_name: 'akoya_request', full: true },
+          },
+        ],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      })
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'Denied.' }],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      });
+
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'describe request' }] },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(mockGetEntityAttributes).toHaveBeenCalledWith('akoya_request');
+    const secondCall = mockStream.mock.calls[1][0];
+    const toolResultMessage = secondCall.messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    );
+    expect(toolResultMessage.content[0].content).toContain('Access denied');
   });
 });
