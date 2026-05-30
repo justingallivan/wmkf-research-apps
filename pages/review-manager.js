@@ -1442,7 +1442,6 @@ function ReviewManagerPage() {
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState({ signature: '' });
 
-  const refreshTrigger = useRef(0);
 
   // Load settings from localStorage
   useEffect(() => {
@@ -1492,10 +1491,9 @@ function ReviewManagerPage() {
 
   useEffect(() => {
     loadReviewers();
-  }, [selectedCycleCode, refreshTrigger.current]);
+  }, [selectedCycleCode]);
 
   const handleRefresh = () => {
-    refreshTrigger.current += 1;
     loadReviewers();
   };
 
