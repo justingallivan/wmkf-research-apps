@@ -139,4 +139,71 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     expect(toolResult).not.toContain('FULL EMAIL OR MEMO BODY');
     expect(toolResult).not.toContain('UNSENT_TAIL');
   });
+
+  test('contact→requests searches PI and co-PI roles, not only primary contact', async () => {
+    const contactId = '304bf67c-ce8f-ee11-8179-000d3a341e8f';
+    mockQueryRecords.mockResolvedValueOnce({
+      records: [
+        {
+          akoya_requestnum: '993791',
+          akoya_requeststatus: 'Closed',
+          akoya_submitdate: '2021-06-01T00:00:00Z',
+          _akoya_applicantid_value_formatted: 'University of Washington',
+          _wmkf_grantprogram_value_formatted: 'Research',
+          _wmkf_projectleader_value: contactId,
+          akoya_paid: 1000000,
+        },
+      ],
+      count: 1,
+      totalCount: 1,
+    });
+
+    mockStream
+      .mockReset()
+      .mockResolvedValueOnce({
+        content: [
+          {
+            type: 'tool_use',
+            id: 'tool-1',
+            name: 'get_related',
+            input: {
+              source_type: 'contact',
+              source_id: contactId,
+              target_type: 'requests',
+            },
+          },
+        ],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      })
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'Found it.' }],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      });
+
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'find requests for Kelly Stevens' }] },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    const queryArgs = mockQueryRecords.mock.calls[0];
+    expect(queryArgs[0]).toBe('akoya_requests');
+    expect(queryArgs[1].filter).toContain(`_akoya_primarycontactid_value eq ${contactId}`);
+    expect(queryArgs[1].filter).toContain(`_wmkf_projectleader_value eq ${contactId}`);
+    expect(queryArgs[1].filter).toContain(`_wmkf_copi5_value eq ${contactId}`);
+
+    const secondCall = mockStream.mock.calls[1][0];
+    const toolResultMessage = secondCall.messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    );
+    const toolResult = toolResultMessage.content[0].content;
+    expect(toolResult).toContain('993791');
+    expect(toolResult).toContain('PI');
+  });
 });

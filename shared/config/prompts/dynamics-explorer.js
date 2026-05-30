@@ -443,6 +443,7 @@ export const LEXICON = {
   ],
   'Organization terms': [
     { triggers: ['applicant', 'grantee', 'institution'], meaning: 'The applying/receiving organization', field: '_akoya_applicantid_value (lookup → account)' },
+    { triggers: ['University of Washington', 'Washington University'], meaning: 'Different institutions; preserve word order and prefer exact account names/AKAs before using a GUID in request filters', field: '_akoya_applicantid_value (lookup → account)' },
     { triggers: ['legal name', 'incorporated name'], meaning: 'Official legal entity name', field: 'wmkf_legalname (on account)' },
     { triggers: ['AKA', 'also known as', 'short name', 'abbreviation'], meaning: 'Common or abbreviated organization name', field: 'akoya_aka or wmkf_dc_aka (on account)' },
     { triggers: ['formerly known as', 'old name', 'previous name'], meaning: 'Historical name after rebranding', field: 'wmkf_formerlyknownas (on account)' },
@@ -518,7 +519,7 @@ export function buildSystemPrompt({ userRole = 'read_only', restrictions = [] } 
 TOOLS — choose the right one:
 - search: keyword/topic discovery across all tables ("find grants about fungi")
 - get_entity: fetch one record by name, number, or GUID ("tell me about request 1001585", "look up Stanford")
-- get_related: follow relationships — use for ANY "show me X for Y" query ("requests from Stanford", "emails for Stanford", "payments for request 1001585", "reviewers for request 1001585")
+- get_related: follow relationships — use for ANY "show me X for Y" query ("requests from Stanford", "emails for Stanford", "payments for request 1001585", "reviewers for request 1001585"). For contact→requests, it searches every grantee-side role: primary contact, PI/project leader, VPR, CEO, authorized official, payment contact, and co-PI slots.
 - describe_table: understand field names/types/meanings BEFORE building OData queries. Call ONLY for tables NOT listed in INLINE SCHEMAS below.
 - query_records: structured OData queries (date ranges, exact filters). For tables in INLINE SCHEMAS, you already know the fields — query directly.
 - count_records: count records with optional filter
@@ -529,6 +530,10 @@ TOOLS — choose the right one:
 RULES:
 - Complete the task in as FEW tool calls as possible.
 - NEVER fabricate data. Only present what tools return.
+- If the user asks for files/documents and a search result gives a plausible request number, STOP searching and call list_documents with that request number. Do not spend many rounds trying alternate keyword searches first.
+- If a follow-up gives clarifying topic/institution/person terms after a failed search, prefer the highest-ranked plausible request hit and proceed; do not repeat broad searches with small wording changes.
+- When an exact multi-clause filter returns 0 records, do not conclude the record does not exist. Relax one constraint at a time or use search results to identify the request. Especially verify institution/account identity and person-role fields before telling the user a grant is missing.
+- If asked why an earlier search failed, do not invent a diagnosis. Only explain causes you can verify from tool results or the found record. If you cannot verify the cause, say so and describe the corrected search path.
 - For tables in INLINE SCHEMAS below, you already have full field details — query directly without describe_table.
 - For OTHER tables, ALWAYS call describe_table BEFORE your first query_records. Do NOT guess field names — they are non-obvious (e.g. akoya_requestnum NOT akoya_requestnumber, akoya_program NOT akoya_name).
 - For org name lookups, review ALL results and pick the exact match.
@@ -566,6 +571,7 @@ Programs:
 - "Undergraduate Education"/"UE" → _wmkf_grantprogram_value eq '139321fd-a6cb-ee11-9078-000d3a341e8f'
 - "Discretionary" → _wmkf_grantprogram_value eq '86e6422b-a7cb-ee11-9078-000d3a341e8f'
 - Hierarchy: wmkf_grantprogram (broad: Research, Southern California, UE, Discretionary) → akoya_program (specific: S&E, MR, Health Care, Chair's Grants, etc.)
+- MR/Medical Research is a specific akoya_program under broad Research. Do NOT explain an MR-filter miss as "it may be categorized as Research broadly" unless you have verified the found record's _akoya_programid_value is not Medical Research.
 - For other programs, query the lookup table first to get the GUID.
 People (external — at institution):
 - "PI"/"researcher"/"principal investigator" → _wmkf_projectleader_value
@@ -677,7 +683,7 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'get_related',
-    description: 'Follow relationships from a source entity. Handles multi-step lookups server-side. Paths: account→requests/emails/payments/reports, request→payments/reports/emails/annotations/reviewers, contact→requests, reviewer→requests. Use for ANY "show me X for Y" query.',
+    description: 'Follow relationships from a source entity. Handles multi-step lookups server-side. Paths: account→requests/emails/payments/reports, request→payments/reports/emails/annotations/reviewers, contact→requests, reviewer→requests. contact→requests searches all grantee-side contact roles, including PI/project leader and co-PI slots. Use for ANY "show me X for Y" query.',
     input_schema: {
       type: 'object',
       properties: {

@@ -1300,9 +1300,23 @@ async function handleRequestReviewers(requestId) {
 
 async function handleContactRequests(contactId, buildDateFilter) {
   const dateFilter = buildDateFilter('akoya_submitdate');
+  const contactRoleFields = [
+    '_akoya_primarycontactid_value',
+    '_wmkf_projectleader_value',
+    '_wmkf_researchleader_value',
+    '_wmkf_ceo_value',
+    '_wmkf_authorizedofficial_value',
+    '_wmkf_paymentcontact_value',
+    '_wmkf_copi1_value',
+    '_wmkf_copi2_value',
+    '_wmkf_copi3_value',
+    '_wmkf_copi4_value',
+    '_wmkf_copi5_value',
+  ];
+  const roleFilter = contactRoleFields.map(field => `${field} eq ${contactId}`).join(' or ');
   const result = await DynamicsService.queryRecords('akoya_requests', {
-    select: 'akoya_requestnum,akoya_requeststatus,akoya_submitdate,akoya_fiscalyear,akoya_paid,wmkf_request_type,_akoya_applicantid_value,_wmkf_grantprogram_value',
-    filter: `_akoya_primarycontactid_value eq ${contactId}${dateFilter}`,
+    select: `akoya_requestnum,akoya_requeststatus,akoya_submitdate,akoya_fiscalyear,akoya_paid,wmkf_request_type,_akoya_applicantid_value,_wmkf_grantprogram_value,${contactRoleFields.join(',')}`,
+    filter: `(${roleFilter})${dateFilter}`,
     orderby: 'akoya_submitdate desc',
     top: 100,
   });
@@ -1314,7 +1328,17 @@ async function handleContactRequests(contactId, buildDateFilter) {
     const org = r._akoya_applicantid_value_formatted || '';
     const program = r._wmkf_grantprogram_value_formatted || '';
     const paid = r.akoya_paid_formatted || r.akoya_paid || '';
-    return `Req ${num} | ${status} | ${date} | ${org} | ${program} | Paid: ${paid}`;
+    const roles = [];
+    if (r._akoya_primarycontactid_value === contactId) roles.push('Primary Contact');
+    if (r._wmkf_projectleader_value === contactId) roles.push('PI');
+    if (r._wmkf_researchleader_value === contactId) roles.push('VPR');
+    if (r._wmkf_ceo_value === contactId) roles.push('CEO');
+    if (r._wmkf_authorizedofficial_value === contactId) roles.push('Authorized Official');
+    if (r._wmkf_paymentcontact_value === contactId) roles.push('Payment Contact');
+    for (let i = 1; i <= 5; i++) {
+      if (r[`_wmkf_copi${i}_value`] === contactId) roles.push(`Co-PI ${i}`);
+    }
+    return `Req ${num} | ${status} | ${date} | ${org} | ${program} | ${roles.join(', ') || 'Contact'} | Paid: ${paid}`;
   });
 
   return {
@@ -1322,7 +1346,7 @@ async function handleContactRequests(contactId, buildDateFilter) {
     requestCount: result.records.length,
     totalCount: result.totalCount,
     hasMore: result.totalCount > result.records.length,
-    header: 'Request# | Status | Submitted | Organization | Program | Paid',
+    header: 'Request# | Status | Submitted | Organization | Program | Contact Role | Paid',
     requests: lines.join('\n') || 'No requests found for this contact.',
   };
 }
@@ -2151,6 +2175,9 @@ async function searchRecords({ search, entities, top }) {
   return {
     totalCount: result.totalCount,
     query: result.queryContext?.alteredquery || search,
+    nextStepHint: (!entities?.length || entities.includes('akoya_request'))
+      ? 'If the user asked for files/documents and a listed request looks plausible, call list_documents with that request number now instead of running more broad searches.'
+      : undefined,
     results: sections.join('\n\n'),
   };
 }
