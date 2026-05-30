@@ -1,55 +1,63 @@
-# Session 199 Prompt: Continue from the S198 eval-triage / hardening pass
+# Session 200 Prompt: Continue from the S199 BILL chunk-4 build
 
-## ⏰ Standing context / guardrails (carried from S197–S198)
-- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Fires a non-blocking reminder on scope/quantity words written into `docs/`, `.claude-memory/`, `CLAUDE.md`, `SESSION_PROMPT.md`, `AGENTS.md`. Run the *disconfirming* query before asserting. It paid off twice in S198 (two Explore over-claims caught — see below).
-- **Codex stop-time review gate is ENABLED.** S198 also ran Codex per-item as an active reviewer (implement → test → Codex → fold → commit); that loop caught a P1 in the optimistic-locking work.
-- **Run `check:fact-consistency` after ANY guard/route change, not just `check:api-routes`.** S198 lesson: switching `test-email` to `requireSuperuser` dropped the code-derived `requireappaccess-endpoint-count` (52→51); committing without refreshing `CANONICAL_COUNTS.md` turned the gate red. Caught + fixed same session, but avoidable.
+## ⏰ Standing context / guardrails (carried from S197–S199)
+- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Fires a non-blocking reminder on scope/quantity words written into `docs/`, `.claude-memory/`, `CLAUDE.md`, `SESSION_PROMPT.md`, `AGENTS.md`. Run the *disconfirming* query before asserting.
+- **Codex stop-time review gate is ENABLED.** S199 ran Codex pre-impl + post-impl + TWO stop-time rounds as active reviewer (design → implement → test → Codex → fold → commit). The loop caught: 3 pre-impl P1s, a post-impl opt-out regression + stranding class, and TWO stop-time correctness bugs (permanently-stranded retries, replayed BILL invite). All folded.
+- **Run `check:fact-consistency` after ANY guard/route/count change.** S199 added `/api/admin/honorarium-amount` → api-route-file-count 95→96; regenerated `CANONICAL_COUNTS.md` + reconciled the 3 stale `[95]` restatements (CLAUDE.md ×2, postgres-reviewer-suggestions.md).
 - **Phasing locked:** one applicant submission entered as Phase I; "Phase II" = internal status flip. The "mid-June 2026 Phase II Research pilot" is **defunct**. Canonical: `docs/SYSTEM_MODEL.md`.
 
-## Session 198 Summary
+## Session 199 Summary
 
-Triaged the S197 codebase evaluation (`docs/CODEBASE_EVALUATION_2026-05-29.md`) — drove every **actionable, in-my-hands** finding to a tested + Codex-reviewed fix. 11 commits, suite 1359→1425 green, all 7 CI gates green throughout.
+Built **BILL chunk-4** — the reviewer-honorarium portal-accept extension — end to end through the design→Codex→fold loop. 6 commits, suite 1425→**1479 green**, all CI gates green throughout. The flow is **inert until `BILL_ENABLED=true`** + operational setup (below), so nothing is live yet.
 
-### What was completed (by eval finding)
-1. **Test-coverage gaps** (`be432ae`) — first direct `proxy.js` test (CSP nonce + `authorized` callback), CSRF referer-fallback, executor impersonation threading. +29 tests. (The audit's "tests failing in sandbox" premise was falsified — suite was already green; the gaps were *missing* tests.)
-2. **#3 drain telemetry** (`9993fd5`) + **maintenance_runs retention** (`15513c5`) — drain now writes `maintenance_runs` (idle ticks skipped to avoid ~720 rows/day flood; failures always recorded), and a new `cleanupMaintenanceRuns` daily step bounds the table.
-3. **#5 is_active TTL** (`8931bb8`) — `is_active` + superuser role now read **fresh every request** (only app grants cached); a deactivated account loses access on the next request, not after 2 min. Reconciled the stale "is_active cached" claims across `SECURITY_ARCHITECTURE.md`, `AUTHENTICATION_SETUP.md`, `CLAUDE.md`.
-4. **#2 intake orphan race** (`5b188d2`) — `promoteToClean` gained `request_id IS NULL`; `submit.js` freeze gained an optimistic count-guard (timestamptz µs-vs-ms ruled out an `updated_at` guard) → `409 draft_changed_retry`. Closes the attach-after-submit orphan both windows.
-5. **#6/#7/#9 legibility** (`9a4d38b`) — README re-anchored to the multi-app system; SYSTEM_MODEL.md glossary gained drain/slice-0/Mode 1·2; CLAUDE.md surfaces SYSTEM_MODEL.md.
-6. **#11 test-email** (`f2a5e96`) — tightened `requireAppAccess('dynamics-explorer')` → `requireSuperuser` (it could send mail from the caller's Dynamics identity). +6 tests.
-7. **Deep-pass** (`8032793`) — wired reviewer **optimistic locking** end-to-end (etag was dead code: surfaced `_etag`, client sends `If-Match`, 412 handled; Codex P1 caught — first-access stamp staleness → post-stamp re-read) + `contactEdits` validation.
-8. **#10 Atlas drift** (`3dd9937`) — execute-prompt citations → symbol anchors; stripped 16 drift-prone `≈line` hints; reconciled the count P0.
-9. **BILL hardening prep** (`efd38c1`) — verified `POST /v3/vendors` has **no idempotency-key header**; wrote the durable-vendorId + resume-marker design into the findings doc for chunk-4.
+### What was completed (3 threads + Codex fixes)
+1. **Thread 1 — `respond.js` accept-path extension** (`7cb8bc4`). New `lib/bill/honorarium-onboard-orchestrator.js`: promote-on-accept contact fallback → `contact.address1_*` PATCH → idempotent honorarium `akoya_request` create (DETERMINISTIC uuidv5 GUID per suggestion id → retry collides on PK, no second honorarium; does NOT over-dedup a reviewer reviewing two proposals) → `wmkf_HonorariumRequest` junction PATCH → in-process `onboardReviewer()` call. `lib/bill/honorarium-discriminators.js` (env-driven program/grantprogram/type GUIDs, fail-loud, `scripts/probe-honorarium-discriminators.js`). reviewer-suggestion adapter: `_wmkf_honorariumrequest_value` in FIELD_SELECT + `setHonorariumRequest()` + schema JSON (eval #8).
+2. **Thread 2 — honorarium amount as single Dataverse ground-truth** (`7cb8bc4`). `honorarium.default_amount` in `wmkf_appsystemsettings`; `lib/services/honorarium-config.js`; `getSettingStrict` distinguishes absent-key (→ $250 fallback) from fetch-failure (→ throws, never silently mints). `render-emails.js` injects the amount server-side; per-user preference removed from `SettingsModal` + Review Manager. `/api/admin/honorarium-amount` (superuser) + admin UI section.
+3. **Thread 3 — Full-real-fix hardening** (`7cb8bc4`). `bill_onboarding_state` table (migration `017`): reserve-before-create (PK race), persist `vendor_id` before the contact PATCH (no dup vendor on retry), `dynamics_pending` torn-state marker. `onboard-reviewer-service.js` rewire + request-PATCH retry+backoff. `MaintenanceService.sweepBillOnboarding` resume sweep (fails closed on NULL `pending_match`) + stuck-row reconcile + `cleanupBillOnboardingState` TTL; wired into daily cron.
+4. **Codex post-impl folds** (`290ba68`): F2 (re-accept now honors PERSISTED opt-out, not just the body) + stranding reconcile + non-fatal address PATCH + terminal-only TTL.
+5. **Stop-time #1** (`529bb65`): re-accept retries no longer loop on `in_progress` — a row with a staged `vendor_id` RESUMES.
+6. **Stop-time #2** (`696706b`): the resume must NOT replay terminal BILL side effects — it now re-applies ONLY the idempotent contact PATCH (`resume_reconciled`), never re-`searchBillNetwork`/`sendNetworkInvitation`. Recovery split: torn writebacks → cron sweep; contact-PATCH strands → re-accept reconcile; abandoned/invite-never-fired → stuck-reconcile ops alert.
+7. **Validation-drift close** (`b1d030a`): one shared `validateOnboardInput()` used by BOTH the HTTP route and the in-process `onboardReviewer()`. The **in-process call (vs the design's HTTP POST) is a CONSCIOUS choice** (self-HTTP is a Vercel anti-pattern; base-URL fragility; redundant HMAC) — documented in `docs/BILL_CHUNK_4_DESIGN.md` "In-process onboarding call" + the API-matrix row. Endpoint stays for external callers.
 
-### Codex caught (folded): role-failure test gap (#5), the optimistic-locking first-access-stamp P1, cron-wiring test gap (retention), README accuracy (thin-adapter/api-capabilities/env), + two pre-existing CLAUDE.md contradictions. Two Explore **false positives** rejected on verification: BILL "PII leak" (ops needs that data to onboard manually) and respond.js "locking missing" (it was wired server-side, just never exercised).
+### Commits
+- `7cb8bc4` — chunk-4 core (3 threads + pre-impl P1 fixes)
+- `290ba68` — Codex post-impl folds
+- `8da3414` — memory: chunk-4 shipped + Q1/Q5 closeout
+- `529bb65` — stop-time #1: stranded retries resume
+- `696706b` — stop-time #2: resume doesn't replay BILL side effects
+- `b1d030a` — shared validateOnboardInput (validation parity) + doc reframe
 
 ## Potential Next Steps
 
-### 1. Verify-live-first (eval #1 — needs prod creds, NOT a build task)
-- Migrations 011 + 013 are almost certainly **already applied** (DEV_LOG S186) — probe prod for `submission_jobs.locked_until` + `intake_drafts.pending_attachments`, confirm, close. Do NOT re-apply blindly.
-- `vercel env ls production` — confirm `INTAKE_BLOB_RW_TOKEN` set + `VRP_ALLOWED_PROVIDERS` includes `claude`.
+### 1. Chunk 5 — Stage 2a address UI (the main remaining build)
+`respond.js` accepts + validates `body.address` server-side already (optional — honorarium row + provenance create without it; BILL onboard `invalid_input`-alerts on missing). Build the reviewer-facing address inputs in the Stage 2a accept form (country picker, validation, prefill from existing `contact.address1_*`). UI work; see `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md` chunk 5.
 
-### 2. BILL chunk-4 (the real build the prep is for)
-Create honorarium `akoya_request` + PATCH junction `wmkf_HonorariumRequest` + call onboard, building in the **idempotent-create + resume-marker** design from `docs/REVIEWER_BILL_HARDENING_FINDINGS.md` (the deferred P1s: duplicate-vendor-on-retry, torn cross-system state). Money-adjacent; flow goes live for reviewers ≥ 2026-06-17. Also: `wmkf_honorariumrequest` is documented-deployed but absent from schema-as-code + `reviewer-suggestion.js` FIELD_SELECT (eval #8).
+### 2. Operational setup before `BILL_ENABLED=true` (NOT a build task — needs prod creds)
+- Apply migration `017_bill_onboarding_state.sql` to prod.
+- Run `scripts/probe-honorarium-discriminators.js` → set `HONORARIUM_PROGRAM_ID` / `_GRANTPROGRAM_ID` / `_TYPE_ID`; run `scripts/probe-bill-option-set-values.js` → set `BILLCOM_ACCOUNT_*_VALUE`. (All fail-loud until set; flow inert.)
+- Set `honorarium.default_amount` via `/admin` → "Reviewer Honorarium Amount" (else $250 fallback).
+- Steph's BILL sandbox provisioning (blocks chunk 8 e2e).
 
-### 3. Deferred lower-severity reviewer/BILL opens (`docs/REVIEWER_BILL_HARDENING_FINDINGS.md`)
-no-match PATCH retry, notify()-failure escalation, contact-PATCH backoff. Deliberate tradeoffs (rate-limit fail-open, HMAC 5-min skew) left as-is with in-code rationale.
+### 3. Chunk 7b + 8 (deferred)
+Webhook `vendor.updated` → flip `wmkf_exisitngbillcomaccount` to "Recently Confirmed" (lands once sandbox reveals payload shape). End-to-end test against BILL sandbox.
 
 ### 4. Parked initiatives (unchanged)
-Appresearcher collapse (gated on reviewer-Workbench), dependency/sequencing pass, intake virus-scan EICAR e2e before Phase I intake goes live.
+Appresearcher collapse (gated on reviewer Workbench), dependency/sequencing pass, intake virus-scan EICAR e2e before Phase I intake goes live.
 
 ## Key Files Reference
 | File | Purpose |
 |------|---------|
-| `docs/CODEBASE_EVALUATION_2026-05-29.md` | The eval this session triaged (point-in-time) |
-| `docs/REVIEWER_BILL_HARDENING_FINDINGS.md` | Deep-pass findings + chunk-4 BILL hardening design (NEW S198) |
-| `lib/utils/auth.js` | `requireAppAccess` — is_active/superuser now fresh-per-request |
-| `pages/api/intake/submit.js` + `lib/services/intake-draft-service.js` | Freeze optimistic guard + `promoteToClean` request_id guard |
-| `pages/api/external/review/[token]/{context,respond}.js` + `shared/components/external/{Stage2aView,DeclineFormView}.js` | Reviewer optimistic-locking wiring |
+| `docs/BILL_CHUNK_4_DESIGN.md` | The chunk-4 design + ALL Codex fold notes (pre-impl, post-impl, both stop-time, the in-process-call rationale) |
+| `lib/bill/honorarium-onboard-orchestrator.js` | Accept-path orchestrator (contact/address/create/junction/onboard) |
+| `lib/bill/onboard-reviewer-service.js` | BILL flow + reserve/persist/resume hardening + `validateOnboardInput` |
+| `lib/bill/onboarding-state.js` | `bill_onboarding_state` data layer (reserve, vendorId, torn marker, stuck/cleanup) |
+| `lib/services/honorarium-config.js` | Single Dataverse ground-truth amount reader (strict) |
+| `pages/api/external/review/[token]/respond.js` | Accept path: honorarium step (persisted-opt-out gate, non-fatal) |
+| `lib/services/maintenance-service.js` | `sweepBillOnboarding` (resume + stuck reconcile) + `cleanupBillOnboardingState` |
 
 ## Testing
 ```bash
-npx jest                       # 1425 tests, 91 suites
-npm run check:atlas && npm run check:api-routes && npm run check:fact-consistency
-# After ANY guard/route change: also run check:fact-consistency (count drift).
+npx jest                       # 1479 tests
+npm run check:atlas && npm run check:api-routes && npm run check:fact-consistency && npm run check:migrations-manifest
+# After ANY guard/route/count change: also run check:fact-consistency (count drift).
 ```
