@@ -1,67 +1,68 @@
-# Session 202 Prompt: open board (lint shipped, Explorer soak deferred)
+# Session 203 Prompt: open board (Explorer Path A complete; soak still traffic-blocked)
 
-## ⏰ Standing context / guardrails (carried from S197–S201)
-- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity words into docs/memory.
-- **Codex stop-time review gate is ENABLED.** S201 ran two explicit review passes + the auto stop-gate; both came back clean on the final state. Keep using it.
-- **Measure before building** (Explorer). S200's pivot earned its keep; don't build more Explorer on a hunch.
-- **Push deploys to prod.** `main` auto-deploys on Vercel. S201's 4 commits are pushed (HEAD `de6010c`).
-- **rtk grep filter: keep it DISABLED.** It corrupted tool output mid-S201 (fabricated lines, dup headers) and masked a failed Edit. If grep/cat output ever looks off again, suspect rtk and verify via `git diff` / Read / `node -e` markers. See `.claude-memory/project-rtk-grep-output-corruption.md`.
+## ⏰ Standing context / guardrails (carried from S197–S202)
+- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity words into docs/memory. S202 earned its keep: probing instead of trusting falsified TWO assumptions (the `/$count` bug is total, not filter-only; the prompt's `akoya_folio` "casing inconsistency" never existed).
+- **Codex stop-time review gate is ENABLED.** S202 ran an explicit post-impl review + a fix re-review (both folded, final GO). Keep using it.
+- **Measure before building** (Explorer). S202 ran the soak first, confirmed the deferral (only +4 calls / +0 errors since S200), then built A3/A4/A5 on the unchanged error *shape* — a deliberate, user-approved override, not a hunch.
+- **Push deploys to prod.** `main` auto-deploys on Vercel. S202's commit is pushed (HEAD `bf43cc4`).
+- **rtk grep filter: keep it DISABLED.** During S202 the rtk-compressed "PASS (N) FAIL (M)" summary hid *which* tests failed — had to dump jest to a file and Read it. If test/grep output looks compressed or off, write to a temp file and Read it. See `.claude-memory/project-rtk-grep-output-corruption.md`.
 
-## Session 201 Summary
+## Session 202 Summary
 
-Started as a quick win (Word export for Phase I Writeup), which surfaced that the repo had **no linting at all** — so the session pivoted into standing up ESLint and cleaning what it found. All shipped, Codex-reviewed clean, pushed.
+Picked up "item 1" (Explorer soak), which the S201 prompt framed as "leave it / deferred." Ran the soak first — confirmed frozen data (1471 vs 1467 calls / 392 vs 392 errors since S200) — so the deferral held. User then chose to build the deferred **A3/A4/A5** Path A slices anyway, on the unchanged error *shape* (fiscalyear 88 / akoya_grant 30 / date-fns 27). A live probe reshaped the work. All shipped, Codex-reviewed (2 findings folded), pushed.
 
-### Thread 1 — Phase I Writeup Word (.docx) export (`492cbbe`)
-`ResultsDisplay` already renders a 📄 Word button when given an `onWordExport` handler; Phase I just wasn't passing one. Wired `handleWordExport` to the shared `generateMarkdownDocument` util (same path peer-review-summarizer uses) — per-result download `<filename>_Phase_I_Writeup.docx`. Phase I produces a free-form markdown draft, so the generic markdown→docx converter fits; no Phase II-style cover-page modal needed.
+### A3 — robust counts (`lib/services/dynamics-service.js`)
+A live probe (`scripts/probe-akoya-folio-casing.js`) showed `/$count` is broken **both** ways on this instance: caps at 5000 unfiltered AND throws `Edm.Int32` on any filter. `countRecords` REPLACED (not a narrow interim) with `$apply=filter(...)/aggregate(<pk> with countdistinct as value)` — true counts 9120/22580 past the cap. PK from new `getPrimaryIdAttribute` (`PrimaryIdAttribute` added to `getEntityDefinitions` $select; `primaryIdMap` dual-keyed by logical + entity-set name; reset in `clearCaches`). Fails loud past the 50k `$apply` ceiling → **>50k unbounded count is the still-deferred FetchXML/paging tail.**
 
-### Thread 2 — ESLint introduced (Next 16 removed `next lint`) (`f065a87`)
-No *active* linting existed (no eslint config/dep/script; `next lint` removed in Next 16 per docs — though 12 dead `eslint-disable` directives show a prior config existed at some point). Added `eslint@9` + `eslint-config-next@16.2.6`, `eslint.config.mjs` (core-web-vitals), `lint`/`lint:fix` scripts, and an `npm run lint` CI step in `.github/workflows/test.yml` (blocks on **errors only** — warnings don't fail exit). CLAUDE.md CI-gates section updated.
-- **Calibration** (never-linted repo surfaced ~100 findings): correctness rules stay errors; stylistic + React-Compiler-eligibility rules → warn. `no-unescaped-entities` off; `react-hooks/{set-state-in-effect,immutability,refs,preserve-manual-memoization}` → warn; `rules-of-hooks` **kept error** (it caught real bugs). Rationale documented inline in the config.
-- **Real fixes to reach green (0 errors):** RequireAuth.js (hooks after early `return` → moved guard below hooks); dynamics-explorer.js + reviewer-finder.js (`useProfile()` in try/catch → `useContext(ProfileContext)`, identical null-when-no-provider semantics); WelcomeModal.js (`<a>`→`next/link`); removed 12 dead `eslint-disable` directives (prior-config leftovers).
+### A4 — domain guardrails + folio reconciliation (`shared/config/prompts/dynamics-explorer.js`)
+New `buildDomainGuardrails()` injects an anti-confabulation block (primary contact = foundation liaison ≠ PI; PI program-conditional; `createdon` ≠ business date; status classes), with lists derived **by reference** from `lib/services/dataverse-export/constants.js` (`ERA_CUTOVER_DATE`, `TERMINAL_NON_AWARD_STATUSES`, `PER_PROGRAM_ANNOTATION`) — no value transcription. Probe **falsified** the prompt's `akoya_folio` casing claim: only `"PAID"` exists, Dataverse `eq` is case-insensitive, `contains()` unnecessary. Reconciled across the prompt, `TABLE_ANNOTATIONS`, and `docs/DYNAMICS_SCHEMA_ANNOTATION.md`.
 
-### Thread 3 — Codex review folds (`e38bf18`, `de6010c`)
-Codex flagged 3 RISKs (all P2-P3, none blocking). Folded:
-- phase-i-writeup: empty-`formatted` guard + `URL.revokeObjectURL` in `finally`.
-- review-manager: removed vestigial `refreshTrigger` useRef (its mutation never re-rendered, so the effect dep was inert and the ref dead; refresh worked solely via `handleRefresh`'s direct `loadReviewers()`).
-- **Process note:** `e38bf18`'s commit message inaccurately claimed the review-manager fix — that Edit silently failed (string-miss, masked by rtk grep corruption) and only the phase-i cleanup committed. Corrected in `de6010c` with an honest message (no force-push). Final Codex pass on the whole diff: **clean, 0 findings.**
+### A5 — fail-loud typed errors (`pages/api/dynamics-explorer/chat.js`)
+New `classifyToolError` turns a Dynamics unknown-field/entity 400 into a typed result (`errorType` + `invalidField` + closest valid field names via `closestFieldNames` + `describe_table` pointer), replacing the bare error string in the `executeOne` catch. Edm.Int32 false-positive guard; normalization inside the try so enrichment never masks the original error.
+
+### Codex review (2 findings, both folded + regression-tested, re-review GO)
+- **[MEDIUM]** `count_records` regressed for `systemuser` (the only annotated table missing from `KNOWN_ENTITY_SETS`) → added the mapping + dual-keyed `primaryIdMap` + `getPrimaryIdAttribute` dual lookup.
+- **[LOW]** A5 enrichment skipped entity-set aliases (`akoya_requests`) → logical-name normalization in `classifyToolError`.
 
 ### Final state
-Lint **0 errors / 50 warnings**; `npm run build` clean; **1533 jest tests pass**. All CI gates green.
+Suite **1544 green** (+11 new), lint **0 errors / 50 warnings**, all 4 CI gates green. Plan doc `docs/DYNAMICS_EXPLORER_PATH_A_PLAN.md` + memory `project-dynamics-explorer-reuse-power-tools.md` updated.
 
-### Commits (oldest→newest)
-- `492cbbe` — phase-i-writeup Word export
-- `f065a87` — ESLint flat config + CI gate + green-baseline fixes
-- `e38bf18` — fold Codex RISKs (phase-i cleanup)
-- `de6010c` — review-manager refreshTrigger fix (real Codex P2)
+### Commits
+- `bf43cc4` — Dynamics Explorer Path A: A3 robust counts + A4 guardrails/folio + A5 typed errors (incl. Codex folds)
 
 ## Potential Next Steps
 
-### 1. Explorer soak — DEFERRED, not pending
-You confirmed the original failing query now succeeds one-shot; traffic is too low for a meaningful aggregate re-run. Leave it until more traffic accrues. **Do not re-measure on thin data, do not build A3/A4/A5 yet.**
+### 1. Explorer soak — STILL traffic-blocked (not effort-blocked)
+The real measurement (error-rate drop + validator catch-rate after A3/A4/A5 + the S200 validator deploy) needs accrued traffic. As of 2026-05-30 the aggregate was frozen (+4 calls since S200). **Do not re-measure on thin data.** When traffic accrues, note the soak script (`scripts/analyze-dynamics-explorer-failures.js`) does NOT split pre/post-deploy and the `ODATA_VALIDATOR_REJECT` catch signal lives in Vercel logs, not `dynamics_query_log` — a clean soak needs a date-split or log analysis.
 
-### 2. BILL chunk-5 tail (non-coding / ops)
-- **Office question (open):** does BILL.com self-registration capture the remittance address? If yes, the Stage 2a address fields come back out (server already treats address as optional — removal is cheap). See `.claude-memory/project-reviewer-address-collection-provisional.md`.
-- Operational setup before `BILL_ENABLED=true` (unchanged): migration `017`, probe + set `HONORARIUM_*`/`BILLCOM_ACCOUNT_*`, set `honorarium.default_amount` via `/admin`, Steph's BILL sandbox.
-- Chunk 7b + 8 deferred (`vendor.updated` webhook + e2e vs sandbox).
+### 2. Explorer A3 >50k tail (deferred)
+The unbounded (>50k row) count still needs the OData→FetchXML shim / record-paging. Only matters for the largest tables (most are <50k). Scope as its own sub-phase if a real >50k count question surfaces.
 
-### 3. Parked pre-cycle must-do
+### 3. BILL chunk-5 tail (non-coding / ops) — unchanged from S201
+- Office question (open): does BILL.com self-registration capture the remittance address? If yes, Stage 2a address fields come back out (server treats address as optional). See `.claude-memory/project-reviewer-address-collection-provisional.md`.
+- Ops before `BILL_ENABLED=true`: migration `017`, probe + set `HONORARIUM_*`/`BILLCOM_ACCOUNT_*`, set `honorarium.default_amount` via `/admin`, Steph's BILL sandbox.
+
+### 4. Parked pre-cycle must-do — unchanged from S201
 Intake virus-scan **EICAR e2e through `/apply`** before the next cycle's Phase I intake goes live (reviewer path verified S193; intake path skipped). See `.claude-memory/project-intake-portal-virus-scan-e2e-deferred.md`.
 
-### 4. Lint ratchet (optional, low-stakes)
-The 50 warnings are the documented cleanup ratchet. The `react-hooks/exhaustive-deps` cluster (14) is where real stale-closure bugs could hide; the rest are React-Compiler-eligibility noise. Pick away when convenient — CI won't block on them.
+### 5. Lint ratchet (optional, low-stakes) — unchanged
+50 warnings; the `react-hooks/exhaustive-deps` cluster is where real stale-closure bugs could hide. CI won't block on them.
 
 ## Key Files Reference
 | File | Purpose |
 |------|---------|
-| `eslint.config.mjs` | ESLint flat config + calibrated rule severities (rationale inline) |
-| `.github/workflows/test.yml` | CI — `npm run lint` step added after `npm ci` |
-| `pages/phase-i-writeup.js` | Word export handler (`handleWordExport`) |
-| `shared/utils/word-export.js` | `generateMarkdownDocument` (generic md→docx) + `generatePhaseIIDocument` |
-| `shared/components/ResultsDisplay.js` | Renders 📄 Word button when `onWordExport` is passed |
+| `lib/services/dynamics-service.js` | A3: `countRecords` (countdistinct-on-PK), `getPrimaryIdAttribute`, dual-keyed `primaryIdMap` |
+| `shared/config/prompts/dynamics-explorer.js` | A4: `buildDomainGuardrails()` + reconciled `akoya_folio` guidance |
+| `pages/api/dynamics-explorer/chat.js` | A5: `classifyToolError` + `closestFieldNames` |
+| `lib/services/dataverse-export/constants.js` | A4 source of truth (imported by reference into the prompt) |
+| `scripts/probe-akoya-folio-casing.js` | Provenance probe (folio distribution + `/$count` brokenness + eq case-insensitivity) |
+| `docs/DYNAMICS_EXPLORER_PATH_A_PLAN.md` | Path A plan — A1+A2 (S200), A3/A4/A5 (S202) all marked shipped |
 
 ## Testing
 ```bash
+npx jest                       # 1544 tests
 npm run lint                   # 0 errors / 50 warnings (CI blocks on errors only)
-npx jest                       # 1533 tests
 npm run check:atlas && npm run check:atlas:self-test && npm run check:api-routes && npm run check:fact-consistency
+node scripts/analyze-dynamics-explorer-failures.js   # soak (read-only, prod); leave until traffic accrues
+node scripts/probe-akoya-folio-casing.js             # folio/count probe (read-only, prod)
 ```
