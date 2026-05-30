@@ -29,19 +29,21 @@ Sequencing between is flexible and depends on Connor's Q5 schema add + Steph's B
 2. Q2 — write `wmkf_paymentnetworkidpni` programmatically? (rec: yes; portal-create path doesn't collide with Steph's 8 backfilled rows)
 3. Q4a — write `wmkf_exisitngbillcomaccount` (Yes/No/Recently Confirmed)? (rec: yes, maps to BILL `GET /v3/network`)
 4. Q4b — leave `wmkf_vendorverified` and `wmkf_paymentcontactconfirmed` alone? (rec: yes — see [[akoya-payment-field-semantics]])
-5. Q5 — **REQUIRED** — add `wmkf_honorariumforrequest` self-referential lookup on `akoya_request`. Our portal knows the linkage at create time; without this field we throw it away.
+5. Q5 — **CLOSED (shipped 2026-05-28)** — Connor added the lookup as `wmkf_HonorariumRequest` **on `wmkf_appreviewersuggestion`** → `akoya_request` (NOT a self-referential lookup on `akoya_request` as the early draft proposed; the junction carries the grant linkage, so provenance to the grant is one hop). Set by chunk-4 at honorarium-create time.
 6. Q6 — adopt "grant request" vs "honorarium request" as canonical staff terminology? (rec: yes)
 7. Q7 — informational — what does the current GOapply "Reviewer Information Form" capture? (We're replacing it, not replicating 1:1; informs portal form design but doesn't block.)
 
 **Build chunks:**
 - 0: design doc → Connor sign-off
-- 1: Connor schema add (Q5) — still pending
+- ~~1: Connor schema add (Q5)~~ **SHIPPED 2026-05-28** — `wmkf_HonorariumRequest` lookup on `wmkf_appreviewersuggestion` → `akoya_request` (Connor moved it to the junction, not on `akoya_request`; provenance to the grant is one hop via `wmkf_Request`).
 - ~~2-3: `lib/bill.js` + unit tests against mock~~ **SHIPPED S188** — primitives at `lib/bill/{index,session,classify,errors,redact}.js` (vendor / network / invitation / webhook-verify); see `docs/BILL_LIB_DESIGN.md` v3.
-- 4: extend `respond.js` accept path — blocked on Q5 lookup field
-- 5: extend Stage 2a accept UI with address inputs — can ship in parallel
-- 6: `/api/bill/onboard-reviewer` endpoint + wire into accept handler — can ship in parallel
-- ~~7a: `/api/webhooks/bill` scaffold~~ **SHIPPED S188** at `pages/api/webhooks/bill.js`; event-dispatch + Dataverse PATCH still pending
-- 8: end-to-end test against BILL sandbox — blocked on Steph's sandbox provisioning
+- ~~4: extend `respond.js` accept path~~ **SHIPPED S199 (2026-05-29, commits 7cb8bc4 + 290ba68)** — `lib/bill/honorarium-onboard-orchestrator.js` (promote-on-accept + address PATCH + idempotent honorarium create w/ DETERMINISTIC uuidv5 GUID per suggestion + junction PATCH + in-process `onboardReviewer()` call). Plus **amount-as-Dataverse-setting** (`honorarium.default_amount` in `wmkf_appsystemsettings`, `lib/services/honorarium-config.js`, admin UI, per-user pref removed) + **Full-real-fix hardening** (`bill_onboarding_state` table migration 017, reserve-before-create, vendorId-before-contact-PATCH, torn-state resume sweep + stuck reconcile). Design: `docs/BILL_CHUNK_4_DESIGN.md`. Codex pre+post-impl reviewed.
+- 5: extend Stage 2a accept UI with address inputs — **STILL PENDING** (respond.js accepts/validates `body.address` server-side already; the UI form fields are not built. Address is optional server-side — honorarium row + provenance create without it; BILL onboard degrades/alerts on missing address).
+- ~~6: `/api/bill/onboard-reviewer` endpoint~~ **SHIPPED S189** (chunk-4 calls `onboardReviewer()` in-process, not via HTTP — see design doc deviation note).
+- ~~7a: `/api/webhooks/bill` scaffold~~ **SHIPPED S188** at `pages/api/webhooks/bill.js`; event-dispatch + Dataverse PATCH (7b) still pending.
+- 8: end-to-end test against BILL sandbox — blocked on Steph's sandbox provisioning.
+
+**Operational setup before BILL_ENABLED=true (chunk-4 reads these, fail-loud):** env GUIDs `HONORARIUM_PROGRAM_ID` / `HONORARIUM_GRANTPROGRAM_ID` / `HONORARIUM_TYPE_ID` (resolve via `scripts/probe-honorarium-discriminators.js`) + `BILLCOM_ACCOUNT_{YES,NO,RECENTLY_CONFIRMED}_VALUE` (probe-bill-option-set-values.js) + the migration 017 applied. The honorarium amount is a Dataverse setting, not an env var.
 
 **Q3 (PA + shared-secret) is dropped from the doc.** The portal calls our BILL endpoint directly; no PA trigger needed.
 
