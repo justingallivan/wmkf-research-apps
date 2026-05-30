@@ -78,6 +78,7 @@
 - [Tool-result serializer SHIPPED](project-dynamics-explorer-serializer-deferred.md) — `lib/utils/dynamics-explorer-serializer.js` redacts sensitive fields + caps long strings
 - [Dataverse Search API + perf optimizations](project-dynamics-explorer-details.md) — Search API enabled (77K+ docs), inline schemas, parallel execution, SSE streaming
 - [Schema discovery: prefer the diff tool](project-dynamics-explorer-schema-diff.md) — `scripts/dynamics-schema-diff.js` enumerates ALL Dataverse attributes; older `dynamics-schema-map.js` silently drops sparsely-populated fields
+- [Improve Explorer via Power Tools reuse](project-dynamics-explorer-reuse-power-tools.md) — Explorer fails on hand-transcribed schema (82/579 akoya_request fields) + trust-hardcoded-GUIDs heuristics; reuse live-taxonomy/fetch-client/schema-diff/encoded-ground-truth. Assessment only (S200), no build decided.
 - [Thumbs feedback admin surface SHIPPED](project-dynamics-feedback-admin-shipped.md) — `DynamicsFeedbackSection` in `pages/admin.js` + `/api/dynamics-explorer/feedback` GET/PATCH already exists. S186 audit #10 "no admin page reads feedback" was stale-premise; don't rebuild.
 
 ## Dynamics CRM
@@ -111,6 +112,7 @@
 - [Reviewer honorarium onboarding (portal-integrated)](project-bill-honorarium-integration.md) — extends already-shipped Stage 2a accept endpoint to capture address + create honorarium akoya_request + trigger BILL.com inline. Target ready 2026-06-10; reviewers ≥ 2026-06-17. Design doc at `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`, 6 Connor questions + 1 informational.
 - [Grant request vs honorarium request nomenclature](akoya-request-honorarium-nomenclature.md) — both stored as `akoya_request` rows but mean very different things; no data link between them by default; use precise terms always.
 - [akoya_request/payment field-gating semantics](akoya-payment-field-semantics.md) — `wmkf_vendorverified` is NOT a payment gate (empirical, S188); `akoya_paymentsent` misleading — use `akoya_folio="PAID"` instead.
+- [Reviewer address collection is provisional](project-reviewer-address-collection-provisional.md) — Stage 2a payment-address may be a relic of manual BILL onboarding; required-when-honorarium/hidden-on-opt-out for now; server treats it OPTIONAL so removal is cheap if office says BILL registration suffices.
 
 ## App Infrastructure
 - [App-level access control](project-app-access-control.md) — Dataverse `wmkf_appuserappaccesses`; appRegistry.js source of truth; `requireAppAccess()` coverage is checked by `check:fact-consistency`

@@ -1,63 +1,69 @@
-# Session 200 Prompt: Continue from the S199 BILL chunk-4 build
+# Session 201 Prompt: Dynamics Explorer soak-and-measure + BILL chunk-5 tail
 
-## ⏰ Standing context / guardrails (carried from S197–S199)
-- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Fires a non-blocking reminder on scope/quantity words written into `docs/`, `.claude-memory/`, `CLAUDE.md`, `SESSION_PROMPT.md`, `AGENTS.md`. Run the *disconfirming* query before asserting.
-- **Codex stop-time review gate is ENABLED.** S199 ran Codex pre-impl + post-impl + TWO stop-time rounds as active reviewer (design → implement → test → Codex → fold → commit). The loop caught: 3 pre-impl P1s, a post-impl opt-out regression + stranding class, and TWO stop-time correctness bugs (permanently-stranded retries, replayed BILL invite). All folded.
-- **Run `check:fact-consistency` after ANY guard/route/count change.** S199 added `/api/admin/honorarium-amount` → api-route-file-count 95→96; regenerated `CANONICAL_COUNTS.md` + reconciled the 3 stale `[95]` restatements (CLAUDE.md ×2, postgres-reviewer-suggestions.md).
-- **Phasing locked:** one applicant submission entered as Phase I; "Phase II" = internal status flip. The "mid-June 2026 Phase II Research pilot" is **defunct**. Canonical: `docs/SYSTEM_MODEL.md`.
+## ⏰ Standing context / guardrails (carried from S197–S200)
+- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity words into docs/memory.
+- **Codex stop-time review gate is ENABLED.** S200 ran the full loop repeatedly (design → Codex review → fold → build → Claude review → Codex stop-gate → fold). It earned its keep: caught a GUID-quoting inversion, the contact-role bug, and **three** separate `describe_table` restriction leaks. Keep using it.
+- **Measure before building.** S200's pivot: instead of building Path A's A3/A4/A5 on a hunch, we ran `scripts/analyze-dynamics-explorer-failures.js` against prod and let the data redirect the work. Do this before the next Explorer build too.
+- **Push deploys to prod.** `main` auto-deploys on Vercel. S200's 13 commits are pushed (deploy in flight).
 
-## Session 199 Summary
+## Session 200 Summary
 
-Built **BILL chunk-4** — the reviewer-honorarium portal-accept extension — end to end through the design→Codex→fold loop. 6 commits, suite 1425→**1479 green**, all CI gates green throughout. The flow is **inert until `BILL_ENABLED=true`** + operational setup (below), so nothing is live yet.
+Two threads, both shipped and pushed (origin/main @ `aa93d5a`).
 
-### What was completed (3 threads + Codex fixes)
-1. **Thread 1 — `respond.js` accept-path extension** (`7cb8bc4`). New `lib/bill/honorarium-onboard-orchestrator.js`: promote-on-accept contact fallback → `contact.address1_*` PATCH → idempotent honorarium `akoya_request` create (DETERMINISTIC uuidv5 GUID per suggestion id → retry collides on PK, no second honorarium; does NOT over-dedup a reviewer reviewing two proposals) → `wmkf_HonorariumRequest` junction PATCH → in-process `onboardReviewer()` call. `lib/bill/honorarium-discriminators.js` (env-driven program/grantprogram/type GUIDs, fail-loud, `scripts/probe-honorarium-discriminators.js`). reviewer-suggestion adapter: `_wmkf_honorariumrequest_value` in FIELD_SELECT + `setHonorariumRequest()` + schema JSON (eval #8).
-2. **Thread 2 — honorarium amount as single Dataverse ground-truth** (`7cb8bc4`). `honorarium.default_amount` in `wmkf_appsystemsettings`; `lib/services/honorarium-config.js`; `getSettingStrict` distinguishes absent-key (→ $250 fallback) from fetch-failure (→ throws, never silently mints). `render-emails.js` injects the amount server-side; per-user preference removed from `SettingsModal` + Review Manager. `/api/admin/honorarium-amount` (superuser) + admin UI section.
-3. **Thread 3 — Full-real-fix hardening** (`7cb8bc4`). `bill_onboarding_state` table (migration `017`): reserve-before-create (PK race), persist `vendor_id` before the contact PATCH (no dup vendor on retry), `dynamics_pending` torn-state marker. `onboard-reviewer-service.js` rewire + request-PATCH retry+backoff. `MaintenanceService.sweepBillOnboarding` resume sweep (fails closed on NULL `pending_match`) + stuck-row reconcile + `cleanupBillOnboardingState` TTL; wired into daily cron.
-4. **Codex post-impl folds** (`290ba68`): F2 (re-accept now honors PERSISTED opt-out, not just the body) + stranding reconcile + non-fatal address PATCH + terminal-only TTL.
-5. **Stop-time #1** (`529bb65`): re-accept retries no longer loop on `in_progress` — a row with a staged `vendor_id` RESUMES.
-6. **Stop-time #2** (`696706b`): the resume must NOT replay terminal BILL side effects — it now re-applies ONLY the idempotent contact PATCH (`resume_reconciled`), never re-`searchBillNetwork`/`sendNetworkInvitation`. Recovery split: torn writebacks → cron sweep; contact-PATCH strands → re-accept reconcile; abandoned/invite-never-fired → stuck-reconcile ops alert.
-7. **Validation-drift close** (`b1d030a`): one shared `validateOnboardInput()` used by BOTH the HTTP route and the in-process `onboardReviewer()`. The **in-process call (vs the design's HTTP POST) is a CONSCIOUS choice** (self-HTTP is a Vercel anti-pattern; base-URL fragility; redundant HMAC) — documented in `docs/BILL_CHUNK_4_DESIGN.md` "In-process onboarding call" + the API-matrix row. Endpoint stays for external callers.
+### Thread 1 — BILL chunk-5: Stage 2a reviewer payment-address UI
+The reviewer-facing honorarium payment-address card on the Stage 2a accept form (completing chunk-4's server path).
+- `shared/config/countries.js` — **complete** ISO 3166-1 alpha-2 set (249, incl. territories) + `normalizeCountryToIso2` (coerces stored full-name/alpha-3 → alpha-2 for prefill). The completeness was a Codex catch (curated subset hard-blocked reviewers from omitted regions).
+- `Stage2aView.js` — `AddressCard` with ISO-2 country picker, **required-when-taking-honorarium / hidden-on-opt-out**, prefilled from promoted `contact.address1_*`, inline error flagging + server 400-reason surfacing + `aria-describedby`.
+- **Address collection is PROVISIONAL** — may be a relic of manual BILL onboarding. Justin is checking in-office whether BILL.com self-registration already captures remittance address; if so the fields come back out (server treats address as optional, so removal is cheap). See `.claude-memory/project-reviewer-address-collection-provisional.md`.
 
-### Commits
-- `7cb8bc4` — chunk-4 core (3 threads + pre-impl P1 fixes)
-- `290ba68` — Codex post-impl folds
-- `8da3414` — memory: chunk-4 shipped + Q1/Q5 closeout
-- `529bb65` — stop-time #1: stranded retries resume
-- `696706b` — stop-time #2: resume doesn't replay BILL side effects
-- `b1d030a` — shared validateOnboardInput (validation parity) + doc reframe
+### Thread 2 — Dynamics Explorer: measure-first pivot → live ground truth + OData validator
+Started as "Path A" (replace hand-transcribed schema/GUIDs with live discovery), pivoted mid-stream when the failure data showed the real problem.
+- **Slice 1 (A1+A2) shipped** (`12f7a51`): A1 = live schema into `describe_table` (+ `full:true`) + softened the inline "you already know the fields" rule; A2 = `lib/services/dynamics-explorer-taxonomy.js` (6h-cached, fail-loud live resolution of program/grantprogram/type/request_type/status GUIDs+codes, replacing the hardcoded prompt block). **Three restriction-leak fixes followed** (`6fbe6eb` field-list gate, `b8913fe` prose redaction) — all Codex stop-gate catches; the live-field exposure reopened every metadata channel.
+- **Measured** (`6d7c960`/`40b0950`): `scripts/analyze-dynamics-explorer-failures.js` over 1,467 prod tool calls → **392 errored calls**, dominated by *invalid OData* (hallucinated field/entity names like `akoya_name` vs `akoya_requestnum`, `akoya_proposal`; request-number-where-GUID-required; `year()/month()/day()`; `_formatted`-in-filter; `contains()`-on-lookup; fiscalyear format guessing). **No active restrictions in prod** (the restriction hardening was defensive). This reprioritized A3/A4/A5 → an OData validator.
+- **OData pre-flight validator shipped** (`aa93d5a`): `lib/services/dynamics-odata-validator.js` — tolerant tokenizer (reject only high-confidence; unknown shapes pass through), field/entity validation against live `getEntityAttributes`, restricted-field enforcement in `filter`/`orderby` (closes the `checkRestriction` gap), request-number-as-GUID detection, unsupported-construct rejects with precise hints. **No auto-correct** (unquoted GUIDs are valid — Codex caught that quoting would be harmful). Validates the EFFECTIVE post-sanitize query; distinct `ODATA_VALIDATOR_REJECT` log marker for soak measurement; in-flight schema-cache coalescing. Design + 2 Codex reviews in `docs/DYNAMICS_EXPLORER_ODATA_VALIDATOR_DESIGN.md`.
+
+### Commits (this session, oldest→newest)
+- `96baeb2`, `b4c91f0` — BILL chunk-5 (UI + Codex folds)
+- `1a20a3a` — (parallel Codex session) Fix Explorer contact grant retrieval
+- `9fe1418`, `6d40c44` — Path A plan + Codex round-2 fold
+- `12f7a51`, `6fbe6eb`, `b8913fe` — Explorer Slice 1 + 2 restriction-leak fixes
+- `6d7c960`, `40b0950` — failure-analysis diagnostic
+- `8aa6c63`, `af803da` — OData validator design + Codex fold
+- `aa93d5a` — OData validator build (Codex) + review (Claude)
 
 ## Potential Next Steps
 
-### 1. Chunk 5 — Stage 2a address UI (the main remaining build)
-`respond.js` accepts + validates `body.address` server-side already (optional — honorarium row + provenance create without it; BILL onboard `invalid_input`-alerts on missing). Build the reviewer-facing address inputs in the Stage 2a accept form (country picker, validation, prefill from existing `contact.address1_*`). UI work; see `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md` chunk 5.
+### 1. SOAK + MEASURE the Explorer work (gating step — do this first)
+After production traffic accumulates (give it days, not hours), re-run `node scripts/analyze-dynamics-explorer-failures.js`. Expect: errored-call rate **down**, `ODATA_VALIDATOR_REJECT` markers appearing in `dynamics_query_log.denial_reason`. This measurement gates whether A3/A4/A5 — or anything else — is worth building. **Do not build more Explorer until measured.**
+- **Watch-item:** the validator's unknown-table reject hard-rejects any table not in the 23 `TABLE_ANNOTATIONS` — a valid query to a non-annotated table would false-reject. It's logged, so the soak will surface it. If it bites, soften to fall through to live resolution.
+- **Watch-item:** A2 taxonomy is fail-loud — a live-taxonomy fetch failure fails the whole chat request (no degrade). 6h cache makes it rare; watch for spikes.
 
-### 2. Operational setup before `BILL_ENABLED=true` (NOT a build task — needs prod creds)
-- Apply migration `017_bill_onboarding_state.sql` to prod.
-- Run `scripts/probe-honorarium-discriminators.js` → set `HONORARIUM_PROGRAM_ID` / `_GRANTPROGRAM_ID` / `_TYPE_ID`; run `scripts/probe-bill-option-set-values.js` → set `BILLCOM_ACCOUNT_*_VALUE`. (All fail-loud until set; flow inert.)
-- Set `honorarium.default_amount` via `/admin` → "Reviewer Honorarium Amount" (else $250 fallback).
-- Steph's BILL sandbox provisioning (blocks chunk 8 e2e).
+### 2. BILL chunk-5 tail (non-coding / ops)
+- **Office question:** does BILL.com self-registration capture the remittance address (making our form collection redundant)? If yes, remove the address fields.
+- **Operational setup before `BILL_ENABLED=true`** (unchanged from S199): apply migration `017`, probe + set `HONORARIUM_*`/`BILLCOM_ACCOUNT_*` env vars, set `honorarium.default_amount` via `/admin`, Steph's BILL sandbox.
+- **Chunk 7b + 8 (deferred):** `vendor.updated` webhook + e2e against BILL sandbox.
 
-### 3. Chunk 7b + 8 (deferred)
-Webhook `vendor.updated` → flip `wmkf_exisitngbillcomaccount` to "Recently Confirmed" (lands once sandbox reveals payload shape). End-to-end test against BILL sandbox.
+### 3. Parked pre-cycle must-do
+Intake virus-scan **EICAR e2e through `/apply`** before the next cycle's Phase I intake goes live (the reviewer path was verified S193; the intake path was skipped). See `.claude-memory/project-intake-portal-virus-scan-e2e-deferred.md`.
 
-### 4. Parked initiatives (unchanged)
-Appresearcher collapse (gated on reviewer Workbench), dependency/sequencing pass, intake virus-scan EICAR e2e before Phase I intake goes live.
+### 4. Deferred Explorer Path A items (gated on #1)
+A3 (robust counts — needs an OData→FetchXML shim), A4 (`constants.js` per-program PI/contact/donor guardrails by-reference), A5 (typed-error fail-loud). Only if the soak shows they're warranted.
 
 ## Key Files Reference
 | File | Purpose |
 |------|---------|
-| `docs/BILL_CHUNK_4_DESIGN.md` | The chunk-4 design + ALL Codex fold notes (pre-impl, post-impl, both stop-time, the in-process-call rationale) |
-| `lib/bill/honorarium-onboard-orchestrator.js` | Accept-path orchestrator (contact/address/create/junction/onboard) |
-| `lib/bill/onboard-reviewer-service.js` | BILL flow + reserve/persist/resume hardening + `validateOnboardInput` |
-| `lib/bill/onboarding-state.js` | `bill_onboarding_state` data layer (reserve, vendorId, torn marker, stuck/cleanup) |
-| `lib/services/honorarium-config.js` | Single Dataverse ground-truth amount reader (strict) |
-| `pages/api/external/review/[token]/respond.js` | Accept path: honorarium step (persisted-opt-out gate, non-fatal) |
-| `lib/services/maintenance-service.js` | `sweepBillOnboarding` (resume + stuck reconcile) + `cleanupBillOnboardingState` |
+| `scripts/analyze-dynamics-explorer-failures.js` | Read-only failure diagnostic — **re-run for the soak** |
+| `lib/services/dynamics-odata-validator.js` | OData pre-flight validator (tokenizer + checks) |
+| `lib/services/dynamics-explorer-taxonomy.js` | A2 cached/fail-loud live taxonomy → resolved prompt block |
+| `pages/api/dynamics-explorer/chat.js` | Explorer engine — `describeTable` (A1), `validateEffectiveODataCall` hook |
+| `docs/DYNAMICS_EXPLORER_PATH_A_PLAN.md` | Slice 1 plan (A1+A2) + A3/A4/A5 |
+| `docs/DYNAMICS_EXPLORER_ODATA_VALIDATOR_DESIGN.md` | Validator design + 2 Codex review folds |
+| `shared/config/countries.js` | ISO-2 list + normalizer (BILL chunk-5) |
+| `shared/components/external/Stage2aView.js` | Stage 2a accept form incl. AddressCard |
 
 ## Testing
 ```bash
-npx jest                       # 1479 tests
-npm run check:atlas && npm run check:api-routes && npm run check:fact-consistency && npm run check:migrations-manifest
-# After ANY guard/route/count change: also run check:fact-consistency (count drift).
+npx jest                       # 1533 tests
+npm run check:atlas && npm run check:atlas:self-test && npm run check:api-routes && npm run check:fact-consistency
+node scripts/analyze-dynamics-explorer-failures.js   # soak measurement (reads prod via .env.local)
 ```
