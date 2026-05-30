@@ -88,6 +88,37 @@ await safe('error-samples', async () => {
   if (!r.rows?.length) console.log('  (none)');
 });
 
+console.log('\n--- Errored-call OData pattern categorization (record_count = -1) ---');
+await safe('error-patterns', async () => {
+  const r = await sql`SELECT query_params::text AS p FROM dynamics_query_log WHERE record_count = -1`;
+  const rows = r.rows || [];
+  const pat = {
+    'date fn year()/month()/day()': /\b(year|month|day)\s*\(/i,
+    '_formatted in filter': /_formatted/i,
+    'contains() on lookup _value': /contains\s*\(\s*_[a-z0-9_]+_value/i,
+    // NOTE: buckets overlap (a row can match several); counts are indicative,
+    // not a partition. "select" alone is a query_params key, so match only the
+    // real subquery shape `in (select`.
+    'SQL subquery in (select ...)': /\bin\s*\(\s*select\b/i,
+    'logical name w/o _value (programdirector/applicantid/grantprogram/projectleader)':
+      /(?<!_)(wmkf_programdirector|akoya_applicantid|wmkf_grantprogram|wmkf_projectleader)\s+eq/i,
+    'akoya_fiscalyear filter': /akoya_fiscalyear/i,
+    'akoya_grant field': /akoya_grant\b/i,
+  };
+  const counts = Object.fromEntries(Object.keys(pat).map(k => [k, 0]));
+  let uncategorized = 0;
+  for (const { p } of rows) {
+    let hit = false;
+    for (const [k, re] of Object.entries(pat)) { if (re.test(p)) { counts[k]++; hit = true; } }
+    if (!hit) uncategorized++;
+  }
+  console.log(`  total errored rows: ${rows.length}`);
+  for (const [k, n] of Object.entries(counts).sort((a, b) => b[1] - a[1])) {
+    console.log(`  ${String(n).padStart(4)}  ${k}`);
+  }
+  console.log(`  ${String(uncategorized).padStart(4)}  (no pattern matched)`);
+});
+
 console.log('\n--- Feedback by type + category ---');
 await safe('feedback', async () => {
   const r = await sql`SELECT feedback_type, COALESCE(category,'(none)') AS category, COUNT(*)::int AS n, SUM(CASE WHEN auto_detected THEN 1 ELSE 0 END)::int AS auto FROM dynamics_feedback GROUP BY feedback_type, category ORDER BY n DESC`;
