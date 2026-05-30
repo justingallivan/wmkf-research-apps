@@ -5,22 +5,38 @@
  *   1. Proposal summary card (read-only)
  *   2. Confirm contact info (inline-editable)
  *   3. Honorarium opt-out (single checkbox)
- *   4. Two policy ack cards (compact; each opens a modal on click)
- *   5. Accept / Decline buttons
+ *   4. Honorarium payment address (shown only when NOT opted out; chunk 5)
+ *   5. Two policy ack cards (compact; each opens a modal on click)
+ *   6. Accept / Decline buttons
  *
- * Accept disabled until both policies are in the acknowledged state.
+ * Accept disabled until both policies are in the acknowledged state. A blocked
+ * submit also surfaces inline errors when the honorarium address is required
+ * but incomplete (required only when the reviewer is taking the honorarium —
+ * opting out hides the card and sends no address).
  * Decline is always enabled — submits to the dispatcher's onRequestDecline
  * callback which routes to the decline-form view.
  *
  * On Accept submit, calls /respond with action='accept' + the contact edits
- * collected here + honorariumOptOut + policyAcks { slot: true }. Server
- * resolves the active wmkf_policyversion lookups at accept time (we don't
- * round-trip the GUIDs from the client — booleans express intent, server
- * pins the versions).
+ * collected here + honorariumOptOut + the optional payment address +
+ * policyAcks { slot: true }. Server resolves the active wmkf_policyversion
+ * lookups at accept time (we don't round-trip the GUIDs from the client —
+ * booleans express intent, server pins the versions). Country is emitted as an
+ * ISO-2 code to match the server validateAddress + downstream BILL contract.
  */
 
 import { useEffect, useRef, useState } from 'react';
 import PolicyAckModal from './PolicyAckModal';
+import { COUNTRIES } from '../../config/countries';
+
+// Payment-address fields the reviewer must complete to receive the honorarium.
+// line2 + state stay optional (many countries have no sub-national state, and
+// the downstream BILL contract treats both as optional). Mirrors the server's
+// validateAddress field set in respond.js.
+const REQUIRED_ADDRESS_FIELDS = ['line1', 'city', 'postalCode', 'country'];
+
+function missingAddressFields(address) {
+  return REQUIRED_ADDRESS_FIELDS.filter((k) => !(address[k] || '').trim());
+}
 
 export default function Stage2aView({ data, token, onRequestDecline, onAccepted }) {
   const prefill = data.prefill || {};
@@ -38,6 +54,21 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
     orcid: prefill.orcid || '',
   });
   const [honorariumOptOut, setHonorariumOptOut] = useState(!!prefill.honorariumOptOut);
+
+  // Payment mailing address — prefilled from the promoted contact when present
+  // (empty for not-yet-promoted reviewers). Collected only when the reviewer is
+  // taking the honorarium; the card is hidden when they opt out.
+  const prefillAddress = prefill.address || {};
+  const [address, setAddress] = useState({
+    line1: prefillAddress.line1 || '',
+    line2: prefillAddress.line2 || '',
+    city: prefillAddress.city || '',
+    state: prefillAddress.state || '',
+    postalCode: prefillAddress.postalCode || '',
+    country: prefillAddress.country || '',
+  });
+  // Which required address fields to flag after a blocked submit attempt.
+  const [addressErrors, setAddressErrors] = useState([]);
 
   // Per-slot ack state. Modal handles the scroll-gate; we just track which
   // slots have been acknowledged in this session.
@@ -63,11 +94,29 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
     setContact((c) => ({ ...c, [name]: value }));
   }
 
+  function updateAddressField(name, value) {
+    setAddress((a) => ({ ...a, [name]: value }));
+    // Clear a field's error indicator as soon as the reviewer types into it.
+    if (value && value.trim()) {
+      setAddressErrors((errs) => errs.filter((k) => k !== name));
+    }
+  }
+
   async function handleAccept() {
     setError(null);
+    setAddressErrors([]);
     if (!allAcked) {
       setError('Please acknowledge both policies to proceed.');
       return;
+    }
+    // Address is required only when the reviewer is taking the honorarium.
+    if (!honorariumOptOut) {
+      const missing = missingAddressFields(address);
+      if (missing.length) {
+        setAddressErrors(missing);
+        setError('Please complete your mailing address to receive the honorarium.');
+        return;
+      }
     }
     setSubmitting(true);
     try {
@@ -81,6 +130,18 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
         const trimmed = (v || '').trim();
         if (trimmed !== (prefill[k] || '').trim()) contactEdits[k] = trimmed;
       }
+      // Address rides along only when taking the honorarium; opting out means
+      // no payment, so we collect and send nothing. Send only the non-empty,
+      // trimmed fields (required-field completeness was checked above).
+      let addressPayload;
+      if (!honorariumOptOut) {
+        const trimmedAddress = {};
+        for (const [k, v] of Object.entries(address)) {
+          const trimmed = (v || '').trim();
+          if (trimmed) trimmedAddress[k] = trimmed;
+        }
+        if (Object.keys(trimmedAddress).length) addressPayload = trimmedAddress;
+      }
       const resp = await fetch(`/api/external/review/${encodeURIComponent(token)}/respond`, {
         method: 'POST',
         headers: {
@@ -93,6 +154,7 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
           action: 'accept',
           contactEdits: Object.keys(contactEdits).length ? contactEdits : undefined,
           honorariumOptOut,
+          address: addressPayload,
           policyAcks: Object.fromEntries(policySlots.map((s) => [s, true])),
         }),
       });
@@ -147,6 +209,16 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
         onChange={setHonorariumOptOut}
         disabled={submitting}
       />
+
+      {!honorariumOptOut && (
+        <AddressCard
+          address={address}
+          errors={addressErrors}
+          onUpdate={updateAddressField}
+          disabled={submitting}
+          prefilled={!!(prefill.address && prefill.address.line1)}
+        />
+      )}
 
       <div className="space-y-3">
         <p className="text-xs uppercase tracking-wide text-gray-500">Required acknowledgments</p>
@@ -273,19 +345,92 @@ function ContactConfirmCard({ contact, affiliationHint, onUpdate, disabled }) {
   );
 }
 
-function Field({ label, value, onChange, type = 'text', placeholder, disabled, fullWidth, hint }) {
+function Field({ label, value, onChange, type = 'text', placeholder, disabled, fullWidth, hint, required, error }) {
   return (
     <label className={`block text-sm ${fullWidth ? 'sm:col-span-2' : ''}`}>
-      <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">{label}</span>
+      <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+        {label}
+        {required && <span className="text-red-600 ml-0.5" aria-hidden="true">*</span>}
+      </span>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-gray-900 focus:ring-0 disabled:bg-gray-50"
+        required={required}
+        aria-invalid={error || undefined}
+        className={`mt-1 block w-full rounded-lg border px-3 py-2 text-sm text-gray-900 focus:ring-0 disabled:bg-gray-50 ${
+          error ? 'border-red-400 focus:border-red-500' : 'border-gray-300 focus:border-gray-900'
+        }`}
       />
       {hint && <span className="block text-xs text-gray-500 mt-1">{hint}</span>}
+    </label>
+  );
+}
+
+function AddressCard({ address, errors, onUpdate, disabled, prefilled }) {
+  const hasError = (k) => errors.includes(k);
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-6">
+      <h3 className="text-base font-semibold text-gray-900">Honorarium payment address</h3>
+      <p className="text-sm text-gray-600 mt-1">
+        {prefilled
+          ? "We pre-filled the mailing address we have on file. Please correct anything that's out of date — we'll use it to issue your honorarium."
+          : "Where should we mail correspondence for your honorarium? We'll use this to set up your payment."}
+      </p>
+      <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field
+          label="Street address" value={address.line1} onChange={(v) => onUpdate('line1', v)}
+          disabled={disabled} fullWidth required error={hasError('line1')}
+        />
+        <Field
+          label="Apt, suite, etc. (optional)" value={address.line2} onChange={(v) => onUpdate('line2', v)}
+          disabled={disabled} fullWidth
+        />
+        <Field
+          label="City" value={address.city} onChange={(v) => onUpdate('city', v)}
+          disabled={disabled} required error={hasError('city')}
+        />
+        <Field
+          label="State / Province (optional)" value={address.state} onChange={(v) => onUpdate('state', v)}
+          disabled={disabled}
+        />
+        <Field
+          label="Postal code" value={address.postalCode} onChange={(v) => onUpdate('postalCode', v)}
+          disabled={disabled} required error={hasError('postalCode')}
+        />
+        <CountrySelect
+          value={address.country} onChange={(v) => onUpdate('country', v)}
+          disabled={disabled} error={hasError('country')}
+        />
+      </div>
+    </div>
+  );
+}
+
+function CountrySelect({ value, onChange, disabled, error }) {
+  return (
+    <label className="block text-sm">
+      <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+        Country
+        <span className="text-red-600 ml-0.5" aria-hidden="true">*</span>
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        required
+        aria-invalid={error || undefined}
+        className={`mt-1 block w-full rounded-lg border px-3 py-2 text-sm text-gray-900 bg-white focus:ring-0 disabled:bg-gray-50 ${
+          error ? 'border-red-400 focus:border-red-500' : 'border-gray-300 focus:border-gray-900'
+        }`}
+      >
+        <option value="">Select a country…</option>
+        {COUNTRIES.map((c) => (
+          <option key={c.code} value={c.code}>{c.name}</option>
+        ))}
+      </select>
     </label>
   );
 }

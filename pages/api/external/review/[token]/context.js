@@ -23,6 +23,7 @@ import { reviewFormSchema } from '../../../../../lib/external/review-form-schema
 import { isReviewerMaterial } from '../../../../../lib/external/reviewer-materials';
 import { getActivePolicies } from '../../../../../lib/external/policy-fetcher';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
+import { normalizeCountryToIso2 } from '../../../../../shared/config/countries';
 
 // Slots Stage 2a renders. Hardcoded per build plan §4a.
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
@@ -163,6 +164,11 @@ export default async function handler(req, res) {
               select: [
                 'firstname', 'lastname', 'nickname', 'jobtitle', 'emailaddress1',
                 'wmkf_orcid', 'adx_organizationname', '_parentcustomerid_value',
+                // Payment mailing address — prefills the Stage 2a address card
+                // (chunk 5). Only populated when the reviewer is already a
+                // promoted contact; new reviewers type it fresh.
+                'address1_line1', 'address1_line2', 'address1_city',
+                'address1_stateorprovince', 'address1_postalcode', 'address1_country',
               ].join(','),
             }),
           );
@@ -367,6 +373,19 @@ function buildStage2aPrefill(suggestion, reviewer, contact) {
     email: firstNonEmpty(suggestion.wmkf_revieweremail, reviewer?.wmkf_emailaddress, contact?.emailaddress1),
     orcid: firstNonEmpty(suggestion.wmkf_reviewerorcid, contact?.wmkf_orcid),
     honorariumOptOut: suggestion.wmkf_honorariumoptout === true,
+    // Payment-address prefill (chunk 5). Sourced from the promoted contact only
+    // (no address fields exist on the potentialreviewer snapshot), so this is
+    // empty for not-yet-promoted reviewers. `country` is coerced to ISO-2: the
+    // stored value is historically a full name ("United States"), but the form
+    // picker and the downstream BILL contract are strict ISO-2.
+    address: {
+      line1: contact?.address1_line1 || '',
+      line2: contact?.address1_line2 || '',
+      city: contact?.address1_city || '',
+      state: contact?.address1_stateorprovince || '',
+      postalCode: contact?.address1_postalcode || '',
+      country: normalizeCountryToIso2(contact?.address1_country),
+    },
   };
 }
 

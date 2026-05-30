@@ -157,7 +157,7 @@ After our portal creates the honorarium `akoya_request`, Connor will build a Pow
 | BILL API down / 5xx | Honorarium request still created; alert sent ("BILL onboarding pending for #X"); Steph retries manually OR we add a small retry job later |
 | BILL hourly rate-limit hit (`BDC_1144`) | Honorarium request still created; alert sent immediately ("BILL onboarding throttled — retry after quota reset"); per `lib/bill.js` policy we do NOT retry futilely against a 60-min window |
 | BILL network search returns ambiguous match (multiple John Smiths) | Skip auto-connect; `wmkf_exisitngbillcomaccount = "No"`; alert Steph for manual confirmation |
-| Reviewer's address incomplete on form | Form-level validation prevents submit; address is required for accept |
+| Reviewer's address incomplete on form | Form-level validation prevents submit **when the reviewer is taking the honorarium** (required fields: line1, city, postalCode, country). If they opt out of the honorarium the address card is hidden and no address is collected. Server treats `address` as optional regardless (honorarium row + provenance create without it; BILL onboarding alerts on missing) — the client requirement is the primary gate. **NOTE (S200):** address collection is provisional pending an office check on whether BILL.com self-registration already captures remittance address; if so, the fields come back out. |
 | `wmkf_billcomid` already populated (returning reviewer) | Soft short-circuit — skip BILL vendor create (reuse stored id); still run network search + invite + PNI write (network state may have changed since last cycle) |
 | Webhook signature invalid | 401, log, no state change |
 | Webhook duplicate delivery (BILL retry-replay) | Postgres dedup gate on `(subscription_id, event_id)` → 200, no further processing |
@@ -298,7 +298,7 @@ No recommendation — just inputs to our portal design.
 | 2 | `lib/bill.js` — session, create vendor, search/invite network, against a mocked BILL response | Vercel | (none — parallel with Connor) |
 | 3 | Unit tests for `lib/bill.js` | Vercel | Chunk 2 |
 | 4 | Extend `respond.js` accept path: address fields in contactEdits, PATCH contact.address1_*, create honorarium `akoya_request` with provenance | Vercel | Chunk 1 |
-| 5 | Extend Stage 2a accept UI with address inputs (country picker, validation, prefill from existing contact) | Vercel | Chunk 4 |
+| 5 | ✅ SHIPPED 2026-05-29 (S200) — Stage 2a accept UI address card: full ISO-2 country picker (`shared/config/countries.js` + `normalizeCountryToIso2` prefill coercion), required-when-honorarium / hidden-on-opt-out, prefill from promoted `contact.address1_*` via context endpoint. Address collection is **provisional** (office check pending — see failure-modes note). | Vercel | Chunk 4 |
 | 6 | New `/api/bill/onboard-reviewer` endpoint; wire into accept handler | Vercel | Chunks 2 + 4 |
 | 7a | `/api/webhooks/bill` scaffold (verify + dedup + log + 200; no Dataverse writes) | Vercel | Chunk 2 |
 | 7b | Wire `vendor.updated` → PATCH `wmkf_exisitngbillcomaccount` to "Recently Confirmed" (lands once sandbox reveals payload shape so correlator is concrete) | Vercel | Chunk 7a + sandbox observation |
