@@ -1,69 +1,67 @@
-# Session 201 Prompt: Dynamics Explorer soak-and-measure + BILL chunk-5 tail
+# Session 202 Prompt: open board (lint shipped, Explorer soak deferred)
 
-## ⏰ Standing context / guardrails (carried from S197–S200)
+## ⏰ Standing context / guardrails (carried from S197–S201)
 - **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity words into docs/memory.
-- **Codex stop-time review gate is ENABLED.** S200 ran the full loop repeatedly (design → Codex review → fold → build → Claude review → Codex stop-gate → fold). It earned its keep: caught a GUID-quoting inversion, the contact-role bug, and **three** separate `describe_table` restriction leaks. Keep using it.
-- **Measure before building.** S200's pivot: instead of building Path A's A3/A4/A5 on a hunch, we ran `scripts/analyze-dynamics-explorer-failures.js` against prod and let the data redirect the work. Do this before the next Explorer build too.
-- **Push deploys to prod.** `main` auto-deploys on Vercel. S200's 13 commits are pushed (deploy in flight).
+- **Codex stop-time review gate is ENABLED.** S201 ran two explicit review passes + the auto stop-gate; both came back clean on the final state. Keep using it.
+- **Measure before building** (Explorer). S200's pivot earned its keep; don't build more Explorer on a hunch.
+- **Push deploys to prod.** `main` auto-deploys on Vercel. S201's 4 commits are pushed (HEAD `de6010c`).
+- **rtk grep filter: keep it DISABLED.** It corrupted tool output mid-S201 (fabricated lines, dup headers) and masked a failed Edit. If grep/cat output ever looks off again, suspect rtk and verify via `git diff` / Read / `node -e` markers. See `.claude-memory/project-rtk-grep-output-corruption.md`.
 
-## Session 200 Summary
+## Session 201 Summary
 
-Two threads, both shipped and pushed (origin/main @ `aa93d5a`).
+Started as a quick win (Word export for Phase I Writeup), which surfaced that the repo had **no linting at all** — so the session pivoted into standing up ESLint and cleaning what it found. All shipped, Codex-reviewed clean, pushed.
 
-### Thread 1 — BILL chunk-5: Stage 2a reviewer payment-address UI
-The reviewer-facing honorarium payment-address card on the Stage 2a accept form (completing chunk-4's server path).
-- `shared/config/countries.js` — **complete** ISO 3166-1 alpha-2 set (249, incl. territories) + `normalizeCountryToIso2` (coerces stored full-name/alpha-3 → alpha-2 for prefill). The completeness was a Codex catch (curated subset hard-blocked reviewers from omitted regions).
-- `Stage2aView.js` — `AddressCard` with ISO-2 country picker, **required-when-taking-honorarium / hidden-on-opt-out**, prefilled from promoted `contact.address1_*`, inline error flagging + server 400-reason surfacing + `aria-describedby`.
-- **Address collection is PROVISIONAL** — may be a relic of manual BILL onboarding. Justin is checking in-office whether BILL.com self-registration already captures remittance address; if so the fields come back out (server treats address as optional, so removal is cheap). See `.claude-memory/project-reviewer-address-collection-provisional.md`.
+### Thread 1 — Phase I Writeup Word (.docx) export (`492cbbe`)
+`ResultsDisplay` already renders a 📄 Word button when given an `onWordExport` handler; Phase I just wasn't passing one. Wired `handleWordExport` to the shared `generateMarkdownDocument` util (same path peer-review-summarizer uses) — per-result download `<filename>_Phase_I_Writeup.docx`. Phase I produces a free-form markdown draft, so the generic markdown→docx converter fits; no Phase II-style cover-page modal needed.
 
-### Thread 2 — Dynamics Explorer: measure-first pivot → live ground truth + OData validator
-Started as "Path A" (replace hand-transcribed schema/GUIDs with live discovery), pivoted mid-stream when the failure data showed the real problem.
-- **Slice 1 (A1+A2) shipped** (`12f7a51`): A1 = live schema into `describe_table` (+ `full:true`) + softened the inline "you already know the fields" rule; A2 = `lib/services/dynamics-explorer-taxonomy.js` (6h-cached, fail-loud live resolution of program/grantprogram/type/request_type/status GUIDs+codes, replacing the hardcoded prompt block). **Three restriction-leak fixes followed** (`6fbe6eb` field-list gate, `b8913fe` prose redaction) — all Codex stop-gate catches; the live-field exposure reopened every metadata channel.
-- **Measured** (`6d7c960`/`40b0950`): `scripts/analyze-dynamics-explorer-failures.js` over 1,467 prod tool calls → **392 errored calls**, dominated by *invalid OData* (hallucinated field/entity names like `akoya_name` vs `akoya_requestnum`, `akoya_proposal`; request-number-where-GUID-required; `year()/month()/day()`; `_formatted`-in-filter; `contains()`-on-lookup; fiscalyear format guessing). **No active restrictions in prod** (the restriction hardening was defensive). This reprioritized A3/A4/A5 → an OData validator.
-- **OData pre-flight validator shipped** (`aa93d5a`): `lib/services/dynamics-odata-validator.js` — tolerant tokenizer (reject only high-confidence; unknown shapes pass through), field/entity validation against live `getEntityAttributes`, restricted-field enforcement in `filter`/`orderby` (closes the `checkRestriction` gap), request-number-as-GUID detection, unsupported-construct rejects with precise hints. **No auto-correct** (unquoted GUIDs are valid — Codex caught that quoting would be harmful). Validates the EFFECTIVE post-sanitize query; distinct `ODATA_VALIDATOR_REJECT` log marker for soak measurement; in-flight schema-cache coalescing. Design + 2 Codex reviews in `docs/DYNAMICS_EXPLORER_ODATA_VALIDATOR_DESIGN.md`.
+### Thread 2 — ESLint introduced (Next 16 removed `next lint`) (`f065a87`)
+No *active* linting existed (no eslint config/dep/script; `next lint` removed in Next 16 per docs — though 12 dead `eslint-disable` directives show a prior config existed at some point). Added `eslint@9` + `eslint-config-next@16.2.6`, `eslint.config.mjs` (core-web-vitals), `lint`/`lint:fix` scripts, and an `npm run lint` CI step in `.github/workflows/test.yml` (blocks on **errors only** — warnings don't fail exit). CLAUDE.md CI-gates section updated.
+- **Calibration** (never-linted repo surfaced ~100 findings): correctness rules stay errors; stylistic + React-Compiler-eligibility rules → warn. `no-unescaped-entities` off; `react-hooks/{set-state-in-effect,immutability,refs,preserve-manual-memoization}` → warn; `rules-of-hooks` **kept error** (it caught real bugs). Rationale documented inline in the config.
+- **Real fixes to reach green (0 errors):** RequireAuth.js (hooks after early `return` → moved guard below hooks); dynamics-explorer.js + reviewer-finder.js (`useProfile()` in try/catch → `useContext(ProfileContext)`, identical null-when-no-provider semantics); WelcomeModal.js (`<a>`→`next/link`); removed 12 dead `eslint-disable` directives (prior-config leftovers).
 
-### Commits (this session, oldest→newest)
-- `96baeb2`, `b4c91f0` — BILL chunk-5 (UI + Codex folds)
-- `1a20a3a` — (parallel Codex session) Fix Explorer contact grant retrieval
-- `9fe1418`, `6d40c44` — Path A plan + Codex round-2 fold
-- `12f7a51`, `6fbe6eb`, `b8913fe` — Explorer Slice 1 + 2 restriction-leak fixes
-- `6d7c960`, `40b0950` — failure-analysis diagnostic
-- `8aa6c63`, `af803da` — OData validator design + Codex fold
-- `aa93d5a` — OData validator build (Codex) + review (Claude)
+### Thread 3 — Codex review folds (`e38bf18`, `de6010c`)
+Codex flagged 3 RISKs (all P2-P3, none blocking). Folded:
+- phase-i-writeup: empty-`formatted` guard + `URL.revokeObjectURL` in `finally`.
+- review-manager: removed vestigial `refreshTrigger` useRef (its mutation never re-rendered, so the effect dep was inert and the ref dead; refresh worked solely via `handleRefresh`'s direct `loadReviewers()`).
+- **Process note:** `e38bf18`'s commit message inaccurately claimed the review-manager fix — that Edit silently failed (string-miss, masked by rtk grep corruption) and only the phase-i cleanup committed. Corrected in `de6010c` with an honest message (no force-push). Final Codex pass on the whole diff: **clean, 0 findings.**
+
+### Final state
+Lint **0 errors / 50 warnings**; `npm run build` clean; **1533 jest tests pass**. All CI gates green.
+
+### Commits (oldest→newest)
+- `492cbbe` — phase-i-writeup Word export
+- `f065a87` — ESLint flat config + CI gate + green-baseline fixes
+- `e38bf18` — fold Codex RISKs (phase-i cleanup)
+- `de6010c` — review-manager refreshTrigger fix (real Codex P2)
 
 ## Potential Next Steps
 
-### 1. SOAK + MEASURE the Explorer work (gating step — do this first)
-After production traffic accumulates (give it days, not hours), re-run `node scripts/analyze-dynamics-explorer-failures.js`. Expect: errored-call rate **down**, `ODATA_VALIDATOR_REJECT` markers appearing in `dynamics_query_log.denial_reason`. This measurement gates whether A3/A4/A5 — or anything else — is worth building. **Do not build more Explorer until measured.**
-- **Watch-item:** the validator's unknown-table reject hard-rejects any table not in the 23 `TABLE_ANNOTATIONS` — a valid query to a non-annotated table would false-reject. It's logged, so the soak will surface it. If it bites, soften to fall through to live resolution.
-- **Watch-item:** A2 taxonomy is fail-loud — a live-taxonomy fetch failure fails the whole chat request (no degrade). 6h cache makes it rare; watch for spikes.
+### 1. Explorer soak — DEFERRED, not pending
+You confirmed the original failing query now succeeds one-shot; traffic is too low for a meaningful aggregate re-run. Leave it until more traffic accrues. **Do not re-measure on thin data, do not build A3/A4/A5 yet.**
 
 ### 2. BILL chunk-5 tail (non-coding / ops)
-- **Office question:** does BILL.com self-registration capture the remittance address (making our form collection redundant)? If yes, remove the address fields.
-- **Operational setup before `BILL_ENABLED=true`** (unchanged from S199): apply migration `017`, probe + set `HONORARIUM_*`/`BILLCOM_ACCOUNT_*` env vars, set `honorarium.default_amount` via `/admin`, Steph's BILL sandbox.
-- **Chunk 7b + 8 (deferred):** `vendor.updated` webhook + e2e against BILL sandbox.
+- **Office question (open):** does BILL.com self-registration capture the remittance address? If yes, the Stage 2a address fields come back out (server already treats address as optional — removal is cheap). See `.claude-memory/project-reviewer-address-collection-provisional.md`.
+- Operational setup before `BILL_ENABLED=true` (unchanged): migration `017`, probe + set `HONORARIUM_*`/`BILLCOM_ACCOUNT_*`, set `honorarium.default_amount` via `/admin`, Steph's BILL sandbox.
+- Chunk 7b + 8 deferred (`vendor.updated` webhook + e2e vs sandbox).
 
 ### 3. Parked pre-cycle must-do
-Intake virus-scan **EICAR e2e through `/apply`** before the next cycle's Phase I intake goes live (the reviewer path was verified S193; the intake path was skipped). See `.claude-memory/project-intake-portal-virus-scan-e2e-deferred.md`.
+Intake virus-scan **EICAR e2e through `/apply`** before the next cycle's Phase I intake goes live (reviewer path verified S193; intake path skipped). See `.claude-memory/project-intake-portal-virus-scan-e2e-deferred.md`.
 
-### 4. Deferred Explorer Path A items (gated on #1)
-A3 (robust counts — needs an OData→FetchXML shim), A4 (`constants.js` per-program PI/contact/donor guardrails by-reference), A5 (typed-error fail-loud). Only if the soak shows they're warranted.
+### 4. Lint ratchet (optional, low-stakes)
+The 50 warnings are the documented cleanup ratchet. The `react-hooks/exhaustive-deps` cluster (14) is where real stale-closure bugs could hide; the rest are React-Compiler-eligibility noise. Pick away when convenient — CI won't block on them.
 
 ## Key Files Reference
 | File | Purpose |
 |------|---------|
-| `scripts/analyze-dynamics-explorer-failures.js` | Read-only failure diagnostic — **re-run for the soak** |
-| `lib/services/dynamics-odata-validator.js` | OData pre-flight validator (tokenizer + checks) |
-| `lib/services/dynamics-explorer-taxonomy.js` | A2 cached/fail-loud live taxonomy → resolved prompt block |
-| `pages/api/dynamics-explorer/chat.js` | Explorer engine — `describeTable` (A1), `validateEffectiveODataCall` hook |
-| `docs/DYNAMICS_EXPLORER_PATH_A_PLAN.md` | Slice 1 plan (A1+A2) + A3/A4/A5 |
-| `docs/DYNAMICS_EXPLORER_ODATA_VALIDATOR_DESIGN.md` | Validator design + 2 Codex review folds |
-| `shared/config/countries.js` | ISO-2 list + normalizer (BILL chunk-5) |
-| `shared/components/external/Stage2aView.js` | Stage 2a accept form incl. AddressCard |
+| `eslint.config.mjs` | ESLint flat config + calibrated rule severities (rationale inline) |
+| `.github/workflows/test.yml` | CI — `npm run lint` step added after `npm ci` |
+| `pages/phase-i-writeup.js` | Word export handler (`handleWordExport`) |
+| `shared/utils/word-export.js` | `generateMarkdownDocument` (generic md→docx) + `generatePhaseIIDocument` |
+| `shared/components/ResultsDisplay.js` | Renders 📄 Word button when `onWordExport` is passed |
 
 ## Testing
 ```bash
+npm run lint                   # 0 errors / 50 warnings (CI blocks on errors only)
 npx jest                       # 1533 tests
 npm run check:atlas && npm run check:atlas:self-test && npm run check:api-routes && npm run check:fact-consistency
-node scripts/analyze-dynamics-explorer-failures.js   # soak measurement (reads prod via .env.local)
 ```

@@ -1,6 +1,7 @@
 # Project Memory
 
 ## Operational
+- [rtk grep output corruption](project-rtk-grep-output-corruption.md) — rtk's grep filter fabricated tool output mid-session (placeholder lines, dup headers, backwards line numbers), masking a failed Edit. Now disabled. Suspect rtk if grep/cat output looks off; verify with git diff / Read / node markers.
 - [Verify before destructive carryover](feedback-verify-before-destructive-carryover.md) — drop/remove/retire/archive items from carryover lists must be grep-verified first. Carryover lists go stale; one nearly broke Reviewer Finder on 2026-05-03.
 - [List and confirm before bulk deletes](feedback-list-and-confirm-before-bulk-deletes.md) — narrow cleanup directive ≠ implicit authorization to delete adjacent items. S193: deleted 4 files in a folder when user asked about 1; one was a restorable-but-real reviewer-form fixture.
 - [Check memory before asking the user](feedback-check-memory-before-asking-user.md) — pre-send "has X happened" items are lookup tasks, not user-confirm tasks. Scan MEMORY.md + recent commits first; rewrite stale doc framing without asking.
