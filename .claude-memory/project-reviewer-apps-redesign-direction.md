@@ -62,7 +62,12 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 
 - PD identity from session (`dynamics_systemuser_id`), no PD picker.
 - Cycle dropdown, defaults to current open cycle.
-- Scope dropdown, three options: My-lead / My-lead-or-backup / All. **Default is ADAPTIVE (refined S206):** My-lead if the user is named as lead/backup PD on ≥1 request this cycle, else All. **"My" vs dashboard-access are orthogonal:** access + the All view key on the `reviewers` grant (NOT on being a PD); only the "My" filters depend on PD-ownership, which is data-derived from request fields (`wmkf_programdirector` = lead per [[project-akoya-request-pd-fields]]; backup field TBD), not a role flag. So a non-PD grant-holder (e.g. Sarah — tracks the review process, never owns a request) lands on All with no special-casing. Caveat: "All" exposes every research request to any `reviewers` grant-holder (fine for the review crew + Sarah; a "My-only" tier would be a future grant refinement).
+- Scope dropdown: My-lead / My-lead-or-backup / All. **Phase-aware visibility (refined S206 by Justin's Phase I/II distinction):** the reviewer dashboard is a **Phase II surface** (reviewer-finding only at Phase II), and **Phase II = the assigned PD's domain** → regular-PD norm/default is **My**. **"All" is an OVERSIGHT capability, not a universal toggle** (corrects an earlier capture that said show All to everyone):
+  - Regular PD → My only (no All — they don't need others' Phase II requests).
+  - Superuser → My + All.
+  - Oversight admin (Sarah) → All, via an explicit **"review oversight / see-all" grant** — not via being a PD (My empty) and not via superuser bypass.
+  - **THREE orthogonal access concepts:** `reviewers` grant (use dashboard) · PD-ownership (data-derived, populates My; `wmkf_programdirector`=lead per [[project-akoya-request-pd-fields]], backup TBD) · review-oversight (unlocks All). Default scope = My if named on ≥1 request this cycle, else All (oversight holders).
+  - Phase I collaboration ("every PD has input") is a SEPARATE upstream surface (triage; spreadsheet today / J27 triage dashboard) where broad visibility is the norm — does NOT apply to this Phase II dashboard.
 - Status filter implemented as `isActionableForPD(request)` policy function (rules deferred).
 - Strict cycle filter; deferred-from-prior-cycle handled at data layer not UI.
 - Row content: still open. S195 user direction was to compact the LEFT side (number + cycle on one line: `#1002279  J26`; institution above PI line: `PI: Mike Pluth`) so the right side can carry actionability cues. Same compact identity unit reused as the persistent header on every Workbench tab.

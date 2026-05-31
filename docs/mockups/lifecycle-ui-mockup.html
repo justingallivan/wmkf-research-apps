@@ -275,6 +275,7 @@ function dashboardView(){
       <h1 class="text-2xl font-bold">Cycle ${STATE.cycle} · Request queue</h1>
       <div class="flex gap-1 bg-gray-100 rounded-lg p-1" data-fork="scope">
         ${scopeBtns.map(([k,l])=>`<button onclick="setScope('${k}')" class="px-3 py-1.5 rounded-md text-sm font-medium ${STATE.scope===k?'bg-white shadow text-gray-900':'text-gray-500'}">${l}</button>`).join('')}
+        ${annoPin('Mockup shows all three to the demo user (effectively a superuser). REAL model: this is a Phase II surface, and Phase II is the ASSIGNED PD\'s domain — so regular PDs see only My. "All" is an OVERSIGHT capability gated to superusers + an explicit review-oversight grant (e.g. Sarah — a non-PD admin who tracks the process; her My is empty so she defaults to All). Three orthogonal concepts: reviewers grant (use the dashboard) · PD-ownership (populates My) · review-oversight (unlocks All). Phase I collaboration is a separate upstream surface.')}
       </div>
     </div>
     <p class="text-sm text-gray-500 mb-4">${rows.length} request${rows.length===1?'':'s'} · sorted by actionability ${annoPin('Default landing for a PD is THIS, not the app launcher. Identity comes from session (dynamics_systemuser_id) — no PD picker. Status filter is the isActionableForPD() policy fn (rules deferred).')}</p>

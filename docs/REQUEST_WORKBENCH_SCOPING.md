@@ -59,7 +59,12 @@ This is the surface that's mocked and the near-term build target.
 ### 3.1 Request queue (tier 2)
 - PD identity from the signed-in session — **no PD picker**.
 - **Cycle** selector (defaults to the current open cycle).
-- **Scope** filter: My (lead PD) / My (lead-or-backup) / All. **Default is adaptive** — **My** if the user is named as lead/backup PD on ≥1 request this cycle, else **All**. Dashboard access and the All view are NOT contingent on being a PD (they key on the `reviewers` grant); only the "My" filters are. So a non-PD grant-holder like Sarah (who tracks the review process but never owns a request) lands on **All** — no special-casing, it falls out of "are you named on any request." "My" is data-derived from request ownership (`wmkf_programdirector` = lead; backup field TBD at build), not a role flag. Note: "All" shows every research request to any `reviewers` grant-holder — acceptable for the review crew + Sarah; a "My-only" tier would be a future grant refinement.
+- **Scope** filter: My (lead) / My (lead-or-backup) / All. The reviewer dashboard is a **Phase II surface** (reviewer-finding only happens at Phase II), and **Phase II is the assigned PD's domain** — so the regular-PD norm and default is **My**. **"All" is an oversight capability, NOT a universal toggle:**
+  - **Regular PD** → My (lead / lead-or-backup); **no All option** (they don't need others' Phase II requests).
+  - **Superuser** → My + All.
+  - **Oversight admin (e.g. Sarah)** → All, via an explicit **"review oversight / see-all" grant** — *not* by being a PD (her My is empty) and *not* by superuser bypass.
+  - "My" is data-derived from request ownership (`wmkf_programdirector` = lead per [[project-akoya-request-pd-fields]]; backup field TBD at build), not a role flag. Default landing scope: My if named on ≥1 request this cycle, else All (for oversight holders).
+  - This means **three orthogonal access concepts**: `reviewers` grant (use the dashboard) · PD-ownership (populates My) · review-oversight (unlocks All). Phase I collaboration ("every PD has input") is a *separate, upstream* surface (triage), where broad visibility is the norm — it does not apply to this Phase II dashboard.
 - Each row: a compact identity unit (request # + cycle + program, institution, PI) on the left, and an **actionability cue** on the right ("what needs me now"). *(Exact row content is still open — see §6.)*
 
 ### 3.2 Per-request Workbench (tier 3)
