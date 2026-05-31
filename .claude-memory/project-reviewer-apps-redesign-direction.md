@@ -28,7 +28,7 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 
 - **Global / cross-cycle:** app launcher survives for Reviewer Pool, Dynamics Explorer, Dataverse Power Tools, Expense Reporter, Literature Analyzer standalone, Grant Reporting (post-award), Admin. Standalone forms of `phase-ii-writeup` / `peer-review-summarizer` / etc. stay around for ad-hoc / off-cycle / training use.
 - **Cycle-scoped:** PD landing dashboard (request queue, by cycle + scope + `isActionableForPD`). Future home of the long-list → short-list triage surface ([[project-staged-review-pipeline]]).
-- **Per-request: the Request Workbench.** URL `/workbench/[requestId]/...`. Every existing per-request operation becomes a tab/affordance: proposal viewer, reviewer-lifecycle, returned reviews + summarizer, writeup, analyses, integrity, site visit notes, funding gap.
+- **Per-request: the Request Workbench.** URL `/workbench/[requestId]/...`. Per-request operations become tabs/affordances: proposal viewer, initial writeup, reviewer-lifecycle, returned reviews + summarizer, pre/post-site-visit writeups, site visit notes. **(S206 pared the tab set:** screening — integrity / expertise / funding-gap — is backend-automated and lives in the Tools menu, not as a per-request tab; Virtual Review Panel likewise moved to Tools, labeled beta. See the S206 decisions block above.)
 
 **The Workbench is a display + refinement surface, not a console.** Backend automation tier (event-driven: `proposal-submitted`, `phase-advanced`, `review-submitted`, etc.) materializes artifacts; the Workbench reads state and lets the PD intervene where judgment matters. PD-triggered regenerate is exception, not default.
 
@@ -63,13 +63,12 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 
 **Why this slice first:** needed for J26 Phase II peer review (real deadline, mid-June 2026 with BILL honoraria); needed for every future cycle as the post-shortlist surface; survives the Phase I sunset; most code-broken piece today.
 
-**Tabs (S195 working list — Find/Invite/Track grouping still open):**
+**Tabs — DECIDED S206: 3-tab (Find / Roster / Closeout).** Default landing is Roster.
 - **Find** — candidate discovery (current Reviewer Finder behavior, request-aware)
-- **Invite** — shortlist + dispatch invitations
-- **Track** — confirmed/pending/declined, materials state, review-in-progress, overdue chasing
+- **Roster** — consolidates the former Invite + Track: shortlist + dispatch invitations, then confirmed/pending/declined, materials state, review-in-progress, overdue chasing — a single table where actions vary by row state
 - **Closeout** — per-reviewer: read returned review, mark closed → triggers honorarium automation downstream
 
-**Open structural question for S196:** Find / Invite / Track / Closeout (4-tab) vs. Find + Roster + Closeout (3-tab, where Roster consolidates Invite + Track with actions varying by row state). User thinking overnight.
+The 4-tab alternative (Find / Invite / Track / Closeout, each a distinct stage) was **rejected S206** — more clicks for no clarity gain once reviewers exist. The mockup keeps it behind a compare-only toggle.
 
 **Honorarium is NOT a PD-facing tab.** It's a downstream automation consequence of Closeout: PD marks review closed → status flips to payable (Dataverse field name TBD; Connor still owes `wmkf_HonorariumRequest` lookup on `wmkf_potentialreviewer` per [[project-bill-honorarium-integration]]) → BILL flow runs.
 
@@ -97,6 +96,6 @@ The reason this redesign is now urgent: Connor maintains a parallel SharePoint f
 
 `docs/REQUEST_WORKBENCH_SCOPING.md` (or similar) — Connor/Sarah-shareable. Captures: holistic architecture; phasing change; reviewer-lifecycle v1 in detail (URL, tabs, what they do, what they replace, integration points with shipped reviewer infra); artifact-storage inventory pass (what's in Dataverse already, what's missing); explicit out-of-scope-for-v1 list (writeup, analyses, triage surface).
 
-S196 likely: lock the tab structure (3-tab vs 4-tab), name the closeout status field for Connor, then write the doc.
+S206 closed the reviewer tab-structure fork (3-tab). Still owed before the scoping doc: name the closeout status field for Connor, then write the doc.
 
 Related: [[reviewer-identity-fragmentation]], [[project-reviewer-finder-dataverse-entry-path]], [[project-reviewer-institution-match]], [[project-w6-table-drop-pending]], [[project-app-roadmap-2026-04-25]], [[project-bill-honorarium-integration]], [[project-grant-phasing-evolution]], [[project-backend-automation]], [[project-staged-review-pipeline]], [[project-proposal-context-extraction]], [[project-prompt-storage-strategy]], [[project-dynamics-ai-writeback]].
