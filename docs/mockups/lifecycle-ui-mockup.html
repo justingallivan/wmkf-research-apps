@@ -47,7 +47,7 @@ const STATE = {
   requestId: null,
   wbTab: 'overview',        // workbench area
   reviewerLayout: '4tab',   // '4tab' | '3tab'  — DECIDED S206: 4-tab + status badges (clearer, mirrors workflow)
-  reviewerSubTab: 'track',  // default landing for 4-tab is Track (home base once invites are out)
+  reviewerSubTab: 'track',  // initial fallback only — openRequest() overrides via state-aware defaultReviewerSub()
   toolsOpen: false,
   cycleOpen: false,
   anno: false,
@@ -60,10 +60,10 @@ const REQUESTS = [
   { id:'1002279', cycle:'J26', inst:'University of Oregon', pi:'Mike Pluth',
     title:'Sulfur signaling probes for live-cell imaging', scope:'mine', program:'SE',
     stage:'Phase II', actionable:true, action:'2 reviews returned — summarize + draft writeup',
-    cand:8, reviewers:{confirmed:3, pending:1, declined:2, returned:2, approved:1, overdue:1, toSend:3} },
+    cand:8, reviewers:{confirmed:3, pending:1, declined:2, returned:2, approved:1, overdue:1, toSend:0} },
   { id:'1002311', cycle:'J26', inst:'Caltech', pi:'Frances Arnold',
     title:'Directed evolution of carbon-fixing enzymes', scope:'mine', program:'SE',
-    stage:'Phase II', actionable:true, action:'Shortlist 5 reviewers from longlist (8 candidates)',
+    stage:'Phase II', actionable:true, action:'5 shortlisted — ready to send invitations',
     cand:8, reviewers:{confirmed:0, pending:0, declined:0, returned:0, overdue:0, toSend:5} },
   { id:'1002345', cycle:'J26', inst:'Stanford', pi:'Carolyn Bertozzi',
     title:'Glycan-targeted degraders', scope:'mine-or-backup', program:'MR',
@@ -154,13 +154,26 @@ function visibleRequests(){
 // ---------------------------------------------------------------------------
 // NAV ACTIONS
 // ---------------------------------------------------------------------------
-// State-aware default landing for the Reviewers tab: Find when nothing is
-// invited yet (no one to track), else Track (4-tab) / Roster (3-tab).
+// State-aware default landing for the Reviewers tab: land on the EARLIEST
+// funnel step with outstanding PD work (Invite if candidates are shortlisted
+// but unsent, Track if reviewers are invited/in-flight, Approve & Pay if
+// reviews are back awaiting approval), else Find. (Placeholder heuristic — the
+// real rule is the deferred isActionableForPD policy, open item #2.)
 function defaultReviewerSub(r, layout){
   const rv = (r && r.reviewers) || {};
-  const hasInvited = (rv.confirmed||0)+(rv.pending||0)+(rv.declined||0) > 0;
-  if(layout==='3tab') return hasInvited ? 'roster' : 'find';
-  return hasInvited ? 'track' : 'find';
+  const toSend = rv.toSend||0, pending = rv.pending||0, overdue = rv.overdue||0;
+  const invited = (rv.confirmed||0)+pending+(rv.declined||0);
+  const awaitingApproval = (rv.returned||0)-(rv.approved||0);
+  if(layout==='3tab'){            // Roster consolidates Invite + Track
+    if(toSend>0 || invited>0) return 'roster';
+    if(awaitingApproval>0) return 'approvepay';
+    return 'find';
+  }
+  if(toSend>0) return 'invite';                  // shortlisted, not yet sent
+  if(pending>0 || overdue>0) return 'track';     // invites out, need chasing
+  if(awaitingApproval>0) return 'approvepay';    // reviews back, need approval
+  if(invited>0) return 'track';                  // confirmed, awaiting reviews
+  return 'find';                                 // nothing started
 }
 function go(view){ STATE.view = view; STATE.toolsOpen=false; STATE.cycleOpen=false; render(); }
 function openRequest(id){ STATE.requestId=id; STATE.reviewerSubTab=defaultReviewerSub(req(), STATE.reviewerLayout); STATE.view='workbench'; STATE.wbTab='overview'; STATE.toolsOpen=false; STATE.cycleOpen=false; render(); }
