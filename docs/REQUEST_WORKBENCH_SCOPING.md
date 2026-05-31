@@ -42,7 +42,7 @@ TIER 3  Per-request Workbench  (/workbench/[requestId]/…)
 |---|---|---|---|---|
 | **Triage** | Winnow the Phase I inflow; decide what advances | PDs | winnowing state | J27 build; replaces the triage **spreadsheet** |
 | **Reviewer** | Find / invite / track / complete reviewers (Phase II) | review PDs | reviewer status | Build now (D26); replaces Finder + Manager; **mocked** |
-| **Editor** | Track writeup **sign-off** across the cycle | writeup-collaborators: PDs **+ CSO + President** | *my* seen/signed-off per writeup | future; sign-off data is new (see §4a) |
+| **Editor** | Track writeup **"Reviewed"** status across the cycle | writeup-collaborators: PDs **+ CSO + President** | *my* reviewed-marker per writeup (+ auto "has edits") | future; marker data is new (see §4a) |
 
 **Flow:** `triage → (winnow → advance) → reviewer (manage reviewers) → … → editor (collective writeup sign-off) → board`.
 
@@ -130,9 +130,15 @@ This is the home of the previously-separate "staged review pipeline" idea (fit s
 
 A third tier-2 lens, for the **writeup-collaborator set** — PDs **+ CSO + President**. Near cycle-end this group collectively edits writeups (see §3.2); the editor dashboard is their **per-person tracker**: the active cycle's writeups with *my seen / signed-off status* ("I've signed off 12 of 28"). The President, for instance, only looks at writeups — this is effectively her whole view of the cycle.
 
-- **Same shape as the reviewer "Completed" tab**, but for editors: a personal progress tracker over the cycle, not reviewer infrastructure. Pairs with the dossier (click a request → read the writeup → sign off) and the writeup-collaborator access set.
-- **New data:** sign-off is per-`(editor, writeup)` — a many-to-many that doesn't exist today (new Dataverse child entity or per-request sign-off records keyed by editor).
-- **Open:** (1) granularity — per request or per writeup stage (initial / pre-visit / final)?; (2) states — just "signed off" or "seen" → "signed off"?; (3) does sign-off *gate* anything (e.g., board-ready) or is it pure tracking?; (4) personal view only, or a coordinator (Sarah) matrix of who-signed-off-what across editors?
+- **Same shape as the reviewer "Completed" tab**, but for editors: a personal progress tracker over the cycle, not reviewer infrastructure. Pairs with the dossier (click a request → read the writeup → mark reviewed) and the writeup-collaborator access set.
+- **Tracking, NOT a gate (Justin 2026-05-31).** Sign-off has never been rigorously enforced — often just an email from leadership ("I looked at your writeups and left comments"). So it doesn't block anything; it's a status tracker (closes the earlier "does it gate?" question).
+- **Its real job is to resolve the *silent case*.** Writeups are edited with track-changes, so "has edits" is visible — but *no edits* is ambiguous: reviewed-with-nothing-to-change vs not-yet-looked-at. So:
+  - **An explicit per-editor "Reviewed" marker** (the editor ticks it) — the one signal track-changes can't provide; it makes "reviewed, no changes" legible.
+  - **Track-changes presence as a secondary auto-signal** ("has edits") — surfaced from the SharePoint Word doc's revision metadata, a hint not the source of truth.
+  - Row state per editor: *untouched* / *has edits* (auto) / *reviewed* (explicit).
+  - **Naming:** "Reviewed" likely reads truer than "Sign-off" (it's not an approval gate).
+- **New data:** the explicit marker is per-`(editor, writeup)` — a many-to-many that doesn't exist today (new Dataverse child entity or per-request records keyed by editor). ("Has edits" is derived from the doc, not stored.)
+- **Still open:** (1) granularity — per request or per writeup stage (initial / pre-visit / final)?; (2) personal view only, or a coordinator (Sarah) matrix of who-reviewed-what across editors?
 
 ---
 
