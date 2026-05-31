@@ -111,7 +111,9 @@ ${wrappedTitle.text}
 Return ONLY the subject line text, nothing else.`;
 }
 
-export default {
+const emailReviewerPrompts = {
   createPersonalizationPrompt,
   createSubjectPrompt
 };
+
+export default emailReviewerPrompts;

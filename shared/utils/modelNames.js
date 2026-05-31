@@ -96,9 +96,11 @@ export function supportsVision(modelId) {
          modelId.includes('claude-haiku');
 }
 
-export default {
+const modelNameUtils = {
   getModelDisplayName,
   getModelTier,
   supportsVision,
   MODEL_DISPLAY_NAMES,
 };
+
+export default modelNameUtils;
