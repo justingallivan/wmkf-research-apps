@@ -133,12 +133,12 @@ const WB_TABS = [
   { key:'overview',  icon:'🗂️', label:'Overview',   kind:null,    phase:'v1',     note:'Request snapshot + what needs the PD now.' },
   { key:'proposal',  icon:'📄', label:'Proposal',   kind:null,    phase:'v1',     note:'In-app proposal viewer. Replaces the SharePoint read-pain workaround.' },
   { key:'initial-writeup', icon:'✍️', label:'Initial Writeup', kind:'refine', phase:'v1', note:'Early writeup draft in the form of a Phase I writeup — reuses the existing Phase I writeup engine. Auto-drafted, PD refines.' },
-  { key:'reviewers', icon:'🎯', label:'Reviewers',  kind:'refine',phase:'v1',     note:'THE v1 slice. Find → invite → track → closeout. Replaces Finder + Manager.' },
+  { key:'reviewers', icon:'🎯', label:'Reviewers',  kind:'refine',phase:'v1',     note:'THE v1 slice. Find → Roster → Approve & Pay. Replaces Finder + Manager.' },
   { key:'reviews',   icon:'📝', label:'Reviews',    kind:'auto',  phase:'future', note:'Returned peer reviews + auto-summary + site-visit questions.' },
   { key:'writeup',   icon:'✍️', label:'Pre Site Visit Writeup', kind:'refine',phase:'future', note:'Writeup draft ahead of the site visit, incorporating returned reviews. Auto-draft skeleton; PD refines. Replaces the filename-keyed Word template.' },
   { key:'sitevisit', icon:'📍', label:'Site Visit', kind:'human', phase:'future', note:'Human-only deliberation notes.' },
   { key:'final-writeup', icon:'📝', label:'Final Writeup', kind:'refine', phase:'future', note:'Final writeup after the site visit, folding in site-visit findings. Auto-draft from the pre-visit writeup; PD refines.' },
-  { key:'closeout',  icon:'✅', label:'Closeout',   kind:'human', phase:'v1',     note:'Mark reviews closed → triggers honorarium automation downstream.' },
+  { key:'status',    icon:'📌', label:'Status',     kind:'readonly', phase:'future', note:'Read-only reflection of the proposal\'s Dynamics status (akoya_requeststatus — e.g. Pending / Approved / Declined). Staff recommend; the BOARD decides and it is recorded in Dynamics elsewhere — not editable here. Tentative placeholder for whatever request-level wrap-up this becomes.' },
 ];
 
 function req(){ return REQUESTS.find(r => r.id === STATE.requestId); }
@@ -183,6 +183,7 @@ function kindBadge(kind){
     auto:  ['Auto','bg-green-100 text-green-800'],
     refine:['Auto-draft · PD refines','bg-blue-100 text-blue-800'],
     human: ['Human-only','bg-purple-100 text-purple-800'],
+    readonly:['Read-only · from Dynamics','bg-gray-100 text-gray-700'],
   };
   const [t,c] = map[kind];
   return `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${c}">${t}</span>`;
@@ -363,7 +364,7 @@ function overviewPanel(r){
       <div class="bg-white border border-gray-200 rounded-xl p-5">
         <h3 class="font-semibold mb-3">Lifecycle progress</h3>
         <div class="flex items-center gap-1 text-xs">
-          ${['Submitted','Screened','Reviewers','Reviews in','Writeup','Closeout'].map((s,i)=>`
+          ${['Submitted','Screened','Reviewers','Reviews in','Writeup','Decision'].map((s,i)=>`
             <div class="flex-1 text-center">
               <div class="h-1.5 rounded-full ${i<=2?'bg-indigo-500':'bg-gray-200'}"></div>
               <div class="mt-1 ${i<=2?'text-indigo-700 font-medium':'text-gray-400'}">${s}</div>
@@ -400,8 +401,8 @@ function placeholderPanel(key){
 
 // ---- Reviewers tab: the v1 slice, with the 3-tab vs 4-tab fork toggle -------
 function reviewersPanel(r){
-  const layout4 = [['find','Find'],['invite','Invite'],['track','Track'],['closeout','Closeout']];
-  const layout3 = [['find','Find'],['roster','Roster'],['closeout','Closeout']];
+  const layout4 = [['find','Find'],['invite','Invite'],['track','Track'],['approvepay','Approve & Pay']];
+  const layout3 = [['find','Find'],['roster','Roster'],['approvepay','Approve & Pay']];
   const tabs = STATE.reviewerLayout==='4tab' ? layout4 : layout3;
   return `
   <div class="mb-4 flex items-center justify-between flex-wrap gap-3">
@@ -417,7 +418,7 @@ function reviewersPanel(r){
     </div>
   </div>
 
-  ${annoNote('<b>Decided (S206): 3-tab</b> — Find / Roster / Closeout, where "Roster" consolidates invite+track and actions vary by row state (simpler, fewer clicks once reviewers exist). The 4-tab split (Find / Invite / Track / Closeout) is kept above only for comparison. Toggle to see the difference.')}
+  ${annoNote('<b>Decided (S206): 3-tab</b> — Find / Roster / Approve &amp; Pay, where "Roster" consolidates invite+track and actions vary by row state (simpler, fewer clicks once reviewers exist). The 4-tab split (Find / Invite / Track / Approve &amp; Pay) is kept above only for comparison. Toggle to see the difference.')}
 
   <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
     <div class="flex gap-0.5 border-b border-gray-200 px-2 pt-1">
@@ -464,17 +465,17 @@ function reviewerSubContent(r){
     </table>
     ${annoNote('In 3-tab, this single Roster replaces both Invite and Track. The action column is row-state-driven. Fewer tabs, denser table — compare against the 4-tab split.')}`;
   }
-  if(sub==='closeout'){
+  if(sub==='approvepay'){
     return `
-    <div class="text-sm text-gray-600 mb-3">Per-reviewer: read returned review, mark closed.</div>
+    <div class="text-sm text-gray-600 mb-3">Per-reviewer: read the returned review, approve it. Approval marks the reviewer\'s work done and releases their honorarium.</div>
     <div class="space-y-2">
-      ${[['Dr. Aisha Rahman','review returned','closed → honorarium queued'],['Dr. Luca Moretti','review returned','mark closed']].map(([n,s,a])=>`
+      ${[['Dr. Aisha Rahman','review returned','approved → honorarium queued'],['Dr. Luca Moretti','review returned','approve & pay']].map(([n,s,a])=>`
         <div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2">
           <div><div class="text-sm font-medium">${n}</div><div class="text-xs text-gray-500">${s}</div></div>
-          <button class="text-xs font-semibold ${a.startsWith('closed')?'text-green-600':'text-indigo-600 hover:underline'}">${a}</button>
+          <button class="text-xs font-semibold ${a.startsWith('approved')?'text-green-600':'text-indigo-600 hover:underline'}">${a}</button>
         </div>`).join('')}
     </div>
-    ${annoNote('<b>Closeout is the automation seam.</b> Marking a review closed flips a Dataverse status (field name still owed to Connor) → BILL honorarium flow runs downstream. Honorarium is NOT a PD tab — it\'s a consequence. The reviewer\'s payment-address was captured earlier on the external /accept surface, not here.')}`;
+    ${annoNote('<b>Approve &amp; Pay is the reviewer-level automation seam</b> (was called "Closeout" — renamed S206 to disambiguate from the request-level Status tab). Approving the review flips a Dataverse status (field name still owed to Connor) → BILL honorarium flow runs downstream. Honorarium is NOT a PD tab — it\'s a consequence. The reviewer\'s payment-address was captured earlier on the external /accept surface, not here. This is per-REVIEWER and happens around/before the site visit; the whole-REQUEST endpoint is the separate Status tab.')}`;
   }
 }
 function panelList(title,desc,rows,action){
