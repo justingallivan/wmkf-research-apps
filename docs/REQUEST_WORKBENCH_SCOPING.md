@@ -65,7 +65,9 @@ This is the surface that's mocked and the near-term build target.
 ### 3.2 Per-request Workbench (tier 3)
 URL `/workbench/[requestId]/…`. Tab strip (current mockup state):
 
-`Overview · Proposal · Initial Writeup · Reviewers · Reviews · Pre Site Visit Writeup · Site Visit · Final Writeup · Status`
+`Overview · Proposal · Initial Writeup · Reviewers · Reviews · Pre Site Visit Writeup · Site Visit · Final Writeup · Status · Awardee`
+
+The lifecycle does **not** end at the board decision: `Status` is the pivot into a **post-award** stage (`Awardee` — see §3.6).
 
 Each tab is an existing capability re-homed and pre-loaded with the proposal. Three writeup stages mirror the real lifecycle (Initial = Phase I form, early; Pre Site Visit = folds in returned reviews; Final = folds in site-visit findings). Initial + Pre-visit reuse the existing Phase I / Phase II writeup engines. **The Reviewers tab is the v1 build; the rest are placeholders that land as the automation tier matures.**
 
@@ -93,6 +95,13 @@ These are unrelated fields at different scopes and must not be conflated.
 
 ### 3.5 What ships alongside
 - **Reviewer Pool** — a request-agnostic roster (browse reviewers, past invitation history, honorarium state, affiliations). Richer than the retired Database tab.
+
+### 3.6 Post-award: the Awardee stage (future, surfaced S206)
+After the board funds a request and ops sends the **Grant Award Letter (GAL)** — which fires a Dataverse status change (value TBD) — the PD runs a short post-award workflow with the awardee: approve a **foundation-written abstract** (auto-drafted from the submitted abstract in house style, saved to Dataverse; awardee approves or edits), upload a **graphical abstract / artwork** for the website, and agree to a **release form**.
+
+Two things make this cheap and worth noting now:
+- **It's the same shape as the reviewer flow** — automated email → magic-link approve/edit → document upload → form-agreement. So it **reuses the external-interaction primitive** (`lib/external`: HMAC token, magic-link landing, upload, form schema). The reviewer lifecycle is instance #1; this is instance #2. Keep the primitive's reviewer-specific bits separable so this doesn't fork it.
+- **It extends the Workbench spine past `Status`** — captured as the placeholder `Awardee` tab. Mainly needs new Dataverse document-routing fields. Full notes: `[[project-awardee-onboarding]]`. **Out of scope for the D26 build.**
 
 ---
 
