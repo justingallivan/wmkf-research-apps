@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: Reviewer Finder + Reviewer Manager are slated to be replaced by a unified Request Workbench (per-request, holistic) + standalone Reviewer Pool. Holistic frame locked S195; build sequence = reviewer-lifecycle slice first (= Workbench v1). Tab structure still open.
+description: Reviewer Finder + Reviewer Manager are slated to be replaced by a unified Request Workbench (per-request, holistic) + standalone Reviewer Pool. Holistic frame locked S195; build sequence = reviewer-lifecycle slice first (= Workbench v1). Reviewer-tab structure DECIDED S206: 3-tab (Find/Roster/Closeout).
 metadata:
   type: project
 ---
@@ -8,6 +8,13 @@ metadata:
 S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer Pool). **S195 reframed it twice**, ending at a holistic Request Workbench backed by a backend automation tier. Build deferred — goal before code is a scoping doc Connor / Sarah can react to.
 
 **S205 reprioritization (2026-05-30):** Justin elevated the **tier-3 whole-lifecycle navigation model** (how launcher → cycle dashboard → per-request Workbench fit together as ONE coherent UI, and how the existing standalone apps fold in) to **top-priority next-session work** — distinct from, and now ahead of, the reviewer-lifecycle-slice build. Not started tonight (deferred deliberately). Approach he wants: **build mockups with a Claude browser session** (visual exploration of the navigation model) before/alongside the scoping doc. The architecture below is still the locked frame; the open work is rendering the tier-stitching as something he can see and react to. Nothing built; no scoping doc yet (see end of entry).
+
+**S206 mockup + decisions (2026-05-31):** Built the first clickable navigation mockup at `docs/mockups/lifecycle-ui-mockup.html` (self-contained HTML, committed 3f659a6; NOT a live app change — no `pages/` route). Decisions Justin made driving it:
+- **Reviewer-tab structure = 3-tab** (Find / Roster / Closeout), chosen over 4-tab (Find/Invite/Track/Closeout) as simpler/more efficient — closes the S196 open fork.
+- **Screening is backend-automated, not a Workbench tab.** Integrity Screener, WMKF Expertise, Funding Analysis live in the Tools menu (manual, on-demand) only.
+- **Virtual Review Panel → Tools menu, labeled beta** (in dev, not part of this cycle).
+- **Workbench tab strip (current mockup state):** Overview · Proposal · Initial Writeup · Reviewers · Reviews · Pre Site Visit Writeup · Site Visit · Final Writeup · Closeout. Three writeup stages mirror the lifecycle (Initial = Phase I-form/early; Pre Site Visit = Phase II-form, folds in reviews; Final = post-site-visit). Initial + Pre-visit reuse existing phase-i/phase-ii-writeup engines.
+- **Tier-stitching positions taken in the mockup:** default home = cycle dashboard (not the launcher; launcher demoted to a "Tools" menu); context preserved via persistent cycle switcher + breadcrumbs; standalone apps coexist via dual-entry (same engine, off-cycle in Tools + per-request as a tab). Tools menu faithfully mirrors all 17 appRegistry apps, tagged standalone/dual/rehomed.
 
 **Why:** Demo failures (S194 model resolver + parser drift) exposed the deeper problem — the apps were built across different constraint regimes (no Dataverse → Dataverse; ad-hoc cycle tracking → cycle entity; .eml downloads → in-app sends) and the seams show. Then S195 surfaced an even deeper one: most apps in the suite are already per-request workflow tools (`phase-ii-writeup`, `peer-review-summarizer`, `multi-perspective-evaluator`, integrity screener, funding-gap, …) but their entry point is "upload the proposal" — built before we had programmatic access to the proposal.
 

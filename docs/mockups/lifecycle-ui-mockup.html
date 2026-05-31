@@ -46,8 +46,8 @@ const STATE = {
   scope: 'mine',            // 'mine' | 'mine-or-backup' | 'all'
   requestId: null,
   wbTab: 'overview',        // workbench area
-  reviewerLayout: '4tab',   // '4tab' | '3tab'  (the open S196 fork)
-  reviewerSubTab: 'find',
+  reviewerLayout: '3tab',   // '4tab' | '3tab'  — DECIDED S206: 3-tab (simpler/more efficient)
+  reviewerSubTab: 'roster', // default landing for 3-tab is the consolidated Roster
   toolsOpen: false,
   cycleOpen: false,
   anno: false,
@@ -161,7 +161,7 @@ function setScope(s){ STATE.scope=s; render(); }
 function setCycle(c){ STATE.cycle=c; STATE.cycleOpen=false; if(STATE.view==='workbench'){STATE.view='dashboard'; STATE.requestId=null;} render(); }
 function toggleTools(){ STATE.toolsOpen=!STATE.toolsOpen; STATE.cycleOpen=false; render(); }
 function toggleCycle(){ STATE.cycleOpen=!STATE.cycleOpen; STATE.toolsOpen=false; render(); }
-function setReviewerLayout(l){ STATE.reviewerLayout=l; STATE.reviewerSubTab = (l==='3tab'?'find':'find'); render(); }
+function setReviewerLayout(l){ STATE.reviewerLayout=l; STATE.reviewerSubTab = (l==='3tab'?'roster':'find'); render(); }
 function setReviewerSub(s){ STATE.reviewerSubTab=s; render(); }
 function toggleAnno(){ STATE.anno=!STATE.anno; render(); }
 
@@ -407,17 +407,17 @@ function reviewersPanel(r){
   <div class="mb-4 flex items-center justify-between flex-wrap gap-3">
     <h2 class="text-lg font-semibold flex items-center gap-2">🎯 Reviewer lifecycle ${kindBadge('refine')}
       <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold">Workbench v1</span></h2>
-    <!-- THE OPEN FORK -->
+    <!-- DECIDED S206: 3-tab. Toggle kept for comparison. -->
     <div class="flex items-center gap-2 text-xs" data-fork="reviewerlayout">
-      <span class="text-gray-400">S196 open question →</span>
-      <div class="flex gap-1 bg-amber-100 rounded-lg p-1">
-        <button onclick="setReviewerLayout('4tab')" class="px-2.5 py-1 rounded-md font-semibold ${STATE.reviewerLayout==='4tab'?'bg-white shadow text-amber-900':'text-amber-700'}">4-tab</button>
-        <button onclick="setReviewerLayout('3tab')" class="px-2.5 py-1 rounded-md font-semibold ${STATE.reviewerLayout==='3tab'?'bg-white shadow text-amber-900':'text-amber-700'}">3-tab</button>
+      <span class="text-gray-400">S196 fork — <span class="text-green-700 font-semibold">decided: 3-tab</span> · compare:</span>
+      <div class="flex gap-1 bg-gray-100 rounded-lg p-1">
+        <button onclick="setReviewerLayout('3tab')" class="px-2.5 py-1 rounded-md font-semibold ${STATE.reviewerLayout==='3tab'?'bg-white shadow text-green-700':'text-gray-500'}">3-tab ✓</button>
+        <button onclick="setReviewerLayout('4tab')" class="px-2.5 py-1 rounded-md font-semibold ${STATE.reviewerLayout==='4tab'?'bg-white shadow text-gray-900':'text-gray-400'}">4-tab</button>
       </div>
     </div>
   </div>
 
-  ${annoNote('<b>The one genuinely open structural fork from S196.</b> Toggle 4-tab ↔ 3-tab above. <b>4-tab:</b> Find / Invite / Track / Closeout — each a distinct stage. <b>3-tab:</b> Find / Roster / Closeout, where "Roster" consolidates invite+track and actions vary by row state. 3-tab is fewer clicks once reviewers exist; 4-tab is clearer for first-time use. This mockup is exactly the artifact to decide it on.')}
+  ${annoNote('<b>Decided (S206): 3-tab</b> — Find / Roster / Closeout, where "Roster" consolidates invite+track and actions vary by row state (simpler, fewer clicks once reviewers exist). The 4-tab split (Find / Invite / Track / Closeout) is kept above only for comparison. Toggle to see the difference.')}
 
   <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
     <div class="flex gap-0.5 border-b border-gray-200 px-2 pt-1">
