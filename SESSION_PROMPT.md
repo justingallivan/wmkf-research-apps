@@ -1,63 +1,59 @@
-# Session 204 Prompt: open board (ProfileContext refactor needs a manual smoke test)
+# Session 205 Prompt: open board (ProfileContext closed; browser/ops-gated items remain)
 
-## ⏰ Standing context / guardrails (carried from S197–S203)
-- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity words into docs/memory. S203 earned its keep: it forced hedging the "two runtime bugs" count to "caught-by-review, not proven-exhaustive."
-- **Codex stop-time review gate is ENABLED** and it is *thorough* on async/state code. In S203 it found 8 successive edges in the ProfileContext work (async-load → resurrection → migration writeback → ref lifetime → stale window → failed-load attribution → out-of-order race → stale optimistic write). Treat its findings as real; don't end the session red.
-- **rtk grep filter STILL corrupts output** (it was "disabled at end of S201" but S203 saw `grep`/`rg` silently drop hits again — `rtk proxy rg` returned empty for a term that existed). For any verification grep, use `rtk proxy git grep` (reliable in S203) or write to a file and Read it. Never trust a bare `grep`/`rg` for a "does X exist" check. See `.claude-memory/project-rtk-grep-output-corruption.md`.
-- **Push deploys to prod.** `main` auto-deploys on Vercel; all of S203's work is pushed (last code commit `306f77a`; docs `9e92df4` + the session-doc commit follow it).
-- **CI-green ≠ correct for async/effect code.** S203's two worst bugs (infinite fetch loop, destructive-migration data loss) BOTH passed lint + 1544 tests + build. See [[feedback-profile-context-runtime-bugs]].
+## ⏰ Standing context / guardrails (carried from S197–S204)
+- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity words into docs/memory. S204 caught itself with it: an early "5 exhaustive-deps warnings" tally was a **false alarm** — a bare `grep` counted `// eslint-disable-next-line react-hooks/exhaustive-deps` *comment text*, not real warnings. The authoritative source for lint counts is `npx eslint . -f json` keyed on `ruleId`/`severity`, NOT grep over the default formatter output (which echoes disable-comment text).
+- **Codex stop-time review gate is ENABLED** and thorough on async/state code.
+- **rtk grep filter STILL corrupts output.** For any "does X exist" verification use `rtk proxy git grep` or write-to-file + Read; never trust a bare `grep`/`rg`. Also: `rtk` compresses `jest` output to a useless `PASS (N) FAIL (0)` — use `rtk proxy npx jest` to see real pass/fail + test names.
+- **Push deploys to prod.** `main` auto-deploys on Vercel. All S204 work is pushed (last commit `fec2e75`).
+- **CI-green ≠ correct for async/effect code.** The two worst S203 bugs passed lint + tests + build. See [[feedback-profile-context-runtime-bugs]].
+- **Local-dev auth:** full Azure login can't run on `localhost` (no `localhost:3000` redirect URI in the app registration). To smoke-test gated UI locally, add `AUTH_REQUIRED=false` + a throwaway `NEXTAUTH_SECRET` + `NEXTAUTH_URL=http://localhost:3000` to `.env.local`, run `npm run dev`, **and revert those 3 lines after** (the base `.env.local` is DB+API-keys only, fail-closed). Under that bypass the fire-and-forget `PATCH /api/user-profiles` (last_used ping) 401s harmlessly.
 
-## Session 203 Summary
+## Session 204 Summary
 
-Open board. Three threads: a migration-drift alert, the parked virus-scan e2e (item 4), and the lint ratchet (item 5) — the last of which cascaded into a full ProfileContext refactor.
+Open board. Started on item 1 (the mandatory ProfileContext smoke test), closed it fully, then did the safe slice of item 6.
 
-### Migration drift (resolved, no commit)
-Admin-panel alert "migration_drift: missing 017_bill_onboarding_state.sql". Diagnosed as accurate (017 committed in `7cb8bc4` but never applied to the env). Maintenance cron's BILL steps are per-step try/caught so it degraded, not crashed. **User applied migration 017** via `scripts/apply-migrations.js`; the alert auto-resolves on next cold start.
+### Item 1 — ProfileContext refactor: SMOKE TEST DONE, refactor verified three ways (CLOSED)
+The S203 atomic refactor previously had **zero** tests, which is why its two bugs shipped CI-green. Now closed:
+1. **5 regression tests** — `tests/unit/profile-context.test.js` (commit `62b0640`). Both CI-missed bugs pinned (init fetch-loop bounded-count assertion; failed-migration-save preserves localStorage), plus stale-flash-on-switch and out-of-order-request fencing. **Both bug reintroductions were verified to turn the suite RED**, then reverted — the tests are non-vacuous.
+2. **Server-log analysis** under local `npm run dev` (auth-bypassed; env reverted after): bounded `2× user-profiles + 1× user-preferences` per load then silent; every profile switch fired a fresh `GET /api/user-preferences?profileId=<new>`. No loop, no cross-profile bleed.
+3. **Justin's browser pass**: correct per-profile settings + persistence, no leak/flash.
 
-### Item 4 — intake virus-scan EICAR e2e (verified what's verifiable; live gate still manual)
-Confirmed the intake infected-branch is intact (`attach.js:430/486/526`: 422 + blob delete + `virus_detection_intake` alert), unit-tested (`intake-attach-endpoint.test.js:523/565`), and the scanner-half was already proven S193 (shared scanner). Added `scripts/build-intake-eicar-fixture.py` so the manual run is turnkey. **Residual = the live deployed-env browser e2e through Entra**, which I can't drive. See [[project-intake-portal-virus-scan-e2e-deferred]].
-
-### Item 5 — lint ratchet → ProfileContext atomic refactor
-Resolved all **14 `react-hooks/exhaustive-deps`** warnings (4 real `useCallback` fixes + reasoned `eslint-disable`s; exhaustive-deps 14→0, total 50→35, 0 errors). The three profile-preference consumers' fixes exposed a real async bug (effect keyed on `currentProfile?.id` but reading async-loaded `preferences`), which spiraled through 8 Codex rounds. Rather than keep guarding, **ProfileContext was refactored to an atomic `useReducer` state machine** (a fresh LLM did the structural pass; see `docs/PROFILE_CONTEXT_REFACTOR_SUMMARY.md`): atomic profile+prefs transitions, `activeRequestId` fencing, profileId-guarded reducer writes, destructive localStorage migration purge. **I caught + fixed two runtime bugs the refactor shipped that CI passed clean**: an init infinite fetch loop (`loadSession` depended on `state.profiles` it mutates → `0876dd0`) and a destructive migration deleting data on a failed save (unchecked `response.ok` before purge → `306f77a`). Then corrected the docs/memory records + ran a `/sweep` (0 stale remaining).
+### Item 6 — lint ratchet: safe slice done (35 → 32 warnings, 0 errors)
+Resolved the **3 `import/no-anonymous-default-export`** warnings (commit `fec2e75`) by naming the default-exported object in `modelNames.js`, `email-reviewer.js`, `dynamics-identity-service.js`. Export shape unchanged → zero runtime risk; 1549 tests pass.
+**Deliberately left the other 32** — all React-Compiler-eligibility noise (`set-state-in-effect` ×26, `immutability` ×5, `preserve-manual-memoization` ×1). "Fixing" them = reworking effect/state logic, several in the exact ProfileContext consumer effects S203 stabilized → the precise [[feedback-profile-context-runtime-bugs]] hazard. Not worth the risk for non-blocking lint cosmetics. **Confirmed: 0 `exhaustive-deps` warnings remain (S203's claim holds).**
 
 ### Commits
-- `0876dd0` — Lint ratchet (exhaustive-deps 14→0) + atomic ProfileContext refactor + EICAR fixture (incl. init-loop fix)
-- `306f77a` — ProfileContext: don't purge localStorage when migration save fails
-- `9e92df4` — docs: correct ProfileContext refactor records (memory file + S203 tag + reconcile summary doc)
+- `62b0640` — ProfileContext regression tests (the two S203 CI-missed bugs + 2 structural guards)
+- `fec2e75` — Lint ratchet: 3 `import/no-anonymous-default-export` resolved
 
 ## Potential Next Steps
 
-### 1. ⚠️ MANUAL SMOKE TEST the ProfileContext refactor (do this before trusting it)
-Both S203 runtime bugs were CI-invisible. Before relying on the refactor in prod, manually: load the app (confirm no fetch loop in the Network tab), switch a profile (confirm no data leak/flash + settings load), and ideally simulate a failing preferences save (confirm localStorage is preserved, not purged). The destructive migration purge is irreversible — verify it only fires on a confirmed-successful save.
+The solo-drivable, low-risk work is exhausted. Remaining items are gated on the user (browser/ops) or are deliberately-deferred-risky.
 
-### 2. Stop-gate may surface more ProfileContext edges
-S203 ended via `/stop`, not a clean stop-gate ALLOW. The reducer's `profileId`-guard structurally covers the round-8 "stale optimistic write" finding, but a fresh review of the refactored file could still flag something. If it does, the file is `shared/context/ProfileContext.js`.
+### 1. Intake virus-scan EICAR e2e — STILL the parked pre-cycle must-do (browser-gated)
+Run the live EICAR upload through `/apply` before the next cycle's Phase I intake goes live. Fixture builder exists (`scripts/build-intake-eicar-fixture.py`). Needs a browser-through-Entra session. See [[project-intake-portal-virus-scan-e2e-deferred]].
 
-### 3. Intake virus-scan EICAR e2e — STILL the parked pre-cycle must-do (unchanged)
-Run the live EICAR upload through `/apply` before the next cycle's Phase I intake goes live. Fixture builder now exists (`scripts/build-intake-eicar-fixture.py`). See [[project-intake-portal-virus-scan-e2e-deferred]].
+### 2. BILL chunk-5 tail (ops / non-coding)
+Office question (BILL self-registration address capture); ops before `BILL_ENABLED=true`: `HONORARIUM_*`/`BILLCOM_ACCOUNT_*` probe+set, `honorarium.default_amount` via /admin, Steph's sandbox. (Migration 017 applied S203 ✓.)
 
-### 4. Explorer soak — still traffic-blocked (carried from S203, untouched)
-Error-rate measurement after A3/A4/A5 + the S200 validator needs accrued traffic. Don't re-measure on thin data. `scripts/analyze-dynamics-explorer-failures.js` doesn't split pre/post-deploy; a clean soak needs a date-split or Vercel-log analysis.
+### 3. Explorer soak — still traffic-blocked
+Error-rate measurement after A3/A4/A5 + the S200 validator needs accrued traffic. Don't re-measure on thin data. `scripts/analyze-dynamics-explorer-failures.js` doesn't split pre/post-deploy.
 
-### 5. BILL chunk-5 tail (non-coding / ops) — unchanged
-Office question (BILL self-registration address capture); ops before `BILL_ENABLED=true` (017 now applied ✓; still need `HONORARIUM_*`/`BILLCOM_ACCOUNT_*` probe+set, `honorarium.default_amount` via /admin, Steph's sandbox).
-
-### 6. Lint ratchet remainder (optional, low-stakes)
-35 warnings left: `react-hooks/set-state-in-effect` (26, React-Compiler-eligibility noise), `immutability` (5), `import/no-anonymous-default-export` (3), `preserve-manual-memoization`. Lower-signal than exhaustive-deps was; CI won't block.
+### 4. Lint ratchet remainder (optional, risky — default: leave)
+32 warnings, all React-Compiler-eligibility noise; CI won't block. If touched, treat each `immutability`/`set-state-in-effect` as a *real* change (read the effect, reason, test) — not a silencing pass. Lowest priority.
 
 ## Key Files Reference
 | File | Purpose |
 |------|---------|
-| `shared/context/ProfileContext.js` | Atomic `useReducer` state machine (status/activeRequestId/profileId-guarded writes/destructive migration); the S203 refactor target |
-| `docs/PROFILE_CONTEXT_REFACTOR_SUMMARY.md` | Refactor design + "Post-Refactor Fixes" section (the two CI-missed runtime bugs) |
-| `shared/components/{EmailSettingsPanel,EmailTemplateEditor,SettingsModal,EmailGeneratorModal}.js` | Consumers simplified to gate on `status === 'ready'` |
+| `tests/unit/profile-context.test.js` | S204 regression tests for the two S203 CI-missed bugs + state-machine guards |
+| `shared/context/ProfileContext.js` | Atomic `useReducer` state machine (the S203 refactor target; now test-backed) |
 | `scripts/build-intake-eicar-fixture.py` | Builds `/tmp/eicar-test-exe.docx` for the manual intake virus-scan e2e |
-| `.claude-memory/feedback-profile-context-runtime-bugs.md` | The two runtime-bug root causes + the smoke-test rule |
+| `.claude-memory/feedback-profile-context-runtime-bugs.md` | The two runtime-bug root causes + the now-CLOSED smoke-test rule |
 
 ## Testing
 ```bash
-npx jest                       # 1544 tests
-npm run lint                   # 0 errors / 35 warnings (CI blocks on errors only)
+rtk proxy npx jest                       # 1549 tests (use `rtk proxy` — bare rtk compresses jest output)
+npm run lint                             # 0 errors / 32 warnings (CI blocks on errors only)
+npx eslint . -f json                     # authoritative warning tally (keyed on ruleId/severity, NOT grep)
 npm run check:atlas && npm run check:atlas:self-test && npm run check:api-routes && npm run check:fact-consistency
-# rtk caveat: for verification greps use `rtk proxy git grep`, NOT bare grep/rg (filter drops hits)
 ```
