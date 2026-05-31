@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WMKF — Proposal Lifecycle UI Mockup (tier-3 navigation model)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .anno { display: none; }
+  .anno-on .anno { display: block; }
+  .anno-pin { display: none; }
+  .anno-on .anno-pin { display: inline-flex; }
+  /* fork highlight */
+  .anno-on [data-fork] { outline: 2px dashed #f59e0b; outline-offset: 2px; }
+</style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+<!-- ============================================================= -->
+<!-- This is a NON-FUNCTIONAL clickable mockup. No real data, no    -->
+<!-- network, no auth. Everything is hardcoded to explore the       -->
+<!-- tier-1 / tier-2 / tier-3 navigation model. Open in a browser   -->
+<!-- and click through. Toggle "Design notes" (top-right) to see    -->
+<!-- the rationale + open questions overlaid as callouts.           -->
+<!-- ============================================================= -->
+
+<div id="app"></div>
+
+<!-- Floating control: annotation toggle + reset -->
+<div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 items-end">
+  <button id="annoToggle" onclick="toggleAnno()"
+    class="px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold shadow-lg">
+    💡 Design notes: OFF
+  </button>
+  <div class="text-[10px] text-gray-400 bg-white/80 px-2 py-1 rounded">mockup · no live data</div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// FAKE STATE — drives the clickable navigation. Not real data.
+// ---------------------------------------------------------------------------
+const STATE = {
+  view: 'dashboard',        // 'dashboard' | 'workbench' | 'tools'
+  cycle: 'J26',
+  scope: 'mine',            // 'mine' | 'mine-or-backup' | 'all'
+  requestId: null,
+  wbTab: 'overview',        // workbench area
+  reviewerLayout: '4tab',   // '4tab' | '3tab'  (the open S196 fork)
+  reviewerSubTab: 'find',
+  toolsOpen: false,
+  cycleOpen: false,
+  anno: false,
+};
+
+const CYCLES = ['J26', 'D25', 'J25'];
+
+// Fake request queue (tier-2 rows). Compact-left identity per locked S194 design.
+const REQUESTS = [
+  { id:'1002279', cycle:'J26', inst:'University of Oregon', pi:'Mike Pluth',
+    title:'Sulfur signaling probes for live-cell imaging', scope:'mine', program:'SE',
+    stage:'Phase II', actionable:true, action:'2 reviews returned — summarize + draft writeup',
+    reviewers:{confirmed:3, pending:1, declined:2, returned:2} },
+  { id:'1002311', cycle:'J26', inst:'Caltech', pi:'Frances Arnold',
+    title:'Directed evolution of carbon-fixing enzymes', scope:'mine', program:'SE',
+    stage:'Phase II', actionable:true, action:'Shortlist 5 reviewers from longlist (8 candidates)',
+    reviewers:{confirmed:0, pending:0, declined:0, returned:0} },
+  { id:'1002345', cycle:'J26', inst:'Stanford', pi:'Carolyn Bertozzi',
+    title:'Glycan-targeted degraders', scope:'mine-or-backup', program:'MR',
+    stage:'Phase II', actionable:false, action:'Awaiting reviewer responses (3 pending)',
+    reviewers:{confirmed:1, pending:3, declined:1, returned:0} },
+  { id:'1002390', cycle:'J26', inst:'MIT', pi:'Feng Zhang',
+    title:'Programmable RNA editing platforms', scope:'all', program:'MR',
+    stage:'Phase I', actionable:false, action:'Phase I screening complete — awaiting committee',
+    reviewers:{confirmed:0, pending:0, declined:0, returned:0} },
+];
+
+// Tier-1 launcher / Tools menu. FAITHFULLY mirrors shared/config/appRegistry.js
+// (all 17 registered apps) + Admin + the new Reviewer Pool. Each app is tagged
+// by its disposition under the three-tier model:
+//   standalone — lives only here (no per-request equivalent)
+//   dual       — here (off-cycle, upload-driven) AND as a Workbench tab (pre-loaded)
+//   rehomed    — primary home is now a Workbench tab; standalone form kept for ad-hoc use
+const TOOLS = [
+  // net-new
+  { icon:'🧑‍🔬', name:'Reviewer Pool',                key:'reviewer-pool',            disp:'new',        wb:null,         desc:'Request-agnostic reviewer roster — history, honorarium state, affiliations.' },
+  // standalone (no proposal context)
+  { icon:'💬', name:'Dynamics Explorer',              key:'dynamics-explorer',        disp:'standalone', wb:null,         desc:'Natural-language CRM queries.' },
+  { icon:'📤', name:'Dataverse Bulk Export',          key:'dataverse-bulk-export',    disp:'standalone', wb:null,         desc:'Structured filter builder over akoya_request.' },
+  { icon:'📊', name:'Grant Reporting',                key:'grant-reporting',          disp:'standalone', wb:null,         desc:'Post-award final-report extraction + Word export.' },
+  { icon:'💰', name:'Expense Reporter',               key:'expense-reporter',         disp:'standalone', wb:null,         desc:'Receipt / invoice extraction.' },
+  { icon:'📑', name:'Batch Phase I Summaries',        key:'batch-phase-i-summaries',  disp:'standalone', wb:null,         desc:'Bulk Phase I summarization (inherently multi-proposal).' },
+  { icon:'📑', name:'Batch Phase II Summaries',       key:'batch-proposal-summaries', disp:'standalone', wb:null,         desc:'Bulk Phase II summarization (inherently multi-proposal).' },
+  { icon:'🎭', name:'Multi-Perspective Evaluator',    key:'multi-perspective-evaluator', disp:'standalone', wb:null,      desc:'3-perspective concept evaluation (concepts stage; deprecating).' },
+  { icon:'📖', name:'Literature Analyzer',            key:'literature-analyzer',      disp:'standalone', wb:null,         desc:'Synthesize research papers — ad-hoc, no request context.' },
+  // screening-type apps — backend-automated by default; available here on demand
+  { icon:'💵', name:'Funding Analysis',               key:'funding-gap-analyzer',     disp:'standalone', wb:null,         desc:'Federal funding landscape (NSF/NIH/USAspending). Auto-run on the backend; manual here if needed.' },
+  { icon:'🔍', name:'Applicant Integrity Screener',   key:'integrity-screener',       disp:'standalone', wb:null,         desc:'Research-integrity screen (Retraction Watch, PubPeer). Auto-run on the backend; manual here if needed.' },
+  { icon:'🧠', name:'WMKF Expertise',                 key:'expertise-finder',         disp:'standalone', wb:null,         desc:'Match proposal to internal staff / consultants / board. Auto-run on the backend; manual here if needed.' },
+  // re-homed into the Workbench (standalone form kept for ad-hoc / off-cycle)
+  { icon:'🎯', name:'Reviewer Finder',                key:'reviewer-finder',          disp:'rehomed',    wb:'Reviewers',  desc:'AI + DB reviewer discovery.' },
+  { icon:'📋', name:'Review Manager',                 key:'review-manager',           disp:'rehomed',    wb:'Reviewers',  desc:'Peer-review lifecycle: send, track, remind, collect.' },
+  { icon:'📝', name:'Summarize Peer Reviews',         key:'peer-review-summarizer',   disp:'rehomed',    wb:'Reviews',    desc:'Analyze returned reviews + site-visit questions.' },
+  { icon:'✍️', name:'Phase I Writeup',                 key:'phase-i-writeup',          disp:'rehomed',    wb:'Initial Writeup', desc:'Phase I writeup draft.' },
+  { icon:'✍️', name:'Phase II Writeup',                key:'phase-ii-writeup',         disp:'rehomed',    wb:'Pre Site Visit Writeup', desc:'Phase II writeup draft + Q&A.' },
+  { icon:'🧑‍⚖️', name:'Virtual Review Panel',          key:'virtual-review-panel',     disp:'standalone', wb:null,  beta:true, desc:'Multi-LLM proposal review + synthesis. In development — not part of this cycle.' },
+  // infra
+  { icon:'⚙️', name:'Admin',                           key:'admin',                    disp:'standalone', wb:null,         desc:'Users, app access, model config, alerts.' },
+];
+const DISP_BADGE = {
+  'new':        ['new','bg-green-100 text-green-700'],
+  'standalone': [null, ''],
+  'dual':       ['also a Workbench tab','bg-blue-100 text-blue-700'],
+  'rehomed':    ['→ moved into Workbench','bg-indigo-100 text-indigo-700'],
+};
+function toolsMenuItem(t){
+  const [label,cls] = DISP_BADGE[t.disp] || [null,''];
+  const badge = label ? `<span class="ml-1 text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${cls}">${label}</span>` : '';
+  const beta = t.beta ? `<span class="ml-1 text-[9px] px-1.5 py-0.5 rounded-full font-semibold bg-purple-100 text-purple-700">beta</span>` : '';
+  const tab = (t.disp==='rehomed'||t.disp==='dual') && t.wb ? `<span class="ml-1 text-[9px] text-gray-400">↳ ${t.wb} tab</span>` : '';
+  return `
+    <button onclick="go('tools')" class="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-start gap-3 ${t.disp==='rehomed'?'opacity-80':''}">
+      <span class="text-lg leading-none mt-0.5">${t.icon}</span>
+      <span class="min-w-0"><span class="text-sm font-medium text-gray-800">${t.name}</span>${beta}${badge}${tab}
+      <span class="block text-xs text-gray-500">${t.desc}</span></span>
+    </button>`;
+}
+
+// Per-request Workbench areas (tier-3). Maps existing apps onto request-scoped tabs.
+// kind: auto | refine | human  (from the artifact-categorization in memory)
+// phase: v1 | future
+const WB_TABS = [
+  { key:'overview',  icon:'🗂️', label:'Overview',   kind:null,    phase:'v1',     note:'Request snapshot + what needs the PD now.' },
+  { key:'proposal',  icon:'📄', label:'Proposal',   kind:null,    phase:'v1',     note:'In-app proposal viewer. Replaces the SharePoint read-pain workaround.' },
+  { key:'initial-writeup', icon:'✍️', label:'Initial Writeup', kind:'refine', phase:'v1', note:'Early writeup draft in the form of a Phase I writeup — reuses the existing Phase I writeup engine. Auto-drafted, PD refines.' },
+  { key:'reviewers', icon:'🎯', label:'Reviewers',  kind:'refine',phase:'v1',     note:'THE v1 slice. Find → invite → track → closeout. Replaces Finder + Manager.' },
+  { key:'reviews',   icon:'📝', label:'Reviews',    kind:'auto',  phase:'future', note:'Returned peer reviews + auto-summary + site-visit questions.' },
+  { key:'writeup',   icon:'✍️', label:'Pre Site Visit Writeup', kind:'refine',phase:'future', note:'Writeup draft ahead of the site visit, incorporating returned reviews. Auto-draft skeleton; PD refines. Replaces the filename-keyed Word template.' },
+  { key:'sitevisit', icon:'📍', label:'Site Visit', kind:'human', phase:'future', note:'Human-only deliberation notes.' },
+  { key:'final-writeup', icon:'📝', label:'Final Writeup', kind:'refine', phase:'future', note:'Final writeup after the site visit, folding in site-visit findings. Auto-draft from the pre-visit writeup; PD refines.' },
+  { key:'closeout',  icon:'✅', label:'Closeout',   kind:'human', phase:'v1',     note:'Mark reviews closed → triggers honorarium automation downstream.' },
+];
+
+function req(){ return REQUESTS.find(r => r.id === STATE.requestId); }
+function visibleRequests(){
+  return REQUESTS.filter(r => {
+    if (r.cycle !== STATE.cycle) return false;
+    if (STATE.scope === 'mine') return r.scope === 'mine';
+    if (STATE.scope === 'mine-or-backup') return r.scope === 'mine' || r.scope === 'mine-or-backup';
+    return true;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// NAV ACTIONS
+// ---------------------------------------------------------------------------
+function go(view){ STATE.view = view; STATE.toolsOpen=false; STATE.cycleOpen=false; render(); }
+function openRequest(id){ STATE.requestId=id; STATE.view='workbench'; STATE.wbTab='overview'; STATE.toolsOpen=false; STATE.cycleOpen=false; render(); }
+function setTab(k){ STATE.wbTab=k; render(); }
+function setScope(s){ STATE.scope=s; render(); }
+function setCycle(c){ STATE.cycle=c; STATE.cycleOpen=false; if(STATE.view==='workbench'){STATE.view='dashboard'; STATE.requestId=null;} render(); }
+function toggleTools(){ STATE.toolsOpen=!STATE.toolsOpen; STATE.cycleOpen=false; render(); }
+function toggleCycle(){ STATE.cycleOpen=!STATE.cycleOpen; STATE.toolsOpen=false; render(); }
+function setReviewerLayout(l){ STATE.reviewerLayout=l; STATE.reviewerSubTab = (l==='3tab'?'find':'find'); render(); }
+function setReviewerSub(s){ STATE.reviewerSubTab=s; render(); }
+function toggleAnno(){ STATE.anno=!STATE.anno; render(); }
+
+// ---------------------------------------------------------------------------
+// SMALL RENDER HELPERS
+// ---------------------------------------------------------------------------
+function annoNote(text){
+  return `<div class="anno mt-2 text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded-lg px-3 py-2 leading-relaxed">
+    <span class="font-semibold">design&nbsp;note —</span> ${text}</div>`;
+}
+function annoPin(text){
+  return `<span class="anno-pin group relative ml-1 align-middle items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] font-bold cursor-help">?
+    <span class="hidden group-hover:block absolute z-50 left-5 top-0 w-64 bg-amber-900 text-amber-50 text-[11px] rounded-lg px-3 py-2 shadow-xl leading-relaxed normal-case font-normal">${text}</span>
+  </span>`;
+}
+function kindBadge(kind){
+  if(!kind) return '';
+  const map = {
+    auto:  ['Auto','bg-green-100 text-green-800'],
+    refine:['Auto-draft · PD refines','bg-blue-100 text-blue-800'],
+    human: ['Human-only','bg-purple-100 text-purple-800'],
+  };
+  const [t,c] = map[kind];
+  return `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${c}">${t}</span>`;
+}
+
+// ---------------------------------------------------------------------------
+// TIER 1 — GLOBAL BAR (persistent across every view)
+// ---------------------------------------------------------------------------
+function globalBar(){
+  return `
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 flex items-center gap-3 h-14">
+      <!-- brand / home -->
+      <button onclick="go('dashboard')" class="flex items-center gap-2 font-bold text-gray-900">
+        <span class="text-xl">🔬</span><span class="hidden sm:inline">WMKF&nbsp;Apps</span>
+      </button>
+
+      <!-- cycle switcher (tier-2 anchor, always present) -->
+      <div class="relative" data-fork="cycle">
+        <button onclick="toggleCycle()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-semibold">
+          📅 Cycle: ${STATE.cycle} <span class="text-gray-400">▾</span>
+        </button>
+        ${STATE.cycleOpen ? `
+        <div class="absolute mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-40">
+          ${CYCLES.map(c=>`<button onclick="setCycle('${c}')" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${c===STATE.cycle?'font-bold text-gray-900':'text-gray-600'}">${c} ${c===STATE.cycle?'✓':''}</button>`).join('')}
+          <div class="border-t border-gray-100 mt-1 pt-1"><button class="w-full text-left px-4 py-2 text-xs text-gray-400">Manage cycles…</button></div>
+        </div>`:''}
+        ${annoPin('The cycle switcher is the spine of tier-1→tier-2 navigation. It persists everywhere. Switching cycle from inside a Workbench drops you back to that cycle\'s dashboard (context handoff, not a dead end).')}
+      </div>
+
+      <div class="flex-1"></div>
+
+      <!-- Tools menu = the DEMOTED launcher (tier-1 standalone apps) -->
+      <div class="relative" data-fork="tools">
+        <button onclick="toggleTools()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-gray-100 text-sm font-medium text-gray-600">
+          🧰 Tools <span class="text-gray-400">▾</span>
+        </button>
+        ${STATE.toolsOpen ? `
+        <div class="absolute right-0 mt-1 w-96 bg-white border border-gray-200 rounded-xl shadow-xl py-2 z-40 max-h-[75vh] overflow-auto">
+          <div class="px-4 pt-1 pb-1 text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Standalone &amp; off-cycle</div>
+          ${TOOLS.filter(t=>t.disp!=='rehomed').map(toolsMenuItem).join('')}
+          <div class="border-t border-gray-100 mt-1 px-4 pt-2 pb-1 text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Now primarily in the Workbench
+            <span class="lowercase tracking-normal font-normal text-gray-400"> — standalone form kept for ad-hoc use</span></div>
+          ${TOOLS.filter(t=>t.disp==='rehomed').map(toolsMenuItem).join('')}
+        </div>`:''}
+        ${annoPin('Faithful mirror of appRegistry.js — all 17 registered apps, plus Admin and the new Reviewer Pool. Each is tagged by its fate: standalone (no request context), dual-entry (here AND a Workbench tab, pre-loaded), or re-homed (its primary home is now a per-request tab; the standalone form survives for ad-hoc/off-cycle work). This is the "how every existing app folds in" answer.')}
+      </div>
+
+      <!-- user -->
+      <div class="flex items-center gap-2 pl-2 border-l border-gray-200">
+        <div class="w-8 h-8 rounded-full bg-indigo-500 text-white flex items-center justify-center text-sm font-semibold">JG</div>
+        <span class="hidden sm:inline text-sm text-gray-600">PD: J. Gallivan</span>
+      </div>
+    </div>
+  </header>`;
+}
+
+// ---------------------------------------------------------------------------
+// TIER 2 — CYCLE DASHBOARD (PD landing)
+// ---------------------------------------------------------------------------
+function dashboardView(){
+  const rows = visibleRequests();
+  const scopeBtns = [['mine','My (lead PD)'],['mine-or-backup','My (lead or backup)'],['all','All requests']];
+  return `
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <div class="flex items-center justify-between flex-wrap gap-3 mb-1">
+      <h1 class="text-2xl font-bold">Cycle ${STATE.cycle} · Request queue</h1>
+      <div class="flex gap-1 bg-gray-100 rounded-lg p-1" data-fork="scope">
+        ${scopeBtns.map(([k,l])=>`<button onclick="setScope('${k}')" class="px-3 py-1.5 rounded-md text-sm font-medium ${STATE.scope===k?'bg-white shadow text-gray-900':'text-gray-500'}">${l}</button>`).join('')}
+      </div>
+    </div>
+    <p class="text-sm text-gray-500 mb-4">${rows.length} request${rows.length===1?'':'s'} · sorted by actionability ${annoPin('Default landing for a PD is THIS, not the app launcher. Identity comes from session (dynamics_systemuser_id) — no PD picker. Status filter is the isActionableForPD() policy fn (rules deferred).')}</p>
+
+    ${annoNote('<b>Tier-2 = the home a PD lands on.</b> The flat app launcher is gone from the default path (it lives in the Tools menu now). A PD\'s day starts from "what in my cycle needs me," and drilling into a request is the primary action.')}
+
+    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden mt-4">
+      ${rows.length===0?`<div class="p-10 text-center text-gray-400 text-sm">No requests match this scope in ${STATE.cycle}. Try a wider scope.</div>`:''}
+      ${rows.map(r=>`
+        <button onclick="openRequest('${r.id}')" class="w-full text-left border-b border-gray-100 last:border-0 hover:bg-gray-50 transition flex items-center gap-4 px-4 py-3">
+          <!-- compact LEFT identity unit (locked S194/S195) -->
+          <div class="w-56 shrink-0" data-fork="identity">
+            <div class="text-sm font-mono text-gray-900">#${r.id} <span class="text-gray-400">${r.cycle}</span> <span class="text-[10px] px-1 rounded ${r.program==='MR'?'bg-rose-100 text-rose-700':'bg-sky-100 text-sky-700'}">${r.program}</span></div>
+            <div class="text-sm font-medium text-gray-800 truncate">${r.inst}</div>
+            <div class="text-xs text-gray-500">PI: ${r.pi}</div>
+          </div>
+          <!-- middle: title -->
+          <div class="flex-1 min-w-0">
+            <div class="text-sm text-gray-700 truncate">${r.title}</div>
+            <div class="text-xs text-gray-400 mt-0.5">Reviewers: ${r.reviewers.confirmed} confirmed · ${r.reviewers.pending} pending · ${r.reviewers.returned} returned</div>
+          </div>
+          <!-- RIGHT: actionability cue -->
+          <div class="w-72 shrink-0 text-right">
+            ${r.actionable
+              ? `<span class="inline-block text-[11px] font-semibold text-amber-800 bg-amber-100 rounded-full px-2 py-0.5 mb-1">● action needed</span>`
+              : `<span class="inline-block text-[11px] font-semibold text-gray-500 bg-gray-100 rounded-full px-2 py-0.5 mb-1">waiting</span>`}
+            <div class="text-xs text-gray-500">${r.action}</div>
+            <div class="text-[10px] text-gray-300 mt-0.5">${r.stage}</div>
+          </div>
+        </button>`).join('')}
+    </div>
+    ${annoNote('<b>Open fork (S195):</b> row content. Left side compacted into one identity unit (number + cycle on one line, institution above PI). The RIGHT side carries the actionability cue + next-action text. This same compact unit becomes the persistent Workbench header — try clicking a row.')}
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// TIER 3 — REQUEST WORKBENCH
+// ---------------------------------------------------------------------------
+function workbenchView(){
+  const r = req();
+  if(!r) return dashboardView();
+  return `
+  <!-- breadcrumb + persistent request header -->
+  <div class="bg-white border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 pt-3 pb-2">
+      <div class="text-xs text-gray-400 flex items-center gap-1.5 mb-2">
+        <button onclick="go('dashboard')" class="hover:text-gray-700 hover:underline">${r.cycle} queue</button>
+        <span>/</span>
+        <span class="text-gray-600 font-mono">#${r.id} ${r.pi}</span>
+        <span>/</span>
+        <span class="text-gray-900 font-medium capitalize">${WB_TABS.find(t=>t.key===STATE.wbTab).label}</span>
+        ${annoPin('Breadcrumb is the context lifeline. "←  '+r.cycle+' queue" returns you to the SAME filtered dashboard you came from (scope preserved). You never lose your place drilling in and out.')}
+      </div>
+      <div class="flex items-center gap-4 pb-1">
+        <div class="url-pill text-[10px] font-mono text-gray-400 hidden md:block">/workbench/${r.id}/${STATE.wbTab}</div>
+      </div>
+      <!-- the same compact identity unit, now persistent across tabs -->
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div data-fork="identity">
+          <div class="text-lg font-bold flex items-center gap-2">#${r.id}
+            <span class="text-[10px] px-1.5 py-0.5 rounded ${r.program==='MR'?'bg-rose-100 text-rose-700':'bg-sky-100 text-sky-700'}">${r.program}</span>
+            <span class="text-[11px] font-medium text-gray-400">${r.cycle} · ${r.stage}</span>
+          </div>
+          <div class="text-sm text-gray-700">${r.inst} — PI: ${r.pi}</div>
+          <div class="text-xs text-gray-500 max-w-2xl truncate">${r.title}</div>
+        </div>
+        <button onclick="go('dashboard')" class="text-sm text-gray-500 hover:text-gray-800 hover:underline">← back to ${r.cycle} queue</button>
+      </div>
+    </div>
+
+    <!-- tier-3 tab strip -->
+    <div class="max-w-7xl mx-auto px-4">
+      <div class="flex gap-0.5 overflow-x-auto" data-fork="wbtabs">
+        ${WB_TABS.map(t=>`
+          <button onclick="setTab('${t.key}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 ${STATE.wbTab===t.key?'border-indigo-600 text-indigo-700':'border-transparent text-gray-500 hover:text-gray-800'}">
+            <span>${t.icon}</span>${t.label}
+            ${t.phase==='future'?'<span class="text-[8px] px-1 rounded bg-gray-200 text-gray-500 font-semibold">later</span>':''}
+          </button>`).join('')}
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    ${STATE.anno ? annoNote('<b>Tier-3 = the request is the spine.</b> Every existing per-request app becomes a tab here, pre-loaded with this proposal (no upload). Badges: <span class="text-green-700 font-semibold">Auto</span> = materialized by the backend automation tier; <span class="text-blue-700 font-semibold">Auto-draft·PD refines</span> = generated, PD edits; <span class="text-purple-700 font-semibold">Human-only</span>. "later" = not in v1; the Reviewers tab IS v1.') : ''}
+    ${wbPanel(r)}
+  </div>`;
+}
+
+function wbPanel(r){
+  switch(STATE.wbTab){
+    case 'reviewers': return reviewersPanel(r);
+    case 'overview':  return overviewPanel(r);
+    case 'proposal':  return placeholderPanel('proposal');
+    default:          return placeholderPanel(STATE.wbTab);
+  }
+}
+
+function overviewPanel(r){
+  return `
+  <div class="grid md:grid-cols-3 gap-4">
+    <div class="md:col-span-2 space-y-4">
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 class="font-semibold mb-2">What needs you now</h3>
+        <div class="text-sm ${r.actionable?'text-amber-800':'text-gray-500'} flex items-start gap-2">
+          <span>${r.actionable?'●':'○'}</span><span>${r.action}</span>
+        </div>
+        ${r.actionable && STATE.wbTab==='overview' ? `<button onclick="setTab('reviewers')" class="mt-3 text-sm font-semibold text-indigo-600 hover:underline">Go to Reviewers →</button>`:''}
+      </div>
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 class="font-semibold mb-3">Lifecycle progress</h3>
+        <div class="flex items-center gap-1 text-xs">
+          ${['Submitted','Screened','Reviewers','Reviews in','Writeup','Closeout'].map((s,i)=>`
+            <div class="flex-1 text-center">
+              <div class="h-1.5 rounded-full ${i<=2?'bg-indigo-500':'bg-gray-200'}"></div>
+              <div class="mt-1 ${i<=2?'text-indigo-700 font-medium':'text-gray-400'}">${s}</div>
+            </div>`).join('')}
+        </div>
+        ${annoNote('Overview is the main net-new surface among the Workbench tabs — a per-request command center. Most other tabs re-home an existing app; Reviewer Pool (tier-1) is also new. It answers "where is this request and what do I do next."')}
+      </div>
+    </div>
+    <div class="space-y-4">
+      <div class="bg-white border border-gray-200 rounded-xl p-5 text-sm">
+        <h3 class="font-semibold mb-2">At a glance</h3>
+        <dl class="space-y-1 text-gray-600">
+          <div class="flex justify-between"><dt>Stage</dt><dd class="font-medium text-gray-900">${r.stage}</dd></div>
+          <div class="flex justify-between"><dt>Program</dt><dd class="font-medium text-gray-900">${r.program}</dd></div>
+          <div class="flex justify-between"><dt>Reviewers confirmed</dt><dd class="font-medium text-gray-900">${r.reviewers.confirmed} / 3</dd></div>
+          <div class="flex justify-between"><dt>Reviews returned</dt><dd class="font-medium text-gray-900">${r.reviewers.returned}</dd></div>
+        </dl>
+      </div>
+    </div>
+  </div>`;
+}
+
+function placeholderPanel(key){
+  const t = WB_TABS.find(x=>x.key===key);
+  return `
+  <div class="bg-white border border-gray-200 rounded-xl p-8 text-center">
+    <div class="text-4xl mb-3">${t.icon}</div>
+    <h3 class="text-lg font-semibold flex items-center justify-center gap-2">${t.label} ${kindBadge(t.kind)}</h3>
+    <p class="text-sm text-gray-500 max-w-md mx-auto mt-2">${t.note}</p>
+    ${t.phase==='future'?`<p class="text-xs text-gray-400 mt-3">Not in v1 — lands as the automation tier matures. URL slot reserved: <span class="font-mono">/workbench/${STATE.requestId}/${key}</span></p>`:''}
+    ${annoNote('This is a placeholder. The point of the mockup is the NAVIGATION model — how you get here and how this coexists with the standalone Tools entry. The panel content itself is the existing app, re-homed.')}
+  </div>`;
+}
+
+// ---- Reviewers tab: the v1 slice, with the 3-tab vs 4-tab fork toggle -------
+function reviewersPanel(r){
+  const layout4 = [['find','Find'],['invite','Invite'],['track','Track'],['closeout','Closeout']];
+  const layout3 = [['find','Find'],['roster','Roster'],['closeout','Closeout']];
+  const tabs = STATE.reviewerLayout==='4tab' ? layout4 : layout3;
+  return `
+  <div class="mb-4 flex items-center justify-between flex-wrap gap-3">
+    <h2 class="text-lg font-semibold flex items-center gap-2">🎯 Reviewer lifecycle ${kindBadge('refine')}
+      <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold">Workbench v1</span></h2>
+    <!-- THE OPEN FORK -->
+    <div class="flex items-center gap-2 text-xs" data-fork="reviewerlayout">
+      <span class="text-gray-400">S196 open question →</span>
+      <div class="flex gap-1 bg-amber-100 rounded-lg p-1">
+        <button onclick="setReviewerLayout('4tab')" class="px-2.5 py-1 rounded-md font-semibold ${STATE.reviewerLayout==='4tab'?'bg-white shadow text-amber-900':'text-amber-700'}">4-tab</button>
+        <button onclick="setReviewerLayout('3tab')" class="px-2.5 py-1 rounded-md font-semibold ${STATE.reviewerLayout==='3tab'?'bg-white shadow text-amber-900':'text-amber-700'}">3-tab</button>
+      </div>
+    </div>
+  </div>
+
+  ${annoNote('<b>The one genuinely open structural fork from S196.</b> Toggle 4-tab ↔ 3-tab above. <b>4-tab:</b> Find / Invite / Track / Closeout — each a distinct stage. <b>3-tab:</b> Find / Roster / Closeout, where "Roster" consolidates invite+track and actions vary by row state. 3-tab is fewer clicks once reviewers exist; 4-tab is clearer for first-time use. This mockup is exactly the artifact to decide it on.')}
+
+  <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div class="flex gap-0.5 border-b border-gray-200 px-2 pt-1">
+      ${tabs.map(([k,l])=>`<button onclick="setReviewerSub('${k}')" class="px-4 py-2 text-sm font-medium border-b-2 -mb-px ${STATE.reviewerSubTab===k?'border-indigo-600 text-indigo-700':'border-transparent text-gray-500 hover:text-gray-800'}">${l}</button>`).join('')}
+    </div>
+    <div class="p-5">${reviewerSubContent(r)}</div>
+  </div>`;
+}
+
+function reviewerSubContent(r){
+  const sub = STATE.reviewerSubTab;
+  if(sub==='find'){
+    return `
+    <div class="text-sm text-gray-600 mb-3">AI + database candidate discovery — <b>request-aware</b> (proposal already loaded, no upload). Replaces standalone Reviewer Finder.</div>
+    <div class="space-y-2">
+      ${[['Dr. Aisha Rahman','MIT · 41 relevant pubs','match 0.91'],['Dr. Luca Moretti','ETH Zürich · 28 pubs','match 0.87'],['Dr. Priya Nair','UW–Madison · 33 pubs','match 0.85']].map(([n,a,m])=>`
+        <div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2">
+          <div><div class="text-sm font-medium">${n}</div><div class="text-xs text-gray-500">${a}</div></div>
+          <div class="flex items-center gap-3"><span class="text-xs font-mono text-green-700">${m}</span>
+          <button class="text-xs font-semibold text-indigo-600 hover:underline">+ shortlist</button></div>
+        </div>`).join('')}
+    </div>
+    ${annoNote('Find pulls from the Reviewer Pool (the standalone tier-1 app) but scoped to this request. Same data, request-aware entry — the dual-entry principle again.')}`;
+  }
+  if(sub==='invite'){
+    return panelList('Invite','Shortlisted candidates awaiting dispatch. PD picks 5 (over-invite buffer; need 3 confirmed).',
+      [['Dr. Aisha Rahman','ready to send'],['Dr. Luca Moretti','ready to send'],['Dr. Priya Nair','draft email']],
+      'Send invitation');
+  }
+  if(sub==='track'){
+    return panelList('Track','Confirmed / pending / declined, materials state, overdue chasing.',
+      [['Dr. Aisha Rahman','✅ confirmed · materials sent'],['Dr. Luca Moretti','⏳ pending (3d)'],['Dr. Priya Nair','❌ declined']],
+      'Send reminder');
+  }
+  if(sub==='roster'){
+    return `
+    <div class="text-sm text-gray-600 mb-3">Consolidated roster (3-tab layout): invite + track in one table; actions vary by row state.</div>
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-xs text-gray-400 border-b"><th class="py-2">Reviewer</th><th>State</th><th>Materials</th><th class="text-right">Action</th></tr></thead>
+      <tbody>
+        ${[['Dr. Aisha Rahman','Confirmed','Sent','Send reminder'],['Dr. Luca Moretti','Pending (3d)','—','Resend invite'],['Dr. Priya Nair','Declined','—','Replace'],['(empty slot)','—','—','Invite from Find']].map(([n,s,m,a])=>`
+          <tr class="border-b border-gray-50"><td class="py-2 font-medium">${n}</td><td class="text-gray-600">${s}</td><td class="text-gray-500">${m}</td><td class="text-right"><button class="text-xs font-semibold text-indigo-600 hover:underline">${a}</button></td></tr>`).join('')}
+      </tbody>
+    </table>
+    ${annoNote('In 3-tab, this single Roster replaces both Invite and Track. The action column is row-state-driven. Fewer tabs, denser table — compare against the 4-tab split.')}`;
+  }
+  if(sub==='closeout'){
+    return `
+    <div class="text-sm text-gray-600 mb-3">Per-reviewer: read returned review, mark closed.</div>
+    <div class="space-y-2">
+      ${[['Dr. Aisha Rahman','review returned','closed → honorarium queued'],['Dr. Luca Moretti','review returned','mark closed']].map(([n,s,a])=>`
+        <div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2">
+          <div><div class="text-sm font-medium">${n}</div><div class="text-xs text-gray-500">${s}</div></div>
+          <button class="text-xs font-semibold ${a.startsWith('closed')?'text-green-600':'text-indigo-600 hover:underline'}">${a}</button>
+        </div>`).join('')}
+    </div>
+    ${annoNote('<b>Closeout is the automation seam.</b> Marking a review closed flips a Dataverse status (field name still owed to Connor) → BILL honorarium flow runs downstream. Honorarium is NOT a PD tab — it\'s a consequence. The reviewer\'s payment-address was captured earlier on the external /accept surface, not here.')}`;
+  }
+}
+function panelList(title,desc,rows,action){
+  return `
+  <div class="text-sm text-gray-600 mb-3">${desc}</div>
+  <div class="space-y-2">
+    ${rows.map(([n,s])=>`<div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2">
+      <div><div class="text-sm font-medium">${n}</div><div class="text-xs text-gray-500">${s}</div></div>
+      <button class="text-xs font-semibold text-indigo-600 hover:underline">${action}</button></div>`).join('')}
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// TOOLS placeholder view (when you click a standalone app)
+// ---------------------------------------------------------------------------
+function toolsView(){
+  return `
+  <div class="max-w-7xl mx-auto px-4 py-10 text-center">
+    <div class="text-4xl mb-3">🧰</div>
+    <h1 class="text-xl font-bold">Standalone tool (tier-1)</h1>
+    <p class="text-sm text-gray-500 max-w-lg mx-auto mt-2">This is a standalone app opened from the Tools menu — upload-driven, no request context. Same as today\'s flat-launcher apps.</p>
+    ${annoNote('<b>How standalone apps coexist:</b> they keep their independent, off-cycle home in the Tools menu (training, ad-hoc, off-cycle work). The dual-entry ones ALSO appear as a Workbench tab pre-loaded with a request\'s proposal. The launcher isn\'t deleted — it\'s demoted from "the home" to "the toolbox."')}
+    <button onclick="go('dashboard')" class="mt-5 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold">← Back to cycle dashboard</button>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// ROOT RENDER
+// ---------------------------------------------------------------------------
+function render(){
+  let body;
+  if(STATE.view==='workbench') body = workbenchView();
+  else if(STATE.view==='tools') body = toolsView();
+  else body = dashboardView();
+
+  document.getElementById('app').innerHTML = globalBar() + body;
+  document.body.classList.toggle('anno-on', STATE.anno);
+  const btn = document.getElementById('annoToggle');
+  btn.textContent = STATE.anno ? '💡 Design notes: ON' : '💡 Design notes: OFF';
+  btn.classList.toggle('bg-amber-600', STATE.anno);
+}
+render();
+</script>
+</body>
+</html>
