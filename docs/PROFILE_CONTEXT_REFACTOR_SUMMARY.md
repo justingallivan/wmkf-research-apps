@@ -46,3 +46,34 @@ useEffect(() => {
 - **Reduced Complexity:** Removed ~150 lines of boilerplate/guard logic across 4 components.
 - **Data Integrity:** Singular source of truth (Database > LocalStorage) with no resurrection paths.
 - **Better UX:** No "flash" of old user data when switching profiles.
+
+## Post-Refactor Fixes (runtime bugs CI did not catch)
+The architecture above is sound, but the initial implementation shipped two
+runtime bugs that `npm run lint`, the full jest suite, and `next build` all
+passed clean (they are render-time / HTTP-status issues, invisible to CI). Both
+were caught in stop-gate review and fixed — recorded here so they are not
+reintroduced. (Caught-by-review, not a proven-exhaustive list.)
+
+1. **Init fetch loop (fixed, commit `0876dd0`).** `loadSession` listed
+   `state.profiles` in its `useCallback` deps, and the `init` effect depended on
+   `loadSession`. `init` calls `fetchProfiles()` → `UPDATE_PROFILES` dispatches a
+   new array reference → `state.profiles` changes → `loadSession` is recreated →
+   the `init` effect re-fires → unbounded loop. **Fix:** read profiles from a
+   synced `profilesRef` inside `loadSession` so it does not depend on
+   `state.profiles` (deps are now `[fetchProfiles, migrateLegacySettings]`).
+   *Rule:* never let an effect depend on a callback that depends on state the
+   callback itself mutates — read changing state via a ref instead.
+
+2. **Destructive migration data loss (fixed, commit `306f77a`).**
+   `migrateLegacySettings` awaited the migration POST but did not check
+   `response.ok`. `fetch()` does NOT throw on an HTTP error status (500/403), so
+   a rejected save fell through to `localStorage.removeItem(...)` — purging the
+   user's legacy settings even though they were never persisted to the profile
+   (permanent data loss). **Fix:** `if (!response.ok) throw` before the purge, so
+   a failed save preserves localStorage and migration retries next load.
+   *Rule:* any `await fetch` that gates an irreversible/destructive action must
+   check `response.ok` first.
+
+**Process note:** for load-bearing async/effect code, green CI is not sufficient
+evidence of correctness — manually smoke-test (mount the app, switch a profile,
+simulate a failing save) before considering such a refactor done.
