@@ -77,15 +77,16 @@ Each tab is an existing capability re-homed and pre-loaded with the proposal. Th
 | **Find** | AI + database candidate discovery, request-aware (replaces Reviewer Finder) | # candidates |
 | **Invite** | Build shortlist, compose + dispatch invitations | # awaiting dispatch |
 | **Track** | Confirmed / pending / declined, materials, overdue chasing | # pending · ⚠ overdue |
-| **Approve & Pay** | Read & approve a returned review → mark the engagement complete (row drops off the dashboard). See the payment nuance in §3.4. | # awaiting approval |
+| **Completed** | Read the returned review and mark it complete. Record-keeping only — no trigger, no drop-off (see §3.4). | # completed |
 
 - The badges make the tab bar an **at-a-glance overview** ("where is everyone"), so the four-tab split costs nothing in scannability.
-- **Landing is state-aware:** open on the earliest step with outstanding work (Invite if shortlisted-but-unsent, Track if invites are out, Approve & Pay if reviews are back, Find if nothing's started).
+- **Landing is state-aware:** open on the earliest step with outstanding work (Invite if shortlisted-but-unsent, Track if invites are out, Completed if reviews are back awaiting sign-off, Find if nothing's started).
 
 ### 3.4 "Closeout" disambiguated
 The word was overloaded. It now splits into two **different** things at two scopes:
-- **Approve & Pay** — *per reviewer.* The PD reads the returned review and closes the engagement out. This maps to **existing, deployed** fields on `wmkf_appreviewersuggestion`: set `wmkf_reviewstatus = complete (100000004)` and stamp **`wmkf_completedat`** (added S196, prod 2026-05-28). The row then drops off the PD's dashboard.
-  - **Payment nuance (needs a decision — see §6):** in the *current* model, `wmkf_completedat` is record-keeping only — **no automation reacts to it.** Payment-eligibility is signaled by a *different* field, `wmkf_reviewreceivedat` (set when the **reviewer submits**), and staff hold the final remit gate (`wmkf_authorizationtoremitpaymentflag`); the honorarium request is linked via the `wmkf_HonorariumRequest` lookup (shipped 2026-05-28). So the tab name "Approve & Pay" implies PD-approval-gates-payment, which is *not* how the deployed model works today. Whether to make PD closeout an actual payment gate, or keep it as a "PD done" marker with payment keyed on reviewer-submission, is an open call.
+- **Completed** — *per reviewer.* The PD reads the returned review and marks it complete. This maps to **existing, deployed** fields on `wmkf_appreviewersuggestion`: set `wmkf_reviewstatus = complete (100000004)` and stamp **`wmkf_completedat`** (added S196, prod 2026-05-28).
+  - **Settled (S206, option a — no payment trigger):** completion is **record-keeping only — nothing reacts to it.** Payment-eligibility stays on its existing path: `wmkf_reviewreceivedat` (set when the **reviewer submits**) signals eligibility, the `wmkf_HonorariumRequest` lookup (shipped 2026-05-28) links the honorarium, and staff hold the final remit gate (`wmkf_authorizationtoremitpaymentflag`). The tab is named **"Completed"** (not "Approve & Pay") precisely so it doesn't imply it pays anyone. Its badge is a **done-count** ("how many are completed").
+  - **No drop-off:** completed rows are **not** filtered off the dashboard (this overrides the original S196 "row drops off at `wmkf_completedat`" intent). Cleanup is handled by **cycle-scoping** — the next cycle starts with a clean dashboard, and a finished cycle is reopened from the cycle switcher if needed.
 - **Status** — *per request.* A **read-only** reflection of the proposal's own Dynamics lifecycle status (`akoya_requeststatus`). Staff *recommend*; the **board decides** approve/decline and it's recorded in Dynamics elsewhere. The Workbench only displays it.
 
 These are unrelated fields at different scopes and must not be conflated.
@@ -135,14 +136,14 @@ The current and next cycles have different shapes, so the rollout differs.
 
 **Reviewer closeout fields — RESOLVED (not owed; corrected 2026-05-31).** The earlier "approve→payable field owed to Connor" was stale. The closeout fields already exist and are deployed: `wmkf_reviewstatus = complete` + `wmkf_completedat` (S196, prod 2026-05-28), and the `wmkf_HonorariumRequest` lookup shipped 2026-05-28. What's genuinely open is the **policy/semantic** question, not a field:
 
-- **Does PD closeout gate payment?** Today `wmkf_completedat` is record-keeping only (no automation), payment-eligibility keys on reviewer-submission (`wmkf_reviewreceivedat`), and staff hold the remit gate. The "Approve & Pay" tab implies PD-approval-gates-payment. Decide whether to (a) keep the current model and rename the tab to something like "Review & Close," or (b) make PD closeout an actual payment-eligibility gate (a behavior change — loop in Steph, who owns the remit signal). This is a Justin/Steph call, with Connor only if the trigger wiring changes.
+- **Does PD closeout gate payment? — RESOLVED (S206, option a).** No. The tab is named **"Completed"**, marking it sets `wmkf_reviewstatus=complete` + `wmkf_completedat` as record-keeping only, and **nothing is triggered**. Payment-eligibility stays on its existing path (reviewer-submission `wmkf_reviewreceivedat` + staff remit gate). Completed rows stay on the dashboard (no drop-off); cycle-scoping handles cleanup.
 
 **Open design**
 - **Dashboard row content / actionability rules** (`isActionableForPD`) for the reviewer dashboard — what the right-hand "what needs me" column shows, and the rule set behind it. Reviewer-centric for v1; the 300-proposal *triage* actionability is a separate, later design (do not merge the two).
 - **Status tab** — `akoya_requeststatus` is a **living taxonomy** (enumerate live, never hardcode; unknown value → "unclassified," not a guess). Its value→class map is documented in `docs/DATAVERSE_POWER_TOOLS_DESIGN.md` (probe-derived; in-flight = Pending-family, decided-terminal = Approved/Denied/Declined/Ineligible/Closed/Done/Withdrawn/etc.). The tab is tentative — what else belongs at the request endpoint is undecided.
 
 **Locked (no longer open)**
-- Reviewer tab structure (4-tab + badges); PD identity from session, no picker; the Closeout → Approve & Pay / Status split; the two-dashboard model; the D26 allowlist mechanism.
+- Reviewer tab structure (4-tab + badges); PD identity from session, no picker; the Closeout → **Completed** (reviewer, no trigger, no drop-off) / **Status** (request, read-only) split; the two-dashboard model; the D26 allowlist mechanism.
 
 ---
 
@@ -163,7 +164,7 @@ The current and next cycles have different shapes, so the rollout differs.
 ## 8. Reference
 
 - **Clickable mockup:** `docs/mockups/lifecycle-ui-mockup.html` (open in a browser; toggle "Design notes" for rationale; the reviewer tab carries a 3-tab vs 4-tab compare toggle showing the rejected alternative).
-- **Memory / background:** `[[project-reviewer-apps-redesign-direction]]` (the locked architecture + this session's decisions), `[[project-grant-phasing-evolution]]` (D26 vs J27 phasing), `[[project-staged-review-pipeline]]` (the triage-dashboard precursor), `[[project-bill-honorarium-integration]]` (honorarium flow downstream of Approve & Pay).
+- **Memory / background:** `[[project-reviewer-apps-redesign-direction]]` (the locked architecture + this session's decisions), `[[project-grant-phasing-evolution]]` (D26 vs J27 phasing), `[[project-staged-review-pipeline]]` (the triage-dashboard precursor), `[[project-bill-honorarium-integration]]` (honorarium flow — separate from the Completed tab; keyed on reviewer-submission + staff remit gate).
 
 ### Appendix — artifact categorization (how tabs get populated)
 - **Fully auto (no PD in loop):** proposal summary, peer-review summary, funding-gap, integrity screen, fit screen + intelligence brief, reviewer candidate longlist, cover-page assembly, honorarium kickoff.

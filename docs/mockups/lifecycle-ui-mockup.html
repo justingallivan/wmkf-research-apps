@@ -133,12 +133,12 @@ const WB_TABS = [
   { key:'overview',  icon:'🗂️', label:'Overview',   kind:null,    phase:'v1',     note:'Request snapshot + what needs the PD now.' },
   { key:'proposal',  icon:'📄', label:'Proposal',   kind:null,    phase:'v1',     note:'In-app proposal viewer. Replaces the SharePoint read-pain workaround.' },
   { key:'initial-writeup', icon:'✍️', label:'Initial Writeup', kind:'refine', phase:'v1', note:'Early writeup draft in the form of a Phase I writeup — reuses the existing Phase I writeup engine. Auto-drafted, PD refines.' },
-  { key:'reviewers', icon:'🎯', label:'Reviewers',  kind:'refine',phase:'v1',     note:'THE v1 slice. Find → Roster → Approve & Pay. Replaces Finder + Manager.' },
+  { key:'reviewers', icon:'🎯', label:'Reviewers',  kind:'refine',phase:'v1',     note:'THE v1 slice. Find → Invite → Track → Completed. Replaces Finder + Manager.' },
   { key:'reviews',   icon:'📝', label:'Reviews',    kind:'auto',  phase:'future', note:'Returned peer reviews + auto-summary + site-visit questions.' },
   { key:'writeup',   icon:'✍️', label:'Pre Site Visit Writeup', kind:'refine',phase:'future', note:'Writeup draft ahead of the site visit, incorporating returned reviews. Auto-draft skeleton; PD refines. Replaces the filename-keyed Word template.' },
   { key:'sitevisit', icon:'📍', label:'Site Visit', kind:'human', phase:'future', note:'Human-only deliberation notes.' },
   { key:'final-writeup', icon:'📝', label:'Final Writeup', kind:'refine', phase:'future', note:'Final writeup after the site visit, folding in site-visit findings. Auto-draft from the pre-visit writeup; PD refines.' },
-  { key:'status',    icon:'📌', label:'Status',     kind:'readonly', phase:'future', note:'Read-only reflection of the proposal\'s own Dynamics lifecycle string (akoya_requeststatus on akoya_request) — a LIVING taxonomy: enumerate live at query time, do not hardcode a value list (per DATAVERSE_POWER_TOOLS_DESIGN). The documented value→class map (probe-derived 2026-05-16) splits Pending-family (Concept / Phase I / Phase II Pending) ⇒ in-flight (probe-clean) from a decided-terminal class (probe-proven examples: Approved, Denied, *Declined, *Ineligible, Closed, *Done) plus a user-attested middle (Active = awarded-in-performance, Proposal Not Invited, Withdrawn — S158, inferred not probe-proven); a value not in the live map ⇒ UNCLASSIFIED, not a guess. Staff recommend; the BOARD decides, recorded in Dynamics elsewhere — not editable here. Distinct from the reviewer-level approve→payable field (owed to Connor) and from wmkf_phaseiistatus. Tentative placeholder for whatever request-level wrap-up this becomes.' },
+  { key:'status',    icon:'📌', label:'Status',     kind:'readonly', phase:'future', note:'Read-only reflection of the proposal\'s own Dynamics lifecycle string (akoya_requeststatus on akoya_request) — a LIVING taxonomy: enumerate live at query time, do not hardcode a value list (per DATAVERSE_POWER_TOOLS_DESIGN). The documented value→class map (probe-derived 2026-05-16) splits Pending-family (Concept / Phase I / Phase II Pending) ⇒ in-flight (probe-clean) from a decided-terminal class (probe-proven examples: Approved, Denied, *Declined, *Ineligible, Closed, *Done) plus a user-attested middle (Active = awarded-in-performance, Proposal Not Invited, Withdrawn — S158, inferred not probe-proven); a value not in the live map ⇒ UNCLASSIFIED, not a guess. Staff recommend; the BOARD decides, recorded in Dynamics elsewhere — not editable here. Distinct from the reviewer-level Completed signal (wmkf_reviewstatus=complete + wmkf_completedat, deployed S196 — record-keeping, no trigger) and from wmkf_phaseiistatus. Tentative placeholder for whatever request-level wrap-up this becomes.' },
 ];
 
 function req(){ return REQUESTS.find(r => r.id === STATE.requestId); }
@@ -156,22 +156,22 @@ function visibleRequests(){
 // ---------------------------------------------------------------------------
 // State-aware default landing for the Reviewers tab: land on the EARLIEST
 // funnel step with outstanding PD work (Invite if candidates are shortlisted
-// but unsent, Track if reviewers are invited/in-flight, Approve & Pay if
-// reviews are back awaiting approval), else Find. (Placeholder heuristic — the
+// but unsent, Track if reviewers are invited/in-flight, Completed if reviews
+// are back awaiting the PD's sign-off), else Find. (Placeholder heuristic — the
 // real rule is the deferred isActionableForPD policy, open item #2.)
 function defaultReviewerSub(r, layout){
   const rv = (r && r.reviewers) || {};
   const toSend = rv.toSend||0, pending = rv.pending||0, overdue = rv.overdue||0;
   const invited = (rv.confirmed||0)+pending+(rv.declined||0);
-  const awaitingApproval = (rv.returned||0)-(rv.approved||0);
+  const awaitingSignoff = (rv.returned||0)-(rv.approved||0);
   if(layout==='3tab'){            // Roster consolidates Invite + Track
     if(toSend>0 || invited>0) return 'roster';
-    if(awaitingApproval>0) return 'approvepay';
+    if(awaitingSignoff>0) return 'completed';
     return 'find';
   }
   if(toSend>0) return 'invite';                  // shortlisted, not yet sent
   if(pending>0 || overdue>0) return 'track';     // invites out, need chasing
-  if(awaitingApproval>0) return 'approvepay';    // reviews back, need approval
+  if(awaitingSignoff>0) return 'completed';      // reviews back, need sign-off
   if(invited>0) return 'track';                  // confirmed, awaiting reviews
   return 'find';                                 // nothing started
 }
@@ -422,8 +422,8 @@ function placeholderPanel(key){
 
 // ---- Reviewers tab: the v1 slice, with the 3-tab vs 4-tab fork toggle -------
 function reviewersPanel(r){
-  const layout4 = [['find','Find'],['invite','Invite'],['track','Track'],['approvepay','Approve & Pay']];
-  const layout3 = [['find','Find'],['roster','Roster'],['approvepay','Approve & Pay']];
+  const layout4 = [['find','Find'],['invite','Invite'],['track','Track'],['completed','Completed']];
+  const layout3 = [['find','Find'],['roster','Roster'],['completed','Completed']];
   const tabs = STATE.reviewerLayout==='4tab' ? layout4 : layout3;
   return `
   <div class="mb-4 flex items-center justify-between flex-wrap gap-3">
@@ -439,7 +439,7 @@ function reviewersPanel(r){
     </div>
   </div>
 
-  ${annoNote('<b>Decided (S206): 4-tab + status badges</b> — Find / Invite / Track / Approve &amp; Pay. All four are action labels (vs. the noun "Roster"), and Invite (compose+send) vs. Track (monitor+chase) are genuinely different modes. The badges on the tab bar (e.g. Track <span class="font-semibold">1 pending · ⚠1</span>, Approve &amp; Pay <span class="font-semibold">1 to approve</span>) recover the one thing the consolidated Roster did well — at-a-glance "where is everyone" — without losing the descriptive tabs. White space per sub-tab is acceptable at per-request scale. Toggle to compare the old 3-tab Roster.')}
+  ${annoNote('<b>Decided (S206): 4-tab + status badges</b> — Find / Invite / Track / Completed. The labels are descriptive (vs. the noun "Roster"), and Invite (compose+send) vs. Track (monitor+chase) are genuinely different modes. The badges on the tab bar (e.g. Track <span class="font-semibold">1 pending · ⚠1</span>, Completed <span class="font-semibold">1 completed</span>) recover the one thing the consolidated Roster did well — at-a-glance "where is everyone" — without losing the descriptive tabs. White space per sub-tab is acceptable at per-request scale. Toggle to compare the old 3-tab Roster.')}
 
   <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
     <div class="flex gap-0.5 border-b border-gray-200 px-2 pt-1">
@@ -459,7 +459,7 @@ function subBadge(k,r){
   if(k==='invite') return rv.toSend>0 ? pill(rv.toSend, gray) : '';
   if(k==='track'){ let out=''; if(rv.pending>0) out+=pill(rv.pending+' pending', gray); if(rv.overdue>0) out+=pill('⚠'+rv.overdue, amber); return out; }
   if(k==='roster'){ const active=(rv.confirmed||0)+(rv.pending||0); return active>0?pill(active+' active', gray):''; }
-  if(k==='approvepay'){ const awaiting=(rv.returned||0)-(rv.approved||0); return awaiting>0 ? pill(awaiting+' to approve', indigo) : ''; }
+  if(k==='completed'){ const done=rv.approved||0; return done>0 ? pill(done+' completed', 'bg-green-100 text-green-700') : ''; }
   return '';
 }
 
@@ -531,16 +531,16 @@ function reviewerSubContent(r){
     </table>` : emptyState('No reviewers yet — start in Find.')}
     ${annoNote('In 3-tab, this single Roster replaces both Invite and Track. The action column is row-state-driven. Fewer tabs, denser table — compare against the 4-tab split.')}`;
   }
-  if(sub==='approvepay'){
+  if(sub==='completed'){
     const ret = names(rv.returned);
-    const approved = rv.approved||0;
+    const done = rv.approved||0;
     return `
-    <div class="text-sm text-gray-600 mb-3">Per-reviewer: read the returned review, approve it. Approval marks the reviewer\'s work done and releases their honorarium. The badge counts reviews still awaiting approval (returned − already-approved).</div>
-    ${ret.length ? `<div class="space-y-2">${ret.map(([n],i)=> i<approved
-        ? rowCard(n,'review returned','<span class="text-xs font-semibold text-green-600">approved → honorarium queued</span>')
-        : rowCard(n,'review returned','<button class="text-xs font-semibold text-indigo-600 hover:underline">approve & pay</button>')).join('')}</div>`
+    <div class="text-sm text-gray-600 mb-3">Per-reviewer: read the returned review and mark it <b>Completed</b>. Completion is record-keeping only — it triggers nothing and does NOT remove the row. The badge counts how many are completed.</div>
+    ${ret.length ? `<div class="space-y-2">${ret.map(([n],i)=> i<done
+        ? rowCard(n,'review returned','<span class="text-xs font-semibold text-green-600">✓ completed</span>')
+        : rowCard(n,'review returned','<button class="text-xs font-semibold text-indigo-600 hover:underline">mark completed</button>')).join('')}</div>`
       : emptyState('No reviews returned yet.')}
-    ${annoNote('<b>Approve &amp; Pay is the reviewer-level automation seam</b> (was called "Closeout" — renamed S206 to disambiguate from the request-level Status tab). Approving the review flips a Dataverse status (field name still owed to Connor) → BILL honorarium flow runs downstream. Honorarium is NOT a PD tab — it\'s a consequence. The reviewer\'s payment-address was captured earlier on the external /accept surface, not here. Per-REVIEWER, around/before the site visit; the whole-REQUEST endpoint is the separate Status tab.')}`;
+    ${annoNote('<b>"Completed" (was "Approve &amp; Pay" / "Closeout" — settled S206, option a).</b> Maps to existing DEPLOYED fields: wmkf_reviewstatus = complete (100000004) + wmkf_completedat (S196, prod 2026-05-28). NO trigger — payment-eligibility stays on the reviewer-submission signal (wmkf_reviewreceivedat) + staff remit gate; the honorarium link (wmkf_HonorariumRequest) already exists, separately. Completed rows are NOT filtered off the dashboard (this overrides the original S196 drop-off intent) — cycle-scoping handles cleanup, and you can reopen a past cycle to review. Per-REVIEWER; the whole-REQUEST endpoint is the separate read-only Status tab.')}`;
   }
 }
 
