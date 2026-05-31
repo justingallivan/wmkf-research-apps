@@ -59,12 +59,11 @@ This is the surface that's mocked and the near-term build target.
 ### 3.1 Request queue (tier 2)
 - PD identity from the signed-in session — **no PD picker**.
 - **Cycle** selector (defaults to the current open cycle).
-- **Scope** filter: My (lead) / My (lead-or-backup) / All. The reviewer dashboard is a **Phase II surface** (reviewer-finding only happens at Phase II), and **Phase II is the assigned PD's domain** — so the regular-PD norm and default is **My**. **"All" is an oversight capability, NOT a universal toggle:**
-  - **Regular PD** → My (lead / lead-or-backup); **no All option** (they don't need others' Phase II requests).
-  - **Superuser** → My + All.
-  - **Oversight admin (e.g. Sarah)** → All, via an explicit **"review oversight / see-all" grant** — *not* by being a PD (her My is empty) and *not* by superuser bypass.
-  - "My" is data-derived from request ownership (`wmkf_programdirector` = lead per [[project-akoya-request-pd-fields]]; backup field TBD at build), not a role flag. Default landing scope: My if named on ≥1 request this cycle, else All (for oversight holders).
-  - This means **three orthogonal access concepts**: `reviewers` grant (use the dashboard) · PD-ownership (populates My) · review-oversight (unlocks All). Phase I collaboration ("every PD has input") is a *separate, upstream* surface (triage), where broad visibility is the norm — it does not apply to this Phase II dashboard.
+- **Scope filter: My (lead) / My (lead-or-backup) / All — a personal filter, NOT a security boundary.** The Phase II silo is *partial*: reviewer **management** is the lead PD's domain, but Phase II **content** (proposal, returned reviews, docs, analyses) is needed by the whole team for in-depth evaluation. So gating is at the **tab** level, not the dashboard level:
+  - **Reading is team-open.** Any `reviewers` grant-holder can browse all requests in the cycle and open any request's content. My = your action queue; All = browse everything for evaluation. Default scope = My if named on ≥1 request this cycle, else All.
+  - **The Reviewers *management* tab (Find/Invite/Track/Completed) is gated to the lead PD** (+ superuser; backup/co-PD management TBD — see open Qs). It is the ONE "assigned PD's domain" surface; everything else on the request is open to the team.
+  - `reviewers` grant = research-review-team membership (use the dashboard + read any request). PD-ownership (`wmkf_programdirector` = lead per [[project-akoya-request-pd-fields]]; backup TBD) populates My **and** gates the management tab. (This supersedes an earlier draft that made "All" oversight-gated and regular PDs My-only — reading is open; only reviewer *management* is per-PD.)
+  - Phase I collaboration ("every PD has input") is a *separate, upstream* surface (triage); this dashboard is Phase II.
 - Each row: a compact identity unit (request # + cycle + program, institution, PI) on the left, and an **actionability cue** on the right ("what needs me now"). *(Exact row content is still open — see §6.)*
 
 ### 3.2 Per-request Workbench (tier 3)
@@ -109,6 +108,11 @@ After the board funds a request and ops sends the **Grant Award Letter (GAL)** �
 Two things make this cheap and worth noting now:
 - **It's the same shape as the reviewer flow** — automated email → magic-link approve/edit → document upload → form-agreement. So it **reuses the external-interaction primitive** (`lib/external`: HMAC token, magic-link landing, upload, form schema). The reviewer lifecycle is instance #1; this is instance #2. Keep the primitive's reviewer-specific bits separable so this doesn't fork it.
 - **It extends the Workbench spine past `Status`** — captured as the placeholder `Awardee` tab. Mainly needs new Dataverse document-routing fields. Full notes: `[[project-awardee-onboarding]]`. **Out of scope for the D26 build.**
+
+### 3.7 Request dossier (team-open read view)
+Clicking a **request number** anywhere (dashboard, search, an email) opens the request's **read view** — proposal, returned reviews, docs, analyses. This is the team-open surface that supports collective Phase II evaluation: any `reviewers` grant-holder can open it, regardless of who the lead PD is.
+
+Architecturally it's the **read-only projection of the per-request Workbench**, not a separate app — the same content tabs, with the **Reviewers management tab appearing only for the lead PD** (+ superuser). Likely UX: a **lightweight modal for a quick read** + the **full Workbench page for deep work**. The "request # → dossier" link is a reusable primitive worth using wherever a request number appears.
 
 ---
 

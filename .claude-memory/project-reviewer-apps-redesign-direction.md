@@ -62,12 +62,12 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 
 - PD identity from session (`dynamics_systemuser_id`), no PD picker.
 - Cycle dropdown, defaults to current open cycle.
-- Scope dropdown: My-lead / My-lead-or-backup / All. **Phase-aware visibility (refined S206 by Justin's Phase I/II distinction):** the reviewer dashboard is a **Phase II surface** (reviewer-finding only at Phase II), and **Phase II = the assigned PD's domain** → regular-PD norm/default is **My**. **"All" is an OVERSIGHT capability, not a universal toggle** (corrects an earlier capture that said show All to everyone):
-  - Regular PD → My only (no All — they don't need others' Phase II requests).
-  - Superuser → My + All.
-  - Oversight admin (Sarah) → All, via an explicit **"review oversight / see-all" grant** — not via being a PD (My empty) and not via superuser bypass.
-  - **THREE orthogonal access concepts:** `reviewers` grant (use dashboard) · PD-ownership (data-derived, populates My; `wmkf_programdirector`=lead per [[project-akoya-request-pd-fields]], backup TBD) · review-oversight (unlocks All). Default scope = My if named on ≥1 request this cycle, else All (oversight holders).
-  - Phase I collaboration ("every PD has input") is a SEPARATE upstream surface (triage; spreadsheet today / J27 triage dashboard) where broad visibility is the norm — does NOT apply to this Phase II dashboard.
+- Scope dropdown: My-lead / My-lead-or-backup / All — **a personal filter, NOT a security boundary** (FINAL S206 model; this section was revised 3×, this is the stable end state). The Phase II silo is **partial**: reviewer *management* is the lead PD's domain, but Phase II *content* (proposal, returned reviews, docs) is needed by the whole team for in-depth evaluation. So gating is at the **TAB** level, not the dashboard:
+  - **Reading is team-open** — any `reviewers` grant-holder can browse all requests + open any request's content. My = your action queue; All = browse everything. Default scope = My if named on ≥1 request this cycle, else All.
+  - **The Reviewers *management* tab (Find/Invite/Track/Completed) is gated to the lead PD** (+ superuser; backup/co-PD management TBD). The ONE "assigned PD's domain" surface; everything else open.
+  - Concepts: `reviewers` grant (use dashboard + read anything) · PD-ownership (`wmkf_programdirector`=lead per [[project-akoya-request-pd-fields]]; backup TBD — populates My AND gates the management tab). The earlier "All is oversight-gated / regular PDs My-only" and the separate "review-oversight grant" are SUPERSEDED — reading is open; Sarah's tracking need is met by open reading, not a special capability.
+  - **Request dossier (Justin wants this):** clicking a request # opens the read-only projection of the request (proposal, reviews, docs) — team-open; Reviewers tab shows only for the lead PD. Likely UX: lightweight modal for a peek + full Workbench page for deep work. "Request # → dossier" is a reusable link primitive.
+  - Phase I collaboration ("every PD has input") is a SEPARATE upstream surface (triage); this dashboard is Phase II.
 - Status filter implemented as `isActionableForPD(request)` policy function (rules deferred).
 - Strict cycle filter; deferred-from-prior-cycle handled at data layer not UI.
 - Row content: still open. S195 user direction was to compact the LEFT side (number + cycle on one line: `#1002279  J26`; institution above PI line: `PI: Mike Pluth`) so the right side can carry actionability cues. Same compact identity unit reused as the persistent header on every Workbench tab.
