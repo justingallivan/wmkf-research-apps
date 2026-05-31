@@ -71,6 +71,8 @@ The lifecycle does **not** end at the board decision: `Status` is the pivot into
 
 Each tab is an existing capability re-homed and pre-loaded with the proposal. Three writeup stages mirror the real lifecycle (Initial = Phase I form, early; Pre Site Visit = folds in returned reviews; Final = folds in site-visit findings). Initial + Pre-visit reuse the existing Phase I / Phase II writeup engines. **The Reviewers tab is the v1 build; the rest are placeholders that land as the automation tier matures.**
 
+**Access:** both the Tools menu and the per-request Workbench tabs filter by the **same per-user app-access grants** the app uses today (Dataverse `wmkf_appuserappaccesses`, admin-managed in `/admin`; `Layout.js` → `hasAccess()`). A re-homed app and its Workbench tab share one grant — e.g. no `reviewer-finder` grant ⇒ the user sees neither the standalone tool nor the Reviewers tab. (The mockup ignores this and shows everything, for legibility.)
+
 ### 3.3 The Reviewers tab — locked structure
 **Four sub-tabs, with status badges on the bar** (decided S206, after comparing a 3-tab "Roster" variant):
 
