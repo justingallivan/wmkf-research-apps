@@ -1,41 +1,40 @@
-# Session 206 Prompt: Proposal-lifecycle UI navigation model (tier-3) — TOP PRIORITY
+# Session 207 Prompt: Proposal-lifecycle UI — build the D26 reviewer dashboard (or keep mocking)
 
-## ⏰ Standing context / guardrails (carried from S197–S205)
-- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity words into docs/memory. The authoritative source for lint counts is `npx eslint . -f json` keyed on `ruleId`/`severity`, NOT grep over the default formatter output (which echoes disable-comment text).
-- **Codex stop-time review gate is ENABLED** and thorough on async/state code.
-- **rtk grep filter STILL corrupts output.** For any "does X exist" verification use `rtk proxy git grep` or write-to-file + Read; never trust a bare `grep`/`rg`. Also: `rtk` compresses `jest` output to a useless `PASS (N) FAIL (0)` — use `rtk proxy npx jest` to see real pass/fail + test names.
-- **Push deploys to prod.** `main` auto-deploys on Vercel.
+## ⏰ Standing context / guardrails (carried from S197–S206)
+- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity words into docs/memory. The authoritative source for lint counts is `npx eslint . -f json` keyed on `ruleId`/`severity`, NOT grep over the default formatter output.
+- **Codex stop-time review gate is ENABLED** and was *very* active in S206 — it repeatedly caught over-claims in design docs/memory (assumptions written as final, stale wording after a rename, two grants collapsed into one). Lesson reinforced: when a design decision changes, **reconcile every restatement across mockup + scoping doc + memory + SESSION_PROMPT in the same turn**, and mark unresolved things OPEN, not final.
+- **rtk grep filter STILL corrupts output.** For any "does X exist" verification use `rtk proxy git grep` or write-to-file + Read; never trust a bare `grep`/`rg`. `rtk` also compresses `jest` to a useless `PASS (N) FAIL (0)` — use `rtk proxy npx jest`.
+- **Push deploys to prod.** `main` auto-deploys on Vercel. (S206 changed only `docs/` + `.claude-memory/` — nothing deployable.)
 - **CI-green ≠ correct for async/effect code.** See [[feedback-profile-context-runtime-bugs]].
 - **Local-dev auth:** full Azure login can't run on `localhost`. To smoke-test gated UI locally, add `AUTH_REQUIRED=false` + a throwaway `NEXTAUTH_SECRET` + `NEXTAUTH_URL=http://localhost:3000` to `.env.local`, run `npm run dev`, **and revert those 3 lines after**.
 
-## Session 205 Summary
+## Session 206 Summary
 
-Short session. Opened the board, closed out the EICAR question, then surfaced + parked the big lifecycle-UI initiative.
+**A design / scoping session — no application code shipped.** Built the proposal-lifecycle UI as a clickable mockup + a Connor/Sarah-shareable scoping doc, and locked a large set of navigation/access decisions through live discussion with Justin. All output is in `docs/mockups/`, `docs/`, and `.claude-memory/`. 33 commits (`3f659a6` → `3e56275`); tree clean; **nothing deployable changed** (no `pages/`, `lib/`, schema, scripts).
 
-### Start-of-session checks — all green
-- CI gates green: `check:atlas` (32 PG / 32 DV), `check:atlas:self-test` (12/12), `check:api-routes` (96 routes; the two BILL routes are *warnings*, not failures). Git clean, up to date, memory store consolidated.
+### Deliverables
+- **`docs/mockups/lifecycle-ui-mockup.html`** — self-contained clickable mockup (open in a browser; "Design notes" toggle overlays rationale + open-question pins; reviewer tab has a 3-tab compare toggle).
+- **`docs/REQUEST_WORKBENCH_SCOPING.md`** — the shareable scoping doc. §6 holds the consolidated open questions.
 
-### Item 1 (EICAR intake e2e) — DEFERRED again (browser/ops-gated, by Justin's call)
-- Did everything solo-verifiable: **re-verified the live `attach.js` infected-branch path is UNCHANGED** from the S203 memory (`:430` infected branch → `:432-433` delBlob + removePending → `:459`/`:486` `draft.attach_infected` audit + `virus_detection_intake` alert → `:526` `jsonError(422, 'infected')`). Rebuilt the fixture: `/tmp/eicar-test-exe.docx` (34,783 bytes, `PK` magic, embeds `/bin/ls`).
-- Residual is the irreducible manual gate only: deployed env with `VIRUS_SCAN_ENABLED=true` + `CLOUDMERSIVE_API_KEY` + a real Entra-authed applicant session through `/apply`. Runbook lives in [[project-intake-portal-virus-scan-e2e-deferred]]. No prod changes made. No code touched.
-
-### Lifecycle UI — NEW TOP PRIORITY, deferred to S206 by Justin
-- Discussed "thornier issues about the UI for the proposal lifecycle." Justin scoped it to **tier-3: the whole-lifecycle navigation model** — how launcher → cycle dashboard → per-request Workbench fit together as ONE coherent UI, and how the existing standalone apps fold in. (NOT the reviewer-lifecycle slice; that's a separate, now-lower item.)
-- Not started tonight (deliberately). **Bumped to top priority.** Justin wants to **build mockups with a Claude browser session** to explore the navigation model visually before/alongside the scoping doc.
-- Captured in [[project-reviewer-apps-redesign-direction]] with a dated S205 reprioritization note.
+### Decisions locked (all in [[project-reviewer-apps-redesign-direction]] S206 block + scoping doc)
+1. **Tier-2 = a family of per-person role *lenses* over one cycle request list** (proposed framing; surfaces are real): **reviewer** (mocked; build now), **triage** (J27 spreadsheet-replacement winnowing ~200→32→28 / up to ~300), **editor** (writeup "Reviewed" tracker). Default landing = your primary lens.
+2. **Reviewer tab = 4-tab + work-remaining badges**: Find / Invite / Track / **Completed**. State-aware default landing. Panels + badges are data-driven (no drift).
+3. **"Closeout" disambiguated**: reviewer-level → **"Completed"** (sets `wmkf_reviewstatus=complete` + `wmkf_completedat` — **record-keeping, no trigger, no drop-off**; existing reviewer-submission + Steph remit payment path untouched); request-level → read-only **"Status"** (`akoya_requeststatus`, board-decided).
+4. **D26 patch** = a **committed allowlist of the ~28 going-forward request numbers**; dashboard shows them regardless of `akoya_requeststatus` (avoids the 'Phase II Pending' PA trigger). **No Connor needed.** Verified only `pages/api/reviewer-finder/my-proposals.js` gates visibility on status.
+5. **Access = Option B**: mint ONE new `reviewers` grant replacing `reviewer-finder` + `review-manager` (build-time migration + retire two appRegistry keys). Visibility filters by per-user app-access (`hasAccess()`), extended to Workbench tabs.
+6. **Visibility model**: reading is **team-open** (Phase II *content* is collective); only the **Reviewers management tab** is lead-PD-gated. Scope My/All = personal filter. Plus the **request dossier** (click a request # → read-only request view).
+7. **Captured future features**: **post-award Awardee stage** (GAL → abstract approval + artwork + release form; reuses the `lib/external` primitive — reviewer is instance #1, awardee #2) — see [[project-awardee-onboarding]]; **collaborative writeup editing** (PDs + CSO + President, lean = embed SharePoint co-authoring); **editor "Reviewed" dashboard** (tracking not a gate; resolves the track-changes silent case).
 
 ### Commits
-- (memory/docs only — committed at `/stop`; no code commits this session)
+33 commits `3f659a6`..`3e56275` (mockup build + iterative decisions + several Codex-driven reconciliations). Representative: `9f5e03f` lock 4-tab; `5cb06f4` Approve&Pay→Completed; `4cf9183` scoping doc; `29e9037` access Option B; `e4849cf` partial-silo scope + dossier; `72cb4b9` editor dashboard; `ba63f38` Reviewed-marker.
 
 ## Potential Next Steps
 
-### 1. ⭐ TOP PRIORITY — Proposal-lifecycle UI: design DONE (S206), build next
-**S206 produced the design artifacts.** Clickable mockup at `docs/mockups/lifecycle-ui-mockup.html` (open in a browser; toggle "Design notes" for rationale + the 3-tab compare). Shareable scoping doc at `docs/REQUEST_WORKBENCH_SCOPING.md`. **Read [[project-reviewer-apps-redesign-direction]] (S206 decisions block) + the scoping doc before continuing.** Note: there are still no `/workbench` UI/routes/write-paths; one piece of schema groundwork IS deployed — `wmkf_appreviewersuggestion.wmkf_completedat` (PD-closeout stamp, S196, prod 2026-05-28).
-- **Tier-2 = a family of per-person role lenses over one cycle request list (S206):** (a) **reviewer lens** = the mocked *post-shortlist* surface (request queue → per-request Workbench; Reviewers tab = v1) — replaces Reviewer Finder + Review Manager; (b) **triage lens** (J27) = upstream spreadsheet-replacement winnowing funnel (D26 ~200→32→28; J27 up to ~300), NOT yet mocked; (c) **editor lens** (future) = writeup "Reviewed" tracker for PDs + CSO + President (President only looks at writeups); tracking not a gate — explicit per-editor "Reviewed" marker resolves the track-changes silent case (no-edits = reviewed-or-not-looked). Default landing = your primary lens. Lens-unification is a proposed framing; surfaces are real.
-- **D26 (current, dual-phase) patch — the near-term build:** reviewer dashboard fits D26 as-is (Phase II = already-winnowed set). Pre-populate via a **committed allowlist of the ~28 going-forward request numbers** — dashboard shows them regardless of `akoya_requeststatus` (avoids the 'Phase II Pending' PA trigger; **no Connor needed**). Verified [2026-05-31]: only `pages/api/reviewer-finder/my-proposals.js` gates visibility on status; invite/external/honorarium paths don't. Justin supplies the ~28 as a one-shot batch (advanced as a group, no trickle).
-- **Reviewer tab structure: DECIDED S206 — 4-tab + status badges** (Find / Invite / Track / Completed), state-aware default landing (earliest funnel step with outstanding work: Invite if shortlisted-unsent, Track if invited, Completed if reviews back awaiting completion, Find if nothing). (Arc: briefly 3-tab w/ "Roster", then reconsidered and locked.) Badge note: every tab surfaces work-remaining (attention); Completed shows **"# to review"** (amber, returned-not-marked) + **"# completed"** (green progress) — Justin asked S206 that attention stay visible, not just a done-count. "Closeout" disambiguated: reviewer-level step → **"Completed"** (sets `wmkf_reviewstatus=complete` + `wmkf_completedat`; **record-keeping only — no trigger, no drop-off**; honorarium is a SEPARATE staff-gated path on the reviewer-submission signal); request-level endpoint → read-only "Status" (reflects Dynamics `akoya_requeststatus`, board-decided, not PD-editable). Scoping doc written: `docs/REQUEST_WORKBENCH_SCOPING.md`.
-- **Phasing:** **D26 is the current/last dual-phase cohort**; **J27** is the first single-submission cycle (one doc entered as Phase I, "Phase II" = internal status flip; full proposals ~Dec 2026, up to ~300, most never reviewed). See [[project-grant-phasing-evolution]].
-- **Next-build open items:** (1) PD dashboard **row content / `isActionableForPD`** (reviewer-centric for v1). (2) **J27 phase trigger** (Connor). *(Payment-gate question CLOSED S206 — option a: tab named "Completed", no trigger, no drop-off, existing reviewer-submission + staff-remit payment path untouched.)*
+### 1. ⭐ Proposal-lifecycle UI — design is done; choose: build vs keep mocking
+**Read [[project-reviewer-apps-redesign-direction]] (S206 block) + `docs/REQUEST_WORKBENCH_SCOPING.md` first.** Two forks:
+- **(a) Build the D26 reviewer dashboard** — the near-term, real-deadline piece (D26 Phase II peer review ~mid-June 2026). **Blocked on Justin handing over the ~28 going-forward request numbers** for the committed allowlist. URL pattern `/workbench/[requestId]/...`; nothing built yet (no `/workbench` routes). One bit of schema groundwork IS live: `wmkf_appreviewersuggestion.wmkf_completedat` (S196, prod).
+- **(b) Keep mocking** — the triage lens, the editor "Reviewed" lens, and the dossier (modal-for-peek + full-page) are not yet drawn; sketching them would pressure-test the lens-family framing before code.
+- **Open questions to resolve before/at build** (full list = scoping doc §6): PD dashboard **row content / `isActionableForPD`** (reviewer-centric for v1); **access boundaries** (exact team-open read set; backup/co-PD reviewer-management; writeup-collaborator enforcement via SharePoint perms vs app capability + whether CSO/President get a light request-view entry); **editor dashboard** granularity (per request vs writeup-stage) + personal-vs-coordinator matrix; **J27 phase trigger** (Connor); **Awardee** GAL status value (findable via probe) + abstract-automation scope + document-routing fields + tab name.
 
 ### 2. Intake virus-scan EICAR e2e — STILL the parked pre-cycle must-do (browser-gated)
 Fixture turnkey (`scripts/build-intake-eicar-fixture.py`), code path verified S205. Needs deployed env + Entra applicant session. [[project-intake-portal-virus-scan-e2e-deferred]].
@@ -50,17 +49,18 @@ Office question (BILL self-registration address capture); ops before `BILL_ENABL
 
 | File | Purpose |
 |------|---------|
-| `.claude-memory/project-reviewer-apps-redesign-direction.md` | LOCKED three-tier architecture + S206 decisions block. READ FIRST for the lifecycle UI work. |
-| `docs/REQUEST_WORKBENCH_SCOPING.md` | S206 Connor/Sarah-shareable scoping doc: tier-2 lens family (reviewer/triage/editor), reviewer tab structure, D26 allowlist patch, access model, dependencies, scope fences. |
-| `docs/mockups/lifecycle-ui-mockup.html` | S206 clickable navigation mockup (open in browser; "Design notes" toggle). The reviewer dashboard rendered. |
-| `docs/GRANT_CYCLE_LIFECYCLE.md` | Canonical lifecycle stages/statuses (current cycle); note the cycle-redesign-in-flight banner. |
-| `shared/config/appRegistry.js` | Single source of truth for the existing apps that must fold into the navigation model. |
-| `shared/components/Layout.js` | Current nav (filtered by app access) — the surface tier-3 reworks. |
-| `scripts/build-intake-eicar-fixture.py` | Builds `/tmp/eicar-test-exe.docx` for the parked intake virus-scan e2e. |
+| `.claude-memory/project-reviewer-apps-redesign-direction.md` | LOCKED architecture + the full S206 decisions block. READ FIRST for the lifecycle UI work. |
+| `docs/REQUEST_WORKBENCH_SCOPING.md` | S206 Connor/Sarah-shareable scoping doc: tier-2 lens family, reviewer tab structure, D26 allowlist patch, access model, dossier, §6 open questions. |
+| `docs/mockups/lifecycle-ui-mockup.html` | S206 clickable navigation mockup (open in browser; "Design notes" toggle). |
+| `.claude-memory/project-awardee-onboarding.md` | Captured post-award awardee-onboarding feature (GAL → abstract/artwork/release; reuses `lib/external`). |
+| `shared/config/appRegistry.js` | Source of truth for the apps that fold into the navigation model (Option B will retire `reviewer-finder`/`review-manager` keys). |
+| `shared/components/Layout.js` | Current nav (filtered by `hasAccess()`) — the chrome the new global bar replaces; ~23/24 pages render through it. |
+| `pages/api/reviewer-finder/my-proposals.js` | The only place that gates dashboard visibility on `akoya_requeststatus='Phase II Pending'` (verified S206) — the allowlist augments this. |
 
 ## Testing
 ```bash
-rtk proxy npx jest                       # 1549 tests (use `rtk proxy` — bare rtk compresses jest output)
-npm run lint                             # 0 errors / 32 warnings (CI blocks on errors only)
+rtk proxy npx jest                       # use `rtk proxy` — bare rtk compresses jest output
+npm run lint                             # 0 errors / warnings only (CI blocks on errors only)
 npm run check:atlas && npm run check:atlas:self-test && npm run check:api-routes && npm run check:fact-consistency
+# Mockup is non-functional: open docs/mockups/lifecycle-ui-mockup.html in a browser; no test harness.
 ```
