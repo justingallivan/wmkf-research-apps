@@ -164,11 +164,16 @@ export function ProfileProvider({ children }) {
 
     if (hasMigrationData || !currentPrefs[MIGRATION_FLAG]) {
       try {
-        await fetch('/api/user-preferences', {
+        const response = await fetch('/api/user-preferences', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ profileId, preferences: settingsToSave })
         });
+        // fetch() does NOT throw on HTTP error status, so an unchecked response
+        // would fall through to the purge below and DELETE the local settings
+        // even though the server rejected the save — permanent data loss. Only
+        // purge after a confirmed-successful save.
+        if (!response.ok) throw new Error('Failed to persist migrated preferences');
 
         // After successful migration, PURGE localStorage to prevent resurrection
         Object.keys(legacyKeys).forEach(key => localStorage.removeItem(key));
