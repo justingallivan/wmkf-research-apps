@@ -30,23 +30,21 @@ TIER 1  Global launcher → demoted to a "Tools" menu
          Reporting, Expense Reporter, Admin, + standalone forms of the
          per-request apps for off-cycle / ad-hoc use)
                               │
-TIER 2  Cycle-scoped, per-PD dashboards  ── TWO of them (see below)
+TIER 2  Cycle-scoped, per-person dashboards  ── a FAMILY of role lenses (see below)
                               │
 TIER 3  Per-request Workbench  (/workbench/[requestId]/…)
         every per-request operation becomes a tab, pre-loaded with the proposal
 ```
 
-**The key refinement (this session): there are TWO tier-2 dashboards, not one.**
+**The key refinement (this session): tier-2 is a FAMILY of per-person role "lenses" over the same cycle request list, not one dashboard.** Each lens shows role-specific columns + actions; **your default landing = your primary lens** (PD → reviewer; President → editor; Sarah → editor + open reading). Proposed framing (the lens-unification is a recommendation; the surfaces themselves are real).
 
-| | Triage / cycle dashboard | Reviewer dashboard |
-|---|---|---|
-| **Job** | Run the Phase I winnowing funnel; decide what advances | Find, invite, track, and pay reviewers for what advanced |
-| **Volume** | The whole inflow (J27: up to ~300) | Only the advanced set (D26: ~28) |
-| **Replaces** | The triage **spreadsheet** | Reviewer Finder + Review Manager |
-| **When** | J27 build | Build now (D26) |
-| **Mocked?** | Not yet | Yes — `docs/mockups/lifecycle-ui-mockup.html` |
+| Lens | Job | Audience | Tracks | When / status |
+|---|---|---|---|---|
+| **Triage** | Winnow the Phase I inflow; decide what advances | PDs | winnowing state | J27 build; replaces the triage **spreadsheet** |
+| **Reviewer** | Find / invite / track / complete reviewers (Phase II) | review PDs | reviewer status | Build now (D26); replaces Finder + Manager; **mocked** |
+| **Editor** | Track writeup **sign-off** across the cycle | writeup-collaborators: PDs **+ CSO + President** | *my* seen/signed-off per writeup | future; sign-off data is new (see §4a) |
 
-**Flow:** `triage dashboard → (winnow → advance the group) → reviewer dashboard → per-request Workbench`.
+**Flow:** `triage → (winnow → advance) → reviewer (manage reviewers) → … → editor (collective writeup sign-off) → board`.
 
 Standalone apps don't disappear — they live in the Tools menu for off-cycle/ad-hoc use, and the per-request ones *also* appear as a Workbench tab pre-loaded with that proposal (same engine, two doors).
 
@@ -120,13 +118,21 @@ Architecturally it's the **read-only projection of the per-request Workbench**, 
 
 ## 4. The triage / cycle dashboard (J27)
 
-Not mocked yet; defined here so the two dashboards relate cleanly.
+Not mocked yet; defined here so the dashboard lenses (reviewer / triage / editor) relate cleanly.
 
 **Core job: replace the Phase I triage spreadsheet.** The winnowing is a real, structured funnel — this cycle roughly **~200 → ~32 → ~28** (long list → short list → final set to invite to Phase II). The dashboard runs that funnel in-app, per PD, with tasks across the whole grant cycle and access to re-homed versions of the existing apps, and ends in an **advance-the-group** action.
 
 That advance action is where the **phase trigger** fires: it flips the advanced set into the working Phase II state and hands them to the reviewer dashboard.
 
 This is the home of the previously-separate "staged review pipeline" idea (fit screen → intelligence brief → panel), now anchored as the upstream half of the model.
+
+## 4a. The editor dashboard (future, surfaced S206)
+
+A third tier-2 lens, for the **writeup-collaborator set** — PDs **+ CSO + President**. Near cycle-end this group collectively edits writeups (see §3.2); the editor dashboard is their **per-person tracker**: the active cycle's writeups with *my seen / signed-off status* ("I've signed off 12 of 28"). The President, for instance, only looks at writeups — this is effectively her whole view of the cycle.
+
+- **Same shape as the reviewer "Completed" tab**, but for editors: a personal progress tracker over the cycle, not reviewer infrastructure. Pairs with the dossier (click a request → read the writeup → sign off) and the writeup-collaborator access set.
+- **New data:** sign-off is per-`(editor, writeup)` — a many-to-many that doesn't exist today (new Dataverse child entity or per-request sign-off records keyed by editor).
+- **Open:** (1) granularity — per request or per writeup stage (initial / pre-visit / final)?; (2) states — just "signed off" or "seen" → "signed off"?; (3) does sign-off *gate* anything (e.g., board-ready) or is it pure tracking?; (4) personal view only, or a coordinator (Sarah) matrix of who-signed-off-what across editors?
 
 ---
 
@@ -169,7 +175,7 @@ The current and next cycles have different shapes, so the rollout differs.
 - **Status tab** — `akoya_requeststatus` is a **living taxonomy** (enumerate live, never hardcode; unknown value → "unclassified," not a guess). Its value→class map is documented in `docs/DATAVERSE_POWER_TOOLS_DESIGN.md` (probe-derived; in-flight = Pending-family, decided-terminal = Approved/Denied/Declined/Ineligible/Closed/Done/Withdrawn/etc.). The tab is tentative — what else belongs at the request endpoint is undecided.
 
 **Locked (no longer open)**
-- Reviewer tab structure (4-tab + badges); PD identity from session, no picker; the Closeout → **Completed** (reviewer, no trigger, no drop-off) / **Status** (request, read-only) split; the two-dashboard model; the D26 allowlist mechanism.
+- Reviewer tab structure (4-tab + badges); PD identity from session, no picker; the Closeout → **Completed** (reviewer, no trigger, no drop-off) / **Status** (request, read-only) split; the tier-2 lens family (reviewer / triage / editor over one cycle request list); the D26 allowlist mechanism.
 
 ---
 
