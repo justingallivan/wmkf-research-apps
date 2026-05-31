@@ -60,19 +60,19 @@ const REQUESTS = [
   { id:'1002279', cycle:'J26', inst:'University of Oregon', pi:'Mike Pluth',
     title:'Sulfur signaling probes for live-cell imaging', scope:'mine', program:'SE',
     stage:'Phase II', actionable:true, action:'2 reviews returned — summarize + draft writeup',
-    cand:8, reviewers:{confirmed:3, pending:1, declined:2, returned:2, overdue:1} },
+    cand:8, reviewers:{confirmed:3, pending:1, declined:2, returned:2, overdue:1, toSend:3} },
   { id:'1002311', cycle:'J26', inst:'Caltech', pi:'Frances Arnold',
     title:'Directed evolution of carbon-fixing enzymes', scope:'mine', program:'SE',
     stage:'Phase II', actionable:true, action:'Shortlist 5 reviewers from longlist (8 candidates)',
-    cand:8, reviewers:{confirmed:0, pending:0, declined:0, returned:0, overdue:0} },
+    cand:8, reviewers:{confirmed:0, pending:0, declined:0, returned:0, overdue:0, toSend:5} },
   { id:'1002345', cycle:'J26', inst:'Stanford', pi:'Carolyn Bertozzi',
     title:'Glycan-targeted degraders', scope:'mine-or-backup', program:'MR',
     stage:'Phase II', actionable:false, action:'Awaiting reviewer responses (3 pending)',
-    cand:6, reviewers:{confirmed:1, pending:3, declined:1, returned:0, overdue:0} },
+    cand:6, reviewers:{confirmed:1, pending:3, declined:1, returned:0, overdue:0, toSend:0} },
   { id:'1002390', cycle:'J26', inst:'MIT', pi:'Feng Zhang',
     title:'Programmable RNA editing platforms', scope:'all', program:'MR',
     stage:'Phase I', actionable:false, action:'Phase I screening complete — awaiting committee',
-    cand:0, reviewers:{confirmed:0, pending:0, declined:0, returned:0, overdue:0} },
+    cand:0, reviewers:{confirmed:0, pending:0, declined:0, returned:0, overdue:0, toSend:0} },
 ];
 
 // Tier-1 launcher / Tools menu. FAITHFULLY mirrors shared/config/appRegistry.js
@@ -435,7 +435,7 @@ function subBadge(k,r){
   const pill=(t,c)=>`<span class="ml-1.5 text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${c}">${t}</span>`;
   const gray='bg-gray-100 text-gray-600', amber='bg-amber-100 text-amber-800', indigo='bg-indigo-100 text-indigo-700';
   if(k==='find')   return r.cand>0 ? pill(r.cand, gray) : '';
-  if(k==='invite'){ const open=Math.max(0,5-(rv.confirmed||0)-(rv.pending||0)); return open>0?pill(open+' open', gray):''; }
+  if(k==='invite') return rv.toSend>0 ? pill(rv.toSend, gray) : '';
   if(k==='track'){ let out=''; if(rv.pending>0) out+=pill(rv.pending+' pending', gray); if(rv.overdue>0) out+=pill('⚠'+rv.overdue, amber); return out; }
   if(k==='roster'){ const active=(rv.confirmed||0)+(rv.pending||0); return active>0?pill(active+' active', gray):''; }
   if(k==='approvepay') return rv.returned>0 ? pill(rv.returned, indigo) : '';

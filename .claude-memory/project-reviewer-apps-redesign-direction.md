@@ -67,7 +67,7 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 
 **Tabs — leaning 4-tab + status badges (S206, pending final confirm).** Default landing is Track.
 - **Find** — candidate discovery (current Reviewer Finder behavior, request-aware). Badge: candidate count.
-- **Invite** — build shortlist + compose/dispatch invitations. Badge: open slots to fill.
+- **Invite** — build shortlist + compose/dispatch invitations. Badge: # shortlisted candidates awaiting dispatch (matches the count shown in the panel).
 - **Track** — confirmed/pending/declined, materials state, review-in-progress, overdue chasing — the home base once invites are out. Badge: pending count + overdue (⚠).
 - **Approve & Pay** (was "Closeout" — renamed S206) — per-reviewer: read & approve the returned review → reviewer's work is done → triggers honorarium automation downstream. Badge: reviews awaiting approval.
 
