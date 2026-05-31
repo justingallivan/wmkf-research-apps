@@ -46,8 +46,8 @@ const STATE = {
   scope: 'mine',            // 'mine' | 'mine-or-backup' | 'all'
   requestId: null,
   wbTab: 'overview',        // workbench area
-  reviewerLayout: '3tab',   // '4tab' | '3tab'  — DECIDED S206: 3-tab (simpler/more efficient)
-  reviewerSubTab: 'roster', // default landing for 3-tab is the consolidated Roster
+  reviewerLayout: '4tab',   // '4tab' | '3tab'  — S206 reconsidered: 4-tab + status badges (clearer, mirrors workflow)
+  reviewerSubTab: 'track',  // default landing for 4-tab is Track (home base once invites are out)
   toolsOpen: false,
   cycleOpen: false,
   anno: false,
@@ -60,19 +60,19 @@ const REQUESTS = [
   { id:'1002279', cycle:'J26', inst:'University of Oregon', pi:'Mike Pluth',
     title:'Sulfur signaling probes for live-cell imaging', scope:'mine', program:'SE',
     stage:'Phase II', actionable:true, action:'2 reviews returned — summarize + draft writeup',
-    reviewers:{confirmed:3, pending:1, declined:2, returned:2} },
+    cand:8, reviewers:{confirmed:3, pending:1, declined:2, returned:2, overdue:1} },
   { id:'1002311', cycle:'J26', inst:'Caltech', pi:'Frances Arnold',
     title:'Directed evolution of carbon-fixing enzymes', scope:'mine', program:'SE',
     stage:'Phase II', actionable:true, action:'Shortlist 5 reviewers from longlist (8 candidates)',
-    reviewers:{confirmed:0, pending:0, declined:0, returned:0} },
+    cand:8, reviewers:{confirmed:0, pending:0, declined:0, returned:0, overdue:0} },
   { id:'1002345', cycle:'J26', inst:'Stanford', pi:'Carolyn Bertozzi',
     title:'Glycan-targeted degraders', scope:'mine-or-backup', program:'MR',
     stage:'Phase II', actionable:false, action:'Awaiting reviewer responses (3 pending)',
-    reviewers:{confirmed:1, pending:3, declined:1, returned:0} },
+    cand:6, reviewers:{confirmed:1, pending:3, declined:1, returned:0, overdue:0} },
   { id:'1002390', cycle:'J26', inst:'MIT', pi:'Feng Zhang',
     title:'Programmable RNA editing platforms', scope:'all', program:'MR',
     stage:'Phase I', actionable:false, action:'Phase I screening complete — awaiting committee',
-    reviewers:{confirmed:0, pending:0, declined:0, returned:0} },
+    cand:0, reviewers:{confirmed:0, pending:0, declined:0, returned:0, overdue:0} },
 ];
 
 // Tier-1 launcher / Tools menu. FAITHFULLY mirrors shared/config/appRegistry.js
@@ -161,7 +161,7 @@ function setScope(s){ STATE.scope=s; render(); }
 function setCycle(c){ STATE.cycle=c; STATE.cycleOpen=false; if(STATE.view==='workbench'){STATE.view='dashboard'; STATE.requestId=null;} render(); }
 function toggleTools(){ STATE.toolsOpen=!STATE.toolsOpen; STATE.cycleOpen=false; render(); }
 function toggleCycle(){ STATE.cycleOpen=!STATE.cycleOpen; STATE.toolsOpen=false; render(); }
-function setReviewerLayout(l){ STATE.reviewerLayout=l; STATE.reviewerSubTab = (l==='3tab'?'roster':'find'); render(); }
+function setReviewerLayout(l){ STATE.reviewerLayout=l; STATE.reviewerSubTab = (l==='3tab'?'roster':'track'); render(); }
 function setReviewerSub(s){ STATE.reviewerSubTab=s; render(); }
 function toggleAnno(){ STATE.anno=!STATE.anno; render(); }
 
@@ -408,24 +408,38 @@ function reviewersPanel(r){
   <div class="mb-4 flex items-center justify-between flex-wrap gap-3">
     <h2 class="text-lg font-semibold flex items-center gap-2">🎯 Reviewer lifecycle ${kindBadge('refine')}
       <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold">Workbench v1</span></h2>
-    <!-- DECIDED S206: 3-tab. Toggle kept for comparison. -->
+    <!-- S206 reconsidered: leaning 4-tab + badges. Toggle kept for comparison. -->
     <div class="flex items-center gap-2 text-xs" data-fork="reviewerlayout">
-      <span class="text-gray-400">S196 fork — <span class="text-green-700 font-semibold">decided: 3-tab</span> · compare:</span>
+      <span class="text-gray-400">S206 — <span class="text-green-700 font-semibold">leaning: 4-tab + badges</span> · compare:</span>
       <div class="flex gap-1 bg-gray-100 rounded-lg p-1">
-        <button onclick="setReviewerLayout('3tab')" class="px-2.5 py-1 rounded-md font-semibold ${STATE.reviewerLayout==='3tab'?'bg-white shadow text-green-700':'text-gray-500'}">3-tab ✓</button>
-        <button onclick="setReviewerLayout('4tab')" class="px-2.5 py-1 rounded-md font-semibold ${STATE.reviewerLayout==='4tab'?'bg-white shadow text-gray-900':'text-gray-400'}">4-tab</button>
+        <button onclick="setReviewerLayout('4tab')" class="px-2.5 py-1 rounded-md font-semibold ${STATE.reviewerLayout==='4tab'?'bg-white shadow text-green-700':'text-gray-500'}">4-tab ✓</button>
+        <button onclick="setReviewerLayout('3tab')" class="px-2.5 py-1 rounded-md font-semibold ${STATE.reviewerLayout==='3tab'?'bg-white shadow text-gray-900':'text-gray-400'}">3-tab</button>
       </div>
     </div>
   </div>
 
-  ${annoNote('<b>Decided (S206): 3-tab</b> — Find / Roster / Approve &amp; Pay, where "Roster" consolidates invite+track and actions vary by row state (simpler, fewer clicks once reviewers exist). The 4-tab split (Find / Invite / Track / Approve &amp; Pay) is kept above only for comparison. Toggle to see the difference.')}
+  ${annoNote('<b>Leaning (S206, reconsidered): 4-tab + status badges</b> — Find / Invite / Track / Approve &amp; Pay. All four are action labels (vs. the noun "Roster"), and Invite (compose+send) vs. Track (monitor+chase) are genuinely different modes. The badges on the tab bar (e.g. Track <span class="font-semibold">1 pending · ⚠1</span>, Approve &amp; Pay <span class="font-semibold">2</span>) recover the one thing the consolidated Roster did well — at-a-glance "where is everyone" — without losing the descriptive tabs. White space per sub-tab is acceptable at per-request scale. Toggle to compare the old 3-tab Roster.')}
 
   <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
     <div class="flex gap-0.5 border-b border-gray-200 px-2 pt-1">
-      ${tabs.map(([k,l])=>`<button onclick="setReviewerSub('${k}')" class="px-4 py-2 text-sm font-medium border-b-2 -mb-px ${STATE.reviewerSubTab===k?'border-indigo-600 text-indigo-700':'border-transparent text-gray-500 hover:text-gray-800'}">${l}</button>`).join('')}
+      ${tabs.map(([k,l])=>`<button onclick="setReviewerSub('${k}')" class="px-4 py-2 text-sm font-medium border-b-2 -mb-px flex items-center ${STATE.reviewerSubTab===k?'border-indigo-600 text-indigo-700':'border-transparent text-gray-500 hover:text-gray-800'}">${l}${subBadge(k,r)}</button>`).join('')}
     </div>
     <div class="p-5">${reviewerSubContent(r)}</div>
   </div>`;
+}
+
+// Status badges on the reviewer sub-tabs — the tab bar doubles as the at-a-glance
+// overview (the one thing the consolidated Roster did well, recovered for 4-tab).
+function subBadge(k,r){
+  const rv = r.reviewers||{};
+  const pill=(t,c)=>`<span class="ml-1.5 text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${c}">${t}</span>`;
+  const gray='bg-gray-100 text-gray-600', amber='bg-amber-100 text-amber-800', indigo='bg-indigo-100 text-indigo-700';
+  if(k==='find')   return r.cand>0 ? pill(r.cand, gray) : '';
+  if(k==='invite'){ const open=Math.max(0,5-(rv.confirmed||0)-(rv.pending||0)); return open>0?pill(open+' open', gray):''; }
+  if(k==='track'){ let out=''; if(rv.pending>0) out+=pill(rv.pending+' pending', gray); if(rv.overdue>0) out+=pill('⚠'+rv.overdue, amber); return out; }
+  if(k==='roster'){ const active=(rv.confirmed||0)+(rv.pending||0); return active>0?pill(active+' active', gray):''; }
+  if(k==='approvepay') return rv.returned>0 ? pill(rv.returned, indigo) : '';
+  return '';
 }
 
 function reviewerSubContent(r){

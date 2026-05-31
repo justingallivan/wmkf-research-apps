@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: Reviewer Finder + Reviewer Manager are slated to be replaced by a unified Request Workbench (per-request, holistic) + standalone Reviewer Pool. Holistic frame locked S195; build sequence = reviewer-lifecycle slice first (= Workbench v1). Reviewer-tab structure DECIDED S206: 3-tab (Find/Roster/Approve & Pay).
+description: Reviewer Finder + Reviewer Manager are slated to be replaced by a unified Request Workbench (per-request, holistic) + standalone Reviewer Pool. Holistic frame locked S195; build sequence = reviewer-lifecycle slice first (= Workbench v1). Reviewer-tab structure S206: leaning 4-tab + status badges (Find/Invite/Track/Approve & Pay), pending final confirm.
 metadata:
   type: project
 ---
@@ -10,7 +10,7 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 **S205 reprioritization (2026-05-30):** Justin elevated the **tier-3 whole-lifecycle navigation model** (how launcher → cycle dashboard → per-request Workbench fit together as ONE coherent UI, and how the existing standalone apps fold in) to **top-priority next-session work** — distinct from, and now ahead of, the reviewer-lifecycle-slice build. Not started tonight (deferred deliberately). Approach he wants: **build mockups with a Claude browser session** (visual exploration of the navigation model) before/alongside the scoping doc. The architecture below is still the locked frame; the open work is rendering the tier-stitching as something he can see and react to. Nothing built; no scoping doc yet (see end of entry).
 
 **S206 mockup + decisions (2026-05-31):** Built the first clickable navigation mockup at `docs/mockups/lifecycle-ui-mockup.html` (self-contained HTML, committed 3f659a6; NOT a live app change — no `pages/` route). Decisions Justin made driving it:
-- **Reviewer-tab structure = 3-tab** (Find / Roster / Approve & Pay), chosen over 4-tab (Find/Invite/Track/Approve & Pay) as simpler/more efficient — closes the S196 open fork.
+- **Reviewer-tab structure → leaning 4-tab + status badges** (Find / Invite / Track / Approve & Pay). NOTE the arc within S206: first landed on 3-tab (Find/Roster/Approve & Pay) as simpler, then Justin reconsidered same session — "Roster" is a noun that breaks the all-actions label pattern and hides the work; Invite (compose+send) vs Track (monitor+chase) are genuinely different modes worth separating; the white-space worry was inherited from the old standalone Manager and is minor at per-request scale. Resolution = 4-tab with count/status badges on the tab bar (e.g. Track "1 pending · ⚠1", Approve & Pay "2"), so the bar doubles as the at-a-glance overview that Roster provided. Default landing = Track. Mockup defaults to this; 3-tab kept behind a compare toggle. **Pending Justin's final confirm after viewing the rendered hybrid.**
 - **"Closeout" disambiguated (S206).** The word was overloaded across two scopes. The per-REVIEWER step (approve a returned review → reviewer done → honorarium eligible; happens around/before the site visit) is now **"Approve & Pay"** — it carries the honorarium trigger. The whole-REQUEST endpoint is a separate concern (below).
 - **Request endpoint = read-only "Status" tab, NOT a PD decision.** Justin: staff only *recommend*; the BOARD decides approve/decline and it is entered into Dynamics by someone else. So the top-level final tab is a read-only reflection of the proposal's Dynamics status (`akoya_requeststatus` — Pending / Approved / Declined), not an editable PD field. Still tentative — Justin isn't sure yet what else belongs at the request endpoint.
 - **Screening is backend-automated, not a Workbench tab.** Integrity Screener, WMKF Expertise, Funding Analysis live in the Tools menu (manual, on-demand) only.
@@ -65,12 +65,13 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 
 **Why this slice first:** needed for J26 Phase II peer review (real deadline, mid-June 2026 with BILL honoraria); needed for every future cycle as the post-shortlist surface; survives the Phase I sunset; most code-broken piece today.
 
-**Tabs — DECIDED S206: 3-tab (Find / Roster / Approve & Pay).** Default landing is Roster.
-- **Find** — candidate discovery (current Reviewer Finder behavior, request-aware)
-- **Roster** — consolidates the former Invite + Track: shortlist + dispatch invitations, then confirmed/pending/declined, materials state, review-in-progress, overdue chasing — a single table where actions vary by row state
-- **Approve & Pay** (was "Closeout" — renamed S206) — per-reviewer: read & approve the returned review → reviewer's work is done → triggers honorarium automation downstream
+**Tabs — leaning 4-tab + status badges (S206, pending final confirm).** Default landing is Track.
+- **Find** — candidate discovery (current Reviewer Finder behavior, request-aware). Badge: candidate count.
+- **Invite** — build shortlist + compose/dispatch invitations. Badge: open slots to fill.
+- **Track** — confirmed/pending/declined, materials state, review-in-progress, overdue chasing — the home base once invites are out. Badge: pending count + overdue (⚠).
+- **Approve & Pay** (was "Closeout" — renamed S206) — per-reviewer: read & approve the returned review → reviewer's work is done → triggers honorarium automation downstream. Badge: reviews awaiting approval.
 
-The 4-tab alternative (Find / Invite / Track / Approve & Pay, each a distinct stage) was **rejected S206** — more clicks for no clarity gain once reviewers exist. The mockup keeps it behind a compare-only toggle.
+The badges on the tab bar recover the at-a-glance "where is everyone" overview that the rejected 3-tab Roster consolidated into one table — without giving up the descriptive action labels. The 3-tab alternative (Find / Roster / Approve & Pay) is kept behind a compare-only toggle in the mockup.
 
 **Honorarium is NOT a PD-facing tab.** It's a downstream automation consequence of Approve & Pay: PD approves the review → status flips to payable (Dataverse field name TBD; Connor still owes `wmkf_HonorariumRequest` lookup on `wmkf_potentialreviewer` per [[project-bill-honorarium-integration]]) → BILL flow runs.
 
@@ -98,6 +99,6 @@ The reason this redesign is now urgent: Connor maintains a parallel SharePoint f
 
 `docs/REQUEST_WORKBENCH_SCOPING.md` (or similar) — Connor/Sarah-shareable. Captures: holistic architecture; phasing change; reviewer-lifecycle v1 in detail (URL, tabs, what they do, what they replace, integration points with shipped reviewer infra); artifact-storage inventory pass (what's in Dataverse already, what's missing); explicit out-of-scope-for-v1 list (writeup, analyses, triage surface).
 
-S206 closed the reviewer tab-structure fork (3-tab) and disambiguated "Closeout" (reviewer-level → "Approve & Pay"; request-level → read-only "Status"). Still owed before the scoping doc: name the approve→payable status field for Connor, then write the doc.
+S206 reopened the reviewer tab-structure fork and is leaning 4-tab + status badges (was briefly 3-tab; pending Justin's final confirm), and disambiguated "Closeout" (reviewer-level → "Approve & Pay"; request-level → read-only "Status"). Still owed before the scoping doc: confirm the 4-tab call; name the approve→payable status field for Connor; then write the doc.
 
 Related: [[reviewer-identity-fragmentation]], [[project-reviewer-finder-dataverse-entry-path]], [[project-reviewer-institution-match]], [[project-w6-table-drop-pending]], [[project-app-roadmap-2026-04-25]], [[project-bill-honorarium-integration]], [[project-grant-phasing-evolution]], [[project-backend-automation]], [[project-staged-review-pipeline]], [[project-proposal-context-extraction]], [[project-prompt-storage-strategy]], [[project-dynamics-ai-writeback]].
