@@ -60,7 +60,7 @@ const REQUESTS = [
   { id:'1002279', cycle:'J26', inst:'University of Oregon', pi:'Mike Pluth',
     title:'Sulfur signaling probes for live-cell imaging', scope:'mine', program:'SE',
     stage:'Phase II', actionable:true, action:'2 reviews returned — summarize + draft writeup',
-    cand:8, reviewers:{confirmed:3, pending:1, declined:2, returned:2, overdue:1, toSend:3} },
+    cand:8, reviewers:{confirmed:3, pending:1, declined:2, returned:2, approved:1, overdue:1, toSend:3} },
   { id:'1002311', cycle:'J26', inst:'Caltech', pi:'Frances Arnold',
     title:'Directed evolution of carbon-fixing enzymes', scope:'mine', program:'SE',
     stage:'Phase II', actionable:true, action:'Shortlist 5 reviewers from longlist (8 candidates)',
@@ -418,7 +418,7 @@ function reviewersPanel(r){
     </div>
   </div>
 
-  ${annoNote('<b>Leaning (S206, reconsidered): 4-tab + status badges</b> — Find / Invite / Track / Approve &amp; Pay. All four are action labels (vs. the noun "Roster"), and Invite (compose+send) vs. Track (monitor+chase) are genuinely different modes. The badges on the tab bar (e.g. Track <span class="font-semibold">1 pending · ⚠1</span>, Approve &amp; Pay <span class="font-semibold">2</span>) recover the one thing the consolidated Roster did well — at-a-glance "where is everyone" — without losing the descriptive tabs. White space per sub-tab is acceptable at per-request scale. Toggle to compare the old 3-tab Roster.')}
+  ${annoNote('<b>Leaning (S206, reconsidered): 4-tab + status badges</b> — Find / Invite / Track / Approve &amp; Pay. All four are action labels (vs. the noun "Roster"), and Invite (compose+send) vs. Track (monitor+chase) are genuinely different modes. The badges on the tab bar (e.g. Track <span class="font-semibold">1 pending · ⚠1</span>, Approve &amp; Pay <span class="font-semibold">1 to approve</span>) recover the one thing the consolidated Roster did well — at-a-glance "where is everyone" — without losing the descriptive tabs. White space per sub-tab is acceptable at per-request scale. Toggle to compare the old 3-tab Roster.')}
 
   <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
     <div class="flex gap-0.5 border-b border-gray-200 px-2 pt-1">
@@ -438,68 +438,89 @@ function subBadge(k,r){
   if(k==='invite') return rv.toSend>0 ? pill(rv.toSend, gray) : '';
   if(k==='track'){ let out=''; if(rv.pending>0) out+=pill(rv.pending+' pending', gray); if(rv.overdue>0) out+=pill('⚠'+rv.overdue, amber); return out; }
   if(k==='roster'){ const active=(rv.confirmed||0)+(rv.pending||0); return active>0?pill(active+' active', gray):''; }
-  if(k==='approvepay') return rv.returned>0 ? pill(rv.returned, indigo) : '';
+  if(k==='approvepay'){ const awaiting=(rv.returned||0)-(rv.approved||0); return awaiting>0 ? pill(awaiting+' to approve', indigo) : ''; }
   return '';
+}
+
+// Sample reviewer name pool — sliced to per-request counts so every sub-panel's
+// rows are generated from the SAME data the badges use. Row count then matches
+// the tab badge for ANY request (no static-vs-data drift).
+const POOL = [
+  ['Dr. Aisha Rahman','MIT'], ['Dr. Luca Moretti','ETH Zürich'], ['Dr. Priya Nair','UW–Madison'],
+  ['Dr. Sam Okafor','Rice'], ['Dr. Elena Vargas','UC San Diego'], ['Dr. Hiroshi Tanaka','Kyoto'],
+  ['Dr. Maya Chen','Caltech'], ['Dr. Omar Haddad','Toronto'], ['Dr. Nadia Khan','Imperial'], ['Dr. Tom Becker','EPFL'],
+];
+function names(n){ return Array.from({length:Math.max(0,n||0)}, (_,i)=>POOL[i % POOL.length]); }
+function emptyState(msg){ return `<div class="text-sm text-gray-400 italic py-8 text-center">${msg}</div>`; }
+function rowCard(n, sub, right){
+  return `<div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2">
+    <div><div class="text-sm font-medium">${n}</div><div class="text-xs text-gray-500">${sub}</div></div>
+    ${right}</div>`;
 }
 
 function reviewerSubContent(r){
   const sub = STATE.reviewerSubTab;
+  const rv = r.reviewers || {};
   if(sub==='find'){
+    const rows = names(r.cand);
     return `
     <div class="text-sm text-gray-600 mb-3">AI + database candidate discovery — <b>request-aware</b> (proposal already loaded, no upload). Replaces standalone Reviewer Finder.</div>
-    <div class="space-y-2">
-      ${[['Dr. Aisha Rahman','MIT · 41 relevant pubs','match 0.91'],['Dr. Luca Moretti','ETH Zürich · 28 pubs','match 0.87'],['Dr. Priya Nair','UW–Madison · 33 pubs','match 0.85']].map(([n,a,m])=>`
-        <div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2">
-          <div><div class="text-sm font-medium">${n}</div><div class="text-xs text-gray-500">${a}</div></div>
-          <div class="flex items-center gap-3"><span class="text-xs font-mono text-green-700">${m}</span>
-          <button class="text-xs font-semibold text-indigo-600 hover:underline">+ shortlist</button></div>
-        </div>`).join('')}
-    </div>
-    ${annoNote('Find pulls from the Reviewer Pool (the standalone tier-1 app) but scoped to this request. Same data, request-aware entry — the dual-entry principle again.')}`;
+    ${rows.length ? `<div class="space-y-2">${rows.map(([n,a],i)=>rowCard(n, `${a} · ${22+((i*7)%28)} relevant pubs`,
+        `<div class="flex items-center gap-3"><span class="text-xs font-mono text-green-700">match ${Math.max(0.62,0.95-i*0.03).toFixed(2)}</span><button class="text-xs font-semibold text-indigo-600 hover:underline">+ shortlist</button></div>`)).join('')}</div>`
+      : emptyState('No candidates discovered yet — run discovery.')}
+    ${annoNote('Find pulls from the Reviewer Pool (the standalone tier-1 app) but scoped to this request. Same data, request-aware entry — the dual-entry principle again. Rows are generated from this request\'s candidate count, so the count matches the Find badge.')}`;
   }
   if(sub==='invite'){
-    return panelList('Invite','Shortlisted candidates awaiting dispatch. PD picks 5 (over-invite buffer; need 3 confirmed).',
-      [['Dr. Aisha Rahman','ready to send'],['Dr. Luca Moretti','ready to send'],['Dr. Priya Nair','draft email']],
-      'Send invitation');
+    const rows = names(rv.toSend);
+    return `
+    <div class="text-sm text-gray-600 mb-3">Shortlisted candidates awaiting dispatch. PD picks 5 (over-invite buffer; need 3 confirmed).</div>
+    ${rows.length ? `<div class="space-y-2">${rows.map(([n],i)=>rowCard(n, i%3===2?'draft email':'ready to send',
+        `<button class="text-xs font-semibold text-indigo-600 hover:underline">Send invitation</button>`)).join('')}</div>`
+      : emptyState('Nothing shortlisted yet — add candidates from Find.')}`;
   }
   if(sub==='track'){
-    return panelList('Track','Confirmed / pending / declined, materials state, overdue chasing.',
-      [['Dr. Aisha Rahman','✅ confirmed · materials sent'],['Dr. Luca Moretti','⏳ pending (3d)'],['Dr. Priya Nair','❌ declined']],
-      'Send reminder');
+    const inv = names((rv.confirmed||0)+(rv.pending||0)+(rv.declined||0));
+    const conf = inv.slice(0, rv.confirmed||0);
+    const pend = inv.slice(rv.confirmed||0, (rv.confirmed||0)+(rv.pending||0));
+    const decl = inv.slice((rv.confirmed||0)+(rv.pending||0));
+    const rows = [
+      ...conf.map(([n])=>[n,'✅ confirmed · materials sent','Send reminder']),
+      ...pend.map(([n],i)=>[n, i<(rv.overdue||0)?'⏳ pending · ⚠ overdue':'⏳ pending (3d)','Send reminder']),
+      ...decl.map(([n])=>[n,'❌ declined','Replace']),
+    ];
+    return `
+    <div class="text-sm text-gray-600 mb-3">Confirmed / pending / declined, materials state, overdue chasing. The badge tracks pending + overdue (the part needing action).</div>
+    ${rows.length ? `<div class="space-y-2">${rows.map(([n,s,a])=>rowCard(n,s,`<button class="text-xs font-semibold text-indigo-600 hover:underline">${a}</button>`)).join('')}</div>`
+      : emptyState('No reviewers invited yet — send invitations from Invite.')}`;
   }
   if(sub==='roster'){
+    const total=(rv.toSend||0)+(rv.confirmed||0)+(rv.pending||0)+(rv.declined||0);
+    const nm = names(total); let p=0; const grab=k=>{const s=nm.slice(p,p+(k||0)); p+=(k||0); return s;};
+    const rows=[
+      ...grab(rv.toSend).map(([n])=>[n,'Shortlisted','—','Send invitation']),
+      ...grab(rv.confirmed).map(([n])=>[n,'Confirmed','Sent','Send reminder']),
+      ...grab(rv.pending).map(([n],i)=>[n, i<(rv.overdue||0)?'Pending · ⚠ overdue':'Pending (3d)','—','Resend invite']),
+      ...grab(rv.declined).map(([n])=>[n,'Declined','—','Replace']),
+    ];
     return `
     <div class="text-sm text-gray-600 mb-3">Consolidated roster (3-tab layout): invite + track in one table; actions vary by row state.</div>
-    <table class="w-full text-sm">
+    ${rows.length ? `<table class="w-full text-sm">
       <thead><tr class="text-left text-xs text-gray-400 border-b"><th class="py-2">Reviewer</th><th>State</th><th>Materials</th><th class="text-right">Action</th></tr></thead>
-      <tbody>
-        ${[['Dr. Aisha Rahman','Confirmed','Sent','Send reminder'],['Dr. Luca Moretti','Pending (3d)','—','Resend invite'],['Dr. Priya Nair','Declined','—','Replace'],['(empty slot)','—','—','Invite from Find']].map(([n,s,m,a])=>`
-          <tr class="border-b border-gray-50"><td class="py-2 font-medium">${n}</td><td class="text-gray-600">${s}</td><td class="text-gray-500">${m}</td><td class="text-right"><button class="text-xs font-semibold text-indigo-600 hover:underline">${a}</button></td></tr>`).join('')}
-      </tbody>
-    </table>
+      <tbody>${rows.map(([n,s,m,a])=>`<tr class="border-b border-gray-50"><td class="py-2 font-medium">${n}</td><td class="text-gray-600">${s}</td><td class="text-gray-500">${m}</td><td class="text-right"><button class="text-xs font-semibold text-indigo-600 hover:underline">${a}</button></td></tr>`).join('')}</tbody>
+    </table>` : emptyState('No reviewers yet — start in Find.')}
     ${annoNote('In 3-tab, this single Roster replaces both Invite and Track. The action column is row-state-driven. Fewer tabs, denser table — compare against the 4-tab split.')}`;
   }
   if(sub==='approvepay'){
+    const ret = names(rv.returned);
+    const approved = rv.approved||0;
     return `
-    <div class="text-sm text-gray-600 mb-3">Per-reviewer: read the returned review, approve it. Approval marks the reviewer\'s work done and releases their honorarium.</div>
-    <div class="space-y-2">
-      ${[['Dr. Aisha Rahman','review returned','approved → honorarium queued'],['Dr. Luca Moretti','review returned','approve & pay']].map(([n,s,a])=>`
-        <div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2">
-          <div><div class="text-sm font-medium">${n}</div><div class="text-xs text-gray-500">${s}</div></div>
-          <button class="text-xs font-semibold ${a.startsWith('approved')?'text-green-600':'text-indigo-600 hover:underline'}">${a}</button>
-        </div>`).join('')}
-    </div>
-    ${annoNote('<b>Approve &amp; Pay is the reviewer-level automation seam</b> (was called "Closeout" — renamed S206 to disambiguate from the request-level Status tab). Approving the review flips a Dataverse status (field name still owed to Connor) → BILL honorarium flow runs downstream. Honorarium is NOT a PD tab — it\'s a consequence. The reviewer\'s payment-address was captured earlier on the external /accept surface, not here. This is per-REVIEWER and happens around/before the site visit; the whole-REQUEST endpoint is the separate Status tab.')}`;
+    <div class="text-sm text-gray-600 mb-3">Per-reviewer: read the returned review, approve it. Approval marks the reviewer\'s work done and releases their honorarium. The badge counts reviews still awaiting approval (returned − already-approved).</div>
+    ${ret.length ? `<div class="space-y-2">${ret.map(([n],i)=> i<approved
+        ? rowCard(n,'review returned','<span class="text-xs font-semibold text-green-600">approved → honorarium queued</span>')
+        : rowCard(n,'review returned','<button class="text-xs font-semibold text-indigo-600 hover:underline">approve & pay</button>')).join('')}</div>`
+      : emptyState('No reviews returned yet.')}
+    ${annoNote('<b>Approve &amp; Pay is the reviewer-level automation seam</b> (was called "Closeout" — renamed S206 to disambiguate from the request-level Status tab). Approving the review flips a Dataverse status (field name still owed to Connor) → BILL honorarium flow runs downstream. Honorarium is NOT a PD tab — it\'s a consequence. The reviewer\'s payment-address was captured earlier on the external /accept surface, not here. Per-REVIEWER, around/before the site visit; the whole-REQUEST endpoint is the separate Status tab.')}`;
   }
-}
-function panelList(title,desc,rows,action){
-  return `
-  <div class="text-sm text-gray-600 mb-3">${desc}</div>
-  <div class="space-y-2">
-    ${rows.map(([n,s])=>`<div class="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2">
-      <div><div class="text-sm font-medium">${n}</div><div class="text-xs text-gray-500">${s}</div></div>
-      <button class="text-xs font-semibold text-indigo-600 hover:underline">${action}</button></div>`).join('')}
-  </div>`;
 }
 
 // ---------------------------------------------------------------------------
