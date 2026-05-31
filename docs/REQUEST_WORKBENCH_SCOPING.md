@@ -77,7 +77,7 @@ Each tab is an existing capability re-homed and pre-loaded with the proposal. Th
 | **Find** | AI + database candidate discovery, request-aware (replaces Reviewer Finder) | # candidates |
 | **Invite** | Build shortlist, compose + dispatch invitations | # awaiting dispatch |
 | **Track** | Confirmed / pending / declined, materials, overdue chasing | # pending · ⚠ overdue |
-| **Completed** | Read the returned review and mark it complete. Record-keeping only — no trigger, no drop-off (see §3.4). | # completed |
+| **Completed** | Read the returned review and mark it complete. Record-keeping only — no trigger, no drop-off (see §3.4). | # to review · # completed |
 
 - The badges make the tab bar an **at-a-glance overview** ("where is everyone"), so the four-tab split costs nothing in scannability.
 - **Landing is state-aware:** open on the earliest step with outstanding work (Invite if shortlisted-but-unsent, Track if invites are out, Completed if reviews are back awaiting sign-off, Find if nothing's started).
@@ -85,7 +85,7 @@ Each tab is an existing capability re-homed and pre-loaded with the proposal. Th
 ### 3.4 "Closeout" disambiguated
 The word was overloaded. It now splits into two **different** things at two scopes:
 - **Completed** — *per reviewer.* The PD reads the returned review and marks it complete. This maps to **existing, deployed** fields on `wmkf_appreviewersuggestion`: set `wmkf_reviewstatus = complete (100000004)` and stamp **`wmkf_completedat`** (added S196, prod 2026-05-28).
-  - **Settled (S206, option a — no payment trigger):** completion is **record-keeping only — nothing reacts to it.** Payment-eligibility stays on its existing path: `wmkf_reviewreceivedat` (set when the **reviewer submits**) signals eligibility, the `wmkf_HonorariumRequest` lookup (shipped 2026-05-28) links the honorarium, and staff hold the final remit gate (`wmkf_authorizationtoremitpaymentflag`). The tab is named **"Completed"** (not "Approve & Pay") precisely so it doesn't imply it pays anyone. Its badge is a **done-count** ("how many are completed").
+  - **Settled (S206, option a — no payment trigger):** completion is **record-keeping only — nothing reacts to it.** Payment-eligibility stays on its existing path: `wmkf_reviewreceivedat` (set when the **reviewer submits**) signals eligibility, the `wmkf_HonorariumRequest` lookup (shipped 2026-05-28) links the honorarium, and staff hold the final remit gate (`wmkf_authorizationtoremitpaymentflag`). The tab is named **"Completed"** (not "Approve & Pay") precisely so it doesn't imply it pays anyone. Its badge shows **"# to review"** (amber — reviews returned but not yet marked, the attention signal) plus **"# completed"** (green progress).
   - **No drop-off:** completed rows are **not** filtered off the dashboard (this overrides the original S196 "row drops off at `wmkf_completedat`" intent). Cleanup is handled by **cycle-scoping** — the next cycle starts with a clean dashboard, and a finished cycle is reopened from the cycle switcher if needed.
 - **Status** — *per request.* A **read-only** reflection of the proposal's own Dynamics lifecycle status (`akoya_requeststatus`). Staff *recommend*; the **board decides** approve/decline and it's recorded in Dynamics elsewhere. The Workbench only displays it.
 

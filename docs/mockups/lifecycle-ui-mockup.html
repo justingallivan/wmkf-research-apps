@@ -439,7 +439,7 @@ function reviewersPanel(r){
     </div>
   </div>
 
-  ${annoNote('<b>Decided (S206): 4-tab + status badges</b> — Find / Invite / Track / Completed. The labels are descriptive (vs. the noun "Roster"), and Invite (compose+send) vs. Track (monitor+chase) are genuinely different modes. The badges on the tab bar (e.g. Track <span class="font-semibold">1 pending · ⚠1</span>, Completed <span class="font-semibold">1 completed</span>) recover the one thing the consolidated Roster did well — at-a-glance "where is everyone" — without losing the descriptive tabs. White space per sub-tab is acceptable at per-request scale. Toggle to compare the old 3-tab Roster.')}
+  ${annoNote('<b>Decided (S206): 4-tab + status badges</b> — Find / Invite / Track / Completed. The labels are descriptive (vs. the noun "Roster"), and Invite (compose+send) vs. Track (monitor+chase) are genuinely different modes. The badges on the tab bar (e.g. Track <span class="font-semibold">1 pending · ⚠1</span>, Completed <span class="font-semibold">1 to review · 1 completed</span>) recover the one thing the consolidated Roster did well — at-a-glance "where is everyone" — without losing the descriptive tabs. White space per sub-tab is acceptable at per-request scale. Toggle to compare the old 3-tab Roster.')}
 
   <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
     <div class="flex gap-0.5 border-b border-gray-200 px-2 pt-1">
@@ -459,7 +459,7 @@ function subBadge(k,r){
   if(k==='invite') return rv.toSend>0 ? pill(rv.toSend, gray) : '';
   if(k==='track'){ let out=''; if(rv.pending>0) out+=pill(rv.pending+' pending', gray); if(rv.overdue>0) out+=pill('⚠'+rv.overdue, amber); return out; }
   if(k==='roster'){ const active=(rv.confirmed||0)+(rv.pending||0); return active>0?pill(active+' active', gray):''; }
-  if(k==='completed'){ const done=rv.approved||0; return done>0 ? pill(done+' completed', 'bg-green-100 text-green-700') : ''; }
+  if(k==='completed'){ const done=rv.approved||0, awaiting=(rv.returned||0)-done; let out=''; if(awaiting>0) out+=pill(awaiting+' to review', amber); if(done>0) out+=pill(done+' completed', 'bg-green-100 text-green-700'); return out; }
   return '';
 }
 
@@ -535,7 +535,7 @@ function reviewerSubContent(r){
     const ret = names(rv.returned);
     const done = rv.approved||0;
     return `
-    <div class="text-sm text-gray-600 mb-3">Per-reviewer: read the returned review and mark it <b>Completed</b>. Completion is record-keeping only — it triggers nothing and does NOT remove the row. The badge counts how many are completed.</div>
+    <div class="text-sm text-gray-600 mb-3">Per-reviewer: read the returned review and mark it <b>Completed</b>. Completion is record-keeping only — it triggers nothing and does NOT remove the row. The badge shows how many still need your review (amber) + how many are completed (green).</div>
     ${ret.length ? `<div class="space-y-2">${ret.map(([n],i)=> i<done
         ? rowCard(n,'review returned','<span class="text-xs font-semibold text-green-600">✓ completed</span>')
         : rowCard(n,'review returned','<button class="text-xs font-semibold text-indigo-600 hover:underline">mark completed</button>')).join('')}</div>`
