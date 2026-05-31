@@ -138,7 +138,7 @@ const WB_TABS = [
   { key:'writeup',   icon:'✍️', label:'Pre Site Visit Writeup', kind:'refine',phase:'future', note:'Writeup draft ahead of the site visit, incorporating returned reviews. Auto-draft skeleton; PD refines. Replaces the filename-keyed Word template.' },
   { key:'sitevisit', icon:'📍', label:'Site Visit', kind:'human', phase:'future', note:'Human-only deliberation notes.' },
   { key:'final-writeup', icon:'📝', label:'Final Writeup', kind:'refine', phase:'future', note:'Final writeup after the site visit, folding in site-visit findings. Auto-draft from the pre-visit writeup; PD refines.' },
-  { key:'status',    icon:'📌', label:'Status',     kind:'readonly', phase:'future', note:'Read-only reflection of the proposal\'s Dynamics status (akoya_requeststatus — e.g. Pending / Approved / Declined). Staff recommend; the BOARD decides and it is recorded in Dynamics elsewhere — not editable here. Tentative placeholder for whatever request-level wrap-up this becomes.' },
+  { key:'status',    icon:'📌', label:'Status',     kind:'readonly', phase:'future', note:'Read-only reflection of the proposal\'s own Dynamics lifecycle string (akoya_requeststatus on akoya_request — confirmed values Concept Pending → Phase I Pending → Phase II Pending; later funded/declined values exist in the same field but are not yet surveyed). Staff recommend; the BOARD decides and it is recorded in Dynamics elsewhere — not editable here. NOTE: distinct from the reviewer-level approve→payable field (owed to Connor, lives on the suggestion/contact side), and from wmkf_phaseiistatus. Tentative placeholder for whatever request-level wrap-up this becomes.' },
 ];
 
 function req(){ return REQUESTS.find(r => r.id === STATE.requestId); }
