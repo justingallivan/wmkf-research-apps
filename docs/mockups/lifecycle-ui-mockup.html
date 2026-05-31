@@ -154,14 +154,22 @@ function visibleRequests(){
 // ---------------------------------------------------------------------------
 // NAV ACTIONS
 // ---------------------------------------------------------------------------
+// State-aware default landing for the Reviewers tab: Find when nothing is
+// invited yet (no one to track), else Track (4-tab) / Roster (3-tab).
+function defaultReviewerSub(r, layout){
+  const rv = (r && r.reviewers) || {};
+  const hasInvited = (rv.confirmed||0)+(rv.pending||0)+(rv.declined||0) > 0;
+  if(layout==='3tab') return hasInvited ? 'roster' : 'find';
+  return hasInvited ? 'track' : 'find';
+}
 function go(view){ STATE.view = view; STATE.toolsOpen=false; STATE.cycleOpen=false; render(); }
-function openRequest(id){ STATE.requestId=id; STATE.view='workbench'; STATE.wbTab='overview'; STATE.toolsOpen=false; STATE.cycleOpen=false; render(); }
+function openRequest(id){ STATE.requestId=id; STATE.reviewerSubTab=defaultReviewerSub(req(), STATE.reviewerLayout); STATE.view='workbench'; STATE.wbTab='overview'; STATE.toolsOpen=false; STATE.cycleOpen=false; render(); }
 function setTab(k){ STATE.wbTab=k; render(); }
 function setScope(s){ STATE.scope=s; render(); }
 function setCycle(c){ STATE.cycle=c; STATE.cycleOpen=false; if(STATE.view==='workbench'){STATE.view='dashboard'; STATE.requestId=null;} render(); }
 function toggleTools(){ STATE.toolsOpen=!STATE.toolsOpen; STATE.cycleOpen=false; render(); }
 function toggleCycle(){ STATE.cycleOpen=!STATE.cycleOpen; STATE.toolsOpen=false; render(); }
-function setReviewerLayout(l){ STATE.reviewerLayout=l; STATE.reviewerSubTab = (l==='3tab'?'roster':'track'); render(); }
+function setReviewerLayout(l){ STATE.reviewerLayout=l; STATE.reviewerSubTab = defaultReviewerSub(req(), l); render(); }
 function setReviewerSub(s){ STATE.reviewerSubTab=s; render(); }
 function toggleAnno(){ STATE.anno=!STATE.anno; render(); }
 
