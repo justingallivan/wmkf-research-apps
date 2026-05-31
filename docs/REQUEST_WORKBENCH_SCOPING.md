@@ -44,7 +44,7 @@ TIER 3  Per-request Workbench  (/workbench/[requestId]/…)
 | **Reviewer** | Find / invite / track / complete reviewers (Phase II) | review PDs | reviewer status | Build now (D26); replaces Finder + Manager; **mocked** |
 | **Editor** | Track writeup **"Reviewed"** status across the cycle | writeup-collaborators: PDs **+ CSO + President** | *my* reviewed-marker per writeup (+ auto "has edits") | future; marker data is new (see §4a) |
 
-**Flow:** `triage → (winnow → advance) → reviewer (manage reviewers) → … → editor (collective writeup sign-off) → board`.
+**Flow:** `triage → (winnow → advance) → reviewer (manage reviewers) → … → editor (writeup "Reviewed" tracking) → board`.
 
 Standalone apps don't disappear — they live in the Tools menu for off-cycle/ad-hoc use, and the per-request ones *also* appear as a Workbench tab pre-loaded with that proposal (same engine, two doors).
 
@@ -88,7 +88,7 @@ Each tab is an existing capability re-homed and pre-loaded with the proposal. Th
 | **Completed** | Read the returned review and mark it complete. Record-keeping only — no trigger, no drop-off (see §3.4). | # to review · # completed |
 
 - The badges make the tab bar an **at-a-glance overview** ("where is everyone"), so the four-tab split costs nothing in scannability.
-- **Landing is state-aware:** open on the earliest step with outstanding work (Invite if shortlisted-but-unsent, Track if invites are out, Completed if reviews are back awaiting sign-off, Find if nothing's started).
+- **Landing is state-aware:** open on the earliest step with outstanding work (Invite if shortlisted-but-unsent, Track if invites are out, Completed if reviews are back awaiting completion, Find if nothing's started).
 
 ### 3.4 "Closeout" disambiguated
 The word was overloaded. It now splits into two **different** things at two scopes:
@@ -128,7 +128,7 @@ This is the home of the previously-separate "staged review pipeline" idea (fit s
 
 ## 4a. The editor dashboard (future, surfaced S206)
 
-A third tier-2 lens, for the **writeup-collaborator set** — PDs **+ CSO + President**. Near cycle-end this group collectively edits writeups (see §3.2); the editor dashboard is their **per-person tracker**: the active cycle's writeups with *my seen / signed-off status* ("I've signed off 12 of 28"). The President, for instance, only looks at writeups — this is effectively her whole view of the cycle.
+A third tier-2 lens, for the **writeup-collaborator set** — PDs **+ CSO + President**. Near cycle-end this group collectively edits writeups (see §3.2); the editor dashboard is their **per-person tracker**: the active cycle's writeups with *my "Reviewed" status* ("reviewed 12 of 28"). The President, for instance, only looks at writeups — this is effectively her whole view of the cycle.
 
 - **Same shape as the reviewer "Completed" tab**, but for editors: a personal progress tracker over the cycle, not reviewer infrastructure. Pairs with the dossier (click a request → read the writeup → mark reviewed) and the writeup-collaborator access set.
 - **Tracking, NOT a gate (Justin 2026-05-31).** Sign-off has never been rigorously enforced — often just an email from leadership ("I looked at your writeups and left comments"). So it doesn't block anything; it's a status tracker (closes the earlier "does it gate?" question).

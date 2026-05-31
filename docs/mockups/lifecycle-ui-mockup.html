@@ -158,21 +158,21 @@ function visibleRequests(){
 // State-aware default landing for the Reviewers tab: land on the EARLIEST
 // funnel step with outstanding PD work (Invite if candidates are shortlisted
 // but unsent, Track if reviewers are invited/in-flight, Completed if reviews
-// are back awaiting the PD's sign-off), else Find. (Placeholder heuristic — the
+// are back awaiting the PD marking them complete), else Find. (Placeholder heuristic — the
 // real rule is the deferred isActionableForPD policy, open item #2.)
 function defaultReviewerSub(r, layout){
   const rv = (r && r.reviewers) || {};
   const toSend = rv.toSend||0, pending = rv.pending||0, overdue = rv.overdue||0;
   const invited = (rv.confirmed||0)+pending+(rv.declined||0);
-  const awaitingSignoff = (rv.returned||0)-(rv.approved||0);
+  const awaitingCompletion = (rv.returned||0)-(rv.approved||0);
   if(layout==='3tab'){            // Roster consolidates Invite + Track
     if(toSend>0 || invited>0) return 'roster';
-    if(awaitingSignoff>0) return 'completed';
+    if(awaitingCompletion>0) return 'completed';
     return 'find';
   }
   if(toSend>0) return 'invite';                  // shortlisted, not yet sent
   if(pending>0 || overdue>0) return 'track';     // invites out, need chasing
-  if(awaitingSignoff>0) return 'completed';      // reviews back, need sign-off
+  if(awaitingCompletion>0) return 'completed';      // reviews back, need completion
   if(invited>0) return 'track';                  // confirmed, awaiting reviews
   return 'find';                                 // nothing started
 }
