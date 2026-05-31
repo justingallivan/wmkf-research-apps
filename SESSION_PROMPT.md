@@ -1,68 +1,63 @@
-# Session 203 Prompt: open board (Explorer Path A complete; soak still traffic-blocked)
+# Session 204 Prompt: open board (ProfileContext refactor needs a manual smoke test)
 
-## ⏰ Standing context / guardrails (carried from S197–S202)
-- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity words into docs/memory. S202 earned its keep: probing instead of trusting falsified TWO assumptions (the `/$count` bug is total, not filter-only; the prompt's `akoya_folio` "casing inconsistency" never existed).
-- **Codex stop-time review gate is ENABLED.** S202 ran an explicit post-impl review + a fix re-review (both folded, final GO). Keep using it.
-- **Measure before building** (Explorer). S202 ran the soak first, confirmed the deferral (only +4 calls / +0 errors since S200), then built A3/A4/A5 on the unchanged error *shape* — a deliberate, user-approved override, not a hunch.
-- **Push deploys to prod.** `main` auto-deploys on Vercel. S202's commit is pushed (HEAD `bf43cc4`).
-- **rtk grep filter: keep it DISABLED.** During S202 the rtk-compressed "PASS (N) FAIL (M)" summary hid *which* tests failed — had to dump jest to a file and Read it. If test/grep output looks compressed or off, write to a temp file and Read it. See `.claude-memory/project-rtk-grep-output-corruption.md`.
+## ⏰ Standing context / guardrails (carried from S197–S203)
+- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity words into docs/memory. S203 earned its keep: it forced hedging the "two runtime bugs" count to "caught-by-review, not proven-exhaustive."
+- **Codex stop-time review gate is ENABLED** and it is *thorough* on async/state code. In S203 it found 8 successive edges in the ProfileContext work (async-load → resurrection → migration writeback → ref lifetime → stale window → failed-load attribution → out-of-order race → stale optimistic write). Treat its findings as real; don't end the session red.
+- **rtk grep filter STILL corrupts output** (it was "disabled at end of S201" but S203 saw `grep`/`rg` silently drop hits again — `rtk proxy rg` returned empty for a term that existed). For any verification grep, use `rtk proxy git grep` (reliable in S203) or write to a file and Read it. Never trust a bare `grep`/`rg` for a "does X exist" check. See `.claude-memory/project-rtk-grep-output-corruption.md`.
+- **Push deploys to prod.** `main` auto-deploys on Vercel. HEAD `9e92df4` is pushed.
+- **CI-green ≠ correct for async/effect code.** S203's two worst bugs (infinite fetch loop, destructive-migration data loss) BOTH passed lint + 1544 tests + build. See [[feedback-profile-context-runtime-bugs]].
 
-## Session 202 Summary
+## Session 203 Summary
 
-Picked up "item 1" (Explorer soak), which the S201 prompt framed as "leave it / deferred." Ran the soak first — confirmed frozen data (1471 vs 1467 calls / 392 vs 392 errors since S200) — so the deferral held. User then chose to build the deferred **A3/A4/A5** Path A slices anyway, on the unchanged error *shape* (fiscalyear 88 / akoya_grant 30 / date-fns 27). A live probe reshaped the work. All shipped, Codex-reviewed (2 findings folded), pushed.
+Open board. Three threads: a migration-drift alert, the parked virus-scan e2e (item 4), and the lint ratchet (item 5) — the last of which cascaded into a full ProfileContext refactor.
 
-### A3 — robust counts (`lib/services/dynamics-service.js`)
-A live probe (`scripts/probe-akoya-folio-casing.js`) showed `/$count` is broken **both** ways on this instance: caps at 5000 unfiltered AND throws `Edm.Int32` on any filter. `countRecords` REPLACED (not a narrow interim) with `$apply=filter(...)/aggregate(<pk> with countdistinct as value)` — true counts 9120/22580 past the cap. PK from new `getPrimaryIdAttribute` (`PrimaryIdAttribute` added to `getEntityDefinitions` $select; `primaryIdMap` dual-keyed by logical + entity-set name; reset in `clearCaches`). Fails loud past the 50k `$apply` ceiling → **>50k unbounded count is the still-deferred FetchXML/paging tail.**
+### Migration drift (resolved, no commit)
+Admin-panel alert "migration_drift: missing 017_bill_onboarding_state.sql". Diagnosed as accurate (017 committed in `7cb8bc4` but never applied to the env). Maintenance cron's BILL steps are per-step try/caught so it degraded, not crashed. **User applied migration 017** via `scripts/apply-migrations.js`; the alert auto-resolves on next cold start.
 
-### A4 — domain guardrails + folio reconciliation (`shared/config/prompts/dynamics-explorer.js`)
-New `buildDomainGuardrails()` injects an anti-confabulation block (primary contact = foundation liaison ≠ PI; PI program-conditional; `createdon` ≠ business date; status classes), with lists derived **by reference** from `lib/services/dataverse-export/constants.js` (`ERA_CUTOVER_DATE`, `TERMINAL_NON_AWARD_STATUSES`, `PER_PROGRAM_ANNOTATION`) — no value transcription. Probe **falsified** the prompt's `akoya_folio` casing claim: only `"PAID"` exists, Dataverse `eq` is case-insensitive, `contains()` unnecessary. Reconciled across the prompt, `TABLE_ANNOTATIONS`, and `docs/DYNAMICS_SCHEMA_ANNOTATION.md`.
+### Item 4 — intake virus-scan EICAR e2e (verified what's verifiable; live gate still manual)
+Confirmed the intake infected-branch is intact (`attach.js:430/486/526`: 422 + blob delete + `virus_detection_intake` alert), unit-tested (`intake-attach-endpoint.test.js:523/565`), and the scanner-half was already proven S193 (shared scanner). Added `scripts/build-intake-eicar-fixture.py` so the manual run is turnkey. **Residual = the live deployed-env browser e2e through Entra**, which I can't drive. See [[project-intake-portal-virus-scan-e2e-deferred]].
 
-### A5 — fail-loud typed errors (`pages/api/dynamics-explorer/chat.js`)
-New `classifyToolError` turns a Dynamics unknown-field/entity 400 into a typed result (`errorType` + `invalidField` + closest valid field names via `closestFieldNames` + `describe_table` pointer), replacing the bare error string in the `executeOne` catch. Edm.Int32 false-positive guard; normalization inside the try so enrichment never masks the original error.
-
-### Codex review (2 findings, both folded + regression-tested, re-review GO)
-- **[MEDIUM]** `count_records` regressed for `systemuser` (the only annotated table missing from `KNOWN_ENTITY_SETS`) → added the mapping + dual-keyed `primaryIdMap` + `getPrimaryIdAttribute` dual lookup.
-- **[LOW]** A5 enrichment skipped entity-set aliases (`akoya_requests`) → logical-name normalization in `classifyToolError`.
-
-### Final state
-Suite **1544 green** (+11 new), lint **0 errors / 50 warnings**, all 4 CI gates green. Plan doc `docs/DYNAMICS_EXPLORER_PATH_A_PLAN.md` + memory `project-dynamics-explorer-reuse-power-tools.md` updated.
+### Item 5 — lint ratchet → ProfileContext atomic refactor
+Resolved all **14 `react-hooks/exhaustive-deps`** warnings (4 real `useCallback` fixes + reasoned `eslint-disable`s; exhaustive-deps 14→0, total 50→35, 0 errors). The three profile-preference consumers' fixes exposed a real async bug (effect keyed on `currentProfile?.id` but reading async-loaded `preferences`), which spiraled through 8 Codex rounds. Rather than keep guarding, **ProfileContext was refactored to an atomic `useReducer` state machine** (a fresh LLM did the structural pass; see `docs/PROFILE_CONTEXT_REFACTOR_SUMMARY.md`): atomic profile+prefs transitions, `activeRequestId` fencing, profileId-guarded reducer writes, destructive localStorage migration purge. **I caught + fixed two runtime bugs the refactor shipped that CI passed clean**: an init infinite fetch loop (`loadSession` depended on `state.profiles` it mutates → `0876dd0`) and a destructive migration deleting data on a failed save (unchecked `response.ok` before purge → `306f77a`). Then corrected the docs/memory records + ran a `/sweep` (0 stale remaining).
 
 ### Commits
-- `bf43cc4` — Dynamics Explorer Path A: A3 robust counts + A4 guardrails/folio + A5 typed errors (incl. Codex folds)
+- `0876dd0` — Lint ratchet (exhaustive-deps 14→0) + atomic ProfileContext refactor + EICAR fixture (incl. init-loop fix)
+- `306f77a` — ProfileContext: don't purge localStorage when migration save fails
+- `9e92df4` — docs: correct ProfileContext refactor records (memory file + S203 tag + reconcile summary doc)
 
 ## Potential Next Steps
 
-### 1. Explorer soak — STILL traffic-blocked (not effort-blocked)
-The real measurement (error-rate drop + validator catch-rate after A3/A4/A5 + the S200 validator deploy) needs accrued traffic. As of 2026-05-30 the aggregate was frozen (+4 calls since S200). **Do not re-measure on thin data.** When traffic accrues, note the soak script (`scripts/analyze-dynamics-explorer-failures.js`) does NOT split pre/post-deploy and the `ODATA_VALIDATOR_REJECT` catch signal lives in Vercel logs, not `dynamics_query_log` — a clean soak needs a date-split or log analysis.
+### 1. ⚠️ MANUAL SMOKE TEST the ProfileContext refactor (do this before trusting it)
+Both S203 runtime bugs were CI-invisible. Before relying on the refactor in prod, manually: load the app (confirm no fetch loop in the Network tab), switch a profile (confirm no data leak/flash + settings load), and ideally simulate a failing preferences save (confirm localStorage is preserved, not purged). The destructive migration purge is irreversible — verify it only fires on a confirmed-successful save.
 
-### 2. Explorer A3 >50k tail (deferred)
-The unbounded (>50k row) count still needs the OData→FetchXML shim / record-paging. Only matters for the largest tables (most are <50k). Scope as its own sub-phase if a real >50k count question surfaces.
+### 2. Stop-gate may surface more ProfileContext edges
+S203 ended via `/stop`, not a clean stop-gate ALLOW. The reducer's `profileId`-guard structurally covers the round-8 "stale optimistic write" finding, but a fresh review of the refactored file could still flag something. If it does, the file is `shared/context/ProfileContext.js`.
 
-### 3. BILL chunk-5 tail (non-coding / ops) — unchanged from S201
-- Office question (open): does BILL.com self-registration capture the remittance address? If yes, Stage 2a address fields come back out (server treats address as optional). See `.claude-memory/project-reviewer-address-collection-provisional.md`.
-- Ops before `BILL_ENABLED=true`: migration `017`, probe + set `HONORARIUM_*`/`BILLCOM_ACCOUNT_*`, set `honorarium.default_amount` via `/admin`, Steph's BILL sandbox.
+### 3. Intake virus-scan EICAR e2e — STILL the parked pre-cycle must-do (unchanged)
+Run the live EICAR upload through `/apply` before the next cycle's Phase I intake goes live. Fixture builder now exists (`scripts/build-intake-eicar-fixture.py`). See [[project-intake-portal-virus-scan-e2e-deferred]].
 
-### 4. Parked pre-cycle must-do — unchanged from S201
-Intake virus-scan **EICAR e2e through `/apply`** before the next cycle's Phase I intake goes live (reviewer path verified S193; intake path skipped). See `.claude-memory/project-intake-portal-virus-scan-e2e-deferred.md`.
+### 4. Explorer soak — still traffic-blocked (carried from S203, untouched)
+Error-rate measurement after A3/A4/A5 + the S200 validator needs accrued traffic. Don't re-measure on thin data. `scripts/analyze-dynamics-explorer-failures.js` doesn't split pre/post-deploy; a clean soak needs a date-split or Vercel-log analysis.
 
-### 5. Lint ratchet (optional, low-stakes) — unchanged
-50 warnings; the `react-hooks/exhaustive-deps` cluster is where real stale-closure bugs could hide. CI won't block on them.
+### 5. BILL chunk-5 tail (non-coding / ops) — unchanged
+Office question (BILL self-registration address capture); ops before `BILL_ENABLED=true` (017 now applied ✓; still need `HONORARIUM_*`/`BILLCOM_ACCOUNT_*` probe+set, `honorarium.default_amount` via /admin, Steph's sandbox).
+
+### 6. Lint ratchet remainder (optional, low-stakes)
+35 warnings left: `react-hooks/set-state-in-effect` (26, React-Compiler-eligibility noise), `immutability` (5), `import/no-anonymous-default-export` (3), `preserve-manual-memoization`. Lower-signal than exhaustive-deps was; CI won't block.
 
 ## Key Files Reference
 | File | Purpose |
 |------|---------|
-| `lib/services/dynamics-service.js` | A3: `countRecords` (countdistinct-on-PK), `getPrimaryIdAttribute`, dual-keyed `primaryIdMap` |
-| `shared/config/prompts/dynamics-explorer.js` | A4: `buildDomainGuardrails()` + reconciled `akoya_folio` guidance |
-| `pages/api/dynamics-explorer/chat.js` | A5: `classifyToolError` + `closestFieldNames` |
-| `lib/services/dataverse-export/constants.js` | A4 source of truth (imported by reference into the prompt) |
-| `scripts/probe-akoya-folio-casing.js` | Provenance probe (folio distribution + `/$count` brokenness + eq case-insensitivity) |
-| `docs/DYNAMICS_EXPLORER_PATH_A_PLAN.md` | Path A plan — A1+A2 (S200), A3/A4/A5 (S202) all marked shipped |
+| `shared/context/ProfileContext.js` | Atomic `useReducer` state machine (status/activeRequestId/profileId-guarded writes/destructive migration); the S203 refactor target |
+| `docs/PROFILE_CONTEXT_REFACTOR_SUMMARY.md` | Refactor design + "Post-Refactor Fixes" section (the two CI-missed runtime bugs) |
+| `shared/components/{EmailSettingsPanel,EmailTemplateEditor,SettingsModal,EmailGeneratorModal}.js` | Consumers simplified to gate on `status === 'ready'` |
+| `scripts/build-intake-eicar-fixture.py` | Builds `/tmp/eicar-test-exe.docx` for the manual intake virus-scan e2e |
+| `.claude-memory/feedback-profile-context-runtime-bugs.md` | The two runtime-bug root causes + the smoke-test rule |
 
 ## Testing
 ```bash
 npx jest                       # 1544 tests
-npm run lint                   # 0 errors / 50 warnings (CI blocks on errors only)
+npm run lint                   # 0 errors / 35 warnings (CI blocks on errors only)
 npm run check:atlas && npm run check:atlas:self-test && npm run check:api-routes && npm run check:fact-consistency
-node scripts/analyze-dynamics-explorer-failures.js   # soak (read-only, prod); leave until traffic accrues
-node scripts/probe-akoya-folio-casing.js             # folio/count probe (read-only, prod)
+# rtk caveat: for verification greps use `rtk proxy git grep`, NOT bare grep/rg (filter drops hits)
 ```
