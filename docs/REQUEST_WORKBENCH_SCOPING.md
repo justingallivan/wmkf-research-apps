@@ -60,7 +60,7 @@ This is the surface that's mocked and the near-term build target.
 - PD identity from the signed-in session — **no PD picker**.
 - **Cycle** selector (defaults to the current open cycle).
 - **Scope filter: My (lead) / My (lead-or-backup) / All — a personal filter, NOT a security boundary.** The Phase II silo is *partial*: reviewer **management** is the lead PD's domain, but Phase II **content** (proposal, returned reviews, docs, analyses) is needed by the whole team for in-depth evaluation. So gating is at the **tab** level, not the dashboard level:
-  - **Reading is team-open.** Any `reviewers` grant-holder can browse all requests in the cycle and open any request's content. My = your action queue; All = browse everything for evaluation. Default scope = My if named on ≥1 request this cycle, else All.
+  - **Reading is team-open** (decided). Who exactly counts as "the team" is an **open boundary** (§6) — *assumed* to be all `reviewers` grant-holders. Such a user can browse all requests in the cycle and open any request's content. My = your action queue; All = browse everything for evaluation. Default scope = My if named on ≥1 request this cycle, else All.
   - **The Reviewers *management* tab (Find/Invite/Track/Completed) is gated to the lead PD** (+ superuser; backup/co-PD management TBD — see open Qs). It is the ONE "assigned PD's domain" surface; everything else on the request is open to the team.
   - `reviewers` grant = research-review-team membership (use the dashboard + read any request). PD-ownership (`wmkf_programdirector` = lead per [[project-akoya-request-pd-fields]]; backup TBD) populates My **and** gates the management tab. (This supersedes an earlier draft that made "All" oversight-gated and regular PDs My-only — reading is open; only reviewer *management* is per-PD.)
   - Phase I collaboration ("every PD has input") is a *separate, upstream* surface (triage); this dashboard is Phase II.
@@ -159,6 +159,9 @@ The current and next cycles have different shapes, so the rollout differs.
 - **Does PD closeout gate payment? — RESOLVED (S206, option a).** No. The tab is named **"Completed"**, marking it sets `wmkf_reviewstatus=complete` + `wmkf_completedat` as record-keeping only, and **nothing is triggered**. Payment-eligibility stays on its existing path (reviewer-submission `wmkf_reviewreceivedat` + staff remit gate). Completed rows stay on the dashboard (no drop-off); cycle-scoping handles cleanup.
 
 **Open design**
+- **Access boundaries (the *shape* is decided — gate management, open reading, dossier — but two boundaries are NOT settled; don't implement as final):**
+  - **Reading-open set:** is team-open read access exactly all `reviewers` grant-holders, or narrower/broader? (Assumed: all grant-holders.)
+  - **Reviewer-management rights:** lead PD only, or backup/co-PDs too? (Superuser assumed in either case.)
 - **Dashboard row content / actionability rules** (`isActionableForPD`) for the reviewer dashboard — what the right-hand "what needs me" column shows, and the rule set behind it. Reviewer-centric for v1; the 300-proposal *triage* actionability is a separate, later design (do not merge the two).
 - **Status tab** — `akoya_requeststatus` is a **living taxonomy** (enumerate live, never hardcode; unknown value → "unclassified," not a guess). Its value→class map is documented in `docs/DATAVERSE_POWER_TOOLS_DESIGN.md` (probe-derived; in-flight = Pending-family, decided-terminal = Approved/Denied/Declined/Ineligible/Closed/Done/Withdrawn/etc.). The tab is tentative — what else belongs at the request endpoint is undecided.
 
