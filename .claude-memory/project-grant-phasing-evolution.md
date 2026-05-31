@@ -12,7 +12,7 @@ originSessionId: 8d412c2f-d6c6-4080-a43c-79e0e04e9653
 
 **Concepts are going away.** Future cycles will not have a concept stage. Already noted broadly in `project-strategy-direction.md` ("Grant cycle is being redesigned").
 
-**Next cycle (post-J26/D26):** Single-package submission, but internal phasing remains.
+**Next cycle (J27 — single-submission begins; D26 is the current/last dual-phase cycle):** Single-package submission, but internal phasing remains. Full proposals arrive **~Dec 2026, up to ~300, and most are never sent for outside review** (user, 2026-05-31) — so J27 needs an upstream per-PD triage/cycle dashboard to winnow to the pursue-set BEFORE the reviewer dashboard applies (see [[project-reviewer-apps-redesign-direction]] "TWO distinct PD dashboards").
 - Applicants submit **once** — one document called "Phase I." No separate Phase II document.
 - Staff still classifies proposals internally as Phase I or Phase II.
 - "Phase II" becomes a **label change on the original document**, not a new submission.

@@ -17,6 +17,8 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 - **Virtual Review Panel → Tools menu, labeled beta** (in dev, not part of this cycle).
 - **Workbench tab strip (current mockup state):** Overview · Proposal · Initial Writeup · Reviewers · Reviews · Pre Site Visit Writeup · Site Visit · Final Writeup · Status. Three writeup stages mirror the lifecycle (Initial = Phase I-form/early; Pre Site Visit = Phase II-form, folds in reviews; Final = post-site-visit). Initial + Pre-visit reuse existing phase-i/phase-ii-writeup engines.
 - **Tier-stitching positions taken in the mockup:** default home = cycle dashboard (not the launcher; launcher demoted to a "Tools" menu); context preserved via persistent cycle switcher + breadcrumbs; standalone apps coexist via dual-entry (same engine, off-cycle in Tools + per-request as a tab). Tools menu faithfully mirrors all 17 appRegistry apps, tagged standalone/dual/rehomed.
+- **TWO distinct PD dashboards, not one (clarified by Justin 2026-05-31).** What the mockup shows is the **reviewer dashboard** = the *post-shortlist* surface (per-PD request queue → reviewer Workbench). For the single-submission model (J27) it is NOT the entry point: full proposals arrive **Dec 2026, up to ~300, most never sent for review**, so an upstream **triage / cycle dashboard** is needed first — per-PD, tasks across the whole grant cycle, access to re-homed versions of the existing apps, winnowing the ~300 down to the pursue-set (≈ [[project-staged-review-pipeline]]). Flow: triage dashboard → winnow → reviewer dashboard (today's mockup) for the subset that advances. Consequence for the #2 actionability work: the reviewer dashboard's rows stay **reviewer-centric** (find→invite→track→approve&pay); the 300-proposal triage actionability is a SEPARATE future design, do not jam it into the reviewer dashboard.
+- **D26 (current, dual-phase) temporary patch.** D26 is the current cycle; Phase I→II flip ~mid-June 2026 (single-submission begins J27). In the dual-phase model, Phase II = the already-winnowed set (Phase I committee advanced them), so the reviewer dashboard fits D26 **as-is** — no triage dashboard needed for D26. Plan: ship the reviewer dashboard/mockup for D26 as a fenced, throwaway-OK patch, and **populate PD dashboards before mid-June** so PDs start finding reviewers at-risk (board recommendations known early; overturns rare). Early-populate mechanism is a Connor conversation — likely advancing `akoya_requeststatus` to 'Phase II Pending' early, BUT that value is a live PA trigger (intake recompute per `INTAKE_PORTAL_DESIGN`/`DRAIN_PLAN`), so advancing it early may fire downstream automation prematurely; a separate "PD working-set" signal that does NOT touch the official status may be safer. Open with Connor.
 
 **Why:** Demo failures (S194 model resolver + parser drift) exposed the deeper problem — the apps were built across different constraint regimes (no Dataverse → Dataverse; ad-hoc cycle tracking → cycle entity; .eml downloads → in-app sends) and the seams show. Then S195 surfaced an even deeper one: most apps in the suite are already per-request workflow tools (`phase-ii-writeup`, `peer-review-summarizer`, `multi-perspective-evaluator`, integrity screener, funding-gap, …) but their entry point is "upload the proposal" — built before we had programmatic access to the proposal.
 
@@ -36,7 +38,7 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 
 **This unifies several initiatives that were sitting separate in memory:** [[project-backend-automation]], [[project-staged-review-pipeline]], [[project-proposal-context-extraction]], [[project-prompt-storage-strategy]], [[project-new-ai-capabilities]]. They are the **automation tier** feeding the Workbench, not separate projects.
 
-**The two-stage submission *process* is sunsetting** ([[project-grant-phasing-evolution]]): J26 is the last cohort with a *separate* Phase I → Phase II submission. Going forward there is **one submission, entered as Phase I**, with "Phase II" as an internal status flip (no Phase II uploads) — full materials arrive at the start; "long list → short list" winnowing still happens but on that one submission. **This simplifies the trigger model** — don't over-design dual-phase branching; build the pipeline for single-submission with internal staging labels.
+**The two-stage submission *process* is sunsetting** ([[project-grant-phasing-evolution]]): D26 (the current cycle) is the last cohort with a *separate* Phase I → Phase II submission; single-submission begins J27. Going forward there is **one submission, entered as Phase I**, with "Phase II" as an internal status flip (no Phase II uploads) — full materials arrive at the start; "long list → short list" winnowing still happens but on that one submission. **This simplifies the trigger model** — don't over-design dual-phase branching; build the pipeline for single-submission with internal staging labels.
 
 ---
 
@@ -63,7 +65,7 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 
 ## Reviewer-lifecycle slice = Workbench v1 (build target)
 
-**Why this slice first:** needed for J26 Phase II peer review (real deadline, mid-June 2026 with BILL honoraria); needed for every future cycle as the post-shortlist surface; survives the Phase I sunset; most code-broken piece today.
+**Why this slice first:** needed for D26 Phase II peer review (real deadline, ~mid-June 2026 Phase I→II flip with BILL honoraria); needed for every future cycle as the post-shortlist surface; survives the Phase I sunset; most code-broken piece today.
 
 **Tabs — DECIDED S206: 4-tab + status badges.** Default landing is state-aware (earliest funnel step with outstanding work; see the S206 decisions block above), not a fixed tab.
 - **Find** — candidate discovery (current Reviewer Finder behavior, request-aware). Badge: candidate count.
@@ -90,7 +92,7 @@ The reason this redesign is now urgent: Connor maintains a parallel SharePoint f
 ## Build sequence
 
 - **Now (S196 → mid-June 2026):** Reviewer-lifecycle slice as Workbench v1 + Reviewer Pool. URL pattern is the holistic one (`/workbench/[requestId]/...`) even though only one functional area lands.
-- **Next cycle (post-J26):** Automation tier (proposal-submitted fan-out, artifact materialization) + writeup tab + analyses tabs + triage surface. Runway: doesn't need to be live until next cycle accepts submissions.
+- **Next cycle (J27, single-submission):** the upstream triage / cycle dashboard (winnow ~300 Dec-2026 proposals; ≈ [[project-staged-review-pipeline]]) + automation tier (proposal-submitted fan-out, artifact materialization) + writeup tab + analyses tabs. Runway: doesn't need to be live until J27 accepts submissions (Dec 2026).
 - **Holistic Workbench is the destination**, built incrementally tab-by-tab as the automation tier matures.
 
 ---
