@@ -46,7 +46,7 @@ const STATE = {
   scope: 'mine',            // 'mine' | 'mine-or-backup' | 'all'
   requestId: null,
   wbTab: 'overview',        // workbench area
-  reviewerLayout: '4tab',   // '4tab' | '3tab'  — S206 reconsidered: 4-tab + status badges (clearer, mirrors workflow)
+  reviewerLayout: '4tab',   // '4tab' | '3tab'  — DECIDED S206: 4-tab + status badges (clearer, mirrors workflow)
   reviewerSubTab: 'track',  // default landing for 4-tab is Track (home base once invites are out)
   toolsOpen: false,
   cycleOpen: false,
@@ -408,9 +408,9 @@ function reviewersPanel(r){
   <div class="mb-4 flex items-center justify-between flex-wrap gap-3">
     <h2 class="text-lg font-semibold flex items-center gap-2">🎯 Reviewer lifecycle ${kindBadge('refine')}
       <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold">Workbench v1</span></h2>
-    <!-- S206 reconsidered: leaning 4-tab + badges. Toggle kept for comparison. -->
+    <!-- DECIDED S206: 4-tab + badges. Toggle kept for comparison. -->
     <div class="flex items-center gap-2 text-xs" data-fork="reviewerlayout">
-      <span class="text-gray-400">S206 — <span class="text-green-700 font-semibold">leaning: 4-tab + badges</span> · compare:</span>
+      <span class="text-gray-400">S206 — <span class="text-green-700 font-semibold">decided: 4-tab + badges</span> · compare:</span>
       <div class="flex gap-1 bg-gray-100 rounded-lg p-1">
         <button onclick="setReviewerLayout('4tab')" class="px-2.5 py-1 rounded-md font-semibold ${STATE.reviewerLayout==='4tab'?'bg-white shadow text-green-700':'text-gray-500'}">4-tab ✓</button>
         <button onclick="setReviewerLayout('3tab')" class="px-2.5 py-1 rounded-md font-semibold ${STATE.reviewerLayout==='3tab'?'bg-white shadow text-gray-900':'text-gray-400'}">3-tab</button>
@@ -418,7 +418,7 @@ function reviewersPanel(r){
     </div>
   </div>
 
-  ${annoNote('<b>Leaning (S206, reconsidered): 4-tab + status badges</b> — Find / Invite / Track / Approve &amp; Pay. All four are action labels (vs. the noun "Roster"), and Invite (compose+send) vs. Track (monitor+chase) are genuinely different modes. The badges on the tab bar (e.g. Track <span class="font-semibold">1 pending · ⚠1</span>, Approve &amp; Pay <span class="font-semibold">1 to approve</span>) recover the one thing the consolidated Roster did well — at-a-glance "where is everyone" — without losing the descriptive tabs. White space per sub-tab is acceptable at per-request scale. Toggle to compare the old 3-tab Roster.')}
+  ${annoNote('<b>Decided (S206): 4-tab + status badges</b> — Find / Invite / Track / Approve &amp; Pay. All four are action labels (vs. the noun "Roster"), and Invite (compose+send) vs. Track (monitor+chase) are genuinely different modes. The badges on the tab bar (e.g. Track <span class="font-semibold">1 pending · ⚠1</span>, Approve &amp; Pay <span class="font-semibold">1 to approve</span>) recover the one thing the consolidated Roster did well — at-a-glance "where is everyone" — without losing the descriptive tabs. White space per sub-tab is acceptable at per-request scale. Toggle to compare the old 3-tab Roster.')}
 
   <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
     <div class="flex gap-0.5 border-b border-gray-200 px-2 pt-1">
