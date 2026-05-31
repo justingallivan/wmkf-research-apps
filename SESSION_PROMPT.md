@@ -4,7 +4,7 @@
 - **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity words into docs/memory. S203 earned its keep: it forced hedging the "two runtime bugs" count to "caught-by-review, not proven-exhaustive."
 - **Codex stop-time review gate is ENABLED** and it is *thorough* on async/state code. In S203 it found 8 successive edges in the ProfileContext work (async-load → resurrection → migration writeback → ref lifetime → stale window → failed-load attribution → out-of-order race → stale optimistic write). Treat its findings as real; don't end the session red.
 - **rtk grep filter STILL corrupts output** (it was "disabled at end of S201" but S203 saw `grep`/`rg` silently drop hits again — `rtk proxy rg` returned empty for a term that existed). For any verification grep, use `rtk proxy git grep` (reliable in S203) or write to a file and Read it. Never trust a bare `grep`/`rg` for a "does X exist" check. See `.claude-memory/project-rtk-grep-output-corruption.md`.
-- **Push deploys to prod.** `main` auto-deploys on Vercel. HEAD `9e92df4` is pushed.
+- **Push deploys to prod.** `main` auto-deploys on Vercel; all of S203's work is pushed (last code commit `306f77a`; docs `9e92df4` + the session-doc commit follow it).
 - **CI-green ≠ correct for async/effect code.** S203's two worst bugs (infinite fetch loop, destructive-migration data loss) BOTH passed lint + 1544 tests + build. See [[feedback-profile-context-runtime-bugs]].
 
 ## Session 203 Summary
