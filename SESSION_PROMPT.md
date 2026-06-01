@@ -1,60 +1,71 @@
-# Session 211 Prompt: Workbench Phase 3 prod-smoke + pilot enablement
+# Session 212 Prompt: Workbench reviewer-invite — PROD SMOKE (real email) + co-PD COI follow-up
 
-## ⏰ Standing context / guardrails (carried from S197–S210)
-- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity into docs/memory — in S210 it caught a tab-count error ("8 placeholders" → verified from source = **9**; 10 tabs, Reviewers live). Authoritative lint counts = `npx eslint . -f json` keyed on `ruleId`/`severity`, NOT grep over the default formatter.
-- **Codex stop-time review gate is ENABLED and it WORKS.** In S210 it blocked four times and each catch was real (false-empty-state, staff-removal resurrection, 412 conflict-guard, diacritic exclude-miss, stale placeholder docs). Reconcile every restatement in the same turn; verify-as-you-go.
-- **Deliver Codex output VERBATIM** ([[feedback-share-codex-verbatim]]) — paste the whole `codex:codex-rescue` tool result in a delimited block as the *next* message; fold fixes a turn later. S210 recurred (I gave a "verbatim summary" = a contradiction). Do not repeat.
-- **rtk grep filter STILL corrupts output** — in S210 a plain `rg` rendered "standalone Reviewer Finder" as "n". For "does X exist" use `git grep` / Read; never trust a bare `rg`/`grep`. rtk is an explicit CLI, plain `git grep`/`Grep`/`Read` are unaffected.
-- **Push deploys to prod.** `main` auto-deploys on Vercel. All S210 work is pushed (`81f4010`).
-- **CI-green ≠ correct for async/effect/UI code.** Manual smoke is mandatory for load-bearing UI ([[feedback-profile-context-runtime-bugs]]). The in-panel search hits live Claude/PubMed/Dataverse and **was NOT browser-smoked** — that's the #1 next step.
-- **Local-dev auth bypass:** `AUTH_REQUIRED=false NEXTAUTH_SECRET=dev-throwaway NEXTAUTH_URL=http://localhost:3000 ./node_modules/.bin/next dev`. Under bypass `/api/app-access` returns all apps + `isSuperuser:true`. The Workbench's per-request paths (`applicant-reviewers?requestId=`, `resolve-request?requestId=`, `load-proposal`, `analyze`/`discover`/`enrich`/`save-candidates`) are email-independent and work under bypass; the PD-email dashboard (`/api/workbench/dashboard`) hard-fails. Smoke the Find tab via `/workbench/<guid>?tab=reviewers&sub=find`.
-- **`npm run` glitches the Bash tool intermittently** — call binaries directly (`./node_modules/.bin/next build`, `npx jest`) when `npm run X` errors with an `H.replace`-type message.
+## ⏰ Standing context / guardrails (carried S197–S211)
+- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity into docs/memory. Authoritative lint = `npx eslint . -f json` keyed on `ruleId`/`severity`, never grep over the default formatter.
+- **Codex stop-time review gate is ENABLED and it WORKS.** In S211 it blocked **three** times on the invite feature and every catch was real (materials-on-invitation → caller-controlled attachment gate → server-authoritative acceptance gate). Reconcile every restatement in the same turn; verify-as-you-go.
+- **Deliver Codex output VERBATIM** ([[feedback-share-codex-verbatim]]) — paste the whole `codex:codex-rescue` result in a delimited block as the *next* message; fold fixes a turn later.
+- **`main` auto-deploys to prod.** All S211 work is pushed.
+- **CI-green ≠ correct for async/effect/UI/outward-facing code.** Manual smoke is mandatory ([[feedback-profile-context-runtime-bugs]]). The whole reviewer-invite flow below was **NOT browser-smoked** and sends **real Dynamics email** — that's the #1 next step.
+- **Local-dev auth bypass:** `AUTH_REQUIRED=false NEXTAUTH_SECRET=dev-throwaway NEXTAUTH_URL=http://localhost:3000 ./node_modules/.bin/next dev`. Under bypass `/api/app-access` returns all apps + `isSuperuser:true`; per-request paths (`?requestId=`) are email-independent.
+- **Ad-hoc prod-Dataverse probes:** the `.env`/`.env.local`-loading mjs pattern (client-credentials token → OData) works read-only and (with explicit user OK) for writes. The auto-mode classifier will (correctly) pause DELETE/PATCH on prod — get explicit confirmation first.
 
-## Session 210 Summary
+## Session 211 Summary
 
-**Built Workbench Phase 3 — the long pole — end to end: applicant-reviewer ingestion + the full in-panel reviewer search, completing the Find tab. 10 commits, all pushed, tree clean, 1689 tests green, all gates green. Four Codex stop-gate rounds + one post-impl review, all folded. Decision locked with Justin: option B (excluded = soft-block only).**
+**Massive reviewer-Workbench session.** Brought the in-panel search to full parity + real bibliometrics (3 commits, earlier), then `enrich-recommended`, then — after live testing on request **1002794** surfaced wrong-person enrichment + "vanishing" candidates — added a Candidates tab, real invitations, and a Scholar-disambiguation fix. ~6 commits, all pushed, **1729 tests green, 0 lint errors, build + all CI gates green**. Many Codex rounds (pre-impl + stop-gate), every catch folded.
 
-### What was completed
-1. **Applicant-reviewer ingestion (`79a2840`, hardened `e0b7190`/`f393d74`).** `pages/api/workbench/applicant-reviewers.js` (GET `?requestId=`): idempotently materializes the 5 legacy `wmkf_potentialreviewer1..5` slots into `disposition=recommended` candidate rows (race-safe `ensureApplicantRecommended` — converges a lost alternate-key 412 to an update; **never resurrects a staff `softDelete`**; "excluded wins"); parses free-text `wmkf_excludedreviewers` via a hardened (A7-wrapped) Claude extraction (`lib/services/reviewer-exclusion-parser.js`) into names for the **soft-block only** — NO structured excluded rows ([[project-excluded-reviewers-often-in-pool]]).
-2. **Proposal auto-pick fix (`bec416c`).** `classifyFile` was picking "Application Cover Page.docx" (broad `application` signal). Added a front-matter exclusion + recognized `ProjectDescription.pdf` (solid-cased) as a narrative signal, in **both** picker copies + the shared classifier (fixes Grant Reporting too); added a **manual file-picker override** to the Find panel. +26 classifyFile tests (none existed).
-3. **In-panel reviewer search (`e946401`, diacritic fix `4628ec3`).** `shared/components/reviewers/ReviewerSearchSection.js` replaces the standalone-handoff: reuses the loaded proposal `blobUrl` + applicant excludes and chains `analyze → discover → enrich-contacts → save-candidates(requestId)` over a shared SSE reader (`sse.js`), saving into this request's pool. Pure logic in `reviewer-search-logic.js` (`mergeEnrichment`, `filterExcluded` with **NFD diacritic folding**, `asPercent`). **Codex post-impl review (12 findings) folded:** excluded names hard-filtered from `/discover` results (the soft-block isn't honored server-side); `event: error` SSE frames detected; editable exclude box; reset-on-context-change + generation guard; `savedCount===0` = failure; run/save double-submit refs.
-4. **Doc reconciliation sweep (2 rounds, `8808e53`+`81f4010`).** Every "Find placeholder / standalone handoff / deferred NewSearchTab" restatement corrected across CLAUDE.md, the two component headers, the build plan (§Phase 3 SHIPPED + Deferred list + verification), `[requestId].js`, and a probe memory. Tab count corrected to 9 (verified from source).
+### What was completed (this session's later half)
+1. **Full search parity + real bibliometrics + ranker fix (`ef78bf9`)** — source/count/diversity/notes inputs, rich COI/mismatch cards in Claude/Database/Unverified sections, all enrichment tiers on-by-default, real h-index/citations via SerpAPI `google_scholar_author`, shared `rankByRelevance` field-fix + client re-rank.
+2. **Enrich-recommended (`fe82593`)** — `/api/workbench/enrich-recommended` runs applicant-recommended reviewers through verify→COI→enrich, writes back (race-safe sidecar upsert + atomic `setMatchReason`). `model: sonnet` 404 hotfix (`0758a3b`): the endpoint + `enrich-contacts` now call `loadModelOverrides()`.
+3. **Candidates tab + real invitations + Scholar disambiguation (`bd95087`)** — see below; the headline of the session's back half.
+
+### Live-data findings on 1002794 (ground truth, via prod probes)
+- The applicant submitted **rich data** for all 5 recommended (name/email/affiliation/title/expertise), not just names.
+- Search results are **ephemeral until "Save"** — the "12 reviewers disappeared" was unsaved results, never persisted.
+- Enrichment matched the **wrong same-named person** for 2/5 (Landsman→Harvard podiatrist, Becker→Göttingen psychiatrist). **Cleared** those 5 sidecars + reset the COI tag with explicit user OK (recommendation rows + applicant data preserved). 1002794 is a clean slate.
+
+### `bd95087` — what shipped
+- **Scholar disambiguation:** institution-in-query + keep-biased `institutionConflicts` guard (`serp-contact-service.js`); skip persisting a mismatched profile (`contact-enrichment-service.js`). 12 unit tests incl. the 4 real cases.
+- **Candidates sub-tab:** `ReviewersTab` now has 5 tabs (Find→Candidates→Invite→Track→Completed); `CandidatesPanel.js` = roster from `my-candidates` with invite status. "Invite" tab still = materials (post-accept); **Candidates = invite (pre-accept)**.
+- **Invitations:** `InviteEmailModal.js` → `render-emails`/`send-emails` `templateType:'invitation'` (real Dynamics email + accept/decline magic link, sets `invited`, no reviewstatus bump). Accept via external portal → flows into Invite tab.
+- **Send safety (Codex, 3 rounds):** `lib/utils/reviewer-invite.js` — `shouldSkipDuplicateInvitation` (no double-send), `sendAllowsAttachments` (no fetch for invitations), and the load-bearing `recipientMayReceiveAttachments` (materials attach ONLY to `wmkf_accepted===true` recipients — server-authoritative, not caller's templateType).
 
 ### Commits
-- `79a2840` ingestion + Find panel (option B) · `e0b7190` no-resurrect-staff-removal · `f393d74` 412 conflict-guard + doc · `bec416c` proposal auto-pick + manual picker · `9d2db30` honest handoff copy · `e946401` in-panel search · `4628ec3` NFD diacritic exclude-fold · `213238f` memory (Codex-verbatim recurrence) · `8808e53` doc reconcile · `81f4010` doc reconcile round 2
+- `ef78bf9` parity + bibliometrics · `fe82593` enrich-recommended · `0758a3b` model-resolver hotfix · `bd95087` Candidates tab + invitations + disambiguation
 
 ## Potential Next Steps
 
-### 1. ⭐ Browser-smoke the Workbench Find tab in prod (the parked must-do)
-On the deployed site, open `/workbench/<D26-guid>?tab=reviewers&sub=find` (e.g. request **1002794**) with a real Azure session and verify the full path: applicant recommendations badged + saved as candidates; `ProjectDescription.pdf` auto-loads (manual picker corrects a wrong pick); **Run reviewer search** → candidates stream in → excluded names filtered → select + Save reports "Saved N" → invited accepters show in the Invite tab. CI-green ≠ correct for this (live Claude/PubMed/Dataverse). Capture console errors if anything misbehaves.
+### 1. ⭐ PROD SMOKE the full reviewer-invite flow on 1002794 (the parked must-do — sends REAL email)
+On the deployed site, `/workbench/<1002794-guid>?tab=reviewers&sub=find`:
+1. **Enrich recommended** → confirm Corkum/Weinacht/Le get correct h-index/citations and **Landsman/Becker get NO scholar metrics** (institution mismatch correctly skips the wrong person).
+2. **Candidates tab** → the 5 show as "Not invited" with applicant email/affiliation; select → **Send invitation** → real email sends, they flip to "Invited — awaiting response". Re-click → no duplicate (skipped). Confirm **no proposal materials are attached** to the invitation.
+3. Click the magic link → external accept → candidate appears in the **Invite** tab. Capture console/network errors.
 
-### 2. Grant `reviewers` to the pilot PDs + validate the dashboard tier
-Adding the registry key grants no one. Grant `reviewers` via `/admin` → App Access to the 4 pilot PDs, then validate `/workbench` shows the 35 D26 rows + My/All with a real login (the dashboard is PD-email-gated; never smoked in prod).
+### 2. Co-investigator COI parity in `discover.js` (small follow-up)
+enrich-recommended folds `coInvestigators` into the coauthor check; the shared `discover.js` search path still checks the PI only (`proposalInfo.proposalAuthors`, normalized to PI at `reviewer-finder.js:243`). Decide whether to fold co-Is there too (shared with the standalone — re-smoke).
 
-### 3. Find-mod 6 cleanup (small, optional)
-The Workbench no longer passes `summaryPages`, but shared `analyze.js` still references `summaryPages`/`summaryBlobUrl`/`extractPages`. Per the build plan's Deferred list, the analyze-side strip is still pending (keep `maintenance-service.js` L317's historical blob-cleanup read). Low priority.
+### 3. Grant `reviewers` to the pilot PDs + validate the dashboard tier (carried from S211)
+Adding the registry key grants no one. Grant `reviewers` via `/admin` → App Access to the pilot PDs; validate `/workbench` dashboard with a real login (PD-email-gated; never smoked in prod).
 
-### 4. Intake virus-scan EICAR e2e — STILL the parked pre-cycle must-do
-[[project-intake-portal-virus-scan-e2e-deferred]]. Needs deployed env + Entra applicant session. Separate track from the Workbench.
+### 4. Intake virus-scan EICAR e2e — STILL parked pre-cycle must-do
+[[project-intake-portal-virus-scan-e2e-deferred]]. Needs deployed env + Entra applicant session. Separate track.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` | Build plan — §Phase 3 now marked SHIPPED. Reviewers tab is the only live tier-3 tab; 9 placeholders remain. |
-| `pages/api/workbench/applicant-reviewers.js` | Ingestion endpoint (recommended → rows; excluded → soft-block names). |
-| `lib/services/reviewer-exclusion-parser.js` | Hardened Claude extraction of excluded names (noise-gated). |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | `ensureApplicantRecommended` (race-safe, no-resurrect) + the disposition machinery. |
-| `shared/components/reviewers/ReviewerFindPanel.js` | Find tab: ingestion display + auto-load proposal + manual picker + search section. |
-| `shared/components/reviewers/ReviewerSearchSection.js` | In-panel search (analyze→discover→enrich→save). |
-| `shared/components/reviewers/{sse,reviewer-search-logic}.js` | SSE reader + pure search logic (unit-tested). |
-| `pages/api/grant-reporting/lookup-grant.js` | Shared `classifyFile` + `pickProposalBestGuess` (proposal auto-pick). |
+| `shared/components/reviewers/CandidatesPanel.js` | Candidates sub-tab roster + invite trigger |
+| `shared/components/reviewers/InviteEmailModal.js` | Lean preview→send invitation modal |
+| `lib/utils/reviewer-invite.js` | Pure send-safety helpers (dup-guard, attachment gates) — unit-tested |
+| `pages/api/review-manager/send-emails.js` | `invitation` lifecycle + server-authoritative attachment gate |
+| `lib/services/serp-contact-service.js` | `findScholarProfileViaGoogle` (institution-aware) + `institutionConflicts` guard |
+| `pages/api/workbench/enrich-recommended.js` | Applicant-recommended verify→COI→enrich→writeback |
+| `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` | §Phase 3 + S211/S212 bullets (SHIPPED) |
 
 ## Testing
 ```bash
-npx jest                                 # 1689 tests
-npx eslint . -f json                     # authoritative lint count (0 errors; warnings don't gate)
-npm run check:atlas && npm run check:atlas:self-test && npm run check:api-routes && npm run check:doc-currency && npm run check:fact-consistency
-./node_modules/.bin/next build           # confirms routes compile
-# Workbench Find smoke (local bypass): /workbench/<guid>?tab=reviewers&sub=find — per-request path is email-independent.
+npx jest                                 # 1729 tests
+npx eslint . -f json                     # 0 errors (warnings don't gate)
+npm run check:atlas && npm run check:api-routes && npm run check:doc-currency && npm run check:fact-consistency
+./node_modules/.bin/next build
+# Reviewer-invite smoke (local bypass): /workbench/<guid>?tab=reviewers&sub=candidates — but real send needs a deployed env + real Azure session.
 ```
