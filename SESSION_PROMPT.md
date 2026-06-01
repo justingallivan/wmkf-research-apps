@@ -1,72 +1,68 @@
-# Session 208 Prompt: Build the Request Workbench — Phase 0 (foundation)
+# Session 209 Prompt: Request Workbench — Phase 2 (Manage panel)
 
-## ⏰ Standing context / guardrails (carried from S197–S207)
-- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity words into docs/memory. Authoritative lint counts = `npx eslint . -f json` keyed on `ruleId`/`severity`, NOT grep over the default formatter.
-- **Codex stop-time review gate is ENABLED** and was *very* active in S207 — four review rounds on the build plan caught a too-narrow scope claim, an incomplete junction-reader audit, an allowlist `scope=my` bug, race/resolution gaps, and an internal contradiction. Lesson reinforced: reconcile every restatement in the same turn; mark unresolved things OPEN; verify-as-you-go.
-- **rtk grep filter STILL corrupts output.** For "does X exist" use `rtk proxy git grep` or write-to-file + Read; never trust a bare `grep`/`rg`. `rtk` also compresses `jest` — use `rtk proxy npx jest`.
-- **Push deploys to prod.** `main` auto-deploys on Vercel. (S207 changed only `docs/` + `.claude-memory/` — nothing deployable.)
-- **CI-green ≠ correct for async/effect code.** See [[feedback-profile-context-runtime-bugs]]. Manual smoke is mandatory for load-bearing async logic.
-- **Local-dev auth:** full Azure login can't run on `localhost`. To smoke gated UI locally, add `AUTH_REQUIRED=false` + throwaway `NEXTAUTH_SECRET` + `NEXTAUTH_URL=http://localhost:3000` to `.env.local`, `npm run dev`, **and revert those 3 lines after**.
-- **Read-only Dataverse probe pattern (used S207):** load `.env.local` → client-credentials token (`DYNAMICS_TENANT_ID`/`CLIENT_ID`/`CLIENT_SECRET`/`URL`) → GET `…/api/data/v9.2/…`. Inline `node -e` works without writing a script; needs `dangerouslyDisableSandbox` for network.
+## ⏰ Standing context / guardrails (carried from S197–S208)
+- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity into docs/memory. Authoritative lint counts = `npx eslint . -f json` keyed on `ruleId`/`severity`, NOT grep over the default formatter.
+- **Codex stop-time review gate is ENABLED** and was active in S208 — it caught (1) batch/thank-you complete transitions skipping `wmkf_completedat`, (2) the fail-closed boundary leaking, (3) dashboard rows linking to a missing route. Each was a real fix. Reconcile every restatement in the same turn; verify-as-you-go.
+- **rtk grep filter STILL corrupts output.** For "does X exist" use `rtk proxy git grep` / `git grep` / write-to-file + Read; never trust a bare `grep`/`rg`. `rtk` also compresses jest — use `rtk proxy npx jest` (or plain `npx jest`).
+- **Push deploys to prod.** `main` auto-deploys on Vercel. CI is now GREEN again (S208 fixed a chronically-red `check:doc-currency` step that had masked the real jest signal for ~8 sessions).
+- **CI-green ≠ correct for async/effect code.** [[feedback-profile-context-runtime-bugs]]. Manual smoke is mandatory for load-bearing async/UI logic — **the S208 Workbench UI was NOT browser-smoked yet** (data layer was validated headlessly).
+- **`/start` gate-list gap:** the start skill only runs `check:atlas` + `check:api-routes`. It does NOT run `check:doc-currency` or `check:fact-consistency` — which is why a red `doc-currency` gate slipped for sessions. **Quick win: add both to `.claude/skills/start`** so this class surfaces at session start.
+- **Local-dev auth:** full Azure login can't run on `localhost`. To smoke gated UI: add `AUTH_REQUIRED=false` + throwaway `NEXTAUTH_SECRET` + `NEXTAUTH_URL=http://localhost:3000` to `.env.local`, `npm run dev`, **revert those 3 lines after**.
+- **Read-only Dataverse probe pattern (used S208):** load `.env.local` → `DynamicsService.getAccessToken()` → GET `…/api/data/v9.2/…`. Inline `node -e` works; needs `dangerouslyDisableSandbox` for network.
 
-## Session 207 Summary
+## Session 208 Summary
 
-**A design / pre-implementation session — no application code shipped.** Justin handed over the 35 going-forward D26 request numbers, which unblocked the Request Workbench build. Output: a complete, Codex-vetted implementation plan + one memory entry + a deferral note. 2 commits (`0e4ac04`, `4099778`); tree clean; **nothing deployable changed.**
+**Built and shipped Request Workbench Phase 0 + Phase 1 + the per-request shell, fixed a long-standing red CI, all green and on prod.** 4 commits; tree clean. Read `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` first.
 
 ### What was completed
-1. **`docs/REQUEST_WORKBENCH_BUILD_PLAN.md` (new, v3) — implementation-ready.** Complements the S206 scoping doc with the *how*: phases, file paths, signatures. Cleared **four Codex review rounds** (final verdict: implementation-ready, no contradictions).
-2. **Grounded against live state:** verified the `'Phase II Pending'` gate, variadic `requireAppAccess`, the reviewer-suggestion adapter, `Stage2aView` rendering `wmkf_abstract`, and **a live Dataverse probe confirming `wmkf_abstract` is populated for all 35 D26 requests** (lengths 918–2,478 chars).
-3. **Find modernization decided with Justin** (not a verbatim port): Find defaults to the request's documents (drop PDF upload); applicant **recommended + excluded** reviewers unify on `wmkf_appreviewersuggestion` via a **new `wmkf_applicantdisposition` picklist** (`recommended`/`excluded`), per-request scoped; recommendations enriched on equal footing on the PD's search run; excludes kept free-text-raw + mirrored to structured rows on confident match; `summaryPages`/`summaryBlobUrl` removed (abstract replaces it). Stale-UI retirements: "My Candidates" → Invite, legacy `.eml` path, three email-config fragments, RM Overview/Proposal-Detail tabs.
-4. **`canManage` resolved (S207):** soft UI gate for v1, server stays **org-open** (today's behavior; emails are attributed, field/file writes are service-account-attributed). The **system-wide `DYNAMICS_IMPERSONATION_ENABLED` flip is DEFERRED to a future session** (env-wide change; needs its own privilege audit). Recorded in the build plan + `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md`.
-5. **Memory:** created [[project-intake-portal-reviewer-capture]] — the new intake portal writes applicant reviewers to the junction + disposition flag (not the legacy slots/free-text).
+1. **Phase 0 — grant + disposition foundation (`79a343d`).** Additive `reviewers` app grant (18 reviewer-finder/review-manager routes now variadic `requireAppAccess(..., 'reviewers')`; legacy keys NOT retired). New **`wmkf_applicantdisposition`** picklist (Recommended=100000000 / Excluded=100000001; null = staff/Claude-discovered) **deployed to prod Dataverse** (wave6, idempotent, verified). Excluded rows filtered from all candidate/count readers via the **null-safe** `notExcludedFilter()` — see [[project-dataverse-odata-null-filter]] (a bare `ne` would have dropped all normal rows). Fail-closed chokepoints: `findById`, `updateLifecycle` (every write, post-Codex), `ensureToken`/`regenerate-token`, `verifySuggestionToken`. `wmkf_completedat` stamped on EVERY complete transition (centralized in adapter `updateLifecycle`, post-Codex). Codex-reviewed; remaining sinks recorded as Phase-3 acceptance criteria in the build plan.
+2. **CI fix (`1aff4a3`).** The CI "Tests" job had been red on every push for ~8 sessions — not jest, but `check:doc-currency` exiting 1 (before build/tests ran) on a missed allow-list entry for real schema filenames in `APPRESEARCHER_COLLAPSE_PLAN.md`. Allow-listed; CI green again.
+3. **Phase 1 — dashboard + allowlist (`44c10b6`).** `/workbench` tier-2 cycle dashboard + `/api/workbench/{dashboard,resolve-request}`. Additive union: status-gated PD/cycle query ∪ (for D26) the committed allowlist of 35 going-forward request NUMBERS (`shared/config/d26Allowlist.js`). Grounded live: all 35 are Phase I Pending (gate excludes them → allowlist is load-bearing), all Dec-2026 dated (→ D26), 4 PDs. Headless smoke vs prod: scope=all → 35; scope=my partitions cleanly (8+6+13+8). `my-proposals.js` untouched. Reconciled `api-route-file-count` 96→98, `requireappaccess-endpoint-count` 51→53, `app-definition-count` 17→18.
+4. **Per-request shell (`eeb5da3`).** `/workbench/[requestId].js` stub (tab strip + placeholder panels) so dashboard rows resolve instead of 404ing (Codex catch).
+
+Full suite **1581 green**, 0 lint errors, all CI gates green, build passes, CI run green each push.
 
 ### Commits
-- `0e4ac04` — Request Workbench build plan (v3) + memory + identity-doc deferral note
-- `4099778` — fix Codex round-3 finding (line-34 "just unread" contradiction)
+- `79a343d` — Phase 0: reviewers grant + applicant-disposition foundation (hardened)
+- `1aff4a3` — Fix chronically-red CI: allow-list real schema filenames in doc-currency
+- `44c10b6` — Phase 1: cycle dashboard + D26 allowlist
+- `eeb5da3` — per-request shell so dashboard rows resolve
 
 ## Potential Next Steps
 
-### 1. ⭐ Build Phase 0 — foundation (low-risk, no UI). **Read `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` first.**
-Phase 0 is the safe starting slice (no UI, easily testable):
-- Add the `reviewers` app grant to `appRegistry.js` (additive; not in DEFAULT_APP_GRANTS).
-- Make the 18 reviewer-finder/review-manager API routes accept `, 'reviewers'` (variadic).
-- Admin label + guide + baseConfig entries.
-- **Deploy the new `wmkf_applicantdisposition` picklist** on `wmkf_appreviewersuggestion` (delegated creator privileges; idempotent script; doc in `INTAKE_PORTAL_SCHEMA_CHANGES.md` + atlas). NB: `wmkf_completedat` is already deployed — adapter wiring only.
-- Adapter: add `wmkf_completedat` + `wmkf_applicantdisposition` to FIELD_SELECT/maps; stamp `completedAt` on complete in `reviewers.js`.
-- **Junction-reader filter audit** (load-bearing): `disposition ne excluded` on all candidate/count readers incl. `grant-cycles-dataverse` aggregate + the upsert lookup + a shared chokepoint for the findById/token-mint action paths; excluded rows `wmkf_selected=false`.
-- Tests: `ALL_APP_KEYS`, genuinely-wrong `wrongApp` key, excluded-filter unit test.
-Then Phase 1 (dashboard + allowlist + grant assignment), Phase 2 (Workbench shell + Manage panel), Phase 3 (Find panel + applicant ingestion — the long pole). Phases are sized one-per-session.
+### 1. ⭐ Phase 2 — Manage panel (the real Reviewers-tab content)
+**Read the build plan §Phase 2 first.** Extract Review Manager's reviewer-management substance + inline deps (`StatusBadge`, `TokenStateBadge`, `TokenActionsMenu`, `StatusSummary`, `EmailModal`, `UploadReviewModal`, `StatusDropdown`) from `pages/review-manager.js` → **`shared/components/reviewers/ReviewerManagePanel.js`** (props `{ proposal, reviewers, loading, onRefresh, mode∈{invite,track,completed} }`). Strip the proposal-selector dropdown + standalone proposal info card + per-app signature bar. Both `review-manager.js` AND the Workbench shell import it; Workbench feeds one request via `reviewers.js?proposalId=<guid>`. Also `ReviewersTab.js` (4 sub-tabs, `canManage` gate) + `SubTabBadges.js`. **Regression budget:** verify `review-manager.js` still renders/sends/uploads identically against the shared module.
 
-### 2. Intake virus-scan EICAR e2e — STILL the parked pre-cycle must-do (browser-gated)
-Fixture turnkey (`scripts/build-intake-eicar-fixture.py`), code path verified S205. Needs deployed env + Entra applicant session. [[project-intake-portal-virus-scan-e2e-deferred]].
+### 2. Ops to make the Workbench actually usable (manual, quick)
+- **Grant `reviewers`** to the 4 pilot PDs via `/admin` → App Access (the registry key grants no one).
+- **Browser-smoke `/workbench`** under the local auth bypass (data layer validated headlessly; the UI itself wasn't rendered).
 
-### 3. BILL chunk-5 tail (ops / non-coding)
-Office question (BILL self-registration address capture); ops before `BILL_ENABLED=true`: `HONORARIUM_*`/`BILLCOM_ACCOUNT_*` probe+set, `honorarium.default_amount` via /admin, Steph's sandbox. Migration 017 applied S203.
+### 3. Quick tooling win — close the `/start` gate-list gap
+Add `check:doc-currency` (+ self-test) and `check:fact-consistency` to `.claude/skills/start` so a red drift gate surfaces at session start (this is how the 8-session-old red CI slipped). Update [[feedback-red-gates-are-p0]] accordingly.
 
-### 4. DEFERRED — system-wide impersonation flip (future session, NOT this build)
-`DYNAMICS_IMPERSONATION_ENABLED=true` is the path to per-person attribution on Dataverse field/file writes, but it's env-wide (all app-driven writes). Needs a privilege audit across every write path + the outstanding `/phase-i-dynamics overwrite=true` smoke. See `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md`. Do NOT couple it to the Workbench build.
+### 4. Intake virus-scan EICAR e2e — STILL the parked pre-cycle must-do (browser-gated)
+[[project-intake-portal-virus-scan-e2e-deferred]]. Needs deployed env + Entra applicant session.
 
-### 5. Lint ratchet remainder (optional, low priority — default: leave)
-React-Compiler-eligibility noise; CI won't block.
+### 5. Phase 3 — Find panel + applicant-reviewer ingestion (own session; the long pole)
+Also where the deferred fail-closed residuals land (token-revocation-on-exclusion, `mintAndStore` sink, staff post-acceptance paths). See build plan §Phase 3 + §"Excluded-row fail-closed boundary".
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` | **v3, implementation-ready.** The build plan: phases, file paths, signatures, CI-gate doc updates, verification. READ FIRST. |
-| `docs/REQUEST_WORKBENCH_SCOPING.md` | S206 Connor/Sarah scoping doc (the *what/why*). |
-| `.claude-memory/project-reviewer-apps-redesign-direction.md` | Locked architecture + S206 decisions. |
-| `.claude-memory/project-intake-portal-reviewer-capture.md` | Applicant reviewers → junction + `wmkf_applicantdisposition` (going-forward). |
-| `shared/config/appRegistry.js` | Add the `reviewers` grant here (Phase 0). |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | Adapter to extend (completedAt + applicantdisposition + reader filters). |
-| `pages/api/reviewer-finder/my-proposals.js` | Status-gate + `fetchReviewerCounts` reused by the dashboard endpoint. |
-| `pages/api/review-manager/reviewers.js` | Mark-complete PATCH (stamp both timestamps); single-request fetch path. |
-| `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md` | Deferred impersonation flip + privilege-intersection contract. |
+| `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` | The build plan — phases, signatures, Phase-3 fail-closed criteria. READ FIRST. |
+| `pages/workbench.js` / `pages/workbench/[requestId].js` | Tier-2 dashboard / tier-3 per-request shell (Phase 1). |
+| `pages/api/workbench/{dashboard,resolve-request}.js` | Dashboard feed (additive allowlist union) + number→GUID. |
+| `shared/config/d26Allowlist.js` | 35 going-forward D26 request numbers (throwaway). |
+| `lib/dataverse/adapters/reviewer-suggestion.js` | `notExcludedFilter()`, `isExcluded()`, `findById` throw, `updateLifecycle` every-write guard + complete-stamp. |
+| `pages/review-manager.js` | Source of the reviewer-management substance to extract in Phase 2. |
+| `.claude-memory/project-reviewer-apps-redesign-direction.md` | Locked architecture + S208 build status. |
 
 ## Testing
 ```bash
-rtk proxy npx jest                       # use `rtk proxy` — bare rtk compresses jest output
-npm run lint                             # 0 errors / warnings only (CI blocks on errors only)
-npm run check:atlas && npm run check:atlas:self-test && npm run check:api-routes && npm run check:fact-consistency
-# Phase 1 smoke: AUTH_REQUIRED=false + throwaway NEXTAUTH_* in .env.local, npm run dev, open /workbench (revert after).
+npx jest                                 # 1581 tests; or `rtk proxy npx jest`
+npm run lint                             # 0 errors (warnings don't gate)
+npm run check:atlas && npm run check:atlas:self-test && npm run check:api-routes && npm run check:doc-currency && npm run check:doc-currency:self-test && npm run check:fact-consistency
+npm run build                            # confirms /workbench routes compile
+# Phase 1/2 smoke: AUTH_REQUIRED=false + throwaway NEXTAUTH_* in .env.local, npm run dev, open /workbench (revert after).
 ```
