@@ -145,7 +145,7 @@ function WorkbenchDashboard() {
       ) : (
         <div className="space-y-3">
           {proposals.map((p) => (
-            <Link key={p.requestId} href={`/workbench/${p.requestId}?tab=reviewers`} className="block">
+            <Link key={p.requestId} href={`/workbench/${p.requestId}?tab=reviewers&n=${encodeURIComponent(p.requestNumber)}`} className="block">
               <Card className="cursor-pointer">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0">
