@@ -35,22 +35,36 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'reviewers');
   if (!access) return;
 
+  // Resolve by GUID (the Workbench route always has it) OR by human request
+  // number (dashboard links / typed). GUID is preferred so the per-request shell
+  // can always load context — header, empty-states, and the soft canManage gate
+  // must not depend on the optional ?n= number being present (Codex S209 catch).
+  const requestId = req.query.requestId ? String(req.query.requestId).trim() : '';
   const requestNumber = req.query.requestNumber ? String(req.query.requestNumber).trim() : '';
-  if (!requestNumber) {
-    return res.status(400).json({ error: 'requestNumber is required' });
+  if (!requestId && !requestNumber) {
+    return res.status(400).json({ error: 'requestId or requestNumber is required' });
   }
 
   return bypassDynamicsRestrictions('workbench-resolve-request', async () => {
     try {
-      const safe = requestNumber.replace(/'/g, "''");
-      const { records } = await DynamicsService.queryRecords('akoya_requests', {
-        select: SELECT,
-        filter: `akoya_requestnum eq '${safe}'`,
-        top: 1,
-      });
-      const r = records[0];
+      let r = null;
+      if (requestId) {
+        try {
+          r = await DynamicsService.getRecord('akoya_requests', requestId, { select: SELECT });
+        } catch (e) {
+          r = null; // fall through to 404
+        }
+      } else {
+        const safe = requestNumber.replace(/'/g, "''");
+        const { records } = await DynamicsService.queryRecords('akoya_requests', {
+          select: SELECT,
+          filter: `akoya_requestnum eq '${safe}'`,
+          top: 1,
+        });
+        r = records[0];
+      }
       if (!r) {
-        return res.status(404).json({ error: `No request found for number ${requestNumber}` });
+        return res.status(404).json({ error: `No request found for ${requestId || `number ${requestNumber}`}` });
       }
 
       const cycleCode = r.wmkf_meetingdate ? meetingDateToCycleCode(r.wmkf_meetingdate) : null;

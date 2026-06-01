@@ -45,12 +45,13 @@ function WorkbenchRequest() {
   const [ctx, setCtx] = useState(null);
   const [error, setError] = useState(null);
 
-  // Best-effort header context. resolve-request keys on number, so we only fetch
-  // when the dashboard passed ?n=<requestNumber>; otherwise we just show the id.
+  // Request context (header, PD for the canManage gate, title for the panel).
+  // Resolved by GUID — which the route always has — so it loads on direct/
+  // bookmarked links too, not only when the dashboard passes ?n= (Codex S209).
   const requestNumber = typeof router.query.n === 'string' ? router.query.n : null;
-  const loadCtx = useCallback(async (num) => {
+  const loadCtx = useCallback(async (id) => {
     try {
-      const res = await fetch(`/api/workbench/resolve-request?requestNumber=${encodeURIComponent(num)}`);
+      const res = await fetch(`/api/workbench/resolve-request?requestId=${encodeURIComponent(id)}`);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `Failed to load request (${res.status})`);
       setCtx(body);
@@ -60,8 +61,8 @@ function WorkbenchRequest() {
   }, []);
 
   useEffect(() => {
-    if (requestNumber) loadCtx(requestNumber);
-  }, [requestNumber, loadCtx]);
+    if (typeof requestId === 'string' && requestId) loadCtx(requestId);
+  }, [requestId, loadCtx]);
 
   const selectTab = (key) => {
     router.push(

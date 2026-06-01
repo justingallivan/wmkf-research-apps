@@ -1155,20 +1155,22 @@ export default function ReviewerManagePanel({
 
   return (
     <div className="space-y-4">
-      {/* Actions bar */}
+      {/* Actions bar. Counts use selectedList (visible + selected), not the raw
+          selectedReviewers set, which can retain IDs no longer visible after a
+          refresh removes a reviewer — that would overcount (Codex S209). */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-600">
-            {selectedReviewers.size > 0 ? `${selectedReviewers.size} selected` : `${reviewers.length} reviewer${reviewers.length !== 1 ? 's' : ''}`}
+            {selectedList.length > 0 ? `${selectedList.length} selected` : `${reviewers.length} reviewer${reviewers.length !== 1 ? 's' : ''}`}
           </span>
           {loading && (
             <div className="w-4 h-4 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
           )}
         </div>
         <div className="flex items-center gap-2">
-          {canManage && selectedReviewers.size > 0 && (
+          {canManage && selectedList.length > 0 && (
             <Button onClick={() => setEmailModalOpen(true)}>
-              Send Email ({selectedReviewers.size})
+              Send Email ({selectedList.length})
             </Button>
           )}
         </div>

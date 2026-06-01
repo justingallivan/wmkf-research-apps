@@ -97,16 +97,17 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   // fetch is in flight we don't guess.
   const current = activeSub || (loading ? null : computeDefaultSub(reviewers));
 
-  // A synthetic proposal so the panel can render title/deadline even before any
-  // reviewer has accepted (the GET returns no projection until then).
-  const panelProposal = proposal || (context
-    ? {
-        proposalId: context.requestId || requestId,
-        proposalTitle: context.title || (context.requestNumber ? `Request ${context.requestNumber}` : 'Request'),
-        reviewDeadline: null,
-        reviewers: [],
-      }
-    : null);
+  // A synthetic proposal so the panel can render its empty state even before any
+  // reviewer has accepted (the GET returns no projection until then) and even
+  // when request context didn't load — keyed on requestId, which is always
+  // present. Never null, so the manage panels never render blank (Codex S209).
+  const panelProposal = proposal || {
+    proposalId: (context && context.requestId) || requestId || null,
+    proposalTitle: (context && context.title)
+      || (context && context.requestNumber ? `Request ${context.requestNumber}` : 'Request'),
+    reviewDeadline: null,
+    reviewers: [],
+  };
 
   return (
     <div className="space-y-4">
