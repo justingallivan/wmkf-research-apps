@@ -59,6 +59,7 @@
 - [Grant phasing evolution](project-grant-phasing-evolution.md) — reviewer-finding only at Phase II; concepts going away; next cycle: one applicant-facing package, internal Phase I/II labels persist.
 
 ## Intake Portal (GOapply replacement)
+- [Reviewer capture → appreviewersuggestion + disposition flag](project-intake-portal-reviewer-capture.md) — intake portal writes applicant recommended/excluded reviewers to `wmkf_appreviewersuggestion` (per-request junction) via new `wmkf_applicantdisposition` picklist; per-request scope, NOT legacy akoya_request slots/free-text.
 - [External ID auth foundation SHIPPED (S129)](project-intake-portal-external-id-foundation.md) — tenant `04a1406b...`, NextAuth `entra-external` provider, `/apply` route auth round-trip verified.
 - [Intake portal UI TODOs (deferred to UI-design session)](project-intake-portal-ui-todo.md) — S187 surfaced two UX bugs while smoke-testing DR8: (1) sign-out silently re-authenticates via Entra and (2) Entra sign-up flow collects irrelevant City/State/DisplayName fields. Both held for a dedicated UI session.
 - [Intake portal virus-scan e2e — DEFERRED](project-intake-portal-virus-scan-e2e-deferred.md) — S193 verified reviewer path; intake path skipped (Entra sign-up rough). MUST run EICAR-style e2e through /apply before the next cycle's Phase I intake goes live.
