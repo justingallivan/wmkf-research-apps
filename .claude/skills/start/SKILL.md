@@ -65,16 +65,19 @@ and hangs `git fsck`/`gc`.
 
 Before reading any session context, run the project's CI gates to surface rubric violations *before* doing other work. A red gate is a violation of the ground-truth rule (`docs/CLAUDE_REMEDIATION_PLAN.md` + CLAUDE.md "Ground-truth requirement"), regardless of which session caused it.
 
-If the project has these scripts (check `package.json`), run them:
+If the project has these scripts (check `package.json`), run them. Run each gate and its `:self-test` **sequentially, never in parallel** — the self-tests write synthetic fixtures into paths the main gate scans (CLAUDE.md "Operating rules"):
 ```bash
-npm run check:atlas             # Application State Atlas coverage
-npm run check:atlas:self-test   # Coverage-tool self-test
-npm run check:api-routes        # API route security matrix coverage
+npm run check:atlas                  # Application State Atlas coverage
+npm run check:atlas:self-test        # Coverage-tool self-test
+npm run check:api-routes             # API route security matrix coverage
+npm run check:doc-currency           # Doc-currency drift gate (was red & unnoticed for ~8 sessions)
+npm run check:doc-currency:self-test # Doc-currency self-test
+npm run check:fact-consistency       # Registered scalar drift across docs/memory
 ```
 
 Skip silently if any of those scripts isn't defined — not every project has them. Do not skip when they are defined.
 
-**If any gate is red:** report it as the FIRST thing in the Step 4 summary, before recapping the previous session. A red gate is a P0 blocker for any new feature work in the affected area (data layer for `check:atlas`, API routes for `check:api-routes`). Treat fixing it as a candidate first task, not a side-note.
+**If any gate is red:** report it as the FIRST thing in the Step 4 summary, before recapping the previous session. A red gate is a P0 blocker for any new feature work in the affected area (data layer for `check:atlas`, API routes for `check:api-routes`, docs/memory drift for `check:doc-currency` and `check:fact-consistency`). Treat fixing it as a candidate first task, not a side-note. The `doc-currency` gate is included here precisely because it sat red for ~8 sessions while masking the real jest signal — exactly the class this list is meant to surface.
 
 ## Step 3: Load Context
 
