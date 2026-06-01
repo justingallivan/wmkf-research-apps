@@ -85,6 +85,15 @@ export const APP_REGISTRY = [
     features: ['Review Tracking', 'Email Templates', 'Status Pipeline', 'Document Upload'],
   },
   {
+    key: 'reviewers',
+    name: 'Reviewers',
+    href: '/workbench',
+    icon: '🗂️',
+    description: 'Request Workbench — per-request reviewer dashboard consolidating finding, inviting, tracking, and completing peer reviews across the review lifecycle (successor to Reviewer Finder + Review Manager)',
+    categories: ['phase-ii'],
+    features: ['Cycle Dashboard', 'Find + Invite + Track', 'Applicant Reviewers', 'Work-Remaining Cues'],
+  },
+  {
     key: 'peer-review-summarizer',
     name: 'Summarize Peer Reviews',
     href: '/peer-review-summarizer',

@@ -22,6 +22,7 @@ import { requireAppAccess } from '../../../lib/utils/auth';
 import { mintAndStore } from '../../../lib/external/token-lifecycle';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { APPLICANT_DISPOSITION_EXCLUDED } from '../../../lib/dataverse/adapters/reviewer-suggestion';
 
 const DEFAULT_TTL_DAYS = 90;
 
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, reason: 'method_not_allowed' });
   }
 
-  const access = await requireAppAccess(req, res, 'review-manager');
+  const access = await requireAppAccess(req, res, 'review-manager', 'reviewers');
   if (!access) return;
 
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
@@ -60,7 +61,7 @@ export default async function handler(req, res) {
     try {
       suggestion = await bypassDynamicsRestrictions('regenerate-token-lookup', () =>
         DynamicsService.getRecord('wmkf_appreviewersuggestions', suggestionId, {
-          select: 'wmkf_appreviewersuggestionid,_wmkf_request_value',
+          select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_applicantdisposition',
         }),
       );
     } catch (e) {
@@ -68,6 +69,14 @@ export default async function handler(req, res) {
         return res.status(404).json({ ok: false, reason: 'not_found' });
       }
       throw e;
+    }
+
+    // Fail closed on an applicant-"excluded" engagement. This is a direct-mint
+    // path (mintAndStore, not ensureToken), so it carries its own disposition
+    // chokepoint — never regenerate a magic link for a reviewer the applicant
+    // asked us not to use (Phase 0.7).
+    if (suggestion?.wmkf_applicantdisposition === APPLICANT_DISPOSITION_EXCLUDED) {
+      return res.status(409).json({ ok: false, reason: 'excluded' });
     }
 
     const requestId = suggestion?._wmkf_request_value;

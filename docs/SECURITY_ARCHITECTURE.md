@@ -661,7 +661,7 @@ Authentication is enforced at three levels — the server-side proxy, API route 
 | Component | Purpose |
 |-----------|---------|
 | `AppAccessContext` | React context; fetches `/api/app-access` on mount; exposes `hasAccess(appKey)`, `isSuperuser`. Deny-by-default during loading; fail-closed on fetch error. |
-| `RequireAppAccess` | Page-level wrapper on all [17](CANONICAL_COUNTS.md#app-definition-count) app pages; shows "Access Not Available" if denied. |
+| `RequireAppAccess` | Page-level wrapper on all [18](CANONICAL_COUNTS.md#app-definition-count) app pages; shows "Access Not Available" if denied. |
 | `Layout.js` | Filters navigation links by app access. |
 
 **Auth kill switch:** Setting `AUTH_REQUIRED=false` disables authentication at all layers. Intended for emergency access or local development.
@@ -685,7 +685,7 @@ Authentication is enforced at three levels — the server-side proxy, API route 
 
 | Attribute | Detail |
 |-----------|--------|
-| **Registry** | `shared/config/appRegistry.js` — single source of truth for all [17](CANONICAL_COUNTS.md#app-definition-count) app definitions (keys, names, routes, icons, categories) |
+| **Registry** | `shared/config/appRegistry.js` — single source of truth for all [18](CANONICAL_COUNTS.md#app-definition-count) app definitions (keys, names, routes, icons, categories) |
 | **Database** | Dataverse `wmkf_appuserappaccesses` (per-user app grants). The Postgres `user_app_access` table that previously enforced this via a `(user_profile_id, app_key)` unique constraint was dropped 2026-05-12 at the Wave 1 cutover. |
 | **Default grants** | New users receive only `dynamics-explorer`; all other apps require explicit superuser grant |
 | **Superuser bypass** | Users with `role = 'superuser'` in `dynamics_user_roles` bypass all app checks |
@@ -1276,7 +1276,7 @@ _(Historical as-of-finding paths. `evaluate-concepts.js` was later archived to `
 
 #### L10: API Usage Log Unbounded Growth — REMEDIATED
 
-**Finding:** `api_usage_log` grows with every Claude API call across all apps ([17](CANONICAL_COUNTS.md#app-definition-count) in current registry) and has no archival or cleanup mechanism.
+**Finding:** `api_usage_log` grows with every Claude API call across all apps ([18](CANONICAL_COUNTS.md#app-definition-count) in current registry) and has no archival or cleanup mechanism.
 
 **Remediation:** Daily maintenance cron (`/api/cron/maintenance`) runs `MaintenanceService.cleanupUsageLog()` to delete records older than the configured retention period (default 90 days). Retention is configurable via Dataverse `wmkf_appsystemsettings` *(formerly Postgres `system_settings`, dropped 2026-05-12)*.
 

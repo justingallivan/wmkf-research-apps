@@ -2,18 +2,18 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-05-09 (Stage 2a additions, see below) — prior verification 2026-05-07 via `scripts/audit-dataverse-state.js` + EntityDefinitions metadata probe
+**Last verified:** 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed + live metadata probe: 77 `wmkf_`-prefixed attrs, 108 total) — prior 2026-05-09 (Stage 2a additions) / 2026-05-07 via `scripts/audit-dataverse-state.js` + EntityDefinitions metadata probe
 **Live row count:** 336
 **Entity set:** `wmkf_appreviewersuggestions`
 **Adapter:** `lib/dataverse/adapters/reviewer-suggestion.js`
-**Extension manifests:** `lib/dataverse/schema/wave2-existing/wmkf_appreviewersuggestion-extensions.json` (S128–S130 additions) + `lib/dataverse/schema/wave3/04_wmkf_appreviewersuggestion_stage2a.json` (S143 Stage 2a slice 1 additions) + `lib/dataverse/schema/wave5/01_wmkf_appreviewersuggestion_workbench.json` (S196 Workbench prep)
+**Extension manifests:** `lib/dataverse/schema/wave2-existing/wmkf_appreviewersuggestion-extensions.json` (S128–S130 additions) + `lib/dataverse/schema/wave3/04_wmkf_appreviewersuggestion_stage2a.json` (S143 Stage 2a slice 1 additions) + `lib/dataverse/schema/wave5/01_wmkf_appreviewersuggestion_workbench.json` (S196 Workbench prep) + `lib/dataverse/schema/wave6/01_wmkf_appreviewersuggestion_applicant_disposition.json` (S208 applicant disposition)
 **Native entity audit:** ENABLED (S143). Field-level before/after on the engagement-scope correction fields below is captured by Dataverse's native audit log; no parallel audit entity built. See `scripts/enable-suggestion-audit.mjs`.
 
 ## Source of truth
 
 **Active.** Per-(reviewer, request) suggestion + outreach lifecycle. Reviewer Finder writes here on save-candidates; Review Manager updates lifecycle here on send/receive/thank-you. Postgres `reviewer_suggestions` (337 rows) is the legacy mirror — ~97.6% parity per S136 probe.
 
-## Schema (live, 52 custom attrs)
+## Schema (52 documented custom attrs as of 2026-05-09; +`wmkf_completedat` (S196) +`wmkf_applicantdisposition` (S208) added since — live probe 2026-05-31 shows 77 `wmkf_`-prefixed attrs incl. virtual `*name` denorms)
 
 Identity / linkage:
 - `wmkf_appreviewersuggestionid` (PK)
@@ -41,6 +41,16 @@ Outreach timestamps:
 
 Review status: `wmkf_reviewstatus` (Picklist: `accepted=100000000 | materials_sent | under_review | review_received | complete=100000004`).
 - `complete` (S196 claim): set by Request Workbench when PD closes out — drops the row off the PD dashboard. Paired with `wmkf_completedat` (DateTime, added 2026-05-28).
+
+Applicant disposition (S208, wave6 — deployed 2026-05-31):
+- `wmkf_applicantdisposition` (Picklist, local optionset: `Recommended=100000000 | Excluded=100000001`; **null = staff/Claude-discovered, the normal case**). Tags an applicant-sourced engagement row. **Per-request only** — lives solely on this junction, never on the global `wmkf_potentialreviewer` person, so a reviewer excluded by one applicant stays eligible for every other request. `excluded` rows are also written `wmkf_selected=false`.
+- **Candidate-read convention:** every list/count reader of candidates must drop `excluded` rows. The adapter exposes `notExcludedFilter()` → `(wmkf_applicantdisposition eq null or wmkf_applicantdisposition ne 100000001)`. The `eq null or` is **load-bearing**: Dataverse omits rows whose `$filter` evaluates to null, and `field ne X` is null when the field is null, so a bare `ne` would silently hide every normal (null) candidate. Applied in `findByRequest`/`findByPD`/`findAcceptedByPD` (adapter), `fetchReviewerCounts` (`my-proposals.js`), `fetchCounts` aggregate (`grant-cycles-dataverse.js`, inlined), and `reviewer-suggestion-sweep.js`.
+- **Action chokepoints (fail closed):** four layers, tightened after the S208 Codex review.
+  - `updateLifecycle` (adapter) reads + THROWS on an excluded row for **every** lifecycle write (not just complete transitions) — covers single/batch PATCH, send-emails, my-candidates, future callers.
+  - `findById` (adapter) THROWS on an excluded row — covers email render/send paths that resolve rows through it.
+  - `ensureToken` / `regenerate-token` refuse to mint a magic link for an excluded row.
+  - `verifySuggestionToken` rejects an excluded row even with a previously-minted live token — the single chokepoint for all external context/respond/upload (reported as `revoked`).
+  - **Phase-3 residual** (unreachable while ingestion hasn't written excluded rows; see `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` § "Excluded-row fail-closed boundary"): `mintAndStore` sink self-guard, staff post-acceptance direct writes (`mark-received-no-file`, `review-upload` staff path, `download-review`), the legacy `generate-emails` `.eml` loop, and token-revocation when ingestion flips an existing row to excluded.
 
 Honorarium linkage (BILL chunk 1, added by Connor 2026-05-28):
 - `wmkf_honorariumrequest` (Lookup → `akoya_request`) + `wmkf_honorariumrequestname` (virtual denorm) — points at the honorarium `akoya_request` row created when the reviewer accepted. Optional; populated by the portal at honorarium-request create time. No backfill on historical engagements.
@@ -88,16 +98,19 @@ Picklist extension on existing `wmkf_responsetype`: added `withdrawn_sufficient=
 ## Adapter contract (`lib/dataverse/adapters/reviewer-suggestion.js`)
 
 Methods:
-- `findByPotentialReviewerAndRequest`, `findById`
-- `findByRequest(requestId, { selectedOnly })` — used by Review Manager request views
-- `findByPD(systemuserid, { cycleCode, selectedOnly })` — two-step: query `akoya_requests` by lead PD then suggestions by request OR-chain (chunks of 25)
-- `findAcceptedByPD` — same shape, `wmkf_accepted eq true` filter
-- `upsert` — save-candidates path
-- `updateLifecycle(id, updates, { actingUserSystemId })` — partial update with picklist mapping for `responseType`/`reviewStatus`
+- `findByPotentialReviewerAndRequest` — upsert lookup; disposition-aware (returns excluded rows so `upsert` can honor "excluded wins", but does not throw)
+- `findById` — **THROWS on an applicant-excluded row** (action chokepoint; see Applicant disposition above)
+- `findByRequest(requestId, { selectedOnly })` — used by Review Manager request views; carries `notExcludedFilter()`
+- `findByPD(systemuserid, { cycleCode, selectedOnly })` — two-step: query `akoya_requests` by lead PD then suggestions by request OR-chain (chunks of 25); carries `notExcludedFilter()`
+- `findAcceptedByPD` — same shape, `wmkf_accepted eq true` filter; carries `notExcludedFilter()`
+- `upsert` — save-candidates path; accepts `applicantDisposition`; refuses to convert an existing excluded row into a selected candidate (returns `{ skippedExcluded: true }`)
+- `updateLifecycle(id, updates, { actingUserSystemId })` — partial update with picklist mapping for `responseType`/`reviewStatus`/`applicantDisposition`; supports `completedAt`. Reads the row once per write to (a) THROW on an applicant-excluded row (every write, fail closed) and (b) stamp `wmkf_completedat`+`wmkf_reviewreceivedat` idempotently on a `reviewStatus=complete` transition
 - `softDelete(id)` — sets `wmkf_selected = false`
 - `bulkUpdateByRequest` — UI's "assign cycle/program area to whole proposal" action
 
-Picklist maps live in the adapter (`RESPONSE_TYPE_MAP`, `REVIEW_STATUS_MAP`). Callers pass legacy Postgres string values; adapter translates.
+Exported helpers (S208): `APPLICANT_DISPOSITION_MAP`, `APPLICANT_DISPOSITION_EXCLUDED`, `notExcludedFilter(field?)`, `isExcluded(row)`.
+
+Picklist maps live in the adapter (`RESPONSE_TYPE_MAP`, `REVIEW_STATUS_MAP`, `APPLICANT_DISPOSITION_MAP`). Callers pass legacy Postgres string values; adapter translates.
 
 ## Read / write paths
 

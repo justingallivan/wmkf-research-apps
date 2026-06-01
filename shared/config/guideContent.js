@@ -99,6 +99,26 @@ export const GUIDE_SECTIONS = [
     ],
   },
   {
+    key: 'reviewers',
+    title: 'Request Workbench',
+    icon: '🗂️',
+    appKey: 'reviewers',
+    sections: [
+      {
+        heading: 'Overview',
+        content: `The Request Workbench is the per-request home for managing peer review. It consolidates what the Reviewer Finder and Review Manager did into one request-scoped workspace, opened from a cycle dashboard of your assigned requests. (Rolling out in phases — some panels arrive in later updates.)`,
+      },
+      {
+        heading: 'Cycle Dashboard',
+        content: `Pick a grant cycle to see the requests you are Program Director on, each with a cue showing what work remains (reviewers to find, invitations to send, reviews still pending or to read). Choose My to see only your requests or All to see the whole cycle. Click a request to open its Workbench.`,
+      },
+      {
+        heading: 'Reviewers Tab',
+        content: `Inside a request, the Reviewers tab brings together finding candidates, inviting them, tracking responses, and marking reviews complete. Applicant-recommended and applicant-excluded reviewers are surfaced and badged so you can see them on equal footing with candidates Claude discovers.`,
+      },
+    ],
+  },
+  {
     key: 'integrity-screener',
     title: 'Integrity Screener',
     icon: '🔍',

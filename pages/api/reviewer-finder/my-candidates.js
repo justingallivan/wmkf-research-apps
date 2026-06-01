@@ -63,7 +63,7 @@ function projectRequest(r) {
 }
 
 export default async function handler(req, res) {
-  const access = await requireAppAccess(req, res, 'reviewer-finder');
+  const access = await requireAppAccess(req, res, 'reviewer-finder', 'reviewers');
   if (!access) return;
 
   // Trusted internal endpoint — no field/table masking applies.

@@ -198,7 +198,7 @@ that surface inside the capabilities above. It is a **dependency / collaboration
 mostly in PowerAutomate by Connor, sharing only the prompt contract with the Vercel suite. Central
 to sequencing; not a thing a user "uses."
 
-**Legacy apps are dissolving.** Most of the ~17 apps are *a summarization prompt + a thin adapter*.
+**Legacy apps are dissolving.** Most of the ~18 apps are *a summarization prompt + a thin adapter*.
 As backend triggers land, a prompt's primary caller flips from the Vercel UI to PA, and the
 user-facing app demotes from daily-driver to ad-hoc/override. The app isn't rewritten — it's
 re-weighted. Some are retired outright by the cycle change. **Sorting rule = the automation axis:**
@@ -318,7 +318,7 @@ mandate). A stakeholder pass is owed, especially around BILL payout and records/
 
 ## The simplifying realizations this model is built on
 
-1. **An app = (a prompt in Dataverse) × (a thin adapter).** "17 apps" → *N prompts + a few adapter
+1. **An app = (a prompt in Dataverse) × (a thin adapter).** "18 apps" → *N prompts + a few adapter
    shapes* (Workbench tab · PA trigger · ad hoc standalone).
 2. **The workflow and the surface are one initiative** (reviewer lifecycle = Workbench v1), with the
    **state machine as backbone**.

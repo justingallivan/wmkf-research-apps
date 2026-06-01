@@ -385,6 +385,21 @@ describe('requireAppAccess', () => {
     expect(result.profileId).toBe(1);
   });
 
+  // Request Workbench (Phase 0): the additive `reviewers` grant is wired as the
+  // variadic SECOND key on the 18 reviewer-finder/review-manager routes. A
+  // user holding only `reviewers` (no legacy key) must pass both families.
+  it('allows a reviewers-only grant via the variadic second key (both families)', async () => {
+    mockAuthenticatedUser(8, ['reviewers']);
+
+    const rf = await requireAppAccess(createMockReq(), createMockRes(), 'reviewer-finder', 'reviewers');
+    expect(rf).toBeTruthy();
+    expect(rf.profileId).toBe(8);
+
+    const rm = await requireAppAccess(createMockReq(), createMockRes(), 'review-manager', 'reviewers');
+    expect(rm).toBeTruthy();
+    expect(rm.profileId).toBe(8);
+  });
+
   it('superuser bypasses all app checks', async () => {
     mockAuthenticatedUser(2, [], { isSuperuser: true });
     const req = createMockReq();

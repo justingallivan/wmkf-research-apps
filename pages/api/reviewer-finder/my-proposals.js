@@ -28,14 +28,14 @@ import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { resolveByEmail } from '../../../lib/services/program-director-resolver';
 import { meetingDateToCycleCode, cycleCodeToOdataFilter } from '../../../lib/utils/cycle-code';
-import { RESPONSE_TYPE_MAP } from '../../../lib/dataverse/adapters/reviewer-suggestion';
+import { RESPONSE_TYPE_MAP, notExcludedFilter } from '../../../lib/dataverse/adapters/reviewer-suggestion';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const access = await requireAppAccess(req, res, 'reviewer-finder');
+  const access = await requireAppAccess(req, res, 'reviewer-finder', 'reviewers');
   if (!access) return;
 
   const azureEmail = access.session?.user?.azureEmail;
@@ -216,7 +216,7 @@ async function fetchReviewerCounts(requestIds) {
     const orChain = chunk.map((id) => `_wmkf_request_value eq ${id}`).join(' or ');
     const { records } = await DynamicsService.queryAllRecords('wmkf_appreviewersuggestions', {
       select: '_wmkf_request_value,wmkf_invited,wmkf_accepted,wmkf_declined,wmkf_emailsentat,wmkf_responsetype',
-      filter: `(${orChain}) and wmkf_selected eq true`,
+      filter: `(${orChain}) and wmkf_selected eq true and ${notExcludedFilter()}`,
     });
     for (const s of records) {
       const rid = s._wmkf_request_value;

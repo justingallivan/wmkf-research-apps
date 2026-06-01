@@ -92,7 +92,7 @@ function projectRequest(r) {
 }
 
 export default async function handler(req, res) {
-  const access = await requireAppAccess(req, res, 'review-manager');
+  const access = await requireAppAccess(req, res, 'review-manager', 'reviewers');
   if (!access) return;
 
   return bypassDynamicsRestrictions('review-manager-reviewers', async () => {
@@ -277,14 +277,10 @@ async function handlePatch(req, res, access) {
     if (reviewStatus !== undefined) lifecycle.reviewStatus = reviewStatus;
     if (notes !== undefined) lifecycle.notes = notes;
 
-    // Marking complete: set reviewReceivedAt to now if not already populated.
-    // Mirrors the legacy COALESCE(review_received_at, NOW()) logic.
-    if (reviewStatus === 'complete') {
-      const existing = await suggestionAdapter.findById(suggestionId);
-      if (existing && !existing.wmkf_reviewreceivedat) {
-        lifecycle.reviewReceivedAt = new Date().toISOString();
-      }
-    }
+    // Note: the reviewStatus=complete close-out stamps (wmkf_completedat +
+    // wmkf_reviewreceivedat) and the applicant-excluded fail-closed guard are
+    // handled centrally in the adapter's updateLifecycle, so EVERY complete
+    // path (single, batch below, thank-you send) is covered uniformly.
 
     if (Object.keys(lifecycle).length === 0) {
       return res.status(400).json({ error: 'No supported fields to update' });

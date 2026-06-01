@@ -56,7 +56,7 @@ const REQUEST_SELECT = [
 ].join(',');
 
 export default async function handler(req, res) {
-  const access = await requireAppAccess(req, res, 'reviewer-finder');
+  const access = await requireAppAccess(req, res, 'reviewer-finder', 'reviewers');
   if (!access) return;
 
   if (req.method !== 'GET') {

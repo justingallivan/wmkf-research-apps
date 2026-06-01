@@ -886,6 +886,7 @@ const APP_MODEL_NAMES = {
   'phase-ii-writeup': 'Phase II Writeup',
   'reviewer-finder': 'Reviewer Finder',
   'review-manager': 'Review Manager',
+  'reviewers': 'Reviewers',
   'peer-review-summarizer': 'Peer Review Summarizer',
   'funding-analysis': 'Funding Analysis',
   'qa': 'Q&A',

@@ -123,7 +123,7 @@ jest.mock('exceljs', () => ({}));
 
 // App registry
 jest.mock('../../shared/config/appRegistry', () => ({
-  ALL_APP_KEYS: ['reviewer-finder', 'review-manager', 'dynamics-explorer', 'integrity-screener'],
+  ALL_APP_KEYS: ['reviewer-finder', 'review-manager', 'reviewers', 'dynamics-explorer', 'integrity-screener'],
 }));
 
 // Integrity screener dependencies
@@ -229,6 +229,47 @@ describe.each(routeSpecs)('$name', ({ importPath, appKey, method, body }) => {
       expect(code).not.toBe(401);
       expect(code).not.toBe(403);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Request Workbench: the additive `reviewers` grant must reach BOTH legacy
+// route families (reviewer-finder + review-manager) via the variadic
+// requireAppAccess(..., 'reviewers') second key. A user with ONLY the
+// `reviewers` grant (no legacy key) should not be bounced with 401/403.
+// ---------------------------------------------------------------------------
+describe.each([
+  { name: '/api/reviewer-finder/my-proposals', importPath: '../../pages/api/reviewer-finder/my-proposals', method: 'GET' },
+  { name: '/api/review-manager/reviewers', importPath: '../../pages/api/review-manager/reviewers', method: 'GET' },
+])('reviewers-only grant reaches $name', ({ importPath, method }) => {
+  let handler;
+  beforeAll(async () => {
+    const mod = await import(importPath);
+    handler = mod.default;
+  });
+
+  it('does NOT return 401/403 for a reviewers-only grant', async () => {
+    mockAuthenticatedUser(1, ['reviewers']);
+    const req = createMockReq({ method });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    if (res.status.mock.calls.length > 0) {
+      const code = res.status.mock.calls[0][0];
+      expect(code).not.toBe(401);
+      expect(code).not.toBe(403);
+    }
+  });
+
+  it('still returns 403 for an unrelated grant', async () => {
+    mockAuthenticatedUser(1, ['dynamics-explorer']);
+    const req = createMockReq({ method });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
   });
 });
 

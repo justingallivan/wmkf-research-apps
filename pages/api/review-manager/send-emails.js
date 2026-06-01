@@ -72,7 +72,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const access = await requireAppAccess(req, res, 'review-manager');
+  const access = await requireAppAccess(req, res, 'review-manager', 'reviewers');
   if (!access) return;
 
   const fromEmail = access.session?.user?.azureEmail;

@@ -83,7 +83,7 @@ Now we have read access to Dynamics and SharePoint, and leadership buy-in to use
 | **Write to SharePoint** | `Sites.Selected` + write role on akoyaGO site (granted 2026-04-15) | **Working** — verified end-to-end via `scripts/probe-sharepoint-write.js` 2026-05-01 |
 | **Write to Dynamics** | App registration `prvUpdate` on `akoya_request`, `prvCreate`/`prvUpdate` on `wmkf_ai_run` | **Working** — granted/verified 2026-04-14; impersonation via `MSCRMCallerID` available behind `DYNAMICS_IMPERSONATION_ENABLED` flag |
 | Send CRM-tracked email | `DynamicsService.createAndSendEmail()` | Working |
-| AI proposal processing | Claude integration across [17](CANONICAL_COUNTS.md#app-definition-count) apps | Working |
+| AI proposal processing | Claude integration across [18](CANONICAL_COUNTS.md#app-definition-count) apps | Working |
 | Reviewer discovery | Multi-database search + AI ranking | Working |
 | Email generation | `.eml` files + direct Dynamics sending | Working |
 | Review management | Review Manager app + external-reviewer magic-link surface (`/external/review/[token]/*`) | Working |

@@ -9,6 +9,24 @@ Per `project_dataverse_creator_privileges.md` (2026-05-06), Connor delegated ent
 
 ---
 
+## 2026-05-31 — Request Workbench Phase 0: `wmkf_appreviewersuggestion.wmkf_applicantdisposition` (S208)
+
+**Scope:** One local Picklist field on `wmkf_appreviewersuggestion`. Deployed via `apply-dataverse-schema.js --target=prod --wave=6 --execute` against prod. New wave directory (`lib/dataverse/schema/wave6/`).
+
+**Rationale:** Request Workbench Phase 0 (`docs/REQUEST_WORKBENCH_BUILD_PLAN.md`) unifies applicant-recommended and applicant-excluded reviewers onto the existing per-(person, request) engagement junction `wmkf_appreviewersuggestion`. A single picklist distinguishes them from the normal staff/Claude-discovered candidate (null). Per-request scoped **by construction** — the disposition lives only on the junction row, never on the global `wmkf_potentialreviewer` person, so a reviewer excluded by one applicant stays eligible/enrichable for every other request. Replaces the idea of a parallel child table (human-legibility schema principle: expand enums on existing entities, don't proliferate tables).
+
+### New field
+
+| Schema name | Logical name | Type | Options | Notes |
+|---|---|---|---|---|
+| `wmkf_ApplicantDisposition` | `wmkf_applicantdisposition` | Picklist (local optionset) | `Recommended=100000000`, `Excluded=100000001` (null = staff/Claude-discovered, the normal case) | `excluded` rows also written `wmkf_selected=false`. Read-filter convention `notExcludedFilter()` = `(… eq null or … ne 100000001)` — the `eq null or` is load-bearing (Dataverse drops rows whose filter evaluates to null). `findById` + both token-mint paths fail closed on excluded. |
+
+**Verification:** Dry-run then `--execute`; re-run reports `· exists` (idempotent). Live metadata probe confirmed the optionset: `100000000=Recommended`, `100000001=Excluded`. Entity now carries 77 `wmkf_`-prefixed attributes (108 total incl. virtual `*name` denorms).
+
+**Status:** DEPLOYED to prod 2026-05-31. Atlas: `docs/atlas/dataverse-wmkf-appreviewersuggestion.md` (Applicant disposition section + read convention).
+
+---
+
 ## 2026-05-28 — BILL chunk 1: `wmkf_appreviewersuggestion.wmkf_HonorariumRequest` (Connor)
 
 **Scope:** One Lookup field on `wmkf_appreviewersuggestion`. Created by Connor outside the `apply-dataverse-schema.js` flow; logged here for catalog continuity.

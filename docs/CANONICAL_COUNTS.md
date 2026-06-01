@@ -12,7 +12,7 @@ are machine-verified — `N` against the derive, the anchor against this registr
 
 ## app-definition-count
 
-- **Live value:** 17
+- **Live value:** 18
 - **Description:** APP_REGISTRY application definitions
 - **Derive:** `shared/config/appRegistry.js` → `APP_REGISTRY.length`
 

@@ -30,6 +30,7 @@ export const BASE_CONFIG = {
     'phase-ii-writeup':            { model: 'sonnet', fallback: 'haiku' },
     'reviewer-finder':             { model: 'sonnet', fallback: 'haiku' },
     'review-manager':              { model: 'sonnet', fallback: 'haiku' },
+    'reviewers':                   { model: 'sonnet', fallback: 'haiku' },
     'peer-review-summarizer':      { model: 'sonnet', fallback: 'haiku' },
     'funding-analysis':            { model: 'sonnet', fallback: 'haiku' },
     'qa':                          { model: 'sonnet', fallback: 'haiku' },

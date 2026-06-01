@@ -88,7 +88,7 @@ describe('/api/review-manager/regenerate-token', () => {
     expect(DynamicsService.getRecord).toHaveBeenCalledWith(
       'wmkf_appreviewersuggestions',
       'suggestion-1',
-      { select: 'wmkf_appreviewersuggestionid,_wmkf_request_value' },
+      { select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_applicantdisposition' },
     );
     expect(mintAndStore).toHaveBeenCalledWith({
       suggestionId: 'suggestion-1',
@@ -116,6 +116,44 @@ describe('/api/review-manager/regenerate-token', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
+    expect(mintAndStore).not.toHaveBeenCalled();
+  });
+
+  it('mints for a caller holding only the additive reviewers grant', async () => {
+    mockAuthenticatedUser(4, ['reviewers']);
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_appreviewersuggestionid: 'suggestion-1',
+      _wmkf_request_value: 'request-1',
+      wmkf_applicantdisposition: null,
+    });
+    const expiresAt = new Date(Date.now() + 60_000);
+    mintAndStore.mockResolvedValue({ url: 'https://app.example/x', expiresAt, jti: 'jti-1' });
+
+    const req = createMockReq({ method: 'POST', body: { suggestionId: 'suggestion-1' } });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(mintAndStore).toHaveBeenCalled();
+  });
+
+  it('refuses (409) to regenerate a token for an applicant-excluded suggestion', async () => {
+    mockAuthenticatedUser(2, ['review-manager']);
+    // 100000001 = APPLICANT_DISPOSITION_EXCLUDED (lib/dataverse/adapters/reviewer-suggestion).
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_appreviewersuggestionid: 'suggestion-1',
+      _wmkf_request_value: 'request-1',
+      wmkf_applicantdisposition: 100000001,
+    });
+
+    const req = createMockReq({ method: 'POST', body: { suggestionId: 'suggestion-1' } });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'excluded' });
     expect(mintAndStore).not.toHaveBeenCalled();
   });
 });

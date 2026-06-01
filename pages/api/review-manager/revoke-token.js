@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, reason: 'method_not_allowed' });
   }
 
-  const access = await requireAppAccess(req, res, 'review-manager');
+  const access = await requireAppAccess(req, res, 'review-manager', 'reviewers');
   if (!access) return;
 
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;

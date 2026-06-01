@@ -1,0 +1,26 @@
+{
+  "name": "wmkf_appreviewersuggestion-applicant-disposition",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_appreviewersuggestion",
+  "_comment": "Request Workbench Phase 0 (S208). One local picklist tagging an applicant-sourced engagement row. null (the normal case) = staff/Claude-discovered candidate; 'recommended'/'excluded' carry the applicant's intent for THIS request only — the disposition lives solely on the junction, never on the global wmkf_potentialreviewer person, so a person excluded by one applicant stays eligible for every other request. 'excluded' rows are also written wmkf_selected=false and filtered from all candidate/count readers via notExcludedFilter() (lib/dataverse/adapters/reviewer-suggestion.js). DefaultFormValue -1 keeps the unset value null. Idempotent: ensureAttribute checks existence before create. Deploy: node scripts/apply-dataverse-schema.js --target=prod --wave=6 --execute",
+  "attributes": [
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_ApplicantDisposition",
+      "displayName": "Applicant Disposition",
+      "description": "Applicant-stated intent for this reviewer on this request. Blank = candidate found by staff/Claude (the normal case). Recommended = the applicant suggested this reviewer. Excluded = the applicant asked us not to use this reviewer. Per-request only — never marks the person globally.",
+      "options": [
+        {
+          "value": 100000000,
+          "label": "Recommended",
+          "description": "Applicant recommended this reviewer for this request."
+        },
+        {
+          "value": 100000001,
+          "label": "Excluded",
+          "description": "Applicant asked that this reviewer not be used for this request."
+        }
+      ]
+    }
+  ]
+}

@@ -44,7 +44,7 @@ export default async function handler(req, res) {
   }
 
   // Require authentication + app access
-  const access = await requireAppAccess(req, res, 'reviewer-finder');
+  const access = await requireAppAccess(req, res, 'reviewer-finder', 'reviewers');
   if (!access) return;
 
   const allowed = await limiter(req, res);
