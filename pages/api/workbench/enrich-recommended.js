@@ -33,6 +33,7 @@ import { safeFetch } from '../../../lib/utils/safe-fetch';
 import { normalizeName } from '../../../lib/utils/name-normalization';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { ClaudeReviewerService } from '../../../lib/services/claude-reviewer-service';
 import { DiscoveryService } from '../../../lib/services/discovery-service';
 import { DeduplicationService } from '../../../lib/services/deduplication-service';
@@ -75,6 +76,12 @@ export default async function handler(req, res) {
 
   const allowed = await limiter(req, res);
   if (allowed !== true) return;
+
+  // Resolve per-app model overrides + register the tier→id resolver BEFORE any
+  // Claude call (analyzeProposal / claudeWebSearch via enrichCandidates). Without
+  // this, getModelForApp returns the unresolved 'sonnet' tier alias and Anthropic
+  // 404s ("model: sonnet"). Mirrors analyze.js / discover.js.
+  await loadModelOverrides();
 
   const { requestId, blobUrl, analysisResult } = req.body || {};
   if (!requestId || !GUID_RE.test(String(requestId))) {

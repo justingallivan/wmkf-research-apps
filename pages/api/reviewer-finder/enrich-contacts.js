@@ -25,6 +25,7 @@
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
+import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -49,6 +50,12 @@ export default async function handler(req, res) {
 
   const allowed = await limiter(req, res);
   if (allowed !== true) return;
+
+  // Register the tier→model-id resolver before any claudeWebSearch (Tier 3):
+  // getModelForApp otherwise returns the raw 'sonnet' tier alias and Anthropic
+  // 404s. This is its own request (separate from analyze/discover), so it must
+  // load overrides itself rather than relying on a warm process.
+  await loadModelOverrides();
 
   const { candidates, options = {} } = req.body;
 
