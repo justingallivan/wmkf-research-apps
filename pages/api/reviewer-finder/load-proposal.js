@@ -37,7 +37,7 @@ function pickProposalBestGuess(files) {
   const proposals = files.filter((f) => f.classification === 'proposal');
   if (proposals.length === 0) return null;
 
-  const tier1 = proposals.filter((f) => /project[\s_\-]*narrative/i.test(f.name));
+  const tier1 = proposals.filter((f) => /project[\s_\-]*(narrative|description)/i.test(f.name));
   const phaseIIRe = /(?:^|[\s_\-])phase[\s_]?ii(?:[\s_\-]|$)/i;
   const tier2 = proposals.filter((f) => phaseIIRe.test(f.name));
 

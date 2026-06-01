@@ -320,9 +320,28 @@ export function classifyFile(name) {
   const isPhaseI = wordRe('phase[\\s_]?i').test(n) && !wordRe('phase[\\s_]?ii').test(n);
   if (isPhaseI) return 'other';
 
+  // Front-matter / package boilerplate is NEVER the substantive proposal
+  // narrative, even though such filenames often contain "Application" (e.g.
+  // "Application Cover Page.docx") — which would otherwise trip the broad
+  // `application` proposal signal below and get auto-picked over the real
+  // narrative (reported bug: Reviewer Finder loaded the cover page). A project
+  // narrative wins regardless (the most specific positive signal), so the
+  // exclusion is gated on NOT being a narrative.
+  // "project narrative" and "project description" are the two common names for
+  // the substantive proposal body (the latter often written solid, e.g.
+  // "ProjectDescription.pdf" — `[\s_\-]*` matches zero separators too).
+  const hasNarrative = /project[\s_\-]*(narrative|description)/i.test(n);
+  const isFrontMatter =
+    /cover[\s_\-]*(page|sheet|letter)/i.test(n) ||
+    /face[\s_\-]*page/i.test(n) ||
+    /title[\s_\-]*page/i.test(n) ||
+    /signature[\s_\-]*page/i.test(n) ||
+    /application[\s_\-]*form/i.test(n);
+  if (isFrontMatter && !hasNarrative) return 'other';
+
   // Strong proposal signals.
   const isProposal =
-    /project[\s_\-]*narrative/i.test(n) ||
+    hasNarrative ||
     wordRe('phase[\\s_]?ii').test(n) ||
     wordRe('proposal').test(n) ||
     wordRe('application').test(n);
@@ -348,8 +367,9 @@ function pickProposalBestGuess(files) {
   const proposals = files.filter(f => f.classification === 'proposal');
   if (proposals.length === 0) return null;
 
-  // Tier 1: project narrative (handles "Project Narrative" and "Project_Narrative")
-  const tier1 = proposals.filter(f => /project[\s_\-]*narrative/i.test(f.name));
+  // Tier 1: the proposal body — "Project Narrative", "Project_Narrative", or
+  // "Project Description" / "ProjectDescription".
+  const tier1 = proposals.filter(f => /project[\s_\-]*(narrative|description)/i.test(f.name));
   // Tier 2: phase ii (handles "Phase II", "Phase_II", "Phase-II")
   const phaseIIRe = /(?:^|[\s_\-])phase[\s_]?ii(?:[\s_\-]|$)/i;
   const tier2 = proposals.filter(f => phaseIIRe.test(f.name));
