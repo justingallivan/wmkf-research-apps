@@ -1,17 +1,20 @@
 /**
  * Request Workbench — per-request shell (tier-3).
  *
- * Phase 1 ships this as the landing target for the dashboard rows so they don't
- * link into a 404. It renders the request context header + the tab strip; the
- * Reviewers tab (and the rest) get their real panels in Phase 2. Tab selection
- * is query-string driven (?tab=reviewers) for deep-links.
+ * Renders the request context header + the tab strip. The Reviewers tab is live
+ * (Phase 2: Invite/Track/Completed via the shared ReviewerManagePanel, plus a
+ * Find placeholder pending Phase 3); the remaining tabs are placeholders for the
+ * rest of the request lifecycle. Tab + sub-tab selection is query-string driven
+ * (?tab=reviewers&sub=invite) for deep-links.
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Layout, { Card } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
+import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 
 // Reviewers is the live tab (Phase 2); the rest are placeholders for the full
 // request lifecycle. Order matches the build plan's tab strip.
@@ -31,6 +34,7 @@ const TAB_KEYS = new Set(TABS.map((t) => t.key));
 
 function WorkbenchRequest() {
   const router = useRouter();
+  const { data: session } = useSession();
   const { requestId } = router.query;
 
   const tabParam = typeof router.query.tab === 'string' ? router.query.tab : null;
@@ -64,6 +68,15 @@ function WorkbenchRequest() {
       { shallow: true },
     );
   };
+
+  // Soft UI gate (S207 decision): the lead PD sees the reviewer-management write
+  // controls. Permissive when we can't resolve the viewer's systemuser id or the
+  // request's PD (the reused server APIs stay org-open regardless — this is
+  // cosmetic, not an auth boundary). Superuser bypass is server-side only.
+  const myUserId = session?.user?.dynamicsSystemuserId || null;
+  const pdId = ctx?.programDirectorId || null;
+  const canManage = !pdId || (!!myUserId && myUserId === pdId);
+  const reviewerSettings = { signature: session?.user?.profileName || '' };
 
   return (
     <Layout title="Request Workbench">
@@ -104,19 +117,18 @@ function WorkbenchRequest() {
         </nav>
       </div>
 
-      <Card hover={false}>
-        {activeTab === 'reviewers' ? (
-          <div className="text-gray-600">
-            <p className="font-medium text-gray-900 mb-1">Reviewers</p>
-            <p className="text-sm">
-              Finding, inviting, and tracking peer reviewers for this request lands here in the next update.
-              For now, use the standalone Reviewer Finder and Review Manager.
-            </p>
-          </div>
-        ) : (
+      {activeTab === 'reviewers' ? (
+        <ReviewersTab
+          requestId={typeof requestId === 'string' ? requestId : ''}
+          context={ctx}
+          canManage={canManage}
+          settings={reviewerSettings}
+        />
+      ) : (
+        <Card hover={false}>
           <p className="text-sm text-gray-500">This panel is coming in a later update.</p>
-        )}
-      </Card>
+        </Card>
+      )}
     </Layout>
   );
 }

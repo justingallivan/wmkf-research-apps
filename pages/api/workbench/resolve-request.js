@@ -68,6 +68,10 @@ export default async function handler(req, res) {
         projectLeader: r._wmkf_projectleader_value_formatted || null,
         grantProgram: r._wmkf_grantprogram_value_formatted || null,
         programDirector: r._wmkf_programdirector_value_formatted || null,
+        // Raw lead-PD systemuser GUID — feeds the Workbench's soft `canManage`
+        // UI gate (compare against the session's dynamicsSystemuserId). Server
+        // stays org-open; this is cosmetic. See REQUEST_WORKBENCH_BUILD_PLAN §Phase 2.
+        programDirectorId: r._wmkf_programdirector_value || null,
       });
     } catch (err) {
       console.error('workbench resolve-request error:', err);
