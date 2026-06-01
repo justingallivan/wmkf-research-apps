@@ -54,6 +54,10 @@ const DRIFT_PATTERNS = [
       'POSTGRES_TO_DATAVERSE_MIGRATION.md',
       'REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md',
       'DOC_TRIAGE_2026-05-07.md',
+      // References the real schema-as-code filename
+      // lib/dataverse/schema/wave2/wmkf_app_researcher.json (deployed entity is
+      // wmkf_appresearcher); the doc explicitly clarifies the file-vs-entity split.
+      'APPRESEARCHER_COLLAPSE_PLAN.md',
       'check-doc-currency.js',
     ],
   },
@@ -69,6 +73,10 @@ const DRIFT_PATTERNS = [
       'REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md',
       'dataverse-wmkf-apppublication-and-appgrantcycle.md',
       'postgres-publications.md',
+      // References the real schema-as-code filename
+      // lib/dataverse/schema/wave2/wmkf_app_publication.json (deployed entity
+      // is wmkf_apppublication).
+      'APPRESEARCHER_COLLAPSE_PLAN.md',
     ],
   },
   {
