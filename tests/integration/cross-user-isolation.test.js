@@ -116,7 +116,7 @@ describe('/api/review-manager/send-emails cross-user isolation', () => {
     // Mock User B with review-manager access but no azureEmail in the session —
     // this is the auth-layer property that replaces the old Postgres-filter
     // isolation: sender identity is derived from session, not request body.
-    mockAuthenticatedUser(USER_B_PROFILE, ['review-manager']);
+    mockAuthenticatedUser(USER_B_PROFILE, ['review-manager'], { azureEmail: null });
 
     const req = createMockReq({
       method: 'POST',

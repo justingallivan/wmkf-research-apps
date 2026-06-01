@@ -95,10 +95,17 @@ export function mockUnauthenticated() {
  * @param {{ isSuperuser?: boolean }} [opts]
  */
 export function mockAuthenticatedUser(profileId, appKeys = [], opts = {}) {
+  // Real staff sessions carry azureEmail (set in the NextAuth callback from
+  // azure_email); PD-scoped endpoints resolve it via program-director-resolver.
+  // Pass `{ azureEmail: null }` to simulate a malformed session that lacks it.
+  const azureEmail = opts.azureEmail === null
+    ? undefined
+    : (opts.azureEmail || `user${profileId}@wmkeck.org`);
   _mockSession = {
     user: {
       profileId,
       email: `user${profileId}@wmkeck.org`,
+      ...(azureEmail ? { azureEmail } : {}),
       name: `Test User ${profileId}`,
     },
   };
@@ -188,6 +195,9 @@ export function mockIsActiveLookupFailure(profileId) {
     user: {
       profileId,
       email: `user${profileId}@wmkeck.org`,
+      // Real staff sessions carry azureEmail (set in the NextAuth callback from
+      // azure_email); PD-scoped endpoints resolve it via program-director-resolver.
+      azureEmail: `user${profileId}@wmkeck.org`,
       name: `Test User ${profileId}`,
     },
   };
