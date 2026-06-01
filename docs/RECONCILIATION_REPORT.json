@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-26T18:00:53.860Z",
+  "generated": "2026-06-01T04:16:13.646Z",
   "summary": {
     "total_claims": 157,
     "stale": 38,
@@ -45,12 +45,6 @@
     "stale_row_count": [],
     "doc_label_collision": [],
     "postgres_table_mismatch": [
-      {
-        "table": "bill_webhook_events",
-        "in_schema_as_code": true,
-        "deployed": false,
-        "declared_in": "migrations"
-      },
       {
         "table": "schema_migrations",
         "in_schema_as_code": false,
