@@ -41,9 +41,26 @@ export function asPercent(value) {
   return Math.round(value <= 1 ? value * 100 : value);
 }
 
-/** Normalize a reviewer name for exclusion matching: drop honorifics + punctuation. */
+/**
+ * Normalize a reviewer name for exclusion matching: fold diacritics to their
+ * base letter, then drop honorifics + punctuation.
+ *
+ * Diacritic folding is via Unicode NFKD (decompose) + combining-mark strip, so
+ * "Jens Hör" → "jens hor" and matches a plain-ASCII "Jens Hor" — the previous
+ * `[^a-z]` strip turned "hör" into "hr" and silently MISSED that match
+ * (Codex stop-time review, S210). Mirrors `DeduplicationService.normalizeName`.
+ *
+ * NB: this folds accented letters (ö→o, é→e) and ß→ss, but deliberately does
+ * NOT fold spelled-out transliteration digraphs (ö↔oe, ü↔ue): a blanket oe→o /
+ * ue→u rule would mangle unrelated names ("Manuel"→"manl", "Moerner"→"morner")
+ * and over-filter good candidates. Those rare variants are handled by the
+ * editable exclude box in the search UI.
+ */
 export function normalizeReviewerName(name) {
   return String(name || '')
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '') // strip combining diacritical marks
+    .replace(/ß/g, 'ss') // sharp-s (ß) does not NFKD-decompose
     .toLowerCase()
     .replace(/^(dr|prof|professor|mr|mrs|ms)\.?\s+/i, '')
     .replace(/[^a-z\s]/g, '')

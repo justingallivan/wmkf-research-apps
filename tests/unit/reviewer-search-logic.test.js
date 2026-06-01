@@ -61,7 +61,14 @@ describe('asPercent', () => {
 describe('normalizeReviewerName', () => {
   test('strips honorifics and punctuation', () => {
     expect(normalizeReviewerName('Dr. Thomas K. Wood')).toBe('thomas k wood');
-    expect(normalizeReviewerName('Prof Jens Hör')).toBe('jens hr');
+  });
+
+  test('folds diacritics to their base letter (NFD), so accented == plain', () => {
+    expect(normalizeReviewerName('Prof Jens Hör')).toBe('jens hor');
+    expect(normalizeReviewerName('Jens Hor')).toBe('jens hor');
+    expect(normalizeReviewerName('José García')).toBe('jose garcia');
+    expect(normalizeReviewerName('Müller')).toBe('muller');
+    expect(normalizeReviewerName('Strauß')).toBe('strauss');
   });
 });
 
@@ -94,5 +101,11 @@ describe('filterExcluded', () => {
   test('does not over-filter on partial/substring names', () => {
     const { kept } = filterExcluded([{ name: 'Thomas Woodward' }], ['Thomas Wood']);
     expect(kept.map((c) => c.name)).toEqual(['Thomas Woodward']);
+  });
+
+  test('matches across diacritics — accented candidate vs plain excluded name', () => {
+    const { kept, removed } = filterExcluded([{ name: 'Jens Hör' }, { name: 'Jane Smith' }], ['Jens Hor']);
+    expect(kept.map((c) => c.name)).toEqual(['Jane Smith']);
+    expect(removed.map((c) => c.name)).toEqual(['Jens Hör']);
   });
 });
