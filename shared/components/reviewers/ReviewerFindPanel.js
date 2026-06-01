@@ -252,7 +252,6 @@ export default function ReviewerFindPanel({ requestId, context }) {
         ) : doc.data ? (
           <p className="text-sm text-gray-700">
             Auto-loaded <span className="font-medium">{doc.data.filename}</span> from the request’s documents.
-            Reviewer search uses this proposal — no upload needed.
           </p>
         ) : (
           <p className="text-sm text-gray-600">No proposal document found for this request.</p>
@@ -286,15 +285,18 @@ export default function ReviewerFindPanel({ requestId, context }) {
         )}
       </Card>
 
-      {/* Search entry (full in-panel search is the remaining Phase 3 deep refactor) */}
+      {/* Search entry. The full in-panel candidate search is the remaining Phase 3
+          work; until then this is an HONEST handoff — the standalone app does NOT
+          yet receive the proposal or exclude list (no requestId param), so don't
+          claim it does. */}
       <Card hover={false}>
         <p className="font-medium text-gray-900 mb-1">Search for reviewers</p>
         <p className="text-sm text-gray-600">
-          Run the candidate search from the{' '}
-          <Link href="/reviewer-finder" className="text-blue-600 underline">standalone Reviewer Finder</Link>{' '}
-          {context?.requestNumber ? <>for request <span className="font-medium">{context.requestNumber}</span></> : null},
-          carrying over the exclude list above. The applicant’s recommended reviewers are already saved as candidates,
-          so anyone who accepts will appear in this request’s <span className="font-medium">Invite</span> tab.
+          Candidate search isn’t in the Workbench yet. For now, run it in the{' '}
+          <Link href="/reviewer-finder" className="text-blue-600 underline">standalone Reviewer Finder</Link>
+          {context?.requestNumber ? <> (you’ll re-select request <span className="font-medium">{context.requestNumber}</span> there)</> : null}.
+          The applicant’s recommended reviewers above are already saved as candidates for this request, so anyone you
+          invite and who accepts will appear in the <span className="font-medium">Invite</span> tab here.
         </p>
       </Card>
     </div>
