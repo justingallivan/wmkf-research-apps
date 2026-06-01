@@ -2,10 +2,10 @@
  * Request Workbench — per-request shell (tier-3).
  *
  * Renders the request context header + the tab strip. The Reviewers tab is live
- * (Phase 2: Invite/Track/Completed via the shared ReviewerManagePanel, plus a
- * Find placeholder pending Phase 3); the remaining tabs are placeholders for the
- * rest of the request lifecycle. Tab + sub-tab selection is query-string driven
- * (?tab=reviewers&sub=invite) for deep-links.
+ * (Phase 2: Invite/Track/Completed via the shared ReviewerManagePanel; Phase 3:
+ * the Find sub-tab — applicant-reviewer ingestion + in-panel search); the other
+ * 9 tabs are placeholders for the rest of the request lifecycle. Tab + sub-tab
+ * selection is query-string driven (?tab=reviewers&sub=invite) for deep-links.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -18,8 +18,8 @@ import { useAppAccess } from '../../shared/context/AppAccessContext';
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
 
-// Reviewers is the live tab (Phase 2); the rest are placeholders for the full
-// request lifecycle. Order matches the build plan's tab strip.
+// Reviewers is the live tab (Phases 2–3); the other 9 are placeholders for the
+// full request lifecycle. Order matches the build plan's tab strip.
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'proposal', label: 'Proposal' },
