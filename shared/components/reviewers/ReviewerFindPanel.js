@@ -26,13 +26,13 @@
  *
  * Props:
  *   - requestId : the akoya_request GUID (always present)
- *   - context   : light request context from resolve-request (requestNumber, …)
- *   - canManage : soft UI gate (cosmetic; ingestion APIs stay org-open)
+ *   (context / canManage are passed by ReviewersTab but not needed here — the
+ *   panel is request-scoped by requestId and all ingestion APIs stay org-open.)
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { Card } from '../Layout';
+import ReviewerSearchSection from './ReviewerSearchSection';
 
 function Spinner() {
   return <div className="w-5 h-5 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />;
@@ -57,7 +57,7 @@ function Badge({ children, tone = 'gray' }) {
   );
 }
 
-export default function ReviewerFindPanel({ requestId, context }) {
+export default function ReviewerFindPanel({ requestId }) {
   const [ingest, setIngest] = useState({ loading: true, data: null, error: null });
   const [doc, setDoc] = useState({ loading: true, data: null, error: null });
 
@@ -198,6 +198,11 @@ export default function ReviewerFindPanel({ requestId, context }) {
         <p className="font-medium text-gray-900 mb-2">Applicant-excluded reviewers</p>
         {ingest.loading ? (
           <p className="text-sm text-gray-500">Reading the applicant’s exclusion list…</p>
+        ) : ingest.error ? (
+          <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
+            Couldn’t load the applicant’s exclusion list — this is NOT a confirmed “none.” Retry above, or add
+            exclusions by hand in the search box below.
+          </div>
         ) : excludedParseFailed ? (
           <div className="space-y-2">
             <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
@@ -285,20 +290,17 @@ export default function ReviewerFindPanel({ requestId, context }) {
         )}
       </Card>
 
-      {/* Search entry. The full in-panel candidate search is the remaining Phase 3
-          work; until then this is an HONEST handoff — the standalone app does NOT
-          yet receive the proposal or exclude list (no requestId param), so don't
-          claim it does. */}
-      <Card hover={false}>
-        <p className="font-medium text-gray-900 mb-1">Search for reviewers</p>
-        <p className="text-sm text-gray-600">
-          Candidate search isn’t in the Workbench yet. For now, run it in the{' '}
-          <Link href="/reviewer-finder" className="text-blue-600 underline">standalone Reviewer Finder</Link>
-          {context?.requestNumber ? <> (you’ll re-select request <span className="font-medium">{context.requestNumber}</span> there)</> : null}.
-          The applicant’s recommended reviewers above are already saved as candidates for this request, so anyone you
-          invite and who accepts will appear in the <span className="font-medium">Invite</span> tab here.
-        </p>
-      </Card>
+      {/* In-panel candidate search — uses the proposal already loaded above and
+          the applicant exclude list; saves into this request's candidate pool.
+          exclusionsUnavailable flags when ingestion couldn't produce the list so
+          the search shows a warning rather than treating it as "no exclusions". */}
+      <ReviewerSearchSection
+        requestId={requestId}
+        blobUrl={doc.data?.blobUrl || null}
+        cycleCode={data?.cycleCode || null}
+        excludedNames={data?.excludedNames || []}
+        exclusionsUnavailable={!!ingest.error || excludedParseFailed}
+      />
     </div>
   );
 }
