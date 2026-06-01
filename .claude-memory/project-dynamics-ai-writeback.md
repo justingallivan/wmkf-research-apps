@@ -31,7 +31,7 @@ Note: "compliance" task label was renamed to **Check-in** in v3.
 
 ## Known quirks (will change soon)
 
-- `wmkf__ai_summary` (double underscore) exists on `akoya_request` alongside the real `wmkf_ai_summary` — cruft, Connor will delete. Do not target it.
+- `wmkf__ai_summary` (double underscore) exists on `akoya_request` alongside the real `wmkf_ai_summary` — cruft, Connor will delete. **Still present as of S209 (2026-06-01) — not yet deleted; akoya_request now carries 39 `wmkf_ai_*` attributes total, field sets A–D all confirmed deployed.** Do not target it.
 - `wmkf_ai_rundatetime` exists on `wmkf_ai_run` but is vestigial — use built-in `createdon` instead. Do not write to `wmkf_ai_rundatetime`.
 - **`wmkf_ai_rawoutput` cap is 1,000,000 chars** (Connor raised it from the 2000-char default on 2026-04-14). `DynamicsService.logAiRun` still truncates with a `…[truncated N chars]` marker as a safety valve, but real Grant Reporting payloads (5-15k) are nowhere near the cap. `wmkf_ai_notes` is still on the 2000-char default — keep notes short.
 

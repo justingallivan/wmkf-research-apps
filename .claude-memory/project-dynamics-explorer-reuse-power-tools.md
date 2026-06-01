@@ -5,6 +5,8 @@ metadata:
   type: project
 ---
 
+> **STATUS (S209): Path A COMPLETE — keep as do-not-rebuild guard.** Slice 1 (A1 live schema + A2 cached taxonomy) + the OData pre-flight validator + A3/A4/A5 all SHIPPED (S200–S202; see the dated sections below). The early-body "assessment / deferred / measure-first" narrative is chronological history — the tail (last section) is the live state. Only remaining open item: a **real soak pending meaningful traffic** (blocked on volume, not effort). The `akoya_folio` "drift" is RESOLVED (S202) and consistent with [[akoya-payment-field-semantics]].
+
 **Assessment (S200, two-agent codebase map).** Dynamics Explorer fails frequently because its schema understanding is **hand-transcribed, not discovered**: `TABLE_ANNOTATIONS` (`shared/config/prompts/dynamics-explorer.js`) covers 23 tables and only **82 of 579** `akoya_request` attributes (`scripts/dynamics-schema-diff.json`). The LLM `describe_table` path reads that static set, even though `lib/services/dynamics-service.js:269-398` ALREADY has live `getEntityAttributes`/`getEntityRelationships` (unused by the agent). On top sit fragile heuristics the prompt tells the model to trust over live data: hardcoded program GUIDs (`dynamics-explorer.js:564-569`), hardcoded option-set codes (incl. the `wmkf_request_type eq 100000001` default gating most queries), most-active-account disambiguation guess (`chat.js:780-808`), and an error-as-tool-result loop (`chat.js:201-208`) that hides wrong-field failures by burning rounds.
 
 **Reusable Power Tools assets** (`lib/services/dataverse-export/`, built prior session, headless jest-covered — exact case count unverified here):

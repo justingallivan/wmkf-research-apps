@@ -31,12 +31,12 @@ New app (Session 91) that creates a virtual review panel using 3-4 LLMs to indep
 - `GOOGLE_AI_API_KEY` — required for Gemini reviewer
 - `PERPLEXITY_API_KEY` — required for Perplexity reviewer (best for Stage 1 claim verification due to built-in search)
 
-### DB Tables (V24 migration)
+### DB Tables (migration `003_virtual_review_panel.sql`)
 - `panel_reviews` — one row per review session
 - `panel_review_items` — one row per LLM per stage
+- (The "V24" label in the original S91 note was wrong — the real file is `lib/db/migrations/003_virtual_review_panel.sql`; no `024`/`V24` exists. Fixed S209.)
 
-### Status (Session 91)
-- Infrastructure built, build passing
-- Not yet tested end-to-end (needs API keys configured)
-- Prompts are experimental — Stage 1 especially will need iteration
-- Stage 2 prompts based on actual WMKF Research Reviewer Form
+### Status (S91 baseline; iterated since — S209)
+- Infrastructure built and live; the S91 "not yet tested end-to-end" line is stale (`pages/virtual-review-panel.js` actively iterated through late-May 2026).
+- Provider gating now hardened: `VRP_ALLOWED_PROVIDERS` allowlist intersected with configured keys, production fails closed if unset, must include `claude` (`lib/utils/vrp-providers.js`); see `docs/VIRTUAL_REVIEW_PANEL.md`.
+- Prompts remain iterative; Stage 2 based on the actual WMKF Research Reviewer Form.

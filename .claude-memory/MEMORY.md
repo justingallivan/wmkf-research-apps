@@ -91,7 +91,7 @@
 - [Identity reconciliation SHIPPED](project-dynamics-identity-reconciliation.md) — DB bridge + MSCRMCallerID + adapter chain + token lifecycle (S127-129). Delegate role granted 2026-05-06; impersonation smoke PASS.
 - [Email activities](project-dynamics-email.md) — `SendEmail` bound action; sender party needs `partyid_systemuser@odata.bind`; methods in `dynamics-service.js`.
 - [OData API limitations](project-dynamics-crm-limitations.md) — `$skip` unsupported; `$count` fails with complex filters; `_formatted` fields not in `$select`.
-- [AI fields — v3 canonical, all sets deployed](project-dynamics-ai-writeback.md) — 28 wmkf_ai_* fields on akoya_request deployed 2026-05-07; field names in v3 spec.
+- [AI fields — v3 canonical, all sets deployed](project-dynamics-ai-writeback.md) — 39 wmkf_ai_* fields on akoya_request (sets A–D; S209 re-probe); field names in v3 spec; `wmkf__ai_summary` cruft still present.
 - [akoya_request PD fields](project-akoya-request-pd-fields.md) — `wmkf_programdirector` = lead PD; `wmkf_programdirector2` does NOT assign reviewers; `ownerid` = integration service account.
 - [Grant lifecycle states confirmed (2026-05-01)](project-grant-lifecycle-states-confirmed.md) — `akoya_requeststatus` string: 'Concept Pending' → 'Phase I Pending' → 'Phase II Pending'.
 - [Akoya temporal axis encodings](akoya-temporal-axis-encodings.md) — `wmkf_meetingdate` is the ONE canonical temporal field; FY + cycle derive from it. `Jxx`/`Dxx` is a June/Dec CONVENTION; off-month meetings drop today → fail-loud required.
@@ -135,7 +135,7 @@
 - [PDF Processing Tiers](project-pdf-processing-tiers.md) — text-only for auto/bulk, full PDF vision for selective/detailed.
 
 ## New AI Capabilities
-- [Compliance + Staff Matching](project-new-ai-capabilities.md) — batch eval on historical data → auto-deploy via PowerAutomate.
+- [Compliance + Staff Matching](project-new-ai-capabilities.md) — Staff-matching SHIPPED as Expertise Finder (with UI); Compliance Screening still unbuilt (batch-eval → PowerAutomate plan).
 
 ## Dev Environment
 - [Dev environment](project-dev-environment.md) — `npm run dev` port 3000; auth off in dev; `.env.local` values quoted; WAVE1 flags mirror prod since 2026-05-11.

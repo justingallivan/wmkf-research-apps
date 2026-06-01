@@ -56,6 +56,6 @@ Sequencing between is flexible and depends on Connor's Q5 schema add + Steph's B
 
 **How to apply:**
 - Don't reintroduce PA-trigger framing in design conversations — that path is closed.
-- The `wmkf_appreviewersuggestion` row carries the grant linkage; use it as the provenance source when populating `wmkf_honorariumforrequest`.
+- The `wmkf_appreviewersuggestion` row carries the grant linkage; use it as the provenance source when populating the honorarium→grant lookup, whose real nav-property is `wmkf_HonorariumRequest` (set via `wmkf_HonorariumRequest@odata.bind`, read as `_wmkf_honorariumrequest_value`) — NOT `wmkf_honorariumforrequest` (a dead variant; see lines 32/38). [verified S209]
 - Existing Stage 2a primitives (token verify, state machine, optimistic locking, audit, rate limit, policy ack) handle all the auth/safety concerns — extension is purely additive.
 - Related: [[akoya-request-honorarium-nomenclature]], [[akoya-payment-field-semantics]], [[project-external-reviewer-file-access]] (Stage 2a primitives), [[project-reviewer-lifecycle]].

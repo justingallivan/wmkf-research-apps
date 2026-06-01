@@ -24,7 +24,7 @@ User ran out of Anthropic API credits during a batch expertise matching run (Apr
 **Pricing accuracy machinery (S181):**
 - **`lib/utils/model-pricing.js`** — extracted from `usage-logger.js`. Longest-prefix-first matcher (was `.includes()`, which silently misrouted `claude-opus-4-6` → `claude-opus-4` pricing for 3× overestimate). `LAST_REVIEWED_AT` field. Bug fixes: Haiku 4.5 = $1/$5 (was $0.80/$4); Opus 4.5/4.6/4.7 = $5/$25 (were inheriting Opus 4 $15/$75). 1h cache write multiplier (2×) added.
 - **`/api/cron/pricing-canary`** — weekly (Mon 10am UTC). Scans last 7d of `api_usage_log` for unknown model ids + flags if `LAST_REVIEWED_AT` >60 days old. Free signal, no Admin API needed.
-- **`/api/cron/pricing-refresh`** — monthly (1st of month, 11am UTC). Pulls Anthropic `/v1/organizations/cost_report` for last 30d, derives per-(model, token_type) price from `cost / tokens`, compares to local table, alerts on >5% drift OR unknown-in-cost-report. Skips when `ANTHROPIC_ADMIN_API_KEY` not set. Writes audit history to `model_pricing_audit` (V032).
+- **`/api/cron/pricing-refresh`** — monthly (1st of month, 11am UTC). Pulls Anthropic `/v1/organizations/cost_report` for last 30d, derives per-(model, token_type) price from `cost / tokens`, compares to local table, alerts on >5% drift OR unknown-in-cost-report. Skips when `ANTHROPIC_ADMIN_API_KEY` not set. Writes audit history to `model_pricing_audit` (created in `scripts/setup-database.js`, not a numbered migration — there is no `032`; latest migration is `017`). [verified S209]
 - **Storage decision:** pricing source of truth stays in code; cron alerts and humans edit. No auto-overwrite — protects against billing-system glitches corrupting prices.
 
 **Local code removed (S181):**
