@@ -30,11 +30,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import ReviewerManagePanel from './ReviewerManagePanel';
 import ReviewerFindPanel from './ReviewerFindPanel';
+import CandidatesPanel from './CandidatesPanel';
 import { SubTabBadge } from './SubTabBadges';
 import { countForMode, workRemainingForMode, computeDefaultSub } from './reviewer-modes';
 
 const SUB_TABS = [
   { key: 'find', label: 'Find' },
+  { key: 'candidates', label: 'Candidates' },
   { key: 'invite', label: 'Invite' },
   { key: 'track', label: 'Track' },
   { key: 'completed', label: 'Completed' },
@@ -46,8 +48,12 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const [proposal, setProposal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [candidates, setCandidates] = useState([]);
+  const [candidatesLoading, setCandidatesLoading] = useState(true);
 
   const reviewers = proposal?.reviewers || [];
+  // Candidates badge: saved candidates not yet invited (and not accepted/declined).
+  const candidatesToInvite = candidates.filter((c) => !c.invited && !c.accepted && !c.declined).length;
 
   const subParam = typeof router.query.sub === 'string' ? router.query.sub : null;
   const activeSub = subParam && SUB_TAB_KEYS.has(subParam) ? subParam : null;
@@ -74,6 +80,27 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   useEffect(() => {
     loadReviewers();
   }, [loadReviewers]);
+
+  // Saved-candidate roster (all selected suggestion rows for the request,
+  // regardless of accepted) — the data behind the Candidates tab + its badge.
+  const loadCandidates = useCallback(async () => {
+    if (!requestId) return;
+    setCandidatesLoading(true);
+    try {
+      const res = await fetch(`/api/reviewer-finder/my-candidates?requestId=${encodeURIComponent(requestId)}`);
+      const data = await res.json().catch(() => ({}));
+      const rows = (data.proposals && data.proposals[0] && data.proposals[0].candidates) || [];
+      setCandidates(Array.isArray(rows) ? rows : []);
+    } catch {
+      setCandidates([]);
+    } finally {
+      setCandidatesLoading(false);
+    }
+  }, [requestId]);
+
+  useEffect(() => {
+    loadCandidates();
+  }, [loadCandidates]);
 
   const selectSub = (key) => {
     router.push(
@@ -119,12 +146,14 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
                 }`}
               >
                 {t.label}
-                {isManage && (
+                {t.key === 'candidates' ? (
+                  <SubTabBadge count={candidatesToInvite} workRemaining={candidatesToInvite} />
+                ) : isManage ? (
                   <SubTabBadge
                     count={countForMode(reviewers, t.key)}
                     workRemaining={workRemainingForMode(reviewers, t.key)}
                   />
-                )}
+                ) : null}
               </button>
             );
           })}
@@ -143,6 +172,14 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
         </div>
       ) : current === 'find' ? (
         <ReviewerFindPanel requestId={requestId} context={context} canManage={canManage} />
+      ) : current === 'candidates' ? (
+        <CandidatesPanel
+          requestId={requestId}
+          candidates={candidates}
+          loading={candidatesLoading}
+          onRefresh={loadCandidates}
+          settings={settings}
+        />
       ) : (
         <ReviewerManagePanel
           proposal={panelProposal}

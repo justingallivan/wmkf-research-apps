@@ -14,7 +14,9 @@
  *
  * Request body:
  *   - suggestionIds: string[]
- *   - templateType: 'materials' | 'followup' | 'thankyou'
+ *   - templateType: 'invitation' | 'materials' | 'followup' | 'thankyou' (passthrough; the
+ *     caller supplies subject/body. 'invitation' carries {{externalLink}} → a magic accept/
+ *     decline link is minted, same placeholder-driven path as materials.)
  *   - template: { subject, body }
  *   - settings: { signature, reviewerFormLink, customFields, ... }
  *

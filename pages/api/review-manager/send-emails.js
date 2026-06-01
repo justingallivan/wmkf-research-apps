@@ -50,6 +50,7 @@ import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import * as contactAdapter from '../../../lib/dataverse/adapters/contact';
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
+import { shouldSkipDuplicateInvitation, sendAllowsAttachments, recipientMayReceiveAttachments } from '../../../lib/utils/reviewer-invite';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -103,6 +104,10 @@ export default async function handler(req, res) {
       templateType = 'materials',
       attachmentUrls = [],
       markAsSent = true,
+      // Invitation only: by default we refuse to re-send an invitation to a
+      // candidate already marked invited (guards an accidental re-click / retry
+      // from firing a second real email). A deliberate "Re-invite" sets this.
+      allowResend = false,
     } = req.body;
 
     if (!Array.isArray(drafts) || drafts.length === 0) {
@@ -157,41 +162,55 @@ export default async function handler(req, res) {
     const cycleConfigByCode = await loadCycleConfigs(distinctCycleCodes);
 
     // Fetch shared attachments once (caller-supplied + first cycle's template).
+    // INVARIANT: a pre-acceptance invitation carries NO attachments at all — not
+    // caller-supplied, not cycle materials — so proposal materials can never leave
+    // before the reviewer accepts (defense-in-depth around the modal sending none).
     sendEvent('progress', { stage: 'fetching_attachments', message: 'Fetching attachments...' });
     const attachmentCache = new Map();
     const sharedAttachments = [];
+    const allowAttachments = sendAllowsAttachments(templateType);
 
-    for (const url of attachmentUrls) {
-      if (!url) continue;
-      try {
-        const att = await fetchAttachment(url, attachmentCache);
-        if (att) sharedAttachments.push(att);
-      } catch (err) {
-        console.warn('Failed to fetch attachment:', url, err.message);
+    if (allowAttachments) {
+      for (const url of attachmentUrls) {
+        if (!url) continue;
+        try {
+          const att = await fetchAttachment(url, attachmentCache);
+          if (att) sharedAttachments.push(att);
+        } catch (err) {
+          console.warn('Failed to fetch attachment:', url, err.message);
+        }
       }
     }
 
     // Pull cycle template + additional attachments from the first available cycle.
     // (Today every batch in the UI is single-cycle; multi-cycle batches would
     // need per-recipient attachment selection — out of scope.)
+    // Cycle materials (review template + additional attachments) must NOT ride on
+    // a pre-acceptance INVITATION — the reviewer hasn't agreed (or acked COI/AI
+    // policy) yet, so proposal materials can't leave the building. They go out
+    // post-acceptance via the materials email (Codex S211 stop-gate catch). The
+    // caller-supplied `attachmentUrls` above are still honored (the invite modal
+    // sends none).
     const firstCycle = cycleConfigByCode[distinctCycleCodes[0]];
-    if (firstCycle?.review_template_blob_url && !attachmentCache.has(firstCycle.review_template_blob_url)) {
-      try {
-        const att = await fetchAttachment(firstCycle.review_template_blob_url, attachmentCache);
-        if (att) sharedAttachments.push(att);
-      } catch (err) {
-        console.warn('Failed to fetch review template:', err.message);
+    if (allowAttachments) {
+      if (firstCycle?.review_template_blob_url && !attachmentCache.has(firstCycle.review_template_blob_url)) {
+        try {
+          const att = await fetchAttachment(firstCycle.review_template_blob_url, attachmentCache);
+          if (att) sharedAttachments.push(att);
+        } catch (err) {
+          console.warn('Failed to fetch review template:', err.message);
+        }
       }
-    }
-    if (Array.isArray(firstCycle?.additional_attachments)) {
-      for (const a of firstCycle.additional_attachments) {
-        const url = a.blobUrl || a.url;
-        if (url && !attachmentCache.has(url)) {
-          try {
-            const att = await fetchAttachment(url, attachmentCache);
-            if (att) sharedAttachments.push(att);
-          } catch (err) {
-            console.warn('Failed to fetch additional attachment:', url, err.message);
+      if (Array.isArray(firstCycle?.additional_attachments)) {
+        for (const a of firstCycle.additional_attachments) {
+          const url = a.blobUrl || a.url;
+          if (url && !attachmentCache.has(url)) {
+            try {
+              const att = await fetchAttachment(url, attachmentCache);
+              if (att) sharedAttachments.push(att);
+            } catch (err) {
+              console.warn('Failed to fetch additional attachment:', url, err.message);
+            }
           }
         }
       }
@@ -237,7 +256,31 @@ export default async function handler(req, res) {
         continue;
       }
 
+      // Duplicate-invitation guard: never re-send an invitation to a candidate
+      // already marked invited unless the caller explicitly opts in (Re-invite).
+      // Protects against an accidental re-click / retry firing a second real
+      // email. Only applies to the invitation flow — materials/followup/thankyou
+      // are intentionally re-sendable.
+      if (shouldSkipDuplicateInvitation({ templateType, allowResend, invited: suggestion?.wmkf_invited === true })) {
+        skipped.push({ suggestionId: draft.suggestionId, candidateName: name, candidateEmail: email, reason: 'already_invited' });
+        sendEvent('progress', {
+          stage: 'sending',
+          current: processed,
+          total: drafts.length,
+          message: `Skipped ${name || '(unnamed)'} (already invited)`,
+        });
+        continue;
+      }
+
       const regardingId = request?.akoya_requestid || null;
+
+      // Attachment safety is SERVER-authoritative, not caller-controlled: proposal
+      // materials only ride on an email to a recipient who has actually ACCEPTED
+      // (`wmkf_accepted === true` on their suggestion row) — independent of the
+      // caller-supplied templateType. A pre-acceptance recipient (an invitation,
+      // or any mislabeled send) gets NO attachments (Codex S211 stop-gate). The
+      // `allowAttachments` (templateType) gate above just avoids fetching them.
+      const recipientAttachments = recipientMayReceiveAttachments(suggestion) ? sharedAttachments : [];
 
       try {
         const { emailId } = await DynamicsService.createAndSendEmail({
@@ -247,7 +290,7 @@ export default async function handler(req, res) {
           to: email,
           regardingId: regardingId || undefined,
           regardingType: regardingId ? 'akoya_request' : undefined,
-          attachments: sharedAttachments,
+          attachments: recipientAttachments,
           actingUserSystemId,
         });
 
@@ -334,6 +377,14 @@ export default async function handler(req, res) {
             await suggestionAdapter.updateLifecycle(s.suggestionId, {
               thankYouSentAt: now,
               reviewStatus: 'complete',
+            }, { actingUserSystemId });
+          } else if (templateType === 'invitation') {
+            // Pre-acceptance: mark invited + when the email went out, but do NOT
+            // touch wmkf_reviewstatus — status only advances to 'accepted' when
+            // the reviewer accepts in the external portal.
+            await suggestionAdapter.updateLifecycle(s.suggestionId, {
+              invited: true,
+              emailSentAt: now,
             }, { actingUserSystemId });
           }
         } catch (err) {
