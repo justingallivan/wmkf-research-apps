@@ -305,6 +305,25 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
     expect(payload.wmkf_selected).toBeUndefined();
   });
 
+  test('converges when the duplicate is signalled by message even without a conflict status', async () => {
+    DynamicsService.queryRecords
+      .mockResolvedValueOnce({ records: [] })
+      .mockResolvedValueOnce({ records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        wmkf_applicantdisposition: null,
+        wmkf_sources: 'applicant',
+      }] });
+    // No HTTP status, but the Dataverse duplicate-key message is present.
+    DynamicsService.createRecord.mockRejectedValue(
+      new Error('A record with matching key values already exists'),
+    );
+
+    const result = await ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID });
+
+    expect(result).toEqual({ id: SUGGESTION_ID, created: false, selected: true });
+    expect(DynamicsService.updateRecord).toHaveBeenCalled();
+  });
+
   test('a NON-conflict create error is surfaced, not masked as success', async () => {
     DynamicsService.queryRecords.mockResolvedValue({ records: [] });
     DynamicsService.createRecord.mockRejectedValue(
