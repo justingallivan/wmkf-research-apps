@@ -25,6 +25,7 @@ const {
   findByRequest,
   upsert,
   updateLifecycle,
+  ensureApplicantRecommended,
   APPLICANT_DISPOSITION_EXCLUDED,
   APPLICANT_DISPOSITION_MAP,
 } = suggestionAdapter;
@@ -176,6 +177,123 @@ describe('updateLifecycle fails closed on excluded rows for EVERY write', () => 
   test('refuses a NON-complete lifecycle write on an excluded row too', async () => {
     DynamicsService.getRecord.mockResolvedValue({ wmkf_applicantdisposition: APPLICANT_DISPOSITION_EXCLUDED });
     await expect(updateLifecycle(SUGGESTION_ID, { invited: true })).rejects.toThrow(/excluded/i);
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+});
+
+describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
+  test('creates a recommended, selected, applicant-sourced row when none exists', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: [] });
+
+    const result = await ensureApplicantRecommended({
+      potentialReviewerId: PR_ID,
+      requestId: REQUEST_ID,
+      suggestionLabel: 'Title — Jane Doe',
+      grantCycleCode: 'D26',
+      programArea: 'Medical Research',
+      matchReason: 'Recommended by applicant (legacy reviewer slot).',
+    });
+
+    expect(result).toEqual({ id: SUGGESTION_ID, created: true });
+    const payload = DynamicsService.createRecord.mock.calls[0][1];
+    expect(payload.wmkf_selected).toBe(true);
+    expect(payload.wmkf_applicantdisposition).toBe(APPLICANT_DISPOSITION_MAP.recommended);
+    expect(payload.wmkf_sources).toBe('applicant');
+    expect(payload['wmkf_PotentialReviewer@odata.bind']).toContain(PR_ID);
+    expect(payload['wmkf_Request@odata.bind']).toContain(REQUEST_ID);
+  });
+
+  test('merges applicant into existing sources without clobbering, and fills empty label only', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        wmkf_applicantdisposition: null,
+        wmkf_sources: 'claude,pubmed',
+        wmkf_suggestionlabel: 'Existing label',
+      }],
+    });
+
+    const result = await ensureApplicantRecommended({
+      potentialReviewerId: PR_ID,
+      requestId: REQUEST_ID,
+      suggestionLabel: 'New label that must not overwrite',
+      grantCycleCode: 'D26',
+    });
+
+    expect(result).toEqual({ id: SUGGESTION_ID, created: false });
+    expect(DynamicsService.createRecord).not.toHaveBeenCalled();
+    const payload = DynamicsService.updateRecord.mock.calls[0][2];
+    expect(payload.wmkf_sources).toBe('claude,pubmed,applicant');
+    expect(payload.wmkf_applicantdisposition).toBe(APPLICANT_DISPOSITION_MAP.recommended);
+    expect(payload.wmkf_selected).toBe(true);
+    // existing label preserved (not overwritten); empty cycle filled
+    expect(payload.wmkf_suggestionlabel).toBeUndefined();
+    expect(payload.wmkf_grantcyclecode).toBe('D26');
+  });
+
+  test('is idempotent — re-running with applicant already in sources keeps a single source', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        wmkf_applicantdisposition: APPLICANT_DISPOSITION_MAP.recommended,
+        wmkf_sources: 'applicant',
+        wmkf_suggestionlabel: 'Title — Jane Doe',
+      }],
+    });
+
+    await ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID });
+
+    expect(DynamicsService.createRecord).not.toHaveBeenCalled();
+    const payload = DynamicsService.updateRecord.mock.calls[0][2];
+    expect(payload.wmkf_sources).toBe('applicant');
+  });
+
+  test('excluded wins — never flips an existing excluded row to recommended', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        wmkf_applicantdisposition: APPLICANT_DISPOSITION_EXCLUDED,
+        wmkf_sources: 'applicant',
+      }],
+    });
+
+    const result = await ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID });
+
+    expect(result).toEqual({ id: SUGGESTION_ID, created: false, skippedExcluded: true });
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+    expect(DynamicsService.createRecord).not.toHaveBeenCalled();
+  });
+
+  test('race-safe — a lost create race re-fetches and converges to an update', async () => {
+    // First find: no row. Create: throws (alternate-key conflict). Second find:
+    // the row another concurrent run just created.
+    DynamicsService.queryRecords
+      .mockResolvedValueOnce({ records: [] })
+      .mockResolvedValueOnce({ records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        wmkf_applicantdisposition: null,
+        wmkf_sources: 'claude',
+      }] });
+    DynamicsService.createRecord.mockRejectedValue(Object.assign(new Error('Duplicate alternate key'), { status: 412 }));
+
+    const result = await ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID });
+
+    expect(result).toEqual({ id: SUGGESTION_ID, created: false });
+    const payload = DynamicsService.updateRecord.mock.calls[0][2];
+    expect(payload.wmkf_sources).toBe('claude,applicant');
+    expect(payload.wmkf_applicantdisposition).toBe(APPLICANT_DISPOSITION_MAP.recommended);
+  });
+
+  test('a NON-conflict create error is surfaced, not masked as success', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: [] });
+    DynamicsService.createRecord.mockRejectedValue(
+      Object.assign(new Error('Insufficient privileges'), { status: 403 }),
+    );
+
+    await expect(
+      ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID }),
+    ).rejects.toThrow(/privileges/i);
+    // Must not refetch-and-converge on a non-conflict failure.
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
 });

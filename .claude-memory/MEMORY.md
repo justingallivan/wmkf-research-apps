@@ -102,6 +102,7 @@
 ## Reviewer Lifecycle
 - [Reviewer apps redesign direction (S194)](project-reviewer-apps-redesign-direction.md) — Finder + Manager → request-scoped Reviewer Workbench + standalone Reviewer Pool. Decisions locked; don't propose incremental Finder/Manager cleanup.
 - [D26 reviewer-inputs ground truth (S209 probe)](project-d26-reviewer-inputs-probe.md) — all 35 D26 reqs: 0 existing candidates (Manage tabs empty → smoke via Review Manager), 5/5 legacy slots (~175 recs for Phase 3), excluded text heterogeneous + mostly N/A.
+- [Excluded reviewers often already in our pool](project-excluded-reviewers-often-in-pool.md) — applicant-excluded = competitors = domain experts; exclusion is per-request/case-by-case, NOT person-level "unfit". Disposition lives only on the junction row. S210 pilot chose soft-block-only (option B).
 - [Appresearcher collapse pending post-pilot](project-appresearcher-collapse-post-pilot.md) — `wmkf_appresearcher` 1:1 sidecar is redundant; collapse bibliometric fields into `wmkf_potentialreviewer` post-pilot. Don't act mid-pilot.
 - [Reviewer lifecycle automation plan](project-reviewer-lifecycle.md) — phased plan (A-D); Phase A (CRM send) is the foundation.
 - [Lifecycle tracking → automation goal](project-reviewer-lifecycle-automation.md) — manual timestamp/status fields designed for cron-driven reminders + state machine in Wave 2.

@@ -104,6 +104,7 @@ Methods:
 - `findByPD(systemuserid, { cycleCode, selectedOnly })` — two-step: query `akoya_requests` by lead PD then suggestions by request OR-chain (chunks of 25); carries `notExcludedFilter()`
 - `findAcceptedByPD` — same shape, `wmkf_accepted eq true` filter; carries `notExcludedFilter()`
 - `upsert` — save-candidates path; accepts `applicantDisposition`; refuses to convert an existing excluded row into a selected candidate (returns `{ skippedExcluded: true }`)
+- `ensureApplicantRecommended({ potentialReviewerId, requestId, … })` — **Workbench Phase 3 ingestion** of the legacy `wmkf_potentialreviewer1..5` slots. Idempotently materializes a `disposition=recommended`, `selected=true` row, **unions** `applicant` into existing `wmkf_sources` (no clobber), fills descriptive fields only when empty, honors "excluded wins" (`{ skippedExcluded: true }`), and is **race-safe** (catches a lost alternate-key create race, re-fetches, converges to update)
 - `updateLifecycle(id, updates, { actingUserSystemId })` — partial update with picklist mapping for `responseType`/`reviewStatus`/`applicantDisposition`; supports `completedAt`. Reads the row once per write to (a) THROW on an applicant-excluded row (every write, fail closed) and (b) stamp `wmkf_completedat`+`wmkf_reviewreceivedat` idempotently on a `reviewStatus=complete` transition
 - `softDelete(id)` — sets `wmkf_selected = false`
 - `bulkUpdateByRequest` — UI's "assign cycle/program area to whole proposal" action
@@ -120,7 +121,8 @@ Read:
 - `lib/external/verify-suggestion-token.js` — load-bearing for every `/external/review/*` endpoint; reads with `$expand=wmkf_Request($select=...),wmkf_PotentialReviewer($select=...)` to hydrate the reviewer landing page in one round trip
 - `pages/api/external/review/[token]/context.js` — reader (via `verify-suggestion-token`) AND best-effort writer (`wmkf_proposalfirstaccessed` stamp on first access; non-fatal on failure)
 
-Write (verified 2026-05-07):
+Write (verified 2026-05-07; +Phase 3 ingestion S210):
+- `pages/api/workbench/applicant-reviewers.js` — adapter `ensureApplicantRecommended` per populated legacy slot (Workbench Phase 3, lazy on Find-tab open). Writes only `disposition=recommended` rows; **writes NO `disposition=excluded` rows** (S210 option B — excluded names are parsed via `lib/services/reviewer-exclusion-parser.js` and returned for the search soft-block only, nothing global touched).
 - `pages/api/reviewer-finder/save-candidates.js` — adapter `upsert` (per-(reviewer,request) suggestion creation)
 - `pages/api/reviewer-finder/my-candidates.js` — adapter `updateLifecycle` (single suggestion lifecycle PATCH), `bulkUpdateByRequest` (per-proposal cycle/program-area assignment), `softDelete` (`wmkf_selected = false`); when `accepted` flips to `true` calls `ensureToken` from `lib/external/token-lifecycle.js` which is idempotent but may write `wmkf_externaltoken*` fields if no usable token exists
 - `pages/api/review-manager/render-emails.js` — `mintAndStore` from `lib/external/token-lifecycle.js`; mints + stores HMAC token hash on `wmkf_externaltokenhash` + `wmkf_externaltokenissued` + `wmkf_externaltokenexpires` per recipient before email render

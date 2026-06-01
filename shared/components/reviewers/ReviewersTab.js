@@ -2,9 +2,10 @@
  * ReviewersTab — the Reviewers tab inside the Request Workbench (tier-3).
  *
  * Hosts the reviewer sub-tabs for a single request:
- *   - Find       : placeholder in Phase 2 (the Find panel + applicant-reviewer
- *                  ingestion land in Phase 3 — see the build plan). For now it
- *                  points staff at the standalone Reviewer Finder.
+ *   - Find       : ReviewerFindPanel (Phase 3) — runs applicant-reviewer
+ *                  ingestion (recommended → candidates, excluded → per-request
+ *                  soft-block) and auto-loads the proposal. The full in-panel
+ *                  candidate search relocation is the remaining Phase 3 refactor.
  *   - Invite     : accepted reviewers awaiting materials.
  *   - Track      : reviewers in flight (materials sent → review received).
  *   - Completed  : reviewers whose review is complete.
@@ -27,8 +28,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { Card } from '../Layout';
 import ReviewerManagePanel from './ReviewerManagePanel';
+import ReviewerFindPanel from './ReviewerFindPanel';
 import { SubTabBadge } from './SubTabBadges';
 import { countForMode, workRemainingForMode, computeDefaultSub } from './reviewer-modes';
 
@@ -141,14 +142,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           <div className="w-6 h-6 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
         </div>
       ) : current === 'find' ? (
-        <Card hover={false}>
-          <p className="font-medium text-gray-900 mb-1">Find reviewers</p>
-          <p className="text-sm text-gray-600">
-            Searching for candidates and ingesting applicant-recommended reviewers
-            lands here in a later update. For now, use the standalone Reviewer
-            Finder, then return here to invite and track those who accept.
-          </p>
-        </Card>
+        <ReviewerFindPanel requestId={requestId} context={context} canManage={canManage} />
       ) : (
         <ReviewerManagePanel
           proposal={panelProposal}
