@@ -5,9 +5,12 @@
 
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen
- * candidates by name, mirroring the standalone Reviewer Finder's save mapping:
- * the enrichment's email/website take precedence, and the full contactEnrichment
- * object is attached for save-candidates to persist.
+ * candidates by name, mirroring the standalone Reviewer Finder's save mapping.
+ * The enrichment's contact + bibliometric fields take precedence and are also
+ * promoted to the candidate top-level, because save-candidates.js reads them off
+ * `candidate.*` (email/website/orcid/website/hIndex/i10Index/totalCitations/…),
+ * NOT off `candidate.contactEnrichment.*`. The full contactEnrichment object is
+ * also attached so the card can render source/year detail.
  *
  * @param {object[]} candidates
  * @param {Array<{name: string, contactEnrichment: object}>|null|undefined} enrichmentResults
@@ -28,6 +31,16 @@ export function mergeEnrichment(candidates, enrichmentResults) {
       contactEnrichment: e,
       email: e.email || c.email,
       website: e.website || c.website,
+      facultyPageUrl: e.facultyPageUrl || c.facultyPageUrl,
+      department: e.department || c.department,
+      orcid: e.orcid || e.orcidId || c.orcid,
+      orcidUrl: e.orcidUrl || c.orcidUrl,
+      googleScholarId: e.googleScholarId || c.googleScholarId,
+      googleScholarUrl: e.googleScholarUrl || c.googleScholarUrl,
+      // Bibliometrics: prefer enrichment, but `?? c` so a real 0 isn't dropped.
+      hIndex: e.hIndex ?? c.hIndex,
+      i10Index: e.i10Index ?? c.i10Index,
+      totalCitations: e.totalCitations ?? c.totalCitations,
     };
   });
 }

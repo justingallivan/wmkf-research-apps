@@ -103,9 +103,13 @@ export default async function handler(req, res) {
           orcidUrl: candidate.orcidUrl || candidate.contactEnrichment?.orcidUrl || null,
           googleScholarId: candidateGoogleScholarId,
           googleScholarUrl: candidate.googleScholarUrl || candidate.contactEnrichment?.googleScholarUrl || null,
-          hIndex: candidate.hIndex ?? null,
-          i10Index: candidate.i10Index ?? null,
-          totalCitations: candidate.totalCitations ?? null,
+          // Fall back to contactEnrichment like every other field above —
+          // enrichment writes bibliometrics there, and not all callers promote
+          // them to the candidate top-level (the standalone Reviewer Finder does
+          // not), so reading candidate.* only would silently drop fetched metrics.
+          hIndex: candidate.hIndex ?? candidate.contactEnrichment?.hIndex ?? null,
+          i10Index: candidate.i10Index ?? candidate.contactEnrichment?.i10Index ?? null,
+          totalCitations: candidate.totalCitations ?? candidate.contactEnrichment?.totalCitations ?? null,
           affiliation: candidateAffiliation,
           department: candidate.department || candidate.contactEnrichment?.department || null,
           website: candidateWebsite,

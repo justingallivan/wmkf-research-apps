@@ -42,6 +42,54 @@ describe('mergeEnrichment', () => {
   test('non-array candidates → []', () => {
     expect(mergeEnrichment(null, [])).toEqual([]);
   });
+
+  test('promotes bibliometrics + orcid/scholar onto the candidate top-level (save-candidates reads candidate.*)', () => {
+    const out = mergeEnrichment(
+      [{ name: 'Dr. C', hIndex: null }],
+      [{
+        name: 'Dr. C',
+        contactEnrichment: {
+          email: 'c@x.edu',
+          orcidId: '0000-0002-1825-0097',
+          orcidUrl: 'https://orcid.org/0000-0002-1825-0097',
+          googleScholarId: 'ABC123',
+          googleScholarUrl: 'https://scholar.google.com/citations?user=ABC123',
+          hIndex: 42,
+          i10Index: 88,
+          totalCitations: 12345,
+          facultyPageUrl: 'https://u.edu/c',
+          department: 'Microbiology',
+        },
+      }],
+    );
+    expect(out[0].hIndex).toBe(42);
+    expect(out[0].i10Index).toBe(88);
+    expect(out[0].totalCitations).toBe(12345);
+    expect(out[0].orcid).toBe('0000-0002-1825-0097');
+    expect(out[0].orcidUrl).toBe('https://orcid.org/0000-0002-1825-0097');
+    expect(out[0].googleScholarId).toBe('ABC123');
+    expect(out[0].googleScholarUrl).toBe('https://scholar.google.com/citations?user=ABC123');
+    expect(out[0].facultyPageUrl).toBe('https://u.edu/c');
+    expect(out[0].department).toBe('Microbiology');
+  });
+
+  test('a real 0 h-index from enrichment is not dropped by the candidate fallback', () => {
+    const out = mergeEnrichment(
+      [{ name: 'Dr. D', hIndex: 9 }],
+      [{ name: 'Dr. D', contactEnrichment: { hIndex: 0, totalCitations: 0 } }],
+    );
+    expect(out[0].hIndex).toBe(0);
+    expect(out[0].totalCitations).toBe(0);
+  });
+
+  test('absent enrichment bibliometrics keep the candidate values', () => {
+    const out = mergeEnrichment(
+      [{ name: 'Dr. E', hIndex: 7, totalCitations: 50 }],
+      [{ name: 'Dr. E', contactEnrichment: { email: 'e@x.edu' } }],
+    );
+    expect(out[0].hIndex).toBe(7);
+    expect(out[0].totalCitations).toBe(50);
+  });
 });
 
 describe('asPercent', () => {
