@@ -2,10 +2,10 @@
  * ReviewersTab — the Reviewers tab inside the Request Workbench (tier-3).
  *
  * Hosts the reviewer sub-tabs for a single request:
- *   - Find       : ReviewerFindPanel (Phase 3) — runs applicant-reviewer
- *                  ingestion (recommended → candidates, excluded → per-request
- *                  soft-block) and auto-loads the proposal. The full in-panel
- *                  candidate search relocation is the remaining Phase 3 refactor.
+ *   - Find       : ReviewerFindPanel (Phase 3) — applicant-reviewer ingestion
+ *                  (recommended → candidates, excluded → per-request soft-block),
+ *                  auto-loaded proposal, and the in-panel reviewer search
+ *                  (ReviewerSearchSection: inline analyze→discover→enrich→save).
  *   - Invite     : accepted reviewers awaiting materials.
  *   - Track      : reviewers in flight (materials sent → review received).
  *   - Completed  : reviewers whose review is complete.

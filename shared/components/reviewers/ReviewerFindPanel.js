@@ -19,10 +19,11 @@
  * exclusion here never affects the person's eligibility on any other request
  * (`[[project-excluded-reviewers-often-in-pool]]`).
  *
- * The full in-panel candidate search (relocating the standalone Reviewer
- * Finder's ~1,400-line search flow, dropping `summaryPages`) is the remaining
- * Phase 3 deep refactor — staff run that search from the standalone Reviewer
- * Finder for now, with the exclude list surfaced here to carry over.
+ * The candidate search runs IN-PANEL via `ReviewerSearchSection` (S210): it
+ * reuses the proposal loaded here + the applicant exclude list and chains the
+ * reviewer-finder endpoints (analyze → discover → enrich → save), so saved
+ * candidates land in this request's pool alongside the applicant recommendations.
+ * (`summaryPages`/PDF-upload are not used — the proposal is auto-loaded.)
  *
  * Props:
  *   - requestId : the akoya_request GUID (always present)
