@@ -52,7 +52,7 @@ UNIQUE constraint: `(proposal_id, researcher_id)`.
 
 Not a path: `scripts/seed-reviewer-finder-prompts.js` (comment only), `scripts/README.md` (doc).
 
-**No `pages/api/review-manager/*` Postgres readers OR writers.** The prior claim "Review Manager reads `grant_cycles` from Postgres" is **stale**: Review Manager reads grant cycles from **Dataverse** via `lib/services/grant-cycles-dataverse` and writes reviewer lifecycle to Dataverse `wmkf_appreviewersuggestion` via the adapter. The Review Manager request path's only remaining Postgres touch is the shared cross-app auth gate (`requireAppAccess` → `user_profiles` / `dynamics_user_roles`) — identity infrastructure shared by all ~[99](../CANONICAL_COUNTS.md#api-route-file-count) route files, not reviewer-domain data. [VERIFIED 2026-05-18 (S164) via transitive import grep of `pages/api/review-manager/*` + the full service chain]
+**No `pages/api/review-manager/*` Postgres readers OR writers.** The prior claim "Review Manager reads `grant_cycles` from Postgres" is **stale**: Review Manager reads grant cycles from **Dataverse** via `lib/services/grant-cycles-dataverse` and writes reviewer lifecycle to Dataverse `wmkf_appreviewersuggestion` via the adapter. The Review Manager request path's only remaining Postgres touch is the shared cross-app auth gate (`requireAppAccess` → `user_profiles` / `dynamics_user_roles`) — identity infrastructure shared by all ~[100](../CANONICAL_COUNTS.md#api-route-file-count) route files, not reviewer-domain data. [VERIFIED 2026-05-18 (S164) via transitive import grep of `pages/api/review-manager/*` + the full service chain]
 
 ## Cross-system
 

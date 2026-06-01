@@ -301,6 +301,7 @@ export default function ReviewerFindPanel({ requestId }) {
         cycleCode={data?.cycleCode || null}
         excludedNames={data?.excludedNames || []}
         exclusionsUnavailable={!!ingest.error || excludedParseFailed}
+        recommended={recommended}
       />
     </div>
   );

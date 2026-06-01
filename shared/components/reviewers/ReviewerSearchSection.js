@@ -211,7 +211,9 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false }) {
             </span>
             {hIndex != null && <span>· h-index {hIndex}</span>}
             {citations != null && <span>· {citations.toLocaleString()} citations</span>}
-            <Pill tone={claude ? 'amber' : 'gray'}>{claude ? 'Claude suggestion' : (c.source || 'Database')}</Pill>
+            {c.isApplicantRecommended
+              ? <Pill tone="green">Applicant recommended</Pill>
+              : <Pill tone={claude ? 'amber' : 'gray'}>{claude ? 'Claude suggestion' : (c.source || 'Database')}</Pill>}
           </div>
 
           {(email || website || orcidUrl) && (
@@ -273,6 +275,7 @@ export default function ReviewerSearchSection({
   cycleCode,
   excludedNames = [],
   exclusionsUnavailable = false,
+  recommended = [],
   onSaved,
 }) {
   const [phase, setPhase] = useState('idle'); // idle | running | results | saving | done | error
@@ -291,6 +294,13 @@ export default function ReviewerSearchSection({
   const [reviewerCount, setReviewerCount] = useState(12); // how many candidates Claude is asked to suggest
   const [temperature, setTemperature] = useState(0.3); // "reviewer diversity": 0.3 conservative → 1.0 creative
   const [additionalNotes, setAdditionalNotes] = useState(''); // optional extra instructions for Claude
+
+  // Applicant-recommended enrichment (separate flow from the search).
+  const [recPhase, setRecPhase] = useState('idle'); // idle | running | done | error
+  const [recCandidates, setRecCandidates] = useState([]);
+  const [recProgress, setRecProgress] = useState([]);
+  const [recError, setRecError] = useState(null);
+  const recRunningRef = useRef(false);
 
   // Imperative guards: prevent double-submit (Finding 8) and let a context change
   // invalidate an in-flight run so a stale stream can't overwrite newer state
@@ -311,6 +321,7 @@ export default function ReviewerSearchSection({
     setReviewerCount(12);
     setTemperature(0.3);
     setAdditionalNotes('');
+    setRecPhase('idle'); setRecCandidates([]); setRecProgress([]); setRecError(null);
     excludeEditedRef.current = false;
     setExcludeText((excludedNames || []).join(', '));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -447,6 +458,40 @@ export default function ReviewerSearchSection({
     }
   }, [blobUrl, excludeText, searchSources, noSourcesSelected, reviewerCount, temperature, additionalNotes, pushProgress]);
 
+  // Run the applicant-recommended reviewers through the full verify→COI→enrich
+  // pipeline (server-side) and write the enrichment back to their existing rows.
+  // Independent of the search; reuses the search's `analysis` when present so the
+  // server can skip a second analyze call.
+  const enrichRecommended = useCallback(async () => {
+    if (!blobUrl || recRunningRef.current) return;
+    recRunningRef.current = true;
+    const myGen = genRef.current;
+    setRecPhase('running'); setRecError(null); setRecProgress([]); setRecCandidates([]);
+    try {
+      const res = await fetch('/api/workbench/enrich-recommended', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, blobUrl, analysisResult: analysis || undefined }),
+      });
+      let result = null;
+      let streamError = null;
+      await readSseStream(res, ({ event, data }) => {
+        if (event === 'error') { streamError = data?.message || 'Enrichment failed'; return; }
+        if (data?.error) { streamError = data.error; return; }
+        if (data?.message) setRecProgress((p) => [...p.slice(-6), data.message]);
+        if (data?.recommended) result = data.recommended;
+      });
+      if (streamError) throw new Error(streamError);
+      if (genRef.current !== myGen) return; // context changed — abort
+      setRecCandidates(Array.isArray(result) ? result : []);
+      setRecPhase('done');
+    } catch (e) {
+      if (genRef.current === myGen) { setRecError(e.message); setRecPhase('error'); }
+    } finally {
+      recRunningRef.current = false;
+    }
+  }, [blobUrl, requestId, analysis]);
+
   const toggle = (i) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -510,7 +555,67 @@ export default function ReviewerSearchSection({
   const claudeItems = candidates.map((c, i) => ({ c, i })).filter(({ c }) => isClaudeSuggestion(c));
   const dbItems = candidates.map((c, i) => ({ c, i })).filter(({ c }) => !isClaudeSuggestion(c));
 
+  // Staff-removed recommendations (selected===false) are NOT enriched by the
+  // endpoint (it loads selectedOnly:true), so count only the enrichable ones —
+  // otherwise the button promises N but enriches fewer (Codex post-impl).
+  const recCount = recommended.filter((r) => r.selected !== false).length;
+
   return (
+    <>
+    {recCount > 0 && (
+      <Card hover={false}>
+        <div className="flex items-center justify-between mb-2">
+          <p className="font-medium text-gray-900">Enrich applicant-recommended reviewers</p>
+          {recPhase === 'running' && <Spinner />}
+        </div>
+        {(recPhase === 'idle' || recPhase === 'error') && (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              Run the applicant’s {recCount} recommended reviewer{recCount === 1 ? '' : 's'} through the same
+              verification, conflict-of-interest, and contact/citation enrichment the search uses — and save the results to their rows.
+            </p>
+            {!blobUrl && <p className="text-xs text-amber-700">Load a proposal document above first (needed for conflict-of-interest checks).</p>}
+            {recError && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{recError}</div>}
+            <button
+              type="button"
+              onClick={enrichRecommended}
+              disabled={!blobUrl}
+              className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {recPhase === 'error' ? 'Try again' : `Enrich recommended reviewers (${recCount})`}
+            </button>
+          </div>
+        )}
+        {recPhase === 'running' && (
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600">Verifying &amp; enriching… this can take a minute.</p>
+            <ul className="text-xs text-gray-500 space-y-0.5">
+              {recProgress.map((m, i) => <li key={i}>{m}</li>)}
+            </ul>
+          </div>
+        )}
+        {recPhase === 'done' && (
+          <div className="space-y-3">
+            {recCandidates.length === 0 ? (
+              <p className="text-sm text-gray-600">No recommended reviewers could be enriched.</p>
+            ) : (
+              <>
+                <p className="text-sm text-gray-600">
+                  Enriched {recCandidates.length} applicant-recommended reviewer{recCandidates.length === 1 ? '' : 's'} — metrics &amp; conflicts saved to their records.
+                </p>
+                <div className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
+                  {recCandidates.map((c, i) => (
+                    <CandidateCard key={`rec-${c.suggestionId || c.name}-${i}`} candidate={c} readOnly />
+                  ))}
+                </div>
+                <button type="button" onClick={enrichRecommended} className="text-sm text-gray-500 underline">Re-enrich</button>
+              </>
+            )}
+          </div>
+        )}
+      </Card>
+    )}
+
     <Card hover={false}>
       <div className="flex items-center justify-between mb-2">
         <p className="font-medium text-gray-900">Search for reviewers</p>
@@ -727,5 +832,6 @@ export default function ReviewerSearchSection({
         </>
       )}
     </Card>
+    </>
   );
 }

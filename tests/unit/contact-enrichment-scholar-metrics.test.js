@@ -64,6 +64,23 @@ describe('enrichCandidate — Scholar metrics fetched even for early-email candi
     expect(out.contactEnrichment.hIndex).toBe(42);
   });
 
+  test('persist:false skips saveToDatabase (caller owns the writeback); default persists', async () => {
+    jest.spyOn(ContactParser, 'extractPrimaryEmail').mockReturnValue('p@x.edu');
+    const saveSpy = ContactEnrichmentService.saveToDatabase;
+
+    await ContactEnrichmentService.enrichCandidate(
+      { name: 'Dr. P', affiliation: 'X' },
+      { credentials: { serpApiKey: 'k' }, useSerpSearch: true, persist: false, usePubmed: false, useOrcid: false, useClaudeSearch: false },
+    );
+    expect(saveSpy).not.toHaveBeenCalled();
+
+    await ContactEnrichmentService.enrichCandidate(
+      { name: 'Dr. Q', affiliation: 'X' },
+      { credentials: { serpApiKey: 'k' }, useSerpSearch: true, usePubmed: false, useOrcid: false, useClaudeSearch: false },
+    );
+    expect(saveSpy).toHaveBeenCalled(); // default persist:true
+  });
+
   test('no Scholar fetch when SerpAPI is disabled', async () => {
     jest.spyOn(ContactParser, 'extractPrimaryEmail').mockReturnValue('z@x.edu');
 
