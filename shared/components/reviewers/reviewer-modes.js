@@ -1,0 +1,89 @@
+/**
+ * reviewer-modes — pure (React-free) logic for the reviewer management surface.
+ *
+ * Extracted so the status pipeline, the sub-tab mode→status bucketing, the
+ * state-aware default landing, and the soft canManage gate can be unit-tested
+ * without rendering any component. Imported by ReviewerManagePanel,
+ * SubTabBadges, ReviewersTab, and the Workbench shell. See
+ * docs/REQUEST_WORKBENCH_BUILD_PLAN.md § Phase 2.
+ */
+
+// The full reviewer lifecycle, in order. Every wmkf_reviewstatus the API can
+// return (REVIEW_STATUS_BY_VALUE in pages/api/review-manager/reviewers.js) MUST
+// have a key here, and MUST land in exactly one MODE_STATUSES bucket — otherwise
+// a reviewer in that state would vanish from all sub-tabs. The
+// reviewer-modes.test.js "no fallthrough" assertion enforces this invariant.
+export const STATUS_PIPELINE = [
+  { key: 'accepted', label: 'Accepted', color: 'bg-blue-100 text-blue-800' },
+  { key: 'materials_sent', label: 'Materials Sent', color: 'bg-indigo-100 text-indigo-800' },
+  { key: 'under_review', label: 'Under Review', color: 'bg-yellow-100 text-yellow-800' },
+  { key: 'review_received', label: 'Review Received', color: 'bg-green-100 text-green-800' },
+  { key: 'complete', label: 'Complete', color: 'bg-gray-100 text-gray-800' },
+];
+
+export function getStatusInfo(status) {
+  return STATUS_PIPELINE.find(s => s.key === status) || STATUS_PIPELINE[0];
+}
+
+// Which reviewStatus values each Workbench sub-tab mode surfaces. The three
+// buckets must partition every STATUS_PIPELINE key (complete coverage, no
+// overlap).
+export const MODE_STATUSES = {
+  invite: ['accepted'],
+  track: ['materials_sent', 'under_review', 'review_received'],
+  completed: ['complete'],
+};
+
+// Reviewers a mode still has open work for (drives the work-remaining badge).
+// Completed has none; invite = needs materials; track = review not yet in.
+export const MODE_WORK_REMAINING = {
+  invite: ['accepted'],
+  track: ['materials_sent', 'under_review'],
+  completed: [],
+};
+
+export function filterByMode(reviewers, mode) {
+  if (!mode || mode === 'all') return reviewers || [];
+  const statuses = MODE_STATUSES[mode];
+  if (!statuses) return reviewers || [];
+  return (reviewers || []).filter(r => statuses.includes(r.reviewStatus));
+}
+
+/** Reviewers visible under a given mode. */
+export function countForMode(reviewers, mode) {
+  const statuses = MODE_STATUSES[mode];
+  if (!statuses) return (reviewers || []).length;
+  return (reviewers || []).filter(r => statuses.includes(r.reviewStatus)).length;
+}
+
+/** Reviewers under a mode that still need staff action. */
+export function workRemainingForMode(reviewers, mode) {
+  const statuses = MODE_WORK_REMAINING[mode];
+  if (!statuses || statuses.length === 0) return 0;
+  return (reviewers || []).filter(r => statuses.includes(r.reviewStatus)).length;
+}
+
+// State-aware default sub-tab: drop staff where the open work is. If reviewers
+// have accepted but aren't out yet → invite; if any are in flight → track; if
+// some are done and nothing is pending → completed; otherwise (no reviewers) the
+// Find tab, where reviewer-finding starts.
+export function computeDefaultSub(reviewers) {
+  if (workRemainingForMode(reviewers, 'invite') > 0) return 'invite';
+  if (countForMode(reviewers, 'track') > 0) return 'track';
+  if (countForMode(reviewers, 'completed') > 0) return 'completed';
+  if (countForMode(reviewers, 'invite') > 0) return 'invite';
+  return 'find';
+}
+
+/**
+ * Soft UI gate (S207 decision): the lead PD and superusers see the reviewer-
+ * management write controls. Cosmetic only — the reused server APIs stay
+ * org-open — so it FAILS OPEN: hides controls only when we can positively tell
+ * the viewer is a non-superuser, identity-resolved, non-PD staffer. A superuser,
+ * an unresolved viewer systemuser id, or an unresolved request PD all stay
+ * permissive (Codex S209 catch — the prior gate wrongly hid controls from
+ * superusers and identity-unresolved staff).
+ */
+export function computeCanManage({ isSuperuser = false, pdId = null, myUserId = null } = {}) {
+  return Boolean(isSuperuser || !pdId || !myUserId || myUserId === pdId);
+}

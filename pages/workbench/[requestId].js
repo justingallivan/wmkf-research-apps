@@ -16,6 +16,7 @@ import Layout, { Card } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import { useAppAccess } from '../../shared/context/AppAccessContext';
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
+import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
 
 // Reviewers is the live tab (Phase 2); the rest are placeholders for the full
 // request lifecycle. Order matches the build plan's tab strip.
@@ -72,16 +73,10 @@ function WorkbenchRequest() {
     );
   };
 
-  // Soft UI gate (S207 decision): the lead PD and superusers see the
-  // reviewer-management write controls. This is cosmetic — the reused server
-  // APIs stay org-open regardless — so it must FAIL OPEN: hide controls only
-  // when we can positively tell the viewer is a non-superuser, identity-resolved,
-  // non-PD staffer. Superusers, an unresolved viewer systemuser id, or an
-  // unresolved request PD all stay permissive (Codex S209 catch — the prior gate
-  // wrongly hid controls from superusers and identity-unresolved staff).
+  // Soft UI gate (S207 decision) — cosmetic, fails open. See computeCanManage.
   const myUserId = session?.user?.dynamicsSystemuserId || null;
   const pdId = ctx?.programDirectorId || null;
-  const canManage = isSuperuser || !pdId || !myUserId || myUserId === pdId;
+  const canManage = computeCanManage({ isSuperuser, pdId, myUserId });
   const reviewerSettings = { signature: session?.user?.profileName || '' };
 
   return (

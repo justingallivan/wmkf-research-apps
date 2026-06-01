@@ -26,43 +26,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, Button } from '../Layout';
 import ReviewFormFields from '../external/ReviewFormFields';
+import { STATUS_PIPELINE, getStatusInfo, filterByMode } from './reviewer-modes';
 
-// ─── Status Pipeline ────────────────────────────────────────────────────────
-
-export const STATUS_PIPELINE = [
-  { key: 'accepted', label: 'Accepted', color: 'bg-blue-100 text-blue-800' },
-  { key: 'materials_sent', label: 'Materials Sent', color: 'bg-indigo-100 text-indigo-800' },
-  { key: 'under_review', label: 'Under Review', color: 'bg-yellow-100 text-yellow-800' },
-  { key: 'review_received', label: 'Review Received', color: 'bg-green-100 text-green-800' },
-  { key: 'complete', label: 'Complete', color: 'bg-gray-100 text-gray-800' },
-];
-
-function getStatusInfo(status) {
-  return STATUS_PIPELINE.find(s => s.key === status) || STATUS_PIPELINE[0];
-}
-
-// Which reviewStatus values each Workbench sub-tab mode surfaces. Exported so
-// SubTabBadges / ReviewersTab can compute counts from the same source of truth.
-export const MODE_STATUSES = {
-  invite: ['accepted'],
-  track: ['materials_sent', 'under_review', 'review_received'],
-  completed: ['complete'],
-};
-
-// Reviewers a mode still has open work for (drives the work-remaining badge).
-// Completed has none; invite = needs materials; track = review not yet in.
-export const MODE_WORK_REMAINING = {
-  invite: ['accepted'],
-  track: ['materials_sent', 'under_review'],
-  completed: [],
-};
-
-export function filterByMode(reviewers, mode) {
-  if (!mode || mode === 'all') return reviewers;
-  const statuses = MODE_STATUSES[mode];
-  if (!statuses) return reviewers;
-  return reviewers.filter(r => statuses.includes(r.reviewStatus));
-}
+// Pure status-pipeline / mode-bucketing logic lives in ./reviewer-modes
+// (React-free + unit-tested). Re-export the pipeline so existing importers of
+// it from this module keep working.
+export { STATUS_PIPELINE, MODE_STATUSES, MODE_WORK_REMAINING, filterByMode } from './reviewer-modes';
 
 // ─── Template Defaults ──────────────────────────────────────────────────────
 

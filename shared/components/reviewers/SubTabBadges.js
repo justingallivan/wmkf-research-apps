@@ -1,28 +1,16 @@
 /**
- * SubTabBadges — work-remaining badge primitives for the Reviewers sub-tabs.
+ * SubTabBadges — work-remaining badge primitive for the Reviewers sub-tabs.
  *
  * Each management sub-tab (Invite / Track / Completed) carries a count badge.
  * "Work remaining" (reviewers still needing action this stage) shows amber;
  * a stage with reviewers but no open work shows neutral gray; an empty stage
- * shows nothing. Counts derive from the same MODE_* maps the panel filters on,
- * so the badge and the table can never disagree.
+ * shows nothing. Counts derive from the pure reviewer-modes helpers so the
+ * badge and the panel table can never disagree.
  */
 
-import { MODE_STATUSES, MODE_WORK_REMAINING } from './ReviewerManagePanel';
-
-/** Reviewers visible under a given mode. */
-export function countForMode(reviewers, mode) {
-  const statuses = MODE_STATUSES[mode];
-  if (!statuses) return (reviewers || []).length;
-  return (reviewers || []).filter(r => statuses.includes(r.reviewStatus)).length;
-}
-
-/** Reviewers under a mode that still need staff action. */
-export function workRemainingForMode(reviewers, mode) {
-  const statuses = MODE_WORK_REMAINING[mode];
-  if (!statuses || statuses.length === 0) return 0;
-  return (reviewers || []).filter(r => statuses.includes(r.reviewStatus)).length;
-}
+// Re-export the pure count helpers for back-compat with importers that pulled
+// them from here before they moved into ./reviewer-modes.
+export { countForMode, workRemainingForMode } from './reviewer-modes';
 
 /**
  * A single sub-tab count badge.

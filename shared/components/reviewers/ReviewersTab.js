@@ -29,7 +29,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { Card } from '../Layout';
 import ReviewerManagePanel from './ReviewerManagePanel';
-import { SubTabBadge, countForMode, workRemainingForMode } from './SubTabBadges';
+import { SubTabBadge } from './SubTabBadges';
+import { countForMode, workRemainingForMode, computeDefaultSub } from './reviewer-modes';
 
 const SUB_TABS = [
   { key: 'find', label: 'Find' },
@@ -38,17 +39,6 @@ const SUB_TABS = [
   { key: 'completed', label: 'Completed' },
 ];
 const SUB_TAB_KEYS = new Set(SUB_TABS.map((t) => t.key));
-
-// State-aware default: drop staff where the open work is. If reviewers have
-// accepted but aren't out yet → Invite; if any are in flight → Track; if some
-// are done and nothing is pending → Completed; otherwise (no reviewers) Find.
-function computeDefaultSub(reviewers) {
-  if (workRemainingForMode(reviewers, 'invite') > 0) return 'invite';
-  if (countForMode(reviewers, 'track') > 0) return 'track';
-  if (countForMode(reviewers, 'completed') > 0) return 'completed';
-  if (countForMode(reviewers, 'invite') > 0) return 'invite';
-  return 'find';
-}
 
 export default function ReviewersTab({ requestId, context, canManage = true, settings = {} }) {
   const router = useRouter();
