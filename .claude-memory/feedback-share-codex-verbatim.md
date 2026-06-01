@@ -52,3 +52,13 @@ salient than the delivery format). Mitigation: treat the verbatim paste as
 a tool-output mechanical step, NOT a writing task — copy the entire Agent
 tool result inside a delimited block, then end the message. Folding happens
 in the next turn, not the same one.
+
+**Recurred AGAIN S210 (2026-06-01):** post-impl review of the in-panel reviewer
+search (12 findings). I delivered a "Codex review (verbatim summary)" — a
+re-ranked bullet condensation with framing — then immediately folded fixes.
+Same momentum trap as S192. User had to demand the verbatim output a second
+time. The mitigation is non-negotiable: when an `Agent(codex:codex-rescue)` tool
+result returns, the VERY NEXT user-facing message is that result pasted whole in
+a fenced/delimited block — no "summary", no severity re-ordering, no "my
+assessment" intro. Fold in a later turn. A "verbatim summary" is a contradiction
+and is the violation.
