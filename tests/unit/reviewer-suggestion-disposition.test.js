@@ -194,7 +194,7 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
       matchReason: 'Recommended by applicant (legacy reviewer slot).',
     });
 
-    expect(result).toEqual({ id: SUGGESTION_ID, created: true });
+    expect(result).toEqual({ id: SUGGESTION_ID, created: true, selected: true });
     const payload = DynamicsService.createRecord.mock.calls[0][1];
     expect(payload.wmkf_selected).toBe(true);
     expect(payload.wmkf_applicantdisposition).toBe(APPLICANT_DISPOSITION_MAP.recommended);
@@ -220,15 +220,35 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
       grantCycleCode: 'D26',
     });
 
-    expect(result).toEqual({ id: SUGGESTION_ID, created: false });
+    expect(result).toEqual({ id: SUGGESTION_ID, created: false, selected: true });
     expect(DynamicsService.createRecord).not.toHaveBeenCalled();
     const payload = DynamicsService.updateRecord.mock.calls[0][2];
     expect(payload.wmkf_sources).toBe('claude,pubmed,applicant');
     expect(payload.wmkf_applicantdisposition).toBe(APPLICANT_DISPOSITION_MAP.recommended);
-    expect(payload.wmkf_selected).toBe(true);
+    // selected is NOT written on update — curation state is preserved, never resurrected
+    expect(payload.wmkf_selected).toBeUndefined();
     // existing label preserved (not overwritten); empty cycle filled
     expect(payload.wmkf_suggestionlabel).toBeUndefined();
     expect(payload.wmkf_grantcyclecode).toBe('D26');
+  });
+
+  test('does NOT resurrect a staff-removed candidate (selected=false stays false)', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        wmkf_applicantdisposition: APPLICANT_DISPOSITION_MAP.recommended,
+        wmkf_sources: 'applicant',
+        wmkf_suggestionlabel: 'Title — Jane Doe',
+        wmkf_selected: false, // staff soft-deleted this candidate
+      }],
+    });
+
+    const result = await ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID });
+
+    expect(result).toEqual({ id: SUGGESTION_ID, created: false, selected: false });
+    const payload = DynamicsService.updateRecord.mock.calls[0][2];
+    // The update must NOT flip wmkf_selected back to true.
+    expect(payload.wmkf_selected).toBeUndefined();
   });
 
   test('is idempotent — re-running with applicant already in sources keeps a single source', async () => {
@@ -259,7 +279,7 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
 
     const result = await ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID });
 
-    expect(result).toEqual({ id: SUGGESTION_ID, created: false, skippedExcluded: true });
+    expect(result).toEqual({ id: SUGGESTION_ID, created: false, selected: false, skippedExcluded: true });
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
     expect(DynamicsService.createRecord).not.toHaveBeenCalled();
   });
@@ -278,10 +298,11 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
 
     const result = await ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID });
 
-    expect(result).toEqual({ id: SUGGESTION_ID, created: false });
+    expect(result).toEqual({ id: SUGGESTION_ID, created: false, selected: true });
     const payload = DynamicsService.updateRecord.mock.calls[0][2];
     expect(payload.wmkf_sources).toBe('claude,applicant');
     expect(payload.wmkf_applicantdisposition).toBe(APPLICANT_DISPOSITION_MAP.recommended);
+    expect(payload.wmkf_selected).toBeUndefined();
   });
 
   test('a NON-conflict create error is surfaced, not masked as success', async () => {

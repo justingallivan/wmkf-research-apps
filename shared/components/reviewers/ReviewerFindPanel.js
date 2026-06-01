@@ -153,6 +153,7 @@ export default function ReviewerFindPanel({ requestId, context }) {
                       <span className="text-sm text-gray-900">{r.name || '(unnamed reviewer)'}</span>
                       <span className="flex items-center gap-2">
                         <Badge tone="green">Applicant</Badge>
+                        {r.selected === false && <Badge tone="red">Removed by staff</Badge>}
                         {r.skippedExcluded && <Badge tone="red">Excluded — kept</Badge>}
                         {r.created && <Badge tone="gray">new</Badge>}
                       </span>

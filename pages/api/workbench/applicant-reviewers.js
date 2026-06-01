@@ -120,6 +120,9 @@ export default async function handler(req, res) {
             name,
             suggestionId: result.id,
             created: result.created,
+            // false ⇒ staff soft-deleted this candidate; ingestion preserves that
+            // (does not resurrect). The panel badges it "removed by staff".
+            selected: result.selected !== false,
             skippedExcluded: result.skippedExcluded || false,
           });
           if (result.created) recommendedCreated += 1;
