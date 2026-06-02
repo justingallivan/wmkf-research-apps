@@ -2691,14 +2691,23 @@ function MyCandidatesTab({ refreshTrigger, userProfileId }) {
   const handleRemoveCandidate = async (suggestionId) => {
     if (!confirm('Remove this candidate from your list?')) return;
     try {
-      await fetch('/api/reviewer-finder/my-candidates', {
+      const resp = await fetch('/api/reviewer-finder/my-candidates', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ suggestionId })
       });
+      // The DELETE now also revokes any magic link server-side, so a non-ok
+      // here can mean the removal genuinely didn't happen — don't refresh as if
+      // it succeeded (Codex S213). fetch() doesn't throw on 4xx/5xx.
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        alert(`Could not remove candidate: ${data.error || data.message || data.details || resp.status}`);
+        return;
+      }
       fetchCandidates();
     } catch (err) {
       console.error('Remove failed:', err);
+      alert(`Network error removing candidate: ${err.message}`);
     }
   };
 
@@ -2764,19 +2773,27 @@ function MyCandidatesTab({ refreshTrigger, userProfileId }) {
 
     setIsDeleting(true);
     try {
-      // Delete all selected candidates
-      await Promise.all(
+      // Delete all selected candidates. Each DELETE now also revokes any magic
+      // link server-side, so a non-ok response can mean a removal didn't happen
+      // — count failures and tell the user rather than refreshing as if all
+      // succeeded (Codex S213). fetch() doesn't throw on 4xx/5xx.
+      const results = await Promise.all(
         Array.from(selectedForDeletion).map(suggestionId =>
           fetch('/api/reviewer-finder/my-candidates', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ suggestionId })
-          })
+          }).then(r => r.ok).catch(() => false)
         )
       );
+      const failed = results.filter(ok => !ok).length;
+      if (failed > 0) {
+        alert(`${failed} of ${results.length} candidate(s) could not be removed. The list shows the current state.`);
+      }
       fetchCandidates();
     } catch (err) {
       console.error('Bulk delete failed:', err);
+      alert(`Network error during bulk remove: ${err.message}`);
     } finally {
       setIsDeleting(false);
     }

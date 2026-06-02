@@ -503,7 +503,16 @@ async function handleDelete(req, res, access) {
     if (!suggestionId) {
       return res.status(400).json({ error: 'suggestionId is required' });
     }
-    await suggestionAdapter.softDelete(suggestionId, { actingUserSystemId });
+    // Server-authoritative removal (Codex S213 BUG-1 + BUG-3 fix): unselect the
+    // row AND revoke any magic link in ONE atomic PATCH (wmkf_selected=false +
+    // wmkf_externaltokenrevoked=true). A single write means there's no two-step
+    // window where the row could end up revoked-but-still-selected (or unselected-
+    // but-link-live) on a partial failure. Harmless on a never-invited candidate
+    // (no token → just sets a bool); throws (→ 500) only if the row is missing, so
+    // the caller keeps the row rather than silently "removing" a nonexistent one.
+    // Doing this server-side means removal never relies on a stale client-cached
+    // tokenState, closing the concurrent-regeneration race.
+    await suggestionAdapter.softDelete(suggestionId, { actingUserSystemId, alsoRevokeToken: true });
     return res.status(200).json({ success: true, message: 'Candidate removed' });
   } catch (error) {
     console.error('Delete candidate error:', error);

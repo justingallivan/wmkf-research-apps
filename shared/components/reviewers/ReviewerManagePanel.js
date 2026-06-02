@@ -81,7 +81,7 @@ export function TokenStateBadge({ state, expiresAt, firstAccessedAt }) {
 
 const MENU_WIDTH = 224; // w-56
 
-export function TokenActionsMenu({ reviewer, onRegenerate, onRevoke, onMarkReceivedNoFile }) {
+export function TokenActionsMenu({ reviewer, onRegenerate, onRevoke, onMarkReceivedNoFile, onRemove }) {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState(null); // { left, top } in viewport px, or null
   const btnRef = useRef(null);
@@ -89,7 +89,9 @@ export function TokenActionsMenu({ reviewer, onRegenerate, onRevoke, onMarkRecei
 
   const isActive = reviewer.tokenState === 'active';
   const hasReview = !!(reviewer.reviewReceivedAt);
-  const itemCount = 1 + (isActive ? 1 : 0) + (!hasReview ? 1 : 0);
+  // 1 (regenerate) + revoke? + mark-received? + remove? — drives the upward-flip
+  // height estimate so the portalled menu never opens off-screen.
+  const itemCount = 1 + (isActive ? 1 : 0) + (!hasReview ? 1 : 0) + (onRemove ? 1 : 0);
 
   // Position the menu in viewport coords, flipping upward when there isn't room
   // below. Rendered in a portal (see below) so it escapes the table card's
@@ -166,6 +168,14 @@ export function TokenActionsMenu({ reviewer, onRegenerate, onRevoke, onMarkRecei
               className="w-full text-left px-3 py-2 hover:bg-gray-50"
             >
               Mark received (no file)
+            </button>
+          )}
+          {onRemove && (
+            <button
+              onClick={() => { setOpen(false); onRemove(); }}
+              className="w-full text-left px-3 py-2 hover:bg-gray-50 text-red-700 border-t border-gray-100"
+            >
+              Remove from this request
             </button>
           )}
         </div>,
@@ -1097,6 +1107,42 @@ export default function ReviewerManagePanel({
     }
   };
 
+  // Remove a reviewer from THIS request. The my-candidates DELETE endpoint is
+  // server-authoritative (S213, Codex BUG-1 fix): it revokes any live magic link
+  // FIRST, then soft-deletes (sets the suggestion wmkf_selected=false). It never
+  // touches the global wmkf_potentialreviewer person / promoted contact, which
+  // are reused across requests; the engagement row + its history are preserved,
+  // just dropped from the request's lists. Doing the revoke server-side means we
+  // don't rely on a stale client tokenState to decide whether a link needs
+  // killing — `hasLiveLink` here only tailors the confirm wording. A revoke
+  // failure on the server fails the whole DELETE (non-ok), so the row is kept and
+  // we never leave an unselected row with a live link.
+  const handleRemoveReviewer = async (reviewer) => {
+    const hasLiveLink = reviewer.tokenState === 'active';
+    const msg = `Remove ${reviewer.name || 'this reviewer'} from this request?\n\n`
+      + 'This drops them from your reviewer list for this proposal. '
+      + (hasLiveLink ? 'Their review link will be revoked. ' : '')
+      + 'Their reviewer record and any review history are preserved.';
+    if (!confirm(msg)) return;
+
+    try {
+      const resp = await fetch('/api/reviewer-finder/my-candidates', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ suggestionId: reviewer.suggestionId }),
+      });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        const detail = data.error || data.message || data.details || resp.status;
+        alert(`Could not remove the reviewer: ${detail}`);
+        return;
+      }
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert(`Network error removing reviewer: ${err.message}`);
+    }
+  };
+
   const updateStatus = async (suggestionId, newStatus) => {
     try {
       await fetch('/api/review-manager/reviewers', {
@@ -1287,6 +1333,7 @@ export default function ReviewerManagePanel({
                             onRegenerate={() => handleRegenerateToken(r.suggestionId)}
                             onRevoke={() => handleRevokeToken(r.suggestionId)}
                             onMarkReceivedNoFile={() => handleMarkReceivedNoFile(r.suggestionId)}
+                            onRemove={() => handleRemoveReviewer(r)}
                           />
                         </div>
                       </td>
