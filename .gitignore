@@ -45,6 +45,8 @@ outputs/
 # Cron scheduler runtime state (session-scoped)
 .claude/scheduled_tasks.json
 .claude/scheduled_tasks.lock
+# Smoke-test helper state (live prod GUIDs + tester email — never commit)
+scripts/.smoke-test-candidate.json
 .git.nosync
 # iCloud-exclusion artifacts (local-only build/dep dirs)
 *.nosync/
