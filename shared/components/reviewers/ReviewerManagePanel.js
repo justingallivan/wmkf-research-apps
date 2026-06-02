@@ -24,6 +24,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Card, Button } from '../Layout';
 import ReviewFormFields from '../external/ReviewFormFields';
 import { STATUS_PIPELINE, getStatusInfo, filterByMode } from './reviewer-modes';
@@ -123,25 +124,59 @@ export function TokenStateBadge({ state, expiresAt, firstAccessedAt }) {
   );
 }
 
+const MENU_WIDTH = 224; // w-56
+
 export function TokenActionsMenu({ reviewer, onRegenerate, onRevoke, onMarkReceivedNoFile }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDocClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, [open]);
+  const [coords, setCoords] = useState(null); // { left, top } in viewport px, or null
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
 
   const isActive = reviewer.tokenState === 'active';
   const hasReview = !!(reviewer.reviewReceivedAt);
+  const itemCount = 1 + (isActive ? 1 : 0) + (!hasReview ? 1 : 0);
+
+  // Position the menu in viewport coords, flipping upward when there isn't room
+  // below. Rendered in a portal (see below) so it escapes the table card's
+  // `overflow-hidden` clip and the footer's stacking context.
+  const place = useCallback(() => {
+    const btn = btnRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const estHeight = itemCount * 40 + 8;
+    const openUp = rect.bottom + estHeight > window.innerHeight && rect.top > estHeight;
+    setCoords({
+      left: Math.max(8, rect.right - MENU_WIDTH),
+      top: openUp ? rect.top - estHeight - 4 : rect.bottom + 4,
+    });
+  }, [itemCount]);
+
+  useEffect(() => {
+    if (!open) return;
+    place();
+    const onDocClick = (e) => {
+      // Close only when the click is outside BOTH the trigger and the portalled
+      // menu (the menu lives outside this component's DOM subtree).
+      if (btnRef.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    // Position is computed once on open; close on scroll/resize so a stale
+    // fixed position can never be shown detached from its row.
+    const onReflow = () => setOpen(false);
+    document.addEventListener('mousedown', onDocClick);
+    window.addEventListener('scroll', onReflow, true);
+    window.addEventListener('resize', onReflow);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      window.removeEventListener('scroll', onReflow, true);
+      window.removeEventListener('resize', onReflow);
+    };
+  }, [open, place]);
 
   return (
-    <div className="relative" ref={ref}>
+    <>
       <button
+        ref={btnRef}
         onClick={() => setOpen(o => !o)}
         className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
         title="Reviewer link actions"
@@ -150,8 +185,12 @@ export function TokenActionsMenu({ reviewer, onRegenerate, onRevoke, onMarkRecei
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01" />
         </svg>
       </button>
-      {open && (
-        <div className="absolute right-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 text-sm">
+      {open && coords && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', left: coords.left, top: coords.top, width: MENU_WIDTH }}
+          className="bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 text-sm"
+        >
           <button
             onClick={() => { setOpen(false); onRegenerate(); }}
             className="w-full text-left px-3 py-2 hover:bg-gray-50"
@@ -174,9 +213,10 @@ export function TokenActionsMenu({ reviewer, onRegenerate, onRevoke, onMarkRecei
               Mark received (no file)
             </button>
           )}
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
 
