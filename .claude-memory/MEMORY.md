@@ -109,7 +109,7 @@
 - [Lifecycle tracking → automation goal](project-reviewer-lifecycle-automation.md) — manual timestamp/status fields designed for cron-driven reminders + state machine in Wave 2.
 - [Accept/decline magic links](project-reviewer-accept-decline-links.md) — HMAC primitive shipped; build atop the existing token, don't add a new secret.
 - [Reviewer Finder Dataverse-native entry path](project-reviewer-finder-dataverse-entry-path.md) — fully Dataverse-native (W3-W6 done 2026-05-12); Postgres reviewer tables drain-only, deletion ≥ 2026-07-01.
-- [Contact promotion verified working](project-contact-promotion-permission.md) — AppendTo on Contact (BU) granted 2026-05-01; send-emails links potentialreviewer → contact.
+- [Contact promotion verified working](project-contact-promotion-permission.md) — AppendTo on Contact (BU) granted 2026-05-01; send-emails links potentialreviewer → contact. App user has Create+AppendTo but NO DeleteAccess (S213): smoke cleanup orphans the promoted contact; findByEmail ignores statecode → re-smoke needs a new email.
 - [Institution contact-role triad](project-institution-foundation-liaison.md) — user-attested S159: `akoya_primarycontactid` = foundation liaison (NOT PI), `wmkf_projectleader` = the PI, `wmkf_researchleader` = institutional research officer (NOT PI).
 - [External reviewer file access architecture](project-external-reviewer-file-access.md) — SHIPPED 2026-05-03. Token primitive, /external/* endpoints, SharePoint upload, event-driven token expiry.
 - [Reviewer count invariant](project-reviewer-count-invariant.md) — need 3 confirmed reviewers per proposal; 5 wmkf_potentialreviewer slots are over-invite buffer.
@@ -141,6 +141,7 @@
 
 ## Dev Environment
 - [Dev environment](project-dev-environment.md) — `npm run dev` port 3000; auth off in dev; `.env.local` values quoted; WAVE1 flags mirror prod since 2026-05-11.
+- [Dynamics sandbox state](project-dynamics-sandbox-state.md) — a reachable sandbox exists (`orgd9e66399`, prod-clone) but is schema-stale (no `wmkf_appreviewersuggestion`/`appresearcher`/`appgrantcycle`, 0 policy versions) → NOT drop-in usable for reviewer testing without a schema deploy + email check. Corrects "no test store".
 - [Local jest/build environment](local-jest-build-environment.md) — S173 FIXED: Rosetta off, Node 26 arm64 via Homebrew, clean node_modules; `npx jest` + `npm run build` work locally. Don't re-litigate.
 - [git traversal commands hang](env-broken-git-autogc.md) — `gc`/`fsck`/`repack`/`prune` hang in mmap() on `.git` loose objects (cloud File Provider offloaded them). Fix = repo on a plain local path; `gc.auto 0` interim.
 - [Accept MODULE_TYPELESS warning](decision-module-typeless-warning-accept.md) — S164 Codex-reviewed: the Node `MODULE_TYPELESS_PACKAGE_JSON` reparse warning is ACCEPTED; never a broad `.js`→`.mjs` rename. Don't re-litigate.

@@ -11,3 +11,4 @@ metadata:
 - Auth disabled in dev (`AUTH_REQUIRED=false` in `.env.local`)
 - `.env.local` values are quoted (e.g., `DYNAMICS_URL="https://..."`) — scripts that parse it must strip quotes
 - `.env.local` has `WAVE1_BACKEND_SETTINGS=dataverse`, `WAVE1_BACKEND_APP_ACCESS=dataverse`, `WAVE1_BACKEND_PREFS=dataverse` (mirroring prod since 2026-05-11). Dispatcher defaults to Dataverse as of 2026-05-12; missing flags now fail loudly instead of silently routing to the dropped Postgres tables.
+- Local dev points at **prod Dataverse** (`DYNAMICS_URL=https://wmkf.crm.dynamics.com`) — there is no separate test store wired in. A sandbox exists but isn't drop-in usable; see [[project-dynamics-sandbox-state]].
