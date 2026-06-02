@@ -1,8 +1,12 @@
 ---
 name: project-appresearcher-collapse-post-pilot
-description: wmkf_appresearcher is structural redundancy; collapse into wmkf_potentialreviewer post-pilot (no historical h-index needed)
+description: wmkf_appresearcher sidecar collapse into wmkf_potentialreviewers — EXECUTING now (2026-06-02), posture reversed from post-pilot
 metadata:
   type: project
+---
+
+**STATUS 2026-06-02 — posture REVERSED, now EXECUTING.** The "don't act mid-pilot" guidance below is superseded. User decided to do the collapse NOW because the sidecar data is disposable (339 rows, almost all last-cycle reviewers, near-zero cross-cycle overlap). Live plan: **`docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`** (execute-now lighter cutover) — decisions locked (D-AFF = canonical `wmkf_primaryaffiliation`(500) + migrate adapter & 7 reviewer-affiliation readers + drop the 100-char `wmkf_organizationname` clamp; light backfill all 339; `wmkf_department` String(255) on person; skip `wmkf_notes`(0 rows) + `wmkf_potentialreviewername`). Ground truth re-probed + Codex-confirmed 2026-06-02 (`docs/DATAVERSE_LIVE_PROBE_FINDINGS_2026-06-02.md`). **Caller count is 5, not 4** — the S196 plan missed `pages/api/workbench/enrich-recommended.js` (S211); `orcid-service.js` is NOT a caller. Entity logical name is `wmkf_potentialreviewers` (trailing s). The S196 doc remains the reference for exhaustive doc-cleanup.
+
 ---
 
 `wmkf_appresearcher` (bibliometric 1:1 sidecar to `wmkf_potentialreviewer`) is structural redundancy. The original "sidecar so identity row doesn't churn on metric refresh" rationale doesn't survive scrutiny: cadence concerns are light, no historical-snapshot requirement exists, and the vendor-entity argument I (Claude) initially cited turned out to be wrong — `wmkf_potentialreviewers` is `IsCustomEntity=true, IsManaged=false` (custom Foundation entity, not vendor).

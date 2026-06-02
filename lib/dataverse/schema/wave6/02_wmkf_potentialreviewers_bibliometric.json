@@ -1,0 +1,122 @@
+{
+  "name": "wmkf_potentialreviewers-bibliometric",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_potentialreviewers",
+  "_comment": "appresearcher collapse (S213, docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md). Folds the wmkf_appresearcher 1:1 bibliometric sidecar's fields onto the person so reviewer identity + bibliometrics live in one row (the sidecar + the two empty publication tables are dropped after caller switchover). 17 fields — the sidecar's 24 wmkf_* attrs minus 2 structural (PK, lookup) and 5 skips: wmkf_name (collision, person's wins — D0.3), wmkf_email (dup of wmkf_emailaddress alt-key — D0.4), wmkf_normalizedname (no consumer — D0.5), wmkf_notes (0 rows — D-NOTES), wmkf_potentialreviewername (denormalized name copy — D-DENORM). wmkf_PrimaryAffiliation (500) becomes the canonical reviewer affiliation per D-AFF (replaces the 100-char wmkf_organizationname; readers migrate in Phase 4). ORCID is NOT made an alternate key here (most rows null; person dedupes on wmkf_emailaddress). Collision-checked 2026-06-02: none of these logical names exist on wmkf_potentialreviewers (only wmkf_name collides, which is skipped). Idempotent: ensureAttribute checks existence before create. Deploy: node scripts/apply-dataverse-schema.js --target=prod --wave=6 --execute",
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_PrimaryAffiliation",
+      "displayName": "Primary Affiliation",
+      "description": "Reviewer's institutional affiliation (canonical, per D-AFF — replaces the 100-char wmkf_organizationname). Free text.",
+      "maxLength": 500
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_Department",
+      "displayName": "Department",
+      "description": "Reviewer's department within their institution (e.g. 'Department of Chemistry'). Captured by reviewer search/enrichment and by reviewer self-correction at accept; used in staff write-ups.",
+      "maxLength": 255
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_Orcid",
+      "displayName": "ORCID",
+      "description": "ORCID identifier (xxxx-xxxx-xxxx-xxxx).",
+      "maxLength": 50
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_OrcidUrl",
+      "displayName": "ORCID URL",
+      "format": "Url",
+      "maxLength": 255
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_GoogleScholarId",
+      "displayName": "Google Scholar ID",
+      "maxLength": 100
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_GoogleScholarUrl",
+      "displayName": "Google Scholar URL",
+      "format": "Url",
+      "maxLength": 500
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_HIndex",
+      "displayName": "H-Index",
+      "minValue": 0,
+      "maxValue": 1000
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_I10Index",
+      "displayName": "i10-Index",
+      "minValue": 0,
+      "maxValue": 100000
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_TotalCitations",
+      "displayName": "Total Citations",
+      "minValue": 0,
+      "maxValue": 100000000
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_Website",
+      "displayName": "Website",
+      "format": "Url",
+      "maxLength": 500
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_FacultyPageUrl",
+      "displayName": "Faculty Page URL",
+      "format": "Url",
+      "maxLength": 500
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_Keywords",
+      "displayName": "Keywords",
+      "description": "Topic keywords (comma- or space-separated).",
+      "maxLength": 50000
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_EmailSource",
+      "displayName": "Email Source",
+      "description": "Where the email came from (orcid, scholar, manual, etc.).",
+      "maxLength": 100
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_LastChecked",
+      "displayName": "Last Checked",
+      "description": "Last time the row's bibliometric data was reviewed/refreshed."
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_MetricsUpdatedAt",
+      "displayName": "Metrics Updated At",
+      "description": "Last refresh of citation metrics (h-index, citations)."
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ContactEnrichedAt",
+      "displayName": "Contact Enriched At",
+      "description": "Last time the reviewer's contact info was enriched."
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ContactEnrichmentSource",
+      "displayName": "Contact Enrichment Source",
+      "maxLength": 100
+    }
+  ]
+}
