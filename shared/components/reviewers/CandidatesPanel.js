@@ -13,7 +13,7 @@
  * Props:
  *   - requestId
  *   - candidates : [{ suggestionId, name, affiliation, email, hIndex, totalCitations,
- *                     invited, accepted, declined, emailSentAt, responseType }]
+ *                     applicantRecommended, invited, accepted, declined, emailSentAt, responseType }]
  *   - loading, onRefresh, settings ({ signature })
  */
 
@@ -90,7 +90,17 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-gray-900 truncate">{c.name || '(unnamed)'}</span>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="text-sm font-medium text-gray-900 truncate">{c.name || '(unnamed)'}</span>
+                      {c.applicantRecommended && (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 whitespace-nowrap"
+                          title="Recommended by the applicant on their proposal"
+                        >
+                          Applicant-suggested
+                        </span>
+                      )}
+                    </span>
                     <StatusChip c={c} />
                   </div>
                   {c.affiliation && <p className="text-xs text-gray-500 mt-0.5 truncate">{c.affiliation}</p>}

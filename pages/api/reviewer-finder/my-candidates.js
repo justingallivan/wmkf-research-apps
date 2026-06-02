@@ -183,6 +183,12 @@ async function handleGet(req, res, access) {
         sources: typeof s.wmkf_sources === 'string'
           ? s.wmkf_sources.split(',').map((x) => x.trim()).filter(Boolean)
           : (s.wmkf_sources || []),
+        // Applicant-recommended (intake/applicant-reviewer ingestion) vs.
+        // staff/Claude-discovered (null disposition). Excluded rows carry
+        // wmkf_selected=false and never reach this selected-only list, so the
+        // meaningful flag here is just "did the applicant suggest this person".
+        applicantRecommended:
+          s.wmkf_applicantdisposition === suggestionAdapter.APPLICANT_DISPOSITION_MAP.recommended,
         invited: !!s.wmkf_invited,
         accepted: !!s.wmkf_accepted,
         declined: !!s.wmkf_declined,
