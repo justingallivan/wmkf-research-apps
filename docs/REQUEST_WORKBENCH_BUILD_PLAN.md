@@ -147,8 +147,8 @@ Retire legacy `reviewer-finder`/`review-manager` keys + delete old pages; real f
 
 ## Appendix A — D26 allowlist (going-forward request numbers)
 
-35 `akoya_requestnum` values in the S207 handover set (verified 2026-05-31: all exist; `wmkf_abstract` populated for all 35). Set is complete but may change before mid-June — keep `shared/config/d26Allowlist.js` editable in one place. **S212 appended one throwaway smoke-test request (1002826)** outside the handover set; the live array therefore has 36 entries.
+35 `akoya_requestnum` values in the S207 handover set (verified 2026-05-31: all exist; `wmkf_abstract` populated for all 35). Set is complete but may change before mid-June — keep `shared/config/d26Allowlist.js` editable in one place. **One smoke-test request is appended** outside the handover set; the live array therefore has 36 entries. (S212 used 1002826, a real declined grant; **S213 replaced it with 1002788**, a purpose-built test request Connor created — see below.)
 
 Batch 1 (18): 1002836, 1002850, 1002852, 1002872, 1002874, 1002903, 1002912, 1002926, 1002959, 1002963, 1002964, 1003000, 1003010, 1003013, 1003020, 1003024, 1003038, 1003046
 Batch 2 (17): 1002794, 1002821, 1002833, 1002835, 1002860, 1002873, 1002886, 1002913, 1002916, 1002953, 1002988, 1003023, 1003034, 1003036, 1003070, 1003074, 1003075
-S212 test (1): 1002826 — declined / no longer under consideration; harm-free testbed for the reviewer-invite prod smoke (lead PD Justin Gallivan, meeting 2026-12-11 → D26).
+S213 test (1): 1002788 — "Dec 2026 Project Title TEST 2", a purpose-built test request Connor created (applicant = W. M. Keck Foundation, Phase I Pending, lead PD Justin Gallivan, meeting 2026-12-11 → D26). Dedicated reviewer-invite prod-smoke testbed — touches no real grant data. (Replaced S212's stopgap 1002826, a real declined grant.)
