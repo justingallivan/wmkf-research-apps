@@ -176,7 +176,7 @@ export default function ReviewerFindPanel({ requestId }) {
                     <li key={r.suggestionId || r.potentialReviewerId} className="py-2 flex items-center justify-between gap-3">
                       <span className="text-sm text-gray-900">{r.name || '(unnamed reviewer)'}</span>
                       <span className="flex items-center gap-2">
-                        <Badge tone="green">Applicant</Badge>
+                        <Badge tone="green">Applicant-suggested</Badge>
                         {r.selected === false && <Badge tone="red">Removed by staff</Badge>}
                         {r.skippedExcluded && <Badge tone="red">Excluded — kept</Badge>}
                         {r.created && <Badge tone="gray">new</Badge>}
