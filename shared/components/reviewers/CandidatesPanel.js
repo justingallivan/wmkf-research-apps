@@ -13,13 +13,22 @@
  * Props:
  *   - requestId
  *   - candidates : [{ suggestionId, name, affiliation, email, hIndex, totalCitations,
- *                     applicantRecommended, invited, accepted, declined, emailSentAt, responseType }]
+ *                     relevanceScore, reasoning, keywords, website, googleScholarUrl,
+ *                     googleScholarId, orcidUrl, applicantRecommended, invited, accepted,
+ *                     declined, emailSentAt, responseType }]
+ *
+ * Each candidate carries the persisted selection rationale (reasoning) + metrics
+ * (h-index, citations, relevance) + profile links so a PD returning to the list
+ * across multiple invite rounds can refresh their memory without re-running a
+ * search. NB: recent papers are NOT persisted (live-only during a search) — the
+ * Scholar link is the way to pull them up again.
  *   - loading, onRefresh, settings ({ signature })
  */
 
 import { useState } from 'react';
 import { Card } from '../Layout';
 import InviteEmailModal from './InviteEmailModal';
+import { buildScholarSearchUrl } from '../../../lib/utils/scholar-url';
 
 function StatusChip({ c }) {
   const tones = {
@@ -109,6 +118,43 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
                     {c.hIndex != null && <span>h-index {c.hIndex}</span>}
                     {c.totalCitations != null && <span>{Number(c.totalCitations).toLocaleString()} citations</span>}
                     {c.emailSentAt && <span>invited {new Date(c.emailSentAt).toLocaleDateString()}</span>}
+                  </div>
+
+                  {/* Persisted selection rationale — the key "refresh my memory"
+                      content when a PD returns to the list across invite rounds. */}
+                  {c.reasoning && (
+                    <p className="text-xs text-gray-700 mt-1.5">
+                      <span className="font-medium">Why: </span>{c.reasoning}
+                    </p>
+                  )}
+                  {c.keywords && (
+                    <p className="text-xs text-gray-500 mt-1 truncate" title={c.keywords}>
+                      <span className="font-medium text-gray-600">Expertise: </span>{c.keywords}
+                    </p>
+                  )}
+
+                  {/* Profile links. Recent papers aren't persisted (live-only
+                      during a search), so Scholar is how staff pull them up again. */}
+                  <div className="mt-1.5 flex items-center flex-wrap gap-3 text-xs">
+                    <a
+                      href={c.googleScholarUrl || buildScholarSearchUrl(c.name, c.affiliation)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-purple-600 hover:text-purple-800"
+                      title={c.googleScholarUrl ? 'Open Google Scholar profile to view papers' : 'Search Google Scholar to view papers'}
+                    >
+                      🎓 {c.googleScholarUrl ? 'Scholar profile' : 'Scholar search'} →
+                    </a>
+                    {c.website && (
+                      <a href={c.website} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:text-green-900" title="Faculty / personal website">
+                        🔗 Website
+                      </a>
+                    )}
+                    {c.orcidUrl && (
+                      <a href={c.orcidUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:text-emerald-900" title="ORCID profile">
+                        ORCID
+                      </a>
+                    )}
                   </div>
                 </div>
               </li>

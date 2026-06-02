@@ -176,6 +176,14 @@ async function handleGet(req, res, access) {
         affiliation: researcher?.wmkf_primaryaffiliation || person.wmkf_organizationname || null,
         email: person.wmkf_emailaddress || null,
         website: researcher?.wmkf_website || null,
+        // Scholar / ORCID profile URLs persisted on the bibliometric sidecar.
+        // Publications themselves are NOT persisted (live-only during a search),
+        // so the Candidates tab links out to Scholar to view papers instead.
+        googleScholarUrl: researcher?.wmkf_googlescholarurl || null,
+        googleScholarId: researcher?.wmkf_googlescholarid || null,
+        orcid: researcher?.wmkf_orcid || null,
+        orcidUrl: researcher?.wmkf_orcidurl || null,
+        keywords: researcher?.wmkf_keywords || null,
         hIndex: researcher?.wmkf_hindex ?? null,
         totalCitations: researcher?.wmkf_totalcitations ?? null,
         relevanceScore: s.wmkf_relevancescore,
@@ -304,7 +312,7 @@ async function fetchResearchersByPerson(personIds) {
     const chunk = personIds.slice(i, i + CHUNK);
     const orChain = chunk.map((id) => `_wmkf_potentialreviewer_value eq ${id}`).join(' or ');
     const { records } = await DynamicsService.queryRecords('wmkf_appresearchers', {
-      select: 'wmkf_appresearcherid,_wmkf_potentialreviewer_value,wmkf_primaryaffiliation,wmkf_website,wmkf_hindex,wmkf_totalcitations,wmkf_orcid,wmkf_googlescholarid',
+      select: 'wmkf_appresearcherid,_wmkf_potentialreviewer_value,wmkf_primaryaffiliation,wmkf_website,wmkf_hindex,wmkf_totalcitations,wmkf_orcid,wmkf_orcidurl,wmkf_googlescholarid,wmkf_googlescholarurl,wmkf_keywords',
       filter: orChain,
       top: 500,
     });
