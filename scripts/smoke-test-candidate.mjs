@@ -107,9 +107,16 @@ async function create(email, requestNum) {
     );
   }
 
+  // NB: wmkf_name is a COMPUTED composite ("{firstname} {lastname}") — a directly
+  // supplied wmkf_name is discarded on create. So the marker MUST live in the name
+  // parts: firstname "ZZZ Smoke" + lastname "Test (DELETE)" → computed name
+  // " ZZZ Smoke Test (DELETE) ", which (trimmed) contains MARKER_NAME so the
+  // cleanup hard-gate passes. (S213: an earlier version set firstname "Smoke" and
+  // relied on wmkf_name, which produced "Smoke Test (DELETE)" and the gate refused
+  // to delete its own record.)
   const personRec = await DynamicsService.createRecord('wmkf_potentialreviewerses', {
     wmkf_name: MARKER_NAME,
-    wmkf_firstname: 'Smoke',
+    wmkf_firstname: 'ZZZ Smoke',
     wmkf_lastname: 'Test (DELETE)',
     wmkf_emailaddress: email,
     wmkf_organizationname: 'Smoke Test Institution',
