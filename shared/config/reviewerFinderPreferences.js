@@ -9,6 +9,11 @@ export const PREFERENCE_KEYS = {
   GRANT_CYCLE_SETTINGS: 'reviewer_finder_grant_cycle_settings',
   EMAIL_TEMPLATE: 'reviewer_finder_email_template',
   CURRENT_CYCLE_ID: 'reviewer_finder_current_cycle_id',
+  // Sticky review-process dates last used when inviting reviewers (the
+  // two-phase proposal timeline shown in the invitation email). Stored as a
+  // JSON string { respondByDate, proposalSendDate, reviewDueDate } (YYYY-MM-DD).
+  // Per-user "last used" defaults — not template text. See InviteEmailModal.
+  INVITE_TIMING: 'reviewer_invite_timing',
 };
 
 /**

@@ -1,12 +1,20 @@
 /**
  * InviteEmailModal — a lean preview→send modal for INVITING saved candidates to
  * review (Workbench Candidates tab). Deliberately NOT the Review Manager
- * EmailModal (which is coupled to localStorage templates, review-due-date, and
- * materials attachments). This one is invitation-only:
+ * EmailModal (which is coupled to localStorage templates and materials
+ * attachments). This one is invitation-only:
  *   render-emails (templateType:'invitation', mints the accept/decline magic
  *   link via {{externalLink}}) → editable preview → send-emails
  *   (templateType:'invitation' → sets invited+emailSentAt, no status bump;
  *   skips already-invited unless allowResend).
+ *
+ * Review-process timeline (this last two-phase cycle): the PD enters three dates
+ * — respond-by, proposal-delivery, review-due — that appear in the invitation
+ * body. They are interpolated CLIENT-SIDE here (not via render-emails) so a blank
+ * date drops its line instead of leaking a literal {{token}} into a real email,
+ * and so editing a draft doesn't require re-fetching the preview. The dates are
+ * persisted as sticky per-user defaults (PREFERENCE_KEYS.INVITE_TIMING) and
+ * pre-fill next time.
  *
  * Props:
  *   - candidates : [{ suggestionId, name, email }] to invite (already filtered)
@@ -17,6 +25,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { readSseStream } from './sse';
+import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
 
 const INVITATION_TEMPLATE = {
   subject: 'Invitation to review a grant proposal: {{proposalTitle}}',
@@ -27,22 +36,84 @@ The W. M. Keck Foundation invites you to serve as a peer reviewer for the propos
 Please use your secure personal link to accept or decline this invitation:
 {{externalLink}}
 
+Review timeline:
+- Please respond to this invitation by {{respondBy}}.
+- If you accept, we will send the full proposal and review form on {{proposalDelivery}}.
+- Completed reviews are due by {{reviewDue}}.
+
 If you accept, the same link gives you access to the proposal materials and the review form. We would be grateful for your expertise.
 
 {{signature}}`,
 };
 
+// Local (client-side) timing tokens → the timing-state field that fills them.
+// These are NOT server placeholders; render-emails leaves them untouched and we
+// substitute them here.
+const TIMING_TOKENS = {
+  '{{respondBy}}': 'respondByDate',
+  '{{proposalDelivery}}': 'proposalSendDate',
+  '{{reviewDue}}': 'reviewDueDate',
+};
+
+// Parse a YYYY-MM-DD as LOCAL time (not UTC) and format as "January 15, 2026".
+function formatDate(ymd) {
+  if (!ymd) return '';
+  const [y, m, d] = String(ymd).split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+// Substitute the timing tokens with formatted dates. A line whose token has no
+// date is dropped entirely (so the bullet doesn't appear with a blank/leftover
+// token). The "Review timeline:" header is dropped when no dates are set at all.
+function applyTiming(body, timing) {
+  const anySet = Object.values(TIMING_TOKENS).some((k) => timing[k]);
+  const lines = body.split('\n');
+  const out = [];
+  for (const line of lines) {
+    if (!anySet && /^\s*Review timeline:\s*$/.test(line)) continue;
+    let drop = false;
+    let next = line;
+    for (const [token, key] of Object.entries(TIMING_TOKENS)) {
+      if (line.includes(token)) {
+        if (!timing[key]) { drop = true; break; }
+        next = next.split(token).join(formatDate(timing[key]));
+      }
+    }
+    if (!drop) out.push(next);
+  }
+  return out.join('\n');
+}
+
 export default function InviteEmailModal({ candidates = [], settings = {}, allowResend = false, onClose, onSent }) {
-  const [step, setStep] = useState('preview'); // preview | sending | sent | error (preview shows drafts)
-  const [drafts, setDrafts] = useState([]);
+  const [step, setStep] = useState('preview'); // preview | sending | sent | error
+  const [rawDrafts, setRawDrafts] = useState([]); // from render-emails, timing tokens still literal
+  const [edits, setEdits] = useState({}); // suggestionId -> { subject?, body? } user overrides
+  const [timing, setTiming] = useState({ respondByDate: '', proposalSendDate: '', reviewDueDate: '' });
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState({ current: 0, total: 0, message: 'Rendering previews…' });
   const [results, setResults] = useState({ sent: [], failed: [], skipped: [] });
 
   const suggestionIds = candidates.map((c) => c.suggestionId).filter(Boolean);
 
+  // Load sticky timing defaults (last-used dates) once on open.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/user-preferences?key=${encodeURIComponent(PREFERENCE_KEYS.INVITE_TIMING)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled && data?.value) {
+          const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+          setTiming((t) => ({ ...t, ...parsed }));
+        }
+      } catch { /* sticky defaults are best-effort */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const renderPreviews = useCallback(async () => {
-    setError(null); setDrafts([]);
+    setError(null); setRawDrafts([]);
     setProgress({ current: 0, total: suggestionIds.length, message: 'Rendering previews…' });
     try {
       const res = await fetch('/api/review-manager/render-emails', {
@@ -57,7 +128,7 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to render previews');
-      setDrafts(data.drafts || []);
+      setRawDrafts(data.drafts || []);
     } catch (e) {
       setError(e.message);
     }
@@ -68,10 +139,29 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const updateDraft = (suggestionId, field, value) =>
-    setDrafts((prev) => prev.map((d) => (d.suggestionId === suggestionId ? { ...d, [field]: value } : d)));
+  // Displayed draft = server-rendered draft with timing applied, unless the user
+  // has manually edited that field (edits win; changing dates won't clobber them).
+  const draftView = (d) => ({
+    ...d,
+    subject: edits[d.suggestionId]?.subject ?? d.subject,
+    body: edits[d.suggestionId]?.body ?? (d.skipped ? d.body : applyTiming(d.body, timing)),
+  });
+  const drafts = rawDrafts.map(draftView);
+
+  const updateEdit = (suggestionId, field, value) =>
+    setEdits((prev) => ({ ...prev, [suggestionId]: { ...prev[suggestionId], [field]: value } }));
 
   const sendable = drafts.filter((d) => !d.skipped && d.candidateEmail);
+
+  const persistTiming = useCallback(async () => {
+    try {
+      await fetch('/api/user-preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: PREFERENCE_KEYS.INVITE_TIMING, value: JSON.stringify(timing) }),
+      });
+    } catch { /* sticky save is best-effort */ }
+  }, [timing]);
 
   const handleSend = async () => {
     if (sendable.length === 0) { setError('No recipients with an email to send to.'); return; }
@@ -84,6 +174,7 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
     setProgress({ current: 0, total: sendable.length, message: 'Sending…' });
     setError(null);
     setResults({ sent: [], failed: [], skipped: [] });
+    persistTiming(); // remember the dates for next time (best-effort, non-blocking)
     try {
       const res = await fetch('/api/review-manager/send-emails', {
         method: 'POST',
@@ -127,40 +218,69 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
           {error && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm mb-3">{error}</div>}
 
           {step === 'preview' && (
-            drafts.length === 0 && !error ? (
-              <p className="text-sm text-gray-500">{progress.message}</p>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-xs text-gray-500">
-                  Review each invitation below; the secure accept/decline link is embedded. Edit if needed, then send.
+            <>
+              <div className="mb-4 border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <p className="text-xs font-medium text-gray-700 mb-2">Review timeline (appears in the invitation)</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <label className="text-xs text-gray-600">
+                    Respond to invitation by
+                    <input type="date" value={timing.respondByDate}
+                      onChange={(e) => setTiming((t) => ({ ...t, respondByDate: e.target.value }))}
+                      className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
+                  </label>
+                  <label className="text-xs text-gray-600">
+                    Proposal delivered on
+                    <input type="date" value={timing.proposalSendDate}
+                      onChange={(e) => setTiming((t) => ({ ...t, proposalSendDate: e.target.value }))}
+                      className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
+                  </label>
+                  <label className="text-xs text-gray-600">
+                    Review due by
+                    <input type="date" value={timing.reviewDueDate}
+                      onChange={(e) => setTiming((t) => ({ ...t, reviewDueDate: e.target.value }))}
+                      className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
+                  </label>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-2">
+                  A blank date omits its line. These dates are saved as your defaults for next time.
                 </p>
-                {drafts.map((d) => (
-                  <div key={d.suggestionId} className={`border rounded-lg p-3 ${d.skipped ? 'border-amber-200 bg-amber-50' : 'border-gray-200'}`}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-900">{d.candidateName || '(unnamed)'}</span>
-                      <span className="text-xs text-gray-500">{d.candidateEmail || 'no email'}</span>
-                    </div>
-                    {d.skipped ? (
-                      <p className="text-xs text-amber-700 mt-1">Skipped ({d.skipped === 'no_email' ? 'no email address' : d.skipped}).</p>
-                    ) : (
-                      <div className="mt-2 space-y-2">
-                        <input
-                          className="w-full text-sm border border-gray-300 rounded px-2 py-1"
-                          value={d.subject}
-                          onChange={(e) => updateDraft(d.suggestionId, 'subject', e.target.value)}
-                        />
-                        <textarea
-                          className="w-full text-xs border border-gray-300 rounded px-2 py-1 font-mono"
-                          rows={7}
-                          value={d.body}
-                          onChange={(e) => updateDraft(d.suggestionId, 'body', e.target.value)}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))}
               </div>
-            )
+
+              {rawDrafts.length === 0 && !error ? (
+                <p className="text-sm text-gray-500">{progress.message}</p>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-gray-500">
+                    Review each invitation below; the secure accept/decline link is embedded. Edit if needed, then send.
+                  </p>
+                  {drafts.map((d) => (
+                    <div key={d.suggestionId} className={`border rounded-lg p-3 ${d.skipped ? 'border-amber-200 bg-amber-50' : 'border-gray-200'}`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-900">{d.candidateName || '(unnamed)'}</span>
+                        <span className="text-xs text-gray-500">{d.candidateEmail || 'no email'}</span>
+                      </div>
+                      {d.skipped ? (
+                        <p className="text-xs text-amber-700 mt-1">Skipped ({d.skipped === 'no_email' ? 'no email address' : d.skipped}).</p>
+                      ) : (
+                        <div className="mt-2 space-y-2">
+                          <input
+                            className="w-full text-sm border border-gray-300 rounded px-2 py-1"
+                            value={d.subject}
+                            onChange={(e) => updateEdit(d.suggestionId, 'subject', e.target.value)}
+                          />
+                          <textarea
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1 font-mono"
+                            rows={9}
+                            value={d.body}
+                            onChange={(e) => updateEdit(d.suggestionId, 'body', e.target.value)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           {step === 'sending' && (
