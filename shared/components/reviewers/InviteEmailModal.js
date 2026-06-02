@@ -23,7 +23,7 @@
  *   - onClose, onSent
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { readSseStream } from './sse';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
 import { loadEmailTemplates, DEFAULT_TEMPLATES } from './email-template-store';
@@ -77,7 +77,11 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
   const [progress, setProgress] = useState({ current: 0, total: 0, message: 'Rendering previews…' });
   const [results, setResults] = useState({ sent: [], failed: [], skipped: [] });
 
-  const suggestionIds = candidates.map((c) => c.suggestionId).filter(Boolean);
+  // Stable across renders (candidates is a fresh array each parent render, so a
+  // raw .map() would give renderPreviews a new identity every render and the
+  // render-previews effect below would re-fetch in a loop). Key on the id list.
+  const idsKey = candidates.map((c) => c.suggestionId).filter(Boolean).join(',');
+  const suggestionIds = useMemo(() => (idsKey ? idsKey.split(',') : []), [idsKey]);
 
   // On open: load the user's invitation template + sticky timing defaults.
   useEffect(() => {
