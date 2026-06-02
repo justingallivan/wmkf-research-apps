@@ -204,8 +204,9 @@ async function listProposals(res, pd, cycleCode, scope) {
 /**
  * Fetch the committed allowlist requests by NUMBER (akoya_requestnum is a STRING
  * field → each value is single-quoted). A defensive meeting-date cycle filter is
- * AND-ed in: all 35 carry Dec-2026 dates (verified), so it never drops a real
- * member but guards against a mistyped number from another cycle. scope=my also
+ * AND-ed in: every allowlisted request carries a Dec-2026 date (verified), so it
+ * never drops a real member but guards against a mistyped number from another
+ * cycle. scope=my also
  * AND-s the lead-PD filter so "My" never dumps the whole set on one PD.
  */
 async function fetchAllowlisted(pd, scope, cycleFilter) {

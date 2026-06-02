@@ -16,7 +16,9 @@
  * picks the same requests up) and can be deleted.
  *
  * Set is complete but MAY CHANGE before mid-June 2026 — keep it editable here,
- * in one place. Two ascending batches (18 + 17) as handed over (S207).
+ * in one place. The 35-request handover set is two ascending batches (18 + 17)
+ * as handed over (S207). A 36th entry was appended in S212 as a safe smoke-test
+ * request (see below) — the handover set itself is still the original 35.
  *
  * NB: `akoya_requestnum` is a STRING field in Dataverse — these are string
  * literals and must be quoted in OData filters.
@@ -33,4 +35,10 @@ export const D26_ALLOWLIST_REQUEST_NUMS = [
   '1002794', '1002821', '1002833', '1002835', '1002860', '1002873',
   '1002886', '1002913', '1002916', '1002953', '1002988', '1003023',
   '1003034', '1003036', '1003070', '1003074', '1003075',
+  // S212 test addition (1) — NOT part of the S207 handover set. Request 1002826
+  // is "Phase I Pending", meeting date 2026-12-11 (→ D26), lead PD Justin
+  // Gallivan, and is no longer under consideration, so it's a harm-free testbed
+  // for the reviewer-invite prod smoke (replaces using live requests like
+  // 1002794). Remove after smoke if a clean handover-only set is wanted.
+  '1002826',
 ];
