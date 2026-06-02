@@ -191,6 +191,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           loading={candidatesLoading}
           onRefresh={loadCandidates}
           settings={settings}
+          canManage={canManage}
         />
       ) : (
         <ReviewerManagePanel

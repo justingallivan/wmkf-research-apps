@@ -43,10 +43,41 @@ function StatusChip({ c }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tone}`}>{label}</span>;
 }
 
-export default function CandidatesPanel({ requestId, candidates = [], loading = false, onRefresh, settings = {} }) {
+export default function CandidatesPanel({ requestId, candidates = [], loading = false, onRefresh, settings = {}, canManage = true }) {
   const [selected, setSelected] = useState(() => new Set());
   const [modal, setModal] = useState(null); // { candidates, allowResend } | null
   const [editing, setEditing] = useState(null); // candidate row being edited | null
+  const [removingId, setRemovingId] = useState(null);
+
+  // Remove a candidate from THIS request. Same server-authoritative DELETE the
+  // Invite/Track rows use (my-candidates → soft-delete wmkf_selected=false + revoke
+  // any link atomically) — never touches the global person/contact. fetch() doesn't
+  // throw on 4xx/5xx, so we check resp.ok before refreshing.
+  const removeCandidate = async (c) => {
+    const msg = `Remove ${c.name || 'this candidate'} from this request?\n\n`
+      + 'This drops them from the candidate list for this proposal'
+      + (c.invited && !c.accepted ? ' and revokes their invitation link' : '')
+      + '. Their reviewer record is preserved.';
+    if (!confirm(msg)) return;
+    setRemovingId(c.suggestionId);
+    try {
+      const resp = await fetch('/api/reviewer-finder/my-candidates', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ suggestionId: c.suggestionId }),
+      });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        alert(`Could not remove candidate: ${data.error || data.message || data.details || resp.status}`);
+        return;
+      }
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert(`Network error removing candidate: ${err.message}`);
+    } finally {
+      setRemovingId(null);
+    }
+  };
 
   // Accepted candidates are managed in the Invite/Track tabs; not selectable here.
   const selectable = candidates.filter((c) => !c.accepted);
@@ -119,7 +150,23 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
                         </span>
                       )}
                     </span>
-                    <StatusChip c={c} />
+                    <span className="flex items-center gap-1 flex-shrink-0">
+                      <StatusChip c={c} />
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={() => removeCandidate(c)}
+                          disabled={removingId === c.suggestionId}
+                          className="p-1 text-gray-300 hover:text-red-600 disabled:opacity-50 rounded hover:bg-gray-100"
+                          title="Remove from this request"
+                          aria-label={`Remove ${c.name || 'candidate'} from this request`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </span>
                   </div>
                   {c.affiliation && <p className="text-xs text-gray-500 mt-0.5 truncate">{c.affiliation}</p>}
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-xs text-gray-500">
