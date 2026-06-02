@@ -104,6 +104,17 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
     loadCandidates();
   }, [loadCandidates]);
 
+  // Refresh BOTH data sources after any mutation. An accepted reviewer appears in
+  // both the Candidates roster (my-candidates) and the Invite/Track lists
+  // (review-manager/reviewers); removing/editing/inviting from one surface must
+  // refresh the other or the untouched tab shows stale state (Codex S213: removing
+  // an accepted candidate refreshed only the candidates list, leaving the Invite
+  // tab still showing the removed reviewer).
+  const refreshAll = useCallback(() => {
+    loadCandidates();
+    loadReviewers();
+  }, [loadCandidates, loadReviewers]);
+
   const selectSub = (key) => {
     router.push(
       { pathname: router.pathname, query: { ...router.query, sub: key } },
@@ -189,7 +200,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           requestId={requestId}
           candidates={candidates}
           loading={candidatesLoading}
-          onRefresh={loadCandidates}
+          onRefresh={refreshAll}
           settings={settings}
           canManage={canManage}
         />
@@ -198,7 +209,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           proposal={panelProposal}
           reviewers={reviewers}
           loading={loading}
-          onRefresh={loadReviewers}
+          onRefresh={refreshAll}
           settings={settings}
           mode={current}
           canManage={canManage}
