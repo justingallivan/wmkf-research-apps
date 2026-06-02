@@ -191,29 +191,68 @@ async function teardownPerson(personId) {
   // The promoted contact was created FROM this person (create refuses a
   // pre-existing contact email, so it's ours). Defense-in-depth: only delete it
   // if its name is the marker — never delete a contact that isn't clearly ours.
+  //
+  // NB (S213): the app user has Create/AppendTo on Contact (that's how
+  // invite-accept promotes a reviewer) but NOT DeleteAccess, so this delete
+  // ALWAYS 403s in the live environment — the contact is left orphaned. We
+  // detect that case and return it so cleanup() can report PARTIAL cleanup
+  // rather than a misleading "complete". Returns the orphaned contact (or null).
   if (contactId) {
     try {
-      const c = await DynamicsService.getRecord('contacts', contactId, { select: 'contactid,fullname' });
-      if (c && (c.fullname || '').trim().includes(MARKER_NAME)) {
+      const c = await DynamicsService.getRecord('contacts', contactId, { select: 'contactid,fullname,emailaddress1' });
+      if (!c) return null;
+      if (!(c.fullname || '').trim().includes(MARKER_NAME)) {
+        console.log(`  SKIPPED contact ${contactId} — fullname "${c.fullname}" is not the marker; left in place (delete manually only if it's test data)`);
+        return null;
+      }
+      try {
         await DynamicsService.deleteRecord('contacts', contactId);
         console.log(`  deleted promoted contact ${contactId} (${c.fullname})`);
-      } else {
-        console.log(`  SKIPPED contact ${contactId} — fullname "${c?.fullname}" is not the marker; left in place (delete manually only if it's test data)`);
+        return null;
+      } catch (delErr) {
+        const noDeleteRight = /DeleteAccess|0x80048306|unManagedIdsAccessDenied|403/.test(delErr.message || '');
+        if (noDeleteRight) {
+          console.log(`  ⚠ could NOT delete contact ${contactId} — the app user has no DeleteAccess on Contact (expected in this env).`);
+        } else {
+          console.log(`  ⚠ could not delete contact ${contactId}: ${delErr.message}`);
+        }
+        return { id: contactId, fullname: c.fullname, email: c.emailaddress1 || null };
       }
     } catch (e) {
-      console.log(`  could not resolve/delete contact ${contactId}: ${e.message}`);
+      console.log(`  could not resolve contact ${contactId}: ${e.message}`);
+      return null;
     }
   }
+  return null;
+}
+
+// Print the final status, distinguishing a fully-clean teardown from a PARTIAL
+// one that left an orphaned contact the app user couldn't delete. A partial
+// teardown matters operationally: the leftover contact's email is still in the
+// pool, so re-running `create` with the SAME email will be refused (the contact
+// guard) until a sysadmin deletes it in CRM. Re-smoke with a different email, or
+// have someone with DeleteAccess remove the listed contact(s).
+function reportCleanup(orphans, suffix = '') {
+  if (orphans.length === 0) {
+    console.log(`\nCleanup complete${suffix}. State file cleared.`);
+    return;
+  }
+  console.log(`\n⚠ Cleanup PARTIAL${suffix}: person + suggestion(s) removed, but ${orphans.length} promoted contact(s) could NOT be deleted (app user lacks DeleteAccess on Contact):`);
+  for (const o of orphans) {
+    console.log(`    contact ${o.id} — "${o.fullname}"${o.email ? ` <${o.email}>` : ''}`);
+  }
+  console.log('  These remain in CRM. A sysadmin must delete them manually, OR re-smoke with a DIFFERENT throwaway email');
+  console.log('  (create refuses an email that already exists as a contact).');
 }
 
 async function cleanup(personOverride) {
   if (personOverride) {
-    await teardownPerson(personOverride);
+    const orphan = await teardownPerson(personOverride);
     // Drop it from state too if present.
     const state = readState();
     state.records = state.records.filter((r) => r.personId !== personOverride);
     writeState(state);
-    console.log('\nCleanup complete (explicit --person).');
+    reportCleanup(orphan ? [orphan] : [], ' (explicit --person)');
     return;
   }
 
@@ -223,11 +262,13 @@ async function cleanup(personOverride) {
     console.log('(If you know a leftover person GUID, run: cleanup --person <guid>.)');
     return;
   }
+  const orphans = [];
   for (const r of state.records) {
-    await teardownPerson(r.personId);
+    const orphan = await teardownPerson(r.personId);
+    if (orphan) orphans.push(orphan);
   }
   writeState({ records: [] });
-  console.log('\nCleanup complete. State file cleared.');
+  reportCleanup(orphans);
 }
 
 const args = process.argv.slice(2);
