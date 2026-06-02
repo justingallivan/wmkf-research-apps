@@ -14,6 +14,11 @@ export const PREFERENCE_KEYS = {
   // JSON string { respondByDate, proposalSendDate, reviewDueDate } (YYYY-MM-DD).
   // Per-user "last used" defaults — not template text. See InviteEmailModal.
   INVITE_TIMING: 'reviewer_invite_timing',
+  // Per-user reviewer email templates, keyed by type:
+  //   { invitation, materials, followup, thankyou } → { subject, body }.
+  // Distinct from the legacy single-template EMAIL_TEMPLATE key above (which the
+  // standalone Reviewer Finder still uses) so the two shapes never collide.
+  EMAIL_TEMPLATES: 'reviewer_email_templates',
 };
 
 /**

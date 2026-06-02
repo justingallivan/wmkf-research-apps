@@ -26,25 +26,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { readSseStream } from './sse';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
-
-const INVITATION_TEMPLATE = {
-  subject: 'Invitation to review a grant proposal: {{proposalTitle}}',
-  body: `{{greeting}},
-
-The W. M. Keck Foundation invites you to serve as a peer reviewer for the proposal "{{proposalTitle}}" from {{piInstitution}}.
-
-Please use your secure personal link to accept or decline this invitation:
-{{externalLink}}
-
-Review timeline:
-- Please respond to this invitation by {{respondBy}}.
-- If you accept, we will send the full proposal and review form on {{proposalDelivery}}.
-- Completed reviews are due by {{reviewDue}}.
-
-If you accept, the same link gives you access to the proposal materials and the review form. We would be grateful for your expertise.
-
-{{signature}}`,
-};
+import { loadEmailTemplates, DEFAULT_TEMPLATES } from './email-template-store';
 
 // Local (client-side) timing tokens → the timing-state field that fills them.
 // These are NOT server placeholders; render-emails leaves them untouched and we
@@ -90,13 +72,14 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
   const [rawDrafts, setRawDrafts] = useState([]); // from render-emails, timing tokens still literal
   const [edits, setEdits] = useState({}); // suggestionId -> { subject?, body? } user overrides
   const [timing, setTiming] = useState({ respondByDate: '', proposalSendDate: '', reviewDueDate: '' });
+  const [template, setTemplate] = useState(DEFAULT_TEMPLATES.invitation); // user's invitation template
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState({ current: 0, total: 0, message: 'Rendering previews…' });
   const [results, setResults] = useState({ sent: [], failed: [], skipped: [] });
 
   const suggestionIds = candidates.map((c) => c.suggestionId).filter(Boolean);
 
-  // Load sticky timing defaults (last-used dates) once on open.
+  // On open: load the user's invitation template + sticky timing defaults.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -108,6 +91,10 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
           setTiming((t) => ({ ...t, ...parsed }));
         }
       } catch { /* sticky defaults are best-effort */ }
+      try {
+        const tpl = await loadEmailTemplates();
+        if (!cancelled && tpl?.invitation) setTemplate(tpl.invitation);
+      } catch { /* falls back to the default invitation template */ }
     })();
     return () => { cancelled = true; };
   }, []);
@@ -122,7 +109,7 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
         body: JSON.stringify({
           suggestionIds,
           templateType: 'invitation',
-          template: INVITATION_TEMPLATE,
+          template,
           settings: { signature: settings.signature || '' },
         }),
       });
@@ -132,12 +119,13 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
     } catch (e) {
       setError(e.message);
     }
-  }, [suggestionIds, settings.signature]);
+  }, [suggestionIds, settings.signature, template]);
 
+  // Render previews on open and again if the loaded template differs from the
+  // default (renderPreviews identity changes when `template` updates).
   useEffect(() => {
     renderPreviews();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [renderPreviews]);
 
   // Displayed draft = server-rendered draft with timing applied, unless the user
   // has manually edited that field (edits win; changing dates won't clobber them).

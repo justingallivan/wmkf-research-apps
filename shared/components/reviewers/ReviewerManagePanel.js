@@ -28,6 +28,7 @@ import { createPortal } from 'react-dom';
 import { Card, Button } from '../Layout';
 import ReviewFormFields from '../external/ReviewFormFields';
 import { STATUS_PIPELINE, getStatusInfo, filterByMode } from './reviewer-modes';
+import { DEFAULT_TEMPLATES, loadEmailTemplates, saveEmailTemplates } from './email-template-store';
 
 // Pure status-pipeline / mode-bucketing logic lives in ./reviewer-modes
 // (React-free + unit-tested). Re-export the pipeline so existing importers of
@@ -35,55 +36,9 @@ import { STATUS_PIPELINE, getStatusInfo, filterByMode } from './reviewer-modes';
 export { STATUS_PIPELINE, MODE_STATUSES, MODE_WORK_REMAINING, filterByMode } from './reviewer-modes';
 
 // ─── Template Defaults ──────────────────────────────────────────────────────
-
-const DEFAULT_TEMPLATES = {
-  materials: {
-    subject: 'Review Materials: {{proposalTitle}}',
-    body: `{{greeting}},
-
-Thank you for agreeing to review the proposal "{{proposalTitle}}" from {{piInstitution}}.
-
-Please use your secure reviewer link to download the proposal materials and submit your completed review:
-{{externalLink}}
-
-This link is unique to you. We ask that you submit your review by {{reviewDueDate}}.
-
-If you have any questions about the review process, please don't hesitate to reach out.
-
-Thank you for your time and expertise.
-
-{{signature}}`,
-  },
-  followup: {
-    subject: 'Reminder: Review Due — {{proposalTitle}}',
-    body: `{{greeting}},
-
-This is a friendly reminder that your review of "{{proposalTitle}}" is due by {{reviewDueDate}}.
-
-Your secure reviewer link (also in the original invitation):
-{{externalLink}}
-
-Please let us know if you need additional time or have any questions.
-
-Thank you,
-
-{{signature}}`,
-  },
-  thankyou: {
-    subject: 'Thank You for Your Review — {{proposalTitle}}',
-    body: `{{greeting}},
-
-Thank you very much for completing your review of "{{proposalTitle}}". Your expertise and thoughtful evaluation are greatly appreciated and will be invaluable to the Foundation's decision-making process.
-
-We will be in touch regarding the processing of your honorarium.
-
-With gratitude,
-
-{{signature}}`,
-  },
-};
-
-const TEMPLATE_STORAGE_KEY = 'review_manager_templates';
+// Defaults + per-user persistence live in email-template-store.js (Dataverse,
+// PREFERENCE_KEYS.EMAIL_TEMPLATES). DEFAULT_TEMPLATES is imported from there so
+// the invitation + materials/followup/thankyou defaults stay in one place.
 
 // ─── Status Badge ───────────────────────────────────────────────────────────
 
@@ -284,15 +239,18 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
     }
   }, [isOpen]);
 
-  // Load saved templates, email fields, and attachments from localStorage
+  // Templates load from the per-user Dataverse store; email-fields + attachments
+  // remain per-browser (localStorage) — they're per-send scratch, not templates.
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(TEMPLATE_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setTemplates(prev => ({ ...prev, ...parsed }));
-      }
-    } catch (e) { /* ignore */ }
+    let cancelled = false;
+    (async () => {
+      const t = await loadEmailTemplates();
+      if (!cancelled) setTemplates(t);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
     try {
       const saved = localStorage.getItem(EMAIL_FIELDS_STORAGE_KEY);
       if (saved) setEmailFields(prev => ({ ...prev, ...JSON.parse(saved) }));
@@ -312,12 +270,17 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
     } catch (e) { /* ignore */ }
   }, []);
 
-  const saveTemplate = useCallback(() => {
+  const [templateSaved, setTemplateSaved] = useState(false);
+  const saveTemplate = useCallback(async () => {
+    // Templates → per-user Dataverse store (shared with the Workbench invite
+    // flow + the EmailTemplatesModal). Email-fields + attachments stay local.
     try {
-      localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(templates));
       localStorage.setItem(EMAIL_FIELDS_STORAGE_KEY, JSON.stringify(emailFields));
       localStorage.setItem(ATTACHMENTS_STORAGE_KEY, JSON.stringify(attachmentsByType));
     } catch (e) { /* ignore */ }
+    const ok = await saveEmailTemplates(templates);
+    setTemplateSaved(ok);
+    if (ok) setTimeout(() => setTemplateSaved(false), 1500);
   }, [templates, emailFields, attachmentsByType]);
 
   const handleFileUpload = async (e) => {
@@ -814,8 +777,9 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
                 <button
                   onClick={saveTemplate}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg border border-gray-300 transition-colors"
+                  title="Save these as your default templates (stored to your account)"
                 >
-                  Save Template
+                  {templateSaved ? 'Saved ✓' : 'Save Template'}
                 </button>
                 <Button onClick={handlePreview}>
                   Preview {reviewers.filter(r => r.email).length} Email{reviewers.filter(r => r.email).length !== 1 ? 's' : ''}
