@@ -5,7 +5,7 @@
  *
  * The candidate is a brand-new fake person ("ZZZ Smoke Test (DELETE)") with a
  * tester-supplied email, saved as a selected candidate on one request (default:
- * 1002826, which is out of consideration).
+ * 1002788, a dedicated test request — see DEFAULT_REQUEST_NUM below).
  *
  *   node scripts/smoke-test-candidate.mjs create  <email> [requestNum]
  *   node scripts/smoke-test-candidate.mjs cleanup
@@ -44,7 +44,11 @@ if (fs.existsSync(envPath)) {
 }
 
 const MARKER_NAME = 'ZZZ Smoke Test (DELETE)';
-const DEFAULT_REQUEST_NUM = '1002826';
+// Dedicated test request Connor created ("Dec 2026 Project Title TEST 2", applicant
+// = W. M. Keck Foundation), in the D26 allowlist — touches no real grant data. S213
+// retired the prior default 1002826 (a real declined grant). Keep this in sync with
+// the test-request entry in shared/config/d26Allowlist.js.
+const DEFAULT_REQUEST_NUM = '1002788';
 const STATE_PATH = path.join(__dirname, '.smoke-test-candidate.json');
 
 function readState() {
