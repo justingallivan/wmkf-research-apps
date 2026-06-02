@@ -4,15 +4,15 @@
  * Guards the S211 enrich-recommended writeback safety fixes (Codex rounds 2–3):
  *  - reviewer-suggestion.setMatchReason — atomic, ETag-conditional, fail-closed on
  *    excluded, single-field PATCH, retry-once-on-412.
- *  - researcher.upsertByPotentialReviewer — race-safe (catch duplicate → re-query
- *    → update) so a concurrent create can't leave a duplicate sidecar.
+ *  - researcher.upsertByPotentialReviewer — post-collapse (S213) writes bibliometrics
+ *    directly onto the person (no sidecar create/race path); metrics overwrite,
+ *    descriptive fields fill-if-empty, affiliation → wmkf_primaryaffiliation.
  */
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { setMatchReason, APPLICANT_DISPOSITION_EXCLUDED } from '../../lib/dataverse/adapters/reviewer-suggestion.js';
 import { upsertByPotentialReviewer } from '../../lib/dataverse/adapters/researcher.js';
 
 function err412() { const e = new Error('Precondition Failed'); e.status = 412; return e; }
-function errDup() { const e = new Error('A record with these values already exists. 0x80040237'); e.status = 412; return e; }
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -76,26 +76,32 @@ describe('reviewer-suggestion.setMatchReason — atomic match-reason write', () 
   });
 });
 
-describe('researcher.upsertByPotentialReviewer — race-safe', () => {
-  test('duplicate on create → re-query + update (no duplicate row)', async () => {
-    // getByPotentialReviewer: first null (so we attempt create), then the raced row.
-    jest.spyOn(DynamicsService, 'queryRecords')
-      .mockResolvedValueOnce({ records: [] })
-      .mockResolvedValueOnce({ records: [{ wmkf_appresearcherid: 'res-1' }] });
-    const create = jest.spyOn(DynamicsService, 'createRecord').mockRejectedValue(errDup());
+describe('researcher.upsertByPotentialReviewer — writes bibliometrics onto the person (S213 collapse)', () => {
+  test('updates the person row (no create); metrics overwrite, affiliation → wmkf_primaryaffiliation', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ wmkf_potentialreviewersid: 'pr-1' });
+    const create = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue(undefined);
     const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
 
-    const out = await upsertByPotentialReviewer('pr-1', { name: 'Dr. R', hIndex: 5 });
-    expect(create).toHaveBeenCalledTimes(1);
+    const out = await upsertByPotentialReviewer('pr-1', { hIndex: 5, affiliation: 'MIT' });
+
+    expect(create).not.toHaveBeenCalled();        // no sidecar create path anymore
     expect(update).toHaveBeenCalledTimes(1);
-    expect(update.mock.calls[0][1]).toBe('res-1'); // updated the raced row
-    expect(out).toEqual({ id: 'res-1', created: false });
+    expect(update.mock.calls[0][1]).toBe('pr-1'); // wrote to the person id
+    const payload = update.mock.calls[0][2];
+    expect(payload.wmkf_hindex).toBe(5);
+    expect(payload.wmkf_primaryaffiliation).toBe('MIT');
+    expect(out).toEqual({ id: 'pr-1', created: false });
   });
 
-  test('non-duplicate create error propagates', async () => {
-    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
-    const boom = new Error('500 server error'); boom.status = 500;
-    jest.spyOn(DynamicsService, 'createRecord').mockRejectedValue(boom);
-    await expect(upsertByPotentialReviewer('pr-2', { name: 'Dr. S' })).rejects.toThrow('500 server error');
+  test('descriptive fields fill-if-empty; metrics always overwrite', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_potentialreviewersid: 'pr-2', wmkf_primaryaffiliation: 'Existing U', wmkf_hindex: 3,
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    await upsertByPotentialReviewer('pr-2', { affiliation: 'New U', hIndex: 9 });
+    const payload = update.mock.calls[0][2];
+    expect(payload.wmkf_primaryaffiliation).toBeUndefined(); // already set → not overwritten
+    expect(payload.wmkf_hindex).toBe(9);                     // metric always overwrites
   });
 });

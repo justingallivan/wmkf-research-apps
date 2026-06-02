@@ -134,16 +134,9 @@ describe('researcher adapter', () => {
     expect(lastCallOpts(DynamicsService.updateRecord)).toEqual({ actingUserSystemId: ACTING });
   });
 
-  test('upsertByPotentialReviewer (create path) forwards on create', async () => {
-    DynamicsService.queryRecords.mockResolvedValue({ records: [] });
-    DynamicsService.createRecord.mockResolvedValue({ wmkf_appresearcherid: RESEARCHER_ID });
-    await researcherAdapter.upsertByPotentialReviewer(
-      PR_ID,
-      { name: 'Alice' },
-      { actingUserSystemId: ACTING },
-    );
-    expect(lastCallOpts(DynamicsService.createRecord)).toEqual({ actingUserSystemId: ACTING });
-  });
+  // S213 collapse: upsertByPotentialReviewer no longer has a create path (it
+  // writes bibliometrics onto the existing person via updateRecord). The
+  // existing-path test above + updateById below cover caller-id forwarding.
 
   test('updateById forwards', async () => {
     await researcherAdapter.updateById(RESEARCHER_ID, { hIndex: 12 }, { actingUserSystemId: ACTING });

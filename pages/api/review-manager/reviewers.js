@@ -188,7 +188,6 @@ async function handleGet(req, res, access) {
 
       byRequest[reqId].reviewers.push({
         suggestionId: s.wmkf_appreviewersuggestionid,
-        researcherId: researcher?.wmkf_appresearcherid || null,
         potentialReviewerId: s._wmkf_potentialreviewer_value || null,
         name: person.wmkf_name || null,
         affiliation: researcher?.wmkf_primaryaffiliation || person.wmkf_organizationname || null,
@@ -336,19 +335,22 @@ async function fetchPotentialReviewers(ids) {
   return out;
 }
 
+// S213 appresearcher collapse: bibliometrics now live on the person, not the
+// wmkf_appresearcher sidecar. Query the person rows (keyed by id) so downstream
+// `researcher?.X` reads resolve against the same person record.
 async function fetchResearchersByPerson(personIds) {
   if (!personIds?.length) return {};
   const out = {};
   const CHUNK = 25;
   for (let i = 0; i < personIds.length; i += CHUNK) {
     const chunk = personIds.slice(i, i + CHUNK);
-    const orChain = chunk.map((id) => `_wmkf_potentialreviewer_value eq ${id}`).join(' or ');
-    const { records } = await DynamicsService.queryRecords('wmkf_appresearchers', {
-      select: 'wmkf_appresearcherid,_wmkf_potentialreviewer_value,wmkf_primaryaffiliation,wmkf_website,wmkf_hindex,wmkf_totalcitations',
+    const orChain = chunk.map((id) => `wmkf_potentialreviewersid eq ${id}`).join(' or ');
+    const { records } = await DynamicsService.queryRecords('wmkf_potentialreviewerses', {
+      select: 'wmkf_potentialreviewersid,wmkf_primaryaffiliation,wmkf_website,wmkf_hindex,wmkf_totalcitations',
       filter: orChain,
       top: 500,
     });
-    for (const r of records) out[r._wmkf_potentialreviewer_value] = r;
+    for (const r of records) out[r.wmkf_potentialreviewersid] = r;
   }
   return out;
 }

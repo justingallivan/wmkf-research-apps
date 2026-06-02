@@ -170,7 +170,6 @@ async function handleGet(req, res, access) {
       const researcher = researcherByPerson[s._wmkf_potentialreviewer_value] || null;
       byRequest[reqId].candidates.push({
         suggestionId: s.wmkf_appreviewersuggestionid,
-        researcherId: researcher?.wmkf_appresearcherid || null,
         potentialReviewerId: s._wmkf_potentialreviewer_value || null,
         name: person.wmkf_name || null,
         affiliation: researcher?.wmkf_primaryaffiliation || person.wmkf_organizationname || null,
@@ -304,19 +303,22 @@ async function fetchApplicantAkas(accountIds) {
   return out;
 }
 
+// S213 appresearcher collapse: bibliometrics now live on the person, not the
+// wmkf_appresearcher sidecar. Query the person rows (keyed by id) so downstream
+// `researcher?.X` reads resolve against the same person record.
 async function fetchResearchersByPerson(personIds) {
   if (!personIds?.length) return {};
   const out = {};
   const CHUNK = 25;
   for (let i = 0; i < personIds.length; i += CHUNK) {
     const chunk = personIds.slice(i, i + CHUNK);
-    const orChain = chunk.map((id) => `_wmkf_potentialreviewer_value eq ${id}`).join(' or ');
-    const { records } = await DynamicsService.queryRecords('wmkf_appresearchers', {
-      select: 'wmkf_appresearcherid,_wmkf_potentialreviewer_value,wmkf_primaryaffiliation,wmkf_website,wmkf_hindex,wmkf_totalcitations,wmkf_orcid,wmkf_orcidurl,wmkf_googlescholarid,wmkf_googlescholarurl,wmkf_keywords',
+    const orChain = chunk.map((id) => `wmkf_potentialreviewersid eq ${id}`).join(' or ');
+    const { records } = await DynamicsService.queryRecords('wmkf_potentialreviewerses', {
+      select: 'wmkf_potentialreviewersid,wmkf_primaryaffiliation,wmkf_website,wmkf_hindex,wmkf_totalcitations,wmkf_orcid,wmkf_orcidurl,wmkf_googlescholarid,wmkf_googlescholarurl,wmkf_keywords',
       filter: orChain,
       top: 500,
     });
-    for (const r of records) out[r._wmkf_potentialreviewer_value] = r;
+    for (const r of records) out[r.wmkf_potentialreviewersid] = r;
   }
   return out;
 }
@@ -437,16 +439,14 @@ async function handlePatch(req, res, access) {
         await potentialReviewerAdapter.update(personId, personUpdates, { actingUserSystemId });
       }
 
+      // Bibliometric edits go straight onto the person now (S213 collapse —
+      // updateById takes the person id; email is identity, handled elsewhere).
       const researcherUpdates = {};
       if (affiliation !== undefined) researcherUpdates.affiliation = affiliation;
       if (website !== undefined) researcherUpdates.website = website;
       if (hIndex !== undefined) researcherUpdates.hIndex = hIndex;
-      if (email !== undefined) researcherUpdates.email = email;
       if (Object.keys(researcherUpdates).length > 0) {
-        const researcher = await researcherAdapter.getByPotentialReviewer(personId);
-        if (researcher) {
-          await researcherAdapter.updateById(researcher.wmkf_appresearcherid, researcherUpdates, { actingUserSystemId });
-        }
+        await researcherAdapter.updateById(personId, researcherUpdates, { actingUserSystemId });
       }
     }
 
