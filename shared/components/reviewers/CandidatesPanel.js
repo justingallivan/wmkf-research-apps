@@ -28,6 +28,7 @@
 import { useState } from 'react';
 import { Card } from '../Layout';
 import InviteEmailModal from './InviteEmailModal';
+import CandidateEditModal from './CandidateEditModal';
 import { buildScholarSearchUrl } from '../../../lib/utils/scholar-url';
 
 function StatusChip({ c }) {
@@ -45,6 +46,7 @@ function StatusChip({ c }) {
 export default function CandidatesPanel({ requestId, candidates = [], loading = false, onRefresh, settings = {} }) {
   const [selected, setSelected] = useState(() => new Set());
   const [modal, setModal] = useState(null); // { candidates, allowResend } | null
+  const [editing, setEditing] = useState(null); // candidate row being edited | null
 
   // Accepted candidates are managed in the Invite/Track tabs; not selectable here.
   const selectable = candidates.filter((c) => !c.accepted);
@@ -100,7 +102,14 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm font-medium text-gray-900 truncate">{c.name || '(unnamed)'}</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditing(c)}
+                        className="text-sm font-medium text-gray-900 hover:text-blue-700 hover:underline truncate text-left"
+                        title="Edit this candidate’s details (name, email, affiliation…)"
+                      >
+                        {c.name || '(unnamed)'}
+                      </button>
                       {c.applicantRecommended && (
                         <span
                           className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 whitespace-nowrap"
@@ -191,6 +200,14 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
           allowResend={modal.allowResend}
           onClose={() => setModal(null)}
           onSent={afterSent}
+        />
+      )}
+
+      {editing && (
+        <CandidateEditModal
+          candidate={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => { if (onRefresh) onRefresh(); }}
         />
       )}
     </Card>
