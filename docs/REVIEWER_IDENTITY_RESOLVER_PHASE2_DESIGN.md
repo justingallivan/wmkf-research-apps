@@ -111,7 +111,8 @@ resolveIdentity(hypothesis, evidence):   // evidence = what enrichment already g
                   else weak VerifiedAnchor('scholar_profile')
        orcid    → findContact returned a name-matched record ⇒ weak VerifiedAnchor('orcid_public')
                   findContact abstained on multi-match ⇒ no anchor + competitors populated
-       (institutional_email weak anchor: only if a verified-domain check is cheap; else skip PR1)
+       (institutional_email weak anchor: SKIPPED in PR1 unless the domain is already present in
+        enrichment evidence — no new domain-classification work in PR1)
   2. (rejected-anchor memory consult — DEFERRED to the web-leads PR; not in PR1)
   3. STATUS (rule-based):
        confirmed  : NOT REACHABLE IN PR1 (requires faculty-page + consistent pub-cluster — later PR)
@@ -177,7 +178,7 @@ Search API (`/search`, not sonar) — ranked `results[]` (`title/url/snippet/dat
 ## 9. PR1 build plan (schema-first, safe order)
 
 1. **Dataverse schema deploy** — the 6 §2.5 identity fields on `wmkf_potentialreviewers` (new wave). *Must precede any code that reads/writes them.*
-2. **`lib/services/reviewer-identity-resolver.js`** — `resolveIdentity(hypothesis, evidence)` → §2.2 shape, PR1 rules only (§3). Pure/unit-testable; no network.
+2. **`lib/services/reviewer-identity-resolver.js`** — `resolveIdentity(hypothesis, evidence)` → §2.2 shape, PR1 rules only (§3). Pure/unit-testable; no network. **Step 2a: first lock the `evidence` contract** — the exact subset of `enrichCandidate`'s `contactEnrichment` the classifier reads (scholar `{scholarId, googleScholarUrl, nameMismatch, institutionMismatch, skipped}` from `tierResults.scholar_profile` + `scholarIdentityStatus`; orcid `{orcidId, orcidUrl}` + an abstain/multi-match signal; affiliation). Normalizing this contract is the first commit so the classifier reads a stable shape, not raw enrichment internals.
 3. **Read-only legacy audit** over the ~7 verified persons using the new resolver → report proposed downgrades/clears. *Before* enabling write-gates. (Remediation = separate PR.)
 4. **Thread `resolvedIdentity`** through `ContactEnrichmentService.enrichCandidate` → its consumers; gate **all** identity-bearing writes + clear-on-downgrade at the write paths:
    - **Fields gated/cleared:** `wmkf_googlescholarid`, `wmkf_googlescholarurl`, `wmkf_hindex`, `wmkf_i10index`, `wmkf_totalcitations`, `wmkf_orcid`, `wmkf_orcidurl`.

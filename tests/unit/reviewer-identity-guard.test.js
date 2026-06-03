@@ -119,6 +119,20 @@ describe('_attachScholarMetrics — identity gate before persisting metrics', ()
     expect(out.contactEnrichment.googleScholarId).toBe('TSAI');
     expect(out.contactEnrichment.scholarIdentityStatus).toBe('probable');
   });
+
+  test('enrichCandidate attaches the resolver verdict (contactEnrichment.identity)', async () => {
+    jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue({
+      scholarProfileUrl: 'https://scholar.google.com/citations?user=TSAI',
+      scholarId: 'TSAI', nameMismatch: false, institutionMismatch: false,
+    });
+    jest.spyOn(SerpContactService, 'fetchScholarMetrics').mockResolvedValue({ hIndex: 120, i10Index: 200, totalCitations: 80000 });
+
+    const out = await enrich('Li-Huei Tsai');
+    // ORCID off in this block → lone Scholar weak anchor → unresolved.
+    expect(out.contactEnrichment.identity).toBeTruthy();
+    expect(out.contactEnrichment.identity.status).toBe('unresolved');
+    expect(out.contactEnrichment.identity.resolverVersion).toBeTruthy();
+  });
 });
 
 describe('ORCIDService.findContact — name-scored selection', () => {

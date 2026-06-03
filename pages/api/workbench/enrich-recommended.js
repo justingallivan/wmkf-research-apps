@@ -43,6 +43,7 @@ import * as reviewerSuggestionAdapter from '../../../lib/dataverse/adapters/revi
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
 import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
 import { APPLICANT_DISPOSITION_MAP } from '../../../lib/dataverse/adapters/reviewer-suggestion';
+import { mayPersistIdentity, RESOLVER_SOURCED_FIELDS } from '../../../lib/services/reviewer-identity-resolver';
 
 const limiter = nextRateLimiter({ max: 10 });
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -228,17 +229,23 @@ export default async function handler(req, res) {
       for (const c of enriched) {
         const prId = c.potentialReviewerId;
         const ce = c.contactEnrichment || {};
-        // Identity gate (REVIEWER_IDENTITY_RESOLUTION_PLAN.md Phase 1): if Scholar
-        // enrichment abstained (name/institution mismatch — likely a different
-        // person), drop the Scholar id/url + bibliometrics for both the writeback
-        // and the UI payload. The adapter treats null as a no-op (never erases a
-        // prior-correct value, never writes the wrong one).
+        // Identity gate (Phase 2 — REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md).
+        // The resolver verdict (ce.identity) gates identity-bearing persistence +
+        // the UI payload: blockByIdentity (verdict < probable) drops ALL resolver-
+        // sourced fields; scholarSkipped is the Phase-1 fallback (scholar id/url +
+        // metrics) when no verdict is present. The adapter treats null as a no-op;
+        // a true downgrade additionally CLEARS stale values via clearIdentityFields.
         const scholarSkipped = !!ce.tierResults?.scholar_profile?.skipped;
-        const hIndex = scholarSkipped ? null : (c.hIndex ?? ce.hIndex ?? null);
-        const i10Index = scholarSkipped ? null : (c.i10Index ?? ce.i10Index ?? null);
-        const totalCitations = scholarSkipped ? null : (c.totalCitations ?? ce.totalCitations ?? null);
-        const googleScholarId = scholarSkipped ? null : (ce.googleScholarId || null);
-        const googleScholarUrl = scholarSkipped ? null : (ce.googleScholarUrl || null);
+        const identity = ce.identity || null;
+        const blockByIdentity = !!identity && !mayPersistIdentity(identity.status);
+        const blockScholar = scholarSkipped || blockByIdentity;
+        const hIndex = blockScholar ? null : (c.hIndex ?? ce.hIndex ?? null);
+        const i10Index = blockScholar ? null : (c.i10Index ?? ce.i10Index ?? null);
+        const totalCitations = blockScholar ? null : (c.totalCitations ?? ce.totalCitations ?? null);
+        const googleScholarId = blockScholar ? null : (ce.googleScholarId || null);
+        const googleScholarUrl = blockScholar ? null : (ce.googleScholarUrl || null);
+        const orcidId = blockByIdentity ? null : (ce.orcidId || null);
+        const orcidUrl = blockByIdentity ? null : (ce.orcidUrl || null);
         const email = c.email || ce.email || null;
 
         if (prId) {
@@ -248,8 +255,8 @@ export default async function handler(req, res) {
               normalizedName: normalizeName(c.name),
               email,
               emailSource: ce.emailSource || null,
-              orcid: ce.orcidId || null,
-              orcidUrl: ce.orcidUrl || null,
+              orcid: orcidId,
+              orcidUrl,
               googleScholarId,
               googleScholarUrl,
               hIndex,
@@ -261,6 +268,13 @@ export default async function handler(req, res) {
               facultyPageUrl: ce.facultyPageUrl || null,
               keywords: Array.isArray(c.expertiseAreas) ? c.expertiseAreas.filter(Boolean).join('; ') : null,
             }, { actingUserSystemId });
+            // Persist the resolver decision; clear stale identity fields on downgrade.
+            if (identity) {
+              await researcherAdapter.writeIdentityDecision(prId, identity, { actingUserSystemId });
+              if (blockByIdentity) {
+                await researcherAdapter.clearIdentityFields(prId, RESOLVER_SOURCED_FIELDS, { actingUserSystemId });
+              }
+            }
           } catch (err) {
             sendEvent('progress', { message: `Could not save metrics for ${c.name}: ${err.message}` });
           }

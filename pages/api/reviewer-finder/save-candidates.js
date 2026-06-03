@@ -16,6 +16,7 @@ import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
 import * as reviewerSuggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { mayPersistIdentity, RESOLVER_SOURCED_FIELDS } from '../../../lib/services/reviewer-identity-resolver';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -86,13 +87,19 @@ export default async function handler(req, res) {
           matchReason += ' [Coauthor COI: Has co-authored with proposal authors]';
         }
 
-        // Identity gate (REVIEWER_IDENTITY_RESOLUTION_PLAN.md Phase 1): if Scholar
-        // enrichment abstained (name/institution mismatch — likely a different
-        // person), do NOT persist the Scholar id/url or its bibliometrics, even
-        // if a stale value rode in on the candidate top-level. Passing null is a
-        // safe no-op in the adapter (pruneEmpty drops it → never overwrites a
-        // previously-correct value, never writes the wrong one).
+        // Identity gate (Phase 2 — REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md).
+        // The resolver's verdict (attached to contactEnrichment.identity) is the
+        // gate: bibliometrics/ORCID persist only when status ∈ {confirmed,probable}.
+        //   - blockByIdentity: resolver verdict below probable → block ALL
+        //     resolver-sourced fields (scholar id/url, metrics, ORCID id/url).
+        //   - scholarSkipped: Phase-1 fallback when no resolver verdict is present
+        //     (enrichment didn't run) — blocks the scholar id/url + metrics only.
+        // Passing null is a safe no-op in the adapter (pruneEmpty drops it); a true
+        // downgrade additionally CLEARS any stale value below via clearIdentityFields.
         const scholarSkipped = !!candidate.contactEnrichment?.tierResults?.scholar_profile?.skipped;
+        const identity = candidate.contactEnrichment?.identity || null;
+        const blockByIdentity = !!identity && !mayPersistIdentity(identity.status);
+        const blockScholar = scholarSkipped || blockByIdentity;
 
         const { id: potentialReviewerId } = await potentialReviewerAdapter.upsertByEmail({
           name: candidate.name,
@@ -107,23 +114,33 @@ export default async function handler(req, res) {
           normalizedName,
           email: candidateEmail,
           emailSource: candidate.contactEnrichment?.emailSource || null,
-          orcid: candidateOrcid,
-          orcidUrl: candidate.orcidUrl || candidate.contactEnrichment?.orcidUrl || null,
-          googleScholarId: scholarSkipped ? null : candidateGoogleScholarId,
-          googleScholarUrl: scholarSkipped ? null : (candidate.googleScholarUrl || candidate.contactEnrichment?.googleScholarUrl || null),
+          orcid: blockByIdentity ? null : candidateOrcid,
+          orcidUrl: blockByIdentity ? null : (candidate.orcidUrl || candidate.contactEnrichment?.orcidUrl || null),
+          googleScholarId: blockScholar ? null : candidateGoogleScholarId,
+          googleScholarUrl: blockScholar ? null : (candidate.googleScholarUrl || candidate.contactEnrichment?.googleScholarUrl || null),
           // Fall back to contactEnrichment like every other field above —
           // enrichment writes bibliometrics there, and not all callers promote
           // them to the candidate top-level (the standalone Reviewer Finder does
           // not), so reading candidate.* only would silently drop fetched metrics.
-          hIndex: scholarSkipped ? null : (candidate.hIndex ?? candidate.contactEnrichment?.hIndex ?? null),
-          i10Index: scholarSkipped ? null : (candidate.i10Index ?? candidate.contactEnrichment?.i10Index ?? null),
-          totalCitations: scholarSkipped ? null : (candidate.totalCitations ?? candidate.contactEnrichment?.totalCitations ?? null),
+          hIndex: blockScholar ? null : (candidate.hIndex ?? candidate.contactEnrichment?.hIndex ?? null),
+          i10Index: blockScholar ? null : (candidate.i10Index ?? candidate.contactEnrichment?.i10Index ?? null),
+          totalCitations: blockScholar ? null : (candidate.totalCitations ?? candidate.contactEnrichment?.totalCitations ?? null),
           affiliation: candidateAffiliation,
           department: candidate.department || candidate.contactEnrichment?.department || null,
           website: candidateWebsite,
           facultyPageUrl: candidate.facultyPageUrl || candidate.contactEnrichment?.facultyPageUrl || null,
           keywords: expertiseForDv,
         }, { actingUserSystemId });
+
+        // Persist the resolver decision on the person; on a downgrade, also CLEAR
+        // any stale resolver-sourced identity fields (upsert's null is a no-op, so
+        // an explicit null-PATCH is required to remove a previously-wrong value).
+        if (identity) {
+          await researcherAdapter.writeIdentityDecision(potentialReviewerId, identity, { actingUserSystemId });
+          if (blockByIdentity) {
+            await researcherAdapter.clearIdentityFields(potentialReviewerId, RESOLVER_SOURCED_FIELDS, { actingUserSystemId });
+          }
+        }
 
         await reviewerSuggestionAdapter.upsert({
           potentialReviewerId,
