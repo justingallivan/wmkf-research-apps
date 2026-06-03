@@ -101,6 +101,7 @@
 
 ## Reviewer Lifecycle
 - [Reviewer apps redesign direction (S194)](project-reviewer-apps-redesign-direction.md) — Finder + Manager → request-scoped Reviewer Workbench + standalone Reviewer Pool. Decisions locked; don't propose incremental Finder/Manager cleanup.
+- [Reviewer identity resolution (false-match redesign)](project-reviewer-identity-resolution.md) — Finder false-matches people (discovery ≠ identity); Tsai→lab-member Nakano via institution-only guard. Codex plan `docs/REVIEWER_IDENTITY_RESOLUTION_PLAN.md`: Phase 1 name-guard + confidence-gated persist; Phase 2 identity resolver. Principle: unresolved OK, wrong-and-confident not.
 - [Workbench invite workflow (S211-212)](project-reviewer-workbench-invite-workflow.md) — 5 sub-tabs Find→Candidates→Invite→Track→Completed; "Invite" tab = materials (post-accept), Candidates = invite (pre-accept); search results ephemeral until saved; send-safety server-authoritative on wmkf_accepted; enrichment must disambiguate by affiliation.
 - [D26 reviewer-inputs ground truth (S209 probe)](project-d26-reviewer-inputs-probe.md) — all 35 D26 reqs: 0 existing candidates (Manage tabs empty → smoke via Review Manager), 5/5 legacy slots (~175 recs for Phase 3), excluded text heterogeneous + mostly N/A.
 - [Excluded reviewers often already in our pool](project-excluded-reviewers-often-in-pool.md) — applicant-excluded = competitors = domain experts; exclusion is per-request/case-by-case, NOT person-level "unfit". Disposition lives only on the junction row. S210 pilot chose soft-block-only (option B).
