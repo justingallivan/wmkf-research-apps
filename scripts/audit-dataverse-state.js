@@ -88,10 +88,10 @@ async function countRecords(token, entitySet, filter) {
 }
 
 const CUSTOM_ENTITIES = [
-  // Wave 2 — reviewer finder
-  { entitySet: 'wmkf_appresearchers', describe: 'Bibliometric sidecar (1:1 to wmkf_potentialreviewers)' },
+  // Wave 2 — reviewer finder. (S213: the wmkf_appresearcher bibliometric sidecar +
+  // wmkf_apppublication/author tables were collapsed into wmkf_potentialreviewers
+  // and DROPPED — see docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md.)
   { entitySet: 'wmkf_appreviewersuggestions', describe: 'Suggestion lifecycle ledger ((reviewer, request) pairs)' },
-  { entitySet: 'wmkf_apppublications', describe: 'Publication records (per Wave 2 schema-as-code)' },
   { entitySet: 'wmkf_appgrantcycles', describe: 'Grant cycle definitions (per Wave 2 schema-as-code)' },
   // NOTE unconventional plural: entity-set is `wmkf_appproposalsearchs` (no `e` before `s`)
   // because the singular logical name is `wmkf_appproposalsearch` (auto-pluralized).

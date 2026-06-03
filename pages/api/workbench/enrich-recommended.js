@@ -10,8 +10,9 @@
  *   PubMed author-verification (publications + expertise)
  *   → COI vs the proposal's PI/authors (institution + coauthorship)
  *   → contact + real Google Scholar bibliometrics enrichment
- *   → idempotent writeback to each person's existing wmkf_appresearcher sidecar
- *      (keyed by potentialReviewerId — NOT email, so no duplicate person rows)
+ *   → idempotent bibliometric writeback onto each person row (S213: the
+ *      wmkf_appresearcher sidecar was collapsed into wmkf_potentialreviewers;
+ *      keyed by potentialReviewerId)
  *   → COI persisted onto the recommended junction row's match reason (so a
  *      conflicted recommendee doesn't read as "clean" in the Invite/Manage tab)
  *

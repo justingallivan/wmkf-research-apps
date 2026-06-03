@@ -37,10 +37,10 @@ The canonical reference for the live state of the application's data layer.
 
 | Entity | Rows | Status | Page |
 |---|---:|---|---|
-| `wmkf_appresearcher` | 334 | active sidecar to potentialreviewers | [dataverse-wmkf-appresearcher.md](atlas/dataverse-wmkf-appresearcher.md) |
+| `wmkf_appresearcher` | — | **DROPPED S213** — bibliometric sidecar collapsed into `wmkf_potentialreviewers` (17 fields folded onto the person); see `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md` | (page removed) |
 | `wmkf_appreviewersuggestion` | 336 | active lifecycle ledger | [dataverse-wmkf-appreviewersuggestion.md](atlas/dataverse-wmkf-appreviewersuggestion.md) |
-| `wmkf_potentialreviewers` (vendor + ext.) | 4,267 | per-person scratch+history (one-shot post-pilot DELETE plan replaces the earlier cleanup-cron design; no cron exists) | [dataverse-wmkf-potentialreviewers.md](atlas/dataverse-wmkf-potentialreviewers.md) |
-| `wmkf_apppublication` | 0 | deployed, no callers | [dataverse-wmkf-apppublication-and-appgrantcycle.md](atlas/dataverse-wmkf-apppublication-and-appgrantcycle.md) |
+| `wmkf_potentialreviewers` (vendor + ext.) | 4,269 | per-person scratch+history; **now also carries the bibliometric fields** (affiliation/h-index/citations/scholar/orcid/etc.) folded in from the dropped sidecar (S213) | [dataverse-wmkf-potentialreviewers.md](atlas/dataverse-wmkf-potentialreviewers.md) |
+| `wmkf_apppublication` | — | **DROPPED S213** (was 0 rows, no callers) — went down with the appresearcher collapse | (page section removed) |
 | `wmkf_appgrantcycle` | 10 | Dataverse-primary post-W3 (2026-05-12); full 11-attr schema deployed; consumed by reviewer-finder/grant-cycles + review-manager render/send-emails + maintenance-service blob-cleanup | same page |
 | `wmkf_appproposalsearch` | 0 | DEPLOYED (S185), entity set is the unconventional `wmkf_appproposalsearchs`; verified S188 audit re-sweep 2026-05-25 | same page |
 | `wmkf_app_z_publication_author` | n/a | NOT DEPLOYED | same page |
@@ -86,12 +86,12 @@ Promote any of these to a per-entity page if app code starts writing to it.
 
 | File | Entity set | Methods | Callers |
 |---|---|---|---|
-| `researcher.js` | `wmkf_appresearchers` | `getByPotentialReviewer`, `upsertByPotentialReviewer`, `updateById` | `pages/api/reviewer-finder/{save-candidates,my-candidates}.js` |
+| `researcher.js` | `wmkf_potentialreviewerses` (was `wmkf_appresearchers`) | `getByPotentialReviewer`, `upsertByPotentialReviewer`, `updateById` | S213: repointed to write bibliometrics onto the person (sidecar dropped); `save-candidates`/`my-candidates`/`workbench/enrich-recommended`/`contact-enrichment-service` |
 | `potential-reviewer.js` | `wmkf_potentialreviewerses` | `getByEmail`, `getById`, `upsertByEmail`, `update`, `setContactLink` | `pages/api/reviewer-finder/{save-candidates,my-candidates}.js`, `pages/api/review-manager/send-emails.js` |
 | `reviewer-suggestion.js` | `wmkf_appreviewersuggestions` | `findByPotentialReviewerAndRequest`, `findByRequest`, `findByPD`, `findAcceptedByPD`, `upsert`, `updateLifecycle`, `softDelete`, `bulkUpdateByRequest`, `findById` | `pages/api/reviewer-finder/{save-candidates,my-candidates}.js`, `pages/api/review-manager/{render-emails,send-emails,reviewers}.js` |
 | `contact.js` | `contacts` | `findByEmail`, `findOrCreateByEmail` | `pages/api/review-manager/send-emails.js` |
 
-No adapter exists yet for: `wmkf_apppublication`, `wmkf_appgrantcycle`, `wmkf_appproposalsearch`, `akoya_request` (accessed direct via `DynamicsService`).
+No adapter exists yet for: `wmkf_appgrantcycle`, `wmkf_appproposalsearch`, `akoya_request` (accessed direct via `DynamicsService`). (`wmkf_apppublication` was dropped S213.)
 
 ## Service-layer inventory (`lib/services/`)
 
@@ -102,7 +102,7 @@ The high-leverage services for data-layer work — full source remains authorita
 | `database-service.js` | `search_cache`, `user_profiles`, `api_usage_log`, etc. — researcher/publication/suggestion methods gutted W5 (commit `0c58da4`) | none | central Postgres gateway for the surviving tables; Wave 1 user_preferences branch is dead code (table dropped 2026-05-12) |
 | `discovery-service.js` | — (Postgres-researchers cache check removed in W5 commit `c0c5b5b`) | `wmkf_potentialreviewer` (indirect via picker flow) | previously called `DatabaseService.findResearcher` for the verification cache; PubMed verification is now unconditional |
 | `deduplication-service.js` | — (Postgres-researchers lookup removed in W5 commit `c0c5b5b`) | none | previously called `DatabaseService.findResearcher` to attach `existing?.id`; merged candidates are now transient with no PG id |
-| `contact-enrichment-service.js` | — (Postgres-researchers writer removed in W5 commit `c0c5b5b`) | `wmkf_potentialreviewer` (read+upsert) + `wmkf_appresearcher` (upsert) via adapter chain | enrichment writeback now targets Dataverse — fill-only `potentialReviewerAdapter.upsertByEmail` + `researcherAdapter.upsertByPotentialReviewer`, gated on potentialreviewer-row existence |
+| `contact-enrichment-service.js` | — (Postgres-researchers writer removed in W5 commit `c0c5b5b`) | `wmkf_potentialreviewer` (read+upsert identity + bibliometrics, S213) via adapter chain | enrichment writeback targets the person: `potentialReviewerAdapter.upsertByEmail` (identity) + `researcherAdapter.upsertByPotentialReviewer` (bibliometrics, now person-targeting post-collapse), gated on potentialreviewer-row existence |
 | `dynamics-service.js` | none | all entities | canonical Dataverse client (OAuth, OData, search, email, `updateIfEmpty`, `logAiRun`, impersonation) |
 | `dynamics-context.js` | none | all | AsyncLocalStorage scoping for restrictions |
 | `dynamics-identity-service.js` | `user_profiles` (read) | `systemusers` (read) | impersonation contract (`MSCRMCallerID`) |
@@ -153,9 +153,9 @@ Useful summary of how Postgres ↔ Dataverse currently join (or will join post-c
 
 | Entity | Schema-as-code | Live deployment | Has data |
 |---|---|---|---|
-| `wmkf_appresearcher` | ✅ 21 attrs | ✅ 24 attrs | ✅ 334 rows |
+| `wmkf_appresearcher` | — | **DROPPED S213** (collapsed into `wmkf_potentialreviewers`) | — |
 | `wmkf_appreviewersuggestion` | extension manifest | ✅ 52 attrs | ✅ 336 rows |
-| `wmkf_apppublication` | ✅ 14 attrs | ✅ 14 attrs | empty |
+| `wmkf_apppublication` | — | **DROPPED S213** | — |
 | `wmkf_appgrantcycle` | ✅ 8 attrs | ✅ 10 attrs (different gap from Postgres) | ✅ 10 rows (2026-05-14 audit) |
 | `wmkf_appproposalsearch` | ✅ | ✅ (entity set `wmkf_appproposalsearchs`, NOT `-es`) | empty |
 | `wmkf_app_z_publication_author` | ✅ | ❌ NOT DEPLOYED | n/a |

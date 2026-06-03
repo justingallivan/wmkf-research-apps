@@ -1,6 +1,8 @@
 # `wmkf_appresearcher` Collapse — V2 (execute-now cutover)
 
-**Status:** Proposed for **immediate execution** (mid-pilot), pending Codex ground-truth review + user sign-off on the open decisions below.
+**Status: ✅ EXECUTED 2026-06-02 (S213).** All phases done on prod: 17 bibliometric fields added to `wmkf_potentialreviewers`; 339 sidecars backfilled (verified exact); adapter + callers repointed to the person (154 tests, lint, build green); live-smoke-verified on the Workbench (saves land on the person, no new sidecars); `wmkf_appresearcher` + `wmkf_apppublication` + `wmkf_apppublicationauthor` DROPPED (all 404). D-AFF write-side made `wmkf_primaryaffiliation` canonical (organizationname kept as clamped compat shadow); the broader 5-reader `organizationname` migration was deferred (those readers still work off the compat shadow). Snapshot at `scripts/.appresearcher-snapshot.jsonl`.
+
+**(original status:** Proposed for immediate execution, pending Codex review + sign-off — all resolved.)
 
 **Supersedes the *timing* of** `docs/APPRESEARCHER_COLLAPSE_PLAN.md` (S196), which said "post-pilot, do not execute now." That posture was driven by a data-preservation caution that no longer applies (see "Why now"). The S196 doc remains the reference for the **exhaustive doc-cleanup file list** (its Phase 6) and detailed mechanics; this V2 overrides the parts that changed and re-grounds every state claim against a live probe.
 

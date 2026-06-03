@@ -1,6 +1,6 @@
 # `wmkf_appresearcher` Collapse Plan
 
-**Status:** Planned. Execute post-pilot. Do not execute mid-pilot.
+**Status: ✅ EXECUTED 2026-06-02 (S213) via the lighter cutover in `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`.** The "post-pilot, do not execute mid-pilot" posture below was reversed (disposable data). This S196 doc remains the reference for the exhaustive doc-cleanup file list; V2 is the as-executed record.
 
 **Goal:** Eliminate the `wmkf_appresearcher` 1:1 sidecar by folding its bibliometric fields into `wmkf_potentialreviewer` directly. Background and rationale: `.claude-memory/project-appresearcher-collapse-post-pilot.md` and `docs/REVIEWER_DATA_MODEL.md` § "Open design notes."
 
