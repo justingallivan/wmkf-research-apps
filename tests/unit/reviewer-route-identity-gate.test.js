@@ -120,6 +120,20 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
+
+  test('scholarSkipped fallback (no verdict) → Scholar fields nulled, ORCID kept, no decision/clear', async () => {
+    const ce = enrichmentFor(null);                                  // identity absent
+    ce.tierResults = { scholar_profile: { skipped: 'name_mismatch' } };
+    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr X', contactEnrichment: ce }] } };
+    const res = mockRes();
+    await handler(req, res);
+    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
+    expect(payload.googleScholarId).toBeNull();
+    expect(payload.hIndex).toBeNull();
+    expect(payload.orcid).toBe('0000-0001');                          // ORCID NOT blocked (blockByIdentity false)
+    expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
+    expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
+  });
 });
 
 // ── /api/workbench/enrich-recommended ─────────────────────────────────────────
@@ -162,11 +176,12 @@ describe('enrich-recommended route — identity gate + clear-on-downgrade', () =
     expect(researcherAdapter.clearIdentityFields).toHaveBeenCalledWith('PID-1', RESOLVER_SOURCED_FIELDS, expect.any(Object));
   });
 
-  test('probable verdict → ORCID/Scholar persisted, NO clear', async () => {
+  test('probable verdict → ORCID/Scholar persisted, decision written, NO clear', async () => {
     await run({ status: 'probable' });
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
     expect(payload.orcid).toBe('0000-0001');
     expect(payload.hIndex).toBe(40);
+    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'probable' }), expect.any(Object));
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
 });

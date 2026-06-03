@@ -75,3 +75,7 @@ scripts/.scholar-identity-audit.jsonl
 
 # ORCID resolution measurement output (contains person data; local-only, S215)
 scripts/.orcid-resolution.jsonl
+
+# ORCID backfill checkpoints (contain person data; local-only, S215)
+scripts/.orcid-backfill.jsonl
+scripts/.orcid-backfill-applied.jsonl
