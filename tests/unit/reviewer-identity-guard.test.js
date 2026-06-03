@@ -190,6 +190,42 @@ describe('ORCIDService.findContact — name-scored selection', () => {
     expect(out.matchedInstitution).toBeNull();
   });
 
+  test('institutionCorroborated is false (no crash) when no affiliation is provided', async () => {
+    jest.spyOn(ORCIDService, 'searchByName').mockResolvedValue([
+      { orcidId: '0000-0000-0000-0011', orcidUrl: 'u11', givenNames: 'Li-Huei', familyName: 'Tsai', otherNames: [], emails: ['t@mit.edu'], institutions: ['Massachusetts Institute of Technology'] },
+    ]);
+    const out = await ORCIDService.findContact({ name: 'Li-Huei Tsai', affiliation: null, ...creds });
+    expect(out.status).toBe('resolved');
+    expect(out.institutionCorroborated).toBe(false);
+    expect(out.matchedInstitution).toBeNull();
+  });
+
+  test('institutionCorroborated propagates on the profile-null return path (record has no public email)', async () => {
+    jest.spyOn(ORCIDService, 'searchByName').mockResolvedValue([
+      { orcidId: '0000-0000-0000-0012', orcidUrl: 'u12', givenNames: 'Li-Huei', familyName: 'Tsai', otherNames: [], emails: [], institutions: ['Massachusetts Institute of Technology'] },
+    ]);
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue(null);
+    const out = await ORCIDService.findContact({ name: 'Li-Huei Tsai', affiliation: 'Massachusetts Institute of Technology', ...creds });
+    expect(out.source).toBe('orcid_search');     // profile-null branch
+    expect(out.email).toBeNull();
+    expect(out.institutionCorroborated).toBe(true);
+    expect(out.matchedInstitution).toMatch(/Massachusetts Institute/);
+  });
+
+  test('institutionCorroborated propagates on the full-profile return path', async () => {
+    jest.spyOn(ORCIDService, 'searchByName').mockResolvedValue([
+      { orcidId: '0000-0000-0000-0013', orcidUrl: 'u13', givenNames: 'Li-Huei', familyName: 'Tsai', otherNames: [], emails: [], institutions: ['Massachusetts Institute of Technology'] },
+    ]);
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue({
+      orcidId: '0000-0000-0000-0013', orcidUrl: 'u13', givenNames: 'Li-Huei', familyName: 'Tsai',
+      creditName: '', primaryEmail: 'lh@mit.edu', primaryUrl: null, currentAffiliation: 'MIT',
+    });
+    const out = await ORCIDService.findContact({ name: 'Li-Huei Tsai', affiliation: 'Massachusetts Institute of Technology', ...creds });
+    expect(out.source).toBe('orcid_profile');    // full-profile branch
+    expect(out.institutionCorroborated).toBe(true);
+    expect(out.matchedInstitution).toMatch(/Massachusetts Institute/);
+  });
+
   test('_nameMatchesTarget matches via creditName / otherNames', () => {
     expect(ORCIDService._nameMatchesTarget(
       { givenNames: 'Elizabeth', familyName: 'Smith', creditName: '', otherNames: ['Beth Smith'] }, 'Beth Smith')).toBe(true);

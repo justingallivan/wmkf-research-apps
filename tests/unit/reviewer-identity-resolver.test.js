@@ -1,11 +1,12 @@
 /**
  * @jest-environment node
  *
- * Reviewer Identity Resolver — Phase 2 PR1 classifier (docs/REVIEWER_IDENTITY_
- * RESOLVER_PHASE2_DESIGN.md §3). Locks the PR1 rules: weak-only anchors, lone
- * weak → unresolved, two corroborating weak → probable, ORCID multi-match →
+ * Reviewer Identity Resolver — Phase 2 classifier (docs/REVIEWER_IDENTITY_
+ * RESOLVER_PHASE2_DESIGN.md §3 + §3.1). Locks the rules: lone WEAK anchor →
+ * unresolved, two corroborating weak → probable, ONE STRONG anchor (S215:
+ * institution-corroborated ORCID) → probable on its own, ORCID multi-match →
  * ambiguous, name-mismatched Scholar = rejected ANCHOR (not identity rejection),
- * confirmed/rejected not reachable in PR1.
+ * confirmed/rejected not reachable yet.
  */
 const {
   resolveIdentity, evidenceFromEnrichment, mayPersistIdentity,

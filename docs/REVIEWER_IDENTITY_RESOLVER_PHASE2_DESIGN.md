@@ -109,18 +109,22 @@ resolveIdentity(hypothesis, evidence):   // evidence = what enrichment already g
   1. ANCHOR CHECKS (Phase-1 floors, deterministic):
        scholar  → nameMismatch||institutionMismatch ⇒ RejectedAnchor('scholar', reason)
                   else weak VerifiedAnchor('scholar_profile')
-       orcid    → findContact returned a name-matched record ⇒ weak VerifiedAnchor('orcid_public')
+       orcid    → findContact returned a name-matched record:
+                    institution-corroborated (record institution contains affiliation token, §3.1)
+                      ⇒ STRONG VerifiedAnchor('orcid_public_institution_corroborated')
+                    else (bare name-match) ⇒ weak VerifiedAnchor('orcid_public')
                   findContact abstained on multi-match ⇒ no anchor + competitors populated
        (institutional_email weak anchor: SKIPPED in PR1 unless the domain is already present in
         enrichment evidence — no new domain-classification work in PR1)
   2. (rejected-anchor memory consult — DEFERRED to the web-leads PR; not in PR1)
   3. STATUS (rule-based):
        confirmed  : NOT REACHABLE IN PR1 (requires faculty-page + consistent pub-cluster — later PR)
-       probable   : one STRONG anchor (none available in PR1) OR ≥2 CORROBORATING WEAK signals
-                    agreeing on the same person (e.g. orcid_public name-match AND scholar_profile
-                    name-match, not contradicted)
+       probable   : one STRONG anchor (S215: institution-corroborated ORCID — §3.1) OR
+                    ≥2 CORROBORATING WEAK signals agreeing on the same person (e.g. orcid_public
+                    name-match AND scholar_profile name-match, not contradicted)
        ambiguous  : ORCID multi-match abstain, or ≥2 competitors evidence can't separate
-       unresolved : ≤1 weak signal, or none (a lone public-ORCID or lone Scholar match → unresolved)
+       unresolved : ≤1 WEAK signal, or none (a lone bare-name public-ORCID or lone Scholar match →
+                    unresolved; a lone institution-corroborated ORCID is STRONG → probable, §3.1)
        rejected   : DETERMINISTIC rule — a passing anchor positively resolves to a DIFFERENT named
                     human (its displayed name strongly matches someone other than the target) AND no
                     anchor supports the target. (Rare; not "subjective wrongness".)
