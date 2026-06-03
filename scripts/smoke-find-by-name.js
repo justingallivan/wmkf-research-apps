@@ -14,7 +14,8 @@ require('./../lib/dataverse/client').loadEnvLocal();
   const escaped = frag.replace(/'/g, "''");
 
   const { records: prs } = await DynamicsService.queryRecords('wmkf_potentialreviewerses', {
-    select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_emailaddress,wmkf_organizationname,createdon,modifiedon',
+    // S213: bibliometrics live on the person now (no wmkf_appresearcher sidecar).
+    select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_emailaddress,wmkf_organizationname,wmkf_primaryaffiliation,wmkf_hindex,wmkf_totalcitations,createdon,modifiedon',
     filter: `contains(wmkf_name,'${escaped}')`,
     top: 10,
   });
@@ -33,12 +34,7 @@ require('./../lib/dataverse/client').loadEnvLocal();
       console.log(`      - ${s.wmkf_suggestionlabel} | request ${s._wmkf_request_value} | created ${s.createdon}`);
     }
 
-    const { records: rs } = await DynamicsService.queryRecords('wmkf_appresearchers', {
-      select: 'wmkf_appresearcherid,wmkf_hindex,wmkf_totalcitations,wmkf_primaryaffiliation',
-      filter: `_wmkf_potentialreviewer_value eq ${p.wmkf_potentialreviewersid}`,
-      top: 1,
-    });
-    console.log(`    researcher: ${rs.length ? `h-index ${rs[0].wmkf_hindex ?? '-'} / cites ${rs[0].wmkf_totalcitations ?? '-'}` : '(none)'}`);
+    console.log(`    bibliometrics: h-index ${p.wmkf_hindex ?? '-'} / cites ${p.wmkf_totalcitations ?? '-'} / aff ${p.wmkf_primaryaffiliation ?? '-'}`);
   }
   });
 })().catch((e) => { console.error(e.message); process.exit(1); });

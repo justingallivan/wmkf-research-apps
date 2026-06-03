@@ -882,7 +882,7 @@ const ENTITY_TYPE_CONFIGS = {
   reviewer: {
     entitySet: 'wmkf_potentialreviewerses',
     idField: 'wmkf_potentialreviewersid',
-    select: 'wmkf_name,wmkf_firstname,wmkf_lastname,wmkf_title,wmkf_emailaddress,wmkf_organizationname,wmkf_areaofexpertise,wmkf_potentialreviewersid',
+    select: 'wmkf_name,wmkf_firstname,wmkf_lastname,wmkf_title,wmkf_emailaddress,wmkf_organizationname,wmkf_primaryaffiliation,wmkf_areaofexpertise,wmkf_potentialreviewersid',
     filterField: 'wmkf_name',
     filterExact: false,
     nameField: 'wmkf_name',
@@ -1478,7 +1478,7 @@ async function handleRequestReviewers(requestId) {
   if (reviewers.length > 0) {
     const orClauses = reviewers.map(r => `wmkf_potentialreviewersid eq ${r.id}`).join(' or ');
     const detailResult = await DynamicsService.queryRecords('wmkf_potentialreviewerses', {
-      select: 'wmkf_name,wmkf_title,wmkf_emailaddress,wmkf_organizationname,wmkf_areaofexpertise,wmkf_potentialreviewersid',
+      select: 'wmkf_name,wmkf_title,wmkf_emailaddress,wmkf_organizationname,wmkf_primaryaffiliation,wmkf_areaofexpertise,wmkf_potentialreviewersid',
       filter: orClauses,
       top: 5,
     });
@@ -1494,7 +1494,7 @@ async function handleRequestReviewers(requestId) {
       if (detail) {
         rev.title = detail.wmkf_title || '';
         rev.email = detail.wmkf_emailaddress || '';
-        rev.organization = detail.wmkf_organizationname || '';
+        rev.organization = detail.wmkf_primaryaffiliation || detail.wmkf_organizationname || '';
         rev.expertise = detail.wmkf_areaofexpertise || '';
       }
     }

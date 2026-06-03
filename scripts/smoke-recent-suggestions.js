@@ -39,19 +39,12 @@ require('./../lib/dataverse/client').loadEnvLocal();
     const prId = s._wmkf_potentialreviewer_value;
     const reqId = s._wmkf_request_value;
 
+    // S213: bibliometrics live on the person now (wmkf_appresearcher dropped).
     const pr = prId
       ? await DynamicsService.getRecord('wmkf_potentialreviewerses', prId, {
-          select: 'wmkf_name,wmkf_emailaddress,wmkf_organizationname,wmkf_areaofexpertise,wmkf_whyreviewerwaschosen',
+          select: 'wmkf_name,wmkf_emailaddress,wmkf_organizationname,wmkf_areaofexpertise,wmkf_whyreviewerwaschosen,wmkf_primaryaffiliation,wmkf_orcid,wmkf_googlescholarid,wmkf_hindex,wmkf_totalcitations,wmkf_metricsupdatedat',
         }).catch(() => null)
       : null;
-
-    const { records: researchers } = prId
-      ? await DynamicsService.queryRecords('wmkf_appresearchers', {
-          select: 'wmkf_appresearcherid,wmkf_name,wmkf_email,wmkf_orcid,wmkf_googlescholarid,wmkf_hindex,wmkf_totalcitations,wmkf_primaryaffiliation,wmkf_metricsupdatedat',
-          filter: `_wmkf_potentialreviewer_value eq ${prId}`,
-          top: 1,
-        })
-      : { records: [] };
 
     console.log('---');
     console.log('suggestion:', s.wmkf_suggestionlabel || '(no label)');
@@ -71,15 +64,12 @@ require('./../lib/dataverse/client').loadEnvLocal();
     } else {
       console.log('  potentialReviewer: (not found)');
     }
-    if (researchers[0]) {
-      const r = researchers[0];
-      console.log('  researcher:');
-      console.log('    h-index/cites:', `${r.wmkf_hindex ?? '-'} / ${r.wmkf_totalcitations ?? '-'}`);
-      console.log('    orcid/scholar:', `${r.wmkf_orcid ?? '-'} / ${r.wmkf_googlescholarid ?? '-'}`);
-      console.log('    affiliation: ', r.wmkf_primaryaffiliation);
-      console.log('    metricsAt:   ', r.wmkf_metricsupdatedat);
-    } else {
-      console.log('  researcher: (not found)');
+    if (pr) {
+      console.log('  bibliometrics (on the person):');
+      console.log('    h-index/cites:', `${pr.wmkf_hindex ?? '-'} / ${pr.wmkf_totalcitations ?? '-'}`);
+      console.log('    orcid/scholar:', `${pr.wmkf_orcid ?? '-'} / ${pr.wmkf_googlescholarid ?? '-'}`);
+      console.log('    affiliation: ', pr.wmkf_primaryaffiliation);
+      console.log('    metricsAt:   ', pr.wmkf_metricsupdatedat);
     }
   }
   });

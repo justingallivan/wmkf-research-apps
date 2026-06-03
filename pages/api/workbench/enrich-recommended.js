@@ -152,7 +152,7 @@ export default async function handler(req, res) {
         let affiliation = null;
         try {
           const person = await potentialReviewerAdapter.getById(prId);
-          affiliation = person?.wmkf_organizationname || null;
+          affiliation = person?.wmkf_primaryaffiliation || person?.wmkf_organizationname || null;
         } catch { /* affiliation is optional — verify fills it from PubMed */ }
         suggestions.push({
           name,

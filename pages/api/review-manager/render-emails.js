@@ -88,7 +88,7 @@ export default async function handler(req, res) {
       const requestId = sug._wmkf_request_value;
       const [person, request] = await Promise.all([
         personId ? DynamicsService.getRecord('wmkf_potentialreviewerses', personId, {
-          select: 'wmkf_name,wmkf_emailaddress,wmkf_organizationname',
+          select: 'wmkf_name,wmkf_emailaddress,wmkf_organizationname,wmkf_primaryaffiliation',
         }).catch(() => null) : null,
         requestId ? DynamicsService.getRecord('akoya_requests', requestId, {
           select: 'akoya_requestid,akoya_requestnum,akoya_title,wmkf_abstract,wmkf_organizationname,_akoya_applicantid_value,_wmkf_projectleader_value,wmkf_meetingdate',
@@ -166,7 +166,7 @@ export default async function handler(req, res) {
 
       const candidate = {
         name: candidateName,
-        affiliation: person?.wmkf_organizationname || null,
+        affiliation: person?.wmkf_primaryaffiliation || person?.wmkf_organizationname || null,
         email: candidateEmail,
       };
       const proposal = {

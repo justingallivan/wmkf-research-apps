@@ -206,7 +206,7 @@ export default async function handler(req, res) {
       reviewer: {
         name: reviewer?.wmkf_name || null,
         email: reviewer?.wmkf_emailaddress || null,
-        organization: reviewer?.wmkf_organizationname || null,
+        organization: reviewer?.wmkf_primaryaffiliation || reviewer?.wmkf_organizationname || null,
       },
       // Soft deadline shown on the page. Token expiry is review due + 4 weeks
       // grace, so this is the wall-clock cutoff for self-serve submission.
@@ -221,7 +221,7 @@ export default async function handler(req, res) {
       // when the engagement is in pre-materials state.
       prefill: {
         affiliation:
-          suggestion.wmkf_revieweraffiliation || reviewer?.wmkf_organizationname || '',
+          suggestion.wmkf_revieweraffiliation || reviewer?.wmkf_primaryaffiliation || reviewer?.wmkf_organizationname || '',
         impact: suggestion.wmkf_reviewerimpact ?? null,
         risk: suggestion.wmkf_reviewerrisk ?? null,
         overallRating: suggestion.wmkf_revieweroverallrating ?? null,
@@ -355,6 +355,7 @@ function buildStage2aPrefill(suggestion, reviewer, contact) {
 
   let affiliation = firstNonEmpty(
     suggestion.wmkf_revieweraffiliation,
+    reviewer?.wmkf_primaryaffiliation,
     reviewer?.wmkf_organizationname,
     contact?.adx_organizationname,
   );
