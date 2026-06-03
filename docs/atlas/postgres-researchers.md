@@ -7,7 +7,7 @@
 
 ## Source of truth
 
-**Drain-only post-W6 cutover (2026-05-12).** The canonical identity for reviewer candidates is Dataverse `wmkf_potentialreviewers` + bibliometrics on `wmkf_appresearcher`. The Postgres `researchers` table is retained as a historical snapshot pending the post-pilot drop (≥2026-07-01; requires `scripts/restore-postgres-drain-table-backup.js` to be built first — not yet built). Zero application code under `pages/api/`, `lib/services/`, `lib/dataverse/`, or `shared/` reads or writes this table; only `scripts/*` admin/migration tools touch it. The Database tab admin UI and `pages/api/reviewer-finder/researchers.js` endpoint that previously read this pool were retired W6 step 1.
+**Drain-only post-W6 cutover (2026-05-12).** The canonical identity for reviewer candidates is Dataverse `wmkf_potentialreviewers`, which **also carries the bibliometric fields** (S213: the `wmkf_appresearcher` sidecar was collapsed onto the person and dropped — historical `wmkf_appresearcher` references below predate that). The Postgres `researchers` table is retained as a historical snapshot pending the post-pilot drop (≥2026-07-01; requires `scripts/restore-postgres-drain-table-backup.js` to be built first — not yet built). Zero application code under `pages/api/`, `lib/services/`, `lib/dataverse/`, or `shared/` reads or writes this table; only `scripts/*` admin/migration tools touch it. The Database tab admin UI and `pages/api/reviewer-finder/researchers.js` endpoint that previously read this pool were retired W6 step 1.
 
 ## Schema (live, from `information_schema`)
 

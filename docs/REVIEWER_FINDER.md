@@ -141,7 +141,7 @@ Reviewer Finder settings are stored per-profile in Dataverse (`wmkf_appuserprefe
 
 ## ~~Database Tab~~ (RETIRED 2026-05-12, W6 step 1)
 
-The Database tab and its Postgres-backed researcher CRUD (`pages/api/reviewer-finder/researchers.js` + the `researchers` / `researcher_keywords` Postgres tables) were retired in W6 of the Postgres→Dataverse migration. The UI is now a two-tab interface (Find Reviewers + My Candidates); saved-candidate state lives in Dataverse `wmkf_appresearcher` / `wmkf_potentialreviewer` / `wmkf_appreviewersuggestion`. An `add-candidate-manual` endpoint that replaces the in-place Add Researcher flow is spec'd as post-pilot work — see `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`.
+The Database tab and its Postgres-backed researcher CRUD (`pages/api/reviewer-finder/researchers.js` + the `researchers` / `researcher_keywords` Postgres tables) were retired in W6 of the Postgres→Dataverse migration. The UI is now a two-tab interface (Find Reviewers + My Candidates); saved-candidate state lives in Dataverse `wmkf_potentialreviewer` (person + bibliometrics, S213) / `wmkf_appreviewersuggestion`. An `add-candidate-manual` endpoint that replaces the in-place Add Researcher flow is spec'd as post-pilot work — see `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`.
 
 ---
 

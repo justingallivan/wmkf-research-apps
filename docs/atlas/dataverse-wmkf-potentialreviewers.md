@@ -39,7 +39,7 @@ Field caps observed empirically:
 - `wmkf_organizationname` — 100 chars
 - `wmkf_areaofexpertise` — 100 chars
 
-(Full-string affiliation belongs on `wmkf_appresearcher.wmkf_primaryaffiliation`.)
+**Bibliometric fields (S213 — folded in from the dropped `wmkf_appresearcher` sidecar):** `wmkf_primaryaffiliation` (500, the canonical full-string affiliation per D-AFF), `wmkf_department` (255), `wmkf_orcid`/`wmkf_orcidurl`, `wmkf_googlescholarid`/`wmkf_googlescholarurl`, `wmkf_hindex`/`wmkf_i10index`/`wmkf_totalcitations`, `wmkf_website`/`wmkf_facultypageurl`, `wmkf_keywords` (Memo), `wmkf_emailsource`, `wmkf_lastchecked`/`wmkf_metricsupdatedat`/`wmkf_contactenrichedat`/`wmkf_contactenrichmentsource`. (`wmkf_organizationname` kept as a clamped-100 compat shadow.) Written by `adapters/researcher.js` (now person-targeting) + `potential-reviewer.js`. See `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`.
 
 ## Adapter contract (`lib/dataverse/adapters/potential-reviewer.js`)
 
@@ -58,7 +58,7 @@ Methods:
 - `pages/api/review-manager/render-emails.js` — `DynamicsService.getRecord('wmkf_potentialreviewerses', personId)` to hydrate person fields per email draft
 - `pages/api/review-manager/reviewers.js` `fetchPotentialReviewers` — chunked OR-chain on `wmkf_potentialreviewersid` to hydrate the Review Manager reviewer list
 - `pages/api/reviewer-finder/{save-candidates,my-candidates}.js`
-- (Indirectly via `wmkf_appresearcher` lookup — every researcher row has a 1:1 to here)
+- `pages/api/workbench/enrich-recommended.js`, `lib/services/contact-enrichment-service.js`, `adapters/researcher.js` — read the bibliometric fields here (S213: was the `wmkf_appresearcher` sidecar)
 
 ## Write paths
 
@@ -71,12 +71,12 @@ Methods:
 |---|---|
 | Postgres `researchers` | Migrates 1:1 by email match — produces the identity half of the new model |
 | Dataverse `contacts` | Promoted on first outreach via `wmkf_contact` lookup; AppendTo permission granted 2026-05-01 |
-| Dataverse `wmkf_appresearcher` | 1:1 sidecar holding bibliometric snapshots |
+| ~~Dataverse `wmkf_appresearcher`~~ | **DROPPED S213** — bibliometric snapshots folded onto this entity (see Key fields) |
 | Vendor `akoya_requests.wmkf_potentialreviewer1..5` | Legacy per-proposal slots (not the canonical link — those are in `wmkf_appreviewersuggestion`) |
 
 ## "Engaged" semantics + one-shot post-pilot drop (locked S136; cleanup-cron approach replaced)
 
-Per the migration plan, this table is treated as **scratch + history** rather than canonical-person. A `wmkf_potentialreviewer` row becomes "engaged" (= history) when ANY of the 8 signals on its linked `wmkf_appreviewersuggestion` are populated (see that page). The earlier cleanup-cron plan was replaced (Codex-reviewed) with a **one-shot post-pilot DELETE script** matching the Wave 1 precedent: drops un-engaged rows where `wmkf_meetingdate < today - 30 days`, with cascade onto the `wmkf_appresearcher` sidecar. No cron exists or is planned. Permanent reviewer identity ultimately lives in `contact` via promotion (`wmkf_contact` lookup).
+Per the migration plan, this table is treated as **scratch + history** rather than canonical-person. A `wmkf_potentialreviewer` row becomes "engaged" (= history) when ANY of the 8 signals on its linked `wmkf_appreviewersuggestion` are populated (see that page). The earlier cleanup-cron plan was replaced (Codex-reviewed) with a **one-shot post-pilot DELETE script** matching the Wave 1 precedent: drops un-engaged rows where `wmkf_meetingdate < today - 30 days` (the `wmkf_appresearcher` sidecar that this once cascaded onto was dropped S213 — bibliometrics are now columns on this row). No cron exists or is planned. Permanent reviewer identity ultimately lives in `contact` via promotion (`wmkf_contact` lookup).
 
 ## Migration disposition (live source of truth for reviewer identity)
 

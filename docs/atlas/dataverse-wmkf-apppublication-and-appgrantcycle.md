@@ -1,8 +1,10 @@
-# Atlas: `wmkf_apppublication`, `wmkf_appgrantcycle`, `wmkf_apppublicationauthor` (empty Wave 2 entities)
+# Atlas: `wmkf_appgrantcycle` (live) — `wmkf_apppublication` + `wmkf_apppublicationauthor` DROPPED S213
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-05-07 via `scripts/audit-dataverse-state.js` + EntityDefinitions metadata probe. **`wmkf_appgrantcycle` section re-verified 2026-05-19** post-W3 cutover (see that section); the other entities on this page (publication, proposalsearch, junction) retain the 2026-05-07 audit.
+> **⚠ S213 (2026-06-02): `wmkf_apppublication` and `wmkf_apppublicationauthor` were DROPPED** (deployed with 0 rows, no callers; went down with the `wmkf_appresearcher` collapse — `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`). The publication sections below are historical. **`wmkf_appgrantcycle` is unaffected and remains live** — see its section.
+
+**Last verified:** 2026-05-07 via `scripts/audit-dataverse-state.js` + EntityDefinitions metadata probe. **`wmkf_appgrantcycle` section re-verified 2026-05-19** post-W3 cutover (see that section); the publication entities were dropped S213 (above).
 
 ## `wmkf_apppublication` — DEPLOYED but EMPTY
 

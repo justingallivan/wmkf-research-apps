@@ -14,7 +14,7 @@ Schema: `id`, `researcher_id` (FK CASCADE), `keyword`, `relevance_score` (0-1), 
 
 **Read/write paths:** Live application readers/writers retired. `pages/api/reviewer-finder/researchers.js` deleted 2026-05-12 in W6 step 1; `lib/services/database-service.js` keyword methods gutted in W5 step 2 (commit `0c58da4`). Remaining touches: `scripts/backfill-postgres-to-dataverse.js`, `scripts/clear-all-database.js` (admin scripts).
 
-**Cross-system:** Migrates to `wmkf_appresearcher.wmkf_keywords` as a single Memo field (comma-joined per the schema-as-code). The 1:N → 1:1 collapse is intentional — the current Postgres design over-models keyword provenance.
+**Cross-system:** Migrates to `wmkf_potentialreviewer.wmkf_keywords` as a single Memo field (comma-joined; S213: this was `wmkf_appresearcher.wmkf_keywords` before the sidecar collapsed onto the person). The 1:N → 1:1 collapse is intentional — the current Postgres design over-models keyword provenance.
 
 ## `proposal_searches` (0 rows)
 

@@ -11,7 +11,7 @@ Visual orientation for the reviewer-domain Dataverse entities and how they conne
 | Entity | What it is | When the row appears | Row count |
 |---|---|---|---|
 | `wmkf_potentialreviewer` | The **person**. Custom Foundation entity (not vendor). Global. One row per real human, dedup'd on email. Row origin tracked in `wmkf_source` — currently two main paths: (a) **Reviewer Finder** discovery (rich enrichment, full bibliometrics), (b) **Applicant-submitted** during application intake (sparse: usually just name + affiliation + email). The same person can later be enriched if Reviewer Finder picks them up, or via the Workbench "enrich recommended reviewers" action (S211). | First touch by either path. | 4,267 |
-| `wmkf_appresearcher` | **Bibliometric sidecar** of the person — h-index, ORCID, citations, scholar URL. 1:1 with the person. *Structural redundancy noted — see "Open design notes" below. Slated for collapse into `wmkf_potentialreviewer` post-pilot.* | Reviewer Finder enrichment, or the Workbench "enrich recommended reviewers" action (S211) which now also creates a sidecar for an applicant-recommended person. (Applicant-source rows that have never been enriched still have no companion row.) | 334 |
+| ~~`wmkf_appresearcher`~~ | **DROPPED S213** — the bibliometric sidecar (h-index, ORCID, citations, scholar URL) was collapsed onto `wmkf_potentialreviewer`. Those fields now live on the person; written by Reviewer Finder enrichment + the Workbench "enrich recommended reviewers" action. See "What changed" below. | — |
 | `contact` | The **CRM contact**. Where canonical identity ultimately lives. | Promoted from `wmkf_potentialreviewer` on first staff outreach. | (vendor table — many) |
 | `wmkf_appreviewersuggestion` | The **per-(reviewer, request) engagement**. Lifecycle ledger — every state, timestamp, decline reason, policy ack, review content lives here. | Reviewer Finder save-candidates creates one per (person, request). | 336 |
 | `akoya_request` (grant) | The **proposal being reviewed**. | Created when WMKF intakes a grant request. | 25,473+ |
@@ -171,7 +171,7 @@ When does each entity get touched? Stages mirror `docs/REVIEWER_INTERACTION_DESI
 
 ```mermaid
 flowchart TD
-    S0["Stage 0 — Reviewer Finder discovers candidate"] --> S0w["WRITES:<br/>• wmkf_potentialreviewer (upsert by email)<br/>• wmkf_appresearcher (sidecar, bibliometrics)<br/>• wmkf_appreviewersuggestion (engagement, selected=true)"]
+    S0["Stage 0 — Reviewer Finder discovers candidate"] --> S0w["WRITES:<br/>• wmkf_potentialreviewer (upsert by email; bibliometrics on the person since S213)<br/>• wmkf_appreviewersuggestion (engagement, selected=true)"]
 
     S0w --> S1["Stage 1 — PD invites (send-emails)"]
     S1 --> S1w["WRITES:<br/>• wmkf_appreviewersuggestion: invited=true, wmkf_emailsentat, external token fields<br/>• contact: created if missing; wmkf_contact lookup set on wmkf_potentialreviewer (promotion)"]
@@ -210,7 +210,7 @@ flowchart TD
 |---|---|---|
 | Reviewer's canonical name + email | `contact` (post-promotion) or `wmkf_potentialreviewer` (pre-promotion) | Promotion happens on first outreach via `wmkf_potentialreviewer.wmkf_contact` |
 | Reviewer's engagement-scope corrections (they updated their email at accept) | `wmkf_appreviewersuggestion.wmkf_revieweremail` etc. | Engagement-scoped — never auto-promoted to contact or person record |
-| h-index / citation count / ORCID / scholar URL | `wmkf_appresearcher.wmkf_hindex` etc. | 1:1 sidecar to person |
+| h-index / citation count / ORCID / scholar URL | `wmkf_potentialreviewer.wmkf_hindex` etc. | on the person (S213; was the `wmkf_appresearcher` sidecar) |
 | Accept/decline state | `wmkf_appreviewersuggestion.wmkf_responsetype` (picklist) + `.wmkf_accepted` / `.wmkf_declined` booleans | |
 | Decline reason | `wmkf_appreviewersuggestion.wmkf_declinereasonpicklist` (structured) + `.wmkf_declinereason` (free text) + `.wmkf_declinereferral` | |
 | COI / AI policy acknowledged? | `wmkf_appreviewersuggestion.wmkf_coiackedat` (timestamp) + `wmkf_coipolicyversion` (which version they saw) | Same shape for AI-use |
@@ -230,11 +230,9 @@ flowchart TD
 
 ---
 
-## Open design notes
+## What changed
 
-**`wmkf_appresearcher` is structural redundancy.** Originally split off as a "bibliometric sidecar" to keep h-index refreshes from churning the identity row. With no historical-snapshot requirement and `wmkf_potentialreviewer` confirmed custom (not vendor — see metadata probe results), the bibliometric fields could live directly on `wmkf_potentialreviewer` with no structural loss. The sparse-row pattern is already the norm there (applicant-source rows have minimal data); adding nullable bibliometric attrs continues that pattern, doesn't introduce it.
-
-**Slated for post-pilot collapse.** Full plan: `docs/APPRESEARCHER_COLLAPSE_PLAN.md` (Codex-reviewed S196). Schema add (17 fields to `wmkf_potentialreviewer`), backfill 334 rows from `wmkf_appresearcher`, fold `adapters/researcher.js` into `adapters/potential-reviewer.js`, update 4 live app callers (Reviewer Finder save-candidates + my-candidates, Review Manager reviewers, contact-enrichment-service) + 8 scripts, drop the entity. ~8 hours of focused work. Not done mid-pilot because mid-pilot churn risks correctness over a small cleanup benefit.
+**`wmkf_appresearcher` collapse — ✅ SHIPPED S213 (2026-06-02).** The bibliometric sidecar was structural redundancy (split off to keep h-index refreshes from churning the identity row, but with no historical-snapshot need and `wmkf_potentialreviewer` confirmed custom-not-vendor, the fields belonged on the person). It was collapsed: 17 bibliometric fields added to `wmkf_potentialreviewer`, all 339 sidecar rows backfilled onto their persons, `adapters/researcher.js` repointed to write the person, callers cut over, and `wmkf_appresearcher` + the two empty `wmkf_apppublication`/`wmkf_apppublicationauthor` tables **DROPPED**. Bibliometrics (affiliation/h-index/citations/ORCID/scholar/etc.) now live directly on `wmkf_potentialreviewer`. As-executed record: `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md` (the S196 `docs/APPRESEARCHER_COLLAPSE_PLAN.md` is the original design). **The two ER diagrams above + the entity table predate the collapse — read the `APPRESEARCHER` entity there as folded into `POTENTIALREVIEWER`.**
 
 ---
 
@@ -252,7 +250,7 @@ flowchart TD
 
 - `docs/atlas/dataverse-wmkf-appreviewersuggestion.md` — engagement junction (the central row)
 - `docs/atlas/dataverse-wmkf-potentialreviewers.md` — person record
-- `docs/atlas/dataverse-wmkf-appresearcher.md` — bibliometric sidecar
+- (bibliometric fields now live on `docs/atlas/dataverse-wmkf-potentialreviewers.md` — the `wmkf_appresearcher` sidecar + its atlas page were dropped S213)
 - `docs/atlas/dataverse-wmkf-policy-and-policy-version.md` — policy versioning
 - `docs/atlas/dataverse-akoya-request.md` — grant + honorarium row shape
 - `docs/REVIEWER_INTERACTION_DESIGN.md` — full reviewer-journey design

@@ -235,7 +235,7 @@ Run `node scripts/apply-migrations.js` (NOT `setup-database.js`) on any existing
 | Table | Purpose |
 |-------|---------|
 | `user_profiles` | Identity (azure_id, azure_email, is_active, dynamics_systemuser_id) |
-| `researchers`, `publications` | Postgres drain-only (Reviewer Finder formerly read this pool; W6 retired the Database tab and `researchers.js` 2026-05-12). Active reviewer state now in Dataverse `wmkf_appresearcher` / `wmkf_potentialreviewer`. |
+| `researchers`, `publications` | Postgres drain-only (Reviewer Finder formerly read this pool; W6 retired the Database tab and `researchers.js` 2026-05-12). Active reviewer state now in Dataverse `wmkf_potentialreviewer` (S213: the `wmkf_appresearcher` bibliometric sidecar was collapsed onto the person and dropped). |
 | `grant_cycles` | Postgres drain-only post-W3 cutover (2026-05-12); Dataverse `wmkf_appgrantcycle` is source of truth. See `docs/atlas/postgres-grant-cycles.md`. |
 | `proposal_searches`, `reviewer_suggestions` | Postgres drain-only / script-only (Reviewer Finder per-user state migrated to Dataverse `wmkf_appreviewersuggestion`). |
 | `retractions`, `integrity_screenings`, `screening_dismissals` | Integrity Screener (Retraction Watch + per-user history) |

@@ -54,8 +54,8 @@ Pre-W5 (now removed):
 
 ## Cross-system
 
-Schema-as-code at `lib/dataverse/schema/wave2/wmkf_app_publication.json` exists and the Dataverse entity `wmkf_apppublication` IS DEPLOYED (14 custom attrs verified live), but has **0 rows**. Both Postgres and Dataverse sides are empty.
+The Dataverse entity `wmkf_apppublication` (and its `wmkf_apppublicationauthor` junction) was **DROPPED S213** — it was deployed with 0 rows and no callers, so it went down with the `wmkf_appresearcher` collapse (`docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`); its schema-as-code manifest was removed too. The Postgres `publications` table remains a drain-only empty snapshot.
 
 ## Migration disposition
 
-Per `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`: skip-safe — drop the Postgres table during cleanup; no rows to migrate. Dataverse `wmkf_apppublication` will start populating once the live discovery flow writes to it.
+Per `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`: skip-safe — drop the Postgres table during cleanup; no rows to migrate. (The Dataverse `wmkf_apppublication` target was dropped S213; if publication tracking is ever needed it would be redesigned around `wmkf_potentialreviewer` directly.)

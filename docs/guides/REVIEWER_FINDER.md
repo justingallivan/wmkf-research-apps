@@ -1,6 +1,6 @@
 # Reviewer Finder Guide
 
-> **Note (2026-05-19):** Saved candidates write directly to Dataverse (`wmkf_potentialreviewer` + `wmkf_appreviewersuggestion` + `wmkf_appresearcher`). Per-proposal picker and a "My Proposals" PD-filtered view are also available in the app. The "Database" tab and its underlying Postgres researcher pool were **retired in W6 (2026-05-12)** — researcher data now lives in Dataverse alongside the rest of reviewer state. The walkthrough below describes the user-facing flow; for the underlying data model see `docs/atlas/dataverse-wmkf-appreviewersuggestion.md`.
+> **Note (2026-05-19):** Saved candidates write directly to Dataverse (`wmkf_potentialreviewer` — incl. bibliometrics since the S213 collapse — + `wmkf_appreviewersuggestion`). Per-proposal picker and a "My Proposals" PD-filtered view are also available in the app. The "Database" tab and its underlying Postgres researcher pool were **retired in W6 (2026-05-12)** — researcher data now lives in Dataverse alongside the rest of reviewer state. The walkthrough below describes the user-facing flow; for the underlying data model see `docs/atlas/dataverse-wmkf-appreviewersuggestion.md`.
 
 Find qualified peer reviewers for grant proposals using AI analysis combined with academic database verification.
 
