@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer bibliometric sidecar collapse (Session 213)
+
+**Milestone:** Collapsed the `wmkf_appresearcher` 1:1 bibliometric sidecar into the person entity `wmkf_potentialreviewers` and **dropped** it (+ the two empty `wmkf_apppublication`/`wmkf_apppublicationauthor` tables) — the reviewer domain goes from four Dataverse tables to two. Executed mid-pilot (the prior "post-pilot, don't act now" posture was reversed once the sidecar data proved disposable — near-zero cross-cycle reviewer overlap). Full prod cutover, each phase verified; live-smoke-verified on the Workbench; Codex ground-truth + structure review folded in.
+
+**Sessions:** 213 (single session; ~20 commits; Codex plan-review + network-enabled ground-truth probe).
+
+**Ship state:**
+- 17 bibliometric fields (affiliation/h-index/citations/ORCID/Scholar/department/etc.) added to `wmkf_potentialreviewers`; all 339 sidecar rows backfilled onto their persons (verified exact); `wmkf_appresearcher` + both publication tables **DROPPED** (EntityDefinitions 404). Snapshot retained as rollback insurance; backfill + drop one-shot scripts committed.
+- `adapters/researcher.js` repointed to write the person (no sidecar); affiliation canonical on `wmkf_primaryaffiliation` (500) per D-AFF, with `wmkf_organizationname` (100) kept as a clamped compat shadow; the 7 affiliation readers + 5 callers cut over; **zero runtime references to the dropped entity remain** (verified by grep).
+- Phase 6 doc reconcile: Atlas index, `REVIEWER_DATA_MODEL`, `REVIEWER_ARCHITECTURE`, atlas pages, plans, CLAUDE.md, memory — all marked SHIPPED / corrected; dated/archive snapshots left as history. All doc/state CI gates green.
+- Also this session: a Workbench "Remove from this request" reviewer action (atomic link-revoke + soft-delete, on Candidates + Invite/Track/Completed), the D26 smoke testbed swapped to a dedicated test request (1002788), and smoke-helper hardening.
+
+**Why it matters:** removed a structural-redundancy join hop from every reviewer query; the disposable-data insight turned S196's ~8h careful "post-pilot" migration into a lighter clean cutover. The dig also surfaced — and tee'd up — the reviewer-identity false-match problem (a search for a PI attached a *lab member's* Scholar metrics because the institution-only guard can't tell them apart): Codex redesign plan saved, Phase 1 (a Scholar name-guard) not yet built.
+
+**Pointers:** `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`, `docs/REVIEWER_IDENTITY_RESOLUTION_PLAN.md`, `.claude-memory/project-appresearcher-collapse-post-pilot.md`. Commits `bfc903d`→`fb0a3f4` (collapse), `ca95de5`→`e9d5660` (remove-reviewer feature).
+
 ## May 2026 — Canonical system model + falsification guardrails + drift reconciliation (Session 197)
 
 **Milestone:** Turned chronic doc/memory nomenclature drift into durable infrastructure. Named the recurring root failure — *searching to confirm, not to falsify* — and built a forcing function for it, plus the project's first canonical conceptual model. Two multi-agent evaluation workflows (drift audit, 10-front codebase eval), each independently Codex-reviewed.
