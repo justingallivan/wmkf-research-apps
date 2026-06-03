@@ -228,9 +228,17 @@ export default async function handler(req, res) {
       for (const c of enriched) {
         const prId = c.potentialReviewerId;
         const ce = c.contactEnrichment || {};
-        const hIndex = c.hIndex ?? ce.hIndex ?? null;
-        const i10Index = c.i10Index ?? ce.i10Index ?? null;
-        const totalCitations = c.totalCitations ?? ce.totalCitations ?? null;
+        // Identity gate (REVIEWER_IDENTITY_RESOLUTION_PLAN.md Phase 1): if Scholar
+        // enrichment abstained (name/institution mismatch — likely a different
+        // person), drop the Scholar id/url + bibliometrics for both the writeback
+        // and the UI payload. The adapter treats null as a no-op (never erases a
+        // prior-correct value, never writes the wrong one).
+        const scholarSkipped = !!ce.tierResults?.scholar_profile?.skipped;
+        const hIndex = scholarSkipped ? null : (c.hIndex ?? ce.hIndex ?? null);
+        const i10Index = scholarSkipped ? null : (c.i10Index ?? ce.i10Index ?? null);
+        const totalCitations = scholarSkipped ? null : (c.totalCitations ?? ce.totalCitations ?? null);
+        const googleScholarId = scholarSkipped ? null : (ce.googleScholarId || null);
+        const googleScholarUrl = scholarSkipped ? null : (ce.googleScholarUrl || null);
         const email = c.email || ce.email || null;
 
         if (prId) {
@@ -242,8 +250,8 @@ export default async function handler(req, res) {
               emailSource: ce.emailSource || null,
               orcid: ce.orcidId || null,
               orcidUrl: ce.orcidUrl || null,
-              googleScholarId: ce.googleScholarId || null,
-              googleScholarUrl: ce.googleScholarUrl || null,
+              googleScholarId,
+              googleScholarUrl,
               hIndex,
               i10Index,
               totalCitations,
@@ -295,7 +303,7 @@ export default async function handler(req, res) {
           emailSource: ce.emailSource || null,
           website: c.website || ce.website || null,
           orcidUrl: ce.orcidUrl || null,
-          googleScholarUrl: ce.googleScholarUrl || null,
+          googleScholarUrl,
           hIndex,
           totalCitations,
           // Flag the UI uses to badge these rows distinctly.

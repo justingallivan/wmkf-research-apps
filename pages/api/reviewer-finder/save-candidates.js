@@ -86,6 +86,14 @@ export default async function handler(req, res) {
           matchReason += ' [Coauthor COI: Has co-authored with proposal authors]';
         }
 
+        // Identity gate (REVIEWER_IDENTITY_RESOLUTION_PLAN.md Phase 1): if Scholar
+        // enrichment abstained (name/institution mismatch — likely a different
+        // person), do NOT persist the Scholar id/url or its bibliometrics, even
+        // if a stale value rode in on the candidate top-level. Passing null is a
+        // safe no-op in the adapter (pruneEmpty drops it → never overwrites a
+        // previously-correct value, never writes the wrong one).
+        const scholarSkipped = !!candidate.contactEnrichment?.tierResults?.scholar_profile?.skipped;
+
         const { id: potentialReviewerId } = await potentialReviewerAdapter.upsertByEmail({
           name: candidate.name,
           email: candidateEmail,
@@ -101,15 +109,15 @@ export default async function handler(req, res) {
           emailSource: candidate.contactEnrichment?.emailSource || null,
           orcid: candidateOrcid,
           orcidUrl: candidate.orcidUrl || candidate.contactEnrichment?.orcidUrl || null,
-          googleScholarId: candidateGoogleScholarId,
-          googleScholarUrl: candidate.googleScholarUrl || candidate.contactEnrichment?.googleScholarUrl || null,
+          googleScholarId: scholarSkipped ? null : candidateGoogleScholarId,
+          googleScholarUrl: scholarSkipped ? null : (candidate.googleScholarUrl || candidate.contactEnrichment?.googleScholarUrl || null),
           // Fall back to contactEnrichment like every other field above —
           // enrichment writes bibliometrics there, and not all callers promote
           // them to the candidate top-level (the standalone Reviewer Finder does
           // not), so reading candidate.* only would silently drop fetched metrics.
-          hIndex: candidate.hIndex ?? candidate.contactEnrichment?.hIndex ?? null,
-          i10Index: candidate.i10Index ?? candidate.contactEnrichment?.i10Index ?? null,
-          totalCitations: candidate.totalCitations ?? candidate.contactEnrichment?.totalCitations ?? null,
+          hIndex: scholarSkipped ? null : (candidate.hIndex ?? candidate.contactEnrichment?.hIndex ?? null),
+          i10Index: scholarSkipped ? null : (candidate.i10Index ?? candidate.contactEnrichment?.i10Index ?? null),
+          totalCitations: scholarSkipped ? null : (candidate.totalCitations ?? candidate.contactEnrichment?.totalCitations ?? null),
           affiliation: candidateAffiliation,
           department: candidate.department || candidate.contactEnrichment?.department || null,
           website: candidateWebsite,

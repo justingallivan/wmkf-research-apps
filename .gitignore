@@ -65,3 +65,6 @@ tmp/
 
 # appresearcher collapse backfill snapshot (local rollback insurance, S213)
 scripts/.appresearcher-snapshot.jsonl
+
+# scholar-identity audit output (contains person data; local-only, S214)
+scripts/.scholar-identity-audit.jsonl
