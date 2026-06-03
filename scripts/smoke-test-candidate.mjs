@@ -180,13 +180,9 @@ async function teardownPerson(personId) {
   }
   const contactId = person._wmkf_contact_value || null;
 
-  const { records: sidecars } = await DynamicsService.queryRecords('wmkf_appresearchers', {
-    select: 'wmkf_appresearcherid', filter: `_wmkf_potentialreviewer_value eq ${personId}`, top: 50,
-  });
-  for (const s of sidecars) {
-    await DynamicsService.deleteRecord('wmkf_appresearchers', s.wmkf_appresearcherid);
-    console.log(`  deleted sidecar ${s.wmkf_appresearcherid}`);
-  }
+  // S213: the wmkf_appresearcher bibliometric sidecar was collapsed into the
+  // person and dropped — there is no sidecar row to delete anymore. (Smoke
+  // candidates never had one anyway: create only makes person + suggestion.)
 
   const { records: sugs } = await DynamicsService.queryRecords('wmkf_appreviewersuggestions', {
     select: 'wmkf_appreviewersuggestionid,_wmkf_request_value', filter: `_wmkf_potentialreviewer_value eq ${personId}`, top: 50,
