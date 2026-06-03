@@ -1,6 +1,6 @@
 # Reviewer Identity Resolver — Phase 2 design (v3)
 
-**Status:** Design spec, pre-implementation. **v3 (S214, 2026-06-02)** resolves the PR1-blocking inconsistencies Codex flagged in its v2 re-review. **No code yet.**
+**Status:** **PR1 SHIPPED (S214)** + **S215 extension SHIPPED** (institution-corroborated ORCID = strong anchor, §3.1). The v3 design (S214, 2026-06-02) resolved the PR1-blocking inconsistencies Codex flagged in v2; PR1 then landed (resolver + write-gates + clear-on-downgrade). S215 fixed the ORCID `family-names` parser bug that had blocked all ORCID capture and added the corroborated-ORCID strong-anchor rule (§3.1). Later PRs (PubMed-cluster + faculty-page → `confirmed`; Postgres leads table; Perplexity Search-API) remain unbuilt.
 
 **v3 changelog (what the v2 re-review changed):**
 - **PR1 resolver reframed as a post-enrichment *classifier*** — it consumes the ORCID/Scholar evidence the existing enrichment pipeline already gathered; **no new network calls, no new enumeration** in PR1. (Resolves: "no new external calls" vs §3 enumeration, "wrap not replace," where enumeration comes from.)
@@ -131,15 +131,25 @@ resolveIdentity(hypothesis, evidence):   // evidence = what enrichment already g
 **Scholar enumeration (decided):** PR1 treats Scholar as **single-candidate** and relies on the displayed-name floor (`findScholarProfileViaGoogle` returns one result today). Multi-result Scholar enumeration is a later PR. **Ambiguity is exercised via ORCID multi-match**, which Phase 1 already abstains on.
 **Later PR adds:** PubMed-cluster + faculty-page verification (with cluster invariants: recurring coauthors + stable affiliation lineage + topical coherence; count alone never confirms), enabling `confirmed` and competitor enumeration beyond ORCID.
 
+### 3.1 Institution-corroborated ORCID = STRONG anchor (S215)
+
+**Decision:** an **institution-corroborated public ORCID** is a STRONG anchor and reaches `probable` **on its own** (one strong anchor → probable; the rung the original §4 promotion rule reserved for a strong anchor PR1 "lacked"). "Corroborated" = the matched ORCID record's self-reported institution (`institution-name`) contains the reviewer's affiliation token (`extractInstitutionName` + `normalizeNameForMatch` substring, the same primitive `findContact` uses to narrow multi-match — `orcid-service.js`). A **bare name-match** ORCID (no institution corroboration) stays a **weak** anchor → `unresolved` alone.
+
+**Rationale (data, S215):** the ORCID `family-names` parser bug (now fixed) had blocked *all* ORCID capture — only 1 of 4,269 reviewer rows had an ORCID persisted. A random sample of 250 resolved **~42%** to an unambiguous ORCID (32.8% institution-corroborated, 8.8% lone). Crossing with Scholar: requiring `probable` = ORCID **and** clean Scholar captures 30%; promoting corroborated-ORCID-alone adds **+7.2%** (→37%), of which 16/18 had a *rejected* Scholar match (Scholar found the wrong person; the corroborated ORCID is the rescue). Only **~4.4%** (lone, uncorroborated) stays gated — the common-name false-match risk, correctly withheld. Product context: ORCID's value is as an authoritative unique researcher ID, not bibliometrics.
+
+**Implementation:** `ORCIDService.findContact` returns `institutionCorroborated` + `matchedInstitution` on a resolved single match; `resolveIdentity`/`orcidEval` emit an auditable anchor `type: 'orcid_public_institution_corroborated'`, `weight: 'strong'`, logging the matched institution in `parserOutput` (per Codex review — inspectable, not an unmarked ORCID). Status stays `probable`/band `medium`; no new status. **Not built:** the lone-uncorroborated "candidate ORCID" capture path (the residual ~4.4% — gating it is the right call; revisit only if observed volume warrants).
+
+**Residual risk (accepted):** institution corroboration is a substring match on self-reported ORCID affiliation data, so two same-name researchers at the same institution, or stale ORCID affiliations, can still false-positive. Higher-precision than lone name-match; not authenticated. Acronym/full-name token differences can also miss true positives (cf. `serp-contact-service.institutionConflicts`).
+
 ---
 
 ## 4. Evidence weighting (hard floors, not soft weights)
 
-- **Strong** (can support `confirmed` — **all later-PR**): authenticated ORCID (reviewer OAuth — *not built*); verified faculty/staff page; verified institutional email/domain; internally-consistent publication cluster; multi-source agreement.
-- **Weak** (never sufficient *alone*): **public ORCID search match** (`ORCIDService.findContact` — name-scored, not authenticated); Scholar profile match; same institution/lab; shared coauthors; topical similarity; name variants.
+- **Strong** (sufficient alone for `probable`; `confirmed` still later-PR): **institution-corroborated public ORCID** (name-match AND institution-match — live, §3.1); authenticated ORCID (reviewer OAuth — *not built*); verified faculty/staff page; verified institutional email/domain; internally-consistent publication cluster; multi-source agreement.
+- **Weak** (never sufficient *alone*): **bare-name public ORCID search match** (`ORCIDService.findContact` — name-scored, no institution corroboration); Scholar profile match; same institution/lab; shared coauthors; topical similarity; name variants.
 - **Negative / hard-reject:** displayed-name mismatch; source is a different same-lab person; conflicting affiliation w/o corroboration; cross-identifier disagreement.
 
-**Promotion rule (resolves the v2 contradiction):** a lone weak anchor → `unresolved`. `probable` needs **≥2 corroborating weak signals** (or one strong, which PR1 lacks). So in PR1, public-ORCID-alone and Scholar-alone are both `unresolved`; the two *agreeing* → `probable`.
+**Promotion rule:** a lone weak anchor → `unresolved`. `probable` needs **one STRONG anchor** (S215: institution-corroborated ORCID) **OR ≥2 corroborating weak signals**. So a bare-name public-ORCID-alone and Scholar-alone are both `unresolved`; an institution-corroborated ORCID alone, or two weak signals *agreeing*, → `probable`.
 
 ---
 

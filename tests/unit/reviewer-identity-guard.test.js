@@ -170,6 +170,26 @@ describe('ORCIDService.findContact — name-scored selection', () => {
     expect(out.candidateCount).toBe(2);
   });
 
+  test('flags institutionCorroborated when the matched record institution contains the affiliation (S215)', async () => {
+    jest.spyOn(ORCIDService, 'searchByName').mockResolvedValue([
+      { orcidId: '0000-0000-0000-0009', orcidUrl: 'u9', givenNames: 'Li-Huei', familyName: 'Tsai', otherNames: [], emails: ['tsai@mit.edu'], institutions: ['Massachusetts Institute of Technology'] },
+    ]);
+    const out = await ORCIDService.findContact({ name: 'Li-Huei Tsai', affiliation: 'Massachusetts Institute of Technology', ...creds });
+    expect(out.status).toBe('resolved');
+    expect(out.institutionCorroborated).toBe(true);
+    expect(out.matchedInstitution).toMatch(/Massachusetts Institute/);
+  });
+
+  test('institutionCorroborated is false when the matched record institution differs from the affiliation', async () => {
+    jest.spyOn(ORCIDService, 'searchByName').mockResolvedValue([
+      { orcidId: '0000-0000-0000-0010', orcidUrl: 'u10', givenNames: 'Li-Huei', familyName: 'Tsai', otherNames: [], emails: ['tsai@x.edu'], institutions: ['Stanford University'] },
+    ]);
+    const out = await ORCIDService.findContact({ name: 'Li-Huei Tsai', affiliation: 'Massachusetts Institute of Technology', ...creds });
+    expect(out.status).toBe('resolved');
+    expect(out.institutionCorroborated).toBe(false);
+    expect(out.matchedInstitution).toBeNull();
+  });
+
   test('_nameMatchesTarget matches via creditName / otherNames', () => {
     expect(ORCIDService._nameMatchesTarget(
       { givenNames: 'Elizabeth', familyName: 'Smith', creditName: '', otherNames: ['Beth Smith'] }, 'Beth Smith')).toBe(true);

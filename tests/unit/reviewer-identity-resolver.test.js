@@ -18,6 +18,7 @@ const r = (hyp, ev) => resolveIdentity(hyp, ev, { now: NOW });
 const scholarPass = (id = 'TSAI') => ({ scholarId: id, googleScholarUrl: `https://scholar.google.com/citations?user=${id}`, displayName: 'Li-Huei Tsai', nameMismatch: false, institutionMismatch: false, skipped: null });
 const scholarNameMismatch = () => ({ scholarId: 'NAK', googleScholarUrl: 'https://scholar.google.com/citations?user=NAK', displayName: 'Masayuki Nakano', nameMismatch: true, institutionMismatch: false, skipped: 'name_mismatch' });
 const orcidResolved = (id = '0000-0001') => ({ status: 'resolved', orcidId: id, orcidUrl: `https://orcid.org/${id}`, name: 'Li-Huei Tsai' });
+const orcidCorroborated = (id = '0000-0001') => ({ status: 'resolved', orcidId: id, orcidUrl: `https://orcid.org/${id}`, name: 'Li-Huei Tsai', institutionCorroborated: true, matchedInstitution: 'Massachusetts Institute of Technology' });
 const orcidAmbiguous = (n = 2) => ({ status: 'ambiguous', orcidId: null, candidateCount: n });
 
 describe('resolveIdentity — PR1 status rules', () => {
@@ -48,6 +49,31 @@ describe('resolveIdentity — PR1 status rules', () => {
     expect(out.status).toBe('probable');
     expect(out.confidenceBand).toBe('medium');
     expect(out.anchors).toHaveLength(2);
+  });
+
+  test('institution-corroborated lone ORCID is a STRONG anchor → probable on its own (S215)', () => {
+    const out = r({ name: 'Li-Huei Tsai' }, { scholar: null, orcid: orcidCorroborated() });
+    expect(out.status).toBe('probable');
+    expect(out.confidenceBand).toBe('medium');
+    expect(out.anchors).toHaveLength(1);
+    expect(out.anchors[0].type).toBe('orcid_public_institution_corroborated');
+    expect(out.anchors[0].weight).toBe('strong');
+    expect(out.anchors[0].parserOutput.matchedInstitution).toBe('Massachusetts Institute of Technology');
+  });
+
+  test('corroborated ORCID reaches probable even when Scholar is anchor-rejected (the rescue case)', () => {
+    const out = r({ name: 'Li-Huei Tsai' }, { scholar: scholarNameMismatch(), orcid: orcidCorroborated() });
+    expect(out.status).toBe('probable');
+    expect(out.anchors).toHaveLength(1);
+    expect(out.anchors[0].weight).toBe('strong');
+    expect(out.rejectedAnchors).toHaveLength(1); // Scholar still recorded as a rejected anchor
+  });
+
+  test('ORCID ambiguity still wins over a corroborated ORCID is N/A — ambiguous never carries institutionCorroborated', () => {
+    // Guard: an ambiguous ORCID abstain carries no orcidId, so it can never be promoted to strong.
+    const out = r({ name: 'Wei Zhang' }, { scholar: null, orcid: orcidAmbiguous(2) });
+    expect(out.status).toBe('ambiguous');
+    expect(out.anchors).toHaveLength(0);
   });
 
   test('ORCID multi-match → ambiguous with a competitor + no band', () => {
