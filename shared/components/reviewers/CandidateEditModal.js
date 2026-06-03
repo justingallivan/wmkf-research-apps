@@ -7,8 +7,9 @@
  * reviewer themselves (so the invitation reaches the right inbox).
  *
  * PATCHes /api/reviewer-finder/my-candidates with { suggestionId, ...changed }.
- * Only changed fields are sent. These edits hit the shared person
- * (wmkf_potentialreviewer) + bibliometric sidecar (wmkf_appresearcher) records,
+ * Only changed fields are sent. These edits hit the shared person record
+ * (wmkf_potentialreviewer — which since the S213 collapse carries the
+ * bibliometric fields directly; the wmkf_appresearcher sidecar was dropped),
  * so they apply to EVERY proposal that references this researcher — not just
  * this request. The footer says so. Ported from the standalone Reviewer Finder.
  *

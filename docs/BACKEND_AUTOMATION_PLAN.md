@@ -182,13 +182,13 @@ A Vercel app page + API endpoint that:
 
 **Goal:** Move all operational data from Vercel Postgres to Dynamics so Dynamics is the single source of truth.
 
-> **Status banner (2026-05-19):** Reviewer-domain tables in the table below — `researchers`, `publications`, `reviewer_suggestions`, `proposal_searches`, `grant_cycles` — were migrated in W3–W6 (2026-05-12) and are now **drain-only** in Postgres; live state is in Dataverse (`wmkf_appresearcher`, `wmkf_appreviewersuggestion`, `wmkf_appgrantcycle`). See `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` for the migration log. The remaining rows below (`integrity_screenings`, `screening_dismissals`, `panel_reviews`, `expertise_roster`, `expertise_matches`) are still Postgres-only and not yet scoped for migration.
+> **Status banner (2026-05-19):** Reviewer-domain tables in the table below — `researchers`, `publications`, `reviewer_suggestions`, `proposal_searches`, `grant_cycles` — were migrated in W3–W6 (2026-05-12) and are now **drain-only** in Postgres; live state is in Dataverse (`wmkf_potentialreviewer` — carrying the bibliometric fields since the S213 collapse dropped the `wmkf_appresearcher` sidecar — `wmkf_appreviewersuggestion`, `wmkf_appgrantcycle`). See `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` for the migration log. The remaining rows below (`integrity_screenings`, `screening_dismissals`, `panel_reviews`, `expertise_roster`, `expertise_matches`) are still Postgres-only and not yet scoped for migration.
 
 ### Tables to migrate
 
 | Table | Records | Purpose | Cutover status |
 |-------|---------|---------|----------------|
-| `researchers` | Expert profiles | Shared pool of reviewer candidates | drain-only post-W6 (2026-05-12); Dataverse `wmkf_appresearcher` is source of truth |
+| `researchers` | Expert profiles | Shared pool of reviewer candidates | drain-only post-W6 (2026-05-12); Dataverse `wmkf_potentialreviewer` is source of truth (S213: bibliometrics folded onto the person; the `wmkf_appresearcher` sidecar was dropped) |
 | `publications` | Linked to researchers | Publication history | drain-only; writer dead |
 | `reviewer_suggestions` | Per-user per-proposal | "My Candidates" saved reviewers | drain-only post-W3-W6; Dataverse `wmkf_appreviewersuggestion` is source of truth |
 | `proposal_searches` | Per-user | Proposal analysis results | drain-only; `extract-summary` endpoint retired |
@@ -211,7 +211,7 @@ System/infrastructure data that has no Dynamics equivalent:
 (Wave 1 retired 2026-05-12: `user_preferences`, `user_app_access`, `system_settings` moved to Dataverse `wmkf_appuserpreferences`, `wmkf_appuserappaccesses`, `wmkf_appsystemsettings`.)
 
 ### Prerequisites (Connor)
-- ~~Create corresponding entities/fields in Dynamics for each table above~~ — done for the reviewer-domain entities (`wmkf_appresearcher`, `wmkf_potentialreviewer`, `wmkf_appreviewersuggestion`, `wmkf_appgrantcycle`, `wmkf_apprequestperson`). Pending: integrity / panel-review / expertise entities (no scheduled work).
+- ~~Create corresponding entities/fields in Dynamics for each table above~~ — done for the reviewer-domain entities (`wmkf_potentialreviewer` — now also carrying bibliometrics after the S213 `wmkf_appresearcher` sidecar collapse — `wmkf_appreviewersuggestion`, `wmkf_appgrantcycle`, `wmkf_apprequestperson`). Pending: integrity / panel-review / expertise entities (no scheduled work).
 - ~~Define the Dynamics schema for reviewer data, screening results, etc.~~ — reviewer schema shipped (Wave 2). Screening / panel / expertise schemas not yet defined.
 
 ### Migration strategy
@@ -334,7 +334,7 @@ All within Connor's access — no external IT or vendor dependencies.
 | `lib/services/graph-service.js` | SharePoint document access (Phase 1) |
 | `shared/config/baseConfig.js` | Cache patterns to reuse |
 | `pages/admin.js` | Batch evaluation UI (Phase 1), processing dashboard (Phase 5) |
-| `pages/api/reviewer-finder/save-candidates.js` | Dynamics write-back SHIPPED (Phase 2 / W2-W3); writes to `wmkf_potentialreviewer` + `wmkf_appresearcher` + `wmkf_appreviewersuggestion` |
+| `pages/api/reviewer-finder/save-candidates.js` | Dynamics write-back SHIPPED (Phase 2 / W2-W3); writes to `wmkf_potentialreviewer` (identity + bibliometrics, post-S213 collapse) + `wmkf_appreviewersuggestion` |
 | `pages/api/review-manager/reviewers.js` | Dynamics-backed (W3-W6 / S164); status updates via `suggestionAdapter.updateLifecycle` |
 | `docs/GRANT_CYCLE_LIFECYCLE.md` | Full lifecycle reference |
 | `docs/archive/PENDING_ADMIN_REQUESTS.md` | Historical permission requests (all resolved as of 2026-05-08) |

@@ -8,8 +8,9 @@
  * reviewer_suggestions, grant_cycles, proposal_searches) are read or
  * written by any code under pages/api/, lib/services/, lib/dataverse/, or
  * shared/. They are drain-only post-W3-W6 cutover (2026-05-12); live
- * source of truth is Dataverse (wmkf_appresearcher, wmkf_potentialreviewer,
- * wmkf_appreviewersuggestion, wmkf_appgrantcycle).
+ * source of truth is Dataverse (wmkf_potentialreviewer, which now carries
+ * bibliometrics after the S213 appresearcher collapse, plus
+ * wmkf_appreviewersuggestion and wmkf_appgrantcycle).
  *
  * S167 audit found a long tail of stale doc mentions that asserted these
  * tables as live application state. Three iterative audit passes failed
@@ -302,7 +303,7 @@ function main() {
       `drain-table-mentions FAILED: ${violations.length} unannotated mention(s) of a drained reviewer-domain Postgres table.\n` +
       `Each drained table mention must carry a same-line drain/historical/post-W context annotation, OR a structured marker:\n` +
       `  <!-- drain-table:ignore reason=<short-reason> -->\n` +
-      `Live source of truth is Dataverse: wmkf_appresearcher / wmkf_potentialreviewer / wmkf_appreviewersuggestion / wmkf_appgrantcycle.\n` +
+      `Live source of truth is Dataverse: wmkf_potentialreviewer (identity + bibliometrics) / wmkf_appreviewersuggestion / wmkf_appgrantcycle.\n` +
       `If a mention belongs to a doc whose PURPOSE is describing drained tables:\n` +
       `  - Atlas state pages (docs/atlas/*.md, docs/APPLICATION_STATE_ATLAS.md): add a visible top-of-file marker\n` +
       `      <!-- drain-table:file-purpose=atlas-state-page -->\n` +

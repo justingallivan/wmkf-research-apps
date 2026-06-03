@@ -567,7 +567,7 @@
 | App access | `user_app_access` *(now Dataverse `wmkf_appuserappaccesses`)* | Medium — per-user app grants | Per-user |
 | System config | `system_settings` *(now Dataverse `wmkf_appsystemsettings`)* | Medium — model overrides, settings | Global |
 | API usage | `api_usage_log` | Medium — model, tokens, cost per request | Per-user |
-| Researcher data | `researchers`, `publications`, `researcher_keywords` *(all Postgres drain-only post-W6 2026-05-12; live reviewer/researcher state is in Dataverse `wmkf_appresearcher` / `wmkf_potentialreviewer`)* | Low — public academic data | Shared/global |
+| Researcher data | `researchers`, `publications`, `researcher_keywords` *(all Postgres drain-only post-W6 2026-05-12; live reviewer/researcher state is in Dataverse `wmkf_potentialreviewer` — which since the S213 collapse carries the bibliometric fields directly; the `wmkf_appresearcher` sidecar was dropped)* | Low — public academic data | Shared/global |
 | Search results | `proposal_searches` *(Postgres drain-only; writer dead, `extract-summary` endpoint retired)* | Medium — proposal metadata, blob URLs | Per-user |
 | Reviewer candidates | `reviewer_suggestions` *(Postgres drain-only post-W3-W6; live reviewer-suggestion state is in Dataverse `wmkf_appreviewersuggestion`)* | Medium — reviewer-proposal matches | Per-user |
 | Grant cycles | `grant_cycles` *(Postgres drain-only post-W3 2026-05-12; live cycle state is in Dataverse `wmkf_appgrantcycle`)* | Low — organizational metadata | Shared/global |
@@ -1347,7 +1347,7 @@ openssl rand -hex 32
 | `api_usage_log` | Medium | Per-user | Growing | Model, tokens, cost, latency per API call |
 | `researchers` *(Postgres drain-only post-W6 2026-05-12)* | Low | Shared | ~1000s | Public academic profiles |
 | `publications` *(Postgres drain-only; writer dead)* | Low | Shared | ~5000s | Public paper metadata |
-| `researcher_keywords` *(Postgres drain-only; folded into Dataverse `wmkf_appresearcher.wmkf_keywords` for new rows)* | Low | Shared | Variable | Expertise areas for researchers |
+| `researcher_keywords` *(Postgres drain-only; folded into Dataverse `wmkf_potentialreviewer.wmkf_keywords` for new rows — S213: on the person; the `wmkf_appresearcher` sidecar was dropped)* | Low | Shared | Variable | Expertise areas for researchers |
 | `grant_cycles` *(Postgres drain-only post-W3 2026-05-12; Dataverse `wmkf_appgrantcycle` is source of truth, ~10 rows)* | Low | Shared | ~10s | Cycle names, dates, templates |
 | `proposal_searches` *(Postgres drain-only; `extract-summary` endpoint retired)* | Medium | Per-user | ~100s | Proposal metadata, blob URLs |
 | `reviewer_suggestions` *(Postgres drain-only post-W3-W6; live state is Dataverse `wmkf_appreviewersuggestion`)* | Medium | Per-user | ~1000s | Reviewer-proposal matches, outreach status |

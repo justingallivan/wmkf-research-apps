@@ -58,6 +58,8 @@ const DRIFT_PATTERNS = [
       // lib/dataverse/schema/wave2/wmkf_app_researcher.json (deployed entity is
       // wmkf_appresearcher); the doc explicitly clarifies the file-vs-entity split.
       'APPRESEARCHER_COLLAPSE_PLAN.md',
+      // Audit doc confirming the same deleted schema file is gone (file-vs-entity).
+      'APPRESEARCHER_COLLAPSE_VALIDATION_FINDINGS_2026-06-03.md',
       'check-doc-currency.js',
     ],
   },
@@ -77,6 +79,8 @@ const DRIFT_PATTERNS = [
       // lib/dataverse/schema/wave2/wmkf_app_publication.json (deployed entity
       // is wmkf_apppublication).
       'APPRESEARCHER_COLLAPSE_PLAN.md',
+      // Audit doc confirming the same deleted schema file is gone (file-vs-entity).
+      'APPRESEARCHER_COLLAPSE_VALIDATION_FINDINGS_2026-06-03.md',
     ],
   },
   {

@@ -36,7 +36,7 @@ The live Dataverse prompt-storage entity is `wmkf_ai_prompt` (entity set `wmkf_a
 
 ### `check:drain-table-mentions` — stale "data lives in PG" claims (S167)
 
-Reviewer-domain Postgres tables (`researchers`, `publications`, `researcher_keywords`, `reviewer_suggestions`, `grant_cycles`, `proposal_searches`) are drain-only post-W3-W6 cutover (2026-05-12); live source of truth is Dataverse (`wmkf_appresearcher`, `wmkf_potentialreviewer`, `wmkf_appreviewersuggestion`, `wmkf_appgrantcycle`).
+Reviewer-domain Postgres tables (`researchers`, `publications`, `researcher_keywords`, `reviewer_suggestions`, `grant_cycles`, `proposal_searches`) are drain-only post-W3-W6 cutover (2026-05-12); live source of truth is Dataverse (`wmkf_potentialreviewer` — which since the S213 collapse carries the bibliometric fields directly; the `wmkf_appresearcher` sidecar was dropped — `wmkf_appreviewersuggestion`, `wmkf_appgrantcycle`).
 
 **Detection (7-shape, per Codex review):**
 1. Backticked identifier (` `X` `)

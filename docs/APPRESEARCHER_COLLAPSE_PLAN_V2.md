@@ -47,7 +47,7 @@ Net: this becomes a **clean cutover** — add fields → repoint callers → re-
 
 **Collision check (clean):** of the sidecar's fields, **only `wmkf_name` already exists on the person** (person's wins — D0.3). Every bibliometric field is absent from the person → safe additive deploy, no collisions.
 
-**Population:** `wmkf_primaryaffiliation` set on **330/339**; `wmkf_department` set on **4/339** (so department is real but barely populated — consistent with "captured only when enrichment happened to surface it").
+**Population (pre-drop, sidecar-scoped):** `wmkf_primaryaffiliation` set on **330/339**; `wmkf_department` set on **4/339** (so department is real but barely populated — consistent with "captured only when enrichment happened to surface it"). **Post-drop reconciliation (S214 live probe):** `wmkf_potentialreviewerses?$filter=wmkf_primaryaffiliation ne null&$count=true` returns **331** persons with affiliation. All counts above are the pre-drop sidecar figures; the current source-of-truth count is the 331 person rows. The +1 over the 330 pre-drop sidecar-affiliation count is observed but not source-attributed by the count probe alone.
 
 **Link-shape audit (Codex, 2026-06-02) — CLEAN:** across all 339 sidecar rows, `_wmkf_potentialreviewer_value` had **0 null, 0 dangling, 0 duplicate** links. The 1:1 alt-key is intact, so backfill can assume every sidecar maps to exactly one live person. (This does NOT make the audit skippable — it's the gate that *proved* it clean; keep it as a pre-backfill/pre-drop check per Phase 2.0/5.)
 

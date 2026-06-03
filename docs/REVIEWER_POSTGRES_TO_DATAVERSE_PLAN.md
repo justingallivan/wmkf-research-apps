@@ -4,7 +4,7 @@
 
 **Created:** 2026-05-06 (Session 136)
 **Last revision:** 2026-05-25 (S188) — stale W3-W5 forward-tense language reconciled across §"Endpoint rewrite scope", §"Dependency-ordered queue", and the W3-W7 schedule table. Whole-doc one-pass sweep, not site-by-site patches.
-**Status:** **Active build, late shipping.** Schema deployed (`wmkf_potentialreviewer` extended, `wmkf_appresearcher`, `wmkf_appreviewersuggestion`, `wmkf_apprequestperson`, `wmkf_appgrantcycle`). `save-candidates` / `my-candidates` / `load-proposal` / `contact-history` live in prod. W3 grant-cycle cutover, W4 reviewer-suggestion data alignment, and the full W5 reader-cutover wave (generate-emails, my-proposals, extract-summary retirement, maintenance blob-scanner) all shipped. W6 step 1 — `researchers.js` retirement + Database tab UI removal — shipped 2026-05-12. Remaining: post-pilot one-shot cleanup/drop script; restore-from-backup script **(⚠️ was double-booked for two unrelated restores; RESOLVED S164 → distinct filenames — see the `restore-reviewer-suggestion-cleanup-backup.js` row in the "Spec'd vs. built" table)**; match-on-discovery wiring + UI (post-pilot); `add-candidate-manual` (post-pilot). See "Spec'd vs. built" table below for the line-by-line state.
+**Status:** **Active build, late shipping.** Schema deployed (`wmkf_potentialreviewer` extended with the S213 bibliometric fields, `wmkf_appreviewersuggestion`, `wmkf_apprequestperson`, `wmkf_appgrantcycle`; the former `wmkf_appresearcher` sidecar was dropped S213). `save-candidates` / `my-candidates` / `load-proposal` / `contact-history` live in prod. W3 grant-cycle cutover, W4 reviewer-suggestion data alignment, and the full W5 reader-cutover wave (generate-emails, my-proposals, extract-summary retirement, maintenance blob-scanner) all shipped. W6 step 1 — `researchers.js` retirement + Database tab UI removal — shipped 2026-05-12. Remaining: post-pilot one-shot cleanup/drop script; restore-from-backup script **(⚠️ was double-booked for two unrelated restores; RESOLVED S164 → distinct filenames — see the `restore-reviewer-suggestion-cleanup-backup.js` row in the "Spec'd vs. built" table)**; match-on-discovery wiring + UI (post-pilot); `add-candidate-manual` (post-pilot). See "Spec'd vs. built" table below for the line-by-line state.
 **Priority:** Top (historical) — was the gate for the intake portal pilot; the reviewer migration shipped W3–W6 2026-05-12, and that pilot is superseded (the live direction is a single Phase I intake for the next cycle — see `docs/SYSTEM_MODEL.md`).
 **Target environment:** Prod (Dataverse Wave 2 schema is live)
 
@@ -26,7 +26,7 @@ Refreshed 2026-05-12. Several artifacts have shipped since the plan was locked; 
 | `scripts/backfill-request-person-junction.js` | **BUILT + EXECUTED** | ~14 KB, dedup-guarded against existing junction rows. Executed in commit mode 2026-05-07 (commit 8b9b287) writing 5,561 rows from akoya_request slot fields. Earlier drafts of this plan claimed "not yet executed" — that was stale. Re-running in dry-run confirms 0 to insert as of 2026-05-12 (W4 Day 4 re-verification). |
 | `pages/api/reviewer-finder/contact-history.js` | **BUILT** (S139, commit `b23586c`) | UNION read strategy across junction + `_wmkf_projectleader_value`. **Both paths are steady-state per S136 (§"Junction read strategy") — `_wmkf_projectleader_value` stays authoritative for the lead PI; the junction is the additive source for co-PIs.** Smoke at `scripts/smoke-contact-history.js`. |
 | `scripts/backfill-reviewer-suggestions-to-dataverse.js` | spec'd | Idempotent commit-mode backfill of the 8-row Postgres-only delta. **Triage these 8 rows first** (per Codex 3b 2026-05-12): determine whether each is a genuine missed sync or a legitimate Postgres-only row (e.g., proposal not yet in Dataverse) before committing. |
-| `pages/api/reviewer-finder/add-candidate-manual.js` | spec'd | Net-new "add candidate by hand" endpoint, replaces retired Database tab. Writes to all three Dataverse entities (`wmkf_potentialreviewer`, `wmkf_appresearcher`, `wmkf_appreviewersuggestion`) via existing adapters. |
+| `pages/api/reviewer-finder/add-candidate-manual.js` | spec'd | Net-new "add candidate by hand" endpoint, replaces retired Database tab. Writes to `wmkf_potentialreviewer` (identity + bibliometrics on the person, post-S213) and `wmkf_appreviewersuggestion` via existing adapters. |
 | `lib/services/contact-history-service.js` | spec'd | Match-on-discovery aggregation helper. **Distinct from the existing endpoint** — the endpoint serves a batched Dataverse lookup; this service would consume it from `discovery-service.js` during candidate enrichment. |
 | Match-on-discovery wiring in `lib/services/discovery-service.js` + history-badge UI in `pages/reviewer-finder.js` | spec'd | First-class new scope. Badge sources: 🔁 reviewed (from `wmkf_appreviewersuggestion` rows linked to the contact via slot's `wmkf_contact`); 🚫 declined (from `wmkf_appreviewersuggestion.wmkf_responsetype`); 💰 funded PI (from `wmkf_apprequestperson` junction + `_wmkf_projectleader_value` on `akoya_request` — the same UNION the contact-history endpoint already returns). |
 | `wmkf_appgrantcycle` entity | **DEPLOYED, DATAVERSE-PRIMARY** (11 custom attrs live + 2 alt-keys, 10 rows post-W3 cutover 2026-05-12) | The entity is the live source of truth for cycle data. The three fields originally flagged as missing (`wmkf_ShortCode`, `wmkf_ProgramName`, `wmkf_CustomFields`) were patched 2026-05-12 (W3 preflight) and are now in both schema-as-code and prod; `grant-cycles-dataverse.js` selects all three on every read (live evidence). See `docs/atlas/dataverse-wmkf-apppublication-and-appgrantcycle.md`. |
@@ -59,7 +59,7 @@ Every application file holding a live Postgres read/write against a Wave 2 drain
 
 ## What this doc supersedes
 
-The Wave 2 spec in `docs/POSTGRES_TO_DATAVERSE_MIGRATION.md` (Session 106) was written assuming a **researcher-pool model** (free-standing `wmkf_app_researcher` rows accumulated across cycles, optional `wmkf_contact` lookup at promotion). What got actually built is different: a **1:1 sidecar model** — `wmkf_appresearcher` exists 1:1 with `wmkf_potentialreviewer`, which is itself a global per-person row keyed on email. See §"Data model: 1:1 sidecar" below for the authoritative cardinality definition.
+The Wave 2 spec in `docs/POSTGRES_TO_DATAVERSE_MIGRATION.md` (Session 106) was written assuming a **researcher-pool model** (free-standing `wmkf_app_researcher` rows accumulated across cycles, optional `wmkf_contact` lookup at promotion). What actually got built first was different: a **1:1 sidecar model** — `wmkf_appresearcher` existed 1:1 with `wmkf_potentialreviewer`, which is itself a global per-person row keyed on email. **S213 then collapsed that sidecar onto the person and dropped it**, leaving `wmkf_potentialreviewer` + `wmkf_appreviewersuggestion` as the reviewer-domain core. See §"Data model: 1:1 sidecar" below for the historical cardinality definition and S213 update.
 
 Connor (2026-05-06) confirmed the underlying intuition: researcher rows are **cycle-bounded transient candidate scratch**, not a permanent bibliometric pool. The 1:1 model coincidentally got this right. This doc operationalizes the migration around that ground truth.
 
@@ -86,10 +86,10 @@ To prevent scope creep — destructive carryover items that name "drop Postgres 
 
 > **HISTORICAL — supersede with the spec-vs-built table (line 13) + ground-truth banner (line 42) for current state.** The W3-W6 cutovers shipped 2026-05-12 (W3 grant cycles; W4 reviewer-suggestion alignment; W5 reader cutover incl. `generate-emails.js` / `my-proposals.js` / `extract-summary.js` retirement / `maintenance-service.js` blob-scanner / `database-service.js` gut; W6 step 1 `researchers.js` retirement). Body of this section was written pre-cutover; the "Migrate", "rewriting endpoints", "Review Manager is mostly Dataverse but partially Postgres" framings are the planning state, not the live state. Drop-pending tail items still real: post-pilot one-shot Postgres table drop, restore script, match-on-discovery, add-candidate-manual.
 
-**Already in Dataverse (live)** — three custom entities + extensions on `wmkf_potentialreviewer` (vendor-pattern existing entity):
+**Already in Dataverse (live)** — reviewer-person extension + lifecycle entity (historically three custom entities + extensions before S213):
 
 - `wmkf_potentialreviewer` — global per-person identity (by email). One person across N proposals = ONE row. Source: pre-existing entity, extended per `lib/dataverse/schema/wave2-existing/wmkf_potentialreviewers-extensions.json`.
-- `wmkf_appresearcher` — 1:1 sidecar to `wmkf_potentialreviewer`; bibliometric snapshot (h_index, ORCID, Scholar) — though h_index/citations are 0% populated in live data.
+- ~~`wmkf_appresearcher`~~ — **DROPPED S213**; its bibliometric fields now live directly on `wmkf_potentialreviewer`.
 - `wmkf_appreviewersuggestion` — per-(person, request) lifecycle ledger. Extended per `wave2-existing/wmkf_appreviewersuggestion-extensions.json` with token fields, review-form picklists, and SharePoint folder.
 - Adapters: `lib/dataverse/adapters/{contact, potential-reviewer, researcher, reviewer-suggestion}.js`
 - Endpoints fully on Dataverse: `save-candidates.js`, `my-candidates.js`, `load-proposal.js`
@@ -97,7 +97,7 @@ To prevent scope creep — destructive carryover items that name "drop Postgres 
 
 **Pre-existing schema-as-code (mixed deployment status — verify per-file before consuming):**
 
-The `lib/dataverse/schema/wave2/` directory holds six schema-as-code files written in an earlier session that designed the original Wave 2 entities. **All six are deployed today** (verified 2026-05-28 live metadata probe): `wmkf_appgrantcycle`, `wmkf_apppublication`, `wmkf_appresearcher`, `wmkf_appreviewersuggestion`, `wmkf_appproposalsearch` (S185; entity-set `wmkf_appproposalsearchs`), and `wmkf_apppublicationauthor` (deployed logical name has no `_z_` despite the schema-as-code file having `wmkf_app_z_publication_author.json`; 0 rows; verified S196). Earlier drafts said the junction was undeployed — that was a logical-name confusion. All six encode the **1:1 sidecar model** (not the pool model the Wave 1 design doc text implied):
+The `lib/dataverse/schema/wave2/` directory held six schema-as-code files written in an earlier session that designed the original Wave 2 entities. **S213 update — only three remain deployed:** `wmkf_appgrantcycle`, `wmkf_appreviewersuggestion`, and `wmkf_appproposalsearch` (S185; entity-set `wmkf_appproposalsearchs`, empty). The other three — **`wmkf_appresearcher`, `wmkf_apppublication`, and `wmkf_apppublicationauthor` — were DROPPED S213** (the sidecar collapsed onto `wmkf_potentialreviewers`; the two publication entities were empty and went down with it; their schema-as-code files were deleted). See `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`. Historically all six encoded the **1:1 sidecar model** (not the pool model the Wave 1 design doc text implied):
 
 - `wmkf_app_grant_cycle.json` — `wmkf_AppGrantCycle` entity, OrganizationOwned, alt-keyed on `wmkf_FiscalYearCode`
 - `wmkf_app_proposal_search.json` — `wmkf_AppProposalSearch` entity, UserOwned per-search analysis log
@@ -114,10 +114,10 @@ The migration question is therefore **"do we deploy what's already designed, or 
 
 | Table | Rows (verified 2026-05-12) | Disposition |
 |---|---|---|
-| `publications` | 0 | **Retire** (deploy decision: skip). Writer is dead and reader `DatabaseService.getRecentPublications` (line 313) has **zero external callers** (verified 2026-05-07 via repo-wide grep — Codex R3 #7 resolved). The Dataverse counterpart `wmkf_apppublication` is deployed (14 custom attrs verified live 2026-05-07) with 0 rows; the junction `wmkf_apppublicationauthor` is also deployed with 0 rows (S196 verification — earlier draft claimed undeployed under the `_z_` name, which is the schema-as-code FILE name, not the deployed entity logical name). With zero data on either side and the `researchers.js` admin UI being retired, both publication entities are slated for drop in the appresearcher collapse (`docs/APPRESEARCHER_COLLAPSE_PLAN.md`). Reviewer Finder discovery already rescrapes per-search; no need for a cached table. |
+| `publications` | 0 | **Retired** (deploy decision: skip). Writer is dead and reader `DatabaseService.getRecentPublications` (line 313) has **zero external callers** (verified 2026-05-07 via repo-wide grep — Codex R3 #7 resolved). The Dataverse counterparts `wmkf_apppublication` and the junction `wmkf_apppublicationauthor` were both deployed empty (0 rows) and **DROPPED S213** in the appresearcher collapse (`docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`). Reviewer Finder discovery already rescrapes per-search; no need for a cached table. |
 | `proposal_searches` | 0 | **Drain (no app readers remain).** `pages/api/reviewer-finder/extract-summary.js` retired W5 (2026-05-12) per row 49 above + `docs/atlas/postgres-other-reviewer-tables.md:25`. The W3 grant-cycles JOIN dropped at the same cutover. Remaining touches are admin scripts only. The Dataverse counterpart `wmkf_appproposalsearch` IS deployed (S185, 0 rows, entity-set `wmkf_appproposalsearchs`) and sits empty awaiting a future feature need. Postgres table drop unblocked. |
 | `researchers` | 331 | **Drain.** Don't migrate. `researchers.js` admin UI retired 2026-05-12 (W6 step 1); no live application readers/writers remain. The post-pilot one-shot DELETE/table-drop path handles cleanup after the staleness probe passes (≥2026-07-01), matching the W6 row below. |
-| `researcher_keywords` | 1,028 | **Drain.** Coverage moves to `wmkf_appresearcher.wmkf_keywords` for new rows. Live readers/writers gone with `researchers.js` retirement (W6 step 1). |
+| `researcher_keywords` | 1,028 | **Drain.** Coverage moves to `wmkf_potentialreviewers.wmkf_keywords` for new rows (S213: folded onto the person; the `wmkf_appresearcher` sidecar was dropped). Live readers/writers gone with `researchers.js` retirement (W6 step 1). |
 | `reviewer_suggestions` | 337 | **Backfill spec needed** — see "Reviewer suggestions backfill" section below. Naive "active-cycle migrate, closed-cycle discard" is not enough. |
 | `grant_cycles` | 13 | **Migrate** to net-new `wmkf_appgrantcycle`. Field-by-field mapping in "Grant cycle field mapping" section below — Postgres has more fields than the original §1 spec captured. |
 
@@ -149,7 +149,7 @@ Per-column population probed against live Neon Postgres. Highlights driving plan
 - 1%: `orcid`, `google_scholar_id`, `orcid_url`, `google_scholar_url`, `metrics_updated_at`
 - **0%: `h_index`, `i10_index`, `total_citations`, `last_checked`, `email_year`, `email_verified_at`, `faculty_page_url`, `contact_enrichment_source`, `notes`, `department` (1%)**
 
-**Implication for `wmkf_appresearcher` (1:1 sidecar):** the bibliometric fields it carries (`wmkf_hindex`, `wmkf_i10index`, `wmkf_totalcitations`, `wmkf_lastchecked`) will continue to be null in practice. The match-on-discovery framing should not promise rich h-index data in history badges — we don't have it. What badges CAN show is engagement history (saved, invited, accepted, declined, reviewed) — which IS captured.
+**Historical pre-S213 implication:** the sidecar's bibliometric metrics (`wmkf_hindex`, `wmkf_i10index`, `wmkf_totalcitations`, `wmkf_lastchecked`) were effectively empty in the old Postgres-derived pool. S213 moved the bibliometric fields onto `wmkf_potentialreviewer`; any history-badge design still should not assume rich historical h-index data. What badges CAN show reliably is engagement history (saved, invited, accepted, declined, reviewed) — which IS captured.
 
 **`grant_cycles` (13 rows, 10 active)** — sparser than schema suggests:
 - 100%: `name`, `short_code`, `program_name`, `summary_pages`, `is_active`
@@ -168,10 +168,10 @@ So the "JSON validation" and "blob URL reachability" gymnastics in the plan can 
 The model:
 
 - `wmkf_potentialreviewer` is **global per-person**, identified by email. `getByEmail(email)` returns one row. One person across N proposals = ONE potentialreviewer.
-- `wmkf_appresearcher` is **1:1 with `wmkf_potentialreviewer`** (per-person bibliometric snapshot — h_index, ORCID, Scholar). Not per-proposal. Per-`wmkf_app_researcher.json`'s file description: *"1:1 sidecar to wmkf_potentialreviewers"*.
+- `wmkf_appresearcher` was **1:1 with `wmkf_potentialreviewer`** (per-person bibliometric snapshot — h_index, ORCID, Scholar). **S213: this sidecar was collapsed — its bibliometric fields now live directly on `wmkf_potentialreviewers`, and the sidecar entity was dropped.** Read the "+ 1 `wmkf_appresearcher`" below as "those fields on the person."
 - `wmkf_appreviewersuggestion` is **per-(person, request)** — the lifecycle ledger. `findByPotentialReviewerAndRequest(prId, requestId)`.
 
-So one John Smith on 5 proposals = 1 `wmkf_potentialreviewer` + 1 `wmkf_appresearcher` + 5 `wmkf_appreviewersuggestion`.
+So one John Smith on 5 proposals = 1 `wmkf_potentialreviewer` (now carrying his bibliometrics) + 5 `wmkf_appreviewersuggestion` (pre-S213 this also had 1 `wmkf_appresearcher` sidecar).
 
 This model is **consistent across both** the live deployed entities AND the schema-as-code in `wave2/`. Earlier drafts of this plan framed a "pool vs 1:1" decision as an open fork — that was based on misreading the Wave 1 design doc's text rather than checking the schema-as-code in the repo. The schema-as-code already has the 1:1 design. There was never a real fork.
 
@@ -204,7 +204,7 @@ For each akoya_request where wmkf_meetingdate < (today - 14 days):
     If the suggestion is "engaged" (defined below): keep
     Otherwise: delete the suggestion row only.
     Do NOT delete the linked wmkf_potentialreviewer (global per-person).
-    Do NOT delete the linked wmkf_appresearcher (1:1 with potentialreviewer).
+    No linked wmkf_appresearcher remains post-S213; bibliometrics live on the global person.
 ```
 
 **"Engaged" predicate** — keep any `wmkf_appreviewersuggestion` row where any of these signals is populated. Either via the suggestion itself or via the linked `wmkf_potentialreviewer` (global per-person):
@@ -570,14 +570,14 @@ Audit: are there other 100-char (or other) caps elsewhere in the adapter set? Ru
 
 **Net-new endpoints still to build:**
 
-- `pages/api/reviewer-finder/add-candidate-manual.js` — net-new "add candidate by hand" feature, replaces retired Database tab. Writes to all three Dataverse entities via existing adapters.
+- `pages/api/reviewer-finder/add-candidate-manual.js` — net-new "add candidate by hand" feature, replaces retired Database tab. Writes to `wmkf_potentialreviewer` (identity + bibliometrics on the person, post-S213) and `wmkf_appreviewersuggestion` via existing adapters.
 
 **Service-layer rewrites:**
 
 - `lib/services/database-service.js` — researcher/publication/keyword paths gutted; suggestion paths point at `wmkf_appreviewersuggestion`.
 - `lib/services/discovery-service.js` — calls `DatabaseService.findResearcher` (1 of 3 callers, verified via Atlas). Replace with match-on-discovery against `contact`.
 - `lib/services/deduplication-service.js` — calls `DatabaseService.findResearcher` (2 of 3 callers). Reads candidates from Dataverse instead of Postgres; logic unchanged.
-- `lib/services/contact-enrichment-service.js` — **MIGRATED W5 (writeback shipped 2026-05-??).** Writes via `researcherAdapter.upsertByPotentialReviewer` against `wmkf_potentialreviewers` + `wmkf_appresearcher` (verified at line 28, 539). The original Postgres-writer scope ("rewrite the writer to upsert against Dataverse") is complete. Pending the appresearcher collapse (`docs/APPRESEARCHER_COLLAPSE_PLAN.md`), this service will switch from the researcher adapter to the consolidated potential-reviewer adapter; the storage destination itself is already Dataverse.
+- `lib/services/contact-enrichment-service.js` — **MIGRATED W5 (writeback shipped 2026-05-??).** Writes identity through `potentialReviewerAdapter.upsertByEmail` and bibliometrics through `researcherAdapter.upsertByPotentialReviewer`; post-S213 the researcher adapter targets the person entity set `wmkf_potentialreviewerses`, not a sidecar. The original Postgres-writer scope ("rewrite the writer to upsert against Dataverse") is complete.
 - New: `lib/services/contact-history-service.js` — encapsulates the match-on-discovery + history aggregation.
 
 **No change:** `pubmed-service.js`, `arxiv-service.js`, `biorxiv-service.js`, `chemrxiv-service.js`, `orcid-service.js`, `serp-contact-service.js`, `claude-reviewer-service.js`. External-DB clients don't care where we persist.

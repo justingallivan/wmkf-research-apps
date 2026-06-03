@@ -46,7 +46,7 @@ Indexes: `normalized_name`, `email`, `last_updated`, `(email IS NOT NULL)`, `con
 ## Live state notes
 
 - 331 rows; 99% have an email; **bibliometric fields (h-index, i10, citations) are 0% populated** — the writer that fills them never landed or got removed.
-- Parity probe (`scripts/backfill-reviewer-suggestions-parity.js`) treats this pool as the source for `wmkf_appresearcher` row creation; **Dataverse `wmkf_appresearcher` count is 334** (slightly higher — see "Cross-system" below).
+- Parity probe (`scripts/backfill-reviewer-suggestions-parity.js`) historically treated this pool as the source for `wmkf_appresearcher` row creation. **S213: the `wmkf_appresearcher` sidecar (339 rows at drop) was collapsed onto `wmkf_potentialreviewers` and dropped** — the bibliometric fields now live on the person. The pre-drop counts below (334 → 339) are historical.
 
 ## Read paths
 
@@ -67,7 +67,7 @@ Pre-W5/W6 callers (now removed, kept for archaeology):
 - `scripts/clear-all-database.js`, `scripts/cleanup-database.js` — DELETE only
 
 Pre-W5/W6 writers (now removed):
-- `lib/services/contact-enrichment-service.js` — enrichment writeback now targets `wmkf_potentialreviewer` + `wmkf_appresearcher` via the adapter chain (W5)
+- `lib/services/contact-enrichment-service.js` — enrichment writeback now targets `wmkf_potentialreviewers` (the person) via the adapter chain (W5; S213: bibliometrics fold onto the person, not the dropped `wmkf_appresearcher` sidecar)
 - `DatabaseService.createOrUpdateResearcher` — gutted in commit `0c58da4` (W5 step 2)
 - `pages/api/reviewer-finder/researchers.js` — deleted W6 step 1
 
@@ -76,13 +76,13 @@ Pre-W5/W6 writers (now removed):
 | Direction | Mapping | Status |
 |---|---|---|
 | Postgres `researchers.id` → Dataverse `wmkf_potentialreviewers` | by email match | live (per-proposal saves promote on demand) |
-| Postgres `researchers.h_index/i10/total_citations` → `wmkf_appresearcher.wmkf_hindex/...` | via adapter `lib/dataverse/adapters/researcher.js` | adapter exists; bibliometric fields are 0% populated in Postgres so the migration carries no metric values |
+| Postgres `researchers.h_index/i10/total_citations` → `wmkf_potentialreviewers.wmkf_hindex/...` | via adapter `lib/dataverse/adapters/researcher.js` | adapter exists; bibliometric fields are 0% populated in Postgres so the migration carries no metric values. **S213: the adapter now writes these onto the person (`wmkf_potentialreviewerses`), not the dropped `wmkf_appresearcher` sidecar.** |
 
-`wmkf_appresearchers` has 334 rows (3 more than Postgres `researchers`). Likely cause: per-proposal promotion via `save-candidates` created Dataverse rows for people who never made it into the Postgres pool (e.g., candidates added directly from the picker without enrichment). Not a data-loss risk.
+**Historical (pre-S213):** `wmkf_appresearchers` had 334 → 339 rows (a few more than Postgres `researchers`). Likely cause: per-proposal promotion via `save-candidates` created Dataverse rows for people who never made it into the Postgres pool (e.g., candidates added directly from the picker without enrichment). That sidecar entity is now dropped; bibliometrics live on `wmkf_potentialreviewers`.
 
 ## Migration disposition
 
-Per `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`: identity → `wmkf_potentialreviewers`; bibliometric snapshot → `wmkf_appresearcher`. Browse/edit UI rewrites endpoints to query Dataverse directly. Postgres `researchers` retired post-cutover.
+Per `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`: identity → `wmkf_potentialreviewers`; bibliometric snapshot → also `wmkf_potentialreviewers` (S213: folded onto the person; the `wmkf_appresearcher` sidecar that originally held these was dropped — see `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`). Browse/edit UI rewrites endpoints to query Dataverse directly. Postgres `researchers` retired post-cutover.
 
 ## Open questions / gotchas
 

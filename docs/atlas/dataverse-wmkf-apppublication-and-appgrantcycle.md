@@ -6,17 +6,17 @@
 
 **Last verified:** 2026-05-07 via `scripts/audit-dataverse-state.js` + EntityDefinitions metadata probe. **`wmkf_appgrantcycle` section re-verified 2026-05-19** post-W3 cutover (see that section); the publication entities were dropped S213 (above).
 
-## `wmkf_apppublication` — DEPLOYED but EMPTY
+## `wmkf_apppublication` — DROPPED S213 (historical section)
 
-**Live row count:** 0 (entity exists, no writers active)
-**Entity set:** `wmkf_apppublications`
-**Schema-as-code:** `lib/dataverse/schema/wave2/wmkf_app_publication.json`
+**Live row count:** n/a — **entity DROPPED S213** (was 0 rows, no writers; `EntityDefinitions` now returns 404). Went down with the `wmkf_appresearcher` collapse. The details below are historical.
+**Entity set (gone):** `wmkf_apppublications`
+**Schema-as-code (deleted S213):** `lib/dataverse/schema/wave2/wmkf_app_publication.json`
 
 Custom attrs (14, all confirmed deployed): `wmkf_apppublicationid` (PK), `wmkf_title` (primary name attr), `wmkf_authorsraw` (Memo), `wmkf_journal`, `wmkf_doi` (alt-key), `wmkf_pmid`, `wmkf_pmcid`, `wmkf_arxivid`, `wmkf_publicationdate`, `wmkf_year`, `wmkf_citations`, `wmkf_abstract`, `wmkf_url`, `wmkf_source`.
 
 **No adapter exists** (no `lib/dataverse/adapters/publication.js`). No callers anywhere.
 
-**Migration disposition:** Postgres `publications` is also empty (0 rows). Wave 2 plan was to retire the Postgres table and only start writing here when discovery is rewired. The schema-as-code calls out that authorship goes through a junction; the deployed entity logical name is `wmkf_apppublicationauthor` (no `_z_` — that's only in the schema-as-code FILE name). **S196 update:** both `wmkf_apppublication` and `wmkf_apppublicationauthor` are slated for drop in the appresearcher collapse (see `docs/APPRESEARCHER_COLLAPSE_PLAN.md`); both are deployed, empty, and unused. The earlier "junction NOT deployed" claim was based on a probe of the wrong logical name.
+**Migration disposition (CLOSED S213):** Postgres `publications` is also empty (0 rows). Wave 2 plan was to retire the Postgres table and only start writing here when discovery is rewired. **S213 outcome:** both `wmkf_apppublication` and `wmkf_apppublicationauthor` were **DROPPED** with the appresearcher collapse (both were deployed, empty, and unused; see `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`). The earlier "junction NOT deployed" claim was based on a probe of the wrong logical name — the junction's deployed logical name was `wmkf_apppublicationauthor` (no `_z_`; that artifact was only in the schema-as-code FILE name).
 
 ## `wmkf_appgrantcycle` — DEPLOYED, DATAVERSE-PRIMARY (W3 cutover 2026-05-12)
 
@@ -38,13 +38,13 @@ Deployed custom attrs (11): `wmkf_appgrantcycleid`, `wmkf_displayname` (primary)
 
 S185 audit catch (2026-05-25-B): the prior "NOT DEPLOYED" claim (from 2026-05-07) was based on a probe of only the `-es` variant. The reconcile-memory-claims candidate generator's broader probe (commit `5d560c2`) found the actual `-s` entity set. The entity exists, has no rows, has no writer code, and no read path uses it. Postgres `proposal_searches` is also 0 rows; writer is dead. Defer indefinitely — but the deployment status row in the migration-plan table below is now ✅ deployed (empty), not ❌.
 
-## `wmkf_apppublicationauthor` — DEPLOYED (empty)
+## `wmkf_apppublicationauthor` — DROPPED S213 (historical section)
 
-**Live row count:** 0 (re-probed S196 2026-05-28)
-**Entity set:** `wmkf_apppublicationauthors`
-**Schema-as-code:** `lib/dataverse/schema/wave2/wmkf_app_z_publication_author.json` (file name has `_z_` artifact; deployed entity logical name is `wmkf_apppublicationauthor` without the `_z_`)
+**Live row count:** n/a — **entity DROPPED S213** (was 0 rows; `EntityDefinitions` now 404).
+**Entity set (gone):** `wmkf_apppublicationauthors`
+**Schema-as-code (deleted S213):** `lib/dataverse/schema/wave2/wmkf_app_z_publication_author.json` (file name had `_z_` artifact; deployed entity logical name was `wmkf_apppublicationauthor` without the `_z_`)
 
-Junction for `wmkf_apppublication ↔ wmkf_appresearcher`. Originally marked NOT DEPLOYED in the 2026-05-07 probe — that was wrong (the probe used the `_z_`-named entity set, which doesn't exist). The deployed entity uses the no-`_z_` logical name. Both publication entities are deployed with 0 rows; both are slated for drop in the appresearcher collapse (see `docs/APPRESEARCHER_COLLAPSE_PLAN.md`).
+Junction for `wmkf_apppublication ↔ wmkf_appresearcher`. Originally marked NOT DEPLOYED in the 2026-05-07 probe — that was wrong (the probe used the `_z_`-named entity set, which never existed). The deployed entity used the no-`_z_` logical name. Both publication entities were dropped S213 in the appresearcher collapse (see `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`).
 
 ## What this means for the migration plan
 
@@ -52,11 +52,11 @@ Junction for `wmkf_apppublication ↔ wmkf_appresearcher`. Originally marked NOT
 
 | Entity | Schema-as-code? | Deployed? | Has data? |
 |---|---|---|---|
-| `wmkf_appresearcher` | ✅ | ✅ | ✅ (334 rows) |
+| `wmkf_appresearcher` | (deleted S213) | **DROPPED S213** (404) | collapsed onto `wmkf_potentialreviewers` (was 339 rows) |
 | `wmkf_appreviewersuggestion` | (extension manifest only) | ✅ | ✅ (336 rows) |
-| `wmkf_apppublication` | ✅ | ✅ | empty |
+| `wmkf_apppublication` | (deleted S213) | **DROPPED S213** (404) | was empty |
 | `wmkf_appgrantcycle` | ✅ (partial) | ✅ | 10 rows (Dataverse-primary post-2026-05-12) |
 | `wmkf_appproposalsearch` | ✅ | ✅ (entity set is `wmkf_appproposalsearchs`, NOT `-es`) | empty |
-| `wmkf_apppublicationauthor` (file: `wmkf_app_z_publication_author.json`) | ✅ | ✅ | empty (slated for drop in appresearcher collapse) |
+| `wmkf_apppublicationauthor` (file: `wmkf_app_z_publication_author.json`) | (deleted S213) | **DROPPED S213** (404) | was empty |
 
-The "as-built vs. as-designed" reconciliation Codex round-3 #5 asked for is captured here.
+The "as-built vs. as-designed" reconciliation Codex round-3 #5 asked for is captured here. (S213: the three sidecar/publication entities were dropped — see `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`.)

@@ -25,9 +25,9 @@ The canonical reference for the live state of the application's data layer.
 
 | Table | Rows | Status | Page |
 |---|---:|---|---|
-| `researchers` | 331 | drain-only post-W6 (2026-05-12); Dataverse `wmkf_appresearcher` is source of truth | [postgres-researchers.md](atlas/postgres-researchers.md) |
+| `researchers` | 331 | drain-only post-W6 (2026-05-12); Dataverse `wmkf_potentialreviewers` is source of truth (S213: bibliometric fields folded onto the person; the `wmkf_appresearcher` sidecar was dropped) | [postgres-researchers.md](atlas/postgres-researchers.md) |
 | `publications` | 0 | drain-only; writer dead | [postgres-publications.md](atlas/postgres-publications.md) |
-| `researcher_keywords` | 1,028 | drain-only post-W6; folded into Dataverse `wmkf_appresearcher.wmkf_keywords` | [postgres-other-reviewer-tables.md](atlas/postgres-other-reviewer-tables.md) |
+| `researcher_keywords` | 1,028 | drain-only post-W6; folded into Dataverse `wmkf_potentialreviewers.wmkf_keywords` (S213: was on the dropped `wmkf_appresearcher` sidecar) | [postgres-other-reviewer-tables.md](atlas/postgres-other-reviewer-tables.md) |
 | `reviewer_suggestions` | 337 | drain-only post-W3-W6; Dataverse `wmkf_appreviewersuggestion` is source of truth | [postgres-reviewer-suggestions.md](atlas/postgres-reviewer-suggestions.md) |
 | `grant_cycles` | 13 | drain-only post-W3 (2026-05-12); Dataverse `wmkf_appgrantcycle` is source of truth (10 rows) | [postgres-grant-cycles.md](atlas/postgres-grant-cycles.md) |
 | `proposal_searches` | 0 | drain-only; writer dead, `extract-summary` endpoint retired | [postgres-other-reviewer-tables.md](atlas/postgres-other-reviewer-tables.md) |
