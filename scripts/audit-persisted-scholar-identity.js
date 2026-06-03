@@ -60,6 +60,26 @@ const SELECT = [
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Resolve the Scholar author_id for a person. Prefer the dedicated id field
+ * when it is a clean 12-char Scholar token; otherwise extract a valid `user=`
+ * token from the profile URL (covers rows where the id lives only in the URL,
+ * or where the id field is malformed — e.g. a doubled URL). Returns null for
+ * search-fallback URLs (`view_op=search_authors`, no profile pinned).
+ */
+function resolveAuthorId(person) {
+  const ID_RE = /^[A-Za-z0-9_-]{12}$/;
+  const idField = (person.wmkf_googlescholarid || '').trim();
+  if (ID_RE.test(idField)) return idField;
+  const url = person.wmkf_googlescholarurl || '';
+  // A real profile URL has user=<12-char token>; pick the first VALID token
+  // (skips the doubled-URL artifact whose first user= captures a long string).
+  for (const m of url.matchAll(/user=([A-Za-z0-9_-]+)/g)) {
+    if (ID_RE.test(m[1])) return m[1];
+  }
+  return null;
+}
+
 /** Fetch the displayed author name for a Scholar author_id (read-only SerpAPI). */
 async function fetchScholarAuthorName(authorId) {
   const params = new URLSearchParams({
@@ -74,21 +94,26 @@ async function fetchScholarAuthorName(authorId) {
 await bypassDynamicsRestrictions('audit-persisted-scholar-identity', async () => {
   console.log(`Mode: READ-ONLY audit${Number.isFinite(LIMIT) ? ` (limit ${LIMIT})` : ''}\n`);
 
-  // Persons carrying a persisted Scholar id (these are the at-risk rows).
+  // Every person carrying a persisted Scholar URL (the id field is unreliable —
+  // it is null for URL-only rows and malformed for at least one). We resolve the
+  // real author_id per row below and skip search-fallback URLs.
   const { records: persons } = await DynamicsService.queryAllRecords(PERSON_SET, {
     select: SELECT.join(','),
-    filter: 'wmkf_googlescholarid ne null',
+    filter: 'wmkf_googlescholarurl ne null',
   });
-  console.log(`${persons.length} person(s) carry a persisted Google Scholar id.\n`);
+  console.log(`${persons.length} person(s) carry a persisted Google Scholar URL.\n`);
 
   const flagged = [];
-  let checked = 0, errors = 0, ok = 0, unnamed = 0;
+  const idToPersons = new Map(); // resolved authorId -> [personName] (collision detector)
+  let checked = 0, errors = 0, ok = 0, unnamed = 0, searchOnly = 0;
 
   for (const p of persons) {
     if (checked >= LIMIT) break;
-    checked++;
     const personName = p.wmkf_name || '';
-    const authorId = p.wmkf_googlescholarid;
+    const authorId = resolveAuthorId(p);
+    if (!authorId) { searchOnly++; continue; } // search-fallback URL — no pinned profile
+    checked++;
+    idToPersons.set(authorId, [...(idToPersons.get(authorId) || []), personName]);
 
     const { name: scholarName, error } = await fetchScholarAuthorName(authorId);
     await sleep(250); // be gentle on SerpAPI
@@ -121,12 +146,20 @@ await bypassDynamicsRestrictions('audit-persisted-scholar-identity', async () =>
   const outPath = path.join(__dirname, '.scholar-identity-audit.jsonl');
   fs.writeFileSync(outPath, flagged.map((r) => JSON.stringify(r)).join('\n'));
 
+  // Collision: the same Scholar author_id persisted on >1 person → at least one wrong.
+  const collisions = [...idToPersons.entries()].filter(([, names]) => names.length > 1);
+
   console.log(`\n── Summary ──`);
-  console.log(`  checked:        ${checked}`);
+  console.log(`  pinned profiles checked: ${checked}`);
+  console.log(`  search-fallback (skipped): ${searchOnly}`);
   console.log(`  name OK:        ${ok}`);
   console.log(`  NAME MISMATCH:  ${flagged.length}  ← likely wrong-person metrics`);
   console.log(`  no profile name:${unnamed}`);
   console.log(`  fetch errors:   ${errors}`);
+  if (collisions.length) {
+    console.log(`\n  ⚠ SHARED author_id across people (at least one is wrong):`);
+    for (const [id, names] of collisions) console.log(`    ${id} → ${names.map((n) => `"${n.trim()}"`).join(', ')}`);
+  }
   console.log(`\nFlagged rows written to ${outPath} (read-only; no Dataverse changes made).`);
   console.log(`Remediation is a separate, explicitly-authorized step.`);
 });
