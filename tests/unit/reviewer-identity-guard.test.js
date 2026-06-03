@@ -145,13 +145,15 @@ describe('ORCIDService.findContact — name-scored selection', () => {
     expect(out.identityStatus).toBe('probable');
   });
 
-  test('abstains when two distinct name-matching records cannot be disambiguated', async () => {
+  test('returns structured ambiguous when two distinct name-matching records cannot be disambiguated', async () => {
     jest.spyOn(ORCIDService, 'searchByName').mockResolvedValue([
       { orcidId: '0000-0000-0000-0004', orcidUrl: 'u4', givenNames: 'Wei', familyName: 'Zhang', otherNames: [], emails: [] },
       { orcidId: '0000-0000-0000-0005', orcidUrl: 'u5', givenNames: 'Wei', familyName: 'Zhang', otherNames: [], emails: [] },
     ]);
     const out = await ORCIDService.findContact({ name: 'Wei Zhang', affiliation: null, ...creds });
-    expect(out).toBeNull();
+    expect(out.status).toBe('ambiguous');
+    expect(out.orcidId).toBeNull();
+    expect(out.candidateCount).toBe(2);
   });
 
   test('_nameMatchesTarget matches via creditName / otherNames', () => {
