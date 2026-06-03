@@ -62,7 +62,9 @@ export default async function handler(req, res) {
 
         const candidateEmail = candidate.email || candidate.contactEnrichment?.email || null;
         const candidateAffiliation = candidate.affiliation || candidate.contactEnrichment?.affiliation || null;
-        const candidateOrcid = candidate.orcid || candidate.contactEnrichment?.orcid || null;
+        // Enrichment stores the ORCID iD as `orcidId` (not `orcid`); read that key
+        // so a candidate carrying only contactEnrichment doesn't drop a real ORCID.
+        const candidateOrcid = candidate.orcid || candidate.contactEnrichment?.orcidId || null;
         const candidateGoogleScholarId = candidate.googleScholarId || candidate.contactEnrichment?.googleScholarId || null;
         const candidateWebsite = candidate.website || candidate.contactEnrichment?.website || null;
 

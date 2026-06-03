@@ -441,6 +441,11 @@ async function handlePatch(req, res, access) {
 
       // Bibliometric edits go straight onto the person now (S213 collapse —
       // updateById takes the person id; email is identity, handled elsewhere).
+      // NOTE (Phase 2): this PATCH is a MANUAL STAFF EDIT and is intentionally
+      // NOT resolver-gated — a human correcting a record is the authority (the
+      // identity resolver's human-in-the-loop override). Automated enrichment
+      // paths (save-candidates / enrich-recommended / saveToDatabase) ARE gated;
+      // staff hand-edits are not, by design.
       const researcherUpdates = {};
       if (affiliation !== undefined) researcherUpdates.affiliation = affiliation;
       if (website !== undefined) researcherUpdates.website = website;
