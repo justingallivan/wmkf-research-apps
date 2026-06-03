@@ -23,8 +23,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Local env files
+# Local env files, pulled env, and backups (may contain secrets) — never commit
 .env*.local
+.env
+.env.*
+.env*.bak
+!.env.example
 
 # Vercel
 .vercel
@@ -68,3 +72,6 @@ scripts/.appresearcher-snapshot.jsonl
 
 # scholar-identity audit output (contains person data; local-only, S214)
 scripts/.scholar-identity-audit.jsonl
+
+# ORCID resolution measurement output (contains person data; local-only, S215)
+scripts/.orcid-resolution.jsonl

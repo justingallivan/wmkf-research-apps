@@ -177,3 +177,43 @@ describe('ORCIDService.findContact — name-scored selection', () => {
       { givenNames: 'Masayuki', familyName: 'Nakano', otherNames: [] }, 'Li-Huei Tsai')).toBe(false);
   });
 });
+
+describe('ORCIDService.searchByName — response field mapping', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  // Regression: ORCID's /expanded-search response uses `family-names` (PLURAL).
+  // Reading the singular `family-name` left every record's familyName undefined,
+  // so the downstream name-match gate (_nameMatchesTarget) rejected even correct
+  // records and findContact ALWAYS abstained — ORCID never contributed an anchor,
+  // making the resolver's `probable` status (Scholar+ORCID) unreachable in practice.
+  // The prior tests mocked searchByName above this mapping, so CI never caught it.
+  test('maps family-names (plural) from the raw expanded-search payload', async () => {
+    jest.spyOn(ORCIDService, 'getAccessToken').mockResolvedValue('tok');
+    const rawPayload = {
+      'expanded-result': [
+        {
+          'orcid-id': '0000-0001-7564-8010',
+          'given-names': 'Ram',
+          'family-names': 'Madabhushi',
+          'credit-name': null,
+          'other-name': [],
+          'email': [],
+          'institution-name': ['The University of Texas Southwestern Medical Center Medical School'],
+        },
+      ],
+    };
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => rawPayload,
+    });
+
+    const out = await ORCIDService.searchByName({ name: 'Ram Madabhushi', clientId: 'c', clientSecret: 's' });
+    fetchSpy.mockRestore();
+
+    expect(out).toHaveLength(1);
+    expect(out[0].givenNames).toBe('Ram');
+    expect(out[0].familyName).toBe('Madabhushi'); // ← was undefined before the fix
+    // The mapped record must now pass the identity name-match gate.
+    expect(ORCIDService._nameMatchesTarget(out[0], 'Ram Madabhushi')).toBe(true);
+  });
+});
