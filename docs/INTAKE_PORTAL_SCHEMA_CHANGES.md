@@ -9,6 +9,24 @@ Per `project_dataverse_creator_privileges.md` (2026-05-06), Connor delegated ent
 
 ---
 
+## 2026-06-02 — Reviewer Identity Resolver Phase 2 PR1: identity-decision fields (S214)
+
+**Scope:** Six fields on `wmkf_potentialreviewers` holding the resolver's *current* identity verdict (`docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md` §2.5). Schema-as-code: `lib/dataverse/schema/wave6/03_wmkf_potentialreviewers_identity.json`.
+
+**Rationale:** The deterministic identity resolver classifies each reviewer (confirmed/probable/ambiguous/unresolved/rejected); this status is the single gate for whether identity-bearing fields persist or count toward ranking. Stored on the person (Dataverse = reviewer-identity ground truth).
+
+### New fields
+- `wmkf_identitystatus` (String 20) — confirmed | probable | ambiguous | unresolved | rejected
+- `wmkf_identityconfidenceband` (String 10) — high | medium | empty
+- `wmkf_identityresolverversion` (String 30)
+- `wmkf_identityresolvedat` (DateTime)
+- `wmkf_identityevidencesummary` (String 2000)
+- `wmkf_identityverifiedanchorsjson` (Memo 50000) — compact JSON of verified anchors
+
+Strings (not Picklists) for status/band: lower deploy risk + consistent with the existing `wmkf_emailsource`; the resolver (`lib/services/reviewer-identity-resolver.js`) enforces valid values in code.
+
+**Status: ⚠ DEPLOY PENDING.** Dry-run against prod was CLEAN (collision-free, all 6 additive). `--execute` was repeatedly blocked by a 429 `0x80071151` — "another [Import] running" — which a live `importjobs` probe confirmed is a **rolling Microsoft managed-solution update wave** (`msdyn_URModernAdminBase`, then `msdynce_EmailTemplateConfigSolution`, …), NOT WMKF work and NOT our error. Zero partial state (fails on field #1; idempotent). **Deploy once the Microsoft update window clears:** `node scripts/apply-dataverse-schema.js --target=prod --wave=6 --execute` (re-checks existing wave6 fields as `· exists`, creates the 6 identity fields). PR1 threading/write-gates are blocked on this deploy.
+
 ## 2026-05-31 — Request Workbench Phase 0: `wmkf_appreviewersuggestion.wmkf_applicantdisposition` (S208)
 
 **Scope:** One local Picklist field on `wmkf_appreviewersuggestion`. Deployed via `apply-dataverse-schema.js --target=prod --wave=6 --execute` against prod. New wave directory (`lib/dataverse/schema/wave6/`).

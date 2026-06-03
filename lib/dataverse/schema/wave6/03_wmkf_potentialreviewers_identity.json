@@ -1,0 +1,49 @@
+{
+  "name": "wmkf_potentialreviewers-identity",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_potentialreviewers",
+  "_comment": "Reviewer Identity Resolver Phase 2 PR1 (docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md §2.5). The deterministic resolver's CURRENT decision, stored on the person. status/confidenceBand are Strings (not Picklists) — lower deploy risk + consistent with the existing String wmkf_emailsource; the resolver (lib/services/reviewer-identity-resolver.js) is the source of truth for valid values (status: confirmed|probable|ambiguous|unresolved|rejected; confidenceBand: high|medium|<null>). verifiedanchorsjson is a compact Memo JSON blob (kept small — cap anchors). Idempotent: ensureAttribute skips existing. Deploy: node scripts/apply-dataverse-schema.js --target=prod --wave=6 --execute",
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_IdentityStatus",
+      "displayName": "Identity Status",
+      "description": "Resolver verdict: confirmed | probable | ambiguous | unresolved | rejected. The single gate for whether identity-bearing fields may persist or count toward ranking.",
+      "maxLength": 20
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_IdentityConfidenceBand",
+      "displayName": "Identity Confidence Band",
+      "description": "Display-only band derived from status: high (confirmed) | medium (probable) | empty (ambiguous/unresolved/rejected). Never a sort key.",
+      "maxLength": 10
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_IdentityResolverVersion",
+      "displayName": "Identity Resolver Version",
+      "description": "Semver of the rule set that produced this decision (enables replay/drift measurement).",
+      "maxLength": 30
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_IdentityResolvedAt",
+      "displayName": "Identity Resolved At",
+      "description": "When the resolver last classified this person."
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_IdentityEvidenceSummary",
+      "displayName": "Identity Evidence Summary",
+      "description": "Human-readable 'why' for the status (anchors that passed/failed, ambiguity).",
+      "maxLength": 2000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_IdentityVerifiedAnchorsJson",
+      "displayName": "Identity Verified Anchors (JSON)",
+      "description": "Compact JSON of the verified anchors backing the decision (canonicalKey/type/sourceUrl/verifier/retrievedAt). Kept small.",
+      "maxLength": 50000
+    }
+  ]
+}
