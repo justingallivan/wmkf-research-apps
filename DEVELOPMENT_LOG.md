@@ -10,6 +10,24 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer identity resolution: false-match safety + deterministic resolver (Session 214)
+
+**Milestone:** Built the reviewer-identity safety layer the S213 collapse surfaced — the recurring false-match where a search for a PI attached a *lab member's / homonym's* Scholar/ORCID metrics (the institution-only guard can't tell same-institution people apart). Shipped a hard Scholar displayed-name guard + ORCID name-scoring (Phase 1), audited + remediated the already-wrong prod data, then landed a deterministic identity **resolver** (Phase 2 PR1) that gates whether bibliometrics/ORCID may persist or count toward ranking. New architecture + a prod Dataverse schema deploy + a quiet data-correction incident.
+
+**Sessions:** 214 (single long session; 13 commits; full design→Codex pre-impl ×2→impl→Codex post-impl loop, all via the `codex:codex-rescue` agent).
+
+**Ship state:**
+- **Phase 1** (`40d7327`): `SerpContactService.scholarNameMismatch` (hard displayed-name floor — kills the Tsai→lab-member-Nakano class) + `ORCIDService.findContact` name-scoring/abstain + persistence gates.
+- **Prod data remediation** (`5bf8d3b`/`c836f4a`): a disconfirming probe found the persisted-Scholar footprint was **8 pinned profiles (not "~330"** — that was the affiliation backfill); 1 genuine wrong match (Frank Noe's row carried Cecilia Clementi's Scholar profile) cleared + 5 malformed/missing id fields fixed. Read-only audit + remediation scripts committed.
+- **Phase 2 PR1** (`8350551`→`b6bfadc`): 6 `wmkf_identity*` decision fields **deployed to prod** on `wmkf_potentialreviewers`; `lib/services/reviewer-identity-resolver.js` deterministic classifier (weak-only PR1 rules — `confirmed` deferred to a later PR); verdict gates all **three** write paths (save-candidates, enrich-recommended, the email-keyed `saveToDatabase` — a Codex post-impl catch) + `relevance-score`; `clearIdentityFields` null-clears stale wrong values on downgrade. 1766 tests; all gates green.
+- The prod schema deploy lost ~15 min to a Microsoft managed-solution import wave holding the org customization lock (diagnosed via an `importjobs` probe, not our error).
+
+**Why it matters:** "unresolved is acceptable; wrong-and-confident is not" is now enforced in code, not just discipline — a wrong-but-rich profile can no longer persist or float to the top on borrowed metrics. The deterministic resolver is the contract that makes later web/LLM evidence sources (e.g. Perplexity Search API) safe to add as untrusted *leads*.
+
+**Ship caveat:** PR1 is live but **manual Workbench smoke is still pending** (CI-green ≠ correct for this outward-facing class); `confirmed` status + faculty/PubMed-cluster verification + the Perplexity lead source are specced-but-unbuilt later PRs.
+
+**Pointers:** `docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md` (v3, approved), `lib/services/reviewer-identity-resolver.js`, `scripts/{audit,remediate}-scholar-identity.js`, `.claude-memory/project-reviewer-identity-resolution-phase1.md`. Commits `40d7327`→`9da5793`.
+
 ## June 2026 — Reviewer bibliometric sidecar collapse (Session 213)
 
 **Milestone:** Collapsed the `wmkf_appresearcher` 1:1 bibliometric sidecar into the person entity `wmkf_potentialreviewers` and **dropped** it (+ the two empty `wmkf_apppublication`/`wmkf_apppublicationauthor` tables) — the reviewer domain goes from four Dataverse tables to two. Executed mid-pilot (the prior "post-pilot, don't act now" posture was reversed once the sidecar data proved disposable — near-zero cross-cycle reviewer overlap). Full prod cutover, each phase verified; live-smoke-verified on the Workbench; Codex ground-truth + structure review folded in.
