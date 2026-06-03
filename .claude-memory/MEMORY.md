@@ -143,6 +143,7 @@
 
 ## Dev Environment
 - [Dev environment](project-dev-environment.md) — `npm run dev` port 3000; auth off in dev; `.env.local` values quoted; WAVE1 flags mirror prod since 2026-05-11.
+- [Vercel "Sensitive" env vars pull EMPTY](project-vercel-sensitive-env-pull-empty.md) — `vercel env pull` returns recently-added secrets (ORCID/NCBI/blob tokens) blank (write-only); paste by hand. Don't copy VERCEL_*/TURBO_*/AUTH_* into `.env.local`. eslint NOT installed locally (lint is CI-only).
 - [Dynamics sandbox state](project-dynamics-sandbox-state.md) — a reachable sandbox exists (`orgd9e66399`, prod-clone) but is schema-stale (no `wmkf_appreviewersuggestion`/`appresearcher`/`appgrantcycle`, 0 policy versions) → NOT drop-in usable for reviewer testing without a schema deploy + email check. Corrects "no test store".
 - [Local jest/build environment](local-jest-build-environment.md) — S173 FIXED: Rosetta off, Node 26 arm64 via Homebrew, clean node_modules; `npx jest` + `npm run build` work locally. Don't re-litigate.
 - [git traversal commands hang](env-broken-git-autogc.md) — `gc`/`fsck`/`repack`/`prune` hang in mmap() on `.git` loose objects (cloud File Provider offloaded them). Fix = repo on a plain local path; `gc.auto 0` interim.
