@@ -56,8 +56,8 @@ Pre-W5 (now removed):
 
 ## Cross-system
 
-The Dataverse entity `wmkf_apppublication` (and its `wmkf_apppublicationauthor` junction) was **DROPPED S213** — it was deployed with 0 rows and no callers, so it went down with the `wmkf_appresearcher` collapse (`docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`); its schema-as-code manifest was removed too. The Postgres `publications` table remains a drain-only empty snapshot.
+The Dataverse entity `wmkf_apppublication` (and its `wmkf_apppublicationauthor` junction) was **DROPPED S213** — it was deployed with 0 rows and no callers, so it went down with the `wmkf_appresearcher` collapse (`docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`); its schema-as-code manifest was removed too. The Postgres `publications` table was DROPPED 2026-06-04 (S219, migration 018).
 
 ## Migration disposition
 
-Per `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`: skip-safe — drop the Postgres table during cleanup; no rows to migrate. (The Dataverse `wmkf_apppublication` target was dropped S213; if publication tracking is ever needed it would be redesigned around `wmkf_potentialreviewer` directly.)
+Per `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`: was skip-safe — the Postgres table was DROPPED 2026-06-04 (S219, migration 018); it was empty, so no rows to migrate. (The Dataverse `wmkf_apppublication` target was dropped S213; if publication tracking is ever needed it would be redesigned around `wmkf_potentialreviewer` directly.)

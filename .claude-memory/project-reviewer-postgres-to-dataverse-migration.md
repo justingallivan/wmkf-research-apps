@@ -92,7 +92,7 @@ Plan was updated against live data, not assumptions. Key findings:
 - **`researchers` bibliometric data is 0% populated** for h_index, i10_index, total_citations. Infrastructure exists, was never wired up. Match-on-discovery history badges should not promise rich bibliometrics — we don't capture them. Engagement history (invited, accepted, reviewed) IS captured and IS the right basis.
 - **`grant_cycles` is sparser than schema suggests**: only 5 of 13 columns populated. JSON columns (`additional_attachments`, `custom_fields`), `review_deadline`, `review_template_blob_url`, `review_template_filename` all 0%. Migration spec simplified accordingly.
 - **`maintenance-service.js` blob-scanner concern partially evaporates** — only `reviewer_suggestions.summary_blob_url` (55%) is a real source today. Still rewrite for cutover, lower urgency.
-- **Cleanup is forward-looking only** — every existing `reviewer_suggestions` row has `selected=true`. The "transient unselected scratch" pattern doesn't appear in live data; the cleanup predicate's value is future code paths (and it now runs as the deferred one-shot DELETE per item 3, not a cron).
+- **Cleanup is forward-looking only** — every existing `reviewer_suggestions` row has `selected=true`. The "transient unselected scratch" pattern doesn't appear in live data; the cleanup predicate's value was future code paths — moot in the end, because the drained tables (incl. `reviewer_suggestions`) were dropped wholesale 2026-06-04 via tracked migration 018, not row-filtered.
 - All data 2026-01-03 → 2026-04-30; matches "<12 months old" claim.
 
 ## How to apply
