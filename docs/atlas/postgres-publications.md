@@ -1,9 +1,11 @@
-# Atlas: `publications` (Postgres — DRAIN-ONLY; writer dead)
+# Atlas: `publications` (Postgres — DROPPED 2026-06-04)
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
+> **DROPPED 2026-06-04 (S219)** via `lib/db/migrations/018_drop_reviewer_finder_postgres_tables.sql`. The table no longer exists in Postgres. It was empty (0 rows, dead writer) — no backup needed. Page retained as historical record.
+
 **Last verified:** 2026-05-07 via `scripts/audit-postgres-state.js`. **Drain-status re-verified 2026-05-19 (S167).** Zero live application readers/writers.
-**Live row count:** **0**
+**Final row count before drop:** **0**
 
 ## Source of truth
 

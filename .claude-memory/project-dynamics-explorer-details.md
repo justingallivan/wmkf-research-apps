@@ -21,7 +21,7 @@ Do:
 Do not:
 - Trust the index size / doc-count figures here as current — re-probe if load-bearing.
 
-Ground truth: `pages/api/dynamics-explorer/chat.js`, `shared/config/prompts/dynamics-explorer.js`; structural Search/schema facts should be re-probed, not trusted from this memory. See [[project-dynamics-explorer-reuse-power-tools]], [[project-dynamics-explorer-schema-diff]].
+Ground truth: `pages/api/dynamics-explorer/chat.js` (agentic tool-use orchestration), `lib/services/dynamics-service.js` (`searchRecords` — the `search/v1.0/query` impl now lives here, not in `chat.js`), `shared/config/prompts/dynamics-explorer.js`; structural Search/schema facts should be re-probed, not trusted from this memory. See [[project-dynamics-explorer-reuse-power-tools]], [[project-dynamics-explorer-schema-diff]].
 
 ## Dataverse Search API
 

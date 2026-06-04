@@ -21,7 +21,7 @@ Do not:
 - Read pre-J26 zeros (or J26 mixed-adoption zeros) as real zero invitations.
 - Assume the W3–W6 backfill invented missing history — pre-J26 gaps remain gaps.
 
-Ground truth: Dataverse `wmkf_appreviewersuggestion` (backfilled from Postgres `reviewer_suggestions`, now drain-only), `wmkf_potentialreviewer1..5` slot fallback.
+Ground truth: Dataverse `wmkf_appreviewersuggestion` (backfilled from the Postgres `reviewer_suggestions` table, which was DROPPED 2026-06-04 via migration 018 after backfill), `wmkf_potentialreviewer1..5` slot fallback.
 
 **Reality:** Reviewer lifecycle counts shown in `/reviewer-finder` (invited / accepted / declined) come from **Dataverse `wmkf_appreviewersuggestion`** (post-W3-W6 cutover 2026-05-12) — backfilled from the historical Postgres `reviewer_suggestions` table where data existed. That data only starts being populated when staff used the tool to save candidates — which began in **J26** for the Foundation, and not all staff used it that cycle either. The data-quality caveat below is unchanged by the storage migration; it's about adoption history, not where the rows live now.
 
@@ -36,4 +36,4 @@ Ground truth: Dataverse `wmkf_appreviewersuggestion` (backfilled from Postgres `
 
 **Do:**
 - Trust counts on J26+ proposals where the row exists.
-- The W3-W6 backfill migrated historical Postgres rows into `wmkf_appreviewersuggestion` without inventing missing data; pre-J26 gaps remain gaps. Postgres `reviewer_suggestions` is drain-only.
+- The W3-W6 backfill migrated historical Postgres rows into `wmkf_appreviewersuggestion` without inventing missing data; pre-J26 gaps remain gaps. The source Postgres `reviewer_suggestions` table was DROPPED 2026-06-04 (migration 018); Dataverse is the sole store.

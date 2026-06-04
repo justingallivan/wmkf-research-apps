@@ -1,6 +1,6 @@
 ---
 name: reviewer-identity-fragmentation
-description: Sample-based flag (5/87 + architecture, not a census) — a peer reviewer appears to span ≥4 disjoint stores with no shared key. The Reviewer Manager→Dataverse engineering migration is DONE (W5/W6); only a gated table-drop + a deferred census remain.
+description: Sample-based flag (5/87 + architecture, not a census) — a peer reviewer appears to span ≥4 disjoint stores with no shared key. The Reviewer Manager→Dataverse engineering migration is DONE (W5/W6); the gated table-drop executed 2026-06-04 (migration 018); only a deferred census remains.
 metadata:
   type: project
   status: active
@@ -20,7 +20,7 @@ Do:
 Do not:
 - Store remittance/banking PII in Dataverse — onboard reviewers at bill.com, keep only status + the join pointer.
 - Join applicants on `akoya_primarycontactid` (=liaison); the PI is `wmkf_projectleader`.
-- Run `--execute` table-drops autonomously; the W6 drop is gated destructive carryover.
+- Run `--execute` table-drops autonomously — always grep live callers + back up first (as the W6 drop did: migration 018, 2026-06-04, with JSONL+Blob backup).
 
 Ground truth: `docs/atlas/postgres-researchers.md`, `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` (rev3); probe scripts (artifacts gitignored). Related: [[project-w6-table-drop-pending]], [[project-no-banking-pii-in-dataverse]], [[project-reviewer-identity-resolution-phase1]], [[project-institution-foundation-liaison]].
 
@@ -56,8 +56,9 @@ no shared key**:
    a separate portal-layer person record (email-keyed).
 3. **The honorarium `akoya_request` row itself** — reviewer activity/payment
    buried in the grants entity (polymorphic reuse).
-4. **Postgres `researchers`** — the Reviewer Finder pool, drain-only, W6 drop
-   pending ≥2026-07-01 (see [[project-w6-table-drop-pending]]).
+4. **Postgres `researchers`** — *was* the Reviewer Finder pool; DROPPED 2026-06-04
+   (migration 018, see [[project-w6-table-drop-pending]]). Pool identity now lives
+   only in Dataverse `wmkf_potentialreviewer`.
 
 Email is the only natural join and it is fragile. The design doc labels this
 "forward design, NOT Power Tools scope."
@@ -75,9 +76,9 @@ identity machinery ([[project-dynamics-identity-reconciliation]]), not a new
 bridge; (c) **payment: do NOT store remittance/banking PII in Dataverse** (see
 [[project-no-banking-pii-in-dataverse]]) — onboard reviewers at bill.com, store
 only onboarding-confirmed status + the `wmkf_paymentnetworkidpni` join pointer.
-What actually remains: a gated `DROP TABLE` (destructive carryover — grep live
-callers, no autonomous `--execute`) and an explicitly-deferred 5/87→census
-upgrade. Do not re-derive the finding from scratch — cite this memory.
+What remains: an explicitly-deferred 5/87→census upgrade. (The gated `DROP TABLE`
+was executed 2026-06-04 via migration 018 — backed up + verified, not autonomous.)
+Do not re-derive the finding from scratch — cite this memory.
 Related: [[dataverse-export-floor-scoping]] (Power Tools / Track B scope boundary).
 
 **ORCID-as-join-key measured S216 (read-only probes, prod Dataverse — scripts
@@ -86,7 +87,9 @@ Related: [[dataverse-export-floor-scoping]] (Power Tools / Track B scope boundar
 backfill ([[project-reviewer-identity-resolution-phase1]]) ORCID's *direct*
 cross-store power today is MODEST, because each join's far side is still
 ORCID-sparse:
-- **Pool**: 4,269 reviewers, 1,533 (35.9%) carry ORCID; only 2 promoted to a
+- **Pool**: 4,269 reviewers, 1,533 (35.9%) carry ORCID *[S216 snapshot; the
+  S219 lone-ORCID Scholar backfill since raised this to 1,773 / 41.5% — see
+  [[project-reviewer-identity-resolution-phase1]]]*; only 2 promoted to a
   `contact`, 0 ORCID-bearing.
 - **Within-pool dedup** (ORCID's strongest play): 24 ORCIDs sit on >1 row = 24
   fragmented humans / 48 rows; **23 of 24 email would MISS** (same person,

@@ -27,6 +27,7 @@ These items are **done, closed, or point-in-time** and no longer earn a slot in 
 
 ## Closed migrations
 - **Wave 1 Postgres → Dataverse migration** (CLOSED 2026-05-12) — `system_settings`/`user_app_access`/`user_preferences` dropped; dispatcher defaults → Dataverse. Live tail still tracked in the index: prod app-user elevation-revert deferred. History: `docs/POSTGRES_TO_DATAVERSE_MIGRATION.md`, [[project-wave1-pending]]. Zero-touch first-login onboarding design (not built): [[project-wave1-onboarding]].
+- **Wave 6 reviewer-finder Postgres tables dropped** (CLOSED 2026-06-04, S219) — `researchers`/`researcher_keywords`/`publications`/`proposal_searches`/`reviewer_suggestions` DROPPED via migration `018_drop_reviewer_finder_postgres_tables.sql`, ahead of the old ≥2026-07-01 trigger. `search_cache` kept (live cache). Pre-drop backups: Vercel Blob `cleanup-backup/2026-06-04/`. Authoritative record: [[project-w6-table-drop-pending]] (now closed).
 
 ## Shipped features (don't rebuild — design docs are authoritative)
 - **Dynamics Explorer**: multi-library + subfolder document listing ([[project-dynamics-explorer-archive-libs]], `lib/utils/sharepoint-buckets.js`); tool-result serializer ([[project-dynamics-explorer-serializer-deferred]], `lib/utils/dynamics-explorer-serializer.js`); Search API + perf — 77K+ docs, inline schemas, parallel exec, SSE ([[project-dynamics-explorer-details]]). Still in the index as thin pointers: schema-diff tool preference, Power-Tools reuse direction, thumbs-feedback admin anti-rebuild guardrail.

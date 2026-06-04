@@ -25,13 +25,13 @@ The canonical reference for the live state of the application's data layer.
 
 | Table | Rows | Status | Page |
 |---|---:|---|---|
-| `researchers` | 331 | drain-only post-W6 (2026-05-12); Dataverse `wmkf_potentialreviewers` is source of truth (S213: bibliometric fields folded onto the person; the `wmkf_appresearcher` sidecar was dropped) | [postgres-researchers.md](atlas/postgres-researchers.md) |
-| `publications` | 0 | drain-only; writer dead | [postgres-publications.md](atlas/postgres-publications.md) |
-| `researcher_keywords` | 1,028 | drain-only post-W6; folded into Dataverse `wmkf_potentialreviewers.wmkf_keywords` (S213: was on the dropped `wmkf_appresearcher` sidecar) | [postgres-other-reviewer-tables.md](atlas/postgres-other-reviewer-tables.md) |
-| `reviewer_suggestions` | 337 | drain-only post-W3-W6; Dataverse `wmkf_appreviewersuggestion` is source of truth | [postgres-reviewer-suggestions.md](atlas/postgres-reviewer-suggestions.md) |
-| `grant_cycles` | 13 | drain-only post-W3 (2026-05-12); Dataverse `wmkf_appgrantcycle` is source of truth (10 rows) | [postgres-grant-cycles.md](atlas/postgres-grant-cycles.md) |
-| `proposal_searches` | 0 | drain-only; writer dead, `extract-summary` endpoint retired | [postgres-other-reviewer-tables.md](atlas/postgres-other-reviewer-tables.md) |
-| `search_cache` | 0 | dead | [postgres-other-reviewer-tables.md](atlas/postgres-other-reviewer-tables.md) |
+| ~~`researchers`~~ | — | **DROPPED 2026-06-04 (S219)** via migration 018 (was 331 rows). Source of truth = Dataverse `wmkf_potentialreviewers`. | [postgres-researchers.md](atlas/postgres-researchers.md) |
+| ~~`publications`~~ | — | **DROPPED 2026-06-04 (S219)** via migration 018 (was empty, dead writer) | [postgres-publications.md](atlas/postgres-publications.md) |
+| ~~`researcher_keywords`~~ | — | **DROPPED 2026-06-04 (S219)** via migration 018 (was 1,028 rows; folded into Dataverse `wmkf_potentialreviewers.wmkf_keywords`) | [postgres-other-reviewer-tables.md](atlas/postgres-other-reviewer-tables.md) |
+| ~~`reviewer_suggestions`~~ | — | **DROPPED 2026-06-04 (S219)** via migration 018 (was 337 rows; Dataverse `wmkf_appreviewersuggestion` is source of truth) | [postgres-reviewer-suggestions.md](atlas/postgres-reviewer-suggestions.md) |
+| `grant_cycles` | 13 | drain-only post-W3 (2026-05-12); Dataverse `wmkf_appgrantcycle` is source of truth (10 rows). NOT dropped (separate domain, still draining). | [postgres-grant-cycles.md](atlas/postgres-grant-cycles.md) |
+| ~~`proposal_searches`~~ | — | **DROPPED 2026-06-04 (S219)** via migration 018 (was empty, `extract-summary` endpoint retired) | [postgres-other-reviewer-tables.md](atlas/postgres-other-reviewer-tables.md) |
+| `search_cache` | 0 | **KEPT — live cache** (0 rows but `DatabaseService.checkCache`/`cacheSearch` in pubmed/biorxiv/arxiv/chemrxiv + `/api/cron/maintenance` cleanup are live callers). Excluded from the S219 drop. | [postgres-other-reviewer-tables.md](atlas/postgres-other-reviewer-tables.md) |
 
 ### Reviewer-finder domain (Dataverse)
 
@@ -140,14 +140,14 @@ Useful summary of how Postgres ↔ Dataverse currently join (or will join post-c
 | Postgres key | Dataverse counterpart | Join field |
 |---|---|---|
 | `user_profiles.dynamics_systemuser_id` | `systemusers.systemuserid` | direct |
-| `researchers.email` | `wmkf_potentialreviewers.wmkf_emailaddress` | de-dupe key |
-| `reviewer_suggestions.request_number` | `akoya_requests.akoya_requestnum` | natural key |
-| `reviewer_suggestions.researcher_id` (→ email) | `wmkf_appreviewersuggestion._wmkf_potentialreviewer_value` | indirect |
+| ~~`researchers.email`~~ → `wmkf_potentialreviewers.wmkf_emailaddress` *(historical)* | — | Postgres `researchers` DROPPED 2026-06-04 (S219, migration 018); the de-dupe key now lives entirely in Dataverse. |
+| ~~`reviewer_suggestions.request_number`~~ → `akoya_requests.akoya_requestnum` *(historical)* | — | Postgres `reviewer_suggestions` DROPPED 2026-06-04 (S219); join now via `wmkf_appreviewersuggestion`. |
+| ~~`reviewer_suggestions.researcher_id` (→ email)~~ → `wmkf_appreviewersuggestion._wmkf_potentialreviewer_value` *(historical)* | — | Postgres `reviewer_suggestions` DROPPED 2026-06-04 (S219). |
 | `grant_cycles` (entire table) | `wmkf_appgrantcycle` — **10 rows** (2026-05-14 audit), Dataverse-primary | migration complete (W3, 2026-05-12) |
 | `wmkf_appreviewersuggestion.wmkf_reviewsharepointfolder` | SharePoint `akoya_request/{requestNumber}_{guidNoHyphensUpper}/Reviewer_Uploads/{reviewerSubfolder}` | written by `lib/services/review-upload.js`; any plan that touches reviewer suggestions must preserve this path or orphan the SharePoint files |
 | `wmkf_ai_run.wmkf_ai_Prompt@odata.bind` | `wmkf_ai_prompt` | written by `lib/services/execute-prompt.js`; FK from audit row to source prompt |
 | `wmkf_ai_run.wmkf_ai_Request@odata.bind` | `akoya_request` | written by `execute-prompt.js` + `dynamics-service.js logAiRun`; FK from audit row to processed request |
-| ~~`proposal_searches.grant_cycle_id` → `grant_cycles.id`~~ *(historical)* | — | **No longer an application dependency.** `pages/api/reviewer-finder/grant-cycles.js:99` retains only a past-tense NOTE; no live LEFT JOIN. `proposal_searches` = 0 rows, dead (see row table line 31). |
+| ~~`proposal_searches.grant_cycle_id` → `grant_cycles.id`~~ *(historical)* | — | **No longer an application dependency.** The LEFT JOIN was retired in W3; `pages/api/reviewer-finder/grant-cycles.js` retains only a past-tense NOTE. `proposal_searches` was DROPPED 2026-06-04 (S219, migration 018). |
 
 ## "As-built vs. as-designed" reconciliation (Wave 2)
 

@@ -1,64 +1,59 @@
-# Session 219 Prompt: Open — new feature work or carried tails
+# Session 220 Prompt: Open — reviewer-workflow validation + carried tails
 
-## ⏰ Standing context / guardrails (carried S197–S218)
-- **`main` auto-deploys to prod on push.** Commit/push only when asked. Feature branches do NOT deploy — use one for anything touching a live prod-write path, smoke it, then merge.
-- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`) + a PreToolUse reminder on durable-doc scope claims. Run the *disconfirming* query before asserting scope/quantity; derive denominators independently. (S218: the IRS memory's "SHIPPED + runs as scheduled" self-claim was wrong — a live Postgres/maintenance_runs probe caught it. **Don't trust a memory file's own SHIPPED/closed self-label; probe live state.**)
-- **Local-dev hits the SAME prod Dataverse + prod Postgres** — no isolated test store. `POSTGRES_URL` IS in `.env.local`, so read-only PG probes work (the `.env.local`-loading + `pg.Pool({ssl:{rejectUnauthorized:false}})` pattern). Dataverse probes: client-credentials token + `EntityDefinitions(LogicalName='x')` for set names (note `wmkf_potentialreviewer`'s set is the double-plural `wmkf_potentialreviewerses`; metadata `$filter` rejects `startswith`/`contains`). `queryAllRecords` caps at 5000.
-- **ORCID/NCBI + EXTERNAL_LINK_SECRET are "Sensitive" in Vercel** → `vercel env pull` returns them EMPTY; hand-enter in `.env.local` ([[project-vercel-sensitive-env-pull-empty]]).
-- **Memory is now a ROUTER.** `.claude-memory/MEMORY.md` routes "for THIS task → read these 1–3 files." Read the routed topic files in full before acting. New gate `npm run check:memory-router` (+ `:self-test`) keeps it ≤150 lines/18KB with valid links + statuses. Spec: `docs/CLAUDE_MEMORY_REORGANIZATION_PLAN.md`.
+## ⏰ Standing context / guardrails (carried S197–S219)
+- **`main` auto-deploys to prod on push.** Commit/push only when asked. Feature branches do NOT deploy — use one for anything touching a live prod-write path, smoke it, then merge. (Note: one-shot operator *scripts* and SQL *migrations* run against prod directly when executed locally — they are not gated by deploy; treat them with the same care.)
+- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`) + a PreToolUse reminder on durable-doc scope claims. Run the *disconfirming* query before asserting scope/quantity; derive denominators independently. (S218 lesson still holds: don't trust a memory file's own SHIPPED/closed self-label — probe live state. S219 reinforced it: a memory's "drain table still present / drop pending" survived a session past the actual drop.)
+- **Local-dev hits the SAME prod Dataverse + prod Postgres** — no isolated test store. `POSTGRES_URL` IS in `.env.local`, so read-only PG probes work (`.env.local`-load + `pg.Pool({ssl:{rejectUnauthorized:false}})`). Dataverse probes: client-credentials token + `EntityDefinitions(LogicalName='x')` for set names (`wmkf_potentialreviewer`'s set is the double-plural `wmkf_potentialreviewerses`; metadata `$filter` rejects `startswith`/`contains`). `queryAllRecords` caps at 5000 and requires a `$filter`.
+- **ORCID/NCBI + EXTERNAL_LINK_SECRET are "Sensitive" in Vercel** → `vercel env pull` returns them EMPTY; hand-enter in `.env.local` ([[project-vercel-sensitive-env-pull-empty]]). `SERP_API_KEY` + `BLOB_READ_WRITE_TOKEN` ARE in `.env.local`.
+- **Memory is a ROUTER.** `.claude-memory/MEMORY.md` routes "for THIS task → read these 1–3 files." Read the routed topic files in full before acting. Gate `npm run check:memory-router` (+ `:self-test`) keeps it ≤150 lines/18KB with valid links + statuses. Task-routed files must be `active`/`stale`, never `closed`.
 
-## Session 218 Summary
+## Session 219 Summary
 
-No app-code changes. Entire session was **memory-system work** + a Codex audit response. All committed + pushed; tree clean.
+Three pieces, all committed + pushed; tree clean. No app *runtime* code changed — this was data-layer + doc/memory work.
 
-### What was completed
-1. **Confirmed PR4 already landed.** Pulled 19 commits at session start; verified the reviewer self-reported ORCID work (sticky-`confirmed` invariant) was merged (`876dd88`) + headless e2e runner (`015aad6`) on prod. Wrote the deferred `project-reviewer-self-report-orcid-sticky-confirmed` memory.
-2. **Reorganized `.claude-memory/` into a router** (per `docs/CLAUDE_MEMORY_REORGANIZATION_PLAN.md`). `MEMORY.md` 24.3KB/143 lines → **~7.7KB/78 lines**. Normalized **all 118 topic files**: added `status`/`scope`/`last_verified` + a `## Recall Rule` (additive only — zero body deletions, verified). New `project-closed-work-archive.md` holds closed/point-in-time entries. New gate `scripts/check-memory-router.js` (+ self-test), wired into `package.json` + `.github/workflows/test.yml`.
-3. **Acted on the Codex reorg audit** (`docs/MEMORY_REORG_AUDIT_2026-06-04.md`):
-   - **P1 (verified vs code, fixed):** `intake-portal-reviewer-capture` — separated CURRENT Workbench (option B: recommended→junction rows; **excluded→soft-block only, NO rows**) from FUTURE intake design; `reviewer-workbench-invite-workflow` — per-user signature **IS** wired (`pages/workbench/[requestId].js` reads `SENDER_INFO`), replaced stale "not yet wired."
-   - **P2:** split all 6 over-full routes to ≤3 files; convention = a task-routed file must be `active`/`stale`, never `closed` → reclassified 12 routed files closed→active.
-   - **IRS reality-check:** live probe showed `irs_exempt_orgs` **does** hold 1,264,156 rows, BUT the quarterly cron **has never fired** (0 `maintenance_runs` rows) and **nothing built consumes** verify-EIN. Rewrote `project-irs-exempt-verification` from "SHIPPED + running" → "code+data shipped, **DORMANT**."
-4. **Spot-probed every other closed/SHIPPED memory** against live Postgres/Dataverse/repo. **IRS was the only overstatement** — Wave-1 tables dropped ✓, W6 drain tables present ✓, appresearcher entities dropped ✓, 6 `wmkf_identity*` fields deployed ✓, slice-0 schema deployed ✓, BILL chunks + Q5 lookup + honorarium setting all present ✓. Upgraded `last_verified` on 9 verified files to real `via live probe` provenance.
+### 1. Lone-ORCID Scholar backfill — closed the S215 ORCID residual (commit `c734356`)
+- `scripts/backfill-lone-orcid-scholar.js`: ran Google Scholar over the 454 lone-ORCID reviewers (name-only ORCID match, left `unresolved` by the S215 backfill). Where Scholar was clean, fed both weak anchors (lone ORCID + clean Scholar) through the live `resolveIdentity` gate → `probable` → wrote the ORCID.
+- **Result (verified vs live Dataverse): 240 written, 144 rejected (correctly gated), 70 no-Scholar.** Pool: ORCID **1,533→1,773**, `probable` **1,532→1,772** (+240 each, triangulated). Scholar used as corroborating evidence only — `wmkf_googlescholarid` NOT persisted. Cost $0 (454 of 14,647 monthly SerpAPI headroom). Two Codex rounds + a SerpAPI-`data.error`="no results"→`sch_none` fix.
 
-### Commits
-- `91f7597` — memory: PR4 sticky-confirmed entry (checkpoint before trim)
-- `ba105f7` — memory: trim MEMORY.md under harness limit (archive + merge duplicate feedback)
-- `4cb926d` — Reorganize Claude project memory routing (router + 118 normalized files + gate)
-- `b8fd81c` — docs: add Claude memory reorganization plan
-- `9e501f0` — memory: act on Codex reorg audit (P1 fixes + router cleanup + IRS reality-check)
-- `eea0bc9` — memory: spot-probe closed/SHIPPED files vs live state — stamp last_verified
-- (this session-doc commit follows)
+### 2. Dropped the reviewer-finder Postgres drain tables (commit `e6a339d`, migration 018)
+- Done **early** at Justin's direction (he'd removed reviewer-finder/review-manager from other users + stopped using them), ahead of the old ≥2026-07-01 trigger.
+- **5 tables dropped** (`migration 018`, guarded + tracked, Wave-1 precedent): `researchers`, `researcher_keywords`, `publications`, `proposal_searches`, **`reviewer_suggestions`**. Verified gone from the pg catalog; no dangling FKs. Scope grew from 4→5 once an FK probe showed `reviewer_suggestions.researcher_id → researchers` and re-verification confirmed `reviewer_suggestions` had no live app SQL.
+- **`search_cache` EXCLUDED** — 0 rows but has live callers (`DatabaseService.checkCache`/`cacheSearch` in pubmed/biorxiv/arxiv/chemrxiv + the maintenance cron). The verification rule caught this.
+- Pre-drop backups (331 / 1,028 / 337 rows) → local JSONL + Vercel Blob `cleanup-backup/2026-06-04/` (`scripts/w6-drop-backup.js` + `w6-drop-restore.js`). Neon PITR 7-day = secondary.
 
-## Potential Next Steps
+### 3. Doc/memory reconciliation audit (this commit)
+- At Justin's request, audited CLAUDE.md + SESSION_PROMPT + all ~118 memory topic files (3 parallel auditor agents) for currency vs reality. Fixed the staleness the S219 changes introduced: ~7 memory files (drop "pending"/"drain-only" → DROPPED; old ORCID counts annotated; `017`→`018`; PromptResolver→Executor; explorer Search pointer), the Atlas index + 4 atlas pages (incl. the missed `postgres-publications.md`), CLAUDE.md schema row. All gates + self-tests green.
 
-Everything below the memory work is open — no forced priority. Pick from carried tails or new features.
+## Potential Next Steps (no forced priority)
 
-### 1. Carried reviewer/intake tails (operator / live-session work — not code)
-- Grant `reviewers` app access to pilot PDs + validate `/workbench` with a real PD login (`/admin` → `wmkf_appuserappaccesses`).
-- **Intake virus-scan EICAR e2e** — still parked pre-cycle must-do ([[project-intake-portal-virus-scan-e2e-deferred]]); needs deployed env + Entra applicant session.
+### 1. Reviewer-workflow validation — the longest-deferred debt
+- **Manual PD smoke of the identity resolver + `/workbench`** — shipped + CI-green since S214 but never exercised by a real PD login (CI-green ≠ correct for an outward-facing match-quality surface). Grant `reviewers` to pilot PDs via `/admin` (`wmkf_appuserappaccesses`) and walk Find→Invite→Track→Completed. **Highest-value next step.**
+- **Intake virus-scan EICAR e2e** — still parked pre-cycle must-do ([[project-intake-portal-virus-scan-e2e-deferred]]); needs a deployed env + Entra applicant session.
 
-### 2. ORCID capture residual (from S215)
-Lone-ORCID + clean-Scholar (~4.4%) — a second backfill pass running Scholar would catch them (SerpAPI cost), or let normal enrichment pick them up. Cost decision, not code.
+### 2. Finish the reviewer-app consolidation
+- Retire the legacy `reviewer-finder` / `review-manager` appRegistry keys now that Workbench has Find-tab parity — **destructive**, grep live callers first (the 18 routes accept `reviewers` variadically; both old keys still live). See [[project-reviewer-apps-redesign-direction]] (Option B).
 
-### 3. Optional memory follow-ons (low priority, documented as deferred in the audit)
-- P2 — 47 topic files use flat top-level frontmatter vs nested `metadata:` (cosmetic; gate-clean). Normalize if touched.
-- P3 — regenerate `docs/RECONCILIATION_REPORT.json` via the non-`--no-write` drift path (needs live probe).
+### 3. ORCID residual tail (cost decision, low priority)
+- 70 no-Scholar + 144 Scholar-rejected reviewers stay correctly `unresolved` (the safety wins). Separately, lone-Scholar/no-ORCID people aren't ORCID-captured — a different bucket, no action planned.
 
-### 4. New features
-Roadmap memories: route via `MEMORY.md` → "Strategy / system model", "Planned: …" rows. ([[project-app-roadmap-2026-04-25]], [[project-staged-review-pipeline]], [[project-proposal-context-extraction]]).
+### 4. New features / next cycle
+- J27 triage dashboard + automation tier (Dec 2026 runway); roadmap memories via MEMORY.md "Planned: …" / "Strategy" rows.
+
+## Open audit note (outside the S219 scope, flagged not fixed)
+- `requireAppAccess(` appears in **56** `pages/api` files but `docs/CANONICAL_COUNTS.md` + the fact-consistency gate say **55** (gate is green). Likely `pages/api/test-email.js` is intentionally excluded as a non-app endpoint — worth a 5-min confirm that the canonical count's derivation is deliberate, not a 1-off drift.
 
 ## Key Files Reference
 | File | Purpose |
 |------|---------|
-| `.claude-memory/MEMORY.md` | The router — read it, follow task routes to topic files |
-| `docs/CLAUDE_MEMORY_REORGANIZATION_PLAN.md` | Router spec + layer model + operating rules |
-| `scripts/check-memory-router.js` (+ `-self-test`) | The new gate (≤150 lines/18KB, links resolve, valid statuses) |
-| `docs/MEMORY_REORG_AUDIT_2026-06-04.md` | Codex audit (P1/P2/P3 findings, now addressed) |
-| `.claude-memory/project-irs-exempt-verification.md` | Corrected: code+data shipped but DORMANT (no consumer, cron never fired) |
+| `lib/db/migrations/018_drop_reviewer_finder_postgres_tables.sql` | The S219 table drop (guarded, tracked) |
+| `scripts/w6-drop-backup.js` / `w6-drop-restore.js` | Pre-drop backup + break-glass restore |
+| `scripts/backfill-lone-orcid-scholar.js` | The lone-ORCID Scholar backfill (resumable) |
+| `docs/APPLICATION_STATE_ATLAS.md` + `docs/atlas/` | Canonical live-state; reconciled S219 |
+| `.claude-memory/project-w6-table-drop-pending.md` | Now `status: closed` — the drop's authoritative record |
 
 ## Testing
 ```bash
 npx jest                                    # full suite (eslint is CI-only, not local)
-npm run check:memory-router && npm run check:memory-router:self-test
 npm run check:atlas && npm run check:api-routes && npm run check:fact-consistency && npm run check:doc-currency
+npm run check:memory-router && npm run check:migrations-manifest && npm run check:drain-table-mentions
 ```

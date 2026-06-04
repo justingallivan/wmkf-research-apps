@@ -32,7 +32,7 @@ The user-facing `/phase-i-dynamics` summary app was originally a quick way to pr
 
 **Why:** Justin's framing 2026-04-25 — backend-driven prompt automation will produce most summaries; UI app demand collapses for high-volume early-cycle work. Reviewer finder + Phase II tools remain because they're expert-driven late-cycle work.
 
-**Important nuance (audit 2026-05-03):** the "winddown" is about strategic priority and UI investment, NOT a development freeze. The `/phase-i-dynamics` page and `/api/phase-i-dynamics/summarize{,-v2}` endpoints are still actively iterated — v2 uses the new PromptResolver, A/B comparison scripts (`scripts/compare-phase-i-v1-v2.js`, `scripts/ab-phase-i-prompts.js`) and prompt-size audit tooling (`scripts/audit-system-prompt-sizes.js`) reference it. Hidden from main nav by design (direct URL only); it's a prompt-development surface, not a deprecated app.
+**Important nuance (audit 2026-05-03):** the "winddown" is about strategic priority and UI investment, NOT a development freeze. The `/phase-i-dynamics` page and `/api/phase-i-dynamics/summarize{,-v2}` endpoints are still actively iterated — v2 uses the shared Executor (`executePrompt` from `lib/services/execute-prompt.js`), A/B comparison scripts (`scripts/compare-phase-i-v1-v2.js`, `scripts/ab-phase-i-prompts.js`) and prompt-size audit tooling (`scripts/audit-system-prompt-sizes.js`) reference it. Hidden from main nav by design (direct URL only); it's a prompt-development surface, not a deprecated app.
 
 **How to apply:**
 - Don't over-invest in `/phase-i-dynamics` UI features (forms, polish, dashboards). It works for May 2026; details of its prompt may change but driven by backend needs not user request.
