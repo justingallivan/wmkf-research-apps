@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * READ-ONLY provenance probe (S216): the cross-store probe found 409 `contact`
- * rows already carry wmkf_orcid — NOT written by us (contact has no wmkf_orcidurl,
- * our researcher adapter writes both; only 2 reviewers are promoted, 0 ORCID).
+ * READ-ONLY provenance probe (S216): the cross-store probe found `contact` rows
+ * already carrying wmkf_orcid (423 non-null; 409 parse as a valid iD, 14 malformed) —
+ * NOT written by us (contact has no wmkf_orcidurl, our researcher adapter writes both;
+ * only 2 reviewers are promoted, 0 ORCID).
  * Where did they come from, and are they a reviewer population or a grant-applicant
  * population? That answer changes the back-propagation design.
  *

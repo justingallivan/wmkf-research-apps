@@ -5,10 +5,11 @@
  * ACTUALLY RESOLVES — the input to the "de-fragment the disjoint reviewer identity
  * stores" decision ([[reviewer-identity-fragmentation]]).
  *
- * Architectural reality being measured (NOT assumed): the GOapply-sourced stores
- * (`contact`, honorarium `akoya_request`, GOapply submitter) do NOT carry ORCID
- * natively — EMAIL is the only natural join. So ORCID's cross-store power is two
- * distinct things, measured separately here:
+ * SUPERSEDED ASSUMPTION (kept for honesty): this probe was written believing the
+ * GOapply-sourced stores carry no ORCID natively, so EMAIL is the only join. That was
+ * FALSIFIED — `contact` HAS a native `wmkf_orcid` (423 populated) — see
+ * `probe-orcid-contact-direct-join.js` and `probe-contact-orcid-provenance.js`. ORCID's
+ * cross-store power is still two distinct things, measured separately here:
  *   (B) DIRECT: collapse duplicate person rows WITHIN the reviewer pool, where ORCID
  *       is present on both sides (ORCID catches dups that email/name miss).
  *   (C/D) BRIDGE: for the GOapply stores, ORCID can only become a durable join key
