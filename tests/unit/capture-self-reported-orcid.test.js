@@ -1,0 +1,84 @@
+/**
+ * @jest-environment node
+ *
+ * Reviewer self-reported ORCID capture (reviewer-side twin of PR3). Locks:
+ * a valid self-reported iD writes the person (overwrite + 'confirmed') AND fills
+ * the contact join key; an invalid iD / missing person abstains; URL-form input
+ * normalizes; the contact write is skipped (person-only) when no contact exists.
+ */
+import { captureSelfReportedReviewerOrcid } from '../../lib/services/capture-self-reported-orcid.js';
+
+const VALID = '0000-0002-1825-0097';
+
+function deps() {
+  return {
+    researcher: {
+      updateById: jest.fn().mockResolvedValue(undefined),
+      writeIdentityDecision: jest.fn().mockResolvedValue(undefined),
+    },
+    contacts: {
+      setOrcidIfAbsent: jest.fn().mockResolvedValue({ action: 'write', orcid: VALID }),
+    },
+  };
+}
+
+describe('captureSelfReportedReviewerOrcid', () => {
+  test('valid iD + contact → person overwrite + confirmed status + contact fill', async () => {
+    const d = deps();
+    const out = await captureSelfReportedReviewerOrcid(
+      { potentialReviewerId: 'pr-1', rawOrcid: `https://orcid.org/${VALID}`, contactId: 'c-1', actingUserSystemId: 'u1', now: 'T0' },
+      d,
+    );
+    expect(out).toEqual({ persisted: true, orcid: VALID, contact: { action: 'write', orcid: VALID } });
+
+    // Person: overwrite both iD fields (self-report beats a resolver guess).
+    expect(d.researcher.updateById).toHaveBeenCalledWith('pr-1',
+      { orcid: VALID, orcidUrl: `https://orcid.org/${VALID}` }, { actingUserSystemId: 'u1' });
+
+    // Identity decision: a sticky 'confirmed' human attestation with a self-report anchor.
+    const [prId, decision, opts] = d.researcher.writeIdentityDecision.mock.calls[0];
+    expect(prId).toBe('pr-1');
+    expect(decision.status).toBe('confirmed');
+    expect(decision.resolvedAt).toBe('T0');
+    expect(decision.anchors[0].type).toBe('self_reported_orcid');
+    expect(decision.anchors[0].canonicalKey).toBe(`orcid:${VALID}`);
+    expect(opts).toEqual({ actingUserSystemId: 'u1' });
+
+    // Contact: fill-only join-key write.
+    expect(d.contacts.setOrcidIfAbsent).toHaveBeenCalledWith('c-1', VALID, { actingUserSystemId: 'u1' });
+  });
+
+  test('no contact → person-only (no contact write attempted)', async () => {
+    const d = deps();
+    const out = await captureSelfReportedReviewerOrcid({ potentialReviewerId: 'pr-1', rawOrcid: VALID }, d);
+    expect(out).toEqual({ persisted: true, orcid: VALID, contact: null });
+    expect(d.researcher.updateById).toHaveBeenCalled();
+    expect(d.researcher.writeIdentityDecision).toHaveBeenCalled();
+    expect(d.contacts.setOrcidIfAbsent).not.toHaveBeenCalled();
+  });
+
+  test('invalid / malformed iD → skip, no writes', async () => {
+    const d = deps();
+    expect(await captureSelfReportedReviewerOrcid({ potentialReviewerId: 'pr-1', rawOrcid: '1234567', contactId: 'c-1' }, d))
+      .toEqual({ skipped: 'invalid_orcid', state: 'malformed' });
+    expect(await captureSelfReportedReviewerOrcid({ potentialReviewerId: 'pr-1', rawOrcid: '', contactId: 'c-1' }, d))
+      .toEqual({ skipped: 'invalid_orcid', state: 'empty' });
+    expect(d.researcher.updateById).not.toHaveBeenCalled();
+    expect(d.researcher.writeIdentityDecision).not.toHaveBeenCalled();
+    expect(d.contacts.setOrcidIfAbsent).not.toHaveBeenCalled();
+  });
+
+  test('checksum-invalid (right shape) → skip', async () => {
+    const d = deps();
+    const out = await captureSelfReportedReviewerOrcid({ potentialReviewerId: 'pr-1', rawOrcid: '0000-0002-1825-0098' }, d);
+    expect(out).toEqual({ skipped: 'invalid_orcid', state: 'malformed' });
+    expect(d.researcher.updateById).not.toHaveBeenCalled();
+  });
+
+  test('missing person id → skip no_person (even with a valid iD)', async () => {
+    const d = deps();
+    const out = await captureSelfReportedReviewerOrcid({ rawOrcid: VALID, contactId: 'c-1' }, d);
+    expect(out).toEqual({ skipped: 'no_person' });
+    expect(d.contacts.setOrcidIfAbsent).not.toHaveBeenCalled();
+  });
+});

@@ -42,6 +42,8 @@ import { getActivePolicies } from '../../../../../lib/external/policy-fetcher';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 import { ensureHonorariumOnboarding } from '../../../../../lib/bill/honorarium-onboard-orchestrator';
+import { captureSelfReportedReviewerOrcid } from '../../../../../lib/services/capture-self-reported-orcid';
+import { normalizeOrcid } from '../../../../../lib/utils/orcid-normalize';
 import NotificationService from '../../../../../lib/services/notification-service';
 
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
@@ -102,6 +104,34 @@ const REVIEW_STATUS_MATERIALS_SENT = 100000001;
 const RESPONSE_TYPE_ACCEPTED = 100000000;
 const RESPONSE_TYPE_DECLINED = 100000001;
 const RESPONSE_TYPE_WITHDRAWN_SUFFICIENT = 100000003;
+
+// The reviewer's self-reported ORCID for this response: the value they typed
+// this time (delta) OR the one already persisted on the engagement row (which
+// was their prefill — the client sends only CHANGED fields, so a confirm-without-
+// edit sends nothing) (Codex S217 #3).
+function selfReportedOrcidOf(body, suggestion) {
+  return body?.contactEdits?.orcid || suggestion?.wmkf_reviewerorcid || null;
+}
+
+// Capture the reviewer's self-confirmed ORCID onto the person + contact (the
+// reviewer-side twin of PR3 — highest-trust source, persisted as a sticky
+// 'confirmed'). NON-FATAL: the accept/decline already committed. contactId is
+// the just-created honorarium contact when present, else the pointer promoted at
+// invite time; absent → person-only capture.
+async function captureReviewerSelfReportedOrcid({ reviewer, contactId, rawOrcid }) {
+  if (!rawOrcid) return;
+  try {
+    await bypassDynamicsRestrictions('external-orcid-selfreport', () =>
+      captureSelfReportedReviewerOrcid({
+        potentialReviewerId: reviewer?.wmkf_potentialreviewersid || null,
+        rawOrcid,
+        contactId: contactId || reviewer?._wmkf_contact_value || null,
+      }),
+    );
+  } catch (orcidErr) {
+    console.warn('[external respond] self-reported ORCID capture failed (non-fatal):', orcidErr?.message || orcidErr);
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -187,6 +217,9 @@ export default async function handler(req, res) {
         }
         throw e;
       }
+      // A declining reviewer still gives us their ORCID for free — capture it
+      // (person + contact-if-promoted). No honorarium on decline → no new contact.
+      await captureReviewerSelfReportedOrcid({ reviewer, contactId: null, rawOrcid: selfReportedOrcidOf(body, suggestion) });
       return res.status(200).json({
         ok: true,
         idempotent: false,
@@ -244,6 +277,19 @@ export default async function handler(req, res) {
       }
     }
 
+    // Reflect a valid self-reported ORCID onto the in-memory reviewer BEFORE
+    // honorarium (Codex S217 #2), so honorarium's contact back-prop carries the
+    // self-report (highest trust, 'confirmed') rather than a stale resolver iD —
+    // avoiding a needless fill-then-conflict on the contact. If the contact was
+    // already filled with a DIFFERENT corroborated iD in a prior session, the §4
+    // conflict policy still (correctly) surfaces rather than clobbers.
+    const acceptOrcidRaw = selfReportedOrcidOf(body, suggestion);
+    const acceptOrcidNorm = normalizeOrcid(acceptOrcidRaw);
+    if (acceptOrcidNorm.state === 'valid' && reviewer) {
+      reviewer.wmkf_orcid = acceptOrcidNorm.id;
+      reviewer.wmkf_identitystatus = 'confirmed';
+    }
+
     // ── Honorarium onboarding (NON-FATAL to the accept) ────────────────────
     // Runs on both fresh accept and re-accept; gated on opt-out. Any failure
     // alerts and is left for the resume sweep / a later re-accept — it never
@@ -253,11 +299,13 @@ export default async function handler(req, res) {
     // post-impl F2): a re-accept whose body omits honorariumOptOut must not
     // mint a honorarium for a reviewer who opted out on the original accept.
     const optedOut = body.honorariumOptOut === true || suggestion.wmkf_honorariumoptout === true;
+    let honContactId = null;
     if (!optedOut) {
       try {
-        await bypassDynamicsRestrictions('external-honorarium', () =>
+        const honResult = await bypassDynamicsRestrictions('external-honorarium', () =>
           ensureHonorariumOnboarding({ suggestion, request, reviewer, body }),
         );
+        honContactId = honResult?.contactId || null;
       } catch (honErr) {
         console.error('[external respond] honorarium onboarding failed (non-fatal):', honErr?.message || honErr);
         try {
@@ -280,6 +328,12 @@ export default async function handler(req, res) {
         }
       }
     }
+
+    // Self-reported ORCID → person + contact (twin of PR3). Uses the just-created
+    // honorarium contact when present, else the invite-time pointer. Runs on fresh
+    // and repeat accepts (idempotent); independent of honorarium opt-out. Sourced
+    // from the typed delta OR the persisted engagement value (confirm-without-edit).
+    await captureReviewerSelfReportedOrcid({ reviewer, contactId: honContactId, rawOrcid: acceptOrcidRaw });
 
     return res.status(200).json({
       ok: true,
