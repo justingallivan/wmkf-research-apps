@@ -60,3 +60,33 @@ What actually remains: a gated `DROP TABLE` (destructive carryover — grep live
 callers, no autonomous `--execute`) and an explicitly-deferred 5/87→census
 upgrade. Do not re-derive the finding from scratch — cite this memory.
 Related: [[dataverse-export-floor-scoping]] (Power Tools / Track B scope boundary).
+
+**ORCID-as-join-key measured S216 (read-only probes, prod Dataverse — scripts
+`probe-orcid-cross-store-matches.js` / `probe-orcid-contact-direct-join.js` /
+`probe-contact-orcid-provenance.js`, artifacts gitignored).** After the S215
+backfill ([[project-reviewer-identity-resolution-phase1]]) ORCID's *direct*
+cross-store power today is MODEST, because each join's far side is still
+ORCID-sparse:
+- **Pool**: 4,269 reviewers, 1,533 (35.9%) carry ORCID; only 2 promoted to a
+  `contact`, 0 ORCID-bearing.
+- **Within-pool dedup** (ORCID's strongest play): 24 ORCIDs sit on >1 row = 24
+  fragmented humans / 48 rows; **23 of 24 email would MISS** (same person,
+  different institutional emails). This is the clean win.
+- **reviewer→contact**: email bridge reaches 183/1,533; direct ORCID↔ORCID
+  shares only 18 (marginal +2 over email).
+- **honorarium akoya_request**: 49/87 paid reviewers match the pool (ALL by
+  email, 0 by contact-ptr); 18 ORCID-resolved.
+- **`contact` HAS a native `wmkf_orcid` field** (falsifies "GOapply stores are
+  email-only"), populated on 423 — but it's a DISJOINT population: 100% created
+  by "# BCO akoyaGO Integration", `akoya_entitysource=GOapply`, 398 in 2026,
+  **52% are PIs (`wmkf_projectleader`) on current-cycle requests** = grant
+  APPLICANTS, not reviewers. So GOapply already captures applicant ORCID at
+  intake. NB the PI is `wmkf_projectleader`, NOT `akoya_primarycontactid`
+  (=liaison) — joining on primary-contact undercounts applicants ~200x
+  ([[project-institution-foundation-liaison]]).
+Design implication: de-fragmentation is a FLOW problem, not a one-shot collapse
+— make ORCID propagate (back-propagate the 1,533 reviewer ORCIDs onto their
+contacts; carry ORCID through the intake portal + applicant-suggested-reviewer
+capture) so the shared key builds over time. `contact.wmkf_orcid` has no
+`wmkf_orcidurl` sibling (our researcher adapter writes both) — a write-signature
+tell. 14 contact ORCID values are malformed (direct-join data-quality snag).
