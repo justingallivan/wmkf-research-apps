@@ -18,7 +18,7 @@ Quick pre-flight: grep for live callers, read the most likely ones to confirm th
 
 This rule does NOT apply to additive work (new features, endpoints, tables) — only destructive work.
 
-## Durable-doc edits: reconcile the WHOLE file, not the line
+## Durable-doc edits: reconcile the WHOLE file, not just the flagged line
 
 When you change a fact, status, or claim in any `.claude-memory/*.md`, `docs/**`, `CLAUDE.md`, or `SESSION_PROMPT.md`:
 

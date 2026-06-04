@@ -6,8 +6,8 @@
  * When EDITING a durable artifact (docs/, .claude-memory/, or a top-level
  * agent-instruction file), inject a non-blocking reminder to read the WHOLE file
  * and grep the repo for the same fact, then fix every instance in one pass —
- * NOT just the grep-targeted line. This is the "read the line, not the file"
- * failure mode that cost S219 three Codex review rounds.
+ * NOT just the grep-targeted line. This is the patch-the-flagged-line-instead-of-
+ * reconciling-the-whole-file failure mode that cost S219 three Codex review rounds.
  *
  * Fires on Edit only (Write = new file / full rewrite is less prone to the bug).
  * FAILS OPEN: any parse error / missing field exits 0 silently — never blocks an edit.
