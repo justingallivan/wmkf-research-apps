@@ -16,6 +16,7 @@ import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { ClaudeReviewerService } from '../../../lib/services/claude-reviewer-service';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
+import { deriveProposalAuthorNames } from '../../../lib/utils/proposal-authors';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -130,16 +131,14 @@ export default async function handler(req, res) {
 
     const { DeduplicationService } = require('../../../lib/services/deduplication-service');
 
-    // Filter out proposal authors (PI and co-authors) - they should never be reviewers
-    const proposalAuthorsRaw = analysisResult.proposalInfo?.proposalAuthors;
+    // Filter out proposal authors (PI AND co-investigators) — they should never
+    // be reviewers. Derived via the shared helper so this matches the COI set
+    // used by enrich-recommended.js (S213 parity — co-PIs were previously
+    // dropped here, so a co-PI could slip through as a candidate/coauthor-clean).
+    const proposalAuthors = deriveProposalAuthorNames(analysisResult.proposalInfo);
     let verifiedCandidates = discoveryResults.verified;
 
-    if (proposalAuthorsRaw && proposalAuthorsRaw.toLowerCase() !== 'not specified') {
-      const proposalAuthors = proposalAuthorsRaw
-        .split(',')
-        .map(a => a.trim())
-        .filter(a => a.length > 0);
-
+    {
       if (proposalAuthors.length > 0) {
         const authorFilterResult = DeduplicationService.filterProposalAuthors(
           verifiedCandidates,
@@ -182,13 +181,8 @@ export default async function handler(req, res) {
       }
     }
 
-    // Check for coauthor COI if we have proposal authors (reuse parsed array from earlier)
-    if (proposalAuthorsRaw && proposalAuthorsRaw.toLowerCase() !== 'not specified') {
-      const proposalAuthors = proposalAuthorsRaw
-        .split(',')
-        .map(a => a.trim())
-        .filter(a => a.length > 0);
-
+    // Check for coauthor COI if we have proposal authors (reuse the shared array)
+    {
       if (proposalAuthors.length > 0 && verifiedWithCOI.length > 0) {
         sendEvent('progress', {
           stage: 'coi_check',
@@ -255,13 +249,8 @@ export default async function handler(req, res) {
       }
     }
 
-    // Filter out proposal authors from discovered candidates too
-    if (proposalAuthorsRaw && proposalAuthorsRaw.toLowerCase() !== 'not specified' && enhancedDiscovered.length > 0) {
-      const proposalAuthors = proposalAuthorsRaw
-        .split(',')
-        .map(a => a.trim())
-        .filter(a => a.length > 0);
-
+    // Filter out proposal authors from discovered candidates too (same shared set)
+    if (enhancedDiscovered.length > 0) {
       if (proposalAuthors.length > 0) {
         const discoveredFilterResult = DeduplicationService.filterProposalAuthors(
           enhancedDiscovered,
