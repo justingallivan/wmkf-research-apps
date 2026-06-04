@@ -40,6 +40,7 @@ function makeDeps(overrides = {}) {
     suggestions: { setHonorariumRequest: jest.fn().mockResolvedValue(undefined), ...overrides.suggestions },
     onboard: overrides.onboard || jest.fn().mockResolvedValue({ status: 'alert_only' }),
     getAmount: overrides.getAmount || jest.fn().mockResolvedValue(250),
+    backProp: overrides.backProp || jest.fn().mockResolvedValue({ action: 'noop' }),
     deriveGuid: overrides.deriveGuid || jest.fn((name) => `det-${name}`),
   };
 }
@@ -72,8 +73,8 @@ describe('ensureHonorariumOnboarding', () => {
     const deps = makeDeps();
     const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_potentialreviewersid: 'pr-1', wmkf_emailaddress: 'jane@uni.edu', wmkf_name: 'Jane' } });
     await ensureHonorariumOnboarding(args, deps);
-    expect(deps.contacts.findOrCreateByEmail).toHaveBeenCalledWith(expect.objectContaining({ email: 'jane@uni.edu' }));
-    expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-new');
+    expect(deps.contacts.findOrCreateByEmail).toHaveBeenCalledWith(expect.objectContaining({ email: 'jane@uni.edu' }), { actingUserSystemId: undefined });
+    expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-new', { actingUserSystemId: undefined });
     expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-new)');
   });
 
@@ -152,5 +153,32 @@ describe('ensureHonorariumOnboarding', () => {
     const deps = makeDeps({ getAmount: jest.fn().mockRejectedValue(err) });
     await expect(ensureHonorariumOnboarding(baseArgs(), deps)).rejects.toMatchObject({ code: 'honorarium_amount_unavailable' });
     expect(deps.dynamics.createRecord).not.toHaveBeenCalled();
+  });
+
+  it('back-propagates the reviewer ORCID onto the ensured contact (design §5)', async () => {
+    const deps = makeDeps();
+    const args = baseArgs({ reviewer: { wmkf_orcid: '0000-0002-1825-0097', wmkf_identitystatus: 'probable' } });
+    await ensureHonorariumOnboarding({ ...args, actingUserSystemId: 'u9' }, deps);
+    expect(deps.backProp).toHaveBeenCalledWith(expect.objectContaining({
+      reviewer: expect.objectContaining({ wmkf_orcid: '0000-0002-1825-0097' }),
+      contactId: 'contact-1',
+      actingUserSystemId: 'u9',
+    }));
+  });
+
+  it('ORCID back-prop failure is non-fatal — honorarium still created + onboarded', async () => {
+    const deps = makeDeps({ backProp: jest.fn().mockRejectedValue(new Error('contact 403')) });
+    const res = await ensureHonorariumOnboarding(baseArgs(), deps);
+    expect(deps.dynamics.createRecord).toHaveBeenCalled();
+    expect(deps.onboard).toHaveBeenCalled();
+    expect(res.honorariumRequestId).toBe(`det-${SUGGESTION_ID}`);
+  });
+
+  it('threads actingUserSystemId into the promote-on-accept contact helpers (Codex #13)', async () => {
+    const deps = makeDeps();
+    const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_potentialreviewersid: 'pr-1', wmkf_emailaddress: 'jane@uni.edu', wmkf_name: 'Jane' } });
+    await ensureHonorariumOnboarding({ ...args, actingUserSystemId: 'u9' }, deps);
+    expect(deps.contacts.findOrCreateByEmail).toHaveBeenCalledWith(expect.any(Object), { actingUserSystemId: 'u9' });
+    expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-new', { actingUserSystemId: 'u9' });
   });
 });

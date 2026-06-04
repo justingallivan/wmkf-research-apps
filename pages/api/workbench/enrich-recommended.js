@@ -44,6 +44,7 @@ import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/poten
 import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
 import { APPLICANT_DISPOSITION_MAP } from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import { mayPersistIdentity, RESOLVER_SOURCED_FIELDS } from '../../../lib/services/reviewer-identity-resolver';
+import { backPropReviewerOrcidToContact } from '../../../lib/services/backprop-reviewer-orcid';
 
 const limiter = nextRateLimiter({ max: 10 });
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -145,7 +146,10 @@ export default async function handler(req, res) {
 
       // 3. Build verification suggestions, carrying potentialReviewerId +
       //    suggestionId through (verifyClaudeSuggestions spreads ...suggestion).
+      // Retain each person's contact pointer (design §5 hydration contract) so
+      // the post-writeback ORCID back-prop can target an already-linked contact.
       const suggestions = [];
+      const contactValueByPr = new Map();
       for (const row of recommendedRows) {
         const prId = row._wmkf_potentialreviewer_value;
         const name = row._wmkf_potentialreviewer_value_formatted || row.wmkf_name || null;
@@ -154,6 +158,7 @@ export default async function handler(req, res) {
         try {
           const person = await potentialReviewerAdapter.getById(prId);
           affiliation = person?.wmkf_primaryaffiliation || person?.wmkf_organizationname || null;
+          if (person?._wmkf_contact_value) contactValueByPr.set(prId, person._wmkf_contact_value);
         } catch { /* affiliation is optional — verify fills it from PubMed */ }
         suggestions.push({
           name,
@@ -277,6 +282,28 @@ export default async function handler(req, res) {
             }
           } catch (err) {
             sendEvent('progress', { message: `Could not save metrics for ${c.name}: ${err.message}` });
+          }
+
+          // ORCID back-prop (design §5): if this person is already linked to a
+          // contact, flow the just-persisted, identity-gated ORCID onto it now
+          // instead of waiting for a later send. The helper enforces eligibility
+          // (valid iD + confirmed/probable status); a null/blocked ORCID or a
+          // non-promoted person is a clean skip. Non-fatal.
+          const contactValue = contactValueByPr.get(prId) || null;
+          if (contactValue) {
+            try {
+              await backPropReviewerOrcidToContact({
+                reviewer: {
+                  wmkf_orcid: orcidId,
+                  wmkf_identitystatus: identity?.status || null,
+                  _wmkf_contact_value: contactValue,
+                },
+                contactId: contactValue,
+                actingUserSystemId,
+              });
+            } catch (bpErr) {
+              sendEvent('progress', { message: `Could not back-propagate ORCID for ${c.name}: ${bpErr.message}` });
+            }
           }
         }
 

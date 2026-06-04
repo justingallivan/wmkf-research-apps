@@ -50,6 +50,7 @@ import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import * as contactAdapter from '../../../lib/dataverse/adapters/contact';
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
+import { backPropReviewerOrcidToContact } from '../../../lib/services/backprop-reviewer-orcid';
 import { shouldSkipDuplicateInvitation, sendAllowsAttachments, recipientMayReceiveAttachments } from '../../../lib/utils/reviewer-invite';
 
 const limiter = nextRateLimiter({ max: 10 });
@@ -142,7 +143,7 @@ export default async function handler(req, res) {
       const requestId = sug._wmkf_request_value;
       const [person, request] = await Promise.all([
         personId ? DynamicsService.getRecord('wmkf_potentialreviewerses', personId, {
-          select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_emailaddress,wmkf_firstname,wmkf_lastname,_wmkf_contact_value',
+          select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_emailaddress,wmkf_firstname,wmkf_lastname,_wmkf_contact_value,wmkf_orcid,wmkf_identitystatus',
         }).catch(() => null) : null,
         requestId ? DynamicsService.getRecord('akoya_requests', requestId, {
           select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate',
@@ -225,6 +226,10 @@ export default async function handler(req, res) {
     const sent = [];
     const failed = [];
     const skipped = [];
+    // Aggregate ORCID back-prop outcomes so a per-recipient failure isn't a
+    // vanished console.warn (design §8.2, Codex #21). Native Dataverse audit on
+    // contact.wmkf_orcid is the durable record (§7); these are the run summary.
+    const orcidStats = { written: 0, noop: 0, conflict: 0, malformed: 0, ineligible: 0, no_contact: 0, error: 0 };
     let processed = 0;
 
     for (const draft of drafts) {
@@ -298,6 +303,7 @@ export default async function handler(req, res) {
         // have a wmkf_contact link. Failures are non-fatal — the email
         // already shipped.
         let contactPromoted = false;
+        let promotedContactId = null;
         try {
           if (person && !person._wmkf_contact_value) {
             const fn = person.wmkf_firstname || splitName(name).firstName;
@@ -308,10 +314,35 @@ export default async function handler(req, res) {
               email,
             }, { actingUserSystemId });
             await potentialReviewerAdapter.setContactLink(person.wmkf_potentialreviewersid, contactId, { actingUserSystemId });
+            promotedContactId = contactId;
             contactPromoted = created ? 'created' : 'linked';
           }
         } catch (promoteErr) {
           console.warn(`Contact promotion failed for ${name} <${email}>:`, promoteErr.message);
+        }
+
+        // ORCID back-propagation onto the contact (design §5). Runs against the
+        // just-promoted contact OR an existing pointer — so already-linked
+        // reviewers with an empty-ORCID contact are still filled. Non-fatal: the
+        // email already shipped, and the helper's operational throws are caught
+        // here (does NOT move the recipient to `failed` — confirmation pass).
+        let orcidBackprop = null;
+        try {
+          const cid = promotedContactId || person?._wmkf_contact_value || null;
+          if (person && cid) {
+            const r = await backPropReviewerOrcidToContact({ reviewer: person, contactId: cid, actingUserSystemId });
+            orcidBackprop = r.action || r.skipped || null;
+            if (r.action === 'write') orcidStats.written++;
+            else if (r.action === 'noop') orcidStats.noop++;
+            else if (r.action === 'conflict') { orcidStats.conflict++; console.warn(`ORCID back-prop conflict for ${name} <${email}>: contact has ${r.existing}, reviewer ${r.incoming}`); }
+            else if (r.action === 'malformed') { orcidStats.malformed++; console.warn(`ORCID back-prop malformed target for ${name} <${email}>: ${r.existing}`); }
+            else if (r.skipped === 'ineligible') orcidStats.ineligible++;
+            else if (r.skipped === 'no_contact') orcidStats.no_contact++;
+          }
+        } catch (bpErr) {
+          orcidStats.error++;
+          orcidBackprop = 'error';
+          console.warn(`ORCID back-prop failed for ${name} <${email}>:`, bpErr.message);
         }
 
         sent.push({
@@ -321,6 +352,7 @@ export default async function handler(req, res) {
           emailId,
           regardingLinked: Boolean(regardingId),
           contactPromoted,
+          orcidBackprop,
         });
         sendEvent('email_sent', sent[sent.length - 1]);
         sendEvent('progress', {
@@ -402,6 +434,7 @@ export default async function handler(req, res) {
       failed,
       skipped,
       stats: { sent: sent.length, failed: failed.length, skipped: skipped.length, total: drafts.length },
+      orcidBackprop: orcidStats,
     });
 
     sendEvent('complete', {
