@@ -1,11 +1,11 @@
 ---
 name: Wave 1 automated onboarding — agreed design
-description: Agreed design (2026-04-24) for zero-touch first-login provisioning after Wave 1 flags flip, including the new ensureStaffRoleAssigned helper and where to wire it.
+description: Agreed design (2026-04-24) for zero-touch first-login provisioning after Wave 1 flags flip, including the new ensureStaffRoleAssigned helper and where to wire it. DESIGN agreed but UNBUILT — no `lib/services/onboarding.js`; `grantDefaultApps` does not yet call `ensureStaffRoleAssigned`; manual `apply-security-role.js` covers onboarding meanwhile.
 type: project
 originSessionId: 12929e8f-a1f9-4780-8aeb-89b85e260c0b
-status: closed
+status: active
 scope: dataverse
-last_verified: 2026-05-12 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-06-04 via code (confirmed UNBUILT — no onboarding service; only grantDefaultApps wired)
 ---
 
 ## Recall Rule

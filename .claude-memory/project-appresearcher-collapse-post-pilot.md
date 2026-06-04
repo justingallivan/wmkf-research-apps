@@ -19,7 +19,7 @@ Do:
 Do not:
 - Re-execute or re-plan the collapse; the "don't act mid-pilot" guidance below is SUPERSEDED.
 - Assume `wmkf_appresearcher` still exists or write to it; zero runtime refs remain.
-- Trust the body's "caller count is 4" — it's 5 (includes `pages/api/workbench/enrich-recommended.js`).
+- Undercount the runtime callers — there are **5** (incl. `pages/api/workbench/enrich-recommended.js`), not the 4 the original S196 plan enumerated; the body list is now corrected to 5.
 
 Ground truth: `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md` (as-executed), `docs/DATAVERSE_LIVE_PROBE_FINDINGS_2026-06-02.md`, `docs/atlas/dataverse-wmkf-potentialreviewers.md`. Optional deferred tail = remove the `wmkf_organizationname` compat-shadow fallback.
 
@@ -40,7 +40,7 @@ Sparse-row reality reinforces: `wmkf_potentialreviewer` rows already have variab
 - **Don't act mid-pilot.** Per intake-portal slice-0 timeline posture, avoid churn while pilot stabilizes. Slate for post-pilot, same window as Wave 1-style cleanup work.
 - **Detailed implementation plan:** `docs/APPRESEARCHER_COLLAPSE_PLAN.md` (written S196 2026-05-28). Covers all 7 phases, decision points (D0.1 affiliation reconciliation needs Connor's call), caller enumeration, risks, rollback, ~6h effort estimate. Pre-flight check section guards against staleness — re-verify before executing.
 - **Live state surprises surfaced during planning:** `wmkf_apppublication` + `wmkf_apppublicationauthor` are deployed (logical name has no `_z_`; schema-as-code FILE has `_z_`) with 0 rows in prod, despite having an FK to `wmkf_appresearcher`. Plan drops both alongside (cheaper than retargeting).
-- **Caller count is 4** (corrected S196 via Codex review): save-candidates, my-candidates, **review-manager/reviewers** (Codex P0 catch — joins on `_wmkf_potentialreviewer_value`, surfaces affiliation/website/h-index/citations to Review Manager UI), contact-enrichment-service. Plus 8 scripts (audit/smoke/probe tier) listed in the plan's Phase 4.5.
+- **Caller count is 5**: save-candidates, my-candidates, **review-manager/reviewers** (Codex P0 catch — joins on `_wmkf_potentialreviewer_value`, surfaces affiliation/website/h-index/citations to Review Manager UI), **workbench/enrich-recommended** (the 5th, added by the Workbench Find tab), contact-enrichment-service. Plus the script tier (audit/smoke/probe) listed in the plan's Phase 4.5. (Grep `upsertByPotentialReviewer|getByPotentialReviewer` over `pages/`+`lib/` for the live set; `capture-self-reported-orcid.js` also calls the adapter but for ORCID identity, not the collapsed bibliometrics.)
 - **Codex-flagged risks in original plan:** missing pre-drop snapshot/backup (Phase 5.0 added); invalid `String (no cap)` spec for affiliation (D0.1 now requires explicit max-length); publication-author entity-existence check needed before drop; forward-doc references in REVIEWER_POSTGRES_TO_DATAVERSE_PLAN must be reconciled (D0.6); pre-flight check expanded from 4 to 10 items.
 - **Living doc:** `docs/REVIEWER_DATA_MODEL.md` § "Open design notes" carries the rationale + planned-collapse note; entity row in the at-a-glance table is annotated.
 - **Atlas mislabel that triggered this:** `docs/atlas/dataverse-wmkf-potentialreviewers.md` previously called the entity "vendor entity + extensions." That was wrong and now corrected. Verify any future doc/memory claim about ownership of reviewer-domain entities — `IsCustomEntity=true, IsManaged=false` is the live signal.

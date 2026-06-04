@@ -1,6 +1,6 @@
 ---
 name: w6-table-drop-pending
-description: "After ~2026-07-01, run the Wave 2 W6 Postgres table-drop checklist for drain-only reviewer tables (researchers, researcher_keywords, publications, proposal_searches). Built per Codex's recommendation to defer cleanup-cron in favor of one-shot DELETE matching Wave 1 precedent."
+description: "CLOSED — the reviewer-finder Postgres drain tables (researchers, researcher_keywords, publications, proposal_searches, + reviewer_suggestions) were DROPPED 2026-06-04 via tracked migration 018, ahead of the original ≥2026-07-01 trigger. search_cache kept. Historical checklist retained below; no longer actionable."
 metadata: 
   node_type: memory
   type: project
@@ -14,16 +14,15 @@ metadata:
 
 ## Recall Rule
 
-Read this when: a session starts on or after 2026-07-01 and the drain-only reviewer Postgres tables still exist.
+Read this when: you need the history of the reviewer-finder Postgres table drop (it is DONE — closed 2026-06-04). The action below is HISTORICAL; do not re-run it.
 
-Do:
-- Surface this as a P0 `/start` item if past the date threshold and tables still present.
-- Run the staleness probe first (every `MAX(...)` should be ≥14 days old); STOP if any is recent.
-- Back up to JSONL on Blob + write the restore script before any DROP; drop in dependency order (`researcher_keywords` before `researchers`); update Atlas pages + re-run `check:atlas`.
+Done (2026-06-04, S219):
+- All 5 tables dropped via tracked migration 018 (verified gone from the pg catalog); `search_cache` kept.
+- Backups taken (local JSONL + Blob `cleanup-backup/2026-06-04/`); restore = `scripts/w6-drop-restore.js` or Neon PITR.
 
 Do not:
-- Build a cleanup cron — the decision was a one-shot DELETE per Wave 1 precedent.
-- Proceed if the pilot was rolled back or a live reader is found — the trigger is "date passed," not "drop no matter what."
+- Re-create the dropped tables, or treat the checklist below as a pending action — it executed.
+- Drop `search_cache` (live callers) or `grant_cycles` (still draining) without their own verification.
 
 Ground truth: `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` (post-pilot row §801), `docs/atlas/postgres-researchers.md`, `docs/atlas/postgres-other-reviewer-tables.md`. Related: [[project-reviewer-postgres-to-dataverse-migration]].
 

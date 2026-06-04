@@ -14,7 +14,7 @@ Read this when: building or modifying anything prompt-related — the Executor, 
 
 Do:
 - Read `docs/EXECUTOR_CONTRACT.md` first; use `lib/services/execute-prompt.js` as the canonical Executor.
-- Use the real table/field names: table `wmkf_ai_prompt` (NOT `wmkf_prompt_template`), fields `wmkf_ai_promptbody`/`wmkf_ai_promptvariables`/`wmkf_ai_promptoutputschema`/etc., system prompt `wmkf_ai_systemprompt`.
+- Use the real table/field names: table `wmkf_ai_prompt` (NOT `wmkf_prompt_template`), fields `wmkf_ai_promptbody`/`wmkf_ai_promptvariables`/`wmkf_ai_promptoutputschema`/etc., system prompt `wmkf_ai_systemprompt`. <!-- prompt-storage:ignore reason=correct-name-guidance -->
 - Keep Path B (declarative wrappers + generic executors); name prompts `<domain>.<purpose>`.
 
 Do not:

@@ -159,7 +159,7 @@ node scripts/apply-migrations.js  # Apply DB migrations (existing env; setup-dat
 
 See `scripts/README.md` for database utility scripts.
 
-For multi-Mac development, see `docs/MULTI_MAC_SETUP.md`.
+For multi-Mac development, the load-bearing gotcha is the per-machine Claude-memory symlink (the `~/.claude/projects/<slug>/memory` → `.claude-memory` link breaks whenever the repo path changes) — see `.claude-memory/memory-store-propagation.md` and the `/start` skill's Step 1.5. **Do NOT put `.git`/the working tree in a cloud-synced folder** (iCloud/OneDrive/Google Drive) — it offloads git objects to placeholders and corrupts the repo.
 
 ---
 
