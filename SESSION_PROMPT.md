@@ -39,8 +39,8 @@ Three pieces, all committed + pushed; tree clean. No app *runtime* code changed 
 ### 4. New features / next cycle
 - J27 triage dashboard + automation tier (Dec 2026 runway); roadmap memories via MEMORY.md "Planned: …" / "Strategy" rows.
 
-## Open audit note (outside the S219 scope, flagged not fixed)
-- `requireAppAccess(` appears in **56** `pages/api` files but `docs/CANONICAL_COUNTS.md` + the fact-consistency gate say **55** (gate is green). Likely `pages/api/test-email.js` is intentionally excluded as a non-app endpoint — worth a 5-min confirm that the canonical count's derivation is deliberate, not a 1-off drift.
+## Resolved audit note (S219)
+- The `requireAppAccess` 56-vs-55 question is RESOLVED (Codex-adjudicated): `pages/api/test-email.js:19` mentions the gate name in a **comment** but the live guard is `requireSuperuser` (line 22). `scripts/lib/canonical-facts.js` counts AST call-sites = **55**, which is correct. Not a drift.
 
 ## Key Files Reference
 | File | Purpose |
