@@ -312,7 +312,6 @@ export default function ReviewerSearchSection({
   // proposal), prefill the box — unless the user has already edited it.
   useEffect(() => {
     if (!excludeEditedRef.current) setExcludeText((excludedNames || []).join(', '));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [excludedNames]);
 
   const pushProgress = useCallback((m) => {
