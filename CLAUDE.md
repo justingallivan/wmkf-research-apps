@@ -18,6 +18,20 @@ Quick pre-flight: grep for live callers, read the most likely ones to confirm th
 
 This rule does NOT apply to additive work (new features, endpoints, tables) — only destructive work.
 
+## Durable-doc edits: reconcile the WHOLE file, not the line
+
+When you change a fact, status, or claim in any `.claude-memory/*.md`, `docs/**`, `CLAUDE.md`, or `SESSION_PROMPT.md`:
+
+1. **Read the entire file first — not a grep-targeted slice.** A fact you're updating almost always restates itself elsewhere in the same file (frontmatter `description`/`status`, recall rule, body, lead-ins, tails, summaries). Editing only the line you grepped to leaves a self-contradiction. A partial `Read` (offset/limit) satisfies the Edit precondition but NOT this rule.
+2. **Grep the repo for the same fact** and fix every instance in the same pass.
+3. A partial fix that leaves a contradiction is **worse than no fix** — it reads as "reconciled" while still lying. Treat "top says X, tail says not-X" as a P0, same urgency as a red gate.
+
+Enforced by a PreToolUse hook (`.claude/hooks/doc-edit-reconcile-reminder.js`, fires on every `Edit` of these paths) and the `feedback-reconcile-dont-append-docs` memory. Non-negotiable: it recurred ≥3× in S219 and cost three Codex review rounds because each fix patched the flagged line and left residuals elsewhere.
+
+## Scope discipline — time-box meta-work, check in before spiraling
+
+Cleanup, reconciliation, doc/memory audits, and verification loops are **support work, not the goal.** Before such meta-work exceeds **~30 minutes or 2 commits** without advancing the user's actual project objective, **STOP and check in**: name what's left, roughly what it would cost, and ask whether to continue or return to the project. Do not let a "quick cleanup" balloon into a multi-hour session — S219 spent ~6 hours on cleanup/reconciliation with zero feature progress because no time-box check-in happened. The user values forward progress over a perfectly-tidy memory store; surface the trade-off and let them choose. See `feedback-timebox-metawork`.
+
 ## Ground-truth requirement
 
 **Probe live state before drafting plans.** Session 136 produced three rounds of plan corrections because state claims weren't being verified. Self-correction rules live in **`docs/CLAUDE_REMEDIATION_PLAN.md`** (read this before starting any migration / integration / data-layer work):

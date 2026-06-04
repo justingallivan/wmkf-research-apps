@@ -11,6 +11,17 @@
             "statusMessage": "scope-claim check"
           }
         ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/doc-edit-reconcile-reminder.js\" 2>/dev/null || true",
+            "timeout": 10,
+            "statusMessage": "doc-edit reconcile check"
+          }
+        ]
       }
     ]
   }

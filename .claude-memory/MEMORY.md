@@ -13,7 +13,8 @@
 - Destructive carryover or bulk delete: feedback-verify-before-destructive-carryover.md; feedback-list-and-confirm-before-bulk-deletes.md
 - Red CI gate at session start: feedback-red-gates-are-p0.md
 - Any scope/count/quantity claim: feedback-falsify-not-confirm.md
-- Editing a fact in docs/memory: feedback-reconcile-dont-append-docs.md; feedback-apply-reconcile-to-fix-work.md
+- Editing a fact in docs/memory (READ THE WHOLE FILE, not the grepped line; PreToolUse hook enforces): feedback-reconcile-dont-append-docs.md; feedback-apply-reconcile-to-fix-work.md
+- Cleanup/audit/verify loop ballooning (time-box ~30min/2 commits, check in): feedback-timebox-metawork.md
 - Stating Dataverse/PA/Azure/Vercel behavior: feedback-verify-external-platform-claims.md; feedback-cite-ground-truth.md
 - Relaying Codex/reviewer output: feedback-share-codex-verbatim.md; feedback-surface-full-review-findings.md
 - Tool output looks fabricated (rtk): project-rtk-grep-output-corruption.md
