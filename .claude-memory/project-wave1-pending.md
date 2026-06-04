@@ -7,7 +7,7 @@ metadata:
   originSessionId: e2f71cb4-b29c-4510-b8fe-1da4a49ec6ee
   status: closed
   scope: dataverse
-  last_verified: 2026-05-26 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-06-04 via live Postgres probe (system_settings/user_app_access/user_preferences all ABSENT = dropped)
 ---
 
 ## Recall Rule

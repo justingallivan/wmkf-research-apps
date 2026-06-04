@@ -5,7 +5,7 @@ type: project
 originSessionId: d898b20a-8b1d-4a13-ad0e-878f4f62e71d
 status: active
 scope: prompt
-last_verified: S209 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-06-04 via live Dataverse probe (wmkf_ai_prompts count=11)
 ---
 
 ## Recall Rule

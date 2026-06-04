@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: S214 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-06-04 via live Dataverse probe (all 6 wmkf_identity* fields present on wmkf_potentialreviewerses)
 ---
 
 ## Recall Rule

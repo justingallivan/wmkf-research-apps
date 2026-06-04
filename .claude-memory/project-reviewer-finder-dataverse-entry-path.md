@@ -5,7 +5,7 @@ type: project
 originSessionId: 97cd3044-49bb-4f67-b000-5d32980d6faa
 status: active
 scope: reviewer
-last_verified: 2026-05-14 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-06-04 via live Postgres probe (reviewer drain tables still present)
 ---
 
 ## Recall Rule

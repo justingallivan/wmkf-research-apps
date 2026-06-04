@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: dynamics
-  last_verified: S187 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-06-04 via code (admin.js DynamicsFeedbackSection + pages/api/dynamics-explorer/feedback.js)
 ---
 
 ## Recall Rule

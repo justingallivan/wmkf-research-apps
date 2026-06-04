@@ -7,7 +7,7 @@ metadata:
   originSessionId: 6f66eb83-87a2-47a6-b4be-21f06cbadf1a
   status: active
   scope: dataverse
-  last_verified: S164 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-06-04 via live Postgres probe (researchers=331, reviewer_suggestions=337, grant_cycles=13, publications/proposal_searches present — NOT yet dropped, today<2026-07-01)
 ---
 
 ## Recall Rule

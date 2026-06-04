@@ -4,7 +4,7 @@ description: All 24 LLM-input surfaces in this repo are hardened against prompt 
 type: project
 status: active
 scope: security
-last_verified: S209 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-06-04 via gate (check:prompt-injection-tagging reports 24 surfaces)
 ---
 
 ## Recall Rule

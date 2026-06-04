@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-06-02 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-06-04 via live Dataverse probe (wmkf_appresearcher/apppublication/apppublicationauthor entity-defs return 404 = dropped; bibliometric fields live on wmkf_potentialreviewerses)
 ---
 
 ## Recall Rule

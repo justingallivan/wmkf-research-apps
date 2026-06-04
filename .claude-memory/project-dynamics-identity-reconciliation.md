@@ -5,7 +5,7 @@ type: project
 originSessionId: 62437821-a516-465d-9fe9-ccd2fa785705
 status: active
 scope: dynamics
-last_verified: 2026-05-06 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-06-04 via code+probe (reconcile-identities cron present + has run in maintenance_runs)
 ---
 
 ## Recall Rule
