@@ -10,6 +10,23 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer Postgres→Dataverse migration CLOSED + lone-ORCID backfill (Session 219)
+
+**Milestone:** The W3–W6 reviewer Postgres→Dataverse migration is closed — the 5 drained reviewer-finder tables were physically dropped from prod (migration 018), leaving Dataverse (`wmkf_potentialreviewer` / `wmkf_appreviewersuggestion`) as the sole store. Same session closed the S215 ORCID residual: 240 more reviewers gained an authoritative ORCID via Scholar corroboration. Two prod data/schema cutovers; a long doc/memory-reconciliation + guardrails tail followed.
+
+**Sessions:** 219 (table drop done early at Justin's direction; ORCID backfill + reconciliation each Codex-reviewed — the reconciliation took 3 verification rounds; the ~6h cleanup tail was flagged as over-long → time-box guardrail added).
+
+**Ship state:**
+- **5 tables dropped** (`e6a339d`, migration 018, guarded + tracked, Wave-1 precedent): researchers, researcher_keywords, publications, proposal_searches, reviewer_suggestions. Verified gone, no dangling FKs. `search_cache` KEPT (live callers). Backups → JSONL + Blob `cleanup-backup/2026-06-04/`; Neon PITR 7-day.
+- **Lone-ORCID Scholar backfill** (`c734356`, `scripts/backfill-lone-orcid-scholar.js`): 240 written / 144 correctly gated / 70 no-Scholar; pool ORCID 1,533→1,773, probable 1,532→1,772. Scholar = corroboration only, not persisted. $0.
+- **Process guardrails** (`1385a65`): doc-edit reconcile PreToolUse hook + time-box meta-work rule; `/start` now runs all 11 gates (`4fc5194`) after `prompt-storage-mentions` was found red & unnoticed.
+
+**Why it matters:** Reviewer state now lives in exactly one store (Dataverse), ending the Postgres drain era; ORCID — the cross-system join key — covers 1,773 of the pool. The guardrails target a recurring "patch the flagged line, leave residuals elsewhere" failure that cost this session 3 review rounds.
+
+**Pointers:** `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`, `docs/atlas/` (reconciled), `.claude-memory/project-w6-table-drop-pending.md` (closed); commits `c734356` `e6a339d` `4fc5194` `1385a65`.
+
+---
+
 ## June 2026 — Reviewer ORCID back-propagation shipped + de-fragmentation flow live (Session 217)
 
 **Milestone:** S215 captured authoritative ORCIDs on 1,533 reviewers but they sat inert — each cross-store join's far side was ORCID-sparse. S217 made them *flow*: the reviewer-pool ORCID now propagates onto the matched CRM `contact.wmkf_orcid` (the durable cross-system join key) both forward (on every outreach/accept) and historically (one-shot backfill). De-fragmentation went from a measurement to a running production flow. A prod cutover + new architecture.
