@@ -354,3 +354,62 @@ is safe inside send-emails' catch. The three partials are folded into rev3:
   field), reinforcing the corroborated-`probable` bar rather than narrowing the claim.
 - **RESOLVED, no change needed**: throw-compatible-with-send-emails, native-audit
   provenance sufficiency, conditional-PATCH availability.
+
+## 14. Reviewer-self-reported ORCID capture (PR4 — the reviewer-side twin of PR3)
+**Built S217.** At Stage 2a the reviewer confirms/corrects their **own** ORCID on
+the authenticated magic-link form (`Stage2aView` ORCID field → `respond.js` →
+`wmkf_reviewerorcid` on the engagement row). That self-confirmation is the
+highest-trust ORCID source we have (the person attested it, having received the
+token at their own email), yet pre-PR4 it never left the engagement row. PR4
+captures it onto the **person** and the **contact** so it joins the flow.
+
+- **Service** `lib/services/capture-self-reported-orcid.js`: normalize (§3
+  checksum) → if valid, **person** (`researcher.updateById`) OVERWRITE
+  `wmkf_orcid`+`wmkf_orcidurl` (human self-report beats a prior resolver guess) +
+  mark identity **`confirmed`**; then **contact** `setOrcidIfAbsent` (fill-only,
+  §4 conflict policy still applies — a genuine different-iD case is surfaced, not
+  clobbered). Invalid iD / missing person → clean skip.
+- **Trust model — `confirmed` is a sticky human-attestation sentinel.** The
+  resolver (`reviewer-identity-resolver`) NEVER emits `confirmed` (only
+  probable/unresolved/ambiguous), so a stored `confirmed` unambiguously means
+  self-reported/manually-attested. `researcher.writeIdentityDecision` and
+  `clearIdentityFields` now **refuse to downgrade or clear a `confirmed`** record
+  (each reads the current status first; an incoming `confirmed` — a fresh
+  attestation — is the only thing that replaces a prior `confirmed`). This is the
+  correctness lynchpin: without it, a later automated enrich pass that computed a
+  sub-probable verdict would overwrite the status and `clearIdentityFields` would
+  wipe the attested ORCID.
+- **Wiring** (`respond.js`): runs on a fresh **decline** (person + contact-if-
+  promoted) AND on **accept** (after honorarium, using its just-created
+  `contactId` ?? the invite-time pointer); independent of honorarium opt-out; all
+  NON-FATAL (the response already committed). Idempotent on repeat accepts.
+- **Interaction note:** on accept the honorarium back-prop runs first with the
+  reviewer's *prior* (resolver) ORCID; PR4's contact write then fills/None-ops. If
+  the self-report differs from a prior resolver iD already on the contact,
+  `setOrcidIfAbsent` surfaces a conflict rather than clobbering — correct (two
+  different valid iDs for one person is a real identity signal). The common case
+  (reviewer had no iD → self-reports one → fills the empty contact) is clean.
+- Tests: `capture-self-reported-orcid.test.js`,
+  `researcher-identity-confirmed-sticky.test.js`.
+
+**Codex adversarial review (S217) — dispositions:**
+- **#1 (HIGH) FIXED — guard fail-open.** The sticky-`confirmed` guard's status read
+  used `.catch(()=>null)` and then proceeded, so a transient read error could let a
+  resolver verdict downgrade/clear an attestation. Now it FAILS CLOSED: the read
+  must succeed; a read error propagates (callers handle identity writes per-row).
+- **#3 (MED) FIXED — confirm-without-edit missed capture.** The Stage 2a client
+  sends only CHANGED fields, so a reviewer who confirms a prefilled ORCID sends no
+  `contactEdits.orcid`. Capture now sources `contactEdits.orcid || suggestion.
+  wmkf_reviewerorcid` (`selfReportedOrcidOf`), so confirmed-from-prefill and the
+  repeat-accept repair path are covered.
+- **#2 (MED) FIXED — honorarium back-prop strands self-report.** On accept the
+  honorarium back-prop runs first; now respond.js reflects a valid self-report onto
+  the in-memory `reviewer` (`wmkf_orcid` + `wmkf_identitystatus='confirmed'`)
+  BEFORE honorarium, so its contact back-prop carries the self-reported iD — no
+  fill-then-conflict. The rare prior-session-different-corroborated-iD case still
+  surfaces a §4 conflict (correct — a self-report differing from an
+  institution-corroborated iD must not silently clobber; could be a typo).
+- **#4 (LOW) ACCEPTED as-is.** Malformed `contactEdits.orcid` can still land on the
+  RAW engagement field `wmkf_reviewerorcid` (it's the reviewer's verbatim record,
+  64-char capped). The person/contact canonical stores are checksum-gated by the
+  capture service, and an accept must not 400 over a typo'd optional field.
