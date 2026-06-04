@@ -1,80 +1,62 @@
-# Session 217 Prompt: Build reviewer ORCID back-propagation (PR1) — or new work
+# Session 218 Prompt: Land PR4 (reviewer self-report ORCID) after Codex e2e — or new features
 
-## ⏰ Standing context / guardrails (carried S197–S216)
-- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity into docs/memory. It earns its keep — S216 it caught an action-breakdown that summed to 1,531 not 1,532 (email-dedup), and forced the "contact is email-only" assumption to be falsified (contact HAS native `wmkf_orcid`). Authoritative lint = `npx eslint . -f json`, **but eslint is NOT installed locally** — lint runs in CI only; rely on jest + `node --check` locally.
-- **Codex via the RESCUE PATH works well** — `Agent(subagent_type: 'codex:codex-rescue')`. S216 ran 2 clean passes (pre-impl 24 findings + confirmation 6). **Codex has no outbound network** — feed it captured data, tell it not to fetch. **SendMessage to continue an agent is NOT available in this harness** — spawn a fresh rescue agent for follow-ups (it shares the filesystem, reads the doc directly). The stop-time review GATE is still disabled. **Deliver Codex output VERBATIM** ([[feedback-share-codex-verbatim]]).
-- **`main` auto-deploys to prod.** Commit/push only when asked ([[CLAUDE.md git policy]]).
-- **CI-green ≠ correct for async/effect/UI/outward-facing code.** Manual smoke is mandatory ([[feedback-profile-context-runtime-bugs]]).
-- **Local-dev auth bypass:** `AUTH_REQUIRED=false NEXTAUTH_SECRET=dev-throwaway NEXTAUTH_URL=http://localhost:3000 ./node_modules/.bin/next dev`. Local-dev and prod hit the SAME prod Dataverse — no isolated test store.
-- **Ad-hoc prod-Dataverse probes/writes:** `.env.local`-loading pattern (CommonJS `require` works; the S216 probes use it). Adapters need `bypassDynamicsRestrictions(...)`. Person logical name `wmkf_potentialreviewers` (set `wmkf_potentialreviewerses`). Metadata `Attributes` endpoint **501s on `$filter startswith`** but **DOES accept `$filter LogicalName eq '…'`** (used S216). `queryRecords` caps at one page; raw `@odata.nextLink` paging avoids the 5000 cap (S216 probes do this).
-- **ORCID/NCBI creds SET in prod + `.env.local`.** Vercel marks new secrets "Sensitive" → `vercel env pull` returns them EMPTY ([[project-vercel-sensitive-env-pull-empty]]).
+## ⏰ Standing context / guardrails (carried S197–S217)
+- **`main` auto-deploys to prod on push.** Commit/push only when asked. Feature branches do NOT deploy — use one for anything that touches a live prod-write path, smoke it, then merge.
+- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`) + a PreToolUse reminder on durable-doc scope claims. Run the *disconfirming* query before asserting scope/quantity; derive denominators independently. (S217: the 162/1,533 backfill counts came straight from the live `--summary` and sum to the denominator.)
+- **Codex via the RESCUE PATH works well** — `Agent(subagent_type: 'codex:codex-rescue')`. S217 ran clean pre-impl + adversarial passes on PR1/PR4 and caught real bugs (PR4: a fail-open guard, a confirm-without-edit miss, a honorarium-ordering strand). **Codex has no outbound network** — feed it captured data / point it at in-repo files, tell it not to fetch. Deliver Codex output VERBATIM ([[feedback-share-codex-verbatim]]).
+- **CI-green ≠ correct for async/effect/UI/external-write paths.** Manual or scripted smoke is mandatory ([[feedback-profile-context-runtime-bugs]]). S217 live-smoked PR1's write (1 write + verify) before the bulk apply.
+- **Local-dev hits the SAME prod Dataverse** — no isolated test store. `AUTH_REQUIRED=false NEXTAUTH_SECRET=dev-throwaway NEXTAUTH_URL=http://localhost:3000 ./node_modules/.bin/next dev`. Ad-hoc prod probes/writes: the `.env.local`-loading script pattern + `bypassDynamicsRestrictions(...)`. `queryAllRecords` caps at 5000.
+- **ORCID/NCBI + EXTERNAL_LINK_SECRET are "Sensitive" in Vercel** → `vercel env pull` returns them EMPTY; hand-enter in `.env.local` ([[project-vercel-sensitive-env-pull-empty]]). For local reviewer-flow e2e, `EXTERNAL_LINK_SECRET` can be ANY 32+ char throwaway (minted + verified by the same local env).
 
-## Session 216 Summary
+## Session 217 Summary
 
-Carried-over next-step #1 ("probe how many cross-store matches ORCID resolves") → grew into a full probe → spec → 2× Codex-review design loop for **reviewer ORCID back-propagation**. **Design is build-ready; no code written yet (stopped at design per request). All S216 commits are LOCAL — not pushed.**
+Shipped the **reviewer ORCID back-propagation** work end-to-end to prod, plus two carried reviewer follow-ons and an ORCID search hardening. Built PR4 (reviewer self-report capture) on a branch and **handed its e2e to Codex** so we can move to new features.
 
-### What was completed
-1. **Three read-only cross-store probes** (`a24f807`, `fff1895`) measuring ORCID's cross-store reach:
-   - Pool: 4,269 reviewers, 1,533 with ORCID (1,532 `probable`, 1 null-status); only 2 promoted to a contact, 0 ORCID-bearing.
-   - **Within-pool dedup**: 24 ORCIDs on >1 row (48 rows → 24 humans); **23 of 24 email would miss** (ORCID's cleanest win).
-   - **reviewer→contact**: 183 email matches; direct ORCID↔ORCID only 18 (+2 beyond email).
-   - **honorarium akoya_request**: 49/87 paid reviewers in pool (all by email), 18 ORCID-resolved.
-   - **Falsified assumption**: `contact` HAS a native `wmkf_orcid` (423 populated, 14 malformed) — but it's a GOapply *applicant* population (100% created by "# BCO akoyaGO Integration", 52% are PIs via `wmkf_projectleader`), largely disjoint from reviewers. **Provenance settled**: ORCID is captured at GOapply intake.
-2. **Design doc** `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` (`ee99393`→`63bd94d`, rev1→rev3): push the 1,532 resolver-gated reviewer ORCIDs onto matched `contact.wmkf_orcid` so it becomes a durable join key. De-fragmentation = a FLOW problem, not a one-shot collapse.
-3. **Two Codex passes** (rescue path): pre-impl (24 findings) + confirmation (3 resolved / 3 partial / 0 new arch). Both folded.
-4. **Gated action breakdown measured**: 162 WRITE / 14 noop / **0 conflict** / 0 malformed / 7 ambiguous / 1,348 no-contact → backfill yield **162 writes**.
-5. **Audit-capability probe** settled provenance WITHOUT new schema: `contact.wmkf_orcid IsAuditEnabled=true`, `RetrieveRecordChangeHistory(contact)`=200 (bulk `/audits`=403). Native audit = durable provenance/rollback.
-6. Memory `reviewer-identity-fragmentation` updated with the S216 measurement.
+### Shipped to `main` (deployed)
+1. **PR1 — runtime forward-flow** (`a25bda2`): ORCID flows onto the matched `contact.wmkf_orcid` on every send/accept/enrich. Centralized `orcid-normalize` (mod-11-2) + `setOrcidIfAbsent` (fill-only, conflict-surfacing, conditional If-Match) + shared `backPropReviewerOrcidToContact`. Codex: 2 design passes + an adversarial impl pass (tightened 412 detection).
+2. **PR2 — historical backfill, RAN** (`0c75ec9`): `scripts/backfill-contact-orcid.js`. Live counts matched the projection exactly — **162 write / 0 conflict / 0 malformed**, all verified by `(contactId, reviewerId)`, 0 failures. Contact ORCID population **~423 → ~585**.
+3. **S213 follow-ons** (`ee689e8`): co-PI COI parity in `discover.js` (shared `lib/utils/proposal-authors.js`) + per-user Workbench invite signature (reads `SENDER_INFO`).
+4. **ORCID SOLR-injection fix** (`87a84ad`): special-char reviewer names (hyphens, parens, `<>`) no longer 500 `searchByName`.
+5. **Docs** (`cfc7c04`): design §12 marked PR1/PR2 shipped; PR3 (intake reviewer-capture) documented as blocked-on-Connor with a day-one wiring note.
 
-### Commits (this session, newest first; ALL LOCAL/UNPUSHED until you push)
-`63bd94d` design rev3 (confirmation pass) · `65cd092` design rev2 (24 findings) · `cd0b0c9` design + §8 decisions · `ee99393` design rev1 · `fff1895` provenance probe · `a24f807` cross-store probes · (+ this session-doc commit)
+### Built on a branch — `feature/reviewer-self-reported-orcid` (NOT merged; pushed)
+6. **PR4 — reviewer self-reported ORCID capture** (`c5e0ec0`): the reviewer confirms their OWN ORCID on the Stage 2a accept/decline form → captured onto person + contact. Persisted as a **sticky `confirmed`** status (the resolver never emits `confirmed`, so `writeIdentityDecision`/`clearIdentityFields` refuse to downgrade/clear it — fail-closed). Codex adversarial pass folded (4 findings). 1842 tests, build clean.
+7. **PR4 e2e handoff** (`c58d7b3`): `docs/REVIEWER_SELF_REPORT_ORCID_E2E_HANDOFF.md` + `scripts/pr4-e2e-{setup,verify,cleanup}.js` — handed to Codex to build the automated e2e suite.
 
 ## Potential Next Steps
 
-### 1. ⭐ Build PR1 — the runtime back-prop forward-flow
-Per `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` §12. **Gating work item (Codex confirmation pass §13, HIGH): the caller field-hydration contract** — the shared helper reads `wmkf_orcid`/`wmkf_identitystatus`/`_wmkf_contact_value` but NO call site loads all three today. Do that plumbing first:
-- `send-emails.js` person `$select` (~L145) — add `wmkf_orcid,wmkf_identitystatus`.
-- honorarium path: `verify-suggestion-token.js` select (~L77) — add the three fields (flows via `respond.js`).
-- `enrich-recommended.js` — retain the fetched person (it's discarded after affiliation ~L149→L251).
-Then: centralized ORCID normalizer (+checksum) · NEW separate `resolveForBackprop` (top:2; leave `findByEmail`/`findOrCreateByEmail` UNTOUCHED) · `contactAdapter.setOrcidIfAbsent` (re-read by contactid; data-states return status, operational errors throw; conditional `If-Match` PATCH — `updateRecord` supports `options.ifMatch`) · shared `backPropReviewerOrcidToContact` helper wired to all 3 sites · tests (§10).
+### 1. ⭐ Land PR4 once Codex's e2e is green
+Codex is developing the e2e for `feature/reviewer-self-reported-orcid` (handoff doc + scaffolding scripts on the branch). When it passes: review Codex's e2e work, run it (or confirm Codex's run), then **merge the branch to `main`** (fast-forward off `cfc7c04`). After merge, add a memory entry for the **sticky-`confirmed` invariant** (a future resolver change could violate it) — held until merge so it's not recorded for unshipped code.
 
-### 2. PR2 — one-shot historical backfill (162 writes)
-`scripts/backfill-contact-orcid.js`, mirroring `backfill-orcid-identity.js` (resolve/summary/apply, group-by-contactId, `status_null` exception). Then verify by `(contactId, reviewerId)` (§9). Run it.
+### 2. Carried reviewer follow-ons (operator / live-session work — not code)
+- Grant `reviewers` app access to pilot PDs + validate `/workbench` with a real PD login (runtime admin in `/admin` → `wmkf_appuserappaccesses`).
+- **Intake virus-scan EICAR e2e** — STILL parked pre-cycle must-do ([[project-intake-portal-virus-scan-e2e-deferred]]); needs deployed env + Entra applicant session.
 
-### 3. PR3 (later) — close the flow at intake
-Carry ORCID through the intake portal applicant-suggested-reviewer capture.
+### 3. ORCID capture residual (from S215)
+Lone-ORCID + clean-Scholar (~4.4%) — a second backfill pass running Scholar would catch them (SerpAPI cost), or let normal enrichment pick them up. Operational/cost decision, not code.
 
-### 4. Carried reviewer follow-ons (from S213, still open)
-- Per-user **signature** into the Workbench invite (`workbench/[requestId].js` passes only `session.profileName`; wire `SENDER_INFO`).
-- **Co-investigator COI parity** in `discover.js`.
-- Grant `reviewers` app access to pilot PDs + validate `/workbench` with a real PD login.
+### 4. PR3 — intake reviewer-capture (blocked, future)
+Carry ORCID through the intake-portal applicant-suggested-reviewer capture. BLOCKED: that capture form doesn't exist (intake `submit.js` ships only budget_lines; persons parked behind Connor; reviewers not on the list). Day-one ORCID wiring is documented in design §12 PR3 + memory [[project-intake-portal-reviewer-capture]]. Defer until the capture feature is built.
 
-### 5. Intake virus-scan EICAR e2e — STILL parked pre-cycle must-do
-[[project-intake-portal-virus-scan-e2e-deferred]]. Needs deployed env + Entra applicant session.
-
-### 6. ORCID capture residual (from S215)
-- Lone ORCID + clean Scholar (~4.4%) — a second backfill pass running Scholar would catch them (SerpAPI cost), or let normal enrichment pick them up.
-- Special-character names that 500 ORCID's SOLR search — sanitize the query in `searchByName`.
+### 5. New features
+Everything above is finish-work or blocked. Open to new capability work — see the roadmap memories ([[project-app-roadmap-2026-04-25]], [[project-staged-review-pipeline]], [[project-proposal-context-extraction]]).
 
 ## Key Files Reference
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` | rev3, build-ready; §5 call sites + hydration contract, §11/§13 Codex dispositions |
-| `scripts/probe-orcid-cross-store-matches.js` | Pool/dedup/contact-bridge/honorarium cross-store measurement |
-| `scripts/probe-orcid-contact-direct-join.js` | Direct ORCID↔ORCID join + contact-side population |
-| `scripts/probe-contact-orcid-provenance.js` | 423 contact ORCIDs = GOapply applicant population |
-| `scripts/probe-dataverse-audit-capability.js` | Confirms `contact.wmkf_orcid` is audited (provenance source) |
-| `lib/dataverse/adapters/contact.js` | `setOrcidIfAbsent` goes here; keep findByEmail/findOrCreateByEmail intact |
-| `lib/dataverse/adapters/potential-reviewer.js` | `setContactLink` (L182); FIELD_SELECT |
-| `pages/api/review-manager/send-emails.js` | PR1 call site #1 (promotion ~L300) + Candidates path |
-| `lib/bill/honorarium-onboard-orchestrator.js` | PR1 call site #2 (ensureContact ~L142) |
-| `pages/api/workbench/enrich-recommended.js` | PR1 call site #3 (identity writeback) |
+| `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` | §12 PR1/PR2 (shipped), §13 Codex, §14 PR4 (reviewer self-report + sticky-confirmed) |
+| `docs/REVIEWER_SELF_REPORT_ORCID_E2E_HANDOFF.md` | Codex's e2e brief for PR4 (on the PR4 branch) |
+| `lib/services/backprop-reviewer-orcid.js` · `lib/dataverse/adapters/contact.js` | shared back-prop helper + `setOrcidIfAbsent`/`resolveForBackprop` |
+| `lib/utils/orcid-normalize.js` | centralized normalizer + mod-11-2 checksum |
+| `scripts/backfill-contact-orcid.js` | PR2 backfill (resolve/summary/apply/verify) — already run |
+| `lib/services/capture-self-reported-orcid.js` · `lib/dataverse/adapters/researcher.js` | PR4 service + the sticky-`confirmed` guards (on the PR4 branch) |
+| `scripts/pr4-e2e-{setup,verify,cleanup}.js` | PR4 e2e scaffolding (on the PR4 branch) |
 
 ## Testing
 ```bash
-npx jest                                    # full suite (eslint NOT local; lint is CI-only)
-node --check scripts/<probe>.js             # syntax
+npx jest                                    # full suite (eslint is CI-only, not local)
+node --check <file>.js                       # syntax
 npm run check:atlas && npm run check:api-routes && npm run check:fact-consistency && npm run check:doc-currency
-# Re-run a cross-store probe (read-only): node scripts/probe-orcid-cross-store-matches.js
-# S216 probe artifacts are gitignored (scripts/.orcid-*.json — contain person data).
+# PR4 e2e (after Codex builds it): see docs/REVIEWER_SELF_REPORT_ORCID_E2E_HANDOFF.md
+git checkout feature/reviewer-self-reported-orcid   # PR4 work lives here until merged
 ```

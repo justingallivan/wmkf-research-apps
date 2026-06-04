@@ -10,6 +10,24 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer ORCID back-propagation shipped + de-fragmentation flow live (Session 217)
+
+**Milestone:** S215 captured authoritative ORCIDs on 1,533 reviewers but they sat inert — each cross-store join's far side was ORCID-sparse. S217 made them *flow*: the reviewer-pool ORCID now propagates onto the matched CRM `contact.wmkf_orcid` (the durable cross-system join key) both forward (on every outreach/accept) and historically (one-shot backfill). De-fragmentation went from a measurement to a running production flow. A prod cutover + new architecture.
+
+**Sessions:** 217 (PR1 runtime + PR2 backfill + S213 follow-ons + SOLR fix; each Codex-reviewed incl. adversarial passes; live-smoked then bulk-applied).
+
+**Ship state:**
+- **PR1 runtime forward-flow** (`a25bda2`): `orcid-normalize` (ISO-7064 checksum) + `contactAdapter.setOrcidIfAbsent` (fill-only, conflict-surfacing, conditional If-Match) + shared `backPropReviewerOrcidToContact`, wired into send-emails + honorarium + enrich-recommended (each hydrates `wmkf_orcid`/`wmkf_identitystatus`/`_wmkf_contact_value` first). Gate: valid iD + `confirmed`/`probable`.
+- **PR2 historical backfill RAN** (`0c75ec9`, `scripts/backfill-contact-orcid.js`): live `--resolve` matched the S216 projection exactly — **162 write / 0 conflict / 0 malformed / 7 ambiguous / 14 noop / 1 status_null / 1,349 nocontact** of 1,533; all 162 `contact.wmkf_orcid` fills verified by `(contactId, reviewerId)`, 0 failures. Contact ORCID population ~423 → ~585. Native Dataverse audit = provenance (reversible).
+- **S213 reviewer follow-ons** (`ee689e8`): co-PI COI parity in `discover.js` (shared `deriveProposalAuthorNames`) + per-user Workbench invite signature. **ORCID SOLR-injection fix** (`87a84ad`): special-char reviewer names no longer 500 `searchByName`.
+- **PR4 built, e2e pending** (branch `feature/reviewer-self-reported-orcid`, `c5e0ec0`): capture the reviewer's self-confirmed ORCID at Stage 2a → person + contact, protected by a sticky-`confirmed` resolver invariant. Handed to Codex for e2e (`docs/REVIEWER_SELF_REPORT_ORCID_E2E_HANDOFF.md`).
+
+**Why it matters:** ORCID — the authoritative researcher ID — now actively de-fragments the disjoint reviewer stores (contact / GOapply / honorarium / pool) instead of dead-ending on the pool. The join key grows on its own going forward and was back-filled across history.
+
+**Pointers:** `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` (§12 PR1/PR2, §14 PR4); memory [[reviewer-identity-fragmentation]]; commits `a25bda2` `0c75ec9` `ee689e8` `87a84ad` `cfc7c04`.
+
+---
+
 ## June 2026 — ORCID capture restored + authoritative-ID backfill (Session 215)
 
 **Milestone:** A manual Workbench smoke of the S214 resolver uncovered that ORCID had been silently dead: `searchByName` read `family-name`, but ORCID's expanded-search returns `family-names` (plural), so every record's familyName was undefined → the name-match gate rejected all records → `findContact` always returned null → ORCID never contributed an anchor → the resolver's `probable` status was unreachable. (ORCID creds were also unset in prod, masking it.) Fixed the parser, added the corroborated-ORCID strong-anchor rule, and backfilled authoritative ORCIDs across the reviewer pool. A latent-bug incident + a new resolver capability + a prod data cutover.
