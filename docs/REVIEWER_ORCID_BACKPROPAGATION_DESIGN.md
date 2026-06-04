@@ -54,9 +54,15 @@ For each eligible reviewer, resolve the target contact in this precedence:
 1. **Already linked** — `_wmkf_contact_value` set → use that contactid directly
    (0 today; the runtime path below creates these going forward).
 2. **Email match** — `contact.emailaddress1 == wmkf_emailaddress` (case-insensitive,
-   trimmed). 183 today. If email matches **>1 contact → ambiguous, skip + log**
-   (duplicate contacts; do not guess).
-3. No contact → skip (non-goal: no creation).
+   trimmed). 183 email matches today. If email matches **>1 contact → ambiguous, skip
+   + log** (duplicate contacts; do not guess) — **7 today**.
+3. No contact → skip (non-goal: no creation) — **1,348 today**.
+
+**Measured action breakdown (S216, eligibility gate applied to the 1,532 eligible
+of 1,533 ORCID reviewers; 1 row has null status and is correctly dropped):**
+**162 WRITE** (target ORCID empty), 14 noop (contact already has the same iD),
+**0 conflict**, 0 malformed-target, 7 ambiguous, 1,348 no-contact. So the backfill's
+real yield is **162 writes**; the 183 email-match figure decomposes as 162 + 14 + 7.
 
 ORCID normalization (shared with the probes): extract the canonical
 `\d{4}-\d{4}-\d{4}-\d{3}[\dX]` iD; compare case-insensitively.
@@ -93,7 +99,7 @@ Audit the workbench paths too: `pages/api/workbench/enrich-recommended.js` and t
 Candidates invite path. If either promotes (sets `wmkf_Contact`), wire the same hook.
 (Confirm during impl — they may route through `send-emails` already.)
 
-### PR2 — One-shot historical backfill (the existing 183)
+### PR2 — One-shot historical backfill (162 writes; 183 email matches)
 New `scripts/backfill-contact-orcid.js`, mirroring `backfill-orcid-identity.js`'s
 resumable two-phase shape:
 - `--resolve` (read-only): for every eligible reviewer, resolve target contact (§3),
@@ -117,24 +123,49 @@ resumable two-phase shape:
 - ORCID is 19 chars — no field-cap concern.
 
 ## 7. Verification / metrics
-- Pre/post `count(contacts where wmkf_orcid ne null)` — expect **+~183 − conflicts −
-  ambiguous**.
+- Pre/post `count(contacts where wmkf_orcid ne null)` — expect **+162** (measured:
+  162 empty-target writes; conflicts/malformed both 0, 7 ambiguous skipped).
 - Re-run `scripts/probe-orcid-contact-direct-join.js` — direct-join overlap should rise
-  from 18 toward ~183+.
+  from 18 toward ~176 (162 new + 14 already-agreeing).
 - Backfill JSONL tallies: written / noop / conflict / ambiguous / nocontact.
 - Unit tests: `setOrcidIfAbsent` (all four §4 branches); promotion-hook eligibility
   gate (skips `unresolved`/missing-status, writes on `probable`/`confirmed`); ambiguous
   multi-contact skip.
 
 ## 8. Open decisions for review
-1. **Auto-promotion** — current design says NO (keep `wmkf_Contact` = engagement).
-   Confirm; the alternative (set the pointer during back-prop) makes the join O(1) but
-   muddies promotion semantics.
-2. **Conflict surfacing** — log-only for the pilot, or write conflicts to a review
-   queue / alert? Default: log + JSONL; revisit if conflict count is non-trivial.
-3. **Optional `contact.wmkf_orcidsource`** — a provenance marker to distinguish
-   reviewer-resolved from GOapply-self-reported ORCIDs. Deferred (schema-minimization),
-   but cheap if wanted.
+
+### 8.1 Auto-promotion — set the `wmkf_Contact` pointer during back-prop? → **NO**
+The pointer is **load-bearing**, not cosmetic. Readers found in-repo:
+`honorarium-onboard-orchestrator.js:131` (decides payment-onboarding contact),
+`external/review/[token]/context.js` (renders the linked contact's name on the
+reviewer-facing form), `send-emails.js:302` (gates whether outreach promotes),
+`membership-service.js`, `contact-history.js`, `generate-emails.js`. A pointer set
+on a fuzzy email match would assert "this reviewer IS this CRM contact" into payment
+and reviewer-facing flows — exactly the discovery≠identity error class the resolver
+work exists to prevent (`project-reviewer-identity-resolution`). The 7 ambiguous
+email→multi-contact cases prove email isn't reliably 1:1. **Asymmetry that decides it:**
+writing `contact.wmkf_orcid` is fill-only + reversible (low stakes); setting the
+identity pointer is an identity assertion feeding payment/CRM (high stakes). So
+back-prop writes the ORCID field only; the pointer stays an engagement signal, set at
+real outreach. (Revisit later as a separately-gated linking pass if email-match proves
+trustworthy enough.)
+
+### 8.2 Conflict surfacing — log-only, or review queue / alert? → **log-only**
+**Measured conflicts = 0** (no matched contact has a different valid ORCID; the 14
+already-present all AGREE with the resolver). The conflict branch stays in code
+(runtime could hit it as the pool grows) but routes to `console.warn` + the backfill
+JSONL — no `system_alerts` row or review queue for the pilot. Escalate only if the
+runtime conflict counter becomes non-trivial.
+
+### 8.3 Optional `contact.wmkf_orcidsource` provenance marker → **defer**
+Its main justifications — distinguishing resolver-derived from GOapply-self-reported
+ORCIDs, and debugging conflicts — are moot at current data (0 conflicts; the 14 overlaps
+agree). And provenance is already reconstructable without new schema: back-prop only
+fills *empty* contact fields, so any `contact.wmkf_orcid` matching an eligible reviewer's
+gated ORCID that was empty at backfill time is our write (the JSONL records this; the
+reviewer row holds full anchors via `wmkf_identityverifiedanchorsjson`). Add the field
+only if a concrete read-time consumer needs to branch on source. Honors
+schema-minimization (`feedback-human-legibility-schema-principle`).
 
 ## 9. Phasing
 - **PR1**: `contactAdapter.setOrcidIfAbsent` + send-emails promotion hook + person-select
