@@ -293,14 +293,49 @@ schema-minimization (`feedback-human-legibility-schema-principle`). Revisit only
 - **Confirmation only:** #10 (Candidates routes through send-emails — verified true).
 
 ## 12. Phasing
-- **PR1**: centralized ORCID normalizer + ambiguity-aware contact resolver +
-  `contactAdapter.setOrcidIfAbsent` + shared `backPropReviewerOrcidToContact` helper +
-  wire all three call sites (send-emails, honorarium, enrich-recommended) +
-  person-select fields + actingUserSystemId threading + tests (§10).
-- **PR2**: `backfill-contact-orcid.js` (resolve/summary/apply, group-by-contact,
-  status_null exception) + verification (§9); run it.
-- **PR3 (later, separate)**: carry ORCID through the intake portal applicant-suggested
-  reviewer capture so the flow closes at intake, not just at outreach.
+- **PR1 — ✅ SHIPPED S217** (`main` 2026-06-03): centralized ORCID normalizer +
+  ambiguity-aware contact resolver + `contactAdapter.setOrcidIfAbsent` + shared
+  `backPropReviewerOrcidToContact` helper + wire all three call sites (send-emails,
+  honorarium, enrich-recommended) + person-select fields + actingUserSystemId
+  threading + tests (§10). Codex-reviewed (pre-impl + confirmation + an adversarial
+  pass — tightened 412 detection to `err.status===412`, kept the missing-etag
+  unconditional fallback per `updateIfEmpty`).
+- **PR2 — ✅ SHIPPED + RAN S217**: `scripts/backfill-contact-orcid.js`
+  (resolve/summary/apply/verify, group-by-contact, status_null exception). Live
+  counts matched the projection exactly — **162 write / 0 conflict / 0 malformed /
+  7 ambiguous / 14 noop / 1 status_null / 1,349 nocontact** of 1,533; all 162 fills
+  verified by (contactId, reviewerId), 0 failures.
+- **PR3 (DEFERRED — blocked, not yet buildable)**: carry ORCID through the intake
+  portal applicant-suggested reviewer capture so the flow closes at intake, not
+  just at outreach.
+
+  **Status (probed S217):** there is NOTHING to carry ORCID through yet. The
+  intake portal (`pages/api/intake/{draft,submit}`, `pages/apply/`) has **no
+  reviewer-capture** — `submit.js` ships only `budget_lines`; `persons` is parked
+  (blocked on Connor), and reviewers aren't even on the parked list. Today's
+  applicant-suggested reviewers come from the **legacy GOapply slots**
+  (`akoya_request.wmkf_potentialreviewer1..5` → existing person GUIDs, ingested by
+  `/api/workbench/applicant-reviewers`), where the applicant supplies no ORCID —
+  and that path is **already covered by PR1** (those persons back-prop their ORCID
+  when staff enrich them via `enrich-recommended` or invite them via `send-emails`).
+  So PR3 has zero incremental value until the intake-portal **direct** reviewer-
+  capture form exists, which is a Connor-gated intake scope item, not part of this
+  ORCID work.
+
+  **Wiring note for whoever builds the intake reviewer-capture (do it from day
+  one):** when an applicant enters a suggested reviewer, capture the reviewer's
+  ORCID if offered (an optional `orcid` field on the reviewer sub-form) and/or
+  resolve it via `ORCIDService.findContact(name, affiliation)` at materialization.
+  Write it onto the `wmkf_potentialreviewers` person through the **gated** path —
+  i.e. only persist when the identity resolver reaches `confirmed`/`probable`
+  (`researcher.writeIdentityDecision` + `mayPersistIdentity`), never a bare
+  applicant-typed string (same persistence gate `enrich-recommended` uses). Once
+  `wmkf_potentialreviewers.wmkf_orcid` + `wmkf_identitystatus` are set, the EXISTING
+  back-prop carries it to the matched contact automatically — no new ORCID code is
+  needed in the intake path, only the capture+gated-write of the person field. The
+  applicant's OWN ORCID (the PI) is a separate concern already captured by GOapply
+  onto `contact.wmkf_orcid` at intake (§1; the disjoint 423-row population) — do
+  NOT conflate it with their suggested reviewers'.
 
 ## 13. Codex confirmation-pass disposition (rev2 → rev3)
 Second pass (post-rev2): **3 RESOLVED, 3 PARTIALLY-RESOLVED, 0 new architectural issues**;

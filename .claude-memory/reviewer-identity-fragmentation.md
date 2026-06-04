@@ -90,3 +90,22 @@ contacts; carry ORCID through the intake portal + applicant-suggested-reviewer
 capture) so the shared key builds over time. `contact.wmkf_orcid` has no
 `wmkf_orcidurl` sibling (our researcher adapter writes both) — a write-signature
 tell. 14 contact ORCID values are malformed (direct-join data-quality snag).
+
+**ORCID back-prop SHIPPED S217 (the flow now exists).** Design
+`docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` (rev3, 2 Codex passes) built as
+PR1 (runtime forward-flow) + PR2 (one-shot backfill), both on `main` 2026-06-03,
+Codex-reviewed (incl. an adversarial pass). Mechanics: `lib/utils/orcid-normalize.js`
+(mod-11-2 checksum) → `contactAdapter.resolveForBackprop`/`setOrcidIfAbsent`
+(fill-only, conditional If-Match, conflict-surfacing) → shared
+`lib/services/backprop-reviewer-orcid.js` helper, wired into send-emails +
+honorarium-onboard-orchestrator + workbench/enrich-recommended (each hydrates
+`wmkf_orcid`/`wmkf_identitystatus`/`_wmkf_contact_value` first). Eligibility =
+valid iD + `mayPersistIdentity` (confirmed/probable). Runs forward automatically
+on every promotion now. **Historical backfill RAN + verified**
+(`scripts/backfill-contact-orcid.js --resolve/--apply/--verify`): live counts
+matched the projection exactly — **162 write / 0 conflict / 0 malformed / 7
+ambiguous / 14 noop / 1 status_null / 1,349 nocontact** of 1,533; all 162
+`contact.wmkf_orcid` fills confirmed by (contactId, reviewerId), 0 failures.
+Provenance = native Dataverse audit on `contact.wmkf_orcid` (reversible, §7);
+no `wmkf_orcidsource` field. **Still OPEN: PR3** — carry ORCID through the intake
+portal applicant-suggested-reviewer capture (close the flow at intake).
