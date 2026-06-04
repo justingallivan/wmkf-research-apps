@@ -80,6 +80,10 @@ scripts/.orcid-resolution.jsonl
 scripts/.orcid-backfill.jsonl
 scripts/.orcid-backfill-applied.jsonl
 
+# Contact-ORCID back-prop backfill checkpoints (PR2; contain person data; local-only, S217)
+scripts/.contact-orcid-backfill.jsonl
+scripts/.contact-orcid-backfill-applied.jsonl
+
 # ORCID cross-store match probe artifact (contains person data; local-only, S216)
 scripts/.orcid-cross-store.json
 scripts/.orcid-contact-direct.json
