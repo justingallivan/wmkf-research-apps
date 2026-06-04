@@ -9,9 +9,9 @@
 
 ## Source of truth
 
-**None.** Table exists; nothing reads or writes it in production traffic. Writer is dead code.
+**None.** Table was DROPPED 2026-06-04 (migration 018); before that it existed but nothing read or wrote it in production traffic (the writer was dead code).
 
-## Schema (live)
+## Schema (at drop — historical)
 
 | Column | Type |
 |---|---|
@@ -35,9 +35,9 @@
 
 Indexes: `researcher_id`, `publication_date DESC`, `doi`.
 
-## Live state notes
+## State notes (pre-drop)
 
-- 0 rows. Writer was either never wired or was disabled.
+- 0 rows at drop. Writer was either never wired or was disabled.
 - **W5 update (commit `0c58da4`):** the `DatabaseService.addPublication` / `getRecentPublications` / `getResearchersByKeywords` methods that referenced this table were gutted from `database-service.js`. No live readers or writers remain in the service layer.
 
 ## Read paths
