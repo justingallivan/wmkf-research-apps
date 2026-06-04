@@ -84,6 +84,12 @@ scripts/.orcid-backfill-applied.jsonl
 scripts/.contact-orcid-backfill.jsonl
 scripts/.contact-orcid-backfill-applied.jsonl
 
+# Lone-ORCID + Scholar corroboration backfill checkpoints (contain person data; local-only, S219)
+scripts/.lone-orcid-scholar.jsonl
+scripts/.lone-orcid-scholar-applied.jsonl
+scripts/.lone-orcid-scholar-conflicts.jsonl
+scripts/.lone-orcid-scholar-*.out
+
 # ORCID cross-store match probe artifact (contains person data; local-only, S216)
 scripts/.orcid-cross-store.json
 scripts/.orcid-contact-direct.json

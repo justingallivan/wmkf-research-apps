@@ -5,8 +5,10 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-06-04 via live Dataverse probe (all 6 wmkf_identity* fields present on wmkf_potentialreviewerses)
+  last_verified: 2026-06-04 via live Dataverse probe (pool ORCID 1,773 / probable 1,772 after the S219 lone-ORCID backfill)
 ---
+
+> **S219 — lone-ORCID residual CLOSED.** The S215 backfill only persisted institution-corroborated ORCIDs, leaving 454 lone (name-only) ORCID rows `unresolved`. `scripts/backfill-lone-orcid-scholar.js` ran Google Scholar over those 454 and, where Scholar was CLEAN (no name/inst mismatch), fed both weak anchors (lone public ORCID + clean Scholar) through `resolveIdentity` → `probable` → wrote the ORCID. Result: **240 clean → written, 144 rejected (correctly gated), 70 no-Scholar.** Pool: ORCID 1,533→**1,773** (+240), probable 1,532→**1,772** (+240), 0 failures/conflicts, independently re-counted. Scholar used as corroborating evidence ONLY — `wmkf_googlescholarid` NOT persisted (verified null on written rows). Two Codex rounds (transient-failure suppression + fail-closed apply re-read) + a live bug fix (SerpAPI 200-with-`data.error` "no results" must map to `sch_none`, not a retryable error). Same safety adapters as S215 (fill-if-empty ORCID + writeIdentityDecision skips `confirmed`).
 
 ## Recall Rule
 
