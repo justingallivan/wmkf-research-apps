@@ -8,13 +8,15 @@
  * selection is query-string driven (?tab=reviewers&sub=invite) for deep-links.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Layout, { Card } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import { useAppAccess } from '../../shared/context/AppAccessContext';
+import { useProfile } from '../../shared/context/ProfileContext';
+import { PREFERENCE_KEYS } from '../../shared/config/reviewerFinderPreferences';
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
 
@@ -38,6 +40,7 @@ function WorkbenchRequest() {
   const router = useRouter();
   const { data: session } = useSession();
   const { isSuperuser } = useAppAccess();
+  const { preferences } = useProfile();
   const { requestId } = router.query;
 
   const tabParam = typeof router.query.tab === 'string' ? router.query.tab : null;
@@ -77,7 +80,24 @@ function WorkbenchRequest() {
   const myUserId = session?.user?.dynamicsSystemuserId || null;
   const pdId = ctx?.programDirectorId || null;
   const canManage = computeCanManage({ isSuperuser, pdId, myUserId });
-  const reviewerSettings = { signature: session?.user?.profileName || '' };
+
+  // Per-user invite signature — the same SENDER_INFO preference the standalone
+  // Reviewer Finder uses (sender identity is always the signed-in MS account;
+  // this only resolves the {{signature}} placeholder in the email templates).
+  // Falls back to the freeform signature → sender name → profile display name.
+  const reviewerSettings = useMemo(() => {
+    let signature = session?.user?.profileName || '';
+    const raw = preferences?.[PREFERENCE_KEYS.SENDER_INFO];
+    if (raw) {
+      try {
+        const sender = JSON.parse(raw);
+        signature = sender.signature || sender.name || signature;
+      } catch {
+        /* malformed preference — keep the profile-name fallback */
+      }
+    }
+    return { signature };
+  }, [preferences, session?.user?.profileName]);
 
   return (
     <Layout title="Request Workbench">

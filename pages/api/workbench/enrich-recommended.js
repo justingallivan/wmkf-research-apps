@@ -32,6 +32,7 @@ import { requireAppAccess } from '../../../lib/utils/auth';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { safeFetch } from '../../../lib/utils/safe-fetch';
 import { normalizeName } from '../../../lib/utils/name-normalization';
+import { deriveProposalAuthorNames } from '../../../lib/utils/proposal-authors';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
@@ -189,17 +190,10 @@ export default async function handler(req, res) {
         coiChecked = DeduplicationService.markInstitutionCOI(coiChecked, proposalInfo.authorInstitution);
       }
       // Coauthor COI vs PI + co-investigators. `proposalAuthors` is normalized to
-      // the PI only (reviewer-finder.js:243); fold in `coInvestigators` so a
-      // recommendee who co-authored with a listed co-PI is also flagged. (The
-      // shared discover.js path only checks the PI — see the parity note in the
-      // build plan.)
-      const NOT_SET = (s) => !s || /^(not specified|not set|n\/a|none)$/i.test(s.trim());
-      const authorBlob = [proposalInfo.proposalAuthors, proposalInfo.coInvestigators]
-        .filter((s) => !NOT_SET(s))
-        .join(', ');
-      const proposalAuthors = authorBlob
-        ? authorBlob.split(',').map((a) => a.trim()).filter(Boolean)
-        : [];
+      // the PI only (reviewer-finder.js:243); the shared helper folds in
+      // `coInvestigators` so a recommendee who co-authored with a listed co-PI is
+      // also flagged. discover.js now derives the SAME set (S213 parity closed).
+      const proposalAuthors = deriveProposalAuthorNames(proposalInfo);
       if (proposalAuthors.length > 0 && coiChecked.length > 0) {
         coiChecked = await DiscoveryService.checkCoauthorshipsForCandidates(
           coiChecked,
