@@ -65,19 +65,24 @@ and hangs `git fsck`/`gc`.
 
 Before reading any session context, run the project's CI gates to surface rubric violations *before* doing other work. A red gate is a violation of the ground-truth rule (`docs/CLAUDE_REMEDIATION_PLAN.md` + CLAUDE.md "Ground-truth requirement"), regardless of which session caused it.
 
-If the project has these scripts (check `package.json`), run them. Run each gate and its `:self-test` **sequentially, never in parallel** — the self-tests write synthetic fixtures into paths the main gate scans (CLAUDE.md "Operating rules"):
+Run **every** `check:*` gate, not a subset — a gate left out of this list is a gate that can sit red and unnoticed (this is exactly how `check:prompt-storage-mentions` was red for ~1 session: it wasn't in the old short list, and `check:doc-currency` before it sat red ~8 sessions). Run each gate and its `:self-test` **sequentially, never in parallel** — the self-tests write synthetic fixtures into paths the main gate scans (CLAUDE.md "Operating rules"). The `&&` below pairs each gate with its self-test so a red gate skips its own self-test but the next gate still runs:
 ```bash
-npm run check:atlas                  # Application State Atlas coverage
-npm run check:atlas:self-test        # Coverage-tool self-test
-npm run check:api-routes             # API route security matrix coverage
-npm run check:doc-currency           # Doc-currency drift gate (was red & unnoticed for ~8 sessions)
-npm run check:doc-currency:self-test # Doc-currency self-test
-npm run check:fact-consistency       # Registered scalar drift across docs/memory
+npm run check:migrations-manifest                                              # migrations-manifest ↔ on-disk .sql files
+npm run check:api-routes                                                       # API route security matrix coverage
+npm run check:atlas && npm run check:atlas:self-test                           # Application State Atlas coverage
+npm run check:doc-currency && npm run check:doc-currency:self-test             # doc-currency drift (was red & unnoticed ~8 sessions)
+npm run check:fact-consistency && npm run check:fact-consistency:self-test     # registered scalar drift across docs/memory
+npm run check:canonical-pointers && npm run check:canonical-pointers:self-test # anchor rot in CANONICAL_COUNTS pointers
+npm run check:drain-table-mentions && npm run check:drain-table-mentions:self-test       # stale "lives in PG" claims for drain tables
+npm run check:prompt-storage-mentions && npm run check:prompt-storage-mentions:self-test # stale wmkf_prompt_template refs (was red & unnoticed ~1 session)
+npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging:self-test # A7 prompt-injection surface markers
+npm run check:memory-router && npm run check:memory-router:self-test           # MEMORY.md router shape + valid statuses/links
+npm run check:memory-drift:no-write                                            # advisory: memory↔code drift (read-only)
 ```
 
-Skip silently if any of those scripts isn't defined — not every project has them. Do not skip when they are defined.
+**This list is the full set as of 2026-06-04. Before running, `grep '"check:' package.json` — if a `check:*` script exists that is NOT above (and is not a `:self-test` of one already listed), run it too and add it here.** That keeps the list from silently going stale as gates are added. Skip silently only if NONE of these scripts is defined (not every project has them); do not skip a gate that IS defined.
 
-**If any gate is red:** report it as the FIRST thing in the Step 4 summary, before recapping the previous session. A red gate is a P0 blocker for any new feature work in the affected area (data layer for `check:atlas`, API routes for `check:api-routes`, docs/memory drift for `check:doc-currency` and `check:fact-consistency`). Treat fixing it as a candidate first task, not a side-note. The `doc-currency` gate is included here precisely because it sat red for ~8 sessions while masking the real jest signal — exactly the class this list is meant to surface.
+**If any gate is red:** report it as the FIRST thing in the Step 4 summary, before recapping the previous session. A red gate is a P0 blocker for any new feature work in the affected area (data layer for `check:atlas`, API routes for `check:api-routes`, docs/memory drift for the rest), regardless of which session caused it. Treat fixing it as a candidate first task, not a side-note. Two gates in this list (`doc-currency`, `prompt-storage-mentions`) are here precisely because they each sat red and unnoticed while the short list omitted them — running the complete set is what prevents a recurrence.
 
 ## Step 3: Load Context
 
