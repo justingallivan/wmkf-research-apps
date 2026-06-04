@@ -1,62 +1,64 @@
-# Session 218 Prompt: Land PR4 (reviewer self-report ORCID) after Codex e2e — or new features
+# Session 219 Prompt: Open — new feature work or carried tails
 
-## ⏰ Standing context / guardrails (carried S197–S217)
-- **`main` auto-deploys to prod on push.** Commit/push only when asked. Feature branches do NOT deploy — use one for anything that touches a live prod-write path, smoke it, then merge.
-- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`) + a PreToolUse reminder on durable-doc scope claims. Run the *disconfirming* query before asserting scope/quantity; derive denominators independently. (S217: the 162/1,533 backfill counts came straight from the live `--summary` and sum to the denominator.)
-- **Codex via the RESCUE PATH works well** — `Agent(subagent_type: 'codex:codex-rescue')`. S217 ran clean pre-impl + adversarial passes on PR1/PR4 and caught real bugs (PR4: a fail-open guard, a confirm-without-edit miss, a honorarium-ordering strand). **Codex has no outbound network** — feed it captured data / point it at in-repo files, tell it not to fetch. Deliver Codex output VERBATIM ([[feedback-share-codex-verbatim]]).
-- **CI-green ≠ correct for async/effect/UI/external-write paths.** Manual or scripted smoke is mandatory ([[feedback-profile-context-runtime-bugs]]). S217 live-smoked PR1's write (1 write + verify) before the bulk apply.
-- **Local-dev hits the SAME prod Dataverse** — no isolated test store. `AUTH_REQUIRED=false NEXTAUTH_SECRET=dev-throwaway NEXTAUTH_URL=http://localhost:3000 ./node_modules/.bin/next dev`. Ad-hoc prod probes/writes: the `.env.local`-loading script pattern + `bypassDynamicsRestrictions(...)`. `queryAllRecords` caps at 5000.
-- **ORCID/NCBI + EXTERNAL_LINK_SECRET are "Sensitive" in Vercel** → `vercel env pull` returns them EMPTY; hand-enter in `.env.local` ([[project-vercel-sensitive-env-pull-empty]]). For local reviewer-flow e2e, `EXTERNAL_LINK_SECRET` can be ANY 32+ char throwaway (minted + verified by the same local env).
+## ⏰ Standing context / guardrails (carried S197–S218)
+- **`main` auto-deploys to prod on push.** Commit/push only when asked. Feature branches do NOT deploy — use one for anything touching a live prod-write path, smoke it, then merge.
+- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`) + a PreToolUse reminder on durable-doc scope claims. Run the *disconfirming* query before asserting scope/quantity; derive denominators independently. (S218: the IRS memory's "SHIPPED + runs as scheduled" self-claim was wrong — a live Postgres/maintenance_runs probe caught it. **Don't trust a memory file's own SHIPPED/closed self-label; probe live state.**)
+- **Local-dev hits the SAME prod Dataverse + prod Postgres** — no isolated test store. `POSTGRES_URL` IS in `.env.local`, so read-only PG probes work (the `.env.local`-loading + `pg.Pool({ssl:{rejectUnauthorized:false}})` pattern). Dataverse probes: client-credentials token + `EntityDefinitions(LogicalName='x')` for set names (note `wmkf_potentialreviewer`'s set is the double-plural `wmkf_potentialreviewerses`; metadata `$filter` rejects `startswith`/`contains`). `queryAllRecords` caps at 5000.
+- **ORCID/NCBI + EXTERNAL_LINK_SECRET are "Sensitive" in Vercel** → `vercel env pull` returns them EMPTY; hand-enter in `.env.local` ([[project-vercel-sensitive-env-pull-empty]]).
+- **Memory is now a ROUTER.** `.claude-memory/MEMORY.md` routes "for THIS task → read these 1–3 files." Read the routed topic files in full before acting. New gate `npm run check:memory-router` (+ `:self-test`) keeps it ≤150 lines/18KB with valid links + statuses. Spec: `docs/CLAUDE_MEMORY_REORGANIZATION_PLAN.md`.
 
-## Session 217 Summary
+## Session 218 Summary
 
-Shipped the **reviewer ORCID back-propagation** work end-to-end to prod, plus two carried reviewer follow-ons and an ORCID search hardening. Built PR4 (reviewer self-report capture) on a branch and **handed its e2e to Codex** so we can move to new features.
+No app-code changes. Entire session was **memory-system work** + a Codex audit response. All committed + pushed; tree clean.
 
-### Shipped to `main` (deployed)
-1. **PR1 — runtime forward-flow** (`a25bda2`): ORCID flows onto the matched `contact.wmkf_orcid` on every send/accept/enrich. Centralized `orcid-normalize` (mod-11-2) + `setOrcidIfAbsent` (fill-only, conflict-surfacing, conditional If-Match) + shared `backPropReviewerOrcidToContact`. Codex: 2 design passes + an adversarial impl pass (tightened 412 detection).
-2. **PR2 — historical backfill, RAN** (`0c75ec9`): `scripts/backfill-contact-orcid.js`. Live counts matched the projection exactly — **162 write / 0 conflict / 0 malformed**, all verified by `(contactId, reviewerId)`, 0 failures. Contact ORCID population **~423 → ~585**.
-3. **S213 follow-ons** (`ee689e8`): co-PI COI parity in `discover.js` (shared `lib/utils/proposal-authors.js`) + per-user Workbench invite signature (reads `SENDER_INFO`).
-4. **ORCID SOLR-injection fix** (`87a84ad`): special-char reviewer names (hyphens, parens, `<>`) no longer 500 `searchByName`.
-5. **Docs** (`cfc7c04`): design §12 marked PR1/PR2 shipped; PR3 (intake reviewer-capture) documented as blocked-on-Connor with a day-one wiring note.
+### What was completed
+1. **Confirmed PR4 already landed.** Pulled 19 commits at session start; verified the reviewer self-reported ORCID work (sticky-`confirmed` invariant) was merged (`876dd88`) + headless e2e runner (`015aad6`) on prod. Wrote the deferred `project-reviewer-self-report-orcid-sticky-confirmed` memory.
+2. **Reorganized `.claude-memory/` into a router** (per `docs/CLAUDE_MEMORY_REORGANIZATION_PLAN.md`). `MEMORY.md` 24.3KB/143 lines → **~7.7KB/78 lines**. Normalized **all 118 topic files**: added `status`/`scope`/`last_verified` + a `## Recall Rule` (additive only — zero body deletions, verified). New `project-closed-work-archive.md` holds closed/point-in-time entries. New gate `scripts/check-memory-router.js` (+ self-test), wired into `package.json` + `.github/workflows/test.yml`.
+3. **Acted on the Codex reorg audit** (`docs/MEMORY_REORG_AUDIT_2026-06-04.md`):
+   - **P1 (verified vs code, fixed):** `intake-portal-reviewer-capture` — separated CURRENT Workbench (option B: recommended→junction rows; **excluded→soft-block only, NO rows**) from FUTURE intake design; `reviewer-workbench-invite-workflow` — per-user signature **IS** wired (`pages/workbench/[requestId].js` reads `SENDER_INFO`), replaced stale "not yet wired."
+   - **P2:** split all 6 over-full routes to ≤3 files; convention = a task-routed file must be `active`/`stale`, never `closed` → reclassified 12 routed files closed→active.
+   - **IRS reality-check:** live probe showed `irs_exempt_orgs` **does** hold 1,264,156 rows, BUT the quarterly cron **has never fired** (0 `maintenance_runs` rows) and **nothing built consumes** verify-EIN. Rewrote `project-irs-exempt-verification` from "SHIPPED + running" → "code+data shipped, **DORMANT**."
+4. **Spot-probed every other closed/SHIPPED memory** against live Postgres/Dataverse/repo. **IRS was the only overstatement** — Wave-1 tables dropped ✓, W6 drain tables present ✓, appresearcher entities dropped ✓, 6 `wmkf_identity*` fields deployed ✓, slice-0 schema deployed ✓, BILL chunks + Q5 lookup + honorarium setting all present ✓. Upgraded `last_verified` on 9 verified files to real `via live probe` provenance.
 
-### Built on a branch — `feature/reviewer-self-reported-orcid` (NOT merged; pushed)
-6. **PR4 — reviewer self-reported ORCID capture** (`c5e0ec0`): the reviewer confirms their OWN ORCID on the Stage 2a accept/decline form → captured onto person + contact. Persisted as a **sticky `confirmed`** status (the resolver never emits `confirmed`, so `writeIdentityDecision`/`clearIdentityFields` refuse to downgrade/clear it — fail-closed). Codex adversarial pass folded (4 findings). 1842 tests, build clean.
-7. **PR4 e2e handoff** (`c58d7b3`): `docs/REVIEWER_SELF_REPORT_ORCID_E2E_HANDOFF.md` + `scripts/pr4-e2e-{setup,verify,cleanup}.js` — handed to Codex to build the automated e2e suite.
+### Commits
+- `91f7597` — memory: PR4 sticky-confirmed entry (checkpoint before trim)
+- `ba105f7` — memory: trim MEMORY.md under harness limit (archive + merge duplicate feedback)
+- `4cb926d` — Reorganize Claude project memory routing (router + 118 normalized files + gate)
+- `b8fd81c` — docs: add Claude memory reorganization plan
+- `9e501f0` — memory: act on Codex reorg audit (P1 fixes + router cleanup + IRS reality-check)
+- `eea0bc9` — memory: spot-probe closed/SHIPPED files vs live state — stamp last_verified
+- (this session-doc commit follows)
 
 ## Potential Next Steps
 
-### 1. ⭐ Land PR4 once Codex's e2e is green
-Codex is developing the e2e for `feature/reviewer-self-reported-orcid` (handoff doc + scaffolding scripts on the branch). When it passes: review Codex's e2e work, run it (or confirm Codex's run), then **merge the branch to `main`** (fast-forward off `cfc7c04`). After merge, add a memory entry for the **sticky-`confirmed` invariant** (a future resolver change could violate it) — held until merge so it's not recorded for unshipped code.
+Everything below the memory work is open — no forced priority. Pick from carried tails or new features.
 
-### 2. Carried reviewer follow-ons (operator / live-session work — not code)
-- Grant `reviewers` app access to pilot PDs + validate `/workbench` with a real PD login (runtime admin in `/admin` → `wmkf_appuserappaccesses`).
-- **Intake virus-scan EICAR e2e** — STILL parked pre-cycle must-do ([[project-intake-portal-virus-scan-e2e-deferred]]); needs deployed env + Entra applicant session.
+### 1. Carried reviewer/intake tails (operator / live-session work — not code)
+- Grant `reviewers` app access to pilot PDs + validate `/workbench` with a real PD login (`/admin` → `wmkf_appuserappaccesses`).
+- **Intake virus-scan EICAR e2e** — still parked pre-cycle must-do ([[project-intake-portal-virus-scan-e2e-deferred]]); needs deployed env + Entra applicant session.
 
-### 3. ORCID capture residual (from S215)
-Lone-ORCID + clean-Scholar (~4.4%) — a second backfill pass running Scholar would catch them (SerpAPI cost), or let normal enrichment pick them up. Operational/cost decision, not code.
+### 2. ORCID capture residual (from S215)
+Lone-ORCID + clean-Scholar (~4.4%) — a second backfill pass running Scholar would catch them (SerpAPI cost), or let normal enrichment pick them up. Cost decision, not code.
 
-### 4. PR3 — intake reviewer-capture (blocked, future)
-Carry ORCID through the intake-portal applicant-suggested-reviewer capture. BLOCKED: that capture form doesn't exist (intake `submit.js` ships only budget_lines; persons parked behind Connor; reviewers not on the list). Day-one ORCID wiring is documented in design §12 PR3 + memory [[project-intake-portal-reviewer-capture]]. Defer until the capture feature is built.
+### 3. Optional memory follow-ons (low priority, documented as deferred in the audit)
+- P2 — 47 topic files use flat top-level frontmatter vs nested `metadata:` (cosmetic; gate-clean). Normalize if touched.
+- P3 — regenerate `docs/RECONCILIATION_REPORT.json` via the non-`--no-write` drift path (needs live probe).
 
-### 5. New features
-Everything above is finish-work or blocked. Open to new capability work — see the roadmap memories ([[project-app-roadmap-2026-04-25]], [[project-staged-review-pipeline]], [[project-proposal-context-extraction]]).
+### 4. New features
+Roadmap memories: route via `MEMORY.md` → "Strategy / system model", "Planned: …" rows. ([[project-app-roadmap-2026-04-25]], [[project-staged-review-pipeline]], [[project-proposal-context-extraction]]).
 
 ## Key Files Reference
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` | §12 PR1/PR2 (shipped), §13 Codex, §14 PR4 (reviewer self-report + sticky-confirmed) |
-| `docs/REVIEWER_SELF_REPORT_ORCID_E2E_HANDOFF.md` | Codex's e2e brief for PR4 (on the PR4 branch) |
-| `lib/services/backprop-reviewer-orcid.js` · `lib/dataverse/adapters/contact.js` | shared back-prop helper + `setOrcidIfAbsent`/`resolveForBackprop` |
-| `lib/utils/orcid-normalize.js` | centralized normalizer + mod-11-2 checksum |
-| `scripts/backfill-contact-orcid.js` | PR2 backfill (resolve/summary/apply/verify) — already run |
-| `lib/services/capture-self-reported-orcid.js` · `lib/dataverse/adapters/researcher.js` | PR4 service + the sticky-`confirmed` guards (on the PR4 branch) |
-| `scripts/pr4-e2e-{setup,verify,cleanup}.js` | PR4 e2e scaffolding (on the PR4 branch) |
+| `.claude-memory/MEMORY.md` | The router — read it, follow task routes to topic files |
+| `docs/CLAUDE_MEMORY_REORGANIZATION_PLAN.md` | Router spec + layer model + operating rules |
+| `scripts/check-memory-router.js` (+ `-self-test`) | The new gate (≤150 lines/18KB, links resolve, valid statuses) |
+| `docs/MEMORY_REORG_AUDIT_2026-06-04.md` | Codex audit (P1/P2/P3 findings, now addressed) |
+| `.claude-memory/project-irs-exempt-verification.md` | Corrected: code+data shipped but DORMANT (no consumer, cron never fired) |
 
 ## Testing
 ```bash
 npx jest                                    # full suite (eslint is CI-only, not local)
-node --check <file>.js                       # syntax
+npm run check:memory-router && npm run check:memory-router:self-test
 npm run check:atlas && npm run check:api-routes && npm run check:fact-consistency && npm run check:doc-currency
-# PR4 e2e (after Codex builds it): see docs/REVIEWER_SELF_REPORT_ORCID_E2E_HANDOFF.md
-git checkout feature/reviewer-self-reported-orcid   # PR4 work lives here until merged
 ```

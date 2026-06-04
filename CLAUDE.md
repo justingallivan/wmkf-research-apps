@@ -44,6 +44,7 @@ The **Application State Atlas** at `docs/APPLICATION_STATE_ATLAS.md` (with per-e
 
 - `:canonical-pointers` — anchor rot in `[N](docs/CANONICAL_COUNTS.md#<fact-id>)` pointers.
 - `:memory-drift` (advisory) — memory↔code drift.
+- `:memory-router` (+ `:self-test`) — `.claude-memory/MEMORY.md` is a compact **router** (Startup / Always-Read Guardrails / Working Norms / Task Routing / Archive), not a prose index; gate hard-fails if it exceeds 150 lines / 18KB, a routed link breaks, or a topic file lacks a valid `status:`. Topic files carry `status`/`scope`/`last_verified` + a `## Recall Rule`. Reorg spec: `docs/CLAUDE_MEMORY_REORGANIZATION_PLAN.md`.
 
 **Operating rules** (full mechanics, exemption keyword lists, detection-shape catalogs, and the "lesson → fixture → fix → atlas page" 4-step commit order live in `docs/CI_GATES_REFERENCE.md`):
 - Red on `main` is a rubric violation **right now**, regardless of which session caused it. "Not my regression" is not a valid reason. Established 2026-05-08 after a two-session gap let an Atlas miss propagate.
