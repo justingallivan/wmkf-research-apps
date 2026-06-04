@@ -31,7 +31,8 @@
 
 ## Task Routing
 - Reviewer Workbench / lifecycle: project-reviewer-apps-redesign-direction.md; project-reviewer-workbench-invite-workflow.md; project-reviewer-lifecycle.md
-- Reviewer identity / ORCID: project-reviewer-identity-resolution.md; project-reviewer-identity-resolution-phase1.md; project-reviewer-self-report-orcid-sticky-confirmed.md; reviewer-identity-fragmentation.md
+- Reviewer identity resolver / ORCID: project-reviewer-identity-resolution.md; project-reviewer-identity-resolution-phase1.md; project-reviewer-self-report-orcid-sticky-confirmed.md
+- Reviewer identity fragmentation (why the resolver exists): reviewer-identity-fragmentation.md
 - Reviewer lifecycle automation (cron/reminders) + address: project-reviewer-lifecycle-automation.md; project-reviewer-address-collection-provisional.md
 - Reviewer data model / migration: project-reviewer-postgres-to-dataverse-migration.md; project-reviewer-finder-dataverse-entry-path.md; project-appresearcher-collapse-post-pilot.md
 - Reviewer matching / institution / contacts: project-reviewer-institution-match.md; project-contact-promotion-permission.md; project-institution-foundation-liaison.md
@@ -43,9 +44,11 @@
 - Intake virus-scan e2e (MUST before next cycle): project-intake-portal-virus-scan-e2e-deferred.md; project-virus-scanning-it-context.md; project-cloudmersive-advanced-endpoint.md
 - Dataverse schema / probes / OData: project-dataverse-schema-deploy-gotchas.md; project-dataverse-odata-null-filter.md; project-living-taxonomy-principle.md
 - Dynamics CRM facts (fields, lifecycle, temporal): project-akoya-request-pd-fields.md; project-grant-lifecycle-states-confirmed.md; akoya-temporal-axis-encodings.md
-- Dynamics CRM (users, email, OData limits, AI fields): project-dynamics-crm-users.md; project-dynamics-email.md; project-dynamics-crm-limitations.md; project-dynamics-ai-writeback.md
+- Dynamics CRM (users + email): project-dynamics-crm-users.md; project-dynamics-email.md
+- Dynamics CRM (OData limits + AI fields): project-dynamics-crm-limitations.md; project-dynamics-ai-writeback.md
 - Dynamics identity reconciliation / impersonation: project-dynamics-identity-reconciliation.md
-- Dynamics Explorer: project-dynamics-explorer-details.md; project-dynamics-explorer-schema-diff.md; project-dynamics-explorer-reuse-power-tools.md; project-dynamics-feedback-admin-shipped.md
+- Dynamics Explorer (core + schema): project-dynamics-explorer-details.md; project-dynamics-explorer-schema-diff.md
+- Dynamics Explorer (reuse direction + feedback-admin anti-rebuild): project-dynamics-explorer-reuse-power-tools.md; project-dynamics-feedback-admin-shipped.md
 - Dataverse Power Tools (find&fix + bulk export): project-dataverse-power-tools.md; dataverse-export-floor-scoping.md
 - Prompt / Executor work: project-prompt-storage-strategy.md; project-dynamics-as-prompt-ground-truth.md; project-pdf-processing-tiers.md
 - BILL / honoraria: project-bill-honorarium-integration.md; akoya-request-honorarium-nomenclature.md; akoya-payment-field-semantics.md
@@ -54,11 +57,16 @@
 - W6 Postgres table-drop PENDING (P0 if ≥ 2026-07-01): project-w6-table-drop-pending.md
 - Security (A7 prompt-injection hardening): project-a7-prompt-injection-hardening.md
 - Virtual Review Panel: project-virtual-review-panel.md
-- Dev environment / local build / git: project-dev-environment.md; project-vercel-sensitive-env-pull-empty.md; local-jest-build-environment.md; env-broken-git-autogc.md
+- Dev environment / secrets: project-dev-environment.md; project-vercel-sensitive-env-pull-empty.md
+- Local build + git gotchas: local-jest-build-environment.md; env-broken-git-autogc.md
 - Dynamics sandbox (NOT drop-in usable): project-dynamics-sandbox-state.md
-- Strategy / system model / roadmap: project-system-model.md; project-strategy-direction.md; project-app-roadmap-2026-04-25.md; project-phase-i-summary-app-winddown.md
+- Strategy / system model: project-system-model.md; project-strategy-direction.md
+- Roadmap (historical snapshots — cross-check current strategy): project-app-roadmap-2026-04-25.md; project-phase-i-summary-app-winddown.md
 - Phasing / cycle scoping: project-grant-phasing-evolution.md; feedback-cycle-vs-executor-scope.md; feedback-concepts-vs-phase-i.md
-- Planned capabilities (not built): project-staged-review-pipeline.md; project-proposal-context-extraction.md; project-interim-report-automation.md; project-awardee-onboarding.md; project-irs-exempt-verification.md; project-backend-automation.md; project-new-ai-capabilities.md
+- Planned: review pipeline + proposal extracts: project-staged-review-pipeline.md; project-proposal-context-extraction.md
+- Planned: backend automation + interim reports: project-backend-automation.md; project-interim-report-automation.md
+- Planned: post-award + new AI capabilities: project-awardee-onboarding.md; project-new-ai-capabilities.md
+- IRS verify-EIN (code+data shipped, cron unfired, no consumer yet): project-irs-exempt-verification.md
 - Decision log: decision-module-typeless-warning-accept.md
 
 ## User Context

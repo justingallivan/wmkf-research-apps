@@ -3,7 +3,7 @@ name: External reviewer file access architecture (proposals out, reviews in)
 description: SHIPPED 2026-05-03 — foundation-owned external-intake primitive (HMAC magic-links) mediates proposal download + review upload through our backend. Reusable for the intake portal. SharePoint write access verified end-to-end.
 type: project
 originSessionId: 9ea67012-f70f-47e6-ba56-ded9f73601c4
-status: closed
+status: active
 scope: reviewer
 last_verified: 2026-05-03 via memory-content (not re-probed 2026-06-04)
 ---

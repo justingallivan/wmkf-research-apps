@@ -3,7 +3,7 @@ name: project-dynamics-explorer-reuse-power-tools
 description: Dynamics Explorer fails due to hand-transcribed schema + trust-the-hardcoded-GUIDs heuristics; Dataverse Power Tools assets are the principled fix
 metadata:
   type: project
-  status: closed
+  status: active
   scope: dynamics
   last_verified: S209 via memory-content (not re-probed 2026-06-04)
 ---

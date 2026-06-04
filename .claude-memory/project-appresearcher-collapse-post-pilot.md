@@ -3,7 +3,7 @@ name: project-appresearcher-collapse-post-pilot
 description: wmkf_appresearcher sidecar collapse into wmkf_potentialreviewers — ✅ SHIPPED 2026-06-02 (S213); entity dropped, bibliometrics on the person
 metadata:
   type: project
-  status: closed
+  status: active
   scope: reviewer
   last_verified: 2026-06-02 via memory-content (not re-probed 2026-06-04)
 ---

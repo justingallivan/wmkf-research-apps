@@ -3,7 +3,7 @@ name: feedback-profile-context-runtime-bugs
 description: ProfileContext atomic-refactor (S203) shipped runtime bugs CI missed — two the stop-gate caught: an init fetch loop and a destructive-migration data-loss path. Check response.ok before irreversible actions; never let an effect depend on a callback that depends on state it mutates.
 metadata:
   type: feedback
-  status: closed
+  status: active
   scope: auth
   last_verified: S204 via memory-content (not re-probed 2026-06-04)
 ---

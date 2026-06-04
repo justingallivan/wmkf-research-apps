@@ -3,7 +3,7 @@ name: Intake portal — Entra External ID foundation shipped
 description: Tenant provisioned, NextAuth dual-provider wired, /apply route auth round-trip verified end-to-end (S129). Form/membership/Dynamics writes still ahead.
 type: project
 originSessionId: 5fc8fbcf-cfc0-4f4b-a4d6-5abf1de8d42e
-status: closed
+status: active
 scope: auth
 last_verified: S129 via memory-content (not re-probed 2026-06-04)
 ---

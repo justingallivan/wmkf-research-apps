@@ -2,7 +2,7 @@
 name: A7 prompt-injection hardening (SHIPPED S173-S177)
 description: All 24 LLM-input surfaces in this repo are hardened against prompt injection via wrapUntrustedContent + buildUntrustedContentPreamble + CI gate. Do NOT build a parallel system.
 type: project
-status: closed
+status: active
 scope: security
 last_verified: S209 via memory-content (not re-probed 2026-06-04)
 ---

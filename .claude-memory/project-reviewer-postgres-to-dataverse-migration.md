@@ -3,7 +3,7 @@ name: Reviewer Postgres → Dataverse migration plan locked (S136)
 description: Migration scope, model decisions, and feature scope locked 2026-05-06. Most "migration" is drain, not move. Match-on-discovery + history badges are first-class scope.
 type: project
 originSessionId: 064dffdf-ba31-44c3-81f2-73bf4d3b908f
-status: closed
+status: active
 scope: reviewer
 last_verified: 2026-05-14 via memory-content (not re-probed 2026-06-04)
 ---

@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: intake
-  last_verified: S217 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-06-04 via code (applicant-reviewers.js, reviewer-suggestion.js)
 ---
 
 ## Recall Rule
@@ -13,8 +13,9 @@ metadata:
 Read this when: building intake-portal reviewer-capture fields (applicant recommended + excluded reviewers), or coding any reader of `wmkf_appreviewersuggestion`.
 
 Do:
-- Write applicant recommended/excluded reviewers to `wmkf_appreviewersuggestion` (the per-(person,request) junction), distinguished by the `wmkf_applicantdisposition` picklist (`recommended`/`excluded`; null = staff/Claude); append `applicant` to `wmkf_sources`.
-- Filter `wmkf_applicantdisposition ne excluded` in every candidate/count/invite path, or exclusions leak.
+- **Recommended** reviewers → write to `wmkf_appreviewersuggestion` (the per-(person,request) junction) with `wmkf_applicantdisposition=recommended`; append `applicant` to `wmkf_sources`. This IS current behavior (`applicant-reviewers.js` `ensureApplicantRecommended`).
+- **Excluded** reviewers → CURRENT Workbench (S210 option B) parses the free-text for a **search soft-block ONLY and writes NO junction rows** (`applicant-reviewers.js` returns `excluded`/`excludedNames`/`excludedRaw`). Writing `disposition=excluded` rows is FUTURE intake-portal design, not current behavior — re-confirm before building it.
+- Filter `wmkf_applicantdisposition ne excluded` in every candidate/count/invite path — a forward guard for when excluded rows do get written (the `excluded` picklist value exists in `reviewer-suggestion.js` but is unused by the live path today).
 - Capture suggested-reviewer ORCID via the GATED path only (persist at `confirmed`/`probable` via `researcher.writeIdentityDecision` + `mayPersistIdentity`); back-prop to contact is already shipped (S217).
 
 Do not:
@@ -26,11 +27,11 @@ Ground truth: `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` §12 PR3, [[projec
 
 When building the new applicant intake portal (GOapply replacement), the reviewer-capture form fields (applicant **recommended** reviewers + reviewers to **exclude**) must write to **`wmkf_appreviewersuggestion`** — the per-(person, request) engagement junction, the SAME table Reviewer Finder candidates live in — distinguished by the **new `wmkf_applicantdisposition` picklist** (`recommended` / `excluded`; null = staff/Claude-discovered). Origin is flagged by appending `applicant` to the free-text `wmkf_sources`.
 
-This is the **going-forward location**, chosen 2026-05-31 with Justin. It deprecates the legacy GOapply path (applicant suggestions → `akoya_request.wmkf_potentialreviewer1..5` lookup slots; excludes → free-text `akoya_request.wmkf_excludedreviewers`). The D26 Workbench build includes a one-time patch that migrates those legacy slots + free-text into junction rows; the intake portal writes the junction rows directly so no migration is needed for future cycles.
+This is the **going-forward location**, chosen 2026-05-31 with Justin. It deprecates the legacy GOapply path (applicant suggestions → `akoya_request.wmkf_potentialreviewer1..5` lookup slots; excludes → free-text `akoya_request.wmkf_excludedreviewers`). **Current Workbench ingestion (verified 2026-06-04, `applicant-reviewers.js`):** the recommended legacy slots ARE materialized into `disposition=recommended` junction rows; the excluded free-text is parsed for a search soft-block ONLY (no junction rows). There is NO migration of excludes into junction rows today. The intake portal, when built, writes recommended junction rows directly; whether it also writes excluded rows is open future design.
 
 **Why the junction (not a person-level field):** exclusion must be **per-request** — a reviewer excluded by one applicant must stay eligible/enrichable for every other proposal. The junction is request-scoped by construction. Write the disposition ONLY on the junction row, never on the global `wmkf_potentialreviewer` person record. This is distinct from the planned-but-undeployed person-level `wmkf_reviewerstate` lifecycle picklist (see [[project-intake-portal-pilot-decisions-2026-05-06]]) — that's a person lifecycle axis, not the applicant recommend/exclude capture location.
 
-**Load-bearing follow-through:** every reader of `wmkf_appreviewersuggestion` that treats rows as candidates (counts, candidate lists, invite paths) must filter `wmkf_applicantdisposition ne excluded`, or an exclusion leaks into a candidate/invite path. Recommended entries get full enrichment (papers/COI/contact) on equal footing with Claude candidates; excluded entries are only resolved/matched, not bibliometrically enriched. Free-text `wmkf_excludedreviewers` is kept as the raw source of the applicant's *reasons* and mirrored into structured excluded rows.
+**Load-bearing follow-through (forward guard):** IF/when excluded junction rows get written, every reader of `wmkf_appreviewersuggestion` that treats rows as candidates (counts, candidate lists, invite paths) must filter `wmkf_applicantdisposition ne excluded`, or an exclusion leaks into a candidate/invite path. Recommended entries get full enrichment (papers/COI/contact) on equal footing with Claude candidates. **Today** (option B) free-text `wmkf_excludedreviewers` is kept as the raw source of the applicant's *reasons* and used for the soft-block only — it is NOT mirrored into structured excluded rows.
 
 **Wire ORCID capture from day one (PR3 of the ORCID back-prop work).** When this reviewer-capture form is built, capture each suggested reviewer's ORCID (optional `orcid` field and/or resolve via `ORCIDService.findContact`) and write it onto the `wmkf_potentialreviewers` person through the GATED path — persist only at `confirmed`/`probable` via `researcher.writeIdentityDecision` + `mayPersistIdentity` (the same gate `enrich-recommended` uses; never a bare applicant-typed string). The EXISTING back-prop (SHIPPED S217) then carries it to the matched contact automatically — no new ORCID code in the intake path, only the capture + gated person-field write. Full note: `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` §12 PR3. NB the capture form itself isn't built yet (S217 probe: intake `submit.js` ships only budget_lines; persons parked, reviewers not on the list) — PR3 is blocked on that Connor-gated build, NOT on ORCID work. Don't conflate with the applicant's OWN ORCID (the PI), already captured by GOapply onto `contact.wmkf_orcid` ([[reviewer-identity-fragmentation]]).
 

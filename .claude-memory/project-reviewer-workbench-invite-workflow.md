@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: S213 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-06-04 (signature claim re-checked vs pages/workbench/[requestId].js); rest S213 via memory-content
 ---
 
 ## Recall Rule
@@ -35,7 +35,7 @@ The Request Workbench Reviewers tab (tier-3) has **5 sub-tabs** (S211–212):
 - **"Applicant-suggested" badge** (green) marks applicant-recommended rows (`wmkf_applicantdisposition===recommended`) on BOTH Find and Candidates tabs — wording deliberately identical across the two.
 
 - **Per-user email templates + invite timing (S212).** All four reviewer email templates (invitation/materials/followup/thankyou) are per-user in Dataverse `wmkf_appuserpreferences` under key `reviewer_email_templates`, via `shared/components/reviewers/email-template-store.js` (defaults + load/save) — OFF browser-localStorage. Edited from "✎ Email templates" on the Reviewers tab; InviteEmailModal + ReviewerManagePanel both source from the store. Distinct from the legacy single-template `reviewer_finder_email_template` key (standalone Finder). The invitation also has a review TIMELINE (respond-by / proposal-delivery / review-due) entered in the invite modal, sticky per-user under `reviewer_invite_timing`, interpolated CLIENT-SIDE via `{{respondBy}}`/`{{proposalDelivery}}`/`{{reviewDue}}` tokens (render-emails leaves them; blank date drops its line). Two-phase-cycle artifact — retiring after this last cycle.
-- **Signature is NOT yet wired per-user in the Workbench.** `workbench/[requestId].js` passes `settings.signature = session.profileName` (weak). The real per-user signature lives in `SENDER_INFO` pref (used by `EmailSettingsPanel`); wiring it into the Workbench invite is a known follow-on.
+- **Per-user invite signature IS wired (verified 2026-06-04, S217 follow-on).** `pages/workbench/[requestId].js` (~L88-100) resolves `settings.signature` from the per-user `PREFERENCE_KEYS.SENDER_INFO` preference (`reviewer_finder_sender_info`), parsing `sender.signature || sender.name`, falling back to `session.user.profileName`. The signed-in MS account is always the actual sender; this only fills the `{{signature}}` template placeholder. Consumed by ReviewersTab/CandidatesPanel/InviteEmailModal/ReviewerManagePanel. (Earlier "not yet wired" note was stale.)
 
 **Two durable design principles (learned the hard way, S211–212):**
 1. **Outward-send safety must be SERVER-authoritative, not caller-controlled.** `send-emails` gates proposal-material attachments on the recipient's `wmkf_accepted` state (`recipientMayReceiveAttachments`), NOT the caller's `templateType` — so a mislabeled/pre-acceptance send can't leak materials. Apply this shape to any future send/attach path. Also `shouldSkipDuplicateInvitation` prevents re-click double-sends. Helpers in `lib/utils/reviewer-invite.js`.

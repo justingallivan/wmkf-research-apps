@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 8973a5d9-b293-4f16-b683-f8fa76e1618a
-  status: closed
+  status: active
   scope: dev-env
   last_verified: S173 via memory-content (not re-probed 2026-06-04)
 ---

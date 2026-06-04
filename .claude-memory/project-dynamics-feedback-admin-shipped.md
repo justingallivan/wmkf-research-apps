@@ -3,7 +3,7 @@ name: project-dynamics-feedback-admin-shipped
 description: Dynamics Explorer thumbs-feedback admin surface is fully shipped — don't re-list as a P1 from stale audits.
 metadata:
   type: project
-  status: closed
+  status: active
   scope: dynamics
   last_verified: S187 via memory-content (not re-probed 2026-06-04)
 ---

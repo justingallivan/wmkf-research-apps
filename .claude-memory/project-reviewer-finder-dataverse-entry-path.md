@@ -3,7 +3,7 @@ name: Reviewer Finder — Dataverse-native entry path
 description: Reviewer Finder is fully Dataverse-native. Picker, save-candidates, and browse/email/summary/cycles flows all run on Dataverse since W3–W6 cutovers (2026-05-12). Postgres reviewer tables are drain-only and scheduled for deletion ≥ 2026-07-01.
 type: project
 originSessionId: 97cd3044-49bb-4f67-b000-5d32980d6faa
-status: closed
+status: active
 scope: reviewer
 last_verified: 2026-05-14 via memory-content (not re-probed 2026-06-04)
 ---
