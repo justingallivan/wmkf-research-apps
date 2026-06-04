@@ -18,6 +18,7 @@
     "test:integration": "jest tests/integration",
     "test:prompts": "jest tests/unit/prompts",
     "test:utils": "jest tests/unit/utils",
+    "e2e:pr4": "node scripts/pr4-e2e.js",
     "test:ci": "jest --ci --coverage --watchAll=false",
     "check:api-routes": "node scripts/check-api-route-security-matrix.js",
     "check:atlas": "node scripts/check-application-state-atlas.js",

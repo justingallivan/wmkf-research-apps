@@ -173,3 +173,47 @@ After an Accept with self-reported ORCID `X`:
 - `git --no-pager diff main..HEAD` shows the full PR4 change if you want the exact diff.
 - Honor the project's ground-truth rule: every state claim verified against live code, not
   assumed. The facts in §6 were each read out of the cited files.
+
+---
+
+## 10. Codex addition: headless runner
+
+Codex added `scripts/pr4-e2e.js` plus the `npm run e2e:pr4` alias. This is a manual,
+prod-touching rehearsal script, not a CI test. It creates a real test person, contact,
+reviewer suggestion, and magic-link token; calls `/context` and `/respond` headlessly;
+verifies person/contact/engagement ORCID propagation; then best-effort revokes and
+deletes/deactivates the test rows it owns.
+
+Run a local server first:
+
+```bash
+AUTH_REQUIRED=false NEXTAUTH_SECRET=dev-throwaway NEXTAUTH_URL=http://localhost:3000 npm run dev
+```
+
+Then run one case:
+
+```bash
+npm run e2e:pr4 -- --request <GUID|requestNum> --case typed-accept --confirm-prod-dataverse
+```
+
+Supported cases:
+
+- `typed-accept` — sends `contactEdits.orcid` and accepts with `honorariumOptOut:true`.
+- `prefill-accept` — pre-seeds `wmkf_reviewerorcid`, sends no ORCID edit, and accepts.
+- `decline` — sends `contactEdits.orcid` and declines.
+- `all` — runs the three cases sequentially with independent test rows.
+
+Safety notes:
+
+- `--confirm-prod-dataverse` is required because this creates real production Dataverse rows.
+- Contacts are intentionally left in place, matching the existing cleanup-script constraint.
+- Use a fresh proxy email per run, or omit `--email` and let the runner generate one.
+- `--keep` skips cleanup for debugging; otherwise cleanup is best-effort and intentionally narrow.
+
+Verification run while authoring:
+
+```bash
+node --check scripts/pr4-e2e.js
+npx eslint scripts/pr4-e2e.js
+npm test -- tests/integration/external-review-routes.test.js --runInBand
+```
