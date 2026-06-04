@@ -3,7 +3,26 @@ name: project-intake-portal-reviewer-capture
 description: The new intake portal must collect applicant recommended + excluded reviewers and write them to wmkf_appreviewersuggestion (the per-request junction) flagged via the new wmkf_applicantdisposition picklist — NOT the legacy akoya_request slots/free-text.
 metadata:
   type: project
+  status: active
+  scope: intake
+  last_verified: S217 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: building intake-portal reviewer-capture fields (applicant recommended + excluded reviewers), or coding any reader of `wmkf_appreviewersuggestion`.
+
+Do:
+- Write applicant recommended/excluded reviewers to `wmkf_appreviewersuggestion` (the per-(person,request) junction), distinguished by the `wmkf_applicantdisposition` picklist (`recommended`/`excluded`; null = staff/Claude); append `applicant` to `wmkf_sources`.
+- Filter `wmkf_applicantdisposition ne excluded` in every candidate/count/invite path, or exclusions leak.
+- Capture suggested-reviewer ORCID via the GATED path only (persist at `confirmed`/`probable` via `researcher.writeIdentityDecision` + `mayPersistIdentity`); back-prop to contact is already shipped (S217).
+
+Do not:
+- Write applicant suggestions to legacy `akoya_request.wmkf_potentialreviewer1..5` slots or `wmkf_excludedreviewers` free-text (free-text kept only as raw reason source).
+- Put disposition on the global person record — it must stay request-scoped.
+- Conflate this with the person-level `wmkf_reviewerstate` lifecycle picklist or with the PI's own ORCID (`contact.wmkf_orcid`). The capture form itself isn't built yet (Connor-gated).
+
+Ground truth: `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` §12 PR3, [[project-excluded-reviewers-often-in-pool]], [[project-reviewer-apps-redesign-direction]], [[reviewer-identity-fragmentation]].
 
 When building the new applicant intake portal (GOapply replacement), the reviewer-capture form fields (applicant **recommended** reviewers + reviewers to **exclude**) must write to **`wmkf_appreviewersuggestion`** — the per-(person, request) engagement junction, the SAME table Reviewer Finder candidates live in — distinguished by the **new `wmkf_applicantdisposition` picklist** (`recommended` / `excluded`; null = staff/Claude-discovered). Origin is flagged by appending `applicant` to the free-text `wmkf_sources`.
 

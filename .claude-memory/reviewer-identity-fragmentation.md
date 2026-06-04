@@ -3,7 +3,26 @@ name: reviewer-identity-fragmentation
 description: Sample-based flag (5/87 + architecture, not a census) — a peer reviewer appears to span ≥4 disjoint stores with no shared key. The Reviewer Manager→Dataverse engineering migration is DONE (W5/W6); only a gated table-drop + a deferred census remain.
 metadata:
   type: project
+  status: active
+  scope: reviewer
+  last_verified: S217 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: designing reviewer identity resolution / de-duplication, cross-store reviewer joins, or ORCID-as-join-key work.
+
+Do:
+- Treat the Reviewer Manager→Dataverse engineering migration as DONE (W5/W6) — stop if told to "do" it.
+- Cite this memory for the fragmentation finding (sample-based flag, 5/87, not a census); don't re-derive from scratch.
+- Treat de-fragmentation as a FLOW problem — propagate ORCID forward (intake, applicant-suggested capture) rather than a one-shot collapse; reuse existing identity machinery.
+
+Do not:
+- Store remittance/banking PII in Dataverse — onboard reviewers at bill.com, keep only status + the join pointer.
+- Join applicants on `akoya_primarycontactid` (=liaison); the PI is `wmkf_projectleader`.
+- Run `--execute` table-drops autonomously; the W6 drop is gated destructive carryover.
+
+Ground truth: `docs/atlas/postgres-researchers.md`, `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` (rev3); probe scripts (artifacts gitignored). Related: [[project-w6-table-drop-pending]], [[project-no-banking-pii-in-dataverse]], [[project-reviewer-identity-resolution-phase1]], [[project-institution-foundation-liaison]].
 
 This is the referent of every `see memory project_reviewer_identity_fragmentation`
 citation (`docs/DATAVERSE_POWER_TOOLS_DESIGN.md:344`, SESSION_PROMPT C–F list).

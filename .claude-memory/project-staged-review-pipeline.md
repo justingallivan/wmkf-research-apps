@@ -2,7 +2,26 @@
 name: Staged Review Pipeline
 description: Three-stage automated proposal triage pipeline planned for the new grant cycle — fit screening, intelligence brief, virtual panel review
 type: project
+status: active
+scope: reviewer
+last_verified: unknown via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: planning or scoping automated proposal-triage / staged-review pipeline work for the new grant cycle.
+
+Do:
+- Reference `docs/STAGED_REVIEW_PIPELINE.md` for stage definitions/schemas/routing and `docs/STAGED_PIPELINE_IMPLEMENTATION_PLAN.md` for the build plan.
+- Reuse what exists: Stage 0 intelligence pass → Stage 2 sub-tasks; Virtual Review Panel pipeline → Stage 3 core.
+- Design the service layer so it migrates directly to PowerAutomate triggers later.
+
+Do not:
+- Auto-decline any proposal without staff confirmation (Stage 1 is advisory, not decisional).
+- Average the Devil's Advocate output into the panel — label it separately in synthesis.
+- Assume this is scheduled; it is saved for a future session, not yet started.
+
+Ground truth: `docs/STAGED_REVIEW_PIPELINE.md`, `docs/STAGED_PIPELINE_IMPLEMENTATION_PLAN.md`.
 
 Three-stage LLM-assisted proposal review pipeline for the new grant cycle (higher volume, full proposals instead of concepts + Phase I).
 

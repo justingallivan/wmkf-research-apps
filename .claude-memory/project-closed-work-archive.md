@@ -3,7 +3,25 @@ name: project-closed-work-archive
 description: Index of closed/shipped work and point-in-time status snapshots moved OUT of the always-loaded MEMORY.md — recall when one of these subjects resurfaces.
 metadata:
   type: reference
+  status: closed
+  scope: docs
+  last_verified: S209 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: a closed, shipped, or point-in-time subject resurfaces and you need to find the detailed topic file or design doc it was consolidated into.
+
+Do:
+- Use this as the consolidated pointer to closed-work topic files that no longer hold an always-loaded MEMORY.md slot.
+- Pull the named topic file (or its design doc) when the subject actually comes up.
+- Treat listed shipped features as authoritative-by-design-doc — don't rebuild them.
+
+Do not:
+- Expand this index into route/implementation detail — it's a pointer, not a spec.
+- Assume a point-in-time snapshot here is current; live state lives in SESSION_PROMPT handoffs / the named topic files.
+
+Ground truth: the linked topic files + design docs named per entry (e.g. `docs/POSTGRES_TO_DATAVERSE_MIGRATION.md`); historical-only consolidation.
 
 These items are **done, closed, or point-in-time** and no longer earn a slot in the always-loaded MEMORY.md index. Their detailed topic files still exist on disk and are recall-able by `description` — this file is the consolidated pointer so nothing is lost. Pull the named topic file (or design doc) when the subject actually comes up.
 

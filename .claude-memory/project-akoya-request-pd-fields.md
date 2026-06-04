@@ -3,7 +3,26 @@ name: akoya_request — Program Director fields
 description: Which fields on akoya_request hold the program director, secondary PD, coordinator, and meeting date — used to filter "my proposals" for the authenticated user
 type: project
 originSessionId: 8d412c2f-d6c6-4080-a43c-79e0e04e9653
+status: active
+scope: dynamics
+last_verified: 2026-06-04 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: you need to filter `akoya_request` rows by program director, secondary PD, coordinator, or meeting date (e.g. "my proposals in cycle Jxx").
+
+Do:
+- Filter on `_wmkf_programdirector_value` for "proposals I'm responsible for" — this is the lead PD that assigns reviewers.
+- Derive cycle code from `wmkf_meetingdate` (June → `J{YY}`, December → `D{YY}`).
+
+Do not:
+- Use `ownerid` as the program director — it's a service account (`# BCO akoyaGO Integration`).
+- Include `wmkf_programdirector2` in reviewer-finder filters — it does not assign reviewers.
+- Confuse the five `wmkf_potentialreviewer1..5` lookup slots with the `wmkf_appreviewersuggestion` lifecycle ledger.
+
+Ground truth: validated against prod request 1002379 (St. Jude / Christoph Gorgulla); `akoya_request` Dynamics schema. See `docs/atlas/` Dynamics entity pages for live schema.
+
 **Lead PD (the one who assigns reviewers):** `wmkf_programdirector` — Lookup → `systemuser`. This is the field to filter on for "proposals I'm responsible for."
 
 **Secondary PD:** `wmkf_programdirector2` — Lookup → `systemuser`. Exists but does NOT assign reviewers; each proposal has exactly one lead PD that does. Don't include in reviewer-finder filters by default.

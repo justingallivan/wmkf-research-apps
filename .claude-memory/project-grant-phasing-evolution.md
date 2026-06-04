@@ -3,7 +3,26 @@ name: Grant phasing — current vs next cycle
 description: How proposal phasing works now and how it changes next cycle (one-package submission, internal-only Phase I/II labels)
 type: project
 originSessionId: 8d412c2f-d6c6-4080-a43c-79e0e04e9653
+status: active
+scope: strategy
+last_verified: S197 (2026-05-28) via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: writing document-loading or phase-gating logic, or planning for the J27 single-submission cycle.
+
+Do:
+- Gate reviewer-finding on the internal Phase II label (`akoya_requeststatus = 'Phase II Pending'`) — stays correct across both dual-phase (D26) and single-submission (J27) cycles.
+- Treat the Phase I→II flip as a first-class lifecycle event (a status flip, not a second submission).
+- Plan an upstream per-PD triage/cycle dashboard for J27 (~300 full proposals arrive ~Dec 2026, most never sent for outside review).
+
+Do not:
+- Hard-code "Phase II is a different file than Phase I" — next cycle they're the same relabeled document.
+- Assume concepts persist — the concept stage is going away.
+
+Ground truth: `docs/SYSTEM_MODEL.md`, [[project-system-model]], [[project-reviewer-apps-redesign-direction]], `project-strategy-direction.md`.
+
 **Reviewer-finding gate (today and going forward):** Only proposals that advance to **Phase II** get sent to outside reviewers. So the actionable filter for Reviewer Finder is `akoya_requeststatus = 'Phase II Pending'` (or whatever the live "in Phase II" status is in a given cycle). Concepts and Phase I never need outside reviewers.
 
 **Current cycle (J26 / D26):**

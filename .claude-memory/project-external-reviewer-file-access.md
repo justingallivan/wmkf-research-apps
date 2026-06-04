@@ -3,7 +3,25 @@ name: External reviewer file access architecture (proposals out, reviews in)
 description: SHIPPED 2026-05-03 — foundation-owned external-intake primitive (HMAC magic-links) mediates proposal download + review upload through our backend. Reusable for the intake portal. SharePoint write access verified end-to-end.
 type: project
 originSessionId: 9ea67012-f70f-47e6-ba56-ded9f73601c4
+status: closed
+scope: reviewer
+last_verified: 2026-05-03 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: building any external-facing flow that hands foundation files to non-AzureAD parties or accepts their uploads (reviewer or applicant intake).
+
+Do:
+- Reuse the `lib/external/*` primitives (`token-lifecycle`, `verify-suggestion-token`, `reviewer-materials`, `review-form-schema`) — the HMAC magic-link boundary is at our backend.
+- Extend the same primitive to the applicant intake portal.
+
+Do not:
+- Rebuild the token/download/upload flow — it shipped 2026-05-03.
+- Reach for anonymous-public SharePoint permissions or a separate quarantine library — unnecessary, the boundary is our backend, not SharePoint.
+
+Ground truth: `lib/external/*`, `proxy.js` (`/external/*` allowlist), `/api/review-manager/upload-review`, commit `2277d23`.
+
 Two related problems that share the same underlying architectural question: how do we hand foundation-controlled documents to external reviewers (who don't have AzureAD accounts) and accept their uploads back?
 
 **Problem A — Proposal URLs in emails throw "expired link" errors.** The links we send to reviewers point at SharePoint share URLs (or similar). Reviewers without authenticated access to the akoyaGO site can't open them — and even when authenticated paths exist, the links seem to expire. Justin's read: the deeper issue is that reviewer access must be non-authenticated for that fragment of the SharePoint drive, which the akoyaGO site policy may not currently support.

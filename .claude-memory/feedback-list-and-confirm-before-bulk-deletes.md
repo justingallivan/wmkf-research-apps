@@ -3,7 +3,24 @@ name: feedback-list-and-confirm-before-bulk-deletes
 description: When a cleanup directive names a single artifact, never bulk-delete adjacent items in the same folder/scope without listing and confirming first. Recurring foot-gun in cleanup tasks.
 metadata:
   type: feedback
+  status: active
+  scope: global
+  last_verified: S193 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: a cleanup/deletion directive names a single artifact (file, row, record) but the surrounding folder/table/scope contains other items that "look" cleanup-eligible.
+
+Do:
+- Scope the deletion to exactly the noun the user named; delete one when they said "the file."
+- List multi-item destructive targets by name and get explicit go-ahead before looping a delete.
+
+Do not:
+- Treat "I'm pretty sure they're all test files" as authorization.
+- Expand a narrow directive into a broader "clean up everything test-ish nearby" scope.
+
+Ground truth: historical-only (lesson, not live state). Related: [[feedback-verify-before-destructive-carryover]].
 
 When the user asks to clean up "the test file" or "the artifact" or names a single thing, do NOT assume that everything else in the same folder/scope is also cleanup-eligible. List the contents, surface them by name, ask which to delete.
 

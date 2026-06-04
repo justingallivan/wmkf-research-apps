@@ -2,7 +2,25 @@
 name: Virtual Review Panel
 description: Multi-LLM review panel app — Claude, GPT, Gemini, Perplexity independently review proposals against WMKF reviewer form, then Claude synthesizes
 type: project
+status: active
+scope: reviewer
+last_verified: S209 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: working on the Virtual Review Panel app, its multi-LLM pipeline, or its provider gating.
+
+Do:
+- Use app key `virtual-review-panel`; access is granted via admin dashboard (NOT in DEFAULT_APP_GRANTS).
+- Honor `VRP_ALLOWED_PROVIDERS` (intersected with configured keys, fail-closed if unset, must include `claude`) via `lib/utils/vrp-providers.js`.
+- Reference key files: `multi-llm-service.js`, `panel-review-service.js`, `shared/config/prompts/virtual-review-panel.js`, the SSE route + page.
+
+Do not:
+- Cite a "V24"/`024` migration — the real file is `lib/db/migrations/003_virtual_review_panel.sql`.
+- Repeat the stale "not yet tested end-to-end" line — it's live and iterated through late-May 2026.
+
+Ground truth: `docs/VIRTUAL_REVIEW_PANEL.md`; `pages/api/virtual-review-panel.js`, `lib/utils/vrp-providers.js`.
 
 ## Virtual Review Panel App
 

@@ -3,7 +3,27 @@ name: project-reviewer-apps-redesign-direction
 description: Reviewer Finder + Reviewer Manager are slated to be replaced by a unified Request Workbench (per-request, holistic) + standalone Reviewer Pool. Holistic frame locked S195; build sequence = reviewer-lifecycle slice first (= Workbench v1). Reviewer-tab structure DECIDED S206: 4-tab + status badges (Find/Invite/Track/Completed).
 metadata:
   type: project
+  status: active
+  scope: reviewer
+  last_verified: S208 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: building or planning the Request Workbench, the cycle dashboard, the reviewer-lifecycle slice, or anything that touches the Finder/Manager → Workbench consolidation.
+
+Do:
+- Build toward the per-request-holistic destination; the near-term build is the reviewer-lifecycle slice as Workbench v1 (URL `/workbench/[requestId]/...`).
+- Use the DECIDED reviewer-tab structure: 4-tab + status badges (Find / Invite / Track / Completed), state-aware default landing.
+- Treat `akoya_requeststatus` (Status tab) as a read-only living taxonomy — enumerate live, never hardcode; the board decides approve/decline, staff only recommend.
+- Verify-before-relying on the D26 allowlist: grep reviewer/invite/honorarium paths to confirm only dashboard visibility is gated on grant status.
+
+Do not:
+- Propose incremental cleanup to Finder/Manager, or design Workbench as a narrow reviewer-only surface.
+- Re-flag `akoya_requeststatus` values as "unverified," or advance status early for D26 (use the manual request-number allowlist instead — advancing status fires PA triggers prematurely).
+- Treat "Completed" as paying anyone or firing a trigger (option a: record-keeping only, no drop-off).
+
+Ground truth: `docs/REQUEST_WORKBENCH_BUILD_PLAN.md`, `docs/REQUEST_WORKBENCH_SCOPING.md`, `docs/mockups/lifecycle-ui-mockup.html`, `shared/config/d26Allowlist.js`, `docs/DATAVERSE_POWER_TOOLS_DESIGN.md`, `scripts/probe-akoya-status-predicate.js`; many related entries linked at file end.
 
 S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer Pool). **S195 reframed it twice**, ending at a holistic Request Workbench backed by a backend automation tier. Build deferred until S208 — goal before code was a scoping doc Connor / Sarah can react to.
 

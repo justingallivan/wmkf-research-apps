@@ -3,7 +3,25 @@ name: feedback-apply-reconcile-to-fix-work
 description: The reconcile-dont-append + cite-ground-truth rules apply to MY fix work, not just original drafts. When folding review findings, each fix is original work — grep restatements, verify external claims, re-read surrounding paragraph for contradictions BEFORE writing.
 metadata:
   type: feedback
+  status: active
+  scope: global
+  last_verified: S196 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: folding code-review / Codex findings into a plan, doc, or memory — i.e. doing fix-work on a partly-correct artifact.
+
+Do:
+- Treat every fix as original work: probe/grep every claim about external state before writing it.
+- Re-read the steps under any principle you introduce against that principle (catch internal contradictions).
+- Before declaring fold-in done, grep the touched files for restatements of each fact you changed; fix contradicting copies.
+
+Do not:
+- Treat fix-work as lower-rigor than a first draft ("this is just a fix" is the signal to apply MORE rigor).
+- Hide unverified claims in tables/matrices/ordered lists where structure lends false authority.
+
+Ground truth: historical-only (lesson from S196 collapse-plan, 3 Codex rounds each finding bugs in prior fixes). Linked: [[feedback-reconcile-dont-append-docs]], [[feedback-cite-ground-truth]], [[feedback-verify-external-platform-claims]], [[feedback-thoroughness-default]].
 
 When folding code-review / Codex findings into a plan or doc, every fix I write is itself original work and produces fresh unverified claims if I don't apply the same verification rules I would to a first-draft.
 

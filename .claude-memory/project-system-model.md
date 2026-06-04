@@ -3,7 +3,26 @@ name: project-system-model
 description: Canonical conceptual model of the whole system at docs/SYSTEM_MODEL.md — the rote/thinking principle, two orthogonal axes, layers, and what's a capability vs a dependency
 metadata:
   type: project
+  status: active
+  scope: strategy
+  last_verified: S197 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: doing any cross-capability planning, sequencing, or resolving "pilot"/phasing nomenclature.
+
+Do:
+- Read `docs/SYSTEM_MODEL.md` first; where it conflicts with an older doc, the model wins.
+- Keep the two axes separate — storage follows record-maturity; automate-or-not follows rote/thinking.
+- Treat an app as (a Dataverse prompt) × (a thin adapter); treat PA and Vercel as two independent Executor-contract implementations that never call each other.
+
+Do not:
+- Use a round "~19/~24" prompt denominator (canonical app count=17; A7 input-surface registry=24; both differ from prompt-bearing-route count).
+- Treat the three-tier prompt-resolution ordering or the provenance-tier document service as current code — both are TARGET state.
+- Treat the intake "mid-June 2026 Phase II Research pilot" as live — it's DEFUNCT; intake is a Phase I build for the next cycle.
+
+Ground truth: `docs/SYSTEM_MODEL.md` (v2), `docs/EXECUTOR_CONTRACT.md`; `execute-prompt.js:215`.
 
 The whole-system conceptual model is **`docs/SYSTEM_MODEL.md`** (v2, synthesized S197 2026-05-28 with a Codex outside-review pass). Read it before any cross-capability planning or sequencing. This entry holds the durable principles so they don't re-drift.
 

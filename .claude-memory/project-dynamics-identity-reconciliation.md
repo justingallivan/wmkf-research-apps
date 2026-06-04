@@ -3,7 +3,26 @@ name: Dynamics Identity Reconciliation
 description: SHIPPED + UNBLOCKED — user_profiles ↔ systemuser bridge + MSCRMCallerID write attribution end-to-end (S127–S129). Connor granted Delegate role to app user 2026-05-06; impersonation re-smoke PASS for Justin and cnoda. Remaining: full /phase-i-dynamics overwrite=true run + flip prod env flag DYNAMICS_IMPERSONATION_ENABLED=true.
 type: project
 originSessionId: 62437821-a516-465d-9fe9-ccd2fa785705
+status: active
+scope: dynamics
+last_verified: 2026-05-06 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: wiring a new session-bound Dynamics write, touching a Dataverse write adapter, or rolling out `MSCRMCallerID` impersonation in any environment.
+
+Do:
+- Pass `actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null` on session-bound writes; leave null for cron / token-auth / PA paths.
+- Thread `actingUserSystemId` only through the adapter function you're touching — don't add it speculatively everywhere.
+- Before enabling impersonation in a new Dataverse env, verify the **Delegate** role is on the app user first (`prvActOnBehalfOfAnotherUser` lives only there).
+
+Do not:
+- Send the caller-id header on reads (reads always stay clean).
+- Assume the privilege gap is staff-side per-table writes — the S132 403 was the app user lacking Delegate.
+
+Ground truth: `lib/services/dynamics-service.js`, `lib/services/dynamics-identity-service.js`, `lib/dataverse/adapters/*.js`, `lib/external/token-lifecycle.js`, `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md` § Step 5.
+
 **Status (2026-05-04, post Session 129):** Code complete. Only outstanding item is flipping `DYNAMICS_IMPERSONATION_ENABLED=true` in preview → prod.
 
 **Shipped Session 127:**

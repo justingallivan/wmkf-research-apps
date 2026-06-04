@@ -5,7 +5,25 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e2f71cb4-b29c-4510-b8fe-1da4a49ec6ee
+  status: closed
+  scope: dataverse
+  last_verified: 2026-05-26 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: anything touches the Wave 1 Postgres→Dataverse migration, the `WAVE1_BACKEND_*` flags, or the prod app-user role elevations.
+
+Do:
+- Treat Wave 1 as DONE — don't re-litigate the flag flip, the drop, or the table list.
+- Leave the temp role elevations (`WMKF AI Elevated TEMP` + `System Customizer`) on the prod app user through the pilot; revert only per `docs/WAVE1_REVERT_TEMP_ELEVATIONS.md` once the portal schema settles.
+- Remember dispatcher Postgres branches were deleted; `WAVE1_BACKEND_*=postgres` now throws at cold-start by design.
+
+Do not:
+- Re-add a Postgres fallback for the three migrated tables (`system_settings`, `user_app_access`, `user_preferences`) — they were dropped 2026-05-12.
+- Assume a long Neon PITR recovery window — it closed ~2026-05-19.
+
+Ground truth: `docs/WAVE1_REVERT_TEMP_ELEVATIONS.md`, `lib/db/migrations/007_drop_wave1_tables.sql`, `lib/services/{settings,app-access,database}-service.js`. Related: [[project-wave1-onboarding]].
 
 Wave 1 closed out cleanly on **2026-05-12**.
 

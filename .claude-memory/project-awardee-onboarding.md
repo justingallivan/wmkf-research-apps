@@ -3,7 +3,25 @@ name: project-awardee-onboarding
 description: Post-award awardee onboarding feature (surfaced S206 2026-05-31) — after a fund decision + GAL, automate abstract approval + artwork upload + release form; reuses the external reviewer-flow primitive. Not built yet.
 metadata:
   type: project
+  status: active
+  scope: reviewer
+  last_verified: S206 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: planning the Request Workbench post-award lifecycle, an `Awardee` tab, or a GAL-sent status trigger.
+
+Do:
+- Build on the external-interaction primitive in `lib/external/` (HMAC token, magic-link, upload, form schema) — this is instance #2 after the reviewer flow.
+- Treat the request lifecycle as extending PAST the board decision; the GAL-sent status change is the pivot into this stage.
+
+Do not:
+- Assume the GAL-sent status field/value is known — it's UNKNOWN and must be found in Dataverse first.
+- Fork the external primitive; keep reviewer-specific bits separable.
+- Assume the abstract-writing automation is in scope — that's still to-confirm.
+
+Ground truth: not-yet-built (design only, surfaced S206). Reuses [[project-external-reviewer-file-access]] + [[project-reviewer-lifecycle]]; extends [[project-reviewer-apps-redesign-direction]]; status-trigger family [[project-backend-automation]].
 
 **Surfaced by Justin 2026-05-31 (S206).** A new per-request, POST-AWARD workflow. Not built yet; captured because it shapes the Request Workbench lifecycle and reuses existing infrastructure.
 

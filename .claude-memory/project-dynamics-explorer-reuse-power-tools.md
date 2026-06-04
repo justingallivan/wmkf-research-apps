@@ -3,7 +3,25 @@ name: project-dynamics-explorer-reuse-power-tools
 description: Dynamics Explorer fails due to hand-transcribed schema + trust-the-hardcoded-GUIDs heuristics; Dataverse Power Tools assets are the principled fix
 metadata:
   type: project
+  status: closed
+  scope: dynamics
+  last_verified: S209 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: improving Dynamics Explorer reliability (schema accuracy, counts, taxonomy, OData validity) or considering reuse of `lib/services/dataverse-export/` assets.
+
+Do:
+- Treat Path A as COMPLETE (Slices A1–A5 + OData pre-flight validator shipped S200–S202) — extend, don't rebuild.
+- Reuse the Power Tools assets where applicable: `fetch-client.js` (paging + 429 + true aggregate count), `live-taxonomy.js` (live option-set resolution), `constants.js` (probe ground-truth), `scripts/dynamics-schema-diff.js`.
+- Remember live-taxonomy/fetch-client BYPASS `checkRestriction` — keep the whitelist + restriction guard at the injection gate.
+
+Do not:
+- Re-derive Explorer schema from hand-transcribed `TABLE_ANNOTATIONS`; prefer live discovery.
+- Use OData `$count` for counts (broken both ways) — use `$apply=...aggregate(...countdistinct)`.
+
+Ground truth: `docs/DYNAMICS_EXPLORER_PATH_A_PLAN.md`, `docs/DYNAMICS_EXPLORER_ODATA_VALIDATOR_DESIGN.md`, `lib/services/dataverse-export/`, `lib/services/dynamics-explorer-taxonomy.js`, `lib/services/dynamics-odata-validator.js`. Shipped state — only remaining open item is a real soak pending traffic. See [[project-dataverse-power-tools]], [[project-dynamics-explorer-details]], [[project-dynamics-explorer-schema-diff]], [[akoya-payment-field-semantics]].
 
 > **STATUS (S209): Path A COMPLETE — keep as do-not-rebuild guard.** Slice 1 (A1 live schema + A2 cached taxonomy) + the OData pre-flight validator + A3/A4/A5 all SHIPPED (S200–S202; see the dated sections below). The early-body "assessment / deferred / measure-first" narrative is chronological history — the tail (last section) is the live state. Only remaining open item: a **real soak pending meaningful traffic** (blocked on volume, not effort). The `akoya_folio` "drift" is RESOLVED (S202) and consistent with [[akoya-payment-field-semantics]].
 

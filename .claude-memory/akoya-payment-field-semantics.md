@@ -3,7 +3,25 @@ name: akoya_request / akoya_requestpayment field-gating semantics
 description: wmkf_vendorverified is NOT a payment gate (empirically). akoya_paymentsent is misleading — akoya_folio="PAID" is the real "money went out" signal. Two real gates exist: ED approval + authToRemit flag.
 metadata:
   type: project
+  status: active
+  scope: bill
+  last_verified: S188 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: reasoning about whether a Dataverse `akoya_request`/`akoya_requestpayment` field gates a payment workflow, or writing BILL/honorarium payment-related code.
+
+Do:
+- Use `akoya_folio="PAID"` as the issued-payment signal, not `akoya_paymentsent` (which is null on sampled paid grants).
+- Look for paid-and-not-verified counter-examples before assuming any field is a gate.
+- Leave `wmkf_vendorverified` / `wmkf_paymentcontactconfirmed` null defensively; it's fine to write `wmkf_exisitngbillcomaccount`.
+
+Do not:
+- Treat `wmkf_vendorverified=No` as "do not pay" — it's a tax-status tracker, sparsely populated, orthogonal to the payment flow.
+- Assume `akoya_paymentsent` (DateTime) reliably means money went out.
+
+Ground truth: `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md` (full appendix); S188 population scans on `akoya_request`/`akoya_requestpayment`. Real gates: `wmkf_executivedirectorapproval`, `wmkf_authorizationtoremitpaymentflag`.
 
 S188 probe (2026-05-25) audited which `akoya_request` / `akoya_requestpayment` fields actually gate payment activity vs. which are sparsely-populated tracking conveniences. Findings worth preserving so the next investigator doesn't re-litigate.
 

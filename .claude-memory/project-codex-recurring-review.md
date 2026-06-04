@@ -3,7 +3,26 @@ name: Codex as recurring code review surface
 description: Justin runs Codex periodically as a sanity-check reviewer; expect more reviews and use them to calibrate priorities
 type: project
 originSessionId: 87c3bedf-c936-4b4d-bdb8-69e4062e9249
+status: active
+scope: global
+last_verified: S181 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: a Codex (or similar third-party) review lands, or you're deciding how to act on its findings.
+
+Do:
+- Mirror the response shape in `docs/archive/CODE_REVIEW_RESPONSE_2026-04-30.md`: independently verify each finding against the code, push back where Codex missed context, sequence in waves.
+- Treat findings overlapping your existing plan as confirming signal (note it explicitly); record drift markers in the living doc.
+- Use the broker-driven `codex:codex-rescue` subagent as the default review path (back up per S181); offer a copy-pasteable prompt when Justin asks.
+
+Do not:
+- Let the review become the to-do list — it's input, prioritized against the user's actual goals.
+- Trust the stale S179/S180 "Codex unreliable" guidance — that was a transient broker outage, now superseded.
+
+Ground truth: `docs/API_ROUTE_SECURITY_MATRIX.md` (living, CI-gated via `check:api-routes`), `docs/archive/CODE_REVIEW_RESPONSE_2026-04-30.md`. Related: [[project-codex-design-pre-impl-iteration]], [[feedback-share-codex-verbatim]].
+
 Justin plans to run Codex (or similar third-party static review) periodically as a sanity check on the codebase. The 2026-04-30 review (`docs/archive/CODE_REVIEW_FRAGILITY_FINDINGS_2026-04-30.md`) is the first one; my response is in `docs/archive/CODE_REVIEW_RESPONSE_2026-04-30.md`.
 
 **Why:** independent eyes catch architectural drift the active developer (and I) miss. Codex doesn't see conversation context, so it sometimes flags things we've already planned to fix — that's still useful confirming signal.

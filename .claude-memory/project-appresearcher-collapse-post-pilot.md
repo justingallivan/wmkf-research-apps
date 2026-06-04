@@ -3,7 +3,25 @@ name: project-appresearcher-collapse-post-pilot
 description: wmkf_appresearcher sidecar collapse into wmkf_potentialreviewers — ✅ SHIPPED 2026-06-02 (S213); entity dropped, bibliometrics on the person
 metadata:
   type: project
+  status: closed
+  scope: reviewer
+  last_verified: 2026-06-02 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: any reference to `wmkf_appresearcher` / `wmkf_apppublication` / `wmkf_apppublicationauthor` resurfaces, or you're touching reviewer bibliometric fields / affiliation reads.
+
+Do:
+- Read bibliometrics + affiliation from the person row `wmkf_potentialreviewers` (trailing s); prefer `wmkf_primaryaffiliation`.
+- Treat the collapse as DONE (shipped S213, 2026-06-02) — the three sidecar entities are DROPPED (404).
+
+Do not:
+- Re-execute or re-plan the collapse; the "don't act mid-pilot" guidance below is SUPERSEDED.
+- Assume `wmkf_appresearcher` still exists or write to it; zero runtime refs remain.
+- Trust the body's "caller count is 4" — it's 5 (includes `pages/api/workbench/enrich-recommended.js`).
+
+Ground truth: `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md` (as-executed), `docs/DATAVERSE_LIVE_PROBE_FINDINGS_2026-06-02.md`, `docs/atlas/dataverse-wmkf-potentialreviewers.md`. Optional deferred tail = remove the `wmkf_organizationname` compat-shadow fallback.
 
 **STATUS 2026-06-02 — ✅ SHIPPED (S213).** The collapse is DONE: 17 bibliometric fields added to `wmkf_potentialreviewers`, all 339 sidecars backfilled onto persons, adapter + callers repointed (`researcher.js` now writes the person; `affiliation → wmkf_primaryaffiliation`), and `wmkf_appresearcher` + `wmkf_apppublication` + `wmkf_apppublicationauthor` DROPPED (404). As-executed record: `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`. Phase 6 follow-up reconciled the main current docs/memory; dated/archive snapshots remain historical. The 7 `wmkf_organizationname` affiliation readers were migrated to prefer `wmkf_primaryaffiliation`; `wmkf_organizationname` remains as a clamped 100-char compat shadow, and removing that fallback is deferred. Smoke scripts were repointed off the dropped entity. Zero runtime refs to `wmkf_appresearchers` remain. Everything below is historical. The "don't act mid-pilot" guidance is superseded. User decided to do the collapse NOW because the sidecar data is disposable (339 rows, almost all last-cycle reviewers, near-zero cross-cycle overlap). Live plan: **`docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`** (execute-now lighter cutover) — decisions locked (D-AFF = canonical `wmkf_primaryaffiliation`(500) + migrate adapter & 7 reviewer-affiliation readers + keep the 100-char `wmkf_organizationname` compat shadow; light backfill all 339; `wmkf_department` String(255) on person; skip `wmkf_notes`(0 rows) + `wmkf_potentialreviewername`). Ground truth re-probed + Codex-confirmed 2026-06-02 (`docs/DATAVERSE_LIVE_PROBE_FINDINGS_2026-06-02.md`). **Caller count is 5, not 4** — the S196 plan missed `pages/api/workbench/enrich-recommended.js` (S211); `orcid-service.js` is NOT a caller. Entity logical name is `wmkf_potentialreviewers` (trailing s). The S196 doc remains the reference for exhaustive doc-cleanup.
 

@@ -5,7 +5,25 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 31a4b8ba-daca-4b1d-9ce6-4b88706b7693
+  status: active
+  scope: security
+  last_verified: S190 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: working on `VIRUS_SCAN_ENABLED` rollout, upload-path virus scanning, or detection-notification design.
+
+Do:
+- Treat app-side Cloudmersive scanning as the PRIMARY defense for external upload paths (reviewer, intake) — tenant has no MDO/Safe Attachments.
+- On detection, write a `system_alerts` row AND email the UNION of the `'virus-detection'` category recipients plus per-event explicit recipients (the PD on the related request when resolvable).
+- Ship sender UX + internal alert + operational enable as a unit before flipping the flag; preserve typed text on rejection.
+
+Do not:
+- Build a DFT-recipient email path — DFT does not need per-detection notifications.
+- Assume staff paths need app-side scanning urgency (Defender + Huntress cover staff-OneDrive uploads).
+
+Ground truth: `docs/CREDENTIALS_RUNBOOK.md` § virus scanning; `lib/utils/virus-scan-config.js`; DFT email 2026-05-26. Related: [[memory-store-propagation]], [[project-bill-honorarium-integration]].
 
 DFT email exchange 2026-05-26 — locked context for the `VIRUS_SCAN_ENABLED` rollout.
 

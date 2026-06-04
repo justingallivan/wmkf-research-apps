@@ -3,7 +3,26 @@ name: Reviewer accept/decline magic links — partly subsumed by external-review
 description: HMAC magic-link primitive shipped as the broader external-reviewer landing page. Accept/decline endpoint `pages/api/external/review/[token]/respond.js` also shipped (verified 2026-05-14). Email-side click-buttons are the remaining gap.
 type: project
 originSessionId: 223c47bb-55ef-4adb-bab2-c2616bfa5311
+status: active
+scope: reviewer
+last_verified: 2026-05-14 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: someone asks for reviewer accept/decline email buttons or a click-from-email response flow.
+
+Do:
+- Build the email-side UX on top of the existing `pages/api/external/review/[token]/respond.js` endpoint and `lib/external/token-lifecycle.js` primitive.
+- Add a two-click confirm page to defeat email-scanner prefetch (Defender Safe Links, Gmail prefetch, antivirus crawlers GET every link).
+- Reuse `EXTERNAL_LINK_SECRET`.
+
+Do not:
+- Rebuild the HMAC token primitive, the external-reviewer landing page, or the accept/decline endpoint — all SHIPPED (endpoint verified 2026-05-14).
+- Add a separate `REVIEWER_RESPONSE_SECRET`, or recreate `pages/review-response.js` / `pages/api/review-response/confirm.js` (those paths are unused; capability lives in `respond.js`).
+
+Ground truth: `pages/api/external/review/[token]/respond.js`, `lib/external/token-lifecycle.js`, `lib/services/external-token.js`, `lib/dataverse/adapters/reviewer-suggestion.js:444-469`, `docs/API_ROUTE_SECURITY_MATRIX.md`.
+
 **Audit 2026-05-03: this entry was rewritten.** The original plan was a small "click Accept / click Decline" flow in invitation emails. What actually shipped is broader: the External Reviewer Intake (`/external/review/[token]`) landing page, where reviewers see proposal info, download materials, and upload completed reviews — all token-authenticated.
 
 **What shipped (don't rebuild):**

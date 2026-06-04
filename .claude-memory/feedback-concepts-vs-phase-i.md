@@ -3,7 +3,25 @@ name: Concepts vs Phase I are different grant stages
 description: Do not feed "Research Concepts" PDFs to the Phase I prompt; they are a pre-Phase-I stage, not a Phase I proposal
 type: feedback
 originSessionId: 0083d4e8-8936-4011-9989-1b099d0caeaa
+status: active
+scope: prompt
+last_verified: Session 105 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: selecting test cases or input files for a Phase I prompt pipeline, or naming/filtering grant-cycle PDFs.
+
+Do:
+- Filter for Phase I files matching `/proposal|narrative|phase.?i|research.phase/i`.
+- Hard-exclude any file whose name matches `/concept/i` — even if it's the largest PDF in the folder.
+- Treat Concepts, Concept Papers, Concepts Bios/Cover Page as a distinct pre-Phase-I stage.
+
+Do not:
+- Assume "Research Concepts" is a naming variant of "Research Phase I Application" — they're different stages with different content/output.
+
+Ground truth: historical-only (lesson from Session 105 v2 validation). Grant cycle is being redesigned (Phase I may be eliminated) — re-confirm taxonomy when picking future test cases. Related: `project-staged-review-pipeline.md`.
+
 **Concepts** (files named `Research Concepts`, `Concept Papers`, `Concepts Bios`, `Concepts Cover Page`, `Additional Concepts`) are a **separate grant-cycle stage** from **Phase I proposals** (files named `Research Phase I Application`). The two stages have different content, different expected output, and must not be cross-tested with the same prompt.
 
 **Why:** User corrected me during Session 105 v2 validation — I discovered that Dec 2025 Keck submissions produced "Research Concepts_<timestamp>.pdf" files, which I mistakenly assumed were a naming variant of the Apr 2026 "Research Phase I Application". They are NOT. Feeding a Concepts PDF through the Phase I prompt pipeline produces misleading quality signals.

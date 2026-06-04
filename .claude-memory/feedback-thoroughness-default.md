@@ -5,7 +5,26 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: e2f71cb4-b29c-4510-b8fe-1da4a49ec6ee
+  status: active
+  scope: docs
+  last_verified: 2026-05-12 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: editing docs, memory, or any artifact whose current state I'm about to claim is "done."
+
+Do:
+- Pair every banner/description-line edit with a body audit in the same cycle.
+- Run an antonym grep after a status change (`grep -rln "<old framing>" docs/ .claude-memory/` for "in progress / pending / not yet flipped").
+- Cold-re-read edited docs in a different order/question to fight confirmation bias.
+- State partial scope explicitly ("banner updated; body audit pending") rather than passing it as complete.
+
+Do not:
+- Update only a banner or only a description line and call the artifact current.
+- Treat skimming as a time-saver — it costs the user Codex tokens and review attention.
+
+Ground truth: historical-only (lesson, not live state). Related: [[feedback-surface-full-review-findings]].
 
 **The rule:** When editing docs, memory, or any artifact whose state I'm claiming is current, default to thorough. Skimming saves session time but costs the user Codex tokens and review attention on follow-ups — net negative on every axis.
 

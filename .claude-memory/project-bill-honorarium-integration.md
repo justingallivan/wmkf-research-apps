@@ -3,7 +3,26 @@ name: Reviewer honorarium onboarding (portal-integrated)
 description: Reviewer portal accept-action creates the honorarium akoya_request + triggers BILL.com onboarding inline. Extends already-shipped Stage 2a. Targets ready 2026-06-10; reviewers ≥ 2026-06-17. Approved by Ops 2026-05-23; design doc has 6 Connor questions + 1 informational.
 metadata:
   type: project
+  status: active
+  scope: bill
+  last_verified: S209 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: touching reviewer honorarium onboarding, the BILL.com integration, the Stage 2a accept path, or honorarium `akoya_request` creation.
+
+Do:
+- Treat the architecture as portal-integrated (Stage 2a accept extension), not PA-triggered.
+- Read provenance from the `wmkf_appreviewersuggestion` junction; the honorarium→grant lookup nav-property is `wmkf_HonorariumRequest` (bind `wmkf_HonorariumRequest@odata.bind`, read `_wmkf_honorariumrequest_value`).
+- Treat honorarium amount as the Dataverse setting `honorarium.default_amount`, not an env var.
+
+Do not:
+- Reintroduce PA-trigger / shared-secret (Q3) framing — that path is closed.
+- Use `wmkf_honorariumforrequest` — it's a dead variant.
+- Rebuild shipped chunks (lib/bill primitives, chunk-4 orchestrator, webhook scaffold); chunk 5 (address UI) and 7b (webhook dispatch) are the pending pieces.
+
+Ground truth: `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`, `docs/BILL_CHUNK_4_DESIGN.md`, `docs/BILL_LIB_DESIGN.md`; `lib/bill/*`. Related: [[akoya-payment-field-semantics]], [[akoya-request-honorarium-nomenclature]], [[project-external-reviewer-file-access]].
 
 **Status (S188, 2026-05-25):** Design doc at `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`. **Architecture pivoted from PA-triggered backend-only to portal-integrated** after discovering Stage 2a accept endpoint is already shipped (since 2026-05-09) and only needs extension. No GOapply replacement work needed.
 

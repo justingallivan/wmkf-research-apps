@@ -5,7 +5,27 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 8050fbb7-13c6-444b-b802-c9bc7a61a3ce
+  status: active
+  scope: dataverse
+  last_verified: 2026-05-26 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: scoping or building Dataverse Bulk Export (Track B) filter axes, the AI on-ramp grounding artifact, or any AI-driven export-column mapping.
+
+Do:
+- Treat the NL AI on-ramp as the headline goal; the builder UI is the confirmation/inspection surface.
+- Make the field-dictionary grounding artifact PER-PROGRAM, not entity-global; "led by X" is a per-program disjunction (Research→`wmkf_projectleader`+junction; SoCal→primary contact/`wmkf_ceo`; Discretionary→`wmkf_donorname` internal director).
+- Force the request-vs-org choice for "primary contact" (request `akoya_request.akoya_primarycontactid` vs org `account.primarycontactid` vs `wmkf_ceo` diverge ~32% in SoCal).
+- Label `wmkf_donorname` as "Directed by (discretionary sponsor)" — internal directed-giving, NOT an external philanthropic donor.
+
+Do not:
+- Treat the filter floor as 1:1 with the trusted export-column contract — it's the bulk-selective subset (Denial reason = export column, dropped as filter axis).
+- Ship a generic single-field "PI" axis (silently misses non-research leads = plausible-wrong export).
+- Match/filter by contact GUID as if it were a person (duplicate contact rows fragment one human).
+
+Ground truth: `docs/.../DESIGN.md` (§10 AI on-ramp, §167 grounding artifact); probes `probe-akoya-person-role-by-program.js`, `probe-akoya-socal-contacts.js`, `probe-akoya-socal-contact-divergence.js` (+ 2026-05-18 evidence files). Related: [[akoya-temporal-axis-encodings]].
 
 The user's headline vision for Dataverse Bulk Export (Track B) is the **NL AI on-ramp** (a Dynamics-Explorer-style prompt that emits a hardened QuerySpec into the existing stable `/preview`→`/run` confirm seam). The builder UI is the *confirmation/inspection surface*, not the primary input. The deferred "AI on-ramp" in the build plan §10 is therefore the user's core goal, not a nice-to-have. S162 working session = scoping the compilable axis "floor" that gates how much the AI can honestly promise.
 

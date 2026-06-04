@@ -3,7 +3,27 @@ name: Grant lifecycle states confirmed (2026-05-01)
 description: Observed akoya_requeststatus transitions across the cycle and what each state means for Reviewer Finder picker behavior
 type: project
 originSessionId: 0c2648c3-78b0-4258-ad88-9960b3a3d864
+status: active
+scope: dynamics
+last_verified: S209 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: filtering proposals by lifecycle state, debugging an empty Reviewer Finder picker, or reading reviewer slot fields on `akoya_request`.
+
+Do:
+- Read `akoya_requeststatus` as a raw string (no `_formatted`); `'Phase II Pending'` is the only picker-actionable state.
+- When a picker is empty for a cycle, first check the `akoya_requeststatus` distribution for that cycle's meeting date — empty is expected until Phase I review advances proposals.
+- Treat `wmkf_potentialreviewer1..5` as existing AND read by live code (`reviewer-finder/my-proposals.js`, `dynamics-explorer/chat.js` `handleReviewerRequests`).
+
+Do not:
+- Expect freshly-submitted proposals to be `'Phase II Pending'` — that state is assigned later.
+- Conflate `wmkf_phaseiistatus` (often null) with `akoya_requeststatus`.
+- Repeat the retracted claims that the slots "do NOT exist" or that "no live code reads them" — both were corrected (2026-05-15 / S209).
+
+Ground truth: `pages/api/reviewer-finder/my-proposals.js`, `pages/api/dynamics-explorer/chat.js`, `docs/atlas/dataverse-akoya-request.md`, [[project-d26-reviewer-inputs-probe]].
+
 Confirmed on 2026-05-01 by querying production Dataverse on the day Phase I opened for the D26 cycle.
 
 **`akoya_requeststatus` is a string field, not an optionset.** No `_formatted` annotation comes back; read the raw `akoya_requeststatus` directly.

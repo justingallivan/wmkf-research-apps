@@ -3,7 +3,25 @@ name: stakeholder-email-tone
 description: Stakeholder-facing emails (Connor, Sarah, DFT, foundation staff) should drop insider jargon and codebase abstractions; match the recipient's frame, not the writer's.
 metadata:
   type: feedback
+  status: active
+  scope: global
+  last_verified: S183 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: drafting an email or message to a non-engineer stakeholder (Connor, Sarah, DFT, foundation staff).
+
+Do:
+- Re-read assuming the recipient has zero codebase context; describe what the system does from their POV, not subsystem names.
+- Replace abstract qualifiers with concrete consequences ("if this field is wrong the proposal goes to the wrong committee").
+- Calibrate per recipient: Connor=PA flow specs at middle detail/zero-detail motivation; Sarah=applicant-experience frame; DFT=M365 admin-console frame.
+
+Do not:
+- Use insider jargon ("semantically load-bearing", "intake-portal drain", "source-of-truth picklist") as framing.
+- Assume code paths/table names help unless they are the literal answer-target the recipient must act on.
+
+Ground truth: historical-only (lesson, not live state). Related: [[user-powerautomate]].
 
 Drafts of emails to non-engineers regularly fall into codebase-shape jargon
 that doesn't help the reader. S183: the Connor Q1-Q4 draft used phrases

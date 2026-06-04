@@ -5,7 +5,24 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 8821677f-2a33-4a32-b5ca-e3fb038b41a1
+  status: closed
+  scope: dev-env
+  last_verified: S209 (2026-06-01) via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: git traversal commands (`gc`/`fsck`/`repack`/`prune`/`rev-list --all`) hang, or a commit fails with `cannot lock ref 'HEAD'`.
+
+Do:
+- For the lock case: `pkill -f 'git-core/git (gc|repack|prune|pack-objects|maintenance)'`; if `.git/refs/heads/main` is missing but `main.lock` exists, the lock file content IS the correct ref — `mv` it onto `main`, verify with `git rev-parse HEAD`.
+- Keep the repo off any cloud-synced path (it now lives at `/Users/gallivan/Code/WMKF_Apps`).
+
+Do not:
+- Put `.git` back under a cloud File Provider (OneDrive/Google Drive/iCloud) — dataless placeholders on loose objects cause `mmap()` page-fault hangs.
+- Plain-`mv` a cloud-hosted repo without first materializing all dataless objects (can orphan content).
+
+Ground truth: historical-only (resolved S209; recovery runbook + do-not-relitigate guard). Root cause confirmed S175 via `ls -lO` showing `dataless` flag.
 
 > **RESOLVED (verified S209, 2026-06-01).** The recommended fix was executed: the repo now lives at **`/Users/gallivan/Code/WMKF_Apps`** (off any cloud-synced path), `gc.auto` is **unset**, there are **no dataless objects**, loose-object count is ~3K (not 31K), and full-walk traversal (`git rev-list --all --count`) completes in <30s without hanging. Kept as the **recovery runbook** for the `cannot lock ref 'HEAD'` lock-file case and as a do-not-relitigate guard (never put `.git` back under a cloud File Provider).
 

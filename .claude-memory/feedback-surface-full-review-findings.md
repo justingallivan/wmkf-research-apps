@@ -3,7 +3,26 @@ name: Surface every finding from external reviewers, don't filter
 description: When Codex or any external reviewer raises issues, list ALL findings to the user using the reviewer's own classifications. Never pre-classify into "defer" or "polish-not-worth-surfacing" without showing the full set first.
 type: feedback
 originSessionId: b8ea3bce-5eab-46eb-a312-51d2ff4ef77b
+status: active
+scope: global
+last_verified: 2026-05-09 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: relaying findings from any external review surface (Codex, code-reviewer subagents, ultrareview, security-review, lint/typecheck, CI gates) to the user.
+
+Do:
+- List every finding using the reviewer's own labels (BLOCKER / POLISH / SOUND / etc.).
+- Put my own recommendations in a separate section AFTER the complete set; relay first, recommend second.
+- Err toward more detail when in doubt.
+
+Do not:
+- Pre-classify items into "defer"/"polish-not-worth-surfacing" or bury them under "defer the rest" framing.
+- Re-classify with my own severity labels in place of the reviewer's.
+
+Ground truth: historical-only (lesson, not live state). Related: [[feedback-share-codex-verbatim]] (delivery format), [[feedback-thoroughness-default]] (prevention side).
+
 When another developer or reviewer (Codex, code-reviewer agents, etc.) is asked to review work, the user wants the actual review — not a curated summary that pre-decides what's worth their attention.
 
 **Why:** On 2026-05-09 Codex reviewed Session C UI code and returned 9 numbered findings (1 BLOCKER, 5 POLISH, 3 SOUND). I surfaced the blocker plus 2 polish items I judged "strongest," and tucked the remaining 3 polish items under phrases like "defer the rest" and "the modal-footer mobile concern" without listing them. The user explicitly called this out as a trust issue — they brought Codex in for an outside view, and my filtering partially nullified that. The user said: *"If another developer raises an issue, I want to hear about it, not have it swept under the rug."*

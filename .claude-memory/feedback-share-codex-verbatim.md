@@ -3,7 +3,24 @@ name: feedback-share-codex-verbatim
 description: When a Codex review/rescue runs, its stdout verbatim IS the entire user-facing reply — no paraphrase, summary, or framing before or after it, every round-trip
 metadata:
   type: feedback
+  status: active
+  scope: global
+  last_verified: S210 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: an `Agent(codex:codex-rescue)` / `/codex:rescue` / Codex review-rescue-diagnostic tool result returns — every round-trip, not just the first.
+
+Do:
+- Make the VERY NEXT user-facing message Codex's stdout pasted whole in a delimited block, labeled verbatim, as the entire delivery.
+- Treat the paste as a mechanical tool-output step; fold catches/fixes in a LATER turn.
+
+Do not:
+- Paraphrase, summarize, re-rank, drop footers, or add framing before/after — a "verbatim summary" is the violation.
+- Bolt a scope/decision question onto the verbatim delivery; raise it in a separate subsequent turn.
+
+Ground truth: historical-only (lesson, not live state); recurred S149/S155/S192/S210. Distinct from [[feedback-surface-full-review-findings]] (completeness, not format).
 
 When a Codex review, rescue, or diagnostic pass runs (`codex:codex-rescue`
 subagent / `/codex:rescue` skill / direct `Agent(subagent_type: codex:codex-rescue)`),

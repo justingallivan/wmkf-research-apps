@@ -3,7 +3,27 @@ name: Dataverse Power Tools — two separate apps (Find&fix + Bulk export)
 description: Scoped plan to fill the two gaps Dynamics Explorer can't (targeted field edits; high-volume filtered export) — both currently absorbed by Akoya Go
 type: project
 originSessionId: S156
+status: active
+scope: dataverse
+last_verified: S209 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: planning or building Dataverse Power Tools (Track A field-edit / Track B bulk filtered export), or reasoning about `akoya_request` polymorphism, era classification, or per-program completeness.
+
+Do:
+- Read `docs/DATAVERSE_POWER_TOOLS_DESIGN.md` (the authoritative source-of-truth "Residuals" list) and `docs/DATAVERSE_POWER_TOOLS_TRACK_B_BUILD_PLAN.md` before any build — this entry is orientation only.
+- Use FetchXML aggregate / `RetrieveTotalRecordCount` for counts, never OData `$count` (silently caps at 5,000 — that undercount IS the trigger).
+- Time-slice history on `akoya_decisiondate` (corroborated by `wmkf_meetingdate`), never `createdon`; treat migrated/native as creation-provenance, not business-era.
+- Segment process-dependent output by program and fail loud on unannotated ones; apply the living-taxonomy principle (read live, fail loud).
+
+Do not:
+- Treat the era cutover, status→class map, or per-program stats as live truth from this memory — they are dated probe evidence; re-probe via the cited scripts.
+- Export migrated-100% amount fields as real values, or apply a blanket "migrated-high = backfill" rule (each era-asymmetric field needs its own structural explanation).
+
+Ground truth: `docs/DATAVERSE_POWER_TOOLS_DESIGN.md`, `docs/DATAVERSE_POWER_TOOLS_TRACK_B_BUILD_PLAN.md`, `lib/services/dataverse-export/`, probe scripts (`scripts/probe-akoya-*`); structural Dataverse facts should be re-probed, not trusted from this memory — see `../docs/APPLICATION_STATE_ATLAS.md`. See [[project-living-taxonomy-principle]].
+
 Two separate apps, one spine. Dynamics Explorer covers "most users, simple question" but structurally cannot do two things still done in Akoya Go (poor UX): **Track A** = maintenance staff find a record and edit a field; **Track B** = volume users pull filtered data beyond the Explorer's agentic cap (trigger: CSO ask for ~5,000 requests as Excel). Shared spine = AI proposes → deterministic code performs → human-confirm gate (compiler-not-interpreter, the opposite of Explorer). **Full design, all evidence, and `[VERIFIED file:line]` claims live in `docs/DATAVERSE_POWER_TOOLS_DESIGN.md` — read it before any build plan; this entry is orientation only.**
 
 **Why:** Track B's naïve "filter→page→Excel" framing is wrong. `akoya_request` (~25,561 rows) is **polymorphic** ("grant" is a view: research grants, feedback-only concepts, SoCal, discretionary, $100M projects) and **temporally polymorphic** (clean Akoya-native vs. approximate migrated). Completeness = property of (field × era × program). Users are PhDs/lawyers/MBAs who own their analyses — optimize against the *plausible* wrong answer that passes the sniff test. Fits [[project-intake-portal-skinny-scope]]; on the GOapply-replacement arc.

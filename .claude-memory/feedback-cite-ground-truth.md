@@ -3,7 +3,25 @@ name: Cite ground truth — never pass through unsourced
 description: Every external fact stated to the user gets a source citation (URL, file path + line, Codex round + their citation, or explicit "unverified, from memory/training"). Pass-through citations from Codex must be retained.
 metadata:
   type: feedback
+  status: active
+  scope: global
+  last_verified: S188 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: about to state any external fact to the user — especially platform-specific facts (pricing, retention, quota, API behavior, security model) or facts pulled from a Codex round.
+
+Do:
+- Attach a citation to every external-fact claim (URL, `path:line`, "I ran `<script>` and observed X", `[[memory-entry]]`, or "Codex round N per `<URL>`").
+- Preserve the source URL Codex cited — don't strip it when relaying.
+- Give tables of numeric facts (prices, limits, retention windows) a "Source:" line.
+
+Do not:
+- State bare platform facts (e.g. "6 hours") without provenance.
+- Pass through training/general knowledge as fact — flag it explicitly as unverified.
+
+Ground truth: historical-only (lesson from S188 Neon-pricing burn). Pair with [[feedback-verify-external-platform-claims]] (do the verify) and [[feedback-share-codex-verbatim]] (don't strip Codex output).
 
 **The rule:** Every external-fact claim in a user-facing response gets a citation. No exceptions.
 

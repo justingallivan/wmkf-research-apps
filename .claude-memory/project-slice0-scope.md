@@ -3,7 +3,25 @@ name: Slice-0 schema scope is 4 items, not 3 (carryover under-counted)
 description: Authoritative intake-portal slice-0 Dataverse schema scope; corrects the SESSION_PROMPT carryover item C which dropped wmkf_portal_membership
 type: project
 originSessionId: S155
+status: closed
+scope: intake
+last_verified: S178 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: re-deriving intake-portal slice-0 schema scope or auditing what shipped.
+
+Do:
+- Trust the 4-target scope (NEW `wmkf_proposalbudgetline`; EXTEND `wmkf_apprequestperson`; `akoya_request.wmkf_totalothersources`; NEW `wmkf_portalmembership` + `wmkf_priordecisionstatus`).
+- Re-derive scope from `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` 2026-05-14 catalog each time; use wave dir `wave4`/`wave4-existing`.
+
+Do not:
+- Trust carryover enumerations (the 3-item count dropped the membership entity and propagated ~5 sessions).
+- Pull `contact.wmkf_portal_oid` / `wmkf_phaseiisubmittedat`/`by` into slice-0 on the design doc's authority alone (doc-vs-catalog gap).
+
+Ground truth: `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` (2026-05-14 catalog), `docs/BUDGET_FORM_SPEC.md` v3, `docs/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md`, `lib/dataverse/schema/wave4/`. Point-in-time status snapshot — defer to live SESSION_PROMPT handoffs. Related: [[project-slice0-role-probe]].
+
 Intake-portal "slice 0" was a **single Dataverse schema-deploy event** that multiple work-streams converged on — NOT the budget-only slice. **DEPLOYED to prod Dataverse S178, 2026-05-22.** The SESSION_PROMPT carryover item C enumerated only 3 items and dropped the membership entity; Codex caught it, verified S155.
 
 **Authoritative source:** `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` 2026-05-14 section (the slice-0 catalog) + `docs/BUDGET_FORM_SPEC.md` v3 + `docs/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md`. The design doc `docs/INTAKE_PORTAL_DESIGN.md` is older (v2, 2026-05-12) — defer to the catalog where they differ.

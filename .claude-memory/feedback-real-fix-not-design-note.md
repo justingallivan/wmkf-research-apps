@@ -3,7 +3,25 @@ name: feedback-real-fix-not-design-note
 description: When a real correctness issue is found, do NOT default to "design-note" / "acceptable for pilot" / "last-writer-wins is fine" framing. Propose the actual fix and its cost honestly; let the user decide. The default should be "fix it" unless the fix is genuinely prohibitive.
 metadata:
   type: feedback
+  status: active
+  scope: global
+  last_verified: S184 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: external review (Codex, code-reviewer, etc.) surfaces a real correctness issue and my first instinct is to document/accept it ("fine for pilot").
+
+Do:
+- Compute the actual cost of the fix and surface BOTH options (fix vs accept) for the user to decide.
+- Default to "fix it" when the fix lives at the genuinely race-safe layer (e.g. SQL UPDATE WHERE), unless cost is prohibitive (>2h cross-contract).
+
+Do not:
+- Unilaterally call a fixable correctness gap "acceptable" because the fix has cost.
+- Treat "we have N defensive checks already" as safety when none is race-safe at the persistence layer.
+- Wave through trigger phrases: "acceptable for pilot", "last-writer-wins is fine", "the race window is narrow".
+
+Ground truth: historical-only (lesson, not live state). Related: [[feedback-thoroughness-default]], [[feedback-surface-full-review-findings]].
 
 When external review (Codex, code-reviewer, etc.) surfaces a real
 correctness issue, my default response should be **"here's the fix

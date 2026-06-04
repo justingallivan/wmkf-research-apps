@@ -3,7 +3,24 @@ name: project-intake-portal-ui-todo
 description: Intake portal UI/UX bugs surfaced during DR8 verification that are deferred to a dedicated UI-design session, not addressed in S187.
 metadata:
   type: project
+  status: active
+  scope: intake
+  last_verified: S203 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: working on the `/apply` intake portal sign-out flow or the Entra External ID sign-up / attribute-collection UX.
+
+Do:
+- Build a `/apply/signed-out` landing page with a manual sign-in link (no auto-redirect `useEffect`) and also hit Entra's federated logout endpoint to kill the IdP session.
+- Trim the Entra user flow's attribute collection (uncheck City, State/Province, Display Name; keep Given Name + Surname) in the Azure portal, not in code.
+
+Do not:
+- Assume `signOut({ callbackUrl: '/apply' })` actually signs the user out — it silently re-auths via the still-valid Entra session.
+- Touch `/apply` piecemeal across sessions; these are held for a dedicated UI-design session.
+
+Ground truth: `pages/apply/index.js` (~line 73), `pages/api/auth/[...nextauth].js` (contactName/contactEmail/contactOid claims), `proxy.js`; Azure portal External Identities user flow `wmkeckapply-signup-signin`.
 
 Deferred from S187 (intake portal pilot-readiness, mostly backend). Both surfaced while smoke-testing DR8 against `https://wmkfresearch.vercel.app/apply` after the `EXTERNAL_AZURE_AD_*` env vars were provisioned and the `entra-external` provider came online.
 

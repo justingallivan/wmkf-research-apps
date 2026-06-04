@@ -3,7 +3,26 @@ name: Reviewer lifecycle — automate the manual tracking points
 description: Reviewer-recruitment lifecycle has timestamp/status fields that are set manually; long-term goal is automated reminders driven by these fields. Originally framed against the Postgres reviewer_suggestions schema; post-W3-W6 cutover the same fields live on Dataverse wmkf_appreviewersuggestion. Design discipline below still applies.
 type: project
 originSessionId: 223c47bb-55ef-4adb-bab2-c2616bfa5311
+status: active
+scope: reviewer
+last_verified: 2026-05-12 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: shaping `wmkf_appreviewersuggestion` fields or any feature touching reviewer email/status tracking.
+
+Do:
+- Design new status/timestamp fields for single-filter cron consumption (e.g. status + age + reminder_count in one query).
+- Consolidate toward a clean state machine (`wmkf_review_status` choice + `wmkf_response_type`) instead of scattered booleans.
+- Make APIs stateless / token-authenticated so PowerAutomate can call them later.
+
+Do not:
+- Add new manual-state fields without considering how an automated job would query them.
+- Duplicate email history in our DB — it's queryable in CRM via `regardingobjectid`.
+
+Ground truth: Dataverse `wmkf_appreviewersuggestion` (post-W3–W6 cutover; same fields formerly on Postgres `reviewer_suggestions`).
+
 The reviewer-recruitment lifecycle today has several semi-manual tracking points: email-sent (semi-automated via .eml workflow today), email-opened (not tracked), response-received (manual), review-received (manual via upload). The forward goal is automated reminders and status transitions driven by these fields.
 
 **Why:** Justin flagged this during Session 113 while designing the direct-email-send feature. Sending tens of emails per cycle is small enough to micromanage today, but follow-up cadence (e.g., "reviewer hasn't responded in 14 days → send reminder") is exactly the kind of thing that should be automated, not tracked in someone's head.

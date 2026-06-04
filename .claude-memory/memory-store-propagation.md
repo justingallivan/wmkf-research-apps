@@ -3,7 +3,25 @@ name: memory-store-propagation
 description: Memory must live in the git-tracked .claude-memory/ store; the per-machine harness store is symlinked into it. The symlink is keyed to the repo's path-derived slug, so it must be re-created per machine and whenever the repo moves.
 metadata:
   type: project
+  status: active
+  scope: dev-env
+  last_verified: S175 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: memory seems to have stopped propagating between Macs, a cited memory entry is "missing," setting up a new machine, or after the repo moves to a new path.
+
+Do:
+- Keep `.claude-memory/` (git-tracked, kebab-case) as the single source of truth; index is `.claude-memory/MEMORY.md`.
+- On each machine once, symlink `~/.claude/projects/<slug>/memory` → `<repo>/.claude-memory`; re-create when the repo path changes.
+- If `~/.claude/projects/<slug>/memory` is a regular directory (not a symlink into the repo), stop and reconsolidate before writing.
+
+Do not:
+- Put `.git` or the working tree inside any cloud-synced folder (iCloud/OneDrive/Google Drive) — it offloads loose objects and corrupts git ops.
+- Assume moving the repo into iCloud makes memory propagate (the harness store lives under `~/.claude`, outside the repo).
+
+Ground truth: `.claude-memory/`; `~/.claude/projects/<slug>/memory` symlink. Supersedes: `memory-propagation-icloud-misfix`, `project_memory_two_stores_propagation`. Related: [[env-broken-git-autogc]].
 
 **There is ONE canonical memory store: `.claude-memory/` in the repo, git-tracked.**
 Everything durable lives there, propagates between Macs via normal `git push`/`pull`,

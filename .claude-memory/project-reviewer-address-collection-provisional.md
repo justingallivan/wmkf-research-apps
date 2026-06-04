@@ -3,7 +3,24 @@ name: project-reviewer-address-collection-provisional
 description: Reviewer payment-address collection on Stage 2a accept is PROVISIONAL — may be a relic of manual BILL onboarding; pending office confirmation
 metadata:
   type: project
+  status: active
+  scope: bill
+  last_verified: S200 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: touching the Stage 2a accept form's payment-address collection (chunk 5) or honorarium BILL onboarding address handling.
+
+Do:
+- Keep `address` OPTIONAL server-side (honorarium `akoya_request` + provenance create without it; BILL onboarding only alerts staff on missing).
+- If the office confirms BILL.com self-registration captures the remittance address, removal is small: drop the form fields + stop alerting on missing — no structural rework.
+
+Do not:
+- Harden or expand address collection until Justin's office-confirmation lands (it may be a relic of the old manual BILL onboarding).
+- Add address detail to Dataverse beyond what's needed — brushes against [[project-no-banking-pii-in-dataverse]]'s "only onboarding-status + pointer" constraint.
+
+Ground truth: Stage 2a accept form chunk 5 (`address` → `contact.address1_*` → BILL vendor payload); related [[project-bill-honorarium-integration]], [[project-no-banking-pii-in-dataverse]]. Pending office answer flagged S200.
 
 The Stage 2a accept form (chunk 5) collects the reviewer's payment mailing address (`address` → `contact.address1_*` → BILL vendor payload). **Justin flagged S200 that this may be a relic of the old manual BILL onboarding** and is checking in the office whether we actually need it or whether the reviewer self-registering in BILL.com captures the address on BILL's side, making our collection redundant.
 

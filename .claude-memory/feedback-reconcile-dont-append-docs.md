@@ -3,7 +3,26 @@ name: feedback_reconcile_dont_append_docs
 description: When updating a long-lived design/state doc, reconcile the whole doc to one consistent state — never append-patch a new claim while leaving stale contradictory text elsewhere. Registered code-derived scalars are gated by `check:fact-consistency` (run before any fact-level "DONE" claim).
 metadata:
   type: feedback
+  status: active
+  scope: docs
+  last_verified: S166 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: updating a long-lived design/state doc, Atlas page, SESSION_PROMPT, or memory entry with a new decision/finding/status.
+
+Do:
+- Edit the whole doc into one internally-consistent state in a single pass; re-grep for every restatement of the changed claim (banner, status lines, lead-ins, tails, summaries).
+- Run `npm run check:fact-consistency` (and a cross-repo grep of the changed value) before emitting any "DONE"/"✅" on a fact-level edit.
+- When a new drift-prone code-derived scalar appears, add a `CANONICAL_FACTS` entry plus self-test fixtures in the same commit.
+
+Do not:
+- Append-patch a new "S### update:" paragraph next to stale contradictory text.
+- Trust your own (or an audit doc's) completion markers for cross-doc consistency without the fan-in.
+
+Ground truth: `scripts/check-fact-consistency.js` (`CANONICAL_FACTS`); CLAUDE.md "Ground-truth requirement"; `docs/DATAVERSE_POWER_TOOLS_DESIGN.md`. Related: [[feedback-share-codex-verbatim]], [[feedback-surface-full-review-findings]], [[feedback-red-gates-are-p0]].
+
 When recording a new decision/finding into a long-lived design or state document (e.g. `docs/DATAVERSE_POWER_TOOLS_DESIGN.md`, Atlas pages, SESSION_PROMPT), **edit the document into a single internally-consistent state**. Do not bolt the new claim onto the top/middle and leave the old contradictory wording in the tail, status lines, or summary blocks. After any edit that changes a status/conclusion, re-grep the whole doc for every place that restates that status and bring them all into agreement (AUTHORITATIVE block, Status-of-unknowns, lead-ins, tails, memory pointer).
 
 **Why:** This is a *recurring, named* failure. S157's Codex holistic review found the Power Tools record had gone stale/self-contradictory from incremental append-patching and had to be consolidated. S158 reproduced the exact same failure — even while the session was explicitly watching for it — declaring residuals "all CLOSED / build-plan-ready" at the top while line 393 still read "neither residual is solo-actionable." A self-contradictory doc on `main` is a ground-truth violation (CLAUDE.md), it silently propagates wrong beliefs across session handoffs, and it forces an expensive external review to catch what a self-grep would have.

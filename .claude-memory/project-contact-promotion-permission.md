@@ -3,7 +3,26 @@ name: Contact promotion verified working
 description: Reviewer Finder's contact-promotion path works (Create+AppendTo, 2026-05-01); app user has NO DeleteAccess on Contact
 type: project
 originSessionId: 9ea67012-f70f-47e6-ba56-ded9f73601c4
+status: active
+scope: reviewer
+last_verified: 2026-06-02 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: working on Reviewer Finder/Manager contact promotion, send-emails, smoke-test cleanup, or any "remove a promoted reviewer" feature.
+
+Do:
+- Rely on find-or-create-by-email + `setContactLink` for promotion (Create + AppendTo are granted, verified 2026-05-01).
+- For smoke tests, expect PARTIAL cleanup and re-smoke with a DIFFERENT throwaway email when the orphan contact wasn't hard-deleted.
+- Build removal as unlink/deactivate (`wmkf_selected=false`), never hard-delete.
+
+Do not:
+- Assume the app can hard-delete a Contact — the role has NO DeleteAccess (`0x80048306` / `unManagedIdsAccessDenied`, verified S213).
+- Assume deactivating an orphan unblocks re-use — `contact.findByEmail` matches regardless of statecode.
+
+Ground truth: `pages/api/review-manager/send-emails.js`, `lib/dataverse/adapters/contact.js`, `scripts/smoke-test-candidate.mjs`. Related: [[project-reviewer-workbench-invite-workflow]].
+
 The Reviewer Finder / Review Manager send-emails flow promotes recipients to CRM contacts on first outreach (find-or-create by email, then `setContactLink` on the `wmkf_potentialreviewer`). **Verified end-to-end on 2026-05-01** with a test send to `justingallivan@me.com` — `_wmkf_contact_value` populated correctly.
 
 **Why:** Connor granted `AppendTo` on Contact at BusinessUnitLevel to the `# WMK: Research Review App Suite` security role on 2026-05-01. Prior to that, the create half worked (orphan contacts landed in CRM) but the link half 403'd.

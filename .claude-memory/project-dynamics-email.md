@@ -5,7 +5,25 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 17893605-3207-451d-8190-118bbacd8141
+  status: active
+  scope: dynamics
+  last_verified: Session 77 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: sending Dynamics email activities or wiring `SendEmail`.
+
+Do:
+- Call `SendEmail` as a bound action: `emails({id})/Microsoft.Dynamics.CRM.SendEmail` with `{ IssueSend: true }`.
+- Include `partyid_systemuser@odata.bind` on the sender party; resolve the systemuser via `resolveSystemUser(email)`.
+- Reuse the `dynamics-service.js` methods (`createEmailActivity`, `sendEmail`, `createAndSendEmail`, etc.) rather than reinventing.
+
+Do not:
+- Use `addressused` alone for the sender ("Invalid sender party" error).
+- Expect to control the CRM tracking-token subject prefix — it's an org-wide Server-Side Sync setting, not our code.
+
+Ground truth: `dynamics-service.js` email methods; test surfaces `/test-email`, `scripts/test-dynamics-email.js`. Durable API pattern. See [[project-dynamics-ai-writeback]] (sender-party binding gotcha).
 
 Email sending is WORKING (as of Session 77).
 

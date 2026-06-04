@@ -3,7 +3,25 @@ name: Dynamics Explorer — multi-library + subfolder document listing (shipped)
 description: SharePoint document listing in Dynamics Explorer now searches all archive libraries and recurses into subfolders, via the shared sharepoint-buckets helper
 type: project
 originSessionId: 855d17dc-8935-4bc6-88a5-cb73f4cb1b2d
+status: closed
+scope: dynamics
+last_verified: unknown via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: listing a request's SharePoint files from any caller, or building a file picker that spans archive libraries / nested subfolders.
+
+Do:
+- Import `getRequestSharePointBuckets` from `lib/utils/sharepoint-buckets.js` and walk buckets in parallel — don't reinvent bucket discovery.
+- Carry per-file `library`/`folder`/`subfolder` so download URLs route to the right drive and users can disambiguate (e.g. `Year 1/Report.docx`).
+
+Do not:
+- Rebuild this — it shipped (multi-library + recursive subfolder listing in Dynamics Explorer); extend the shared helper instead.
+- Assume a single top-level `library`/`folder` on results (replaced by a `libraries[]` per-bucket summary).
+
+Ground truth: `lib/utils/sharepoint-buckets.js`, `pages/api/dynamics-explorer/chat.js`, `GraphService.listFiles`. Shipped feature — verify current behavior in source if extending.
+
 # SHIPPED: Dynamics Explorer multi-library + subfolder document listing
 
 ## What changed

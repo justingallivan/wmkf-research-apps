@@ -3,7 +3,26 @@ name: Reviewer Postgres → Dataverse migration plan locked (S136)
 description: Migration scope, model decisions, and feature scope locked 2026-05-06. Most "migration" is drain, not move. Match-on-discovery + history badges are first-class scope.
 type: project
 originSessionId: 064dffdf-ba31-44c3-81f2-73bf4d3b908f
+status: closed
+scope: reviewer
+last_verified: 2026-05-14 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: working on the reviewer Postgres→Dataverse migration, the 1:1 model, or match-on-discovery / history badges.
+
+Do:
+- Treat the migration as SHIPPED (W3–W6, 2026-05-12); most Postgres tables drain, only `grant_cycles` migrated.
+- Read `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` (not the stale Wave 1 doc); re-run `scripts/audit-postgres-state.js` before any further migration work.
+- Use engagement-history (`wmkf_appreviewersuggestion` linked via `wmkf_potentialreviewer.wmkf_contact`) as per-contact reviewer history.
+
+Do not:
+- Re-litigate locked decisions (1:1 model, no new role child entity, `wmkf_app<name>` naming, no denormalized reviewer flag).
+- Drop Postgres reviewer tables ad hoc — drain is gated on the one-shot DELETE (≥ 2026-07-01).
+
+Ground truth: `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`, `scripts/audit-postgres-state.js`, `lib/dataverse/adapters/`, [[project-appresearcher-collapse-post-pilot]], [[project-w6-table-drop-pending]], [[project-system-model]].
+
 **Status as of 2026-05-06 (S136)**: Plan rewritten against ground truth. Authoritative doc: `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`. (The reviewer migration shipped W3–W6 2026-05-12; the "mid-June 2026 pilot deadline" rationale is superseded — that intake pilot was cancelled, see [[project-system-model]].)
 
 ## Ground truth (what's already done)

@@ -3,7 +3,25 @@ name: project-cloudmersive-advanced-endpoint
 description: Cloudmersive virus scan uses /advanced endpoint as of S193. /basic was a no-op for our use case (couldn't see container contents). Why and how.
 metadata:
   type: project
+  status: active
+  scope: security
+  last_verified: S193 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: touching Cloudmersive virus-scan callers, tests, or design docs, or building any end-to-end scan test.
+
+Do:
+- Use the `/virus/scan/file/advanced` endpoint; it's required to see container/embedded contents.
+- Read synthesized `foundViruses[0].virusName` when `CleanResult: false` with no `FoundViruses`; the `detectedThreats` / `verifiedFileFormat` envelope fields exist as of S193.
+- To verify realistic threats, build a DOCX with embedded executable bytes (trips `ContainsExecutable`/`ContainsInvalidFile`).
+
+Do not:
+- Revert to `/basic` — it's a no-op for embedded threats (the S193 burn).
+- Use EICAR as a meaningful end-to-end test — it passes clean when embedded in a PDF/DOCX.
+
+Ground truth: `lib/services/cloudmersive-scan.js`; review-upload + intake/attach alert paths; [[project-virus-scanning-it-context]] (why Cloudmersive is primary defense).
 
 `lib/services/cloudmersive-scan.js` POSTs to `https://api.cloudmersive.com/virus/scan/file/advanced`, NOT the basic `/virus/scan/file` endpoint. Switched in S193 (2026-05-27) after live testing proved the basic endpoint was functionally a no-op for our threat model.
 

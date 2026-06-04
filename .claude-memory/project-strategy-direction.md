@@ -2,7 +2,25 @@
 name: Strategy direction established with Connor
 description: Key strategic decisions from Session 86 — AkoyaGO posture, Dynamics as ground truth, backend triggers, Connor collaboration
 type: project
+status: active
+scope: strategy
+last_verified: 2026-05-14 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: making database/architecture decisions or planning anything touching AkoyaGO, Dynamics-vs-Postgres source-of-truth, or backend-trigger direction.
+
+Do:
+- Prefer Dynamics-first designs; treat Dynamics as ground truth for organizational data long-term.
+- Use Postgres for staging and app-operational data only.
+- Frame AkoyaGO posture as "minimize reliance, not replace."
+
+Do not:
+- Build features that assume AkoyaGO replacement, or state "AkoyaGO going away" as a settled decision (it's shorthand only).
+- Treat researcher/reviewer data as merely app-operational — it belongs in the CRM.
+
+Ground truth: `docs/STRATEGY.md`.
 
 Strategy document revised with input from Connor (Foundation colleague, knows AkoyaGO/Dynamics best). Key decisions:
 

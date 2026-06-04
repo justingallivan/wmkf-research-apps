@@ -23,6 +23,8 @@ jobs:
       - run: npm run check:doc-currency
       - run: npm run check:doc-currency:self-test
       - run: npm run check:migrations-manifest
+      - run: npm run check:memory-router
+      - run: npm run check:memory-router:self-test
       # Build re-runs prebuild (build-migrations-manifest); then assert the
       # committed manifest is in sync. Catches "added a migration but forgot
       # to regenerate the manifest" before it reaches prod.

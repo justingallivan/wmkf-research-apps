@@ -5,7 +5,25 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 17893605-3207-451d-8190-118bbacd8141
+  status: active
+  scope: auth
+  last_verified: S211 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: adding or wiring app-level access control — a new app, a new app-specific API route, default grants, or the React access context.
+
+Do:
+- Treat `shared/config/appRegistry.js` as the single source of truth for app definitions and `DEFAULT_APP_GRANTS`.
+- Enforce app-specific routes with `requireAppAccess(req, res, ...appKeys)`; grants live in Dataverse `wmkf_appuserappaccesses`.
+- Use `AppAccessContext.js` (`hasAccess(appKey)` / `isSuperuser`) for client-side gating.
+
+Do not:
+- Read app access from Postgres `user_app_access` — it was retired 2026-05-12 (Wave 1 closeout).
+- Assume the two legacy reviewer keys are retired — they are still live; the `reviewers` grant is additive/variadic. Full collapse to one-tab-per-grant is still future.
+
+Ground truth: `shared/config/appRegistry.js`, `shared/context/AppAccessContext.js`, `lib/utils/auth.js` (`requireAppAccess`), Dataverse `wmkf_appuserappaccesses`; counts regenerated from live code via `docs/CANONICAL_COUNTS.md`. See [[project-reviewer-apps-redesign-direction]].
 
 - **Dataverse `wmkf_appuserappaccesses`** — per-user app grants; Postgres `user_app_access` retired 2026-05-12 (Wave 1 closeout)
 - **`shared/config/appRegistry.js`** — single source of truth for all [18](../docs/CANONICAL_COUNTS.md#app-definition-count) app definitions (keys, names, icons, categories, descriptions); used by Layout nav, home page, admin dashboard, and access control

@@ -3,7 +3,24 @@ name: project-dataverse-odata-null-filter
 description: Dataverse OData $filter drops rows whose expression evaluates to null, so `field ne X` silently EXCLUDES null-valued rows — use `(field eq null or field ne X)` for any nullable field.
 metadata:
   type: project
+  status: active
+  scope: dataverse
+  last_verified: S208 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: writing or reviewing any Dataverse OData `$filter` (including `$apply=filter(...)` aggregates) that uses `ne` or `eq false` on a field that can be null.
+
+Do:
+- Null-guard every `ne`/`eq false` on a nullable field: `(field eq null or field ne X)`.
+- Reuse the established pattern (`notExcludedFilter()` in `lib/dataverse/adapters/reviewer-suggestion.js`).
+
+Do not:
+- Assume `field ne X` returns null-valued rows — three-valued logic silently drops them.
+- Add a "belt-and-suspenders" `ne` filter without checking the field's nullability first.
+
+Ground truth: MS "Filter rows" Web API doc; live precedent `lib/dataverse/adapters/reviewer-suggestion.js`, `reviewer-suggestion-sweep.js`. This is a durable behavioral rule (not a live-state claim). See [[project-dataverse-schema-deploy-gotchas]].
 
 **Dataverse Web API `$filter` omits any row whose expression evaluates to `null`** (not just `false`) — per the MS "Filter rows" doc: "The response includes only records where the expression evaluates to `true`. Records aren't included if the expression evaluates to `false` or `null`."
 

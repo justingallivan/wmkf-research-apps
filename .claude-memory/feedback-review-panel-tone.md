@@ -2,7 +2,24 @@
 name: Virtual Review Panel tone calibration
 description: LLM reviewers must balance critique with upside evaluation — not mimic conservative NIH/NSF study sections. Based on CSO feedback.
 type: feedback
+scope: prompt
+status: active
+last_verified: 2026-03-30 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: writing or tuning Virtual Review Panel reviewer/synthesis prompts (or any LLM-reviewer proposal-evaluation prompt for Keck).
+
+Do:
+- Evaluate upside and concerns with equal rigor; treat high risk as acceptable when payoff justifies it (Keck funds early-stage work).
+- Treat applying known methods to genuinely new systems/questions as meaningful novelty.
+
+Do not:
+- Adopt a conservative NIH/NSF study-section posture or penalize lack of preliminary data.
+- Treat prior work in a different system/organism/context as precedent that undermines novelty.
+
+Ground truth: CSO feedback 2026-03-30 (quoted in body); `docs/VIRTUAL_REVIEW_PANEL.md`.
 
 Virtual Review Panel prompts must NOT adopt a conservative NIH/NSF study-section posture.
 

@@ -2,7 +2,24 @@
 name: When checking for existing infrastructure, grep general terms not domain jargon
 description: "Does the codebase have X?" requires grepping general-purpose terms (untrusted, sentinel, scan, guard) NOT terms from the prompting source (article jargon, attacker-specific terminology).
 type: feedback
+status: active
+scope: global
+last_verified: S182 (2026-05-23) via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: a user asks "does our system handle X?" / "what defenses do we have against Z?" — any question that requires checking the codebase for existing infrastructure.
+
+Do:
+- Grep the general-purpose terms a prior infra/security engineer would have used (e.g. prompt-injection → `untrusted`, `sentinel`, `boundary`, `wrap`, `LLM01`, `guard`), NOT the jargon of the source that prompted the question.
+- Also check `docs/security-audit/` and `docs/<subdomain>/` subdirectories (top-level `ls docs/` hides them), `package.json` `check:*` gates, and `git log --all`.
+- Require multiple empty signals (grep + docs subdirs + gates + git log) before concluding infra doesn't exist.
+
+Do not:
+- Grep article/attacker-specific terminology ("white-on-white", "OCR", "canary") and treat one empty grep as proof of absence — that built a parallel weaker A7 system (S182, reverted).
+
+Ground truth: historical-only (S182 burn). Same shape as CLAUDE.md "before claiming 'X has no Y', grep for Y" — in spirit, not just letter. See [[project-a7-prompt-injection-hardening]].
 
 When a user asks a question that requires checking the codebase for existing infrastructure ("does our system handle X?", "should we add Y?", "what defenses do we have against Z?"), the search has to use **general-purpose terms** the prior implementer would plausibly have used — not the specific terminology of whatever prompted the question.
 

@@ -3,7 +3,27 @@ name: project_institution_foundation_liaison
 description: WMKF contact-role triad (user-attested S159) — akoya_primarycontactid = foundation liaison/grant-steward (NOT PI), wmkf_projectleader = the PI/scientific lead, wmkf_researchleader = institutional research officer (NOT PI)
 metadata:
   type: project
+  status: active
+  scope: dynamics
+  last_verified: S209 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: surfacing `akoya_request` person fields anywhere (bulk export, Grant Reporting auto-fill, contact enrichment, Reviewer Finder COI).
+
+Do:
+- Label `akoya_primarycontactid` ("Primary Contact") as the foundation liaison / grant steward (President's office for large gifts) — NOT the PI.
+- Surface `wmkf_projectleader` ("Project Leader") as the PI for research-scoped data; use an `N/A — no PI (non-research process)` sentinel where structurally absent.
+- Treat `wmkf_researchleader` as the institution's senior research officer, not the PI.
+- Render null fill as a not-captured sentinel, never blank (migrated-era fill is institution-variable).
+
+Do not:
+- Attribute a grant's science to the Primary Contact — that's the plausible-wrong-answer trap (President / grants officer).
+- Cite the whole-entity 16/32% mig/nat `wmkf_projectleader` number — it's a process-pooled fiction.
+
+Ground truth: user-attested S159 (WMKF authority, behavioral-signature corroborated); evidence `docs/atlas/evidence/akoya-*-2026-05-17.txt`, [[project-dataverse-power-tools]], [[reviewer-identity-fragmentation]], [[project-contact-promotion-permission]].
+
 **User-attested (S159, WMKF authority — best current understanding, not probe-proven semantics).** Grantee institutions assign a **dedicated liaison to the Foundation who stewards research grants**; that person — not the principal investigator — is what `akoya_request.akoya_primarycontactid` (lookup → `contact`, label "Primary Contact") holds. **For large gifts, the contact routes through the institution's President's office.** Probe-substantiated *behavioral signature* corroborates the user's *semantic*: one liaison recurs across many unrelated grants for an institution (Hossein @ USC, Nelly @ Caltech — ~8 and ~18 unrelated science topics respectively), and the institution President appears on big/institutional gifts (USC's Carol Folt, Caltech's Thomas Rosenbaum). Evidence: `docs/atlas/evidence/akoya-usc-primarycontact-2026-05-17.txt`, `akoya-caltech-primarycontact-2026-05-17.txt`, `akoya-underinclusion-4-2026-05-17.txt`.
 
 **The contact-role triad (all user-attested S159, WMKF authority; behavioral-signature corroborated — evidence `docs/atlas/evidence/akoya-pi-fields-2026-05-17.txt` + `docs/atlas/evidence/akoya-projectleader-by-program-2026-05-17.txt` [two separate files; the prior single mashed-up filename was a citation glitch, fixed S209], #1002794 Wen Li / USC Khajavikhan-Wang / Caltech Cai-Prober-Jackson).** Three distinct person fields on `akoya_request` — do not conflate:

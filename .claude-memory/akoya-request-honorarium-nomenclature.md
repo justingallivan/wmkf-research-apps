@@ -3,7 +3,24 @@ name: Grant request vs honorarium request nomenclature
 description: Both grant proposals AND reviewer honoraria are stored as akoya_request rows in Dataverse — easy to confuse. Use precise terms; the two are not data-linked by default.
 metadata:
   type: project
+  status: active
+  scope: bill
+  last_verified: 2026-05-25 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: writing or discussing anything involving `akoya_request` rows where grant proposals and reviewer honoraria could be confused (design docs, tickets, emails, query filters).
+
+Do:
+- Say "grant request" or "honorarium request" — never "request" alone.
+- When filtering `akoya_request`, state which type and use the program-lookup discriminator (`akoya_program`/`wmkf_grantprogram`/`wmkf_type`), not heuristics like the $250 amount.
+- Reconstruct honorarium→grant linkage via the reviewer's contact (`_akoya_primarycontactid_value`) + matching grant cycle (`wmkf_meetingdate`).
+
+Do not:
+- Assume an honorarium row has a parent-grant lookup — there is none by default.
+
+Ground truth: live discriminators as of 2026-05-25 in body; [[project-bill-honorarium-integration]]; [[akoya-payment-field-semantics]]. Grant↔reviewer assignment denormalized on the grant request (`wmkf_potentialreviewer1..5`, `wmkf_reviewer1`).
 
 **The trap.** Two very different concepts share the `akoya_request` entity. Saying "request" alone is ambiguous and has caused confusion in design conversations (S188).
 

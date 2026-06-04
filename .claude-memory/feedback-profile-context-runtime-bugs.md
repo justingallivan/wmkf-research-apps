@@ -3,7 +3,25 @@ name: feedback-profile-context-runtime-bugs
 description: ProfileContext atomic-refactor (S203) shipped runtime bugs CI missed — two the stop-gate caught: an init fetch loop and a destructive-migration data-loss path. Check response.ok before irreversible actions; never let an effect depend on a callback that depends on state it mutates.
 metadata:
   type: feedback
+  status: closed
+  scope: auth
+  last_verified: S204 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: doing load-bearing async/effect React work (contexts, mount effects, fetch-then-mutate flows) — especially anything with destructive side effects gated on a fetch.
+
+Do:
+- Check `response.ok` before any irreversible action (delete/purge/overwrite) — `fetch()` does not throw on HTTP errors.
+- Use a `useRef` to read changing state inside a callback that is itself an effect dependency, so deps stay stable.
+- Manually smoke-test (mount, switch profile, simulate a failing save) before calling such a refactor done; lint+tests+build green is not sufficient.
+
+Do not:
+- Assume CI (lint + jest + build) catches runtime-only effect loops or fetch-error data-loss paths — both S203 bugs passed CI clean.
+- Let an effect depend on a callback that depends on the state that callback mutates.
+
+Ground truth: `shared/context/ProfileContext.js`; `docs/PROFILE_CONTEXT_REFACTOR_SUMMARY.md`; `tests/unit/profile-context.test.js`; commits 0876dd0, 306f77a, 62b0640.
 
 The S203 atomic-state-machine refactor of `shared/context/ProfileContext.js` — which correctly resolved a long chain of profile/preferences race + resurrection bugs — itself shipped at least two runtime bugs that `npm run lint` + the 1544-test jest suite + `next build` all passed clean. The stop-gate (Codex) caught these two after they landed (there may be others not yet surfaced — this is not a proven-exhaustive count):
 

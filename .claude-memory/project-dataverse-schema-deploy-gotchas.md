@@ -3,7 +3,26 @@ name: Dataverse schema-deploy gotchas
 description: Recurring failure modes when running apply-dataverse-schema.js or batch-creating Dataverse rows; expect each one and plan around it
 type: project
 originSessionId: dbb306e7-a291-40e3-8509-b57067e842e0
+status: active
+scope: dataverse
+last_verified: S147 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: running `apply-dataverse-schema.js`, batch-creating/inserting Dataverse rows, or writing adapter PATCH/`@odata.bind` payloads.
+
+Do:
+- Wrap schema-apply in a 30s-backoff `until` retry loop (idempotent script picks up where it stopped); don't drop the sleep below ~30s.
+- Use the PascalCase nav-property (`lookupSchemaName`) for `@odata.bind`; use the fully-lowercased logical name for plain reads/writes and FIELD_SELECT arrays.
+- Smoke bulk inserts with `--limit 50` first; for >5,000-row reads use raw paginated fetch (`@odata.nextLink` + `Prefer: odata.maxpagesize=5000`), not `queryAllRecords`.
+
+Do not:
+- Lowercase only the prefix when translating schema-name → logical-name (chop-at-underscore is a 400 footgun).
+- Run two solution-customization operations concurrently (429 / `0x80071151`).
+
+Ground truth: `scripts/apply-dataverse-schema.js`, `lib/services/execute-prompt.js` (correct `@odata.bind`), `scripts/backfill-request-person-junction.js` (paged fetch). Durable behavioral rules; the 5000 cap in `queryAllRecords` is a code fact — verify in current source. See [[project-dataverse-odata-null-filter]].
+
 Four Dataverse behaviors that bite multi-attribute deploys and bulk inserts. Each was rediscovered in S139–S147 after consuming real time; treat as standing knowledge.
 
 **1. EntityCustomization 429 throttling between metadata writes (`apply-dataverse-schema.js`).**

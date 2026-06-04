@@ -3,7 +3,25 @@ name: project-reviewer-institution-match
 description: Reviewer affiliation must be matched against existing `accounts` whenever it lands in Dataverse — discovery save, contact promotion, and any future reviewer-side edit
 metadata:
   type: project
+  status: active
+  scope: reviewer
+  last_verified: S213 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: a free-text reviewer affiliation is about to land in Dataverse (discovery save, contact promotion, or any reviewer-side edit).
+
+Do:
+- Match affiliation against existing `accounts.{name, akoya_aka, wmkf_legalname, wmkf_abbreviation}` via Dataverse Search before writing; match-first, create-as-last-resort.
+- Set `contact.parentcustomerid` to a matched account GUID at promotion (highest-impact touch point), not a free-text fill.
+- Reuse one fuzzy-match primitive shared with the intake portal.
+
+Do not:
+- Let raw web-search affiliation strings populate `contact.parentcustomerid` unmatched — it fragments grant history and pollutes the registry.
+- Assume `reviewer-finder/send-emails.js` is the promotion path — it's `pages/api/review-manager/send-emails.js` (verified S209).
+
+Ground truth: `pages/api/review-manager/send-emails.js`, `docs/atlas/dataverse-akoya-request.md`, [[project-intake-portal-institution-match]], [[reviewer-identity-fragmentation]], [[project-contact-promotion-permission]].
 
 The reviewer pipeline has the same institution-dedup hazard as the intake portal: a free-text "affiliation" string entering Dataverse without being matched to an existing `account` fragments a researcher's grant history and pollutes the canonical institution registry.
 

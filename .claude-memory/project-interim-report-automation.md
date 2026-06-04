@@ -3,7 +3,25 @@ name: Interim grant report auto-evaluation (unblocked; ready to build)
 description: Future backend automation to evaluate yearly interim grant reports and write results back to a Dynamics field. Dynamics write access unblocked + verified 2026-04-14; building remains on the future-work list, not a blocker.
 type: project
 originSessionId: 855d17dc-8935-4bc6-88a5-cb73f4cb1b2d
+status: active
+scope: dynamics
+last_verified: 2026-05-07 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: building backend automation to evaluate yearly interim grant reports and write results back to Dynamics.
+
+Do:
+- Reuse the bucket + Graph plumbing from `pages/api/grant-reporting/extract.js` and `lib/utils/sharepoint-buckets.js` — document discovery is already solved.
+- First confirm with Connor which `akoya_request` field holds the staff evaluation (or whether a new `wmkf_ai_interim_evaluation` field is needed); get real past examples before writing the prompt.
+
+Do not:
+- Treat Dynamics or SharePoint write access as a blocker — both were granted + verified (Dynamics 2026-04-14, SharePoint end-to-end 2026-05-01).
+- Build a final-narrative-completeness prompt; interim eval is year-over-year progress, a thinner `compareProposalToReport`.
+
+Ground truth: `pages/api/grant-reporting/extract.js`, `lib/utils/sharepoint-buckets.js`, `compareProposalToReport` helper; Field Set B fields deployed 2026-05-07.
+
 # Interim grant report auto-evaluation
 
 In addition to the final reports the Grant Reporting app currently handles, grantees submit **yearly interim reports** during multi-year grants. Today, staff read each interim report manually and write their evaluation into a field on the corresponding `akoya_request` record in Dynamics.

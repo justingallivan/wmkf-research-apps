@@ -3,7 +3,26 @@ name: API Credit Monitoring
 description: Credit-spend observability — `/admin` spend tile, daily-threshold alert, and the cache-underreporting bug that motivated building it
 type: project
 originSessionId: 855d17dc-8935-4bc6-88a5-cb73f4cb1b2d
+status: active
+scope: global
+last_verified: S209 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: working on credit-spend observability, the `/admin` spend tile, pricing accuracy, or adding a new streaming Claude caller.
+
+Do:
+- Keep pricing source of truth in code (`lib/utils/model-pricing.js`); cron alerts surface drift, humans edit.
+- When adding a streaming Claude caller, verify the SSE parser captures BOTH `cache_creation_input_tokens` and `cache_read_input_tokens` from `message_start.message.usage` (silent zeros = the dynamics-explorer bug).
+- Use Anthropic console Billing → Usage for authoritative org-wide spend; auto-reload is ON.
+
+Do not:
+- Rebuild the removed low-balance estimator/anchor machinery — Anthropic-native auto-reload + spend limits replaced it (S181).
+- Assume there is a numbered migration `032` for `model_pricing_audit` — it's created in `scripts/setup-database.js`; latest numbered migration is `017`.
+
+Ground truth: `lib/utils/model-pricing.js`, `pages/api/admin/stats.js`, `pages/api/cron/{spend-check,pricing-canary,pricing-refresh}.js`, `api_usage_log` table; Anthropic console for reconciliation.
+
 User ran out of Anthropic API credits during a batch expertise matching run (April 2026). Prepaid account at the time, no auto-reload. Wanted: admin tile, daily-spend threshold alert, low-balance alert.
 
 **Why originally:** batch processing burns credits faster than interactive use. Running out mid-batch wastes time and leaves partial results. Per-app / per-user spend trends matter because the interactive-user base is small but backend/PA jobs may dominate cost once live.

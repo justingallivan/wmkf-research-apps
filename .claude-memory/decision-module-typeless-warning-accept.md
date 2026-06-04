@@ -5,7 +5,24 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 5782a015-a329-4b5a-8ea7-6a44489bae62
+  status: closed
+  scope: dev-env
+  last_verified: S164 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: a session proposes "fix the `MODULE_TYPELESS_PACKAGE_JSON` warning" emitted by ESM `scripts/*.js` files.
+
+Do:
+- Answer E (accept as-is) — the warning is cosmetic, one-time per-process, zero runtime impact.
+- Only if genuinely warranted, use Option F (gradual CJS conversion of a script already being edited: `require()` + async `main()`, keeps the `.js` path).
+
+Do not:
+- Do a broad Option D `.js`→`.mjs` rename (breaks `scripts/acceptance-w4.js` filename-spawning; would have blinded the Atlas P0 gate before its S164 fix).
+- Re-investigate from scratch — this was Codex-reviewed S164.
+
+Ground truth: historical-only (decision, not live state). Atlas-scanner fix recorded as pattern E in `docs/CLAUDE_COVERAGE_LESSONS.md`. Related: [[reviewer-identity-fragmentation]].
 
 **Decision:** the `MODULE_TYPELESS_PACKAGE_JSON` reparse warning emitted by ESM `scripts/*.js` files is **ACCEPTED as-is (Option E)**. Root cause: root `package.json` has no `"type"`, so Node tries CJS first, fails, reparses as ESM (cosmetic, one-time per-process, zero runtime impact). 37 of 174 `scripts/*.js` are ESM and emit it; 136 are CJS (silent).
 

@@ -3,7 +3,26 @@ name: Intake portal — Entra External ID foundation shipped
 description: Tenant provisioned, NextAuth dual-provider wired, /apply route auth round-trip verified end-to-end (S129). Form/membership/Dynamics writes still ahead.
 type: project
 originSessionId: 5fc8fbcf-cfc0-4f4b-a4d6-5abf1de8d42e
+status: closed
+scope: auth
+last_verified: S129 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: touching the dual-provider NextAuth setup, the `/apply` applicant auth path, or the External ID tenant.
+
+Do:
+- Branch on `session.user.userType: 'staff' | 'applicant'` — never infer identity from which fields are populated.
+- Rely on OID-keyed contact lookup (permanent across email changes); email is bootstrap key only.
+- Keep the `entra-external` provider env-gated (registers only when all three `EXTERNAL_AZURE_AD_*` are set).
+
+Do not:
+- Re-include `/apply/*` in `ProfileProvider`/`AppAccessProvider` in `_app.js` (it's excluded on purpose).
+- Navigate the External ID portal by label (Microsoft renames "User flows"/"Self-service sign-up" constantly) — navigate by concept.
+
+Ground truth: `docs/INTAKE_PORTAL_DESIGN.md`, `docs/archive/IT_ENTRA_EXTERNAL_TENANT_REQUEST_2026-05-04.md`, commit `68e4c59`; tenant `04a1406b-3878-4286-bd17-b8c8118886f7`.
+
 External ID auth foundation for the applicant intake portal is live in code as of Session 129. Applicants can OTP-sign-in and the app sees their stable Object ID — that's the bridge for `contact.wmkf_portal_oid` once intake writes start.
 
 **Tenant facts:**

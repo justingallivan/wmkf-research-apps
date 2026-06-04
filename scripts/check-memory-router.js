@@ -1,0 +1,112 @@
+#!/usr/bin/env node
+/**
+ * scripts/check-memory-router.js
+ *
+ * CI gate for the Claude memory router (`.claude-memory/MEMORY.md`) and topic
+ * files, per docs/CLAUDE_MEMORY_REORGANIZATION_PLAN.md.
+ *
+ * MEMORY.md is auto-loaded at session start (Claude Code reads only the first
+ * 200 lines / 25KB). The reorg made it a compact ROUTER, not a prose index.
+ * This gate keeps it from silently bloating back over budget and keeps the
+ * routing links + topic-file metadata honest.
+ *
+ * Hard failures (exit 1):
+ *   1. MEMORY.md missing.
+ *   2. MEMORY.md > MAX_LINES lines.
+ *   3. MEMORY.md > MAX_BYTES bytes.
+ *   4. A `*.md` link in MEMORY.md does not resolve.
+ *   5. A topic file (.claude-memory/*.md except MEMORY.md) is missing a
+ *      `status:` frontmatter key, or has an unrecognized status value.
+ *
+ * Soft warning (does not fail): MEMORY.md over the TARGET_BYTES comfort budget.
+ *
+ * Run with `--self-test` to exercise the validators against synthetic fixtures
+ * (see check-memory-router-self-test.js, which shells out with that flag).
+ *
+ * Wire into .github/workflows/test.yml alongside the other check:* gates.
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+const MEM_DIR = path.join(__dirname, '..', '.claude-memory');
+const MEMORY_MD = path.join(MEM_DIR, 'MEMORY.md');
+
+const MAX_LINES = 150;        // hard cap (plan: stay below even after growth)
+const MAX_BYTES = 18 * 1024;  // hard cap 18KB
+const TARGET_BYTES = 12 * 1024; // comfort target (warn only)
+const VALID_STATUS = new Set(['active', 'stale', 'closed', 'superseded']);
+
+/**
+ * Validate a single memory store. Pure function over a directory so the
+ * self-test can point it at a fixture dir. Returns { errors:[], warnings:[] }.
+ */
+function validateStore(memDir) {
+  const errors = [];
+  const warnings = [];
+  const memoryMd = path.join(memDir, 'MEMORY.md');
+
+  if (!fs.existsSync(memoryMd)) {
+    errors.push(`MEMORY.md missing at ${memoryMd}`);
+    return { errors, warnings };
+  }
+
+  const raw = fs.readFileSync(memoryMd, 'utf8');
+  const bytes = Buffer.byteLength(raw, 'utf8');
+  const lines = raw.split('\n').length;
+
+  if (lines > MAX_LINES) errors.push(`MEMORY.md is ${lines} lines (hard cap ${MAX_LINES}).`);
+  if (bytes > MAX_BYTES) errors.push(`MEMORY.md is ${bytes} bytes (hard cap ${MAX_BYTES}).`);
+  if (bytes > TARGET_BYTES && bytes <= MAX_BYTES) {
+    warnings.push(`MEMORY.md is ${bytes} bytes, over the ${TARGET_BYTES}-byte comfort target (still under the ${MAX_BYTES} hard cap).`);
+  }
+
+  // 4. Every *.md link in MEMORY.md must resolve (relative to memDir).
+  const refs = new Set(raw.match(/[A-Za-z0-9._/-]+\.md/g) || []);
+  for (const ref of refs) {
+    if (ref === 'MEMORY.md') continue;
+    const resolved = path.resolve(memDir, ref);
+    if (!fs.existsSync(resolved)) errors.push(`MEMORY.md links a missing file: ${ref}`);
+  }
+
+  // 5. Every topic file must declare a recognized status.
+  const topicFiles = fs.readdirSync(memDir)
+    .filter((f) => f.endsWith('.md') && f !== 'MEMORY.md');
+  for (const f of topicFiles) {
+    const body = fs.readFileSync(path.join(memDir, f), 'utf8');
+    const m = body.match(/^\s*status:\s*(\S+)/m);
+    if (!m) {
+      errors.push(`${f}: no \`status:\` frontmatter key.`);
+    } else if (!VALID_STATUS.has(m[1])) {
+      errors.push(`${f}: unrecognized status \`${m[1]}\` (expected one of ${[...VALID_STATUS].join(', ')}).`);
+    }
+  }
+
+  return { errors, warnings };
+}
+
+function main() {
+  // --self-test points the validator at a fixture dir passed as the next arg.
+  const selfTestIdx = process.argv.indexOf('--self-test');
+  const memDir = selfTestIdx !== -1 && process.argv[selfTestIdx + 1]
+    ? path.resolve(process.argv[selfTestIdx + 1])
+    : MEM_DIR;
+
+  const { errors, warnings } = validateStore(memDir);
+
+  for (const w of warnings) console.warn(`warning: ${w}`);
+
+  if (errors.length) {
+    console.error('memory-router gate FAILED:');
+    for (const e of errors) console.error(`  - ${e}`);
+    process.exit(1);
+  }
+
+  const raw = fs.readFileSync(path.join(memDir, 'MEMORY.md'), 'utf8');
+  const topicCount = fs.readdirSync(memDir).filter((f) => f.endsWith('.md') && f !== 'MEMORY.md').length;
+  console.log(`memory-router OK — MEMORY.md ${Buffer.byteLength(raw, 'utf8')} bytes / ${raw.split('\n').length} lines; ${topicCount} topic file(s), all links resolve + all carry a valid status.`);
+}
+
+module.exports = { validateStore, MAX_LINES, MAX_BYTES, TARGET_BYTES, VALID_STATUS };
+
+if (require.main === module) main();

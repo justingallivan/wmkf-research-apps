@@ -3,7 +3,25 @@ name: App roadmap (post-Phase-0, 2026-04-25)
 description: Per-app status, deprecation, and trigger-pattern notes from Justin's 2026-04-25 framing
 type: project
 originSessionId: e2e4c03f-8046-4d90-a1fd-93c1bb8256d1
+status: stale
+scope: strategy
+last_verified: S166 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: planning per-app roadmap direction, deprecation, or backend-trigger (dual-caller) evolution from the 2026-04-25 framing.
+
+Do:
+- Treat several "user-driven" apps (Grant Reporting, Integrity Screener) as dual-caller-in-waiting that gain PA triggers once Executor extensions land.
+- Give Reviewer Finder its own architectural look (agent-loop / `executeAgent()`), not a force-fit into `executePrompt()`.
+
+Do not:
+- Resurrect Concept Evaluator — it's DEPRECATED and archived to `_archived/`.
+- Treat this as live status — it's a 2026-04-25 snapshot; cross-check current state (Reviewer work has since become the Request Workbench).
+
+Ground truth: historical snapshot (Justin 2026-04-25, doc tail reconciled S166); for current direction see [[project-reviewer-apps-redesign-direction]], [[project-phase-i-summary-app-winddown]], `docs/SYSTEM_MODEL.md`.
+
 Strategic notes per app (Justin 2026-04-25), affecting Session 111+ planning:
 
 - **Concept Evaluator** — **DEPRECATED.** Removed from `appRegistry.js` (residual deprecation comment at line 12 only). Page + API archived to `_archived/pages/concept-evaluator.js` and `_archived/pages/api/evaluate-concepts.js`. **Doc tail reconciled S166** — `docs/SYSTEM_OVERVIEW.md`, `docs/AI_PROMPTS_DETAILED.md`, `docs/AI_PROMPTS_OVERVIEW.md`, and `docs/PDF_EXPORT.md` now carry retirement labels/banners; retained references are historical/reference only.

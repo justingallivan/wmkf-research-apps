@@ -3,7 +3,26 @@ name: Reviewer Finder — Dataverse-native entry path
 description: Reviewer Finder is fully Dataverse-native. Picker, save-candidates, and browse/email/summary/cycles flows all run on Dataverse since W3–W6 cutovers (2026-05-12). Postgres reviewer tables are drain-only and scheduled for deletion ≥ 2026-07-01.
 type: project
 originSessionId: 97cd3044-49bb-4f67-b000-5d32980d6faa
+status: closed
+scope: reviewer
+last_verified: 2026-05-14 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: planning Reviewer Finder work that touches the picker, save-candidates writeback, or the drain-only Postgres reviewer tables.
+
+Do:
+- Treat the Dataverse-native entry path as DONE (picker + save-candidates shipped W3–W6, 2026-05-12); don't rebuild it.
+- Use the verification commands in the body to re-confirm status if needed.
+- Expect the four drain-only Postgres tables to be dropped via one-shot DELETE (trigger ≥ 2026-07-01).
+
+Do not:
+- Treat the old "do NOT drop the Postgres reviewer tables" framing as live — drop is the planned next step.
+- Assume `researchers.js`/`extract-summary.js` still exist (deleted W5/W6).
+
+Ground truth: `pages/reviewer-finder.js`, `pages/api/reviewer-finder/save-candidates.js`, `docs/atlas/postgres-researchers.md`, `docs/atlas/postgres-other-reviewer-tables.md`, [[project-w6-table-drop-pending]].
+
 **Status: SHIPPED.** Both pieces of the original direction landed before 2026-05-03; verified by reading the live code:
 
 - **Picker UI:** `pages/reviewer-finder.js` exposes a "From My Proposals" / "Upload PDF" tab toggle. The picker (`ProposalPickerCard`) is the default tab, calling `/api/reviewer-finder/my-proposals` for the cycle dropdown and `/api/reviewer-finder/load-proposal` to materialize the chosen proposal's narrative PDF into Vercel Blob for the existing analyze pipeline. PDF upload retained as a fallback only.

@@ -5,7 +5,24 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 1e1dfc4f-ebfe-49c2-965d-23d90c70e16f
+  status: active
+  scope: dataverse
+  last_verified: 2026-05-14 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: designing Dataverse schema — deciding between a new child entity vs. expanding an enum/discriminator on an existing entity.
+
+Do:
+- Default to expanding a choice value, lookup, or discriminator column on an existing entity, even at the cost of more enum values / downstream filter logic.
+- Ask "could this be a discriminator on an existing entity?" before proposing a new entity.
+- When a new entity IS right (different parent/lifecycle/shape), name the human-legibility cost explicitly in the trade-off.
+
+Do not:
+- Optimize for normalization purity at the expense of non-technical staff having to learn a proliferation of obscure tables.
+
+Ground truth: historical-only (principle set by Justin, 2026-05-14 Connor schema-review, `docs/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md` Item 1; catalog `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`). Aligns with [[project-dynamics-as-prompt-ground-truth]].
 
 When weighing "new child entity" vs "expand an enum / add a discriminator on an existing entity", default to the latter unless the semantic cost is irrecoverable. Non-technical staff browsing Dataverse should not have to learn a proliferation of obscure tables to understand a proposal's data.
 

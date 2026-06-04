@@ -5,7 +5,25 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ada6c18e-51f9-4c56-94fa-c8dabd742178
+  status: active
+  scope: dataverse
+  last_verified: S213 (2026-06-02) via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: deciding where to run reviewer-Workbench smoke tests, or considering the sandbox as a test store.
+
+Do:
+- Treat the sandbox (`orgd9e66399`) as reachable but schema-stale — NOT drop-in usable for reviewer-Workbench testing.
+- Run reviewer smokes on prod against the dedicated test request (S213: 1002788, in the D26 allowlist) until the sandbox is provisioned.
+- To route the local app at the sandbox, set `DYNAMICS_URL` (not `DYNAMICS_SANDBOX_URL`) in `.env.local`.
+
+Do not:
+- Repeat the "there is NO isolated test store" claim — a sandbox exists.
+- Assume the sandbox can send email or has the reviewer schema (`wmkf_appreviewersuggestion`/`appgrantcycle` 404; `wmkf_policyversion` 0 rows).
+
+Ground truth: `scripts/discover-dynamics-envs.js`, `scripts/apply-dataverse-schema.js`, [[project-contact-promotion-permission]].
 
 A Dynamics **sandbox exists and is reachable** by our app registration — `WM Keck Sandbox`, `https://orgd9e66399.crm.dynamics.com` (org `3d52a072-b138-ef11-8e4b-000d3a106422`). Verified S213 (2026-06-02) via `scripts/discover-dynamics-envs.js` (read-only Global Discovery + WhoAmI both succeed with the prod `DYNAMICS_CLIENT_ID`/`SECRET`/`TENANT_ID`). So the "there is NO isolated test store" claim that rode along in SESSION_PROMPT S213 is **overstated** — a sandbox is there.
 

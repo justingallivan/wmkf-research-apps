@@ -3,7 +3,24 @@ name: feedback-falsify-not-confirm
 description: For any scope/quantity claim, run the DISCONFIRMING query (complement/counter-instance), not the confirming one — the grammar of the claim picks the query. Hook-enforced.
 metadata:
   type: feedback
+  status: active
+  scope: global
+  last_verified: S197 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: about to assert a claim with a scope/quantity signature — only / all / none / every / never / always / "the rest" / "N of M" / "source of truth" — especially into docs/, .claude-memory/, CLAUDE.md.
+
+Do:
+- Verify by FALSIFICATION. "X only in Y" / all/none/rest → query the complement set for a counter-instance. "N of M" → derive M independently of N. "X is source of truth" → search for a counter-instance.
+- If no falsifying query is constructible → hedge, don't assert.
+
+Do not:
+- Search to confirm (grep for exactly your hypothesis, treat the hit as proof) — the query shaped by the assumption can only confirm it.
+- Rely on a single query for both numerator and denominator (circular).
+
+Ground truth: historical-only (recurring failure, S197). Enforced by PreToolUse(Write|Edit) hook `.claude/hooks/scope-claim-reminder.js` (fails open). See [[project-system-model]], [[feedback-apply-reconcile-to-fix-work]].
 
 **The failure (recurring, S197):** I search to *confirm*, not to *falsify*. I form a hypothesis ("bundled prompts live in `shared/config/prompts`"), grep for exactly that, get a hit, and treat the hit as verification — but the query was shaped by the assumption, so it can only confirm it. The search launders the assumption into a "fact" and I stop early. This produced a string of wrong claims an outside reviewer (Codex) caught that my self-review could not, because the blind spot lived in my premise.
 

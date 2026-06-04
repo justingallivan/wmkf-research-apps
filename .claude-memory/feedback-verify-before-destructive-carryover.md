@@ -2,7 +2,26 @@
 name: Verify before acting on destructive carryover items
 description: Any task that drops/removes/retires/archives infrastructure carried over from a prior session must be verified against live state before action. Carryover lists go stale and have already nearly broken a live app once.
 type: feedback
+status: active
+scope: global
+last_verified: 2026-05-12 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: a carryover item (SESSION_PROMPT next-steps, TODO, user prompt citing an earlier decision) says drop / remove / retire / archive / delete / deprecate infrastructure (table, column, endpoint, env var, file, dispatch wrapper, dependency, feature flag).
+
+Do:
+- Grep for live callers and read the most likely ones before touching anything.
+- Stop and report back to the user if anything looks live.
+- After confirming dead, proceed and update the originating memory entry to reflect the live check.
+
+Do not:
+- Treat a destructive carryover as an approved task — it is unverified-until-checked.
+- Apply this to additive work (new features/endpoints/tables) — destructive only.
+
+Ground truth: historical-only (lesson, not live state); CLAUDE.md "Carryover Hygiene". Related: [[feedback-list-and-confirm-before-bulk-deletes]].
+
 **Rule:** Before acting on any carryover task that says **drop**, **remove**, **retire**, **archive**, **delete**, or **deprecate** infrastructure (table, column, endpoint, env var, file, dispatch wrapper, dependency, feature flag, etc.), perform a live-state verification first:
 
 1. Grep for live callers of the thing being removed.

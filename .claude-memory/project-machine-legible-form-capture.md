@@ -3,7 +3,25 @@ name: Intake portal as a chance to capture machine-legible structured data
 description: New portal forms should split structured content (budgets, rosters, milestones) out of narrative text, so downstream AI tools don't have to re-extract from PDFs
 type: project
 originSessionId: 05e61454-b0c9-4b62-a30f-89e979b3157b
+status: active
+scope: intake
+last_verified: unknown via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: designing intake portal form fields with Sarah/Connor for the next cycle's Phase I intake.
+
+Do:
+- Ask "what's the most structured representation we can extract without making the form annoying?" — not "what fields does GOapply have?"
+- Split structured content into real rows/fields: budget (year × category × amount), co-PI roster (name/affiliation/role/% effort), milestones (date/deliverable), prior support (funder/amount/dates/role).
+- Keep naturally-document content (CV/biosketch, letters of support, budget justification narrative) as file attachments.
+
+Do not:
+- Push structured content into narrative free-text fields or XLSX/PDF uploads — every downstream AI tool then re-extracts it (latency, cost, error risk).
+
+Ground truth: historical-only (lesson/design principle, not live state); compounds with [[project-strategy-direction]]. Sarah + Connor own the per-phase field wishlists.
+
 The new applicant intake portal is a strategic opportunity to capture
 machine-legible structured data instead of stuffing everything into narrative
 free-text fields like GOapply does.

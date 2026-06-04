@@ -5,7 +5,25 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 17893605-3207-451d-8190-118bbacd8141
+  status: active
+  scope: sharepoint
+  last_verified: 2026-05-01 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: listing, downloading, or writing request documents, or reasoning about where attachments live.
+
+Do:
+- Use `lib/services/graph-service.js` (Graph API, separate token cache) and `lib/utils/sharepoint-buckets.js` `getRequestSharePointBuckets` to enumerate all plausible libraries.
+- Probe `akoya_request` + `RequestArchive1..3` speculatively in parallel and tolerate 404s; walk subfolders with `listFiles(..., { recursive: true })`.
+- Use folder pattern `{RequestNumber}_{GUIDNoHyphensUppercase}`.
+
+Do not:
+- Use the `sharepointdocument` virtual entity via Web API (does not work) — go through Graph.
+- Assume files are in `akoya_request` only; migrated grants often live in an archive library (e.g. 993879 in RequestArchive3).
+
+Ground truth: `lib/services/graph-service.js`, `lib/utils/sharepoint-buckets.js`, `scripts/probe-sharepoint-write.js`, `docs/archive/IT_SECURITY_RESPONSE.md`.
 
 Documents attached to requests are stored in **SharePoint**, not Dynamics.
 

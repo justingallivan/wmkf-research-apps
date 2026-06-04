@@ -3,7 +3,26 @@ name: project-reviewer-workbench-invite-workflow
 description: Workbench Reviewers tab = 5 sub-tabs Find→Candidates→Invite→Track→Completed; invitations + attachment-safety + enrichment-disambiguation rules
 metadata:
   type: project
+  status: active
+  scope: reviewer
+  last_verified: S213 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: building or debugging the Workbench Reviewers tab sub-tabs, reviewer invitations/materials, or external enrichment disambiguation.
+
+Do:
+- Treat the 5 sub-tabs as Find → Candidates (where you INVITE pre-accept) → Invite/Track/Completed (materials to ALREADY-accepted reviewers).
+- Keep outward-send safety SERVER-authoritative: gate attachments on recipient `wmkf_accepted`, not caller `templateType`; guard duplicate sends.
+- Disambiguate external enrichment by the affiliation already known (institution in query + keep-biased `institutionConflicts`).
+
+Do not:
+- Persist search results before "Save" (they're ephemeral browser state) or add a paper-list field to the person record.
+- Assume "Invite" tab means inviting — it sends materials post-acceptance.
+- Put reviewer email templates in browser-localStorage — they're per-user in Dataverse `wmkf_appuserpreferences`.
+
+Ground truth: `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` §Phase 3, `lib/utils/reviewer-invite.js`, `serp-contact-service.js`, `shared/components/reviewers/email-template-store.js`, [[project-d26-reviewer-inputs-probe]], [[project-excluded-reviewers-often-in-pool]].
 
 The Request Workbench Reviewers tab (tier-3) has **5 sub-tabs** (S211–212):
 **Find** (discover/enrich via `ReviewerSearchSection` + applicant ingestion) → **Candidates** (`CandidatesPanel` — the saved-candidate roster from `my-candidates?requestId=`, where you INVITE) → **Invite/Track/Completed** (`ReviewerManagePanel`, accepted-reviewer management, `reviewers.js?proposalId=` which is `wmkf_accepted===true` only).

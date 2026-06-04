@@ -3,7 +3,27 @@ name: Dynamics AI Fields — v3 canonical, write access verified
 description: Canonical field names + write-access state for AI writeback to Dynamics akoya_request and wmkf_ai_run. Supersedes v2 spec.
 type: project
 originSessionId: 09e7e972-ba80-4cd8-88a7-6fa9bffc5036
+status: active
+scope: dynamics
+last_verified: S209 (2026-06-01) via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: wiring any AI writeback to Dynamics `akoya_request` or `wmkf_ai_run` (field names, Choice values, write privileges, no-clobber semantics).
+
+Do:
+- Pull field/Choice names from the v3 spec `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md`; use numeric Choice codes, never labels.
+- Use built-in `createdon` for run timestamps (`wmkf_ai_rundatetime` is vestigial); discover custom lookup nav-props (e.g. `wmkf_ai_Request`, capital R) via EntityDefinitions before binding.
+- For user-initiated writebacks, read-before-write (409-on-conflict contract); backend/PowerAutomate flows may overwrite freely.
+
+Do not:
+- Use v2 spec names (archived; do NOT match live) or target the `wmkf__ai_summary` double-underscore cruft field.
+- Design anything that drops `annotation` notes (`prvCreateNote` not granted) without going back to IT.
+- Trust the field counts / deploy-status here as current — re-probe via `scripts/inspect-ai-fields.js` / `scripts/dynamics-schema-diff.js`.
+
+Ground truth: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md`, `DynamicsService.logAiRun`, probe scripts (`scripts/inspect-ai-fields.js`); structural field/Choice/privilege facts should be re-probed, not trusted from this memory — see `../docs/APPLICATION_STATE_ATLAS.md`. Supersedes: v2 spec (`docs/archive/DYNAMICS_AI_FIELDS_SPEC_v2.md`).
+
 **Canonical spec:** `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` (Connor, 2026-04-14). v2 (`docs/archive/DYNAMICS_AI_FIELDS_SPEC_v2.md`) is archived — field names, Choice values, and child-table schema in v2 do NOT match what's actually live. Always refer to v3.
 
 **Why:** Connor implemented v3 in Dynamics and renamed several fields (no underscores after `wmkf_ai_` prefix, some renamed: `structured_data` → `dataextract`, `task_type` → `tasktype`, etc.). Writing code against v2 names will fail.

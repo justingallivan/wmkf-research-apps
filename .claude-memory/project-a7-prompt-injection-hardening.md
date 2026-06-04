@@ -2,7 +2,26 @@
 name: A7 prompt-injection hardening (SHIPPED S173-S177)
 description: All 24 LLM-input surfaces in this repo are hardened against prompt injection via wrapUntrustedContent + buildUntrustedContentPreamble + CI gate. Do NOT build a parallel system.
 type: project
+status: closed
+scope: security
+last_verified: S209 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: you're about to design or build any prompt-injection / untrusted-document / data-instruction-separation defense, or add a new LLM input surface.
+
+Do:
+- Read `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md` end-to-end before designing anything.
+- Use `wrapUntrustedContent` (text) or the multimodal preamble (image/document blocks) and register the surface in the `check:prompt-injection-tagging` gate.
+- For Dataverse-stored prompts, declare untrusted variables with `untrusted: true` in the variable schema.
+
+Do not:
+- Build a parallel/weaker injection-defense system — A7 already covers all 24 surfaces (the S182 burn).
+- Propose multimodal as a "future Phase 2" — it's already shipped.
+- Grep with article-jargon (canary, OCR, white-on-white); use codebase-general terms (untrusted, sentinel).
+
+Ground truth: `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md`; `lib/utils/ai-payload-boundary.js`; `lib/utils/ai-output-schema.js`; `scripts/check-prompt-injection-tagging.js`; `tests/unit/*-a7.test.js`.
 
 The codebase has a comprehensive, CI-gated prompt-injection-defense system. It was shipped across Sessions 173-177 (May 2026) as the "A7" initiative — 7 parts, ~30 commits, three Codex review rounds. Before designing or building any prompt-injection / LLM-content / "untrusted document" defense, read the existing plan and check the gate.
 

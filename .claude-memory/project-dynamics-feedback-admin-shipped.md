@@ -3,7 +3,24 @@ name: project-dynamics-feedback-admin-shipped
 description: Dynamics Explorer thumbs-feedback admin surface is fully shipped — don't re-list as a P1 from stale audits.
 metadata:
   type: project
+  status: closed
+  scope: dynamics
+  last_verified: S187 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: an audit or carryover re-lists "build the dynamics_feedback admin surface" as a P1/TODO.
+
+Do:
+- Treat it as a stale-premise carryover and verify against live state before any work — the surface already shipped.
+- Point to `DynamicsFeedbackSection` in `pages/admin.js` as the canonical reader.
+
+Do not:
+- Rebuild the feedback admin surface.
+- Conflate `dynamics_feedback` (user-facing thumbs) with `dynamics_query_log` (operational telemetry) — a real query_log gap is net-new tooling, scoped separately.
+
+Ground truth: `pages/api/dynamics-explorer/feedback.js`, `pages/admin.js` (`DynamicsFeedbackSection`), `dynamics_feedback` table, `FeedbackService.cleanupOldFeedback`.
 
 The Dynamics Explorer thumbs-up/down feedback flow is end-to-end shipped:
 

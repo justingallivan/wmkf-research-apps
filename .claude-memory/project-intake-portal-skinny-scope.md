@@ -3,7 +3,27 @@ name: Intake portal — skinny scope, not feature-for-feature GOapply replacemen
 description: Long-term goal is full GOapply replacement, but pilot is sized like the external reviewer intake — not a parallel GOapply
 type: project
 originSessionId: 05e61454-b0c9-4b62-a30f-89e979b3157b
+status: active
+scope: intake
+last_verified: unknown via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: sizing or scoping any intake-portal pilot work.
+
+Do:
+- Anchor on "external reviewer intake but for applicants," not "GOapply but better."
+- Use forms-as-code (no form builder UI); per-cycle deploys are acceptable.
+- Prefer fields on existing entities over new tables; shrink admin UI to collaborator approval + submitted-request list.
+
+Do not:
+- Replicate GOapply's full surface (scholarship automatch, multi-site, donor management, payment processing) — no WMKF value.
+- Build the submission PDF generator unless a downstream tool actually needs it.
+- Treat the four-table model in the planning doc as pilot scope (it's Phase 1+ expansion).
+
+Ground truth: `docs/INTAKE_PORTAL_DESIGN.md` (still skewed to the larger target), [[project-system-model]].
+
 The new applicant intake portal targets full GOapply replacement long-term
 (target "a"), but every pilot decision should be sized like the external
 reviewer intake portal: skinny, focused, leverages existing infra.

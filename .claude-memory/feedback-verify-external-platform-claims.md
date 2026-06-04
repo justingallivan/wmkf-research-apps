@@ -5,7 +5,25 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 1e1dfc4f-ebfe-49c2-965d-23d90c70e16f
+  status: active
+  scope: global
+  last_verified: S149 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: about to state behavior of an external platform (Dataverse, Power Automate, Azure AD, Vercel, Postgres, SharePoint Graph) in any doc, plan, or recommendation — especially latency numbers, quota limits, capability boundaries, defaults.
+
+Do:
+- WebFetch the authoritative doc (Microsoft Learn / Vercel / Postgres docs) before writing the claim; do not fall back to training-data memory.
+- Make verification use-case-specific, not feature-existence-specific; downgrade to `[partially verified — testing needed for {combination}]` when only the primitive is confirmed.
+- Label unverifiable claims explicitly `[unverified — needs Connor/Codex confirmation]`.
+
+Do not:
+- Let an option-matrix's structure smuggle confidence into unverified numbers.
+- Treat Codex rescue as the verification step (it's a second opinion on an already-verified decision).
+
+Ground truth: authoritative external docs (WebFetch); CLAUDE.md external-systems list. Related: [[feedback-cite-ground-truth]], [[feedback-falsify-not-confirm]].
 
 When making claims about external-platform behavior — Dataverse rollup latency, PA trigger filter capability, plug-in execution limits, Azure AD token lifetimes, Vercel quota semantics, Postgres advisory-lock scope, anything outside the repo — **probe an authoritative source before writing the claim**. Default to WebFetch on Microsoft Learn / official docs; WebSearch when the URL isn't obvious. Do NOT default to training-data memory.
 

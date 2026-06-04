@@ -3,7 +3,25 @@ name: Slice-0 wmkf_role probe + extension — VERIFIED 2026-05-22 (all 5 values 
 description: Which script verifies wmkf_apprequestperson.wmkf_role for intake schema slice 0, the post-deploy verified state (extender ran during S178; 0 to insert on S179 re-run), and the live data distribution
 type: project
 originSessionId: S155
+status: closed
+scope: intake
+last_verified: S179 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: verifying `wmkf_apprequestperson.wmkf_role` before writing Senior/Key/Other roster rows.
+
+Do:
+- Use `scripts/probe-apprequestperson-role-data.js` (definition + live row-data + filtered count; read-only; exit 0=CLEAR, 3=BLOCK).
+- Treat the deploy-time blocker as CLOSED (verified S179: all 5 picklist values present, 0 live rows in the new slots); re-run only if state may have drifted.
+
+Do not:
+- Use `scripts/dynamics-schema-diff.js` for this — it errors "Unknown table" on `wmkf_apprequestperson` and never inspects row data.
+- Trust a metadata-definition probe alone (Dataverse retains orphaned numeric values on rows).
+
+Ground truth: `scripts/probe-apprequestperson-role-data.js`, `scripts/extend-apprequestperson-role-picklist.mjs`, `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`. Point-in-time status snapshot — defer to live SESSION_PROMPT handoffs for current state. Related: [[feedback-human-legibility-schema-principle]], [[project-dynamics-explorer-schema-diff]].
+
 Intake-portal schema slice 0 extends `wmkf_apprequestperson.wmkf_role` from 2 → 5 option values (adds `100000002`/`100000003`/`100000004` = Senior Personnel / Key Personnel / Other). Blocking pre-deploy check: confirm no live row data already occupies those numeric slots — Dataverse retains orphaned numeric values on rows after an option is deleted, so a metadata-definition probe alone is insufficient.
 
 **Use:** `node scripts/probe-apprequestperson-role-data.js` (written S155, 2026-05-15). Does both halves — option-set *definition* probe + live *row-data* distribution + a precise filtered count on `100000002`–`100000004`. Exit `0`=CLEAR, `3`=BLOCK, `1`=ERROR (read-only; two OData GETs). Definition-only half alone: `scripts/probe-picklist.js wmkf_apprequestperson.wmkf_role`.

@@ -3,7 +3,26 @@ name: Wave 1 automated onboarding — agreed design
 description: Agreed design (2026-04-24) for zero-touch first-login provisioning after Wave 1 flags flip, including the new ensureStaffRoleAssigned helper and where to wire it.
 type: project
 originSessionId: 12929e8f-a1f9-4780-8aeb-89b85e260c0b
+status: closed
+scope: dataverse
+last_verified: 2026-05-12 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: a new staff onboarding triggers the auto-provisioning gap, or planning zero-touch first-login provisioning.
+
+Do:
+- Extend `grantDefaultApps` in `pages/api/auth/[...nextauth].js` to call a new `ensureStaffRoleAssigned(profileId)` helper (to live at `lib/services/onboarding.js`).
+- Make it idempotent and non-fatal — log failures, let sign-in proceed; resolve via `dataverse-identity-map.js` + `role-apply.js` against the Staff role.
+- Until built, use `apply-security-role.js --assign=<email>` to cover onboarding.
+
+Do not:
+- Build a separate panel/app/script — the /admin dashboard already handles grant-more-apps.
+- Treat the Wave 1 prerequisite as unmet — flags flipped 2026-05-03, tables dropped 2026-05-12.
+
+Ground truth: `pages/api/auth/[...nextauth].js`, `lib/services/dataverse-identity-map.js`, `lib/dataverse/role-apply.js`. Related: [[project-wave1-pending]].
+
 Once `WAVE1_BACKEND_APP_ACCESS=dataverse` is flipped in prod, new staff onboarding should be automated — not a panel, not a separate app, not a script. Justin approved this direction 2026-04-24 ("I'm not super worried about Dataverse being reachable on sign-in").
 
 **Design:**

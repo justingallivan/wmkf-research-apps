@@ -5,7 +5,23 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 17893605-3207-451d-8190-118bbacd8141
+  status: active
+  scope: dynamics
+  last_verified: unknown via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: using or extending the Dataverse Search API in Dynamics Explorer, or reasoning about its performance optimizations.
+
+Do:
+- Hit `{DYNAMICS_URL}/api/search/v1.0/query` for cross-table indexed text search; filter with `entities: [{ name: 'akoya_request' }]`; read `@search.*` result fields and `{crmhit}` highlights.
+- Keep the applied optimizations (inline schemas for top tables, parallel tool execution, SSE `text_delta` streaming, memoized message rendering).
+
+Do not:
+- Trust the index size / doc-count figures here as current — re-probe if load-bearing.
+
+Ground truth: `pages/api/dynamics-explorer/chat.js`, `shared/config/prompts/dynamics-explorer.js`; structural Search/schema facts should be re-probed, not trusted from this memory. See [[project-dynamics-explorer-reuse-power-tools]], [[project-dynamics-explorer-schema-diff]].
 
 ## Dataverse Search API
 

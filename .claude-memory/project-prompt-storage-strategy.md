@@ -3,7 +3,26 @@ name: Prompt Storage + Executor Contract (Phase 0 in flight for May 1 2026)
 description: Phased Vercel-first → PA-later plan; shared Dynamics core via wmkf_ai_prompt; Executor contract at docs/EXECUTOR_CONTRACT.md; Path B chosen (declarative wrappers, generic executors in both callers)
 type: project
 originSessionId: d898b20a-8b1d-4a13-ad0e-878f4f62e71d
+status: active
+scope: prompt
+last_verified: S209 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: building or modifying anything prompt-related — the Executor, prompt rows, chains, or PA/Vercel prompt execution.
+
+Do:
+- Read `docs/EXECUTOR_CONTRACT.md` first; use `lib/services/execute-prompt.js` as the canonical Executor.
+- Use the real table/field names: table `wmkf_ai_prompt` (NOT `wmkf_prompt_template`), fields `wmkf_ai_promptbody`/`wmkf_ai_promptvariables`/`wmkf_ai_promptoutputschema`/etc., system prompt `wmkf_ai_systemprompt`.
+- Keep Path B (declarative wrappers + generic executors); name prompts `<domain>.<purpose>`.
+
+Do not:
+- Re-litigate the Session-109 locked decisions (Path B, two chain shapes, declarative vars/outputs, cache-boundary marker).
+- Treat the Executor as multi-turn / agent-loop / SSE-streaming / retry-engine / chain-orchestrator / Batch API — it is none of these.
+
+Ground truth: `docs/EXECUTOR_CONTRACT.md`, `docs/PROMPT_STORAGE_DESIGN.md`, `docs/WORKFLOW_CHAINING_DESIGN.md`, `lib/services/execute-prompt.js`, `pages/api/phase-i-dynamics/summarize-v2.js`; wmkf_ai_prompt schema probed live 2026-04-24, row counts re-probed S209 2026-06-01.
+
 Session 109 (2026-04-24) reconciled six design docs + Wave 1 reality + Connor's built-out Dynamics schema into a single staged plan. **Authoritative refs:**
 - `docs/EXECUTOR_CONTRACT.md` — shared spec both PA + Vercel build against
 - `docs/PROMPT_STORAGE_DESIGN.md` — original design; field names now need renaming (see Ground truth below)

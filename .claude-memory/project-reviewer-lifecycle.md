@@ -2,7 +2,25 @@
 name: Reviewer Lifecycle Automation Plan
 description: Phased plan for automating the full reviewer lifecycle — from discovery through review filing. Pain is distributed across all stages.
 type: project
+status: active
+scope: reviewer
+last_verified: 2026-05-12 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: planning any reviewer-lifecycle automation (invitations, reminders, intake, status dashboard) or its phasing.
+
+Do:
+- Treat CRM email send (Phase A) as the foundation; build it in a shared, stateless, token-authenticatable helper callable from UI, chatbot, or PowerAutomate.
+- Keep workflows data-driven per grant cycle (JSONB config) — multiple programs differ; don't hardcode Research-specific steps.
+- Filter the default view by "my proposals" rather than restricting access (mirrors AkoyaGO).
+
+Do not:
+- Assume a manual add/create-from-scratch reviewer entry UI exists — re-verify the entry path (the old `reviewer-finder.js:2802` "Add Researcher modal" pin no longer resolves).
+- Re-pin design notes to line numbers.
+
+Ground truth: Dataverse `wmkf_appgrantcycle.wmkf_reviewreturndeadline`, `wmkf_appreviewersuggestion`; `chat.js` agentic tool-use pattern. Historical phasing agreed S87 (2026-03-13/14).
 
 Reviewer lifecycle has 8 stages. Current state: discovery is well-automated (Reviewer Finder), everything else has significant manual friction.
 

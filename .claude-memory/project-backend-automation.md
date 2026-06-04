@@ -2,7 +2,25 @@
 name: Backend Automation Vision
 description: Leadership-driven initiative to move from manual user-initiated processing to event-driven backend automation via PowerAutomate, with all results written to Dynamics
 type: project
+status: active
+scope: strategy
+last_verified: unknown via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: planning event-driven backend automation, PowerAutomate triggers on Dynamics status changes, or dual-auth processing endpoints.
+
+Do:
+- Make new API work stateless and token-authenticated so it serves both UI users and PowerAutomate (plan for service-token OR user-session auth).
+- Treat Dynamics as the write-back source of truth; PA handles CRM writes initially.
+- Use the v3 AI field spec; see [[project-dynamics-ai-writeback]] for the canonical field list.
+
+Do not:
+- Reintroduce per-app v2 field names (`wmkf_ai_structured_data` is renamed to `wmkf_ai_dataextract`).
+- Assume run metadata lives on `akoya_request` — timestamps/model/version moved to the `wmkf_ai_run` child table.
+
+Ground truth: `docs/EXECUTOR_CONTRACT.md`, [[project-dynamics-ai-writeback]]; PROMPT_STORAGE_DESIGN (Pattern A dual-caller).
 
 Leadership wants key processing tasks automated on the backend — no manual uploads. Two tiers:
 

@@ -3,7 +3,26 @@ name: Dynamics Explorer tool-result serializer — shipped
 description: Codex AI_DATA_FLOW_MATRIX P1 #2 (Dynamics Explorer agentic-loop record-detail boundary). Deferred 2026-05-04, then shipped later in Session 130 after Codex implemented the model-context minimization tranche.
 type: project
 originSessionId: 86703e2a-1188-4182-8ea8-fcc124398944
+status: closed
+scope: dynamics
+last_verified: S130 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: adding or extending Dynamics Explorer tools, or debugging Claude treating an AI-generated field as authoritative in the explorer agent loop.
+
+Do:
+- Default new tools to non-passthrough so the serializer (`lib/utils/dynamics-explorer-serializer.js`) fires; only add to PASSTHROUGH_TOOLS for small, already-curated output (schema/counts/search summaries).
+- Treat the serializer as model-context minimization (token + loopback control), NOT a Dataverse permission layer — staff already have full CRM access.
+- Investigate denylist vs. system-prompt tightening when the AI-field loopback symptom appears.
+
+Do not:
+- Frame this as RBAC or a sensitive-field security control.
+- Assume `wmkf_ai_summary` is redacted — it relies on the 1500-char cap, not the denylist.
+
+Ground truth: `lib/utils/dynamics-explorer-serializer.js`, `pages/api/dynamics-explorer/chat.js`, tests `tests/unit/dynamics-explorer-serializer.test.js` + `tests/integration/dynamics-explorer-tool-serialization.test.js`, commit `06e682b`.
+
 Shipped in Session 130, commit `06e682b` (`Add Dynamics Explorer model-context serializer`). Implemented as `lib/utils/dynamics-explorer-serializer.js` and wired into `pages/api/dynamics-explorer/chat.js` at three points: tool results before they're appended as Claude `tool_result` messages, Dataverse Search highlights field-by-field, and export AI-processing record paths.
 
 **Framing — important for future readers:** This is **model-context minimization, not a Dataverse permission layer.** The 16 staff users have full CRM access by design; the serializer's job is to keep generated content (`wmkf_ai_summary`, `wmkf_ai_rawoutput`, `wmkf_ai_promptoverride`), large narrative memos (`description`, `notetext`, `body`, `documentbody`), and credential-shaped fields out of the agent loop where they would inflate cost and risk loopback. The original "sensitive field" framing in Codex's matrix was preventive against a threat model staff-side RBAC already covers — the real value is reducing token spend and Claude-citing-AI-output-as-truth.

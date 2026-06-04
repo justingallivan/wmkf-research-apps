@@ -5,7 +5,25 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e2f71cb4-b29c-4510-b8fe-1da4a49ec6ee
+  status: closed
+  scope: dynamics
+  last_verified: 2026-05-14 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: working on IRS tax-exempt (BMF) verification — the verify-EIN endpoint, the BMF refresh cron, or PA's account writeback contract.
+
+Do:
+- Treat this as SHIPPED + loaded (1.26M rows live as of 2026-05-14); the `refresh()` + `verifyEin()` service is `lib/services/irs-bmf-service.js`.
+- Keep the endpoint read-only: PA owns the Dynamics `account` writeback, not this app.
+- Bump the cron from quarterly (`0 6 15 1,4,7,10 *`) to monthly (`0 6 15 * *`) only when the SoCal program comes online.
+
+Do not:
+- Move the BMF extract into Dataverse — reference data stays in Postgres by design.
+- Assume Pub 78 / Auto-Revocation lists are loaded (they are not; BMF alone answers "currently exempt?").
+
+Ground truth: `lib/db/migrations/008_irs_exempt_orgs.sql`, `lib/services/irs-bmf-service.js`, `pages/api/cron/refresh-irs-bmf.js`, `pages/api/irs/verify-ein.js`, `scripts/import-irs-bmf.js`, `vercel.json` cron entry, `proxy.js` allowlist.
 
 **Status: SHIPPED 2026-05-12 (Session 147) + FIRST LOAD COMPLETE.** Initial implementation shipped 2026-05-12. **First BMF load complete — 1,264,156 rows live in `irs_exempt_orgs` as of 2026-05-14 audit.** Verify-EIN endpoint is now answering real lookups, not `found: false` for everything.
 

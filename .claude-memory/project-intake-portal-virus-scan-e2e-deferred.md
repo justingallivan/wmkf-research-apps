@@ -3,7 +3,24 @@ name: project-intake-portal-virus-scan-e2e-deferred
 description: When intake portal goes live, run an EICAR-style e2e through /apply to verify the virus-scan rejection path. Reviewer path was verified in S193; intake path was deferred since the portal isn't user-ready yet.
 metadata:
   type: project
+  status: active
+  scope: intake
+  last_verified: S203 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: the intake portal is about to go live to real applicants, or you're touching the intake upload virus-scan path.
+
+Do:
+- Run the irreducible manual EICAR e2e through `/apply` on a deployed env (`VIRUS_SCAN_ENABLED=true` + `CLOUDMERSIVE_API_KEY`) before real applicants: stage `python3 scripts/build-intake-eicar-fixture.py`, upload `/tmp/eicar-test-exe.docx`, confirm HTTP 422 `infected` + blob deleted + `system_alerts` row `type='virus_detection_intake'` + email.
+- Expect `ContainsExecutable` to fire and surface as `virusName='embedded executable'`.
+
+Do not:
+- Treat the reviewer-path S193 verification as covering the intake path — only the shared scanner half is proven; the live integration (Entra session + three-call dance + Blob + scan) is still unrun.
+- Skip this as "just a logic check" — the code/unit half is green; the residual is deployed-env integration confidence.
+
+Ground truth: `pages/api/intake/draft/attach.js` (lines 430/486/526), `lib/services/cloudmersive-scan.js` (`scanBytes`), `tests/unit/intake-attach-endpoint.test.js:523/565`, `scripts/build-intake-eicar-fixture.py`; related [[project-cloudmersive-advanced-endpoint]], [[project-virus-scanning-it-context]].
 
 S193 verified the virus-scan reject + system_alerts row + email path end-to-end through the **reviewer upload** flow (`/api/review-manager/upload-review` → `lib/services/review-upload.js` → Cloudmersive `/advanced`). The **intake portal upload** path (`/api/intake/draft/attach`) was NOT exercised live because Entra External ID sign-up was rough (per [[project-intake-portal-ui-todo]]) and the test would have required navigating a fake-applicant flow that isn't user-ready.
 

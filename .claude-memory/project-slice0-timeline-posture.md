@@ -3,7 +3,27 @@ name: Slice-0 timeline posture — historical (slice-0 deployed S178 2026-05-22)
 description: Slice-0 has deployed. This entry preserves the soft-dates / no-aggressive-chasing posture as historical context — applies forward to similar Connor-gated work, NOT to slice-0 itself.
 type: project
 originSessionId: S157
+status: closed
+scope: intake
+last_verified: S178 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: reporting status on any Connor-gated schema-deploy or collaboration work in a `/start` digest or `/stop` handoff.
+
+Do:
+- Report Connor-gated gating status factually, without "overdue / at-risk / N-days-out" framing.
+- Treat planning dates as SOFT targets with built-in slack; write Calendar Checkpoints in soft-target language.
+- Batch any "Connor asks" into a single low-pressure consolidated request.
+
+Do not:
+- Compress soft planning dates into hard-deadline language or re-amplify false urgency each session.
+- Propose aggressive Connor escalation or nagging — the user has leverage, not zero, and is not Connor's boss.
+- Treat this as a live posture for slice-0 itself (it deployed S178); apply only as a forward pattern.
+
+Ground truth: historical-only (lesson, not live state). Pilot anchor context in [[project-intake-portal-skinny-scope]], [[project-system-model]].
+
 **STATUS: HISTORICAL — slice-0 deployed S178 (2026-05-22).** Connor's Item 6 + name/shape review work converged successfully. The posture below is preserved as a forward-applicable pattern for similar Connor-gated work, NOT a live posture for slice-0.
 
 The slice-0 calendar checkpoints that `/start` was surfacing as "OVERDUE / 3 days out / timeline at risk" were **misframed**. Per the user (S157, 2026-05-16):

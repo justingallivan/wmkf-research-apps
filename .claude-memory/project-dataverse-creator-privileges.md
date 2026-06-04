@@ -3,7 +3,26 @@ name: Dataverse entity-creation authority delegated to Justin/Claude (2026-05-06
 description: Connor approved standing authorization to create new Dataverse entities + fields directly via creator privileges, with summary-after model rather than design-review-before
 type: project
 originSessionId: 064dffdf-ba31-44c3-81f2-73bf4d3b908f
+status: active
+scope: dataverse
+last_verified: 2026-05-14 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: deciding whether new Dataverse entities/fields/choices for pilot-scope work need Connor sign-off before creation.
+
+Do:
+- Proceed on pilot-scope additive schema changes without per-change Connor coordination; apply, then log.
+- Record every entity/field/choice change in the running catalog `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`.
+- Keep conservative `wmkf_*` naming, single source of truth, no orphans.
+
+Do not:
+- Drop, repurpose, or mutate existing production entities/fields under this authorization — it covers ADDING only.
+- Touch out-of-scope schema (core `akoya_request` redesign, relationship restructuring, anything affecting AkoyaGo) without explicit Connor sign-off.
+
+Ground truth: `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` (live catalog); deployed-vs-sketched entity names — see [[project-slice0-scope]]; verify any specific live schema claim against `../docs/APPLICATION_STATE_ATLAS.md`, do not trust this file's in-meeting sketch names.
+
 **Status as of 2026-05-06**: Standing authorization. Granted by Connor in the intake portal sync 2026-05-06.
 
 **Why**: Connor said "we still have creator privileges. Connor has given the go ahead to create new entities for this project. We can do it and just give him a summary of what's been created." Removes a coordination bottleneck for portal pilot work where many small schema changes were going to gate on Connor design review.

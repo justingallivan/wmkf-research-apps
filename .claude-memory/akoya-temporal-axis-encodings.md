@@ -5,7 +5,26 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: 8050fbb7-13c6-444b-b802-c9bc7a61a3ce
+  status: active
+  scope: dataverse
+  last_verified: S162 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: building any cohorting/cycle-filter or temporal-axis UI over `akoya_request` (e.g. Dataverse Bulk Export, Reviewer Finder cycle filters).
+
+Do:
+- Treat `wmkf_meetingdate` as the single canonical temporal handle (raw range = fail-safe ground truth); compile cycle filters to a `wmkf_meetingdate` range via `cycleCodeToOdataFilter`.
+- Surface an off-month / null-cycle meeting LOUDLY (`UNCLASSIFIED cycle` sentinel) — never coerce to nearest cycle, never silently drop.
+- Verify callers (e.g. `my-proposals.js`, `reviewer-suggestion.js findByPD`) before relying on existing cycle filters.
+
+Do not:
+- Expose `akoya_fiscalyear` as a separate filter axis (it's just month+year of `wmkf_meetingdate`).
+- Treat `Jxx`/`Dxx` as a schema invariant — it's a June/Dec convention; non-June/Dec months return null and vanish from cycle-grouped views.
+- Conflate `wmkf_meetingdate` (board-cycle) with `akoya_decisiondate` (approval-stamp/business-history axis).
+
+Ground truth: `lib/utils/cycle-code.js`; `scripts/probe-akoya-meetingdate-by-type.js` + evidence `docs/atlas/evidence/akoya-meetingdate-by-type-2026-05-18.txt`; build-plan §9. Related: [[dataverse-export-floor-scoping]].
 
 On `akoya_request`, `wmkf_meetingdate` is the single canonical temporal field for board-cycle work. There are not multiple independent time dimensions for cohorting — there is one, with three encodings:
 

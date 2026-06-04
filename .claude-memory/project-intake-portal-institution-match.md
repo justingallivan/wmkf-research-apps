@@ -3,7 +3,25 @@ name: project-intake-portal-institution-match
 description: Intake portal must match an applicant's institution against existing `account` rows before creating a new one — typo-fuzzy ("Stafnord" → "Stanford"), AKA-aware
 metadata:
   type: project
+  status: active
+  scope: intake
+  last_verified: S168 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: designing the intake portal's institution-selection control, or any path where a free-text org name lands in the system (PA flows, external integrations).
+
+Do:
+- Match-an-existing-account-first, create-only-as-last-resort.
+- Query Dataverse `accounts` against `name`, `akoya_aka`, `wmkf_legalname`, and `wmkf_abbreviation` using fuzzy matching (trigram / edit-distance / Search API relevance).
+- Use a typeahead + confirmed-pick UX with a "Did you mean…?" interstitial above a similarity threshold.
+
+Do not:
+- Ship a bare free-text Institution box — it pollutes the canonical `account` registry with near-duplicates.
+- Rely on Connor's GOverify gate for dedup (it validates tax status only).
+
+Ground truth: Dataverse `accounts` (Search API enabled per [[project-dynamics-explorer-details]]), [[project-intake-portal-skinny-scope]], [[project-machine-legible-form-capture]].
 
 When the intake portal lets an applicant request a new account / submit a proposal, the institution selection must be **match-an-existing-account-first, create-only-as-last-resort**. A free-text "Institution" box will pollute the `account` table with near-duplicates (typos like "Stafnord", abbreviation drift "Stanford U." / "Stanford University" / "The Board of Trustees of the Leland Stanford Junior University", punctuation/casing variants).
 

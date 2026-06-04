@@ -5,7 +5,25 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 6f66eb83-87a2-47a6-b4be-21f06cbadf1a
+  status: active
+  scope: dataverse
+  last_verified: S164 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: a session starts on or after 2026-07-01 and the drain-only reviewer Postgres tables still exist.
+
+Do:
+- Surface this as a P0 `/start` item if past the date threshold and tables still present.
+- Run the staleness probe first (every `MAX(...)` should be ≥14 days old); STOP if any is recent.
+- Back up to JSONL on Blob + write the restore script before any DROP; drop in dependency order (`researcher_keywords` before `researchers`); update Atlas pages + re-run `check:atlas`.
+
+Do not:
+- Build a cleanup cron — the decision was a one-shot DELETE per Wave 1 precedent.
+- Proceed if the pilot was rolled back or a live reader is found — the trigger is "date passed," not "drop no matter what."
+
+Ground truth: `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` (post-pilot row §801), `docs/atlas/postgres-researchers.md`, `docs/atlas/postgres-other-reviewer-tables.md`. Related: [[project-reviewer-postgres-to-dataverse-migration]].
 
 **Trigger:** any session that starts on or after **2026-07-01**, while these tables still exist in Postgres.
 

@@ -5,7 +5,25 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 8050fbb7-13c6-444b-b802-c9bc7a61a3ce
+  status: active
+  scope: intake
+  last_verified: S178 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: working on the slice-0 parent↔child roster rollup, the `wmkf_apprequestperson` recompute, or the intake drain lifecycle.
+
+Do:
+- Use soft-delete via `statecode` deactivation, never hard delete; recompute the parent over ACTIVE children only.
+- Treat the recompute mechanism as Option A′ (flow-body conditional; trigger has no Filter rows) — P1-Update Filter-rows FAILED maker-portal validation.
+- Re-run both point-in-time probes + grep live callers at actual deploy time; `--execute` is never autonomous.
+
+Do not:
+- Re-propagate "NOT Item-6-gated / no open precondition" — that was the corrected overstatement; the deployed schema is done but P4 (A′ real-schema re-verify) remains.
+- Assume slice-0 needs schema rework for deactivation — Dataverse custom entities carry `statecode`/`statuscode` by default; schema DEPLOYED to prod S178.
+
+Ground truth: `docs/INTAKE_PORTAL_ITEM_6_STATUS.md` (live status), `INTAKE_PORTAL_DESIGN.md`, `INTAKE_PORTAL_SCHEMA_CHANGES.md`. Related: [[dataverse-export-floor-scoping]].
 
 Connor's email (received S162, 2026-05-18) resolving the slice-0 Item-6 block — verbatim gist: *"Option A is a no-go. Dynamics doesn't provide the parent record ID when the child record is deleted. But … defunct records shouldn't be deleted, they should be deactivated. The flow would run on the child record update deactivating it, and recalculate based only on active records."*
 

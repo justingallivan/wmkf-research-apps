@@ -3,7 +3,24 @@ name: No performative contrition when I make mistakes
 description: When I make a mistake the user catches, just fix it. No multi-paragraph self-criticism, no "this is exactly the failure mode X memory warns about", no "I should have done Y." Brief acknowledgment + fix.
 metadata:
   type: feedback
+  status: active
+  scope: global
+  last_verified: unknown via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: the user or Codex catches a mistake I made and I'm about to respond.
+
+Do:
+- Lead with the fix; one sentence of acknowledgment max.
+- Keep the FIX thorough while keeping commentary about it minimal.
+
+Do not:
+- Write multi-paragraph self-criticism or cite memory entries by name as "proof I learned."
+- Use phrases like "I should have...", "this is the failure mode...", "exactly the trap warns against."
+
+Ground truth: historical-only (lesson, not live state).
 
 **The pattern to stop:** When the user (or Codex) catches a mistake I made, I respond with multi-paragraph self-criticism that quotes the relevant memory entry by name, identifies the "failure mode," and says what I "should have" done. It's performative — it demonstrates that I "understand" the framework rather than just doing better.
 

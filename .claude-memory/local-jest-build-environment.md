@@ -5,7 +5,23 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 8973a5d9-b293-4f16-b683-f8fa76e1618a
+  status: closed
+  scope: dev-env
+  last_verified: S173 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: local `npx jest` / `npm run build` hangs or behaves oddly on Justin's Mac, or considering whether local test/build is viable vs CI-only.
+
+Do:
+- Treat the env as fixed: Rosetta OFF, Node arm64 via Homebrew at `/opt/homebrew/bin/node`, clean `npm ci` tree — jest + build work locally now.
+- If a dep breaks on Node 26, fall back: `brew install node@24 && brew unlink node && brew link node@24`.
+
+Do not:
+- Re-litigate the S172 "jest hangs" diagnosis or re-chase jest/next config (the cause was a wrong-arch/corrupt `node_modules`, now reset).
+
+Ground truth: historical-only (lesson, not live state); `/opt/homebrew/bin/node`. Related: [[memory-store-propagation]].
 
 Justin's Apple Silicon Mac local dev environment — diagnosed and FIXED in S173 (2026-05-21).
 

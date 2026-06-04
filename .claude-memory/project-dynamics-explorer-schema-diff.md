@@ -3,7 +3,24 @@ name: Dynamics Explorer schema discovery — prefer the diff tool
 description: How to find Dataverse fields missing from Dynamics Explorer's inline annotations; which script to use and which to avoid for that purpose
 type: project
 originSessionId: 176c13fa-41ec-4cad-a5ac-c3ad9b64cdac
+status: active
+scope: dynamics
+last_verified: 2026-05-05 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: a user reports Dynamics Explorer "doesn't know about field X," or you need to find Dataverse fields missing from Explorer's `TABLE_ANNOTATIONS`.
+
+Do:
+- Run `scripts/dynamics-schema-diff.js [table ...]` (definition-based, full attribute metadata regardless of population) to enumerate the gap, then curate descriptions by hand.
+- Focus curation on custom `wmkf_*`/`akoya_*` fields the foundation uses; ignore the large raw "missing" count (mostly system boilerplate).
+
+Do not:
+- Use `scripts/dynamics-schema-map.js` for gap-finding — it's sample-based (25 records, <20% population dropped) and silently misses sparsely-populated new fields like `wmkf_ai_summary`.
+
+Ground truth: `scripts/dynamics-schema-diff.js` (+ gitignored `.json`), `shared/config/prompts/dynamics-explorer.js`. Schema gaps are live — re-run the diff tool rather than trusting any field list in this memory.
+
 When fields are added to Dataverse, Dynamics Explorer's `TABLE_ANNOTATIONS` (`shared/config/prompts/dynamics-explorer.js`) does NOT update automatically. The model only "knows" about hand-curated fields. Use the right tool to find the gap.
 
 **Use:** `scripts/dynamics-schema-diff.js` (added 2026-05-05, commit `25d91e4`).

@@ -3,7 +3,26 @@ name: Reviewer lifecycle counts — historical data quality
 description: Pre-J26 proposals have incomplete invited/accepted/declined data; only J26+ where staff used the tools is reliable
 type: project
 originSessionId: 8d412c2f-d6c6-4080-a43c-79e0e04e9653
+status: active
+scope: reviewer
+last_verified: 2026-05-12 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: interpreting or building on reviewer invited/accepted/declined counts.
+
+Do:
+- Trust counts only on J26+ proposals where the ledger row exists.
+- Filter to J26+ cycles before building alerts/triage on accept rates.
+- Treat pre-J26 zeros as "unknown", not "no reviewers invited".
+
+Do not:
+- Read pre-J26 zeros (or J26 mixed-adoption zeros) as real zero invitations.
+- Assume the W3–W6 backfill invented missing history — pre-J26 gaps remain gaps.
+
+Ground truth: Dataverse `wmkf_appreviewersuggestion` (backfilled from Postgres `reviewer_suggestions`, now drain-only), `wmkf_potentialreviewer1..5` slot fallback.
+
 **Reality:** Reviewer lifecycle counts shown in `/reviewer-finder` (invited / accepted / declined) come from **Dataverse `wmkf_appreviewersuggestion`** (post-W3-W6 cutover 2026-05-12) — backfilled from the historical Postgres `reviewer_suggestions` table where data existed. That data only starts being populated when staff used the tool to save candidates — which began in **J26** for the Foundation, and not all staff used it that cycle either. The data-quality caveat below is unchanged by the storage migration; it's about adoption history, not where the rows live now.
 
 **What this means:**

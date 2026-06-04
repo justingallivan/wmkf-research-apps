@@ -5,7 +5,23 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 8821677f-2a33-4a32-b5ca-e3fb038b41a1
+  status: active
+  scope: global
+  last_verified: S174 via memory-content (not re-probed 2026-06-04)
 ---
+
+## Recall Rule
+
+Read this when: executing a multi-part initiative the user said to finish/complete.
+
+Do:
+- Keep building part after part in the same turn; commit at natural checkpoints and report progress, then continue.
+
+Do not:
+- End turns with "want me to stop here / (a) stop (b) continue" menus — the user reads repeated stop-offers as trying to quit on them.
+- Pause for permission between parts when the destination is known.
+
+Ground truth: historical-only (lesson from S174 A7 initiative). The one real exception: genuine forks — destructive action / ambiguous requirement — see [[slice0-deactivate-not-delete-recalc]].
 
 When given a multi-part initiative ("finish the A tasks"), do NOT keep ending
 turns with "want me to stop here / option (a) stop, (b) continue" menus. The
