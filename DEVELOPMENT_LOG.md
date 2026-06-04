@@ -10,6 +10,25 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — ORCID capture restored + authoritative-ID backfill (Session 215)
+
+**Milestone:** A manual Workbench smoke of the S214 resolver uncovered that ORCID had been silently dead: `searchByName` read `family-name`, but ORCID's expanded-search returns `family-names` (plural), so every record's familyName was undefined → the name-match gate rejected all records → `findContact` always returned null → ORCID never contributed an anchor → the resolver's `probable` status was unreachable. (ORCID creds were also unset in prod, masking it.) Fixed the parser, added the corroborated-ORCID strong-anchor rule, and backfilled authoritative ORCIDs across the reviewer pool. A latent-bug incident + a new resolver capability + a prod data cutover.
+
+**Sessions:** 215 (smoke → fix → measure → rule → 3 Codex rounds → deploy → backfill; 6 commits, all via the `codex:codex-rescue` agent).
+
+**Ship state:**
+- **Parser fix** (`9e14291`): `family-name`→`family-names`; regression test exercises the raw-response mapping the prior tests mocked *above*.
+- **Corroborated-ORCID strong anchor** (`5693a80`, design §3.1): an ORCID matched on name AND institution → STRONG anchor → `probable` on its own (the design's "one strong anchor" rung, previously unimplemented). Bare name-match stays weak → unresolved. Auditable anchor `orcid_public_institution_corroborated` + matched institution logged. `RESOLVER_VERSION` 1.0.0→1.1.0-pr1.
+- **Data measurement:** sampled 250 of 4,269 reviewers → ~42% resolve to an unambiguous ORCID (~33% institution-corroborated); an ORCID×Scholar cross-tab (15% new-unlock, ~4.4% kept-gated) drove the gate decision.
+- **Prod backfill** (`scripts/backfill-orcid-identity.js`, resumable two-phase): wrote **1,532** corroborated ORCIDs to `wmkf_potentialreviewers` — pool went **1 → 1,533** rows with an ORCID, 0 failed, independently re-counted.
+- 1781 tests; Codex round-3 **SHIP-READY**; route-handler clear-on-downgrade coverage added (`59465bb`).
+
+**Why it matters:** ORCID — the authoritative, increasingly-mandated unique researcher ID — is now actually captured (it never was, despite two phases of code assuming it worked). 1,533 reviewers now carry a stable cross-system join key, the foundation for de-fragmenting the disjoint reviewer stores (contact / GOapply / honorarium / researchers).
+
+**Pointers:** `docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md` §3.1; memory [[project-vercel-sensitive-env-pull-empty]]; commits `9e14291`→`84e4d06`.
+
+---
+
 ## June 2026 — Reviewer identity resolution: false-match safety + deterministic resolver (Session 214)
 
 **Milestone:** Built the reviewer-identity safety layer the S213 collapse surfaced — the recurring false-match where a search for a PI attached a *lab member's / homonym's* Scholar/ORCID metrics (the institution-only guard can't tell same-institution people apart). Shipped a hard Scholar displayed-name guard + ORCID name-scoring (Phase 1), audited + remediated the already-wrong prod data, then landed a deterministic identity **resolver** (Phase 2 PR1) that gates whether bibliometrics/ORCID may persist or count toward ranking. New architecture + a prod Dataverse schema deploy + a quiet data-correction incident.

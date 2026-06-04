@@ -1,65 +1,66 @@
-# Session 215 Prompt: Reviewer identity resolver — smoke PR1 + later PRs (or new work)
+# Session 216 Prompt: Reviewer ORCID de-fragmentation + later resolver PRs (or new work)
 
-## ⏰ Standing context / guardrails (carried S197–S214)
-- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity into docs/memory. It earned its keep in S214: caught a "3 persons" claim that was really 8 (filtered on the wrong field). Authoritative lint = `npx eslint . -f json` keyed on `ruleId`/`severity`.
-- **Codex via the RESCUE PATH works well** — `Agent(subagent_type: 'codex:codex-rescue')` ran 5 reviews cleanly in S214 (design ×3, post-impl, Perplexity). The **stop-time review GATE is still disabled** (broke mid-S213); re-enable with `/codex:setup` if wanted, but the rescue path is the reliable way to invoke Codex. **Deliver Codex output VERBATIM** ([[feedback-share-codex-verbatim]]).
-- **`main` auto-deploys to prod.** All S214 work is pushed (`347704f`→`9da5793`).
-- **CI-green ≠ correct for async/effect/UI/outward-facing code.** Manual smoke is mandatory ([[feedback-profile-context-runtime-bugs]]). **← This is the #1 open item for the identity resolver (below).**
+## ⏰ Standing context / guardrails (carried S197–S215)
+- **Falsification hook is LIVE** (`.claude/hooks/scope-claim-reminder.js`). Run the *disconfirming* query before asserting scope/quantity into docs/memory. It earns its keep — S214 caught "3 persons" that was really 8; S215 the pool was "300+" but really 4,269. Authoritative lint = `npx eslint . -f json` keyed on `ruleId`/`severity`, **but eslint is NOT installed locally** (npx tries to fetch it) — lint runs in CI only; rely on jest + `node --check` locally.
+- **Codex via the RESCUE PATH works well** — `Agent(subagent_type: 'codex:codex-rescue')`. S215 ran 5 reviews (1 design + 4 review/rounds) cleanly; one early run stalled because **Codex has no outbound network** (its live ORCID probe failed) — feed it captured data, tell it not to fetch. The **stop-time review GATE is still disabled**; rescue path is the reliable way. **Deliver Codex output VERBATIM** ([[feedback-share-codex-verbatim]]).
+- **`main` auto-deploys to prod.** All S215 work is pushed (`9e14291`→`84e4d06`) and verified deployed (build Ready, prod site 200).
+- **CI-green ≠ correct for async/effect/UI/outward-facing code.** Manual smoke is mandatory ([[feedback-profile-context-runtime-bugs]]). S215's whole arc started from one such smoke surfacing a latent bug CI couldn't see.
 - **Local-dev auth bypass:** `AUTH_REQUIRED=false NEXTAUTH_SECRET=dev-throwaway NEXTAUTH_URL=http://localhost:3000 ./node_modules/.bin/next dev`. Local-dev and prod hit the SAME prod Dataverse — no isolated test store.
-- **Ad-hoc prod-Dataverse probes/writes:** `.env.local`-loading mjs pattern; adapters need `bypassDynamicsRestrictions(...)`. Person logical name `wmkf_potentialreviewers` (trailing s). The metadata `Attributes` endpoint **501s on `$filter startswith`** — fetch all + filter in JS.
-- **Dataverse schema deploys can 429 on `0x80071151` "another [Import] running"** — that's a **Microsoft managed-solution update wave** holding the org customization lock, NOT your error. Diagnose with an `importjobs` probe (`completedon` null = running); retry `apply-dataverse-schema.js` once it clears. (S214 lost ~15 min to this.)
+- **Ad-hoc prod-Dataverse probes/writes:** `.env.local`-loading mjs pattern; adapters need `bypassDynamicsRestrictions(...)`. Person logical name `wmkf_potentialreviewers` (entity set `wmkf_potentialreviewerses`). The metadata `Attributes` endpoint **501s on `$filter startswith`**; `queryAllRecords` requires a `$filter`.
+- **ORCID + NCBI creds are now SET in prod + `.env.local`** (Preview+Production scope). Vercel marks new secrets "Sensitive" → `vercel env pull` returns them EMPTY; paste by hand ([[project-vercel-sensitive-env-pull-empty]]). ORCID public-API search uses SOLR; special-character names can 500 (caught → null).
 
-## Session 214 Summary
+## Session 215 Summary
 
-A long session: appresearcher-collapse doc reconcile → reviewer identity-resolution **Phase 1 shipped** → **Phase 2 PR1 shipped** (deterministic resolver, end-to-end through the design→Codex→impl→post-impl loop).
+Started as the carried-over **manual Workbench smoke** of the S214 resolver; it surfaced that **ORCID had never actually worked**, which cascaded into a fix + a new resolver rule + a prod backfill.
 
 ### What was completed
-1. **Appresearcher-collapse drift reconcile** (`347704f`) — 15 docs + 3 memory + 1 comment repointed off the dropped sidecar; Codex-reviewed; caught a wrong D-AFF memory belief (org-name clamp kept, not dropped).
-2. **Identity resolution Phase 1** (`40d7327`) — Scholar displayed-name guard (`scholarNameMismatch`), ORCID name-scoring (`_nameMatchesTarget`), persistence gates. Fixes the Tsai→lab-member-Nakano false-match class.
-3. **Prod data-governance audit + remediation** (`5bf8d3b`/`c836f4a`) — `scripts/audit-persisted-scholar-identity.js` found the persisted-Scholar footprint is **8 pinned profiles** (not "~330" — that was the affiliation backfill); 1 wrong match (Frank Noe's URL → Cecilia Clementi's profile) cleared + 5 malformed/missing id fields fixed via `scripts/remediate-scholar-identity.js`. Re-audit clean.
-4. **Phase 2 design** (`ffc2cda`/`057d258`/`a5a084c`) — `docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md` v1→v2→v3, two Codex pre-impl rounds (v2 NEEDS-MINOR-REVISION → v3 READY-TO-IMPLEMENT).
-5. **Phase 2 PR1** (`610286f`/`1f9b3a8`/`8350551`/`19a9792`/`b6bfadc`):
-   - 6 `wmkf_identity*` decision fields **DEPLOYED to prod** on `wmkf_potentialreviewers` (`lib/dataverse/schema/wave6/03_*.json`; cataloged in `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`).
-   - `lib/services/reviewer-identity-resolver.js` — pure post-enrichment classifier (`resolveIdentity`, `evidenceFromEnrichment`, `mayPersistIdentity`, `RESOLVER_SOURCED_FIELDS`). PR1 rules: lone weak→unresolved, 2 corroborating weak→probable, ORCID multi-match→ambiguous, Scholar mismatch=rejected ANCHOR; `confirmed`/`rejected` not reachable in PR1.
-   - Verdict threaded through `enrichCandidate._finalize`; gates ALL identity-bearing writes in `save-candidates`, `enrich-recommended`, **and** `saveToDatabase` (the 3rd path — Codex post-impl MUST-FIX); `clearIdentityFields` null-clears on downgrade; `relevance-score` counts bibliometrics only when trusted; ORCID `findContact` returns `{status:'ambiguous'}` (was bare null).
-   - 1766 tests green; lint + atlas + api-routes + doc gates clean.
+1. **Found + fixed a latent ORCID parser bug** (`9e14291`) — `searchByName` read `family-name` but ORCID's expanded-search returns **`family-names`** (plural), so every record's familyName was undefined → name-match gate rejected all → `findContact` always returned null → ORCID never contributed an anchor → resolver `probable` unreachable → all reviewer ORCID/bibliometric persistence was blocked + cleared on re-enrich. Creds were also unset in prod (now set), masking it. Regression test exercises the raw-response mapping (prior tests mocked *above* it).
+2. **Corroborated-ORCID strong-anchor rule** (`5693a80`, design §3.1) — an ORCID matched on **name AND institution** is now a STRONG anchor → `probable` on its own (the design's "one strong anchor" rung, previously unimplemented). Bare name-match stays weak → unresolved. Auditable anchor `orcid_public_institution_corroborated` + matched institution in `parserOutput`; `RESOLVER_VERSION` 1.0.0→1.1.0-pr1.
+3. **Measured the real ORCID rate** (read-only) — random sample of 250 of **4,269** reviewers: ~42% resolve to an unambiguous ORCID (32.8% institution-corroborated, 8.8% lone). ORCID×Scholar cross-tab: `probable`-today 30%, +7.2% new-unlock from corroborated-alone, ~4.4% kept-gated (common-name risk). Scripts: `measure-orcid-resolution-rate.js`, `measure-scholar-orcid-crosstab.js`.
+4. **Codex review ×3 rounds → SHIP-READY** (`f5729db`/`59465bb`/`84e4d06`) — folded test-gap + doc-reconcile fixes, then route-handler clear-on-downgrade coverage (a must-fix for the two live write paths), then the final nice-to-haves. 1781 tests green.
+5. **Prod ORCID backfill** (`scripts/backfill-orcid-identity.js`) — resumable two-phase (`--resolve` read-only → audit JSONL; `--apply` writes eligible). Wrote **1,532 corroborated ORCIDs** to `wmkf_potentialreviewers` via the same gated adapter path production uses. Pool went **1 → 1,533** rows with an ORCID, 0 failed, independently re-counted in Dataverse.
 
 ### Commits (this session, newest first)
-`9da5793` memory · `b6bfadc` PR1 pt3 (post-impl fixes) · `19a9792` PR1 pt2 (threading) · `1f9b3a8` schema deployed · `610286f` schema-as-code · `8350551` PR1 pt1 (classifier) · `a5a084c` design v3 · `057d258` design v2 · `ffc2cda` design v1 · `c836f4a` remediation · `5bf8d3b` audit-script fix · `40d7327` Phase 1 · `347704f` doc reconcile
+`84e4d06` Q5 cleanup + backfill tooling · `523e63e` memory · `59465bb` route-handler coverage · `f5729db` Codex test/doc fixes · `5693a80` corroborated-ORCID strong anchor · `9e14291` family-names fix
 
 ## Potential Next Steps
 
-### 1. ⭐ MANUAL WORKBENCH SMOKE of the identity resolver (do this FIRST)
-PR1 is live prod code touching reviewer enrichment/persistence; CI-green ≠ correct. **Smoke it via the Workbench** with a real candidate (req **1002788** is the testbed): run a reviewer search → enrich → save, and confirm: (a) a clean match persists scholar/orcid + sets `wmkf_identitystatus`; (b) a lone-signal/mismatch candidate does NOT persist scholar/orcid (and clears stale values); (c) the `wmkf_identity*` fields populate sensibly. Watch for the resolver throwing (it's non-fatal but logs).
+### 1. ⭐ ORCID as a cross-store join key (the strategic payoff)
+1,533 reviewers now carry an authoritative ORCID. Use it to start **de-fragmenting the disjoint reviewer identity stores** ([[reviewer-identity-fragmentation]]): match `wmkf_potentialreviewers.wmkf_orcid` against `contact` / honorarium `akoya_request` / GOapply objects to collapse duplicate humans onto one identity. Probe first (how many cross-store matches does ORCID actually resolve?), then design.
 
-### 2. Phase 2 later PRs (specced in the design doc, not built)
-- **PubMed-cluster + faculty-page verification** → unlocks the `confirmed` status (PR1 tops out at `probable`). Cluster invariants: recurring coauthors + stable affiliation lineage + topical coherence.
-- **Postgres `identity_leads` + rejected-anchor memory table** (only needed when web leads land).
-- **Perplexity Search-API lead source** (`/search`, not sonar; anchors from `results[].url` only; A7-wrap; needs a live contract test). Existing `_callPerplexity` is sonar chat (returns flat `citations`); the Search API is a new small adapter.
+### 2. Finish ORCID capture coverage (the residual)
+- **Lone ORCID + clean Scholar (~4.4%)** — these reach `probable` via 2 weak anchors in the *normal* enrichment flow but were skipped by the ORCID-only backfill. A second backfill pass that also runs Scholar would catch them (cost: SerpAPI ×~4k). Or let normal enrichment pick them up.
+- **Special-character names** that 500 ORCID's SOLR search — sanitize the query in `searchByName` and re-run `--resolve` (resumable; it'll only re-touch un-checkpointed rows if you clear them).
 
-### 3. Carried reviewer follow-ons (from S213, still open)
+### 3. Phase 2 later resolver PRs (specced in the design doc, not built)
+- **PubMed-cluster + faculty-page verification** → unlocks the `confirmed` status (resolver tops out at `probable`). Cluster invariants: recurring coauthors + stable affiliation lineage + topical coherence.
+- **Postgres `identity_leads` + rejected-anchor memory** (only needed when web leads land).
+- **Perplexity Search-API lead source** (`/search`, not sonar; anchors from `results[].url` only; A7-wrap; needs a live contract test).
+
+### 4. Carried reviewer follow-ons (from S213, still open)
 - Per-user **signature** into the Workbench invite (`workbench/[requestId].js` passes only `session.profileName`; wire the `SENDER_INFO` pref).
 - **Co-investigator COI parity** in `discover.js` (enrich-recommended folds co-Is; shared discover checks PI only).
 - Grant `reviewers` app access to pilot PDs + validate `/workbench` with a real PD login.
 
-### 4. Intake virus-scan EICAR e2e — STILL parked pre-cycle must-do
+### 5. Intake virus-scan EICAR e2e — STILL parked pre-cycle must-do
 [[project-intake-portal-virus-scan-e2e-deferred]]. Needs deployed env + Entra applicant session.
 
 ## Key Files Reference
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md` | The approved v3 design + staged build plan (PR1 done; later PRs §9) |
-| `lib/services/reviewer-identity-resolver.js` | The deterministic classifier (resolveIdentity + gates) |
-| `lib/dataverse/adapters/researcher.js` | `writeIdentityDecision` + `clearIdentityFields` (+ bibliometric writeback) |
-| `pages/api/reviewer-finder/save-candidates.js`, `pages/api/workbench/enrich-recommended.js` | Gated write paths |
-| `lib/services/contact-enrichment-service.js` | `_finalize` attaches the verdict; `saveToDatabase` gated |
-| `scripts/{audit,remediate}-scholar-identity.js` | Read-only audit + remediation of persisted Scholar identity |
+| `docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md` | Design + §3.1 corroborated-ORCID strong anchor (shipped) |
+| `lib/services/reviewer-identity-resolver.js` | Deterministic classifier; `orcidEval` (strong/weak), `resolveIdentity`, gates |
+| `lib/services/orcid-service.js` | `searchByName` (family-names), `findContact` (+ `institutionCorroborated`/`matchedInstitution`) |
+| `lib/dataverse/adapters/researcher.js` | `upsertByPotentialReviewer` + `writeIdentityDecision` + `clearIdentityFields` |
+| `pages/api/reviewer-finder/save-candidates.js`, `pages/api/workbench/enrich-recommended.js` | Gated write paths (route-handler tested) |
+| `scripts/backfill-orcid-identity.js` | Resumable two-phase ORCID backfill (`--resolve`/`--summary`/`--apply`) |
+| `scripts/measure-orcid-resolution-rate.js`, `scripts/measure-scholar-orcid-crosstab.js` | Read-only ORCID/Scholar rate measurement |
 
 ## Testing
 ```bash
-npx jest                                    # full suite (1766)
-npx jest tests/unit/reviewer-identity-resolver.test.js tests/unit/reviewer-identity-guard.test.js tests/unit/save-to-database-identity-gate.test.js tests/unit/relevance-score-identity-gate.test.js
-npx eslint . -f json                        # 0 errors (warnings don't gate)
-npm run check:atlas && npm run check:api-routes && npm run check:fact-consistency && npm run check:doc-currency && npm run check:drain-table-mentions
-# Identity fields already DEPLOYED — do NOT re-run the wave6 deploy (idempotent, but no need).
+npx jest                                    # full suite (1781)
+npx jest tests/unit/reviewer-identity-resolver.test.js tests/unit/reviewer-identity-guard.test.js tests/unit/reviewer-route-identity-gate.test.js tests/unit/save-to-database-identity-gate.test.js
+node --check lib/services/orcid-service.js  # eslint NOT installed locally; lint is CI-only
+npm run check:atlas && npm run check:api-routes && npm run check:fact-consistency
+# ORCID backfill is DONE (1,532 written). Do NOT re-run --apply; checkpoints are gitignored/local.
 ```
