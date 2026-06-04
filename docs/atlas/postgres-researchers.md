@@ -1,9 +1,11 @@
-# Atlas: `researchers` (Postgres — DRAIN-ONLY)
+# Atlas: `researchers` (Postgres — DROPPED 2026-06-04)
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
+> **DROPPED 2026-06-04 (S219)** via `lib/db/migrations/018_drop_reviewer_finder_postgres_tables.sql`. The table no longer exists in Postgres. Reviewer person identity + bibliometrics live in Dataverse `wmkf_potentialreviewer`. Pre-drop data (331 rows) backed up to local JSONL + Vercel Blob `cleanup-backup/2026-06-04/researchers.jsonl`; restore via `scripts/w6-drop-restore.js` or Neon PITR (7-day). Page retained as historical record.
+
 **Last verified:** 2026-05-07 via `scripts/audit-postgres-state.js`. **Drain-status re-verified 2026-05-19 (S167)** via code grep + Codex independent verification.
-**Live row count:** 331 (drain-only; no live application readers or writers post-W6 cutover 2026-05-12)
+**Final row count before drop:** 331 (drain-only; no live application readers or writers post-W6 cutover 2026-05-12)
 
 ## Source of truth
 

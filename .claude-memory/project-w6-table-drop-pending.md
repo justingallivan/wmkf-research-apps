@@ -5,10 +5,12 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 6f66eb83-87a2-47a6-b4be-21f06cbadf1a
-  status: active
+  status: closed
   scope: dataverse
-  last_verified: 2026-06-04 via live Postgres probe (researchers=331, reviewer_suggestions=337, grant_cycles=13, publications/proposal_searches present — NOT yet dropped, today<2026-07-01)
+  last_verified: 2026-06-04 — DONE early (S219): all 5 tables dropped via migration 018; verified gone from pg catalog
 ---
+
+> **CLOSED — DROPPED EARLY 2026-06-04 (S219), ahead of the 2026-07-01 trigger.** Justin directed the cleanup now (he'd already removed reviewer-finder/review-manager from other users' visibility and stopped using them). Scope EXPANDED beyond the original 4 to **5 tables** — `researchers`, `researcher_keywords`, `publications`, `proposal_searches`, **+ `reviewer_suggestions`** — once a live FK probe showed `reviewer_suggestions.researcher_id → researchers` and re-verification confirmed `reviewer_suggestions` had no live app SQL (admin/migration scripts only). Dropping it too made the FK wrinkle vanish (nothing outside the set references any drop-target → no constraint surgery). **`search_cache` was EXCLUDED** — despite 0 rows it has LIVE callers (`DatabaseService.checkCache`/`cacheSearch` in pubmed/biorxiv/arxiv/chemrxiv + `/api/cron/maintenance`). Mechanism = a tracked migration (`018_drop_reviewer_finder_postgres_tables.sql`), matching the Wave 1 precedent (007), NOT the raw one-shot script this memory originally specified. Pre-drop backups (researchers 331 / researcher_keywords 1028 / reviewer_suggestions 337) → local JSONL + Vercel Blob `cleanup-backup/2026-06-04/` (`scripts/w6-drop-backup.js` + `scripts/w6-drop-restore.js`). Neon PITR 7-day = secondary restore. Atlas pages + CLAUDE.md schema table reconciled. The historical checklist below is retained for record; it is no longer actionable.
 
 ## Recall Rule
 

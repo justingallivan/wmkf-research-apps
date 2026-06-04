@@ -1,9 +1,11 @@
-# Atlas: `reviewer_suggestions` (Postgres — DRAIN-ONLY post-W3-W6 2026-05-12)
+# Atlas: `reviewer_suggestions` (Postgres — DROPPED 2026-06-04)
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
+> **DROPPED 2026-06-04 (S219)** via `lib/db/migrations/018_drop_reviewer_finder_postgres_tables.sql`. The table no longer exists in Postgres. Per-(person,request) reviewer engagement state lives in Dataverse `wmkf_appreviewersuggestion` (source of truth). Pre-drop data (337 rows) backed up to local JSONL + Vercel Blob `cleanup-backup/2026-06-04/reviewer_suggestions.jsonl`; restore via `scripts/w6-drop-restore.js` or Neon PITR (7-day). Verified 2026-06-04: no live app SQL readers/writers (only admin/migration scripts). Page retained as historical record.
+
 **Last verified:** schema/row-count 2026-05-07 via `scripts/audit-postgres-state.js` + `scripts/backfill-reviewer-suggestions-parity.js`; **read/write path lists re-derived 2026-05-18 (S164)** via full codebase grep + per-site SQL-verb classification (see "Read / write paths" below)
-**Live row count:** 337 (as of 2026-05-07; not re-probed S164 — S164 re-derived code paths only, not DB state)
+**Final row count before drop:** 337
 
 ## Source of truth
 

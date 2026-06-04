@@ -90,6 +90,9 @@ scripts/.lone-orcid-scholar-applied.jsonl
 scripts/.lone-orcid-scholar-conflicts.jsonl
 scripts/.lone-orcid-scholar-*.out
 
+# W6 reviewer-table-drop pre-drop backups (contain person data; local-only, S219)
+scripts/.w6-drop-backup/
+
 # ORCID cross-store match probe artifact (contains person data; local-only, S216)
 scripts/.orcid-cross-store.json
 scripts/.orcid-contact-direct.json

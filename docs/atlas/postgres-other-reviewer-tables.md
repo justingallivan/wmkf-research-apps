@@ -1,10 +1,12 @@
-# Atlas: Reviewer-side Postgres tables (small / DRAIN-ONLY)
+# Atlas: Reviewer-side Postgres tables (small)
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-05-07 via `scripts/audit-postgres-state.js`. **Drain-status re-verified 2026-05-19 (S167)** via code grep + Codex independent verification — none of these tables have live application readers/writers.
+> **`researcher_keywords` + `proposal_searches` DROPPED 2026-06-04 (S219)** via `lib/db/migrations/018_drop_reviewer_finder_postgres_tables.sql`. `researcher_keywords` (1,028 rows) backed up to Vercel Blob `cleanup-backup/2026-06-04/researcher_keywords.jsonl`; `proposal_searches` was empty. **`search_cache` is NOT dropped** — despite 0 rows it has LIVE callers (`DatabaseService.checkCache`/`cacheSearch` in pubmed/biorxiv/arxiv/chemrxiv services + the `/api/cron/maintenance` `cleanupExpiredCache` cron), so it remains a live literature-search cache. Sections for the two dropped tables retained as historical record.
 
-Covers three Postgres tables in the reviewer-finder domain that don't warrant individual pages: `researcher_keywords`, `proposal_searches`, `search_cache`. (`playing_with_neon` was a Neon-console tutorial scratch table dropped 2026-05-25 via migration 014; section retained below as a historical record.)
+**Last verified:** 2026-05-07 via `scripts/audit-postgres-state.js`. **Drain-status re-verified 2026-05-19 (S167)** via code grep + Codex independent verification. **`search_cache` live-caller status re-confirmed 2026-06-04 (S219)** — still in active use.
+
+Covers three Postgres tables in the reviewer-finder domain that don't warrant individual pages: `researcher_keywords` (DROPPED 2026-06-04), `proposal_searches` (DROPPED 2026-06-04), `search_cache` (KEPT — live cache). (`playing_with_neon` was a Neon-console tutorial scratch table dropped 2026-05-25 via migration 014; section retained below as a historical record.)
 
 ## `researcher_keywords` (1,028 rows)
 

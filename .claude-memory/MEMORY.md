@@ -54,7 +54,6 @@
 - BILL / honoraria: project-bill-honorarium-integration.md; akoya-request-honorarium-nomenclature.md; akoya-payment-field-semantics.md
 - No banking/PII in Dataverse (firm constraint): project-no-banking-pii-in-dataverse.md
 - App access / auth / admin: project-app-access-control.md; project-admin-dashboard.md; project-api-credit-monitoring.md
-- W6 Postgres table-drop PENDING (P0 if ≥ 2026-07-01): project-w6-table-drop-pending.md
 - Security (A7 prompt-injection hardening): project-a7-prompt-injection-hardening.md
 - Virtual Review Panel: project-virtual-review-panel.md
 - Dev environment / secrets: project-dev-environment.md; project-vercel-sensitive-env-pull-empty.md

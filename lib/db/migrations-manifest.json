@@ -15,6 +15,7 @@
     "014_drop_playing_with_neon.sql",
     "015_bill_webhook_events.sql",
     "016_maintenance_runs_timestamptz.sql",
-    "017_bill_onboarding_state.sql"
+    "017_bill_onboarding_state.sql",
+    "018_drop_reviewer_finder_postgres_tables.sql"
   ]
 }

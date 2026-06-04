@@ -236,9 +236,8 @@ Run `node scripts/apply-migrations.js` (NOT `setup-database.js`) on any existing
 | Table | Purpose |
 |-------|---------|
 | `user_profiles` | Identity (azure_id, azure_email, is_active, dynamics_systemuser_id) |
-| `researchers`, `publications` | Postgres drain-only (Reviewer Finder formerly read this pool; W6 retired the Database tab and `researchers.js` 2026-05-12). Active reviewer state now in Dataverse `wmkf_potentialreviewer` (S213: the `wmkf_appresearcher` bibliometric sidecar was collapsed onto the person and dropped). |
+| ~~`researchers`, `researcher_keywords`, `publications`, `proposal_searches`, `reviewer_suggestions`~~ | **DROPPED 2026-06-04 (S219)** via migration `018_drop_reviewer_finder_postgres_tables.sql` — the reviewer-finder Postgres drain set, closing W3–W6. Reviewer state lives in Dataverse `wmkf_potentialreviewer` + `wmkf_appreviewersuggestion`. Pre-drop backups: Vercel Blob `cleanup-backup/2026-06-04/`. `search_cache` was NOT dropped (live literature-search cache). |
 | `grant_cycles` | Postgres drain-only post-W3 cutover (2026-05-12); Dataverse `wmkf_appgrantcycle` is source of truth. See `docs/atlas/postgres-grant-cycles.md`. |
-| `proposal_searches`, `reviewer_suggestions` | Postgres drain-only / script-only (Reviewer Finder per-user state migrated to Dataverse `wmkf_appreviewersuggestion`). |
 | `retractions`, `integrity_screenings`, `screening_dismissals` | Integrity Screener (Retraction Watch + per-user history) |
 | `dynamics_feedback` | Dynamics Explorer thumbs + auto-detected failures |
 | `expertise_roster`, `expertise_matches` | Expertise Finder roster + match history |
