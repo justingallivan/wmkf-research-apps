@@ -83,3 +83,4 @@ scripts/.orcid-backfill-applied.jsonl
 # ORCID cross-store match probe artifact (contains person data; local-only, S216)
 scripts/.orcid-cross-store.json
 scripts/.orcid-contact-direct.json
+scripts/.orcid-contact-provenance.json
