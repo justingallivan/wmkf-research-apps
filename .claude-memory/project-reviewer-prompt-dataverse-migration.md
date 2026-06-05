@@ -1,12 +1,7 @@
 ---
-name: reviewer-finder-prompt-dataverse-migration-admin-per-user-editing
-description: "S222 in-flight build — migrate reviewer-finder analyze + score-candidates prompts from code to Dataverse wmkf_ai_prompt, with a required superuser /admin versioned-publish editor and per-user overrides. Path A seam. 4-round Codex-reviewed plan."
+name: ""
 metadata: 
   node_type: memory
-  type: project
-  status: active
-  scope: prompt
-  last_verified: 2026-06-04
   originSessionId: 613bb6ee-8f4b-4345-917d-032634550239
 ---
 
@@ -31,5 +26,12 @@ Approved, 4-round-Codex-reviewed implementation plan at `~/.claude/plans/distrib
 - `seed-reviewer-finder-prompts.js` updates in-place at `wmkf_promptversion:1` (no bump).
 - `prompt_publish_audit` must be mirrored into `scripts/setup-database.js` (fresh-install convention), not just the migration.
 
-## Three prod-mutating steps (held for explicit confirmation while building on auto)
-Dataverse re-seed `--execute`, `apply-migrations.js` to prod Postgres, push-to-main (auto-deploy). See [[project-prompt-storage-strategy]] for the wmkf_ai_prompt schema/Executor contract.
+## SHIPPED (2026-06-04, on `main` @ 7dfd827; 10-commit branch merged)
+All three prod-mutating steps ran + verified: (1) `seed-reviewer-finder-prompts.js --execute` updated both rows in prod Dataverse; (2) migration `019_prompt_publish_audit.sql` applied to prod Postgres; (3) merged to main + Vercel prod deploy Ready. Post-deploy live smoke (1002788) confirmed analyze resolves `source=dataverse` v1 with the bioRxiv fix present. 1924 unit tests + all 10 CI gates green. Codex post-impl review passed (its 2 P1s — runtime body validation + reserved-key block — fixed pre-deploy).
+
+**Live surfaces:** runtime resolver `lib/services/reviewer-prompt-resolver.js` + composer `reviewer-prompt-composer.js`; admin editor `/admin` → "Prompt Templates" (`pages/api/admin/prompts/*` + `PromptTemplatesSection.js`); per-user editor `/api/reviewer-finder/prompt-override` + the "✎ Edit prompts" panel in `ReviewerSearchSection`.
+
+## Deferred follow-up
+- `wmkf_ai_rollbackfrom` is NOT written by the admin publish (field type Lookup-vs-text unverified — a wrong write shape would fail the create). Lineage is captured by `prompt_publish_audit.prior_prompt_id`. Probe the field type, then wire it in `pages/api/admin/prompts/[name].js`.
+
+See [[project-prompt-storage-strategy]] for the wmkf_ai_prompt schema/Executor contract.
