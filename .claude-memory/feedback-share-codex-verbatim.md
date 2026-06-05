@@ -5,7 +5,7 @@ metadata:
   type: feedback
   status: active
   scope: global
-  last_verified: S210 via memory-content (not re-probed 2026-06-04)
+  last_verified: S221 (2026-06-04) — recurred again; PostToolUse hook added to enforce
 ---
 
 ## Recall Rule
@@ -20,7 +20,7 @@ Do not:
 - Paraphrase, summarize, re-rank, drop footers, or add framing before/after — a "verbatim summary" is the violation.
 - Bolt a scope/decision question onto the verbatim delivery; raise it in a separate subsequent turn.
 
-Ground truth: historical-only (lesson, not live state); recurred S149/S155/S192/S210. Distinct from [[feedback-surface-full-review-findings]] (completeness, not format).
+Ground truth: historical-only (lesson, not live state); recurred S149/S155/S192/S210/S221. Now also enforced by a PostToolUse hook (`.claude/hooks/codex-verbatim-reminder.js`, fires on every `Task|Agent` result whose input mentions codex). Distinct from [[feedback-surface-full-review-findings]] (completeness, not format).
 
 When a Codex review, rescue, or diagnostic pass runs (`codex:codex-rescue`
 subagent / `/codex:rescue` skill / direct `Agent(subagent_type: codex:codex-rescue)`),
@@ -79,3 +79,19 @@ result returns, the VERY NEXT user-facing message is that result pasted whole in
 a fenced/delimited block — no "summary", no severity re-ordering, no "my
 assessment" intro. Fold in a later turn. A "verbatim summary" is a contradiction
 and is the violation.
+
+**Recurred AGAIN S221 (2026-06-04) — prose rule has now failed ~5×, so it is
+hook-enforced.** Across three Codex round-trips reviewing the reviewer-enrichment
+fixes I broke the rule twice in a new flavor: I ran **verification tool calls
+(Bash/Read) BEFORE posting** the review (acting-before-reporting, not just
+paraphrasing), and twice paraphrased the result into a status **table** instead
+of pasting it. The user (who had spent the morning on memory/rule-obedience)
+called it out. Two takeaways: (1) "act first, then report" is its own violation
+shape — the verbatim paste must precede ANY Bash/Read/Edit on the findings, not
+just precede the paraphrase; (2) consistent with the S219 conclusion that *the
+lever is the hook, not prose* ([[feedback-reconcile-dont-append-docs]] /
+[[feedback-timebox-metawork]]), a PostToolUse hook now fires the instant a
+`Task|Agent` codex result returns: `.claude/hooks/codex-verbatim-reminder.js`,
+wired in `.claude/settings.json` (repo-tracked, so it follows across machines).
+The hook only reminds — it cannot verify I complied — so the rule still binds;
+the hook just removes "I forgot mid-flow" as an excuse.

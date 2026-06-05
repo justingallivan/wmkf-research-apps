@@ -23,6 +23,19 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Task|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/codex-verbatim-reminder.js\" 2>/dev/null || true",
+            "timeout": 10,
+            "statusMessage": "codex-verbatim check"
+          }
+        ]
+      }
     ]
   }
 }
