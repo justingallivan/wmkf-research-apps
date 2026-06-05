@@ -139,7 +139,7 @@ Retire legacy `reviewer-finder`/`review-manager` keys + delete old pages; real f
 
 ## Verification
 
-- `npm run lint` (0 errors), `rtk proxy npx jest`, `npm run check:atlas && npm run check:atlas:self-test && npm run check:api-routes && npm run check:fact-consistency`.
+- `npm run lint` (0 errors), `npx jest`, `npm run check:atlas && npm run check:atlas:self-test && npm run check:api-routes && npm run check:fact-consistency`.
 - Phase 0: tests prove a `reviewers`-only grant reaches a reviewer-finder + review-manager route; legacy holders still work; excluded junction rows are filtered from candidate reads; the new field deploys idempotently.
 - Phase 1: with `AUTH_REQUIRED=false` + throwaway `NEXTAUTH_*` in `.env.local` (revert after), `npm run dev`, open `/workbench` — the allowlisted requests appear under D26 regardless of status; My/All toggles the PD subset.
 - Phase 2: mark a reviewer complete in the Workbench → `wmkf_reviewstatus=complete` + `wmkf_completedat` set, row stays visible; Review Manager unchanged.
