@@ -343,7 +343,10 @@ export default function ReviewerSearchSection({
         if (data?.proposalInfo) analysisResult = data;
       });
       if (streamError) throw new Error(streamError);
-      if (!analysisResult) throw new Error('Analysis returned no result.');
+      // Stream ended cleanly but no result frame arrived — almost always a
+      // timed-out or dropped connection during the long Claude analysis, not a
+      // content problem. Name the likely cause so the user knows to just retry.
+      if (!analysisResult) throw new Error('The proposal analysis didn’t finish — the connection timed out or dropped before results came back. Please run the search again.');
       if (genRef.current !== myGen) return; // context changed — abort
       setAnalysis(analysisResult);
 

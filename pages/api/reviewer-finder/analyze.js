@@ -55,6 +55,17 @@ export default async function handler(req, res) {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
+  // Keepalive: Claude analysis can run ~tens of seconds with no body bytes
+  // flowing. Stream an SSE comment line periodically so an intermediary proxy
+  // can't treat the connection as idle and close it before the result frame.
+  // Comment lines (": ...") are ignored by the parser (shared/components/
+  // reviewers/sse.js), so they never surface as events. Cleared in `finally`.
+  const heartbeat = setInterval(() => {
+    if (!res.writableEnded) {
+      try { res.write(': ping\n\n'); } catch { /* connection already gone */ }
+    }
+  }, 20000);
+
   // Track extracted summary info
   let summaryBlobUrl = null;
   let summaryFilename = null;
@@ -186,6 +197,8 @@ export default async function handler(req, res) {
       message: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
+  } finally {
+    clearInterval(heartbeat);
   }
 
   res.end();
