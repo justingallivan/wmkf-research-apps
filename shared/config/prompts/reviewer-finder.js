@@ -124,8 +124,13 @@ ARXIV_QUERIES:
 2. [second query]
 
 BIORXIV_QUERIES:
-1. [query focused on experimental biology/preprints]
-2. [second query]
+(bioRxiv hosts biology preprints across ALL subfields — treat it as PubMed's
+preprint counterpart, NOT a methods-only index. Use the same broad, on-topic
+queries as PUBMED_QUERIES, phrased for keyword search, and provide the SAME
+NUMBER of queries as PUBMED_QUERIES.)
+1. [core-topic query, same breadth as PubMed]
+2. [second core-topic query]
+3. [third core-topic query]
 
 CHEMRXIV_QUERIES:
 1. [query focused on chemistry/chemical research preprints]
