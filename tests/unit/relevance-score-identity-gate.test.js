@@ -1,43 +1,42 @@
 /**
  * @jest-environment node
  *
- * Phase 2: scoreRelevance must NOT count bibliometrics (h-index/citations) when
- * the identity resolver doesn't trust the match — a wrong-but-rich profile can't
- * float to the top on borrowed metrics. Trusted (confirmed/probable) or no-verdict
- * (pre-enrichment discover) → metrics count as before.
+ * S223: cumulative bibliometrics (h-index / total citations) are EXCLUDED from
+ * the rank order entirely — they are longevity-biased and bury the current
+ * active expert. They stay on the candidate for identity corroboration + human
+ * display only. (This supersedes the Phase-2 "identity gate on bibliometrics in
+ * the score" — the metrics simply aren't in the score anymore, regardless of
+ * identity status, so there is nothing for that gate to do.)
  */
 const { scoreRelevance } = require('../../lib/utils/relevance-score');
 
-const base = { name: 'X', hIndex: 20, totalCitations: 10000, affiliation: 'MIT' };
+const base = { name: 'X', affiliation: 'MIT', publicationCount5yr: 4 };
 
-describe('scoreRelevance — identity gate on bibliometrics', () => {
-  test('no identity verdict → metrics count (backward-compatible, e.g. discover server-rank)', () => {
-    const withMetrics = scoreRelevance(base);
-    const noMetrics = scoreRelevance({ ...base, hIndex: 0, totalCitations: 0 });
-    expect(withMetrics).toBeGreaterThan(noMetrics);
+describe('scoreRelevance — bibliometrics excluded from the rank order', () => {
+  test('h-index / citations never change the score (no identity verdict)', () => {
+    const withMetrics = scoreRelevance({ ...base, hIndex: 80, totalCitations: 500000 });
+    const without = scoreRelevance(base);
+    expect(withMetrics).toBe(without);
   });
 
-  test('probable → metrics count', () => {
-    const probable = scoreRelevance({ ...base, identityStatus: 'probable' });
-    const stripped = scoreRelevance({ ...base, hIndex: 0, totalCitations: 0, identityStatus: 'probable' });
-    expect(probable).toBeGreaterThan(stripped);
+  test('excluded regardless of identity status (probable / unresolved / ambiguous / rejected)', () => {
+    const without = scoreRelevance(base);
+    for (const identityStatus of ['probable', 'unresolved', 'ambiguous', 'rejected']) {
+      const withMetrics = scoreRelevance({ ...base, hIndex: 50, totalCitations: 99999, identityStatus });
+      expect(withMetrics).toBe(without);
+    }
   });
 
-  test('unresolved → h-index + citations excluded', () => {
-    const unresolved = scoreRelevance({ ...base, identityStatus: 'unresolved' });
-    const noMetrics = scoreRelevance({ ...base, hIndex: 0, totalCitations: 0, identityStatus: 'unresolved' });
-    expect(unresolved).toBe(noMetrics); // metrics contributed nothing
+  test('recent activity, not citations, drives the score', () => {
+    const active = scoreRelevance({ name: 'A', publicationCount5yr: 5 });
+    const dormantSuperstar = scoreRelevance({ name: 'B', publicationCount5yr: 0, hIndex: 90, totalCitations: 1e6 });
+    expect(active).toBeGreaterThan(dormantSuperstar);
   });
 
-  test('ambiguous and rejected also exclude metrics', () => {
-    const noMetrics = scoreRelevance({ ...base, hIndex: 0, totalCitations: 0, identityStatus: 'ambiguous' });
-    expect(scoreRelevance({ ...base, identityStatus: 'ambiguous' })).toBe(noMetrics);
-    expect(scoreRelevance({ ...base, identityStatus: 'rejected' })).toBe(noMetrics);
-  });
-
-  test('reads status from contactEnrichment.identity too', () => {
-    const viaCe = scoreRelevance({ ...base, contactEnrichment: { identity: { status: 'unresolved' } } });
-    const noMetrics = scoreRelevance({ ...base, hIndex: 0, totalCitations: 0, identityStatus: 'unresolved' });
-    expect(viaCe).toBe(noMetrics);
+  test('falls back to counting publications[].year when publicationCount5yr is absent', () => {
+    const yr = new Date().getFullYear();
+    const recent = scoreRelevance({ name: 'A', publications: [{ year: yr }, { year: yr - 1 }, { year: yr - 2 }] });
+    const old = scoreRelevance({ name: 'B', publications: [{ year: yr - 20 }, { year: yr - 21 }] });
+    expect(recent).toBeGreaterThan(old);
   });
 });

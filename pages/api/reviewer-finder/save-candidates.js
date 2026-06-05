@@ -79,7 +79,17 @@ export default async function handler(req, res) {
         if (candidate.source === 'biorxiv') sources.push('biorxiv');
         if (sources.length === 0) sources.push(candidate.source || 'unknown');
 
-        const relevanceScore = candidate.verificationConfidence || candidate.relevanceScore || 0.5;
+        // Persist the recency-weighted relevance score (0–100), attached by
+        // rankByRelevance at /discover + the Workbench re-rank. Prefer it over
+        // the 0–1 verificationConfidence so `wmkf_relevancescore` reflects the
+        // recency ranking for verified (Track A) candidates too — previously
+        // Track A stored verificationConfidence (0–1) while Track B stored
+        // relevanceScore (0–100), mixing scales in one field (S223). isFinite so
+        // a legitimate 0 (dormant candidate) is kept; verificationConfidence is
+        // the fallback only when no rank score is present.
+        const relevanceScore = Number.isFinite(candidate.relevanceScore)
+          ? candidate.relevanceScore
+          : (candidate.verificationConfidence || 0.5);
 
         let matchReason = candidate.reasoning || candidate.generatedReasoning || '';
         if (candidate.hasInstitutionCOI) {
