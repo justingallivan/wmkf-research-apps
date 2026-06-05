@@ -1,6 +1,7 @@
 import { useState, useEffect, Fragment } from 'react';
 import Layout, { PageHeader, Card } from '../shared/components/Layout';
 import PoliciesSection from '../shared/components/admin/PoliciesSection';
+import PromptTemplatesSection from '../shared/components/admin/PromptTemplatesSection';
 import { APP_REGISTRY } from '../shared/config/appRegistry';
 
 const PERIOD_OPTIONS = [
@@ -2372,6 +2373,9 @@ export default function AdminDashboard() {
         </CollapsibleCard>
         <CollapsibleCard title="Policies">
           <PoliciesSection />
+        </CollapsibleCard>
+        <CollapsibleCard title="Prompt Templates" subtitle="Edit + publish versioned AI prompt bodies (Dataverse wmkf_ai_prompt)">
+          <PromptTemplatesSection />
         </CollapsibleCard>
         <CollapsibleCard title="Role Management">
           <RoleManagementSection />
