@@ -1,58 +1,52 @@
-# Session 223 Prompt: reviewer-finder improvements — timeout, recency-weighted ID, Perplexity
+# Session 224 Prompt: finish reviewer-finder Topic #2 (affiliation pinning), then Topic #3 (Perplexity)
 
-## ⭐ Top of the agenda — three topics Justin flagged EOD S222 (discuss/scope first)
-Full notes: [[project-reviewer-finder-next-topics]] (read it). Summary:
-1. **Extend / make-configurable the Claude reviewer-call timeout.** Justin nearly lost a search to a timeout. All reviewer routes are at `maxDuration: 300` (5 min); **`discover.js` is the long pole** (DB searches + per-batch Claude + enrichment). Wrinkle: `maxDuration` is a STATIC build-time export — not per-request runtime-configurable. Realistic levers: raise to the Vercel plan's hard cap (verify it; Fluid Compute on Pro can exceed 300s) and/or make the `llm-client.js` 120s-timeout+3-retry budget tunable. Decide the value + mechanism.
-2. **Recency-weighted reviewer identification.** Candidates have a long digital tail (grad → postdoc → current). The footprint is dominated by the *postdoc* (more papers/presence) but we want the *current* role (e.g. a new professor — sparse but correct). Use dated signals you already pull (ORCID employment history + Scholar publication years) to pin + up-weight the current affiliation over the historical tail. Touches `contact-enrichment-service.js`, the identity resolver, and `rankByRelevance`. Hard part: "most evidence wins" picks the wrong (postdoc) affiliation.
-3. **Perplexity's role in reviewer finding/disambiguation.** Confirmed S222: Perplexity is wired ONLY into the Virtual Review Panel (`vrp-providers.js`, `multi-llm-service.js`) — NOT reviewer-finder, no `PERPLEXITY_*` key set. Discussed before in [[project-reviewer-identity-resolution-phase1]]. Decide its role (web-grounded "where are they now" disambiguation dovetails with #2) vs. the existing SerpAPI/Scholar/ORCID path.
+## ⭐ Top of the agenda — resume Topic #2 piece #3 (the affiliation-pinning chain)
+Topic #2 (recency-weighted reviewer identification) is **half-built**. Pieces 1–2 shipped this session (`c694bcb`); pieces 3–6 remain. Full design + all locked decisions: **`docs/REVIEWER_RECENCY_WEIGHTING_PLAN.md`** (read it — it's Codex-reviewed and build-ready for the rest) + [[project-reviewer-ranking-recency-over-citations]].
 
-## ⏰ Standing context / guardrails (carried S197–S222)
-- **`main` auto-deploys to prod on push. Feature branches do NOT deploy.** Commit/push only when asked. One-shot operator scripts + SQL migrations hit prod directly when run locally (`.env.local` → prod Dataverse + prod Postgres).
-- **`rtk` is FULLY UNINSTALLED** on both machines (S221). Do NOT prefix commands with `rtk`. See [[project-rtk-grep-output-corruption]].
-- **THREE reminder hooks LIVE** (`.claude/settings.json`, all machines): PreToolUse `scope-claim-reminder.js`; PreToolUse `doc-edit-reconcile-reminder.js` (on any `docs/`/`.claude-memory/`/`CLAUDE.md`/`SESSION_PROMPT.md`/`AGENTS.md` edit: read the WHOLE file + grep repo + fix every instance); PostToolUse `codex-verbatim-reminder.js` (paste Codex output VERBATIM before acting).
-- **Memory frontmatter gotcha (S222 incident):** the harness auto-memory reformatter strips/re-nests frontmatter; a colon inside an unquoted `last_verified` value broke YAML → `memory-router` red on main. Valid `status:` values are **active / stale / closed / superseded** only. Keep memory values colon-free or quoted; verify `npm run check:memory-router` after any memory edit.
-- **Local-dev hits prod.** jest live-harness pattern (proven S220/S222): `@jest-environment node` + manual `.env.local` load + real `fetch` via `undici` + `loadModelOverrides()` before `analyzeProposal`. Throwaway harnesses only — delete after.
+**Remaining pieces, in order:**
+1. **#13 ORCID always-fetch-profile** — `lib/services/orcid-service.js` `findContact`: remove the public-email fast-path early-return (~L380) so the full profile (→ `currentAffiliation`) is always fetched. One extra ORCID call per candidate, accepted (Justin S223).
+2. **#14 Scholar `author.affiliations`** — `serp-contact-service.js` `fetchScholarMetrics` (~L516): also return `author.affiliations` + `author.email` from the `google_scholar_author` payload we already fetch (S223 live probe confirmed both populated). Currently it reads only `cited_by.table`.
+3. **#15 ⚠ the identity-gated `_finalize` override — Codex's BLOCKER; do this carefully.** `contact-enrichment-service.js`: collect ORCID/Scholar affiliation *candidates* during the tiers WITHOUT mutating `candidate.affiliation`; let `resolveIdentity` run on the ORIGINAL affiliation (overriding earlier corrupts the resolver's evidence — the Tsai→Nakano failure class); then apply the override at the **END of `_finalize()`** gated on verdict **`probable`** (PR1 can't emit `confirmed`). Authority order ORCID > Scholar > PubMed-recency. Set `affiliationSource` provenance.
+4. **#16 UI** — Workbench/reviewer components: show affiliation provenance + **h-index in the detail pane as a human-facing seniority hint** (it's deliberately OUT of the rank math); thread `publicationCount5yr`/`affiliationSource` through `mergeEnrichment` so the client re-rank matches server.
+5. **#17 verify** — full gates + jest + lint, then a Codex post-impl pass on the chain, then push (deploys).
 
-## Session 222 Summary — SHIPPED: reviewer-finder prompts → Dataverse (admin + per-user editable)
-The headline: migrated the reviewer-finder analysis + score-candidates prompts from code into the Dataverse `wmkf_ai_prompt` store, runtime-resolved (per-user override → Dataverse → code fallback), with a superuser `/admin` versioned-publish editor and an in-app per-user override editor. **Deployed to prod + live-verified** (analyze resolves `source=dataverse` v1, bioRxiv fix present). 4-round Codex design review pre-build + a post-impl Codex pass; built "on auto" via remote control. 1924 tests + all 10 gates green. See [[project-reviewer-prompt-dataverse-migration]] (status: closed) + DEVELOPMENT_LOG.
+## ⭐ Then Topic #3 — Perplexity's role in reviewer finding/disambiguation
+Untouched this session. Web-grounded "where are they now" disambiguation dovetails with Topic #2's current-affiliation goal. Confirmed S222: Perplexity is wired ONLY into the Virtual Review Panel, NOT reviewer-finder, no `PERPLEXITY_*` key set. See [[project-reviewer-finder-next-topics]] §3 + [[project-reviewer-identity-resolution-phase1]].
 
-Earlier in the session (the original S222 task that surfaced this): fixed the reviewer-search "Analysis returned no result" — `analyze` `maxDuration` 90→300 (`503c77e`), SSE heartbeat + clearer message (`701fbce`), and a **bioRxiv per-database query fix** (broadened from methods-only to PubMed parity, `3f5cb60`). Also saved a Dataverse custom-table reference doc (`02d1ee7`).
+## Session 223 Summary — SHIPPED Topic #1; built+committed Topic #2 core
+**Topic #1 (Claude reviewer-call timeout) — SHIPPED to prod (`493f4cd`, deployed).** Admin-configurable wall-clock search budget: Dataverse setting `reviewer.time_budget_seconds` (default 600s, clamped [120,800]), superuser `/admin` card + `GET/PUT /api/admin/reviewer-time-budget`. All 5 reviewer search routes (analyze/discover/generate-emails/enrich-contacts + workbench/enrich-recommended) pinned at `maxDuration: 800` (Pro cap) with an app-level AbortSignal deadline (maxDuration is build-time-static → can't be a live setting). `llm-client.js` hardened: abort now stays live through body consumption (`response.json()` + `parseClaudeStream`) and the retry `sleep` is abort-aware. Two Codex rounds (pre-impl design + post-impl found 4 HIGH swallow bugs in enrichment/generate-emails — all fixed). See `docs/REVIEWER_TIMEOUT_BUDGET_PLAN.md`.
 
-### Commits (18 this session)
-- `503c77e`/`701fbce`/`3f5cb60` — analyze timeout + heartbeat + bioRxiv query fix
-- `118d64f`→`5f8400c` — migration foundation: prompt-store leaf, resolver, validators, audit table, runtime flip, Codex-review fixes
-- `b46edd8`/`a40130c` — admin versioned-publish API + UI
-- `91b26b3` — per-user override endpoint + editor UI
-- `7dfd827` — (merge to main = deploy)
-- `c5337da` — admin panel lists ALL prompts incl. drafts
-- `02d1ee7` — Dataverse 143-table reference doc
-- `2b89b77`/`20d2754`/`5a8dada` — memory docs (+ the frontmatter gate-red fix)
+**Topic #2 (recency-weighted identification) — pieces 1–2 committed (`c694bcb`, NOT yet observed live).** Ranking rebalanced (`relevance-score.js`): h-index/citations/raw-pub-count OUT of the rank order (kept only for identity + human display); dominant pure-linear recency term `min(35, 7·min(count,5))` from `publicationCount5yr`. PubMed affiliation (`discovery-service.js`) is now **recency-weighted** (`1/(age+1)` per institution, was most-common — the documented postdoc-era-wins bug) + multi-variant aggregation fix + Track-B recency backfill. `save-candidates.js` now persists the 0–100 `relevanceScore` (was the 0–1 `verificationConfidence` for Track A — a scale-mix). Two Codex rounds; dropped an inert activity floor; fixed the persistence scale-mix.
 
-## Other open items (lower priority than the three top topics)
-1. **Deferred from the migration:** `wmkf_ai_rollbackfrom` is NOT written by admin publish (field type Lookup-vs-text unverified). Probe the field type, then wire it in `pages/api/admin/prompts/[name].js`. Lineage currently captured by `prompt_publish_audit.prior_prompt_id`.
-2. **Connor's prompts (pending his reply):** `wmkf_ai_prompt` is the sole Dataverse prompt store (143-table dump confirmed). His "other" prompts are likely PA-embedded; if so, lift them into `wmkf_ai_prompt` rows → the admin panel administers them automatically.
-3. **Reviewer-workflow validation walkthrough** (Find→Invite→Track→Completed) — still never completed end-to-end (carried since S220).
-4. **Reviewer-app consolidation (destructive — grep first):** retire legacy `reviewer-finder`/`review-manager` keys now Workbench has parity. [[project-reviewer-apps-redesign-direction]].
-5. **Intake virus-scan EICAR e2e** — parked pre-cycle must-do. [[project-intake-portal-virus-scan-e2e-deferred]].
+### Commits (2 this session)
+- `493f4cd` — Topic #1 timeout budget (**pushed + deployed to prod**)
+- `c694bcb` — Topic #2 pieces 1–2 (pushed at session end; **safe standalone**, but the full Topic #2 isn't done)
 
-## Key Files Reference (S222 migration)
-| File | Purpose |
-|------|---------|
-| `lib/services/prompt-store.js` | Dependency-free leaf: `fetchCurrentPrompt`/`interpolate` + typed error codes |
-| `lib/services/reviewer-prompt-resolver.js` | Three-tier resolve (override→Dataverse→code) + runtime body validation |
-| `lib/services/reviewer-prompt-composer.js` | `[code A7 preamble] + [interpolated body]`; byte-parity with `createAnalysisPrompt` |
-| `lib/utils/prompt-validators.js` | Browser-safe generic + per-prompt parse-contract validators |
-| `pages/api/admin/prompts/{index,[name]}.js` | Superuser list + versioned publish (policies.js protocol) |
-| `pages/api/reviewer-finder/prompt-override.js` | Grant-gated per-user override (sole write path) |
-| `shared/components/admin/PromptTemplatesSection.js` / `reviewers/ReviewerPromptOverridePanel.js` | Admin + per-user editor UIs |
-| `lib/db/migrations/019_prompt_publish_audit.sql` | Audit table (mirrors policy_publish_audit) |
-| `docs/DATAVERSE_CUSTOM_TABLES_2026-06-05.md` | 143-table reference snapshot |
+## Standing context / guardrails (carried S197–S223)
+- **`main` auto-deploys to prod on push. Feature branches do NOT deploy.** Commit/push only when asked. Local scripts + SQL migrations hit prod directly (`.env.local` → prod).
+- **`c694bcb` deploys the new recency RANKING + affiliation extraction to prod on push.** It's self-contained + tested, but it IS a live behavior change (reviewers now ranked by recency, not citations). **Eyeball gotcha:** `my-candidates.js:188` reads `wmkf_relevancescore` for display — verify the panel renders the new 0–100 scale sanely (the field was already mixed-scale, so display should tolerate it, but confirm).
+- **`rtk` FULLY UNINSTALLED** (S221) — do NOT prefix commands with `rtk`. [[project-rtk-grep-output-corruption]].
+- **Memory frontmatter gotcha:** valid `status:` values are active/stale/closed/superseded only; keep values colon-free or quoted; run `npm run check:memory-router` after memory edits.
+- **drain-table gate collision:** the word `publications` (a DROPPED reviewer Postgres table) trips `check:drain-table-mentions` in docs even when you mean the in-memory candidate array — annotate with `<!-- drain-table:ignore reason=... -->` or reword.
+- **Codex loop** (design→pre-impl→impl→post-impl) worked well twice this session. Resume the Topic #2 Codex thread for continuity (the rescue skill offers continue-vs-new).
+
+## Key Files Reference (Topic #2 remaining work)
+| File | What to change |
+|------|------|
+| `lib/services/orcid-service.js` | `findContact` ~L380: drop the public-email early-return so the profile (→ `currentAffiliation`) always fetches |
+| `lib/services/serp-contact-service.js` | `fetchScholarMetrics` ~L516: also return `author.affiliations` + `author.email` |
+| `lib/services/contact-enrichment-service.js` | collect affiliation candidates in tiers; apply override at END of `_finalize()` gated on `probable`; set `affiliationSource` |
+| `shared/components/reviewers/*` | affiliation provenance + h-index seniority hint in detail pane; thread `publicationCount5yr`/`affiliationSource` through `mergeEnrichment` |
+| `lib/utils/relevance-score.js` | DONE — recency rank (reference for the contract) |
+| `lib/services/discovery-service.js` | DONE — recency-weighted affiliation + Track-B backfill |
+| `docs/REVIEWER_RECENCY_WEIGHTING_PLAN.md` | the full build-ready spec for the rest |
 
 ## Testing
 ```bash
-npx jest reviewer prompt-store prompt-validators reviewer-prompt admin-prompts prompt-override  # the S222 suites
-npx jest                                                        # full suite (1924 green at S222)
-# live harness pattern (throwaway, hits prod): @jest-environment node + .env.local + undici; see project-reviewer-finder-next-topics
+npx jest reviewer relevance-score dedup-rank discovery-affiliation contact-enrichment   # Topic #2 suites
+npx jest                                                                                 # full suite (1943+ at S223)
 # full gate set (matches /start):
 for g in migrations-manifest api-routes atlas doc-currency fact-consistency canonical-pointers drain-table-mentions prompt-storage-mentions prompt-injection-tagging memory-router; do npm run check:$g; done
+# live SerpAPI google_scholar_author probe shape (S223): engine=google_scholar_author returns author.affiliations, author.email,
+#   cited_by.table.*.since_YYYY, cited_by.graph, articles[] (sort=pubdate → most-recent-first). Throwaway script pattern; delete after.
 ```
