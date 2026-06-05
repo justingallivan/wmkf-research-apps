@@ -17,7 +17,7 @@
 - Cleanup/audit/verify loop ballooning (time-box ~30min/2 commits, check in): feedback-timebox-metawork.md
 - Stating Dataverse/PA/Azure/Vercel behavior: feedback-verify-external-platform-claims.md; feedback-cite-ground-truth.md
 - Relaying Codex/reviewer output: feedback-share-codex-verbatim.md; feedback-surface-full-review-findings.md
-- Tool output looks fabricated (rtk): project-rtk-grep-output-corruption.md
+- rtk UNINSTALLED (S220) — don't call rtk; the global rtk instructions are stale: project-rtk-grep-output-corruption.md
 
 ## Working Norms (cross-cutting; apply most sessions)
 - Effort posture (no skimming, no "keep going?" menus): feedback-thoroughness-default.md; feedback-drive-to-completion.md
