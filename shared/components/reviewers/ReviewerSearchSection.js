@@ -542,60 +542,6 @@ export default function ReviewerSearchSection({
 
   return (
     <>
-    {recCount > 0 && (
-      <Card hover={false}>
-        <div className="flex items-center justify-between mb-2">
-          <p className="font-medium text-gray-900">Enrich applicant-recommended reviewers</p>
-          {recPhase === 'running' && <Spinner />}
-        </div>
-        {(recPhase === 'idle' || recPhase === 'error') && (
-          <div className="space-y-3">
-            <p className="text-sm text-gray-600">
-              Run the applicant’s {recCount} recommended reviewer{recCount === 1 ? '' : 's'} through the same
-              verification, conflict-of-interest, and contact/citation enrichment the search uses — and save the results to their rows.
-            </p>
-            {!blobUrl && <p className="text-xs text-amber-700">Load a proposal document above first (needed for conflict-of-interest checks).</p>}
-            {recError && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{recError}</div>}
-            <button
-              type="button"
-              onClick={enrichRecommended}
-              disabled={!blobUrl}
-              className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {recPhase === 'error' ? 'Try again' : `Enrich recommended reviewers (${recCount})`}
-            </button>
-          </div>
-        )}
-        {recPhase === 'running' && (
-          <div className="space-y-2">
-            <p className="text-sm text-gray-600">Verifying &amp; enriching… this can take a minute.</p>
-            <ul className="text-xs text-gray-500 space-y-0.5">
-              {recProgress.map((m, i) => <li key={i}>{m}</li>)}
-            </ul>
-          </div>
-        )}
-        {recPhase === 'done' && (
-          <div className="space-y-3">
-            {recCandidates.length === 0 ? (
-              <p className="text-sm text-gray-600">No recommended reviewers could be enriched.</p>
-            ) : (
-              <>
-                <p className="text-sm text-gray-600">
-                  Enriched {recCandidates.length} applicant-recommended reviewer{recCandidates.length === 1 ? '' : 's'} — metrics &amp; conflicts saved to their records.
-                </p>
-                <div className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
-                  {recCandidates.map((c, i) => (
-                    <CandidateCard key={`rec-${c.suggestionId || c.name}-${i}`} candidate={c} readOnly />
-                  ))}
-                </div>
-                <button type="button" onClick={enrichRecommended} className="text-sm text-gray-500 underline">Re-enrich</button>
-              </>
-            )}
-          </div>
-        )}
-      </Card>
-    )}
-
     <Card hover={false}>
       <div className="flex items-center justify-between mb-2">
         <p className="font-medium text-gray-900">Search for reviewers</p>
@@ -812,6 +758,65 @@ export default function ReviewerSearchSection({
         </>
       )}
     </Card>
+
+    {/* Secondary, OPTIONAL action — below the primary search so it can't be
+        mistaken for it (S220: a PD ran this thinking it was the reviewer search).
+        It only verifies the applicant's own listed names; it does not find new
+        reviewers. Styled as a secondary (outline) button for the same reason. */}
+    {recCount > 0 && (
+      <Card hover={false}>
+        <div className="flex items-center justify-between mb-2">
+          <p className="font-medium text-gray-900">Optional: verify the applicant’s suggested reviewers</p>
+          {recPhase === 'running' && <Spinner />}
+        </div>
+        {(recPhase === 'idle' || recPhase === 'error') && (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              This only checks the {recCount} name{recCount === 1 ? '' : 's'} the applicant listed — it does
+              <span className="font-medium"> not</span> find new reviewers. It runs them through the same
+              verification, conflict-of-interest, and contact/citation enrichment and saves the results to their rows.
+            </p>
+            {!blobUrl && <p className="text-xs text-amber-700">Load a proposal document above first (needed for conflict-of-interest checks).</p>}
+            {recError && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{recError}</div>}
+            <button
+              type="button"
+              onClick={enrichRecommended}
+              disabled={!blobUrl}
+              className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {recPhase === 'error' ? 'Try again' : `Verify applicant’s ${recCount} suggested reviewer${recCount === 1 ? '' : 's'}`}
+            </button>
+          </div>
+        )}
+        {recPhase === 'running' && (
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600">Verifying &amp; enriching… this can take a minute.</p>
+            <ul className="text-xs text-gray-500 space-y-0.5">
+              {recProgress.map((m, i) => <li key={i}>{m}</li>)}
+            </ul>
+          </div>
+        )}
+        {recPhase === 'done' && (
+          <div className="space-y-3">
+            {recCandidates.length === 0 ? (
+              <p className="text-sm text-gray-600">No recommended reviewers could be enriched.</p>
+            ) : (
+              <>
+                <p className="text-sm text-gray-600">
+                  Verified {recCandidates.length} applicant-suggested reviewer{recCandidates.length === 1 ? '' : 's'} — metrics &amp; conflicts saved to their records.
+                </p>
+                <div className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
+                  {recCandidates.map((c, i) => (
+                    <CandidateCard key={`rec-${c.suggestionId || c.name}-${i}`} candidate={c} readOnly />
+                  ))}
+                </div>
+                <button type="button" onClick={enrichRecommended} className="text-sm text-gray-500 underline">Re-verify</button>
+              </>
+            )}
+          </div>
+        )}
+      </Card>
+    )}
     </>
   );
 }

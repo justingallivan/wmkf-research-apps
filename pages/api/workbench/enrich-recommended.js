@@ -164,6 +164,12 @@ export default async function handler(req, res) {
         suggestions.push({
           name,
           affiliation,
+          // Whether the applicant gave us anything to disambiguate a name-only
+          // PubMed match. A bare name (no affiliation) matches ANY same-named
+          // author, so a "verified" hit on one is not trustworthy (S220: a fake
+          // "Justin_test Gallivan" matched a real Queen's psychologist). Carried
+          // through verifyClaudeSuggestions (which spreads ...suggestion).
+          hadAffiliation: !!affiliation,
           expertiseAreas: [],
           potentialReviewerId: prId,
           suggestionId: row.wmkf_appreviewersuggestionid,
@@ -247,6 +253,19 @@ export default async function handler(req, res) {
         const orcidUrl = blockByIdentity ? null : (ce.orcidUrl || null);
         const email = c.email || ce.email || null;
 
+        // Unconfirmed-identity guard (S220): when the applicant gave no
+        // affiliation, a name-only PubMed match can be the wrong same-named
+        // person. Trust it only if the identity resolver independently reached
+        // ≥probable; otherwise treat the match as UNconfirmed and do NOT write
+        // its derived affiliation/keywords back onto the person (that would
+        // contaminate the record with a stranger's data). Email is already
+        // name-gated (Tier-3/4 guard) and scholar/ORCID are identity-gated above.
+        const identityConfirmed = !!identity && mayPersistIdentity(identity.status);
+        const unconfirmedMatch = c.verified !== false && !c.hadAffiliation && !identityConfirmed;
+        if (unconfirmedMatch) {
+          sendEvent('progress', { message: `Couldn’t confirm ${c.name} is the right person (applicant gave no affiliation) — leaving their record unchanged.` });
+        }
+
         if (prId) {
           try {
             await researcherAdapter.upsertByPotentialReviewer(prId, {
@@ -261,11 +280,13 @@ export default async function handler(req, res) {
               hIndex,
               i10Index,
               totalCitations,
-              affiliation: c.affiliation || null,
-              department: ce.department || null,
-              website: c.website || ce.website || null,
-              facultyPageUrl: ce.facultyPageUrl || null,
-              keywords: Array.isArray(c.expertiseAreas) ? c.expertiseAreas.filter(Boolean).join('; ') : null,
+              // Match-derived fields are suppressed for an unconfirmed name-only
+              // match so a stranger's affiliation/expertise can't be written.
+              affiliation: unconfirmedMatch ? null : (c.affiliation || null),
+              department: unconfirmedMatch ? null : (ce.department || null),
+              website: unconfirmedMatch ? null : (c.website || ce.website || null),
+              facultyPageUrl: unconfirmedMatch ? null : (ce.facultyPageUrl || null),
+              keywords: unconfirmedMatch ? null : (Array.isArray(c.expertiseAreas) ? c.expertiseAreas.filter(Boolean).join('; ') : null),
             }, { actingUserSystemId });
             // Persist the resolver decision; clear stale identity fields on downgrade.
             if (identity) {
@@ -302,8 +323,10 @@ export default async function handler(req, res) {
         }
 
         // Deterministic COI match reason — SET (not append) so re-click is
-        // idempotent. Only when the person actually has COI.
-        if (c.suggestionId && (c.hasInstitutionCOI || c.hasCoauthorCOI)) {
+        // idempotent. Only when the person actually has COI — and only for a
+        // CONFIRMED match (an unconfirmed name-only match computed COI against a
+        // possibly-wrong same-named person, so its COI verdict is meaningless).
+        if (!unconfirmedMatch && c.suggestionId && (c.hasInstitutionCOI || c.hasCoauthorCOI)) {
           let reason = 'Recommended by applicant (legacy reviewer slot).';
           if (c.hasInstitutionCOI) reason += ' [Institution COI: Same institution as proposal PI]';
           if (c.hasCoauthorCOI) reason += ' [Coauthor COI: Has co-authored with proposal authors]';
@@ -314,7 +337,39 @@ export default async function handler(req, res) {
           }
         }
 
-        out.push({
+        // For an unconfirmed name-only match, present the row as needs-review and
+        // withhold the (possibly-wrong) matched person's data from the card —
+        // never show a stranger's publications/affiliation/email under this name.
+        out.push(unconfirmedMatch ? {
+          potentialReviewerId: prId || null,
+          suggestionId: c.suggestionId || null,
+          name: c.name,
+          affiliation: null,
+          seniorityEstimate: null,
+          verified: false,
+          unverified: true,
+          needsIdentification: true,
+          verificationConfidence: null,
+          publications: [],
+          publicationCount5yr: null,
+          reasoning: 'Could not confirm this is the right person — the applicant listed only a name (no affiliation), and a name-only search can match the wrong same-named researcher. Add an affiliation, then re-enrich.',
+          hasInstitutionCOI: false,
+          hasCoauthorCOI: false,
+          institutionCOIDetails: null,
+          coauthorships: [],
+          institutionMismatch: false,
+          suggestedInstitution: null,
+          expertiseMismatch: false,
+          expertiseAreas: [],
+          email: null,
+          emailSource: null,
+          website: null,
+          orcidUrl: null,
+          googleScholarUrl: null,
+          hIndex: null,
+          totalCitations: null,
+          isApplicantRecommended: true,
+        } : {
           potentialReviewerId: prId || null,
           suggestionId: c.suggestionId || null,
           name: c.name,
