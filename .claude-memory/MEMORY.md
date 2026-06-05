@@ -52,6 +52,7 @@
 - Dynamics Explorer (reuse direction + feedback-admin anti-rebuild): project-dynamics-explorer-reuse-power-tools.md; project-dynamics-feedback-admin-shipped.md
 - Dataverse Power Tools (find&fix + bulk export): project-dataverse-power-tools.md; dataverse-export-floor-scoping.md
 - Prompt / Executor work: project-prompt-storage-strategy.md; project-dynamics-as-prompt-ground-truth.md; project-pdf-processing-tiers.md
+- Reviewer-finder prompt → Dataverse migration (admin + per-user editing, in-flight S222): project-reviewer-prompt-dataverse-migration.md
 - BILL / honoraria: project-bill-honorarium-integration.md; akoya-request-honorarium-nomenclature.md; akoya-payment-field-semantics.md
 - No banking/PII in Dataverse (firm constraint): project-no-banking-pii-in-dataverse.md
 - App access / auth / admin: project-app-access-control.md; project-admin-dashboard.md; project-api-credit-monitoring.md
