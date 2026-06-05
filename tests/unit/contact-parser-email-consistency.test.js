@@ -52,6 +52,32 @@ describe('ContactParser.isNameConsistentEmail', () => {
     });
   });
 
+  describe('suffix / credential tokens and accents (Codex S221 false-negative fixes)', () => {
+    test.each([
+      ['gallivan@queensu.ca', 'Justin Gallivan Jr'],        // generational suffix not the surname
+      ['gallivan@queensu.ca', 'Justin Gallivan Ph.D.'],     // credential not the surname
+      ['gallivan@queensu.ca', 'Justin Gallivan III'],       // roman-numeral suffix
+      ['jgallivan@queensu.ca', 'Justin Gallivan MD'],       // initial+surname survives suffix strip
+      ['jose.nunez@unam.mx', 'José Núñez'],                  // accented surname normalizes to ASCII
+      ['jnunez@unam.mx', 'José Núñez'],                      // accented initial+surname
+    ])('accepts %s for "%s"', (email, name) => {
+      expect(ContactParser.isNameConsistentEmail(email, name)).toBe(true);
+    });
+
+    test('a name made only of suffix tokens yields no surname → false', () => {
+      expect(ContactParser.isNameConsistentEmail('jr@x.edu', 'Jr')).toBe(false);
+    });
+
+    test('suffix stripping must NOT collapse a 2-token name to a lone given name (Codex S221 false-accept)', () => {
+      // "John MD" has no real surname once MD is stripped — a lone given-name
+      // address must stay rejected, exactly as "Justin Test3" is.
+      expect(ContactParser.isNameConsistentEmail('john@x.edu', 'John MD')).toBe(false);
+      expect(ContactParser.isNameConsistentEmail('john@x.edu', 'John Jr')).toBe(false);
+      // …but a real surname alongside the credential still works.
+      expect(ContactParser.isNameConsistentEmail('smith@x.edu', 'John Smith MD')).toBe(true);
+    });
+  });
+
   describe('defensive inputs', () => {
     test('null / empty / malformed return false', () => {
       expect(ContactParser.isNameConsistentEmail(null, 'Justin Gallivan')).toBe(false);

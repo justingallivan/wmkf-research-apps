@@ -246,18 +246,25 @@ export default async function handler(req, res) {
         const blockByIdentity = !!identity && !mayPersistIdentity(identity.status);
 
         // Unconfirmed-identity guard (S220): when the applicant gave no
-        // affiliation, a name-only PubMed match can be the wrong same-named
-        // person (a fake "Justin_test Gallivan" matched a real Queen's
-        // psychologist). Trust it only if the identity resolver independently
-        // reached ≥probable; otherwise treat the match as UNconfirmed and
-        // withhold EVERY match-derived field — email, scholar/ORCID, metrics,
-        // affiliation, keywords — from both the writeback and the returned card,
-        // so a stranger's data never lands on the person. (Codex S220: the prior
+        // affiliation, a name-only match can be the wrong same-named person (a
+        // fake "Justin_test Gallivan" matched a real Queen's psychologist).
+        // Trust it only if the identity resolver independently reached ≥probable;
+        // otherwise treat the match as UNconfirmed and withhold EVERY
+        // match-derived field — email, scholar/ORCID, metrics, affiliation,
+        // keywords — from both the writeback and the returned card, so a
+        // stranger's data never lands on the person. (Codex S220: the prior
         // guard only nulled affiliation/keywords, so email + metrics still leaked
         // when the resolver returned no verdict, which is exactly the unconfirmed
         // case — `blockByIdentity`/`blockScholar` are false when `identity` null.)
+        // (Codex S221: the gate previously also excluded `c.verified === false`
+        // rows — but contact enrichment (web/SerpAPI/Scholar) runs on the bare
+        // name for verified AND unverified candidates alike, so a PubMed-unverified,
+        // no-affiliation row could still leak a same-named stranger's website /
+        // faculty page / Scholar metrics. The PubMed-verified flag is irrelevant
+        // to the wrong-person risk; only affiliation or a ≥probable resolver
+        // verdict disambiguates, so gate on those alone.)
         const identityConfirmed = !!identity && mayPersistIdentity(identity.status);
-        const unconfirmedMatch = c.verified !== false && !c.hadAffiliation && !identityConfirmed;
+        const unconfirmedMatch = !c.hadAffiliation && !identityConfirmed;
         if (unconfirmedMatch) {
           sendEvent('progress', { message: `Couldn’t confirm ${c.name} is the right person (applicant gave no affiliation) — leaving their record unchanged.` });
         }
@@ -306,7 +313,18 @@ export default async function handler(req, res) {
             }, { actingUserSystemId });
             // Persist the resolver decision; clear stale identity fields on downgrade.
             if (identity) {
-              await researcherAdapter.writeIdentityDecision(prId, identity, { actingUserSystemId });
+              // For an unconfirmed name-only match the resolver's anchors +
+              // evidence summary can encode a same-named STRANGER's ORCID/Scholar
+              // canonicalKey + sourceUrl. writeIdentityDecision persists those in
+              // wmkf_identityverifiedanchorsjson, which is NOT in RESOLVER_SOURCED_
+              // FIELDS so clearIdentityFields below can't scrub them. Record only
+              // the bare 'unresolved' status (useful audit) with anchors/evidence
+              // stripped, so a stranger's identifiers never land on this person
+              // (Codex S221).
+              const decisionToWrite = unconfirmedMatch
+                ? { ...identity, anchors: [], evidenceSummary: 'Unconfirmed name-only match (applicant gave no affiliation); identifiers withheld.' }
+                : identity;
+              await researcherAdapter.writeIdentityDecision(prId, decisionToWrite, { actingUserSystemId });
               if (blockByIdentity) {
                 await researcherAdapter.clearIdentityFields(prId, RESOLVER_SOURCED_FIELDS, { actingUserSystemId });
               }

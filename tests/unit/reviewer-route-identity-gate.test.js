@@ -184,4 +184,56 @@ describe('enrich-recommended route — identity gate + clear-on-downgrade', () =
     expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'probable' }), expect.any(Object));
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
+
+  // Codex S221 Bug 1: the unconfirmed-match guard previously excluded
+  // `verified === false` rows, so a PubMed-UNverified, no-affiliation candidate
+  // took the normal write path and could leak a same-named stranger's
+  // contact-enrichment data (website / faculty page / email) onto the person row.
+  test('unverified + no-affiliation + below-probable → ALL match-derived fields withheld (no stranger leak)', async () => {
+    ContactEnrichmentService.enrichCandidates.mockResolvedValue({
+      enriched: [{
+        potentialReviewerId: 'PID-1',
+        suggestionId: 'SUG-1',
+        name: 'Jordan Welles',
+        verified: false,            // PubMed found nothing
+        hadAffiliation: false,      // applicant gave no affiliation to disambiguate
+        website: 'https://stranger-lab.edu',
+        expertiseAreas: ['quantum optics'],
+        email: 'welles@stranger.edu', // name-consistent → would have passed the email guard
+        contactEnrichment: {
+          email: 'welles@stranger.edu',
+          facultyPageUrl: 'https://stranger.edu/welles',
+          department: 'Physics',
+          website: 'https://stranger-lab.edu',
+          // A same-named STRANGER's identifiers the resolver considered but could
+          // not confirm — must NOT be persisted onto this person (Codex S221).
+          identity: {
+            status: 'unresolved',
+            anchors: [{ type: 'scholar', canonicalKey: 'scholar:STRANGER', sourceUrl: 'https://scholar.google.com/citations?user=STRANGER', verifier: 'serp' }],
+            evidenceSummary: 'matched STRANGER on Google Scholar',
+          },
+          tierResults: {},
+        },
+      }],
+    });
+    const req = { method: 'POST', body: { requestId: GUID, analysisResult: { proposalInfo: { authorInstitution: 'Stanford', proposalAuthors: 'Dr PI' } } } };
+    const res = mockRes();
+    await handler(req, res);
+
+    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
+    expect(payload.email).toBeNull();
+    expect(payload.website).toBeNull();
+    expect(payload.facultyPageUrl).toBeNull();
+    expect(payload.department).toBeNull();
+    expect(payload.affiliation).toBeNull();
+    expect(payload.keywords).toBeNull();
+
+    // Codex S221 Bug 1 residual: the resolver decision is still recorded (status),
+    // but the stranger's anchors + evidence are stripped before persistence so
+    // wmkf_identityverifiedanchorsjson can't leak their Scholar/ORCID URL.
+    const decisionArg = researcherAdapter.writeIdentityDecision.mock.calls[0][1];
+    expect(decisionArg.status).toBe('unresolved');
+    expect(decisionArg.anchors).toEqual([]);
+    expect(decisionArg.evidenceSummary).not.toMatch(/STRANGER/);
+  });
 });
