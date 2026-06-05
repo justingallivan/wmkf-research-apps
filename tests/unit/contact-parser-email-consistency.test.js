@@ -29,10 +29,26 @@ describe('ContactParser.isNameConsistentEmail', () => {
       ['justin.gallivan@mit.edu', 'Dr. Justin Gallivan'],   // first.surname
       ['justingallivan@me.com', 'Justin Gallivan'],         // firstsurname, free webmail OK when surname present
       ['gallivanj@uw.edu', 'Justin Gallivan'],              // surname + first-initial
-      ['lhtsai@mit.edu', 'Li-Huei Tsai'],                   // surname embedded
-      ['madabhushi@utsouthwestern.edu', 'Ram Madabhushi'],
+      ['lhtsai@mit.edu', 'Li-Huei Tsai'],                   // multi-initial + surname
+      ['madabhushi@utsouthwestern.edu', 'Ram Madabhushi'],  // bare surname
     ])('accepts %s for "%s"', (email, name) => {
       expect(ContactParser.isNameConsistentEmail(email, name)).toBe(true);
+    });
+  });
+
+  describe('surname-first and compound surnames (Codex S220 false-negative fixes)', () => {
+    test.each([
+      ['wzhang@stanford.edu', 'Zhang Wei'],                 // surname-first order: initial(Wei) + surname(Zhang)
+      ['mgarcia@unam.mx', 'Maria Garcia Marquez'],          // compound surname, first component
+      ['marquez@unam.mx', 'Maria Garcia Marquez'],          // compound surname, last component (bare)
+      ['lzhang@mit.edu', 'Li Zhang'],
+    ])('accepts %s for "%s"', (email, name) => {
+      expect(ContactParser.isNameConsistentEmail(email, name)).toBe(true);
+    });
+
+    test('a lone given-name address is still rejected (does not regress #1)', () => {
+      expect(ContactParser.isNameConsistentEmail('justin@gmail.com', 'Justin Test3')).toBe(false);
+      expect(ContactParser.isNameConsistentEmail('maria@unam.mx', 'Maria Garcia Marquez')).toBe(false);
     });
   });
 

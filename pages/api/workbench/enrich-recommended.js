@@ -32,6 +32,7 @@ import { requireAppAccess } from '../../../lib/utils/auth';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { safeFetch } from '../../../lib/utils/safe-fetch';
 import { normalizeName } from '../../../lib/utils/name-normalization';
+import { ContactParser } from '../../../lib/utils/contact-parser';
 import { deriveProposalAuthorNames } from '../../../lib/utils/proposal-authors';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
@@ -243,28 +244,43 @@ export default async function handler(req, res) {
         const scholarSkipped = !!ce.tierResults?.scholar_profile?.skipped;
         const identity = ce.identity || null;
         const blockByIdentity = !!identity && !mayPersistIdentity(identity.status);
-        const blockScholar = scholarSkipped || blockByIdentity;
-        const hIndex = blockScholar ? null : (c.hIndex ?? ce.hIndex ?? null);
-        const i10Index = blockScholar ? null : (c.i10Index ?? ce.i10Index ?? null);
-        const totalCitations = blockScholar ? null : (c.totalCitations ?? ce.totalCitations ?? null);
-        const googleScholarId = blockScholar ? null : (ce.googleScholarId || null);
-        const googleScholarUrl = blockScholar ? null : (ce.googleScholarUrl || null);
-        const orcidId = blockByIdentity ? null : (ce.orcidId || null);
-        const orcidUrl = blockByIdentity ? null : (ce.orcidUrl || null);
-        const email = c.email || ce.email || null;
 
         // Unconfirmed-identity guard (S220): when the applicant gave no
         // affiliation, a name-only PubMed match can be the wrong same-named
-        // person. Trust it only if the identity resolver independently reached
-        // ≥probable; otherwise treat the match as UNconfirmed and do NOT write
-        // its derived affiliation/keywords back onto the person (that would
-        // contaminate the record with a stranger's data). Email is already
-        // name-gated (Tier-3/4 guard) and scholar/ORCID are identity-gated above.
+        // person (a fake "Justin_test Gallivan" matched a real Queen's
+        // psychologist). Trust it only if the identity resolver independently
+        // reached ≥probable; otherwise treat the match as UNconfirmed and
+        // withhold EVERY match-derived field — email, scholar/ORCID, metrics,
+        // affiliation, keywords — from both the writeback and the returned card,
+        // so a stranger's data never lands on the person. (Codex S220: the prior
+        // guard only nulled affiliation/keywords, so email + metrics still leaked
+        // when the resolver returned no verdict, which is exactly the unconfirmed
+        // case — `blockByIdentity`/`blockScholar` are false when `identity` null.)
         const identityConfirmed = !!identity && mayPersistIdentity(identity.status);
         const unconfirmedMatch = c.verified !== false && !c.hadAffiliation && !identityConfirmed;
         if (unconfirmedMatch) {
           sendEvent('progress', { message: `Couldn’t confirm ${c.name} is the right person (applicant gave no affiliation) — leaving their record unchanged.` });
         }
+
+        const blockScholar = scholarSkipped || blockByIdentity || unconfirmedMatch;
+        const blockIdentityFields = blockByIdentity || unconfirmedMatch;
+        const hIndex = blockScholar ? null : (c.hIndex ?? ce.hIndex ?? null);
+        const i10Index = blockScholar ? null : (c.i10Index ?? ce.i10Index ?? null);
+        const totalCitations = blockScholar ? null : (c.totalCitations ?? ce.totalCitations ?? null);
+        const googleScholarId = blockScholar ? null : (ce.googleScholarId || null);
+        const googleScholarUrl = blockScholar ? null : (ce.googleScholarUrl || null);
+        const orcidId = blockIdentityFields ? null : (ce.orcidId || null);
+        const orcidUrl = blockIdentityFields ? null : (ce.orcidUrl || null);
+        // Email: drop it for an unconfirmed match, and ALSO re-run the final
+        // persisted address through the name-consistency guard regardless of the
+        // tier that produced it — PubMed/affiliation/ORCID-sourced emails bypass
+        // the Tier-3/4 filter, so a wrong same-named author's address could still
+        // reach Dataverse without this (Codex S220).
+        const rawEmail = c.email || ce.email || null;
+        const email = (unconfirmedMatch || (rawEmail && !ContactParser.isNameConsistentEmail(rawEmail, c.name)))
+          ? null
+          : rawEmail;
+        const emailSource = email ? (ce.emailSource || null) : null;
 
         if (prId) {
           try {
@@ -272,7 +288,7 @@ export default async function handler(req, res) {
               name: c.name,
               normalizedName: normalizeName(c.name),
               email,
-              emailSource: ce.emailSource || null,
+              emailSource,
               orcid: orcidId,
               orcidUrl,
               googleScholarId,
@@ -390,9 +406,9 @@ export default async function handler(req, res) {
           expertiseMismatch: !!c.expertiseMismatch,
           expertiseAreas: Array.isArray(c.expertiseAreas) ? c.expertiseAreas : [],
           email,
-          emailSource: ce.emailSource || null,
+          emailSource,
           website: c.website || ce.website || null,
-          orcidUrl: ce.orcidUrl || null,
+          orcidUrl,
           googleScholarUrl,
           hIndex,
           totalCitations,
