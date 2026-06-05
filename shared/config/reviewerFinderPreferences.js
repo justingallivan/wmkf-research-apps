@@ -19,6 +19,14 @@ export const PREFERENCE_KEYS = {
   // Distinct from the legacy single-template EMAIL_TEMPLATE key above (which the
   // standalone Reviewer Finder still uses) so the two shapes never collide.
   EMAIL_TEMPLATES: 'reviewer_email_templates',
+  // Per-user reviewer-finder PROMPT overrides (S222), keyed by prompt name:
+  //   { 'reviewer-finder.analyze': { body, basePromptId, baseVersion, updatedAt },
+  //     'reviewer-finder.score-candidates': { ... } }
+  // The override `body` layers over the shared Dataverse template; `baseVersion`
+  // drives stale-override detection. WRITE PATH IS GATED: only
+  // /api/reviewer-finder/prompt-override may write this key (the generic
+  // /api/user-preferences endpoint blocks it). See the migration plan.
+  PROMPT_OVERRIDES: 'reviewer_finder_prompt_overrides',
 };
 
 /**
