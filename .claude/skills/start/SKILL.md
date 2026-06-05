@@ -61,6 +61,30 @@ Never put `.git` or the working tree in a cloud-synced folder (iCloud / OneDrive
 Folder Backup / Google Drive mirror) — it offloads `.git` objects to placeholders
 and hangs `git fsck`/`gc`.
 
+## Step 1.6: Verify the Codex skills symlink
+
+Claude Code reads skills from `.claude/skills/` (git-tracked); **Codex** reads
+them from `.agents/skills/`. To keep ONE source of truth and stop Codex from
+running stale/missing skills, `.agents/skills` MUST be a symlink to
+`.claude/skills`. `.agents/` is gitignored, so this symlink is **per-machine** —
+it does not travel with git and must exist on each machine (S221: Codex was
+running May-22 copies that lacked `sweep`).
+
+Check it:
+```bash
+readlink .agents/skills
+```
+
+- If it prints `../.claude/skills` → good, Codex sees the live skills.
+- If it prints nothing AND `.agents/skills` is a **regular directory** → it's a
+  stale per-machine copy. Replace it (back up first if unsure):
+  `rm -rf .agents/skills && ln -s ../.claude/skills .agents/skills`
+- If `.agents/skills` doesn't exist → `mkdir -p .agents && ln -s ../.claude/skills .agents/skills`
+
+Do NOT run the `migrate-to-codex` skill to populate `.agents/` — it writes a
+corrupted `s/Claude/Codex/` copy and severs the `AGENTS.md` symlink (see CLAUDE.md
+header). The symlink above is the only sanctioned way to share skills with Codex.
+
 ## Step 2: Run rubric-enforcement gates
 
 Before reading any session context, run the project's CI gates to surface rubric violations *before* doing other work. A red gate is a violation of the ground-truth rule (`docs/CLAUDE_REMEDIATION_PLAN.md` + CLAUDE.md "Ground-truth requirement"), regardless of which session caused it.
