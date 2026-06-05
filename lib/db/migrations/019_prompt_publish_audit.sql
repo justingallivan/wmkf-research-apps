@@ -31,7 +31,11 @@ CREATE TABLE IF NOT EXISTS prompt_publish_audit (
   status            TEXT NOT NULL CHECK (status IN ('pending', 'completed', 'partial', 'already_published', 'concurrency_conflict', 'invalid_body', 'no_current_row', 'duplicate_current_rows', 'audit_unavailable', 'failed')),
   outcome_json      JSONB,                                -- structured outcome (created/flipped/resumed) — set on final
   warnings_json     JSONB,                                -- ['prior_flip_failed', 'audit_finalize_failed', ...] — set on final
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- One pending + one final row per publish (request_id). Backs the route's
+  -- idempotent retry: a re-submitted request_id can't silently duplicate the
+  -- pending/final pair (INSERT ... ON CONFLICT detects the prior attempt).
+  UNIQUE (request_id, phase)
 );
 
 CREATE INDEX IF NOT EXISTS idx_prompt_publish_audit_name ON prompt_publish_audit (prompt_name, created_at DESC);

@@ -10,6 +10,15 @@
 
 import { DatabaseService } from '../../lib/services/database-service';
 import { requireAuthWithProfile } from '../../lib/utils/auth';
+import { PREFERENCE_KEYS } from '../../shared/config/reviewerFinderPreferences';
+
+// Keys that this generic endpoint must NOT write — they have a dedicated,
+// grant-gated + validating write path. PROMPT_OVERRIDES (reviewer-finder prompt
+// edits) is only writable via /api/reviewer-finder/prompt-override, which
+// enforces the `reviewers` app grant and validates the body (S222). Blocking it
+// here keeps the gated endpoint the sole write path even though this endpoint is
+// only auth-gated (any signed-in profile).
+const RESERVED_WRITE_KEYS = new Set([PREFERENCE_KEYS.PROMPT_OVERRIDES]);
 
 export default async function handler(req, res) {
   // Require authentication and extract profile ID from session
@@ -68,6 +77,13 @@ async function handlePost(req, res, profileId) {
   try {
     const { preferences, key, value } = req.body;
 
+    // Reject reserved keys (dedicated gated write path only).
+    const attemptedKeys = key !== undefined ? [key] : (preferences && typeof preferences === 'object' ? Object.keys(preferences) : []);
+    const reservedHit = attemptedKeys.find((k) => RESERVED_WRITE_KEYS.has(k));
+    if (reservedHit) {
+      return res.status(403).json({ error: `Preference key "${reservedHit}" cannot be written through this endpoint; use its dedicated route.` });
+    }
+
     // Handle single key-value pair
     if (key !== undefined) {
       const success = await DatabaseService.setUserPreference(profileId, key, value);
@@ -106,6 +122,13 @@ async function handlePost(req, res, profileId) {
 async function handleDelete(req, res, profileId) {
   try {
     const { key, keys } = req.body;
+
+    // Reject reserved keys (dedicated gated write path only).
+    const attemptedKeys = key ? [key] : (Array.isArray(keys) ? keys : []);
+    const reservedHit = attemptedKeys.find((k) => RESERVED_WRITE_KEYS.has(k));
+    if (reservedHit) {
+      return res.status(403).json({ error: `Preference key "${reservedHit}" cannot be deleted through this endpoint; use its dedicated route.` });
+    }
 
     // Handle single key deletion
     if (key) {

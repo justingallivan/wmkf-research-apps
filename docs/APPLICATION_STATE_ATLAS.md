@@ -55,7 +55,7 @@ The canonical reference for the live state of the application's data layer.
 | `account` | 4,601 | organization pivot | (Wave 2 intake portal will extend) |
 | `systemuser` | 222 | internal staff | (used for impersonation; see `dataverse-identity-map.js`) |
 | `wmkf_ai_run` | 325 | append-only AI invocation audit ledger | [dataverse-wmkf-ai-run-and-prompt.md](atlas/dataverse-wmkf-ai-run-and-prompt.md) |
-| `wmkf_ai_prompt` | 10 | staff-editable prompt rows for Executor | same page |
+| `wmkf_ai_prompt` | 11 | staff-editable prompt rows for Executor | same page |
 
 ### Vendor entities — Dynamics Explorer read-only
 

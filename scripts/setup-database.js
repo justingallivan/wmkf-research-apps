@@ -731,7 +731,8 @@ const v34Statements = [
     status            TEXT NOT NULL CHECK (status IN ('pending', 'completed', 'partial', 'already_published', 'concurrency_conflict', 'invalid_body', 'no_current_row', 'duplicate_current_rows', 'audit_unavailable', 'failed')),
     outcome_json      JSONB,
     warnings_json     JSONB,
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (request_id, phase)
   )`,
   `CREATE INDEX IF NOT EXISTS idx_prompt_publish_audit_name ON prompt_publish_audit (prompt_name, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_prompt_publish_audit_request ON prompt_publish_audit (request_id)`,

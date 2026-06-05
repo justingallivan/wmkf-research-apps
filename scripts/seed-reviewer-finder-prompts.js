@@ -5,12 +5,20 @@
  *   - reviewer-finder.analyze
  *   - reviewer-finder.score-candidates
  *
- * These migrate the live Reviewer Finder Claude prompts into Dynamics-resident
- * storage ahead of the route refactor (Session 112+). Until that refactor,
- * the live routes still use the legacy function-based prompts in
- * `shared/config/prompts/reviewer-finder.js`. Seeding now puts the templates
- * in front of staff for review/edit and lets the post-cycle refactor become
- * pure wiring.
+ * These hold the live Reviewer Finder Claude prompt BODIES in Dynamics-resident
+ * storage. As of S222 the route refactor has LANDED: `ClaudeReviewerService`
+ * resolves the body at runtime (per-user override → this Dataverse row → the
+ * in-repo `reviewer-finder.js` code template as fallback) and composes the
+ * code-owned A7 preamble around it. So re-running this seed updates what the
+ * LIVE analyze/discover routes send to Claude — treat `--execute` as a prod
+ * content change, not a staging-ahead step. The code templates in
+ * `reviewer-finder.js` / `reviewer-finder-dynamics.js` are the byte-parity
+ * reference + fallback; keep them in sync with what is seeded here.
+ *
+ * NOTE: this script UPDATES the existing `iscurrent` row in place at
+ * `wmkf_promptversion: 1` (it does NOT create a new version). The /admin prompt
+ * editor (S222) is the versioned-publish path; use this script for the initial
+ * reconcile/seed only.
  *
  * Usage:
  *   node scripts/seed-reviewer-finder-prompts.js --dry-run
