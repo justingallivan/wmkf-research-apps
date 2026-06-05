@@ -31,6 +31,7 @@
 - Stakeholder/email tone: feedback-stakeholder-email-tone.md; feedback-review-panel-tone.md
 
 ## Task Routing
+- Reviewer-finder NEXT-SESSION topics (timeout extend / recency-weighted ID / Perplexity role — flagged EOD S222): project-reviewer-finder-next-topics.md
 - Reviewer Workbench / lifecycle: project-reviewer-apps-redesign-direction.md; project-reviewer-workbench-invite-workflow.md; project-reviewer-lifecycle.md
 - Reviewer identity resolver / ORCID: project-reviewer-identity-resolution.md; project-reviewer-identity-resolution-phase1.md; project-reviewer-self-report-orcid-sticky-confirmed.md
 - Reviewer identity fragmentation (why the resolver exists): reviewer-identity-fragmentation.md
