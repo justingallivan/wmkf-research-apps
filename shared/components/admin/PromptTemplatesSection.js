@@ -80,17 +80,34 @@ function PromptPanel({ prompt, onPublished }) {
     <div className="border rounded-lg overflow-hidden">
       <div className="p-4 bg-gray-50 border-b flex items-baseline justify-between">
         <div>
-          <div className="font-medium text-gray-900"><code>{prompt.name}</code></div>
+          <div className="font-medium text-gray-900">
+            <code>{prompt.name}</code>
+            {!prompt.hasCurrent && (
+              <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] align-middle">
+                draft — no published version
+              </span>
+            )}
+          </div>
           <div className="text-xs text-gray-500">
-            current version <strong>v{prompt.version ?? '?'}</strong> · {(prompt.body || '').length} chars
+            {prompt.hasCurrent ? 'current version' : 'latest version'} <strong>v{prompt.version ?? '?'}</strong> · {(prompt.body || '').length} chars
           </div>
         </div>
-        <button
-          onClick={() => setExpanded((e) => !e)}
-          className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded hover:bg-gray-800"
-        >
-          {expanded ? 'Cancel' : 'Edit & publish'}
-        </button>
+        {prompt.hasCurrent ? (
+          <button
+            onClick={() => setExpanded((e) => !e)}
+            className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded hover:bg-gray-800"
+          >
+            {expanded ? 'Cancel' : 'Edit & publish'}
+          </button>
+        ) : (
+          <button
+            onClick={() => setExpanded((e) => !e)}
+            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-100"
+            title="No published current version. View the body; publishing requires seeding a current version first."
+          >
+            {expanded ? 'Hide' : 'View'}
+          </button>
+        )}
       </div>
 
       {expanded && (
@@ -153,6 +170,12 @@ function PublishForm({ prompt, onSuccess, onOutcome }) {
         </div>
       )}
 
+      {!prompt.hasCurrent && (
+        <div className="text-xs px-3 py-2 rounded border bg-amber-50 text-amber-800 border-amber-200">
+          This prompt has no published current version, so it can&apos;t be versioned from here. Seed/publish a current version first (e.g. via the seed script).
+        </div>
+      )}
+
       <div className="flex items-center justify-end gap-3">
         <button
           type="button"
@@ -164,7 +187,7 @@ function PublishForm({ prompt, onSuccess, onOutcome }) {
         </button>
         <button
           onClick={submit}
-          disabled={submitting || !validation.valid || unchanged}
+          disabled={submitting || !validation.valid || unchanged || !prompt.hasCurrent}
           className="px-4 py-1.5 bg-gray-900 text-white text-sm font-medium rounded hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {submitting ? 'Publishing…' : `Publish v${(prompt.version ?? 0) + 1}`}
