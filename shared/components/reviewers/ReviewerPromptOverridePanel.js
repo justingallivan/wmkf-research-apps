@@ -32,7 +32,7 @@ export default function ReviewerPromptOverridePanel({ onClose }) {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
-  useEffect(() => { load(name); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [name]);
+  useEffect(() => { load(name); }, [name]);
 
   const validation = validatePromptForSave(name, body);
   const usingOverride = !!data?.userOverride;
