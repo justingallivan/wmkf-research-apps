@@ -28,7 +28,7 @@ export const config = {
       sizeLimit: '10mb',
     },
   },
-  maxDuration: 90, // Allow up to 90 seconds for Claude analysis + PDF extraction
+  maxDuration: 300, // Must exceed the LLMClient 120s timeout + retry budget (lib/services/llm-client.js); at 90s a slow Claude call was killed mid-stream before the result frame, surfacing as a silent "Analysis returned no result." Matches discover.js/enrich-recommended.js.
 };
 
 export default async function handler(req, res) {
