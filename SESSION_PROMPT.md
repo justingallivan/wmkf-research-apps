@@ -1,61 +1,67 @@
-# Session 221 Prompt: live-smoke the reviewer fixes, then merge to main
+# Session 222 Prompt: live-smoke the (now-deployed) reviewer fixes, then resume the workflow walkthrough
 
-## ⚠️ Read first — work is on a BRANCH, not main
-S220's reviewer-enrichment fixes live on branch **`fix/workbench-reviewer-find-enrichment`** (pushed to origin), **NOT merged to main → NOT deployed to prod.** This was deliberate: the fixes are Codex-verified + unit-green but **never exercised in the live app**. Next session: **do the live PD smoke first**, then merge to main (which auto-deploys). Don't merge blind.
+## ⚠️ Read first — the reviewer fixes are NOW IN PROD
+S220 + S221's reviewer-enrichment fixes are **merged to `main` and deployed** (the S221 handoff wanted the smoke *before* merge; Justin chose to merge first, so the live PD smoke is now **owed post-deploy**). The code is well-tested (1868 green) and twice Codex-reviewed at home, but **still never exercised by a real PD login.** Top task: do that smoke against prod.
 
-To resume: `git checkout fix/workbench-reviewer-find-enrichment` (or it may already be checked out).
-
-## ⏰ Standing context / guardrails (carried S197–S220)
+## ⏰ Standing context / guardrails (carried S197–S221)
 - **`main` auto-deploys to prod on push.** Feature branches do NOT deploy. Commit/push only when asked. One-shot operator scripts + SQL migrations hit prod directly when run locally.
-- **`rtk` is UNINSTALLED (S220).** Do NOT prefix commands with `rtk`; the global `~/.claude/RTK.md` instructions are stale. The PreToolUse hook was removed from `~/.claude/settings.json`. See [[project-rtk-grep-output-corruption]].
-- **Three reminder hooks LIVE** (`.claude/settings.json`, repo-tracked → all machines): two PreToolUse — `scope-claim-reminder.js` + `doc-edit-reconcile-reminder.js` (read the WHOLE file + grep repo + fix every instance on any docs/memory edit) — and one PostToolUse — `codex-verbatim-reminder.js` (S221: fires when a `Task|Agent` codex result returns → paste Codex VERBATIM before any verify/act/paraphrase; see [[feedback-share-codex-verbatim]]).
-- **Local-dev hits the SAME prod Dataverse + prod Postgres.** `.env.local` has `POSTGRES_URL`, `SERP_API_KEY`, `BLOB_READ_WRITE_TOKEN`. **`CLAUDE_API_KEY` in `.env.local` was stale/401 at S220 start — Justin replaced it.** ORCID/NCBI/EXTERNAL_LINK_SECRET are "Sensitive" → empty on `vercel env pull`, hand-enter.
-- **jest harness for live-pipeline repro:** Next skips `.env.local` under `NODE_ENV=test`; load it by hand in the test, and override `jest.setup.js`'s stub `CLAUDE_API_KEY='test-...'`. Restore real `fetch` via `undici` (give it a no-op `.mockClear`). Service files use extensionless ESM imports → plain `node` can't require them; run through `npx jest`. Pattern proven in S220.
+- **`rtk` is FULLY UNINSTALLED + cleaned on both machines (S221).** Do NOT prefix commands with `rtk`. The two per-machine surfaces (`~/.claude/settings.json`(+`.bak`) and `.claude/settings.local.json`) are now clean on home + office. Global `~/.claude/RTK.md` does not exist here. See [[project-rtk-grep-output-corruption]].
+- **THREE reminder hooks LIVE** (`.claude/settings.json`, repo-tracked → all machines):
+  - PreToolUse `scope-claim-reminder.js` — disconfirm scope/quantity claims.
+  - PreToolUse `doc-edit-reconcile-reminder.js` — on any `docs/`/`.claude-memory/`/`CLAUDE.md`/`SESSION_PROMPT.md`/`AGENTS.md` Edit: read the WHOLE file + grep repo + fix every instance.
+  - **NEW PostToolUse `codex-verbatim-reminder.js` (S221)** — fires when a `Task|Agent` codex result returns: **paste Codex output VERBATIM before ANY verify/act/paraphrase.** Added because that rule failed ~5× in prose; the hook only reminds, the rule still binds. See [[feedback-share-codex-verbatim]].
+- **Codex skills come from `.agents/skills/` (symlink → `.claude/skills/`), per-machine (gitignored).** `/start` Step 1.6 self-heals it. Do NOT run `migrate-to-codex` (corrupts `.agents/` + severs `AGENTS.md` symlink).
+- **Local-dev hits the SAME prod Dataverse + prod Postgres.** `.env.local` has `POSTGRES_URL`, `SERP_API_KEY`, `BLOB_READ_WRITE_TOKEN`. ORCID/NCBI/EXTERNAL_LINK_SECRET are "Sensitive" → empty on `vercel env pull`, hand-enter. (S220: `CLAUDE_API_KEY` in `.env.local` had gone stale/401; Justin replaced it.)
+- **jest harness for live-pipeline repro:** Next skips `.env.local` under `NODE_ENV=test`; load it by hand + override `jest.setup.js`'s stub `CLAUDE_API_KEY`. Restore real `fetch` via `undici`. Run through `npx jest` (extensionless ESM imports). Proven S220.
 - **Memory is a ROUTER.** `.claude-memory/MEMORY.md` routes "for THIS task → read these 1–3 files" (in full).
 
-## Session 220 Summary — reviewer "search" bug → 3 real fixes (on branch)
+## Session 221 Summary — merged S220 to prod, then a fresh Codex review caught 2 more leaks
 
-Started on the S220 carryover #1 (reviewer-workflow validation / PD smoke of `/workbench`). Probed live state (only Justin holds the `reviewers` grant; smoke testbed = request **1002788**, lead PD Justin, real `ProjectDescription.pdf` proposal). Before smoking, Justin reported the Find-tab reviewer search "only returned the applicant's suggested reviewers." Ran the **real** analyze→discover pipeline via a jest harness: it returns **12 correct on-topic reviewers** — so the *search* works. The screenshot showed the symptom was actually the **"Enrich applicant-recommended reviewers"** flow, which exposed three real bugs. Fixed all three (Codex-reviewed twice → CLEAN):
+Justin started S222-adjacent: noticed an unmerged branch ahead of `main` (`fix/workbench-reviewer-find-enrichment`, the S220 work + S221 prompt) and merged it to prod (fast-forward `6019cec..2cc6708`). Then flagged that the S220 Codex reviews ran on the **work machine whose session went stale** — unverifiable. A fresh Codex review at home (correct call) found the prior "Codex-reviewed → CLEAN" was not the whole story:
 
-1. **Fabricated / wrong-person emails.** Tier-3 (Claude web_search) hallucinated emails (`justin@gmail.com` for a 0-pub fake reviewer) and Tier-4 (SerpAPI) could surface a same-named stranger's address (`SarahRose888@boisestate.edu` for "Gallivan"). Added `ContactParser.isNameConsistentEmail` (name-grounding guard on both tiers) + hardened the Tier-3 prompt to forbid guessing.
-2. **Wrong-person name-only match.** A bare applicant name (no affiliation) matched any same-named PubMed author. `enrich-recommended` now treats a no-affiliation + below-`probable`-resolver match as **unconfirmed** and withholds ALL match-derived fields (email/scholar/ORCID/metrics/affiliation/keywords/COI/back-prop) from the Dataverse writeback AND the card, marking `needsIdentification`.
-3. **Search-vs-enrich UX.** Two near-identical dark buttons with the optional enrich on top. Reordered "Search for reviewers" to primary-first; demoted applicant-verification to a secondary outline button relabeled "Optional: verify the applicant's suggested reviewers (does NOT find new reviewers)".
+### 1. Two wrong-person leaks closed (`549dd52`)
+- **Bug 1 (data leak, was live in prod):** the unconfirmed-match guard in `enrich-recommended.js` gated on `c.verified !== false` — but contact enrichment (web/SerpAPI/Scholar) runs on the bare name for verified AND unverified candidates, so a PubMed-UNverified, no-affiliation row leaked a same-named stranger's website/faculty/email/Scholar to writeback. Dropped `c.verified !== false`.
+- **Bug 1 residual:** `writeIdentityDecision` still persisted the stranger's resolver anchors (`canonicalKey`+`sourceUrl`) to `wmkf_identityverifiedanchorsjson` (NOT in `RESOLVER_SOURCED_FIELDS`, so `clearIdentityFields` couldn't scrub them). Now sanitized (`anchors:[]`, generic summary) for unconfirmed matches; bare `unresolved` status still recorded. **Policy decision (Justin): the affiliation-grounded below-probable path keeps its anchors — audit trail, low risk.**
+- **Bug 2 (email-guard false-rejects):** `isNameConsistentEmail` left suffix/credential tokens (Jr/Ph.D./MD) as the "surname" and stripped accents to nothing. Now NFD-normalize + strip `\p{Mn}`, collapse intra-token punctuation, filter `SUFFIX_TOKENS`. **Residual:** suffix-strip collapsed `"John MD"` to lone given name → re-opened the false-accept; fixed with a ≥2-real-token fallback.
+- +9 tests; full suite 1868 green; lint 0 errors. Codex round-2 confirmed both bugs closed.
 
-Also: **uninstalled rtk** + removed its Claude Code hook (it was summarizing `npx jest` output to `PASS/FAIL`, hiding console logs).
+### 2. codex-verbatim enforcement hook (`097e1e4`)
+The verbatim-Codex rule failed twice this session (ran verification Bash/Read + paraphrased into tables before showing the review). Per S219's "lever is the hook, not prose": added PostToolUse `.claude/hooks/codex-verbatim-reminder.js` (fails open, 5-case tested), updated [[feedback-share-codex-verbatim]], fixed the stale "two hooks" count.
 
-### Commits (branch `fix/workbench-reviewer-find-enrichment`)
-- `eeaf1de` - fix(workbench): guard reviewer enrichment against fabricated/wrong-person emails + name-only matches
-- `762c1ec` - docs(memory): record rtk uninstall + Claude Code hook removal
-- `fcdd63a` - fix(workbench): address Codex review — full unconfirmed-match gating + all-source email check
-- `<probe>` - chore(scripts): add read-only reviewers-grant + smoke-state probe
+### 3. rtk fully removed on home + memory reconciled (`965700d`)
+Justin uninstalled rtk; S220 only cleaned the **office** machine (`.claude/settings.local.json` is gitignored → never synced). Home still had **20** dead `Bash(rtk …)` allowlist entries (S220 note said 9 = office-only) → removed. Refreshed `~/.claude/settings.json.bak`. Fixed `rtk proxy npx jest` → `npx jest` in a build-plan doc. Reconciled [[project-rtk-grep-output-corruption]] (explained the 9-vs-20 per-machine gap).
+
+### 4. Codex skills symlink fixed (`88c1ce2`)
+`.agents/skills/` (Codex) held stale May-22 copies of `start`/`stop`, missing `sweep` → Codex ran outdated skills. Replaced with symlink `.agents/skills → ../.claude/skills` (one source of truth). `/start` Step 1.6 now self-heals it per-machine. **Justin confirmed he already created the office symlink** — per-machine + gitignored, so no git conflict.
 
 ## Potential Next Steps
 
-### 1. Live PD smoke of the reviewer fixes, then merge to main (TOP)
-Log in as a PD, open `/workbench/<1002788>` → Reviewers → Find. Verify: "Run reviewer search" returns ~12 real reviewers; the "Optional: verify the applicant's suggested reviewers" button is clearly secondary/below; enriching the 4 fake "Justin" reviewers no longer fabricates emails and marks the no-affiliation ones "needs identification". Then merge the branch to main (→ deploys to prod).
+### 1. Live PD smoke of the deployed reviewer fixes (TOP — now owed post-deploy)
+Log in as a PD, open `/workbench/1002788` (lead PD Justin, real `ProjectDescription.pdf`) → Reviewers → Find. Verify: "Run reviewer search" returns ~12 real reviewers; the "Optional: verify the applicant's suggested reviewers" button reads as secondary; enriching the 4 fake "Justin" reviewers fabricates NO emails and marks the no-affiliation ones "needs identification" — AND now (S221) writes no stranger website/faculty/anchors for them. Only Justin holds the `reviewers` grant; grant pilot PDs via `/admin` (`wmkf_appuserappaccesses`). Read-only state probe: `node scripts/probe-reviewers-grant-and-smoke-state.js`.
 
-### 2. The ORIGINAL S220 task is still open
-The reviewer-workflow validation (Find→Invite→Track→Completed walkthrough) was never completed — we found bugs at the Find step. Resume it after #1.
+### 2. Reviewer-workflow validation walkthrough (the ORIGINAL S220 task, still open)
+Find→Invite→Track→Completed end-to-end. Never completed — bugs surfaced at the Find step both sessions. Resume after #1.
 
-### 3. Consider tightening the email same-surname residual
-`isNameConsistentEmail` still accepts a same-surname different person (`bgallivan@…` for "Justin Gallivan") via the bare-surname rule — documented tradeoff (defense-in-depth via identity resolver + human review). Tighten only if it bites.
+### 3. Reviewer-app consolidation (destructive — grep first)
+Retire legacy `reviewer-finder`/`review-manager` appRegistry keys now Workbench has Find parity. Both keys still live; 18 routes accept `reviewers` variadically. [[project-reviewer-apps-redesign-direction]] (Option B). Verify live callers before touching.
 
-### 4. Reviewer-app consolidation / other S219 carryovers
-Retire legacy `reviewer-finder`/`review-manager` keys (destructive — grep first). Intake virus-scan EICAR e2e (pre-cycle must-do).
+### 4. Intake virus-scan EICAR e2e — parked pre-cycle must-do
+[[project-intake-portal-virus-scan-e2e-deferred]]; needs a deployed env + Entra applicant session.
 
 ## Key Files Reference
 | File | Purpose |
 |------|---------|
-| `lib/utils/contact-parser.js` | `isNameConsistentEmail` name-grounding email guard |
-| `lib/services/contact-enrichment-service.js` | Tier-3/4 email guard + hardened web-search prompt |
-| `pages/api/workbench/enrich-recommended.js` | unconfirmed-match gating of all writeback fields |
-| `shared/components/reviewers/ReviewerSearchSection.js` | search-primary / enrich-secondary reorder |
-| `tests/unit/contact-parser-email-consistency.test.js` | 17 cases for the email guard |
+| `pages/api/workbench/enrich-recommended.js` | unconfirmed-match gating (S221: dropped `c.verified` escape hatch + sanitized identity anchors) |
+| `lib/utils/contact-parser.js` | `isNameConsistentEmail` (S221: NFD + suffix-strip + ≥2-token fallback) |
+| `tests/unit/contact-parser-email-consistency.test.js` / `reviewer-route-identity-gate.test.js` | the S221 regression cases |
+| `.claude/hooks/codex-verbatim-reminder.js` | NEW PostToolUse — paste Codex verbatim before acting |
 | `scripts/probe-reviewers-grant-and-smoke-state.js` | read-only: who holds `reviewers` grant + 1002788 reviewer state |
 
 ## Testing
 ```bash
-npx jest tests/unit/contact-parser-email-consistency.test.js   # the email guard
-npx jest                                                        # full suite (1,859 green at S220)
+npx jest tests/unit/contact-parser-email-consistency.test.js tests/unit/reviewer-route-identity-gate.test.js
+npx jest                                                        # full suite (1868 green at S221)
 node scripts/probe-reviewers-grant-and-smoke-state.js          # live grant + smoke-state probe
+# full gate set (matches /start):
+for g in migrations-manifest api-routes atlas doc-currency fact-consistency canonical-pointers drain-table-mentions prompt-storage-mentions prompt-injection-tagging memory-router; do npm run check:$g; done
 ```
