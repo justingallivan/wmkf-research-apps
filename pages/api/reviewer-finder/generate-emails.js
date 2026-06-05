@@ -30,6 +30,7 @@ import { requireAppAccess } from '../../../lib/utils/auth';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { LLMClient } from '../../../lib/services/llm-client';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
+import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
 import { BASE_CONFIG, getModelForApp } from '../../../shared/config/baseConfig';
 import { safeFetch, isAllowedUrl } from '../../../lib/utils/safe-fetch';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
@@ -173,7 +174,10 @@ export const config = {
       sizeLimit: '10mb', // Increased for attachments
     },
   },
-  maxDuration: 300, // 5 minutes for large batches
+  // Pinned at the Vercel Pro/Enterprise Fluid-Compute cap (800s). The live
+  // search budget (`reviewer.time_budget_seconds`, default 600) is enforced
+  // below via an AbortSignal deadline. See docs/REVIEWER_TIMEOUT_BUDGET_PLAN.md.
+  maxDuration: 800,
 };
 
 export default async function handler(req, res) {
@@ -201,6 +205,13 @@ export default async function handler(req, res) {
     res.write(`event: ${event}\n`);
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
+
+  // Admin-configurable wall-clock budget (default 600s, clamped [120,800]),
+  // enforced via an AbortSignal deadline on the per-candidate Claude
+  // personalization calls. See docs/REVIEWER_TIMEOUT_BUDGET_PLAN.md.
+  const deadlineController = new AbortController();
+  let deadlineTimer = null;
+  let budgetSeconds = null;
 
   try {
     const {
@@ -341,8 +352,26 @@ export default async function handler(req, res) {
     const generatedEmails = [];
     const errors = [];
 
+    // Start the time-budget clock (covers the per-candidate generation loop).
+    budgetSeconds = await getReviewerTimeBudgetSeconds();
+    const deadlineAt = Date.now() + budgetSeconds * 1000;
+    deadlineTimer = setTimeout(() => {
+      const e = new Error('reviewer_time_budget_exceeded');
+      e.code = 'reviewer_time_budget_exceeded';
+      deadlineController.abort(e);
+    }, budgetSeconds * 1000);
+
     // Process each candidate
     for (let i = 0; i < validCandidates.length; i++) {
+      // Stop scheduling more candidates once the deadline fires. Throw rather
+      // than break so the loop does NOT fall through to mark-as-sent + the
+      // success result/complete frames — the top-level catch surfaces the
+      // timeout (a budget abort must be terminal, not a partial success).
+      if (deadlineController.signal.aborted) {
+        const e = new Error('reviewer_time_budget_exceeded');
+        e.code = 'reviewer_time_budget_exceeded';
+        throw e;
+      }
       const candidate = validCandidates[i];
 
       sendEvent('progress', {
@@ -375,12 +404,16 @@ export default async function handler(req, res) {
               candidateProposalInfo,
               body,
               claudeApiKey,
-              userProfileId
+              userProfileId,
+              { signal: deadlineController.signal, deadlineAt }
             );
             if (personalizedBody) {
               body = personalizedBody;
             }
           } catch (claudeError) {
+            // A deadline abort must bubble to the loop-top break, not be
+            // swallowed as a per-candidate personalization failure.
+            if (deadlineController.signal.aborted) throw claudeError;
             console.error(`Claude personalization failed for ${candidate.name}:`, claudeError.message);
             // Continue with non-personalized email
           }
@@ -447,6 +480,10 @@ export default async function handler(req, res) {
         });
 
       } catch (error) {
+        // A budget abort (rethrown from the inner personalization catch) must
+        // bubble to the top-level catch, not be swallowed as a per-candidate
+        // failure — otherwise the loop continues to success frames.
+        if (deadlineController.signal.aborted) throw error;
         console.error(`Error generating email for ${candidate.name}:`, error.message);
         errors.push({
           candidateName: candidate.name,
@@ -508,10 +545,20 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Generate emails error:', error);
-    sendEvent('error', {
-      message: BASE_CONFIG.ERROR_MESSAGES.EMAIL_GENERATION_FAILED,
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    if (deadlineController.signal.aborted) {
+      const mins = budgetSeconds ? Math.round(budgetSeconds / 60) : null;
+      sendEvent('error', {
+        message: `Email generation stopped after exceeding the configured ${mins ? `${mins}-minute ` : ''}time budget. An admin can raise it (up to 13 minutes) under Settings at /admin.`,
+        timeout: true,
+      });
+    } else {
+      sendEvent('error', {
+        message: BASE_CONFIG.ERROR_MESSAGES.EMAIL_GENERATION_FAILED,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  } finally {
+    clearTimeout(deadlineTimer);
   }
 
   res.end();
@@ -520,19 +567,26 @@ export default async function handler(req, res) {
 /**
  * Use Claude to personalize an email body
  */
-async function personalizeWithClaude(candidate, proposalInfo, baseBody, apiKey, userProfileId) {
+async function personalizeWithClaude(candidate, proposalInfo, baseBody, apiKey, userProfileId, { signal, deadlineAt } = {}) {
   const prompt = createPersonalizationPrompt(candidate, proposalInfo, baseBody);
 
-  const claude = new LLMClient({
+  const clientOpts = {
     apiKey,
     model: getModelForApp('email-personalization'),
     appName: 'reviewer-finder-emails',
     userProfileId,
-  });
+  };
+  // Under a deadline, bound this attempt by min(remaining budget, 180s).
+  if (deadlineAt != null) {
+    const remainingMs = deadlineAt - Date.now();
+    clientOpts.timeoutMs = Math.max(1, Math.min(remainingMs, 180_000));
+  }
+  const claude = new LLMClient(clientOpts);
   const r = await claude.complete({
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 512,
     temperature: 0.3, // Low temperature for consistent, professional output
+    signal,
   });
 
   return r.text ? r.text.trim() : null;

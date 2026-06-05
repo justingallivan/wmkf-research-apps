@@ -26,6 +26,7 @@ import { requireAppAccess } from '../../../lib/utils/auth';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
+import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -37,6 +38,10 @@ export const config = {
       sizeLimit: '4mb',
     },
   },
+  // Pinned at the Vercel Pro/Enterprise Fluid-Compute cap (800s). Live budget is
+  // `reviewer.time_budget_seconds` (default 600), enforced via an AbortSignal
+  // deadline. See docs/REVIEWER_TIMEOUT_BUDGET_PLAN.md.
+  maxDuration: 800,
 };
 
 export default async function handler(req, res) {
@@ -73,6 +78,18 @@ export default async function handler(req, res) {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
+  // Admin-configurable wall-clock budget (default 600s, clamped [120,800]),
+  // enforced via an AbortSignal deadline on the Tier-3 Claude web-search calls.
+  // See docs/REVIEWER_TIMEOUT_BUDGET_PLAN.md.
+  const deadlineController = new AbortController();
+  const budgetSeconds = await getReviewerTimeBudgetSeconds();
+  const deadlineAt = Date.now() + budgetSeconds * 1000;
+  const deadlineTimer = setTimeout(() => {
+    const e = new Error('reviewer_time_budget_exceeded');
+    e.code = 'reviewer_time_budget_exceeded';
+    deadlineController.abort(e);
+  }, budgetSeconds * 1000);
+
   try {
     // First, send cost estimate
     const estimate = ContactEnrichmentService.estimateCost(candidates, options);
@@ -94,6 +111,8 @@ export default async function handler(req, res) {
       useOrcid: options.useOrcid !== false,
       useClaudeSearch: options.useClaudeSearch === true,
       useSerpSearch: options.useSerpSearch === true,
+      signal: deadlineController.signal,
+      deadlineAt,
       onProgress: (progress) => {
         sendEvent({
           type: 'progress',
@@ -111,12 +130,22 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Contact enrichment error:', error);
-    sendEvent({
-      type: 'error',
-      message: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-    });
+    if (deadlineController.signal.aborted) {
+      const mins = Math.round(budgetSeconds / 60);
+      sendEvent({
+        type: 'error',
+        message: `Enrichment stopped after exceeding the configured ${mins}-minute time budget. An admin can raise it (up to 13 minutes) under Settings at /admin.`,
+        timeout: true,
+      });
+    } else {
+      sendEvent({
+        type: 'error',
+        message: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
+    }
   } finally {
+    clearTimeout(deadlineTimer);
     res.end();
   }
 }

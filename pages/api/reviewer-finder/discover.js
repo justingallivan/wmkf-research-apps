@@ -17,6 +17,7 @@ import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { ClaudeReviewerService } from '../../../lib/services/claude-reviewer-service';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { deriveProposalAuthorNames } from '../../../lib/utils/proposal-authors';
+import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -29,7 +30,12 @@ export const config = {
       sizeLimit: '2mb',
     },
   },
-  maxDuration: 300, // Allow up to 5 minutes for database searches
+  // Pinned at the Vercel Pro/Enterprise Fluid-Compute cap (800s) — the platform
+  // hard wall. The live search budget is the admin-editable
+  // `reviewer.time_budget_seconds` (default 600), enforced below via an
+  // AbortSignal deadline (maxDuration is build-time-static, not runtime
+  // configurable). See docs/REVIEWER_TIMEOUT_BUDGET_PLAN.md.
+  maxDuration: 800,
 };
 
 export default async function handler(req, res) {
@@ -55,6 +61,14 @@ export default async function handler(req, res) {
     res.write(`event: ${event}\n`);
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
+
+  // Admin-configurable wall-clock budget for the whole discovery run (default
+  // 600s, clamped [120,800]). External DB searches are best-effort (they don't
+  // observe the signal), but a fired deadline aborts the Claude reasoning call
+  // and the per-batch loop, so an over-budget search surfaces a clear timeout.
+  const deadlineController = new AbortController();
+  let deadlineTimer = null;
+  let budgetSeconds = null;
 
   try {
     const {
@@ -98,6 +112,15 @@ export default async function handler(req, res) {
       authorInstitution: analysisResult.proposalInfo?.authorInstitution || '(NOT SET)',
       proposalAuthors: analysisResult.proposalInfo?.proposalAuthors || '(NOT SET)'
     });
+
+    // Start the search budget clock (covers DB searches + reasoning).
+    budgetSeconds = await getReviewerTimeBudgetSeconds();
+    const deadlineAt = Date.now() + budgetSeconds * 1000;
+    deadlineTimer = setTimeout(() => {
+      const e = new Error('reviewer_time_budget_exceeded');
+      e.code = 'reviewer_time_budget_exceeded';
+      deadlineController.abort(e);
+    }, budgetSeconds * 1000);
 
     sendEvent('progress', {
       stage: 'discovery',
@@ -233,7 +256,8 @@ export default async function handler(req, res) {
         (progress) => {
           sendEvent('progress', progress);
         },
-        userProfileId
+        userProfileId,
+        { signal: deadlineController.signal, deadlineAt }
       );
 
       // Filter out irrelevant candidates (those marked as not relevant by Claude)
@@ -300,6 +324,12 @@ export default async function handler(req, res) {
       proposalKeywords
     );
 
+    // Close the boundary race: if the deadline fired while the final LLM call /
+    // ranking was resolving, surface the timeout instead of a success result.
+    if (deadlineController.signal.aborted) {
+      throw deadlineController.signal.reason || new Error('reviewer_time_budget_exceeded');
+    }
+
     sendEvent('result', {
       verified: verifiedWithCOI,
       unverified: discoveryResults.unverified,
@@ -317,10 +347,20 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Discover API error:', error);
-    sendEvent('error', {
-      message: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    if (deadlineController.signal.aborted) {
+      const mins = budgetSeconds ? Math.round(budgetSeconds / 60) : null;
+      sendEvent('error', {
+        message: `Discovery stopped after exceeding the configured ${mins ? `${mins}-minute ` : ''}time budget. An admin can raise it (up to 13 minutes) under Settings at /admin.`,
+        timeout: true,
+      });
+    } else {
+      sendEvent('error', {
+        message: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  } finally {
+    clearTimeout(deadlineTimer);
   }
 
   res.end();

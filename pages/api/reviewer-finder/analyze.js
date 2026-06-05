@@ -19,6 +19,7 @@ import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { safeFetch } from '../../../lib/utils/safe-fetch';
 import { ClaudeReviewerService } from '../../../lib/services/claude-reviewer-service';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
+import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -28,7 +29,12 @@ export const config = {
       sizeLimit: '10mb',
     },
   },
-  maxDuration: 300, // Must exceed the LLMClient 120s timeout + retry budget (lib/services/llm-client.js); at 90s a slow Claude call was killed mid-stream before the result frame, surfacing as a silent "Analysis returned no result." Matches discover.js/enrich-recommended.js.
+  // Pinned at the Vercel Pro/Enterprise Fluid-Compute cap (800s). This is the
+  // platform hard wall; the live, admin-editable budget that actually governs a
+  // search is `reviewer.time_budget_seconds` (default 600), enforced below via
+  // an AbortSignal deadline. maxDuration is build-time-static and CANNOT be
+  // runtime-configurable. See docs/REVIEWER_TIMEOUT_BUDGET_PLAN.md.
+  maxDuration: 800,
 };
 
 export default async function handler(req, res) {
@@ -69,6 +75,13 @@ export default async function handler(req, res) {
   // Track extracted summary info
   let summaryBlobUrl = null;
   let summaryFilename = null;
+
+  // Admin-configurable wall-clock budget for the whole search (default 600s,
+  // clamped [120,800]). A fired deadline aborts the Claude call gracefully so we
+  // surface a clear timeout instead of the platform 504-ing at maxDuration.
+  const deadlineController = new AbortController();
+  let deadlineTimer = null;
+  let budgetSeconds = null;
 
   try {
     const { proposalText, blobUrl, additionalNotes, excludedNames, temperature, reviewerCount, summaryPages } = req.body;
@@ -152,6 +165,16 @@ export default async function handler(req, res) {
       return res.end();
     }
 
+    // Start the search time-budget clock now (after the upload/PDF prep, which
+    // is bounded by maxDuration but not the LLM budget).
+    budgetSeconds = await getReviewerTimeBudgetSeconds();
+    const deadlineAt = Date.now() + budgetSeconds * 1000;
+    deadlineTimer = setTimeout(() => {
+      const e = new Error('reviewer_time_budget_exceeded');
+      e.code = 'reviewer_time_budget_exceeded';
+      deadlineController.abort(e);
+    }, budgetSeconds * 1000);
+
     sendEvent('progress', {
       stage: 'analysis',
       message: 'Analyzing proposal with Claude...',
@@ -164,10 +187,18 @@ export default async function handler(req, res) {
       temperature: temperature !== undefined ? temperature : 0.3,
       reviewerCount: reviewerCount || 12,
       userProfileId,
+      signal: deadlineController.signal,
+      deadlineAt,
       onProgress: (progress) => {
         sendEvent('progress', progress);
       }
     });
+
+    // Close the boundary race: if the deadline fired while the LLM call was
+    // resolving, surface the timeout instead of a success result.
+    if (deadlineController.signal.aborted) {
+      throw deadlineController.signal.reason || new Error('reviewer_time_budget_exceeded');
+    }
 
     if (!result.success) {
       sendEvent('error', { message: 'Analysis failed', details: result });
@@ -193,11 +224,20 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Analyze API error:', error);
-    sendEvent('error', {
-      message: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    if (deadlineController.signal.aborted) {
+      const mins = budgetSeconds ? Math.round(budgetSeconds / 60) : null;
+      sendEvent('error', {
+        message: `Analysis stopped after exceeding the configured ${mins ? `${mins}-minute ` : ''}time budget. An admin can raise it (up to 13 minutes) under Settings at /admin.`,
+        timeout: true,
+      });
+    } else {
+      sendEvent('error', {
+        message: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
   } finally {
+    clearTimeout(deadlineTimer);
     clearInterval(heartbeat);
   }
 

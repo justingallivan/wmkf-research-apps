@@ -47,13 +47,17 @@ import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
 import { APPLICANT_DISPOSITION_MAP } from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import { mayPersistIdentity, RESOLVER_SOURCED_FIELDS } from '../../../lib/services/reviewer-identity-resolver';
 import { backPropReviewerOrcidToContact } from '../../../lib/services/backprop-reviewer-orcid';
+import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
 
 const limiter = nextRateLimiter({ max: 10 });
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const config = {
   api: { bodyParser: { sizeLimit: '2mb' } },
-  maxDuration: 300,
+  // Pinned at the Vercel Pro/Enterprise Fluid-Compute cap (800s). Live budget is
+  // `reviewer.time_budget_seconds` (default 600), enforced via an AbortSignal
+  // deadline. See docs/REVIEWER_TIMEOUT_BUDGET_PLAN.md.
+  maxDuration: 800,
 };
 
 // Resolve proposal text from a Vercel Blob URL (mirrors analyze.js:77–137).
@@ -104,6 +108,18 @@ export default async function handler(req, res) {
   const apiKey = process.env.CLAUDE_API_KEY;
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
 
+  // Admin-configurable wall-clock budget (default 600s, clamped [120,800]),
+  // enforced via an AbortSignal deadline on the analyze + enrich Claude calls.
+  // See docs/REVIEWER_TIMEOUT_BUDGET_PLAN.md.
+  const deadlineController = new AbortController();
+  const budgetSeconds = await getReviewerTimeBudgetSeconds();
+  const deadlineAt = Date.now() + budgetSeconds * 1000;
+  const deadlineTimer = setTimeout(() => {
+    const e = new Error('reviewer_time_budget_exceeded');
+    e.code = 'reviewer_time_budget_exceeded';
+    deadlineController.abort(e);
+  }, budgetSeconds * 1000);
+
   try {
     await bypassDynamicsRestrictions('workbench-enrich-recommended', async () => {
       // 1. Load this request's applicant-RECOMMENDED junction rows.
@@ -137,6 +153,8 @@ export default async function handler(req, res) {
         const analysis = await ClaudeReviewerService.analyzeProposal(text, apiKey, {
           reviewerCount: 1, // we don't use the suggestions here, only proposalInfo
           userProfileId: access.profileId,
+          signal: deadlineController.signal,
+          deadlineAt,
           onProgress: (p) => sendEvent('progress', p),
         });
         proposalInfo = analysis?.proposalInfo || null;
@@ -225,6 +243,8 @@ export default async function handler(req, res) {
         useSerpSearch: true,
         useClaudeSearch: true,
         persist: false,
+        signal: deadlineController.signal,
+        deadlineAt,
         onProgress: (p) => sendEvent('progress', p),
       });
       const enriched = enrichResult.enriched || [];
@@ -439,7 +459,17 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('enrich-recommended error:', err);
-    sendEvent('error', { message: err?.message || 'Failed to enrich recommended reviewers' });
+    if (deadlineController.signal.aborted) {
+      const mins = Math.round(budgetSeconds / 60);
+      sendEvent('error', {
+        message: `Enrichment stopped after exceeding the configured ${mins}-minute time budget. An admin can raise it (up to 13 minutes) under Settings at /admin.`,
+        timeout: true,
+      });
+    } else {
+      sendEvent('error', { message: err?.message || 'Failed to enrich recommended reviewers' });
+    }
+  } finally {
+    clearTimeout(deadlineTimer);
   }
 
   res.end();

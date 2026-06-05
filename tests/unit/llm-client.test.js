@@ -177,6 +177,69 @@ describe('LLMClient.complete', () => {
   });
 });
 
+describe('LLMClient external-abort (deadline) handling', () => {
+  test('external abort cancels body consumption, not just the fetch', async () => {
+    // The mock binds .json() to opts.signal (== the internal ac.signal), exactly
+    // as a real fetch body is. If the external→ac bridge is torn down before
+    // body read (the pre-fix bug), aborting the external signal would never reach
+    // json() and this would hang. With the fix, it rejects.
+    safeFetch.mockImplementationOnce((url, opts) => {
+      const acSignal = opts.signal;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: () => new Promise((_resolve, reject) => {
+          if (acSignal.aborted) return reject(new Error('body aborted'));
+          acSignal.addEventListener('abort', () => reject(new Error('body aborted')), { once: true });
+        }),
+      });
+    });
+    const controller = new AbortController();
+    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'm', timeoutMs: 100000 });
+    const p = client.complete({ messages: [], signal: controller.signal });
+    await new Promise(r => setTimeout(r, 5)); // let execution reach json()
+    controller.abort(new Error('reviewer_time_budget_exceeded'));
+    await expect(p).rejects.toThrow(/aborted/);
+  });
+
+  test('aborts during retry backoff instead of waiting the full delay', async () => {
+    // 429 with no retry-after → 30s computed backoff. An external abort during
+    // the sleep must reject ~immediately, not after 30s.
+    safeFetch.mockResolvedValueOnce(jsonResponse({ error: 'rate limited' }, { status: 429 }));
+    const controller = new AbortController();
+    const client = new LLMClient({
+      apiKey: 'sk-ant-test', model: 'm', initialRetryDelayMs: 30000, maxRetries: 3,
+    });
+    const start = Date.now();
+    const p = client.complete({ messages: [], signal: controller.signal });
+    await new Promise(r => setTimeout(r, 5)); // let execution reach sleep()
+    controller.abort(new Error('reviewer_time_budget_exceeded'));
+    await expect(p).rejects.toThrow(/reviewer_time_budget_exceeded/);
+    expect(Date.now() - start).toBeLessThan(2000);
+  });
+
+  test('parseClaudeStream throws a clean error when the signal is already aborted', async () => {
+    const controller = new AbortController();
+    controller.abort(new Error('reviewer_time_budget_exceeded'));
+    const resp = streamResponse([{ type: 'message_start', message: { model: 'm', usage: {} } }]);
+    await expect(parseClaudeStream(resp, null, null, controller.signal))
+      .rejects.toThrow(/reviewer_time_budget_exceeded/);
+  });
+
+  test('no-signal path is unchanged (regression guard)', async () => {
+    // Mirrors the basic complete() happy path but explicitly asserts that
+    // omitting a signal still works end-to-end (cleanup is a no-op).
+    safeFetch.mockResolvedValueOnce(jsonResponse({
+      content: [{ type: 'text', text: 'ok' }],
+      model: 'm', usage: { input_tokens: 1, output_tokens: 1 },
+    }));
+    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'm' });
+    const r = await client.complete({ messages: [] });
+    expect(r.text).toBe('ok');
+  });
+});
+
 describe('LLMClient.stream', () => {
   test('reassembles text deltas and forwards them via onTextDelta', async () => {
     safeFetch.mockResolvedValueOnce(streamResponse([
