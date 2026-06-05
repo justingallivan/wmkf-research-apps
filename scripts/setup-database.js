@@ -714,6 +714,30 @@ const v28Statements = [
   `CREATE INDEX IF NOT EXISTS idx_policy_publish_audit_created ON policy_publish_audit (created_at DESC)`,
 ];
 
+// V34: Prompt publish audit (append-only). See migration 019_prompt_publish_audit.sql
+// for full rationale. Mirrors policy_publish_audit for wmkf_ai_prompt versioned
+// publishes from the /admin prompt editor (S222).
+const v34Statements = [
+  `CREATE TABLE IF NOT EXISTS prompt_publish_audit (
+    id                SERIAL PRIMARY KEY,
+    request_id        TEXT NOT NULL,
+    prompt_name       TEXT NOT NULL,
+    target_version    INTEGER NOT NULL,
+    new_prompt_id     TEXT,
+    prior_prompt_id   TEXT,
+    body_hash         TEXT,
+    profile_id        INTEGER REFERENCES user_profiles(id),
+    phase             TEXT NOT NULL CHECK (phase IN ('pending', 'final')),
+    status            TEXT NOT NULL CHECK (status IN ('pending', 'completed', 'partial', 'already_published', 'concurrency_conflict', 'invalid_body', 'no_current_row', 'duplicate_current_rows', 'audit_unavailable', 'failed')),
+    outcome_json      JSONB,
+    warnings_json     JSONB,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_prompt_publish_audit_name ON prompt_publish_audit (prompt_name, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_prompt_publish_audit_request ON prompt_publish_audit (request_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_prompt_publish_audit_created ON prompt_publish_audit (created_at DESC)`,
+];
+
 // V26: Intake Portal — draft staging + audit
 const v26Statements = [
   `CREATE TABLE IF NOT EXISTS intake_drafts (
@@ -1442,6 +1466,25 @@ async function runMigration() {
           console.log(`[v28-${i + 1}/${v28Statements.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v28-${i + 1}/${v28Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V34 table creation (Prompt publish audit)
+    console.log(`\nApplying v34 schema updates - Prompt publish audit (${v34Statements.length} statements)...`);
+    for (let i = 0; i < v34Statements.length; i++) {
+      const statement = v34Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+
+      try {
+        await sql.query(statement);
+        console.log(`[v34-${i + 1}/${v34Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v34-${i + 1}/${v34Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v34-${i + 1}/${v34Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }
