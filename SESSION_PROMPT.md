@@ -1,59 +1,61 @@
-# Session 220 Prompt: PIVOT TO PROJECT WORK — reviewer-workflow validation
+# Session 221 Prompt: live-smoke the reviewer fixes, then merge to main
 
-## ⚠️ Read first
-S219 was **~6 hours of cleanup with zero feature progress** (table drop → ORCID backfill → a doc/memory reconciliation that took 3 Codex rounds → a start-gate fix → guardrails). Justin called it out. New rule now in CLAUDE.md + [[feedback-timebox-metawork]]: **time-box meta-work (~30 min / 2 commits) and check in before it balloons.** Next session: start on the *project*, not another tidy-up loop.
+## ⚠️ Read first — work is on a BRANCH, not main
+S220's reviewer-enrichment fixes live on branch **`fix/workbench-reviewer-find-enrichment`** (pushed to origin), **NOT merged to main → NOT deployed to prod.** This was deliberate: the fixes are Codex-verified + unit-green but **never exercised in the live app**. Next session: **do the live PD smoke first**, then merge to main (which auto-deploys). Don't merge blind.
 
-## ⏰ Standing context / guardrails (carried S197–S219)
-- **`main` auto-deploys to prod on push.** Commit/push only when asked. Feature branches do NOT deploy. One-shot operator *scripts* and SQL *migrations* hit prod directly when run locally — same care.
-- **Two PreToolUse hooks are LIVE** (`.claude/settings.json`): (a) `scope-claim-reminder.js` — disconfirm before asserting scope/quantity; derive denominators independently; (b) **NEW `doc-edit-reconcile-reminder.js`** — fires on every `Edit` of `docs/`, `.claude-memory/`, `CLAUDE.md`, `SESSION_PROMPT.md`: **read the WHOLE file (not a grep slice) + grep the repo + fix every instance.** S219 proved the lever is the hook, not prose (the "patch the flagged line, leave residuals" error recurred 3× even while watched for).
-- **`/start` now runs the COMPLETE gate set** (all 11 `check:*`, not a subset) — `check:prompt-storage-mentions` had been red & unnoticed because it wasn't in the old short list.
-- **Local-dev hits the SAME prod Dataverse + prod Postgres** — no isolated test store. `POSTGRES_URL` IS in `.env.local` (read-only PG probes work: `.env.local`-load + `pg.Pool({ssl:{rejectUnauthorized:false}})`). Dataverse: client-credentials token + `EntityDefinitions(LogicalName='x')` for set names (`wmkf_potentialreviewer`'s set is the double-plural `wmkf_potentialreviewerses`). `queryAllRecords` caps at 5000 + requires a `$filter`.
-- **ORCID/NCBI + EXTERNAL_LINK_SECRET are "Sensitive" in Vercel** → `vercel env pull` returns them EMPTY; hand-enter in `.env.local`. `SERP_API_KEY` + `BLOB_READ_WRITE_TOKEN` ARE in `.env.local`.
-- **Memory is a ROUTER.** `.claude-memory/MEMORY.md` routes "for THIS task → read these 1–3 files" (in full). Task-routed files must be `active`/`stale`, never `closed`.
+To resume: `git checkout fix/workbench-reviewer-find-enrichment` (or it may already be checked out).
 
-## Session 219 Summary (two real prod changes, then a long cleanup tail)
+## ⏰ Standing context / guardrails (carried S197–S220)
+- **`main` auto-deploys to prod on push.** Feature branches do NOT deploy. Commit/push only when asked. One-shot operator scripts + SQL migrations hit prod directly when run locally.
+- **`rtk` is UNINSTALLED (S220).** Do NOT prefix commands with `rtk`; the global `~/.claude/RTK.md` instructions are stale. The PreToolUse hook was removed from `~/.claude/settings.json`. See [[project-rtk-grep-output-corruption]].
+- **Two PreToolUse hooks still LIVE** (`.claude/settings.json`): `scope-claim-reminder.js` + `doc-edit-reconcile-reminder.js` (read the WHOLE file + grep repo + fix every instance on any docs/memory edit).
+- **Local-dev hits the SAME prod Dataverse + prod Postgres.** `.env.local` has `POSTGRES_URL`, `SERP_API_KEY`, `BLOB_READ_WRITE_TOKEN`. **`CLAUDE_API_KEY` in `.env.local` was stale/401 at S220 start — Justin replaced it.** ORCID/NCBI/EXTERNAL_LINK_SECRET are "Sensitive" → empty on `vercel env pull`, hand-enter.
+- **jest harness for live-pipeline repro:** Next skips `.env.local` under `NODE_ENV=test`; load it by hand in the test, and override `jest.setup.js`'s stub `CLAUDE_API_KEY='test-...'`. Restore real `fetch` via `undici` (give it a no-op `.mockClear`). Service files use extensionless ESM imports → plain `node` can't require them; run through `npx jest`. Pattern proven in S220.
+- **Memory is a ROUTER.** `.claude-memory/MEMORY.md` routes "for THIS task → read these 1–3 files" (in full).
 
-### 1. Lone-ORCID Scholar backfill — closed the S215 ORCID residual (`c734356`)
-`scripts/backfill-lone-orcid-scholar.js` ran Google Scholar over the 454 lone-ORCID reviewers (name-only match, left `unresolved` by S215); clean Scholar = second weak anchor → live `resolveIdentity` → `probable` → wrote the ORCID. **240 written, 144 rejected (correctly gated), 70 no-Scholar.** Pool: ORCID **1,533→1,773**, `probable` **1,532→1,772** (triangulated). Scholar NOT persisted (corroboration only). Cost $0. Two Codex rounds + a SerpAPI `data.error`="no results"→`sch_none` fix.
+## Session 220 Summary — reviewer "search" bug → 3 real fixes (on branch)
 
-### 2. Dropped the reviewer-finder Postgres drain tables (`e6a339d`, migration 018)
-Done early at Justin's direction. **5 tables dropped** (guarded, tracked migration — Wave-1 precedent): `researchers`, `researcher_keywords`, `publications`, `proposal_searches`, `reviewer_suggestions`. Verified gone from pg catalog; no dangling FKs. Scope grew 4→5 once an FK probe showed `reviewer_suggestions.researcher_id → researchers`. **`search_cache` EXCLUDED** (0 rows but live callers: `DatabaseService.checkCache`/`cacheSearch` + maintenance cron). Pre-drop backups (331/1,028/337 rows) → local JSONL + Vercel Blob `cleanup-backup/2026-06-04/` (`w6-drop-backup.js`/`w6-drop-restore.js`); Neon PITR 7-day secondary. This **closes the W3–W6 Postgres→Dataverse migration.**
+Started on the S220 carryover #1 (reviewer-workflow validation / PD smoke of `/workbench`). Probed live state (only Justin holds the `reviewers` grant; smoke testbed = request **1002788**, lead PD Justin, real `ProjectDescription.pdf` proposal). Before smoking, Justin reported the Find-tab reviewer search "only returned the applicant's suggested reviewers." Ran the **real** analyze→discover pipeline via a jest harness: it returns **12 correct on-topic reviewers** — so the *search* works. The screenshot showed the symptom was actually the **"Enrich applicant-recommended reviewers"** flow, which exposed three real bugs. Fixed all three (Codex-reviewed twice → CLEAN):
 
-### 3. Doc/memory reconciliation + Codex verification (`fa11d47`, `f9344d0`, `eb12d0a`, `d2eff0e`, `6b42461`)
-Audited CLAUDE.md + SESSION_PROMPT + all ~118 memory files (3 parallel agents) for currency, then had **Codex independently screen + verify against code — across 3 rounds.** Codex earned its keep: caught a **red gate** (`prompt-storage-mentions`), a count the gate missed in prose (`app count=17`→18), a `status:` that lied about its body, stale "live" entity refs, and — twice — that my own fixes were *incomplete* (I patched flagged lines and left residuals: the exact failure mode). Also reconciled the Atlas index + atlas pages (incl. the missed page for the dropped `publications` table) and CLAUDE.md schema row. <!-- drain-table:ignore reason=atlas-page-filename-reference -->
+1. **Fabricated / wrong-person emails.** Tier-3 (Claude web_search) hallucinated emails (`justin@gmail.com` for a 0-pub fake reviewer) and Tier-4 (SerpAPI) could surface a same-named stranger's address (`SarahRose888@boisestate.edu` for "Gallivan"). Added `ContactParser.isNameConsistentEmail` (name-grounding guard on both tiers) + hardened the Tier-3 prompt to forbid guessing.
+2. **Wrong-person name-only match.** A bare applicant name (no affiliation) matched any same-named PubMed author. `enrich-recommended` now treats a no-affiliation + below-`probable`-resolver match as **unconfirmed** and withholds ALL match-derived fields (email/scholar/ORCID/metrics/affiliation/keywords/COI/back-prop) from the Dataverse writeback AND the card, marking `needsIdentification`.
+3. **Search-vs-enrich UX.** Two near-identical dark buttons with the optional enrich on top. Reordered "Search for reviewers" to primary-first; demoted applicant-verification to a secondary outline button relabeled "Optional: verify the applicant's suggested reviewers (does NOT find new reviewers)".
 
-### 4. Process guardrails so this doesn't recur (`4fc5194`, `1385a65`, `bc9da28`)
-`/start` runs the full gate set; new doc-edit reconcile **hook** + time-box meta-work rule (CLAUDE.md + [[feedback-timebox-metawork]] + strengthened [[feedback-reconcile-dont-append-docs]]); deleted the untracked `.agents/skills/` tree (corrupted `migrate-to-codex` `s/Claude/Codex/` copies). Fixed the ambiguous "read the line, not the file" phrasing.
+Also: **uninstalled rtk** + removed its Claude Code hook (it was summarizing `npx jest` output to `PASS/FAIL`, hiding console logs).
 
-## Potential Next Steps (lead with PROJECT work, not cleanup)
+### Commits (branch `fix/workbench-reviewer-find-enrichment`)
+- `eeaf1de` - fix(workbench): guard reviewer enrichment against fabricated/wrong-person emails + name-only matches
+- `762c1ec` - docs(memory): record rtk uninstall + Claude Code hook removal
+- `fcdd63a` - fix(workbench): address Codex review — full unconfirmed-match gating + all-source email check
+- `<probe>` - chore(scripts): add read-only reviewers-grant + smoke-state probe
 
-### 1. Reviewer-workflow validation — the longest-deferred debt (TOP)
-**Manual PD smoke of the identity resolver + `/workbench`** — shipped + CI-green since S214 but never exercised by a real PD login (CI-green ≠ correct for an outward-facing match-quality surface). Grant `reviewers` to pilot PDs via `/admin` (`wmkf_appuserappaccesses`) and walk Find→Invite→Track→Completed. Operator/live work, not code.
+## Potential Next Steps
 
-### 2. Finish the reviewer-app consolidation
-Retire the legacy `reviewer-finder` / `review-manager` appRegistry keys now that Workbench has Find-tab parity — **destructive**, grep live callers first (18 routes accept `reviewers` variadically; both old keys still live). See [[project-reviewer-apps-redesign-direction]] (Option B).
+### 1. Live PD smoke of the reviewer fixes, then merge to main (TOP)
+Log in as a PD, open `/workbench/<1002788>` → Reviewers → Find. Verify: "Run reviewer search" returns ~12 real reviewers; the "Optional: verify the applicant's suggested reviewers" button is clearly secondary/below; enriching the 4 fake "Justin" reviewers no longer fabricates emails and marks the no-affiliation ones "needs identification". Then merge the branch to main (→ deploys to prod).
 
-### 3. Intake virus-scan EICAR e2e — parked pre-cycle must-do
-[[project-intake-portal-virus-scan-e2e-deferred]]; needs a deployed env + Entra applicant session.
+### 2. The ORIGINAL S220 task is still open
+The reviewer-workflow validation (Find→Invite→Track→Completed walkthrough) was never completed — we found bugs at the Find step. Resume it after #1.
 
-### 4. New features / next cycle
-J27 triage dashboard + automation tier (Dec 2026 runway); roadmap memories via MEMORY.md "Planned: …" / "Strategy" rows. [[project-staged-review-pipeline]], [[project-proposal-context-extraction]].
+### 3. Consider tightening the email same-surname residual
+`isNameConsistentEmail` still accepts a same-surname different person (`bgallivan@…` for "Justin Gallivan") via the bare-surname rule — documented tradeoff (defense-in-depth via identity resolver + human review). Tighten only if it bites.
 
-## Resolved audit note (S219)
-`requireAppAccess` 56-vs-55 is RESOLVED (Codex): `pages/api/test-email.js:19` names the gate in a *comment* but uses `requireSuperuser`; `scripts/lib/canonical-facts.js` counts AST call-sites = **55**, correct. Not a drift.
+### 4. Reviewer-app consolidation / other S219 carryovers
+Retire legacy `reviewer-finder`/`review-manager` keys (destructive — grep first). Intake virus-scan EICAR e2e (pre-cycle must-do).
 
 ## Key Files Reference
 | File | Purpose |
 |------|---------|
-| `lib/db/migrations/018_drop_reviewer_finder_postgres_tables.sql` | The S219 table drop (guarded, tracked) |
-| `scripts/w6-drop-backup.js` / `w6-drop-restore.js` | Pre-drop backup + break-glass restore |
-| `scripts/backfill-lone-orcid-scholar.js` | The lone-ORCID Scholar backfill (resumable) |
-| `.claude/hooks/doc-edit-reconcile-reminder.js` | NEW — read-whole-file reminder on durable-doc edits |
-| `.claude-memory/feedback-timebox-metawork.md` | NEW — time-box cleanup/audit/verify loops |
+| `lib/utils/contact-parser.js` | `isNameConsistentEmail` name-grounding email guard |
+| `lib/services/contact-enrichment-service.js` | Tier-3/4 email guard + hardened web-search prompt |
+| `pages/api/workbench/enrich-recommended.js` | unconfirmed-match gating of all writeback fields |
+| `shared/components/reviewers/ReviewerSearchSection.js` | search-primary / enrich-secondary reorder |
+| `tests/unit/contact-parser-email-consistency.test.js` | 17 cases for the email guard |
+| `scripts/probe-reviewers-grant-and-smoke-state.js` | read-only: who holds `reviewers` grant + 1002788 reviewer state |
 
 ## Testing
 ```bash
-npx jest                                    # full suite (1,842 tests; eslint is CI-only, not local)
-# full gate set (now matches /start):
-for g in migrations-manifest api-routes atlas doc-currency fact-consistency canonical-pointers drain-table-mentions prompt-storage-mentions prompt-injection-tagging memory-router; do npm run check:$g; done
+npx jest tests/unit/contact-parser-email-consistency.test.js   # the email guard
+npx jest                                                        # full suite (1,859 green at S220)
+node scripts/probe-reviewers-grant-and-smoke-state.js          # live grant + smoke-state probe
 ```
