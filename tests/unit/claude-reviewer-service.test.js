@@ -6,6 +6,19 @@
  * construction sends it to the model.
  */
 
+// Keep the resolver hermetic: analyzeProposal now resolves the prompt body from
+// Dataverse, which would make a network call. Stub it to the code-fallback body.
+jest.mock('../../lib/services/reviewer-prompt-resolver.js', () => {
+  const { ANALYZE_USER_PROMPT_TEMPLATE } = jest.requireActual('../../shared/config/prompts/reviewer-finder-dynamics.js');
+  return {
+    REVIEWER_PROMPT_NAMES: { ANALYZE: 'reviewer-finder.analyze', SCORE_CANDIDATES: 'reviewer-finder.score-candidates' },
+    resolveReviewerPrompt: jest.fn(async () => ({
+      body: ANALYZE_USER_PROMPT_TEMPLATE, source: 'code-fallback', promptId: null,
+      version: null, overrideUsed: false, fallbackReason: 'test-stub', staleOverride: null,
+    })),
+  };
+});
+
 import { ClaudeReviewerService } from '../../lib/services/claude-reviewer-service.js';
 import { REVIEWER_FINDER_PROPOSAL_MAX_CHARS } from '../../lib/utils/ai-payload-boundary.js';
 

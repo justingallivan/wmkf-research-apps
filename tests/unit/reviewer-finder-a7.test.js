@@ -38,18 +38,28 @@ describe('Reviewer Finder A7 hardening', () => {
     );
   });
 
-  test('createDiscoveredReasoningPrompt wraps the U-EXT candidate list', () => {
+  test('createDiscoveredReasoningPrompt wraps BOTH the U-EXT candidate list and the LLM-derived summary (S222 P0)', () => {
     const prompt = createDiscoveredReasoningPrompt('a proposal summary', [
       { name: 'Dr. A', affiliation: 'Univ X', publications: [{ title: 'Paper One', year: 2024 }] },
       { name: 'Dr. B', affiliation: 'Univ Y', publications: [] },
     ]);
     expect(prompt).toContain('UNTRUSTED CONTENT RULES:');
-    const open = prompt.match(/\[\[WMKF-UNTRUSTED-CONTENT nonce=([0-9a-f]{24})/);
-    expect(open).not.toBeNull();
-    expect(prompt).toContain(`[[/WMKF-UNTRUSTED-CONTENT nonce=${open[1]}]]`);
-    // Candidate names land inside the sentinels.
-    const inner = prompt.split(open[0])[1].split('[[/WMKF-UNTRUSTED-CONTENT')[0];
-    expect(inner).toContain('Dr. A');
-    expect(inner).toContain('Paper One');
+
+    // Extract every nonce-delimited block and the text inside it.
+    const blockRe = /\[\[WMKF-UNTRUSTED-CONTENT nonce=([0-9a-f]{24})[^\]]*\]\]([\s\S]*?)\[\[\/WMKF-UNTRUSTED-CONTENT nonce=\1\]\]/g;
+    const blocks = [...prompt.matchAll(blockRe)].map((m) => ({ nonce: m[1], inner: m[2] }));
+    // Two wrapped blocks now: the summary and the candidate list.
+    expect(blocks.length).toBe(2);
+    // The preamble names both nonces.
+    for (const b of blocks) expect(prompt).toContain(b.nonce);
+
+    const joinedInner = blocks.map((b) => b.inner).join('\n');
+    // Candidate names + the formerly-raw summary both land INSIDE sentinels.
+    expect(joinedInner).toContain('Dr. A');
+    expect(joinedInner).toContain('Paper One');
+    expect(joinedInner).toContain('a proposal summary');
+    // Regression guard: the summary must NOT appear outside the sentinels.
+    const outsideText = prompt.replace(blockRe, '');
+    expect(outsideText).not.toContain('a proposal summary');
   });
 });

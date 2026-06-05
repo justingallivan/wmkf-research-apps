@@ -51,10 +51,12 @@ Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching ei
 
 **Entity set:** `wmkf_ai_prompts`
 
-**Schema (verified 2026-05-07 via `execute-prompt.js` `fetchCurrentPrompt`, L204):** `wmkf_ai_promptid`, `wmkf_ai_promptname`, `wmkf_ai_systemprompt` (Memo), `wmkf_ai_promptbody` (Memo), `wmkf_ai_promptvariables` (Memo, JSON), `wmkf_ai_promptoutputschema` (Memo, JSON), `wmkf_ai_model` (String — per-prompt model override), `wmkf_ai_temperature` (Decimal), `wmkf_ai_maxtokens` (Integer), `wmkf_promptversion` (Integer — note: NO `_ai_` infix), `wmkf_ai_iscurrent` (Boolean — `fetchCurrentPrompt` filters on this), `wmkf_ai_promptstatus` (Picklist — seed scripts write `PROMPTSTATUS_PUBLISHED`). Full attr list deferrable; probe `EntityDefinitions(LogicalName='wmkf_ai_prompt')` if more fields surface.
+**Schema (verified 2026-05-07 via `fetchCurrentPrompt`, now in `lib/services/prompt-store.js` — moved out of `execute-prompt.js` in S222):** `wmkf_ai_promptid`, `wmkf_ai_promptname`, `wmkf_ai_systemprompt` (Memo), `wmkf_ai_promptbody` (Memo), `wmkf_ai_promptvariables` (Memo, JSON), `wmkf_ai_promptoutputschema` (Memo, JSON), `wmkf_ai_model` (String — per-prompt model override), `wmkf_ai_temperature` (Decimal), `wmkf_ai_maxtokens` (Integer), `wmkf_promptversion` (Integer — note: NO `_ai_` infix), `wmkf_ai_iscurrent` (Boolean — `fetchCurrentPrompt` filters on this), `wmkf_ai_promptstatus` (Picklist — seed scripts write `PROMPTSTATUS_PUBLISHED`). Full attr list deferrable; probe `EntityDefinitions(LogicalName='wmkf_ai_prompt')` if more fields surface.
 
-**Read paths (verified 2026-05-07):**
-- `lib/services/execute-prompt.js` `fetchCurrentPrompt` (L204) — reads via direct `DynamicsService.queryRecords('wmkf_ai_prompts', { filter: \`wmkf_ai_promptname eq '...'\` })`. **Does NOT go through `prompt-resolver.js`.**
+**Read paths (verified 2026-05-07; updated S222):**
+- `lib/services/prompt-store.js` `fetchCurrentPrompt` — the canonical fetch (a dependency-free leaf extracted from `execute-prompt.js` in S222 so the streaming reviewer routes can resolve bodies without importing the non-streaming Executor). Reads via direct `DynamicsService.queryRecords('wmkf_ai_prompts', { filter: \`wmkf_ai_promptname eq '...' and wmkf_ai_iscurrent eq true\`, top: 2 })`; throws typed `PROMPT_NOT_FOUND` / `PROMPT_DUPLICATE_CURRENT` on 0/≥2 current rows. **Does NOT go through `prompt-resolver.js`.**
+- `lib/services/execute-prompt.js` — imports `fetchCurrentPrompt` from `prompt-store.js` (Executor v3 path; behavior unchanged, covered by the Executor regression test).
+- `lib/services/reviewer-prompt-resolver.js` `resolveReviewerPrompt` (S222) — runtime resolver for the two `reviewer-finder.*` prompts: per-user override (`wmkf_appuserpreferences`) → Dataverse `iscurrent` row (via `prompt-store`) → in-repo code template fallback. Called by `ClaudeReviewerService.analyzeProposal` / `generateDiscoveredReasoning`; the A7 preamble is composed in code (`reviewer-prompt-composer.js`), never in the editable body. Fails loud on structural corruption.
 
 **Write paths:**
 - Connor edits in Dynamics directly (per `project_dynamics_as_prompt_ground_truth.md` — staff-readable/editable prompts).
@@ -69,6 +71,16 @@ Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching ei
 These are independent. Don't conflate them.
 
 **Migration disposition:** strategic destination for staff-facing prompts (per memory: *"all staff-facing prompts (content readable/editable by non-technical staff). New prompts default there; migrate user-driven apps when touched"*). 11 rows means light current adoption; expand as Executor-mode apps land.
+
+## `prompt_publish_audit` (Postgres — append-only)
+
+**Source of truth:** Postgres-only. Append-only audit trail for superuser-initiated `wmkf_ai_prompt` versioned publishes from the `/admin` prompt editor (S222). Modeled on `policy_publish_audit` (see `docs/atlas/dataverse-wmkf-policy-and-policy-version.md`): Dataverse has no `$batch` transaction, so the publish (create new `iscurrent` row → flip the prior row's `iscurrent=false`) is non-atomic; a `pending` row is written before the first mutation and a `final` row after, paired by a route-minted `request_id` (also the idempotency key, with `body_hash` dedup).
+
+**Schema:** migration `019_prompt_publish_audit.sql` (mirrored into `scripts/setup-database.js` V34). Columns: `request_id`, `prompt_name`, `target_version`, `new_prompt_id`, `prior_prompt_id`, `body_hash`, `profile_id` (→ `user_profiles`), `phase` (`pending`/`final`), `status` (incl. invariant statuses `no_current_row` / `duplicate_current_rows`), `outcome_json`, `warnings_json`, `created_at`.
+
+**Write path:** `pages/api/admin/prompts/[name].js` (superuser) — the versioned-publish route. The prompt BODY is not stored here (it lives on the `wmkf_ai_prompt` row); only audit metadata.
+
+**Migration disposition:** stays Postgres. Parallels `policy_publish_audit`; no Dataverse counterpart.
 
 ## Naming gotcha
 
