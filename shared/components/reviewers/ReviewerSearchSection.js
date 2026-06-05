@@ -706,7 +706,7 @@ export default function ReviewerSearchSection({
 
           {busy && (
             <div className="space-y-2">
-              <p className="text-sm text-gray-600">{phase === 'saving' ? 'Saving candidates…' : 'Searching… this can take a minute.'}</p>
+              <p className="text-sm text-gray-600">{phase === 'saving' ? 'Saving candidates…' : 'Searching… this can take several minutes — please keep this tab open.'}</p>
               <ul className="text-xs text-gray-500 space-y-0.5">
                 {progress.map((m, i) => <li key={i}>{m}</li>)}
               </ul>
@@ -833,7 +833,7 @@ export default function ReviewerSearchSection({
         )}
         {recPhase === 'running' && (
           <div className="space-y-2">
-            <p className="text-sm text-gray-600">Verifying &amp; enriching… this can take a minute.</p>
+            <p className="text-sm text-gray-600">Verifying &amp; enriching… this can take several minutes — please keep this tab open.</p>
             <ul className="text-xs text-gray-500 space-y-0.5">
               {recProgress.map((m, i) => <li key={i}>{m}</li>)}
             </ul>
