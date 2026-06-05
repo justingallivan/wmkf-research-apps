@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer-finder prompts migrated to Dataverse; admin + per-user editable (Session 222)
+
+**Milestone:** The reviewer-finder analysis + candidate-scoring prompts now resolve from the Dataverse `wmkf_ai_prompt` store at runtime (per-user override → Dataverse `iscurrent` → code fallback), so reword no longer needs a deploy. Shipped a superuser `/admin` versioned-publish editor and an in-app per-user override editor. Prod cutover run + live-verified (analyze resolves `source=dataverse`).
+
+**Sessions:** 222 (10-commit branch; 4-round Codex design review pre-build + a post-impl Codex pass; built "on auto" via remote control; three prod steps — Dataverse re-seed, migration 019, deploy — executed + smoke-verified; a self-inflicted memory-frontmatter gate-red caught + fixed same session).
+
+**Ship state:**
+- Path A seam: streaming routes resolve the body + compose the code-owned A7 preamble (`reviewer-prompt-resolver.js` + `reviewer-prompt-composer.js`); `executePrompt` untouched (non-streaming). Byte-parity with the old code prompt proven.
+- Admin: `/api/admin/prompts/*` versioned publish adapting the `policies.js` protocol (`prompt_publish_audit`, If-Match, exactly-one-current invariant); panel lists ALL prompts incl. drafts.
+- Per-user: grant-gated `/api/reviewer-finder/prompt-override` + reserved-key block on the generic prefs endpoint; "✎ Edit prompts" panel.
+- A7 P0 folded in: `proposal_summary` now wrapped (was interpolated raw). 1924 tests + 10 gates green.
+
+**Why it matters:** Justin iterates on reviewer prompts often (same session: the bioRxiv per-database query fix); `/admin` + per-user editing removes the deploy round-trip, and the shared `wmkf_ai_prompt` store is the one model PA + Vercel both read.
+
+**Pointers:** plan `~/.claude/plans/distributed-cuddling-gizmo.md`; memory `project-reviewer-prompt-dataverse-migration`; atlas `docs/atlas/dataverse-wmkf-ai-run-and-prompt.md`. Commits `118d64f`…`c5337da`; deploy `7dfd827`.
+
 ## June 2026 — Reviewer Postgres→Dataverse migration CLOSED + lone-ORCID backfill (Session 219)
 
 **Milestone:** The W3–W6 reviewer Postgres→Dataverse migration is closed — the 5 drained reviewer-finder tables were physically dropped from prod (migration 018), leaving Dataverse (`wmkf_potentialreviewer` / `wmkf_appreviewersuggestion`) as the sole store. Same session closed the S215 ORCID residual: 240 more reviewers gained an authoritative ORCID via Scholar corroboration. Two prod data/schema cutovers; a long doc/memory-reconciliation + guardrails tail followed.

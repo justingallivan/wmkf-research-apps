@@ -1,67 +1,58 @@
-# Session 222 Prompt: live-smoke the (now-deployed) reviewer fixes, then resume the workflow walkthrough
+# Session 223 Prompt: reviewer-finder improvements — timeout, recency-weighted ID, Perplexity
 
-## ⚠️ Read first — the reviewer fixes are NOW IN PROD
-S220 + S221's reviewer-enrichment fixes are **merged to `main` and deployed** (the S221 handoff wanted the smoke *before* merge; Justin chose to merge first, so the live PD smoke is now **owed post-deploy**). The code is well-tested (1868 green) and twice Codex-reviewed at home, but **still never exercised by a real PD login.** Top task: do that smoke against prod.
+## ⭐ Top of the agenda — three topics Justin flagged EOD S222 (discuss/scope first)
+Full notes: [[project-reviewer-finder-next-topics]] (read it). Summary:
+1. **Extend / make-configurable the Claude reviewer-call timeout.** Justin nearly lost a search to a timeout. All reviewer routes are at `maxDuration: 300` (5 min); **`discover.js` is the long pole** (DB searches + per-batch Claude + enrichment). Wrinkle: `maxDuration` is a STATIC build-time export — not per-request runtime-configurable. Realistic levers: raise to the Vercel plan's hard cap (verify it; Fluid Compute on Pro can exceed 300s) and/or make the `llm-client.js` 120s-timeout+3-retry budget tunable. Decide the value + mechanism.
+2. **Recency-weighted reviewer identification.** Candidates have a long digital tail (grad → postdoc → current). The footprint is dominated by the *postdoc* (more papers/presence) but we want the *current* role (e.g. a new professor — sparse but correct). Use dated signals you already pull (ORCID employment history + Scholar publication years) to pin + up-weight the current affiliation over the historical tail. Touches `contact-enrichment-service.js`, the identity resolver, and `rankByRelevance`. Hard part: "most evidence wins" picks the wrong (postdoc) affiliation.
+3. **Perplexity's role in reviewer finding/disambiguation.** Confirmed S222: Perplexity is wired ONLY into the Virtual Review Panel (`vrp-providers.js`, `multi-llm-service.js`) — NOT reviewer-finder, no `PERPLEXITY_*` key set. Discussed before in [[project-reviewer-identity-resolution-phase1]]. Decide its role (web-grounded "where are they now" disambiguation dovetails with #2) vs. the existing SerpAPI/Scholar/ORCID path.
 
-## ⏰ Standing context / guardrails (carried S197–S221)
-- **`main` auto-deploys to prod on push.** Feature branches do NOT deploy. Commit/push only when asked. One-shot operator scripts + SQL migrations hit prod directly when run locally.
-- **`rtk` is FULLY UNINSTALLED + cleaned on both machines (S221).** Do NOT prefix commands with `rtk`. The two per-machine surfaces (`~/.claude/settings.json`(+`.bak`) and `.claude/settings.local.json`) are now clean on home + office. Global `~/.claude/RTK.md` does not exist here. See [[project-rtk-grep-output-corruption]].
-- **THREE reminder hooks LIVE** (`.claude/settings.json`, repo-tracked → all machines):
-  - PreToolUse `scope-claim-reminder.js` — disconfirm scope/quantity claims.
-  - PreToolUse `doc-edit-reconcile-reminder.js` — on any `docs/`/`.claude-memory/`/`CLAUDE.md`/`SESSION_PROMPT.md`/`AGENTS.md` Edit: read the WHOLE file + grep repo + fix every instance.
-  - **NEW PostToolUse `codex-verbatim-reminder.js` (S221)** — fires when a `Task|Agent` codex result returns: **paste Codex output VERBATIM before ANY verify/act/paraphrase.** Added because that rule failed ~5× in prose; the hook only reminds, the rule still binds. See [[feedback-share-codex-verbatim]].
-- **Codex skills come from `.agents/skills/` (symlink → `.claude/skills/`), per-machine (gitignored).** `/start` Step 1.6 self-heals it. Do NOT run `migrate-to-codex` (corrupts `.agents/` + severs `AGENTS.md` symlink).
-- **Local-dev hits the SAME prod Dataverse + prod Postgres.** `.env.local` has `POSTGRES_URL`, `SERP_API_KEY`, `BLOB_READ_WRITE_TOKEN`. ORCID/NCBI/EXTERNAL_LINK_SECRET are "Sensitive" → empty on `vercel env pull`, hand-enter. (S220: `CLAUDE_API_KEY` in `.env.local` had gone stale/401; Justin replaced it.)
-- **jest harness for live-pipeline repro:** Next skips `.env.local` under `NODE_ENV=test`; load it by hand + override `jest.setup.js`'s stub `CLAUDE_API_KEY`. Restore real `fetch` via `undici`. Run through `npx jest` (extensionless ESM imports). Proven S220.
-- **Memory is a ROUTER.** `.claude-memory/MEMORY.md` routes "for THIS task → read these 1–3 files" (in full).
+## ⏰ Standing context / guardrails (carried S197–S222)
+- **`main` auto-deploys to prod on push. Feature branches do NOT deploy.** Commit/push only when asked. One-shot operator scripts + SQL migrations hit prod directly when run locally (`.env.local` → prod Dataverse + prod Postgres).
+- **`rtk` is FULLY UNINSTALLED** on both machines (S221). Do NOT prefix commands with `rtk`. See [[project-rtk-grep-output-corruption]].
+- **THREE reminder hooks LIVE** (`.claude/settings.json`, all machines): PreToolUse `scope-claim-reminder.js`; PreToolUse `doc-edit-reconcile-reminder.js` (on any `docs/`/`.claude-memory/`/`CLAUDE.md`/`SESSION_PROMPT.md`/`AGENTS.md` edit: read the WHOLE file + grep repo + fix every instance); PostToolUse `codex-verbatim-reminder.js` (paste Codex output VERBATIM before acting).
+- **Memory frontmatter gotcha (S222 incident):** the harness auto-memory reformatter strips/re-nests frontmatter; a colon inside an unquoted `last_verified` value broke YAML → `memory-router` red on main. Valid `status:` values are **active / stale / closed / superseded** only. Keep memory values colon-free or quoted; verify `npm run check:memory-router` after any memory edit.
+- **Local-dev hits prod.** jest live-harness pattern (proven S220/S222): `@jest-environment node` + manual `.env.local` load + real `fetch` via `undici` + `loadModelOverrides()` before `analyzeProposal`. Throwaway harnesses only — delete after.
 
-## Session 221 Summary — merged S220 to prod, then a fresh Codex review caught 2 more leaks
+## Session 222 Summary — SHIPPED: reviewer-finder prompts → Dataverse (admin + per-user editable)
+The headline: migrated the reviewer-finder analysis + score-candidates prompts from code into the Dataverse `wmkf_ai_prompt` store, runtime-resolved (per-user override → Dataverse → code fallback), with a superuser `/admin` versioned-publish editor and an in-app per-user override editor. **Deployed to prod + live-verified** (analyze resolves `source=dataverse` v1, bioRxiv fix present). 4-round Codex design review pre-build + a post-impl Codex pass; built "on auto" via remote control. 1924 tests + all 10 gates green. See [[project-reviewer-prompt-dataverse-migration]] (status: closed) + DEVELOPMENT_LOG.
 
-Justin started S222-adjacent: noticed an unmerged branch ahead of `main` (`fix/workbench-reviewer-find-enrichment`, the S220 work + S221 prompt) and merged it to prod (fast-forward `6019cec..2cc6708`). Then flagged that the S220 Codex reviews ran on the **work machine whose session went stale** — unverifiable. A fresh Codex review at home (correct call) found the prior "Codex-reviewed → CLEAN" was not the whole story:
+Earlier in the session (the original S222 task that surfaced this): fixed the reviewer-search "Analysis returned no result" — `analyze` `maxDuration` 90→300 (`503c77e`), SSE heartbeat + clearer message (`701fbce`), and a **bioRxiv per-database query fix** (broadened from methods-only to PubMed parity, `3f5cb60`). Also saved a Dataverse custom-table reference doc (`02d1ee7`).
 
-### 1. Two wrong-person leaks closed (`549dd52`)
-- **Bug 1 (data leak, was live in prod):** the unconfirmed-match guard in `enrich-recommended.js` gated on `c.verified !== false` — but contact enrichment (web/SerpAPI/Scholar) runs on the bare name for verified AND unverified candidates, so a PubMed-UNverified, no-affiliation row leaked a same-named stranger's website/faculty/email/Scholar to writeback. Dropped `c.verified !== false`.
-- **Bug 1 residual:** `writeIdentityDecision` still persisted the stranger's resolver anchors (`canonicalKey`+`sourceUrl`) to `wmkf_identityverifiedanchorsjson` (NOT in `RESOLVER_SOURCED_FIELDS`, so `clearIdentityFields` couldn't scrub them). Now sanitized (`anchors:[]`, generic summary) for unconfirmed matches; bare `unresolved` status still recorded. **Policy decision (Justin): the affiliation-grounded below-probable path keeps its anchors — audit trail, low risk.**
-- **Bug 2 (email-guard false-rejects):** `isNameConsistentEmail` left suffix/credential tokens (Jr/Ph.D./MD) as the "surname" and stripped accents to nothing. Now NFD-normalize + strip `\p{Mn}`, collapse intra-token punctuation, filter `SUFFIX_TOKENS`. **Residual:** suffix-strip collapsed `"John MD"` to lone given name → re-opened the false-accept; fixed with a ≥2-real-token fallback.
-- +9 tests; full suite 1868 green; lint 0 errors. Codex round-2 confirmed both bugs closed.
+### Commits (18 this session)
+- `503c77e`/`701fbce`/`3f5cb60` — analyze timeout + heartbeat + bioRxiv query fix
+- `118d64f`→`5f8400c` — migration foundation: prompt-store leaf, resolver, validators, audit table, runtime flip, Codex-review fixes
+- `b46edd8`/`a40130c` — admin versioned-publish API + UI
+- `91b26b3` — per-user override endpoint + editor UI
+- `7dfd827` — (merge to main = deploy)
+- `c5337da` — admin panel lists ALL prompts incl. drafts
+- `02d1ee7` — Dataverse 143-table reference doc
+- `2b89b77`/`20d2754`/`5a8dada` — memory docs (+ the frontmatter gate-red fix)
 
-### 2. codex-verbatim enforcement hook (`097e1e4`)
-The verbatim-Codex rule failed twice this session (ran verification Bash/Read + paraphrased into tables before showing the review). Per S219's "lever is the hook, not prose": added PostToolUse `.claude/hooks/codex-verbatim-reminder.js` (fails open, 5-case tested), updated [[feedback-share-codex-verbatim]], fixed the stale "two hooks" count.
+## Other open items (lower priority than the three top topics)
+1. **Deferred from the migration:** `wmkf_ai_rollbackfrom` is NOT written by admin publish (field type Lookup-vs-text unverified). Probe the field type, then wire it in `pages/api/admin/prompts/[name].js`. Lineage currently captured by `prompt_publish_audit.prior_prompt_id`.
+2. **Connor's prompts (pending his reply):** `wmkf_ai_prompt` is the sole Dataverse prompt store (143-table dump confirmed). His "other" prompts are likely PA-embedded; if so, lift them into `wmkf_ai_prompt` rows → the admin panel administers them automatically.
+3. **Reviewer-workflow validation walkthrough** (Find→Invite→Track→Completed) — still never completed end-to-end (carried since S220).
+4. **Reviewer-app consolidation (destructive — grep first):** retire legacy `reviewer-finder`/`review-manager` keys now Workbench has parity. [[project-reviewer-apps-redesign-direction]].
+5. **Intake virus-scan EICAR e2e** — parked pre-cycle must-do. [[project-intake-portal-virus-scan-e2e-deferred]].
 
-### 3. rtk fully removed on home + memory reconciled (`965700d`)
-Justin uninstalled rtk; S220 only cleaned the **office** machine (`.claude/settings.local.json` is gitignored → never synced). Home still had **20** dead `Bash(rtk …)` allowlist entries (S220 note said 9 = office-only) → removed. Refreshed `~/.claude/settings.json.bak`. Fixed `rtk proxy npx jest` → `npx jest` in a build-plan doc. Reconciled [[project-rtk-grep-output-corruption]] (explained the 9-vs-20 per-machine gap).
-
-### 4. Codex skills symlink fixed (`88c1ce2`)
-`.agents/skills/` (Codex) held stale May-22 copies of `start`/`stop`, missing `sweep` → Codex ran outdated skills. Replaced with symlink `.agents/skills → ../.claude/skills` (one source of truth). `/start` Step 1.6 now self-heals it per-machine. **Justin confirmed he already created the office symlink** — per-machine + gitignored, so no git conflict.
-
-## Potential Next Steps
-
-### 1. Live PD smoke of the deployed reviewer fixes (TOP — now owed post-deploy)
-Log in as a PD, open `/workbench/1002788` (lead PD Justin, real `ProjectDescription.pdf`) → Reviewers → Find. Verify: "Run reviewer search" returns ~12 real reviewers; the "Optional: verify the applicant's suggested reviewers" button reads as secondary; enriching the 4 fake "Justin" reviewers fabricates NO emails and marks the no-affiliation ones "needs identification" — AND now (S221) writes no stranger website/faculty/anchors for them. Only Justin holds the `reviewers` grant; grant pilot PDs via `/admin` (`wmkf_appuserappaccesses`). Read-only state probe: `node scripts/probe-reviewers-grant-and-smoke-state.js`.
-
-### 2. Reviewer-workflow validation walkthrough (the ORIGINAL S220 task, still open)
-Find→Invite→Track→Completed end-to-end. Never completed — bugs surfaced at the Find step both sessions. Resume after #1.
-
-### 3. Reviewer-app consolidation (destructive — grep first)
-Retire legacy `reviewer-finder`/`review-manager` appRegistry keys now Workbench has Find parity. Both keys still live; 18 routes accept `reviewers` variadically. [[project-reviewer-apps-redesign-direction]] (Option B). Verify live callers before touching.
-
-### 4. Intake virus-scan EICAR e2e — parked pre-cycle must-do
-[[project-intake-portal-virus-scan-e2e-deferred]]; needs a deployed env + Entra applicant session.
-
-## Key Files Reference
+## Key Files Reference (S222 migration)
 | File | Purpose |
 |------|---------|
-| `pages/api/workbench/enrich-recommended.js` | unconfirmed-match gating (S221: dropped `c.verified` escape hatch + sanitized identity anchors) |
-| `lib/utils/contact-parser.js` | `isNameConsistentEmail` (S221: NFD + suffix-strip + ≥2-token fallback) |
-| `tests/unit/contact-parser-email-consistency.test.js` / `reviewer-route-identity-gate.test.js` | the S221 regression cases |
-| `.claude/hooks/codex-verbatim-reminder.js` | NEW PostToolUse — paste Codex verbatim before acting |
-| `scripts/probe-reviewers-grant-and-smoke-state.js` | read-only: who holds `reviewers` grant + 1002788 reviewer state |
+| `lib/services/prompt-store.js` | Dependency-free leaf: `fetchCurrentPrompt`/`interpolate` + typed error codes |
+| `lib/services/reviewer-prompt-resolver.js` | Three-tier resolve (override→Dataverse→code) + runtime body validation |
+| `lib/services/reviewer-prompt-composer.js` | `[code A7 preamble] + [interpolated body]`; byte-parity with `createAnalysisPrompt` |
+| `lib/utils/prompt-validators.js` | Browser-safe generic + per-prompt parse-contract validators |
+| `pages/api/admin/prompts/{index,[name]}.js` | Superuser list + versioned publish (policies.js protocol) |
+| `pages/api/reviewer-finder/prompt-override.js` | Grant-gated per-user override (sole write path) |
+| `shared/components/admin/PromptTemplatesSection.js` / `reviewers/ReviewerPromptOverridePanel.js` | Admin + per-user editor UIs |
+| `lib/db/migrations/019_prompt_publish_audit.sql` | Audit table (mirrors policy_publish_audit) |
+| `docs/DATAVERSE_CUSTOM_TABLES_2026-06-05.md` | 143-table reference snapshot |
 
 ## Testing
 ```bash
-npx jest tests/unit/contact-parser-email-consistency.test.js tests/unit/reviewer-route-identity-gate.test.js
-npx jest                                                        # full suite (1868 green at S221)
-node scripts/probe-reviewers-grant-and-smoke-state.js          # live grant + smoke-state probe
+npx jest reviewer prompt-store prompt-validators reviewer-prompt admin-prompts prompt-override  # the S222 suites
+npx jest                                                        # full suite (1924 green at S222)
+# live harness pattern (throwaway, hits prod): @jest-environment node + .env.local + undici; see project-reviewer-finder-next-topics
 # full gate set (matches /start):
 for g in migrations-manifest api-routes atlas doc-currency fact-consistency canonical-pointers drain-table-mentions prompt-storage-mentions prompt-injection-tagging memory-router; do npm run check:$g; done
 ```
