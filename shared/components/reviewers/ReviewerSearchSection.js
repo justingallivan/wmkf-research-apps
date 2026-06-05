@@ -33,6 +33,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '../Layout';
 import { readSseStream } from './sse';
+import ReviewerPromptOverridePanel from './ReviewerPromptOverridePanel';
 import {
   mergeEnrichment,
   parseExcludeList,
@@ -282,6 +283,9 @@ export default function ReviewerSearchSection({
   const [recProgress, setRecProgress] = useState([]);
   const [recError, setRecError] = useState(null);
   const recRunningRef = useRef(false);
+
+  // Per-user prompt-override editor toggle (S222).
+  const [showPromptEditor, setShowPromptEditor] = useState(false);
 
   // Imperative guards: prevent double-submit (Finding 8) and let a context change
   // invalidate an in-flight run so a stale stream can't overwrite newer state
@@ -548,8 +552,24 @@ export default function ReviewerSearchSection({
     <Card hover={false}>
       <div className="flex items-center justify-between mb-2">
         <p className="font-medium text-gray-900">Search for reviewers</p>
-        {busy && <Spinner />}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowPromptEditor((s) => !s)}
+            className="text-xs text-gray-500 hover:text-gray-800"
+            title="Edit your personal copy of the analysis / scoring prompts"
+          >
+            ✎ {showPromptEditor ? 'Hide prompt editor' : 'Edit prompts'}
+          </button>
+          {busy && <Spinner />}
+        </div>
       </div>
+
+      {showPromptEditor && (
+        <div className="mb-3">
+          <ReviewerPromptOverridePanel onClose={() => setShowPromptEditor(false)} />
+        </div>
+      )}
 
       {!blobUrl ? (
         <p className="text-sm text-gray-600">Load a proposal document above to search for reviewers.</p>
