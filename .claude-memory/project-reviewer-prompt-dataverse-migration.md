@@ -1,7 +1,12 @@
 ---
-name: ""
+name: reviewer-finder-prompt-dataverse-migration
+description: "S222 — reviewer-finder analyze + score-candidates prompts migrated from code to Dataverse wmkf_ai_prompt, with a superuser /admin versioned-publish editor + per-user overrides. Path A seam. SHIPPED on main 2026-06-04 (deploy 7dfd827)."
 metadata: 
   node_type: memory
+  type: project
+  status: closed
+  scope: prompt
+  last_verified: "2026-06-04 (live smoke 1002788 — analyze resolved source=dataverse v1, bioRxiv fix present)"
   originSessionId: 613bb6ee-8f4b-4345-917d-032634550239
 ---
 
