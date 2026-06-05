@@ -153,10 +153,35 @@ describe('ORCIDService.findContact — name-scored selection', () => {
       { orcidId: '0000-0000-0000-0002', orcidUrl: 'u2', givenNames: 'Wei', familyName: 'Zhang', otherNames: [], emails: ['wrong@x.edu'] },
       { orcidId: '0000-0000-0000-0003', orcidUrl: 'u3', givenNames: 'Li-Huei', familyName: 'Tsai', otherNames: [], emails: ['tsai@mit.edu'] },
     ]);
+    // S224 #13: the profile is now ALWAYS fetched (no public-email fast-path) so
+    // currentAffiliation is captured — assert it's fetched for the SELECTED
+    // (name-matched) record, not the homonym with the email.
+    const profileSpy = jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue({
+      orcidId: '0000-0000-0000-0003', orcidUrl: 'u3', givenNames: 'Li-Huei', familyName: 'Tsai',
+      creditName: '', primaryEmail: 'tsai@mit.edu', primaryUrl: null, currentAffiliation: 'MIT',
+    });
     const out = await ORCIDService.findContact({ name: 'Li-Huei Tsai', affiliation: 'MIT', ...creds });
+    expect(profileSpy).toHaveBeenCalledWith('0000-0000-0000-0003', 'c', 's');
     expect(out.orcidId).toBe('0000-0000-0000-0003');
     expect(out.email).toBe('tsai@mit.edu');
+    expect(out.affiliation).toBe('MIT');
+    expect(out.source).toBe('orcid_profile');
     expect(out.identityStatus).toBe('probable');
+  });
+
+  test('falls back to the search-record email when the always-fetched profile exposes none (S224 #13)', async () => {
+    jest.spyOn(ORCIDService, 'searchByName').mockResolvedValue([
+      { orcidId: '0000-0000-0000-0033', orcidUrl: 'u33', givenNames: 'Li-Huei', familyName: 'Tsai', otherNames: [], emails: ['tsai@mit.edu'] },
+    ]);
+    // Profile is fetched (for affiliation) but its /record endpoint omits the
+    // email — the search-record public email must still be returned.
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue({
+      orcidId: '0000-0000-0000-0033', orcidUrl: 'u33', givenNames: 'Li-Huei', familyName: 'Tsai',
+      creditName: '', primaryEmail: null, primaryUrl: null, currentAffiliation: 'MIT',
+    });
+    const out = await ORCIDService.findContact({ name: 'Li-Huei Tsai', affiliation: 'MIT', ...creds });
+    expect(out.email).toBe('tsai@mit.edu');
+    expect(out.affiliation).toBe('MIT');
   });
 
   test('returns structured ambiguous when two distinct name-matching records cannot be disambiguated', async () => {
@@ -174,6 +199,12 @@ describe('ORCIDService.findContact — name-scored selection', () => {
     jest.spyOn(ORCIDService, 'searchByName').mockResolvedValue([
       { orcidId: '0000-0000-0000-0009', orcidUrl: 'u9', givenNames: 'Li-Huei', familyName: 'Tsai', otherNames: [], emails: ['tsai@mit.edu'], institutions: ['Massachusetts Institute of Technology'] },
     ]);
+    // Profile now always fetched (S224 #13); corroboration is computed from the
+    // search record, so the profile content doesn't affect this assertion.
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue({
+      orcidId: '0000-0000-0000-0009', orcidUrl: 'u9', givenNames: 'Li-Huei', familyName: 'Tsai',
+      creditName: '', primaryEmail: 'tsai@mit.edu', primaryUrl: null, currentAffiliation: 'Massachusetts Institute of Technology',
+    });
     const out = await ORCIDService.findContact({ name: 'Li-Huei Tsai', affiliation: 'Massachusetts Institute of Technology', ...creds });
     expect(out.status).toBe('resolved');
     expect(out.institutionCorroborated).toBe(true);
@@ -184,6 +215,10 @@ describe('ORCIDService.findContact — name-scored selection', () => {
     jest.spyOn(ORCIDService, 'searchByName').mockResolvedValue([
       { orcidId: '0000-0000-0000-0010', orcidUrl: 'u10', givenNames: 'Li-Huei', familyName: 'Tsai', otherNames: [], emails: ['tsai@x.edu'], institutions: ['Stanford University'] },
     ]);
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue({
+      orcidId: '0000-0000-0000-0010', orcidUrl: 'u10', givenNames: 'Li-Huei', familyName: 'Tsai',
+      creditName: '', primaryEmail: 'tsai@x.edu', primaryUrl: null, currentAffiliation: 'Stanford University',
+    });
     const out = await ORCIDService.findContact({ name: 'Li-Huei Tsai', affiliation: 'Massachusetts Institute of Technology', ...creds });
     expect(out.status).toBe('resolved');
     expect(out.institutionCorroborated).toBe(false);
@@ -194,6 +229,10 @@ describe('ORCIDService.findContact — name-scored selection', () => {
     jest.spyOn(ORCIDService, 'searchByName').mockResolvedValue([
       { orcidId: '0000-0000-0000-0011', orcidUrl: 'u11', givenNames: 'Li-Huei', familyName: 'Tsai', otherNames: [], emails: ['t@mit.edu'], institutions: ['Massachusetts Institute of Technology'] },
     ]);
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue({
+      orcidId: '0000-0000-0000-0011', orcidUrl: 'u11', givenNames: 'Li-Huei', familyName: 'Tsai',
+      creditName: '', primaryEmail: 't@mit.edu', primaryUrl: null, currentAffiliation: 'Massachusetts Institute of Technology',
+    });
     const out = await ORCIDService.findContact({ name: 'Li-Huei Tsai', affiliation: null, ...creds });
     expect(out.status).toBe('resolved');
     expect(out.institutionCorroborated).toBe(false);

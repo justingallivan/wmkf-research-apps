@@ -41,6 +41,15 @@ export function mergeEnrichment(candidates, enrichmentResults) {
       hIndex: e.hIndex ?? c.hIndex,
       i10Index: e.i10Index ?? c.i10Index,
       totalCitations: e.totalCitations ?? c.totalCitations,
+      // Current-affiliation pin (S224 #16): enrichment may have replaced the
+      // discovery affiliation with an identity-trusted ORCID/Scholar current
+      // one. Promote it + its provenance so the card shows "per ORCID" and the
+      // client re-rank scores the same affiliation the server persisted.
+      affiliation: e.affiliation || c.affiliation,
+      affiliationSource: e.affiliationSource || c.affiliationSource,
+      // Recency rank input: enrichment carries the discovery value through so the
+      // client re-rank matches the server (`?? c` so a real 0 isn't dropped).
+      publicationCount5yr: e.publicationCount5yr ?? c.publicationCount5yr,
     };
   });
 }

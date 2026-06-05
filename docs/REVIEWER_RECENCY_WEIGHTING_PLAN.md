@@ -1,6 +1,6 @@
 # Reviewer Recency-Weighting Plan (S223, Topic #2)
 
-**Status:** DESIGN — **Codex-reviewed (findings + decisions folded into "Resolutions" below)**. Build-ready.
+**Status:** SHIPPED — pieces 1–2 (ranking rebalance + recency-weighted PubMed affiliation) committed S223 (`c694bcb`); pieces 3–6 (current-affiliation pinning: ORCID always-fetch-profile, Scholar author block, identity-gated `_finalize` override, UI provenance) built + Codex-confirmed S224. Two Codex post-impl rounds (HIGH: ORCID ended-employment fallback; MEDIUM: Scholar no-metrics-table author-block loss) — both fixed and re-confirmed READY TO SHIP.
 **Owner task:** Topic #2 from `project-reviewer-finder-next-topics`. Decisions locked with Justin S223 (see [[project-reviewer-ranking-recency-over-citations]]).
 
 ## Problem
@@ -49,12 +49,12 @@ A potential reviewer has a long digital tail (grad → postdoc → current). The
 ## Files touched
 | File | Change |
 |---|---|
-| `lib/utils/relevance-score.js` | Remove h-index/citations/raw-pub-count terms; add the recency term (dominant) from `publicationCount5yr`. Shared by server + client rank. |
-| `lib/services/discovery-service.js` | Ensure `publicationCount5yr` is set for Track B too (from merged `publications[]`, lower-confidence). Replace `extractBestAffiliationMultiVariant` most-common → recency-weighted; fix single-variant first-match (`:972`). |
-| `lib/services/contact-enrichment-service.js` | Collect ORCID/Scholar affiliation candidates in the tiers; apply the override at the END of `_finalize()` gated on `probable`; set `affiliationSource`. |
-| `lib/services/orcid-service.js` | Remove `findContact` public-email fast-path early-return so the full profile (→ `currentAffiliation`) is always fetched. |
-| `lib/services/serp-contact-service.js` | Extend `fetchScholarMetrics` to also return `author.affiliations` + `author.email` from the already-fetched payload. |
-| `shared/components/reviewers/*` | Surface affiliation provenance + h-index in the detail pane as a seniority hint; reflect new ordering; thread `publicationCount5yr`/`affiliationSource` through `mergeEnrichment` so client re-rank matches server. |
+| `lib/utils/relevance-score.js` | DONE (S223): Removed h-index/citations/raw-pub-count terms; added the recency term (dominant) from `publicationCount5yr`. Shared by server + client rank. |
+| `lib/services/discovery-service.js` | DONE (S223): `publicationCount5yr` set for Track B too (from merged `publications[]`, lower-confidence). Replaced `extractBestAffiliationMultiVariant` most-common → recency-weighted; fixed single-variant first-match (`:972`). |
+| `lib/services/contact-enrichment-service.js` | DONE (S224): collects ORCID/Scholar affiliation candidates in the tiers WITHOUT mutating `candidate.affiliation`; `_applyAffiliationOverride()` applied at the END of `_finalize()` gated on `mayPersistIdentity` (probable/confirmed); sets `affiliation`/`affiliationSource`/`priorAffiliation`; persists the effective affiliation; threads `publicationCount5yr` onto `contactEnrichment`. |
+| `lib/services/orcid-service.js` | DONE (S224): removed `findContact` public-email fast-path early-return so the full profile (→ `currentAffiliation`) is always fetched (search-record email preserved as fallback); `getProfile.currentAffiliation` is now STRICTLY a no-end-date employment (no `affiliations[0]` fallback — Codex HIGH). |
+| `lib/services/serp-contact-service.js` | DONE (S224): `fetchScholarMetrics` also returns `author.affiliations` (`scholarAffiliations`) + `author.email` (`scholarEmail`), parsed before the `cited_by.table` guard so a no-metrics-table profile still surfaces them (Codex MEDIUM). |
+| `shared/components/reviewers/*` + `pages/reviewer-finder.js` | DONE (S224): `mergeEnrichment` + standalone merge sites promote `affiliation`/`affiliationSource`/`publicationCount5yr` to the candidate top-level; both cards show a "current (per ORCID/Scholar)" provenance badge; h-index already rendered as the human-facing seniority hint. |
 | `pages/api/reviewer-finder/save-candidates.js` | DONE (S223): persist the 0–100 `relevanceScore` to `wmkf_relevancescore` consistently (isFinite-guarded), preferring it over the 0–1 `verificationConfidence` — so the recency rank reaches the stored score for Track A too, and the field stops mixing scales. |
 | `tests/**` | recency-score unit tests; recency-weighted-affiliation tests; ORCID/Scholar affiliation-pin gating tests. **Update** `dedup-rank-by-relevance.test.js` + `relevance-score-identity-gate.test.js` (they assert the now-removed 35-pt metrics contribution). |
 

@@ -75,6 +75,19 @@ function isClaudeSuggestion(c) {
   return !!(c?.isClaudeSuggestion || c?.source === 'claude_suggestion');
 }
 
+// Affiliation-pin provenance (S224 #16). enrichment may replace the discovery
+// (PubMed-recency) affiliation with an identity-trusted CURRENT one from ORCID
+// or Scholar. Return a short source label for the "current (per X)" badge, or
+// null for the default pubmed_recency / unset case (no badge — it's the norm).
+function affiliationProvenance(source) {
+  if (source === 'orcid_current') return 'ORCID';
+  if (source === 'scholar_current') return 'Scholar';
+  return null;
+}
+function affiliationSourceLabel(source) {
+  return affiliationProvenance(source) || 'recent publications';
+}
+
 // Ported from the standalone Reviewer Finder: build a Google Scholar author-search
 // URL as a fallback when we don't have the candidate's real profile URL. Strips
 // honorifics and extracts the institution from a messy affiliation string.
@@ -137,7 +150,14 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false }) {
               </Pill>
             )}
           </div>
-          {c.affiliation && <p className="text-xs text-gray-500 mt-0.5 truncate">{c.affiliation}</p>}
+          {c.affiliation && (
+            <p className="text-xs text-gray-500 mt-0.5 truncate" title={enr.priorAffiliation ? `Current affiliation (per ${affiliationSourceLabel(c.affiliationSource || enr.affiliationSource)}); previously: ${enr.priorAffiliation}` : undefined}>
+              {c.affiliation}
+              {affiliationProvenance(c.affiliationSource || enr.affiliationSource) && (
+                <span className="ml-1 text-gray-400">· current (per {affiliationProvenance(c.affiliationSource || enr.affiliationSource)})</span>
+              )}
+            </p>
+          )}
 
           {hasInstitutionCOI && (
             <div className="mt-2 p-2 bg-red-50 border border-red-300 rounded text-xs text-red-800">

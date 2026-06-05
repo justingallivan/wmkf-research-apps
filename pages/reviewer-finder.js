@@ -196,11 +196,22 @@ function CandidateCard({ candidate, selected, onSelect }) {
             </span>
           </div>
 
-          {candidate.affiliation && (
-            <p className="text-sm text-gray-500 truncate">
-              {candidate.affiliation}
-            </p>
-          )}
+          {candidate.affiliation && (() => {
+            // Affiliation-pin provenance (S224 #16): enrichment may have replaced
+            // the discovery affiliation with an identity-trusted CURRENT one.
+            const affSource = candidate.affiliationSource || candidate.contactEnrichment?.affiliationSource;
+            const affVia = affSource === 'orcid_current' ? 'ORCID' : affSource === 'scholar_current' ? 'Scholar' : null;
+            const prior = candidate.contactEnrichment?.priorAffiliation;
+            return (
+              <p
+                className="text-sm text-gray-500 truncate"
+                title={prior ? `Current affiliation (per ${affVia || 'recent publications'}); previously: ${prior}` : undefined}
+              >
+                {candidate.affiliation}
+                {affVia && <span className="ml-1 text-gray-400">· current (per {affVia})</span>}
+              </p>
+            );
+          })()}
 
           {/* Institution COI warning */}
           {candidate.hasInstitutionCOI && (
@@ -1003,7 +1014,15 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
     const updateCandidate = (candidate) => {
       const enrichment = enrichedMap.get(candidate.name);
       if (enrichment) {
-        return { ...candidate, contactEnrichment: enrichment };
+        return {
+          ...candidate,
+          contactEnrichment: enrichment,
+          // Promote the identity-trusted CURRENT affiliation pin + provenance
+          // (S224 #16) so the card shows "current (per ORCID)" and the saved
+          // record carries the current affiliation, not the postdoc-era one.
+          affiliation: enrichment.affiliation || candidate.affiliation,
+          affiliationSource: enrichment.affiliationSource || candidate.affiliationSource,
+        };
       }
       return candidate;
     };
@@ -1050,7 +1069,12 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
             contactEnrichment: enrichment,
             // Also set top-level email/website for database storage
             email: enrichment.email || candidate.email,
-            website: enrichment.website || candidate.website
+            website: enrichment.website || candidate.website,
+            // Persist the identity-trusted CURRENT affiliation pin (S224 #16) —
+            // save-candidates reads candidate.affiliation first, so promote it
+            // or the postdoc-era discovery affiliation would be stored.
+            affiliation: enrichment.affiliation || candidate.affiliation,
+            affiliationSource: enrichment.affiliationSource || candidate.affiliationSource,
           };
         }
         return candidate;
