@@ -93,6 +93,7 @@ export default async function handler(req, res) {
           source: 'cron/secret-check',
           autoResolveKey,
           category: 'ops',
+          emailAdmins: true,
         });
       } else {
         // Secret is healthy — auto-resolve any prior alerts for it
