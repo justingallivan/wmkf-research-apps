@@ -1,55 +1,55 @@
-# Session 225 Prompt: Topic #3 (Perplexity in reviewer disambiguation) + roster follow-ups
+# Session 226 Prompt: Review Codex's enforcement harnesses + web-discovery increment 2
 
-## ⭐ Top of the agenda — Topic #3: Perplexity's role in reviewer finding/disambiguation
-The last open item from the EOD-S222 reviewer-finder list ([[project-reviewer-finder-next-topics]] §3 — now the ONLY open one; #1 timeout + #2 recency/affiliation both SHIPPED). Untouched. Web-grounded "where are they now" disambiguation dovetails with the current-affiliation work that just shipped. **Confirmed S222:** Perplexity is wired ONLY into the Virtual Review Panel (`lib/utils/vrp-providers.js`, `multi-llm-service.js`, `panel-review-service.js`), NOT reviewer-finder; no `PERPLEXITY_*`/`PPLX` key set. **Decide:** web-grounded disambiguation (current affiliation, "is this the same person") vs candidate discovery vs none — compare against the existing SerpAPI/Scholar/ORCID enrichment path. This is scoping/discussion, not yet specced. See [[project-reviewer-identity-resolution-phase1]].
+## ⭐ Top of agenda — you likely woke to NEW Codex-written harnesses
+Justin said Codex would author **enforcement harnesses** (hooks) while this session slept, based on the instruction-architecture work below. **Before building anything: check `git log` / `git status` / `.claude/hooks/` / `.claude/settings.json` for new Codex commits, and review them against `docs/CLAUDE_INSTRUCTION_ARCHITECTURE_REVIEW_RESPONSE.md` — specifically its §4 (re-scoped) and the verified hook facts.** Do NOT trust the first-draft recommendations: a second review corrected real errors (see below). [[project-claude-instruction-architecture]] has the load-bearing facts so you don't re-derive them wrong.
 
-## Session 224 Summary — SHIPPED 3 reviewer features + a verification skill
+## Session 225 Summary
 
-**1. Topic #2 pieces 3–6 — current-affiliation pinning (SHIPPED + DEPLOYED, `6f91bac`).** Completes recency-weighting. ORCID always-fetches the full profile (current affiliation), strictly a no-end-date employment (no stale postdoc fallback); Scholar `author.affiliations`/`email` now parsed; identity-gated `_finalize` override pins the current affiliation (authority ORCID > Scholar > PubMed-recency) with `affiliationSource` provenance shown in the cards. Two Codex post-impl rounds (HIGH: ORCID ended-employment fallback; MEDIUM: Scholar no-table author block — both fixed). `docs/REVIEWER_RECENCY_WEIGHTING_PLAN.md` now marked SHIPPED.
+This was a long, churn-heavy session with two threads. Justin flagged the working pattern as **unacceptable** mid-session: Claude repeatedly asserted state as built/feasible that the code contradicted (the no-3-pub-gate premise, the "promote reuses an existing input" claim that didn't exist, the credential-crossing bug, a wrong SessionStart fact), leaning on Codex to catch real bugs each round. Root-cause framing → the instruction-architecture initiative.
 
-**2. "Several minutes" Find-tab copy fix (`a28771e`).** Both progress lines said "a minute"; the search budget is up to ~10 min (S223). Now "several minutes — please keep this tab open."
+### Thread 1 — Reviewer web-discovery (Topic #3), backend increment 1 SHIPPED (`f842c22`)
+Perplexity Search API as a web-grounded **candidate-discovery lead source** (counter Claude's training-cutoff + fame bias → surface currently-active mid-career researchers). After a `/contract-reconcile` whole-flow trace proved every *pipeline-integration* approach generated HIGHs, scope was cut to a **READ-ONLY web-suggestions panel** (separate path; no merge/rank/COI/roster/save). Built (backend only, **inert in prod — nothing imports it yet**): `lib/services/web-discovery-service.js`, `createWebExtractionPrompt`, `api-capabilities.reviewerWebSearch`, prompt-injection gate entry. **15 unit tests green; A7 gate + lint green.** Went through a `/contract-reconcile` review + a Codex post-impl review that caught a **HIGH** (Perplexity key was being passed to Anthropic — fixed: keys now strictly separate). Plan: `docs/REVIEWER_WEB_DISCOVERY_PLAN.md` (v7). Memory: [[project-reviewer-finder-next-topics]] §3.
 
-**3. ⭐ Durable per-request Find roster + cross-run search dedup (SHIPPED + DEPLOYED, `dee37aa`).** The headline. Workbench Reviewers→Find candidates are no longer ephemeral: every surfaced candidate is recorded per-request and **suppressed from future searches for that request** — enforced **server-side in `/discover` before the per-candidate Claude reasoning**, so re-runs find NEW people instead of re-spending tokens. Durable roster = active selectable list (persists across reload) + a collapsed, recoverable **Excluded** section; **Exclude** sets aside (never deletes), **Promote back** restores. New name-keyed Postgres table `reviewer_find_roster` (status active|excluded|saved). **Migration 020 was applied to prod** (verified live: table + 3 indexes, 0 rows). Went through **2 Codex plan-review rounds + 2 Codex post-impl rounds** (HIGH: roster-reloaded save could bypass the identity-resolver guard — fixed via persist-flags in the pruned DTO; 3 MEDIUM all fixed). Plan: `docs/REVIEWER_RECENCY_WEIGHTING_PLAN.md`'s sibling `~/.claude/plans/cosmic-yawning-starlight.md`; Atlas: `docs/atlas/postgres-reviewer-find-roster.md`.
+### Thread 2 — Claude instruction-architecture cleanup (`1c40a13`)
+Justin authored `docs/CLAUDE_INSTRUCTION_ARCHITECTURE_CLEANUP_PLAN.md` (route CLAUDE.md's 4 jobs to the right mechanism; 308→~80-120 lines; enforce with hooks not prose). Claude produced `docs/CLAUDE_INSTRUCTION_ARCHITECTURE_REVIEW_RESPONSE.md` (Phase-1 AGREE/MODIFY/OBJECT review), **corrected after a second review** (SessionStart canNOT block; precedence→ownership-policy; Stop "judge" split into deterministic gate-check + advisory; `setup-database.js` self-contradiction flagged). **Codex authoring the harnesses next.**
 
-**4. `/contract-reconcile` verification skill + surface hook (`06fa2df`).** Operationalizes `docs/CLAUDE_SKILL_REMEDIATION_PLAN.md` (Justin-authored, a retrospective on this session's Codex catches). One skill, two modes (Review/Implementation): whole-flow trace + six audits + `[VERIFIED/PLANNED/ASSUMED/STALE]` labels. Auto-fires on migration/new-table/new-route/dedup/partial-save/stream/verify-findings; also `/contract-reconcile`. Backed by a PreToolUse hook (`.claude/hooks/contract-surface-reminder.js`) nudging durable-surface obligations on a migration / new route / non-md CREATE TABLE.
+### Commits
+- `f842c22` — web-discovery backend core (Track C v1, read-only) + 15 tests
+- `1c40a13` — instruction-architecture cleanup plan + Phase-1 review response
+- (this doc commit) — Session 225 docs + memory
 
-### Commits (4 this session; first 3 pushed+deployed, `06fa2df` pushed at session end)
-- `6f91bac` — affiliation pinning (Topic #2 pieces 3–6)
-- `a28771e` — "several minutes" copy fix
-- `dee37aa` — durable Find roster + cross-run dedup
-- `06fa2df` — contract-reconcile skill + surface hook
+## Potential Next Steps
 
-## Roster follow-ups (deferred from `dee37aa`, all OPTIONAL)
-- TTL cleanup cron for `reviewer_find_roster` rows on closed requests (mirror `DatabaseService.cleanupExpiredCache`). v1 uses a per-request row cap (300) only.
-- Split the "filtered out" UI counter into applicant-exclusion vs cross-run-dedup.
-- Durable read-only "previously surfaced (N)" / unverified sections.
-- Standalone `pages/reviewer-finder.js` parity (the roster is Workbench-Find-only).
+### 1. ⭐ Review Codex's enforcement harnesses (if present)
+Review against the corrected review response. Watch: a symlink/setup guard must NOT be a `SessionStart` block (it can't block — use `PreToolUse` deny / external / in-script). Stop verifier should be deterministic changed-surface gate checks, not a broad "completion judge." Reconcile `setup-database.js` (`:12` "backwards-compatible on existing DBs" vs `~:600` "fresh-install only") **in source** before any enforcement leans on it.
 
-## Standing context / guardrails (carried S197–S224)
-- **`main` auto-deploys to prod on push. Commit/push only when asked.** Local scripts + SQL migrations hit prod directly (`.env.local` → prod). A NEW migration must be applied (`node scripts/apply-migrations.js`) before the code that reads its table runs — 020 is already applied.
-- **`reviewer_find_roster` is operational/pre-save state (Postgres), NOT canonical reviewer identity (Dataverse).** Do not "drop a reviewer Postgres table" carryover it — it's live (S224). Same class as the retained `search_cache`.
-- **NEW: use `/contract-reconcile`** before declaring a review or multi-layer build done — it auto-fires on the triggers above. The surface hook will nudge migration/route obligations.
-- **`rtk` FULLY UNINSTALLED** (S221) — do NOT prefix commands with `rtk`. [[project-rtk-grep-output-corruption]].
-- **Codex loop** (plan→pre-impl→impl→post-impl) ran 4 times this session and caught real bugs each time. Keep it for anything non-trivial.
-- Memory frontmatter: valid `status:` = active/stale/closed/superseded only; run `npm run check:memory-router` after memory edits.
+### 2. Web-discovery increment 2 (route + UI)
+- Route `pages/api/reviewer-finder/web-suggestions.js` (`requireAppAccess('reviewer-finder','reviewers')`, key-gated, calls `WebDiscoveryService.search`) + **API_ROUTE_SECURITY_MATRIX entry** (`check:api-routes` will go red without it).
+- Read-only "Web suggestions" panel + capability-gated `searchWeb` toggle on both surfaces (standalone `ReviewerSearchSection.js` + Workbench `ReviewerFindPanel.js`).
+- **Live Perplexity contract test before enabling** — no `PERPLEXITY_API_KEY` set yet; `search_after_date_filter` format (M/D/YYYY) is unconfirmed against the real API. Deferred-v2 (full pipeline integration) contracts live in the plan §10.
 
-## Key Files Reference (durable Find roster)
+### 3. (Deferred) the "Add as candidate" manual-add path
+The verified mechanism (append `{name, manualAdd:true}` to `analysisResult.reviewerSuggestions` + discover-only re-run + bypass the 3-pub gate for manual adds) is parked — Codex's v6 review found it carries real contracts. Not in read-only v1.
+
+## Standing context / guardrails
+- **`main` auto-deploys to prod on push. Commit/push only when asked.** The web-discovery service is committed but **inert** (no caller) — safe in prod.
+- **Behavior note (S225):** probe-before-plan, time-box meta-work, falsify-don't-confirm, don't-assert-unverified-state — all violated this session. The instruction-architecture work is the structural fix; until the harnesses land, *be the discipline manually*: verify against code before asserting, label [VERIFIED/ASSUMED].
+- **`/contract-reconcile`** paid off this session (it found the whole-flow integration HIGHs in one pass vs Codex's one-per-round). Use it before declaring multi-layer work done.
+- Codex post-impl review on the actual diff caught what prose review couldn't — keep the impl→post-impl loop.
+
+## Key Files Reference
 | File | Purpose |
 |------|------|
-| `lib/db/migrations/020_reviewer_find_roster.sql` | the table (applied to prod) |
-| `lib/services/reviewer-roster-store.js` | CRUD (recordSurfaced/setExcluded/promote/markSaved/listForRequest) |
-| `pages/api/workbench/reviewer-roster.js` | GET/POST/PATCH route |
-| `lib/utils/reviewer-name-match.js` | shared CJS normalize + exact-exclude (server+client) |
-| `shared/components/reviewers/reviewer-search-logic.js` | `pruneCandidateForRoster` (+ persist flags), re-exports name-match |
-| `shared/components/reviewers/ReviewerSearchSection.js` | the displayCandidates refactor + roster UI |
-| `pages/api/reviewer-finder/discover.js` | server-side `excludedNames` dedup (before reasoning) |
-| `docs/atlas/postgres-reviewer-find-roster.md` | Atlas page |
+| `lib/services/web-discovery-service.js` | Perplexity Search → A7 extraction → WebLead[] (read-only v1, inert until a route calls it) |
+| `tests/unit/web-discovery-service.test.js` | 15 tests (key-routing, provenance, fail-soft, caps, cache) |
+| `shared/config/prompts/reviewer-finder.js` | `createWebExtractionPrompt` (static, A7-registered) |
+| `docs/REVIEWER_WEB_DISCOVERY_PLAN.md` | v7 read-only scope + deferred-v2 integration contracts |
+| `docs/CLAUDE_INSTRUCTION_ARCHITECTURE_CLEANUP_PLAN.md` | Justin's plan |
+| `docs/CLAUDE_INSTRUCTION_ARCHITECTURE_REVIEW_RESPONSE.md` | Claude's corrected Phase-1 review |
 
 ## Testing
 ```bash
-npx jest reviewer-roster-store reviewer-roster-endpoint reviewer-name-match reviewer-search-logic   # roster suites
-npx jest                                                                                            # full suite (1988 at S224)
+npx jest web-discovery-service                     # 15 tests
+npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging:self-test
 for g in migrations-manifest api-routes atlas doc-currency fact-consistency canonical-pointers drain-table-mentions prompt-storage-mentions prompt-injection-tagging memory-router; do npm run check:$g; done
-# verify the prod table exists (manual env parse — no dotenv pkg):
-node -e "const fs=require('fs');for(const f of['.env','.env.local']){try{for(const l of fs.readFileSync(f,'utf8').split('\n')){const m=l.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);if(m&&!process.env[m[1]])process.env[m[1]]=m[2].trim().replace(/^['\"]|['\"]$/g,'')}}catch{}}const{sql}=require('@vercel/postgres');sql\`SELECT count(*) FROM reviewer_find_roster\`.then(r=>console.log('rows',r.rows[0].count))"
 ```

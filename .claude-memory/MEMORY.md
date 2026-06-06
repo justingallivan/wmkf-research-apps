@@ -31,7 +31,7 @@
 - Stakeholder/email tone: feedback-stakeholder-email-tone.md; feedback-review-panel-tone.md
 
 ## Task Routing
-- Reviewer-finder EOD-S222 topics (#1 timeout + #2 recency/affiliation SHIPPED; only #3 Perplexity OPEN): project-reviewer-finder-next-topics.md
+- Reviewer-finder EOD-S222 topics (#1 timeout + #2 recency/affiliation SHIPPED; #3 Perplexity web-discovery SCOPED + backend increment-1 built S225, route+UI next): project-reviewer-finder-next-topics.md
 - Reviewer Workbench / lifecycle: project-reviewer-apps-redesign-direction.md; project-reviewer-workbench-invite-workflow.md; project-reviewer-lifecycle.md
 - Find-tab durable roster + cross-run search dedup (SHIPPED S224; operational PG table, don't drop-carryover): project-reviewer-find-roster.md
 - Reviewer identity resolver / ORCID: project-reviewer-identity-resolution.md; project-reviewer-identity-resolution-phase1.md; project-reviewer-self-report-orcid-sticky-confirmed.md
@@ -65,6 +65,7 @@
 - Local build + git gotchas: local-jest-build-environment.md; env-broken-git-autogc.md
 - Dynamics sandbox (NOT drop-in usable): project-dynamics-sandbox-state.md
 - Strategy / system model: project-system-model.md; project-strategy-direction.md
+- Root instruction file / hooks / rules / instruction-adherence (Codex writing enforcement harnesses next): project-claude-instruction-architecture.md
 - Roadmap (historical snapshots — cross-check current strategy): project-app-roadmap-2026-04-25.md; project-phase-i-summary-app-winddown.md
 - Phasing / cycle scoping: project-grant-phasing-evolution.md; feedback-cycle-vs-executor-scope.md; feedback-concepts-vs-phase-i.md
 - Planned: review pipeline + proposal extracts: project-staged-review-pipeline.md; project-proposal-context-extraction.md
