@@ -18,6 +18,9 @@ export default async function handler(req, res) {
   const sessionProfileId = access.profileId;
 
   try {
+    // model-override-warming:ignore reason=db-methods-only — this route calls only
+    // IntegrityService.getScreening / getScreeningHistory / updateScreeningStatus
+    // (Postgres); it never reaches screenApplicants, the only model-resolving path.
     const { IntegrityService } = await import('../../../lib/services/integrity-service');
 
     if (req.method === 'GET') {

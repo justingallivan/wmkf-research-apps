@@ -16,6 +16,9 @@ export default async function handler(req, res) {
   if (!access) return;
 
   try {
+    // model-override-warming:ignore reason=db-methods-only — this route calls only
+    // IntegrityService.dismissMatch / getDismissals (Postgres reads/writes); it
+    // never reaches screenApplicants, which is the only model-resolving path.
     const { IntegrityService } = await import('../../../lib/services/integrity-service');
 
     if (req.method === 'POST') {

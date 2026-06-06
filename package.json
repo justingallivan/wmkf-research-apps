@@ -41,7 +41,9 @@
     "check:prompt-injection-tagging": "node scripts/check-prompt-injection-tagging.js",
     "check:prompt-injection-tagging:self-test": "node scripts/check-prompt-injection-tagging-self-test.js",
     "check:memory-router": "node scripts/check-memory-router.js",
-    "check:memory-router:self-test": "node scripts/check-memory-router-self-test.js"
+    "check:memory-router:self-test": "node scripts/check-memory-router-self-test.js",
+    "check:model-override-warming": "node scripts/check-model-override-warming.js",
+    "check:model-override-warming:self-test": "node scripts/check-model-override-warming-self-test.js"
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",
