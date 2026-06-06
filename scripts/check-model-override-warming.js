@@ -28,8 +28,11 @@
  *      across function boundaries, so we don't false-positive on those.)
  *
  * Detection is AST-based (@babel/parser): calls are real CallExpressions, so
- * getModelForApp(...) appearing in a COMMENT or a STRING never counts, and
- * "awaited" is a true AwaitExpression parent — not a text heuristic.
+ * getModelForApp(...) appearing in a COMMENT or a STRING never counts. "awaited"
+ * means an AwaitExpression on the ancestor chain up to the enclosing function,
+ * so both `await loadModelOverrides()` and `await Promise.all([loadModelOverrides()])`
+ * count. Import-binding aliases are resolved, so `import { getModelForApp as g }`
+ * (and the require-destructure-rename form) are still detected as resolver calls.
  *
  * Exemption — a route that imports a MIXED module (one exporting both a
  * model-resolving method and unrelated non-LLM methods) but only calls the
@@ -45,11 +48,18 @@
  * set: it DEFINES getModelForApp, isn't a consumer call site, and nearly every
  * route imports it for BASE_CONFIG.
  *
- * Known residual limits (documented, not silently ignored): model resolution
- * reached via computed/bracket member access (baseConfig['getModelForApp']()),
- * a non-literal dynamic import specifier, a path alias, or a warming wrapper
- * whose name is not loadModelOverrides, would not be modeled. None of these
- * patterns exist in this repo today; if one is introduced, extend this gate.
+ * Known residual limits (documented, not silently ignored):
+ *   - Cross-function ordering is NOT modeled: if a route calls a resolver-
+ *     reaching helper/service BEFORE its awaited warm, ordering rule #2 won't
+ *     flag it (only the await requirement applies). Soundly detecting that needs
+ *     intra-procedural control-flow analysis, which would false-positive on the
+ *     common correct shape (await first, helper called later). Accepted boundary.
+ *   - Model resolution reached via computed/bracket member access
+ *     (baseConfig['getModelForApp']()), a non-literal dynamic import specifier,
+ *     a path alias, or a warming wrapper whose name is neither loadModelOverrides
+ *     nor an import alias of it, would not be modeled.
+ * None of these patterns exist in this repo today; if one is introduced, extend
+ * this gate.
  *
  * Usage: node scripts/check-model-override-warming.js [--root <dir>]
  *   --root points the scan at an isolated fixture tree (used by the self-test).
@@ -126,24 +136,51 @@ function calleeName(callee) {
 
 const FN_TYPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'ObjectMethod', 'ClassMethod']);
 
-// Walk the AST collecting: literal relative import specifiers, resolver calls
-// (with enclosing-function identity + position), and warm calls (with awaited
-// flag + enclosing function + position).
+// Walk the AST collecting: literal relative import specifiers; import-binding
+// aliases of the resolver/warm functions (so `import { getModelForApp as g }`
+// and `const { getModelForApp: g } = require(...)` are still detected); and all
+// calls tagged with their enclosing function, position, and an "awaited" flag.
+//
+// "awaited" means an AwaitExpression appears anywhere on the ancestor chain
+// between the call and its enclosing function — so `await loadModelOverrides()`
+// AND `await Promise.all([loadModelOverrides()])` both count. The flag resets at
+// every function boundary (an await in an outer function does not sequence a
+// call made inside an inner one).
 function analyze(ast) {
   const importSpecs = new Set();
-  const resolverCalls = []; // { pos, fn }
-  const warmCalls = [];     // { pos, awaited, fn }
+  const resolverAliases = new Set(); // local names bound to a resolver import
+  const warmAliases = new Set();     // local names bound to loadModelOverrides
+  const calls = [];                  // { name, pos, fn, awaited }
 
-  (function rec(node, parent, fn) {
+  (function rec(node, fn, underAwait) {
     if (!node || typeof node.type !== 'string') return;
     const curFn = FN_TYPES.has(node.type) ? node : fn;
+    const childAwait = FN_TYPES.has(node.type) ? false : (node.type === 'AwaitExpression' ? true : underAwait);
 
-    if (node.type === 'ImportDeclaration' && node.source) importSpecs.add(node.source.value);
+    if (node.type === 'ImportDeclaration' && node.source) {
+      importSpecs.add(node.source.value);
+      for (const spec of node.specifiers || []) {
+        if (spec.type === 'ImportSpecifier' && spec.imported && spec.imported.type === 'Identifier' && spec.local) {
+          if (RESOLVER_NAMES.has(spec.imported.name)) resolverAliases.add(spec.local.name);
+          if (spec.imported.name === WARM_NAME) warmAliases.add(spec.local.name);
+        }
+      }
+    }
     if ((node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration') && node.source) {
       importSpecs.add(node.source.value);
     }
+    // const { getModelForApp: g } = require('...')  /  const { loadModelOverrides: w } = require('...')
+    if (node.type === 'VariableDeclarator' && node.id && node.id.type === 'ObjectPattern'
+        && node.init && node.init.type === 'CallExpression' && calleeName(node.init.callee) === 'require') {
+      for (const prop of node.id.properties || []) {
+        if (prop.type === 'ObjectProperty' && prop.key && prop.key.type === 'Identifier'
+            && prop.value && prop.value.type === 'Identifier') {
+          if (RESOLVER_NAMES.has(prop.key.name)) resolverAliases.add(prop.value.name);
+          if (prop.key.name === WARM_NAME) warmAliases.add(prop.value.name);
+        }
+      }
+    }
     if (node.type === 'CallExpression') {
-      // dynamic import('...')
       if (node.callee && node.callee.type === 'Import'
           && node.arguments[0] && node.arguments[0].type === 'StringLiteral') {
         importSpecs.add(node.arguments[0].value);
@@ -152,19 +189,21 @@ function analyze(ast) {
       if (cn === 'require' && node.arguments[0] && node.arguments[0].type === 'StringLiteral') {
         importSpecs.add(node.arguments[0].value);
       }
-      if (RESOLVER_NAMES.has(cn)) resolverCalls.push({ pos: node.start, fn: curFn });
-      if (cn === WARM_NAME) {
-        warmCalls.push({ pos: node.start, awaited: !!(parent && parent.type === 'AwaitExpression'), fn: curFn });
-      }
+      if (cn) calls.push({ name: cn, pos: node.start, fn: curFn, awaited: underAwait });
     }
 
     for (const k of Object.keys(node)) {
       if (k === 'loc' || k === 'start' || k === 'end' || k === 'range' || k.endsWith('Comments')) continue;
       const v = node[k];
-      if (Array.isArray(v)) { for (const c of v) rec(c, node, curFn); }
-      else if (v && typeof v.type === 'string') rec(v, node, curFn);
+      if (Array.isArray(v)) { for (const c of v) rec(c, curFn, childAwait); }
+      else if (v && typeof v.type === 'string') rec(v, curFn, childAwait);
     }
-  })(ast.program, null, null);
+  })(ast.program, null, false);
+
+  const isResolver = (n) => RESOLVER_NAMES.has(n) || resolverAliases.has(n);
+  const isWarm = (n) => n === WARM_NAME || warmAliases.has(n);
+  const resolverCalls = calls.filter((c) => isResolver(c.name)).map((c) => ({ pos: c.pos, fn: c.fn }));
+  const warmCalls = calls.filter((c) => isWarm(c.name)).map((c) => ({ pos: c.pos, fn: c.fn, awaited: c.awaited }));
 
   return {
     importSpecs: [...importSpecs],

@@ -137,6 +137,36 @@ const CASES = [
     expect: 'pass',
     files: { 'pages/api/r.js': "export default function h(){ return 'see getModelForApp() docs https://x/y'; }\n" },
   },
+  {
+    name: 'warm wrapped in await Promise.all([...]) before resolve → pass (1a)',
+    expect: 'pass',
+    files: { 'pages/api/r.js':
+      "const {getModelForApp}=require('../../shared/config/baseConfig');\n" +
+      "const {loadModelOverrides}=require('../../lib/services/model-override-loader');\n" +
+      'export default async function h(){ await Promise.all([loadModelOverrides()]); return getModelForApp("a"); }\n' },
+  },
+  {
+    name: 'aliased import resolver, no warm → fail (4)',
+    expect: 'fail', flag: 'pages/api/r.js',
+    files: { 'pages/api/r.js':
+      "import { getModelForApp as getModel } from '../../shared/config/baseConfig';\n" +
+      'export default function h(){ return getModel("a"); }\n' },
+  },
+  {
+    name: 'aliased import resolver + awaited warm → pass (4)',
+    expect: 'pass',
+    files: { 'pages/api/r.js':
+      "import { getModelForApp as getModel } from '../../shared/config/baseConfig';\n" +
+      "import { loadModelOverrides as warm } from '../../lib/services/model-override-loader';\n" +
+      'export default async function h(){ await warm(); return getModel("a"); }\n' },
+  },
+  {
+    name: 'require-destructure-rename resolver, no warm → fail (4)',
+    expect: 'fail', flag: 'pages/api/r.js',
+    files: { 'pages/api/r.js':
+      "const { getModelForApp: getModel } = require('../../shared/config/baseConfig');\n" +
+      'export default function h(){ return getModel("a"); }\n' },
+  },
 ];
 
 function runCases() {
