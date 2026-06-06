@@ -333,6 +333,7 @@ Canonical list lives in `lib/utils/tracked-secrets.js` — both `pages/api/cron/
 | `bill_webhook_secret` | BILL Webhook Secret (HMAC for /api/webhooks/bill) | hmac | Per-subscription `securityKey` from BILL. Rotate via `POST /v3/subscriptions/{id}/security-key` |
 | `claude_api_key` | Anthropic Claude API Key | vendor | No vendor expiry, but rotate on compromise or staff offboarding |
 | `cloudmersive_api_key` | Cloudmersive API Key (virus scan; gated by VIRUS_SCAN_ENABLED) | vendor | Pilot uses free tier (800 scans/mo); rotate on compromise |
+| `perplexity_api_key` | Perplexity API Key (VRP sonar claim-verification + reviewer web discovery) | vendor | No vendor expiry, but rotate on compromise or staff offboarding. Live in prod 2026-06-05; one key, two surfaces (set `VRP_ALLOWED_PROVIDERS` to gate VRP exposure). |
 | `blob_read_write_token` | Vercel Blob RW Token (shared store) | blob | Vercel-issued; no expiry; rotate via Vercel dashboard if compromised |
 | `dvx_blob_rw_token` | Vercel Blob RW Token (dvx-export-private) | blob | Same as above |
 | `intake_blob_rw_token` | Vercel Blob RW Token (intake-applicant-private) | blob | Same as above |
