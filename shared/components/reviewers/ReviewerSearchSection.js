@@ -27,6 +27,10 @@
  *   - cycleCode             : grant cycle code (persisted with saved candidates)
  *   - excludedNames         : string[] of applicant-excluded names (prefills the editable box)
  *   - exclusionsUnavailable : true when ingestion failed to produce the exclude list
+ *   - recommended           : applicant-recommended candidate rows (rendered + verifiable in the bottom card)
+ *   - recommendedFailed      : applicant-recommended rows that failed to ingest (warning in the bottom card)
+ *   - slotsPopulated        : how many wmkf_potentialreviewer slots the applicant filled (null = unknown)
+ *   - ingestLoading / ingestError / onRetryIngestion : applicant-reviewer ingestion state + retry (from ReviewerFindPanel)
  *   - onSaved               : optional callback after a successful save
  */
 
@@ -334,6 +338,11 @@ export default function ReviewerSearchSection({
   excludedNames = [],
   exclusionsUnavailable = false,
   recommended = [],
+  recommendedFailed = [],
+  slotsPopulated = null,
+  ingestLoading = false,
+  ingestError = null,
+  onRetryIngestion,
   savedPoolNames = [],
   onSaved,
 }) {
@@ -1141,64 +1150,128 @@ export default function ReviewerSearchSection({
       </Card>
     )}
 
-    {/* Secondary, OPTIONAL action — below the primary search so it can't be
-        mistaken for it (S220: a PD ran this thinking it was the reviewer search).
-        It only verifies the applicant's own listed names; it does not find new
-        reviewers. Styled as a secondary (outline) button for the same reason. */}
-    {recCount > 0 && (
-      <Card hover={false}>
-        <div className="flex items-center justify-between mb-2">
-          <p className="font-medium text-gray-900">Optional: verify the applicant’s suggested reviewers</p>
-          {recPhase === 'running' && <Spinner />}
+    {/* Applicant-recommended reviewers + the OPTIONAL verify action, combined into
+        one card below the primary search so it can't be mistaken for the search
+        (S220: a PD ran the verify thinking it was the reviewer search). The card
+        always renders so it still reports "applicant listed none" / ingestion
+        errors; the verify controls appear only when there are selectable
+        recommendations. Verify checks only the applicant's own listed names — it
+        does not find new reviewers. */}
+    <Card hover={false}>
+      <div className="flex items-center justify-between mb-2">
+        <p className="font-medium text-gray-900">Optional: verify the applicant’s suggested reviewers</p>
+        {(ingestLoading || recPhase === 'running') && <Spinner />}
+      </div>
+
+      {/* Applicant-recommended list (materialized candidates) */}
+      {ingestError ? (
+        <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
+          Couldn’t ingest applicant reviewers: {ingestError}{' '}
+          <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
         </div>
-        {(recPhase === 'idle' || recPhase === 'error') && (
-          <div className="space-y-3">
+      ) : ingestLoading ? (
+        <p className="text-sm text-gray-500">Materializing the applicant’s recommended reviewers…</p>
+      ) : (recommended.length === 0 && recommendedFailed.length === 0 && slotsPopulated === 0) ? (
+        <p className="text-sm text-gray-600">The applicant did not list any recommended reviewers for this request.</p>
+      ) : (recommended.length === 0 && recommendedFailed.length === 0 && slotsPopulated === null) ? (
+        // No usable signal (older/garbled response). Don't claim "listed none".
+        <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
+          Couldn’t confirm the applicant’s recommended reviewers.{' '}
+          <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
+        </div>
+      ) : (
+        <>
+          {recommendedFailed.length > 0 && (
+            <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm mb-3">
+              {recommendedFailed.length} of {slotsPopulated ?? (recommended.length + recommendedFailed.length)}{' '}
+              applicant-recommended reviewer{recommendedFailed.length === 1 ? '' : 's'} failed to ingest
+              {recommendedFailed.some((f) => f.name) && (
+                <> ({recommendedFailed.map((f) => f.name).filter(Boolean).join(', ')})</>
+              )}
+              . They are <span className="font-medium">not</span> saved as candidates yet.{' '}
+              <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
+            </div>
+          )}
+          {recommended.length > 0 ? (
+            <>
+              <p className="text-sm text-gray-600 mb-3">
+                These were recommended by the applicant and are now saved as candidates for this request.
+                Verify them below to enrich their records, then dispatch from the <span className="font-medium">Invite</span> tab.
+              </p>
+              <ul className="divide-y divide-gray-100">
+                {recommended.map((r) => (
+                  <li key={r.suggestionId || r.potentialReviewerId} className="py-2 flex items-center justify-between gap-3">
+                    <span className="text-sm text-gray-900">{r.name || '(unnamed reviewer)'}</span>
+                    <span className="flex items-center gap-2">
+                      <Pill tone="green">Applicant-suggested</Pill>
+                      {r.selected === false && <Pill tone="red">Removed by staff</Pill>}
+                      {r.skippedExcluded && <Pill tone="red">Excluded — kept</Pill>}
+                      {r.created && <Pill tone="gray">new</Pill>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
             <p className="text-sm text-gray-600">
-              This only checks the {recCount} name{recCount === 1 ? '' : 's'} the applicant listed — it does
-              <span className="font-medium"> not</span> find new reviewers. It runs them through the same
-              verification, conflict-of-interest, and contact/citation enrichment and saves the results to their rows.
+              None of the applicant’s recommended reviewers could be ingested — retry above.
             </p>
-            {!blobUrl && <p className="text-xs text-amber-700">Load a proposal document above first (needed for conflict-of-interest checks).</p>}
-            {recError && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{recError}</div>}
-            <button
-              type="button"
-              onClick={enrichRecommended}
-              disabled={!blobUrl}
-              className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {recPhase === 'error' ? 'Try again' : `Verify applicant’s ${recCount} suggested reviewer${recCount === 1 ? '' : 's'}`}
-            </button>
-          </div>
-        )}
-        {recPhase === 'running' && (
-          <div className="space-y-2">
-            <p className="text-sm text-gray-600">Verifying &amp; enriching… this can take several minutes — please keep this tab open.</p>
-            <ul className="text-xs text-gray-500 space-y-0.5">
-              {recProgress.map((m, i) => <li key={i}>{m}</li>)}
-            </ul>
-          </div>
-        )}
-        {recPhase === 'done' && (
-          <div className="space-y-3">
-            {recCandidates.length === 0 ? (
-              <p className="text-sm text-gray-600">No recommended reviewers could be enriched.</p>
-            ) : (
-              <>
-                <p className="text-sm text-gray-600">
-                  Verified {recCandidates.length} applicant-suggested reviewer{recCandidates.length === 1 ? '' : 's'} — metrics &amp; conflicts saved to their records.
-                </p>
-                <div className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
-                  {recCandidates.map((c, i) => (
-                    <CandidateCard key={`rec-${c.suggestionId || c.name}-${i}`} candidate={c} readOnly />
-                  ))}
-                </div>
-                <button type="button" onClick={enrichRecommended} className="text-sm text-gray-500 underline">Re-verify</button>
-              </>
-            )}
-          </div>
-        )}
-      </Card>
-    )}
+          )}
+        </>
+      )}
+
+      {/* Verify action — only when there are selectable recommendations */}
+      {recCount > 0 && (
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          {(recPhase === 'idle' || recPhase === 'error') && (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600">
+                This only checks the {recCount} name{recCount === 1 ? '' : 's'} the applicant listed — it does
+                <span className="font-medium"> not</span> find new reviewers. It runs them through the same
+                verification, conflict-of-interest, and contact/citation enrichment and saves the results to their rows.
+              </p>
+              {!blobUrl && <p className="text-xs text-amber-700">Load a proposal document above first (needed for conflict-of-interest checks).</p>}
+              {recError && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{recError}</div>}
+              <button
+                type="button"
+                onClick={enrichRecommended}
+                disabled={!blobUrl}
+                className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {recPhase === 'error' ? 'Try again' : `Verify applicant’s ${recCount} suggested reviewer${recCount === 1 ? '' : 's'}`}
+              </button>
+            </div>
+          )}
+          {recPhase === 'running' && (
+            <div className="space-y-2">
+              <p className="text-sm text-gray-600">Verifying &amp; enriching… this can take several minutes — please keep this tab open.</p>
+              <ul className="text-xs text-gray-500 space-y-0.5">
+                {recProgress.map((m, i) => <li key={i}>{m}</li>)}
+              </ul>
+            </div>
+          )}
+          {recPhase === 'done' && (
+            <div className="space-y-3">
+              {recCandidates.length === 0 ? (
+                <p className="text-sm text-gray-600">No recommended reviewers could be enriched.</p>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-600">
+                    Verified {recCandidates.length} applicant-suggested reviewer{recCandidates.length === 1 ? '' : 's'} — metrics &amp; conflicts saved to their records.
+                  </p>
+                  <div className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
+                    {recCandidates.map((c, i) => (
+                      <CandidateCard key={`rec-${c.suggestionId || c.name}-${i}`} candidate={c} readOnly />
+                    ))}
+                  </div>
+                  <button type="button" onClick={enrichRecommended} className="text-sm text-gray-500 underline">Re-verify</button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
     </>
   );
 }

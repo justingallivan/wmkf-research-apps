@@ -133,69 +133,10 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
 
   return (
     <div className="space-y-4">
-      {/* Applicant-recommended reviewers */}
-      <Card hover={false}>
-        <div className="flex items-center justify-between mb-2">
-          <p className="font-medium text-gray-900">Applicant-recommended reviewers</p>
-          {ingest.loading && <Spinner />}
-        </div>
-
-        {ingest.error ? (
-          <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
-            Couldn’t ingest applicant reviewers: {ingest.error}{' '}
-            <button type="button" onClick={runIngestion} className="underline font-medium">Retry</button>
-          </div>
-        ) : ingest.loading ? (
-          <p className="text-sm text-gray-500">Materializing the applicant’s recommended reviewers…</p>
-        ) : (recommended.length === 0 && recommendedFailed.length === 0 && slotsPopulated === 0) ? (
-          <p className="text-sm text-gray-600">The applicant did not list any recommended reviewers for this request.</p>
-        ) : (recommended.length === 0 && recommendedFailed.length === 0 && slotsPopulated === null) ? (
-          // No usable signal (older/garbled response). Don't claim "listed none".
-          <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
-            Couldn’t confirm the applicant’s recommended reviewers.{' '}
-            <button type="button" onClick={runIngestion} className="underline font-medium">Retry</button>
-          </div>
-        ) : (
-          <>
-            {recommendedFailed.length > 0 && (
-              <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm mb-3">
-                {recommendedFailed.length} of {slotsPopulated ?? (recommended.length + recommendedFailed.length)}{' '}
-                applicant-recommended reviewer{recommendedFailed.length === 1 ? '' : 's'} failed to ingest
-                {recommendedFailed.some((f) => f.name) && (
-                  <> ({recommendedFailed.map((f) => f.name).filter(Boolean).join(', ')})</>
-                )}
-                . They are <span className="font-medium">not</span> saved as candidates yet.{' '}
-                <button type="button" onClick={runIngestion} className="underline font-medium">Retry</button>
-              </div>
-            )}
-            {recommended.length > 0 ? (
-              <>
-                <p className="text-sm text-gray-600 mb-3">
-                  These were recommended by the applicant and are now saved as candidates for this request.
-                  Enrich them on a search run, then dispatch from the <span className="font-medium">Invite</span> tab.
-                </p>
-                <ul className="divide-y divide-gray-100">
-                  {recommended.map((r) => (
-                    <li key={r.suggestionId || r.potentialReviewerId} className="py-2 flex items-center justify-between gap-3">
-                      <span className="text-sm text-gray-900">{r.name || '(unnamed reviewer)'}</span>
-                      <span className="flex items-center gap-2">
-                        <Badge tone="green">Applicant-suggested</Badge>
-                        {r.selected === false && <Badge tone="red">Removed by staff</Badge>}
-                        {r.skippedExcluded && <Badge tone="red">Excluded — kept</Badge>}
-                        {r.created && <Badge tone="gray">new</Badge>}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : (
-              <p className="text-sm text-gray-600">
-                None of the applicant’s recommended reviewers could be ingested — retry above.
-              </p>
-            )}
-          </>
-        )}
-      </Card>
+      {/* Applicant-recommended reviewers are now rendered (and verified) inside
+          ReviewerSearchSection's bottom card — combined with the optional verify
+          action and positioned below the search. The ingestion state is passed
+          through as props. */}
 
       {/* Applicant-excluded reviewers (per-request soft-block) */}
       <Card hover={false}>
@@ -305,6 +246,11 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
         excludedNames={data?.excludedNames || []}
         exclusionsUnavailable={!!ingest.error || excludedParseFailed}
         recommended={recommended}
+        recommendedFailed={recommendedFailed}
+        slotsPopulated={slotsPopulated}
+        ingestLoading={ingest.loading}
+        ingestError={ingest.error}
+        onRetryIngestion={runIngestion}
         savedPoolNames={savedPoolNames}
         onSaved={onSaved}
       />
