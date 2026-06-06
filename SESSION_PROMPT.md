@@ -1,74 +1,73 @@
-# Session 229 Prompt: Monitor web-discovery in prod — or pick up reviewer-finder deferred-v2 / other threads
+# Session 230 Prompt: Validate the live reviewer-finder COI/concern + prompt changes — then pick up open threads
 
-## Session 228 Summary
+## Session 229 Summary
 
-Verification-only session — no code or doc changes. Startup gates all green (full set, incl. `check:agent-invariants` + `check:instruction-architecture`); repo synced. Confirmed Justin's multi-agent-coordination WIP (the `.claude/skills/agent-coordination/` skill + `docs/AGENT_COLLABORATION_PLAN.md`) was committed + pushed as **`b2d1be5`** — so the "untracked items left for Justin" carryover from the S227 prompt is now CLOSED. No new work started; next steps below are unchanged and still live.
-
-## Session 227 Summary
-
-Built and shipped **Track C v1 increment 2** — the read-only web-grounded "Web suggestions" feature for reviewer-finder — and **took it live in prod**. Justin set `PERPLEXITY_API_KEY` live in prod mid-session, which flipped the risk model (no longer inert), so the gating live contract test was run + passed, the extraction budget was tuned, and everything was pushed.
+Started as live monitoring of the S227 web-suggestions feature and turned into a full reviewer-finder quality pass. Two prod bugs fixed, one multi-part COI feature shipped end-to-end (code + live Dataverse prompt), and a reusable test-reset utility built. Startup gates were all green; repo synced.
 
 ### What Was Completed
 
-1. **Web-suggestions route + read-only UI panel** (`693be96`)
-   - New route `pages/api/reviewer-finder/web-suggestions.js` — POST, `requireAppAccess('reviewer-finder','reviewers')`, rate-limited, key-gated. Derives ≤3 web queries + a proposalContext blurb from the held `analysisResult` **server-side** (cost cap can't be bypassed by the client), calls `WebDiscoveryService.search`, returns `{ success, webLeads, … }`. Fail-soft (always 200).
-   - `ReviewerSearchSection` (shared by the standalone page AND the Workbench Find tab, so one integration covers both): capability self-fetch (`api-capabilities.reviewerWebSearch`) drives a default-on "Also search the web" toggle, hidden when no key. The web call fires in `runSearch` as a **genRef-guarded fire-and-forget IIFE, fully OFF `/discover`'s error/abort boundary**, rendering a visually separate read-only panel (name, snippet, provenance link, date).
-   - **Bug caught during the build:** a stale-closure that pinned `webSearchAvailable` to its initial `false` (fixed by adding it + `searchWeb` to the `runSearch` deps).
-   - Security-matrix row + `CANONICAL_COUNTS` 105→106 / 57→58 refreshed + the two count-hardcoding docs reconciled. `/contract-reconcile` (Mode A) → READY; leads-only/display-only invariant verified (web state never reaches candidates/save/roster).
+1. **Web-suggestions monitoring + funnel log** (`73260ff`)
+   - Added a counts-only `[WebDiscoveryService] funnel` log on the success paths (queriesRun / fromCache / rawResults / webLeads) so the recall funnel is observable in Vercel logs without persisting the display-only `webLeads`.
 
-2. **Live Perplexity Search contract VERIFIED + docs reconciled** (`f52e633`)
-   - `scripts/probe-perplexity-search.mjs` (on-demand, not a jest test — never fires in `npm test`/CI) made one real `POST /search`: **HTTP 200** (the key, bought for VRP sonar chat, IS entitled to the Search API), `search_after_date_filter` **M/D/YYYY accepted + honored**, `results[].{title,url,snippet,date,last_updated}` shape matches plan §5 (10/10).
+2. **Web-suggestions was broken in prod — FIXED** (`c1dce55`)
+   - First live search showed "Web search was unavailable." Diagnosed from prod logs (`vercel logs --json`): the Perplexity search succeeded but the Claude **extraction 404'd on `model: sonnet`** — the route never called `loadModelOverrides()`, so `getModelForApp('reviewer-finder')` returned the unresolved tier key. **The feature had never worked since it shipped S227** (the S227 "live contract verified" was the direct-Perplexity probe; all unit tests mock the LLM). Fix: `await loadModelOverrides()` before `WebDiscoveryService.search`, matching the four other reviewer-finder LLM routes (analyze/discover/enrich-contacts/generate-emails) + a regression test.
 
-3. **Extraction-budget tuning** (`e827780`)
-   - The probe showed ~8KB faculty-page snippets were truncating all but ~2-3 of up to 24 results at the old 20K cap (recall-capping). Nothing external forced it (Sonnet, 200K window; ~cents/search) — untuned defaults. `WEB_RESULTS_MAX_CHARS` 20K→100K, `EXTRACTION_MAX_TOKENS` 1024→4096, new `PER_SNIPPET_MAX_CHARS` 6K guard (full snippet still stored for display).
+3. **Reviewer COI/concern surfacing + historical-institution COI** (`da60679`)
+   - Triggered by a live card: a reviewer (Taekjip Ha — ex-Johns Hopkins, now Harvard) surfaced on a **Johns Hopkins** proposal with the conflict buried in the free-text REASONING field and no structured flag. Root causes: the code institution-COI check only compared **current** affiliation (missed the former-JHU tie), and the model's `POTENTIAL_CONCERNS` output was parsed but dropped before render.
+   - Three parts: (a) **capture + render** — `parseAnalysisResponse` normalizes no-concern values to null via `isNoConcernText` (anchored whole-value sentinel + contrast-conjunction guard; default is render — never hide a real concern); both Workbench + standalone cards render an amber advisory note; roster prune persists it. (b) **historical-institution COI** — `collectAffiliationHistory` + `mergeGroup` aggregate the full affiliation history; `markInstitutionCOI` scans it and flags `institutionCOIDetails.historical`; covers Claude-verified AND Track B candidates; badge reads "Former shared institution." (c) **post-enrichment COI recompute** — `enrich-contacts` re-evaluates COI on the ORCID/Scholar-promoted affiliation (`coiRecomputed` marker), promoted by both client merges + the save path.
+   - **Reviewed by Codex across 4 passes; all findings resolved.** 390 tests, A7 + parity gates green.
 
-4. **Tracked the key + parked the VRP coupling** (`274baca`)
-   - `perplexity_api_key` (tier vendor) added to `tracked-secrets.js` + runbook mirror. The VRP-exposure consequence of the now-permanent key moved OUT of the reviewer-finder memory INTO `project-virtual-review-panel` — to be settled during VRP work, not each reviewer session.
+4. **Applied the analyze prompt change to the LIVE Dataverse row** (no git artifact — Dataverse data)
+   - The prompt source edits (REASONING fitness-only, COI→POTENTIAL_CONCERNS, fame/seniority de-prioritization) shipped in `da60679` but were INERT in prod (prod resolves `wmkf_ai_prompt` from Dataverse, not source). **Probed the live row first** (per the migration memory's clobber warning): live analyze body was byte-identical to the old dynamics body (no `/admin` edits), score-candidates identical → reseed safe. Ran `seed-reviewer-finder-prompts.js --execute`; verified the live `reviewer-finder.analyze` row now == the new 5,586-char body with all three changes present.
 
-5. Committed Justin's parallel `secret-check.js` change (`emailAdmins: true`) separately (`1e35d3e`).
+5. **`scripts/reset-request-reviewers.mjs` test utility** (`89b24fb`)
+   - Per-request, dry-run-by-default cleanup so a test request can search for reviewers from scratch. Clears Postgres `reviewer_find_roster` (Find-tab roster + cross-run dedup) + Dataverse `wmkf_appreviewersuggestion` (soft-delete default, `--hard` opt-in), reports/optionally clears `akoya_request` invite slots. Never touches `wmkf_potentialreviewers` or `search_cache`; refuses to run without a single request id; uses the script-only Dynamics restriction bypass.
+   - **Executed a `--hard` reset on test request #1002788** (12 roster rows DELETED, 10 suggestions hard-deleted, slots left). Verified clean — ready for a from-scratch search.
 
-### Commits (all pushed to prod)
-- `693be96` feat: web-suggestions route + read-only panel
-- `f52e633` test: live Perplexity Search contract verified + doc reconcile
-- `e827780` perf: widen web-extraction budget
-- `274baca` chore: track PERPLEXITY_API_KEY + park VRP coupling
-- `1e35d3e` feat(ops): email admins on secret-check alerts (Justin's change)
+### Commits
+- `73260ff` feat: web-discovery funnel log (pushed)
+- `c1dce55` fix: warm model overrides in web-suggestions route (pushed)
+- `da60679` feat: reviewer COI concerns + former-institution ties (pushed)
+- `89b24fb` chore: reset-request-reviewers test utility (was local-only; pushed at /stop)
 
 ## Potential Next Steps
 
-### 1. Monitor the live web-suggestions feature (the v1 point)
-v1 read-only IS the monitoring phase. After the deploy, watch the first real staff searches: is the toggle showing? Are the web leads relevant/current (mid-career, not founders)? Is the new wider budget surfacing more names? Quality of results drives whether deferred-v2 (pipeline integration) is worth doing.
+### 1. Validate the live prompt + COI feature with a real run (the immediate point)
+`#1002788` is already reset to a clean slate. Run a from-scratch reviewer search/analyze there and confirm the model now (a) leans currently-active / mid-career over field founders, and (b) puts conflicts (e.g. a former-shared-institution tie) in **POTENTIAL_CONCERNS** → rendered as the amber advisory, with REASONING staying fitness-only. Prompt wording shapes but does not guarantee model behavior — this needs a real observation.
 
-### 2. (Deferred-v2) Pipeline integration — only if monitoring justifies it
-The "Add as candidate" / manual-add path + merge→rank→COI→save. Carries real contracts (Codex v6). `docs/REVIEWER_WEB_DISCOVERY_PLAN.md` §10. NOT built. Don't start unless monitoring shows the leads are worth automating.
+### 2. Per-user prompt override caveat
+Resolver order is **override → dataverse → code-fallback**. If a `reviewer-finder.analyze` per-user override exists (e.g. from testing the `/admin` editor), it overrides the row reseeded this session — so a test as that user won't reflect the change. If validation (#1) doesn't show the new wording, check/clear the override (`wmkf_appuserpreferences` PROMPT_OVERRIDES).
 
-### 3. VRP-coupling cleanup — DEFERRED, only when next working on VRP
-Now that `PERPLEXITY_API_KEY` is permanently live, decide whether `VRP_ALLOWED_PROVIDERS` should include `perplexity`. Prod is still fail-closed while unset; dev/test (allowlist unset) already exposes Perplexity to VRP. Parked in `project-virtual-review-panel`. Do NOT surface this every session.
+### 3. Web-suggestions monitoring (now that it actually works)
+v1 read-only is still the monitoring phase, but it was inert until `c1dce55` this session. Watch the first real searches: are web leads relevant/current (mid-career, not founders)? Funnel log (`[WebDiscoveryService] funnel`) is now in Vercel logs. Quality drives whether deferred-v2 (pipeline integration) is worth doing.
 
-### 4. Multi-agent coordination (now tracked)
-`.claude/skills/agent-coordination/` + `docs/AGENT_COLLABORATION_PLAN.md` (Justin's multi-agent-coordination work) were committed + pushed as `b2d1be5` in S228. The `agent-coordination` skill is now live/available. No open action — listed only so the next session knows where it landed.
+### 4. reset-request-reviewers `--include-slots` is unexercised live
+The slot-clearing path ($ref disassociation, nav-property `wmkf_PotentialReviewer{N}`) was NOT run live — watch its output the first time and confirm the nav-property name resolves.
 
 ## Standing context / guardrails
-- **`main` auto-deploys to prod on push. Commit/push only when asked.** This session pushed *with* explicit approval; the feature is now LIVE.
-- Twice this session `git add -A` swept an unrelated user change (`secret-check.js`) into a commit — **stage by explicit path, not `-A`**, when Justin is editing in parallel.
-- `/contract-reconcile` before declaring multi-layer work done; the impl→post-impl loop holds.
+- **`main` auto-deploys to prod on push. Commit/push only when asked.** Stage by explicit path (not `-A`) — Justin edits in parallel.
+- **`.env.local` points at the same prod Dataverse + Postgres.** Scripts that mutate (reset-request-reviewers, seed-reviewer-finder-prompts) hit prod — keep them scoped + dry-run-first.
+- Dataverse-querying scripts need `enterDynamicsBypassForScript(label)` (fail-closed restriction layer); raw-fetch scripts use `DynamicsService.getAccessToken()`.
+- `/contract-reconcile` + Codex review before declaring multi-layer work done; the design→impl→post-impl loop holds (it caught real defects this session).
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `pages/api/reviewer-finder/web-suggestions.js` | Read-only web-suggestions route (key-gated, fail-soft, server-derived queries) |
-| `shared/components/reviewers/ReviewerSearchSection.js` | `searchWeb` toggle + web call (fire-and-forget, off /discover) + read-only panel; shared by both surfaces |
-| `lib/services/web-discovery-service.js` | Perplexity `/search` → A7 extraction → `WebLead[]`; tuned budget constants |
-| `scripts/probe-perplexity-search.mjs` | On-demand live Search-API contract test (verified 2026-06-05) |
-| `docs/REVIEWER_WEB_DISCOVERY_PLAN.md` | v7 scope + §10 deferred-v2 integration contracts |
+| `scripts/reset-request-reviewers.mjs` | Per-request reviewer cleanup for from-scratch testing (dry-run default) |
+| `scripts/seed-reviewer-finder-prompts.js` | Reseed the `wmkf_ai_prompt` analyze/score rows from `dynamics.js` (probe live row first) |
+| `shared/config/prompts/reviewer-finder.js` | `createAnalysisPrompt` + `parseAnalysisResponse` + `isNoConcernText` (no-concern normalization) |
+| `shared/config/prompts/reviewer-finder-dynamics.js` | Canonical analyze/score prompt bodies (seed source + code fallback) |
+| `lib/services/deduplication-service.js` | `markInstitutionCOI` (current + historical) + `mergeGroup` affiliationHistory |
+| `lib/services/discovery-service.js` | `collectAffiliationHistory` + verify-candidate `affiliationHistory` |
+| `pages/api/reviewer-finder/enrich-contacts.js` | Post-enrichment COI recompute (`coiRecomputed`) |
+| `shared/components/reviewers/ReviewerSearchSection.js` / `pages/reviewer-finder.js` | Concern + historical-COI rendering (Workbench + standalone) |
 
 ## Testing
 
 ```bash
-npx jest web-discovery-service web-suggestions-endpoint reviewer-web-suggestions-toggle   # 29 tests
-node scripts/probe-perplexity-search.mjs                                                  # live contract (needs key; one paid call)
-npm run check:api-routes                                                                  # security-matrix (106 routes)
-npm run check:prompt-injection-tagging                                                    # A7 extraction wrap
+npx jest reviewer-finder-parse-analysis institution-coi-historical reviewer-search-logic discovery-affiliation-recency reviewer-prompt-composer dedup reviewer-finder-a7   # COI/concern + parity
+node scripts/reset-request-reviewers.mjs --request <num|GUID>             # dry-run reviewer reset
+node scripts/seed-reviewer-finder-prompts.js --dry-run                    # prompt reseed preview
 # full startup gate set: see .claude/skills/start
 ```

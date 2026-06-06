@@ -39,6 +39,7 @@
 - Reviewer lifecycle automation (cron/reminders) + address: project-reviewer-lifecycle-automation.md; project-reviewer-address-collection-provisional.md
 - Reviewer data model / migration: project-reviewer-postgres-to-dataverse-migration.md; project-reviewer-finder-dataverse-entry-path.md; project-appresearcher-collapse-post-pilot.md
 - Reviewer matching / institution / contacts: project-reviewer-institution-match.md; project-contact-promotion-permission.md; project-institution-foundation-liaison.md
+- Reviewer COI concern surfacing + former-institution COI + from-scratch test reset (S229): project-reviewer-coi-concern-surfacing.md
 - Reviewer RANKING (recency must outweigh citations/h-index): project-reviewer-ranking-recency-over-citations.md
 - Reviewer invariants (counts, history, excluded): project-reviewer-count-invariant.md; project-reviewer-history-data-quality.md; project-excluded-reviewers-often-in-pool.md
 - External reviewer flow / accept-decline / files: project-external-reviewer-file-access.md; project-reviewer-accept-decline-links.md; project-sharepoint-integration.md
