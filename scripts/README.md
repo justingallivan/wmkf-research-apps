@@ -6,10 +6,12 @@ Utility scripts for database management, testing, and development setup.
 
 | Script | Description |
 |--------|-------------|
-| `setup-database.js` | Run database migrations, create tables and indexes. Run after cloning or when schema changes. |
+| `setup-database.js` | Bootstrap a fresh, empty database only; refuses populated databases. |
+| `apply-migrations.js` | Apply pending numbered migrations to an existing database. |
 
 ```bash
-node scripts/setup-database.js
+node scripts/setup-database.js       # fresh empty database only
+node scripts/apply-migrations.js     # existing environment
 ```
 
 ## Database Cleanup

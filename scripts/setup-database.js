@@ -1,5 +1,5 @@
 /**
- * Database Migration Script for Expert Reviewer Finder v2
+ * Fresh-install database bootstrap.
  *
  * Run this script after setting up Vercel Postgres:
  *   node scripts/setup-database.js
@@ -9,12 +9,17 @@
  * 2. Pull environment variables: vercel env pull .env.local
  * 3. Run this script
  *
- * This script is backwards-compatible - it can be run on existing databases
- * to add v2 columns/tables without losing data.
+ * FRESH DATABASES ONLY. Existing environments must use:
+ *   node scripts/apply-migrations.js
+ *
+ * The script refuses to run when the public schema already contains tables.
+ * A deliberate bootstrap recovery may set ALLOW_POPULATED_DATABASE_SETUP=true,
+ * but routine schema changes must never use that override.
  */
 
 const fs = require('fs');
 const path = require('path');
+const { assertFreshDatabase } = require('./lib/database-bootstrap-guard');
 
 // Load environment variables from .env.local
 const envPath = path.join(__dirname, '..', '.env.local');
@@ -955,7 +960,19 @@ async function mergeDuplicateProposals() {
 
 async function runMigration() {
   try {
-    console.log('Starting database migration for Expert Reviewer Finder v2...');
+    const existingTables = await sql`
+      SELECT tablename
+      FROM pg_catalog.pg_tables
+      WHERE schemaname = 'public'
+      ORDER BY tablename
+      LIMIT 10
+    `;
+    assertFreshDatabase(
+      existingTables.rows.map((row) => row.tablename),
+      process.env.ALLOW_POPULATED_DATABASE_SETUP === 'true'
+    );
+
+    console.log('Starting fresh-install database bootstrap...');
     console.log(`Executing ${statements.length} SQL statements...\n`);
 
     // Run main table/index creation

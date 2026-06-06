@@ -1,6 +1,6 @@
 ---
 name: project-claude-instruction-architecture
-description: Initiative to re-route CLAUDE.md's 4 jobs (reduce 308→~80-120 lines) + enforce must-follow rules with hooks not prose. Plan + Phase-1 review done S225; Codex authoring the enforcement harnesses next.
+description: Instruction architecture re-routed: reduced root, scoped rules, authority registry, source-level DB guard, and advisory session-owned gate hooks implemented.
 metadata:
   node_type: memory
   type: project
@@ -12,7 +12,7 @@ metadata:
 ## Recall Rule
 Read when: working on `CLAUDE.md` structure, `.claude/rules/`, `.claude/hooks/`, `.claude/settings.json` hook wiring, or any "why didn't Claude follow the rule" / instruction-adherence question. Also read before editing the root `CLAUDE.md` size/structure.
 
-## State (S225)
+## State (S225 implementation)
 Justin flagged this session's behavior as unacceptable — Claude repeatedly violated rules **already in** `CLAUDE.md`/memory (probe-before-plan, time-box meta-work, falsify-don't-confirm, don't-assert-unverified-state-as-built) across a long design churn. Root-cause framing: the 308-line root file (over Anthropic's documented ~200-line adherence threshold) dilutes must-follow rules into skimmed-past noise.
 
 Two committed docs (commit `1c40a13`):
@@ -24,7 +24,16 @@ Two committed docs (commit `1c40a13`):
 - Hook exit-code-2 blocking: **CAN block** = `PreToolUse`, `UserPromptSubmit`, `Stop` (auto-override after 8 consecutive blocks), `PreCompact`. **CANNOT block** = `PostToolUse` (advisory) and **`SessionStart`** (non-blocking, "shows stderr to user only"). ⚠ A symlink/setup guard CANNOT be a SessionStart block — use `PreToolUse` deny or an external launcher check.
 - Current project hooks (4) are all reminder-only + fail-open (`additionalContext`). No project `Stop`/`SessionStart` hook.
 - Instruction model: there is **no runtime precedence ladder** (unscoped rules load at same priority as `CLAUDE.md`). Use an **ownership policy — one rule, one authoritative home** — not a precedence order. Hooks/gates *enforce*; they are not higher-priority *instructions*.
-- `setup-database.js` **self-contradicts**: header (`:12`) says backwards-compatible-on-existing-DBs, inline block (`~:600`) says fresh-install-only. Reconcile in-source before any enforcement; real guard belongs IN the script (protects humans/CI/other agents, not just Claude).
+- `setup-database.js` contradiction is **resolved**: its header and runtime now define a fresh-install-only contract, and a source-level guard refuses populated databases unless the deliberate recovery override is set.
 
-## Handoff
-**Codex is authoring the enforcement harnesses next** (the §4 re-scoped set: deterministic `Stop` changed-surface gate check; advisory completion checklist; `PreToolUse`/external symlink guard; in-script `setup-database` guard). Next session will likely START with new Codex-written hooks present — review them against the corrected review response, don't assume the first-draft (wrong SessionStart) recommendations. Split-vs-unified `/contract-reconcile` to be decided by regression eval, not intuition. Related: [[feedback-timebox-metawork]], [[feedback-falsify-not-confirm]], [[feedback-reconcile-dont-append-docs]].
+## Implemented
+- Root `CLAUDE.md` now contains session-wide/planning-time rules and canonical pointers rather than mutable catalogues.
+- `.claude/rules/` owns file-scoped conventions.
+- `docs/CLAUDE_INSTRUCTION_AUTHORITY.md` defines authoritative instruction ownership and the hook safety contract.
+- `scripts/setup-database.js` is explicitly fresh-install-only and refuses populated databases unless a deliberate recovery override is set.
+- `check:agent-invariants` verifies the tracked `AGENTS.md` symlink; the lifecycle diagnostic also checks `.agents/skills` and the machine memory link.
+- `.claude/hooks/session-lifecycle.js` captures a session baseline, records successful Write/Edit paths, and runs relevant gates against session-owned changed surfaces at Stop. Gate failures are advisory by default; `CLAUDE_STOP_GATE_MODE=block` remains an explicit rollout switch.
+- `/contract-reconcile` remains unified pending measured activation evidence.
+
+## Follow-up
+Observe several real Claude sessions before enabling blocking changed-surface gates. Record false positives, missed Bash-authored changes, and Stop runtime. Decide split-vs-unified `/contract-reconcile` from repeated evaluation results, not intuition. Related: [[feedback-timebox-metawork]], [[feedback-falsify-not-confirm]], [[feedback-reconcile-dont-append-docs]].

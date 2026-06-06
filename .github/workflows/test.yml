@@ -23,6 +23,8 @@ jobs:
       - run: npm run check:doc-currency
       - run: npm run check:doc-currency:self-test
       - run: npm run check:migrations-manifest
+      - run: npm run check:agent-invariants:ci
+      - run: npm run check:instruction-architecture
       - run: npm run check:memory-router
       - run: npm run check:memory-router:self-test
       # Build re-runs prebuild (build-migrations-manifest); then assert the

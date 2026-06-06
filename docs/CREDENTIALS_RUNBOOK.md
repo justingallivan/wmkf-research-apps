@@ -345,7 +345,7 @@ Canonical list lives in `lib/utils/tracked-secrets.js` — both `pages/api/cron/
 Configure in this order:
 
 1. Link **Vercel Postgres** (auto-sets `POSTGRES_URL`)
-2. Run migrations: `node scripts/setup-database.js`
+2. Bootstrap the new empty database: `node scripts/setup-database.js` (existing environments use `node scripts/apply-migrations.js`)
 3. Set `CLAUDE_API_KEY`
 4. Generate and set `USER_PREFS_ENCRYPTION_KEY`: `openssl rand -hex 32`
 5. Set `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, and Azure AD variables

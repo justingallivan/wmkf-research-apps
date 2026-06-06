@@ -6,6 +6,17 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/protected-path-guard.js\"",
+            "timeout": 10,
+            "statusMessage": "protected-path check"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scope-claim-reminder.js\" 2>/dev/null || true",
             "timeout": 10,
             "statusMessage": "scope-claim check"
@@ -37,6 +48,17 @@
     ],
     "PostToolUse": [
       {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/session-lifecycle.js\" record 2>/dev/null || true",
+            "timeout": 10,
+            "statusMessage": "record changed surface"
+          }
+        ]
+      },
+      {
         "matcher": "Task|Agent",
         "hooks": [
           {
@@ -44,6 +66,31 @@
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/codex-verbatim-reminder.js\" 2>/dev/null || true",
             "timeout": 10,
             "statusMessage": "codex-verbatim check"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/session-lifecycle.js\" start 2>/dev/null || true",
+            "timeout": 15,
+            "statusMessage": "capture session baseline"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/session-lifecycle.js\" stop",
+            "timeout": 130,
+            "statusMessage": "verify session-owned surfaces"
           }
         ]
       }
