@@ -27,6 +27,7 @@
  *   - cycleCode             : grant cycle code (persisted with saved candidates)
  *   - excludedNames         : string[] of applicant-excluded names (prefills the editable box)
  *   - exclusionsUnavailable : true when ingestion failed to produce the exclude list
+ *   - excludedRaw           : the applicant's original free-text exclusion field (shown as a disclosure under the box)
  *   - recommended           : applicant-recommended candidate rows (rendered + verifiable in the bottom card)
  *   - recommendedFailed      : applicant-recommended rows that failed to ingest (warning in the bottom card)
  *   - slotsPopulated        : how many wmkf_potentialreviewer slots the applicant filled (null = unknown)
@@ -337,6 +338,7 @@ export default function ReviewerSearchSection({
   cycleCode,
   excludedNames = [],
   exclusionsUnavailable = false,
+  excludedRaw = null,
   recommended = [],
   recommendedFailed = [],
   slotsPopulated = null,
@@ -983,6 +985,12 @@ export default function ReviewerSearchSection({
                 />
                 {exclusionsUnavailable && (
                   <p className="text-xs text-amber-700 mt-1">The applicant exclusion list couldn’t be loaded — add exclusions manually above.</p>
+                )}
+                {excludedRaw && (
+                  <details className="mt-2">
+                    <summary className="text-xs text-gray-500 cursor-pointer">Applicant’s original text</summary>
+                    <pre className="text-xs bg-gray-50 text-gray-700 rounded p-2 mt-1 whitespace-pre-wrap">{excludedRaw}</pre>
+                  </details>
                 )}
               </div>
               {error && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{error}</div>}

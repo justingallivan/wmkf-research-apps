@@ -47,20 +47,6 @@ function fileKeyOf(f) {
   return `${f.library}::${f.folder}::${f.name}`;
 }
 
-function Badge({ children, tone = 'gray' }) {
-  const tones = {
-    gray: 'bg-gray-100 text-gray-700',
-    green: 'bg-green-100 text-green-700',
-    amber: 'bg-amber-100 text-amber-800',
-    red: 'bg-red-100 text-red-700',
-  };
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tones[tone] || tones.gray}`}>
-      {children}
-    </span>
-  );
-}
-
 export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSaved }) {
   const [ingest, setIngest] = useState({ loading: true, data: null, error: null });
   const [doc, setDoc] = useState({ loading: true, data: null, error: null });
@@ -116,7 +102,6 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
   // absent (older response / fetch error). Lets us tell a genuine "applicant
   // listed none" from "ingestion failed so the list looks empty."
   const slotsPopulated = typeof data?.slotsPopulated === 'number' ? data.slotsPopulated : null;
-  const excluded = data?.excluded || [];
   const excludedRaw = data?.excludedRaw || null;
   const excludedParseFailed = data?.excludedParseFailed || false;
 
@@ -138,53 +123,10 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
           action and positioned below the search. The ingestion state is passed
           through as props. */}
 
-      {/* Applicant-excluded reviewers (per-request soft-block) */}
-      <Card hover={false}>
-        <p className="font-medium text-gray-900 mb-2">Applicant-excluded reviewers</p>
-        {ingest.loading ? (
-          <p className="text-sm text-gray-500">Reading the applicant’s exclusion list…</p>
-        ) : ingest.error ? (
-          <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
-            Couldn’t load the applicant’s exclusion list — this is NOT a confirmed “none.” Retry above, or add
-            exclusions by hand in the search box below.
-          </div>
-        ) : excludedParseFailed ? (
-          <div className="space-y-2">
-            <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
-              Couldn’t automatically parse the exclusion text — please read it manually and exclude by hand in the search.
-            </div>
-            {excludedRaw && (
-              <pre className="text-xs bg-gray-50 text-gray-700 rounded p-2 whitespace-pre-wrap">{excludedRaw}</pre>
-            )}
-          </div>
-        ) : excluded.length === 0 ? (
-          <p className="text-sm text-gray-600">No reviewers were excluded by the applicant for this request.</p>
-        ) : (
-          <>
-            <p className="text-sm text-gray-600 mb-3">
-              Excluded by the applicant <span className="font-medium">for this request only</span> — they stay
-              eligible on every other request. Carry these into your search’s exclude list so they aren’t suggested.
-            </p>
-            <ul className="divide-y divide-gray-100">
-              {excluded.map((e, i) => (
-                <li key={`${e.name}-${i}`} className="py-2 flex items-center justify-between gap-3">
-                  <span className="text-sm text-gray-900">
-                    {e.name}
-                    {e.affiliation && <span className="text-gray-500"> · {e.affiliation}</span>}
-                  </span>
-                  <Badge tone="amber">Excluded by applicant</Badge>
-                </li>
-              ))}
-            </ul>
-            {excludedRaw && (
-              <details className="mt-3">
-                <summary className="text-xs text-gray-500 cursor-pointer">Applicant’s original text</summary>
-                <pre className="text-xs bg-gray-50 text-gray-700 rounded p-2 mt-1 whitespace-pre-wrap">{excludedRaw}</pre>
-              </details>
-            )}
-          </>
-        )}
-      </Card>
+      {/* Applicant-excluded reviewers are no longer a standalone card: the parsed
+          names prefill the search's Exclude box, and the applicant's original
+          exclusion text is shown as a disclosure under that box (ReviewerSearchSection).
+          exclusionsUnavailable surfaces the parse-fail / load-fail case there. */}
 
       {/* Proposal document (auto-loaded, with manual override) */}
       <Card hover={false}>
@@ -245,6 +187,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
         cycleCode={data?.cycleCode || null}
         excludedNames={data?.excludedNames || []}
         exclusionsUnavailable={!!ingest.error || excludedParseFailed}
+        excludedRaw={excludedRaw}
         recommended={recommended}
         recommendedFailed={recommendedFailed}
         slotsPopulated={slotsPopulated}
