@@ -49,11 +49,16 @@ export function deriveWebQueries(analysisResult) {
   const keywords = String(info.keywords || '').trim();
 
   const queries = [];
-  if (primary) queries.push(`${primary} research lab faculty`);
+  // Target INDIVIDUAL researchers and their recent output, NOT department roster
+  // pages. The old "<area> research lab faculty" / "<area> research group"
+  // templates returned faculty directories, which the extractor scraped into
+  // noise (S230 quality pass). Orient toward "recent publications / papers /
+  // authors" so Perplexity surfaces people, not member lists.
+  if (primary) queries.push(`${primary} researchers recent publications${keywords ? ` ${keywords}` : ''}`);
   const tech = [methods, keywords].filter(Boolean).join(', ');
-  if (tech) queries.push(`${tech} researchers`);
+  if (tech) queries.push(`scientists publishing recent research on ${tech}`);
   if (secondary && secondary.toLowerCase() !== primary.toLowerCase()) {
-    queries.push(`${secondary} research group`);
+    queries.push(`recent ${secondary} research papers and their authors`);
   }
 
   if (queries.length === 0) {
@@ -104,6 +109,14 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true, webLeads: [], skipped: 'no_queries' });
   }
 
+  // COI/exclude set the web leads must respect: the proposal's own people (PI +
+  // Co-Investigators, from the analysis) plus any names the caller already
+  // excludes. Read-only leads must NEVER surface a conflict — S230 found a Co-PI
+  // (Anthony Leung) surfaced as a suggested reviewer because the web path filtered
+  // nothing.
+  const clientExcluded = Array.isArray(req.body?.excludeNames) ? req.body.excludeNames : [];
+  const excludeNames = collectExcludeNames(analysisResult, clientExcluded);
+
   // Warm the model-override cache BEFORE the service resolves a model. The
   // service calls getModelForApp() synchronously; without this the tier key
   // ('sonnet') is returned unresolved and Anthropic 404s on `model: sonnet`,
@@ -118,8 +131,31 @@ export default async function handler(req, res) {
   const result = await WebDiscoveryService.search({
     queries,
     proposalContext: deriveProposalContext(analysisResult),
+    excludeNames,
     userProfileId: access.profileId ?? null,
   });
 
   return res.status(200).json({ success: true, ...result });
+}
+
+/**
+ * Collect the names a web lead must never be: the proposal's own PI +
+ * Co-Investigators (from the analysis) plus any caller-supplied exclusions.
+ * Splits comma-separated fields and drops null-equivalent sentinels. Exported
+ * for testing.
+ */
+export function collectExcludeNames(analysisResult, clientExcluded = []) {
+  const info = analysisResult?.proposalInfo || {};
+  const out = [];
+  const push = (v) => {
+    String(v || '').split(',').forEach((s) => {
+      const t = s.trim();
+      if (t && !/^(none|not specified|n\/a|na)$/i.test(t)) out.push(t);
+    });
+  };
+  push(info.principalInvestigator);
+  push(info.proposalAuthors); // backward-compat alias of the PI field
+  push(info.coInvestigators);
+  if (Array.isArray(clientExcluded)) for (const n of clientExcluded) push(n);
+  return out;
 }

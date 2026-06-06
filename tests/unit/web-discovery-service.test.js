@@ -83,13 +83,13 @@ describe('WebDiscoveryService.search — extraction + provenance', () => {
       'NAME: Jane Smith | SOURCE: 1 (https://evil.example/phish)\nNAME: Bob Lee | SOURCE: 2';
     const out = await WebDiscoveryService.search({ queries: ['x'], apiKey: 'k' }, { fetch: _fetch, complete: _complete });
     expect(out.webLeads).toEqual([
-      { name: 'Jane Smith', provenanceUrl: 'https://uni.edu/jsmith', snippet: RESULTS[0].snippet, date: '2024-03-01', source: 'web' },
-      { name: 'Bob Lee', provenanceUrl: 'https://uni.edu/blee', snippet: RESULTS[1].snippet, date: '2023-11-01', source: 'web' },
+      { name: 'Jane Smith', provenanceUrl: 'https://uni.edu/jsmith', rationale: null, date: '2024-03-01', source: 'web' },
+      { name: 'Bob Lee', provenanceUrl: 'https://uni.edu/blee', rationale: null, date: '2023-11-01', source: 'web' },
     ]);
     expect(out.webLeads.some((l) => l.provenanceUrl.includes('evil.example'))).toBe(false);
   });
 
-  test('per-snippet cap bounds the extraction INPUT but the full snippet survives for display', async () => {
+  test('per-snippet cap bounds the extraction INPUT (the raw page is not surfaced on the lead)', async () => {
     // A faculty-directory page snippet larger than PER_SNIPPET_MAX_CHARS (6000).
     const bigSnippet = 'X'.repeat(9000);
     const _fetch = fakeFetch([[{ title: 'Faculty', url: 'https://uni.edu/fac', snippet: bigSnippet, date: '2024-01-01' }]]);
@@ -100,8 +100,10 @@ describe('WebDiscoveryService.search — extraction + provenance', () => {
     const longestXRun = (capturedPrompt.match(/X+/g) || []).reduce((m, s) => Math.max(m, s.length), 0);
     expect(longestXRun).toBeGreaterThan(0);
     expect(longestXRun).toBeLessThanOrEqual(6000);
-    // …but the surfaced WebLead keeps the FULL snippet (provenance display is unbounded here).
-    expect(out.webLeads[0].snippet).toBe(bigSnippet);
+    // …and the surfaced WebLead never carries the raw page dump — only a short
+    // model rationale (none here), so a directory page can't bleed into the UI.
+    expect(out.webLeads[0]).not.toHaveProperty('snippet');
+    expect(out.webLeads[0].rationale).toBeNull();
   });
 
   test('out-of-range SOURCE dropped; duplicate names deduped; pipe cannot bleed into name', async () => {
@@ -124,8 +126,36 @@ describe('WebDiscoveryService.search — extraction + provenance', () => {
     // After filtering the ftp row, results = [jsmith]; SOURCE 1 maps to it.
     const out = await WebDiscoveryService.search({ queries: ['x'], apiKey: 'k' }, { fetch: _fetch, complete: async () => 'NAME: Jane Smith | SOURCE: 1' });
     expect(out.webLeads).toEqual([
-      { name: 'Jane Smith', provenanceUrl: 'https://uni.edu/jsmith', snippet: RESULTS[0].snippet, date: '2024-03-01', source: 'web' },
+      { name: 'Jane Smith', provenanceUrl: 'https://uni.edu/jsmith', rationale: null, date: '2024-03-01', source: 'web' },
     ]);
+  });
+});
+
+describe('WebDiscoveryService.search — S230 quality pass (rationale, COI, per-URL cap)', () => {
+  test('parses the WHY rationale and surfaces it instead of the page snippet', async () => {
+    const _fetch = fakeFetch([RESULTS]);
+    const _complete = async () => 'NAME: Jane Smith | SOURCE: 1 | WHY: leads a cryo-EM lab on X';
+    const out = await WebDiscoveryService.search({ queries: ['x'], apiKey: 'k' }, { fetch: _fetch, complete: _complete });
+    expect(out.webLeads[0].rationale).toBe('leads a cryo-EM lab on X');
+  });
+
+  test('drops leads matching excludeNames (COI), honorific-insensitive', async () => {
+    const _fetch = fakeFetch([RESULTS]);
+    const _complete = async () => 'NAME: Jane Smith | SOURCE: 1\nNAME: Bob Lee | SOURCE: 2';
+    const out = await WebDiscoveryService.search(
+      { queries: ['x'], apiKey: 'k', excludeNames: ['Dr. Jane Smith'] },
+      { fetch: _fetch, complete: _complete },
+    );
+    expect(out.webLeads.map((l) => l.name)).toEqual(['Bob Lee']);
+  });
+
+  test('caps at one lead per source URL so a roster page cannot dump multiple names', async () => {
+    // Both extracted names map to the SAME result url (result 1).
+    const _fetch = fakeFetch([[RESULTS[0]]]);
+    const _complete = async () => 'NAME: Jane Smith | SOURCE: 1\nNAME: Other Person | SOURCE: 1';
+    const out = await WebDiscoveryService.search({ queries: ['x'], apiKey: 'k' }, { fetch: _fetch, complete: _complete });
+    expect(out.webLeads).toHaveLength(1);
+    expect(out.webLeads[0].name).toBe('Jane Smith');
   });
 });
 

@@ -27,7 +27,7 @@ jest.mock('../../lib/services/model-override-loader', () => ({
   loadModelOverrides: (...args) => loadModelOverrides(...args),
 }));
 
-import handler, { deriveWebQueries, deriveProposalContext } from '../../pages/api/reviewer-finder/web-suggestions';
+import handler, { deriveWebQueries, deriveProposalContext, collectExcludeNames } from '../../pages/api/reviewer-finder/web-suggestions';
 import { requireAppAccess } from '../../lib/utils/auth';
 
 function res() {
@@ -67,7 +67,13 @@ describe('deriveWebQueries', () => {
 
   it('does not duplicate the secondary area when it equals the primary', () => {
     const q = deriveWebQueries({ proposalInfo: { primaryResearchArea: 'X', secondaryAreas: 'x' } });
-    expect(q).toEqual(['X research lab faculty']);
+    expect(q).toEqual(['X researchers recent publications']);
+  });
+
+  it('targets individuals/recent work, not faculty directories (S230)', () => {
+    const q = deriveWebQueries(ANALYSIS);
+    expect(q.join(' ')).not.toMatch(/faculty|research group/i);
+    expect(q.some((s) => /recent (publications|research|.*papers)/i.test(s))).toBe(true);
   });
 
   it('falls back to literature queries when proposalInfo is empty', () => {
@@ -78,6 +84,25 @@ describe('deriveWebQueries', () => {
   it('returns [] when nothing usable is present', () => {
     expect(deriveWebQueries({})).toEqual([]);
     expect(deriveWebQueries(null)).toEqual([]);
+  });
+});
+
+describe('collectExcludeNames (COI/self filter)', () => {
+  it('pulls PI + Co-Investigators from the analysis and merges caller exclusions', () => {
+    const names = collectExcludeNames({
+      proposalInfo: {
+        principalInvestigator: 'Dr. Jane Smith',
+        coInvestigators: 'Anthony Leung, John Doe',
+      },
+    }, ['Excluded Person']);
+    expect(names).toEqual(expect.arrayContaining(['Dr. Jane Smith', 'Anthony Leung', 'John Doe', 'Excluded Person']));
+  });
+
+  it('drops null-equivalent sentinels (None / Not specified)', () => {
+    const names = collectExcludeNames({
+      proposalInfo: { principalInvestigator: 'Not specified', coInvestigators: 'None' },
+    });
+    expect(names).toEqual([]);
   });
 });
 
@@ -139,6 +164,18 @@ describe('handler', () => {
     expect(r.body.success).toBe(true);
     expect(r.body.webLeads).toHaveLength(1);
     expect(r.body.webLeads[0].name).toBe('Jane Smith');
+  });
+
+  it('forwards the proposal PI/Co-Is + caller exclusions to search as excludeNames (COI filter, S230)', async () => {
+    const r = res();
+    const analysis = {
+      ...ANALYSIS,
+      proposalInfo: { ...ANALYSIS.proposalInfo, principalInvestigator: 'Jane Smith', coInvestigators: 'Anthony Leung' },
+    };
+    await handler(post({ analysisResult: analysis, excludeNames: ['Manual Exclude'] }), r);
+    expect(search).toHaveBeenCalledTimes(1);
+    const arg = search.mock.calls[0][0];
+    expect(arg.excludeNames).toEqual(expect.arrayContaining(['Jane Smith', 'Anthony Leung', 'Manual Exclude']));
   });
 
   it('warms model overrides BEFORE calling search (regression: prod 404 on tier key "sonnet")', async () => {

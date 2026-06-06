@@ -527,7 +527,10 @@ export default function ReviewerSearchSection({
             const wRes = await fetch('/api/reviewer-finder/web-suggestions', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ analysisResult }),
+              // Pass the effective exclude set so web leads honor the same
+              // applicant/staff exclusions as the candidate search; the route also
+              // adds the proposal's own PI/Co-Is server-side (COI filter).
+              body: JSON.stringify({ analysisResult, excludeNames: effectiveExcluded }),
             });
             const wData = await wRes.json().catch(() => ({}));
             if (genRef.current !== myGen) return; // context changed — discard
@@ -1140,7 +1143,7 @@ export default function ReviewerSearchSection({
                   <span className="text-sm font-medium text-gray-900">{w.name}</span>
                   {w.date && <span className="text-xs text-gray-400 whitespace-nowrap">{w.date}</span>}
                 </div>
-                {w.snippet && <p className="text-xs text-gray-600 mt-0.5">{w.snippet}</p>}
+                {w.rationale && <p className="text-xs text-gray-600 mt-0.5">{w.rationale}</p>}
                 {w.provenanceUrl && (
                   <a
                     href={w.provenanceUrl}
