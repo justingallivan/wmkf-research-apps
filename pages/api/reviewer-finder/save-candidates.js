@@ -50,6 +50,10 @@ export default async function handler(req, res) {
 
     let savedCount = 0;
     const errors = [];
+    // The exact display names that saved successfully — the client flips ONLY
+    // these to status='saved' in the Find-tab roster (S224), so a partial-failure
+    // save never marks a failed row saved.
+    const savedNames = [];
 
     for (const candidate of candidates) {
       try {
@@ -110,8 +114,15 @@ export default async function handler(req, res) {
         // downgrade additionally CLEARS any stale value below via clearIdentityFields.
         const scholarSkipped = !!candidate.contactEnrichment?.tierResults?.scholar_profile?.skipped;
         const identity = candidate.contactEnrichment?.identity || null;
-        const blockByIdentity = !!identity && !mayPersistIdentity(identity.status);
-        const blockScholar = scholarSkipped || blockByIdentity;
+        // A candidate loaded from the durable Find-tab roster has had its
+        // identity/tierResults pruned away, but `pruneCandidateForRoster` left
+        // safe boolean persist flags so the gate still holds after a reload
+        // (Codex post-impl HIGH). `=== false` so they only ever TIGHTEN the gate,
+        // never loosen it for fresh (full-object) candidates that lack the flags.
+        const blockByIdentity = (!!identity && !mayPersistIdentity(identity.status))
+          || candidate.identityPersistAllowed === false;
+        const blockScholar = scholarSkipped || blockByIdentity
+          || candidate.scholarPersistAllowed === false;
 
         const { id: potentialReviewerId } = await potentialReviewerAdapter.upsertByEmail({
           name: candidate.name,
@@ -168,6 +179,7 @@ export default async function handler(req, res) {
         }, { actingUserSystemId });
 
         savedCount++;
+        savedNames.push(candidate.name);
       } catch (candidateError) {
         console.error(`Error saving candidate ${candidate.name}:`, candidateError.message);
         errors.push({ name: candidate.name, error: candidateError.message });
@@ -177,6 +189,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       savedCount,
+      savedNames,
       totalRequested: candidates.length,
       errors: errors.length > 0 ? errors : undefined,
     });

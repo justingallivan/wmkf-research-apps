@@ -73,7 +73,14 @@ export default async function handler(req, res) {
   try {
     const {
       analysisResult,
-      options = {}
+      options = {},
+      // Cross-run dedup + applicant/staff exclusions (S224). Names already
+      // surfaced/excluded/saved for this request are filtered out of the
+      // database results SERVER-SIDE, immediately after discovery and BEFORE the
+      // per-candidate Claude reasoning call — so a re-run doesn't re-spend tokens
+      // reasoning over people we already have. The client also hard-filters
+      // (defense-in-depth); this is the token-saver.
+      excludedNames = []
     } = req.body;
 
     const apiKey = process.env.CLAUDE_API_KEY;
@@ -141,6 +148,28 @@ export default async function handler(req, res) {
         sendEvent('progress', progress);
       }
     });
+
+    // Cross-run dedup + applicant/staff exclusions (S224) — EXACT normalized-name
+    // filter applied to verified + unverified + discovered NOW, before the
+    // per-candidate `generateDiscoveredReasoning` Claude call below, so already-
+    // surfaced/excluded names don't re-spend reasoning tokens. This is a SEPARATE
+    // pass from the fuzzy `DeduplicationService.filterProposalAuthors` author COI
+    // filter (which still runs below) — exact here, fuzzy there, by design.
+    if (Array.isArray(excludedNames) && excludedNames.length > 0) {
+      const { partitionByExcluded } = require('../../../lib/utils/reviewer-name-match');
+      const before = discoveryResults.verified.length + discoveryResults.unverified.length + discoveryResults.discovered.length;
+      discoveryResults.verified = partitionByExcluded(discoveryResults.verified, excludedNames).kept;
+      discoveryResults.unverified = partitionByExcluded(discoveryResults.unverified, excludedNames).kept;
+      discoveryResults.discovered = partitionByExcluded(discoveryResults.discovered, excludedNames).kept;
+      const removed = before - (discoveryResults.verified.length + discoveryResults.unverified.length + discoveryResults.discovered.length);
+      if (removed > 0) {
+        sendEvent('progress', {
+          stage: 'discovery',
+          status: 'deduped',
+          message: `Skipped ${removed} already-surfaced or excluded candidate(s) — searching for new reviewers only`
+        });
+      }
+    }
 
     sendEvent('progress', {
       stage: 'discovery',

@@ -1,0 +1,50 @@
+# Atlas: `reviewer_find_roster` (Postgres — operational, source of truth)
+
+<!-- drain-table:file-purpose=atlas-state-page -->
+
+**Last verified:** 2026-06-05 (added S224 via migration `020_reviewer_find_roster.sql`; schema-as-code, not yet live-probed).
+**Live row count:** 0 (new table; no rows until the Workbench Find tab records a search).
+
+## NOT a regression of the S219/migration-018 Dataverse cutover
+
+Migration 018 dropped the **canonical reviewer-identity** Postgres tables (`researchers`, `researcher_keywords`, `publications`, `proposal_searches`, `reviewer_suggestions`), whose source of truth is now Dataverse (`wmkf_potentialreviewer` / `wmkf_appreviewersuggestion`). `reviewer_find_roster` is a different concern: **operational, pre-save, per-request working state** for the Workbench Reviewers→Find tab — un-vetted search discoveries plus their render blobs. It is the same class of object as `search_cache`, which migration 018 deliberately KEPT in Postgres. The canonical saved reviewer pool still lives in Dataverse, untouched. This table is name-keyed because search candidates are name-based and frequently email-less at surface time, whereas the canonical pool is email-keyed.
+
+## Source of truth
+
+**Postgres-primary.** This table IS the source of truth for the Find-tab per-request candidate roster (which candidates a request's searches have surfaced, and their active/excluded/saved disposition for that request). The canonical reviewer pool (saved candidates) remains Dataverse `wmkf_appreviewersuggestion`; a candidate flips to `status='saved'` here only as a dedup marker after it is saved to Dataverse via `save-candidates.js`.
+
+## Schema (10 columns)
+
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint (IDENTITY PK) | |
+| request_id | uuid | akoya_request GUID (per-request scope) |
+| normalized_name | text | `normalizeReviewerName(candidate.name)` — the dedup key |
+| display_name | text | surface-time `candidate.name` for re-render |
+| status | text | `active` \| `excluded` \| `saved` (CHECK-constrained) |
+| candidate | jsonb | pruned render DTO (only `CandidateCard`-rendered fields, not raw enrichment internals) |
+| source_kind | text | `claude_verified` \| `database` |
+| first_seen_at | timestamptz | |
+| updated_at | timestamptz | |
+
+Indexes: `uq_reviewer_find_roster_req_name` UNIQUE `(request_id, normalized_name)` (the dedup key) + `idx_reviewer_find_roster_req_status (request_id, status)`.
+
+**Status semantics:** `active` = surfaced & available (selectable list) · `excluded` = staff set-aside (collapsed recoverable section) · `saved` = graduated to the Dataverse pool (not rendered on Find, kept for dedup). The cross-run dedup union = **all roster names for the request, every status**. `recordSurfaced` never downgrades `excluded`/`saved` → `active` (curation wins) and enforces a per-request row cap (oldest `active`/`saved` evicted; never `excluded`).
+
+## Read paths
+
+- `lib/services/reviewer-roster-store.js` `listForRequest(requestId)` — the only reader. Surfaced via `pages/api/workbench/reviewer-roster.js` GET, consumed by `shared/components/reviewers/ReviewerSearchSection.js` (roster load-on-mount → active/excluded render + the dedup name union fed into `/analyze` + `/discover`).
+
+## Write paths
+
+- `lib/services/reviewer-roster-store.js` only: `recordSurfaced` (bulk upsert `active`, never-downgrade guard, row cap), `setExcluded` (upsert → `excluded`), `promote` (`excluded`→`active`), `markSaved` (→ `saved`). All via `pages/api/workbench/reviewer-roster.js` (POST/PATCH), driven by `ReviewerSearchSection` actions (record-on-results, Exclude, Promote, save-graduation after `save-candidates`).
+
+## Cross-system
+
+No Dataverse equivalent — operational/ephemeral by design. Crossing point: a candidate saved via `save-candidates.js` lands in Dataverse `wmkf_appreviewersuggestion` (canonical) and is independently flipped to `status='saved'` here as a dedup marker. The two stores are not transactionally linked; the roster never governs the Dataverse `wmkf_applicantdisposition` picklist.
+
+## Migration disposition / gotchas
+
+- Growth bounded by a per-request row cap (v1); a TTL cleanup cron for closed requests is a tracked follow-up (mirror `DatabaseService.cleanupExpiredCache`).
+- PATCH handlers are eviction-tolerant (upsert from the submitted blob / no-op) so a row evicted by the cap while still on screen can't 404 a card action.
+- Stores a pruned render DTO, never the raw `contactEnrichment` internals (no resolver anchors / tierResults).

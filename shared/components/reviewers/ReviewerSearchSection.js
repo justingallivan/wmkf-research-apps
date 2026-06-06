@@ -38,6 +38,8 @@ import {
   mergeEnrichment,
   parseExcludeList,
   filterExcluded,
+  normalizeReviewerName,
+  pruneCandidateForRoster,
 } from './reviewer-search-logic';
 import { rankByRelevance } from '../../../lib/utils/relevance-score';
 import { buildScholarSearchUrl } from '../../../lib/utils/scholar-url';
@@ -75,6 +77,27 @@ function isClaudeSuggestion(c) {
   return !!(c?.isClaudeSuggestion || c?.source === 'claude_suggestion');
 }
 
+// Stable id for a candidate across roster splices + selection (S224): the
+// normalized name — same key the dedup/exclude use, so selection survives a
+// list reorder/splice (the old flat-index selection would corrupt).
+function candKey(c) {
+  return normalizeReviewerName(c && c.name);
+}
+
+// Dedupe a candidate list by normalized name; first occurrence wins (so a
+// freshly-enriched run candidate beats its pruned roster copy).
+function dedupeByName(list) {
+  const seen = new Set();
+  const out = [];
+  for (const c of (Array.isArray(list) ? list : [])) {
+    const k = candKey(c);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(c);
+  }
+  return out;
+}
+
 // Affiliation-pin provenance (S224 #16). enrichment may replace the discovery
 // (PubMed-recency) affiliation with an identity-trusted CURRENT one from ORCID
 // or Scholar. Return a short source label for the "current (per X)" badge, or
@@ -95,8 +118,10 @@ function affiliationSourceLabel(source) {
 // the in-panel Workbench: seniority, COI + mismatch + confidence warnings, the
 // metrics line (expertise match % + real h-index/citations), enriched contact
 // links, a Scholar link, and a publications expander. `readOnly` renders the card
-// without a checkbox for the non-selectable Unverified section.
-function CandidateCard({ candidate, checked, onToggle, readOnly = false }) {
+// without a checkbox for the non-selectable Unverified section. `onExclude` adds
+// a set-aside action (active cards); `onPromote` adds a restore action (the
+// collapsed Excluded section).
+function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclude, onPromote }) {
   const [expanded, setExpanded] = useState(false);
   const c = candidate;
   const confidence = typeof c.verificationConfidence === 'number' ? c.verificationConfidence : undefined;
@@ -251,6 +276,26 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false }) {
             <a href={scholarUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1" title={hasRealScholar ? 'Open this researcher’s Google Scholar profile' : 'Search Google Scholar for this researcher'}>
               🎓 {hasRealScholar ? 'Scholar Profile' : 'Scholar Search'}
             </a>
+            {onExclude && (
+              <button
+                type="button"
+                onClick={() => onExclude(c)}
+                className="text-xs text-gray-400 hover:text-red-600 ml-auto"
+                title="Set aside — moves to the Excluded list and won’t be surfaced again by a search for this request (recoverable)"
+              >
+                ✕ Exclude
+              </button>
+            )}
+            {onPromote && (
+              <button
+                type="button"
+                onClick={() => onPromote(c)}
+                className="text-xs text-blue-600 hover:text-blue-800 ml-auto"
+                title="Promote back to the active candidate list"
+              >
+                ↩ Promote back
+              </button>
+            )}
           </div>
 
           {expanded && pubs.length > 0 && (
@@ -278,6 +323,7 @@ export default function ReviewerSearchSection({
   excludedNames = [],
   exclusionsUnavailable = false,
   recommended = [],
+  savedPoolNames = [],
   onSaved,
 }) {
   const [phase, setPhase] = useState('idle'); // idle | running | results | saving | done | error
@@ -285,7 +331,21 @@ export default function ReviewerSearchSection({
   const [candidates, setCandidates] = useState([]);
   const [unverified, setUnverified] = useState([]); // Claude suggestions PubMed couldn't verify (read-only)
   const [analysis, setAnalysis] = useState(null);
+  // `selected` is keyed by normalizeReviewerName(name) — a STABLE id — not by
+  // flat array index (S224): the durable roster + exclude/promote splice the
+  // candidate list, which would corrupt an index-keyed Set.
   const [selected, setSelected] = useState(() => new Set());
+  // Durable per-request roster (reviewer_find_roster via /api/workbench/reviewer-roster):
+  // active candidates (selectable, persist across reload), the collapsed Excluded
+  // set, and the full surfaced-name list fed into the cross-run dedup.
+  const [rosterActive, setRosterActive] = useState([]);
+  const [rosterExcluded, setRosterExcluded] = useState([]);
+  const [rosterNames, setRosterNames] = useState([]);
+  // Gates the search button until the roster GET resolves, so a run can't skip
+  // the cross-run dedup by firing before rosterNames is loaded (Codex post-impl).
+  const [rosterLoaded, setRosterLoaded] = useState(false);
+  const [rosterNote, setRosterNote] = useState(null); // surfaced if a durable write fails
+  const [excludedOpen, setExcludedOpen] = useState(false);
   const [error, setError] = useState(null);
   const [savedMsg, setSavedMsg] = useState(null);
   const [enrichNote, setEnrichNote] = useState(null);
@@ -317,11 +377,15 @@ export default function ReviewerSearchSection({
 
   // Reset everything when the request or the loaded proposal changes — stale
   // candidates must never be savable under a different proposal (Finding 6).
+  // Also (re)loads the durable per-request roster (genRef-guarded) so the
+  // active + excluded sets show even before any fresh search this session.
   useEffect(() => {
     genRef.current += 1; // invalidate any in-flight run
+    const myGen = genRef.current;
     setPhase('idle'); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null);
     setSelected(new Set()); setError(null); setSavedMsg(null); setEnrichNote(null);
-    setExcludedRemoved(0);
+    setExcludedRemoved(0); setRosterNote(null);
+    setRosterActive([]); setRosterExcluded([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false);
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
     setReviewerCount(12);
     setTemperature(0.3);
@@ -329,6 +393,27 @@ export default function ReviewerSearchSection({
     setRecPhase('idle'); setRecCandidates([]); setRecProgress([]); setRecError(null);
     excludeEditedRef.current = false;
     setExcludeText((excludedNames || []).join(', '));
+
+    // Load the durable roster for this request. genRef-guarded so a slower fetch
+    // can't clobber state after the request/proposal changed again. Never sets
+    // `phase` — the roster renders independent of the search phase.
+    if (requestId) {
+      (async () => {
+        try {
+          const res = await fetch(`/api/workbench/reviewer-roster?requestId=${encodeURIComponent(requestId)}`);
+          const data = await res.json().catch(() => ({}));
+          if (genRef.current !== myGen) return; // context changed — discard
+          if (res.ok && data.success) {
+            setRosterActive(Array.isArray(data.active) ? data.active : []);
+            setRosterExcluded(Array.isArray(data.excluded) ? data.excluded : []);
+            setRosterNames(Array.isArray(data.allNames) ? data.allNames : []);
+          }
+        } catch { /* best-effort — a missing roster just means no dedup/restore this load */ }
+        finally { if (genRef.current === myGen) setRosterLoaded(true); }
+      })();
+    } else {
+      setRosterLoaded(true); // no request → nothing to load; don't block the form
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestId, blobUrl]);
 
@@ -343,10 +428,18 @@ export default function ReviewerSearchSection({
   }, []);
 
   const runSearch = useCallback(async () => {
-    if (!blobUrl || runningRef.current || noSourcesSelected) return;
+    if (!blobUrl || runningRef.current || noSourcesSelected || !rosterLoaded) return;
     runningRef.current = true;
     const myGen = genRef.current;
-    const effectiveExcluded = parseExcludeList(excludeText);
+    // Exclude set = the manual/applicant box + everything already surfaced for
+    // this request (roster, every status) + names already in the saved pool. The
+    // union is what makes a re-run find NEW people instead of re-surfacing the
+    // same set (S224).
+    const effectiveExcluded = Array.from(new Set([
+      ...parseExcludeList(excludeText),
+      ...rosterNames,
+      ...(savedPoolNames || []),
+    ]));
     setPhase('running');
     setError(null); setProgress([]); setCandidates([]); setUnverified([]); setSelected(new Set());
     setSavedMsg(null); setEnrichNote(null); setAnalysis(null); setExcludedRemoved(0);
@@ -381,6 +474,11 @@ export default function ReviewerSearchSection({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           analysisResult,
+          // Server-side dedup: filter already-surfaced/excluded/saved names out of
+          // the database results BEFORE the per-candidate Claude reasoning call, so
+          // a re-run doesn't re-spend reasoning tokens (S224). Client filterExcluded
+          // below stays as defense-in-depth.
+          excludedNames: effectiveExcluded,
           options: {
             searchPubmed: searchSources.pubmed,
             searchArxiv: searchSources.arxiv,
@@ -458,12 +556,40 @@ export default function ReviewerSearchSection({
         setEnrichNote('Contact lookup was incomplete — some cards may be missing emails or citation metrics.');
       }
       setPhase('results');
+
+      // Durably record the surfaced candidates so they persist + dedup future
+      // runs. AWAIT it (don't fire-and-forget) and re-check genRef before trusting
+      // it as deduped — a slow POST must not clobber a newer search's roster
+      // (S224). Verified (Claude) + database discoveries only; unverified stay
+      // ephemeral. A failure degrades to "no dedup this run", never a broken panel.
+      if (enriched.length > 0 && requestId) {
+        try {
+          const pruned = enriched.map(pruneCandidateForRoster);
+          const rRes = await fetch('/api/workbench/reviewer-roster', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requestId, candidates: pruned }),
+          });
+          if (genRef.current !== myGen) return; // newer search started — don't touch roster state
+          if (rRes.ok) {
+            // Merge into the existing active roster (prior runs persist), pruned
+            // DTOs deduped by normalized name.
+            setRosterActive((prev) => dedupeByName([...pruned, ...prev]));
+            setRosterNames((prev) => Array.from(new Set([...prev, ...enriched.map((c) => c.name)])));
+            setRosterNote(null);
+          } else {
+            setRosterNote('Couldn’t save this search to the request — these candidates may re-appear on a future search.');
+          }
+        } catch {
+          if (genRef.current === myGen) setRosterNote('Couldn’t save this search to the request — these candidates may re-appear on a future search.');
+        }
+      }
     } catch (e) {
       if (genRef.current === myGen) { setError(e.message); setPhase('error'); }
     } finally {
       runningRef.current = false;
     }
-  }, [blobUrl, excludeText, searchSources, noSourcesSelected, reviewerCount, temperature, additionalNotes, pushProgress]);
+  }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, searchSources, noSourcesSelected, reviewerCount, temperature, additionalNotes, pushProgress]);
 
   // Run the applicant-recommended reviewers through the full verify→COI→enrich
   // pipeline (server-side) and write the enrichment back to their existing rows.
@@ -499,19 +625,71 @@ export default function ReviewerSearchSection({
     }
   }, [blobUrl, requestId, analysis]);
 
-  const toggle = (i) => {
+  // The selectable list = the durable active roster ∪ this run's results, deduped
+  // by normalized name (run results win — freshest enrichment). Renders + ranks
+  // independent of `phase` so the roster shows on reload without a fresh search.
+  const displayCandidates = dedupeByName([...candidates, ...rosterActive]);
+
+  const toggle = (key) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(i)) next.delete(i); else next.add(i);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   };
-  const allSelected = candidates.length > 0 && selected.size === candidates.length;
-  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(candidates.map((_, i) => i)));
+  const allSelected = displayCandidates.length > 0 && displayCandidates.every((c) => selected.has(candKey(c)));
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(displayCandidates.map(candKey)));
+
+  // Move a surfaced candidate into the durable Excluded set (not deleted). Optimistic:
+  // splice it out of the active view immediately, persist in the background, restore on
+  // failure. The candidate stays in rosterNames so a re-run still won't re-surface it.
+  const excludeCandidate = useCallback(async (cand) => {
+    const key = candKey(cand);
+    if (!key || !requestId) return;
+    const pruned = pruneCandidateForRoster(cand);
+    setCandidates((prev) => prev.filter((c) => candKey(c) !== key));
+    setRosterActive((prev) => prev.filter((c) => candKey(c) !== key));
+    setRosterExcluded((prev) => dedupeByName([pruned, ...prev]));
+    setRosterNames((prev) => Array.from(new Set([...prev, cand.name])));
+    setSelected((prev) => { const next = new Set(prev); next.delete(key); return next; });
+    try {
+      const res = await fetch('/api/workbench/reviewer-roster', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, action: 'exclude', candidate: pruned }),
+      });
+      if (!res.ok) throw new Error('exclude failed');
+    } catch {
+      // Roll back the optimistic move so the card isn't silently lost.
+      setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
+      setRosterActive((prev) => dedupeByName([pruned, ...prev]));
+      setRosterNote('Couldn’t exclude that reviewer — please try again.');
+    }
+  }, [requestId]);
+
+  // Promote an excluded candidate back to the active, selectable list.
+  const promoteCandidate = useCallback(async (cand) => {
+    const key = candKey(cand);
+    if (!key || !requestId) return;
+    setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
+    setRosterActive((prev) => dedupeByName([cand, ...prev]));
+    try {
+      const res = await fetch('/api/workbench/reviewer-roster', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, action: 'promote', name: cand.name }),
+      });
+      if (!res.ok) throw new Error('promote failed');
+    } catch {
+      setRosterActive((prev) => prev.filter((c) => candKey(c) !== key));
+      setRosterExcluded((prev) => dedupeByName([cand, ...prev]));
+      setRosterNote('Couldn’t promote that reviewer — please try again.');
+    }
+  }, [requestId]);
 
   const saveSelected = useCallback(async () => {
     if (savingRef.current) return;
-    const chosen = candidates.filter((_, i) => selected.has(i));
+    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)));
     if (chosen.length === 0) return;
     savingRef.current = true;
     setPhase('saving');
@@ -544,6 +722,27 @@ export default function ReviewerSearchSection({
       const failed = toSave.length - saved;
       setSavedMsg(`Saved ${saved} of ${toSave.length} to this request’s candidate pool.${failed > 0 ? ` ${failed} could not be saved.` : ''}`);
       setPhase('done');
+
+      // Graduate ONLY the successfully-saved names: flip them to status='saved'
+      // in the roster (so they leave the active Find list → Candidates tab, but
+      // stay deduped) and splice them out of the active view. Failed rows remain
+      // active/selectable. Best-effort — a roster failure doesn't fail the save.
+      const savedNames = Array.isArray(sData.savedNames) ? sData.savedNames : [];
+      if (savedNames.length > 0) {
+        const savedKeys = new Set(savedNames.map((n) => normalizeReviewerName(n)));
+        setCandidates((prev) => prev.filter((c) => !savedKeys.has(candKey(c))));
+        setRosterActive((prev) => prev.filter((c) => !savedKeys.has(candKey(c))));
+        setSelected((prev) => { const next = new Set(prev); savedKeys.forEach((k) => next.delete(k)); return next; });
+        if (requestId) {
+          try {
+            await fetch('/api/workbench/reviewer-roster', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ requestId, action: 'saved', names: savedNames }),
+            });
+          } catch { /* best-effort — savedPoolNames dedup covers re-surfacing */ }
+        }
+      }
       if (onSaved) onSaved();
     } catch (e) {
       setError(e.message);
@@ -551,16 +750,16 @@ export default function ReviewerSearchSection({
     } finally {
       savingRef.current = false;
     }
-  }, [candidates, selected, requestId, analysis, cycleCode, onSaved, pushProgress]);
+  }, [displayCandidates, selected, requestId, analysis, cycleCode, onSaved, pushProgress]);
 
   const busy = phase === 'running' || phase === 'saving';
   const onExcludeChange = (ev) => { excludeEditedRef.current = true; setExcludeText(ev.target.value); };
 
-  // Render the two selectable sections as VIEWS over the single flat `candidates`
-  // array, preserving each item's flat index so toggle(i)/selection stay correct
-  // (no second index space — Phase C invariant).
-  const claudeItems = candidates.map((c, i) => ({ c, i })).filter(({ c }) => isClaudeSuggestion(c));
-  const dbItems = candidates.map((c, i) => ({ c, i })).filter(({ c }) => !isClaudeSuggestion(c));
+  // The two selectable sections are VIEWS over displayCandidates; selection is
+  // keyed by candKey(c) (stable normalized name), so a roster splice can't
+  // corrupt it (S224 — replaces the former flat-index invariant).
+  const claudeItems = displayCandidates.filter((c) => isClaudeSuggestion(c));
+  const dbItems = displayCandidates.filter((c) => !isClaudeSuggestion(c));
 
   // Staff-removed recommendations (selected===false) are NOT enriched by the
   // endpoint (it loads selectedOnly:true), so count only the enrichable ones —
@@ -591,11 +790,11 @@ export default function ReviewerSearchSection({
         </div>
       )}
 
-      {!blobUrl ? (
-        <p className="text-sm text-gray-600">Load a proposal document above to search for reviewers.</p>
-      ) : (
-        <>
-          {(phase === 'idle' || phase === 'error') && (
+      {!blobUrl && (
+        <p className="text-sm text-gray-600">Load a proposal document above to search for new reviewers. Candidates already found for this request appear below.</p>
+      )}
+
+      {blobUrl && (phase === 'idle' || phase === 'error') && (
             <div className="space-y-3">
               <p className="text-sm text-gray-600">
                 Searches the selected literature sources using the loaded proposal, verifies expertise, and flags conflicts.
@@ -696,10 +895,10 @@ export default function ReviewerSearchSection({
               <button
                 type="button"
                 onClick={runSearch}
-                disabled={noSourcesSelected}
+                disabled={noSourcesSelected || !rosterLoaded}
                 className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {phase === 'error' ? 'Try again' : 'Run reviewer search'}
+                {!rosterLoaded ? 'Loading existing candidates…' : phase === 'error' ? 'Try again' : 'Run reviewer search'}
               </button>
             </div>
           )}
@@ -713,24 +912,28 @@ export default function ReviewerSearchSection({
             </div>
           )}
 
-          {(phase === 'results' || phase === 'done') && (
-            <div className="space-y-3">
+          {/* Durable roster + this-run results — rendered INDEPENDENT of `phase`
+              so the per-request candidate list (active + the collapsed Excluded
+              set) shows on reload and even when no proposal is loaded. */}
+          {(displayCandidates.length > 0 || rosterExcluded.length > 0 || phase === 'results' || phase === 'done') && (
+            <div className="space-y-3 mt-3">
               {savedMsg && <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm">{savedMsg}</div>}
               {enrichNote && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{enrichNote}</div>}
+              {rosterNote && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{rosterNote}</div>}
               {excludedRemoved > 0 && (
                 <p className="text-xs text-gray-500">
-                  {excludedRemoved} excluded {excludedRemoved === 1 ? 'reviewer was' : 'reviewers were'} filtered out of the results.
+                  {excludedRemoved} already-surfaced or excluded {excludedRemoved === 1 ? 'reviewer was' : 'reviewers were'} filtered out of the results.
                 </p>
               )}
-              {candidates.length === 0 && unverified.length === 0 ? (
+              {displayCandidates.length === 0 && rosterExcluded.length === 0 && unverified.length === 0 ? (
                 <p className="text-sm text-gray-600">No candidates were found for this proposal.</p>
               ) : (
                 <>
-                  {candidates.length > 0 ? (
+                  {displayCandidates.length > 0 && (
                     <>
                       <div className="flex items-center justify-between">
                         <p className="text-sm text-gray-600">
-                          {candidates.length} candidate{candidates.length === 1 ? '' : 's'} found
+                          {displayCandidates.length} candidate{displayCandidates.length === 1 ? '' : 's'} for this request
                           {selected.size > 0 && <> · {selected.size} selected</>}
                         </p>
                         <button type="button" onClick={toggleAll} className="text-xs text-blue-600 underline">
@@ -744,8 +947,8 @@ export default function ReviewerSearchSection({
                               Claude suggestions ({claudeItems.length} verified)
                             </p>
                             <div className="space-y-2">
-                              {claudeItems.map(({ c, i }) => (
-                                <CandidateCard key={`${c.name}-${i}`} candidate={c} checked={selected.has(i)} onToggle={() => toggle(i)} />
+                              {claudeItems.map((c) => (
+                                <CandidateCard key={candKey(c)} candidate={c} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} />
                               ))}
                             </div>
                           </div>
@@ -756,8 +959,8 @@ export default function ReviewerSearchSection({
                               Database discoveries ({dbItems.length})
                             </p>
                             <div className="space-y-2">
-                              {dbItems.map(({ c, i }) => (
-                                <CandidateCard key={`${c.name}-${i}`} candidate={c} checked={selected.has(i)} onToggle={() => toggle(i)} />
+                              {dbItems.map((c) => (
+                                <CandidateCard key={candKey(c)} candidate={c} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} />
                               ))}
                             </div>
                           </div>
@@ -772,14 +975,26 @@ export default function ReviewerSearchSection({
                         >
                           Save {selected.size > 0 ? selected.size : ''} selected as candidates
                         </button>
-                        <button type="button" onClick={runSearch} className="text-sm text-gray-500 underline">Re-run search</button>
+                        <button type="button" onClick={runSearch} disabled={!blobUrl || busy || !rosterLoaded} className="text-sm text-gray-500 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Run another search</button>
                       </div>
                       <p className="text-xs text-gray-400">
-                        Saved candidates join this request’s pool and appear in the Invite tab once you invite and they accept.
+                        Saved candidates join this request’s pool and appear in the Invite tab once you invite and they accept. Excluded and already-surfaced candidates are skipped by the next search.
                       </p>
                     </>
-                  ) : (
-                    <p className="text-sm text-gray-600">No verifiable candidates were found — see unverified suggestions below.</p>
+                  )}
+
+                  {/* Collapsed, recoverable Excluded set (durable per request). */}
+                  {rosterExcluded.length > 0 && (
+                    <details open={excludedOpen} onToggle={(e) => setExcludedOpen(e.currentTarget.open)} className="border border-gray-200 rounded-lg p-2">
+                      <summary className="text-xs font-medium text-gray-500 cursor-pointer">
+                        Excluded ({rosterExcluded.length}) — set aside for this request; not re-surfaced by a search. Promote one back to reconsider it.
+                      </summary>
+                      <div className="space-y-2 mt-2">
+                        {rosterExcluded.map((c) => (
+                          <CandidateCard key={`exc-${candKey(c)}`} candidate={c} readOnly onPromote={promoteCandidate} />
+                        ))}
+                      </div>
+                    </details>
                   )}
 
                   {unverified.length > 0 && (
@@ -798,8 +1013,6 @@ export default function ReviewerSearchSection({
               )}
             </div>
           )}
-        </>
-      )}
     </Card>
 
     {/* Secondary, OPTIONAL action — below the primary search so it can't be

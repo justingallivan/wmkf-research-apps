@@ -3,6 +3,12 @@
  * Kept separate from the React component so they can be unit-tested.
  */
 
+// Name normalization + exact-exclusion live in the CJS util so the server
+// (/discover dedup, reviewer-roster-store) and this client module share ONE
+// implementation. Re-exported below so existing client imports keep working.
+import { normalizeReviewerName as _normalizeReviewerName, partitionByExcluded } from '../../../lib/utils/reviewer-name-match';
+import { mayPersistIdentity } from '../../../lib/services/reviewer-identity-resolver';
+
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen
  * candidates by name, mirroring the standalone Reviewer Finder's save mapping.
@@ -64,31 +70,11 @@ export function asPercent(value) {
 }
 
 /**
- * Normalize a reviewer name for exclusion matching: fold diacritics to their
- * base letter, then drop honorifics + punctuation.
- *
- * Diacritic folding is via Unicode NFKD (decompose) + combining-mark strip, so
- * "Jens Hör" → "jens hor" and matches a plain-ASCII "Jens Hor" — the previous
- * `[^a-z]` strip turned "hör" into "hr" and silently MISSED that match
- * (Codex stop-time review, S210). Mirrors `DeduplicationService.normalizeName`.
- *
- * NB: this folds accented letters (ö→o, é→e) and ß→ss, but deliberately does
- * NOT fold spelled-out transliteration digraphs (ö↔oe, ü↔ue): a blanket oe→o /
- * ue→u rule would mangle unrelated names ("Manuel"→"manl", "Moerner"→"morner")
- * and over-filter good candidates. Those rare variants are handled by the
- * editable exclude box in the search UI.
+ * Normalize a reviewer name for exclusion / dedup matching. Re-exported from the
+ * shared CJS util (`lib/utils/reviewer-name-match`) so the client, the
+ * `/discover` server dedup, and the roster store all use ONE implementation.
  */
-export function normalizeReviewerName(name) {
-  return String(name || '')
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '') // strip combining diacritical marks
-    .replace(/ß/g, 'ss') // sharp-s (ß) does not NFKD-decompose
-    .toLowerCase()
-    .replace(/^(dr|prof|professor|mr|mrs|ms)\.?\s+/i, '')
-    .replace(/[^a-z\s]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+export const normalizeReviewerName = _normalizeReviewerName;
 
 /** Parse a comma/newline-separated exclude textbox into a clean name list. */
 export function parseExcludeList(text) {
@@ -109,17 +95,87 @@ export function parseExcludeList(text) {
  * @returns {{ kept: object[], removed: object[] }}
  */
 export function filterExcluded(candidates, excludedNames) {
-  const list = Array.isArray(candidates) ? candidates : [];
-  const ex = (Array.isArray(excludedNames) ? excludedNames : [])
-    .map(normalizeReviewerName)
-    .filter(Boolean);
-  if (ex.length === 0) return { kept: list, removed: [] };
-  const exSet = new Set(ex);
-  const kept = [];
-  const removed = [];
-  for (const c of list) {
-    if (exSet.has(normalizeReviewerName(c.name))) removed.push(c);
-    else kept.push(c);
-  }
-  return { kept, removed };
+  return partitionByExcluded(candidates, excludedNames, (c) => c && c.name);
+}
+
+/**
+ * Prune an enriched candidate down to the fields `CandidateCard` actually
+ * renders, for durable storage in `reviewer_find_roster` (S224). Keeps the card
+ * fully renderable after reload while dropping the heavy raw enrichment internals
+ * (tierResults, identity-resolver anchors). The SINGLE source for the roster DTO
+ * shape so the server store + client merge agree.
+ */
+export function pruneCandidateForRoster(c) {
+  if (!c || typeof c !== 'object') return c;
+  const e = c.contactEnrichment || {};
+  // Capture the identity-resolver verdict NOW (before it's dropped) as safe
+  // boolean persist-permission flags, so a candidate saved AFTER a roster reload
+  // (when contactEnrichment.identity / tierResults are gone) still honors the
+  // resolver gate (Codex post-impl HIGH). Mirror save-candidates' block logic:
+  //   blockByIdentity = identity present AND verdict < probable
+  //   blockScholar    = blockByIdentity OR the Scholar profile was name/inst-skipped
+  const identity = e.identity || null;
+  const scholarSkipped = !!e.tierResults?.scholar_profile?.skipped;
+  const identityPersistAllowed = !identity || mayPersistIdentity(identity.status);
+  const scholarPersistAllowed = identityPersistAllowed && !scholarSkipped;
+  return {
+    // Render-safe persist flags consumed by save-candidates for roster-reloaded rows.
+    identityPersistAllowed,
+    scholarPersistAllowed,
+    // A render-safe contactEnrichment SUBSET so CandidateCard's `enr.*` reads
+    // (emailSource/emailYear/priorAffiliation/affiliationSource/links/metrics)
+    // still work after reload. NEVER the raw internals (identity/tierResults).
+    contactEnrichment: {
+      email: e.email || null,
+      emailSource: e.emailSource || null,
+      emailYear: e.emailYear || null,
+      website: e.website || null,
+      orcid: e.orcid || e.orcidId || null,
+      orcidId: e.orcidId || null,
+      orcidUrl: e.orcidUrl || null,
+      googleScholarUrl: e.googleScholarUrl || null,
+      googleScholarId: e.googleScholarId || null,
+      affiliationSource: e.affiliationSource || null,
+      priorAffiliation: e.priorAffiliation || null,
+      hIndex: e.hIndex ?? null,
+      totalCitations: e.totalCitations ?? null,
+    },
+    name: c.name,
+    affiliation: c.affiliation || null,
+    affiliationSource: c.affiliationSource || e.affiliationSource || null,
+    seniorityEstimate: c.seniorityEstimate || null,
+    verificationConfidence: typeof c.verificationConfidence === 'number' ? c.verificationConfidence : null,
+    // Source / provenance flags the card branches on.
+    isClaudeSuggestion: !!c.isClaudeSuggestion,
+    source: c.source || null,
+    isApplicantRecommended: !!c.isApplicantRecommended,
+    // COI + mismatch detail.
+    hasInstitutionCOI: !!c.hasInstitutionCOI,
+    institutionCOIDetails: c.institutionCOIDetails || null,
+    hasCoauthorCOI: !!c.hasCoauthorCOI,
+    coauthorships: Array.isArray(c.coauthorships) ? c.coauthorships : [],
+    institutionMismatch: !!c.institutionMismatch,
+    suggestedInstitution: c.suggestedInstitution || null,
+    expertiseMismatch: !!c.expertiseMismatch,
+    expertiseAreas: Array.isArray(c.expertiseAreas) ? c.expertiseAreas : null,
+    keywords: Array.isArray(c.keywords) ? c.keywords : null,
+    reasoning: c.reasoning || c.generatedReasoning || null,
+    // Contact + bibliometrics (prefer the merged top-level, fall back to enrichment).
+    email: c.email || e.email || null,
+    emailSource: e.emailSource || null,
+    emailYear: e.emailYear || null,
+    website: c.website || e.website || null,
+    orcid: c.orcid || e.orcid || e.orcidId || null,
+    orcidUrl: c.orcidUrl || e.orcidUrl || null,
+    googleScholarUrl: c.googleScholarUrl || e.googleScholarUrl || null,
+    googleScholarId: c.googleScholarId || e.googleScholarId || null,
+    priorAffiliation: e.priorAffiliation || null,
+    hIndex: c.hIndex ?? e.hIndex ?? null,
+    totalCitations: c.totalCitations ?? e.totalCitations ?? null,
+    publicationCount5yr: Number.isFinite(c.publicationCount5yr) ? c.publicationCount5yr : (e.publicationCount5yr ?? null),
+    publications: Array.isArray(c.publications)
+      ? c.publications.slice(0, 10).map((p) => ({ title: p && p.title, year: p && p.year, url: p && p.url }))
+      : [],
+    relevanceScore: typeof c.relevanceScore === 'number' ? c.relevanceScore : null,
+  };
 }

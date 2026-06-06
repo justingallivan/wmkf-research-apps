@@ -26,7 +26,10 @@
  * (`summaryPages`/PDF-upload are not used — the proposal is auto-loaded.)
  *
  * Props:
- *   - requestId : the akoya_request GUID (always present)
+ *   - requestId      : the akoya_request GUID (always present)
+ *   - savedPoolNames : names already saved to this request's Dataverse pool
+ *                      (from ReviewersTab's my-candidates fetch), unioned into the
+ *                      search exclude set so a re-search doesn't re-surface them.
  *   (context / canManage are passed by ReviewersTab but not needed here — the
  *   panel is request-scoped by requestId and all ingestion APIs stay org-open.)
  */
@@ -58,7 +61,7 @@ function Badge({ children, tone = 'gray' }) {
   );
 }
 
-export default function ReviewerFindPanel({ requestId }) {
+export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSaved }) {
   const [ingest, setIngest] = useState({ loading: true, data: null, error: null });
   const [doc, setDoc] = useState({ loading: true, data: null, error: null });
 
@@ -302,6 +305,8 @@ export default function ReviewerFindPanel({ requestId }) {
         excludedNames={data?.excludedNames || []}
         exclusionsUnavailable={!!ingest.error || excludedParseFailed}
         recommended={recommended}
+        savedPoolNames={savedPoolNames}
+        onSaved={onSaved}
       />
     </div>
   );

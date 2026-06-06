@@ -194,7 +194,13 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           <div className="w-6 h-6 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
         </div>
       ) : current === 'find' ? (
-        <ReviewerFindPanel requestId={requestId} context={context} canManage={canManage} />
+        <ReviewerFindPanel
+          requestId={requestId}
+          context={context}
+          canManage={canManage}
+          savedPoolNames={candidates.map((c) => c.name).filter(Boolean)}
+          onSaved={refreshAll}
+        />
       ) : current === 'candidates' ? (
         <CandidatesPanel
           requestId={requestId}
