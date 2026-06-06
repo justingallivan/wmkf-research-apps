@@ -10,7 +10,7 @@
  */
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn(async () => ({ profileId: 7 })) }));
 
-const search = jest.fn(async () => ({ webLeads: [{ name: 'Jane Smith', provenanceUrl: 'https://uni.edu/jsmith', snippet: 's', date: '2024-01-01', source: 'web' }], queriesRun: 1, fromCache: 0 }));
+const search = jest.fn(async () => ({ webLeads: [{ name: 'Jane Smith', provenanceUrl: 'https://uni.edu/jsmith', rationale: 'leads a lab on the topic', date: '2024-01-01', source: 'web' }], queriesRun: 1, fromCache: 0 }));
 let configured = true;
 jest.mock('../../lib/services/web-discovery-service', () => ({
   WebDiscoveryService: {

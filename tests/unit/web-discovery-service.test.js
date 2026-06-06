@@ -149,13 +149,37 @@ describe('WebDiscoveryService.search — S230 quality pass (rationale, COI, per-
     expect(out.webLeads.map((l) => l.name)).toEqual(['Bob Lee']);
   });
 
-  test('caps at one lead per source URL so a roster page cannot dump multiple names', async () => {
-    // Both extracted names map to the SAME result url (result 1).
+  test('caps leads per source URL (MAX 2) so a roster page cannot dump many names', async () => {
+    // Three extracted names all map to the SAME result url (result 1).
     const _fetch = fakeFetch([[RESULTS[0]]]);
-    const _complete = async () => 'NAME: Jane Smith | SOURCE: 1\nNAME: Other Person | SOURCE: 1';
+    const _complete = async () => 'NAME: Jane Smith | SOURCE: 1\nNAME: Other Person | SOURCE: 1\nNAME: Third Person | SOURCE: 1';
     const out = await WebDiscoveryService.search({ queries: ['x'], apiKey: 'k' }, { fetch: _fetch, complete: _complete });
-    expect(out.webLeads).toHaveLength(1);
-    expect(out.webLeads[0].name).toBe('Jane Smith');
+    expect(out.webLeads.map((l) => l.name)).toEqual(['Jane Smith', 'Other Person']);
+  });
+
+  test('COI filter catches name variants the exact matcher misses — initials, middle initial, hyphen spacing (Codex review)', async () => {
+    const _fetch = fakeFetch([[
+      { title: 'a', url: 'https://x/1', snippet: 's', date: null },
+      { title: 'b', url: 'https://x/2', snippet: 's', date: null },
+      { title: 'c', url: 'https://x/3', snippet: 's', date: null },
+    ]]);
+    const _complete = async () =>
+      'NAME: Anthony C. Leung | SOURCE: 1\nNAME: A. Leung | SOURCE: 2\nNAME: Jane Smith-Jones | SOURCE: 3';
+    const out = await WebDiscoveryService.search(
+      { queries: ['x'], apiKey: 'k', excludeNames: ['Anthony Leung', 'Jane Smith Jones'] },
+      { fetch: _fetch, complete: _complete },
+    );
+    expect(out.webLeads).toEqual([]); // all three are conflicts (surname+initial / hyphen-normalized exact)
+  });
+
+  test('COI filter keeps a same-surname person with a different first initial', async () => {
+    const _fetch = fakeFetch([[{ title: 'a', url: 'https://x/1', snippet: 's', date: null }]]);
+    const _complete = async () => 'NAME: Maria Leung | SOURCE: 1';
+    const out = await WebDiscoveryService.search(
+      { queries: ['x'], apiKey: 'k', excludeNames: ['Anthony Leung'] },
+      { fetch: _fetch, complete: _complete },
+    );
+    expect(out.webLeads.map((l) => l.name)).toEqual(['Maria Leung']);
   });
 });
 
