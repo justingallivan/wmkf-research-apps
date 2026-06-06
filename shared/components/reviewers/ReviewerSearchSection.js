@@ -357,6 +357,18 @@ export default function ReviewerSearchSection({
   const [temperature, setTemperature] = useState(0.3); // "reviewer diversity": 0.3 conservative → 1.0 creative
   const [additionalNotes, setAdditionalNotes] = useState(''); // optional extra instructions for Claude
 
+  // Track C v1 — READ-ONLY web suggestions (Perplexity). A separate, display-only
+  // panel that counters Claude's training-cutoff + fame bias; it NEVER enters the
+  // candidate list, ranking, COI, roster, or save. The toggle defaults on but is
+  // hidden when no Perplexity key (capability from /api/api-capabilities). The web
+  // call runs independently of /discover (its own fetch + try/catch), so a web
+  // outage degrades to an empty panel and never touches the search's error path.
+  const [searchWeb, setSearchWeb] = useState(true);
+  const [webSearchAvailable, setWebSearchAvailable] = useState(false);
+  const [webPhase, setWebPhase] = useState('idle'); // idle | running | done
+  const [webSuggestions, setWebSuggestions] = useState([]);
+  const [webNote, setWebNote] = useState(null);
+
   // Applicant-recommended enrichment (separate flow from the search).
   const [recPhase, setRecPhase] = useState('idle'); // idle | running | done | error
   const [recCandidates, setRecCandidates] = useState([]);
@@ -390,6 +402,7 @@ export default function ReviewerSearchSection({
     setReviewerCount(12);
     setTemperature(0.3);
     setAdditionalNotes('');
+    setWebPhase('idle'); setWebSuggestions([]); setWebNote(null);
     setRecPhase('idle'); setRecCandidates([]); setRecProgress([]); setRecError(null);
     excludeEditedRef.current = false;
     setExcludeText((excludedNames || []).join(', '));
@@ -423,6 +436,19 @@ export default function ReviewerSearchSection({
     if (!excludeEditedRef.current) setExcludeText((excludedNames || []).join(', '));
   }, [excludedNames]);
 
+  // Web-suggestions capability (Track C): is the Perplexity key configured? Drives
+  // whether the `searchWeb` toggle shows at all. Self-fetched so this shared
+  // component works on every surface that renders it without prop-drilling the
+  // capability through ReviewersTab / ReviewerFindPanel.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/api-capabilities')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (!cancelled && data) setWebSearchAvailable(!!data.reviewerWebSearch); })
+      .catch(() => { /* capability stays false → toggle hidden, search unaffected */ });
+    return () => { cancelled = true; };
+  }, []);
+
   const pushProgress = useCallback((m) => {
     if (m) setProgress((p) => [...p.slice(-6), m]);
   }, []);
@@ -443,6 +469,7 @@ export default function ReviewerSearchSection({
     setPhase('running');
     setError(null); setProgress([]); setCandidates([]); setUnverified([]); setSelected(new Set());
     setSavedMsg(null); setEnrichNote(null); setAnalysis(null); setExcludedRemoved(0);
+    setWebPhase('idle'); setWebSuggestions([]); setWebNote(null);
     try {
       // 1. Analyze the proposal (Claude). excludedNames soft-blocks Claude's own
       //    suggestions; we still hard-filter discovery results below.
@@ -466,6 +493,33 @@ export default function ReviewerSearchSection({
       if (!analysisResult) throw new Error('The proposal analysis didn’t finish — the connection timed out or dropped before results came back. Please run the search again.');
       if (genRef.current !== myGen) return; // context changed — abort
       setAnalysis(analysisResult);
+
+      // 1b. Track C (READ-ONLY): fire web discovery INDEPENDENTLY of /discover —
+      //     its own fetch + try/catch, fire-and-forget so it runs concurrently and
+      //     never delays or fails the candidate flow. A web outage → empty panel.
+      //     genRef-guarded so a stale run can't write into newer state.
+      if (searchWeb && webSearchAvailable) {
+        setWebPhase('running');
+        (async () => {
+          try {
+            const wRes = await fetch('/api/reviewer-finder/web-suggestions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ analysisResult }),
+            });
+            const wData = await wRes.json().catch(() => ({}));
+            if (genRef.current !== myGen) return; // context changed — discard
+            setWebSuggestions(Array.isArray(wData?.webLeads) ? wData.webLeads : []);
+            setWebNote(wData?.error ? 'Web search was unavailable for this run — showing none.' : null);
+          } catch {
+            if (genRef.current !== myGen) return;
+            setWebSuggestions([]);
+            setWebNote('Web search was unavailable for this run — showing none.');
+          } finally {
+            if (genRef.current === myGen) setWebPhase('done');
+          }
+        })();
+      }
 
       // 2. Discover + verify + rank across databases.
       pushProgress('Searching databases for candidates…');
@@ -589,7 +643,7 @@ export default function ReviewerSearchSection({
     } finally {
       runningRef.current = false;
     }
-  }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, searchSources, noSourcesSelected, reviewerCount, temperature, additionalNotes, pushProgress]);
+  }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, searchSources, noSourcesSelected, reviewerCount, temperature, additionalNotes, searchWeb, webSearchAvailable, pushProgress]);
 
   // Run the applicant-recommended reviewers through the full verify→COI→enrich
   // pipeline (server-side) and write the enrichment back to their existing rows.
@@ -824,6 +878,22 @@ export default function ReviewerSearchSection({
                   <p className="text-xs text-amber-700 mt-1">Select at least one source to search.</p>
                 )}
               </div>
+              {webSearchAvailable && (
+                <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={searchWeb}
+                    onChange={(e) => setSearchWeb(e.target.checked)}
+                    className="mt-0.5 accent-blue-600"
+                  />
+                  <span>
+                    Also search the web for current researchers
+                    <span className="block text-xs text-gray-500">
+                      Surfaces active, mid-career names from the live web in a separate panel to counter training-cutoff &amp; fame bias. Read-only leads — they don’t enter the candidate list.
+                    </span>
+                  </span>
+                </label>
+              )}
               <div>
                 <label htmlFor="reviewer-count" className="block text-xs text-gray-500 mb-1">
                   Number of candidates to find: <span className="font-medium text-gray-700">{reviewerCount}</span>
@@ -1014,6 +1084,47 @@ export default function ReviewerSearchSection({
             </div>
           )}
     </Card>
+
+    {/* Web suggestions (Track C v1, READ-ONLY). A visually SEPARATE panel — these
+        are leads from the live web, NOT candidates: not selectable, not ranked,
+        not saved. Renders only once a run has started the web search this session. */}
+    {webSearchAvailable && webPhase !== 'idle' && (
+      <Card hover={false}>
+        <p className="font-medium text-gray-900 mb-1">Web suggestions</p>
+        <p className="text-sm text-gray-600 mb-3">
+          Currently-active researchers surfaced from the live web to counter training-cutoff and fame bias.
+          These are <span className="font-medium">leads only</span> — check the source, then add anyone promising through your normal search. They are not candidates and are not saved.
+        </p>
+        {webNote && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm mb-3">{webNote}</div>}
+        {webPhase === 'running' ? (
+          <p className="text-sm text-gray-500">Searching the web for current researchers…</p>
+        ) : webSuggestions.length === 0 ? (
+          !webNote && <p className="text-sm text-gray-600">No web suggestions for this proposal.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100 max-h-[32rem] overflow-y-auto pr-1">
+            {webSuggestions.map((w, i) => (
+              <li key={`web-${w.name}-${i}`} className="py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-gray-900">{w.name}</span>
+                  {w.date && <span className="text-xs text-gray-400 whitespace-nowrap">{w.date}</span>}
+                </div>
+                {w.snippet && <p className="text-xs text-gray-600 mt-0.5">{w.snippet}</p>}
+                {w.provenanceUrl && (
+                  <a
+                    href={w.provenanceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:text-blue-700 break-all"
+                  >
+                    {w.provenanceUrl}
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    )}
 
     {/* Secondary, OPTIONAL action — below the primary search so it can't be
         mistaken for it (S220: a PD ran this thinking it was the reviewer search).

@@ -1,6 +1,6 @@
 # Reviewer Web-Grounded Discovery (Perplexity Track C) — Build Plan
 
-**Status:** v7 (S225) — **SCOPE NARROWED to a READ-ONLY web-suggestions panel** after 6 prose-review rounds (each returned blockers). Implementation, not more prose, from here.
+**Status:** v7 (S225) — **SCOPE NARROWED to a READ-ONLY web-suggestions panel** after 6 prose-review rounds (each returned blockers). Implementation, not more prose, from here. **Increment 1 (backend `WebDiscoveryService` + A7 extraction prompt) shipped S225; increment 2 (route `/api/reviewer-finder/web-suggestions` + capability-gated `searchWeb` toggle + read-only panel in `ReviewerSearchSection`) shipped S227.** Still GATING prod-enable: the live Perplexity contract test (§5) — no `PERPLEXITY_API_KEY` set yet, so `search_after_date_filter` format is unconfirmed; the feature is inert (capability false → toggle hidden) until the key is set and the contract test passes.
 
 > ## ⚠️ SCOPE BANNER — read this first (S225, takes precedence over older sections below)
 > **v1 ships the READ-ONLY web-suggestions panel ONLY.** A NEW dedicated endpoint `/api/reviewer-finder/web-suggestions` runs Perplexity Search → A7-extraction → `WebLead[]`; the client renders them in a separate panel with provenance links. **It does NOT touch `/discover`, the candidate pipeline, ranking, COI, roster, or save**, and is called **separately** from `/discover` so it is entirely off that route's abort-to-error boundary (this dissolves the v6 deadline blocker — there is no shared deadline frame to corrupt).
