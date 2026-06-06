@@ -25,5 +25,8 @@ export default async function handler(req, res) {
     orcid: !!(process.env.ORCID_CLIENT_ID && process.env.ORCID_CLIENT_SECRET),
     ncbi: !!process.env.NCBI_API_KEY,
     serp: !!process.env.SERP_API_KEY,
+    // Reviewer Finder web-grounded discovery (Perplexity Search API). Shared key
+    // with the Virtual Review Panel; drives the "also search the web" toggle.
+    reviewerWebSearch: !!process.env.PERPLEXITY_API_KEY,
   });
 }
