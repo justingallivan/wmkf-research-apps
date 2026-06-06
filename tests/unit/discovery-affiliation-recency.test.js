@@ -46,3 +46,24 @@ describe('extractBestAffiliation — recency-weighted', () => {
     expect(DiscoveryService.extractBestAffiliation(articles, null)).toMatch(/New Institute/);
   });
 });
+
+describe('collectAffiliationHistory — all distinct affiliations, most-recent-first', () => {
+  test('returns every distinct institution (current pick alone would hide the former one)', () => {
+    const articles = [
+      { year: Y - 8, authors: [author('Jane Smith', 'Old Postdoc University, Dept of Biology')] },
+      { year: Y - 8, authors: [author('Jane Smith', 'Old Postdoc University, Dept of Biology')] },
+      { year: Y, authors: [author('Jane Smith', 'New Faculty University, Dept of Chemistry')] },
+    ];
+    const hist = DiscoveryService.collectAffiliationHistory(articles, ['Jane Smith']);
+    // Recency-best pick is only New Faculty — but history retains Old Postdoc too.
+    expect(hist.some((a) => /New Faculty University/.test(a))).toBe(true);
+    expect(hist.some((a) => /Old Postdoc University/.test(a))).toBe(true);
+    // Most-recent-first ordering.
+    expect(hist[0]).toMatch(/New Faculty University/);
+  });
+
+  test('empty when no name variants match', () => {
+    const articles = [{ year: Y, authors: [author('Someone Else', 'X University')] }];
+    expect(DiscoveryService.collectAffiliationHistory(articles, ['Jane Smith'])).toEqual([]);
+  });
+});

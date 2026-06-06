@@ -31,6 +31,7 @@ import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-tim
 const limiter = nextRateLimiter({ max: 10 });
 
 const { ContactEnrichmentService } = require('../../../lib/services/contact-enrichment-service');
+const { DeduplicationService } = require('../../../lib/services/deduplication-service');
 
 export const config = {
   api: {
@@ -62,7 +63,7 @@ export default async function handler(req, res) {
   // load overrides itself rather than relying on a warm process.
   await loadModelOverrides();
 
-  const { candidates, options = {} } = req.body;
+  const { candidates, options = {}, authorInstitution = null } = req.body;
 
   // Validate input
   if (!candidates || !Array.isArray(candidates) || candidates.length === 0) {
@@ -120,6 +121,34 @@ export default async function handler(req, res) {
         });
       },
     });
+
+    // Re-evaluate institution COI on the POST-enrichment affiliation. Enrichment
+    // may promote an identity-trusted current affiliation (ORCID/Scholar) over the
+    // PubMed-recency one that /discover computed COI against, which would otherwise
+    // leave hasInstitutionCOI / institutionCOIDetails.historical stale relative to
+    // the affiliation the card now shows. Reuses the same markInstitutionCOI logic
+    // (current + historical) so server and client never diverge. The `coiRecomputed`
+    // marker lets the client merge override a now-false COI (vs. when we didn't run,
+    // when authorInstitution is absent, leaving the discover value intact). (Codex P2#1, S229.)
+    if (authorInstitution && Array.isArray(results?.enriched)) {
+      const origList = Array.isArray(candidates) ? candidates : [];
+      results.enriched.forEach((r, idx) => {
+        if (!r || !r.contactEnrichment) return;
+        // enrichCandidates preserves input order, so index is the reliable mapping
+        // — matching by name alone cross-wires duplicate names. Fall back to name
+        // only if the order ever drifts. (Codex P3.)
+        let orig = origList[idx];
+        if (!orig || orig.name !== r.name) orig = origList.find((c) => c.name === r.name) || {};
+        const effectiveAffiliation = r.contactEnrichment.affiliation || orig.affiliation || null;
+        const [evaluated] = DeduplicationService.markInstitutionCOI(
+          [{ affiliation: effectiveAffiliation, affiliationHistory: orig.affiliationHistory }],
+          authorInstitution
+        );
+        r.contactEnrichment.coiRecomputed = true;
+        r.contactEnrichment.hasInstitutionCOI = evaluated.hasInstitutionCOI;
+        r.contactEnrichment.institutionCOIDetails = evaluated.institutionCOIDetails;
+      });
+    }
 
     // Send final results
     sendEvent({

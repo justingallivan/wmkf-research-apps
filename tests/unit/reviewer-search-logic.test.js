@@ -7,6 +7,7 @@ import {
   normalizeReviewerName,
   parseExcludeList,
   filterExcluded,
+  pruneCandidateForRoster,
 } from '../../shared/components/reviewers/reviewer-search-logic.js';
 
 describe('mergeEnrichment', () => {
@@ -90,6 +91,39 @@ describe('mergeEnrichment', () => {
     expect(out[0].hIndex).toBe(7);
     expect(out[0].totalCitations).toBe(50);
   });
+
+  // Codex P2#1: institution COI is re-evaluated against the post-enrichment
+  // affiliation; the merge promotes it only when the route flagged coiRecomputed.
+  test('promotes a recomputed COI (override discover) when coiRecomputed is set', () => {
+    const out = mergeEnrichment(
+      [{ name: 'Dr. F', hasInstitutionCOI: false, institutionCOIDetails: null }],
+      [{ name: 'Dr. F', contactEnrichment: {
+        coiRecomputed: true,
+        hasInstitutionCOI: true,
+        institutionCOIDetails: { piInstitution: 'JHU', reviewerInstitution: 'JHU', historical: true },
+      } }],
+    );
+    expect(out[0].hasInstitutionCOI).toBe(true);
+    expect(out[0].institutionCOIDetails.historical).toBe(true);
+  });
+
+  test('a recompute that found NO COI overrides a stale discover-true', () => {
+    const out = mergeEnrichment(
+      [{ name: 'Dr. G', hasInstitutionCOI: true, institutionCOIDetails: { historical: false } }],
+      [{ name: 'Dr. G', contactEnrichment: { coiRecomputed: true, hasInstitutionCOI: false, institutionCOIDetails: null } }],
+    );
+    expect(out[0].hasInstitutionCOI).toBe(false);
+    expect(out[0].institutionCOIDetails).toBeNull();
+  });
+
+  test('keeps the discover COI when the route did NOT recompute (no authorInstitution)', () => {
+    const out = mergeEnrichment(
+      [{ name: 'Dr. H', hasInstitutionCOI: true, institutionCOIDetails: { historical: true } }],
+      [{ name: 'Dr. H', contactEnrichment: { email: 'h@x.edu' } }],
+    );
+    expect(out[0].hasInstitutionCOI).toBe(true);
+    expect(out[0].institutionCOIDetails.historical).toBe(true);
+  });
 });
 
 describe('asPercent', () => {
@@ -155,5 +189,24 @@ describe('filterExcluded', () => {
     const { kept, removed } = filterExcluded([{ name: 'Jens Hör' }, { name: 'Jane Smith' }], ['Jens Hor']);
     expect(kept.map((c) => c.name)).toEqual(['Jane Smith']);
     expect(removed.map((c) => c.name)).toEqual(['Jens Hör']);
+  });
+});
+
+describe('pruneCandidateForRoster — model-flagged concern survives reload', () => {
+  test('carries potentialConcerns into the roster DTO', () => {
+    const pruned = pruneCandidateForRoster({
+      name: 'Dr. Taekjip Ha',
+      affiliation: 'Harvard Medical School',
+      reasoning: 'Leading single-molecule biophysicist; directly relevant.',
+      potentialConcerns: 'Former Johns Hopkins faculty — shared institution with the PI.',
+    });
+    expect(pruned.potentialConcerns).toBe('Former Johns Hopkins faculty — shared institution with the PI.');
+    // Fitness justification stays in its own field, not conflated.
+    expect(pruned.reasoning).toMatch(/single-molecule/);
+  });
+
+  test('absent concern normalizes to null', () => {
+    const pruned = pruneCandidateForRoster({ name: 'Jane Smith', affiliation: 'MIT' });
+    expect(pruned.potentialConcerns).toBeNull();
   });
 });

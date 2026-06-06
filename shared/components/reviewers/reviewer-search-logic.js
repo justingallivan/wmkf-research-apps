@@ -18,6 +18,10 @@ import { mayPersistIdentity } from '../../../lib/services/reviewer-identity-reso
  * NOT off `candidate.contactEnrichment.*`. The full contactEnrichment object is
  * also attached so the card can render source/year detail.
  *
+ * Institution COI is also re-promoted here: enrich-contacts re-evaluates it on the
+ * post-enrichment affiliation and flags `contactEnrichment.coiRecomputed`, so the
+ * badge matches the affiliation the card actually shows (Codex P2#1).
+ *
  * @param {object[]} candidates
  * @param {Array<{name: string, contactEnrichment: object}>|null|undefined} enrichmentResults
  * @returns {object[]}
@@ -35,6 +39,12 @@ export function mergeEnrichment(candidates, enrichmentResults) {
     return {
       ...c,
       contactEnrichment: e,
+      // Institution COI re-evaluated server-side against the post-enrichment
+      // affiliation (enrich-contacts). `coiRecomputed` distinguishes "ran and
+      // found none" (override the discover value) from "didn't run" (keep it).
+      // (Codex P2#1.)
+      hasInstitutionCOI: e.coiRecomputed ? !!e.hasInstitutionCOI : c.hasInstitutionCOI,
+      institutionCOIDetails: e.coiRecomputed ? (e.institutionCOIDetails || null) : (c.institutionCOIDetails || null),
       email: e.email || c.email,
       website: e.website || c.website,
       facultyPageUrl: e.facultyPageUrl || c.facultyPageUrl,
@@ -152,6 +162,10 @@ export function pruneCandidateForRoster(c) {
     // COI + mismatch detail.
     hasInstitutionCOI: !!c.hasInstitutionCOI,
     institutionCOIDetails: c.institutionCOIDetails || null,
+    // Model-flagged COI/concern from the analyze prompt's POTENTIAL_CONCERNS field
+    // (e.g. a former-institution tie the deterministic check misses). Persisted so
+    // the card's advisory warning survives a roster reload, like `reasoning`.
+    potentialConcerns: c.potentialConcerns || null,
     hasCoauthorCOI: !!c.hasCoauthorCOI,
     coauthorships: Array.isArray(c.coauthorships) ? c.coauthorships : [],
     institutionMismatch: !!c.institutionMismatch,

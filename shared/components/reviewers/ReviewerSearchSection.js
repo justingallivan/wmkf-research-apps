@@ -133,6 +133,11 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
   const hasInstitutionCOI = !!c.hasInstitutionCOI;
   const hasCoauthorCOI = !!c.hasCoauthorCOI;
   const hasAnyCOI = hasInstitutionCOI || hasCoauthorCOI;
+  // Model-flagged concern (POTENTIAL_CONCERNS). The parser normalizes "None
+  // identified" and its variants to null (isNoConcernText), so any non-empty
+  // value here is a real warning.
+  const potentialConcerns = typeof c.potentialConcerns === 'string' ? c.potentialConcerns.trim() : '';
+  const hasPotentialConcern = !!potentialConcerns;
   const reason = c.reasoning || c.generatedReasoning || null;
   const claude = isClaudeSuggestion(c);
   const pubs = Array.isArray(c.publications) ? c.publications : [];
@@ -149,6 +154,7 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
 
   const border = checked ? 'border-blue-500 bg-blue-50'
     : hasAnyCOI ? 'border-red-300 bg-red-50'
+    : hasPotentialConcern ? 'border-amber-300 bg-amber-50'
     : hasAnyMismatch ? 'border-orange-300 bg-orange-50'
     : isLowConfidence ? 'border-amber-300 bg-amber-50'
     : isWeakMatch ? 'border-yellow-200 bg-yellow-50'
@@ -186,7 +192,7 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
 
           {hasInstitutionCOI && (
             <div className="mt-2 p-2 bg-red-50 border border-red-300 rounded text-xs text-red-800">
-              <span className="font-medium">🏛️ Institution COI:</span> Same institution as proposal PI
+              <span className="font-medium">🏛️ Institution COI:</span> {c.institutionCOIDetails?.historical ? 'Former shared institution with proposal PI' : 'Same institution as proposal PI'}
               {c.institutionCOIDetails?.reviewerInstitution && <span className="ml-1">({c.institutionCOIDetails.reviewerInstitution})</span>}
             </div>
           )}
@@ -203,6 +209,11 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+          {hasPotentialConcern && (
+            <div className="mt-2 p-2 bg-amber-100 border border-amber-300 rounded text-xs text-amber-800">
+              <span className="font-medium">⚠️ Potential concern (AI-flagged):</span> {potentialConcerns}
             </div>
           )}
           {isLowConfidence && (
@@ -579,6 +590,10 @@ export default function ReviewerSearchSection({
             body: JSON.stringify({
               candidates: kept,
               options: { usePubmed: true, useOrcid: true, useSerpSearch: true, useClaudeSearch: true },
+              // Lets the route re-evaluate institution COI on the post-enrichment
+              // affiliation so the badge stays accurate after a current-affiliation
+              // promotion (Codex P2#1).
+              authorInstitution: analysisResult?.proposalInfo?.authorInstitution || null,
             }),
           });
           let enrichmentResults = null;

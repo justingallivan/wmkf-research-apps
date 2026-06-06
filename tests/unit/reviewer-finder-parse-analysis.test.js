@@ -8,7 +8,7 @@
  * regex shape.
  */
 
-import { parseAnalysisResponse } from '../../shared/config/prompts/reviewer-finder';
+import { parseAnalysisResponse, isNoConcernText } from '../../shared/config/prompts/reviewer-finder';
 
 const PROPOSAL_METADATA = `## PART 1: PROPOSAL METADATA
 
@@ -216,5 +216,89 @@ ${PART_3}`;
     const result = parseAnalysisResponse(response);
     expect(result.reviewerSuggestions).toHaveLength(1);
     expect(result.searchQueries.pubmed).toEqual(['cell signaling query', 'apoptosis query']);
+  });
+});
+
+describe('isNoConcernText — suppress no-concern phrasings, keep real ones', () => {
+  test.each([
+    'None identified',
+    'None',
+    'None.',
+    'N/A',
+    'N.A.',
+    'NA',
+    'nil',
+    'Not applicable',
+    'No concerns identified',
+    'No COI identified',
+    'No apparent conflicts',
+    'No institutional COI identified',
+    'No known competing interests',
+    'No known conflicts identified',
+    'None identified based on available information',
+    'Not applicable based on available information',
+    // Negated-relationship phrasings — the model is stating a tie is ABSENT,
+    // so these are no-concern values (Codex P1).
+    'No known collaboration with the PI',
+    'No co-author relationship with the PI',
+    'No shared institution identified',
+    '   ',
+    '',
+    null,
+    undefined,
+  ])('treats %p as no-concern', (val) => {
+    expect(isNoConcernText(val)).toBe(true);
+  });
+
+  test.each([
+    'Former Johns Hopkins faculty — shared institution with the PI.',
+    'No obvious conflicts, but they collaborated on a 2023 paper.',
+    'No conflicts, but they collaborated in 2023',
+    'None obvious, but they trained together',
+    'Direct competitor on the same grant topic.',
+    'Co-authored with the PI in 2021.',
+    // A no-concern opener followed by a substantive second clause is a real
+    // concern — the sentinel must not swallow the continuation (Codex P1).
+    'No conflicts; they competed for the same grant',
+    'No conflicts — they were postdoc labmates',
+    'No COI, former labmate of the PI',
+  ])('treats %p as a real concern', (val) => {
+    expect(isNoConcernText(val)).toBe(false);
+  });
+});
+
+describe('parseAnalysisResponse — POTENTIAL_CONCERNS normalization', () => {
+  test('no-concern value normalizes to null', () => {
+    const response = `${PROPOSAL_METADATA}
+## PART 2: REVIEWER SUGGESTIONS
+
+REVIEWER:
+NAME: Dr. Alice Smith
+INSTITUTION: Stanford
+EXPERTISE: signaling
+SENIORITY: Senior
+REASONING: Known expert.
+POTENTIAL_CONCERNS: No COI identified
+SOURCE: Known expert
+${PART_3}`;
+    const r = parseAnalysisResponse(response);
+    expect(r.reviewerSuggestions[0].potentialConcerns).toBeNull();
+  });
+
+  test('real concern is preserved', () => {
+    const response = `${PROPOSAL_METADATA}
+## PART 2: REVIEWER SUGGESTIONS
+
+REVIEWER:
+NAME: Dr. Taekjip Ha
+INSTITUTION: Harvard Medical School
+EXPERTISE: single-molecule biophysics
+SENIORITY: Senior
+REASONING: Leading single-molecule biophysicist.
+POTENTIAL_CONCERNS: Former Johns Hopkins faculty — shared institution with the PI.
+SOURCE: Known expert
+${PART_3}`;
+    const r = parseAnalysisResponse(response);
+    expect(r.reviewerSuggestions[0].potentialConcerns).toMatch(/Johns Hopkins/);
   });
 });

@@ -119,7 +119,7 @@ Suggest ${reviewerCount} potential expert reviewers. For each, provide detailed 
 - Must be established researchers (professors, senior scientists, PIs)
 - Must have relevant expertise to evaluate this proposal
 - Must NOT be from the author's institution
-- Include a mix of seniority levels (rising stars to senior experts)
+- PRIORITIZE currently-active, mid-career researchers (assistant/associate professors, senior staff scientists) who are publishing now. DE-PRIORITIZE field founders, Nobel laureates, emeritus, and clearly very-senior figures — scientifically relevant but unlikely to have bandwidth to review.
 - For interdisciplinary work, cover all major areas
 
 **ACCURACY GUIDELINES:**
@@ -134,8 +134,8 @@ NAME: [Full name in WESTERN ORDER: FirstName LastName, with optional title. Exam
 INSTITUTION: [Current university/research institution - required for verification]
 EXPERTISE: [2-4 specific areas of expertise, comma-separated]
 SENIORITY: [Early-career / Mid-career / Senior]
-REASONING: [2-3 sentences explaining WHY they are qualified. For names from the proposal, cite where they were mentioned. For others, reference their known work.]
-POTENTIAL_CONCERNS: [Any COI concerns, or "None identified"]
+REASONING: [2-3 sentences explaining WHY they are scientifically qualified to review THIS proposal. For names from the proposal, cite where they were mentioned. For others, reference their known work. Do NOT put conflicts of interest, exclusions, or "do not contact" advice here — those belong ONLY in POTENTIAL_CONCERNS.]
+POTENTIAL_CONCERNS: [Any conflict of interest or reason this person may be unsuitable to review THIS proposal — e.g. a former OR current shared institution with the PI, a close collaboration, advisor/advisee ties, or direct competition. Name the specific tie. If none, write "None identified".]
 SOURCE: ["Mentioned in proposal", "References", "Known expert", or "Field leader"]
 
 ---
@@ -252,6 +252,44 @@ export function createDiscoveredReasoningPrompt(proposalSummary, candidates) {
 }
 
 /**
+ * True when a POTENTIAL_CONCERNS value is a "no concern" sentinel rather than a
+ * real conflict. The prompt's default is "None identified", but the model emits
+ * many variants ("No COI identified", "No known conflicts", "N/A", "None
+ * identified based on available information", …). Normalizing these to null at
+ * parse time means every consumer can treat `potentialConcerns` as "present ⇒
+ * render a warning" without re-deriving this list. Anything starting with a real
+ * concern (e.g. "No obvious conflicts, but they collaborated once") is NOT
+ * suppressed — only the leading no-concern phrasings are.
+ */
+export function isNoConcernText(value) {
+  if (value == null) return true;
+  const t = String(value).trim().replace(/[.!\s]+$/, '').toLowerCase();
+  if (!t) return true;
+  // A real concern can OPEN with "no"/"none" yet reveal a tie via a contrast
+  // CONJUNCTION ("No conflicts, but they collaborated"; "None obvious, though they
+  // trained together"). Never suppress those. Only conjunctions trigger this —
+  // NOT relationship nouns, because "No known collaboration with the PI" / "No
+  // shared institution identified" are themselves no-concern statements (the
+  // relationship is being negated, not asserted). (Codex P3/P1.)
+  if (/\b(?:but|however|although|though|except|whereas)\b/.test(t)) {
+    return false;
+  }
+  if (/^(none|n\/?a|n\.a|na|nil|not applicable)$/.test(t)) return true;
+  if (/^none\b/.test(t)) return true; // "none identified", "none known", "none apparent …"
+  if (/^not applicable\b/.test(t)) return true;
+  // "No [qualifier]* <noun> [closer]*" where <noun> is a concern noun OR a
+  // relationship type the model is negating. ANCHORED to the whole value (plus a
+  // few light closers like "identified"/"with the PI") so a sentinel followed by
+  // a substantive second clause — "No conflicts; they competed for the same grant"
+  // — falls through to render. Hiding a real concern is the costly failure, so the
+  // default is to render. (Codex P1: negated relationships + continuation clauses.)
+  const NOUN = 'concerns?|conflicts?|cois?|coi|competing interests?|conflict of interest|conflicts of interest|collaborations?|co-?authorships?|co-?author relationships?|relationships?|ties|connections?|shared institution|same institution|institutional overlap';
+  const CLOSER = 'identified|found|noted|known|apparent|present|detected|reported|disclosed|of (?:note|concern)|with (?:the pi|any (?:proposal )?(?:author|applicant)s?|the applicant)|at this time|based on(?: the)? available information|to (?:report|disclose)';
+  if (new RegExp(`^no\\s+(?:[a-z-]+\\s+){0,3}(?:${NOUN})(?:\\s+(?:${CLOSER}))*$`).test(t)) return true;
+  return false;
+}
+
+/**
  * Parse the Stage 1 analysis response into structured data
  */
 export function parseAnalysisResponse(response) {
@@ -363,7 +401,12 @@ export function parseAnalysisResponse(response) {
     if (reasoningMatch) reviewer.reasoning = reasoningMatch[1].replace(/\*+$/, '').trim();
 
     const concernsMatch = block.match(multiFieldRegex('POTENTIAL_CONCERNS', 'SOURCE|REVIEWER'));
-    if (concernsMatch) reviewer.potentialConcerns = concernsMatch[1].replace(/\*+$/, '').trim();
+    if (concernsMatch) {
+      const concern = concernsMatch[1].replace(/\*+$/, '').trim();
+      // Normalize "None identified"/"No COI"/etc. to null so consumers can treat
+      // any non-null potentialConcerns as a real warning (no per-consumer regex).
+      reviewer.potentialConcerns = isNoConcernText(concern) ? null : concern;
+    }
 
     const sourceMatch = block.match(fieldRegex('SOURCE'));
     if (sourceMatch) reviewer.source = sourceMatch[1].replace(/\*+$/, '').trim();

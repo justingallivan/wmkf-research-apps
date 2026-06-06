@@ -163,12 +163,16 @@ function CandidateCard({ candidate, selected, onSelect }) {
   const hasCoauthorCOI = candidate.hasCoauthorCOI;
   const hasInstitutionCOI = candidate.hasInstitutionCOI;
   const hasAnyCOI = hasCoauthorCOI || hasInstitutionCOI;
+  // Parser normalizes no-concern values to null; trim guards a whitespace-only
+  // value so the advisory block matches the Workbench card. (Codex nit.)
+  const potentialConcerns = typeof candidate.potentialConcerns === 'string' ? candidate.potentialConcerns.trim() : '';
 
   return (
     <div className={`
       border rounded-lg p-4 transition-all duration-200
       ${selected ? 'border-blue-500 bg-blue-50' :
         hasAnyCOI ? 'border-red-300 bg-red-50' :
+        potentialConcerns ? 'border-amber-300 bg-amber-50' :
         hasAnyMismatch ? 'border-orange-300 bg-orange-50' :
         isLowConfidence ? 'border-amber-300 bg-amber-50' :
         isWeakMatch ? 'border-yellow-200 bg-yellow-50' :
@@ -216,12 +220,20 @@ function CandidateCard({ candidate, selected, onSelect }) {
           {/* Institution COI warning */}
           {candidate.hasInstitutionCOI && (
             <div className="mt-2 p-2 bg-red-50 border border-red-300 rounded text-xs text-red-800">
-              <span className="font-medium">🏛️ Institution COI:</span> Same institution as proposal PI
+              <span className="font-medium">🏛️ Institution COI:</span> {candidate.institutionCOIDetails?.historical ? 'Former shared institution with proposal PI' : 'Same institution as proposal PI'}
               {candidate.institutionCOIDetails && (
                 <span className="ml-1">
                   ({candidate.institutionCOIDetails.reviewerInstitution})
                 </span>
               )}
+            </div>
+          )}
+
+          {/* Model-flagged concern (POTENTIAL_CONCERNS) — parser normalizes
+              no-concern values to null, so any value here is a real warning. */}
+          {potentialConcerns && (
+            <div className="mt-2 p-2 bg-amber-100 border border-amber-300 rounded text-xs text-amber-800">
+              <span className="font-medium">⚠️ Potential concern (AI-flagged):</span> {potentialConcerns}
             </div>
           )}
 
@@ -1022,6 +1034,11 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
           // record carries the current affiliation, not the postdoc-era one.
           affiliation: enrichment.affiliation || candidate.affiliation,
           affiliationSource: enrichment.affiliationSource || candidate.affiliationSource,
+          // Institution COI re-evaluated against the post-enrichment affiliation
+          // (enrich-contacts). `coiRecomputed` distinguishes "ran and found none"
+          // (override) from "didn't run" (keep the discover value). (Codex P2#1.)
+          hasInstitutionCOI: enrichment.coiRecomputed ? !!enrichment.hasInstitutionCOI : candidate.hasInstitutionCOI,
+          institutionCOIDetails: enrichment.coiRecomputed ? (enrichment.institutionCOIDetails || null) : (candidate.institutionCOIDetails || null),
         };
       }
       return candidate;
@@ -1075,6 +1092,10 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
             // or the postdoc-era discovery affiliation would be stored.
             affiliation: enrichment.affiliation || candidate.affiliation,
             affiliationSource: enrichment.affiliationSource || candidate.affiliationSource,
+            // Persist the COI re-evaluated against the post-enrichment affiliation
+            // so the saved matchReason isn't stale (mirror the display merge). (Codex P2.)
+            hasInstitutionCOI: enrichment.coiRecomputed ? !!enrichment.hasInstitutionCOI : candidate.hasInstitutionCOI,
+            institutionCOIDetails: enrichment.coiRecomputed ? (enrichment.institutionCOIDetails || null) : (candidate.institutionCOIDetails || null),
           };
         }
         return candidate;
@@ -1149,6 +1170,9 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
         body: JSON.stringify({
           candidates: selected,
           options: enrichmentOptions,
+          // Lets the route re-evaluate institution COI on the post-enrichment
+          // affiliation so the badge stays accurate (Codex P2#1).
+          authorInstitution: analysisResult?.proposalInfo?.authorInstitution || null,
         }),
       });
 

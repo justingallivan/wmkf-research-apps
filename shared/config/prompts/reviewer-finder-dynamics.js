@@ -96,7 +96,7 @@ Suggest {{reviewer_count}} potential expert reviewers. For each, provide detaile
 - Must be established researchers (professors, senior scientists, PIs)
 - Must have relevant expertise to evaluate this proposal
 - Must NOT be from the author's institution
-- Include a mix of seniority levels (rising stars to senior experts)
+- PRIORITIZE currently-active, mid-career researchers (assistant/associate professors, senior staff scientists) who are publishing now. DE-PRIORITIZE field founders, Nobel laureates, emeritus, and clearly very-senior figures — scientifically relevant but unlikely to have bandwidth to review.
 - For interdisciplinary work, cover all major areas
 
 **ACCURACY GUIDELINES:**
@@ -111,8 +111,8 @@ NAME: [Full name in WESTERN ORDER: FirstName LastName, with optional title. Exam
 INSTITUTION: [Current university/research institution - required for verification]
 EXPERTISE: [2-4 specific areas of expertise, comma-separated]
 SENIORITY: [Early-career / Mid-career / Senior]
-REASONING: [2-3 sentences explaining WHY they are qualified. For names from the proposal, cite where they were mentioned. For others, reference their known work.]
-POTENTIAL_CONCERNS: [Any COI concerns, or "None identified"]
+REASONING: [2-3 sentences explaining WHY they are scientifically qualified to review THIS proposal. For names from the proposal, cite where they were mentioned. For others, reference their known work. Do NOT put conflicts of interest, exclusions, or "do not contact" advice here — those belong ONLY in POTENTIAL_CONCERNS.]
+POTENTIAL_CONCERNS: [Any conflict of interest or reason this person may be unsuitable to review THIS proposal — e.g. a former OR current shared institution with the PI, a close collaboration, advisor/advisee ties, or direct competition. Name the specific tie. If none, write "None identified".]
 SOURCE: ["Mentioned in proposal", "References", "Known expert", or "Field leader"]
 
 ---
