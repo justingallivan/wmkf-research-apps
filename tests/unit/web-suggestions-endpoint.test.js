@@ -19,6 +19,14 @@ jest.mock('../../lib/services/web-discovery-service', () => ({
   },
 }));
 
+// The service resolves a model synchronously via getModelForApp(), which only
+// returns a real id once loadModelOverrides() has warmed the cache. The handler
+// MUST call it before search() or Anthropic 404s on the unresolved tier key.
+const loadModelOverrides = jest.fn(async () => {});
+jest.mock('../../lib/services/model-override-loader', () => ({
+  loadModelOverrides: (...args) => loadModelOverrides(...args),
+}));
+
 import handler, { deriveWebQueries, deriveProposalContext } from '../../pages/api/reviewer-finder/web-suggestions';
 import { requireAppAccess } from '../../lib/utils/auth';
 
@@ -131,5 +139,15 @@ describe('handler', () => {
     expect(r.body.success).toBe(true);
     expect(r.body.webLeads).toHaveLength(1);
     expect(r.body.webLeads[0].name).toBe('Jane Smith');
+  });
+
+  it('warms model overrides BEFORE calling search (regression: prod 404 on tier key "sonnet")', async () => {
+    const r = res();
+    await handler(post({ analysisResult: ANALYSIS }), r);
+    expect(loadModelOverrides).toHaveBeenCalledTimes(1);
+    expect(search).toHaveBeenCalledTimes(1);
+    // Ordering: the override cache must be warm before the service resolves a model.
+    expect(loadModelOverrides.mock.invocationCallOrder[0])
+      .toBeLessThan(search.mock.invocationCallOrder[0]);
   });
 });

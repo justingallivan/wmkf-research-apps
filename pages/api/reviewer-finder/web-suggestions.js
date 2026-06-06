@@ -18,6 +18,7 @@
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { WebDiscoveryService } from '../../../lib/services/web-discovery-service';
+import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -102,6 +103,14 @@ export default async function handler(req, res) {
   if (queries.length === 0) {
     return res.status(200).json({ success: true, webLeads: [], skipped: 'no_queries' });
   }
+
+  // Warm the model-override cache BEFORE the service resolves a model. The
+  // service calls getModelForApp() synchronously; without this the tier key
+  // ('sonnet') is returned unresolved and Anthropic 404s on `model: sonnet`,
+  // which the service swallows fail-soft as an empty panel. Every other
+  // LLM-calling reviewer-finder route (analyze/discover/enrich/generate-emails)
+  // does the same near the top of its handler.
+  await loadModelOverrides();
 
   // WebDiscoveryService is fail-soft by contract — it never throws; on any error
   // it returns { webLeads: [], error }. So this handler always responds 200 with a
