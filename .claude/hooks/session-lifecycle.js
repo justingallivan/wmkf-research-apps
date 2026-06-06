@@ -213,6 +213,17 @@ function stop(input, root, file) {
     console.error(`Session-owned changed-surface gate failure:\n${summary}`);
     process.exit(2);
   }
+
+  // Advisory mode: surface each distinct failure state to Claude exactly once, then let
+  // the Stop proceed. additionalContext re-opens the turn, so re-emitting the same failure
+  // on every Stop would loop forever. De-dup on (failing gates + changed-surface
+  // fingerprint); once advised for that state, stay silent so the next Stop is clean. A new
+  // edit (new fingerprint) or a different failing gate re-surfaces; a fixed gate yields an
+  // empty `failures` and returns above.
+  const advisedKey = hash(`${failures.map((f) => f.gate).sort().join('\n')}|${fingerprintKey}`);
+  if (state.lastAdvisedKey === advisedKey) return;
+  state.lastAdvisedKey = advisedKey;
+  saveState(file, state);
   additionalContext('Stop', `Advisory changed-surface gate failure (blocking rollout is not enabled):\n${summary}`);
 }
 
