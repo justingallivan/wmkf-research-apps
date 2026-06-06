@@ -1,6 +1,6 @@
 # Reviewer Web-Grounded Discovery (Perplexity Track C) — Build Plan
 
-**Status:** v7 (S225) — **SCOPE NARROWED to a READ-ONLY web-suggestions panel** after 6 prose-review rounds (each returned blockers). Implementation, not more prose, from here. **Increment 1 (backend `WebDiscoveryService` + A7 extraction prompt) shipped S225; increment 2 (route `/api/reviewer-finder/web-suggestions` + capability-gated `searchWeb` toggle + read-only panel in `ReviewerSearchSection`) shipped S227.** Still GATING prod-enable: the live Perplexity contract test (§5) — no `PERPLEXITY_API_KEY` set yet, so `search_after_date_filter` format is unconfirmed; the feature is inert (capability false → toggle hidden) until the key is set and the contract test passes.
+**Status:** v7 (S225) — **SCOPE NARROWED to a READ-ONLY web-suggestions panel** after 6 prose-review rounds (each returned blockers). Implementation, not more prose, from here. **Increment 1 (backend `WebDiscoveryService` + A7 extraction prompt) shipped S225; increment 2 (route `/api/reviewer-finder/web-suggestions` + capability-gated `searchWeb` toggle + read-only panel in `ReviewerSearchSection`) shipped S227.** Live Perplexity Search contract **VERIFIED 2026-06-05 (S227)** via `scripts/probe-perplexity-search.mjs`: HTTP 200 (account entitled to `/search`, not just sonar chat), `search_after_date_filter` M/D/YYYY accepted + honored, `results[].{title,url,snippet,date,last_updated}` shape confirmed (§5). `PERPLEXITY_API_KEY` is now live in **prod** too → the capability reports true and the feature activates on deploy. Remaining before/at prod-enable: (a) the VRP coupling (§7 — confirm `VRP_ALLOWED_PROVIDERS` in prod), (b) snippet-budget tuning (§4 — observed ~8KB faculty-page snippets vs the 20KB `WEB_RESULTS_MAX_CHARS` extraction cap truncates later results).
 
 > ## ⚠️ SCOPE BANNER — read this first (S225, takes precedence over older sections below)
 > **v1 ships the READ-ONLY web-suggestions panel ONLY.** A NEW dedicated endpoint `/api/reviewer-finder/web-suggestions` runs Perplexity Search → A7-extraction → `WebLead[]`; the client renders them in a separate panel with provenance links. **It does NOT touch `/discover`, the candidate pipeline, ranking, COI, roster, or save**, and is called **separately** from `/discover` so it is entirely off that route's abort-to-error boundary (this dissolves the v6 deadline blocker — there is no shared deadline frame to corrupt).
@@ -50,7 +50,7 @@ searchWeb on + PERPLEXITY_API_KEY set
 ## 4. Steering toward current contributors (not founders)
 
 Levers on the Search API:
-- **Recency:** explicit `search_after_date_filter` window (3–5 yr), not the enum-only `search_recency_filter` — deterministic/reproducible, matches the existing 5-yr recency model. Confirm date behavior via the live contract test.
+- **Recency:** explicit `search_after_date_filter` window (3–5 yr), not the enum-only `search_recency_filter` — deterministic/reproducible, matches the existing 5-yr recency model. Date behavior VERIFIED LIVE 2026-06-05 (S227): M/D/YYYY accepted; no result predated the window.
 - **Domain focus (optional, tunable):** `search_domain_filter` (≤20) toward faculty/lab/scholar/preprint domains.
 - **Extraction prompt:** instructed to surface *active, currently-publishing mid-career researchers* and **de-prioritize field founders / laureates / emeritus**. **v1: a STATIC bundled prompt** in `shared/config/prompts/reviewer-finder`, NOT admin-editable — the reviewer prompt registry (`reviewer-prompt-resolver.js:33-44`) supports only `analyze` + `score-candidates`, and editability would need a third prompt name + fallback + Dynamics seed + resolver coverage. Tuned in code during monitoring; admin-editability deferred. It is still A7-registered (§6).
 
@@ -60,7 +60,7 @@ Levers on the Search API:
 - Request: `query` (string | string[], required); `max_results` (1–20, default 10); `search_recency_filter`; `search_after_date_filter` / `search_before_date_filter`; `last_updated_after_filter` / `last_updated_before_filter`; `search_domain_filter` (≤20); `country`; `search_context_size` (low|medium|high).
 - Response: `{ results: [{ title, url, snippet, date|null, last_updated|null }], id, server_time }`.
 - **Pricing/rate-limits not in docs** — confirm before enabling in prod (§7 cost).
-- **Live contract test REQUIRED** before merge: pin this shape against a real response; the docs-pass is not a substitute.
+- **Live contract test DONE (2026-06-05, S227)** — `scripts/probe-perplexity-search.mjs` pinned this shape against a real response (HTTP 200; `{id, results}`; `results[].{title,url,snippet,date,last_updated}` 10/10; M/D/YYYY filter accepted + honored). The docs-pass was not a substitute; the live call confirmed Search-API entitlement on the existing key.
 - Transport: `api.perplexity.ai` is **already** in `lib/utils/safe-fetch.js` `ALLOWED_HOSTS` (line 43, from the VRP sonar call) and the Search API is the same host — VERIFIED 2026-06-05, no allowlist change needed.
 
 ## 6. Security & safety
@@ -115,7 +115,7 @@ Revisit **after** the monitoring phase shows web suggestions are worth automatin
 
 ## 11. Testing (v1)
 
-- **Live contract test** against the real Search API (skipped when no key) — pins §5 shape.
+- **Live contract test** against the real Search API — `scripts/probe-perplexity-search.mjs` (on-demand script, not a jest test, so a paid call never fires in `npm test`/CI; exits cleanly when no key). Pins §5 shape. DONE 2026-06-05 (S227).
 - Unit: name-extraction mapping (`results` → `WebLead[]`, `provenanceUrl` from `url` only, A7-wrap applied); leads-only invariant (no scores/verdicts); fail-soft when key unset; `searchWeb` off → `WebDiscoveryService` not called; cache hit/miss/**fail-open** with the `perplexity` source namespace (no collision with Claude entries); web error/timeout → empty `webSuggestions`, never an error frame.
 - Integration — web panel isolation: a `webSuggestions` SSE field is emitted separately and does NOT alter `verified`/`unverified`/`discovered`/`ranked`; a fired discovery deadline still yields empty `webSuggestions` (not an error).
 - Integration — Add as candidate: appending `{name, manualAdd:true}` and re-running discover-only routes the name through `verifyClaudeSuggestions`; a manual name with `<3` PubMed pubs lands **selectable** (not in read-only `unverified`) — the gate-bypass at `discovery-service.js:385` — while a NON-manual `<3`-pub Claude suggestion still goes to `unverified` (bypass is scoped to `manualAdd`).

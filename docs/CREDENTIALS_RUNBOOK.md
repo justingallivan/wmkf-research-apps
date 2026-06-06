@@ -59,7 +59,7 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 |----------|---------|--------|
 | `OPENAI_API_KEY` | GPT panel reviewer | [OpenAI Platform](https://platform.openai.com/api-keys) |
 | `GOOGLE_AI_API_KEY` | Gemini panel reviewer | [Google AI Studio](https://aistudio.google.com/) |
-| `PERPLEXITY_API_KEY` | Perplexity panel reviewer (claim verification) | [Perplexity API](https://docs.perplexity.ai/) |
+| `PERPLEXITY_API_KEY` | Perplexity — VRP panel reviewer (sonar claim verification) AND reviewer-finder web discovery (Search API, Track C). Live in prod 2026-06-05. Same key, two surfaces; setting it also makes `perplexity` a *configured* VRP provider — gate VRP exposure with `VRP_ALLOWED_PROVIDERS`. | [Perplexity API](https://docs.perplexity.ai/) |
 
 ### Vercel-Managed (Auto-configured)
 
