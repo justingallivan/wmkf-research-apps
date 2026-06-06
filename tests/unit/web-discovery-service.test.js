@@ -89,6 +89,21 @@ describe('WebDiscoveryService.search — extraction + provenance', () => {
     expect(out.webLeads.some((l) => l.provenanceUrl.includes('evil.example'))).toBe(false);
   });
 
+  test('per-snippet cap bounds the extraction INPUT but the full snippet survives for display', async () => {
+    // A faculty-directory page snippet larger than PER_SNIPPET_MAX_CHARS (6000).
+    const bigSnippet = 'X'.repeat(9000);
+    const _fetch = fakeFetch([[{ title: 'Faculty', url: 'https://uni.edu/fac', snippet: bigSnippet, date: '2024-01-01' }]]);
+    let capturedPrompt = '';
+    const _complete = async ({ prompt }) => { capturedPrompt = prompt; return 'NAME: Jane Smith | SOURCE: 1'; };
+    const out = await WebDiscoveryService.search({ queries: ['x'], apiKey: 'k' }, { fetch: _fetch, complete: _complete });
+    // The extraction prompt saw at most PER_SNIPPET_MAX_CHARS of the snippet…
+    const longestXRun = (capturedPrompt.match(/X+/g) || []).reduce((m, s) => Math.max(m, s.length), 0);
+    expect(longestXRun).toBeGreaterThan(0);
+    expect(longestXRun).toBeLessThanOrEqual(6000);
+    // …but the surfaced WebLead keeps the FULL snippet (provenance display is unbounded here).
+    expect(out.webLeads[0].snippet).toBe(bigSnippet);
+  });
+
   test('out-of-range SOURCE dropped; duplicate names deduped; pipe cannot bleed into name', async () => {
     const _fetch = fakeFetch([RESULTS]);
     const _complete = async () =>
