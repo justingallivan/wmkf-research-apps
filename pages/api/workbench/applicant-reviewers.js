@@ -31,6 +31,7 @@ import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-conte
 import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
 import * as reviewerSuggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import { extractExcludedReviewers } from '../../../lib/services/reviewer-exclusion-parser';
+import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 
 const REQUEST_SELECT = [
   'akoya_requestid',
@@ -69,6 +70,13 @@ export default async function handler(req, res) {
   if (!GUID_RE.test(requestId)) {
     return res.status(400).json({ error: 'requestId must be a GUID' });
   }
+
+  // Warm the model-override cache BEFORE the excluded-reviewer Claude extraction:
+  // getModelForApp('reviewer-finder') resolves tier keys (e.g. 'sonnet') to real
+  // model ids only once overrides are loaded, otherwise Anthropic 404s on the raw
+  // tier key and the extraction fails (mirrors the five other reviewer-finder LLM
+  // routes — analyze/discover/enrich-contacts/web-suggestions/generate-emails).
+  await loadModelOverrides();
 
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
   const userProfileId = access.profileId || null;

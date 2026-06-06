@@ -13,6 +13,7 @@
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
+import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 
 const limiter = nextRateLimiter({ max: 5 });
 
@@ -74,6 +75,11 @@ export default async function handler(req, res) {
         return res.end();
       }
     }
+
+    // Warm the model-override cache BEFORE screening: screenApplicants resolves
+    // its model via the synchronous getModelForApp('integrity-screener'), which
+    // returns the raw tier alias (Anthropic 404s on it) until overrides load.
+    await loadModelOverrides();
 
     // Import service dynamically to avoid issues with server-side imports
     const { IntegrityService } = await import('../../../lib/services/integrity-service');
