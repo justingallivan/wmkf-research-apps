@@ -1,4 +1,8 @@
-# Session 228 Prompt: Monitor web-discovery in prod — or pick up reviewer-finder deferred-v2 / other threads
+# Session 229 Prompt: Monitor web-discovery in prod — or pick up reviewer-finder deferred-v2 / other threads
+
+## Session 228 Summary
+
+Verification-only session — no code or doc changes. Startup gates all green (full set, incl. `check:agent-invariants` + `check:instruction-architecture`); repo synced. Confirmed Justin's multi-agent-coordination WIP (the `.claude/skills/agent-coordination/` skill + `docs/AGENT_COLLABORATION_PLAN.md`) was committed + pushed as **`b2d1be5`** — so the "untracked items left for Justin" carryover from the S227 prompt is now CLOSED. No new work started; next steps below are unchanged and still live.
 
 ## Session 227 Summary
 
@@ -41,8 +45,8 @@ The "Add as candidate" / manual-add path + merge→rank→COI→save. Carries re
 ### 3. VRP-coupling cleanup — DEFERRED, only when next working on VRP
 Now that `PERPLEXITY_API_KEY` is permanently live, decide whether `VRP_ALLOWED_PROVIDERS` should include `perplexity`. Prod is still fail-closed while unset; dev/test (allowlist unset) already exposes Perplexity to VRP. Parked in `project-virtual-review-panel`. Do NOT surface this every session.
 
-### 4. Untracked items left for Justin
-`.claude/skills/agent-coordination/` + `docs/AGENT_COLLABORATION_PLAN.md` appeared mid-session (Justin's multi-agent-coordination work-in-progress) — left untracked/uncommitted, not mine to commit.
+### 4. Multi-agent coordination (now tracked)
+`.claude/skills/agent-coordination/` + `docs/AGENT_COLLABORATION_PLAN.md` (Justin's multi-agent-coordination work) were committed + pushed as `b2d1be5` in S228. The `agent-coordination` skill is now live/available. No open action — listed only so the next session knows where it landed.
 
 ## Standing context / guardrails
 - **`main` auto-deploys to prod on push. Commit/push only when asked.** This session pushed *with* explicit approval; the feature is now LIVE.
