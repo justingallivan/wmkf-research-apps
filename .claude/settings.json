@@ -22,6 +22,17 @@
             "statusMessage": "doc-edit reconcile check"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/contract-surface-reminder.js\" 2>/dev/null || true",
+            "timeout": 10,
+            "statusMessage": "contract-surface check"
+          }
+        ]
       }
     ],
     "PostToolUse": [

@@ -41,6 +41,8 @@ Cleanup, reconciliation, doc/memory audits, and verification loops are **support
 3. **Adjacent-context survey** — when citing a file, `ls` its parent; when citing a doc, `ls docs/`; before claiming "X has no Y", grep for Y
 4. **Active doubt on state claims** — "the convention is X" / "the design landed at Y" need three independent sources before stating
 
+Where `docs/CLAUDE_REMEDIATION_PLAN.md` addresses the *ground-truth* gap, its sibling **`docs/CLAUDE_SKILL_REMEDIATION_PLAN.md`** addresses the *verification-shape* gap — how to read, verify, implement, and report so headlines / grep-hits / plan-intent aren't over-trusted. Its operational form is the **`/contract-reconcile`** skill (whole-flow trace caller→persistence→consumer + six audits; auto-fires on migration/new-table/new-route/dedup/partial-save/stream/verify-findings work, also runnable by name), backed by a PreToolUse hook (`.claude/hooks/contract-surface-reminder.js`) that nudges the durable-surface obligations when a migration / new API route / `CREATE TABLE` is written.
+
 The **Application State Atlas** at `docs/APPLICATION_STATE_ATLAS.md` (with per-entity pages in `docs/atlas/`) is the canonical reference for live-state lookups. Read the relevant per-entity page before any plan claim about that entity's schema, source-of-truth, read paths, or write paths. Re-run the probe scripts (`scripts/audit-postgres-state.js`, `scripts/audit-dataverse-state.js`) if a page hasn't been touched in 60+ days and you're planning destructive work.
 
 ### CI gates
