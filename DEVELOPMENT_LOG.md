@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Web-grounded reviewer discovery (Perplexity Search) live in prod (Session 227)
+
+**Milestone:** Reviewer-finder now surfaces currently-active, mid-career researchers from the live web (Perplexity Search → A7-wrapped Claude name-extraction → a read-only "Web suggestions" panel) to counter Claude's training-cutoff + fame bias. Track C v1 — **leads-only / display-only**: never enters candidates, ranking, COI, roster, or save. `PERPLEXITY_API_KEY` is now live in prod, so the capability activates on deploy.
+
+**Sessions:** 225 (backend `WebDiscoveryService` + A7 extraction prompt, inert); 227 (route + capability-gated UI + live Perplexity Search contract verified + extraction-budget tuning; `/contract-reconcile` pass; pushed to prod).
+
+**Ship state:**
+- Route `/api/reviewer-finder/web-suggestions` (key-gated, fail-soft, server-derived ≤3 queries); read-only panel + default-on `searchWeb` toggle in the SHARED `ReviewerSearchSection` (one integration covers standalone + Workbench Find tab).
+- The web call runs as a genRef-guarded fire-and-forget IIFE OFF `/discover`'s abort boundary — a web outage yields an empty panel, never a search error.
+- Live contract VERIFIED via `scripts/probe-perplexity-search.mjs`: HTTP 200 Search-API entitlement (key was bought for VRP sonar chat), M/D/YYYY date filter accepted + honored, §5 result shape confirmed.
+- Extraction budget tuned (`WEB_RESULTS_MAX_CHARS` 20K→100K, output 1024→4096, new 6K per-snippet guard) after the probe showed ~8KB faculty-page snippets truncated all but ~2-3 of up to 24 results.
+
+**Why it matters:** First web-grounded discovery source in prod — closes the recall/freshness gap (Claude can't name post-cutoff researchers and over-surfaces famous ones). Read-only v1 IS the monitoring phase before any pipeline integration (deferred v2).
+
+**Pointers:** plan `docs/REVIEWER_WEB_DISCOVERY_PLAN.md`; memory `project-reviewer-finder-next-topics` §3; VRP-coupling of the now-permanent key parked in `project-virtual-review-panel`. Commits `693be96`, `f52e633`, `e827780`, `274baca`.
+
 ## June 2026 — Reviewer-finder prompts migrated to Dataverse; admin + per-user editable (Session 222)
 
 **Milestone:** The reviewer-finder analysis + candidate-scoring prompts now resolve from the Dataverse `wmkf_ai_prompt` store at runtime (per-user override → Dataverse `iscurrent` → code fallback), so reword no longer needs a deploy. Shipped a superuser `/admin` versioned-publish editor and an in-app per-user override editor. Prod cutover run + live-verified (analyze resolves `source=dataverse`).

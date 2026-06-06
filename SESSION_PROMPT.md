@@ -1,63 +1,70 @@
-# Session 227 Prompt: Web-discovery increment 2 (route + UI) — or observe the new Stop-gate harness
+# Session 228 Prompt: Monitor web-discovery in prod — or pick up reviewer-finder deferred-v2 / other threads
 
-## Session 226 Summary
+## Session 227 Summary
 
-Short, focused session. The agenda was to **review the enforcement harnesses Codex authored while S225 slept** (the instruction-architecture Phase-2 work). Reviewed against the *corrected* Phase-1 review, found and fixed two real `Stop`-hook loops, then committed + pushed the whole changeset.
+Built and shipped **Track C v1 increment 2** — the read-only web-grounded "Web suggestions" feature for reviewer-finder — and **took it live in prod**. Justin set `PERPLEXITY_API_KEY` live in prod mid-session, which flipped the risk model (no longer inert), so the gating live contract test was run + passed, the extraction budget was tuned, and everything was pushed.
 
 ### What Was Completed
 
-1. **Reviewed Codex's instruction-architecture harnesses** — verdict: faithful to the *corrected* §4 (not the withdrawn first draft). Checked each constraint in source:
-   - SessionStart is advisory-only (can't block — verified); symlink guard is a PreToolUse Write/Edit **deny** (`protected-path-guard.js`).
-   - Stop hook = deterministic **changed-surface** gate check, scoped to session-owned changes, advisory by default (`CLAUDE_STOP_GATE_MODE=block` opts in); symlink breakage blocks immediately.
-   - `setup-database.js` self-contradiction reconciled **in source** + source-level `assertFreshDatabase` guard (refuses populated DBs; `ALLOW_POPULATED_DATABASE_SETUP=true` for recovery).
-   - `CLAUDE_INSTRUCTION_AUTHORITY.md` = ownership registry (one-rule-one-home), not a runtime precedence ladder.
-   - CLAUDE.md trimmed **308→82 lines**; 9 `.claude/rules/*.md` with valid `paths:` frontmatter; CI wires `check:agent-invariants:ci` (tracked-only) + `check:instruction-architecture`. All gates green.
+1. **Web-suggestions route + read-only UI panel** (`693be96`)
+   - New route `pages/api/reviewer-finder/web-suggestions.js` — POST, `requireAppAccess('reviewer-finder','reviewers')`, rate-limited, key-gated. Derives ≤3 web queries + a proposalContext blurb from the held `analysisResult` **server-side** (cost cap can't be bypassed by the client), calls `WebDiscoveryService.search`, returns `{ success, webLeads, … }`. Fail-soft (always 200).
+   - `ReviewerSearchSection` (shared by the standalone page AND the Workbench Find tab, so one integration covers both): capability self-fetch (`api-capabilities.reviewerWebSearch`) drives a default-on "Also search the web" toggle, hidden when no key. The web call fires in `runSearch` as a **genRef-guarded fire-and-forget IIFE, fully OFF `/discover`'s error/abort boundary**, rendering a visually separate read-only panel (name, snippet, provenance link, date).
+   - **Bug caught during the build:** a stale-closure that pinned `webSearchAvailable` to its initial `false` (fixed by adding it + `searchWeb` to the `runSearch` deps).
+   - Security-matrix row + `CANONICAL_COUNTS` 105→106 / 57→58 refreshed + the two count-hardcoding docs reconciled. `/contract-reconcile` (Mode A) → READY; leads-only/display-only invariant verified (web state never reaches candidates/save/roster).
 
-2. **Fixed two `Stop`-hook infinite loops (found live).** `additionalContext` on `Stop` **re-opens the turn** ("conversation continues so Claude can act on the feedback"), so any advisory emitted on a normal stop loops forever:
-   - **No-ledger path** → now exits silently (nothing actionable; sessions predating the hook hit this — I was in this loop during review).
-   - **Advisory gate-failure path** → de-dups on (failing gates + changed-surface fingerprint): surfaces each distinct state to Claude **once**, then the next Stop proceeds. Block mode (exit 2) unchanged.
+2. **Live Perplexity Search contract VERIFIED + docs reconciled** (`f52e633`)
+   - `scripts/probe-perplexity-search.mjs` (on-demand, not a jest test — never fires in `npm test`/CI) made one real `POST /search`: **HTTP 200** (the key, bought for VRP sonar chat, IS entitled to the Search API), `search_after_date_filter` **M/D/YYYY accepted + honored**, `results[].{title,url,snippet,date,last_updated}` shape matches plan §5 (10/10).
 
-### Commits
-- `605593e` — feat(claude-arch): instruction-architecture enforcement harnesses (Phase 2)
-- `8786664` — fix(claude-arch): stop advisory gate-failure from looping the Stop hook
-- (this doc commit) — Session 226 docs + memory
+3. **Extraction-budget tuning** (`e827780`)
+   - The probe showed ~8KB faculty-page snippets were truncating all but ~2-3 of up to 24 results at the old 20K cap (recall-capping). Nothing external forced it (Sonnet, 200K window; ~cents/search) — untuned defaults. `WEB_RESULTS_MAX_CHARS` 20K→100K, `EXTRACTION_MAX_TOKENS` 1024→4096, new `PER_SNIPPET_MAX_CHARS` 6K guard (full snippet still stored for display).
+
+4. **Tracked the key + parked the VRP coupling** (`274baca`)
+   - `perplexity_api_key` (tier vendor) added to `tracked-secrets.js` + runbook mirror. The VRP-exposure consequence of the now-permanent key moved OUT of the reviewer-finder memory INTO `project-virtual-review-panel` — to be settled during VRP work, not each reviewer session.
+
+5. Committed Justin's parallel `secret-check.js` change (`emailAdmins: true`) separately (`1e35d3e`).
+
+### Commits (all pushed to prod)
+- `693be96` feat: web-suggestions route + read-only panel
+- `f52e633` test: live Perplexity Search contract verified + doc reconcile
+- `e827780` perf: widen web-extraction budget
+- `274baca` chore: track PERPLEXITY_API_KEY + park VRP coupling
+- `1e35d3e` feat(ops): email admins on secret-check alerts (Justin's change)
 
 ## Potential Next Steps
 
-### 1. Web-discovery increment 2 (route + UI) — the main feature thread
-Backend (`lib/services/web-discovery-service.js`) shipped S225, **inert in prod** (no caller). To wire it up:
-- Route `pages/api/reviewer-finder/web-suggestions.js` — `requireAppAccess('reviewer-finder','reviewers')`, key-gated, calls `WebDiscoveryService.search`. **Add an API_ROUTE_SECURITY_MATRIX entry or `check:api-routes` goes red.** (The new Stop gate will also flag `pages/api/**` changes.)
-- Read-only "Web suggestions" panel + capability-gated `searchWeb` toggle on both surfaces (`ReviewerSearchSection.js` + Workbench `ReviewerFindPanel.js`).
-- ⚠ **Live Perplexity contract test before enabling** — no `PERPLEXITY_API_KEY` set yet; `search_after_date_filter` format (M/D/YYYY) is unconfirmed against the real API. Deferred-v2 (full pipeline integration) contracts live in plan §10. See [[project-reviewer-finder-next-topics]] §3.
+### 1. Monitor the live web-suggestions feature (the v1 point)
+v1 read-only IS the monitoring phase. After the deploy, watch the first real staff searches: is the toggle showing? Are the web leads relevant/current (mid-career, not founders)? Is the new wider budget surfacing more names? Quality of results drives whether deferred-v2 (pipeline integration) is worth doing.
 
-### 2. Observe the new Stop-gate harness before enabling blocking
-Per [[project-claude-instruction-architecture]] follow-up: watch a few real sessions in **advisory** mode. Record false positives, missed Bash-authored changes (only Write/Edit are attributed), and Stop runtime. Only then consider `CLAUDE_STOP_GATE_MODE=block`. **Latent**: the `main()` error-catch in `session-lifecycle.js` still emits `additionalContext` on a `stop()` exception (loops only if the hook is persistently broken) — Justin deferred fixing it.
+### 2. (Deferred-v2) Pipeline integration — only if monitoring justifies it
+The "Add as candidate" / manual-add path + merge→rank→COI→save. Carries real contracts (Codex v6). `docs/REVIEWER_WEB_DISCOVERY_PLAN.md` §10. NOT built. Don't start unless monitoring shows the leads are worth automating.
 
-### 3. (Deferred) "Add as candidate" manual-add path
-Parked — carries real contracts (Codex v6 review). Not in read-only v1.
+### 3. VRP-coupling cleanup — DEFERRED, only when next working on VRP
+Now that `PERPLEXITY_API_KEY` is permanently live, decide whether `VRP_ALLOWED_PROVIDERS` should include `perplexity`. Prod is still fail-closed while unset; dev/test (allowlist unset) already exposes Perplexity to VRP. Parked in `project-virtual-review-panel`. Do NOT surface this every session.
+
+### 4. Untracked items left for Justin
+`.claude/skills/agent-coordination/` + `docs/AGENT_COLLABORATION_PLAN.md` appeared mid-session (Justin's multi-agent-coordination work-in-progress) — left untracked/uncommitted, not mine to commit.
 
 ## Standing context / guardrails
-- **`main` auto-deploys to prod on push. Commit/push only when asked.** This session's commits are agent-instruction infra + an inert service — safe in prod.
-- **The `additionalContext`-on-`Stop`-loops-the-turn fact is now load-bearing** — see [[project-claude-instruction-architecture]] before touching `session-lifecycle.js`. Block (exit 2) is the only non-looping way to make Stop act every time.
-- `/contract-reconcile` before declaring multi-layer work done; keep the impl→post-impl Codex loop.
+- **`main` auto-deploys to prod on push. Commit/push only when asked.** This session pushed *with* explicit approval; the feature is now LIVE.
+- Twice this session `git add -A` swept an unrelated user change (`secret-check.js`) into a commit — **stage by explicit path, not `-A`**, when Justin is editing in parallel.
+- `/contract-reconcile` before declaring multi-layer work done; the impl→post-impl loop holds.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `.claude/hooks/session-lifecycle.js` | SessionStart baseline + PostToolUse record + Stop changed-surface gate (advisory; de-duped) |
-| `.claude/hooks/protected-path-guard.js` | PreToolUse deny on Write/Edit to `AGENTS.md` / `.agents/skills` |
-| `scripts/check-instruction-architecture.js` | Self-testing gate for the whole harness (18 checks) |
-| `docs/CLAUDE_INSTRUCTION_AUTHORITY.md` | Instruction ownership registry + hook safety contract |
-| `lib/services/web-discovery-service.js` | Perplexity → A7 extraction → WebLead[] (read-only v1, inert until a route calls it) |
-| `docs/REVIEWER_WEB_DISCOVERY_PLAN.md` | v7 read-only scope + deferred-v2 integration contracts |
+| `pages/api/reviewer-finder/web-suggestions.js` | Read-only web-suggestions route (key-gated, fail-soft, server-derived queries) |
+| `shared/components/reviewers/ReviewerSearchSection.js` | `searchWeb` toggle + web call (fire-and-forget, off /discover) + read-only panel; shared by both surfaces |
+| `lib/services/web-discovery-service.js` | Perplexity `/search` → A7 extraction → `WebLead[]`; tuned budget constants |
+| `scripts/probe-perplexity-search.mjs` | On-demand live Search-API contract test (verified 2026-06-05) |
+| `docs/REVIEWER_WEB_DISCOVERY_PLAN.md` | v7 scope + §10 deferred-v2 integration contracts |
 
 ## Testing
 
 ```bash
-npm run check:instruction-architecture          # 18 harness checks
-npm run check:agent-invariants                   # 3 symlinks (tracked + per-machine)
-node -c .claude/hooks/session-lifecycle.js       # hook parses
-npx jest web-discovery-service                   # 15 tests (increment 1)
+npx jest web-discovery-service web-suggestions-endpoint reviewer-web-suggestions-toggle   # 29 tests
+node scripts/probe-perplexity-search.mjs                                                  # live contract (needs key; one paid call)
+npm run check:api-routes                                                                  # security-matrix (106 routes)
+npm run check:prompt-injection-tagging                                                    # A7 extraction wrap
 # full startup gate set: see .claude/skills/start
 ```
