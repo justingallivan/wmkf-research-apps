@@ -1,70 +1,74 @@
-# Session 231 Prompt: Validate the reviewer-finder UI/COI changes on a real request; pick up open threads
+# Session 232 Prompt: Reviewer-finder retrieval-first redesign — next slices (provenance DTO, field-routed sources)
 
-## Session 230 Summary
+## Session 231 Summary
 
-Started as a quick Workbench UI tweak and turned into a full reviewer-finder pass: two UI consolidations, a recurring prod-bug class fixed + permanently gated, and the web-discovery feature evaluated on real proposals and **abandoned + removed**. All work committed and pushed; build + all `check:*` gates green.
+Started as "validate the S229 COI/ranking work on a real request," and that
+validation surfaced a deeper problem that drove the whole session: the
+reviewer-finder pipeline uses Claude as a candidate **generator**, which is
+stale/senior-biased/hallucination-prone, and the verify path **launders**
+fabrications. Outcome: a written retrieval-first redesign plan (Codex-reviewed
+twice), an empirical evidence base, and **three safety/reliability fixes shipped
+to prod**. All committed + pushed; build + gates green throughout.
 
 ### What Was Completed
 
-1. **Workbench Find-tab UI consolidation**
-   - **Merged the applicant-recommended list into the bottom "Optional: verify the applicant's suggested reviewers" card** (`954fd91`) — removed the standalone top card from `ReviewerFindPanel`.
-   - **Folded the "Applicant-excluded reviewers" card into the Search card** (`e7fc59b`) — the parsed names already prefill the Exclude box; moved the "Applicant's original text" disclosure under it and deleted the redundant card.
-   - **Not visually confirmed in-browser** (the session's local-auth detour ate that) — see Next Step #2.
+1. **S229 validated on real proposals (read-only).** Built `scripts/validate-reviewer-analyze.mjs` (full proposal → ranked suggestions, no writes) + `scripts/lib/use-extensionless.mjs` (ESM loader so raw `node` runs app modules). Confirmed S229 on real requests (1002865 RNA/ML, 1002279 chem, etc.): COI/named-competitors → POTENTIAL_CONCERNS, recency-leaning seniority, REASONING fitness-only.
 
-2. **Fixed the "forgot `loadModelOverrides()` → Anthropic 404 on tier alias" bug class + a CI gate to end it**
-   - Root cause that surfaced as "Mya Breitbart couldn't parse": `applicant-reviewers` (excluded-reviewer extraction) and `integrity-screener/screen` resolved a model without warming overrides → 404. Fixed both + regression test (`545ba0e`). Same class as S229's web-suggestions fix.
-   - Built **`check:model-override-warming`** — an AST gate (`@babel/parser`) that fails any route reaching a model resolver without an awaited `loadModelOverrides()` first (`dbc5060`). Hardened across **two Codex review rounds** (`2fe4472`, `d560a0d`): ordering + await enforcement, alias resolution, `Promise.all`-wrap handling, transitive-only ignore marker. Wired into `package.json`, CI, `/start` gate list, `docs/CI_GATES_REFERENCE.md`.
+2. **Found + fixed the verify-path fail-dangerous bug (SHIPPED `a3e6cbb`, `4638db6`).** A fabricated wrong-forename ("Alfred Laederach") verified against the real same-initial person (Alain) with 100% confidence — `generateNameVariants` initial variant + first-initial `namesMatch` + `MIN_PUBLICATIONS` with no forename check. Fix: verification gates on a full-forename match (article-gathering keeps recall); institution/expertise mismatches demote→soft-flag-only (the forename gate is the sole demoter — caught over-demoting Silvi Rouskin in a live smoke). PubMed `year` now prefers real pub date over Medline maintenance dates.
 
-3. **Web-grounded reviewer discovery — EVALUATED → ABANDONED → REMOVED**
-   - v1.1 quality pass first (`62445ec`, COI matcher tightening `35b8b03`): individual-targeted queries, per-person rationale, COI filter (proposal PI/Co-Is), per-URL cap.
-   - **Evaluated on 3 real proposals** (1002794 / 1002238 / 1002204) and **PubMed/ORCID-verified every name**: it reliably finds a few real experts but **fabricates** — invented people, invented emails (inconsistent), and **real people given fabricated affiliations/expertise**. Confidence self-report unreliable; fabrication scales with topic obscurity.
-   - **Recorded as a failed experiment** (`202bcfc`: plan-doc OUTCOME banner + `project-reviewer-web-discovery-abandoned` memory) and **fully removed** (`502154d`, −1,194 lines): route, service, prompt, capability, UI, tests. `PERPLEXITY_API_KEY` kept (VRP sonar still uses it). Eval probes kept as evidence.
+3. **Analyze reliability contract (SHIPPED `de69833`, fixed `0af842c`).** Analyze no longer silently succeeds on empty/short/truncated responses (live smoke hit empty 1002899 + 1-suggestion 1003032). Added a mode-aware validator + 2-attempt budget-gated repair loop (maxTokens→8192 on truncation) + typed `analysis_invalid` surfaced as a retryable error in BOTH frontends (shared `readSseStream`) + a code-owned A7-safe repair block + `analysisPurpose:'proposal_info'` bypass for `enrich-recommended`. Validator **sanitizes** quality issues (placeholders/dups/excluded dropped; incomplete dropped from payload + off-floor) rather than hard-failing. `0af842c` fixed a regression I introduced (incomplete entries had leaked into the downstream payload — Codex re-review caught it).
+
+4. **Evidence base + plan + spec (DESIGN, mostly not built).** Random 10-request cycle sample (analyze behavior across fields; ~20% analyze flakiness; ~1-in-4 non-research grants) + free multi-source coverage probe (`scripts/probe-source-coverage.mjs`). Findings: PubMed = biomedical depth only (astro/physics is sparse-real + namesake-conflated); **OpenAlex + ORCID** cover the PubMed-blind fields; NASA ADS/arXiv are the missing physics sources; Semantic Scholar ≈ OpenAlex recall but no inline ORCID. Wrote `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` + `docs/REVIEWER_ANALYZE_CONTRACT_SPEC.md` (both Codex-reviewed) + memory entries.
 
 ### Commits
-- `954fd91` merge applicant-recommended into the verify card
-- `545ba0e` warm model overrides in applicant-reviewers + integrity screen (+test)
-- `dbc5060` / `2fe4472` / `d560a0d` add + harden `check:model-override-warming`
-- `e7fc59b` fold applicant-excluded card into the search exclude box
-- `62445ec` / `35b8b03` web-discovery v1.1 quality pass + COI matcher
-- `202bcfc` record web-discovery as evaluated→abandoned
-- `502154d` remove the abandoned web-discovery feature
+- `443a2a7` retrieval-first redesign plan + S231 probes + memory (redesign direction + verify-fail-dangerous hazard)
+- `58741bb` revise redesign plan per Codex review (contracts, sequencing, COI parity)
+- `a3e6cbb` verify: gate on full-forename match (fail-dangerous fix)
+- `4638db6` verify: forename gate is sole demoter; mismatches are soft flags
+- `de69833` analyze: validation + retry/repair + typed analysis_invalid failure
+- `0af842c` analyze: drop incomplete suggestions from payload + prefer-complete dedup
+- (also pushed leftover `7b059bb` trial agent-wiki guardrails from S230 at session start)
 
 ## Potential Next Steps
 
-### 1. Validate the S229 COI/concern + reseeded analyze prompt on a REAL request (the still-open original goal)
-This was Session 230's *intended* first task and never happened. **#1002788 is a dummy corner case** (real project description pasted into a test request, dummy PIs, no abstract — confirmed S230) — don't use it. Pick a real request with a populated abstract + real PI/Co-Is and confirm: the model leans currently-active/mid-career over field founders, and conflicts land in POTENTIAL_CONCERNS → the amber advisory, with REASONING fitness-only. Per-user prompt override caveat still applies (override → dataverse → code-fallback).
+### 1. Provenance-DTO migration (plan §4.2) — the next big slice
+The cross-layer wire shape (`provenance.{kind,sources,seedRole,groundingWorkIds}`) across the FOUR consumers that today use binary source semantics: `/discover` result events, `reviewer-roster-store.js` (`claude_verified` vs `database`), `save-candidates.js` (source mapping), and `ReviewerSearchSection.js` (UI sections by `isClaudeSuggestion`). Must land together. Unblocks field-routed sources. Codex flagged this as the centerpiece blocker; scope a spec → Codex-review → build → smoke → merge, same loop as the analyze slice.
 
-### 2. Eyeball the two Find-tab UI changes in the browser
-`954fd91` + `e7fc59b` changed the Find tab layout but were never visually verified (local Azure auth wasn't set up; `.env.local` now has the secrets — `npm run dev`, sign in via Microsoft). Confirm: the merged "Optional: verify…" card renders correctly at the bottom, and the exclude box prefills + shows the "Applicant's original text" disclosure with the excluded card gone.
+### 2. Field-routed sources (plan §4.1/§6) — needs the DTO first
+OpenAlex + ORCID cross-field spine; NASA ADS/arXiv for physics/astro; DBLP for CS. **Prereq:** parse richer PubMed XML (`Initials`, ORCID `Identifier`, `MeshHeadingList`, `ArticleDate`/`PubDate`) — these are load-bearing for the identity anchors, not nice-to-have. **Sequencing:** add sources BEFORE demoting Claude generation, or PubMed-blind fields lose all candidates. Verify ADS/S2 production key constraints before relying.
 
-### 3. `reset-request-reviewers --include-slots` still unexercised live (carryover from S229)
-The slot-clearing path ($ref disassociation, nav-property `wmkf_PotentialReviewer{N}`) hasn't run live; watch its output + confirm the nav-property resolves the first time.
+### 3. Carryover (still unverified)
+- **Eyeball the Find-tab UI changes in-browser** (`954fd91`+`e7fc59b`, S230) — never visually confirmed. `.env.local` has Azure auth; `npm run dev` + Microsoft sign-in. Also worth eyeballing the new `analysis_invalid` retryable error states (both frontends) shipped this session.
+- **`reset-request-reviewers --include-slots`** still unexercised live (S229 carryover).
 
-### 4. Reviewer web-discovery v2 — only if revisited
-Deprioritized. If ever resumed, grounding is mandatory: agent/web as a discovery source ONLY, then verify a topical PubMed/ORCID record, derive affiliation+contact from the verified record (never the model), drop the ungroundable. Full rationale: `[[project-reviewer-web-discovery-abandoned]]`.
+### 4. Deeper analyze fix (deferred)
+The retry/typed-failure now *handles* the ~20% degraded-response rate, but the underlying cause is delimiter-format brittleness + Claude padding/truncation. The real fix is the JSON-schema Stage-0 rewrite — deferred to the retrieval-first phase (plan §4.4 end-state), since it couples to removing parametric generation (which needs sources first).
 
 ## Standing context / guardrails
-- **`main` auto-deploys to prod on push. Commit/push only when asked.** Stage by explicit path (not `-A`).
-- **`.env.local` points at the same prod Dataverse + Postgres.** Scripts that mutate hit prod — dry-run first.
-- Dataverse-querying scripts need `enterDynamicsBypassForScript(label)`; the reviewer-agent probe (`scripts/probe-perplexity-reviewer-agent.mjs`) is read-only (`--request` pulls title/abstract/PI from Dynamics; `--dry-run` skips the paid call).
-- `/contract-reconcile` + Codex review before declaring multi-layer work done (caught real defects again this session).
+- **`main` auto-deploys to prod on push. Commit/push only when asked.** Stage by explicit path (not `-A`). Pre-deploy: `npm run build` green before pushing.
+- **`.env.local` points at prod Dataverse/Postgres.** Read-only probes are fine; anything mutating hits prod.
+- **Codex review caught real defects again — including one I (Claude) introduced** (`0af842c`). Keep the loop: spec → Codex review → build → self-review + live smoke → merge. The Codex rescue runs in a sandbox that can't write `.git` — it leaves changes uncommitted; commit after review.
+- Probe scripts use `node --import ./scripts/lib/use-extensionless.mjs <script>`; Dataverse access needs `enterDynamicsBypassForScript(label)`.
+- Memory router: `project-reviewer-finder-retrieval-redesign` (direction) + `project-reviewer-verify-fail-dangerous` (hazard).
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `shared/components/reviewers/ReviewerSearchSection.js` | The shared Find/standalone search UI — now owns the merged verify card + the exclusion box/disclosure |
-| `shared/components/reviewers/ReviewerFindPanel.js` | Workbench Find sub-tab; ingests applicant reviewers, passes state to the search section |
-| `scripts/check-model-override-warming.js` | CI gate: routes resolving a model must warm overrides first (+ `-self-test.js`) |
-| `pages/api/workbench/applicant-reviewers.js` | Excluded-reviewer extraction; now warms overrides |
-| `pages/api/integrity-screener/screen.js` | Integrity screening; now warms overrides |
-| `docs/REVIEWER_WEB_DISCOVERY_PLAN.md` | Web-discovery design doc — now headed by the ABANDONED OUTCOME banner |
-| `scripts/probe-perplexity-reviewer-agent.mjs` | Read-only eval probe kept as the abandoned-experiment evidence |
+| `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` | The architecture: fan-out/fan-in, provenance model, coverage-by-field, sequencing. Read first. |
+| `docs/REVIEWER_ANALYZE_CONTRACT_SPEC.md` | Per-slice spec for the (shipped) analyze reliability contract. |
+| `lib/services/discovery-service.js` | `verifyClaudeSuggestions` — forename gate + identity status (shipped). |
+| `shared/config/prompts/reviewer-finder.js` | `validateReviewerAnalysis` — mode-aware validator + sanitization (shipped). |
+| `lib/services/claude-reviewer-service.js` | `analyzeProposal` retry/repair loop + typed failure (shipped). |
+| `scripts/validate-reviewer-analyze.mjs` | Read-only single-request analyze probe (reusable). |
+| `scripts/probe-source-coverage.mjs` | Read-only multi-source coverage probe (PubMed/OpenAlex/ORCID/DBLP/keyed-S2). |
+| `scripts/lib/use-extensionless.mjs` | ESM loader for raw-`node` probe scripts. |
 
 ## Testing
 
 ```bash
-npx jest reviewer applicant-reviewers          # reviewer-finder + COI/concern + warming regressions
-npm run check:model-override-warming && npm run check:model-override-warming:self-test
+npx jest reviewer discovery analyze pubmed verification   # all reviewer-finder unit tests
+node --import ./scripts/lib/use-extensionless.mjs scripts/validate-reviewer-analyze.mjs --request <num>
+node --import ./scripts/lib/use-extensionless.mjs scripts/probe-source-coverage.mjs --names "Anna Frebel, David Baker"
 # full startup gate set: see .claude/skills/start
 ```
