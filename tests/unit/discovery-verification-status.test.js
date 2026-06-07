@@ -1,0 +1,178 @@
+/**
+ * @jest-environment node
+ */
+
+jest.mock('../../lib/services/pubmed-service', () => ({
+  PubMedService: {
+    search: jest.fn(),
+  },
+}));
+
+const { DiscoveryService } = require('../../lib/services/discovery-service');
+const { PubMedService } = require('../../lib/services/pubmed-service');
+
+const article = (pmid, authorName, title = 'Relevant publication') => ({
+  pmid,
+  title,
+  year: new Date().getFullYear(),
+  journal: 'Journal of Tests',
+  abstract: '',
+  authors: [{
+    name: authorName,
+    affiliation: 'University of North Carolina, Chapel Hill, NC',
+  }],
+});
+
+const runVerification = (suggestion, articlesByQuery) => {
+  PubMedService.search.mockImplementation(async (query) => {
+    for (const [needle, articles] of Object.entries(articlesByQuery)) {
+      if (query.includes(needle)) return articles;
+    }
+    return [];
+  });
+  return DiscoveryService.verifyClaudeSuggestions([suggestion], () => {});
+};
+
+describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
+  let setTimeoutSpy;
+  let originalMinPublications;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    originalMinPublications = DiscoveryService.MIN_PUBLICATIONS;
+    DiscoveryService.MIN_PUBLICATIONS = 3;
+    setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((cb) => {
+      cb();
+      return 0;
+    });
+  });
+
+  afterEach(() => {
+    DiscoveryService.MIN_PUBLICATIONS = originalMinPublications;
+    setTimeoutSpy.mockRestore();
+  });
+
+  test('fabricated Alfred Laederach does not verify against Alain Laederach initial-only PubMed hits', async () => {
+    const alainArticles = [
+      article('1', 'Alain Laederach'),
+      article('2', 'Alain Laederach'),
+      article('3', 'Alain Laederach'),
+    ];
+
+    const result = await runVerification(
+      { name: 'Dr. Alfred Laederach', expertiseAreas: [] },
+      { 'A Laederach[Author]': alainArticles },
+    );
+
+    expect(result.verified).toHaveLength(0);
+    expect(result.unverified).toHaveLength(1);
+    expect(result.unverified[0]).toMatchObject({
+      name: 'Dr. Alfred Laederach',
+      verified: false,
+      verificationStatus: 'unresolved',
+      identityStatus: 'unresolved',
+    });
+    expect(result.unverified[0].reason).toMatch(/forename|initial/i);
+  });
+
+  test('correct full-name match is verified', async () => {
+    const alainArticles = [
+      article('1', 'Alain Laederach'),
+      article('2', 'Alain Laederach'),
+      article('3', 'Alain Laederach'),
+    ];
+
+    const result = await runVerification(
+      { name: 'Alain Laederach', expertiseAreas: [] },
+      { 'Alain Laederach[Author]': alainArticles },
+    );
+
+    expect(result.unverified).toHaveLength(0);
+    expect(result.verified).toHaveLength(1);
+    expect(result.verified[0]).toMatchObject({
+      name: 'Alain Laederach',
+      verified: true,
+      verificationStatus: 'verified',
+      identityStatus: 'verified',
+    });
+    expect(result.verified[0].nameEvidence.hasFullForenameMatch).toBe(true);
+  });
+
+  test('initial-only suggestion with no corroboration stays unresolved', async () => {
+    const alainArticles = [
+      article('1', 'Alain Laederach'),
+      article('2', 'Alain Laederach'),
+      article('3', 'Alain Laederach'),
+    ];
+
+    const result = await runVerification(
+      { name: 'A Laederach', expertiseAreas: [] },
+      { 'A Laederach[Author]': alainArticles },
+    );
+
+    expect(result.verified).toHaveLength(0);
+    expect(result.unverified).toHaveLength(1);
+    expect(result.unverified[0]).toMatchObject({
+      verified: false,
+      verificationStatus: 'unresolved',
+      identityStatus: 'unresolved',
+    });
+    expect(result.unverified[0].nameEvidence).toMatchObject({
+      hasFullForenameMatch: false,
+      hasInitialOnlyMatch: true,
+    });
+  });
+
+  test('institution mismatch demotes an otherwise full-name match to unresolved', async () => {
+    const alainArticles = [
+      article('1', 'Alain Laederach'),
+      article('2', 'Alain Laederach'),
+      article('3', 'Alain Laederach'),
+    ];
+
+    const result = await runVerification(
+      {
+        name: 'Alain Laederach',
+        suggestedInstitution: 'Salk Institute',
+        expertiseAreas: [],
+      },
+      { 'Alain Laederach[Author]': alainArticles },
+    );
+
+    expect(result.verified).toHaveLength(0);
+    expect(result.unverified).toHaveLength(1);
+    expect(result.unverified[0]).toMatchObject({
+      verified: false,
+      verificationStatus: 'unresolved',
+      identityStatus: 'unresolved',
+      institutionMismatch: true,
+    });
+    expect(result.unverified[0].reason).toMatch(/institution/i);
+  });
+
+  test('expertise mismatch demotes an otherwise full-name match to unresolved', async () => {
+    const alainArticles = [
+      article('1', 'Alain Laederach', 'Cell mechanics'),
+      article('2', 'Alain Laederach', 'RNA structure'),
+      article('3', 'Alain Laederach', 'Molecular folding'),
+    ];
+
+    const result = await runVerification(
+      {
+        name: 'Alain Laederach',
+        expertiseAreas: ['photosynthetic coral bleaching'],
+      },
+      { 'Alain Laederach[Author]': alainArticles },
+    );
+
+    expect(result.verified).toHaveLength(0);
+    expect(result.unverified).toHaveLength(1);
+    expect(result.unverified[0]).toMatchObject({
+      verified: false,
+      verificationStatus: 'unresolved',
+      identityStatus: 'unresolved',
+      expertiseMismatch: true,
+    });
+    expect(result.unverified[0].reason).toMatch(/expertise/i);
+  });
+});
