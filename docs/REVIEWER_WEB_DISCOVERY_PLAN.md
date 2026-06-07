@@ -1,5 +1,28 @@
 # Reviewer Web-Grounded Discovery (Perplexity Track C) — Build Plan
 
+> ## 🛑 OUTCOME (S230, 2026-06-06): EVALUATED → ABANDONED
+> The shipped read-only web-suggestions panel — and a follow-on probe of a single
+> Perplexity `sonar` reviewer-**agent** call (the JSON-returning prompt Perplexity
+> itself proposed) — were evaluated on real proposals and **abandoned**. The web
+> search option is being removed from the reviewer-finder UI. Everything below is
+> retained as the historical design record; **do NOT re-implement the naive
+> (ungrounded) versions.**
+>
+> **What was tried**
+> - *v1.1 (shipped):* Perplexity `/search` (retrieval) → Claude name-extraction → read-only leads. A live run was mostly noise — faculty-directory pages scraped into junk "leads", raw page-dump snippets, and a Co-PI surfaced as a reviewer. S230 fixed the COI filter + a per-URL cap + per-person rationale (commits `62445ec`, `35b8b03`), but quality stayed poor.
+> - *Probe (not in the app):* `scripts/probe-perplexity-reviewer-agent.mjs` — one `sonar-pro` chat call that BOTH searches and reasons, returning finished reviewer JSON. Read-only.
+>
+> **Why abandoned — hallucination VERIFIED against PubMed/ORCID on real proposals:**
+> | Request | Topic | Verified result |
+> |---|---|---|
+> | 1002794 | attosecond physics (mainstream) | ~7/7 real & on-topic; 5 plausible-but-unverified emails |
+> | 1002238 | fungal electrophysiology (niche) | 3 real (Bowman, Beasley, Shabala); **2 confirmed fabricated** (a UT-Austin "Neurospora Michael Levine" + invented email; "Adam Pawluk"); 1 unconfirmed |
+> | 1002204 | RNA intronic thermosensors | 2 strong (Mayr, Kinney) + 1 weak (Hawley); **2 confirmed conflations — REAL people given FALSE affiliations/fields** (DasGupta→"Berkeley", Frische→"Copenhagen"); 1 unsubstantiated |
+>
+> **Failure modes (all verified, not merely suspected):** invented people; invented institutional emails (inconsistent — present 1002238, absent 1002204, so "no email" is NOT a safety signal); and **real researchers given fabricated affiliations + expertise** (worst case — passes a naive "does this name exist?" check, would mis-route a real email). Self-reported `confidence` was unreliable (a perfect match rated "low"; a fabrication "medium"). Fabrication rate scales with topic obscurity.
+>
+> **The one viable path (identified, NOT built):** the agent is a decent idea generator but unsafe raw. A safe v2 would use it as a discovery source ONLY and **ground every name through PubMed/ORCID** — verifying a TOPICAL publication record (not mere existence), deriving affiliation + contact from the verified record (never the model), and dropping anything ungroundable. Deprioritized vs. the existing Claude + PubMed candidate pipeline. If ever revisited, that grounding is mandatory. See [[project-reviewer-web-discovery-abandoned]].
+
 **Status:** v7 (S225) — **SCOPE NARROWED to a READ-ONLY web-suggestions panel** after 6 prose-review rounds (each returned blockers). Implementation, not more prose, from here. **Increment 1 (backend `WebDiscoveryService` + A7 extraction prompt) shipped S225; increment 2 (route `/api/reviewer-finder/web-suggestions` + capability-gated `searchWeb` toggle + read-only panel in `ReviewerSearchSection`) shipped S227.** Live Perplexity Search contract **VERIFIED 2026-06-05 (S227)** via `scripts/probe-perplexity-search.mjs`: HTTP 200 (account entitled to `/search`, not just sonar chat), `search_after_date_filter` M/D/YYYY accepted + honored, `results[].{title,url,snippet,date,last_updated}` shape confirmed (§5). `PERPLEXITY_API_KEY` is now live in **prod** too → the capability reports true and the feature activates on deploy. Snippet-budget tuned S227: the live probe showed ~8KB faculty-page snippets were truncating all but ~2-3 of up to 24 results at the old 20K extraction cap, so `WEB_RESULTS_MAX_CHARS` 20K→100K, `EXTRACTION_MAX_TOKENS` 1024→4096, plus a new `PER_SNIPPET_MAX_CHARS` 6K guard (the constants were untuned defaults, not an API/cost wall — Sonnet 200K window). The VRP-coupling consequence of the now-always-present key is parked in the Virtual Review Panel memory — settle it during VRP work, not each reviewer session.
 
 > ## ⚠️ SCOPE BANNER — read this first (S225, takes precedence over older sections below)
