@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Web-grounded reviewer discovery EVALUATED → ABANDONED & removed (Session 230)
+
+**Milestone:** Deprecated capability removed. The Perplexity web-discovery feature shipped S227 (entry below) was evaluated on real proposals and pulled. Supersedes the S227 milestone.
+
+**Sessions:** 230 (live eval on 1002794 / 1002238 / 1002204, PubMed/ORCID verification of every suggested name, then full removal). Also S230: shipped `check:model-override-warming` (AST CI gate preventing the recurring "forgot `loadModelOverrides()` → Anthropic 404 on tier alias" class) + fixed that bug in `applicant-reviewers` and `integrity-screener/screen`.
+
+**Ship state:**
+- Both the shipped `/search`→extract leads path AND a probed `sonar` reviewer-agent hallucinated: invented people, invented institutional emails (inconsistent), and — worst — **real researchers given fabricated affiliations/expertise** (passes a naive existence check). Self-reported confidence unreliable; fabrication scales with topic obscurity.
+- Removed the route, service, A7 extraction prompt, capability flag, UI panel/toggle, and tests (−1,194 lines). `PERPLEXITY_API_KEY` kept (Virtual Review Panel sonar still uses it). Eval probes (`scripts/probe-perplexity-*.mjs`) kept as evidence.
+- Build + all `check:*` gates green; route counts reconciled (api-route-file-count 106→105, requireappaccess 58→57).
+
+**Why it matters:** Ungrounded LLM web discovery is unsafe for reviewer selection — a foundation that emails reviewers can't tolerate fabricated people/addresses. A safe v2 (NOT built) would require PubMed/ORCID grounding of every name. The existing Claude + PubMed candidate pipeline stands alone.
+
+**Pointers:** `docs/REVIEWER_WEB_DISCOVERY_PLAN.md` (OUTCOME banner) + `[[project-reviewer-web-discovery-abandoned]]`. Commits `202bcfc` (record), `502154d` (removal); gate `dbc5060`→`d560a0d`.
+
 ## June 2026 — Web-grounded reviewer discovery (Perplexity Search) live in prod (Session 227)
 
 **Milestone:** Reviewer-finder now surfaces currently-active, mid-career researchers from the live web (Perplexity Search → A7-wrapped Claude name-extraction → a read-only "Web suggestions" panel) to counter Claude's training-cutoff + fame bias. Track C v1 — **leads-only / display-only**: never enters candidates, ranking, COI, roster, or save. `PERPLEXITY_API_KEY` is now live in prod, so the capability activates on deploy.
