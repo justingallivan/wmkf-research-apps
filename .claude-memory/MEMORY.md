@@ -33,6 +33,8 @@
 ## Task Routing
 - Reviewer-finder EOD-S222 topics (#1 timeout + #2 recency/affiliation SHIPPED; #3 Perplexity web-discovery shipped S225–S227 then EVALUATED → ABANDONED S230): project-reviewer-finder-next-topics.md
 - Reviewer web-discovery / Perplexity reviewer-agent EVALUATED → ABANDONED S230 (verified hallucination of reviewers + affiliations; don't re-attempt ungrounded): project-reviewer-web-discovery-abandoned.md
+- Reviewer-finder RETRIEVAL REDESIGN direction (S231 — demote Claude generator → field-routed retrieval/fan-out; provenance model; OpenAlex+ORCID spine; reuse existing resolver+ranker; NOT BUILT): project-reviewer-finder-retrieval-redesign.md
+- Reviewer VERIFY fail-dangerous HAZARD (S231 — fabricated wrong-forename verifies against real same-initial namesake; no forename gate; institutionMismatch advisory-only): project-reviewer-verify-fail-dangerous.md
 - Reviewer Workbench / lifecycle: project-reviewer-apps-redesign-direction.md; project-reviewer-workbench-invite-workflow.md; project-reviewer-lifecycle.md
 - Find-tab durable roster + cross-run search dedup (SHIPPED S224; operational PG table, don't drop-carryover): project-reviewer-find-roster.md
 - Reviewer identity resolver / ORCID: project-reviewer-identity-resolution.md; project-reviewer-identity-resolution-phase1.md; project-reviewer-self-report-orcid-sticky-confirmed.md

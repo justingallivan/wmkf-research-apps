@@ -1,0 +1,59 @@
+---
+name: project-reviewer-verify-fail-dangerous
+description: "HAZARD (verified S231): the reviewer verify path (DiscoveryService.verifyClaudeSuggestions) confirms a fabricated wrong-forename against a real same-initial namesake — '≥3 PubMed papers by LastName+initial' is treated as verified, with no forename gate; institutionMismatch only warns. Fix before trusting the verifier."
+metadata:
+  node_type: memory
+  type: project
+  status: active
+  scope: reviewer
+  last_verified: 2026-06-07
+---
+
+## Recall Rule
+Read before touching reviewer verification / name-matching / COI in
+`lib/services/discovery-service.js` or extending the identity resolver. This is a
+live correctness hazard, independent of whether the bigger redesign
+([[project-reviewer-finder-retrieval-redesign]]) proceeds.
+
+## The hazard (reproduced live, S231)
+A **fabricated wrong-forename of a real, active researcher verifies as that real
+person.** Demonstrated: running the real `verifyClaudeSuggestions` on a synthetic
+"Dr. Alfred Laederach" (the real person is **Alain** Laederach) returned VERIFIED,
+`confidence 100%`, with Alain's 8 papers + real UNC affiliation attached and
+`institutionMismatch=false`.
+
+Mechanism (all in source):
+- `generateNameVariants` emits an initial variant ("A Laederach"); PubMed
+  `[Author]` is order-insensitive ("A Laederach" == "Laederach A"); `namesMatch`
+  matches "a laederach" == "alain laederach" via a first-initial rule
+  (`discovery-service.js:~1102`).
+- Verify accepts on `>= MIN_PUBLICATIONS` (=3) with **no forename check**
+  (`:~327`). `institutionMismatch`/`expertiseMismatch` only set a field — the
+  candidate is still pushed to `verified:true` (`:~337,363`). Both safeguards miss
+  because only the *forename* was wrong (institution/field were right).
+
+Why "≥N papers by LastName+initial" is unsafe as identity (VERIFIED): PubMed
+returns paper CITATIONS, not person records. For common names it conflates
+namesakes (e.g. "David Yong" = 1 real ASTRO-3D paper + 8 biomedical namesakes →
+mis-verifies with a wrong affiliation); for distinctive names it can be
+sparse-real but below threshold (false-negative). Related: `pubmed-service.js:226`
+derives `year` from `DateCompleted||DateRevised||PubDate` (record-maintenance
+dates, not publication date) → corrupts recency.
+
+Also seen in the wild (analyze output): wrong-forename hallucinations on real
+people — "Phillip"/Peter Clote, "Matthew"/Michael Pluth, "Sigal"/Shalev Itzkovitz;
+~20% of analyze runs fail/degrade (empty response or 1 suggestion); placeholder
+padding.
+
+## How to apply (fix direction)
+- **Forename-equality gate, fail closed:** a full-name suggestion verifies only if
+  a recent topical cluster's author forename *exactly* matches (initials Claude
+  itself supplied / nicknames / accents allowed). **Initial-only matches must
+  never verify a full-name candidate** without a 2nd independent signal
+  (ORCID / co-author / affiliation).
+- **Demote `institutionMismatch`/`expertiseMismatch`** from advisory to
+  confidence-lowering / `unresolved` — route verify through identity STATES, not
+  bare `verified:true`. Reuse/extend `lib/services/reviewer-identity-resolver.js`.
+- Cross-source-zero (PubMed+OpenAlex+ORCID+S2 all zero) is the reliable
+  hallucination filter; a single source's zero is not.
+- Full analysis + plan: `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` §2,§5.
