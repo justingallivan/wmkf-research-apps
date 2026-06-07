@@ -175,6 +175,12 @@ export function pruneCandidateForRoster(c) {
     institutionMismatch: !!c.institutionMismatch,
     suggestedInstitution: c.suggestedInstitution || null,
     expertiseMismatch: !!c.expertiseMismatch,
+    // Verification-incoherence flag (Fix 11) drives the relevance-score −15
+    // down-weight; retain it (like institutionMismatch/expertiseMismatch above) so
+    // the penalty survives a roster reload + the Workbench client re-rank. Fold the
+    // redundant `incoherentVerification` alias into the canonical field here.
+    verificationIncoherence: !!(c.verificationIncoherence || c.incoherentVerification),
+    verificationIncoherenceReasons: Array.isArray(c.verificationIncoherenceReasons) ? c.verificationIncoherenceReasons : [],
     expertiseAreas: Array.isArray(c.expertiseAreas) ? c.expertiseAreas : null,
     keywords: Array.isArray(c.keywords) ? c.keywords : null,
     reasoning: c.reasoning || c.generatedReasoning || null,

@@ -23,14 +23,14 @@ const article = (pmid, authorName, title = 'Relevant publication') => ({
   }],
 });
 
-const runVerification = (suggestion, articlesByQuery) => {
+const runVerification = (suggestion, articlesByQuery, options = {}) => {
   PubMedService.search.mockImplementation(async (query) => {
     for (const [needle, articles] of Object.entries(articlesByQuery)) {
       if (query.includes(needle)) return articles;
     }
     return [];
   });
-  return DiscoveryService.verifyClaudeSuggestions([suggestion], () => {});
+  return DiscoveryService.verifyClaudeSuggestions([suggestion], () => {}, options);
 };
 
 describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
@@ -154,6 +154,84 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
         seedRole: 'query_seed',
       },
     });
+  });
+
+  test('PubMed-off verification routes suggestions to unresolved unverified list', async () => {
+    const result = await runVerification(
+      { name: 'Robert Sang', expertiseAreas: ['attosecond physics'] },
+      { 'Robert Sang[Author]': [article('1', 'Robert Sang'), article('2', 'Robert Sang'), article('3', 'Robert Sang')] },
+      { searchPubmed: false, proposalInfo: { primaryResearchArea: 'Physics' } },
+    );
+
+    expect(PubMedService.search).not.toHaveBeenCalled();
+    expect(result.verified).toHaveLength(0);
+    expect(result.unverified).toHaveLength(1);
+    expect(result.unverified[0]).toMatchObject({
+      name: 'Robert Sang',
+      verified: false,
+      verificationStatus: 'unresolved',
+      identityStatus: 'unresolved',
+      reason: 'Verification skipped — PubMed off / no verifier for this field.',
+      provenance: {
+        kind: 'barred_parametric',
+        sources: [],
+        seedRole: 'query_seed',
+      },
+    });
+  });
+
+  test('proposal-named source maps to proposal_named provenance while References stays parametric', async () => {
+    const skipped = await DiscoveryService.verifyClaudeSuggestions([
+      { name: 'Dr. Proposal Named', source: 'Mentioned in proposal', expertiseAreas: [] },
+      { name: 'Dr. Reference Label', source: 'References', expertiseAreas: [] },
+    ], () => {}, { searchPubmed: false });
+
+    expect(skipped.verified).toHaveLength(0);
+    expect(skipped.unverified[0]).toMatchObject({
+      source: 'proposal_named',
+      provenance: {
+        kind: 'proposal_named',
+        sources: ['proposal_text'],
+        seedRole: 'peer_or_competitor',
+      },
+    });
+    expect(skipped.unverified[1]).toMatchObject({
+      source: 'claude_suggestion',
+      provenance: {
+        kind: 'barred_parametric',
+        sources: [],
+        seedRole: 'query_seed',
+      },
+    });
+  });
+
+  test('non-biomedical proposal demotes biomedical-only same-name PubMed match without topical overlap', async () => {
+    const biomedicalRobertSang = [
+      article('1', 'Robert Sang', 'Malaria vector biology in insect physiology'),
+      article('2', 'Robert Sang', 'Mosquito pathogen surveillance in patients'),
+      article('3', 'Robert Sang', 'Clinical virology and disease epidemiology'),
+    ];
+
+    const result = await runVerification(
+      { name: 'Robert Sang', expertiseAreas: ['attosecond physics', 'quantum tunneling'] },
+      { 'Robert Sang[Author]': biomedicalRobertSang },
+      { proposalInfo: { primaryResearchArea: 'Physics' } },
+    );
+
+    expect(result.verified).toHaveLength(0);
+    expect(result.unverified).toHaveLength(1);
+    expect(result.unverified[0]).toMatchObject({
+      name: 'Robert Sang',
+      verified: false,
+      verificationStatus: 'unresolved',
+      identityStatus: 'unresolved',
+      provenance: {
+        kind: 'literature_retrieved',
+        sources: ['pubmed'],
+        seedRole: 'query_seed',
+      },
+    });
+    expect(result.unverified[0].reason).toMatch(/Non-biomedical proposal/);
   });
 
   test('institution mismatch stays verified for a full-name match and sets advisory flag', async () => {

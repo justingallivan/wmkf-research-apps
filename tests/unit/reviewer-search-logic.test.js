@@ -209,4 +209,26 @@ describe('pruneCandidateForRoster — model-flagged concern survives reload', ()
     const pruned = pruneCandidateForRoster({ name: 'Jane Smith', affiliation: 'MIT' });
     expect(pruned.potentialConcerns).toBeNull();
   });
+
+  test('verification-incoherence flag survives reload so the ranking down-weight reapplies', () => {
+    const pruned = pruneCandidateForRoster({
+      name: 'Robert Sang',
+      affiliation: 'Griffith University',
+      verificationIncoherence: true,
+      verificationIncoherenceReasons: ['institution_mismatch'],
+    });
+    expect(pruned.verificationIncoherence).toBe(true);
+    expect(pruned.verificationIncoherenceReasons).toEqual(['institution_mismatch']);
+  });
+
+  test('folds the redundant incoherentVerification alias into the canonical flag', () => {
+    const pruned = pruneCandidateForRoster({ name: 'Jane Smith', incoherentVerification: true });
+    expect(pruned.verificationIncoherence).toBe(true);
+  });
+
+  test('absent incoherence normalizes to false', () => {
+    const pruned = pruneCandidateForRoster({ name: 'Jane Smith', affiliation: 'MIT' });
+    expect(pruned.verificationIncoherence).toBe(false);
+    expect(pruned.verificationIncoherenceReasons).toEqual([]);
+  });
 });

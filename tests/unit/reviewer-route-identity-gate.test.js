@@ -45,6 +45,8 @@ jest.mock('../../lib/services/discovery-service', () => ({
   DiscoveryService: {
     verifyClaudeSuggestions: jest.fn(async (sugs) => ({ verified: sugs.map((s) => ({ ...s, verified: true })), unverified: [] })),
     checkCoauthorshipsForCandidates: jest.fn(async (cands) => cands),
+    pubMedVerificationContract: jest.fn(() => ({ enabled: true, reason: null })),
+    isClearlyNonBiomedicalVerifierArea: jest.fn(() => false),
   },
 }));
 jest.mock('../../lib/services/deduplication-service', () => ({

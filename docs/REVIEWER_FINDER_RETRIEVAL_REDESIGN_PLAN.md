@@ -194,7 +194,7 @@ The redesign therefore **extends** these, it does not replace them.
     **For question-driven proposals this lane should be the PRIMARY origin — keyword
     `searchQueries` (analyze PART 3) bias toward surface tokens and miss the
     proposal's actual question; see §4.5 for the primacy rationale, failure modes,
-    and a Step-4 build sketch.**
+    and a Step-5 build sketch.**
 - **Stage 2 — hypothesis-builder / mosaic (fan-in):** cluster author-instances
   across sources into candidate-person hypotheses with aggregated evidence:
   normalized name, full forename/initials, ORCID IDs, publication clusters,
@@ -233,6 +233,10 @@ The redesign therefore **extends** these, it does not replace them.
   `query_seed`), `provenance.groundingWorkIds[]` (DOI/PMID/arXiv/ADS/OpenAlex
   work IDs), and legacy-compatible `source`/`sources` fields during migration.
   Do **not** infer provenance from `isClaudeSuggestion`.
+- **Analyze-source guard:** Claude's analyze `SOURCE: References` label must
+  **not** map to `cited_reference`; real cited-reference provenance requires
+  DOI/PMID/arXiv resolution (§4.5) and the work-grounding rule (§4.1). Only
+  `SOURCE: Mentioned in proposal` maps to `proposal_named`.
 - **Consumer migration — IMPLEMENTED S232 (pending ship):** `[VERIFIED]` pre-S232,
   `/discover` streamed `verified/unverified/discovered/ranked` with binary source semantics
   (`pages/api/reviewer-finder/discover.js:362-367`); the roster collapses source
@@ -411,7 +415,10 @@ different, harder set — weigh these before treating it as a silver bullet:
    formats vary. Coverage will be partial and noisy — this, not the concept,
    determines whether the lane works.
 
-**Build sketch (Step-4 slice, on top of the S232 DTO).**
+**Build sketch (Step-5 slice, on top of the S232 DTO).**
+- **Prerequisite:** the hypothesis-builder adapter (§4.3) must land before or
+  with this lane; reference resolution produces grounded author instances, but
+  still needs the adapter to turn them into candidate-person hypotheses.
 - **Extract:** isolate the reference/bibliography section of the parsed proposal
   text; regex out DOIs (`10.\d{4,}/\S+`), PMIDs, and arXiv IDs → a deduped ID set
   with the raw reference string for audit. Log extraction coverage (IDs found vs
@@ -426,7 +433,7 @@ different, harder set — weigh these before treating it as a silver bullet:
 - **Hypothesize:** each author instance → candidate hypothesis with
   `provenance.kind = cited_reference`, `seedRole = cited_author`,
   `groundingWorkIds = [the resolved ID]`, plus author ordinal/corresponding flags and
-  the work's recency. Feed the existing hypothesis-builder (§4.3); do **not**
+  the work's recency. Feed the hypothesis-builder adapter (§4.3); do **not**
   special-case persistence here.
 - **Screen + rank:** run the full §4.4 COI package on every cited-reference candidate
   BEFORE surfacing (this lane's highest-risk step), route through the identity
@@ -457,6 +464,106 @@ Hardening wins that fix the demonstrated failures now:
 5. **Filter non-research/capital grants** before running the pipeline (§4.4).
 6. **COI parity:** run proposal-author, institution, and coauthor-history checks
    across every provenance lane before ranking/surfacing (§4.4).
+
+### 5.1 Live case — request 1002794 "Robert Sang" (namesake laundering + ungated contact)
+`[VERIFIED via prod roster + Codex code review S232]` A physics proposal (attosecond
+"Clocking quantum tunneling with molecular shake-up") surfaced a **Frankenstein
+record**: correct name + Claude's physics expertise tags, but a *different real*
+Robert Sang's affiliation ("Intl. Centre of Insect Physiology & Ecology, Nairobi,
+Kenya"), a Google Scholar URL seeded with that wrong affiliation, and a LinkedIn
+(`linkedin.com/in/john-fazakerley`) belonging to a **third, unrelated** person. It is
+the §2.3 PubMed namesake-conflation hazard firing on a non-biomedical proposal,
+compounded by an ungated contact link. (`[ASSUMED via user report]` The 5 *saved*
+reviewers on this request were applicant-recommended, not pipeline output.)
+
+Root causes (Codex-confirmed against current code):
+- **Track-A verification ignores the UI source toggles and is PubMed-hardwired.**
+  `DiscoveryService.discover` calls `verifyClaudeSuggestions` whenever suggestions
+  exist, with no source argument (`lib/services/discovery-service.js:134`); the
+  variant loop starts at `:303`, the simple/disambiguated PubMed queries are built
+  at `lib/services/discovery-service.js:305` and `:318`, and it stamps
+  `verificationSource:'pubmed'` (`:416`). The
+  `searchPubmed/...` toggles gate only Track B (`:157,172,187,202`). The user
+  deselected PubMed; verification used it anyway. (Precision: every suggestion is
+  PubMed-*attempted*; only `>=MIN_PUBLICATIONS` + full-forename evidence enter
+  `verified[]` — `:380,407,462`.)
+- **The forename gate can't catch same-full-name, cross-field namesakes.** "Robert
+  Sang" == "Robert Sang" satisfies `firstNamesEquivalent` / `fullForenameMatch`
+  (`:1161,1236`), so no demotion (`:401`). The gate (§5 items 1-2) only defends
+  wrong/initial forenames.
+- **Contact links have no name gate.** `isUsefulWebsiteUrl(url)` takes no candidate
+  name and accepts any `linkedin.com/in/` (and returns true for all non-generic
+  URLs) (`lib/utils/contact-parser.js:295-334`, the `isUsefulWebsiteUrl` helper);
+  SerpAPI/enrichment attach it as `website`
+  (`serp-contact-service.js:85,154`; `contact-enrichment-service.js:303`). Email has
+  a name-consistency guard; websites do not
+  (`ContactParser.isNameConsistentEmail(...)` at
+  `lib/services/contact-enrichment-service.js:358`).
+- **The proposal-named anchor is discarded.** Claude tags `SOURCE: Mentioned in
+  proposal` (`reviewer-finder.js:81,107,379`), but Track A overwrites
+  `source:'claude_suggestion'` (`discovery-service.js:441`); the provenance helper
+  only maps the literal `proposal_named` (`reviewer-provenance.js:102`), so the
+  strongest local identity anchor is lost.
+- **The verified composite is incoherent yet ranks normally.** The candidate keeps
+  Claude's `expertiseAreas` (physics) while affiliation/publications come from the
+  namesake; ranking then scores `expertiseAreas` + affiliation/pub-count bonuses
+  (`relevance-score.js:53,67`) as if the record were coherent. (Correction to an
+  earlier read: `expertiseMismatch` *is* computed from the matched articles vs
+  Claude's terms — `:395,1455` — it is simply advisory; the displayed expertise
+  staying Claude's is the `...suggestion` spread at `:411,433`.)
+
+Fix bundle (`[PROPOSED]`, Codex-reviewed; mixed effort, still shippable before the
+big redesign):
+7. **Gate Track-A verification on the source contract.** If `searchPubmed===false`
+   (or `proposalInfo.primaryResearchArea` is clearly non-biomedical), do **not**
+   PubMed-verify; route suggestions to `unverified[]` / identity-review with
+   `verificationStatus:'unresolved'` (provenance `barred_parametric` unless
+   proposal-named / applicant-suggested). Gate the post-verify PubMed coauthor-COI
+   pass (`discover.js:250` → `discovery-service.js:1498`) on the same contract.
+   Also apply this to the applicant-recommended verify path
+   (`pages/api/workbench/enrich-recommended.js:203-208`), which currently calls
+   `DiscoveryService.verifyClaudeSuggestions` against PubMed unconditionally, for
+   non-biomedical proposals.
+   **UX / effort (Codex):** small-to-medium, multi-layer. The "Needs identity
+   review" provenance group is currently selectable (normal `CandidateCard` with
+   `onToggle`, `ReviewerSearchSection.js:795-815,1013-1021`); only the separate
+   "Unverified suggestions" section is read-only (`:1057-1065`). Making these
+   suggestions visible-but-not-selectable requires an explicit service contract,
+   API route, and UI change. Surface unresolved candidates with the reason
+   "verification skipped — PubMed off / no verifier for this field"; never silently
+   drop proposal-named/applicant signals.
+8. **Name-gate every profile/website URL.** Small-but-multi-helper: give the
+   website helper the candidate name; for personal/profile domains (LinkedIn,
+   ResearchGate, X, etc.) require a forename/surname token in the URL slug or page
+   title/snippet before attaching (mirror the email name-consistency guard).
+   `john-fazakerley` vs `Robert Sang` is rejected on the slug alone. Scope includes
+   the SAVE/PERSIST boundary: wrong websites can survive in saved payloads unless a
+   save-time/roster-time website sanitization guard is added at
+   `pages/api/reviewer-finder/save-candidates.js:75,151`.
+9. **Preserve the proposal-named source.** Map parsed `SOURCE: Mentioned in proposal`
+   → `source:'proposal_named'` / `provenance.kind = proposal_named` **before** Track
+   A, so the anchor survives (do not overwrite to `claude_suggestion`). Proposal-
+   named is a high-value *hypothesis + COI flag*, not auto-confirmation (§4.2).
+   Ordering: land this before or with fix 7, because fix 7's unresolved fallback
+   depends on distinguishing barred-parametric suggestions from proposal-named and
+   applicant signals. Guardrail: Claude analyze `SOURCE: References` does **not**
+   become `cited_reference`; only resolved reference-list works do.
+10. **Cross-field / second-signal namesake guard.** Outside biomedicine, a
+    same-full-name PubMed match reaches `verified`/`probable` only with a second
+    corroborating signal — affiliation match to Claude/proposal context, ORCID,
+    coauthor/context overlap, or topical overlap between proposal keywords and the
+    matched articles (the code computes expertise match but does not gate on it —
+    `discovery-service.js:385`). Otherwise `unresolved`. A coarse journal/category
+    "looks biomedical vs physics" check is the cheapest first cut.
+11. **Don't rank an incoherent composite as coherent.** When affiliation/publications
+    come from a verification match that conflicts with the suggested attributes,
+    reconcile or down-weight rather than scoring Claude-expertise +
+    namesake-affiliation together.
+
+Parity note (Codex): the post-verify coauthor-history COI pass runs only on Track-A
+`verifiedWithCOI` candidates (`discover.js:241`); discovered candidates get
+proposal-author + institution marking but no coauthor-history (`discover.js:310,333`)
+— fold into the §4.4 COI-parity item.
 
 ---
 
@@ -495,15 +602,16 @@ Hardening wins that fix the demonstrated failures now:
    retry/repair, typed invalid-analysis failure, and no parametric candidate
    names. Keep source planning and proposal/reference extraction, not reviewer
    invention.
-4. **Add field-routed retrieval sources — provenance plumbing now in place (S232).**
-   Build the **reference-resolution lane (§4.5) FIRST** — for question-driven
-   proposals it is the primary candidate origin, with keyword `searchQueries`
-   demoted to a recall supplement. Then OpenAlex + ORCID spine and
-   ADS/arXiv/DBLP/INSPIRE as field-routed lanes. All ride the S232 DTO contract.
-5. **Add the hypothesis-builder and resolver input adapter.** Publication
+4. **Add the hypothesis-builder and resolver input adapter.** Publication
    clusters, forename/co-author/affiliation evidence, and cross-source
    corroboration feed the pure resolver; the resolver remains classification and
    persistence-gating only.
+5. **Add field-routed retrieval sources — provenance plumbing now in place (S232).**
+   Build the **reference-resolution lane (§4.5) after or with the hypothesis-builder
+   adapter** — for question-driven proposals it is the primary candidate origin,
+   with keyword `searchQueries` demoted to a recall supplement. Then OpenAlex +
+   ORCID spine and ADS/arXiv/DBLP/INSPIRE as field-routed lanes. All ride the S232
+   DTO contract.
 6. **Invert to retrieval-first candidate origination.** Parametric generation is
    barred except as grounded query seeds that must ground-or-drop.
 7. **Shadow-run before cutover.** Compare current vs new pipeline on sampled

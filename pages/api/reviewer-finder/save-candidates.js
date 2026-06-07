@@ -18,6 +18,7 @@ import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { mayPersistIdentity, RESOLVER_SOURCED_FIELDS } from '../../../lib/services/reviewer-identity-resolver';
 import { saveSourceListForCandidate, withReviewerProvenance } from '../../../lib/utils/reviewer-provenance';
+import { ContactParser } from '../../../lib/utils/contact-parser';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -72,7 +73,8 @@ export default async function handler(req, res) {
         // so a candidate carrying only contactEnrichment doesn't drop a real ORCID.
         const candidateOrcid = candidate.orcid || candidate.contactEnrichment?.orcidId || null;
         const candidateGoogleScholarId = candidate.googleScholarId || candidate.contactEnrichment?.googleScholarId || null;
-        const candidateWebsite = candidate.website || candidate.contactEnrichment?.website || null;
+        const rawCandidateWebsite = candidate.website || candidate.contactEnrichment?.website || null;
+        const candidateWebsite = ContactParser.sanitizeWebsiteForCandidate(rawCandidateWebsite, candidate.name);
 
         const expertiseForDv = Array.isArray(candidate.expertiseAreas)
           ? candidate.expertiseAreas.filter(Boolean).join('; ')

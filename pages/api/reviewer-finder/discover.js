@@ -240,7 +240,8 @@ export default async function handler(req, res) {
 
     // Check for coauthor COI if we have proposal authors (reuse the shared array)
     {
-      if (proposalAuthors.length > 0 && verifiedWithCOI.length > 0) {
+      const pubmedVerificationContract = DiscoveryService.pubMedVerificationContract({ searchPubmed, proposalInfo: analysisResult.proposalInfo });
+      if (pubmedVerificationContract.enabled && proposalAuthors.length > 0 && verifiedWithCOI.length > 0) {
         sendEvent('progress', {
           stage: 'coi_check',
           status: 'starting',
@@ -260,6 +261,12 @@ export default async function handler(req, res) {
           message: coiCount > 0
             ? `Found ${coiCount} candidate(s) with coauthorship history`
             : 'No coauthorship conflicts found'
+        });
+      } else if (!pubmedVerificationContract.enabled && proposalAuthors.length > 0 && verifiedWithCOI.length > 0) {
+        sendEvent('progress', {
+          stage: 'coi_check',
+          status: 'skipped',
+          message: 'Skipped PubMed coauthorship check because PubMed verification is off'
         });
       }
     }

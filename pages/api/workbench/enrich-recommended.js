@@ -191,6 +191,7 @@ export default async function handler(req, res) {
           // through verifyClaudeSuggestions (which spreads ...suggestion).
           hadAffiliation: !!affiliation,
           expertiseAreas: [],
+          isApplicantRecommended: true,
           potentialReviewerId: prId,
           suggestionId: row.wmkf_appreviewersuggestionid,
         });
@@ -201,10 +202,19 @@ export default async function handler(req, res) {
       }
 
       // 4. Verify in PubMed (publications + expertise).
-      sendEvent('progress', { message: `Verifying ${suggestions.length} recommended reviewer(s) in PubMed…` });
+      const pubmedVerificationContract = DiscoveryService.pubMedVerificationContract({
+        searchPubmed: !DiscoveryService.isClearlyNonBiomedicalVerifierArea(proposalInfo.primaryResearchArea),
+        proposalInfo,
+      });
+      sendEvent('progress', {
+        message: pubmedVerificationContract.enabled
+          ? `Verifying ${suggestions.length} recommended reviewer(s) in PubMed…`
+          : `Skipping PubMed verification for ${suggestions.length} recommended reviewer(s) — non-biomedical proposal area`,
+      });
       const { verified, unverified } = await DiscoveryService.verifyClaudeSuggestions(
         suggestions,
-        (p) => sendEvent('progress', p)
+        (p) => sendEvent('progress', p),
+        { searchPubmed: pubmedVerificationContract.enabled, proposalInfo }
       );
 
       // 5. COI on the FULL set — verified AND unverified. Institution COI works
@@ -220,12 +230,18 @@ export default async function handler(req, res) {
       // `coInvestigators` so a recommendee who co-authored with a listed co-PI is
       // also flagged. discover.js now derives the SAME set (S213 parity closed).
       const proposalAuthors = deriveProposalAuthorNames(proposalInfo);
-      if (proposalAuthors.length > 0 && coiChecked.length > 0) {
+      if (pubmedVerificationContract.enabled && proposalAuthors.length > 0 && coiChecked.length > 0) {
         coiChecked = await DiscoveryService.checkCoauthorshipsForCandidates(
           coiChecked,
           proposalAuthors,
           (p) => sendEvent('progress', p)
         );
+      } else if (!pubmedVerificationContract.enabled && proposalAuthors.length > 0 && coiChecked.length > 0) {
+        sendEvent('progress', {
+          stage: 'coi_check',
+          status: 'skipped',
+          message: 'Skipped PubMed coauthorship check because this proposal has no PubMed verifier contract',
+        });
       }
 
       // 6. Enrich (all tiers; persist:false — THIS endpoint owns the id-keyed
