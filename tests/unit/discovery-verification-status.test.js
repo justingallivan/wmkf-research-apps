@@ -123,7 +123,7 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
     });
   });
 
-  test('institution mismatch demotes an otherwise full-name match to unresolved', async () => {
+  test('institution mismatch stays verified for a full-name match and sets advisory flag', async () => {
     const alainArticles = [
       article('1', 'Alain Laederach'),
       article('2', 'Alain Laederach'),
@@ -139,18 +139,17 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
       { 'Alain Laederach[Author]': alainArticles },
     );
 
-    expect(result.verified).toHaveLength(0);
-    expect(result.unverified).toHaveLength(1);
-    expect(result.unverified[0]).toMatchObject({
-      verified: false,
-      verificationStatus: 'unresolved',
-      identityStatus: 'unresolved',
+    expect(result.unverified).toHaveLength(0);
+    expect(result.verified).toHaveLength(1);
+    expect(result.verified[0]).toMatchObject({
+      verified: true,
+      verificationStatus: 'verified',
+      identityStatus: 'verified',
       institutionMismatch: true,
     });
-    expect(result.unverified[0].reason).toMatch(/institution/i);
   });
 
-  test('expertise mismatch demotes an otherwise full-name match to unresolved', async () => {
+  test('expertise mismatch stays verified for a full-name match and sets advisory flag', async () => {
     const alainArticles = [
       article('1', 'Alain Laederach', 'Cell mechanics'),
       article('2', 'Alain Laederach', 'RNA structure'),
@@ -165,14 +164,40 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
       { 'Alain Laederach[Author]': alainArticles },
     );
 
-    expect(result.verified).toHaveLength(0);
-    expect(result.unverified).toHaveLength(1);
-    expect(result.unverified[0]).toMatchObject({
-      verified: false,
-      verificationStatus: 'unresolved',
-      identityStatus: 'unresolved',
+    expect(result.unverified).toHaveLength(0);
+    expect(result.verified).toHaveLength(1);
+    expect(result.verified[0]).toMatchObject({
+      verified: true,
+      verificationStatus: 'verified',
+      identityStatus: 'verified',
       expertiseMismatch: true,
     });
-    expect(result.unverified[0].reason).toMatch(/expertise/i);
+  });
+
+  test('institution and expertise mismatch both stay verified for a full-name match', async () => {
+    const alainArticles = [
+      article('1', 'Alain Laederach', 'Cell mechanics'),
+      article('2', 'Alain Laederach', 'RNA structure'),
+      article('3', 'Alain Laederach', 'Molecular folding'),
+    ];
+
+    const result = await runVerification(
+      {
+        name: 'Alain Laederach',
+        suggestedInstitution: 'Salk Institute',
+        expertiseAreas: ['photosynthetic coral bleaching'],
+      },
+      { 'Alain Laederach[Author]': alainArticles },
+    );
+
+    expect(result.unverified).toHaveLength(0);
+    expect(result.verified).toHaveLength(1);
+    expect(result.verified[0]).toMatchObject({
+      verified: true,
+      verificationStatus: 'verified',
+      identityStatus: 'verified',
+      institutionMismatch: true,
+      expertiseMismatch: true,
+    });
   });
 });

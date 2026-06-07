@@ -1,9 +1,11 @@
 # Reviewer Finder — Retrieval-First Redesign Plan
 
-Status: **DESIGN / NOT BUILT.** This plan proposes re-architecting reviewer
-candidate sourcing. Every "current state" claim is labelled `[VERIFIED]` (read
-from source or a live probe this session) or `[ASSUMED]`. Proposed behavior is
-labelled `[PROPOSED]`. Do not present any `[PROPOSED]` item as built.
+Status: **DESIGN.** Phase-1 verify-hardening (forename gate + soft mismatch flags
++ PubMed year basis) is **IMPLEMENTED on branch `reviewer-verify-identity-states`**
+(validated by unit tests + live smoke S231; not yet merged). Everything else is
+unbuilt. Every "current state" claim is labelled `[VERIFIED]` (read from source or
+a live probe this session) or `[ASSUMED]`. Proposed behavior is labelled
+`[PROPOSED]`. Do not present any `[PROPOSED]` item as built.
 
 Origin: Session 231 investigation (validating S229 COI/ranking work) → uncovered
 a root-cause class → adversarial Codex review → empirical probes across a random
@@ -279,9 +281,11 @@ the hypothesis builder:
 - **cross-source corroboration:** PubMed + OpenAlex + ORCID/ADS/arXiv agreement
   raises confidence; conflicts lower to `ambiguous`/`unresolved` or human review.
 - Make current `verifyClaudeSuggestions` (`discovery-service.js:327-388`) or its
-  successor emit **identity states**, not bare `verified:true`. Demote
-  `institutionMismatch`/`expertiseMismatch` from advisory flags to
-  confidence-lowering / `unresolved`.
+  successor emit **identity states**, not bare `verified:true`. The **forename
+  gate is the sole demoter**; `institutionMismatch`/`expertiseMismatch` stay
+  **soft flags** on the candidate (they do NOT demote a forename-confirmed
+  identity) and only corroborate demotion when the match is initial-only.
+  [IMPLEMENTED on branch — see §5.]
 
 ### 4.4 Analyze, grant-type, COI, and fan-out contracts
 `[PROPOSED]` **Analyze retry/repair contract:** Stage 0 must return schema-valid
@@ -353,8 +357,15 @@ route deadline signal (`discover.js:65-68`).
 Hardening wins that fix the demonstrated failures now:
 1. **Initial-only hits must never verify a full-name candidate** without a second
    independent signal (forename / ORCID / co-author / affiliation).
-2. **`institutionMismatch` (and `expertiseMismatch`) must demote** to
-   `unresolved`, not sit beside `verified:true`.
+2. **The forename gate is the *sole* demoter** (IMPLEMENTED). `institutionMismatch`
+   and `expertiseMismatch` must NOT demote a forename-confirmed identity — they
+   ride along as **soft display flags** (a wrong institution is usually Claude's
+   stale attribute guess, not a wrong person; `checkExpertiseMismatch` is
+   title+abstract substring matching — not MeSH — which the old code deliberately
+   never rejected on). They corroborate demotion only when identity is weak
+   (initial-only). Validated S231: under the earlier demote-on-mismatch policy the
+   correct expert Silvi Rouskin was wrongly demoted on a stale institution guess;
+   under the forename-only policy she verifies with the mismatch as a flag.
 3. **`article.year`**: prefer real publication date (`ArticleDate`/`PubDate`) over
    `DateCompleted`/`DateRevised` for recency.
 4. **Analyze contract**: structured output + enforce requested count, no
@@ -391,10 +402,11 @@ Hardening wins that fix the demonstrated failures now:
    `discovery-service.js:327-388`; first make it emit the new identity/provenance
    DTO and update `/discover`, roster, save, and UI section contracts together
    (§4.2). This establishes the candidate wire shape before fan-out changes.
-2. **Bug-fix hardening (§5) without source expansion.** Fix initial-only
-   verification, mismatch demotion, PubMed year basis, COI parity, and
-   non-research grant filtering. These are behavioral safety fixes around current
-   sources.
+2. **Bug-fix hardening (§5) without source expansion.** Forename gate on
+   initial-only verification, institution/expertise mismatch → soft flags (not
+   demotion), PubMed year basis, COI parity, and non-research grant filtering.
+   These are behavioral safety fixes around current sources. (The forename gate +
+   soft mismatch flags + year basis are already IMPLEMENTED on the branch.)
 3. **Analyze contract rewrite.** Replace delimiter parsing with schema output,
    retry/repair, typed invalid-analysis failure, and no parametric candidate
    names. Keep source planning and proposal/reference extraction, not reviewer
