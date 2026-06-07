@@ -56,6 +56,12 @@ function analysisResponse({ title = 'Example', reviewers = [], queries = ['cell 
 }
 
 const reviewer = (name) => ({ name });
+const completeReviewer = (name) => ({
+  name,
+  suggestedInstitution: 'Some University',
+  expertiseAreas: ['systems biology', 'imaging'],
+  reasoning: 'Active expert on the proposal topic.',
+});
 
 describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
   let originalCallLLM;
@@ -220,27 +226,31 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
     const validation = validateReviewerAnalysis({
       proposalInfo: { title: 'Example' },
       reviewerSuggestions: [
-        reviewer('Dr. Jens Hör'),
-        reviewer('Prof. Jens Hor'),
-        reviewer('Dr. Unique Name'),
+        completeReviewer('Dr. Jens Hör'),
+        completeReviewer('Prof. Jens Hor'),
+        completeReviewer('Dr. Unique Name'),
       ],
       searchQueries: { pubmed: ['cell imaging'] },
     }, { reviewerCount: 3 });
 
     expect(validation.valid).toBe(false);
-    expect(validation.issues.map(i => i.code)).toContain('duplicate_reviewer_name');
+    expect(validation.sanitizedResult.reviewerSuggestions.map(r => r.name)).toEqual([
+      'Dr. Jens Hör',
+      'Dr. Unique Name',
+    ]);
+    expect(validation.issues.find(i => i.code === 'duplicate_reviewer_name')?.severity).toBe('warning');
+    expect(validation.issues.map(i => i.code)).toContain('below_suggestion_floor');
   });
 
   test('a duplicate/excluded entry is sanitized as a warning, not a hard failure, when enough usable remain', () => {
-    const complete = (name) => ({ name, suggestedInstitution: 'Some University', reasoning: 'Active expert on the proposal topic.' });
     const validation = validateReviewerAnalysis({
       proposalInfo: { title: 'Example' },
       reviewerSuggestions: [
-        complete('Dr. Aaa One'),
-        complete('Dr. Bbb Two'),
-        complete('Dr. Ccc Three'),
-        complete('Dr. Aaa One'),       // duplicate -> dropped (warning)
-        complete('Excluded Person'),   // excluded -> dropped (warning)
+        completeReviewer('Dr. Aaa One'),
+        completeReviewer('Dr. Bbb Two'),
+        completeReviewer('Dr. Ccc Three'),
+        completeReviewer('Dr. Aaa One'),       // duplicate -> dropped (warning)
+        completeReviewer('Excluded Person'),   // excluded -> dropped (warning)
       ],
       searchQueries: { pubmed: ['topic query'] },
     }, { reviewerCount: 3, excludedNames: ['Excluded Person'] });
@@ -254,19 +264,63 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
   });
 
   test('an incomplete reviewer is a warning excluded from the floor, not a hard failure', () => {
-    const complete = (name) => ({ name, suggestedInstitution: 'Some University', reasoning: 'Active expert on the proposal topic.' });
     const validation = validateReviewerAnalysis({
       proposalInfo: { title: 'Example' },
       reviewerSuggestions: [
-        complete('Dr. Aaa One'),
-        complete('Dr. Bbb Two'),
-        complete('Dr. Ccc Three'),
-        { name: 'Dr. Bare Name' },     // incomplete -> kept, not counted toward floor
+        completeReviewer('Dr. Aaa One'),
+        completeReviewer('Dr. Bbb Two'),
+        completeReviewer('Dr. Ccc Three'),
+        { name: 'Dr. Bare Name' },     // incomplete -> dropped, not counted toward floor
       ],
       searchQueries: { pubmed: ['topic query'] },
     }, { reviewerCount: 3 });
 
     expect(validation.valid).toBe(true);
+    expect(validation.issues.find(i => i.code === 'incomplete_reviewer')?.severity).toBe('warning');
+    expect(validation.sanitizedResult.reviewerSuggestions.map(r => r.name)).not.toContain('Dr. Bare Name');
+  });
+
+  test('a name-only reviewer warning is not forwarded in the sanitized payload', () => {
+    const validation = validateReviewerAnalysis({
+      proposalInfo: { title: 'Example' },
+      reviewerSuggestions: [
+        { name: 'Dr. Bare Name' },
+        completeReviewer('Dr. Aaa One'),
+        completeReviewer('Dr. Bbb Two'),
+        completeReviewer('Dr. Ccc Three'),
+      ],
+      searchQueries: { pubmed: ['topic query'] },
+    }, { reviewerCount: 3 });
+
+    expect(validation.valid).toBe(true);
+    expect(validation.sanitizedResult.reviewerSuggestions.map(r => r.name)).toEqual([
+      'Dr. Aaa One',
+      'Dr. Bbb Two',
+      'Dr. Ccc Three',
+    ]);
+    expect(validation.issues.find(i => i.code === 'incomplete_reviewer')?.severity).toBe('warning');
+    expect(validation.issues.filter(i => i.severity !== 'warning')).toHaveLength(0);
+  });
+
+  test('complete duplicate replaces an earlier incomplete reviewer with the same normalized name', () => {
+    const validation = validateReviewerAnalysis({
+      proposalInfo: { title: 'Example' },
+      reviewerSuggestions: [
+        { name: 'Dr. Jane Same' },
+        completeReviewer('Prof. Jane Same'),
+        completeReviewer('Dr. Aaa One'),
+        completeReviewer('Dr. Bbb Two'),
+      ],
+      searchQueries: { pubmed: ['topic query'] },
+    }, { reviewerCount: 3 });
+
+    expect(validation.valid).toBe(true);
+    expect(validation.sanitizedResult.reviewerSuggestions.map(r => r.name)).toEqual([
+      'Prof. Jane Same',
+      'Dr. Aaa One',
+      'Dr. Bbb Two',
+    ]);
+    expect(validation.issues.find(i => i.code === 'duplicate_reviewer_name')?.severity).toBe('warning');
     expect(validation.issues.find(i => i.code === 'incomplete_reviewer')?.severity).toBe('warning');
   });
 

@@ -544,31 +544,37 @@ export function validateReviewerAnalysis(result, opts = {}) {
   const suggestionFloor = Math.min(requested, Math.max(3, Math.ceil(requested / 2)));
 
   // Sanitize quality issues out of the surfaced list rather than hard-failing on
-  // them. Duplicates and excluded names are DROPPED (excluded are hard-filtered
-  // downstream regardless); incomplete entries are KEPT (a sparsely-described real
-  // name can still verify) but do NOT count toward the suggestion floor. Only the
-  // floor (on usable suggestions), empty/parse, truncation, missing-queries, and a
-  // >20% placeholder ratio block — a single dup/excluded/incomplete entry no longer
-  // fails an otherwise-usable analysis (which would only waste a repair attempt).
+  // them. Duplicates, excluded names, placeholders, and incomplete entries are
+  // DROPPED from the payload; incomplete entries still get a non-blocking warning
+  // and do NOT count toward the suggestion floor. If a duplicate name first appears
+  // as incomplete and later appears complete, keep the complete version.
   const excludedSet = buildExcludedSet(excludedNames);
   const seen = new Map();
   const duplicateNames = [];
   const excludedMatches = [];
-  const kept = [];
+  const incompleteSuggestions = [];
+  const deduped = [];
   for (const suggestion of nonPlaceholder) {
     const normalized = normalizeReviewerName(suggestion?.name);
     if (normalized && excludedSet.has(normalized)) { excludedMatches.push(suggestion.name); continue; }
-    if (normalized && seen.has(normalized)) { duplicateNames.push(suggestion.name); continue; }
-    if (normalized) seen.set(normalized, suggestion.name);
-    kept.push(suggestion);
+    if (!hasReviewerDetail(suggestion)) incompleteSuggestions.push(suggestion);
+    if (normalized && seen.has(normalized)) {
+      duplicateNames.push(suggestion.name);
+      const existingIndex = seen.get(normalized);
+      if (!hasReviewerDetail(deduped[existingIndex]) && hasReviewerDetail(suggestion)) {
+        deduped[existingIndex] = suggestion;
+      }
+      continue;
+    }
+    if (normalized) seen.set(normalized, deduped.length);
+    deduped.push(suggestion);
   }
-  const incomplete = kept.filter(s => !hasReviewerDetail(s));
-  const usable = kept.filter(hasReviewerDetail);
+  const usable = deduped.filter(hasReviewerDetail);
 
   const sanitizedResult = {
     ...(result || {}),
     proposalInfo: result?.proposalInfo || {},
-    reviewerSuggestions: kept,
+    reviewerSuggestions: usable,
     searchQueries: result?.searchQueries || { pubmed: [], arxiv: [], biorxiv: [], chemrxiv: [] },
   };
   const queries = allSearchQueries(sanitizedResult.searchQueries);
@@ -599,11 +605,11 @@ export function validateReviewerAnalysis(result, opts = {}) {
   }
 
   // Quality issues — non-blocking warnings (sanitized above), not hard failures.
-  if (incomplete.length > 0) {
+  if (incompleteSuggestions.length > 0) {
     addIssue(
       issues,
       'incomplete_reviewer',
-      `${incomplete.length} reviewer suggestion${incomplete.length === 1 ? '' : 's'} had only a name or lacked required detail (kept, excluded from the floor).`,
+      `${incompleteSuggestions.length} reviewer suggestion${incompleteSuggestions.length === 1 ? '' : 's'} had only a name or lacked required detail (dropped, excluded from the floor).`,
       'warning',
     );
   }
@@ -616,7 +622,7 @@ export function validateReviewerAnalysis(result, opts = {}) {
 
   if (stopReason === 'max_tokens') {
     addIssue(issues, 'truncated_response', 'The model stopped because it reached the max token limit.');
-  } else if (kept.length > 0 && queries.length === 0) {
+  } else if (usable.length > 0 && queries.length === 0) {
     addIssue(issues, 'truncated_or_missing_queries', 'Reviewer suggestions were present but no database search queries were parsed.');
   }
 

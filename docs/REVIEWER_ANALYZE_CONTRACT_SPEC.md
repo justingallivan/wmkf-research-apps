@@ -27,7 +27,7 @@ phase ordering. So this slice keeps the current delimiter output + parser +
 candidate generation, and only hardens reliability around them. The full
 JSON/no-generation rewrite is deferred to the retrieval-first phase.
 
-## Current behavior `[VERIFIED]`
+## Current behavior (pre-refinement; historical) `[HISTORICAL]`
 - `ClaudeReviewerService.analyzeProposal` (`lib/services/claude-reviewer-service.js`)
   makes ONE LLM call, parses delimiter/markdown text via `parseAnalysisResponse`,
   calls `validateAnalysisResult`, and **returns `success:true` with the validation
@@ -76,10 +76,12 @@ Checks:
   usable analysis + wasted a repair attempt). They are now sanitized and reported
   as warnings; only their effect on the *floor* can block:
   - **per-reviewer completeness:** incomplete entries (bare `NAME`, no detail) are
-    KEPT in the list (a sparsely-described real name can still verify) but do NOT
-    count toward the floor.
+    DROPPED from the surfaced payload and do NOT count toward the floor, while
+    still producing a non-blocking warning.
   - **exact-duplicate names:** later duplicates are DROPPED (kept one), via the
-    existing normalizer in `lib/utils/reviewer-name-match.js` (the 19-for-12 case).
+    existing normalizer in `lib/utils/reviewer-name-match.js` (the 19-for-12 case);
+    if an incomplete entry appears before a complete same-name entry, keep the
+    complete entry.
   - **excluded names:** matches to `excludedNames` are DROPPED (they are already
     hard-filtered downstream regardless), via the same shared normalizer.
 - **truncation:** `stopReason === 'max_tokens'`, OR reviewers present but the
@@ -151,7 +153,8 @@ timeout. `[VERIFIED]` the deadline `AbortSignal` already bounds the call.
 - Duplicate roster (19-for-12) → flagged + deduped via shared normalizer.
 - Sanitize-not-block: a single duplicate/excluded/incomplete entry with enough
   usable suggestions remaining → `valid:true` with warning(s), not a typed failure
-  (dups/excluded dropped; incomplete kept but off the floor).
+  (dups/excluded/incomplete dropped from the payload; incomplete also stays off
+  the floor).
 - Placeholder suggestions are stripped from successful payloads and count toward
   invalidity when the stripped list falls below the floor or placeholders exceed
   20%.
