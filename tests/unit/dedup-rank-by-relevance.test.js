@@ -1,24 +1,30 @@
 /**
  * @jest-environment node
  *
- * Guards the rankByRelevance scoring against the field-name regression fixed in
- * S211: the ranker read `claudeSuggested`/`primaryAffiliation`/`keywords`/`sources[]`
- * but discover-path candidates carry `isClaudeSuggestion`/`source`/`affiliation`/
- * `expertiseAreas`, so 4 of 7 score terms silently never fired. These tests assert
- * the terms now fire for the REAL candidate shape.
+ * Guards the rankByRelevance scoring against field-name and provenance regressions:
+ * discover-path candidates carry `source`/`affiliation`/`expertiseAreas`, and the
+ * 25-point origin bonus now comes from `provenance.kind`, not legacy Claude flags.
  */
 const { DeduplicationService } = require('../../lib/services/deduplication-service');
 
 describe('rankByRelevance — fires for the discover-path candidate shape', () => {
-  test('Claude-suggested bonus fires via isClaudeSuggestion / source', () => {
-    const [viaFlag] = DeduplicationService.rankByRelevance([{ name: 'A', isClaudeSuggestion: true }]);
-    const [viaSource] = DeduplicationService.rankByRelevance([{ name: 'B', source: 'claude_suggestion' }]);
-    const [neither] = DeduplicationService.rankByRelevance([{ name: 'C', source: 'pubmed_discovery' }]);
-    // +25 Claude bonus, then +5 from the always-on single-source term.
-    expect(viaFlag.relevanceScore).toBe(30);
-    expect(viaSource.relevanceScore).toBe(30);
-    // No Claude bonus: just the +5 single-source term.
-    expect(neither.relevanceScore).toBe(5);
+  test('grounded provenance bonus fires from provenance kind, not legacy Claude flags', () => {
+    const [cited] = DeduplicationService.rankByRelevance([
+      { name: 'A', provenance: { kind: 'cited_reference', sources: ['reference_list'], seedRole: 'cited_author', groundingWorkIds: [] } },
+    ]);
+    const [proposalNamed] = DeduplicationService.rankByRelevance([
+      { name: 'B', provenance: { kind: 'proposal_named', sources: ['proposal_text'], seedRole: 'peer_or_competitor', groundingWorkIds: [] } },
+    ]);
+    const [legacyClaude] = DeduplicationService.rankByRelevance([{ name: 'C', isClaudeSuggestion: true, source: 'claude_suggestion' }]);
+    const [literature] = DeduplicationService.rankByRelevance([
+      { name: 'D', provenance: { kind: 'literature_retrieved', sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] } },
+    ]);
+    // +25 grounded bonus, then +5 from the always-on single-source term.
+    expect(cited.relevanceScore).toBe(30);
+    expect(proposalNamed.relevanceScore).toBe(30);
+    // Legacy Claude / literature-retrieved rows do not receive the grounded bonus.
+    expect(legacyClaude.relevanceScore).toBe(5);
+    expect(literature.relevanceScore).toBe(5);
   });
 
   test('affiliation bonus fires off `affiliation` (not just primaryAffiliation)', () => {
@@ -42,7 +48,7 @@ describe('rankByRelevance — fires for the discover-path candidate shape', () =
     const [oneSource] = DeduplicationService.rankByRelevance([
       { name: 'B', source: 'claude_suggestion' },
     ]);
-    // Both get the +25 Claude bonus; the two-source candidate gets +10 vs +5.
+    // Both lack the grounded provenance bonus; the two-source candidate gets +10 vs +5.
     expect(twoSources.relevanceScore - oneSource.relevanceScore).toBe(5);
   });
 
@@ -82,7 +88,7 @@ describe('rankByRelevance — fires for the discover-path candidate shape', () =
   test('sorts by descending relevanceScore', () => {
     const ranked = DeduplicationService.rankByRelevance([
       { name: 'low', source: 'pubmed_discovery' },
-      { name: 'high', isClaudeSuggestion: true, affiliation: 'MIT', publicationCount5yr: 4 },
+      { name: 'high', affiliation: 'MIT', publicationCount5yr: 4 },
     ]);
     expect(ranked[0].name).toBe('high');
     expect(ranked[1].name).toBe('low');

@@ -8,6 +8,7 @@
 // implementation. Re-exported below so existing client imports keep working.
 import { normalizeReviewerName as _normalizeReviewerName, partitionByExcluded } from '../../../lib/utils/reviewer-name-match';
 import { mayPersistIdentity } from '../../../lib/services/reviewer-identity-resolver';
+import { buildReviewerProvenance } from '../../../lib/utils/reviewer-provenance';
 
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen
@@ -118,6 +119,7 @@ export function filterExcluded(candidates, excludedNames) {
 export function pruneCandidateForRoster(c) {
   if (!c || typeof c !== 'object') return c;
   const e = c.contactEnrichment || {};
+  const provenance = buildReviewerProvenance(c);
   // Capture the identity-resolver verdict NOW (before it's dropped) as safe
   // boolean persist-permission flags, so a candidate saved AFTER a roster reload
   // (when contactEnrichment.identity / tierResults are gone) still honors the
@@ -158,6 +160,8 @@ export function pruneCandidateForRoster(c) {
     // Source / provenance flags the card branches on.
     isClaudeSuggestion: !!c.isClaudeSuggestion,
     source: c.source || null,
+    sources: Array.isArray(c.sources) ? c.sources : [],
+    provenance,
     isApplicantRecommended: !!c.isApplicantRecommended,
     // COI + mismatch detail.
     hasInstitutionCOI: !!c.hasInstitutionCOI,

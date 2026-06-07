@@ -2,7 +2,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-06-05 (added S224 via migration `020_reviewer_find_roster.sql`; schema-as-code, not yet live-probed).
+**Last verified:** 2026-06-07 (Provenance-DTO migration: `source_kind` now stores `candidate.provenance.kind`; schema unchanged).
 **Live row count:** 0 (new table; no rows until the Workbench Find tab records a search).
 
 ## NOT a regression of the S219/migration-018 Dataverse cutover
@@ -23,13 +23,15 @@ Migration 018 dropped the **canonical reviewer-identity** Postgres tables (`rese
 | display_name | text | surface-time `candidate.name` for re-render |
 | status | text | `active` \| `excluded` \| `saved` (CHECK-constrained) |
 | candidate | jsonb | pruned render DTO (only `CandidateCard`-rendered fields, not raw enrichment internals) |
-| source_kind | text | `claude_verified` \| `database` |
+| source_kind | text | Provenance kind: `cited_reference` \| `proposal_named` \| `applicant_suggested` \| `literature_retrieved` \| `grounded_seed` \| `barred_parametric`. Legacy rows may hold `claude_verified` or `database`; reads normalize those to a `provenance` DTO without rewriting the row. |
 | first_seen_at | timestamptz | |
 | updated_at | timestamptz | |
 
 Indexes: `uq_reviewer_find_roster_req_name` UNIQUE `(request_id, normalized_name)` (the dedup key) + `idx_reviewer_find_roster_req_status (request_id, status)`.
 
 **Status semantics:** `active` = surfaced & available (selectable list) · `excluded` = staff set-aside (collapsed recoverable section) · `saved` = graduated to the Dataverse pool (not rendered on Find, kept for dedup). The cross-run dedup union = **all roster names for the request, every status**. `recordSurfaced` never downgrades `excluded`/`saved` → `active` (curation wins) and enforces a per-request row cap (oldest `active`/`saved` evicted; never `excluded`).
+
+**Provenance semantics:** `candidate.provenance` is the durable render DTO for origin/grounding (`kind`, ordered `sources[]`, `seedRole`, `groundingWorkIds[]`). `source_kind` is a queryable copy of `provenance.kind`, not a Claude-vs-database flag. During the migration window, candidate JSON also keeps legacy `source`, `sources`, and `isClaudeSuggestion` fields for downstream compatibility.
 
 ## Read paths
 

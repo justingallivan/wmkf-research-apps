@@ -15,8 +15,8 @@
  * enrichment runs ON RESULTS (not at save) so cards show email + ORCID/Scholar +
  * REAL h-index/citations (fetched via the google_scholar_author engine) BEFORE the
  * user selects; rich candidate cards with COI / mismatch / confidence warnings;
- * results split into Claude-suggestions / Database-discoveries / Unverified (the
- * last is read-only). The displayed "expertise match %" is verificationConfidence;
+ * results split by provenance group plus Unverified (the last is read-only).
+ * The displayed "expertise match %" is verificationConfidence;
  * the composite relevanceScore drives ordering only — and because /discover ranks
  * BEFORE enrichment, the enriched list is RE-RANKED here (shared scorer in
  * lib/utils/relevance-score.js) so the fetched h-index/citations affect order.
@@ -48,6 +48,11 @@ import {
 } from './reviewer-search-logic';
 import { rankByRelevance } from '../../../lib/utils/relevance-score';
 import { buildScholarSearchUrl } from '../../../lib/utils/scholar-url';
+import {
+  provenanceGroupOf,
+  provenanceLabelForCandidate,
+  withReviewerProvenance,
+} from '../../../lib/utils/reviewer-provenance';
 
 // The four literature sources the discover endpoint understands. The user picks
 // which to query (parity with the standalone Reviewer Finder); at least one must
@@ -73,13 +78,6 @@ function Pill({ children, tone = 'gray' }) {
     green: 'bg-green-100 text-green-700',
   };
   return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tones[tone] || tones.gray}`}>{children}</span>;
-}
-
-// A candidate is a Claude suggestion (vs a database discovery) when tagged by
-// rankAllCandidates (`isClaudeSuggestion`) or carrying the verified-suggestion
-// source string.
-function isClaudeSuggestion(c) {
-  return !!(c?.isClaudeSuggestion || c?.source === 'claude_suggestion');
 }
 
 // Stable id for a candidate across roster splices + selection (S224): the
@@ -144,7 +142,7 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
   const potentialConcerns = typeof c.potentialConcerns === 'string' ? c.potentialConcerns.trim() : '';
   const hasPotentialConcern = !!potentialConcerns;
   const reason = c.reasoning || c.generatedReasoning || null;
-  const claude = isClaudeSuggestion(c);
+  const provenanceLabel = provenanceLabelForCandidate(c);
   const pubs = Array.isArray(c.publications) ? c.publications : [];
   const pubCount = c.publicationCount5yr || pubs.length || 0;
   const enr = c.contactEnrichment || {};
@@ -256,7 +254,7 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
             {citations != null && <span>· {citations.toLocaleString()} citations</span>}
             {c.isApplicantRecommended
               ? <Pill tone="green">Applicant recommended</Pill>
-              : <Pill tone={claude ? 'amber' : 'gray'}>{claude ? 'Claude suggestion' : (c.source || 'Database')}</Pill>}
+              : <Pill tone={provenanceGroupOf(c) === 'needs_identity_review' ? 'amber' : 'gray'}>{provenanceLabel}</Pill>}
           </div>
 
           {(email || website || orcidUrl) && (
@@ -580,10 +578,10 @@ export default function ReviewerSearchSection({
       // (Codex S211 catch). Mirrors discover.js's keyword derivation.
       const proposalKeywords = (analysisResult.proposalInfo?.keywords || '')
         .split(',').map((k) => k.trim()).filter(Boolean);
-      enriched = rankByRelevance(enriched, proposalKeywords);
+      enriched = rankByRelevance(enriched.map((c) => withReviewerProvenance(c)), proposalKeywords);
 
       setCandidates(enriched);
-      setUnverified(unverifiedKept);
+      setUnverified(unverifiedKept.map((c) => withReviewerProvenance(c)));
       if (enrichFailed) {
         setEnrichNote('Contact lookup was incomplete — some cards may be missing emails or citation metrics.');
       }
@@ -664,7 +662,7 @@ export default function ReviewerSearchSection({
   // The selectable list = the durable active roster ∪ this run's results, deduped
   // by normalized name (run results win — freshest enrichment). Renders + ranks
   // independent of `phase` so the roster shows on reload without a fresh search.
-  const displayCandidates = dedupeByName([...candidates, ...rosterActive]);
+  const displayCandidates = dedupeByName([...candidates, ...rosterActive].map((c) => withReviewerProvenance(c)));
 
   const toggle = (key) => {
     setSelected((prev) => {
@@ -794,8 +792,28 @@ export default function ReviewerSearchSection({
   // The two selectable sections are VIEWS over displayCandidates; selection is
   // keyed by candKey(c) (stable normalized name), so a roster splice can't
   // corrupt it (S224 — replaces the former flat-index invariant).
-  const claudeItems = displayCandidates.filter((c) => isClaudeSuggestion(c));
-  const dbItems = displayCandidates.filter((c) => !isClaudeSuggestion(c));
+  const provenanceSections = [
+    {
+      key: 'cited_or_proposal_named',
+      title: 'Cited / proposal-named',
+      items: displayCandidates.filter((c) => provenanceGroupOf(c) === 'cited_or_proposal_named'),
+    },
+    {
+      key: 'literature_retrieved',
+      title: 'Literature-retrieved',
+      items: displayCandidates.filter((c) => provenanceGroupOf(c) === 'literature_retrieved'),
+    },
+    {
+      key: 'applicant_suggested',
+      title: 'Applicant-suggested',
+      items: displayCandidates.filter((c) => provenanceGroupOf(c) === 'applicant_suggested'),
+    },
+    {
+      key: 'needs_identity_review',
+      title: 'Needs identity review',
+      items: displayCandidates.filter((c) => provenanceGroupOf(c) === 'needs_identity_review'),
+    },
+  ].filter((section) => section.items.length > 0);
 
   // Staff-removed recommendations (selected===false) are NOT enriched by the
   // endpoint (it loads selectedOnly:true), so count only the enrichable ones —
@@ -992,30 +1010,18 @@ export default function ReviewerSearchSection({
                         </button>
                       </div>
                       <div className="max-h-[32rem] overflow-y-auto space-y-4 pr-1">
-                        {claudeItems.length > 0 && (
-                          <div>
+                        {provenanceSections.map((section) => (
+                          <div key={section.key}>
                             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
-                              Claude suggestions ({claudeItems.length} verified)
+                              {section.title} ({section.items.length})
                             </p>
                             <div className="space-y-2">
-                              {claudeItems.map((c) => (
+                              {section.items.map((c) => (
                                 <CandidateCard key={candKey(c)} candidate={c} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} />
                               ))}
                             </div>
                           </div>
-                        )}
-                        {dbItems.length > 0 && (
-                          <div>
-                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
-                              Database discoveries ({dbItems.length})
-                            </p>
-                            <div className="space-y-2">
-                              {dbItems.map((c) => (
-                                <CandidateCard key={candKey(c)} candidate={c} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} />
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                        ))}
                       </div>
                       <div className="flex items-center gap-3">
                         <button

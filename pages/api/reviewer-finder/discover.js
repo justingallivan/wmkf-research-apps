@@ -18,11 +18,16 @@ import { ClaudeReviewerService } from '../../../lib/services/claude-reviewer-ser
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { deriveProposalAuthorNames } from '../../../lib/utils/proposal-authors';
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
+import { withReviewerProvenance } from '../../../lib/utils/reviewer-provenance';
 
 const limiter = nextRateLimiter({ max: 10 });
 
 // Enable verbose logging only in development with DEBUG_REVIEWER_FINDER env var
 const DEBUG = process.env.DEBUG_REVIEWER_FINDER === 'true';
+
+function withProvenanceList(candidates) {
+  return (Array.isArray(candidates) ? candidates : []).map((candidate) => withReviewerProvenance(candidate));
+}
 
 export const config = {
   api: {
@@ -188,7 +193,7 @@ export default async function handler(req, res) {
     // used by enrich-recommended.js (S213 parity — co-PIs were previously
     // dropped here, so a co-PI could slip through as a candidate/coauthor-clean).
     const proposalAuthors = deriveProposalAuthorNames(analysisResult.proposalInfo);
-    let verifiedCandidates = discoveryResults.verified;
+    let verifiedCandidates = withProvenanceList(discoveryResults.verified);
 
     {
       if (proposalAuthors.length > 0) {
@@ -343,8 +348,8 @@ export default async function handler(req, res) {
 
     const combinedResults = {
       verified: verifiedWithCOI,
-      unverified: discoveryResults.unverified,
-      discovered: enhancedDiscovered,
+      unverified: withProvenanceList(discoveryResults.unverified),
+      discovered: withProvenanceList(enhancedDiscovered),
       stats: discoveryResults.stats
     };
 
@@ -359,17 +364,22 @@ export default async function handler(req, res) {
       throw deadlineController.signal.reason || new Error('reviewer_time_budget_exceeded');
     }
 
+    verifiedWithCOI = withProvenanceList(verifiedWithCOI);
+    const unverifiedWithProvenance = withProvenanceList(discoveryResults.unverified);
+    enhancedDiscovered = withProvenanceList(enhancedDiscovered);
+    const rankedWithProvenance = withProvenanceList(rankedCandidates);
+
     sendEvent('result', {
       verified: verifiedWithCOI,
-      unverified: discoveryResults.unverified,
+      unverified: unverifiedWithProvenance,
       discovered: enhancedDiscovered,
-      ranked: rankedCandidates,
+      ranked: rankedWithProvenance,
       stats: discoveryResults.stats
     });
 
     sendEvent('complete', {
       message: 'Discovery complete',
-      totalCandidates: rankedCandidates.length,
+      totalCandidates: rankedWithProvenance.length,
       verifiedCount: verifiedWithCOI.length,
       discoveredCount: enhancedDiscovered.length
     });

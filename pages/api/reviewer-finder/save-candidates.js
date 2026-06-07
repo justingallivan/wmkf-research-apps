@@ -17,6 +17,7 @@ import * as reviewerSuggestionAdapter from '../../../lib/dataverse/adapters/revi
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { mayPersistIdentity, RESOLVER_SOURCED_FIELDS } from '../../../lib/services/reviewer-identity-resolver';
+import { saveSourceListForCandidate, withReviewerProvenance } from '../../../lib/utils/reviewer-provenance';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -55,8 +56,9 @@ export default async function handler(req, res) {
     // save never marks a failed row saved.
     const savedNames = [];
 
-    for (const candidate of candidates) {
+    for (const rawCandidate of candidates) {
       try {
+        const candidate = withReviewerProvenance(rawCandidate);
         const normalizedName = candidate.name
           .toLowerCase()
           .replace(/^(dr\.?|prof\.?|professor)\s+/i, '')
@@ -76,12 +78,8 @@ export default async function handler(req, res) {
           ? candidate.expertiseAreas.filter(Boolean).join('; ')
           : (candidate.expertise || null);
 
-        const sources = [];
-        if (candidate.isClaudeSuggestion || candidate.source === 'claude_suggestion') sources.push('claude');
-        if (candidate.verificationSource === 'pubmed' || candidate.source === 'pubmed') sources.push('pubmed');
-        if (candidate.source === 'arxiv') sources.push('arxiv');
-        if (candidate.source === 'biorxiv') sources.push('biorxiv');
-        if (sources.length === 0) sources.push(candidate.source || 'unknown');
+        const sources = saveSourceListForCandidate(candidate);
+        if (sources.length === 0) sources.push('unknown');
 
         // Persist the recency-weighted relevance score (0–100), attached by
         // rankByRelevance at /discover + the Workbench re-rank. Prefer it over
@@ -181,8 +179,8 @@ export default async function handler(req, res) {
         savedCount++;
         savedNames.push(candidate.name);
       } catch (candidateError) {
-        console.error(`Error saving candidate ${candidate.name}:`, candidateError.message);
-        errors.push({ name: candidate.name, error: candidateError.message });
+        console.error(`Error saving candidate ${rawCandidate?.name}:`, candidateError.message);
+        errors.push({ name: rawCandidate?.name, error: candidateError.message });
       }
     }
 

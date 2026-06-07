@@ -71,6 +71,11 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
       verified: false,
       verificationStatus: 'unresolved',
       identityStatus: 'unresolved',
+      provenance: {
+        kind: 'literature_retrieved',
+        sources: ['pubmed'],
+        seedRole: 'query_seed',
+      },
     });
     expect(result.unverified[0].reason).toMatch(/forename|initial/i);
   });
@@ -94,6 +99,11 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
       verified: true,
       verificationStatus: 'verified',
       identityStatus: 'verified',
+      provenance: {
+        kind: 'literature_retrieved',
+        sources: ['pubmed'],
+        seedRole: 'query_seed',
+      },
     });
     expect(result.verified[0].nameEvidence.hasFullForenameMatch).toBe(true);
   });
@@ -116,10 +126,33 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
       verified: false,
       verificationStatus: 'unresolved',
       identityStatus: 'unresolved',
+      provenance: {
+        kind: 'literature_retrieved',
+        sources: ['pubmed'],
+        seedRole: 'query_seed',
+      },
     });
     expect(result.unverified[0].nameEvidence).toMatchObject({
       hasFullForenameMatch: false,
       hasInitialOnlyMatch: true,
+    });
+  });
+
+  test('ungrounded parametric suggestion is marked barred_parametric', async () => {
+    const result = await runVerification(
+      { name: 'Imaginary Reviewer', expertiseAreas: [] },
+      {},
+    );
+
+    expect(result.verified).toHaveLength(0);
+    expect(result.unverified).toHaveLength(1);
+    expect(result.unverified[0]).toMatchObject({
+      verified: false,
+      provenance: {
+        kind: 'barred_parametric',
+        sources: [],
+        seedRole: 'query_seed',
+      },
     });
   });
 

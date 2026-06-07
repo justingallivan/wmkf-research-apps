@@ -1,9 +1,11 @@
 # Reviewer Finder — Retrieval-First Redesign Plan
 
 Status: **DESIGN.** Phase-1 verify-hardening (forename gate + soft mismatch flags
-+ PubMed year basis) is **IMPLEMENTED on branch `reviewer-verify-identity-states`**
-(validated by unit tests + live smoke S231; not yet merged). Everything else is
-unbuilt. Every "current state" claim is labelled `[VERIFIED]` (read from source or
++ PubMed year basis) is **SHIPPED to `main` in S231** (commits `a3e6cbb`,
+`4638db6`; validated by unit tests + live smoke). Sequencing step 1 —
+the provenance DTO contract (§4.2, §4.5) — is **IMPLEMENTED in S232** (build +
+gates + 374 reviewer tests green; pending a ship decision on its ~30-pt Track-A
+ranking change). Everything else is unbuilt. Every "current state" claim is labelled `[VERIFIED]` (read from source or
 a live probe this session) or `[ASSUMED]`. Proposed behavior is labelled
 `[PROPOSED]`. Do not present any `[PROPOSED]` item as built.
 
@@ -189,6 +191,10 @@ The redesign therefore **extends** these, it does not replace them.
     authorship. This removes **work-level** ambiguity (which paper and which
     byline), not **person-identity** ambiguity; cited-reference author strings are
     still hypotheses that pass through clustering, identity resolution, and COI.
+    **For question-driven proposals this lane should be the PRIMARY origin — keyword
+    `searchQueries` (analyze PART 3) bias toward surface tokens and miss the
+    proposal's actual question; see §4.5 for the primacy rationale, failure modes,
+    and a Step-4 build sketch.**
 - **Stage 2 — hypothesis-builder / mosaic (fan-in):** cluster author-instances
   across sources into candidate-person hypotheses with aggregated evidence:
   normalized name, full forename/initials, ORCID IDs, publication clusters,
@@ -227,8 +233,8 @@ The redesign therefore **extends** these, it does not replace them.
   `query_seed`), `provenance.groundingWorkIds[]` (DOI/PMID/arXiv/ADS/OpenAlex
   work IDs), and legacy-compatible `source`/`sources` fields during migration.
   Do **not** infer provenance from `isClaudeSuggestion`.
-- **Current consumer migration required:** `[VERIFIED]` `/discover` currently
-  streams `verified/unverified/discovered/ranked` with binary source semantics
+- **Consumer migration — IMPLEMENTED S232 (pending ship):** `[VERIFIED]` pre-S232,
+  `/discover` streamed `verified/unverified/discovered/ranked` with binary source semantics
   (`pages/api/reviewer-finder/discover.js:362-367`); the roster collapses source
   to `claude_verified` vs `database`
   (`lib/services/reviewer-roster-store.js:23-27`); save maps source to
@@ -236,7 +242,7 @@ The redesign therefore **extends** these, it does not replace them.
   (`pages/api/reviewer-finder/save-candidates.js:79-84`); the Workbench UI splits
   sections by `isClaudeSuggestion || source === 'claude_suggestion'`
   (`shared/components/reviewers/ReviewerSearchSection.js:78-83,787-788`). The
-  redesign must update all four contracts together: `/discover` emits the
+  S232 updated all four contracts together (Codex-built, reviewed): `/discover` emits the
   provenance DTO on every candidate; roster `source_kind` stores the provenance
   kind (plus raw `provenance` in the candidate JSON); save persists/memoizes the
   ordered scholarly sources plus the provenance kind instead of collapsing to
@@ -285,7 +291,7 @@ the hypothesis builder:
   gate is the sole demoter**; `institutionMismatch`/`expertiseMismatch` stay
   **soft flags** on the candidate (they do NOT demote a forename-confirmed
   identity) and only corroborate demotion when the match is initial-only.
-  [IMPLEMENTED on branch — see §5.]
+  [SHIPPED to `main` S231 — see §5.]
 
 ### 4.4 Analyze, grant-type, COI, and fan-out contracts
 `[PROPOSED]` **Analyze retry/repair contract:** Stage 0 must return schema-valid
@@ -351,6 +357,83 @@ enabled sources fail/timeout, return `success:false`, `status:'retrieval_failed'
 This replaces today's best-effort external DB searches that do not observe the
 route deadline signal (`discover.js:65-68`).
 
+### 4.5 Reference-resolution (cited-reference) lane — primacy, failure modes, build sketch
+`[PROPOSED]` **Status:** the `cited_reference` provenance kind, its `cited_author`
+seedRole, the `reference_list` source, the grounded ranking bonus, and the
+"Cited / proposal-named" UI group are **wired** in the S232 DTO
+(`lib/utils/reviewer-provenance.js`), but there is **no producer** — `[VERIFIED via
+grep]` no reference extraction or DOI/PMID resolution from proposals exists yet
+(`pubmed-service.js` extracts DOIs from PubMed *API responses*, not reference lists).
+The wire shape is ready; the lane is unbuilt.
+
+**Why it should be the PRIMARY origination path for question-driven proposals.**
+The keyword `searchQueries` lane (§4.1 / analyze PART 3) is structurally biased
+toward *surface tokens*: the prompt steers Claude to "methods, organisms, phenomena,
+or systems" in 3–6-word MeSH-friendly queries. That reliably captures techniques and
+model systems but **misses the proposal's fundamental question**, which is relational
+and often novel (not an indexed term). For a proposal whose novelty is a
+*question/hypothesis applied to a common system* (e.g. a regulatory hypothesis tested
+in *E. coli*), the queries collapse to generic tokens and retrieve a large,
+mostly-irrelevant crowd; Track B then takes the senior author of each hit, yielding a
+soup of unrelated PIs. A proposal's **cited references** encode the
+question-community by construction (expert-curated, question-specific), bypassing
+keyword "aboutness" limits. Recommendation: for question-driven proposals treat the
+cited-reference lane as the **primary** candidate origin and demote keyword
+`searchQueries` to a *recall supplement*, not a co-equal source. This is a
+per-proposal routing decision: distinctive-phenomenon proposals (where the science
+has a nameable indexed term — observed in the S231/S232 samples) keyword queries
+still serve, so route by whether the proposal's novelty is a *question* or a
+*nameable phenomenon* rather than replacing keyword search wholesale.
+
+**Failure modes (precision is not free).** The lane trades the keyword problem for a
+different, harder set — weigh these before treating it as a silver bullet:
+1. **Highest COI density of any lane.** Heavily-cited authors are disproportionately
+   the applicants' collaborators, mentors, and direct competitors — exactly the
+   reviewers to *exclude*. The §4.4 COI package (proposal-author, coauthor-history,
+   same/historical-institution) is mandatory and load-bearing here; unfiltered, the
+   top of this lane is unusable.
+2. **Methods-citation noise.** Reference lists also cite tool/stats/foundational-
+   review papers whose authors are off-question — the surface-token crowd reappears
+   *inside* the citation set. Substantive-vs-methodological citation weighting is
+   unsolved; start without it and measure.
+3. **Citation grounds a work, not a person** (§4.1 caveat). A cited multi-author work
+   yields N author-string hypotheses; all pass through clustering + identity
+   resolution. Taking all authors is noisy; taking senior/corresponding reintroduces
+   seniority bias.
+4. **Seniority & staleness skew.** Cited work is often old/foundational, so cited
+   authors skew senior and may be dormant or have moved institutions — a *grounded*
+   echo of the bias the redesign fights. Cross-check against the recency ranker and
+   the fit-vs-contactability split (§4.2).
+5. **Self-citation.** A portion of the list is the applicants' own prior work → those
+   authors are the proposal authors → drop as COI (also a clean COI signal).
+6. **Extraction reliability is the real engineering risk.** PDF bibliographies mangle
+   on parse; many references lack DOIs (older work, books, theses, some preprints);
+   formats vary. Coverage will be partial and noisy — this, not the concept,
+   determines whether the lane works.
+
+**Build sketch (Step-4 slice, on top of the S232 DTO).**
+- **Extract:** isolate the reference/bibliography section of the parsed proposal
+  text; regex out DOIs (`10.\d{4,}/\S+`), PMIDs, and arXiv IDs → a deduped ID set
+  with the raw reference string for audit. Log extraction coverage (IDs found vs
+  reference entries) — a §4.4-style "no silent caps" report, since partial extraction
+  is expected.
+- **Resolve:** ID → exact work + full author byline. Crossref for DOIs, PubMed eutils
+  for PMIDs, arXiv API for arXiv IDs, OpenAlex as cross-resolver/back-stop. Honor the
+  §4.4 fan-out/time-budget contract (AbortSignal, per-source caps, retry policy);
+  cache by ID. **Verify before relying:** Crossref/eutils/arXiv rate limits and the
+  real DOI-coverage of proposal reference lists are unmeasured — probe a sample of
+  current-cycle proposals for extraction yield first.
+- **Hypothesize:** each author instance → candidate hypothesis with
+  `provenance.kind = cited_reference`, `seedRole = cited_author`,
+  `groundingWorkIds = [the resolved ID]`, plus author ordinal/corresponding flags and
+  the work's recency. Feed the existing hypothesis-builder (§4.3); do **not**
+  special-case persistence here.
+- **Screen + rank:** run the full §4.4 COI package on every cited-reference candidate
+  BEFORE surfacing (this lane's highest-risk step), route through the identity
+  resolver, then the recency ranker. Cited-reference candidates carry the grounded
+  +25 bonus (already wired) — but COI-flagged ones drop to human review, never
+  auto-top.
+
 ---
 
 ## 5. Concrete bug fixes (independent of the big redesign)
@@ -397,24 +480,26 @@ Hardening wins that fix the demonstrated failures now:
 ---
 
 ## 7. Sequencing
-1. **Route current `verifyClaudeSuggestions` through identity states — no new
-   sources.** The current verifier is isolated in
-   `discovery-service.js:327-388`; first make it emit the new identity/provenance
-   DTO and update `/discover`, roster, save, and UI section contracts together
-   (§4.2). This establishes the candidate wire shape before fan-out changes.
+1. **[IMPLEMENTED — identity states S231, provenance DTO + 4-consumer contracts
+   S232] Route current `verifyClaudeSuggestions` through identity states — no new
+   sources.** The verifier (`discovery-service.js`) emits identity/provenance DTOs,
+   and `/discover`, roster, save, and the UI section contracts all carry the DTO
+   (§4.2). This established the candidate wire shape before fan-out changes. (S232
+   pending a ship decision on its ~30-pt Track-A ranking change — see §4.2 tail.)
 2. **Bug-fix hardening (§5) without source expansion.** Forename gate on
    initial-only verification, institution/expertise mismatch → soft flags (not
    demotion), PubMed year basis, COI parity, and non-research grant filtering.
    These are behavioral safety fixes around current sources. (The forename gate +
-   soft mismatch flags + year basis are already IMPLEMENTED on the branch.)
+   soft mismatch flags + year basis are already SHIPPED to `main` in S231.)
 3. **Analyze contract rewrite.** Replace delimiter parsing with schema output,
    retry/repair, typed invalid-analysis failure, and no parametric candidate
    names. Keep source planning and proposal/reference extraction, not reviewer
    invention.
-4. **Add field-routed retrieval sources with provenance plumbing already in
-   place.** OpenAlex + ORCID spine, ADS/arXiv/DBLP/INSPIRE as field-routed lanes,
-   and reference-resolution should land **with** the DTO/UI/save/roster
-   provenance contract, not before it.
+4. **Add field-routed retrieval sources — provenance plumbing now in place (S232).**
+   Build the **reference-resolution lane (§4.5) FIRST** — for question-driven
+   proposals it is the primary candidate origin, with keyword `searchQueries`
+   demoted to a recall supplement. Then OpenAlex + ORCID spine and
+   ADS/arXiv/DBLP/INSPIRE as field-routed lanes. All ride the S232 DTO contract.
 5. **Add the hypothesis-builder and resolver input adapter.** Publication
    clusters, forename/co-author/affiliation evidence, and cross-source
    corroboration feed the pure resolver; the resolver remains classification and
