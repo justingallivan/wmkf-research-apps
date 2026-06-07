@@ -62,7 +62,6 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`discovery-service.js`** — Multi-database literature search orchestration.
 - **`deduplication-service.js`** — Name matching, duplicate merge, COI filtering, ranking.
 - **`contact-enrichment-service.js`** — 5-tier contact lookup; header documents Dataverse writeback migration.
-- **`web-discovery-service.js`** — Track C v1 (READ-ONLY): Perplexity Search → A7-wrapped Claude name-extraction → `WebLead[]` for the display-only "Web suggestions" panel. Leads-only; never enters the candidate pipeline/ranking/COI/roster/save. Fail-soft (no key / outage → empty). Perplexity vs Claude keys kept distinct. Wired via `/api/reviewer-finder/web-suggestions`.
 
 ### Integrity Screener
 

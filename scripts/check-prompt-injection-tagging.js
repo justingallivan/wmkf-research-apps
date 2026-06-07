@@ -293,13 +293,11 @@ const SURFACES = [
     ],
     callSiteFiles: [
       'lib/services/claude-reviewer-service.js',
-      // createWebExtractionPrompt's call site (Track C web discovery, v1).
-      'lib/services/web-discovery-service.js',
     ],
     // reviewer-finder-dynamics.js has no prompt builders of its own.
-    // createWebExtractionPrompt: Perplexity web-discovery name extraction (v1) —
-    // wraps untrusted web results + calls buildUntrustedContentPreamble in-body.
-    builders: ['createAnalysisPrompt', 'createDiscoveredReasoningPrompt', 'createWebExtractionPrompt'],
+    // (createWebExtractionPrompt removed S230 — web-discovery abandoned; see
+    // docs/REVIEWER_WEB_DISCOVERY_PLAN.md OUTCOME banner.)
+    builders: ['createAnalysisPrompt', 'createDiscoveredReasoningPrompt'],
   },
   {
     id: 'dynamics-explorer-chat',

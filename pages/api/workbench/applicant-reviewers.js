@@ -74,8 +74,8 @@ export default async function handler(req, res) {
   // Warm the model-override cache BEFORE the excluded-reviewer Claude extraction:
   // getModelForApp('reviewer-finder') resolves tier keys (e.g. 'sonnet') to real
   // model ids only once overrides are loaded, otherwise Anthropic 404s on the raw
-  // tier key and the extraction fails (mirrors the five other reviewer-finder LLM
-  // routes — analyze/discover/enrich-contacts/web-suggestions/generate-emails).
+  // tier key and the extraction fails (mirrors the other reviewer-finder LLM
+  // routes — analyze/discover/enrich-contacts/generate-emails).
   await loadModelOverrides();
 
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
