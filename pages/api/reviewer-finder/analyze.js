@@ -201,7 +201,16 @@ export default async function handler(req, res) {
     }
 
     if (!result.success) {
-      sendEvent('error', { message: 'Analysis failed', details: result });
+      if (result.status === 'analysis_invalid') {
+        sendEvent('error', {
+          status: 'analysis_invalid',
+          retryable: true,
+          message: 'The proposal analysis response was incomplete or unreliable. Please retry the analysis.',
+          details: result,
+        });
+      } else {
+        sendEvent('error', { message: 'Analysis failed', details: result });
+      }
       return res.end();
     }
 

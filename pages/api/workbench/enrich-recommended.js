@@ -152,6 +152,7 @@ export default async function handler(req, res) {
         }
         const analysis = await ClaudeReviewerService.analyzeProposal(text, apiKey, {
           reviewerCount: 1, // we don't use the suggestions here, only proposalInfo
+          analysisPurpose: 'proposal_info',
           userProfileId: access.profileId,
           signal: deadlineController.signal,
           deadlineAt,

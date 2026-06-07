@@ -369,6 +369,7 @@ export default function ReviewerSearchSection({
   const [rosterNote, setRosterNote] = useState(null); // surfaced if a durable write fails
   const [excludedOpen, setExcludedOpen] = useState(false);
   const [error, setError] = useState(null);
+  const [errorMeta, setErrorMeta] = useState(null);
   const [savedMsg, setSavedMsg] = useState(null);
   const [enrichNote, setEnrichNote] = useState(null);
   const [excludeText, setExcludeText] = useState((excludedNames || []).join(', '));
@@ -405,7 +406,7 @@ export default function ReviewerSearchSection({
     genRef.current += 1; // invalidate any in-flight run
     const myGen = genRef.current;
     setPhase('idle'); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null);
-    setSelected(new Set()); setError(null); setSavedMsg(null); setEnrichNote(null);
+    setSelected(new Set()); setError(null); setErrorMeta(null); setSavedMsg(null); setEnrichNote(null);
     setExcludedRemoved(0); setRosterNote(null);
     setRosterActive([]); setRosterExcluded([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false);
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
@@ -463,7 +464,7 @@ export default function ReviewerSearchSection({
       ...(savedPoolNames || []),
     ]));
     setPhase('running');
-    setError(null); setProgress([]); setCandidates([]); setUnverified([]); setSelected(new Set());
+    setError(null); setErrorMeta(null); setProgress([]); setCandidates([]); setUnverified([]); setSelected(new Set());
     setSavedMsg(null); setEnrichNote(null); setAnalysis(null); setExcludedRemoved(0);
     try {
       // 1. Analyze the proposal (Claude). excludedNames soft-blocks Claude's own
@@ -476,12 +477,17 @@ export default function ReviewerSearchSection({
       let analysisResult = null;
       let streamError = null;
       await readSseStream(aRes, ({ event, data }) => {
-        if (event === 'error') { streamError = data?.message || 'Analysis failed'; return; }
-        if (data?.error) { streamError = data.error; return; }
+        if (event === 'error') { streamError = data || { message: 'Analysis failed' }; return; }
+        if (data?.error) { streamError = { message: data.error, status: data.status, retryable: data.retryable }; return; }
         if (data?.message) pushProgress(data.message);
         if (data?.proposalInfo) analysisResult = data;
       });
-      if (streamError) throw new Error(streamError);
+      if (streamError) {
+        const err = new Error(streamError.message || 'Analysis failed');
+        err.status = streamError.status;
+        err.retryable = !!streamError.retryable;
+        throw err;
+      }
       // Stream ended cleanly but no result frame arrived — almost always a
       // timed-out or dropped connection during the long Claude analysis, not a
       // content problem. Name the likely cause so the user knows to just retry.
@@ -611,7 +617,11 @@ export default function ReviewerSearchSection({
         }
       }
     } catch (e) {
-      if (genRef.current === myGen) { setError(e.message); setPhase('error'); }
+      if (genRef.current === myGen) {
+        setError(e.message);
+        setErrorMeta({ status: e.status, retryable: !!e.retryable });
+        setPhase('error');
+      }
     } finally {
       runningRef.current = false;
     }
@@ -719,7 +729,7 @@ export default function ReviewerSearchSection({
     if (chosen.length === 0) return;
     savingRef.current = true;
     setPhase('saving');
-    setError(null); setProgress([]); setSavedMsg(null);
+    setError(null); setErrorMeta(null); setProgress([]); setSavedMsg(null);
     try {
       // Candidates were already enriched at results time (stage 4 of runSearch),
       // so the chosen rows carry contact info + bibliometrics — save them directly.
@@ -923,7 +933,16 @@ export default function ReviewerSearchSection({
                   </details>
                 )}
               </div>
-              {error && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{error}</div>}
+              {error && (
+                <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
+                  {errorMeta?.status === 'analysis_invalid' ? (
+                    <>
+                      The proposal analysis response was incomplete or unreliable. Please retry the analysis.
+                      {errorMeta.retryable && <span className="block text-xs mt-1">Use Try again to rerun the analysis.</span>}
+                    </>
+                  ) : error}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={runSearch}

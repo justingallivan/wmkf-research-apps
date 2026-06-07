@@ -19,6 +19,7 @@ import {
 } from '../../../lib/utils/ai-payload-boundary';
 import { interpolate } from '../../../lib/services/prompt-store';
 import { SCORE_CANDIDATES_USER_PROMPT_TEMPLATE } from './reviewer-finder-dynamics';
+import { normalizeReviewerName, buildExcludedSet } from '../../../lib/utils/reviewer-name-match';
 
 // Cap for the Stage 2 candidate block (U-EXT). Generous — a batch of
 // candidates with three publication titles each stays well under this.
@@ -472,30 +473,176 @@ export function createProposalSummary(proposalInfo) {
   return parts.join('\n');
 }
 
+function allSearchQueries(searchQueries) {
+  return [
+    ...searchQueries?.pubmed || [],
+    ...searchQueries?.arxiv || [],
+    ...searchQueries?.biorxiv || [],
+    ...searchQueries?.chemrxiv || []
+  ].filter(q => String(q || '').trim().length > 0);
+}
+
+function addIssue(issues, code, message, severity = 'error') {
+  issues.push({ code, message, severity });
+}
+
+function isPlaceholderValue(value) {
+  const text = String(value || '').trim();
+  if (!text) return false;
+  if (/^\[[^\]]+\]$/.test(text)) return true;
+  if (/^(?:n\/?a|n\.a\.?|na|none|not applicable|unknown|unspecified)$/i.test(text)) return true;
+  return /\b(?:insufficient certainty|replaced|substituting|placeholder|unable to identify|cannot identify|no suitable reviewer)\b/i.test(text);
+}
+
+function isPlaceholderSuggestion(suggestion) {
+  if (!suggestion) return true;
+  return [
+    suggestion.name,
+    suggestion.suggestedInstitution,
+    suggestion.reasoning,
+    suggestion.source,
+  ].some(isPlaceholderValue);
+}
+
+function hasReviewerDetail(suggestion) {
+  if (!suggestion?.name) return false;
+  const expertise = Array.isArray(suggestion.expertiseAreas)
+    ? suggestion.expertiseAreas.filter(Boolean).join(', ')
+    : suggestion.expertiseAreas;
+  return [
+    suggestion.suggestedInstitution,
+    expertise,
+    suggestion.reasoning,
+  ].some(v => String(v || '').trim().length > 2 && !isPlaceholderValue(v));
+}
+
+/**
+ * Rich, mode-aware Stage-1 analysis validation.
+ *
+ * @param {Object} result parsed delimiter analysis
+ * @param {Object} opts
+ * @param {number} opts.reviewerCount
+ * @param {string|null} opts.stopReason
+ * @param {string[]} opts.excludedNames
+ * @param {'search'|'proposal_info'} opts.analysisPurpose
+ * @returns {{valid:boolean, issues:Array<{code:string,message:string,severity:string}>, severity:string|null, sanitizedResult:Object, suggestionFloor:number, placeholderCount:number}}
+ */
+export function validateReviewerAnalysis(result, opts = {}) {
+  const {
+    reviewerCount = 12,
+    stopReason = null,
+    excludedNames = [],
+    analysisPurpose = 'search',
+  } = opts;
+  const issues = [];
+  const originalSuggestions = Array.isArray(result?.reviewerSuggestions) ? result.reviewerSuggestions : [];
+  const placeholderSuggestions = originalSuggestions.filter(isPlaceholderSuggestion);
+  const nonPlaceholder = originalSuggestions.filter(s => !isPlaceholderSuggestion(s));
+
+  const isSearch = analysisPurpose !== 'proposal_info';
+  const requested = Number.isFinite(Number(reviewerCount)) ? Math.max(0, Number(reviewerCount)) : 12;
+  const suggestionFloor = Math.min(requested, Math.max(3, Math.ceil(requested / 2)));
+
+  // Sanitize quality issues out of the surfaced list rather than hard-failing on
+  // them. Duplicates and excluded names are DROPPED (excluded are hard-filtered
+  // downstream regardless); incomplete entries are KEPT (a sparsely-described real
+  // name can still verify) but do NOT count toward the suggestion floor. Only the
+  // floor (on usable suggestions), empty/parse, truncation, missing-queries, and a
+  // >20% placeholder ratio block — a single dup/excluded/incomplete entry no longer
+  // fails an otherwise-usable analysis (which would only waste a repair attempt).
+  const excludedSet = buildExcludedSet(excludedNames);
+  const seen = new Map();
+  const duplicateNames = [];
+  const excludedMatches = [];
+  const kept = [];
+  for (const suggestion of nonPlaceholder) {
+    const normalized = normalizeReviewerName(suggestion?.name);
+    if (normalized && excludedSet.has(normalized)) { excludedMatches.push(suggestion.name); continue; }
+    if (normalized && seen.has(normalized)) { duplicateNames.push(suggestion.name); continue; }
+    if (normalized) seen.set(normalized, suggestion.name);
+    kept.push(suggestion);
+  }
+  const incomplete = kept.filter(s => !hasReviewerDetail(s));
+  const usable = kept.filter(hasReviewerDetail);
+
+  const sanitizedResult = {
+    ...(result || {}),
+    proposalInfo: result?.proposalInfo || {},
+    reviewerSuggestions: kept,
+    searchQueries: result?.searchQueries || { pubmed: [], arxiv: [], biorxiv: [], chemrxiv: [] },
+  };
+  const queries = allSearchQueries(sanitizedResult.searchQueries);
+  const title = String(sanitizedResult.proposalInfo?.title || '').trim();
+
+  if (!title && originalSuggestions.length === 0) {
+    addIssue(issues, 'empty_parse_failure', 'No proposal title or reviewer suggestions were parsed from the analysis response.');
+  } else if (!title) {
+    addIssue(issues, 'missing_title', 'Missing proposal title.');
+  }
+
+  if (isSearch && usable.length < suggestionFloor) {
+    addIssue(
+      issues,
+      'below_suggestion_floor',
+      `Only ${usable.length} usable reviewer suggestion${usable.length === 1 ? '' : 's'} parsed; expected at least ${suggestionFloor}.`,
+    );
+  }
+
+  if (placeholderSuggestions.length > 0) {
+    const ratio = originalSuggestions.length > 0 ? placeholderSuggestions.length / originalSuggestions.length : 0;
+    addIssue(
+      issues,
+      ratio > 0.2 ? 'placeholder_suggestions' : 'placeholder_suggestions_stripped',
+      `${placeholderSuggestions.length} placeholder reviewer suggestion${placeholderSuggestions.length === 1 ? '' : 's'} were stripped from the analysis response.`,
+      ratio > 0.2 ? 'error' : 'warning',
+    );
+  }
+
+  // Quality issues — non-blocking warnings (sanitized above), not hard failures.
+  if (incomplete.length > 0) {
+    addIssue(
+      issues,
+      'incomplete_reviewer',
+      `${incomplete.length} reviewer suggestion${incomplete.length === 1 ? '' : 's'} had only a name or lacked required detail (kept, excluded from the floor).`,
+      'warning',
+    );
+  }
+  if (duplicateNames.length > 0) {
+    addIssue(issues, 'duplicate_reviewer_name', `Duplicate reviewer name${duplicateNames.length === 1 ? '' : 's'} dropped: ${duplicateNames.join(', ')}.`, 'warning');
+  }
+  if (excludedMatches.length > 0) {
+    addIssue(issues, 'excluded_reviewer_name', `Excluded reviewer${excludedMatches.length === 1 ? '' : 's'} dropped: ${excludedMatches.join(', ')}.`, 'warning');
+  }
+
+  if (stopReason === 'max_tokens') {
+    addIssue(issues, 'truncated_response', 'The model stopped because it reached the max token limit.');
+  } else if (kept.length > 0 && queries.length === 0) {
+    addIssue(issues, 'truncated_or_missing_queries', 'Reviewer suggestions were present but no database search queries were parsed.');
+  }
+
+  if (queries.length === 0) {
+    addIssue(issues, 'missing_queries', 'No database search queries were generated.');
+  }
+
+  const blocking = issues.filter(issue => issue.severity !== 'warning');
+  return {
+    valid: blocking.length === 0,
+    issues,
+    severity: blocking.length > 0 ? 'error' : (issues.length > 0 ? 'warning' : null),
+    sanitizedResult,
+    suggestionFloor,
+    placeholderCount: placeholderSuggestions.length,
+  };
+}
+
 /**
  * Validation helper - check if analysis result is usable
  */
 export function validateAnalysisResult(result) {
   const issues = [];
-
-  if (!result.proposalInfo?.title) {
-    issues.push('Missing proposal title');
-  }
-
-  if (!result.reviewerSuggestions || result.reviewerSuggestions.length === 0) {
-    issues.push('No reviewer suggestions generated');
-  }
-
-  const allQueries = [
-    ...result.searchQueries?.pubmed || [],
-    ...result.searchQueries?.arxiv || [],
-    ...result.searchQueries?.biorxiv || [],
-    ...result.searchQueries?.chemrxiv || []
-  ];
-
-  if (allQueries.length === 0) {
-    issues.push('No search queries generated');
-  }
+  if (!result.proposalInfo?.title) issues.push('Missing proposal title');
+  if (!result.reviewerSuggestions || result.reviewerSuggestions.length === 0) issues.push('No reviewer suggestions generated');
+  if (allSearchQueries(result.searchQueries).length === 0) issues.push('No search queries generated');
 
   return {
     valid: issues.length === 0,

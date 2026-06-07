@@ -26,6 +26,7 @@ import { BASE_CONFIG } from '../shared/config/baseConfig';
 import { resolveStoredCycle, formatCycleForStorage } from '../shared/config/reviewerFinderPreferences';
 import ProfileContext from '../shared/context/ProfileContext';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
+import { readSseStream } from '../shared/components/reviewers/sse';
 
 // Helper to extract email from affiliation string (fallback when email field is null)
 function extractEmailFromAffiliation(affiliation) {
@@ -657,6 +658,7 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
   const [currentStage, setCurrentStage] = useState(null);
   const [progressMessages, setProgressMessages] = useState([]);
   const [error, setError] = useState(null);
+  const [errorMeta, setErrorMeta] = useState(null);
   const [saveMessage, setSaveMessage] = useState(null);
 
   // Contact enrichment state
@@ -829,6 +831,7 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
   const handleFilesUploaded = (files) => {
     setUploadedFiles(files);
     setError(null);
+    setErrorMeta(null);
     // Reset results when new file uploaded
     setAnalysisResult(null);
     setDiscoveryResult(null);
@@ -849,6 +852,7 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
     setCurrentStage('analysis');
     setProgressMessages([]);
     setError(null);
+    setErrorMeta(null);
     setAnalysisResult(null);
     setDiscoveryResult(null);
 
@@ -883,42 +887,32 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
         })
       });
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
       let analysisData = null;
-      let buffer = '';
+      let streamError = null;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-        for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            const event = line.slice(7);
-            // Next line should be data
-          } else if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.message) {
-                // Detect fallback status from message or status field
-                const isFallback = data.status === 'fallback' || data.message?.toLowerCase().includes('fallback');
-                addProgressMessage(data.message, isFallback ? 'fallback' : 'info');
-              }
-              if (data.proposalInfo) {
-                analysisData = data;
-              }
-              if (data.error) {
-                throw new Error(data.error || data.message);
-              }
-            } catch (e) {
-              // Silently ignore parse errors - likely incomplete chunks
-            }
-          }
+      await readSseStream(response, ({ event, data }) => {
+        if (event === 'error') {
+          streamError = data || { message: 'Analysis failed' };
+          return;
         }
+        if (data?.error) {
+          streamError = { message: data.error || data.message, status: data.status, retryable: data.retryable };
+          return;
+        }
+        if (data?.message) {
+          // Detect fallback status from message or status field
+          const isFallback = data.status === 'fallback' || data.message?.toLowerCase().includes('fallback');
+          addProgressMessage(data.message, isFallback ? 'fallback' : 'info');
+        }
+        if (data?.proposalInfo) {
+          analysisData = data;
+        }
+      });
+      if (streamError) {
+        const err = new Error(streamError.message || 'Analysis failed');
+        err.status = streamError.status;
+        err.retryable = !!streamError.retryable;
+        throw err;
       }
 
       if (!analysisData) {
@@ -947,38 +941,31 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
         })
       });
 
-      const discoverReader = discoverResponse.body.getReader();
       let discoveryData = null;
-      let discoverBuffer = '';
-
-      while (true) {
-        const { done, value } = await discoverReader.read();
-        if (done) break;
-
-        discoverBuffer += decoder.decode(value, { stream: true });
-        const lines = discoverBuffer.split('\n');
-        discoverBuffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.message) {
-                // Detect fallback status from message or status field
-                const isFallback = data.status === 'fallback' || data.message?.toLowerCase().includes('fallback');
-                addProgressMessage(data.message, isFallback ? 'fallback' : 'info');
-              }
-              if (data.ranked) {
-                discoveryData = data;
-              }
-              if (data.error) {
-                throw new Error(data.error || data.message);
-              }
-            } catch (e) {
-              // Silently ignore parse errors - likely incomplete chunks
-            }
-          }
+      streamError = null;
+      await readSseStream(discoverResponse, ({ event, data }) => {
+        if (event === 'error') {
+          streamError = data || { message: 'Discovery failed' };
+          return;
         }
+        if (data?.error) {
+          streamError = { message: data.error || data.message, status: data.status, retryable: data.retryable };
+          return;
+        }
+        if (data?.message) {
+          // Detect fallback status from message or status field
+          const isFallback = data.status === 'fallback' || data.message?.toLowerCase().includes('fallback');
+          addProgressMessage(data.message, isFallback ? 'fallback' : 'info');
+        }
+        if (data?.ranked) {
+          discoveryData = data;
+        }
+      });
+      if (streamError) {
+        const err = new Error(streamError.message || 'Discovery failed');
+        err.status = streamError.status;
+        err.retryable = !!streamError.retryable;
+        throw err;
       }
 
       if (discoveryData) {
@@ -991,6 +978,7 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
     } catch (err) {
       console.error('Processing error:', err);
       setError(err.message);
+      setErrorMeta({ status: err.status, retryable: !!err.retryable });
       addProgressMessage(`Error: ${err.message}`);
     } finally {
       setIsProcessing(false);
@@ -1578,7 +1566,12 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
 
         {error && (
           <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {error}
+            {errorMeta?.status === 'analysis_invalid' ? (
+              <>
+                The proposal analysis response was incomplete or unreliable. Please retry the analysis.
+                {errorMeta.retryable && <span className="block text-xs mt-1">Use Find Reviewers to rerun the analysis.</span>}
+              </>
+            ) : error}
           </div>
         )}
       </Card>
