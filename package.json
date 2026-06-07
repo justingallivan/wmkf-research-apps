@@ -14,6 +14,8 @@
     "check:agent-invariants": "node scripts/check-agent-invariants.js",
     "check:agent-invariants:ci": "node scripts/check-agent-invariants.js --tracked-only",
     "check:instruction-architecture": "node scripts/check-instruction-architecture.js",
+    "check:agent-wiki": "node scripts/check-agent-wiki.js",
+    "check:agent-wiki:self-test": "node scripts/check-agent-wiki-self-test.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

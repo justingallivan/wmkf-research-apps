@@ -44,6 +44,17 @@
             "statusMessage": "contract-surface check"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/agent-wiki-reminder.js\" 2>/dev/null || true",
+            "timeout": 10,
+            "statusMessage": "agent-wiki freshness check"
+          }
+        ]
       }
     ],
     "PostToolUse": [

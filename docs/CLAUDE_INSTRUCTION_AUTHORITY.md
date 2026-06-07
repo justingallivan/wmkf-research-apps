@@ -22,6 +22,7 @@ An instruction has one authoritative definition. Concise pointers and mechanical
 | `INTAKE-UPLOAD` | Preserve private Blob and virus-scan contracts | `.claude/rules/intake-uploads.md` | scoped tests/docs | intake-upload review |
 | `DYNAMICS-CONTEXT` | Enter explicit restriction context for Dynamics access | `.claude/rules/dataverse-dynamics.md` | service fail-closed behavior | Dynamics caller review |
 | `AUTH-POLICY-BUNDLE` | Keep proxy auth policy bundle-safe and fail-closed | `.claude/rules/auth-policy.md` | scoped tests/docs | proxy/auth review |
+| `AGENT-WIKI-RETRIEVAL` | Keep the agent wiki subordinate, current, and routed | `.claude/rules/agent-wiki.md` | `check:agent-wiki`; advisory freshness hook | stale-topic fixture |
 
 ## Hook Safety Contract
 

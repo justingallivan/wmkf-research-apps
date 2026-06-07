@@ -14,6 +14,7 @@ const GATE_MAP = [
   { test: /^(lib\/db\/|docs\/atlas\/|docs\/APPLICATION_STATE_ATLAS\.md|scripts\/audit-(?:postgres|dataverse)-state\.js)/, gates: ['check:atlas'] },
   { test: /^lib\/db\/migrations\//, gates: ['check:migrations-manifest'] },
   { test: /^(shared\/config\/prompts\/|lib\/services\/.*prompt)/, gates: ['check:prompt-injection-tagging'] },
+  { test: /^(docs\/agent-wiki\/|scripts\/check-agent-wiki|\.claude\/hooks\/agent-wiki-reminder\.js|\.claude\/rules\/agent-wiki\.md)/, gates: ['check:agent-wiki'] },
   { test: /^(docs\/|\.claude-memory\/|CLAUDE\.md$|SESSION_PROMPT\.md$)/, gates: ['check:fact-consistency'] },
 ];
 const PROTECTED_PATHS = new Set(['AGENTS.md', '.agents/skills']);

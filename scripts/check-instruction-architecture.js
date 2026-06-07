@@ -67,6 +67,7 @@ const requiredRules = [
   'intake-uploads.md',
   'dataverse-dynamics.md',
   'auth-policy.md',
+  'agent-wiki.md',
 ];
 assert(
   'required path-scoped rules exist',
@@ -81,6 +82,12 @@ assert(
   settings.hooks.PreToolUse.some((entry) =>
     entry.hooks.some((hook) => hook.command.includes('protected-path-guard.js'))),
 );
+assert(
+  'agent-wiki freshness hook is wired',
+  settings.hooks.PreToolUse.some((entry) =>
+    entry.hooks.some((hook) => hook.command.includes('agent-wiki-reminder.js'))),
+);
+assert('agent-wiki gate script exists', fs.existsSync(path.join(repoRoot, 'scripts', 'check-agent-wiki.js')));
 
 const guardResult = require('child_process').spawnSync(
   process.execPath,

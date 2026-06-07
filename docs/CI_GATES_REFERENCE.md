@@ -86,6 +86,14 @@ AST gate (`@babel/parser`). Every `pages/api/**` route that reaches a `getModelF
 - Exemption marker for a route that imports a MIXED module but never reaches its model path: `// model-override-warming:ignore reason=<id>` — exempts TRANSITIVE reachability only; a direct resolver call in the route still requires warming.
 - Self-test: `scripts/check-model-override-warming-self-test.js` (17 cases over isolated fixture trees). Codex-reviewed twice (S230).
 
+### `check:agent-wiki` — agent retrieval-layer structure
+
+Validates `docs/agent-wiki/` as a subordinate retrieval layer rather than a parallel source of truth. The gate checks required files, frontmatter, stale `last_verified` dates, source/canonical path existence, topic routing from the index, and local markdown links. Semantic truth still belongs to source files, Atlas pages, probes, and `/sweep`.
+
+- Scope: `docs/agent-wiki/**`, `scripts/check-agent-wiki*.js`, `.claude/hooks/agent-wiki-reminder.js`, and `.claude/rules/agent-wiki.md`.
+- Reminder: `.claude/hooks/agent-wiki-reminder.js` is advisory; it nudges when edits match a topic's `watch_paths`.
+- Self-test: `scripts/check-agent-wiki-self-test.js`.
+
 ## Coverage tool self-tests (binding contract)
 
 When modifying any `scripts/check-*.js` gate (or building a new one), the matching self-test must pass:
@@ -98,6 +106,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:drain-table-mentions` | `check:drain-table-mentions-self-test` |
 | `check:prompt-storage-mentions` | `check:prompt-storage-mentions-self-test` |
 | `check:canonical-pointers` | `check:canonical-pointers-self-test` |
+| `check:agent-wiki` | `check:agent-wiki:self-test` |
 
 **When external review catches a structural pattern an existing gate missed, the order is mandatory:**
 
@@ -118,3 +127,4 @@ Several self-tests write synthetic fixtures into paths that the main gate also s
 - `check:canonical-pointers` then `check:canonical-pointers:self-test` (same hazard)
 - `check:drain-table-mentions` then `check:drain-table-mentions-self-test` (same hazard)
 - `check:prompt-storage-mentions` then `check:prompt-storage-mentions-self-test` (same hazard)
+- `check:agent-wiki` then `check:agent-wiki:self-test`

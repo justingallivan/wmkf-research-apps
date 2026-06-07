@@ -102,6 +102,7 @@ npm run check:prompt-storage-mentions && npm run check:prompt-storage-mentions:s
 npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging:self-test # A7 prompt-injection surface markers
 npm run check:memory-router && npm run check:memory-router:self-test           # MEMORY.md router shape + valid statuses/links
 npm run check:model-override-warming && npm run check:model-override-warming:self-test # API routes that resolve an LLM model must call loadModelOverrides() first
+npm run check:agent-wiki && npm run check:agent-wiki:self-test                 # agent retrieval-layer structure
 npm run check:memory-drift:no-write                                            # advisory: memory↔code drift (read-only)
 ```
 
