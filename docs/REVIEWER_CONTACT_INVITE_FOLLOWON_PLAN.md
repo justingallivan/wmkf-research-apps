@@ -85,6 +85,17 @@ round-trip. Pre-flight also confirmed: no legitimate "pursue anyway" flow exists
 the standalone `reviewer-finder.js` page (no client identity grouping) is covered by the E3 server reject
 because its `discoveryResult.ranked` carries the stamp. Build + 70/70 jest + 11/11 offline smoke green.
 
+**Codex post-impl review (folded in):** (HIGH) the standalone `reviewer-finder.js` now also gates select-all/
+toggle/save on `provenanceGroupOf` + renders a read-only "Needs identity review" group + surfaces
+`rejectedUnresolved` on partial saves (was silent-success before). (MEDIUM) `provenanceGroupOf`'s
+barred/unknown-kind fallback no longer gates a positively-resolved row (confirmed/probable/verified) — a
+BARRED Track-A row upgraded by a shared-ORCID Track-B match is now a legitimate, selectable reviewer on BOTH
+clients (Codex's "split the client group" option). The server save gate intentionally stays on the EXPLICIT
+unresolved triple (NOT the full `provenanceGroupOf`): a BARRED-no-top-level-identity row with a resolver
+verdict is legitimately saved here with field-level gating (proven by `reviewer-route-identity-gate` tests),
+so the client select list is deliberately stricter than the server save gate. Re-verified: build + jest +
+11/11 smoke green.
+
 Goal: a candidate the system could not identity-resolve is visible but NOT selectable/savable as a vetted
 reviewer (anchor-or-abstain at the UI/persistence boundary).
 

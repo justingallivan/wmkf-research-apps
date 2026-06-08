@@ -38,14 +38,21 @@ function contactFieldAllowed(candidate, enrichment, flagName, source) {
   return !paidSearchSource(source);
 }
 
-// Slice E (server hard-reject): a candidate the system could not identity-resolve
-// must NOT be persisted as a vetted reviewer (anchor-or-abstain at the persistence
-// boundary). The Workbench client already hides these (provenanceGroupOf →
-// needs_identity_review), but the standalone Reviewer Finder has no such grouping and
-// POSTs any selected candidate, so the field-level gate alone is insufficient — the
-// server must reject the whole row (write neither person nor suggestion). Keyed on the
-// same explicit identity markers provenanceGroupOf reads (NOT the BARRED_PARAMETRIC
-// fallback), so it rejects deferred/unresolved rows without newly blocking anything else.
+// Slice E (server hard-reject): a candidate the system EXPLICITLY could not
+// identity-resolve must NOT be persisted as a vetted reviewer (anchor-or-abstain at the
+// persistence boundary). The clients hide these rows, but the standalone Reviewer Finder
+// and any bypassed/direct caller can still POST them, so the field-level gate alone is
+// insufficient — the server rejects the whole row (write neither person nor suggestion).
+//
+// Keyed on the EXPLICIT unresolved markers, NOT the broader
+// `provenanceGroupOf === 'needs_identity_review'`. provenanceGroupOf also routes a
+// BARRED/unknown-kind row with no positive identity to needs_identity_review, but such
+// rows are LEGITIMATELY saved here from other paths (e.g. a contact-enriched person with
+// a resolver verdict but no top-level identityStatus — see reviewer-route-identity-gate
+// tests) with field-level gating, so gating on provenanceGroupOf would wrongly reject
+// them. The client (FIND/Workbench select list) is intentionally stricter than this save
+// gate: it hides ungrounded rows from selection; the save route accepts an
+// explicitly-resolved-or-field-gated row.
 function isUnresolvedIdentity(candidate) {
   return candidate?.needsIdentification === true
     || candidate?.identityStatus === 'unresolved'

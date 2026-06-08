@@ -51,7 +51,14 @@ anchors already fetched; do NOT add per-candidate round-trips (latency is the bi
   (E3). **E1b (pre-flight catch):** `pruneCandidateForRoster` now persists the three identity markers so the
   gate survives a Find-roster reload — without it a deferred row re-surfaced as selectable. Regression test
   asserts the round-trip in `tests/unit/reviewer-search-logic.test.js`. No legitimate "pursue anyway" flow
-  exists, so the 422 is safe.
+  exists, so the 422 is safe. **Codex post-impl review folded in:** the standalone `reviewer-finder.js`
+  page now also gates select/save + surfaces `rejectedUnresolved` (was silent-success); and
+  `provenanceGroupOf`'s barred/unknown-kind FALLBACK no longer gates a positively-resolved row
+  (confirmed/probable/verified) — a BARRED Track-A row upgraded by a shared-ORCID Track-B match is a
+  legitimate selectable reviewer on both clients. The server save gate stays on the EXPLICIT unresolved
+  triple (NOT full `provenanceGroupOf`): a BARRED-no-top-level-identity row with a resolver verdict is
+  legitimately saved with field-level gating (`reviewer-route-identity-gate` tests would break otherwise),
+  so the client select list is INTENTIONALLY stricter than the server save gate.
 
 ## How contact gets validated (final design — NOT lexical institution-name matching)
 The actual namesake fix is **Fix A's institution-scoped search** — searching `"<name>" <institution>
