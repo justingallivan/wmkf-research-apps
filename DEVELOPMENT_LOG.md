@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer contact + invite safety: namesake-collapse closed end-to-end (Sessions 234–235)
+
+**Milestone:** Production hardening that closes the namesake-collapse bug class at the contact + invite layer — the downstream half of the identity incident S232 began. A reviewer's identity could resolve correctly while *contact/bibliometric enrichment* attached a namesake's email/website/metrics (request 1002794: Smirnova got an ITMO namesake's email; Chen got a *pianist's* gmail + Van Cliburn page). Governing principle adopted: **identity-confirmed ≠ contact-validated — anchor every contact detail to the resolved identity or abstain.**
+
+**Sessions:** 234 (anchor-or-abstain enrichment fix) + 235 (the E/G/F follow-on plan, shipped in full). Every slice ran the Codex loop (design → review → implement → post-impl review); Codex caught a real issue at nearly every stage (a roster reload-leak, a regression a first fix would have caused, a batch-confirmation hole, the SSRF mechanism).
+
+**Ship state:**
+- **S234 contact anchoring** (`6e7dcfb`, `da2451e`, `440bce9`, merge `9396658`): institution-anchored contact search (Fix A), abstain-when-unanchored (Fix B), per-field persist flags surviving roster reload (Fix C), and a Scholar-**verified-domain** email check (replaced a brittle institution-name guard that had rejected the real address).
+- **S235 Slice E** (`59c945e`, `bac7bb8`, merge `39e82b9`): identity-unresolved candidates are non-selectable (UI read-only + select-all/save exclusion) and server-rejected (`save-candidates` 422); markers persist through the Find-roster (reload-safe).
+- **S235 Slice G** (`8ce1957`, `0b8c8ca`, merge `4b57472`): an `emailConfidence` gate on the invite send — staff get a warning + one-click "confirm & send" for a low-confidence address, enforced server-side via a recipient-specific `confirmedLowConfidenceIds` allowlist, scoped to invitations.
+- **S235 Slice F** (`f6b5bd4`, merge `c5a4a0a`): faculty-page email recovery via a **zero-SSRF** staff link (the Codex-reviewed automated server-fetch was deliberately not built). Build + reviewer/identity jest + `check:*` gates green throughout.
+
+**Why it matters:** a system that *emails* reviewers cannot tolerate sending to a wrong/namesake address. These slices make the pipeline fail safe at every downstream stage — unresolved candidates can't be saved as vetted, unverified addresses can't be invited without a conscious confirm, and a confirmed reviewer with no address has a one-click path to recover it.
+
+**Pointers:** `docs/REVIEWER_CONTACT_INVITE_FEATURES_AND_PROD_TESTS.md` (features + 19 prod tests), `docs/REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md`, `docs/REVIEWER_INVITE_CONFIDENCE_DESIGN.md`, `docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md`; `[[project-reviewer-contact-enrichment-anchoring]]`. Commits above + docs `b0ebb77`.
+
 ## June 2026 — Reviewer identity: provenance DTO + namesake-laundering hardening + OpenAlex/ORCID spine (Session 232)
 
 **Milestone:** New verification architecture + a production incident fix. A namesake-laundering incident on request 1002794 (a Claude-suggested attosecond physicist, "Robert Sang", PubMed-matched to an unrelated Kenyan entomologist, stamped with the wrong affiliation + an unrelated LinkedIn) drove a hardening pass and the first slice of a field-agnostic OpenAlex+ORCID identity spine — atop a candidate-wire-shape migration to a groundedness-based provenance DTO.
