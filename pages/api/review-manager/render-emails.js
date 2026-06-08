@@ -39,6 +39,7 @@ import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
 import { getHonorariumAmount } from '../../../lib/services/honorarium-config';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import { mintAndStore } from '../../../lib/external/token-lifecycle';
+import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 
 const limiter = nextRateLimiter({ max: 30 });
 
@@ -88,7 +89,7 @@ export default async function handler(req, res) {
       const requestId = sug._wmkf_request_value;
       const [person, request] = await Promise.all([
         personId ? DynamicsService.getRecord('wmkf_potentialreviewerses', personId, {
-          select: 'wmkf_name,wmkf_emailaddress,wmkf_organizationname,wmkf_primaryaffiliation',
+          select: 'wmkf_name,wmkf_emailaddress,wmkf_organizationname,wmkf_primaryaffiliation,wmkf_emailsource,wmkf_identitystatus',
         }).catch(() => null) : null,
         requestId ? DynamicsService.getRecord('akoya_requests', requestId, {
           select: 'akoya_requestid,akoya_requestnum,akoya_title,wmkf_abstract,wmkf_organizationname,_akoya_applicantid_value,_wmkf_projectleader_value,wmkf_meetingdate',
@@ -158,6 +159,7 @@ export default async function handler(req, res) {
           subject: '',
           body: '',
           skipped: 'no_email',
+          emailConfidence: emailConfidence(person),
         };
       }
 
@@ -199,6 +201,11 @@ export default async function handler(req, res) {
         requestNumber,
         subject: replacePlaceholders(template.subject, templateData),
         body: replacePlaceholders(template.body, templateData),
+        // Slice G — per-recipient email confidence (Opt-B: stamped server-side; the modal's
+        // recipient DTO is too thin to compute it client-side). Drives the modal's
+        // LOW-confidence warning + one-click confirm, and the `confirmedLowConfidence` flag
+        // the modal then sends to `send-emails` (which re-derives and enforces it).
+        emailConfidence: emailConfidence(person),
       };
     });
 

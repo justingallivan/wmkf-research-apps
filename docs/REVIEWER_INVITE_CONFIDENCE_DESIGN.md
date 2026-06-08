@@ -1,10 +1,14 @@
 # Reviewer Invite-Confidence + Manual-Confirm Gate (Slice G-opt1) — Design
 
 Date: 2026-06-08 (S235)
-Status: READY TO IMPLEMENT — Codex design-reviewed 2026-06-08 (READY WITH NAMED CHANGES);
-all 4 named changes folded in (see "## R. Codex review corrections"). Implements Slice G of
-`docs/REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md` §4. Builds on Slice E (shipped S235)
-and the S234 contact-anchoring slice (Fixes A–D + Scholar-verified-domain).
+Status: IMPLEMENTED 2026-06-08 (S235) on branch `reviewer-slice-g-invite-confidence` —
+Codex design-reviewed (READY WITH NAMED CHANGES), all 4 named changes folded in (see
+"## R."). One implementation refinement beyond the spec: **the gate is scoped to
+`templateType==='invitation'`** (see §3e note) — verified `ReviewerManagePanel` only sends
+post-acceptance types (materials/followup/thankyou), and once a reviewer accepts via the
+magic link the address is proven, so only first-contact invitations are gated. Implements
+Slice G of `docs/REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md` §4. Builds on Slice E (shipped
+S235) and the S234 contact-anchoring slice.
 
 State labels: [VERIFIED] = read in source this session; [ASSUMED] = inference.
 
@@ -113,12 +117,26 @@ email-presence + duplicate checks (`send-emails.js:253`). So the API is the inva
 boundary. `send-emails` must:
 1. **independently** select `wmkf_emailsource` (add to the `:146` select) and compute
    `emailConfidence` per recipient (do not trust a client-sent level);
-2. **refuse a LOW recipient unless the request carries `confirmedLowConfidence: true`** —
-   skip with reason `email_unconfirmed` (a new skip reason, distinct from `no_email`);
+2. **refuse a LOW recipient unless its `suggestionId` is in the request's
+   `confirmedLowConfidenceIds` allowlist** — skip with reason `email_unconfirmed` (a new skip
+   reason, distinct from `no_email`);
 3. include the computed `emailConfidence` on each `email_sent` / `skipped` / `failed`
    outcome for audit.
-The modal sends `confirmedLowConfidence: true` only after the staff one-click confirm. A
-HIGH-only batch never sets the flag and is unaffected.
+The modal sends `confirmedLowConfidenceIds` = the exact LOW recipients it named in the
+confirm dialog. **Recipient-specific, NOT a batch boolean** [Codex post-impl #6]: a batch
+boolean would let a row that became LOW *after* the staff previewed (e.g. a concurrent
+enrichment/edit) ride on another row's confirmation. With the ID allowlist, such a row is
+not in the confirmed set and is refused (`email_unconfirmed`). A HIGH-only batch sends an
+empty allowlist and is unaffected.
+
+**Scope (impl refinement):** the gate fires only for `templateType === 'invitation'`.
+Disconfirming check: `ReviewerManagePanel` (the post-acceptance materials/followup/thankyou
+flow) can only set `templateType ∈ {materials, followup, thankyou}` (its selector at
+`ReviewerManagePanel.js:482`; never `invitation`), so it never trips the gate. Once a
+reviewer accepts via the magic link sent to the address, the address is proven, so only the
+first-contact invitation is gated — same invitation-only scope as
+`shouldSkipDuplicateInvitation`. `emailConfidence` is still recorded on `email_sent` for all
+types (audit), but only invitations are refused.
 
 ## 4. Out of scope
 - Faculty-page email recovery (Slice F) — separate slice; `institution_page` source is
@@ -135,10 +153,24 @@ HIGH-only batch never sets the flag and is unaffected.
 3. **R3 §3c** — Opt-B (server stamps confidence in `render-emails`); Opt-A not viable —
    the modal recipient DTO is only `{suggestionId,name,email}` (`CandidatesPanel.js:94`).
 4. **R4 §3e** — server-enforce: `send-emails` independently computes confidence and refuses
-   LOW unless `confirmedLowConfidence:true` (the API is the invariant boundary, not the UI).
+   LOW unless the recipient is acknowledged (the API is the invariant boundary, not the UI).
 5. **R-Q4 (blast radius)** — verified clean: `wmkf_emailsource` is read only by the
    researcher adapter + a one-shot backfill script; ranking/display/Review-Manager DTOs
    omit it, so stamping `manual` breaks no consumer.
 
 Verdict: READY WITH NAMED CHANGES → all four named changes are folded into §2/§3 above.
 Implementation order (server safety boundary first): 3a → 3b → 3e → 3c → 3d.
+
+## R2. Codex POST-IMPL review (2026-06-08 — 1 blocker fixed, 1 accepted residual)
+- **#6 (major, FIXED)** — the acknowledgement was a batch-level boolean
+  (`confirmedLowConfidence`); a row that became LOW *after* preview could ride on another
+  row's confirmation. Changed to a **recipient-specific allowlist** `confirmedLowConfidenceIds`
+  (the exact suggestionIds the modal named): the server honors the override only for those
+  IDs (`send-emails.js`), so a newly-LOW unconfirmed row is still refused. §3e updated.
+- **#3 (minor, ACCEPTED residual)** — a direct authenticated POST could send invitation-like
+  content under `templateType:'materials'` to dodge the invitation-scoped gate. Not gated:
+  it requires an authenticated staff member hand-crafting a POST, and mislabeling the type
+  self-defeats (skips the `invited` stamp; `recipientMayReceiveAttachments` still blocks
+  materials to a non-accepted recipient). Documented, not fixed — gating all types would add
+  friction to legitimate post-acceptance sends without a matching real-world risk.
+- #1 partial-batch loop, #4 manual→LOW tradeoff, #5 null-safety: all verdict OK/acceptable.

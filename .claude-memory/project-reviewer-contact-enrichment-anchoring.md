@@ -88,10 +88,12 @@ When the scoped search returns no email / a contradicted one: (a) fetch the anch
 faculty page (we already surface it, e.g. `mbi-berlin.de/p/olgasmirnova`) and parse the email; (b) gate
 the INVITE on contact confidence (auto-allow only ORCID / Scholar-domain-matched / institution-page
 emails; else staff "confirm contact before sending"). Slice G (invite-confidence + manual-confirm gate)
-is now DESIGNED + Codex-reviewed (READY TO IMPLEMENT, NOT BUILT) in
-`docs/REVIEWER_INVITE_CONFIDENCE_DESIGN.md` — G-opt1, no schema change, warning + one-click "confirm &
-send", server-enforced `confirmedLowConfidence`; build order 3a→3b→3e→3c→3d. Slice F (faculty-page email
-recovery) still only sketched in `docs/REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md`.
+is IMPLEMENTED S235 (branch `reviewer-slice-g-invite-confidence`, design+impl in
+`docs/REVIEWER_INVITE_CONFIDENCE_DESIGN.md`) — `emailConfidence(person)` helper in `lib/utils/reviewer-invite.js`;
+`send-emails` server-enforces (refuse LOW unless the recipient's id is in `confirmedLowConfidenceIds`, scoped to `templateType==='invitation'`);
+`render-emails` stamps per-draft confidence; `InviteEmailModal` warning + one-click confirm; manual email edits
+stamp `emailSource='manual'`. No schema change. Slice F (faculty-page email recovery) still only sketched in
+`docs/REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md`.
 
 ## Design docs
 `docs/REVIEWER_IDENTITY_CONTACT_FIX_PLAN.md` (+ `_REVIEW`, `_REVIEW_2` Codex passes),

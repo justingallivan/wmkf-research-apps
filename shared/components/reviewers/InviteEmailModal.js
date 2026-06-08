@@ -144,6 +144,11 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
     setEdits((prev) => ({ ...prev, [suggestionId]: { ...prev[suggestionId], [field]: value } }));
 
   const sendable = drafts.filter((d) => !d.skipped && d.candidateEmail);
+  // Slice G — recipients whose email isn't anchored to the resolved identity (manual entry,
+  // affiliation-derived, unknown source, or a search email on an unconfirmed identity). They
+  // are still sendable, but staff must consciously confirm before inviting (guards the S234
+  // wrong-address mistake). The server (send-emails) independently re-derives + enforces this.
+  const lowConfidenceSendable = sendable.filter((d) => d.emailConfidence?.level === 'low');
 
   const persistTiming = useCallback(async () => {
     try {
@@ -157,10 +162,17 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
 
   const handleSend = async () => {
     if (sendable.length === 0) { setError('No recipients with an email to send to.'); return; }
-    const ok = window.confirm(
-      `Send ${sendable.length} invitation${sendable.length === 1 ? '' : 's'} now via Dynamics? `
-      + 'This sends a real email with an accept/decline link and cannot be undone.'
-    );
+    // Slice G — when any recipient is LOW-confidence, the confirm dialog names them so the
+    // staff acknowledgement is conscious (the one-click "confirm & send"). Proceeding sets
+    // confirmedLowConfidence, which the server requires before it will send to a LOW address.
+    const baseMsg = `Send ${sendable.length} invitation${sendable.length === 1 ? '' : 's'} now via Dynamics? `
+      + 'This sends a real email with an accept/decline link and cannot be undone.';
+    const lowMsg = lowConfidenceSendable.length > 0
+      ? `\n\n⚠ ${lowConfidenceSendable.length} address${lowConfidenceSendable.length === 1 ? '' : 'es'} could NOT be verified against the reviewer’s identity:\n`
+        + lowConfidenceSendable.map((d) => `  • ${d.candidateName || '(unnamed)'} <${d.candidateEmail}>`).join('\n')
+        + '\n\nConfirm you’ve checked these addresses before inviting.'
+      : '';
+    const ok = window.confirm(baseMsg + lowMsg);
     if (!ok) return;
     setStep('sending');
     setProgress({ current: 0, total: sendable.length, message: 'Sending…' });
@@ -177,6 +189,11 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
           attachmentUrls: [],
           markAsSent: true,
           allowResend,
+          // Staff acknowledged THESE specific low-confidence addresses via the confirm dialog
+          // above (which named them). Recipient-specific, not a batch boolean: the server only
+          // honors the override for these exact suggestionIds, so a row that became LOW after
+          // preview (and was never shown/confirmed) is still refused (`email_unconfirmed`).
+          confirmedLowConfidenceIds: lowConfidenceSendable.map((d) => d.suggestionId),
         }),
       });
       let final = null;
@@ -251,6 +268,15 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
                         <span className="text-sm font-medium text-gray-900">{d.candidateName || '(unnamed)'}</span>
                         <span className="text-xs text-gray-500">{d.candidateEmail || 'no email'}</span>
                       </div>
+                      {!d.skipped && d.emailConfidence?.level === 'low' && (
+                        <p className="text-xs text-amber-700 mt-1 flex items-start gap-1">
+                          <span aria-hidden="true">⚠</span>
+                          <span>
+                            This address wasn’t verified against the reviewer’s identity
+                            {d.emailConfidence?.reason ? ` (${d.emailConfidence.reason})` : ''}. Double-check it before sending.
+                          </span>
+                        </p>
+                      )}
                       {d.skipped ? (
                         <p className="text-xs text-amber-700 mt-1">Skipped ({d.skipped === 'no_email' ? 'no email address' : d.skipped}).</p>
                       ) : (
@@ -304,9 +330,16 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
                 type="button"
                 onClick={handleSend}
                 disabled={sendable.length === 0}
-                className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                className={`px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed ${
+                  lowConfidenceSendable.length > 0 ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-900 hover:bg-gray-800'
+                }`}
+                title={lowConfidenceSendable.length > 0
+                  ? `${lowConfidenceSendable.length} address(es) couldn’t be verified — you’ll confirm before sending`
+                  : undefined}
               >
-                Send {sendable.length > 0 ? sendable.length : ''} invitation{sendable.length === 1 ? '' : 's'}
+                {lowConfidenceSendable.length > 0
+                  ? `Confirm & send ${sendable.length} invitation${sendable.length === 1 ? '' : 's'}`
+                  : `Send ${sendable.length > 0 ? sendable.length : ''} invitation${sendable.length === 1 ? '' : 's'}`}
               </button>
             </>
           )}

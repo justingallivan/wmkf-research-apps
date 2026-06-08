@@ -51,7 +51,7 @@ import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-sug
 import * as contactAdapter from '../../../lib/dataverse/adapters/contact';
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
 import { backPropReviewerOrcidToContact } from '../../../lib/services/backprop-reviewer-orcid';
-import { shouldSkipDuplicateInvitation, sendAllowsAttachments, recipientMayReceiveAttachments } from '../../../lib/utils/reviewer-invite';
+import { shouldSkipDuplicateInvitation, sendAllowsAttachments, recipientMayReceiveAttachments, emailConfidence } from '../../../lib/utils/reviewer-invite';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -109,7 +109,17 @@ export default async function handler(req, res) {
       // candidate already marked invited (guards an accidental re-click / retry
       // from firing a second real email). A deliberate "Re-invite" sets this.
       allowResend = false,
+      // Slice G — invite-confidence: the server independently computes each recipient's
+      // email confidence and REFUSES a LOW-confidence address unless the staff explicitly
+      // acknowledged THAT recipient (the one-click "confirm & send", which named them). This
+      // is a recipient-specific allowlist of suggestionIds, NOT a batch boolean — so a row
+      // that became LOW after the staff previewed (and was never shown/confirmed) is still
+      // refused, instead of being authorized by another row's confirmation.
+      confirmedLowConfidenceIds = [],
     } = req.body;
+    const confirmedLowConfidenceIdSet = new Set(
+      Array.isArray(confirmedLowConfidenceIds) ? confirmedLowConfidenceIds : []
+    );
 
     if (!Array.isArray(drafts) || drafts.length === 0) {
       sendEvent('error', { message: 'drafts array is required' });
@@ -143,7 +153,7 @@ export default async function handler(req, res) {
       const requestId = sug._wmkf_request_value;
       const [person, request] = await Promise.all([
         personId ? DynamicsService.getRecord('wmkf_potentialreviewerses', personId, {
-          select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_emailaddress,wmkf_firstname,wmkf_lastname,_wmkf_contact_value,wmkf_orcid,wmkf_identitystatus',
+          select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_emailaddress,wmkf_firstname,wmkf_lastname,_wmkf_contact_value,wmkf_orcid,wmkf_identitystatus,wmkf_emailsource',
         }).catch(() => null) : null,
         requestId ? DynamicsService.getRecord('akoya_requests', requestId, {
           select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate',
@@ -261,6 +271,37 @@ export default async function handler(req, res) {
         continue;
       }
 
+      // Slice G — invite-confidence gate (SERVER-authoritative; the API is the real
+      // boundary, not the modal). Compute confidence from the person row's source +
+      // identity; never trust a client-sent level. A LOW-confidence address (manually
+      // entered, affiliation-derived, unknown source, or a search email on an unconfirmed
+      // identity) is REFUSED unless the caller acknowledged it via `confirmedLowConfidence`
+      // — the staff one-click "confirm & send". This is what stops an unknowing invite to a
+      // wrong/namesake address (the S234 pianist-Chen failure).
+      //
+      // Scoped to the INVITATION (first contact): once a reviewer accepts via the magic link
+      // sent to this address, the address is proven, so post-acceptance sends
+      // (materials/followup/thankyou, the ReviewerManagePanel flow) are NOT re-gated — same
+      // invitation-only scope as shouldSkipDuplicateInvitation.
+      const confidence = emailConfidence(person);
+      const lowConfidenceConfirmed = confirmedLowConfidenceIdSet.has(draft.suggestionId);
+      if (templateType === 'invitation' && confidence.level === 'low' && !lowConfidenceConfirmed) {
+        skipped.push({
+          suggestionId: draft.suggestionId,
+          candidateName: name,
+          candidateEmail: email,
+          reason: 'email_unconfirmed',
+          emailConfidence: confidence,
+        });
+        sendEvent('progress', {
+          stage: 'sending',
+          current: processed,
+          total: drafts.length,
+          message: `Skipped ${name || '(unnamed)'} (address not confirmed)`,
+        });
+        continue;
+      }
+
       // Duplicate-invitation guard: never re-send an invitation to a candidate
       // already marked invited unless the caller explicitly opts in (Re-invite).
       // Protects against an accidental re-click / retry firing a second real
@@ -353,6 +394,9 @@ export default async function handler(req, res) {
           regardingLinked: Boolean(regardingId),
           contactPromoted,
           orcidBackprop,
+          // Slice G — record the confidence the send went out under (HIGH, or LOW that
+          // staff explicitly confirmed) so a low-confidence invite is auditable.
+          emailConfidence: confidence,
         });
         sendEvent('email_sent', sent[sent.length - 1]);
         sendEvent('progress', {

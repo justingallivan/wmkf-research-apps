@@ -5,7 +5,7 @@
  * to an already-invited candidate is skipped unless an explicit re-invite, while
  * materials/followup/thankyou stay re-sendable.
  */
-const { shouldSkipDuplicateInvitation, sendAllowsAttachments, recipientMayReceiveAttachments } = require('../../lib/utils/reviewer-invite');
+const { shouldSkipDuplicateInvitation, sendAllowsAttachments, recipientMayReceiveAttachments, emailConfidence } = require('../../lib/utils/reviewer-invite');
 
 describe('shouldSkipDuplicateInvitation', () => {
   test('skips an already-invited invitation by default', () => {
@@ -44,5 +44,53 @@ describe('recipientMayReceiveAttachments — server-authoritative (acceptance), 
     expect(recipientMayReceiveAttachments({ wmkf_accepted: null })).toBe(false);
     expect(recipientMayReceiveAttachments({})).toBe(false);
     expect(recipientMayReceiveAttachments(null)).toBe(false);
+  });
+});
+
+describe('emailConfidence — Slice G invite-confidence gate', () => {
+  test('authoritative sources are HIGH regardless of identity status', () => {
+    for (const source of ['orcid', 'pubmed', 'institution_page']) {
+      expect(emailConfidence({ wmkf_emailsource: source }).level).toBe('high');
+      // even with an unconfirmed identity, the source itself is authoritative
+      expect(emailConfidence({ wmkf_emailsource: source, wmkf_identitystatus: 'unresolved' }).level).toBe('high');
+    }
+  });
+
+  test('search-sourced email is HIGH only on a confirmed/probable identity', () => {
+    for (const source of ['serp_search', 'claude_search']) {
+      expect(emailConfidence({ wmkf_emailsource: source, wmkf_identitystatus: 'confirmed' }).level).toBe('high');
+      expect(emailConfidence({ wmkf_emailsource: source, wmkf_identitystatus: 'probable' }).level).toBe('high');
+      // unconfirmed / unresolved / missing identity → LOW (not anchored)
+      expect(emailConfidence({ wmkf_emailsource: source, wmkf_identitystatus: 'unresolved' }).level).toBe('low');
+      expect(emailConfidence({ wmkf_emailsource: source }).level).toBe('low');
+    }
+  });
+
+  test('affiliation-sourced email is LOW even on a confirmed identity (Codex R2)', () => {
+    expect(emailConfidence({ wmkf_emailsource: 'affiliation', wmkf_identitystatus: 'confirmed' }).level).toBe('low');
+  });
+
+  test('manually-entered, unknown, and missing sources are LOW', () => {
+    expect(emailConfidence({ wmkf_emailsource: 'manual' }).level).toBe('low');
+    expect(emailConfidence({ wmkf_emailsource: 'manual', wmkf_identitystatus: 'confirmed' }).level).toBe('low');
+    expect(emailConfidence({ wmkf_emailsource: null }).level).toBe('low');
+    expect(emailConfidence({}).level).toBe('low');
+    expect(emailConfidence({ wmkf_emailsource: 'something_new' }).level).toBe('low');
+  });
+
+  test('accepts the normalized (camelCase) shape too', () => {
+    expect(emailConfidence({ emailSource: 'orcid' }).level).toBe('high');
+    expect(emailConfidence({ emailSource: 'serp_search', identityStatus: 'confirmed' }).level).toBe('high');
+    expect(emailConfidence({ emailSource: 'manual' }).level).toBe('low');
+  });
+
+  test('source matching is case/whitespace-insensitive', () => {
+    expect(emailConfidence({ wmkf_emailsource: ' ORCID ' }).level).toBe('high');
+    expect(emailConfidence({ wmkf_emailsource: 'Serp_Search', wmkf_identitystatus: 'Confirmed' }).level).toBe('high');
+  });
+
+  test('always returns a human-readable reason string', () => {
+    expect(typeof emailConfidence({ wmkf_emailsource: 'manual' }).reason).toBe('string');
+    expect(emailConfidence({ wmkf_emailsource: 'manual' }).reason.length).toBeGreaterThan(0);
   });
 });
