@@ -57,6 +57,7 @@ jest.mock('../../lib/services/contact-enrichment-service', () => ({
 }));
 
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
+const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
 const { RESOLVER_SOURCED_FIELDS } = require('../../lib/services/reviewer-identity-resolver');
 
 function mockRes() {
@@ -135,6 +136,46 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(payload.orcid).toBe('0000-0001');                          // ORCID NOT blocked (blockByIdentity false)
     expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
+  });
+
+  test('explicit contact persist flags false → confirmed identity still saves no sendable contact fields', async () => {
+    const ce = {
+      ...enrichmentFor({ status: 'confirmed' }),
+      affiliation: 'Wrong Institution',
+      website: 'https://wrong.example.edu',
+      facultyPageUrl: 'https://wrong.example.edu/profile',
+      emailPersistAllowed: false,
+      websitePersistAllowed: false,
+      affiliationPersistAllowed: false,
+    };
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [{
+          name: 'Dr X',
+          email: 'x@mit.edu',
+          affiliation: 'Wrong Institution',
+          website: 'https://wrong.example.edu',
+          facultyPageUrl: 'https://wrong.example.edu/profile',
+          contactEnrichment: ce,
+        }],
+      },
+    };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0]).toEqual(expect.objectContaining({
+      email: null,
+      affiliation: null,
+    }));
+    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
+    expect(payload.email).toBeNull();
+    expect(payload.emailSource).toBeNull();
+    expect(payload.affiliation).toBeNull();
+    expect(payload.website).toBeNull();
+    expect(payload.facultyPageUrl).toBeNull();
+    expect(payload.orcid).toBe('0000-0001');
   });
 });
 

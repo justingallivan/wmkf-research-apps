@@ -20,6 +20,24 @@ import { mayPersistIdentity, RESOLVER_SOURCED_FIELDS } from '../../../lib/servic
 import { saveSourceListForCandidate, withReviewerProvenance } from '../../../lib/utils/reviewer-provenance';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 
+function fieldPersistFlag(candidate, enrichment, flagName) {
+  if (candidate?.[flagName] === false || enrichment?.[flagName] === false) return false;
+  if (candidate?.[flagName] === true || enrichment?.[flagName] === true) return true;
+  return undefined;
+}
+
+function paidSearchSource(source) {
+  return source === 'claude_search' || source === 'serp_search';
+}
+
+function contactFieldAllowed(candidate, enrichment, flagName, source) {
+  if (candidate?.contactStatus === 'unresolved' || enrichment?.contactStatus === 'unresolved') return false;
+  const flag = fieldPersistFlag(candidate, enrichment, flagName);
+  if (flag === false) return false;
+  if (flag === true) return true;
+  return !paidSearchSource(source);
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -67,14 +85,21 @@ export default async function handler(req, res) {
           .replace(/\s+/g, ' ')
           .trim();
 
-        const candidateEmail = candidate.email || candidate.contactEnrichment?.email || null;
-        const candidateAffiliation = candidate.affiliation || candidate.contactEnrichment?.affiliation || null;
+        const enrichment = candidate.contactEnrichment || {};
+        const candidateEmailSource = candidate.emailSource || enrichment.emailSource || null;
+        const candidateWebsiteSource = candidate.websiteSource || enrichment.websiteSource || null;
+        const emailAllowed = contactFieldAllowed(candidate, enrichment, 'emailPersistAllowed', candidateEmailSource);
+        const websiteAllowed = contactFieldAllowed(candidate, enrichment, 'websitePersistAllowed', candidateWebsiteSource);
+        const affiliationAllowed = contactFieldAllowed(candidate, enrichment, 'affiliationPersistAllowed', null);
+        const candidateEmail = emailAllowed ? (candidate.email || enrichment.email || null) : null;
+        const candidateAffiliation = affiliationAllowed ? (candidate.affiliation || enrichment.affiliation || null) : null;
         // Enrichment stores the ORCID iD as `orcidId` (not `orcid`); read that key
         // so a candidate carrying only contactEnrichment doesn't drop a real ORCID.
-        const candidateOrcid = candidate.orcid || candidate.contactEnrichment?.orcidId || null;
-        const candidateGoogleScholarId = candidate.googleScholarId || candidate.contactEnrichment?.googleScholarId || null;
-        const rawCandidateWebsite = candidate.website || candidate.contactEnrichment?.website || null;
+        const candidateOrcid = candidate.orcid || enrichment.orcidId || null;
+        const candidateGoogleScholarId = candidate.googleScholarId || enrichment.googleScholarId || null;
+        const rawCandidateWebsite = websiteAllowed ? (candidate.website || enrichment.website || null) : null;
         const candidateWebsite = ContactParser.sanitizeWebsiteForCandidate(rawCandidateWebsite, candidate.name);
+        const candidateFacultyPageUrl = websiteAllowed ? (candidate.facultyPageUrl || enrichment.facultyPageUrl || null) : null;
 
         const expertiseForDv = Array.isArray(candidate.expertiseAreas)
           ? candidate.expertiseAreas.filter(Boolean).join('; ')
@@ -112,8 +137,8 @@ export default async function handler(req, res) {
         //     (enrichment didn't run) — blocks the scholar id/url + metrics only.
         // Passing null is a safe no-op in the adapter (pruneEmpty drops it); a true
         // downgrade additionally CLEARS any stale value below via clearIdentityFields.
-        const scholarSkipped = !!candidate.contactEnrichment?.tierResults?.scholar_profile?.skipped;
-        const identity = candidate.contactEnrichment?.identity || null;
+        const scholarSkipped = !!enrichment.tierResults?.scholar_profile?.skipped;
+        const identity = enrichment.identity || null;
         // A candidate loaded from the durable Find-tab roster has had its
         // identity/tierResults pruned away, but `pruneCandidateForRoster` left
         // safe boolean persist flags so the gate still holds after a reload
@@ -136,7 +161,7 @@ export default async function handler(req, res) {
           name: candidate.name,
           normalizedName,
           email: candidateEmail,
-          emailSource: candidate.contactEnrichment?.emailSource || null,
+          emailSource: candidateEmail ? candidateEmailSource : null,
           orcid: blockByIdentity ? null : candidateOrcid,
           orcidUrl: blockByIdentity ? null : (candidate.orcidUrl || candidate.contactEnrichment?.orcidUrl || null),
           googleScholarId: blockScholar ? null : candidateGoogleScholarId,
@@ -145,13 +170,13 @@ export default async function handler(req, res) {
           // enrichment writes bibliometrics there, and not all callers promote
           // them to the candidate top-level (the standalone Reviewer Finder does
           // not), so reading candidate.* only would silently drop fetched metrics.
-          hIndex: blockScholar ? null : (candidate.hIndex ?? candidate.contactEnrichment?.hIndex ?? null),
-          i10Index: blockScholar ? null : (candidate.i10Index ?? candidate.contactEnrichment?.i10Index ?? null),
-          totalCitations: blockScholar ? null : (candidate.totalCitations ?? candidate.contactEnrichment?.totalCitations ?? null),
+          hIndex: blockScholar ? null : (candidate.hIndex ?? enrichment.hIndex ?? null),
+          i10Index: blockScholar ? null : (candidate.i10Index ?? enrichment.i10Index ?? null),
+          totalCitations: blockScholar ? null : (candidate.totalCitations ?? enrichment.totalCitations ?? null),
           affiliation: candidateAffiliation,
-          department: candidate.department || candidate.contactEnrichment?.department || null,
+          department: candidate.department || enrichment.department || null,
           website: candidateWebsite,
-          facultyPageUrl: candidate.facultyPageUrl || candidate.contactEnrichment?.facultyPageUrl || null,
+          facultyPageUrl: candidateFacultyPageUrl,
           keywords: expertiseForDv,
         }, { actingUserSystemId });
 

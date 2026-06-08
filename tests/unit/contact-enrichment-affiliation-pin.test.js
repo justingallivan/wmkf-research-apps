@@ -278,4 +278,174 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
     expect(out.contactEnrichment.tierResults.claude_search.rejectedReason).toBe('identity_anchor_contradiction');
     expect(out.contactEnrichment.tierResults.serp_search.rejectedReason).toBe('identity_anchor_contradiction');
   });
+
+  test('ORCID current affiliation anchors contact and Scholar searches without mutating the input candidate', async () => {
+    const input = { name: 'Olga Smirnova', affiliation: null, orcid: '0000-0002-7746-5733', publications: [] };
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue({
+      orcidId: '0000-0002-7746-5733',
+      orcidUrl: 'https://orcid.org/0000-0002-7746-5733',
+      givenNames: 'Olga',
+      familyName: 'Smirnova',
+      primaryEmail: null,
+      primaryUrl: null,
+      currentAffiliation: 'Max-Born-Institute',
+    });
+    const claudeSpy = jest.spyOn(ContactEnrichmentService, 'claudeWebSearch').mockResolvedValue(null);
+    const contactSpy = jest.spyOn(SerpContactService, 'findContact').mockResolvedValue(null);
+    const scholarSpy = jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue(null);
+
+    await ContactEnrichmentService.enrichCandidate(input, {
+      credentials: { orcidClientId: 'c', orcidClientSecret: 's', claudeApiKey: 'ck', serpApiKey: 'sk' },
+      usePubmed: false,
+      useOrcid: true,
+      useClaudeSearch: true,
+      useSerpSearch: true,
+    });
+
+    expect(claudeSpy.mock.calls[0][0].affiliation).toBe('Max-Born-Institute');
+    expect(contactSpy.mock.calls[0][0].affiliation).toBe('Max-Born-Institute');
+    expect(scholarSpy.mock.calls[0][0].affiliation).toBe('Max-Born-Institute');
+    expect(input.affiliation).toBeNull();
+  });
+
+  test('Scholar-verified domain confirms a real institutional email (mbi-berlin recovery)', async () => {
+    // The live regression: olga.smirnova@mbi-berlin.de IS her email; the old
+    // lexical guard rejected it because mbi-berlin.de (MBI acronym + city) is not
+    // in the verbose official name. The Scholar-verified domain corroborates it.
+    jest.spyOn(ContactEnrichmentService, 'claudeWebSearch').mockResolvedValue(null);
+    jest.spyOn(SerpContactService, 'findContact').mockResolvedValue({
+      email: 'olga.smirnova@mbi-berlin.de',
+      website: 'https://mbi-berlin.de/p/olgasmirnova',
+    });
+    jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue({
+      scholarProfileUrl: 'https://scholar.google.com/citations?user=wsyVUeMAAAAJ',
+      scholarId: 'wsyVUeMAAAAJ',
+    });
+    jest.spyOn(SerpContactService, 'fetchScholarMetrics').mockResolvedValue({
+      scholarEmail: 'Verified email at mbiberlin.de', hIndex: 61, totalCitations: 14000,
+    });
+
+    const out = await ContactEnrichmentService.enrichCandidate(
+      { name: 'Olga Smirnova', affiliation: 'Max-Born-Institute for Nonlinear Optics and Short Pulse Spectroscopy', publications: [] },
+      {
+        credentials: { claudeApiKey: 'ck', serpApiKey: 'sk' },
+        usePubmed: false,
+        useOrcid: false,
+        useClaudeSearch: true,
+        useSerpSearch: true,
+      },
+    );
+
+    expect(out.contactEnrichment.email).toBe('olga.smirnova@mbi-berlin.de');
+    expect(out.contactEnrichment.emailPersistAllowed).toBe(true);
+  });
+
+  test('no institution anchor and no ORCID abstains from bare-name contact and Scholar lookup', async () => {
+    const claudeSpy = jest.spyOn(ContactEnrichmentService, 'claudeWebSearch').mockResolvedValue({
+      email: 'nickchenyj@gmail.com',
+      website: 'https://www.cliburn.org/yanjun-chen',
+    });
+    const contactSpy = jest.spyOn(SerpContactService, 'findContact').mockResolvedValue({
+      email: 'nickchenyj@gmail.com',
+      website: 'https://www.cliburn.org/yanjun-chen',
+    });
+    const scholarSpy = jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue({
+      scholarProfileUrl: 'https://scholar.google.com/citations?user=WRONG',
+      scholarId: 'WRONG',
+    });
+
+    const out = await ContactEnrichmentService.enrichCandidate(
+      {
+        name: 'Yanjun Chen',
+        affiliation: null,
+        orcid: null,
+        identityNote: 'Identity needs review',
+        publications: [{ title: 'Attoclock physics', year: 2023 }],
+      },
+      {
+        credentials: { claudeApiKey: 'ck', serpApiKey: 'sk' },
+        usePubmed: false,
+        useOrcid: false,
+        useClaudeSearch: true,
+        useSerpSearch: true,
+      },
+    );
+
+    expect(claudeSpy).not.toHaveBeenCalled();
+    expect(contactSpy).not.toHaveBeenCalled();
+    expect(scholarSpy).not.toHaveBeenCalled();
+    expect(out.contactEnrichment.email).toBeNull();
+    expect(out.contactEnrichment.website).toBeNull();
+    expect(out.contactEnrichment.googleScholarId).toBeNull();
+    expect(out.contactEnrichment.hIndex).toBeNull();
+    expect(out.contactEnrichment.contactStatus).toBe('unresolved');
+    expect(out.contactEnrichment.contactStatusReason).toBe('identity_anchor_required');
+    expect(out.identityNote).toBe('Identity needs review');
+    expect(out.publications).toHaveLength(1);
+  });
+});
+
+describe('ContactEnrichmentService._validateEmailAgainstVerifiedDomain — Scholar-domain contact validation', () => {
+  const run = (email, scholarVerifiedEmail) => {
+    const ce = {
+      email, emailSource: 'serp_search', emailPersistAllowed: true, scholarVerifiedEmail,
+      website: 'https://example.org/x', websiteSource: 'serp_search', websitePersistAllowed: true,
+      facultyPageUrl: 'https://example.org/fac',
+    };
+    ContactEnrichmentService._validateEmailAgainstVerifiedDomain(ce);
+    return ce;
+  };
+
+  test('KEEPS an email whose domain matches the Scholar-verified domain (mbi-berlin vs mbiberlin)', () => {
+    const ce = run('olga.smirnova@mbi-berlin.de', 'Verified email at mbiberlin.de');
+    expect(ce.email).toBe('olga.smirnova@mbi-berlin.de');
+    expect(ce.emailPersistAllowed).toBe(true);
+  });
+
+  test('KEEPS a subdomain email (phys.ethz.ch confirmed by ethz.ch)', () => {
+    const ce = run('keller@phys.ethz.ch', 'Verified email at ethz.ch');
+    expect(ce.email).toBe('keller@phys.ethz.ch');
+    expect(ce.emailPersistAllowed).toBe(true);
+  });
+
+  test('DROPS a namesake email that contradicts the Scholar-verified domain (ifmo vs mbiberlin)', () => {
+    const ce = run('olga.smirnova@metalab.ifmo.ru', 'Verified email at mbiberlin.de');
+    expect(ce.email).toBeNull();
+    expect(ce.website).toBeNull();
+    expect(ce.emailPersistAllowed).toBe(false);
+    expect(ce.contactStatusReason).toBe('verified_domain_contradiction');
+  });
+
+  test('NO-OP when there is no Scholar-verified domain (trusts the institution-scoped search)', () => {
+    const ce = run('someone@unverifiable.edu', null);
+    expect(ce.email).toBe('someone@unverifiable.edu');
+    expect(ce.emailPersistAllowed).toBe(true);
+  });
+
+  test('boundary match only — does NOT treat summit.edu as matching verified mit.edu (drops the namesake)', () => {
+    const ce = run('prof@summit.edu', 'Verified email at mit.edu');
+    expect(ce.email).toBeNull();
+    expect(ce.contactStatusReason).toBe('verified_domain_contradiction');
+  });
+
+  test('boundary match only — does NOT treat notred.ac.uk.evil as matching verified ed.ac.uk', () => {
+    const ce = run('x@notred.ac.uk.evil', 'Verified email at ed.ac.uk');
+    expect(ce.email).toBeNull();
+  });
+
+  test('NEVER drops a researcher-maintained ORCID email on a Scholar-domain mismatch (trusted source)', () => {
+    const ce = {
+      email: 'olga@personal-domain.org', emailSource: 'orcid', emailPersistAllowed: true,
+      scholarVerifiedEmail: 'Verified email at mbiberlin.de',
+      website: null, websiteSource: null, facultyPageUrl: null,
+    };
+    ContactEnrichmentService._validateEmailAgainstVerifiedDomain(ce);
+    expect(ce.email).toBe('olga@personal-domain.org');
+    expect(ce.emailPersistAllowed).toBe(true);
+  });
+
+  test('NO-OP when there is no email to validate', () => {
+    const ce = run(null, 'Verified email at ethz.ch');
+    expect(ce.email).toBeNull();
+  });
 });

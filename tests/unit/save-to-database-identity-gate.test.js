@@ -61,4 +61,31 @@ describe('saveToDatabase — identity gate on the email-keyed side path', () => 
     expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
+
+  test('emailPersistAllowed false → email-keyed side path does not look up or write by the denied email', async () => {
+    await ContactEnrichmentService.saveToDatabase(
+      { name: 'Dr X', affiliation: 'MIT' },
+      { ...enrichment({ status: 'confirmed' }), emailPersistAllowed: false, websitePersistAllowed: true },
+    );
+    expect(potentialReviewerAdapter.getByEmail).not.toHaveBeenCalled();
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+  });
+
+  test('websitePersistAllowed false → confirmed identity still withholds website/faculty page on side-path save', async () => {
+    await ContactEnrichmentService.saveToDatabase(
+      { name: 'Dr X', affiliation: 'MIT' },
+      {
+        ...enrichment({ status: 'confirmed' }),
+        website: 'https://wrong.example.edu',
+        facultyPageUrl: 'https://wrong.example.edu/profile',
+        emailPersistAllowed: true,
+        websitePersistAllowed: false,
+      },
+    );
+    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
+    expect(payload.email).toBe('x@mit.edu');
+    expect(payload.website).toBeNull();
+    expect(payload.facultyPageUrl).toBeNull();
+  });
 });

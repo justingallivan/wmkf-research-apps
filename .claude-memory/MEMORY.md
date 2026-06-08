@@ -37,6 +37,8 @@
 - Reviewer web-discovery / Perplexity reviewer-agent EVALUATED → ABANDONED S230 (verified hallucination of reviewers + affiliations; don't re-attempt ungrounded): project-reviewer-web-discovery-abandoned.md
 - Reviewer-finder RETRIEVAL REDESIGN direction (S231 — demote Claude generator → field-routed retrieval/fan-out; provenance model; OpenAlex+ORCID spine; reuse existing resolver+ranker; NOT BUILT): project-reviewer-finder-retrieval-redesign.md
 - Reviewer VERIFY fail-dangerous HAZARD (S231 — fabricated wrong-forename verifies against real same-initial namesake; no forename gate; institutionMismatch advisory-only): project-reviewer-verify-fail-dangerous.md
+- Reviewer CONTACT-enrichment namesake fix (S234 — identity resolution works; CONTACT/bibliometric enrichment was the locus; anchor-to-resolved-identity-or-abstain; identity-confirmed ≠ contact-validated; Fixes A–D on branch, Fix E deferred): project-reviewer-contact-enrichment-anchoring.md
+- Reviewer enrichment fan-out / SerpAPI budget (~15k/mo, cost not the limiter; LATENCY is — don't add per-candidate round-trips): project-serpapi-budget-latency.md
 - Reviewer Workbench / lifecycle: project-reviewer-apps-redesign-direction.md; project-reviewer-workbench-invite-workflow.md; project-reviewer-lifecycle.md
 - Find-tab durable roster + cross-run search dedup (SHIPPED S224; operational PG table, don't drop-carryover) + clearing/resetting a request's reviewers (use `scripts/reset-request-reviewers.mjs`, don't hand-roll): project-reviewer-find-roster.md
 - Reviewer identity resolver / ORCID: project-reviewer-identity-resolution.md; project-reviewer-identity-resolution-phase1.md; project-reviewer-self-report-orcid-sticky-confirmed.md

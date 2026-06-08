@@ -120,6 +120,11 @@ export function pruneCandidateForRoster(c) {
   if (!c || typeof c !== 'object') return c;
   const e = c.contactEnrichment || {};
   const provenance = buildReviewerProvenance(c);
+  const persistFlag = (name) => {
+    if (c[name] === false || e[name] === false) return false;
+    if (c[name] === true || e[name] === true) return true;
+    return undefined;
+  };
   // Capture the identity-resolver verdict NOW (before it's dropped) as safe
   // boolean persist-permission flags, so a candidate saved AFTER a roster reload
   // (when contactEnrichment.identity / tierResults are gone) still honors the
@@ -134,6 +139,9 @@ export function pruneCandidateForRoster(c) {
     // Render-safe persist flags consumed by save-candidates for roster-reloaded rows.
     identityPersistAllowed,
     scholarPersistAllowed,
+    emailPersistAllowed: persistFlag('emailPersistAllowed'),
+    websitePersistAllowed: persistFlag('websitePersistAllowed'),
+    affiliationPersistAllowed: persistFlag('affiliationPersistAllowed'),
     // A render-safe contactEnrichment SUBSET so CandidateCard's `enr.*` reads
     // (emailSource/emailYear/priorAffiliation/affiliationSource/links/metrics)
     // still work after reload. NEVER the raw internals (identity/tierResults).
@@ -151,6 +159,9 @@ export function pruneCandidateForRoster(c) {
       priorAffiliation: e.priorAffiliation || null,
       hIndex: e.hIndex ?? null,
       totalCitations: e.totalCitations ?? null,
+      emailPersistAllowed: persistFlag('emailPersistAllowed'),
+      websitePersistAllowed: persistFlag('websitePersistAllowed'),
+      affiliationPersistAllowed: persistFlag('affiliationPersistAllowed'),
     },
     name: c.name,
     affiliation: c.affiliation || null,

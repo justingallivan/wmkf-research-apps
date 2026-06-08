@@ -10,7 +10,7 @@ jest.mock('../../lib/services/openalex-service', () => ({
 
 const { OpenAlexService } = require('../../lib/services/openalex-service');
 const { ORCIDService } = require('../../lib/services/orcid-service');
-const { ReviewerIdentityEvidence } = require('../../lib/services/reviewer-identity-evidence');
+const { ReviewerIdentityEvidence, buildIdentityNote } = require('../../lib/services/reviewer-identity-evidence');
 
 const record = (overrides = {}) => ({
   openAlexId: 'https://openalex.org/A1',
@@ -135,5 +135,18 @@ describe('ReviewerIdentityEvidence.evaluateSuggestion', () => {
     expect(out.status).toBe('abstain');
     expect(out.resolverStatus).toBe('unresolved');
     expect(out.sources.openalex).toBe('error');
+  });
+});
+
+describe('buildIdentityNote', () => {
+  test('confirmed identities mention work-grounded authorship when that anchor is present', () => {
+    const note = buildIdentityNote(
+      'confirmed',
+      [{ type: 'authorship_grounded' }, { type: 'topic_match' }],
+      record({ lastKnownInstitution: null }),
+      null,
+    );
+    expect(note).toMatch(/Identity confirmed/);
+    expect(note).toMatch(/work-grounded authorship/);
   });
 });
