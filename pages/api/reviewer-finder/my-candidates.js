@@ -175,6 +175,11 @@ async function handleGet(req, res, access) {
         affiliation: researcher?.wmkf_primaryaffiliation || person.wmkf_organizationname || null,
         email: person.wmkf_emailaddress || null,
         website: researcher?.wmkf_website || null,
+        // Slice F (zero-SSRF email recovery): surface the persisted faculty-page URL so staff
+        // can open it, read the reviewer's real address, and enter it via the manual edit
+        // (which stamps emailSource='manual' → Slice-G confirm-before-invite). The more
+        // specific faculty-page link; `website` is the fallback.
+        facultyPageUrl: researcher?.wmkf_facultypageurl || null,
         // Scholar / ORCID profile URLs persisted on the bibliometric sidecar.
         // Publications themselves are NOT persisted (live-only during a search),
         // so the Candidates tab links out to Scholar to view papers instead.
@@ -314,7 +319,7 @@ async function fetchResearchersByPerson(personIds) {
     const chunk = personIds.slice(i, i + CHUNK);
     const orChain = chunk.map((id) => `wmkf_potentialreviewersid eq ${id}`).join(' or ');
     const { records } = await DynamicsService.queryRecords('wmkf_potentialreviewerses', {
-      select: 'wmkf_potentialreviewersid,wmkf_primaryaffiliation,wmkf_website,wmkf_hindex,wmkf_totalcitations,wmkf_orcid,wmkf_orcidurl,wmkf_googlescholarid,wmkf_googlescholarurl,wmkf_keywords',
+      select: 'wmkf_potentialreviewersid,wmkf_primaryaffiliation,wmkf_website,wmkf_facultypageurl,wmkf_hindex,wmkf_totalcitations,wmkf_orcid,wmkf_orcidurl,wmkf_googlescholarid,wmkf_googlescholarurl,wmkf_keywords',
       filter: orChain,
       top: 500,
     });
