@@ -27,6 +27,7 @@
 - React/async/effect edits (CI won't catch, smoke it): feedback-profile-context-runtime-bugs.md
 - "Has X happened?" is a lookup, not a question: feedback-check-memory-before-asking-user.md
 - Codex iteration loop (design→pre-impl→impl→post-impl): project-codex-design-pre-impl-iteration.md; project-codex-recurring-review.md
+- Delegating to Codex/app (runs in ISOLATED git worktree) → commit/patch first; uncommitted edits don't travel: feedback-commit-before-delegating-to-worktree-agent.md
 - Grep general terms, not domain jargon: feedback-grep-general-codebase-terms.md
 - Schema design: expand enums over new child tables: feedback-human-legibility-schema-principle.md
 - Stakeholder/email tone: feedback-stakeholder-email-tone.md; feedback-review-panel-tone.md
