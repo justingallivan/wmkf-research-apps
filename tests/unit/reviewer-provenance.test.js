@@ -42,4 +42,40 @@ describe('reviewer provenance DTO helper', () => {
     });
     expect(provenanceGroupOf(candidate)).toBe('applicant_suggested');
   });
+
+  // Slice E (S235) — the BARRED/unknown-kind fallback must not gate a row whose IDENTITY
+  // is positively resolved. A BARRED Track-A row upgraded by a shared-ORCID Track-B match
+  // keeps the barred kind but gains confirmed identity; it is a legitimate, selectable
+  // reviewer, and the server (save-candidates) must NOT 422 it. The genuinely-unresolved
+  // BARRED row (no positive identity, covered above at "does not infer…") stays gated.
+  test('a positively-resolved BARRED row is selectable, not needs_identity_review', () => {
+    const confirmedBarred = {
+      name: 'Upgraded By Orcid',
+      isClaudeSuggestion: true,
+      source: 'claude_suggestion', // → barred_parametric kind (no scholarly source)
+      identityStatus: 'confirmed',
+      verified: true,
+      verificationStatus: 'verified',
+      orcid: '0000-0002-1825-0097',
+    };
+    expect(buildReviewerProvenance(confirmedBarred).kind).toBe('barred_parametric');
+    expect(provenanceGroupOf(confirmedBarred)).not.toBe('needs_identity_review');
+    expect(provenanceGroupOf(confirmedBarred)).toBe('literature_retrieved');
+  });
+
+  test('a probable-identity row is also selectable despite a barred kind', () => {
+    const probableBarred = {
+      name: 'Probable Person', isClaudeSuggestion: true, source: 'claude_suggestion',
+      verificationStatus: 'probable',
+    };
+    expect(provenanceGroupOf(probableBarred)).toBe('literature_retrieved');
+  });
+
+  test('an unresolved row still routes to needs_identity_review (gate intact)', () => {
+    const unresolved = {
+      name: 'Deferred Person', isClaudeSuggestion: true, source: 'claude_suggestion',
+      needsIdentification: true, identityStatus: 'unresolved', verificationStatus: 'unresolved',
+    };
+    expect(provenanceGroupOf(unresolved)).toBe('needs_identity_review');
+  });
 });

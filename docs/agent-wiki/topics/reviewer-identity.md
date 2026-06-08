@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-07
+last_verified: 2026-06-08
 stale_after_days: 45
 owner: reviewer-finder
 source_files:
@@ -31,6 +31,7 @@ update_triggers:
   - ORCID/contact propagation changes
   - reviewer ranking or verification confidence changes
   - reviewer suggestion lifecycle write changes
+  - identity-unresolved selectability/save-gate behavior changes
 ---
 
 # Reviewer Identity
@@ -50,6 +51,10 @@ Use this page before work on reviewer identity, enrichment, ORCID propagation, c
 - ORCID/contact propagation can cross from reviewer-finder into review-manager and honorarium flows. Search call sites before treating it as a local reviewer-finder change.
 - Tests that mock an injected resolver or enrichment seam can miss the default production path. Verify at least one unmocked path when the bug involves default credentials, provider routing, or persistence.
 - Ranking and verification fields may be consumed downstream even when a task names only enrichment. Trace save, display, and lifecycle consumers before changing field semantics.
+- Identity-unresolved candidates are gated at TWO boundaries (Slice E, S235), and the two boundaries are INTENTIONALLY asymmetric — the client select list is stricter than the server save gate:
+  - **Client (FIND select list):** BOTH the Workbench and the standalone `reviewer-finder.js` gate selectability on `provenanceGroupOf(c) !== 'needs_identity_review'` — they render the `needs_identity_review` group read-only and exclude it from select-all/save. `provenanceGroupOf` routes a row to `needs_identity_review` when `needsIdentification===true || identityStatus==='unresolved' || verificationStatus==='unresolved'`, OR when the provenance kind is barred/unknown AND the row has NO positive identity. A positively-resolved row (confirmed/probable/verified) is ALWAYS selectable even with a barred kind (e.g. a BARRED Track-A row upgraded by a shared-ORCID Track-B match) — the fallback explicitly excludes it.
+  - **Server (`save-candidates.js`):** HARD-REJECTS only the EXPLICIT-unresolved triple (`needsIdentification===true || identityStatus==='unresolved' || verificationStatus==='unresolved'`), per-row (422 if the whole batch is rejected; mixed batches return 200 with `rejectedUnresolved`). It deliberately does NOT gate on the full `provenanceGroupOf` — a BARRED/unknown-kind row with no top-level identity is legitimately saved here from other paths (a contact-enriched person with a resolver verdict but no top-level `identityStatus`; see `tests/unit/reviewer-route-identity-gate.test.js`) with field-level gating. Gating the server on `provenanceGroupOf` would wrongly reject those.
+  - The gate must survive a Find-roster reload — `pruneCandidateForRoster` persists `identityStatus`/`needsIdentification`/`verificationStatus`, else a deferred candidate re-surfaces as selectable.
 
 ## Standard Probe
 

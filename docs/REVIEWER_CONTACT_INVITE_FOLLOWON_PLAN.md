@@ -1,7 +1,8 @@
 # Reviewer Follow-on Plan: Deferred-Candidate Gating (Fix E) + Invite-Confidence + Faculty-Page Email Recovery
 
 Date: 2026-06-08
-Status: PROPOSED — Codex-reviewed 2026-06-08; corrections folded in (see "## R. Codex review corrections").
+Status: Slice E IMPLEMENTED 2026-06-08 (S235, see §2); Slices G/F PROPOSED — Codex-reviewed 2026-06-08;
+corrections folded in (see "## R. Codex review corrections").
 Author: Claude (Opus 4.8). Builds on the merged-pending branch `reviewer-contact-anchor-fixes`
 (Fixes A–D + Scholar-verified-domain validation) and its design docs
 (`REVIEWER_IDENTITY_CONTACT_FIX_PLAN.md`, `..._REVIEW(_2/_3)`).
@@ -74,6 +75,26 @@ gaps remain, both surfaced during that work:
 ---
 
 ## 2. Slice E — deferred/unanchored candidates must not be silently selectable
+
+**Status: IMPLEMENTED 2026-06-08 (S235).** E1+E2+E3 built as specified, plus a new **E1b** the plan's
+pre-flight surfaced: the durable Find-roster's `pruneCandidateForRoster` dropped `identityStatus`/
+`needsIdentification`/`verificationStatus`, so a deferred candidate stamped at discovery would lose the
+marker on reload and re-surface as selectable (reload-leak). E1b persists those three markers through the
+roster DTO; a regression test asserts `provenanceGroupOf(pruned)==='needs_identity_review'` survives the
+round-trip. Pre-flight also confirmed: no legitimate "pursue anyway" flow exists (so the 422 is safe), and
+the standalone `reviewer-finder.js` page (no client identity grouping) is covered by the E3 server reject
+because its `discoveryResult.ranked` carries the stamp. Build + 70/70 jest + 11/11 offline smoke green.
+
+**Codex post-impl review (folded in):** (HIGH) the standalone `reviewer-finder.js` now also gates select-all/
+toggle/save on `provenanceGroupOf` + renders a read-only "Needs identity review" group + surfaces
+`rejectedUnresolved` on partial saves (was silent-success before). (MEDIUM) `provenanceGroupOf`'s
+barred/unknown-kind fallback no longer gates a positively-resolved row (confirmed/probable/verified) — a
+BARRED Track-A row upgraded by a shared-ORCID Track-B match is now a legitimate, selectable reviewer on BOTH
+clients (Codex's "split the client group" option). The server save gate intentionally stays on the EXPLICIT
+unresolved triple (NOT the full `provenanceGroupOf`): a BARRED-no-top-level-identity row with a resolver
+verdict is legitimately saved here with field-level gating (proven by `reviewer-route-identity-gate` tests),
+so the client select list is deliberately stricter than the server save gate. Re-verified: build + jest +
+11/11 smoke green.
 
 Goal: a candidate the system could not identity-resolve is visible but NOT selectable/savable as a vetted
 reviewer (anchor-or-abstain at the UI/persistence boundary).
@@ -166,8 +187,8 @@ record is a hard requirement, or staff need a per-row "confirmed" state distinct
 ---
 
 ## 5. Sequencing (revised per Codex)
-1. **Slice E hard-block** — client eligibility gate (toggleAll/save) + **server 422** for unresolved rows.
-   Pure defensive addition, no new infra; do first.
+1. ✅ **Slice E hard-block (DONE S235)** — client eligibility gate (toggleAll/save) + **server 422** for
+   unresolved rows + E1 discovery stamp + E1b roster-marker persistence. Pure defensive addition, no new infra.
 2. **Slice G-opt1 + manual-confirm gate** — enrichment floor + the manual-edit confirm gate that closes the
    `my-candidates.js` bypass. No schema change.
 3. **Slice F (on-demand, hardened fetch)** — extend `safe-fetch.js` with DNS/private-IP, max-body,

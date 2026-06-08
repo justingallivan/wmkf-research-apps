@@ -27,6 +27,7 @@ import { resolveStoredCycle, formatCycleForStorage } from '../shared/config/revi
 import ProfileContext from '../shared/context/ProfileContext';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import { readSseStream } from '../shared/components/reviewers/sse';
+import { provenanceGroupOf } from '../lib/utils/reviewer-provenance';
 
 // Helper to extract email from affiliation string (fallback when email field is null)
 function extractEmailFromAffiliation(affiliation) {
@@ -145,7 +146,7 @@ function buildScholarSearchUrl(name, affiliation) {
 }
 
 // Candidate card component
-function CandidateCard({ candidate, selected, onSelect }) {
+function CandidateCard({ candidate, selected, onSelect, readOnly = false }) {
   const [expanded, setExpanded] = useState(false);  // For "View papers" toggle
 
   const isClaudeSuggestion = candidate.isClaudeSuggestion || candidate.source === 'claude_suggestion';
@@ -180,12 +181,20 @@ function CandidateCard({ candidate, selected, onSelect }) {
         'border-gray-200 hover:border-gray-300'}
     `}>
       <div className="flex items-start gap-3">
+        {readOnly ? (
+          <span
+            className="mt-1 h-4 w-4 shrink-0 rounded border border-gray-300 bg-gray-100"
+            title="Identity unconfirmed — not selectable"
+            aria-hidden="true"
+          />
+        ) : (
         <input
           type="checkbox"
           checked={selected}
           onChange={() => onSelect(candidate)}
           className="mt-1 h-4 w-4 text-blue-600 rounded border-gray-300"
         />
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <h4 className="font-medium text-gray-900 truncate">
@@ -985,7 +994,14 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
     }
   };
 
+  // Slice E (S235): a candidate the system could not identity-resolve is shown but NOT
+  // selectable/savable as a vetted reviewer. This page has no provenance grouping, so it
+  // gates on the same helper the Workbench uses; `save-candidates` also hard-rejects
+  // these rows server-side.
+  const isSelectable = (c) => provenanceGroupOf(c) !== 'needs_identity_review';
+
   const toggleCandidate = (candidate) => {
+    if (!isSelectable(candidate)) return; // identity-unresolved rows are not selectable
     const newSelected = new Set(selectedCandidates);
     const key = candidate.name;
     if (newSelected.has(key)) {
@@ -1042,7 +1058,7 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
 
   // Get selected candidate objects
   const getSelectedCandidateObjects = () => {
-    return allCandidates.filter(c => selectedCandidates.has(c.name));
+    return allCandidates.filter(c => selectedCandidates.has(c.name) && isSelectable(c));
   };
 
   // Generate a consistent proposal ID from the title (no timestamp for deduplication)
@@ -1117,9 +1133,14 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
       const result = await response.json();
 
       if (result.success) {
+        // Surface identity-unresolved rejections (Slice E) so a partial save isn't
+        // silently reported as a clean success.
+        const rejected = result.rejectedUnresolved || 0;
         setSaveMessage({
-          type: 'success',
-          text: `Saved ${result.savedCount} candidate(s) to My Candidates`
+          type: rejected > 0 ? 'warning' : 'success',
+          text: rejected > 0
+            ? `Saved ${result.savedCount} candidate(s) to My Candidates. ${rejected} skipped — identity unconfirmed (needs identity review).`
+            : `Saved ${result.savedCount} candidate(s) to My Candidates`
         });
         // Notify parent to refresh My Candidates tab
         if (onCandidatesSaved) {
@@ -1630,7 +1651,7 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setSelectedCandidates(new Set(allCandidates.map(c => c.name)))}
+                onClick={() => setSelectedCandidates(new Set(allCandidates.filter(isSelectable).map(c => c.name)))}
               >
                 Select All
               </Button>
@@ -1655,7 +1676,7 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
               </h4>
               <div className="space-y-3">
                 {allCandidates
-                  .filter(c => c.isClaudeSuggestion || c.source === 'claude_suggestion')
+                  .filter(c => (c.isClaudeSuggestion || c.source === 'claude_suggestion') && isSelectable(c))
                   .map((candidate, i) => (
                     <CandidateCard
                       key={candidate.name + i}
@@ -1679,13 +1700,40 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
               </h4>
               <div className="space-y-3">
                 {allCandidates
-                  .filter(c => !c.isClaudeSuggestion && c.source !== 'claude_suggestion')
+                  .filter(c => !c.isClaudeSuggestion && c.source !== 'claude_suggestion' && isSelectable(c))
                   .map((candidate, i) => (
                     <CandidateCard
                       key={candidate.name + i}
                       candidate={candidate}
                       selected={selectedCandidates.has(candidate.name)}
                       onSelect={toggleCandidate}
+                    />
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Needs-identity-review Section (Slice E): identity-unresolved rows are shown
+              for context but are read-only — not selectable/savable as vetted reviewers. */}
+          {allCandidates.some(c => !isSelectable(c)) && (
+            <div className="mt-6">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs">
+                  Needs identity review
+                </span>
+                <span className="text-gray-400">
+                  ({allCandidates.filter(c => !isSelectable(c)).length} — identity unconfirmed, not selectable)
+                </span>
+              </h4>
+              <div className="space-y-3">
+                {allCandidates
+                  .filter(c => !isSelectable(c))
+                  .map((candidate, i) => (
+                    <CandidateCard
+                      key={candidate.name + i}
+                      candidate={candidate}
+                      selected={false}
+                      readOnly
                     />
                   ))}
               </div>
@@ -1699,9 +1747,11 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
                 <div className={`mb-3 p-2 rounded text-sm ${
                   saveMessage.type === 'success'
                     ? 'bg-green-50 text-green-700 border border-green-200'
-                    : 'bg-red-50 text-red-700 border border-red-200'
+                    : saveMessage.type === 'warning'
+                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                      : 'bg-red-50 text-red-700 border border-red-200'
                 }`}>
-                  {saveMessage.type === 'success' ? '✓ ' : '✗ '}
+                  {saveMessage.type === 'success' ? '✓ ' : saveMessage.type === 'warning' ? '⚠ ' : '✗ '}
                   {saveMessage.text}
                 </div>
               )}

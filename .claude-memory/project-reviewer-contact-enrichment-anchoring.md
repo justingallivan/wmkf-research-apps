@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-contact-enrichment-anchoring
-description: "Reviewer namesake-collapse locus = CONTACT/bibliometric enrichment, not identity resolution. Fix = anchor contact to the resolved identity (ORCID/work-grounded institution) or abstain; identity-confirmed ≠ contact-validated. Fixes A–D shipped on branch reviewer-contact-anchor-fixes (S234), Fix E deferred."
+description: "Reviewer namesake-collapse locus = CONTACT/bibliometric enrichment, not identity resolution. Fix = anchor contact to the resolved identity (ORCID/work-grounded institution) or abstain; identity-confirmed ≠ contact-validated. Fixes A–D merged to main (S234); Fix E (deferred-candidate selectability gate, incl. roster-marker persistence E1b + server 422) shipped S235."
 metadata:
   node_type: memory
   type: project
@@ -33,7 +33,7 @@ OpenAlex author institution already carried onto `candidate.affiliation` by `map
 anchors already fetched; do NOT add per-candidate round-trips (latency is the binding constraint, see
 [[project-serpapi-budget-latency]]).
 
-## What shipped (branch `reviewer-contact-anchor-fixes`, S234 — committed, NOT merged at write time)
+## What shipped (branch `reviewer-contact-anchor-fixes`, S234 — merged to main)
 - **A**: ORCID-resolved affiliation threaded into Tier-3 Claude, Tier-4 Serp, AND Scholar via a
   search-only candidate clone (never mutates the input candidate → preserves the S224
   resolveIdentity-on-original-affiliation invariant); same effective institution feeds the contradiction guard.
@@ -42,9 +42,23 @@ anchors already fetched; do NOT add per-candidate round-trips (latency is the bi
   enforced in BOTH save paths and surviving `pruneCandidateForRoster` (same pattern as the existing
   identity/scholar persist flags — [[project-reviewer-find-roster]]).
 - **D**: `buildIdentityNote` surfaces `authorship_grounded` (was reading as topic-only "confirmed").
-- **Fix E (deferred-candidate selectability) NOT done** — deferred Track-B candidates (beyond the top-25
-  `TRACK_B_IDENTITY_RESOLUTION_LIMIT`) still render selectable; A–D null their contact on save so it's a
-  data-safety-OK / UX-gap, not a correctness hole. Outstanding follow-up.
+- **Fix E (deferred-candidate selectability gate) SHIPPED S235.** Deferred Track-B candidates (beyond the
+  top-25 `TRACK_B_IDENTITY_RESOLUTION_LIMIT`) are now stamped `identityStatus:'unresolved'`/
+  `needsIdentification:true` at discovery (E1), routing them to the non-selectable `needs_identity_review`
+  provenance group. The Workbench renders that group read-only + excludes it from select-all/save (E2);
+  `save-candidates.js` hard-rejects unresolved rows per-row (422 if the whole batch is rejected) — the
+  load-bearing defense for the standalone `reviewer-finder.js` page, which has no client identity grouping
+  (E3). **E1b (pre-flight catch):** `pruneCandidateForRoster` now persists the three identity markers so the
+  gate survives a Find-roster reload — without it a deferred row re-surfaced as selectable. Regression test
+  asserts the round-trip in `tests/unit/reviewer-search-logic.test.js`. No legitimate "pursue anyway" flow
+  exists, so the 422 is safe. **Codex post-impl review folded in:** the standalone `reviewer-finder.js`
+  page now also gates select/save + surfaces `rejectedUnresolved` (was silent-success); and
+  `provenanceGroupOf`'s barred/unknown-kind FALLBACK no longer gates a positively-resolved row
+  (confirmed/probable/verified) — a BARRED Track-A row upgraded by a shared-ORCID Track-B match is a
+  legitimate selectable reviewer on both clients. The server save gate stays on the EXPLICIT unresolved
+  triple (NOT full `provenanceGroupOf`): a BARRED-no-top-level-identity row with a resolver verdict is
+  legitimately saved with field-level gating (`reviewer-route-identity-gate` tests would break otherwise),
+  so the client select list is INTENTIONALLY stricter than the server save gate.
 
 ## How contact gets validated (final design — NOT lexical institution-name matching)
 The actual namesake fix is **Fix A's institution-scoped search** — searching `"<name>" <institution>
@@ -73,7 +87,8 @@ mbi-berlin.de case.
 When the scoped search returns no email / a contradicted one: (a) fetch the anchored institution's own
 faculty page (we already surface it, e.g. `mbi-berlin.de/p/olgasmirnova`) and parse the email; (b) gate
 the INVITE on contact confidence (auto-allow only ORCID / Scholar-domain-matched / institution-page
-emails; else staff "confirm contact before sending"). NOT BUILT — next slice after Fix E.
+emails; else staff "confirm contact before sending"). NOT BUILT — Slices F/G in
+`docs/REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md`, the next work now that Fix E (S235) is shipped.
 
 ## Design docs
 `docs/REVIEWER_IDENTITY_CONTACT_FIX_PLAN.md` (+ `_REVIEW`, `_REVIEW_2` Codex passes),

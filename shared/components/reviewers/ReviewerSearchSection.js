@@ -666,6 +666,14 @@ export default function ReviewerSearchSection({
   // independent of `phase` so the roster shows on reload without a fresh search.
   const displayCandidates = dedupeByName([...candidates, ...rosterActive].map((c) => withReviewerProvenance(c)));
 
+  // Slice E: a candidate the system could not identity-resolve (deferred Track-B or
+  // an unresolved verdict) is visible but NOT selectable/savable as a vetted reviewer
+  // (anchor-or-abstain at the UI boundary). It renders read-only in its own section
+  // and is excluded from select-all + the save set. The server (save-candidates) also
+  // hard-rejects these rows, so this is the friendly gate, not the only one.
+  const isSelectable = (c) => provenanceGroupOf(c) !== 'needs_identity_review';
+  const selectableCandidates = displayCandidates.filter(isSelectable);
+
   const toggle = (key) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -673,8 +681,8 @@ export default function ReviewerSearchSection({
       return next;
     });
   };
-  const allSelected = displayCandidates.length > 0 && displayCandidates.every((c) => selected.has(candKey(c)));
-  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(displayCandidates.map(candKey)));
+  const allSelected = selectableCandidates.length > 0 && selectableCandidates.every((c) => selected.has(candKey(c)));
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(selectableCandidates.map(candKey)));
 
   // Move a surfaced candidate into the durable Excluded set (not deleted). Optimistic:
   // splice it out of the active view immediately, persist in the background, restore on
@@ -725,7 +733,11 @@ export default function ReviewerSearchSection({
 
   const saveSelected = useCallback(async () => {
     if (savingRef.current) return;
-    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)));
+    // Filter by isSelectable too (not just `selected`): a needs-identity-review row
+    // can't be checked, but this guarantees one never reaches save-candidates even if
+    // a stale `selected` entry survives a reclassification (defense-in-depth; the
+    // server 422s these anyway).
+    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isSelectable(c));
     if (chosen.length === 0) return;
     savingRef.current = true;
     setPhase('saving');
@@ -1012,18 +1024,31 @@ export default function ReviewerSearchSection({
                         </button>
                       </div>
                       <div className="max-h-[32rem] overflow-y-auto space-y-4 pr-1">
-                        {provenanceSections.map((section) => (
+                        {provenanceSections.map((section) => {
+                          // Slice E: the needs-identity-review section is read-only —
+                          // these candidates couldn't be identity-resolved, so they are
+                          // shown for context but not selectable/savable as vetted reviewers.
+                          const readOnlySection = section.key === 'needs_identity_review';
+                          return (
                           <div key={section.key}>
                             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
                               {section.title} ({section.items.length})
                             </p>
+                            {readOnlySection && (
+                              <p className="text-xs text-gray-400 mb-1.5">
+                                Identity couldn’t be confirmed for these — not selectable. Re-run a search or resolve the identity to consider them.
+                              </p>
+                            )}
                             <div className="space-y-2">
                               {section.items.map((c) => (
-                                <CandidateCard key={candKey(c)} candidate={c} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} />
+                                readOnlySection
+                                  ? <CandidateCard key={candKey(c)} candidate={c} readOnly onExclude={excludeCandidate} />
+                                  : <CandidateCard key={candKey(c)} candidate={c} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} />
                               ))}
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                       <div className="flex items-center gap-3">
                         <button

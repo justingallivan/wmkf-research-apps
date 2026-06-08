@@ -9,6 +9,7 @@ import {
   filterExcluded,
   pruneCandidateForRoster,
 } from '../../shared/components/reviewers/reviewer-search-logic.js';
+const { provenanceGroupOf } = require('../../lib/utils/reviewer-provenance');
 
 describe('mergeEnrichment', () => {
   const candidates = [
@@ -249,5 +250,42 @@ describe('pruneCandidateForRoster — model-flagged concern survives reload', ()
     expect(pruned.contactEnrichment.emailPersistAllowed).toBe(false);
     expect(pruned.contactEnrichment.websitePersistAllowed).toBe(false);
     expect(pruned.contactEnrichment.affiliationPersistAllowed).toBe(false);
+  });
+});
+
+describe('pruneCandidateForRoster — identity-review markers survive reload (Slice E1b)', () => {
+  // Regression for the roster reload-leak: a deferred/unresolved candidate stamped
+  // identityStatus:'unresolved' at discovery would lose the marker through the roster
+  // DTO and become silently selectable again on reload. pruneCandidateForRoster must
+  // carry the three fields provenanceGroupOf reads so the gate holds across a reload.
+  test('carries identityStatus/needsIdentification/verificationStatus and stays needs_identity_review', () => {
+    const deferred = {
+      name: 'Olga Smirnova',
+      sources: ['openalex', 'pubmed'],
+      needsIdentification: true,
+      identityStatus: 'unresolved',
+      verificationStatus: 'unresolved',
+    };
+    // Pre-prune it routes to the non-selectable group...
+    expect(provenanceGroupOf(deferred)).toBe('needs_identity_review');
+    const pruned = pruneCandidateForRoster(deferred);
+    expect(pruned.identityStatus).toBe('unresolved');
+    expect(pruned.needsIdentification).toBe(true);
+    expect(pruned.verificationStatus).toBe('unresolved');
+    // ...and STILL routes there after the roster round-trip (no reload-leak).
+    expect(provenanceGroupOf(pruned)).toBe('needs_identity_review');
+  });
+
+  test('a resolved candidate stays selectable after prune (no false-positive gating)', () => {
+    const resolved = {
+      name: 'Erika Keller',
+      sources: ['openalex'],
+      needsIdentification: false,
+      identityStatus: 'confirmed',
+      verificationStatus: 'verified',
+    };
+    const pruned = pruneCandidateForRoster(resolved);
+    expect(pruned.needsIdentification).toBe(false);
+    expect(provenanceGroupOf(pruned)).not.toBe('needs_identity_review');
   });
 });
