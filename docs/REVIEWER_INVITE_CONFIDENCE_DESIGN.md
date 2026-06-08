@@ -1,10 +1,14 @@
 # Reviewer Invite-Confidence + Manual-Confirm Gate (Slice G-opt1) — Design
 
 Date: 2026-06-08 (S235)
-Status: READY TO IMPLEMENT — Codex design-reviewed 2026-06-08 (READY WITH NAMED CHANGES);
-all 4 named changes folded in (see "## R. Codex review corrections"). Implements Slice G of
-`docs/REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md` §4. Builds on Slice E (shipped S235)
-and the S234 contact-anchoring slice (Fixes A–D + Scholar-verified-domain).
+Status: IMPLEMENTED 2026-06-08 (S235) on branch `reviewer-slice-g-invite-confidence` —
+Codex design-reviewed (READY WITH NAMED CHANGES), all 4 named changes folded in (see
+"## R."). One implementation refinement beyond the spec: **the gate is scoped to
+`templateType==='invitation'`** (see §3e note) — verified `ReviewerManagePanel` only sends
+post-acceptance types (materials/followup/thankyou), and once a reviewer accepts via the
+magic link the address is proven, so only first-contact invitations are gated. Implements
+Slice G of `docs/REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md` §4. Builds on Slice E (shipped
+S235) and the S234 contact-anchoring slice.
 
 State labels: [VERIFIED] = read in source this session; [ASSUMED] = inference.
 
@@ -119,6 +123,15 @@ boundary. `send-emails` must:
    outcome for audit.
 The modal sends `confirmedLowConfidence: true` only after the staff one-click confirm. A
 HIGH-only batch never sets the flag and is unaffected.
+
+**Scope (impl refinement):** the gate fires only for `templateType === 'invitation'`.
+Disconfirming check: `ReviewerManagePanel` (the post-acceptance materials/followup/thankyou
+flow) can only set `templateType ∈ {materials, followup, thankyou}` (its selector at
+`ReviewerManagePanel.js:482`; never `invitation`), so it never trips the gate. Once a
+reviewer accepts via the magic link sent to the address, the address is proven, so only the
+first-contact invitation is gated — same invitation-only scope as
+`shouldSkipDuplicateInvitation`. `emailConfidence` is still recorded on `email_sent` for all
+types (audit), but only invitations are refused.
 
 ## 4. Out of scope
 - Faculty-page email recovery (Slice F) — separate slice; `institution_page` source is

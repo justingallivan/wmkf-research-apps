@@ -450,6 +450,13 @@ async function handlePatch(req, res, access) {
       if (affiliation !== undefined) researcherUpdates.affiliation = affiliation;
       if (website !== undefined) researcherUpdates.website = website;
       if (hIndex !== undefined) researcherUpdates.hIndex = hIndex;
+      // Slice G — when staff hand-enter/replace the email, stamp emailSource='manual' so the
+      // invite send step reads it as LOW-confidence (this path bypasses the Fix-C enrichment
+      // gate, so the address is unverified against the reviewer's identity until a human
+      // confirms it at send). Does NOT change the "human is authority" stance above — it just
+      // records provenance. Only on an email edit, so an affiliation-only edit won't clobber a
+      // real source. wmkf_emailsource lives on the same person entity (researcher adapter map).
+      if (email !== undefined) researcherUpdates.emailSource = 'manual';
       if (Object.keys(researcherUpdates).length > 0) {
         await researcherAdapter.updateById(personId, researcherUpdates, { actingUserSystemId });
       }

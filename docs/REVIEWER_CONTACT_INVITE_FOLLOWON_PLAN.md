@@ -154,11 +154,11 @@ endpoint staff trigger for a specific candidate (cheaper, avoids fetching for th
 
 ## 4. Slice G — invite-confidence gating (never email an unconfirmed address)
 
-> **Status (S235): DESIGNED + Codex-reviewed, NOT BUILT.** Full implementation-ready design
-> with the 4 Codex named changes folded in lives in
-> `docs/REVIEWER_INVITE_CONFIDENCE_DESIGN.md` (G-opt1 + manual-confirm; no schema change;
-> warning + one-click "confirm & send"; server-enforced `confirmedLowConfidence`). Build
-> order there: 3a→3b→3e→3c→3d. The summary below is the original plan-level sketch.
+> **Status (S235): IMPLEMENTED** on branch `reviewer-slice-g-invite-confidence` (design +
+> impl notes in `docs/REVIEWER_INVITE_CONFIDENCE_DESIGN.md`). G-opt1 + manual-confirm; no
+> schema change; warning + one-click "confirm & send"; server-enforced
+> `confirmedLowConfidence`, scoped to `templateType==='invitation'`. The summary below is the
+> original plan-level sketch — the design doc is authoritative.
 
 Goal: the invite send is the high-stakes action; it must only auto-send to a high-confidence address, else
 route to a staff "confirm contact" step.
