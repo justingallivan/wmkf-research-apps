@@ -17,6 +17,7 @@
     "check:agent-wiki": "node scripts/check-agent-wiki.js",
     "check:agent-wiki:self-test": "node scripts/check-agent-wiki-self-test.js",
     "test": "jest",
+    "smoke:reviewer-contact": "node --import ./scripts/lib/use-extensionless.mjs scripts/smoke-reviewer-contact-anchoring.mjs",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:unit": "jest tests/unit",
