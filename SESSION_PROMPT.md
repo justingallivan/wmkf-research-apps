@@ -1,96 +1,96 @@
-# Session 233 Prompt: Reviewer identity spine — next slices (selectable proposal-named, biomedical path, stratum-3 shadow-run)
+# Session 234 Prompt: Reviewer disambiguation — in-browser eyeball + next Track-B slices
 
-## Session 232 Summary
+## Session 233 Summary
 
-Started by validating the S229/S231 work, hit a **production incident** (a Frankenstein
-reviewer on request 1002794), and that drove the whole session: a candidate-wire-shape
-migration, an incident hardening pass, and the first slice of the OpenAlex+ORCID identity
-spine. Five commits, all pushed; build + 498 reviewer/identity tests + gates green throughout.
-Codex built each slice; Claude reviewed and caught a live-only bug + a fabricated email.
+Started from a user report that reviewer search for request 1002794 (attosecond physics) was
+surfacing wrongly-identified / inactive candidates. A live trace (`scripts/trace-reviewer-provenance.mjs`)
+revealed the ORCID spine was abstaining on **all 12 Track-A suggestions (0 selectable)** —
+including Ursula Keller, who invented the attoclock the proposal is about — so the only selectable
+candidates were unverified Track-B (arxiv) authors with wrong-namesake contacts (Smirnova→ITMO,
+Chen→gmail). Root-caused, fixed Track A, then designed + shipped Track-B identity (Fix C) via the
+Codex loop. Two commits, build + 2110 tests + full gate set green. **Committed, NOT pushed at the
+time of writing this prompt** (push happens in this /stop).
 
 ### What Was Completed
 
-1. **Provenance-DTO migration (`9882eec`).** `provenance.{kind,sources,seedRole,groundingWorkIds}`
-   across `/discover`, roster (`reviewer-roster-store`), save, and the Workbench UI. The axis is
-   groundedness, not "did Claude touch it." "Claude-suggested" is no longer a category — a verified
-   Claude suggestion is `literature_retrieved`; an unverified one is `barred_parametric`. The 25-pt
-   ranking bonus re-scoped to `cited_reference`/`proposal_named` only → verified-Claude candidates
-   drop exactly 30 pts (measured), **ordering preserved** (uniform shift). See
-   `docs/REVIEWER_PROVENANCE_MODEL.md`.
+1. **Track-A spine recovery (Fixes 1/2/A/B).**
+   - **Honorific stripping** before OpenAlex/ORCID search (`openalex-service`, `orcid-service`,
+     `contact-parser.stripHonorifics` now loops for "Prof. Dr."). "Prof. Ursula Keller" was
+     returning the wrong namesake / 0 hits → spine abstained on every titled name.
+   - **Topic-score threshold scale-robust**: live OpenAlex `x_concepts[].score` is a 0–1 float;
+     the prior `>25` (0–100) filter killed topic matching entirely. Detects scale per record.
+   - **Cross-field guard** (`isCrossFieldDiscoveredContamination`) drops bioRxiv-only authors on
+     clearly non-biomedical proposals (reads post-dedup `sources[]`).
+   - **Honorific-robust `areNamesSimilar`** + restored verified-name dedup → a verified reviewer
+     is no longer duplicated by a Track-B literature find.
+   - Result on 1002794: **Track-A 0 → 9 selectable**; Keller & Sang `confirmed` proposal-named.
 
-2. **§5.1 namesake-laundering + ungated-contact hardening (`53206b7`).** The 1002794 "Robert Sang"
-   case: a Claude-suggested attosecond physicist PubMed-matched to an unrelated Kenyan entomologist,
-   given that wrong affiliation + an unrelated LinkedIn. Fixes: Track-A PubMed verification now
-   **honors the source toggle** (the user deselected PubMed; it was ignored); **profile/website-URL
-   name-gate** (`contact-parser.isUsefulWebsiteUrl(url, name)`); `proposal_named` source preserved;
-   coarse cross-field namesake guard; verification-incoherence −15 ranking down-weight. Also gated the
-   applicant-recommended path (`enrich-recommended`).
+2. **Track-B identity (Fix C — `docs/REVIEWER_TRACK_B_IDENTITY_SPEC.md`).**
+   - NEW `lib/services/reviewer-work-author-resolver.js`: resolve the surfacing work in OpenAlex
+     (DOI → PMID → arxiv-DOI → title-search; `ids.arxiv` filter probed and confirmed NOT valid →
+     uses `10.48550/arXiv.<id>`), match the author in its byline → authorship-grounded ORCID.
+     Abstains to needs-review on ambiguity/collision/outage (fail-open).
+   - `authorship_grounded` resolver rule; Track-B run through it after dedup, **capped to top-25**
+     by relevance (deferred count logged).
+   - **ORCID-gated merge**: a discovered author merges into a needs-review proposal-named twin ONLY
+     on shared ORCID; upgraded rows move to the **selectable** bucket. No bare-name merges.
+   - **Enrichment anchoring** (`contact-enrichment-service` Tier 2): when a candidate carries a
+     resolved ORCID, fetch by `getProfile(orcid)` instead of name-searching; Tier 3/4 reject
+     contacts that contradict the anchor. **This is the actual wrong-email fix** — the real Olga
+     Smirnova now resolves with her correct ORCID, so no ITMO namesake email.
 
-3. **OpenAlex+ORCID identity spine — first slice (`0ac4728`, `60e0ef2`).** Constrained-select-or-abstain
-   verifier on the **PubMed-skip path only**. NEW `lib/services/openalex-service.js` (author search,
-   safeFetch, env-only polite-pool `OPENALEX_POLITE_MAILTO`) + NEW `lib/services/reviewer-identity-evidence.js`
-   (top-N → affiliation/topic select or abstain; ORCID-employment corroboration; source-outage → abstain)
-   + resolver anchor rules (`confirmed` = strong-aff + ORCID-employment + topic; `probable` requires
-   affiliation; topic-only → unresolved). `confirmed`/`probable` → `verified[]` (selectable, ORCID
-   attached); `ambiguous`/abstain → `unverified[]` needs-review. **Plain-language identity note** on each
-   card (what corroborated, why not confirmed). Shadow-eval: confident-wrong **29%→0** (Robert Sang
-   recovers to the real Griffith physicist; namesakes/fabrications abstain). Spec: `docs/REVIEWER_ORCID_SPINE_SPEC.md`.
-
-4. **Review catches (the value of the loop).** Claude caught a **live-only bug** Codex shipped: OpenAlex
-   `last_known_institution` (singular) is deprecated → live API returns `last_known_institutions` (plural),
-   so every record had a null institution → spine over-abstained. Tests passed because the fixture used the
-   wrong shape. Fixed + corrected fixture + regression test. Also caught a **fabricated polite-pool email**
-   (`apps@wmkeck.org`) that shipped to prod (`60e0ef2` made it env-only; lesson in
-   `[[feedback-no-fabricated-placeholder-values]]`).
-
-5. **Ops:** cleared the 1002794 Find-roster (non-applicant surfaced candidates) twice via
-   `reset-request-reviewers --roster-only --execute`, preserving the 5 applicant-recommended Dataverse rows.
+3. **Codex loop + a process lesson.** Codex implemented Fix C and reviewed both directions. It ran
+   in an **isolated git worktree off clean HEAD**, so it never saw this session's uncommitted fixes
+   and built on a divergent base (re-derived some, missed others, deleted the verified-name dedup).
+   Claude reviewed Codex's output (found 2 regressions + a goal-defeating merge-bucket bug + a
+   title over-abstention), then **hand-reconciled** both change sets. Lesson saved:
+   [[feedback-commit-before-delegating-to-worktree-agent]] — commit/patch before delegating.
 
 ### Commits
-- `9882eec` provenance-DTO migration (retrieval-redesign step 1)
-- `53206b7` §5.1 namesake-laundering + ungated-contact hardening (fixes 7-11)
-- `0ac4728` OpenAlex+ORCID identity spine for Track-A (PubMed-off path)
-- `60e0ef2` OpenAlex polite-pool email env-only (drop fabricated default)
-- `b00986e` memory: no fabricated placeholder external values (S232 lesson)
+- `86b8dd4` feat(reviewer): Track-B identity spine + honorific/topic-scale fixes (S233)
+- `7df182f` docs(memory): commit/patch before delegating to worktree-isolated Codex
 
 ## Potential Next Steps
 
-### 1. In-browser eyeball of the spine (the one human-only check left)
-Run a physics request (1002794) with **PubMed deselected** + Microsoft sign-in (`.env.local` has Azure
-auth; `npm run dev`). Confirm spine-`probable` candidates render **selectable** with the identity note at
-the card bottom, and the "Needs identity review" grouping looks right. Tests + smoke can't cover the UI path.
+### 1. In-browser eyeball of 1002794 (the one human-only check)
+Run the physics request with **PubMed deselected** + Microsoft sign-in (`.env.local` Azure auth;
+`npm run dev`). Confirm the 9 recovered Track-A reviewers render **selectable** with identity notes,
+the Track-B `confirmed` authors (e.g. Smirnova, Kheifets) show with correct ORCID/affiliation, and
+abstainers (Lu) sit in "Needs identity review". Tests + trace can't cover the rendered UI.
+Note: proposal-named Smirnova also appears in needs-review (no ORCID there → §8 correctly won't
+merge); confirm the duplicate reads acceptably or decide whether to suppress the redundant row.
 
-### 2. Make `proposal_named` + `applicant_suggested` SELECTABLE-with-a-flag
-The physics flow still strands proposal-named peers (Keller/Smirnova/Sang) as not-selectable when they
-don't reach probable. They're grounded by the *proposal*, not PubMed — should be selectable with a
-"verify identity before outreach" flag. Discussed S232, NOT built. Also: reword the **hardcoded UI header**
-`"PubMed couldn't confirm these"` (`ReviewerSearchSection.js:1060`) to reflect the real reason.
+### 2. Cross-field guard: source-level → per-candidate topic-level
+Fix B currently drops bioRxiv-ONLY authors by source. The work-resolver now yields per-candidate
+topics — upgrade the guard to a topic match against the proposal area (catches cross-field PubMed
+authors too, not just bioRxiv). Labeled out-of-scope in the spec §11.
 
-### 3. Spine — biomedical path + stratum-3 shadow-run (before any broader cutover)
-The spine is PubMed-off-only. Extend ORCID/OpenAlex cross-source corroboration to the **biomedical/PubMed-ON**
-path; run the **stratum-3 shadow-run** (early-career / genuinely-no-ORCID tail, ground-truthed via
-cited-reference authorship) — that tail is untested. Keep §5.1 fix-10 as backstop until cleared.
-Consider whether strong-affiliation + ORCID-employment alone should reach `confirmed` (OpenAlex `x_concepts`
-is often empty → many right-person matches land `probable`, not `confirmed`; both selectable).
+### 3. Biomedical / PubMed-ON spine slice
+Track-A spine + Track-B resolver are non-biomedical-leaning. Extend ORCID/OpenAlex corroboration to
+the PubMed-ON path; keep §5.1 fix-10 as backstop until a stratum-3 shadow-run clears it.
 
-### 4. Cited-reference lane (plan §4.5 / §7 step 5) — the next big retrieval slice
-Primary candidate origin for question-driven proposals. Prereq: hypothesis-builder adapter (§7 step 4).
+### 4. Cited-reference lane (plan §4.5 / §7 step 5)
+Still open from S232/S233. Primary candidate origin for question-driven proposals; prereq is the
+hypothesis-builder adapter.
 
-### 5. Manual reviewer add (`docs/REVIEWER_MANUAL_ADD_DESIGN.md` — reviewed, approved direction)
-Phase 1 (new `manual-reviewer` route + UI) is independent and shippable. **Phase 2 (generalize
-`enrich-recommended`) must wait** — it collides with the in-flight spine changes to `verifyClaudeSuggestions`.
-Fully spec the `STAFF_MANUAL` provenance-kind touch-points (group + ranking-bonus decision) before building.
+### 5. Manual reviewer add (`docs/REVIEWER_MANUAL_ADD_DESIGN.md`)
+Phase 1 (new route + UI) independent and shippable. Phase 2 (generalize `enrich-recommended`) must
+wait — it collides with the spine/enrichment changes just landed.
+
+### Housekeeping
+- The Codex worktree `~/.codex/worktrees/63e5/WMKF_Apps` still holds the pre-reconcile copy
+  (gitignored, harmless) — remove if you want a clean `git worktree list`.
 
 ## Standing context / guardrails
-- **`main` auto-deploys to prod on push. Commit/push only when asked.** Stage by explicit path (not `-A`).
-  `npm run build` green before pushing — **but Codex CANNOT run `npm run build`** (Turbopack hangs in its
-  sandbox); brief Codex with `node -c` + `jest` only and run the production build yourself locally.
-- **`ORCID_CLIENT_ID/SECRET` are load-bearing for the spine** (employment corroboration → probable/confirmed).
-  Present in `.env.local` + Vercel. Absent → spine fails safe to needs-review (logs a one-time warning).
-- **`OPENALEX_POLITE_MAILTO`** = `alerts@wmkeck.org`, set as a non-sensitive Vercel env var; no email literal
-  in source. Unset (local) → common pool.
-- Codex review loop caught real defects again (a live-only bug + a fabricated email). Keep the loop:
-  spec → Codex review → Codex build → Claude review (build + tests + **live smoke** + diff) → merge.
+- **`main` auto-deploys to prod on push. Commit/push only when asked. Stage by explicit path
+  (not `-A`).** `npm run build` green before pushing — **Codex CANNOT run `npm run build`**
+  (Turbopack hangs in its sandbox) and `npx jest` may EPERM there too; run build + jest yourself.
+- **Delegating to Codex/app = isolated git worktree.** Commit or hand a patch first — uncommitted
+  edits don't travel ([[feedback-commit-before-delegating-to-worktree-agent]]).
+- **`ORCID_CLIENT_ID/SECRET`** load-bearing for the spine + Track-B + enrichment anchoring.
+  **`OPENALEX_POLITE_MAILTO`** = non-sensitive Vercel env var; never a literal in source.
+- Keep the Codex loop: spec → Codex review → Codex build → Claude review (build + tests + **live
+  smoke/trace** + diff) → reconcile → merge.
 - Probe scripts: `node --import ./scripts/lib/use-extensionless.mjs <script>`; Dataverse needs
   `enterDynamicsBypassForScript(label)`.
 
@@ -98,21 +98,20 @@ Fully spec the `STAFF_MANUAL` provenance-kind touch-points (group + ranking-bonu
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_ORCID_SPINE_SPEC.md` | The spine design (read first for §3 work). |
-| `docs/REVIEWER_PROVENANCE_MODEL.md` | What "Claude-suggested" means now; the provenance DTO. |
-| `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` | The whole redesign; §4.5 cited-ref lane, §5.1 case, §7 sequencing. |
-| `lib/services/reviewer-identity-evidence.js` | Constrained-select-or-abstain spine adapter (shipped). |
-| `lib/services/openalex-service.js` | OpenAlex author search (shipped). |
-| `lib/services/reviewer-identity-resolver.js` | Pure classifier + new spine anchor rules (shipped). |
-| `scripts/eval-orcid-spine-constrained.mjs` | Shadow-run harness (extend for stratum-3). |
-| `scripts/reset-request-reviewers.mjs` | Per-request reviewer-state reset (`--roster-only` = clear non-applicant surfaced). |
-| `docs/REVIEWER_MANUAL_ADD_DESIGN.md` | Manual-add feature design (reviewed; build Phase 1). |
+| `docs/REVIEWER_TRACK_B_IDENTITY_SPEC.md` | Fix C design (work→author, merge gate, anchoring). |
+| `docs/REVIEWER_ORCID_SPINE_SPEC.md` | Track-A spine design. |
+| `lib/services/reviewer-work-author-resolver.js` | Track-B work→author identity resolver (shipped). |
+| `lib/services/openalex-service.js` | Author + work lookups; honorific strip; scale-robust topics. |
+| `lib/services/discovery-service.js` | Tracks A/B, dedup, cross-field guard, Track-B identity + merge. |
+| `lib/services/contact-enrichment-service.js` | Tiered contact lookup + ORCID anchoring (Tier 2/3/4). |
+| `scripts/trace-reviewer-provenance.mjs` | Per-candidate track/provenance/disposition trace (reusable). |
+| `scripts/eval-orcid-spine-constrained.mjs` | Spine shadow-run harness. |
 
 ## Testing
 
 ```bash
-npx jest reviewer discovery analyze pubmed verification provenance contact orcid identity openalex
-node --import ./scripts/lib/use-extensionless.mjs scripts/eval-orcid-spine-constrained.mjs --requests 1002794,1002896,1002959
-# spine live smoke: evaluate a suggestion against real OpenAlex/ORCID (needs .env.local creds)
+npx jest reviewer discovery analyze pubmed verification provenance contact orcid identity openalex dedup track-b work-author
+npm run build
+node --import ./scripts/lib/use-extensionless.mjs scripts/trace-reviewer-provenance.mjs --request 1002794
 # full startup gate set: see .claude/skills/start
 ```
