@@ -1,7 +1,7 @@
 # Reviewer Follow-on Plan: Deferred-Candidate Gating (Fix E) + Invite-Confidence + Faculty-Page Email Recovery
 
 Date: 2026-06-08
-Status: PROPOSED — for Codex review before implementation.
+Status: PROPOSED — Codex-reviewed 2026-06-08; corrections folded in (see "## R. Codex review corrections").
 Author: Claude (Opus 4.8). Builds on the merged-pending branch `reviewer-contact-anchor-fixes`
 (Fixes A–D + Scholar-verified-domain validation) and its design docs
 (`REVIEWER_IDENTITY_CONTACT_FIX_PLAN.md`, `..._REVIEW(_2/_3)`).
@@ -58,6 +58,18 @@ gaps remain, both surfaced during that work:
   exists anywhere.
 - [VERIFIED, this branch] `contactEnrichment` already carries `facultyPageUrl` and `website`, and the
   raw `tierResults.serp_search.{facultyPageUrl,website}` (e.g. for Smirnova, `mbi-berlin.de/p/olgasmirnova`).
+- [VERIFIED 2026-06-08] `lib/utils/safe-fetch.js` ALREADY EXISTS (`safeFetch`/`isAllowedUrl`): HTTPS-only,
+  a FIXED `ALLOWED_HOSTS` regex allowlist, and a manual-redirect cap (`MAX_REDIRECTS`). Slice F must REUSE
+  and extend it — not write a new wrapper. Gaps for faculty-page use: it has no DNS/private-IP (rebind)
+  check, no max-body cap, no content-type gate, and its allowlist is a fixed set (no per-call dynamic
+  institution-domain allowlist).
+
+### 1d. Manual email-entry path (G-opt1 bypass)
+- [VERIFIED 2026-06-08] `pages/api/reviewer-finder/my-candidates.js:436` writes a staff-entered `email`
+  straight to the potential-reviewer person record (`personUpdates.email = email`). So the Fix-C
+  enrichment-time persistence gate is NOT the only writer of `wmkf_emailaddress` — a manual edit bypasses
+  it, and `send-emails` then trusts that address. Any "no auto-invite to an unconfirmed email" guarantee
+  must account for this path, not just the enrichment path.
 
 ---
 
@@ -76,9 +88,14 @@ reviewer (anchor-or-abstain at the UI/persistence boundary).
   an identity-review affordance. Exclude `needs_identity_review` rows from `toggleAll` (select-all) and from
   the `selected`/`chosen` save set (`ReviewerSearchSection.js` ~:677 and ~:728: filter
   `provenanceGroupOf(c) !== 'needs_identity_review'`).
-- **E3 (defense-in-depth, server):** `save-candidates.js` should refuse to write a *selected suggestion* for
-  a candidate whose `provenanceGroupOf`/identity is `needs_identity_review`/unresolved (it already nulls
-  their contact via Fix C; this stops the row itself). Belt-and-suspenders against a stale client.
+- **E3 (server HARD-reject — required, not just belt-and-suspenders):** [Codex] `save-candidates.js`
+  currently gates *fields* but still writes the person + selected-suggestion rows, so the client gate alone
+  is insufficient. The server must **hard-reject** a candidate whose incoming DTO has
+  `identityStatus === 'unresolved'` (return 422 for that row; write neither the person nor the suggestion).
+  Gate on the DTO `identityStatus` (the client key is `provenanceGroupOf`; the server receives the field).
+  PRE-FLIGHT before coding: confirm no legitimate flow intentionally saves a needs-review candidate (e.g. a
+  staff "pursue anyway"); if one exists, make E3 a soft "save as non-selected/needs-review" instead of a
+  hard 422.
 
 Open question: a "needs identity review" candidate is still a legitimate person staff may want to pursue —
 should the read-only card offer a "resolve identity" action (re-run the work-author resolver on demand) or
@@ -95,12 +112,15 @@ anchored domain, fetch it and parse the email.
   no `emailPersistAllowed` email AND carry a `facultyPageUrl`/`website` whose host matches the anchored
   institution domain (or the Scholar-verified domain). Never for abstained/unanchored candidates. Runs at
   most once per such candidate (bounded; latency-aware — only the candidates we actually want).
-- **F2 (safe fetch — SECURITY-CRITICAL):** new helper (e.g. `SerpContactService.fetchPageEmail(url, {anchorDomain})`)
-  that fetches ONLY when the URL host resolves to the anchored institution domain; enforce: https-only,
-  no off-host redirects, timeout, max-body-size, and **regex extraction (ContactParser), not an LLM**, so
-  there is no prompt-injection surface. This is new outbound-fetch surface — must be reviewed against the
-  security posture (SSRF/allowlist). Consider whether it belongs behind an explicit opt-in flag like the
-  existing paid tiers.
+- **F2 (safe fetch — SECURITY-CRITICAL; REUSE + EXTEND `lib/utils/safe-fetch.js`):** [Codex] do NOT write a
+  new fetch wrapper. Build on `safeFetch` (already gives HTTPS-only, host allowlist, redirect cap) and ADD
+  the gaps it lacks before using it for faculty pages: (1) a **per-call dynamic allowlist** = the anchored
+  institution domain only (its fixed `ALLOWED_HOSTS` won't cover institution domains); (2) **DNS/private-IP
+  (rebind) protection** — resolve the host and reject RFC-1918/loopback/link-local, re-checked after any
+  redirect (the highest-risk gap, since the allowlist domain is dynamic per-institution); (3) **max-body
+  cap** (stream truncation / content-length); (4) **content-type gate** (only parse `text/html`). Extract
+  with **regex (ContactParser), never an LLM** — faculty-page HTML is attacker-controllable, so an LLM here
+  is a prompt-injection vector. Put it behind an explicit opt-in like the existing paid tiers.
 - **F3 (validation):** a parsed email is still run through `_validateEmailAgainstVerifiedDomain` (domain
   must match the anchored/Scholar domain) and gets `emailSource: 'institution_page'`, treated as
   high-confidence (NOT in the droppable search-source set).
@@ -132,18 +152,28 @@ Two implementation options (Codex to weigh in):
   change** ([SUBAGENT] no such field today) — must follow `project-dataverse-schema-deploy-gotchas`, the
   no-PII rule, and "expand enums over new child tables."
 
-Recommendation: **G-opt1 first** (achieves the safety goal — you cannot auto-email an unconfirmed address —
-with no schema change), and only add the field (G-opt2) if staff need an explicit per-row "confirmed" state
-distinct from "has a persisted email."
+**G-opt1 does NOT fully achieve the safety goal by itself.** [Codex, verified §1d] the manual-edit path
+(`my-candidates.js:436`) writes `wmkf_emailaddress` directly, bypassing the Fix-C enrichment gate, and
+`send-emails` trusts it. So G-opt1 must be paired with a **manual-confirm gate**: a staff-entered/unconfirmed
+address must be explicitly confirmed before `send-emails` will auto-send to it (either a confirm step in the
+manual-edit UI, or the send path refusing an address that lacks a confirmation marker). Without that, G-opt1
+only covers the enrichment path.
+
+Recommendation: **G-opt1 + manual-confirm gate first** (no schema change; closes both the enrichment and
+manual-edit writers). Add the field (G-opt2) only if an auditable *send-time* "email was confidence-gated"
+record is a hard requirement, or staff need a per-row "confirmed" state distinct from "has a persisted email."
 
 ---
 
-## 5. Sequencing
-1. **Slice E** — self-contained, no new infra; closes the known anchor-or-abstain UI hole. Ship first.
-2. **Slice G-opt1** — invite safety with no schema change; pairs with the Fix C persistence floor.
-3. **Slice F (on-demand)** — email recovery; new fetch surface, needs the security review. Highest value
-   for "actually invite the reviewer," but most review-heavy.
-4. **G-opt2 field** — only if G-opt1 proves insufficient.
+## 5. Sequencing (revised per Codex)
+1. **Slice E hard-block** — client eligibility gate (toggleAll/save) + **server 422** for unresolved rows.
+   Pure defensive addition, no new infra; do first.
+2. **Slice G-opt1 + manual-confirm gate** — enrichment floor + the manual-edit confirm gate that closes the
+   `my-candidates.js` bypass. No schema change.
+3. **Slice F (on-demand, hardened fetch)** — extend `safe-fetch.js` with DNS/private-IP, max-body,
+   content-type, and dynamic per-institution allowlist, THEN add the faculty-page extractor. Highest value
+   for "actually invite the reviewer," most security review.
+4. **G-opt2 field** — only if a send-time audit guarantee is a hard requirement.
 
 ---
 
@@ -170,3 +200,17 @@ distinct from "has a persisted email."
 - SMTP/MX verification of addresses.
 - Bulk page-fetch for every discovered candidate (latency/SSRF) — recovery is per-candidate, anchored only.
 - Re-running discovery/identity automatically (the "resolve identity on demand" UX is noted but not built).
+
+## R. Codex review corrections (2026-06-08)
+Codex reviewed this plan and gave "needs changes" (design-level, not blocking). Corrections folded in above:
+1. **Two current-state claims were wrong** → fixed: `lib/utils/safe-fetch.js` ALREADY EXISTS (reuse it, §1c
+   + Slice F2); `save-candidates.js` does NOT hard-reject unresolved rows today (it gates fields only), so
+   Slice E needs an explicit server 422 (E3).
+2. **G-opt1 bypass found** → the manual email-edit path `my-candidates.js:436` writes `wmkf_emailaddress`
+   directly, so the Fix-C floor isn't a full guarantee; G now requires a manual-confirm gate (§1d, Slice G).
+3. **Slice F SSRF gaps enumerated** → safe-fetch lacks DNS/private-IP (rebind), max-body, content-type, and
+   per-call dynamic allowlist; on-demand over Tier-5; regex-not-LLM extraction confirmed (Slice F2).
+Codex confirmed the answers to all six §6 questions (provenanceGroupOf is the right client key / DTO
+identityStatus on the server; 422 hard-reject; on-demand fetch; G-opt1 insufficient alone; HIGH bar correct
+with domain-anchoring; regex-only mandatory). Full review text is in the session transcript (Codex sandbox
+was read-only and could not write `..._REVIEW.md`).
