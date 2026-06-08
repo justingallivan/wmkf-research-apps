@@ -126,6 +126,15 @@ just display? (Out of scope to build; flag the UX seam.)
 
 ## 3. Slice F — faculty-page email recovery (identity-safe, SSRF-guarded)
 
+> **Status (S235): SHIPPED via the ZERO-SSRF path** (not the automated fetch below). The
+> automated server-side fetch was designed + Codex-reviewed (READY WITH NAMED CHANGES) but NOT
+> built; per Codex Q6 we surfaced the already-persisted `facultyPageUrl` as a "find on faculty
+> page →" link on no-email candidates and let staff enter the address via the existing manual
+> edit (→ `emailSource='manual'` → Slice-G confirm-before-invite). No server fetch, no SSRF
+> surface, no new dependency. Full design + decision in
+> `docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md` (§D). The sketch below is the automated
+> design that was NOT built.
+
 Goal: when a confirmed/anchored candidate has no accepted email but we DO have an institution page on the
 anchored domain, fetch it and parse the email.
 
@@ -196,12 +205,12 @@ record is a hard requirement, or staff need a per-row "confirmed" state distinct
 ## 5. Sequencing (revised per Codex)
 1. ✅ **Slice E hard-block (DONE S235)** — client eligibility gate (toggleAll/save) + **server 422** for
    unresolved rows + E1 discovery stamp + E1b roster-marker persistence. Pure defensive addition, no new infra.
-2. **Slice G-opt1 + manual-confirm gate** — enrichment floor + the manual-edit confirm gate that closes the
-   `my-candidates.js` bypass. No schema change.
-3. **Slice F (on-demand, hardened fetch)** — extend `safe-fetch.js` with DNS/private-IP, max-body,
-   content-type, and dynamic per-institution allowlist, THEN add the faculty-page extractor. Highest value
-   for "actually invite the reviewer," most security review.
-4. **G-opt2 field** — only if a send-time audit guarantee is a hard requirement.
+2. ✅ **Slice G-opt1 + manual-confirm gate (DONE S235)** — enrichment floor + the manual-edit confirm gate
+   that closes the `my-candidates.js` bypass. No schema change.
+3. ✅ **Slice F (DONE S235 — ZERO-SSRF path, not the hardened fetch)** — the automated server-side fetch was
+   Codex-reviewed but NOT built (see §3 banner); instead we surface the persisted `facultyPageUrl` as a
+   staff link and route the address through the Slice-G manual/confirm flow. No SSRF surface, no new dep.
+4. **G-opt2 field** — only if a send-time audit guarantee is a hard requirement. NOT built.
 
 ---
 

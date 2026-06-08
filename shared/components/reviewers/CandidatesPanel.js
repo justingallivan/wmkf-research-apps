@@ -170,7 +170,25 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
                   </div>
                   {c.affiliation && <p className="text-xs text-gray-500 mt-0.5 truncate">{c.affiliation}</p>}
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-xs text-gray-500">
-                    {c.email ? <span>{c.email}</span> : <span className="text-amber-700">no email — can’t invite</span>}
+                    {c.email ? <span>{c.email}</span> : (
+                      <span className="text-amber-700">
+                        no email — can’t invite
+                        {(c.facultyPageUrl || c.website) && (
+                          <>
+                            {' · '}
+                            <a
+                              href={c.facultyPageUrl || c.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-amber-800 underline hover:text-amber-900"
+                              title="Open the faculty page to find this reviewer’s email, then add it via Edit"
+                            >
+                              find on faculty page →
+                            </a>
+                          </>
+                        )}
+                      </span>
+                    )}
                     {c.hIndex != null && <span>h-index {c.hIndex}</span>}
                     {c.totalCitations != null && <span>{Number(c.totalCitations).toLocaleString()} citations</span>}
                     {c.emailSentAt && <span>invited {new Date(c.emailSentAt).toLocaleDateString()}</span>}
