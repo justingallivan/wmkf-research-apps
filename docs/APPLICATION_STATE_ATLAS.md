@@ -124,7 +124,7 @@ The high-leverage services for data-layer work — full source remains authorita
 | `external-token.js` | none (read/write live on `wmkf_appreviewersuggestion` extension fields) | `wmkf_appreviewersuggestion` | HMAC JWT primitive |
 | `review-upload.js` | none | `wmkf_appreviewersuggestion` (PATCH) + SharePoint | shared writer for staff + reviewer paths |
 | `claude-reviewer-service.js` | none | none | legacy; new code uses `llm-client.js` |
-| `discovery-service.js` external clients (`pubmed-service.js`, `arxiv-service.js`, `biorxiv-service.js`, `chemrxiv-service.js`, `orcid-service.js`, `serp-contact-service.js`) | none | none | external research-DB clients |
+| `discovery-service.js` external clients (`pubmed-service.js`, `openalex-service.js`, `arxiv-service.js`, `biorxiv-service.js`, `chemrxiv-service.js`, `orcid-service.js`, `serp-contact-service.js`) | none | none | external research-DB clients |
 | `literature-search-service.js` | none | none | shared search shim |
 
 ## Endpoint inventory

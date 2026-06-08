@@ -184,6 +184,9 @@ export function pruneCandidateForRoster(c) {
     expertiseAreas: Array.isArray(c.expertiseAreas) ? c.expertiseAreas : null,
     keywords: Array.isArray(c.keywords) ? c.keywords : null,
     reasoning: c.reasoning || c.generatedReasoning || null,
+    // Plain-language identity-spine note (confirmed/probable/needs-review + why);
+    // persisted so it survives a roster reload like `reasoning`.
+    identityNote: c.identityNote || null,
     // Contact + bibliometrics (prefer the merged top-level, fall back to enrichment).
     email: c.email || e.email || null,
     emailSource: e.emailSource || null,

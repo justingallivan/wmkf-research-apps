@@ -89,9 +89,17 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | Variable | Purpose | Source | Cost |
 |----------|---------|--------|------|
 | `NCBI_API_KEY` | PubMed higher rate limits | [NCBI Account](https://www.ncbi.nlm.nih.gov/account/settings/) | Free |
-| `ORCID_CLIENT_ID` | Researcher contact lookup | [ORCID Developer Tools](https://orcid.org/developer-tools) | Free |
+| `ORCID_CLIENT_ID` | Researcher contact lookup **+ identity-spine verification (OpenAlex+ORCID Track-A)** | [ORCID Developer Tools](https://orcid.org/developer-tools) | Free |
 | `ORCID_CLIENT_SECRET` | ORCID authentication | Created with client ID | Free |
 | `SERP_API_KEY` | Google Scholar + PubPeer search | [SerpAPI](https://serpapi.com/) | ~$0.01/search |
+
+> **Load-bearing for the reviewer identity spine:** the OpenAlex+ORCID Track-A
+> verifier (`reviewer-identity-evidence.js`) uses `ORCID_CLIENT_ID`/`ORCID_CLIENT_SECRET`
+> to corroborate a candidate's current employment. **Without them the spine cannot
+> reach `probable`/`confirmed` and silently degrades to `needs-review` for
+> non-biomedical / PubMed-off suggestions** — it fails safe (never mis-verifies), but
+> resolution rate drops. `OPENALEX_POLITE_MAILTO` (optional) sets the OpenAlex
+> polite-pool contact; it defaults to `apps@wmkeck.org`.
 
 ### Optional — Per-App Model Overrides
 

@@ -149,6 +149,7 @@ export default async function handler(req, res) {
       searchArxiv,
       searchBiorxiv,
       searchChemrxiv,
+      signal: deadlineController.signal,
       onProgress: (progress) => {
         sendEvent('progress', progress);
       }

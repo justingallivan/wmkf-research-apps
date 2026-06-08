@@ -110,6 +110,60 @@ describe('resolveIdentity — PR1 status rules', () => {
   });
 });
 
+describe('resolveIdentity — OpenAlex/ORCID spine anchor rules', () => {
+  const aff = (weight = 'weak') => ({ type: 'affiliation_match', weight, value: 'Griffith University' });
+  const topic = () => ({ type: 'topic_match', weight: 'weak', value: 'https://openalex.org/A1' });
+  const employment = () => ({ type: 'orcid_employment_corroborated', weight: 'strong', value: '0000-0002-1825-0097' });
+  const orcid = (id = '0000-0002-1825-0097') => ({ type: 'orcid_present', weight: 'weak', value: id });
+
+  test('confirmed requires strong affiliation/employment plus independent topic evidence', () => {
+    const out = r({ name: 'Robert Sang' }, {
+      identityAnchors: [aff('strong'), employment(), topic(), orcid()],
+      spine: {},
+    });
+
+    expect(out.status).toBe('confirmed');
+    expect(out.confidenceBand).toBe('high');
+  });
+
+  test('strong affiliation alone is only probable, never confirmed', () => {
+    const out = r({ name: 'Robert Sang' }, {
+      identityAnchors: [aff('strong'), employment(), orcid()],
+      spine: {},
+    });
+
+    expect(out.status).toBe('probable');
+  });
+
+  test('topic-only weak evidence is unresolved, not probable', () => {
+    const out = r({ name: 'Robert Sang' }, {
+      identityAnchors: [topic()],
+      spine: {},
+    });
+
+    expect(out.status).toBe('unresolved');
+  });
+
+  test('ORCID absence is not a demoter when affiliation plus topic are present', () => {
+    const out = r({ name: 'Robert Sang' }, {
+      identityAnchors: [aff('weak'), topic()],
+      spine: {},
+    });
+
+    expect(out.status).toBe('probable');
+  });
+
+  test('cross-source ORCID disagreement is ambiguous', () => {
+    const out = r({ name: 'Robert Sang' }, {
+      identityAnchors: [aff('strong'), employment(), topic(), orcid('0000-0000-0000-0001')],
+      spine: { crossSourceOrcidDisagreement: true, collision: true },
+    });
+
+    expect(out.status).toBe('ambiguous');
+    expect(out.competitors[0].conflictingEvidence[0]).toMatch(/disagreed/);
+  });
+});
+
 describe('mayPersistIdentity gate', () => {
   test('only confirmed/probable permit persisting identity fields', () => {
     expect(mayPersistIdentity('confirmed')).toBe(true);

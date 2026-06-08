@@ -55,7 +55,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### Research-database clients
 
-- **`pubmed-service.js`**, **`arxiv-service.js`**, **`biorxiv-service.js`**, **`chemrxiv-service.js`**, **`orcid-service.js`**, **`serp-contact-service.js`** — external research-DB clients (API shapes, rate limits, and tier positioning in each header).
+- **`pubmed-service.js`**, **`openalex-service.js`**, **`arxiv-service.js`**, **`biorxiv-service.js`**, **`chemrxiv-service.js`**, **`orcid-service.js`**, **`serp-contact-service.js`** — external research-DB clients (API shapes, rate limits, and tier positioning in each header).
 
 ### Reviewer Finder pipeline
 

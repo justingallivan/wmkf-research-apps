@@ -8,8 +8,15 @@ jest.mock('../../lib/services/pubmed-service', () => ({
   },
 }));
 
+jest.mock('../../lib/services/reviewer-identity-evidence', () => ({
+  ReviewerIdentityEvidence: {
+    evaluateSuggestion: jest.fn(),
+  },
+}));
+
 const { DiscoveryService } = require('../../lib/services/discovery-service');
 const { PubMedService } = require('../../lib/services/pubmed-service');
+const { ReviewerIdentityEvidence } = require('../../lib/services/reviewer-identity-evidence');
 
 const article = (pmid, authorName, title = 'Relevant publication') => ({
   pmid,
@@ -39,6 +46,16 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    ReviewerIdentityEvidence.evaluateSuggestion.mockResolvedValue({
+      status: 'abstain',
+      resolverStatus: 'unresolved',
+      orcid: null,
+      selectedRecord: null,
+      anchors: [],
+      sources: { openalex: 'error', orcid: 'not_run' },
+      reason: 'openalex_outage',
+      identity: { status: 'unresolved', anchors: [] },
+    });
     originalMinPublications = DiscoveryService.MIN_PUBLICATIONS;
     DiscoveryService.MIN_PUBLICATIONS = 3;
     setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((cb) => {
@@ -156,7 +173,21 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
     });
   });
 
-  test('PubMed-off verification routes suggestions to unresolved unverified list', async () => {
+  test('PubMed-off verification runs OpenAlex/ORCID spine and can verify', async () => {
+    ReviewerIdentityEvidence.evaluateSuggestion.mockResolvedValueOnce({
+      status: 'confirmed',
+      resolverStatus: 'confirmed',
+      orcid: '0000-0002-1825-0097',
+      selectedRecord: {
+        openAlexId: 'https://openalex.org/A123',
+        lastKnownInstitution: 'Griffith University',
+      },
+      anchors: [{ type: 'affiliation_match', weight: 'strong' }],
+      sources: { openalex: 'ok', orcid: 'ok' },
+      reason: 'confirmed by OpenAlex/ORCID',
+      identity: { status: 'confirmed', anchors: [] },
+    });
+
     const result = await runVerification(
       { name: 'Robert Sang', expertiseAreas: ['attosecond physics'] },
       { 'Robert Sang[Author]': [article('1', 'Robert Sang'), article('2', 'Robert Sang'), article('3', 'Robert Sang')] },
@@ -164,17 +195,22 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
     );
 
     expect(PubMedService.search).not.toHaveBeenCalled();
-    expect(result.verified).toHaveLength(0);
-    expect(result.unverified).toHaveLength(1);
-    expect(result.unverified[0]).toMatchObject({
+    expect(ReviewerIdentityEvidence.evaluateSuggestion).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Robert Sang' }),
+      expect.objectContaining({ proposalInfo: { primaryResearchArea: 'Physics' } }),
+    );
+    expect(result.verified).toHaveLength(1);
+    expect(result.unverified).toHaveLength(0);
+    expect(result.verified[0]).toMatchObject({
       name: 'Robert Sang',
-      verified: false,
-      verificationStatus: 'unresolved',
-      identityStatus: 'unresolved',
-      reason: 'Verification skipped — PubMed off / no verifier for this field.',
+      verified: true,
+      verificationStatus: 'verified',
+      identityStatus: 'confirmed',
+      verificationSource: 'orcid',
+      orcid: '0000-0002-1825-0097',
       provenance: {
-        kind: 'barred_parametric',
-        sources: [],
+        kind: 'literature_retrieved',
+        sources: ['openalex', 'orcid'],
         seedRole: 'query_seed',
       },
     });
@@ -232,6 +268,7 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
       },
     });
     expect(result.unverified[0].reason).toMatch(/Non-biomedical proposal/);
+    expect(ReviewerIdentityEvidence.evaluateSuggestion).not.toHaveBeenCalled();
   });
 
   test('institution mismatch stays verified for a full-name match and sets advisory flag', async () => {
