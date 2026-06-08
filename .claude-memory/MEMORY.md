@@ -16,6 +16,7 @@
 - Editing a fact in docs/memory (READ THE WHOLE FILE, not the grepped line; PreToolUse hook enforces): feedback-reconcile-dont-append-docs.md; feedback-apply-reconcile-to-fix-work.md
 - Cleanup/audit/verify loop ballooning (time-box ~30min/2 commits, check in): feedback-timebox-metawork.md
 - Stating Dataverse/PA/Azure/Vercel behavior: feedback-verify-external-platform-claims.md; feedback-cite-ground-truth.md
+- External identifier literal (email/URL/ID/contact) in code, esp. Codex-generated — verify it's REAL, not a fabricated placeholder; prefer env config: feedback-no-fabricated-placeholder-values.md
 - Relaying Codex/reviewer output: feedback-share-codex-verbatim.md; feedback-surface-full-review-findings.md
 - rtk UNINSTALLED (S220) — don't call rtk; the global rtk instructions are stale: project-rtk-grep-output-corruption.md
 
