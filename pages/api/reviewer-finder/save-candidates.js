@@ -38,6 +38,20 @@ function contactFieldAllowed(candidate, enrichment, flagName, source) {
   return !paidSearchSource(source);
 }
 
+// Slice E (server hard-reject): a candidate the system could not identity-resolve
+// must NOT be persisted as a vetted reviewer (anchor-or-abstain at the persistence
+// boundary). The Workbench client already hides these (provenanceGroupOf →
+// needs_identity_review), but the standalone Reviewer Finder has no such grouping and
+// POSTs any selected candidate, so the field-level gate alone is insufficient — the
+// server must reject the whole row (write neither person nor suggestion). Keyed on the
+// same explicit identity markers provenanceGroupOf reads (NOT the BARRED_PARAMETRIC
+// fallback), so it rejects deferred/unresolved rows without newly blocking anything else.
+function isUnresolvedIdentity(candidate) {
+  return candidate?.needsIdentification === true
+    || candidate?.identityStatus === 'unresolved'
+    || candidate?.verificationStatus === 'unresolved';
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -69,6 +83,7 @@ export default async function handler(req, res) {
     }
 
     let savedCount = 0;
+    let rejectedUnresolved = 0;
     const errors = [];
     // The exact display names that saved successfully — the client flips ONLY
     // these to status='saved' in the Find-tab roster (S224), so a partial-failure
@@ -78,6 +93,20 @@ export default async function handler(req, res) {
     for (const rawCandidate of candidates) {
       try {
         const candidate = withReviewerProvenance(rawCandidate);
+
+        // Slice E hard-reject: never persist a candidate whose identity is unresolved.
+        // Skip BEFORE any adapter write (neither person nor suggestion) and record it
+        // so a partial batch (mixed resolved/unresolved) still saves the resolved rows.
+        if (isUnresolvedIdentity(candidate)) {
+          rejectedUnresolved += 1;
+          errors.push({
+            name: candidate.name,
+            error: 'Candidate identity is unresolved (needs identity review); not saved.',
+            code: 'identity_unresolved',
+          });
+          continue;
+        }
+
         const normalizedName = candidate.name
           .toLowerCase()
           .replace(/^(dr\.?|prof\.?|professor)\s+/i, '')
@@ -211,11 +240,26 @@ export default async function handler(req, res) {
       }
     }
 
+    // If nothing saved AND the only reason was unresolved-identity rejections, this is
+    // a validation failure (422), not a generic empty/500 — gives the caller (esp. the
+    // standalone Reviewer Finder, which has no client-side identity gate) a clear signal.
+    if (savedCount === 0 && rejectedUnresolved > 0) {
+      return res.status(422).json({
+        error: 'Selected candidates need identity review and were not saved.',
+        savedCount: 0,
+        savedNames,
+        totalRequested: candidates.length,
+        rejectedUnresolved,
+        errors,
+      });
+    }
+
     return res.status(200).json({
       success: true,
       savedCount,
       savedNames,
       totalRequested: candidates.length,
+      rejectedUnresolved: rejectedUnresolved > 0 ? rejectedUnresolved : undefined,
       errors: errors.length > 0 ? errors : undefined,
     });
 

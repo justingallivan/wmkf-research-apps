@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-07
+last_verified: 2026-06-08
 stale_after_days: 45
 owner: reviewer-finder
 source_files:
@@ -31,6 +31,7 @@ update_triggers:
   - ORCID/contact propagation changes
   - reviewer ranking or verification confidence changes
   - reviewer suggestion lifecycle write changes
+  - identity-unresolved selectability/save-gate behavior changes
 ---
 
 # Reviewer Identity
@@ -50,6 +51,7 @@ Use this page before work on reviewer identity, enrichment, ORCID propagation, c
 - ORCID/contact propagation can cross from reviewer-finder into review-manager and honorarium flows. Search call sites before treating it as a local reviewer-finder change.
 - Tests that mock an injected resolver or enrichment seam can miss the default production path. Verify at least one unmocked path when the bug involves default credentials, provider routing, or persistence.
 - Ranking and verification fields may be consumed downstream even when a task names only enrichment. Trace save, display, and lifecycle consumers before changing field semantics.
+- Identity-unresolved candidates are gated at TWO boundaries (Slice E, S235): the Workbench renders the `needs_identity_review` provenance group read-only and excludes it from select-all/save, and `save-candidates.js` HARD-REJECTS any row where `needsIdentification===true || identityStatus==='unresolved' || verificationStatus==='unresolved'` (per-row skip; 422 if the whole batch is rejected). The standalone `reviewer-finder.js` page has NO client identity grouping, so the server reject is the load-bearing defense there. The gate must survive a Find-roster reload — `pruneCandidateForRoster` persists those three markers, else a deferred candidate re-surfaces as selectable.
 
 ## Standard Probe
 

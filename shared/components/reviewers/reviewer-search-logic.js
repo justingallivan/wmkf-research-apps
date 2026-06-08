@@ -168,6 +168,14 @@ export function pruneCandidateForRoster(c) {
     affiliationSource: c.affiliationSource || e.affiliationSource || null,
     seniorityEstimate: c.seniorityEstimate || null,
     verificationConfidence: typeof c.verificationConfidence === 'number' ? c.verificationConfidence : null,
+    // Identity-review markers (Slice E): provenanceGroupOf keys on these to route a
+    // candidate to the non-selectable `needs_identity_review` group. They MUST survive
+    // a roster reload — otherwise a deferred/unresolved candidate recorded as
+    // surfaced-active loses its marker and becomes silently selectable again on reload
+    // (the gate would only hold for the live run). Persist all three the group test reads.
+    identityStatus: c.identityStatus || null,
+    needsIdentification: !!c.needsIdentification,
+    verificationStatus: c.verificationStatus || null,
     // Source / provenance flags the card branches on.
     isClaudeSuggestion: !!c.isClaudeSuggestion,
     source: c.source || null,
