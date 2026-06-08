@@ -6,7 +6,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-06-05
+  last_verified: 2026-06-08
 ---
 
 ## Recall Rule
@@ -24,6 +24,14 @@ Find-tab search candidates are no longer ephemeral. Every candidate a search sur
 
 ## Files
 Store `lib/services/reviewer-roster-store.js`; route `pages/api/workbench/reviewer-roster.js`; shared name-match `lib/utils/reviewer-name-match.js` (CJS, server+client); `pruneCandidateForRoster` in `shared/components/reviewers/reviewer-search-logic.js`; UI `ReviewerSearchSection.js` (displayCandidates refactor, selection keyed by normalized name). Atlas `docs/atlas/postgres-reviewer-find-roster.md`. Plan `~/.claude/plans/cosmic-yawning-starlight.md`.
+
+## Clearing / resetting a request's reviewers — USE THE EXISTING SCRIPT
+`scripts/reset-request-reviewers.mjs` (commit `89b24fb`) already does per-request reviewer teardown — **don't hand-roll probes/SQL for this.** Dry-run by default; its dry-run **already prints the roster breakdown** (status counts) so you don't need a separate counting probe.
+- Clear the Find-tab roster only (regenerable; also resets cross-run dedup so a re-search re-surfaces those names): `--roster-only`
+- Also touch saved Dataverse suggestions (`wmkf_appreviewersuggestion`): default soft-delete (`wmkf_selected=false`, reversible) or `--hard`; skip with `--roster-only`.
+- Invite slots `wmkf_potentialreviewer1..5`: only with `--include-slots`.
+- Run: `node --import ./scripts/lib/use-extensionless.mjs scripts/reset-request-reviewers.mjs --request <num> --roster-only [--execute]`.
+- **"non-applicant-suggested" mapping:** roster rows carry a provenance kind; applicant suggestions live in Dataverse with `wmkf_sources="applicant"`. The dry-run doesn't show provenance — if the task is "clear non-applicant-suggested," do ONE small query to confirm the split (roster=`literature_retrieved`, Dataverse=`applicant`) before executing. S234: all 9 roster rows were `literature_retrieved`, so a `--roster-only` wipe == clearing the non-applicant set.
 
 ## Follow-ups (deferred, optional)
 TTL cleanup cron for closed-request rows; split the "filtered out" counter (applicant-exclusion vs dedup); durable "previously surfaced" view; standalone `reviewer-finder.js` parity. See [[project-reviewer-apps-redesign-direction]].
