@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer identity: provenance DTO + namesake-laundering hardening + OpenAlex/ORCID spine (Session 232)
+
+**Milestone:** New verification architecture + a production incident fix. A namesake-laundering incident on request 1002794 (a Claude-suggested attosecond physicist, "Robert Sang", PubMed-matched to an unrelated Kenyan entomologist, stamped with the wrong affiliation + an unrelated LinkedIn) drove a hardening pass and the first slice of a field-agnostic OpenAlex+ORCID identity spine — atop a candidate-wire-shape migration to a groundedness-based provenance DTO.
+
+**Sessions:** 232. Codex built each slice; Claude reviewed and caught a live-only bug (OpenAlex `last_known_institution` was deprecated singular→plural — every record returned null institution → spine over-abstained; tests mocked the wrong shape) and a fabricated polite-pool email (`apps@wmkeck.org`) that shipped before Justin caught it.
+
+**Ship state:**
+- **Provenance DTO** (`9882eec`): `provenance.{kind,sources,seedRole,groundingWorkIds}` across `/discover`, roster, save, UI. "Claude-suggested" demoted from a category to a seed role; a verified-Claude candidate is `literature_retrieved`. Ranking shifts Track-A −30 (the +25 grounded bonus is now cited/proposal-named-only); ordering preserved.
+- **§5.1 hardening** (`53206b7`): Track-A PubMed verification now honors the source toggle; profile/website-URL name-gate (kills the wrong LinkedIn); `proposal_named` source preserved; coarse cross-field namesake guard; verification-incoherence ranking down-weight.
+- **OpenAlex+ORCID spine** (`0ac4728`, `60e0ef2`): constrained-select-or-abstain verifier on the PubMed-skip path (NEW `openalex-service.js` + `reviewer-identity-evidence.js` + resolver anchor rules). confirmed/probable → selectable; ambiguous/abstain → needs-review; plain-language identity note per candidate. Shadow-eval: confident-wrong 29%→0 (Robert Sang recovers to the real Griffith physicist). OpenAlex polite-pool contact is env-only (`OPENALEX_POLITE_MAILTO`).
+- Build + 498 reviewer/identity tests + `check:*` gates green throughout.
+
+**Why it matters:** PubMed-only verification laundered fabrications/namesakes for non-biomedical fields — the retrieval-redesign's root liability. The spine adds a field-agnostic identity check that **fails safe (abstains, never mis-verifies)**, the first real piece of the cross-field OpenAlex+ORCID spine. Scoped to PubMed-off only; biomedical path + stratum-3 (early-career/no-ORCID) shadow-run still pending before broader cutover.
+
+**Pointers:** `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` (§4.2/§4.5/§5.1/§7), `docs/REVIEWER_PROVENANCE_MODEL.md`, `docs/REVIEWER_ORCID_SPINE_SPEC.md`; `[[project-reviewer-verify-fail-dangerous]]`, `[[feedback-no-fabricated-placeholder-values]]`. Commits `9882eec`, `53206b7`, `0ac4728`, `60e0ef2`, `b00986e`.
+
 ## June 2026 — Web-grounded reviewer discovery EVALUATED → ABANDONED & removed (Session 230)
 
 **Milestone:** Deprecated capability removed. The Perplexity web-discovery feature shipped S227 (entry below) was evaluated on real proposals and pulled. Supersedes the S227 milestone.
