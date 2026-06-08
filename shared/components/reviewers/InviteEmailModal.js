@@ -189,10 +189,11 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
           attachmentUrls: [],
           markAsSent: true,
           allowResend,
-          // Staff acknowledged the low-confidence addresses via the confirm dialog above.
-          // The server re-derives confidence per recipient and only honors this for rows it
-          // independently classifies LOW — a HIGH-only batch is unaffected by the flag.
-          confirmedLowConfidence: lowConfidenceSendable.length > 0,
+          // Staff acknowledged THESE specific low-confidence addresses via the confirm dialog
+          // above (which named them). Recipient-specific, not a batch boolean: the server only
+          // honors the override for these exact suggestionIds, so a row that became LOW after
+          // preview (and was never shown/confirmed) is still refused (`email_unconfirmed`).
+          confirmedLowConfidenceIds: lowConfidenceSendable.map((d) => d.suggestionId),
         }),
       });
       let final = null;

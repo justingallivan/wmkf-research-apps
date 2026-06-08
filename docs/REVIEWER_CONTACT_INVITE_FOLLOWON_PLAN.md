@@ -157,8 +157,9 @@ endpoint staff trigger for a specific candidate (cheaper, avoids fetching for th
 > **Status (S235): IMPLEMENTED** on branch `reviewer-slice-g-invite-confidence` (design +
 > impl notes in `docs/REVIEWER_INVITE_CONFIDENCE_DESIGN.md`). G-opt1 + manual-confirm; no
 > schema change; warning + one-click "confirm & send"; server-enforced
-> `confirmedLowConfidence`, scoped to `templateType==='invitation'`. The summary below is the
-> original plan-level sketch — the design doc is authoritative.
+> recipient-specific `confirmedLowConfidenceIds` allowlist, scoped to
+> `templateType==='invitation'`. The summary below is the original plan-level sketch — the
+> design doc is authoritative.
 
 Goal: the invite send is the high-stakes action; it must only auto-send to a high-confidence address, else
 route to a staff "confirm contact" step.

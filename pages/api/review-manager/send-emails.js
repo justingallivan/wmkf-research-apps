@@ -110,11 +110,16 @@ export default async function handler(req, res) {
       // from firing a second real email). A deliberate "Re-invite" sets this.
       allowResend = false,
       // Slice G — invite-confidence: the server independently computes each recipient's
-      // email confidence and REFUSES a LOW-confidence address unless the caller explicitly
-      // acknowledged it (the staff one-click "confirm & send"). The modal sets this true only
-      // after that acknowledgement; a HIGH-only batch never sets it.
-      confirmedLowConfidence = false,
+      // email confidence and REFUSES a LOW-confidence address unless the staff explicitly
+      // acknowledged THAT recipient (the one-click "confirm & send", which named them). This
+      // is a recipient-specific allowlist of suggestionIds, NOT a batch boolean — so a row
+      // that became LOW after the staff previewed (and was never shown/confirmed) is still
+      // refused, instead of being authorized by another row's confirmation.
+      confirmedLowConfidenceIds = [],
     } = req.body;
+    const confirmedLowConfidenceIdSet = new Set(
+      Array.isArray(confirmedLowConfidenceIds) ? confirmedLowConfidenceIds : []
+    );
 
     if (!Array.isArray(drafts) || drafts.length === 0) {
       sendEvent('error', { message: 'drafts array is required' });
@@ -279,7 +284,8 @@ export default async function handler(req, res) {
       // (materials/followup/thankyou, the ReviewerManagePanel flow) are NOT re-gated — same
       // invitation-only scope as shouldSkipDuplicateInvitation.
       const confidence = emailConfidence(person);
-      if (templateType === 'invitation' && confidence.level === 'low' && !confirmedLowConfidence) {
+      const lowConfidenceConfirmed = confirmedLowConfidenceIdSet.has(draft.suggestionId);
+      if (templateType === 'invitation' && confidence.level === 'low' && !lowConfidenceConfirmed) {
         skipped.push({
           suggestionId: draft.suggestionId,
           candidateName: name,
