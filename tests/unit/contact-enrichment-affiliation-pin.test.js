@@ -422,6 +422,28 @@ describe('ContactEnrichmentService._validateEmailAgainstVerifiedDomain — Schol
     expect(ce.emailPersistAllowed).toBe(true);
   });
 
+  test('boundary match only — does NOT treat summit.edu as matching verified mit.edu (drops the namesake)', () => {
+    const ce = run('prof@summit.edu', 'Verified email at mit.edu');
+    expect(ce.email).toBeNull();
+    expect(ce.contactStatusReason).toBe('verified_domain_contradiction');
+  });
+
+  test('boundary match only — does NOT treat notred.ac.uk.evil as matching verified ed.ac.uk', () => {
+    const ce = run('x@notred.ac.uk.evil', 'Verified email at ed.ac.uk');
+    expect(ce.email).toBeNull();
+  });
+
+  test('NEVER drops a researcher-maintained ORCID email on a Scholar-domain mismatch (trusted source)', () => {
+    const ce = {
+      email: 'olga@personal-domain.org', emailSource: 'orcid', emailPersistAllowed: true,
+      scholarVerifiedEmail: 'Verified email at mbiberlin.de',
+      website: null, websiteSource: null, facultyPageUrl: null,
+    };
+    ContactEnrichmentService._validateEmailAgainstVerifiedDomain(ce);
+    expect(ce.email).toBe('olga@personal-domain.org');
+    expect(ce.emailPersistAllowed).toBe(true);
+  });
+
   test('NO-OP when there is no email to validate', () => {
     const ce = run(null, 'Verified email at ethz.ch');
     expect(ce.email).toBeNull();
