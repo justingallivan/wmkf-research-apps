@@ -25,7 +25,7 @@ import { readFileSync } from 'node:fs';
 function loadEnvLocal() { try { const env = readFileSync(new URL('../.env.local', import.meta.url), 'utf8'); for (const l of env.split('\n')) { const m = l.match(/^([A-Z0-9_]+)=(.*)$/); if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].trim().replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1'); } } catch {} }
 loadEnvLocal();
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const MAILTO = 'justingallivan@me.com';
+const MAILTO = process.env.OPENALEX_POLITE_MAILTO || ''; // polite pool only if a real mailbox is configured
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const args = (() => { const o = { requests: [], reviewerCount: 12 }; const a = process.argv.slice(2); for (let i = 0; i < a.length; i++) { if (a[i] === '--requests') o.requests = a[++i].split(',').map((s) => s.trim()).filter(Boolean); else if (a[i] === '--reviewer-count') o.reviewerCount = parseInt(a[++i], 10) || 12; } return o; })();
 if (!args.requests.length) { console.log('Usage: --requests <n1,n2,...>'); process.exit(2); }
@@ -45,7 +45,7 @@ const toks = (s) => (s || '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/
 function tokenOverlap(a, b) { if (!a || !b) return false; const A = new Set(toks(a)); const B = toks(b); return B.some((t) => A.has(t)); }
 
 async function openalexTopN(name) {
-  const j = await jget(`https://api.openalex.org/authors?search=${encodeURIComponent(clean(name))}&per_page=10&mailto=${MAILTO}`);
+  const j = await jget(`https://api.openalex.org/authors?search=${encodeURIComponent(clean(name))}&per_page=10${MAILTO ? `&mailto=${MAILTO}` : ''}`);
   if (j.__err) return { err: j.__err };
   const recs = (j.results || []).map((r) => ({
     id: r.id, display: r.display_name, works: r.works_count ?? 0,

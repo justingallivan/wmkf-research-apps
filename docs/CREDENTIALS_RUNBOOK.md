@@ -98,8 +98,11 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 > to corroborate a candidate's current employment. **Without them the spine cannot
 > reach `probable`/`confirmed` and silently degrades to `needs-review` for
 > non-biomedical / PubMed-off suggestions** — it fails safe (never mis-verifies), but
-> resolution rate drops. `OPENALEX_POLITE_MAILTO` (optional) sets the OpenAlex
-> polite-pool contact; it defaults to `apps@wmkeck.org`.
+> resolution rate drops. `OPENALEX_POLITE_MAILTO` sets the OpenAlex polite-pool
+> contact — configured in Vercel as `alerts@wmkeck.org` (a real, monitored,
+> non-sensitive WMKF mailbox; OpenAlex uses it only to reach us about API usage).
+> If unset (e.g. local/test), requests use the common pool and no contact email is
+> sent. Never hardcode a fabricated address.
 
 ### Optional — Per-App Model Overrides
 

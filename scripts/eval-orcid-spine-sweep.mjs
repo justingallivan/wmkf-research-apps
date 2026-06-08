@@ -35,7 +35,7 @@ function loadEnvLocal() {
 loadEnvLocal();
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const MAILTO = 'justingallivan@me.com'; // OpenAlex polite pool
+const MAILTO = process.env.OPENALEX_POLITE_MAILTO || ''; // polite pool only if a real mailbox is configured
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function parseArgs(argv) {
@@ -83,7 +83,7 @@ const normOrcid = (x) => (x ? String(x).match(/(\d{4}-\d{4}-\d{4}-[\dX]{4})/)?.[
 async function jget(url, opts) { try { const r = await fetch(url, opts); if (!r.ok) return { __err: r.status }; return await r.json(); } catch (e) { return { __err: e.message }; } }
 
 async function openalex(name) {
-  const j = await jget(`https://api.openalex.org/authors?search=${encodeURIComponent(clean(name))}&per_page=3&mailto=${MAILTO}`);
+  const j = await jget(`https://api.openalex.org/authors?search=${encodeURIComponent(clean(name))}&per_page=3${MAILTO ? `&mailto=${MAILTO}` : ''}`);
   if (j.__err) return { err: j.__err };
   const top = j.results?.[0];
   const inst = top?.last_known_institutions?.[0]?.display_name || top?.last_known_institution?.display_name || null;
