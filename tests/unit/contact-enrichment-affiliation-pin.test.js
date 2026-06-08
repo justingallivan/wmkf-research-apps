@@ -392,6 +392,7 @@ describe('ContactEnrichmentService._emailDomainContradictsInstitution — abbrev
     expect(contradicts('keller@ethz.ch', 'ETH Zurich')).toBe(false);
     expect(contradicts('john.travers@heriot-watt.ac.uk', 'Heriot-Watt University')).toBe(false);
     expect(contradicts('someone@caltech.edu', 'California Institute of Technology')).toBe(false);
+    expect(contradicts('f@gatech.edu', 'Georgia Institute of Technology')).toBe(false);
     expect(contradicts('a@mit.edu', 'Massachusetts Institute of Technology')).toBe(false);
     expect(contradicts('b@stanford.edu', 'Stanford University')).toBe(false);
     expect(contradicts('c@epfl.ch', 'EPFL')).toBe(false);
