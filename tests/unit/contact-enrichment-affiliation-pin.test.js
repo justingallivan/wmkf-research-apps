@@ -278,4 +278,131 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
     expect(out.contactEnrichment.tierResults.claude_search.rejectedReason).toBe('identity_anchor_contradiction');
     expect(out.contactEnrichment.tierResults.serp_search.rejectedReason).toBe('identity_anchor_contradiction');
   });
+
+  test('ORCID current affiliation anchors contact and Scholar searches without mutating the input candidate', async () => {
+    const input = { name: 'Olga Smirnova', affiliation: null, orcid: '0000-0002-7746-5733', publications: [] };
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue({
+      orcidId: '0000-0002-7746-5733',
+      orcidUrl: 'https://orcid.org/0000-0002-7746-5733',
+      givenNames: 'Olga',
+      familyName: 'Smirnova',
+      primaryEmail: null,
+      primaryUrl: null,
+      currentAffiliation: 'Max-Born-Institute',
+    });
+    const claudeSpy = jest.spyOn(ContactEnrichmentService, 'claudeWebSearch').mockResolvedValue(null);
+    const contactSpy = jest.spyOn(SerpContactService, 'findContact').mockResolvedValue(null);
+    const scholarSpy = jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue(null);
+
+    await ContactEnrichmentService.enrichCandidate(input, {
+      credentials: { orcidClientId: 'c', orcidClientSecret: 's', claudeApiKey: 'ck', serpApiKey: 'sk' },
+      usePubmed: false,
+      useOrcid: true,
+      useClaudeSearch: true,
+      useSerpSearch: true,
+    });
+
+    expect(claudeSpy.mock.calls[0][0].affiliation).toBe('Max-Born-Institute');
+    expect(contactSpy.mock.calls[0][0].affiliation).toBe('Max-Born-Institute');
+    expect(scholarSpy.mock.calls[0][0].affiliation).toBe('Max-Born-Institute');
+    expect(input.affiliation).toBeNull();
+  });
+
+  test('anchored search rejects an email domain that contradicts the anchor institution', async () => {
+    jest.spyOn(ContactEnrichmentService, 'claudeWebSearch').mockResolvedValue({
+      email: 'olga.smirnova@metalab.ifmo.ru',
+    });
+    jest.spyOn(SerpContactService, 'findContact').mockResolvedValue(null);
+    jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue(null);
+
+    const out = await ContactEnrichmentService.enrichCandidate(
+      { name: 'Olga Smirnova', affiliation: 'Max-Born-Institute', publications: [] },
+      {
+        credentials: { claudeApiKey: 'ck', serpApiKey: 'sk' },
+        usePubmed: false,
+        useOrcid: false,
+        useClaudeSearch: true,
+        useSerpSearch: true,
+      },
+    );
+
+    expect(out.contactEnrichment.email).toBeNull();
+    expect(out.contactEnrichment.tierResults.claude_search.rejectedReason).toBe('identity_anchor_contradiction');
+  });
+
+  test('no institution anchor and no ORCID abstains from bare-name contact and Scholar lookup', async () => {
+    const claudeSpy = jest.spyOn(ContactEnrichmentService, 'claudeWebSearch').mockResolvedValue({
+      email: 'nickchenyj@gmail.com',
+      website: 'https://www.cliburn.org/yanjun-chen',
+    });
+    const contactSpy = jest.spyOn(SerpContactService, 'findContact').mockResolvedValue({
+      email: 'nickchenyj@gmail.com',
+      website: 'https://www.cliburn.org/yanjun-chen',
+    });
+    const scholarSpy = jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue({
+      scholarProfileUrl: 'https://scholar.google.com/citations?user=WRONG',
+      scholarId: 'WRONG',
+    });
+
+    const out = await ContactEnrichmentService.enrichCandidate(
+      {
+        name: 'Yanjun Chen',
+        affiliation: null,
+        orcid: null,
+        identityNote: 'Identity needs review',
+        publications: [{ title: 'Attoclock physics', year: 2023 }],
+      },
+      {
+        credentials: { claudeApiKey: 'ck', serpApiKey: 'sk' },
+        usePubmed: false,
+        useOrcid: false,
+        useClaudeSearch: true,
+        useSerpSearch: true,
+      },
+    );
+
+    expect(claudeSpy).not.toHaveBeenCalled();
+    expect(contactSpy).not.toHaveBeenCalled();
+    expect(scholarSpy).not.toHaveBeenCalled();
+    expect(out.contactEnrichment.email).toBeNull();
+    expect(out.contactEnrichment.website).toBeNull();
+    expect(out.contactEnrichment.googleScholarId).toBeNull();
+    expect(out.contactEnrichment.hIndex).toBeNull();
+    expect(out.contactEnrichment.contactStatus).toBe('unresolved');
+    expect(out.contactEnrichment.contactStatusReason).toBe('identity_anchor_required');
+    expect(out.identityNote).toBe('Identity needs review');
+    expect(out.publications).toHaveLength(1);
+  });
+});
+
+describe('ContactEnrichmentService._emailDomainContradictsInstitution — abbreviation-domain safety', () => {
+  const contradicts = (email, inst) =>
+    ContactEnrichmentService._emailDomainContradictsInstitution(email, inst);
+
+  test('rejects a genuinely different-institution domain (wrong namesake)', () => {
+    // The live failure: ITMO/St-Petersburg namesake email vs the real Max-Born anchor.
+    expect(contradicts('olga.smirnova@metalab.ifmo.ru',
+      'Max-Born-Institute for Nonlinear Optics and Short Pulse Spectroscopy')).toBe(true);
+  });
+
+  test('does NOT reject legitimate abbreviation / portmanteau / hyphenated domains', () => {
+    // Each of these was a false-positive in the first cut; two are real reviewers
+    // on request 1002794 (Keller@ethz.ch, Travers@heriot-watt) whose correct
+    // emails must not be suppressed.
+    expect(contradicts('keller@ethz.ch', 'ETH Zurich')).toBe(false);
+    expect(contradicts('john.travers@heriot-watt.ac.uk', 'Heriot-Watt University')).toBe(false);
+    expect(contradicts('someone@caltech.edu', 'California Institute of Technology')).toBe(false);
+    expect(contradicts('a@mit.edu', 'Massachusetts Institute of Technology')).toBe(false);
+    expect(contradicts('b@stanford.edu', 'Stanford University')).toBe(false);
+    expect(contradicts('c@epfl.ch', 'EPFL')).toBe(false);
+    expect(contradicts('d@mpl.mpg.de', 'Max Planck Institute for the Science of Light')).toBe(false);
+    expect(contradicts('e@phys.ethz.ch', 'ETH Zurich')).toBe(false);
+  });
+
+  test('never rejects generic mailbox providers, and is keep-biased on empties', () => {
+    expect(contradicts('nickchenyj@gmail.com', 'Shaanxi Normal University')).toBe(false);
+    expect(contradicts('x@outlook.com', 'ETH Zurich')).toBe(false);
+    expect(contradicts(null, 'ETH Zurich')).toBe(false);
+    expect(contradicts('x@ethz.ch', null)).toBe(false);
+  });
 });

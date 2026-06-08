@@ -231,4 +231,23 @@ describe('pruneCandidateForRoster — model-flagged concern survives reload', ()
     expect(pruned.verificationIncoherence).toBe(false);
     expect(pruned.verificationIncoherenceReasons).toEqual([]);
   });
+
+  test('contact persist-deny flags survive roster pruning', () => {
+    const pruned = pruneCandidateForRoster({
+      name: 'Yanjun Chen',
+      contactEnrichment: {
+        email: 'nickchenyj@gmail.com',
+        website: 'https://www.cliburn.org/yanjun-chen',
+        emailPersistAllowed: false,
+        websitePersistAllowed: false,
+        affiliationPersistAllowed: false,
+      },
+    });
+    expect(pruned.emailPersistAllowed).toBe(false);
+    expect(pruned.websitePersistAllowed).toBe(false);
+    expect(pruned.affiliationPersistAllowed).toBe(false);
+    expect(pruned.contactEnrichment.emailPersistAllowed).toBe(false);
+    expect(pruned.contactEnrichment.websitePersistAllowed).toBe(false);
+    expect(pruned.contactEnrichment.affiliationPersistAllowed).toBe(false);
+  });
 });
