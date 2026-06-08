@@ -226,4 +226,56 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
     );
     expect(out.contactEnrichment.publicationCount5yr).toBe(4);
   });
+
+  test('anchored ORCID candidate fetches profile directly and skips name search', async () => {
+    const findSpy = jest.spyOn(ORCIDService, 'findContact').mockResolvedValue(null);
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue({
+      orcidId: '0000-0002-1825-0097',
+      orcidUrl: 'https://orcid.org/0000-0002-1825-0097',
+      givenNames: 'Jane',
+      familyName: 'Roe',
+      creditName: '',
+      primaryEmail: 'jane@example.edu',
+      primaryUrl: 'https://example.edu/jane',
+      currentAffiliation: 'Example University',
+    });
+    jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue(null);
+
+    const out = await ContactEnrichmentService.enrichCandidate(
+      { name: 'Jane Roe', affiliation: 'Example University', orcid: '0000-0002-1825-0097', publications: [] },
+      { ...baseOpts, useSerpSearch: false },
+    );
+
+    expect(findSpy).not.toHaveBeenCalled();
+    expect(ORCIDService.getProfile).toHaveBeenCalledWith('0000-0002-1825-0097', 'c', 's', {});
+    expect(out.contactEnrichment.email).toBe('jane@example.edu');
+    expect(out.contactEnrichment.tierResults.orcid.source).toBe('orcid_anchor');
+  });
+
+  test('anchored Tier 3 and Tier 4 reject institution contradictions', async () => {
+    jest.spyOn(ContactEnrichmentService, 'claudeWebSearch').mockResolvedValue({
+      email: 'wrong@example.edu',
+      affiliation: 'Different University',
+    });
+    jest.spyOn(SerpContactService, 'findContact').mockResolvedValue({
+      email: 'also-wrong@example.edu',
+      institution: 'Different University',
+    });
+    jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue(null);
+
+    const out = await ContactEnrichmentService.enrichCandidate(
+      { name: 'Jane Roe', affiliation: 'Example University', orcid: '0000-0002-1825-0097', publications: [] },
+      {
+        credentials: { claudeApiKey: 'ck', serpApiKey: 'sk' },
+        usePubmed: false,
+        useOrcid: false,
+        useClaudeSearch: true,
+        useSerpSearch: true,
+      },
+    );
+
+    expect(out.contactEnrichment.email).toBeNull();
+    expect(out.contactEnrichment.tierResults.claude_search.rejectedReason).toBe('identity_anchor_contradiction');
+    expect(out.contactEnrichment.tierResults.serp_search.rejectedReason).toBe('identity_anchor_contradiction');
+  });
 });

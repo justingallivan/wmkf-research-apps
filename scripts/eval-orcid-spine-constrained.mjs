@@ -51,7 +51,7 @@ async function openalexTopN(name) {
     id: r.id, display: r.display_name, works: r.works_count ?? 0,
     orcid: normOrcid(r.orcid),
     inst: r.last_known_institutions?.[0]?.display_name || r.last_known_institution?.display_name || null,
-    concepts: (r.x_concepts || []).filter((c) => c.score > 25 && c.level >= 0).map((c) => c.display_name).slice(0, 8).join(' '),
+    concepts: (r.x_concepts || []).filter((c) => c.score > 0.25 && c.level >= 0).map((c) => c.display_name).slice(0, 8).join(' '),
   }));
   return { count: j.meta?.count || 0, recs };
 }

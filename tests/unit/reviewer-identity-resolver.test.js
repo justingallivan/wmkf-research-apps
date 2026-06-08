@@ -153,6 +153,21 @@ describe('resolveIdentity — OpenAlex/ORCID spine anchor rules', () => {
     expect(out.status).toBe('probable');
   });
 
+  test('authorship_grounded alone is probable; topic corroboration confirms it', () => {
+    const authorship = { type: 'authorship_grounded', weight: 'strong', value: 'https://openalex.org/A1' };
+    const probable = r({ name: 'Jane Roe' }, {
+      identityAnchors: [authorship],
+      spine: { authorshipGrounded: true },
+    });
+    expect(probable.status).toBe('probable');
+
+    const confirmed = r({ name: 'Jane Roe' }, {
+      identityAnchors: [authorship, topic()],
+      spine: { authorshipGrounded: true },
+    });
+    expect(confirmed.status).toBe('confirmed');
+  });
+
   test('cross-source ORCID disagreement is ambiguous', () => {
     const out = r({ name: 'Robert Sang' }, {
       identityAnchors: [aff('strong'), employment(), topic(), orcid('0000-0000-0000-0001')],
