@@ -308,15 +308,25 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
     expect(input.affiliation).toBeNull();
   });
 
-  test('anchored search rejects an email domain that contradicts the anchor institution', async () => {
-    jest.spyOn(ContactEnrichmentService, 'claudeWebSearch').mockResolvedValue({
-      email: 'olga.smirnova@metalab.ifmo.ru',
+  test('Scholar-verified domain confirms a real institutional email (mbi-berlin recovery)', async () => {
+    // The live regression: olga.smirnova@mbi-berlin.de IS her email; the old
+    // lexical guard rejected it because mbi-berlin.de (MBI acronym + city) is not
+    // in the verbose official name. The Scholar-verified domain corroborates it.
+    jest.spyOn(ContactEnrichmentService, 'claudeWebSearch').mockResolvedValue(null);
+    jest.spyOn(SerpContactService, 'findContact').mockResolvedValue({
+      email: 'olga.smirnova@mbi-berlin.de',
+      website: 'https://mbi-berlin.de/p/olgasmirnova',
     });
-    jest.spyOn(SerpContactService, 'findContact').mockResolvedValue(null);
-    jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue(null);
+    jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue({
+      scholarProfileUrl: 'https://scholar.google.com/citations?user=wsyVUeMAAAAJ',
+      scholarId: 'wsyVUeMAAAAJ',
+    });
+    jest.spyOn(SerpContactService, 'fetchScholarMetrics').mockResolvedValue({
+      scholarEmail: 'Verified email at mbiberlin.de', hIndex: 61, totalCitations: 14000,
+    });
 
     const out = await ContactEnrichmentService.enrichCandidate(
-      { name: 'Olga Smirnova', affiliation: 'Max-Born-Institute', publications: [] },
+      { name: 'Olga Smirnova', affiliation: 'Max-Born-Institute for Nonlinear Optics and Short Pulse Spectroscopy', publications: [] },
       {
         credentials: { claudeApiKey: 'ck', serpApiKey: 'sk' },
         usePubmed: false,
@@ -326,8 +336,8 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
       },
     );
 
-    expect(out.contactEnrichment.email).toBeNull();
-    expect(out.contactEnrichment.tierResults.claude_search.rejectedReason).toBe('identity_anchor_contradiction');
+    expect(out.contactEnrichment.email).toBe('olga.smirnova@mbi-berlin.de');
+    expect(out.contactEnrichment.emailPersistAllowed).toBe(true);
   });
 
   test('no institution anchor and no ORCID abstains from bare-name contact and Scholar lookup', async () => {
@@ -375,35 +385,45 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
   });
 });
 
-describe('ContactEnrichmentService._emailDomainContradictsInstitution — abbreviation-domain safety', () => {
-  const contradicts = (email, inst) =>
-    ContactEnrichmentService._emailDomainContradictsInstitution(email, inst);
+describe('ContactEnrichmentService._validateEmailAgainstVerifiedDomain — Scholar-domain contact validation', () => {
+  const run = (email, scholarVerifiedEmail) => {
+    const ce = {
+      email, emailSource: 'serp_search', emailPersistAllowed: true, scholarVerifiedEmail,
+      website: 'https://example.org/x', websiteSource: 'serp_search', websitePersistAllowed: true,
+      facultyPageUrl: 'https://example.org/fac',
+    };
+    ContactEnrichmentService._validateEmailAgainstVerifiedDomain(ce);
+    return ce;
+  };
 
-  test('rejects a genuinely different-institution domain (wrong namesake)', () => {
-    // The live failure: ITMO/St-Petersburg namesake email vs the real Max-Born anchor.
-    expect(contradicts('olga.smirnova@metalab.ifmo.ru',
-      'Max-Born-Institute for Nonlinear Optics and Short Pulse Spectroscopy')).toBe(true);
+  test('KEEPS an email whose domain matches the Scholar-verified domain (mbi-berlin vs mbiberlin)', () => {
+    const ce = run('olga.smirnova@mbi-berlin.de', 'Verified email at mbiberlin.de');
+    expect(ce.email).toBe('olga.smirnova@mbi-berlin.de');
+    expect(ce.emailPersistAllowed).toBe(true);
   });
 
-  test('does NOT reject legitimate abbreviation / portmanteau / hyphenated domains', () => {
-    // Each of these was a false-positive in the first cut; two are real reviewers
-    // on request 1002794 (Keller@ethz.ch, Travers@heriot-watt) whose correct
-    // emails must not be suppressed.
-    expect(contradicts('keller@ethz.ch', 'ETH Zurich')).toBe(false);
-    expect(contradicts('john.travers@heriot-watt.ac.uk', 'Heriot-Watt University')).toBe(false);
-    expect(contradicts('someone@caltech.edu', 'California Institute of Technology')).toBe(false);
-    expect(contradicts('f@gatech.edu', 'Georgia Institute of Technology')).toBe(false);
-    expect(contradicts('a@mit.edu', 'Massachusetts Institute of Technology')).toBe(false);
-    expect(contradicts('b@stanford.edu', 'Stanford University')).toBe(false);
-    expect(contradicts('c@epfl.ch', 'EPFL')).toBe(false);
-    expect(contradicts('d@mpl.mpg.de', 'Max Planck Institute for the Science of Light')).toBe(false);
-    expect(contradicts('e@phys.ethz.ch', 'ETH Zurich')).toBe(false);
+  test('KEEPS a subdomain email (phys.ethz.ch confirmed by ethz.ch)', () => {
+    const ce = run('keller@phys.ethz.ch', 'Verified email at ethz.ch');
+    expect(ce.email).toBe('keller@phys.ethz.ch');
+    expect(ce.emailPersistAllowed).toBe(true);
   });
 
-  test('never rejects generic mailbox providers, and is keep-biased on empties', () => {
-    expect(contradicts('nickchenyj@gmail.com', 'Shaanxi Normal University')).toBe(false);
-    expect(contradicts('x@outlook.com', 'ETH Zurich')).toBe(false);
-    expect(contradicts(null, 'ETH Zurich')).toBe(false);
-    expect(contradicts('x@ethz.ch', null)).toBe(false);
+  test('DROPS a namesake email that contradicts the Scholar-verified domain (ifmo vs mbiberlin)', () => {
+    const ce = run('olga.smirnova@metalab.ifmo.ru', 'Verified email at mbiberlin.de');
+    expect(ce.email).toBeNull();
+    expect(ce.website).toBeNull();
+    expect(ce.emailPersistAllowed).toBe(false);
+    expect(ce.contactStatusReason).toBe('verified_domain_contradiction');
+  });
+
+  test('NO-OP when there is no Scholar-verified domain (trusts the institution-scoped search)', () => {
+    const ce = run('someone@unverifiable.edu', null);
+    expect(ce.email).toBe('someone@unverifiable.edu');
+    expect(ce.emailPersistAllowed).toBe(true);
+  });
+
+  test('NO-OP when there is no email to validate', () => {
+    const ce = run(null, 'Verified email at ethz.ch');
+    expect(ce.email).toBeNull();
   });
 });

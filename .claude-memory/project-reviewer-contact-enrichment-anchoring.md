@@ -46,14 +46,34 @@ anchors already fetched; do NOT add per-candidate round-trips (latency is the bi
   `TRACK_B_IDENTITY_RESOLUTION_LIMIT`) still render selectable; A–D null their contact on save so it's a
   data-safety-OK / UX-gap, not a correctness hole. Outstanding follow-up.
 
-## Hazard that bit us (don't repeat)
-The email-domain contradiction guard (backstop for a Serp result with no institution field) is a
-heuristic that CANNOT cleanly separate legit abbreviation/portmanteau domains (ethz.ch, caltech.edu,
-gatech.edu — all real reviewers' homes) from a true wrong-namesake domain (metalab.ifmo.ru). The first
-cut hard-rejected on "domain has a 4+ char token not lexically in the institution name" and would have
-*suppressed correct emails for Keller & Travers on 1002794*. Made it abbreviation-aware + keep-biased
-(relate on word-prefix containment / initialism). Lesson: a domain heuristic must be keep-biased — prefer
-a false negative (wrong email shown) over suppressing a correct contact.
+## How contact gets validated (final design — NOT lexical institution-name matching)
+The actual namesake fix is **Fix A's institution-scoped search** — searching `"<name>" <institution>
+email` returns the right person's email (Smirnova → `olga.smirnova@mbi-berlin.de`, not the ITMO
+namesake). The email is then validated against the **Google Scholar VERIFIED institutional domain**
+("Verified email at mbiberlin.de", already collected as `scholarVerifiedEmail`): a normalized domain
+MATCH (hyphen-insensitive; subdomain-aware) confirms the contact for persistence; a clear CONTRADICTION
+drops it as a likely namesake (ifmo.ru vs mbiberlin.de); with NO verified domain it trusts the scoped
+search and leaves the email alone. Lives in `_validateEmailAgainstVerifiedDomain`, run in `_finalize`
+after Scholar metrics.
+
+## Hazard that bit us (don't repeat) — lexical domain matching is the WRONG tool
+The first/second cuts tried a lexical "does the email DOMAIN appear in the institution NAME" contradiction
+guard. It false-positived on abbreviation/portmanteau/city-coded domains and — caught only by a LIVE
+smoke, not unit tests — **rejected the REAL target's own email**: `olga.smirnova@mbi-berlin.de` (MBI
+acronym + Berlin city) is nowhere in "Max-Born-Institute for Nonlinear Optics and Short Pulse
+Spectroscopy", so the guard suppressed her correct address (the whole point is to email her). Also hit
+ethz.ch/caltech.edu/gatech.edu. **Removed it entirely.** Lessons: (1) an institution NAME string cannot
+validate an email domain — use a positive, signal-grounded anchor (Scholar-verified domain / ORCID /
+the institution's own faculty page) instead; (2) a contact heuristic must be keep-biased — prefer a
+false negative (wrong email shown) over suppressing a correct one; (3) **smoke against live search
+results** — the unit tests used a fabricated true-positive (metalab.ifmo.ru) and never exercised the real
+mbi-berlin.de case.
+
+## Still open for reliable invites (the email is needed to invite the reviewer)
+When the scoped search returns no email / a contradicted one: (a) fetch the anchored institution's own
+faculty page (we already surface it, e.g. `mbi-berlin.de/p/olgasmirnova`) and parse the email; (b) gate
+the INVITE on contact confidence (auto-allow only ORCID / Scholar-domain-matched / institution-page
+emails; else staff "confirm contact before sending"). NOT BUILT — next slice after Fix E.
 
 ## Design docs
 `docs/REVIEWER_IDENTITY_CONTACT_FIX_PLAN.md` (+ `_REVIEW`, `_REVIEW_2` Codex passes),
