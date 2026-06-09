@@ -2,52 +2,36 @@
 /**
  * Deploy artifact for the reviewer relevance-score range bug.
  *
- * Admin runbook:
- *   Run this once after the code change is deployed to widen
- *   wmkf_appreviewersuggestion.wmkf_relevancescore from MaxValue=1 to
- *   MaxValue=100 in Dataverse metadata. The script is idempotent: it first
- *   reads the live attribute metadata and exits cleanly when MaxValue is
- *   already at least 100.
+ * Widens wmkf_appreviewersuggestion.wmkf_relevancescore from MaxValue=1 to
+ * MaxValue=100 in Dataverse metadata, then publishes the entity.
+ *
+ * Dataverse attribute metadata is updated with a full-definition PUT (PATCH is
+ * NOT supported — returns 405), `MSCRM.MergeLabels: true`, followed by
+ * PublishXml. We send back the complete GET'd definition (only MaxValue changed)
+ * so no other property resets to a default; a malformed PUT 400s WITHOUT
+ * partially applying, so this is fail-safe. Idempotent: exits cleanly when
+ * MaxValue is already >= 100.
+ *
+ * Admin runbook: run once after the code change is deployed:
+ *   node scripts/widen-relevancescore-max.mjs
  */
-
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client.js');
 
-const ENTITY_LOGICAL_NAME = 'wmkf_appreviewersuggestion';
-const ATTRIBUTE_LOGICAL_NAME = 'wmkf_relevancescore';
-const TARGET_MAX_VALUE = 100;
-const METADATA_PATH = `/EntityDefinitions(LogicalName='${ENTITY_LOGICAL_NAME}')/Attributes(LogicalName='${ATTRIBUTE_LOGICAL_NAME}')`;
+const ENTITY = 'wmkf_appreviewersuggestion';
+const ATTR = 'wmkf_relevancescore';
+const TARGET_MAX = 100;
+const CAST = 'Microsoft.Dynamics.CRM.DoubleAttributeMetadata';
+const ATTR_PATH = `/EntityDefinitions(LogicalName='${ENTITY}')/Attributes(LogicalName='${ATTR}')`;
+const CAST_PATH = `${ATTR_PATH}/${CAST}`;
+// Never strip these from the PUT body — they identify/define the update.
+const ESSENTIAL = new Set(['MaxValue', 'MinValue', 'Precision', 'MetadataId', 'SchemaName', 'LogicalName', 'AttributeType', '@odata.type']);
 
 function fail(message) {
   console.error(message);
   process.exit(1);
-}
-
-function metadataTypeName(attribute) {
-  return String(attribute?.['@odata.type'] || attribute?.AttributeTypeName?.Value || '');
-}
-
-function patchBodyFor(attribute) {
-  const typeName = metadataTypeName(attribute);
-  if (/DoubleAttributeMetadata/i.test(typeName)) {
-    return {
-      '@odata.type': 'Microsoft.Dynamics.CRM.DoubleAttributeMetadata',
-      MaxValue: TARGET_MAX_VALUE,
-      MinValue: attribute.MinValue ?? 0,
-      Precision: attribute.Precision ?? 4,
-    };
-  }
-  if (/DecimalAttributeMetadata/i.test(typeName)) {
-    return {
-      '@odata.type': 'Microsoft.Dynamics.CRM.DecimalAttributeMetadata',
-      MaxValue: TARGET_MAX_VALUE,
-      MinValue: attribute.MinValue ?? 0,
-      Precision: attribute.Precision ?? 4,
-    };
-  }
-  fail(`Refusing to patch ${ATTRIBUTE_LOGICAL_NAME}: expected Double or Decimal metadata, got ${typeName || '(unknown)'}`);
 }
 
 async function main() {
@@ -58,28 +42,58 @@ async function main() {
   const token = await getAccessToken(resourceUrl);
   const client = createClient({ resourceUrl, token });
 
-  const current = await client.get(METADATA_PATH);
-  if (!current.ok) {
-    fail(`GET metadata failed (${current.status}): ${current.text}`);
-  }
-
-  const attribute = current.body;
-  const typeName = metadataTypeName(attribute);
-  const currentMax = Number(attribute.MaxValue);
-  console.log(`${ATTRIBUTE_LOGICAL_NAME}: type=${typeName || '(unknown)'} MinValue=${attribute.MinValue} MaxValue=${attribute.MaxValue} Precision=${attribute.Precision}`);
-
-  if (Number.isFinite(currentMax) && currentMax >= TARGET_MAX_VALUE) {
-    console.log(`No change needed: MaxValue is already ${attribute.MaxValue}.`);
+  // 1. GET the full attribute definition (non-cast path returns @odata.type +
+  // the Double-specific MaxValue/MinValue/Precision).
+  const cur = await client.get(ATTR_PATH);
+  if (!cur.ok) fail(`GET metadata failed (${cur.status}): ${cur.text}`);
+  const attr = cur.body;
+  console.log(`current: type=${attr['@odata.type']} Min=${attr.MinValue} Max=${attr.MaxValue} Precision=${attr.Precision}`);
+  if (!/DoubleAttributeMetadata/i.test(String(attr['@odata.type'] || '')))
+    fail(`Refusing: expected Double metadata, got ${attr['@odata.type']}`);
+  if (Number.isFinite(Number(attr.MaxValue)) && Number(attr.MaxValue) >= TARGET_MAX) {
+    console.log(`No change needed: MaxValue is already ${attr.MaxValue}.`);
     return;
   }
 
-  const body = patchBodyFor(attribute);
-  const patched = await client.patch(METADATA_PATH, body);
-  if (!patched.ok) {
-    fail(`PATCH metadata failed (${patched.status}): ${patched.text}`);
+  // 2. Full definition back, only MaxValue changed (so nothing else resets).
+  const body = {};
+  for (const [k, v] of Object.entries(attr)) {
+    if (k.startsWith('@odata.')) continue;
+    body[k] = v;
+  }
+  body['@odata.type'] = CAST;
+  body.MaxValue = TARGET_MAX;
+
+  // 3. PUT with MergeLabels; strip any read-only property the API rejects and retry.
+  const headers = { 'MSCRM.MergeLabels': 'true' };
+  for (let attempt = 0; ; attempt++) {
+    const put = await client.raw('PUT', ATTR_PATH, body, headers);
+    if (put.ok) { console.log(`PUT ok (${put.status})`); break; }
+    const named = (put.text || '').match(/'([A-Za-z0-9_]+)'/);
+    const prop = named && named[1];
+    if (put.status === 400 && prop && prop in body && !ESSENTIAL.has(prop) && attempt < 20) {
+      console.log(`  PUT 400 on read-only '${prop}' — stripping and retrying`);
+      delete body[prop];
+      continue;
+    }
+    fail(`PUT metadata failed (${put.status}): ${put.text}`);
   }
 
-  console.log(`Updated ${ATTRIBUTE_LOGICAL_NAME} MaxValue to ${TARGET_MAX_VALUE}.`);
+  // 4. Publish so the change is fully live (forms/validation).
+  const pub = await client.post('/PublishXml', {
+    ParameterXml: `<importexportxml><entities><entity>${ENTITY}</entity></entities></importexportxml>`,
+  });
+  if (!pub.ok) console.warn(`  PublishXml warning (${pub.status}): ${pub.text}`);
+  else console.log('published');
+
+  // 5. Verify read-back.
+  const after = await client.get(ATTR_PATH);
+  const newMax = Number(after.body?.MaxValue);
+  if (after.ok && Number.isFinite(newMax) && newMax >= TARGET_MAX) {
+    console.log(`VERIFIED: ${ATTR} MaxValue is now ${after.body.MaxValue}.`);
+  } else {
+    fail(`Verify FAILED: read back MaxValue=${after.body?.MaxValue} (status ${after.status})`);
+  }
 }
 
 main().catch((err) => fail(err?.stack || err?.message || String(err)));
