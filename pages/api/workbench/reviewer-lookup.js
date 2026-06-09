@@ -12,10 +12,6 @@ import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-conte
 import { normalizeOrcid } from '../../../lib/utils/orcid-normalize';
 import { lookupReviewerIdentity } from '../../../lib/services/reviewer-identity-lookup';
 
-// Re-exported so manual-reviewer.js (and existing tests) keep importing it from
-// this route; the implementation now lives in the lib service.
-export { lookupReviewerIdentity };
-
 const MAX_NAME = 180;
 const MAX_EMAIL = 254;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

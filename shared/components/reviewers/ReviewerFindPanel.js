@@ -267,10 +267,15 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success) {
-      throw new Error(data.error || `Could not add reviewer (${res.status})`);
+      const err = new Error(data.error || `Could not add reviewer (${res.status})`);
+      err.payload = data; // carries { lookup } or { code, details } for 409 re-surfacing
+      throw err;
     }
     return data;
   };
+
+  // Conflict reasons the server can return at submit time (no fresh `lookup`).
+  const CONFLICT_REASONS = new Set(['orcid_email_split', 'contact_linked_elsewhere', 'email_mismatch', 'orcid_mismatch']);
 
   const addManualReviewer = async (ev) => {
     ev.preventDefault();
@@ -308,6 +313,17 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
       if (onSaved) onSaved();
     } catch (e) {
       if (requestIdRef.current !== submittedRequestId) return;
+      // The dedup picture changed between the PD's pick and submit. Re-surface the
+      // fresh decision (candidates/conflict) instead of a dead error string so the
+      // PD can re-choose rather than be stuck.
+      if (e.payload?.lookup) {
+        setManual((prev) => ({ ...prev, saving: false, error: null, lookupResult: e.payload.lookup, resolution: null }));
+        return;
+      }
+      if (e.payload?.code && CONFLICT_REASONS.has(e.payload.code)) {
+        setManual((prev) => ({ ...prev, saving: false, error: null, resolution: null, lookupResult: { outcome: 'conflict', reason: e.payload.code, details: e.payload.details } }));
+        return;
+      }
       setManual((prev) => ({ ...prev, saving: false, error: e.message }));
     }
   };

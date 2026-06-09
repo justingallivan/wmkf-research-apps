@@ -38,7 +38,7 @@ jest.mock('../../lib/dataverse/adapters/contact', () => ({
 }));
 
 const lookupReviewerIdentity = jest.fn(async () => ({ outcome: 'none' }));
-jest.mock('../../pages/api/workbench/reviewer-lookup', () => ({
+jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: (...a) => lookupReviewerIdentity(...a),
 }));
 
@@ -203,6 +203,24 @@ describe('resolution contract', () => {
     expect(r.statusCode).toBe(409);
     expect(r.body.code).toBe('resolution_required');
     expect(createReviewer).not.toHaveBeenCalled();
+  });
+
+  it('rejects an explicit reuse whose id is not in the server re-run candidates (stale_resolution)', async () => {
+    lookupReviewerIdentity.mockResolvedValueOnce({
+      outcome: 'candidates',
+      candidates: [{ source: 'reviewer', matchKey: 'name', reviewerId: PR, contactId: null, context: { name: 'Ada Lovelace', active: true } }],
+    });
+    const r = res();
+    await handler(post({
+      requestId: REQ,
+      name: 'Ada Lovelace',
+      // a valid GUID, but NOT the PR the fresh lookup returned → stale pick
+      resolution: { mode: 'reuse_reviewer', reviewerId: '99999999-9999-9999-9999-999999999999' },
+    }), r);
+    expect(r.statusCode).toBe(409);
+    expect(r.body.code).toBe('stale_resolution');
+    expect(createReviewer).not.toHaveBeenCalled();
+    expect(setContactLink).not.toHaveBeenCalled();
   });
 
   it('rejects reuse_contact when typed email differs from the contact email', async () => {

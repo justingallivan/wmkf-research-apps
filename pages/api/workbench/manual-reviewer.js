@@ -14,7 +14,7 @@ import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/poten
 import * as contactAdapter from '../../../lib/dataverse/adapters/contact';
 import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
 import * as reviewerSuggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
-import { lookupReviewerIdentity } from './reviewer-lookup';
+import { lookupReviewerIdentity } from '../../../lib/services/reviewer-identity-lookup';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -121,7 +121,9 @@ export default async function handler(req, res) {
       const matchReason = note || 'Manually added by staff.';
 
       let selectedResolution = resolution;
-      const lookup = await lookupReviewerIdentity({ name, email: email || null, affiliation: affiliation || null, orcid });
+      // affiliation is not a lookup-tier key (narrowing deferred per design Q4/F4),
+      // so it is intentionally not threaded into the dedup lookup.
+      const lookup = await lookupReviewerIdentity({ name, email: email || null, orcid });
       if (!selectedResolution) {
         const auto = resolutionFromLookup(lookup);
         if (auto) {
