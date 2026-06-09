@@ -99,6 +99,17 @@ IP-pinning dispatcher, scholarVerifiedEmail-only allowlist, IPv6 private-IP bloc
 link on no-email candidates → staff enter the address via the existing Edit (→ `emailSource='manual'` →
 Slice-G confirm). Design+decision: `docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md`.
 
+## Declined email-recovery source: arXiv author emails (S235 — don't re-propose as an automated fetch)
+arXiv DOES expose an email behind a `[view email]` link to logged-in registered users, but harvesting it for
+reviewer coverage is a no-go: (1) it's the **submitter's** email (often a grad student/corresponding author,
+NOT the senior reviewer our discovery picks as last/PI author); (2) it's behind auth, NOT in the Atom API
+(`arxiv-service.js` parses author NAMES only); (3) arXiv **irrevocably blocks an account that views many
+emails in a short window** — our exact use pattern — and has a dedicated "Email protection" policy (metadata
+is CC0, the email explicitly is not). A safe manual deep-link (staff click `[view email]` on the anchored
+paper themselves) was also declined: physics PDs already have arXiv accounts and self-serve, so the link
+saves ~one search. Verified via arXiv help pages (email-protection / registerhelp / api/tou). Don't build an
+automated arXiv-email fetcher.
+
 ## Design docs
 `docs/REVIEWER_IDENTITY_CONTACT_FIX_PLAN.md` (+ `_REVIEW`, `_REVIEW_2` Codex passes),
 `docs/REVIEWER_IDENTITY_STRATEGY_EVALUATION.md`, `docs/REVIEWER_IDENTITY_VERIFICATION_FINDINGS.md`.
