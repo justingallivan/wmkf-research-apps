@@ -73,6 +73,20 @@ describe('DiscoveryService.backfillOpenAlexPublications', () => {
     expect(c.publications).toEqual([]);
   });
 
+  test('dedups duplicate work records by title (OpenAlex preprint + published version)', async () => {
+    jest.spyOn(OpenAlexService, 'getWorksByAuthor').mockResolvedValue({
+      records: [
+        { title: 'Phonon-driven decoherence', year: 2026, url: 'https://doi.org/10.x' },
+        { title: 'phonon-driven  decoherence', year: 2026, url: 'https://openalex.org/W1' }, // same title, diff case/whitespace + url
+        { title: 'Another paper', year: 2025, url: 'u2' },
+      ],
+    });
+    const c = { name: 'X', verified: true, openAlexId: 'A1', publications: [] };
+    await DiscoveryService.backfillOpenAlexPublications([c], {});
+    expect(c.publications).toHaveLength(2);
+    expect(c.publications.map((p) => p.title)).toEqual(['Phonon-driven decoherence', 'Another paper']);
+  });
+
   test('a fetch that returns no usable works leaves the candidate empty (no crash)', async () => {
     jest.spyOn(OpenAlexService, 'getWorksByAuthor').mockResolvedValue({ records: [{ title: null, year: null, url: null }] });
     const c = { name: 'X', verified: true, openAlexId: 'A1', publications: [] };
