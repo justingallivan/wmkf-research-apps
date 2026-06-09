@@ -369,7 +369,7 @@ export default function ReviewerSearchSection({
   const [phase, setPhase] = useState('idle'); // idle | running | results | saving | done | error
   const [progress, setProgress] = useState([]);
   const [candidates, setCandidates] = useState([]);
-  const [unverified, setUnverified] = useState([]); // Claude suggestions PubMed couldn't verify (read-only)
+  const [unverified, setUnverified] = useState([]); // Claude suggestions the searched databases couldn't verify (read-only)
   const [analysis, setAnalysis] = useState(null);
   // `selected` is keyed by normalizeReviewerName(name) — a STABLE id — not by
   // flat array index (S224): the durable roster + exclude/promote splice the
@@ -691,6 +691,17 @@ export default function ReviewerSearchSection({
   // hard-rejects these rows, so this is the friendly gate, not the only one.
   const isSelectable = (c) => provenanceGroupOf(c) !== 'needs_identity_review';
   const selectableCandidates = displayCandidates.filter(isSelectable);
+
+  // A Claude suggestion the server couldn't verify can ALSO surface — and verify —
+  // from a database search, in this run or a prior one (it then lives in
+  // displayCandidates / the active roster). Drop those from the "Unverified
+  // suggestions" set so one reviewer can't appear under both headings; the
+  // verified row always wins over its unverified twin. Excluded names drop too —
+  // they already have their own collapsed section.
+  const knownNameKeys = new Set(
+    [...displayCandidates.map(candKey), ...rosterExcluded.map(candKey)].filter(Boolean)
+  );
+  const unverifiedToShow = unverified.filter((c) => !knownNameKeys.has(candKey(c)));
 
   const toggle = (key) => {
     setSelected((prev) => {
@@ -1026,7 +1037,7 @@ export default function ReviewerSearchSection({
                   {excludedRemoved} already-surfaced or excluded {excludedRemoved === 1 ? 'reviewer was' : 'reviewers were'} filtered out of the results.
                 </p>
               )}
-              {displayCandidates.length === 0 && rosterExcluded.length === 0 && unverified.length === 0 ? (
+              {displayCandidates.length === 0 && rosterExcluded.length === 0 && unverifiedToShow.length === 0 ? (
                 <p className="text-sm text-gray-600">No candidates were found for this proposal.</p>
               ) : (
                 <>
@@ -1099,13 +1110,13 @@ export default function ReviewerSearchSection({
                     </details>
                   )}
 
-                  {unverified.length > 0 && (
+                  {unverifiedToShow.length > 0 && (
                     <details className="border border-gray-200 rounded-lg p-2">
                       <summary className="text-xs font-medium text-gray-500 cursor-pointer">
-                        Unverified suggestions ({unverified.length}) — PubMed couldn’t confirm these; not selectable
+                        Unverified suggestions ({unverifiedToShow.length}) — couldn’t confirm these in the literature; not selectable
                       </summary>
                       <div className="space-y-2 mt-2">
-                        {unverified.map((c, i) => (
+                        {unverifiedToShow.map((c, i) => (
                           <CandidateCard key={`unv-${c.name}-${i}`} candidate={c} readOnly />
                         ))}
                       </div>
