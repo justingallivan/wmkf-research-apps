@@ -129,6 +129,29 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
     expect(result.verified[0].nameEvidence.hasFullForenameMatch).toBe(true);
   });
 
+  test('preprint + published duplicate does NOT satisfy the MIN_PUBLICATIONS gate (3 rows / 2 distinct works)', async () => {
+    // Two of the three rows are the SAME paper (a bioRxiv preprint + the published version),
+    // which title-dedup collapses to one. After dedup there are only 2 distinct works, below
+    // MIN_PUBLICATIONS=3 — so the candidate must NOT verify on duplicate rows (Codex post-impl
+    // HIGH: the dedup runs BEFORE the eligibility gate). Contrast with the 3-distinct-title
+    // 'correct full-name match is verified' case above, which DOES verify.
+    const samePaperTitle = 'Attosecond tunneling dynamics in strong fields';
+    const articles = [
+      article('1', 'Alain Laederach', samePaperTitle), // published (default journal)
+      { ...article('2', 'Alain Laederach', samePaperTitle), journal: 'bioRxiv' }, // preprint of the SAME paper
+      article('3', 'Alain Laederach'), // a genuinely distinct paper (unique default title)
+    ];
+
+    const result = await runVerification(
+      { name: 'Alain Laederach', expertiseAreas: [] },
+      { 'Alain Laederach[Author]': articles },
+    );
+
+    expect(result.verified).toHaveLength(0);
+    expect(result.unverified).toHaveLength(1);
+    expect(result.unverified[0]).toMatchObject({ name: 'Alain Laederach', verified: false });
+  });
+
   test('initial-only suggestion with no corroboration stays unresolved', async () => {
     const alainArticles = [
       article('1', 'Alain Laederach'),
