@@ -124,6 +124,66 @@ describe('ReviewerIdentityEvidence.evaluateSuggestion', () => {
     expect(out.reason).toBe('openalex_collision');
   });
 
+  // S235 — trust ORCID-employment over OpenAlex institution drift (Olga Smirnova case), gated
+  // on a strict forename agreement to keep the namesake fail-safe.
+  const MBI = 'Max Born Institute for Nonlinear Optics and Short Pulse Spectroscopy';
+  const smirnovaProfile = {
+    orcidId: '0000-0002-7746-5733',
+    currentAffiliation: MBI,
+    affiliations: [{ organization: MBI, current: true }],
+  };
+
+  test('ORCID-employment + topic promotes to probable when OpenAlex institution has drifted', async () => {
+    // OpenAlex last_known_institution drifted to a sabbatical host (Technion) → NO affiliation_match;
+    // her ORCID profile still lists the claimed institution (MBI) → strong employment corroboration.
+    OpenAlexService.searchAuthors.mockResolvedValue({ totalCount: 1, records: [record({
+      displayName: 'Olga Smirnova', orcid: '0000-0002-7746-5733',
+      lastKnownInstitution: 'Technion – Israel Institute of Technology', topics: ['Attosecond physics'],
+    })] });
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue(smirnovaProfile);
+
+    const out = await ReviewerIdentityEvidence.evaluateSuggestion(
+      { name: 'Olga Smirnova', suggestedInstitution: MBI, expertiseAreas: ['attosecond science'] },
+      { proposalInfo: { primaryResearchArea: 'Physics' } },
+    );
+
+    expect(out.status).toBe('probable');
+    expect(out.anchors.map((a) => a.type)).toEqual(expect.arrayContaining(['orcid_employment_corroborated', 'topic_match']));
+    expect(out.anchors.map((a) => a.type)).not.toContain('affiliation_match'); // OpenAlex institution drifted away
+  });
+
+  test('FAIL-SAFE: a wrong-forename namesake is NOT promoted even with ORCID-employment + topic', async () => {
+    // A fabricated "Olaf" selects the real "Olga" record (institution/topic match) whose ORCID
+    // employment corroborates — the forename gate must block the promotion.
+    OpenAlexService.searchAuthors.mockResolvedValue({ totalCount: 1, records: [record({
+      displayName: 'Olga Smirnova', orcid: '0000-0002-7746-5733',
+      lastKnownInstitution: 'Technion', topics: ['Attosecond physics'],
+    })] });
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue(smirnovaProfile);
+
+    const out = await ReviewerIdentityEvidence.evaluateSuggestion(
+      { name: 'Olaf Smirnova', suggestedInstitution: MBI, expertiseAreas: ['attosecond science'] },
+      { proposalInfo: { primaryResearchArea: 'Physics' } },
+    );
+
+    expect(out.status).toBe('unresolved'); // forename Olaf ≠ Olga → promotion blocked
+  });
+
+  test('FAIL-SAFE: an initial-only OpenAlex displayName does not satisfy the forename gate', async () => {
+    OpenAlexService.searchAuthors.mockResolvedValue({ totalCount: 1, records: [record({
+      displayName: 'O. Smirnova', orcid: '0000-0002-7746-5733',
+      lastKnownInstitution: 'Technion', topics: ['Attosecond physics'],
+    })] });
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue(smirnovaProfile);
+
+    const out = await ReviewerIdentityEvidence.evaluateSuggestion(
+      { name: 'Olga Smirnova', suggestedInstitution: MBI, expertiseAreas: ['attosecond science'] },
+      { proposalInfo: { primaryResearchArea: 'Physics' } },
+    );
+
+    expect(out.status).toBe('unresolved'); // "O." cannot confirm "Olga" → promotion blocked
+  });
+
   test('OpenAlex outage abstains instead of verifying from partial evidence', async () => {
     OpenAlexService.searchAuthors.mockRejectedValue(new Error('network down'));
 
