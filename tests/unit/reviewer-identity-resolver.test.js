@@ -177,6 +177,42 @@ describe('resolveIdentity — OpenAlex/ORCID spine anchor rules', () => {
     expect(out.status).toBe('ambiguous');
     expect(out.competitors[0].conflictingEvidence[0]).toMatch(/disagreed/);
   });
+
+  // S236 forename gate: a wrong-forename namesake must not be promoted on
+  // affiliation/topic alone, on EITHER the confirmed (:172) or probable (:176)
+  // path. The Track-A spine computes forenameAgrees as a boolean, so an explicit
+  // `false` blocks; other callers leave it undefined and are unaffected (`!== false`).
+  test('wrong forename blocks the confirmed affiliation+employment+topic promotion', () => {
+    const out = r({ name: 'John Smith' }, {
+      identityAnchors: [aff('strong'), employment(), topic(), orcid()],
+      spine: { forenameAgrees: false },
+    });
+    expect(out.status).toBe('unresolved'); // was 'confirmed' before the gate
+  });
+
+  test('wrong forename blocks the probable affiliation+topic promotion', () => {
+    const out = r({ name: 'John Smith' }, {
+      identityAnchors: [aff('weak'), topic()],
+      spine: { forenameAgrees: false },
+    });
+    expect(out.status).toBe('unresolved'); // was 'probable' before the gate
+  });
+
+  test('agreeing forename still confirms (gate does not over-block)', () => {
+    const out = r({ name: 'Robert Sang' }, {
+      identityAnchors: [aff('strong'), employment(), topic(), orcid()],
+      spine: { forenameAgrees: true },
+    });
+    expect(out.status).toBe('confirmed');
+  });
+
+  test('undefined forenameAgrees (non-Track-A callers) does NOT block promotion', () => {
+    const out = r({ name: 'Robert Sang' }, {
+      identityAnchors: [aff('strong'), employment(), topic(), orcid()],
+      spine: {}, // forenameAgrees absent → undefined → not blocked
+    });
+    expect(out.status).toBe('confirmed');
+  });
 });
 
 describe('mayPersistIdentity gate', () => {

@@ -268,34 +268,35 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
     });
   });
 
-  test('non-biomedical proposal demotes biomedical-only same-name PubMed match without topical overlap', async () => {
-    const biomedicalRobertSang = [
-      article('1', 'Robert Sang', 'Malaria vector biology in insect physiology'),
-      article('2', 'Robert Sang', 'Mosquito pathogen surveillance in patients'),
-      article('3', 'Robert Sang', 'Clinical virology and disease epidemiology'),
-    ];
-
+  // S236 Change 1: a clearly-non-biomedical (physics) proposal now routes Track-A
+  // verification to the OpenAlex/ORCID spine even with PubMed ON — PubMed is
+  // biomedical-only and cannot confirm physicists. This SUPERSEDES the old PubMed
+  // cross-field namesake guard (evaluateCrossFieldNamesakeGuard) for physical/eng
+  // proposals: the spine abstains on an unconfirmable identity rather than the
+  // PubMed path verifying-then-demoting a biomedical namesake. The safety property
+  // (a same-name biomedical namesake is not falsely verified) is preserved by the
+  // spine's abstention.
+  test('clearly-non-biomedical proposal routes Track-A verification to the spine, not PubMed', async () => {
     const result = await runVerification(
       { name: 'Robert Sang', expertiseAreas: ['attosecond physics', 'quantum tunneling'] },
-      { 'Robert Sang[Author]': biomedicalRobertSang },
-      { proposalInfo: { primaryResearchArea: 'Physics' } },
+      { 'Robert Sang[Author]': [article('1', 'Robert Sang'), article('2', 'Robert Sang'), article('3', 'Robert Sang')] },
+      { proposalInfo: { primaryResearchArea: 'Physics' } }, // PubMed ON (searchPubmed not false)
     );
 
+    // PubMed is NOT consulted for a physics proposal; the spine is.
+    expect(PubMedService.search).not.toHaveBeenCalled();
+    expect(ReviewerIdentityEvidence.evaluateSuggestion).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Robert Sang' }),
+      expect.objectContaining({ proposalInfo: { primaryResearchArea: 'Physics' } }),
+    );
+    // Default spine mock abstains → the same-name namesake is NOT falsely verified.
     expect(result.verified).toHaveLength(0);
     expect(result.unverified).toHaveLength(1);
     expect(result.unverified[0]).toMatchObject({
       name: 'Robert Sang',
       verified: false,
-      verificationStatus: 'unresolved',
       identityStatus: 'unresolved',
-      provenance: {
-        kind: 'literature_retrieved',
-        sources: ['pubmed'],
-        seedRole: 'query_seed',
-      },
     });
-    expect(result.unverified[0].reason).toMatch(/Non-biomedical proposal/);
-    expect(ReviewerIdentityEvidence.evaluateSuggestion).not.toHaveBeenCalled();
   });
 
   test('institution mismatch stays verified for a full-name match and sets advisory flag', async () => {
@@ -374,5 +375,44 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
       institutionMismatch: true,
       expertiseMismatch: true,
     });
+  });
+});
+
+describe('DiscoveryService.suggestionVerifierRouting (S236 Change 1)', () => {
+  const route = (opts) => DiscoveryService.suggestionVerifierRouting(opts);
+
+  test('biomedical proposal with PubMed on → pubmed', () => {
+    expect(route({ proposalInfo: { primaryResearchArea: 'Cancer immunology' } }).verifier).toBe('pubmed');
+  });
+
+  test('clearly non-biomedical (physics) with PubMed on → spine', () => {
+    expect(route({ proposalInfo: { primaryResearchArea: 'Physics' } }).verifier).toBe('spine');
+  });
+
+  test('ambiguous "Not specified" field with PubMed on → pubmed (conservative)', () => {
+    expect(route({ proposalInfo: { primaryResearchArea: 'Not specified' } }).verifier).toBe('pubmed');
+    expect(route({ proposalInfo: {} }).verifier).toBe('pubmed');
+    expect(route({}).verifier).toBe('pubmed');
+  });
+
+  test('PubMed off → spine regardless of field (checkbox precedence)', () => {
+    expect(route({ searchPubmed: false, proposalInfo: { primaryResearchArea: 'Cancer immunology' } }).verifier).toBe('spine');
+  });
+});
+
+describe('DiscoveryService.pubMedVerificationContract is NOT field-aware (S236 E.2 guard)', () => {
+  // The coauthorship-COI gate at discover.js reuses this contract. Field-aware
+  // routing must NOT leak into it, or COI detection silently turns off for
+  // non-biomedical proposals. This test fails if someone re-adds the field check.
+  test('physics proposal with PubMed on stays enabled (so the COI gate still runs)', () => {
+    const contract = DiscoveryService.pubMedVerificationContract({
+      searchPubmed: true,
+      proposalInfo: { primaryResearchArea: 'Physics' },
+    });
+    expect(contract.enabled).toBe(true);
+  });
+
+  test('only searchPubmed=false disables it', () => {
+    expect(DiscoveryService.pubMedVerificationContract({ searchPubmed: false }).enabled).toBe(false);
   });
 });

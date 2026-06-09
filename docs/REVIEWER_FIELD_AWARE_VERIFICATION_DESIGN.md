@@ -102,6 +102,19 @@ existing behavior is preserved; the COI gate keeps using the unchanged
 by this work** (out of scope: improving non-biomedical coauthorship COI, which
 PubMed can't serve anyway — tracked, not regressed).
 
+**Side-effect — the PubMed cross-field namesake guard becomes inert (acknowledged,
+not removed).** `evaluateCrossFieldNamesakeGuard` (`discovery-service.js:1023`)
+demotes only on the PubMed path AND only for `isPhysicalOrEngineeringResearchArea`
+proposals with biomedical-looking namesake articles. After Change 1, physical/eng
+proposals never reach the PubMed path (they route to the spine), so that guard no
+longer fires for the population it was written for — the spine's abstention
+supersedes it (and is safer: it never *verifies* a wrong namesake in the first
+place). The guard code is **left in place** (harmless; still covers any future
+PubMed-path edge) rather than deleted in this pass; the test that previously
+asserted it (`discovery-verification-status.test.js`) is rewritten to assert the
+spine-routing behavior. **Post-impl review item:** decide whether to retire the now-
+inert guard in a follow-up (destructive — verify no other caller first).
+
 ### Change 2 — close the forename-gate gap BEFORE widening the spine population
 
 Codex E.1 `[VERIFIED via source]`: `reviewer-identity-resolver.js:175` promotes
@@ -114,15 +127,28 @@ A fabricated wrong-forename suggestion that lands an `affiliation_match` +
 users; routing all non-biomedical Track-A here **widens the exposed population**,
 so it is a **non-deferrable companion fix**, not a follow-up.
 
-Proposed: gate the affiliation/topic promotion on `spine.forenameAgrees === true`
-(mirroring `:188`), so a wrong-forename namesake cannot reach `probable` on
-affiliation+topic alone. `confirmed` paths (`authorshipGrounded`,
-`strongAffiliation && employment && topic`) carry their own stronger anchors —
-**design review must decide** whether they also need the forename gate (recommend
-yes for symmetry unless `authorship_grounded[strong]` already implies forename
-agreement — verify in `reviewer-identity-evidence.js`). This is a core-resolver
-behavior change affecting existing users: it gets its own unit tests + its own
-Codex pre-impl review.
+**IMPLEMENTED (S236) after Codex pre-impl review (GO-WITH-CHANGES):** gate BOTH
+ungated promotion paths in `classifySpineEvidence` — `:172`
+(`strongAffiliation && employment && topic` → confirmed) AND `:175`
+(`(anyAffiliation && topic) || strongAffiliation` → probable). The hazard spans
+both, not just the probable path: the spine anchor builder never emits
+`authorship_grounded`, so for the Track-A spine the live confirmed path is `:172`
+(not the `authorshipGrounded` paths `:165-169`, which are dead for the spine and
+live only for `reviewer-work-author-resolver`).
+
+**Gate semantic = `spine.forenameAgrees !== false`, NOT `=== true`** (Codex-confirmed
+the difference is load-bearing): `classifySpineEvidence` is also reached by
+`reviewer-work-author-resolver.js:128-130` (`spine:{authorshipGrounded:true}`) and
+`contact-enrichment-service.js:735`, which leave `forenameAgrees` **undefined**.
+`=== true` would demote all of them; `!== false` blocks only an explicit
+disagreement (which only the Track-A spine produces). A wrong-forename Track-A row
+falls through to `unresolved` (not `ambiguous` — `ambiguous` is reserved for
+cross-source ORCID disagreement / multi-candidate conflict, `resolver.js:145`).
+The two backfill scripts (`scripts/backfill-lone-orcid-scholar.js`,
+`scripts/backfill-orcid-identity.js`) take the non-spine fallthrough and are
+unaffected. Initial-only recall cost accepted (documented abstain-not-mis-verify;
+PI-named-selectable S235 mitigates). Tests: 4 new in
+`tests/unit/reviewer-identity-resolver.test.js`.
 
 **Recall/safety tradeoff to flag:** gating on `forenameAgrees` will abstain on a
 real reviewer whose selected OpenAlex record carries only an initial (no full
