@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-verify-fail-dangerous
-description: "HAZARD (verified S231): the reviewer verify path confirmed a fabricated wrong-forename against a real same-initial namesake, no forename gate. LARGELY CLOSED S235-S236: forename gates now on BOTH verify paths (PubMed nameEvidence/hasFullForenameMatch demotes to unresolved; spine promotions classifySpineEvidence :172/:175 gated on forenameAgrees!==false). Principle still a forward guard for new identity work."
+description: "HAZARD (verified S231): the reviewer verify path confirmed a fabricated wrong-forename against a real same-initial namesake, no forename gate. LARGELY CLOSED S235-S236: forename gates now on BOTH verify paths (PubMed nameEvidence/hasFullForenameMatch demotes to unresolved; spine promotions classifySpineEvidence :172/:175 gated on forenameContradicts!==true — blocks a full-forename CONTRADICTION, not an initial-only record, after a same-session regression where forenameAgrees!==false over-blocked real reviewers stored as initials). Principle still a forward guard for new identity work."
 metadata:
   node_type: memory
   type: project
@@ -16,11 +16,20 @@ BOTH verify paths fail-close on a wrong forename:
   forename-match suggestion to `unresolved` (test `fabricated Alfred Laederach does
   not verify` in `discovery-verification-status.test.js`).
 - **Spine path (S236):** `classifySpineEvidence` promotions `:172` (confirmed) and
-  `:175` (probable) are gated on `spine.forenameAgrees !== false`
+  `:175` (probable) are gated on `spine.forenameContradicts !== true`
   ([[project-reviewer-field-aware-verification]] / `docs/REVIEWER_FIELD_AWARE_VERIFICATION_DESIGN.md`).
-  `!== false` (not `=== true`) so non-Track-A callers that leave forenameAgrees
-  undefined are unaffected. `forenameFullyAgrees` hard-fails initial-only records —
-  the accepted abstain-not-mis-verify cost (PI-named-selectable S235 mitigates).
+  **The gate blocks only a forename CONTRADICTION (both full + different, e.g.
+  "Alfred" vs "Alain"), NOT an initial-only record.** The first cut shipped
+  `forenameAgrees !== false`, which hard-failed initial-only records and demoted
+  REAL strongly-corroborated reviewers (Ursula Keller → OpenAlex "U. Keller",
+  Robert Sang → "R. T. Sang") from confirmed → unresolved despite
+  affiliation_match[strong] + orcid_employment_corroborated[strong] — a regression,
+  fixed same session. Rationale: these promotions already require affiliation_match
+  (the "2nd independent signal" that makes an initial-only match safe per the rule
+  below), so only an explicit full-forename contradiction should demote. `!== true`
+  so non-Track-A callers (forenameContradicts undefined) and initial-only records
+  both pass. The `:188` ORCID-employment-only path (no affiliation_match) keeps the
+  stricter `forenameAgrees === true`.
 This memory stays `active` because the **principle** (fail-closed forename gate;
 initial-only must not verify a full-name candidate without a 2nd signal) remains
 the guard for any future identity/name-matching/COI work.

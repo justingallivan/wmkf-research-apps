@@ -146,19 +146,23 @@ both, not just the probable path: the spine anchor builder never emits
 (not the `authorshipGrounded` paths `:165-169`, which are dead for the spine and
 live only for `reviewer-work-author-resolver`).
 
-**Gate semantic = `spine.forenameAgrees !== false`, NOT `=== true`** (Codex-confirmed
-the difference is load-bearing): `classifySpineEvidence` is also reached by
-`reviewer-work-author-resolver.js:128-130` (`spine:{authorshipGrounded:true}`) and
-`contact-enrichment-service.js:735`, which leave `forenameAgrees` **undefined**.
-`=== true` would demote all of them; `!== false` blocks only an explicit
-disagreement (which only the Track-A spine produces). A wrong-forename Track-A row
-falls through to `unresolved` (not `ambiguous` — `ambiguous` is reserved for
-cross-source ORCID disagreement / multi-candidate conflict, `resolver.js:145`).
-The two backfill scripts (`scripts/backfill-lone-orcid-scholar.js`,
-`scripts/backfill-orcid-identity.js`) take the non-spine fallthrough and are
-unaffected. Initial-only recall cost accepted (documented abstain-not-mis-verify;
-PI-named-selectable S235 mitigates). Tests: 4 new in
-`tests/unit/reviewer-identity-resolver.test.js`.
+**Gate semantic = `spine.forenameContradicts !== true`** (blocks a full-forename
+CONTRADICTION only — both names full and different, e.g. "Alfred" vs "Alain" — NOT
+an initial-only record). The first cut shipped `forenameAgrees !== false`, which
+hard-failed initial-only OpenAlex records and **regressed real, strongly-corroborated
+reviewers** (Ursula Keller → "U. Keller", Robert Sang → "R. T. Sang"): both had
+`affiliation_match[strong]` + `orcid_employment_corroborated[strong]` yet were demoted
+confirmed → unresolved. Fixed same session — these promotions already require
+affiliation_match (the "2nd independent signal" that the
+`[[project-reviewer-verify-fail-dangerous]]` rule says makes an initial-only match
+safe), so only an explicit contradiction should demote. `!== true` so non-Track-A
+callers (`reviewer-work-author-resolver.js:128-130`, `contact-enrichment-service.js:735`)
+that leave `forenameContradicts` **undefined** are unaffected. A contradicting Track-A
+row falls through to `unresolved` (not `ambiguous` — that's reserved for cross-source
+ORCID disagreement / multi-candidate conflict, `resolver.js:145`). The `:188`
+ORCID-employment-only path (no affiliation_match) keeps the stricter
+`forenameAgrees === true`. Tests in `tests/unit/reviewer-identity-resolver.test.js`
+(contradiction blocks; initial-only + strong anchors still confirms; undefined passes).
 
 **Recall/safety tradeoff to flag:** gating on `forenameAgrees` will abstain on a
 real reviewer whose selected OpenAlex record carries only an initial (no full

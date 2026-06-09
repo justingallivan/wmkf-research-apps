@@ -178,38 +178,51 @@ describe('resolveIdentity — OpenAlex/ORCID spine anchor rules', () => {
     expect(out.competitors[0].conflictingEvidence[0]).toMatch(/disagreed/);
   });
 
-  // S236 forename gate: a wrong-forename namesake must not be promoted on
-  // affiliation/topic alone, on EITHER the confirmed (:172) or probable (:176)
-  // path. The Track-A spine computes forenameAgrees as a boolean, so an explicit
-  // `false` blocks; other callers leave it undefined and are unaffected (`!== false`).
-  test('wrong forename blocks the confirmed affiliation+employment+topic promotion', () => {
+  // S236 forename gate: a CONTRADICTING-forename namesake ("Alfred" vs "Alain" —
+  // both full names, different) must not be promoted on affiliation/topic alone, on
+  // EITHER the confirmed (:172) or probable (:175) path. The gate is keyed on
+  // `forenameContradicts` (full+different), NOT on initial-only uncertainty, so a
+  // real reviewer stored as an initial in OpenAlex still verifies (the Keller/Sang
+  // regression fix). Non-spine callers leave it undefined → unaffected (`!== true`).
+  test('contradicting forename blocks the confirmed affiliation+employment+topic promotion', () => {
     const out = r({ name: 'John Smith' }, {
       identityAnchors: [aff('strong'), employment(), topic(), orcid()],
-      spine: { forenameAgrees: false },
+      spine: { forenameContradicts: true },
     });
-    expect(out.status).toBe('unresolved'); // was 'confirmed' before the gate
+    expect(out.status).toBe('unresolved'); // a full-forename contradiction → not verified
   });
 
-  test('wrong forename blocks the probable affiliation+topic promotion', () => {
+  test('contradicting forename blocks the probable affiliation+topic promotion', () => {
     const out = r({ name: 'John Smith' }, {
       identityAnchors: [aff('weak'), topic()],
-      spine: { forenameAgrees: false },
+      spine: { forenameContradicts: true },
     });
-    expect(out.status).toBe('unresolved'); // was 'probable' before the gate
+    expect(out.status).toBe('unresolved');
   });
 
-  test('agreeing forename still confirms (gate does not over-block)', () => {
-    const out = r({ name: 'Robert Sang' }, {
+  test('initial-only record (no contradiction) with strong anchors STILL confirms (Keller/Sang fix)', () => {
+    // OpenAlex stores "Ursula Keller" as "U. Keller" → forenameContradicts=false.
+    // Strong affiliation + ORCID-employment corroboration is the 2nd signal that
+    // makes the initial-only match safe; it must NOT be demoted to unresolved.
+    const out = r({ name: 'Ursula Keller' }, {
       identityAnchors: [aff('strong'), employment(), topic(), orcid()],
-      spine: { forenameAgrees: true },
+      spine: { forenameContradicts: false },
     });
     expect(out.status).toBe('confirmed');
   });
 
-  test('undefined forenameAgrees (non-Track-A callers) does NOT block promotion', () => {
+  test('agreeing forename still confirms', () => {
     const out = r({ name: 'Robert Sang' }, {
       identityAnchors: [aff('strong'), employment(), topic(), orcid()],
-      spine: {}, // forenameAgrees absent → undefined → not blocked
+      spine: { forenameContradicts: false },
+    });
+    expect(out.status).toBe('confirmed');
+  });
+
+  test('undefined forenameContradicts (non-Track-A callers) does NOT block promotion', () => {
+    const out = r({ name: 'Robert Sang' }, {
+      identityAnchors: [aff('strong'), employment(), topic(), orcid()],
+      spine: {}, // forenameContradicts absent → undefined → not blocked
     });
     expect(out.status).toBe('confirmed');
   });
