@@ -9,7 +9,7 @@
  *    descriptive fields fill-if-empty, affiliation → wmkf_primaryaffiliation.
  */
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
-import { setMatchReason, APPLICANT_DISPOSITION_EXCLUDED } from '../../lib/dataverse/adapters/reviewer-suggestion.js';
+import { setMatchReason, ensureStaffManualCandidate, APPLICANT_DISPOSITION_EXCLUDED } from '../../lib/dataverse/adapters/reviewer-suggestion.js';
 import { upsertByPotentialReviewer } from '../../lib/dataverse/adapters/researcher.js';
 
 function err412() { const e = new Error('Precondition Failed'); e.status = 412; return e; }
@@ -73,6 +73,85 @@ describe('reviewer-suggestion.setMatchReason — atomic match-reason write', () 
     const out = await setMatchReason('sug-5', 'reason');
     expect(out).toEqual({ updated: false, skippedExcluded: true });
     expect(patch).toHaveBeenCalledTimes(1); // only the first (failed) attempt
+  });
+});
+
+describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excluded wins', () => {
+  test('existing non-excluded row is re-selected and unions staff_manual without clobbering sources', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: 'sug-1',
+        wmkf_sources: 'pubmed,applicant',
+        wmkf_selected: false,
+        wmkf_applicantdisposition: null,
+        wmkf_suggestionlabel: 'Existing label',
+        wmkf_matchreason: 'Existing reason',
+      }],
+    });
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    const create = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue(undefined);
+
+    const out = await ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-1',
+      requestId: 'req-1',
+      suggestionLabel: 'New label',
+      matchReason: 'Manual note',
+    }, { actingUserSystemId: 'u1' });
+
+    expect(out).toEqual({ id: 'sug-1', created: false, selected: true });
+    expect(create).not.toHaveBeenCalled();
+    expect(patch).toHaveBeenCalledWith('wmkf_appreviewersuggestions', 'sug-1', {
+      wmkf_sources: 'pubmed,applicant,staff_manual',
+      wmkf_selected: true,
+    }, { actingUserSystemId: 'u1' });
+  });
+
+  test('existing excluded row is not resurrected', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: 'sug-ex',
+        wmkf_sources: 'applicant',
+        wmkf_selected: false,
+        wmkf_applicantdisposition: APPLICANT_DISPOSITION_EXCLUDED,
+      }],
+    });
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    const out = await ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-1',
+      requestId: 'req-1',
+    });
+
+    expect(out).toEqual({ id: 'sug-ex', created: false, selected: false, skippedExcluded: true });
+    expect(patch).not.toHaveBeenCalled();
+  });
+
+  test('new row writes staff_manual and request/person binds', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+    const create = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({
+      wmkf_appreviewersuggestionid: 'sug-new',
+    });
+
+    const out = await ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-2',
+      requestId: 'req-2',
+      suggestionLabel: 'Proposal — Reviewer',
+      grantCycleCode: 'J26',
+      programArea: 'Science',
+      matchReason: 'Manual note',
+    });
+
+    expect(out).toEqual({ id: 'sug-new', created: true, selected: true });
+    expect(create).toHaveBeenCalledWith('wmkf_appreviewersuggestions', expect.objectContaining({
+      wmkf_suggestionlabel: 'Proposal — Reviewer',
+      wmkf_grantcyclecode: 'J26',
+      wmkf_programarea: 'Science',
+      wmkf_matchreason: 'Manual note',
+      wmkf_sources: 'staff_manual',
+      wmkf_selected: true,
+      'wmkf_PotentialReviewer@odata.bind': '/wmkf_potentialreviewerses(pr-2)',
+      'wmkf_Request@odata.bind': '/akoya_requests(req-2)',
+    }), { actingUserSystemId: undefined });
   });
 });
 

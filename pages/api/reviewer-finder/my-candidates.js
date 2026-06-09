@@ -168,6 +168,9 @@ async function handleGet(req, res, access) {
       }
       const person = personById[s._wmkf_potentialreviewer_value] || {};
       const researcher = researcherByPerson[s._wmkf_potentialreviewer_value] || null;
+      const sources = typeof s.wmkf_sources === 'string'
+        ? s.wmkf_sources.split(',').map((x) => x.trim()).filter(Boolean)
+        : (s.wmkf_sources || []);
       byRequest[reqId].candidates.push({
         suggestionId: s.wmkf_appreviewersuggestionid,
         potentialReviewerId: s._wmkf_potentialreviewer_value || null,
@@ -192,15 +195,14 @@ async function handleGet(req, res, access) {
         totalCitations: researcher?.wmkf_totalcitations ?? null,
         relevanceScore: s.wmkf_relevancescore,
         reasoning: s.wmkf_matchreason,
-        sources: typeof s.wmkf_sources === 'string'
-          ? s.wmkf_sources.split(',').map((x) => x.trim()).filter(Boolean)
-          : (s.wmkf_sources || []),
+        sources,
         // Applicant-recommended (intake/applicant-reviewer ingestion) vs.
         // staff/Claude-discovered (null disposition). Excluded rows carry
         // wmkf_selected=false and never reach this selected-only list, so the
         // meaningful flag here is just "did the applicant suggest this person".
         applicantRecommended:
           s.wmkf_applicantdisposition === suggestionAdapter.APPLICANT_DISPOSITION_MAP.recommended,
+        manualAdded: sources.includes('staff_manual'),
         invited: !!s.wmkf_invited,
         accepted: !!s.wmkf_accepted,
         declined: !!s.wmkf_declined,
@@ -539,4 +541,3 @@ async function handleDelete(req, res, access) {
     });
   }
 }
-

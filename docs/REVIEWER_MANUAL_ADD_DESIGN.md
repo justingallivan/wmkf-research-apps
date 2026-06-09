@@ -1,7 +1,8 @@
 # Reviewer Workbench Manual Reviewer Add Design
 
-> **Status:** Design spec, drafted 2026-06-07. Pre-implementation. Live-state
-> claims are marked `[VERIFIED]`; design choices are marked `[PROPOSED]`.
+> **Status:** Phase 1 durable manual add shipped 2026-06-09. Manual enrichment
+> and web-suggestion integration remain deferred. Live-state claims are marked
+> `[VERIFIED]`; design choices are marked `[PROPOSED]`.
 >
 > **Objective:** Let a program director manually add a sparse reviewer candidate
 > (name required; email/affiliation optional) to a request's reviewer candidate
@@ -131,16 +132,17 @@ If an existing row for the same `(potentialReviewer, request)` exists:
 `[PROPOSED]` Add a distinct provenance concept for staff manual candidates.
 There are two implementation options:
 
-1. Preferred: extend `lib/utils/reviewer-provenance.js` with
-   `PROVENANCE_KINDS.STAFF_MANUAL = 'staff_manual'`, normalize
-   `staff_manual` as a valid source, and render it as "Manually added."
-2. Minimum viable: persist `wmkf_sources=staff_manual` and render a manual badge
-   from the sources array in `my-candidates` / `CandidatesPanel`, deferring the
-   full provenance DTO extension.
+1. Shipped Phase 1: persist `wmkf_sources=staff_manual`, expose `manualAdded`
+   from `my-candidates`, and render a manual badge in `CandidatesPanel`,
+   deferring the full provenance DTO extension.
+2. Deferred: extend `lib/utils/reviewer-provenance.js` with a first-class
+   `PROVENANCE_KINDS.STAFF_MANUAL = 'staff_manual'`, normalize `staff_manual`
+   as a valid source, and route/search-group it deliberately once the broader
+   provenance migration is ready.
 
-The preferred option is cleaner because it avoids overloading
-`applicant_suggested` and keeps "manual seed" separate from
-`barred_parametric`.
+The Phase 1 choice avoids cutting across the active Find-tab provenance grouping
+and identity-review gates. Manual rows are durable Candidates-tab rows, not
+search-result rows.
 
 ## API Design
 
@@ -178,7 +180,8 @@ Response:
 
 Route contract:
 
-- `requireAppAccess(req, res, 'reviewers')`.
+- `requireAppAccess(req, res, 'reviewer-finder', 'reviewers')`, matching the
+  adjacent candidate-pool routes reachable from the Workbench.
 - Rate-limit like other Workbench mutation routes.
 - Validate `requestId` as GUID before any OData use.
 - Require `name` after trimming; cap length.
@@ -323,14 +326,16 @@ flowchart TD
 
 ### Phase 1 - Durable Manual Add
 
-- Add `pages/api/workbench/manual-reviewer.js`.
-- Add adapter helper if needed: `ensureStaffManualCandidate` in
-  `lib/dataverse/adapters/reviewer-suggestion.js`, or use `upsert` with a small
-  source-union wrapper.
-- Add Find-tab UI form and refresh Candidates after success.
-- Add manual badge in `CandidatesPanel`.
-- Update `my-candidates` DTO to expose `manualAdded`.
-- Update `docs/API_ROUTE_SECURITY_MATRIX.md` and Atlas docs for the new route.
+- `[VERIFIED]` Added `pages/api/workbench/manual-reviewer.js`.
+- `[VERIFIED]` Added adapter helper `ensureStaffManualCandidate` in
+  `lib/dataverse/adapters/reviewer-suggestion.js` so existing sources are
+  unioned, excluded rows fail closed, and explicit staff re-add can reselect a
+  non-excluded row.
+- `[VERIFIED]` Added Find-tab UI form and refresh Candidates after success.
+- `[VERIFIED]` Added manual badge in `CandidatesPanel`.
+- `[VERIFIED]` Updated `my-candidates` DTO to expose `manualAdded`.
+- `[VERIFIED]` Updated `docs/API_ROUTE_SECURITY_MATRIX.md` and Atlas docs for
+  the new route.
 
 ### Phase 2 - Manual Enrichment
 

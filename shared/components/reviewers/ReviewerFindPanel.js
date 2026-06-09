@@ -34,7 +34,7 @@
  *   panel is request-scoped by requestId and all ingestion APIs stay org-open.)
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card } from '../Layout';
 import ReviewerSearchSection from './ReviewerSearchSection';
 
@@ -47,9 +47,20 @@ function fileKeyOf(f) {
   return `${f.library}::${f.folder}::${f.name}`;
 }
 
-export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSaved }) {
+export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSaved, canManage = true }) {
+  const requestIdRef = useRef(requestId);
+  requestIdRef.current = requestId;
   const [ingest, setIngest] = useState({ loading: true, data: null, error: null });
   const [doc, setDoc] = useState({ loading: true, data: null, error: null });
+  const [manual, setManual] = useState({
+    name: '',
+    email: '',
+    affiliation: '',
+    note: '',
+    saving: false,
+    error: null,
+    added: null,
+  });
 
   const runIngestion = useCallback(async () => {
     if (!requestId) return;
@@ -94,6 +105,53 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
 
   useEffect(() => { runIngestion(); }, [runIngestion]);
   useEffect(() => { loadProposal(); }, [loadProposal]);
+
+  const updateManual = (field, value) => {
+    setManual((prev) => ({ ...prev, [field]: value, error: null, added: null }));
+  };
+
+  const addManualReviewer = async (ev) => {
+    ev.preventDefault();
+    if (!requestId || manual.saving) return;
+    const name = manual.name.trim();
+    if (!name) {
+      setManual((prev) => ({ ...prev, error: 'Name is required.' }));
+      return;
+    }
+    setManual((prev) => ({ ...prev, saving: true, error: null, added: null }));
+    const submittedRequestId = requestId;
+    try {
+      const res = await fetch('/api/workbench/manual-reviewer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId,
+          name,
+          email: manual.email.trim() || undefined,
+          affiliation: manual.affiliation.trim() || undefined,
+          note: manual.note.trim() || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `Could not add reviewer (${res.status})`);
+      }
+      if (requestIdRef.current !== submittedRequestId) return;
+      setManual({
+        name: '',
+        email: '',
+        affiliation: '',
+        note: '',
+        saving: false,
+        error: null,
+        added: data.candidate || { name },
+      });
+      if (onSaved) onSaved();
+    } catch (e) {
+      if (requestIdRef.current !== submittedRequestId) return;
+      setManual((prev) => ({ ...prev, saving: false, error: e.message }));
+    }
+  };
 
   const data = ingest.data;
   const recommended = data?.recommended || [];
@@ -175,6 +233,77 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
             </select>
           </div>
         )}
+      </Card>
+
+      <Card hover={false}>
+        <div className="flex items-center justify-between mb-2">
+          <p className="font-medium text-gray-900">Add reviewer</p>
+          {manual.saving && <Spinner />}
+        </div>
+        <form onSubmit={addManualReviewer} className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <label className="block">
+              <span className="block text-xs text-gray-500 mb-1">Name</span>
+              <input
+                type="text"
+                value={manual.name}
+                onChange={(ev) => updateManual('name', ev.target.value)}
+                disabled={!canManage || manual.saving}
+                maxLength={180}
+                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white disabled:bg-gray-50"
+                required
+              />
+            </label>
+            <label className="block">
+              <span className="block text-xs text-gray-500 mb-1">Email</span>
+              <input
+                type="email"
+                value={manual.email}
+                onChange={(ev) => updateManual('email', ev.target.value)}
+                disabled={!canManage || manual.saving}
+                maxLength={254}
+                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white disabled:bg-gray-50"
+              />
+            </label>
+            <label className="block">
+              <span className="block text-xs text-gray-500 mb-1">Affiliation</span>
+              <input
+                type="text"
+                value={manual.affiliation}
+                onChange={(ev) => updateManual('affiliation', ev.target.value)}
+                disabled={!canManage || manual.saving}
+                maxLength={500}
+                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white disabled:bg-gray-50"
+              />
+            </label>
+          </div>
+          <label className="block">
+            <span className="block text-xs text-gray-500 mb-1">Note</span>
+            <textarea
+              value={manual.note}
+              onChange={(ev) => updateManual('note', ev.target.value)}
+              disabled={!canManage || manual.saving}
+              maxLength={1000}
+              rows={2}
+              className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white disabled:bg-gray-50"
+            />
+          </label>
+          <div className="flex items-center gap-3">
+            <button
+              type="submit"
+              disabled={!canManage || manual.saving || !manual.name.trim()}
+              className="px-3 py-1.5 bg-gray-900 text-white rounded text-sm disabled:opacity-50"
+            >
+              {manual.saving ? 'Adding...' : 'Add reviewer'}
+            </button>
+            {manual.error && <span className="text-sm text-red-700">{manual.error}</span>}
+            {manual.added && (
+              <span className="text-sm text-green-700">
+                Added {manual.added.name || 'reviewer'} to Candidates.
+              </span>
+            )}
+          </div>
+        </form>
       </Card>
 
       {/* In-panel candidate search — uses the proposal already loaded above and

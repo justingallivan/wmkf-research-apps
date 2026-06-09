@@ -14,7 +14,7 @@
  *   - requestId
  *   - candidates : [{ suggestionId, name, affiliation, email, hIndex, totalCitations,
  *                     relevanceScore, reasoning, keywords, website, googleScholarUrl,
- *                     googleScholarId, orcidUrl, applicantRecommended, invited, accepted,
+ *                     googleScholarId, orcidUrl, applicantRecommended, manualAdded, invited, accepted,
  *                     declined, emailSentAt, responseType }]
  *
  * Each candidate carries the persisted selection rationale (reasoning) + metrics
@@ -41,6 +41,10 @@ function StatusChip({ c }) {
   const label = c.declined ? 'Declined' : c.accepted ? 'Accepted' : c.invited ? 'Invited — awaiting response' : 'Not invited';
   const tone = c.declined ? tones.declined : c.accepted ? tones.accepted : c.invited ? tones.invited : tones.none;
   return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tone}`}>{label}</span>;
+}
+
+function isManualAdded(c) {
+  return c.manualAdded === true || (Array.isArray(c.sources) && c.sources.includes('staff_manual'));
 }
 
 export default function CandidatesPanel({ requestId, candidates = [], loading = false, onRefresh, settings = {}, canManage = true }) {
@@ -147,6 +151,14 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
                           title="Recommended by the applicant on their proposal"
                         >
                           Applicant-suggested
+                        </span>
+                      )}
+                      {isManualAdded(c) && (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 whitespace-nowrap"
+                          title="Manually added by staff for this request"
+                        >
+                          Manually added
                         </span>
                       )}
                     </span>
