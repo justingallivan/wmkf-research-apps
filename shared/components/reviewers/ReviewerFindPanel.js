@@ -63,6 +63,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
     added: null,
     lookingUp: false,
     lookupMsg: null, // { tone: 'ok' | 'warn', text }
+    orcidAutofilled: false, // true iff the orcid field was set by a lookup (not typed)
   });
 
   const runIngestion = useCallback(async () => {
@@ -110,12 +111,27 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
   useEffect(() => { loadProposal(); }, [loadProposal]);
 
   const updateManual = (field, value) => {
-    setManual((prev) => ({ ...prev, [field]: value, error: null, added: null, lookupMsg: null }));
+    setManual((prev) => {
+      const next = { ...prev, [field]: value, error: null, added: null, lookupMsg: null };
+      if (field === 'orcid') {
+        // The PD typed the ORCID directly — it's no longer a lookup result.
+        next.orcidAutofilled = false;
+      } else if ((field === 'name' || field === 'email' || field === 'affiliation') && prev.orcidAutofilled) {
+        // An identity field changed after a lookup auto-filled the ORCID — that
+        // iD may now belong to a different person. Drop it so a stale ORCID can't
+        // be saved against the wrong human (Codex F3). A PD-typed ORCID is left
+        // intact (orcidAutofilled is false in that case).
+        next.orcid = '';
+        next.orcidAutofilled = false;
+      }
+      return next;
+    });
   };
 
   const freshManual = (over = {}) => ({
     name: '', email: '', affiliation: '', orcid: '', note: '',
     saving: false, error: null, added: null, lookingUp: false, lookupMsg: null,
+    orcidAutofilled: false,
     ...over,
   });
 
@@ -124,47 +140,64 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
   // (message only, nothing attached) when ambiguous or not found, so a wrong
   // namesake's iD is never silently filled in.
   const lookupOrcid = async () => {
-    const name = manual.name.trim();
-    if (!name || manual.lookingUp) return;
+    const submittedName = manual.name.trim();
+    const submittedEmail = manual.email.trim().toLowerCase();
+    if (!submittedName || manual.lookingUp) return;
     setManual((prev) => ({ ...prev, lookingUp: true, lookupMsg: null }));
     const submittedRequestId = requestId;
+
+    // Apply the lookup result only if the form still matches what we searched
+    // for. Staff may edit name/email while this request is in flight; a late
+    // result for name A must not land on form B. We always clear the in-flight
+    // flag (so the button re-enables) but skip the orcid/message on a stale form.
+    const apply = (compute) => setManual((prev) => {
+      if (prev.name.trim() !== submittedName) return { ...prev, lookingUp: false };
+      return { ...prev, lookingUp: false, ...compute() };
+    });
+
     try {
       const res = await fetch('/api/workbench/orcid-lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name,
+          name: submittedName,
           affiliation: manual.affiliation.trim() || undefined,
-          email: manual.email.trim() || undefined,
+          email: submittedEmail || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (requestIdRef.current !== submittedRequestId) return;
       if (data.found && data.orcid) {
-        const where = data.matchedInstitution ? ` · ${data.matchedInstitution}` : '';
-        const corro = data.institutionCorroborated ? ' (institution matches)' : '';
-        setManual((prev) => ({
-          ...prev,
-          orcid: data.orcid,
-          lookingUp: false,
-          lookupMsg: { tone: 'ok', text: `Found ${data.matchedName || name}${where}${corro}. Confirm it's the right person before adding.` },
-        }));
+        // If staff typed an email and the matched ORCID record's public email
+        // disagrees, that's a wrong-person signal — do NOT auto-fill. Surface it
+        // and let staff verify, then enter the iD by hand if it really is them.
+        const emailMismatch = !!(submittedEmail && data.recordEmail && !data.emailMatches);
+        if (emailMismatch) {
+          apply(() => ({
+            lookupMsg: { tone: 'warn', text: `Found ${data.matchedName || submittedName}, but its public ORCID email (${data.recordEmail}) doesn't match the email you entered — not filled. Verify it's the right person, then enter the ORCID iD manually if so.` },
+          }));
+        } else {
+          const where = data.matchedInstitution ? ` · ${data.matchedInstitution}` : '';
+          const corro = data.institutionCorroborated ? ' (institution matches)' : '';
+          const emailOk = data.emailMatches ? ' · email matches' : '';
+          apply(() => ({
+            orcid: data.orcid,
+            orcidAutofilled: true,
+            lookupMsg: { tone: 'ok', text: `Found ${data.matchedName || submittedName}${where}${corro}${emailOk}. Confirm it's the right person before adding.` },
+          }));
+        }
       } else if (data.ambiguous) {
-        setManual((prev) => ({
-          ...prev,
-          lookingUp: false,
+        apply(() => ({
           lookupMsg: { tone: 'warn', text: `Multiple possible matches${data.candidateCount ? ` (${data.candidateCount})` : ''} — none attached. Add an affiliation to disambiguate, or enter the ORCID iD manually.` },
         }));
       } else {
-        setManual((prev) => ({
-          ...prev,
-          lookingUp: false,
+        apply(() => ({
           lookupMsg: { tone: 'warn', text: data.reason || 'No confident ORCID match found. Enter it manually if you have it.' },
         }));
       }
     } catch {
       if (requestIdRef.current !== submittedRequestId) return;
-      setManual((prev) => ({ ...prev, lookingUp: false, lookupMsg: { tone: 'warn', text: 'ORCID lookup failed. Try again or enter it manually.' } }));
+      apply(() => ({ lookupMsg: { tone: 'warn', text: 'ORCID lookup failed. Try again or enter it manually.' } }));
     }
   };
 

@@ -121,7 +121,14 @@ describe('write contract', () => {
       affiliation: 'Example University',
       whyChosen: 'Prior panelist.',
     }), { actingUserSystemId: 'u-1' });
-    expect(updateById).toHaveBeenCalledWith('pr-1', { emailSource: 'manual' }, { actingUserSystemId: 'u-1' });
+    // emailSource is now fill-only via upsertByPotentialReviewer, not an
+    // unconditional updateById overwrite (finding 5).
+    expect(updateById).not.toHaveBeenCalled();
+    expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+      'pr-1',
+      expect.objectContaining({ emailSource: 'manual' }),
+      { actingUserSystemId: 'u-1' },
+    );
     expect(ensureStaffManualCandidate).toHaveBeenCalledWith(expect.objectContaining({
       potentialReviewerId: 'pr-1',
       requestId: REQ,
@@ -139,10 +146,11 @@ describe('write contract', () => {
     await handler(post({ requestId: REQ, name: 'Grace Hopper' }), r);
     expect(r.statusCode).toBe(200);
     expect(updateById).not.toHaveBeenCalled();
+    expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
     expect(r.body.candidate.invitable).toBe(false);
   });
 
-  it('409s when an excluded row wins', async () => {
+  it('409s when an excluded row wins, without any identity-bearing person write', async () => {
     ensureStaffManualCandidate.mockResolvedValueOnce({
       id: 'sug-excluded',
       created: false,
@@ -150,9 +158,19 @@ describe('write contract', () => {
       skippedExcluded: true,
     });
     const r = res();
-    await handler(post({ requestId: REQ, name: 'Ada Lovelace' }), r);
+    // Include email + ORCID so the test proves the exclusion gate fires BEFORE
+    // those writes (finding 4): a rejected re-add must not relabel emailSource
+    // or fill ORCID on the global person row.
+    await handler(post({
+      requestId: REQ,
+      name: 'Ada Lovelace',
+      email: 'ada@example.edu',
+      orcid: '0000-0002-1825-0097',
+    }), r);
     expect(r.statusCode).toBe(409);
     expect(r.body.code).toBe('applicant_excluded');
+    expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
+    expect(updateById).not.toHaveBeenCalled();
   });
 });
 

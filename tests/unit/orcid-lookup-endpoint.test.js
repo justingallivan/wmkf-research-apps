@@ -89,6 +89,31 @@ describe('lookup results', () => {
     });
   });
 
+  it('flags an entered email that disagrees with the ORCID record email', async () => {
+    findContact.mockResolvedValueOnce({
+      status: 'resolved',
+      orcidId: '0000-0002-1825-0097',
+      name: 'Josiah Carberry',
+      email: 'jc@brown.edu',
+    });
+    const r = res();
+    await handler(post({ name: 'Josiah Carberry', email: 'someone-else@elsewhere.edu' }), r);
+    expect(r.statusCode).toBe(200);
+    expect(r.body).toMatchObject({
+      found: true,
+      orcid: '0000-0002-1825-0097',
+      recordEmail: 'jc@brown.edu',
+      emailMatches: false,
+    });
+  });
+
+  it('passes strictAmbiguity:true so the manual path abstains on contactable-only ties', async () => {
+    findContact.mockResolvedValueOnce(null);
+    const r = res();
+    await handler(post({ name: 'John Smith' }), r);
+    expect(findContact).toHaveBeenCalledWith(expect.objectContaining({ strictAmbiguity: true }));
+  });
+
   it('reports ambiguous without attaching an ORCID', async () => {
     findContact.mockResolvedValueOnce({ status: 'ambiguous', orcidId: null, candidateCount: 3 });
     const r = res();

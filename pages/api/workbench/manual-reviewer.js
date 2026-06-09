@@ -82,20 +82,13 @@ export default async function handler(req, res) {
         whyChosen: matchReason,
       }, { actingUserSystemId });
 
-      if (email) {
-        await researcherAdapter.updateById(potentialReviewerId, { emailSource: 'manual' }, { actingUserSystemId });
-      }
-
-      // A staff-provided ORCID (looked up via /orcid-lookup or typed) is persisted
-      // FILL-ONLY — upsertByPotentialReviewer writes wmkf_orcid/wmkf_orcidurl only
-      // when absent, so it never overwrites a resolver-sourced or reviewer-attested
-      // (sticky `confirmed`) ORCID, and it never touches wmkf_identitystatus. Staff
-      // input here is lower-trust than a reviewer self-report.
-      const orcidUrl = orcid ? `https://orcid.org/${orcid}` : null;
-      if (orcid) {
-        await researcherAdapter.upsertByPotentialReviewer(potentialReviewerId, { orcid, orcidUrl }, { actingUserSystemId });
-      }
-
+      // Resolve the per-request candidate row FIRST, so the applicant-exclusion
+      // gate fires before any identity-bearing enrichment write below. If this
+      // reviewer is excluded for this request we return 409 without touching the
+      // person's contact metadata (emailSource / ORCID). The fill-only person
+      // upsert above is acceptable on an excluded reviewer — they are a real human
+      // and exclusion is per-request, not a global "never record" — but we stop
+      // short of relabeling or filling contact identity for a row we're rejecting.
       const suggestion = await reviewerSuggestionAdapter.ensureStaffManualCandidate({
         potentialReviewerId,
         requestId,
@@ -111,6 +104,22 @@ export default async function handler(req, res) {
           code: 'applicant_excluded',
           suggestionId: suggestion.id,
         });
+      }
+
+      // Fill-only contact/identity enrichment on the global person row. Both
+      // emailSource and a staff-provided ORCID (looked up via /orcid-lookup or
+      // typed) go through upsertByPotentialReviewer, which writes each field ONLY
+      // when the existing value is empty. So staff input — lower-trust than a
+      // reviewer self-report — never overwrites a resolver-sourced or
+      // reviewer-attested (sticky `confirmed`) email source / ORCID, and
+      // wmkf_identitystatus is never touched. Single round-trip.
+      const orcidUrl = orcid ? `https://orcid.org/${orcid}` : null;
+      if (email || orcid) {
+        await researcherAdapter.upsertByPotentialReviewer(potentialReviewerId, {
+          emailSource: email ? 'manual' : undefined,
+          orcid: orcid || undefined,
+          orcidUrl: orcidUrl || undefined,
+        }, { actingUserSystemId });
       }
 
       return res.status(200).json({
