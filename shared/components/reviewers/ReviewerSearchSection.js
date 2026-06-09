@@ -298,14 +298,18 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
           )}
 
           <div className="mt-2 flex items-center gap-3">
-            {pubs.length > 0 && (
+            {!identityUnverified && pubs.length > 0 && (
               <button type="button" onClick={() => setExpanded((v) => !v)} className="text-xs text-blue-600 hover:text-blue-800" aria-expanded={expanded}>
                 {expanded ? 'Show less' : `View ${pubs.length} recent paper${pubs.length === 1 ? '' : 's'}`}
               </button>
             )}
-            <a href={scholarUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1" title={hasRealScholar ? 'Open this researcher’s Google Scholar profile' : 'Search Google Scholar for this researcher'}>
-              🎓 {hasRealScholar ? 'Scholar Profile' : 'Scholar Search'}
-            </a>
+            {/* Scholar profile/search link suppressed for selectable-but-unverified rows — it
+                would nudge staff toward a possibly-wrong namesake profile (Codex re-review LOW). */}
+            {!identityUnverified && (
+              <a href={scholarUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1" title={hasRealScholar ? 'Open this researcher’s Google Scholar profile' : 'Search Google Scholar for this researcher'}>
+                🎓 {hasRealScholar ? 'Scholar Profile' : 'Scholar Search'}
+              </a>
+            )}
             {onExclude && (
               <button
                 type="button"
