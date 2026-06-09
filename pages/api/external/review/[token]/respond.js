@@ -81,10 +81,12 @@ function validateContactEdits(edits) {
 }
 
 // Reviewer mailing-address caps (chunk-4). Address is PATCHed to contact.address1_*
-// and fed to BILL vendor onboarding. Absent address is allowed here (the honorarium
-// row + provenance are still created; BILL onboarding degrades/alerts on missing
-// address); a malformed/oversized field returns a clean 400.
-const ADDRESS_MAX = { line1: 200, line2: 200, city: 100, state: 100, postalCode: 20, country: 2 };
+// (phone → address1_telephone1) and fed to BILL vendor onboarding. Absent address is
+// allowed here (the honorarium row + provenance are still created; BILL onboarding
+// degrades/alerts on missing address); a malformed/oversized field returns a clean 400.
+// `phone` is required client-side (Stage2aView) for manual-payment contact this cycle;
+// server stays lenient on emptiness, consistent with the other address fields.
+const ADDRESS_MAX = { line1: 200, line2: 200, city: 100, state: 100, postalCode: 20, country: 2, phone: 40 };
 function validateAddress(address) {
   if (address === undefined || address === null) return null;
   if (typeof address !== 'object' || Array.isArray(address)) return { reason: 'invalid_address' };

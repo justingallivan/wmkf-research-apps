@@ -23,7 +23,7 @@ function baseArgs(overrides = {}) {
     suggestion: { wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_honorariumrequest_value: null, ...overrides.suggestion },
     request: { akoya_requestid: 'req-1', akoya_requestnum: 'REQ-001', wmkf_meetingdate: '2026-06-04T00:00:00Z', ...overrides.request },
     reviewer: { wmkf_potentialreviewersid: 'pr-1', wmkf_name: 'Jane Q. Reviewer', wmkf_emailaddress: 'jane@uni.edu', _wmkf_contact_value: 'contact-1', ...overrides.reviewer },
-    body: { address: { line1: '1 Lab Rd', city: 'Sci City', state: 'CA', postalCode: '90001', country: 'US' }, ...overrides.body },
+    body: { address: { line1: '1 Lab Rd', city: 'Sci City', state: 'CA', postalCode: '90001', country: 'US', phone: '+1 555 0100' }, ...overrides.body },
   };
 }
 
@@ -63,6 +63,7 @@ describe('ensureHonorariumOnboarding', () => {
       reviewerContactId: 'contact-1',
       reviewerName: 'Jane Q. Reviewer',
       reviewerEmail: 'jane@uni.edu',
+      reviewerPhone: '+1 555 0100',
       address: expect.objectContaining({ line1: '1 Lab Rd', zipOrPostalCode: '90001', country: 'US', state: 'CA' }),
     }));
     expect(res.honorariumRequestId).toBe(`det-${SUGGESTION_ID}`);
@@ -128,6 +129,7 @@ describe('ensureHonorariumOnboarding', () => {
     expect(addrCall[2]).toMatchObject({
       address1_line1: '1 Lab Rd', address1_city: 'Sci City',
       address1_stateorprovince: 'CA', address1_postalcode: '90001', address1_country: 'US',
+      address1_telephone1: '+1 555 0100',
     });
   });
 

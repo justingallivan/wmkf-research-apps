@@ -1,11 +1,11 @@
 ---
 name: Reviewer honorarium onboarding (portal-integrated)
-description: Reviewer portal accept-action creates the honorarium akoya_request + triggers BILL.com onboarding inline. Extends already-shipped Stage 2a. Targets ready 2026-06-10; reviewers ≥ 2026-06-17. Approved by Ops 2026-05-23; design doc has 6 Connor questions + 1 informational.
+description: Reviewer portal accept-action creates the honorarium akoya_request + (when enabled) triggers BILL.com onboarding inline. Extends already-shipped Stage 2a. AUTOMATED BILL ONBOARDING DEFERRED for the current cycle by leadership (2026-06-09) — re-enable NEXT cycle. Code intact behind reversible BILL_ONBOARDING_DEFERRED gate; honorarium row + mailing-address(+phone) capture still run.
 metadata:
   type: project
   status: active
   scope: bill
-  last_verified: S209 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-06-09 — code re-grounded (chunk 5 shipped; deferral gate added)
 ---
 
 ## Recall Rule
@@ -20,7 +20,15 @@ Do:
 Do not:
 - Reintroduce PA-trigger / shared-secret (Q3) framing — that path is closed.
 - Use `wmkf_honorariumforrequest` — it's a dead variant.
-- Rebuild shipped chunks (lib/bill primitives, chunk-4 orchestrator, webhook scaffold); chunk 5 (address UI) and 7b (webhook dispatch) are the pending pieces.
+- Rebuild shipped chunks (lib/bill primitives, chunk-4 orchestrator, chunk-5 address UI, webhook dispatch). Chunk 5 (address UI) SHIPPED (commits `96baeb2` + `b4c91f0`); webhook event-dispatch built. Only remaining gap is e2e against the BILL sandbox (chunk 8, blocked on Steph) — and that is moot for THIS cycle (see deferral below).
+- **DON'T re-enable BILL this cycle.** Leadership deferred automated bill.com onboarding to NEXT cycle (2026-06-09). The gate is on; flipping it back on is a next-cycle action, not a "finish the integration" task.
+
+**⚠️ CURRENT-CYCLE STATUS (2026-06-09): automated BILL onboarding DEFERRED by leadership.** Re-enable NEXT cycle. Implemented as a reversible gate, NOT a teardown — no BILL code removed:
+- `lib/bill/onboard-reviewer-service.js` short-circuits to `status: 'deferred'` (no BILL call, **no alert**) when `process.env.BILL_ONBOARDING_DEFERRED === 'true'`. Distinct from `alert_only` ("BILL not wired yet, onboard by hand"); deferred = no BILL onboarding at all this cycle, payment handled manually offline.
+- The honorarium `akoya_request` create + mailing-address PATCH still run on accept (orchestrator steps 2–3), so the $250 payment record is intact — paid manually this cycle (Excel-style, per [[akoya-request-honorarium-nomenclature]]).
+- **Phone now required + collected** in the Stage 2a payment-address card (`shared/components/external/Stage2aView.js`), validated server-side (`respond.js` `ADDRESS_MAX.phone`), persisted to `contact.address1_telephone1` (orchestrator `patchContactAddress`), and carried as `reviewerPhone` on the BILL payload next cycle (orchestrator reads `body.address.phone`).
+- **Re-enable next cycle:** unset `BILL_ONBOARDING_DEFERRED`, set BILL creds + option-set values, flip `BILL_ENABLED=true`. Confirm `HONORARIUM_*_ID` discriminator GUIDs are set (honorarium-create needs them regardless of BILL).
+- Shipped on branch `feat/reviewer-onboarding-no-bill-this-cycle`.
 
 Ground truth: `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`, `docs/BILL_CHUNK_4_DESIGN.md`, `docs/BILL_LIB_DESIGN.md`; `lib/bill/*`. Related: [[akoya-payment-field-semantics]], [[akoya-request-honorarium-nomenclature]], [[project-external-reviewer-file-access]].
 
@@ -57,7 +65,7 @@ Sequencing between is flexible and depends on Connor's Q5 schema add + Steph's B
 - ~~1: Connor schema add (Q5)~~ **SHIPPED 2026-05-28** — `wmkf_HonorariumRequest` lookup on `wmkf_appreviewersuggestion` → `akoya_request` (Connor moved it to the junction, not on `akoya_request`; provenance to the grant is one hop via `wmkf_Request`).
 - ~~2-3: `lib/bill.js` + unit tests against mock~~ **SHIPPED S188** — primitives at `lib/bill/{index,session,classify,errors,redact}.js` (vendor / network / invitation / webhook-verify); see `docs/BILL_LIB_DESIGN.md` v3.
 - ~~4: extend `respond.js` accept path~~ **SHIPPED S199 (2026-05-29, commits 7cb8bc4 + 290ba68)** — `lib/bill/honorarium-onboard-orchestrator.js` (promote-on-accept + address PATCH + idempotent honorarium create w/ DETERMINISTIC uuidv5 GUID per suggestion + junction PATCH + in-process `onboardReviewer()` call). Plus **amount-as-Dataverse-setting** (`honorarium.default_amount` in `wmkf_appsystemsettings`, `lib/services/honorarium-config.js`, admin UI, per-user pref removed) + **Full-real-fix hardening** (`bill_onboarding_state` table migration 017, reserve-before-create, vendorId-before-contact-PATCH, torn-state resume sweep + stuck reconcile). Design: `docs/BILL_CHUNK_4_DESIGN.md`. Codex pre+post-impl reviewed.
-- 5: extend Stage 2a accept UI with address inputs — **STILL PENDING** (respond.js accepts/validates `body.address` server-side already; the UI form fields are not built. Address is optional server-side — honorarium row + provenance create without it; BILL onboard degrades/alerts on missing address).
+- ~~5: extend Stage 2a accept UI with address inputs~~ **SHIPPED** (`96baeb2` + `b4c91f0`) — `shared/components/external/Stage2aView.js` payment-address card (line1/line2/city/state/postalCode/country ISO-2). **Phone field added 2026-06-09** (required; persisted to `contact.address1_telephone1`). Address is required client-side when taking the honorarium; still optional server-side (honorarium row + provenance create without it; the BILL onboard — when enabled — degrades/alerts on missing address).
 - ~~6: `/api/bill/onboard-reviewer` endpoint~~ **SHIPPED S189** (chunk-4 calls `onboardReviewer()` in-process, not via HTTP — see design doc deviation note).
 - ~~7a: `/api/webhooks/bill` scaffold~~ **SHIPPED S188** at `pages/api/webhooks/bill.js`; event-dispatch + Dataverse PATCH (7b) still pending.
 - 8: end-to-end test against BILL sandbox — blocked on Steph's sandbox provisioning.
@@ -69,7 +77,7 @@ Sequencing between is flexible and depends on Connor's Q5 schema add + Steph's B
 **External (operator-side, parallel):**
 - BILL.com sandbox via Steph (Director of Operations) + BILL.com support
 - Vercel env vars: `BILL_DEV_KEY`, `BILL_USERNAME`, `BILL_PASSWORD`, `BILL_ORG_ID`, `BILL_BASE_URL`, `BILL_WEBHOOK_SECRET`
-- **Fallback if sandbox isn't ready by ~June 7:** ship in "alert-only mode" — portal creates honorarium, emails Steph "manual BILL onboarding needed"; flip on real BILL calls when sandbox lands.
+- **Fallback if sandbox isn't ready by ~June 7:** ship in "alert-only mode" — portal creates honorarium, emails Steph "manual BILL onboarding needed"; flip on real BILL calls when sandbox lands. **[SUPERSEDED 2026-06-09 — leadership deferred automated BILL onboarding to next cycle; this cycle uses the silent `BILL_ONBOARDING_DEFERRED` gate (no alert), not alert-only. See current-cycle status block above.]**
 
 **Why:** Ops team meeting 2026-05-23 approved BILL integration. Pre-existing BILL integration (AkoyaGO for institutional grantee payouts) means legal/policy posture is already established — no new financial connector, no new data category. Skipping GOapply entirely (not just for honoraria onboarding, but for the whole reviewer-payment-info flow) removes a UX hop AND a dependency we don't control.
 
