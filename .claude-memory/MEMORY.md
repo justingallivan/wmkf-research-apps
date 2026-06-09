@@ -82,6 +82,7 @@
 - Planned: post-award + new AI capabilities: project-awardee-onboarding.md; project-new-ai-capabilities.md
 - IRS verify-EIN (code+data shipped, cron unfired, no consumer yet): project-irs-exempt-verification.md
 - Decision log: decision-module-typeless-warning-accept.md
+- Deferred code cleanup backlog (read at START of any cleanup/dead-code session; inert-but-not-yet-deleted code + safe-retirement preconditions; append here instead of deleting inline): project-deferred-code-cleanup.md
 
 ## User Context
 - Power Automate familiarity (Justin none / Connor moderate): user-powerautomate.md
