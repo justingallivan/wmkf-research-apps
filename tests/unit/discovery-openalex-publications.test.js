@@ -10,6 +10,50 @@
 const { DiscoveryService } = require('../../lib/services/discovery-service');
 const { OpenAlexService } = require('../../lib/services/openalex-service');
 
+describe('DiscoveryService.dedupePublicationsByTitle (shared PubMed + OpenAlex dedup)', () => {
+  test('collapses same-title duplicates, preserving first-seen order', () => {
+    const out = DiscoveryService.dedupePublicationsByTitle([
+      { title: 'Paper A', year: 2025 },
+      { title: 'paper  a', year: 2025 }, // case/whitespace variant of the same title
+      { title: 'Paper B', year: 2024 },
+    ]);
+    expect(out.map((p) => p.title)).toEqual(['Paper A', 'Paper B']);
+  });
+
+  test('prefers the PUBLISHED version over a bioRxiv preprint (by journal)', () => {
+    const out = DiscoveryService.dedupePublicationsByTitle([
+      { title: 'Gene paper', year: 2025, journal: 'bioRxiv : the preprint server for biology' },
+      { title: 'Gene paper', year: 2025, journal: 'Nature' },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].journal).toBe('Nature');
+  });
+
+  test('prefers the published version over a preprint (by arXiv/bioRxiv DOI in url)', () => {
+    const out = DiscoveryService.dedupePublicationsByTitle([
+      { title: 'Physics paper', year: 2026, url: 'https://doi.org/10.48550/arxiv.2604.07543' },
+      { title: 'Physics paper', year: 2026, url: 'https://doi.org/10.1038/s41586-026-00000' },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].url).toContain('10.1038');
+  });
+
+  test('keeps the preprint if no published version exists', () => {
+    const out = DiscoveryService.dedupePublicationsByTitle([
+      { title: 'Only preprint', year: 2026, journal: 'bioRxiv' },
+    ]);
+    expect(out).toEqual([{ title: 'Only preprint', year: 2026, journal: 'bioRxiv' }]);
+  });
+
+  test('caps at limit and drops untitled rows', () => {
+    const out = DiscoveryService.dedupePublicationsByTitle(
+      [{ title: 'A' }, { title: null }, { title: 'B' }, { title: 'C' }],
+      { limit: 2 },
+    );
+    expect(out.map((p) => p.title)).toEqual(['A', 'B']);
+  });
+});
+
 describe('DiscoveryService.backfillOpenAlexPublications', () => {
   afterEach(() => jest.restoreAllMocks());
 
