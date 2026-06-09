@@ -86,7 +86,10 @@ const enrichmentFor = (identity) => ({
 describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   let handler;
   beforeAll(() => { handler = require('../../pages/api/reviewer-finder/save-candidates').default; });
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    reviewerSuggestionAdapter.upsert.mockResolvedValue({ id: 'S1' });
+  });
 
   const run = (identity) => {
     const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr X', contactEnrichment: enrichmentFor(identity) }] } };
@@ -115,6 +118,25 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(payload.hIndex).toBe(40);
     expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'probable' }), expect.any(Object));
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
+  });
+
+  test('0-100 relevance scores are passed to suggestion upsert unchanged', async () => {
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [
+          { name: 'Dr Forty One', relevanceScore: 41 },
+          { name: 'Dr Eighty Seven', relevanceScore: 87 },
+        ],
+      },
+    };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(reviewerSuggestionAdapter.upsert.mock.calls[0][0].relevanceScore).toBe(41);
+    expect(reviewerSuggestionAdapter.upsert.mock.calls[1][0].relevanceScore).toBe(87);
   });
 
   test('no verdict (resolver absent) → fail-open persist, no decision/clear', async () => {
@@ -239,6 +261,52 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(res.statusCode).toBe(422);
     expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
     expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  });
+
+  test('all-failed non-identity save returns non-2xx with per-row errors', async () => {
+    reviewerSuggestionAdapter.upsert.mockRejectedValueOnce(new Error('Dataverse range validation failed'));
+    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Range Bug', relevanceScore: 41 }] } };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toMatchObject({
+      success: false,
+      savedCount: 0,
+      totalRequested: 1,
+      errors: [{ name: 'Range Bug', error: 'Dataverse range validation failed' }],
+    });
+  });
+
+  test('partial-failure response includes failed candidate names and error text', async () => {
+    reviewerSuggestionAdapter.upsert.mockImplementation(async ({ suggestionLabel }) => {
+      if (suggestionLabel?.includes('Failing Candidate')) {
+        throw new Error('Dataverse write failed');
+      }
+      return { id: 'S1' };
+    });
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        proposalTitle: 'Proposal',
+        candidates: [
+          { name: 'Saved Candidate', relevanceScore: 41 },
+          { name: 'Failing Candidate', relevanceScore: 87 },
+        ],
+      },
+    };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({
+      success: true,
+      savedCount: 1,
+      savedNames: ['Saved Candidate'],
+      totalRequested: 2,
+      errors: [{ name: 'Failing Candidate', error: 'Dataverse write failed' }],
+    });
   });
 });
 

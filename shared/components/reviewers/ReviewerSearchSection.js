@@ -101,6 +101,14 @@ function dedupeByName(list) {
   return out;
 }
 
+function formatSaveFailureDetails(errors = []) {
+  const first = Array.isArray(errors) ? errors.find((e) => e?.error || e?.name) : null;
+  if (!first) return '';
+  const name = first.name || 'Unknown candidate';
+  const error = first.error || 'Save failed';
+  return `${name}: ${error}`;
+}
+
 // Affiliation-pin provenance (S224 #16). enrichment may replace the discovery
 // (PubMed-recency) affiliation with an identity-trusted CURRENT one from ORCID
 // or Scholar. Return a short source label for the "current (per X)" badge, or
@@ -789,16 +797,18 @@ export default function ReviewerSearchSection({
         }),
       });
       const sData = await sRes.json().catch(() => ({}));
-      if (!sRes.ok || !sData.success) throw new Error(sData.error || `Save failed (${sRes.status})`);
-      // save-candidates returns success:true even when every row failed — treat
-      // savedCount === 0 as a hard failure and surface the first error (Finding 9).
+      if (!sRes.ok || !sData.success) {
+        const detail = formatSaveFailureDetails(sData.errors);
+        throw new Error(detail ? `${sData.error || `Save failed (${sRes.status})`} ${detail}` : (sData.error || `Save failed (${sRes.status})`));
+      }
       const saved = sData.savedCount || 0;
       if (saved === 0) {
-        const detail = sData.errors?.[0]?.error;
+        const detail = formatSaveFailureDetails(sData.errors);
         throw new Error(detail ? `No candidates were saved: ${detail}` : 'No candidates were saved.');
       }
       const failed = toSave.length - saved;
-      setSavedMsg(`Saved ${saved} of ${toSave.length} to this request’s candidate pool.${failed > 0 ? ` ${failed} could not be saved.` : ''}`);
+      const failureDetail = failed > 0 ? formatSaveFailureDetails(sData.errors) : '';
+      setSavedMsg(`Saved ${saved} of ${toSave.length} to this request’s candidate pool.${failed > 0 ? ` ${failed} could not be saved${failureDetail ? ` (${failureDetail})` : ''}.` : ''}`);
       setPhase('done');
 
       // Graduate ONLY the successfully-saved names: flip them to status='saved'

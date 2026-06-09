@@ -361,3 +361,49 @@ describe('upsert never converts an excluded row into a candidate', () => {
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
 });
+
+describe('upsert relevance-score range guard', () => {
+  test('0-100 relevance scores reach Dataverse unchanged', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: [] });
+
+    await upsert({
+      potentialReviewerId: PR_ID,
+      requestId: REQUEST_ID,
+      relevanceScore: 41,
+      sources: 'claude',
+      selected: true,
+    });
+    await upsert({
+      potentialReviewerId: PR_ID,
+      requestId: REQUEST_ID,
+      relevanceScore: 87,
+      sources: 'claude',
+      selected: true,
+    });
+
+    expect(DynamicsService.createRecord.mock.calls[0][1].wmkf_relevancescore).toBe(41);
+    expect(DynamicsService.createRecord.mock.calls[1][1].wmkf_relevancescore).toBe(87);
+  });
+
+  test('clamps out-of-range relevance scores to Dataverse [0,100]', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: [] });
+
+    await upsert({
+      potentialReviewerId: PR_ID,
+      requestId: REQUEST_ID,
+      relevanceScore: 150,
+      sources: 'claude',
+      selected: true,
+    });
+    await upsert({
+      potentialReviewerId: PR_ID,
+      requestId: REQUEST_ID,
+      relevanceScore: -5,
+      sources: 'claude',
+      selected: true,
+    });
+
+    expect(DynamicsService.createRecord.mock.calls[0][1].wmkf_relevancescore).toBe(100);
+    expect(DynamicsService.createRecord.mock.calls[1][1].wmkf_relevancescore).toBe(0);
+  });
+});

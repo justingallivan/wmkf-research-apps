@@ -278,13 +278,26 @@ export default async function handler(req, res) {
     // If nothing saved AND the only reason was unresolved-identity rejections, this is
     // a validation failure (422), not a generic empty/500 — gives the caller (esp. the
     // standalone Reviewer Finder, which has no client-side identity gate) a clear signal.
-    if (savedCount === 0 && rejectedUnresolved > 0) {
+    if (savedCount === 0 && rejectedUnresolved === candidates.length) {
       return res.status(422).json({
         error: 'Selected candidates need identity review and were not saved.',
+        success: false,
         savedCount: 0,
         savedNames,
         totalRequested: candidates.length,
         rejectedUnresolved,
+        errors,
+      });
+    }
+
+    if (savedCount === 0) {
+      return res.status(500).json({
+        error: 'No candidates were saved.',
+        success: false,
+        savedCount: 0,
+        savedNames,
+        totalRequested: candidates.length,
+        rejectedUnresolved: rejectedUnresolved > 0 ? rejectedUnresolved : undefined,
         errors,
       });
     }

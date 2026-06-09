@@ -165,11 +165,11 @@ const LIMIT = limitArg ? parseInt(limitArg.split('=')[1] || args[args.indexOf(li
     if (row.proposal_password) lifecycle.proposalPassword = row.proposal_password;
     if (row.review_status) lifecycle.reviewStatus = row.review_status;
 
-    // wmkf_relevancescore is bounded [0,1] in Dataverse; some legacy Postgres
-    // rows have unscaled values (e.g. 35). Clamp.
+    // wmkf_relevancescore is bounded [0,100] in Dataverse. Clamp legacy rows
+    // defensively before writing through the adapter.
     let relevance = row.relevance_score;
     if (typeof relevance === 'number' && Number.isFinite(relevance)) {
-      if (relevance > 1) relevance = 1;
+      if (relevance > 100) relevance = 100;
       else if (relevance < 0) relevance = 0;
     } else {
       relevance = null;

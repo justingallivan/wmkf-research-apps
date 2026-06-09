@@ -37,6 +37,14 @@ function extractEmailFromAffiliation(affiliation) {
   return emailMatch ? emailMatch[0] : null;
 }
 
+function formatSaveFailureDetails(errors = []) {
+  const first = Array.isArray(errors) ? errors.find((e) => e?.error || e?.name) : null;
+  if (!first) return '';
+  const name = first.name || 'Unknown candidate';
+  const error = first.error || 'Save failed';
+  return `${name}: ${error}`;
+}
+
 // Tab component
 function Tab({ label, active, onClick, icon }) {
   return (
@@ -1132,15 +1140,20 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
 
       const result = await response.json();
 
-      if (result.success) {
+      if (response.ok && result.success) {
         // Surface identity-unresolved rejections (Slice E) so a partial save isn't
         // silently reported as a clean success.
         const rejected = result.rejectedUnresolved || 0;
+        const saved = result.savedCount || 0;
+        const failed = Math.max(0, selected.length - saved);
+        const failureDetail = failed > 0 ? formatSaveFailureDetails(result.errors) : '';
         setSaveMessage({
-          type: rejected > 0 ? 'warning' : 'success',
-          text: rejected > 0
-            ? `Saved ${result.savedCount} candidate(s) to My Candidates. ${rejected} skipped — identity unconfirmed (needs identity review).`
-            : `Saved ${result.savedCount} candidate(s) to My Candidates`
+          type: rejected > 0 || failed > 0 ? 'warning' : 'success',
+          text: failed > 0
+            ? `Saved ${saved} candidate(s) to My Candidates. ${failed} failed${failureDetail ? ` (${failureDetail})` : ''}.`
+            : rejected > 0
+              ? `Saved ${saved} candidate(s) to My Candidates. ${rejected} skipped — identity unconfirmed (needs identity review).`
+              : `Saved ${saved} candidate(s) to My Candidates`
         });
         // Notify parent to refresh My Candidates tab
         if (onCandidatesSaved) {
@@ -1149,7 +1162,9 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
       } else {
         setSaveMessage({
           type: 'error',
-          text: result.error || 'Failed to save candidates'
+          text: formatSaveFailureDetails(result.errors)
+            ? `${result.error || 'Failed to save candidates'} ${formatSaveFailureDetails(result.errors)}`
+            : (result.error || 'Failed to save candidates')
         });
       }
     } catch (err) {

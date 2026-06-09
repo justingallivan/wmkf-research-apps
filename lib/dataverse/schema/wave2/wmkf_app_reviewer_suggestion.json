@@ -31,9 +31,9 @@
       "type": "Double",
       "schemaName": "wmkf_RelevanceScore",
       "displayName": "Relevance Score",
-      "description": "AI-assigned match score (0.0 - 1.0).",
+      "description": "AI-assigned match score (0-100).",
       "minValue": 0,
-      "maxValue": 1,
+      "maxValue": 100,
       "precision": 4
     },
     {
