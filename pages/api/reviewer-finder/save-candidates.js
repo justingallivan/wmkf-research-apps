@@ -17,7 +17,7 @@ import * as reviewerSuggestionAdapter from '../../../lib/dataverse/adapters/revi
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { mayPersistIdentity, RESOLVER_SOURCED_FIELDS } from '../../../lib/services/reviewer-identity-resolver';
-import { saveSourceListForCandidate, withReviewerProvenance } from '../../../lib/utils/reviewer-provenance';
+import { saveSourceListForCandidate, withReviewerProvenance, buildReviewerProvenance, isIdentityReviewExemptProvenance } from '../../../lib/utils/reviewer-provenance';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 
 function fieldPersistFlag(candidate, enrichment, flagName) {
@@ -54,9 +54,33 @@ function contactFieldAllowed(candidate, enrichment, flagName, source) {
 // gate: it hides ungrounded rows from selection; the save route accepts an
 // explicitly-resolved-or-field-gated row.
 function isUnresolvedIdentity(candidate) {
+  // Exemption (S235): a cited-in-proposal / PI-named candidate (human/document-grounded — the
+  // proposal author named this specific person) is NOT hard-rejected even when unresolved. It
+  // saves as a name/identity-review row, but with ALL contact + identity-derived fields
+  // force-nulled (see contactBlockedForUnresolvedExempt) so anchor-or-abstain still holds — a
+  // selectable-but-unverified row cannot carry a wrong-person email/ORCID. Only SYSTEM-discovered
+  // unresolved rows are rejected.
+  if (isIdentityReviewExemptProvenance(buildReviewerProvenance(candidate).kind)) return false;
   return candidate?.needsIdentification === true
     || candidate?.identityStatus === 'unresolved'
     || candidate?.verificationStatus === 'unresolved';
+}
+
+function hasResolvedIdentity(candidate, enrichment) {
+  const status = candidate?.identityStatus || enrichment?.identity?.status || null;
+  return candidate?.verified === true
+    || status === 'confirmed' || status === 'probable'
+    || candidate?.verificationStatus === 'verified' || candidate?.verificationStatus === 'probable';
+}
+
+// Codex HIGH (S235): when a cited/PI-named candidate is allowed through save WITHOUT a resolved
+// identity (the exemption above), NO contact or identity-derived field may persist — it could be
+// a namesake of the named person. Force email/website/faculty-page/affiliation/ORCID/Scholar/
+// bibliometrics to null until identity is confirmed/probable. This turns "no silent wrong email"
+// from an assumption into an enforced invariant at the persistence boundary.
+function contactBlockedForUnresolvedExempt(candidate, enrichment) {
+  return isIdentityReviewExemptProvenance(buildReviewerProvenance(candidate).kind)
+    && !hasResolvedIdentity(candidate, enrichment);
 }
 
 export default async function handler(req, res) {
@@ -122,17 +146,20 @@ export default async function handler(req, res) {
           .trim();
 
         const enrichment = candidate.contactEnrichment || {};
+        // Codex HIGH: an unresolved cited/PI-named row saves as a name row only — force ALL
+        // contact + identity-derived fields to null (it could be a namesake of the named person).
+        const contactBlocked = contactBlockedForUnresolvedExempt(candidate, enrichment);
         const candidateEmailSource = candidate.emailSource || enrichment.emailSource || null;
         const candidateWebsiteSource = candidate.websiteSource || enrichment.websiteSource || null;
-        const emailAllowed = contactFieldAllowed(candidate, enrichment, 'emailPersistAllowed', candidateEmailSource);
-        const websiteAllowed = contactFieldAllowed(candidate, enrichment, 'websitePersistAllowed', candidateWebsiteSource);
-        const affiliationAllowed = contactFieldAllowed(candidate, enrichment, 'affiliationPersistAllowed', null);
+        const emailAllowed = !contactBlocked && contactFieldAllowed(candidate, enrichment, 'emailPersistAllowed', candidateEmailSource);
+        const websiteAllowed = !contactBlocked && contactFieldAllowed(candidate, enrichment, 'websitePersistAllowed', candidateWebsiteSource);
+        const affiliationAllowed = !contactBlocked && contactFieldAllowed(candidate, enrichment, 'affiliationPersistAllowed', null);
         const candidateEmail = emailAllowed ? (candidate.email || enrichment.email || null) : null;
         const candidateAffiliation = affiliationAllowed ? (candidate.affiliation || enrichment.affiliation || null) : null;
         // Enrichment stores the ORCID iD as `orcidId` (not `orcid`); read that key
         // so a candidate carrying only contactEnrichment doesn't drop a real ORCID.
-        const candidateOrcid = candidate.orcid || enrichment.orcidId || null;
-        const candidateGoogleScholarId = candidate.googleScholarId || enrichment.googleScholarId || null;
+        const candidateOrcid = contactBlocked ? null : (candidate.orcid || enrichment.orcidId || null);
+        const candidateGoogleScholarId = contactBlocked ? null : (candidate.googleScholarId || enrichment.googleScholarId || null);
         const rawCandidateWebsite = websiteAllowed ? (candidate.website || enrichment.website || null) : null;
         const candidateWebsite = ContactParser.sanitizeWebsiteForCandidate(rawCandidateWebsite, candidate.name);
         const candidateFacultyPageUrl = websiteAllowed ? (candidate.facultyPageUrl || enrichment.facultyPageUrl || null) : null;
@@ -181,7 +208,8 @@ export default async function handler(req, res) {
         // (Codex post-impl HIGH). `=== false` so they only ever TIGHTEN the gate,
         // never loosen it for fresh (full-object) candidates that lack the flags.
         const blockByIdentity = (!!identity && !mayPersistIdentity(identity.status))
-          || candidate.identityPersistAllowed === false;
+          || candidate.identityPersistAllowed === false
+          || contactBlocked; // unresolved cited/PI-named exempt row → null ORCID/Scholar/metrics too
         const blockScholar = scholarSkipped || blockByIdentity
           || candidate.scholarPersistAllowed === false;
 

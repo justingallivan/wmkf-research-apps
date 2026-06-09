@@ -58,6 +58,7 @@ jest.mock('../../lib/services/contact-enrichment-service', () => ({
 
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
+const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const { RESOLVER_SOURCED_FIELDS } = require('../../lib/services/reviewer-identity-resolver');
 
 function mockRes() {
@@ -176,6 +177,49 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(payload.website).toBeNull();
     expect(payload.facultyPageUrl).toBeNull();
     expect(payload.orcid).toBe('0000-0001');
+  });
+
+  // S235 — a PI-named / cited candidate is SAVED even when identity is unresolved (the proposal
+  // author vouched for this specific person), but ALL contact + identity-derived fields are
+  // force-nulled at the boundary (Codex HIGH) — a selectable-but-unverified row can't carry a
+  // wrong-person email/ORCID. System-discovered unresolved rows are still 422-rejected.
+  test('PI-named UNRESOLVED candidate is saved (not rejected) with contact force-nulled', async () => {
+    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{
+      name: 'Olga Smirnova', source: 'proposal_named',
+      needsIdentification: true, identityStatus: 'unresolved',
+      email: 'maybe-namesake@example.edu', affiliation: 'Max-Born-Institute', website: 'https://example.edu',
+      orcid: '0000-0002-9999-9999',
+      contactEnrichment: {
+        email: 'maybe-namesake@example.edu', emailSource: 'serp_search',
+        emailPersistAllowed: true, websitePersistAllowed: true, affiliationPersistAllowed: true,
+      },
+    }] } };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalled(); // the row IS saved (not rejected)
+    const person = potentialReviewerAdapter.upsertByEmail.mock.calls[0][0];
+    expect(person.email).toBeNull();
+    expect(person.affiliation).toBeNull();
+    const researcher = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
+    expect(researcher.email).toBeNull();
+    expect(researcher.orcid).toBeNull();
+    expect(researcher.website).toBeNull();
+    expect(researcher.facultyPageUrl).toBeNull();
+    expect(researcher.googleScholarId).toBeNull();
+  });
+
+  test('a system-discovered (literature_retrieved) UNRESOLVED candidate is still 422-rejected', async () => {
+    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{
+      name: 'Deferred Track-B', sources: ['openalex'], needsIdentification: true, identityStatus: 'unresolved',
+    }] } };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(422);
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
   });
 });
 

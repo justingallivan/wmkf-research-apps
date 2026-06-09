@@ -78,4 +78,26 @@ describe('reviewer provenance DTO helper', () => {
     };
     expect(provenanceGroupOf(unresolved)).toBe('needs_identity_review');
   });
+
+  // S235 — PI-named / cited candidates (the proposal author named/cited THIS person) stay
+  // SELECTABLE even when the automatic identity match is unresolved; only system-discovered
+  // candidates are hard-blocked. (The save path force-nulls their contact until confirmed.)
+  test('a PI-named / cited candidate stays selectable (cited_or_proposal_named) when unresolved', () => {
+    const proposalNamed = {
+      name: 'Olga Smirnova', source: 'proposal_named',
+      needsIdentification: true, identityStatus: 'unresolved', verificationStatus: 'unresolved',
+    };
+    expect(provenanceGroupOf(proposalNamed)).toBe('cited_or_proposal_named');
+
+    const cited = { name: 'Cited Author', source: 'cited_reference', identityStatus: 'unresolved' };
+    expect(provenanceGroupOf(cited)).toBe('cited_or_proposal_named');
+  });
+
+  test('a system-discovered (literature_retrieved) unresolved candidate stays gated (needs_identity_review)', () => {
+    const deferred = {
+      name: 'Deferred Track-B', sources: ['openalex'],
+      needsIdentification: true, identityStatus: 'unresolved',
+    };
+    expect(provenanceGroupOf(deferred)).toBe('needs_identity_review');
+  });
 });

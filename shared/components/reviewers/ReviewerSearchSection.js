@@ -257,6 +257,13 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
             {c.isApplicantRecommended
               ? <Pill tone="green">Applicant recommended</Pill>
               : <Pill tone={provenanceGroupOf(c) === 'needs_identity_review' ? 'amber' : 'gray'}>{provenanceLabel}</Pill>}
+            {/* A cited/PI-named candidate the spine couldn't auto-verify is SELECTABLE (the PI
+                vouched for them) but its contact/bibliometrics are force-nulled at save until
+                identity is confirmed — flag that so staff verify before inviting. */}
+            {provenanceGroupOf(c) !== 'needs_identity_review'
+              && (c.needsIdentification === true || c.identityStatus === 'unresolved' || c.verificationStatus === 'unresolved') && (
+              <Pill tone="amber">⚠ Verify identity — no contact saved until confirmed</Pill>
+            )}
           </div>
 
           {(email || website || orcidUrl) && (
