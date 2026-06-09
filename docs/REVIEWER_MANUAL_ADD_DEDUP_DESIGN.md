@@ -145,8 +145,8 @@ Response one of:
 { "outcome": "candidates",
   "candidates": [ { "source": "reviewer|contact|linked", "matchKey": "name|email|orcid",
                     "reviewerId": "…|null", "contactId": "…|null", "context": { … } } ] }   // top ~5
-{ "outcome": "conflict", "reason": "orcid_email_split|contact_linked_elsewhere|email_mismatch",
-  "details": { … } }                                                                          // cross-store/reverse-link only; PD must resolve
+{ "outcome": "conflict", "reason": "orcid_email_split|contact_linked_elsewhere|email_mismatch|orcid_mismatch",
+  "details": { … } }                                                                          // cross-store/reverse-link/typed-vs-stored; PD must resolve
 { "outcome": "none" }
 ```
 - `requireAppAccess(req, res, 'reviewer-finder', 'reviewers')`. **No writes, no

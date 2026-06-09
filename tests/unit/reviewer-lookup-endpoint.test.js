@@ -11,23 +11,24 @@ jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (_label, fn) => fn(),
 }));
 
-const pr = {
+// Inline jest.fn() factories (the factory can't reference an outer const under
+// this repo's transform), then import the mocked modules to drive them.
+jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   findByOrcidCandidates: jest.fn(),
   findByEmailCandidates: jest.fn(),
   findByContactId: jest.fn(),
   searchByName: jest.fn(),
-};
-jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => pr);
-
-const contacts = {
+}));
+jest.mock('../../lib/dataverse/adapters/contact', () => ({
   findByOrcidCandidates: jest.fn(),
   findByEmailCandidates: jest.fn(),
   searchByName: jest.fn(),
-};
-jest.mock('../../lib/dataverse/adapters/contact', () => contacts);
+}));
 
 import handler from '../../pages/api/workbench/reviewer-lookup';
 import { requireAppAccess } from '../../lib/utils/auth';
+import * as mockPr from '../../lib/dataverse/adapters/potential-reviewer';
+import * as mockContacts from '../../lib/dataverse/adapters/contact';
 
 const ORCID = '0000-0002-1825-0097';
 const PR = '11111111-2222-3333-4444-555555555555';
@@ -48,13 +49,13 @@ const post = (body) => ({ method: 'POST', body });
 beforeEach(() => {
   jest.clearAllMocks();
   requireAppAccess.mockResolvedValue({ profileId: 7, session: { user: {} } });
-  pr.findByOrcidCandidates.mockResolvedValue({ none: true });
-  pr.findByEmailCandidates.mockResolvedValue({ none: true });
-  pr.findByContactId.mockResolvedValue(null);
-  pr.searchByName.mockResolvedValue([]);
-  contacts.findByOrcidCandidates.mockResolvedValue({ none: true });
-  contacts.findByEmailCandidates.mockResolvedValue({ none: true });
-  contacts.searchByName.mockResolvedValue([]);
+  mockPr.findByOrcidCandidates.mockResolvedValue({ none: true });
+  mockPr.findByEmailCandidates.mockResolvedValue({ none: true });
+  mockPr.findByContactId.mockResolvedValue(null);
+  mockPr.searchByName.mockResolvedValue([]);
+  mockContacts.findByOrcidCandidates.mockResolvedValue({ none: true });
+  mockContacts.findByEmailCandidates.mockResolvedValue({ none: true });
+  mockContacts.searchByName.mockResolvedValue([]);
 });
 
 describe('guards', () => {
@@ -66,7 +67,7 @@ describe('guards', () => {
     requireAppAccess.mockResolvedValueOnce(null);
     r = res();
     await handler(post({ name: 'Ada Lovelace' }), r);
-    expect(pr.searchByName).not.toHaveBeenCalled();
+    expect(mockPr.searchByName).not.toHaveBeenCalled();
   });
 
   it('validates name, email, and ORCID', async () => {
@@ -84,7 +85,7 @@ describe('guards', () => {
 
 describe('outcomes', () => {
   it('ambiguous same-key rows return candidates, not conflict', async () => {
-    pr.findByEmailCandidates.mockResolvedValueOnce({
+    mockPr.findByEmailCandidates.mockResolvedValueOnce({
       ambiguous: true,
       count: 2,
       rows: [
@@ -100,12 +101,12 @@ describe('outcomes', () => {
   });
 
   it('cross-store ORCID/email split returns conflict', async () => {
-    pr.findByOrcidCandidates.mockResolvedValueOnce({
+    mockPr.findByOrcidCandidates.mockResolvedValueOnce({
       one: true,
       id: PR,
       row: { wmkf_potentialreviewersid: PR, wmkf_name: 'Ada Lovelace', wmkf_orcid: ORCID, _wmkf_contact_value: null, statecode: 0 },
     });
-    contacts.findByEmailCandidates.mockResolvedValueOnce({
+    mockContacts.findByEmailCandidates.mockResolvedValueOnce({
       one: true,
       id: CONTACT,
       row: { contactid: CONTACT, fullname: 'Ada Lovelace', emailaddress1: 'ada@example.edu', statecode: 0 },
@@ -117,12 +118,12 @@ describe('outcomes', () => {
   });
 
   it('reverse-link collision returns conflict', async () => {
-    contacts.findByEmailCandidates.mockResolvedValueOnce({
+    mockContacts.findByEmailCandidates.mockResolvedValueOnce({
       one: true,
       id: CONTACT,
       row: { contactid: CONTACT, fullname: 'Ada Lovelace', emailaddress1: 'ada@example.edu', statecode: 0 },
     });
-    pr.findByContactId.mockResolvedValueOnce({ wmkf_potentialreviewersid: PR, _wmkf_contact_value: CONTACT });
+    mockPr.findByContactId.mockResolvedValueOnce({ wmkf_potentialreviewersid: PR, _wmkf_contact_value: CONTACT });
     const r = res();
     await handler(post({ name: 'Ada Lovelace', email: 'ada@example.edu' }), r);
     expect(r.statusCode).toBe(200);
@@ -130,7 +131,7 @@ describe('outcomes', () => {
   });
 
   it('returns confident only after both stores are checked', async () => {
-    pr.findByEmailCandidates.mockResolvedValueOnce({
+    mockPr.findByEmailCandidates.mockResolvedValueOnce({
       one: true,
       id: PR,
       row: { wmkf_potentialreviewersid: PR, wmkf_name: 'Ada Lovelace', wmkf_emailaddress: 'ada@example.edu', statecode: 0 },
@@ -138,11 +139,11 @@ describe('outcomes', () => {
     const r = res();
     await handler(post({ name: 'Ada Lovelace', email: 'ada@example.edu' }), r);
     expect(r.body).toMatchObject({ outcome: 'confident', match: { reviewerId: PR, matchKey: 'email' } });
-    expect(contacts.findByEmailCandidates).toHaveBeenCalledWith('ada@example.edu');
+    expect(mockContacts.findByEmailCandidates).toHaveBeenCalledWith('ada@example.edu');
   });
 
   it('name-only hits return candidates', async () => {
-    contacts.searchByName.mockResolvedValueOnce([
+    mockContacts.searchByName.mockResolvedValueOnce([
       { contactid: CONTACT, fullname: 'Ada Lovelace', emailaddress1: 'ada@example.edu', statecode: 1 },
     ]);
     const r = res();

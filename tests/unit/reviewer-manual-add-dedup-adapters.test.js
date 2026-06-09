@@ -41,8 +41,10 @@ describe('potential-reviewer candidate helpers', () => {
   });
 
   test('searchByName uses structured lastname/firstname before fallback', async () => {
+    // searchByName issues the lastname-eq variant then the startswith variant
+    // (a two-part name), so the mock must answer every call, not just the first.
     const query = jest.spyOn(DynamicsService, 'queryRecords')
-      .mockResolvedValueOnce({ records: [{ wmkf_potentialreviewersid: 'r1', wmkf_firstname: 'Ada', wmkf_lastname: 'Lovelace', wmkf_name: 'Ada Lovelace' }] });
+      .mockResolvedValue({ records: [{ wmkf_potentialreviewersid: 'r1', wmkf_firstname: 'Ada', wmkf_lastname: 'Lovelace', wmkf_name: 'Ada Lovelace' }] });
     const out = await potentialReviewer.searchByName('Ada Lovelace', { top: 5 });
     expect(out).toHaveLength(1);
     expect(query.mock.calls[0][1].filter).toContain('wmkf_lastname eq');
@@ -83,7 +85,9 @@ describe('contact candidate helpers', () => {
   });
 
   test('searchByName ranks active contacts first', async () => {
-    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValueOnce({
+    // Persistent mock: searchByName runs several structured filter variants;
+    // every call returns the same two rows so dedup + active-first ranking apply.
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
       records: [
         { contactid: 'inactive', firstname: 'Ada', lastname: 'Lovelace', fullname: 'Ada Lovelace', statecode: 1 },
         { contactid: 'active', firstname: 'Ada', lastname: 'Lovelace', fullname: 'Ada Lovelace', statecode: 0 },
