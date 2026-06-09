@@ -1,5 +1,20 @@
 # Session 236 Prompt: Reviewer identity/contact/invite hardening — large S235 batch shipped
 
+> ## ⏳ PENDING — CODEX REVIEW NEXT SESSION (added S236, 2026-06-08)
+> The **manual reviewer add → ORCID lookup** work shipped this session was NOT run
+> through the Codex loop (self-reviewed only — user iterating live). Run a Codex
+> post-impl review next session on:
+> - `42aa9fe` feat(reviewer): ORCID iD lookup + field on manual reviewer add
+>   — new read-only route `pages/api/workbench/orcid-lookup.js` (reuses
+>   `ORCIDService.findContact`); manual-reviewer.js now persists a staff ORCID
+>   **fill-only** via `upsertByPotentialReviewer` (never overwrites resolver/attested
+>   ORCID, never touches `wmkf_identitystatus`). Focus: the identity-persistence
+>   policy (fill-only vs allow staff correction), and ORCID search not using email.
+> - `8c19b0a` rename + reposition manual add (slot into `ReviewerSearchSection`).
+> - Design spec context: `docs/REVIEWER_MANUAL_ADD_DESIGN.md`,
+>   `[[project-reviewer-field-aware-verification]]` (separate S236 arc, already Codex-reviewed).
+> Also a "bigger issue" surfaced at end of S236 — see whatever was logged after this note.
+
 ## Session 235 Summary
 
 A long session that shipped the **entire E/G/F follow-on plan** to prod AND a further batch of
