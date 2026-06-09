@@ -18,7 +18,11 @@ const { DiscoveryService } = require('../../lib/services/discovery-service');
 const { PubMedService } = require('../../lib/services/pubmed-service');
 const { ReviewerIdentityEvidence } = require('../../lib/services/reviewer-identity-evidence');
 
-const article = (pmid, authorName, title = 'Relevant publication') => ({
+// Default to a UNIQUE title per pmid: distinct real papers have distinct titles, and the
+// discovery pipeline now title-dedups a candidate's article list (collapses a preprint +
+// published version of the SAME paper) before the MIN_PUBLICATIONS gate. A shared default
+// title would (correctly) collapse to one work and fall below the threshold.
+const article = (pmid, authorName, title = `Relevant publication ${pmid}`) => ({
   pmid,
   title,
   year: new Date().getFullYear(),
