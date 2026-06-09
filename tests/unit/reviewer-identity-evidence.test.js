@@ -56,6 +56,27 @@ describe('ReviewerIdentityEvidence.evaluateSuggestion', () => {
     ]));
   });
 
+  test('initial-only OpenAlex displayName still confirms WITH affiliation + ORCID employment (S236 Keller/Sang fix)', async () => {
+    // OpenAlex stores the reviewer as an initial ("R. T. Sang"). forenamesContradict
+    // is false (an initial can't contradict the full forename), and affiliation_match +
+    // ORCID-employment corroboration are the 2nd independent signal that makes the match
+    // safe. The first forename gate (forenameAgrees !== false) wrongly demoted this to
+    // unresolved; the fix (forenameContradicts !== true) must confirm it.
+    OpenAlexService.searchAuthors.mockResolvedValue({ totalCount: 1, records: [record({ displayName: 'R. T. Sang' })] });
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue({
+      orcidId: '0000-0002-1825-0097',
+      currentAffiliation: 'Griffith University',
+      affiliations: [{ organization: 'Griffith University', current: true }],
+    });
+
+    const out = await ReviewerIdentityEvidence.evaluateSuggestion(
+      { name: 'Robert Sang', suggestedInstitution: 'Griffith University', expertiseAreas: ['attosecond science'] },
+      { proposalInfo: { primaryResearchArea: 'Physics' } },
+    );
+
+    expect(out.status).toBe('confirmed');
+  });
+
   test('weak affiliation plus topic resolves probable without ORCID demotion', async () => {
     delete process.env.ORCID_CLIENT_ID;
     delete process.env.ORCID_CLIENT_SECRET;
@@ -169,7 +190,12 @@ describe('ReviewerIdentityEvidence.evaluateSuggestion', () => {
     expect(out.status).toBe('unresolved'); // forename Olaf ≠ Olga → promotion blocked
   });
 
-  test('FAIL-SAFE: an initial-only OpenAlex displayName does not satisfy the forename gate', async () => {
+  test('FAIL-SAFE: initial-only displayName with NO affiliation_match (drift) stays on the strict :188 gate → unresolved', async () => {
+    // Distinct from the Keller/Sang fix above: here OpenAlex drifted to Technion, so there
+    // is NO affiliation_match — the ONLY promotion path is :188 (ORCID-employment-only,
+    // no affiliation), which keeps the stricter `forenameAgrees === true`. "O." can't fully
+    // agree with "Olga" → blocked. (With an affiliation_match, an initial-only record now
+    // confirms via :172/:175 on `forenameContradicts !== true` — see the Keller/Sang test.)
     OpenAlexService.searchAuthors.mockResolvedValue({ totalCount: 1, records: [record({
       displayName: 'O. Smirnova', orcid: '0000-0002-7746-5733',
       lastKnownInstitution: 'Technion', topics: ['Attosecond physics'],
@@ -181,7 +207,7 @@ describe('ReviewerIdentityEvidence.evaluateSuggestion', () => {
       { proposalInfo: { primaryResearchArea: 'Physics' } },
     );
 
-    expect(out.status).toBe('unresolved'); // "O." cannot confirm "Olga" → promotion blocked
+    expect(out.status).toBe('unresolved');
   });
 
   test('OpenAlex outage abstains instead of verifying from partial evidence', async () => {
@@ -208,5 +234,43 @@ describe('buildIdentityNote', () => {
     );
     expect(note).toMatch(/Identity confirmed/);
     expect(note).toMatch(/work-grounded authorship/);
+  });
+});
+
+describe('forenamesContradict — full-forename contradiction only, not initial-only (S236)', () => {
+  const { forenamesContradict, forenameFullyAgrees } = ReviewerIdentityEvidence._internals;
+
+  test('two full, different forenames contradict (the Alfred/Alain fabrication signature)', () => {
+    expect(forenamesContradict('Alfred Laederach', 'Alain Laederach')).toBe(true);
+    expect(forenamesContradict('Olga Smirnova', 'Anna Smirnova')).toBe(true);
+  });
+
+  test('an initial-only record does NOT contradict (Keller/Sang)', () => {
+    expect(forenamesContradict('Ursula Keller', 'U. Keller')).toBe(false);
+    expect(forenamesContradict('Robert Sang', 'R. T. Sang')).toBe(false);
+    expect(forenamesContradict('U. Keller', 'Ursula Keller')).toBe(false); // either side initial
+  });
+
+  test('matching full forenames do not contradict', () => {
+    expect(forenamesContradict('Robert Sang', 'Robert Sang')).toBe(false);
+    expect(forenamesContradict('Prof. Ursula Keller', 'Ursula Keller')).toBe(false); // honorific stripped
+  });
+
+  test('a nickname vs formal forename contradicts — fails safe (over-blocks rather than mis-verifies)', () => {
+    expect(forenamesContradict('Bob Smith', 'Robert Smith')).toBe(true);
+  });
+
+  test('empty / missing forename never contradicts', () => {
+    expect(forenamesContradict('', 'Robert Sang')).toBe(false);
+    expect(forenamesContradict('Robert Sang', '')).toBe(false);
+  });
+
+  test('contradiction and full-agreement are mutually exclusive on full names', () => {
+    // a full, equal forename: agrees=true, contradicts=false
+    expect(forenameFullyAgrees('Robert Sang', 'Robert Sang')).toBe(true);
+    expect(forenamesContradict('Robert Sang', 'Robert Sang')).toBe(false);
+    // initial-only: agrees=false AND contradicts=false (the gap the fix exploits)
+    expect(forenameFullyAgrees('Ursula Keller', 'U. Keller')).toBe(false);
+    expect(forenamesContradict('Ursula Keller', 'U. Keller')).toBe(false);
   });
 });
