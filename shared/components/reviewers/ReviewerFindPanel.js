@@ -174,6 +174,82 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
   });
   const pickedKey = doc.data?.picked || null;
 
+  // Manual reviewer add — rendered (by ReviewerSearchSection) BELOW the search and
+  // ABOVE the optional verify card. State lives here; the JSX is passed down as a
+  // slot so it sits between those two without ReviewerSearchSection owning the form.
+  const manualAddCard = (
+    <Card hover={false}>
+      <div className="flex items-center justify-between mb-2">
+        <p className="font-medium text-gray-900">Manually Add New Reviewer</p>
+        {manual.saving && <Spinner />}
+      </div>
+      <form onSubmit={addManualReviewer} className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <label className="block">
+            <span className="block text-xs text-gray-500 mb-1">Name</span>
+            <input
+              type="text"
+              value={manual.name}
+              onChange={(ev) => updateManual('name', ev.target.value)}
+              disabled={!canManage || manual.saving}
+              maxLength={180}
+              className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white disabled:bg-gray-50"
+              required
+            />
+          </label>
+          <label className="block">
+            <span className="block text-xs text-gray-500 mb-1">Email</span>
+            <input
+              type="email"
+              value={manual.email}
+              onChange={(ev) => updateManual('email', ev.target.value)}
+              disabled={!canManage || manual.saving}
+              maxLength={254}
+              className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white disabled:bg-gray-50"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-xs text-gray-500 mb-1">Affiliation</span>
+            <input
+              type="text"
+              value={manual.affiliation}
+              onChange={(ev) => updateManual('affiliation', ev.target.value)}
+              disabled={!canManage || manual.saving}
+              maxLength={500}
+              className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white disabled:bg-gray-50"
+            />
+          </label>
+        </div>
+        <label className="block">
+          <span className="block text-xs text-gray-500 mb-1">Note</span>
+          <textarea
+            value={manual.note}
+            onChange={(ev) => updateManual('note', ev.target.value)}
+            disabled={!canManage || manual.saving}
+            maxLength={1000}
+            rows={2}
+            className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white disabled:bg-gray-50"
+          />
+        </label>
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={!canManage || manual.saving || !manual.name.trim()}
+            className="px-3 py-1.5 bg-gray-900 text-white rounded text-sm disabled:opacity-50"
+          >
+            {manual.saving ? 'Adding...' : 'Add reviewer'}
+          </button>
+          {manual.error && <span className="text-sm text-red-700">{manual.error}</span>}
+          {manual.added && (
+            <span className="text-sm text-green-700">
+              Added {manual.added.name || 'reviewer'} to Candidates.
+            </span>
+          )}
+        </div>
+      </form>
+    </Card>
+  );
+
   return (
     <div className="space-y-4">
       {/* Applicant-recommended reviewers are now rendered (and verified) inside
@@ -235,81 +311,12 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
         )}
       </Card>
 
-      <Card hover={false}>
-        <div className="flex items-center justify-between mb-2">
-          <p className="font-medium text-gray-900">Add reviewer</p>
-          {manual.saving && <Spinner />}
-        </div>
-        <form onSubmit={addManualReviewer} className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <label className="block">
-              <span className="block text-xs text-gray-500 mb-1">Name</span>
-              <input
-                type="text"
-                value={manual.name}
-                onChange={(ev) => updateManual('name', ev.target.value)}
-                disabled={!canManage || manual.saving}
-                maxLength={180}
-                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white disabled:bg-gray-50"
-                required
-              />
-            </label>
-            <label className="block">
-              <span className="block text-xs text-gray-500 mb-1">Email</span>
-              <input
-                type="email"
-                value={manual.email}
-                onChange={(ev) => updateManual('email', ev.target.value)}
-                disabled={!canManage || manual.saving}
-                maxLength={254}
-                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white disabled:bg-gray-50"
-              />
-            </label>
-            <label className="block">
-              <span className="block text-xs text-gray-500 mb-1">Affiliation</span>
-              <input
-                type="text"
-                value={manual.affiliation}
-                onChange={(ev) => updateManual('affiliation', ev.target.value)}
-                disabled={!canManage || manual.saving}
-                maxLength={500}
-                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white disabled:bg-gray-50"
-              />
-            </label>
-          </div>
-          <label className="block">
-            <span className="block text-xs text-gray-500 mb-1">Note</span>
-            <textarea
-              value={manual.note}
-              onChange={(ev) => updateManual('note', ev.target.value)}
-              disabled={!canManage || manual.saving}
-              maxLength={1000}
-              rows={2}
-              className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white disabled:bg-gray-50"
-            />
-          </label>
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={!canManage || manual.saving || !manual.name.trim()}
-              className="px-3 py-1.5 bg-gray-900 text-white rounded text-sm disabled:opacity-50"
-            >
-              {manual.saving ? 'Adding...' : 'Add reviewer'}
-            </button>
-            {manual.error && <span className="text-sm text-red-700">{manual.error}</span>}
-            {manual.added && (
-              <span className="text-sm text-green-700">
-                Added {manual.added.name || 'reviewer'} to Candidates.
-              </span>
-            )}
-          </div>
-        </form>
-      </Card>
-
       {/* In-panel candidate search — uses the proposal already loaded above and
           the applicant exclude list; saves into this request's candidate pool.
           exclusionsUnavailable flags when ingestion couldn't produce the list so
-          the search shows a warning rather than treating it as "no exclusions". */}
+          the search shows a warning rather than treating it as "no exclusions".
+          The manual-add card is passed as manualAddSlot so it renders BELOW the
+          search and ABOVE the optional verify card. */}
       <ReviewerSearchSection
         requestId={requestId}
         blobUrl={doc.data?.blobUrl || null}
@@ -325,6 +332,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
         onRetryIngestion={runIngestion}
         savedPoolNames={savedPoolNames}
         onSaved={onSaved}
+        manualAddSlot={manualAddCard}
       />
     </div>
   );

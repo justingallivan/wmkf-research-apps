@@ -365,6 +365,7 @@ export default function ReviewerSearchSection({
   onRetryIngestion,
   savedPoolNames = [],
   onSaved,
+  manualAddSlot = null,
 }) {
   const [phase, setPhase] = useState('idle'); // idle | running | results | saving | done | error
   const [progress, setProgress] = useState([]);
@@ -1127,6 +1128,10 @@ export default function ReviewerSearchSection({
             </div>
           )}
     </Card>
+
+    {/* Manual reviewer add — slot rendered BELOW the search and ABOVE the optional
+        verify card (state + handlers live in ReviewerFindPanel). */}
+    {manualAddSlot}
 
     {/* Applicant-recommended reviewers + the OPTIONAL verify action, combined into
         one card below the primary search so it can't be mistaken for the search
