@@ -1,19 +1,35 @@
 ---
 name: project-reviewer-verify-fail-dangerous
-description: "HAZARD (verified S231): the reviewer verify path (DiscoveryService.verifyClaudeSuggestions) confirms a fabricated wrong-forename against a real same-initial namesake — '≥3 PubMed papers by LastName+initial' is treated as verified, with no forename gate; institutionMismatch only warns. Fix before trusting the verifier."
+description: "HAZARD (verified S231): the reviewer verify path confirmed a fabricated wrong-forename against a real same-initial namesake, no forename gate. LARGELY CLOSED S235-S236: forename gates now on BOTH verify paths (PubMed nameEvidence/hasFullForenameMatch demotes to unresolved; spine promotions classifySpineEvidence :172/:175 gated on forenameAgrees!==false). Principle still a forward guard for new identity work."
 metadata:
   node_type: memory
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-06-07
+  last_verified: 2026-06-08
 ---
+
+## Status update (S236) — forename gate now on both verify paths
+The original S231 reproduction was on the PubMed path; it is now gated. As of S236
+BOTH verify paths fail-close on a wrong forename:
+- **PubMed path:** `evaluateNameEvidence`/`hasFullForenameMatch` demotes a no-full-
+  forename-match suggestion to `unresolved` (test `fabricated Alfred Laederach does
+  not verify` in `discovery-verification-status.test.js`).
+- **Spine path (S236):** `classifySpineEvidence` promotions `:172` (confirmed) and
+  `:175` (probable) are gated on `spine.forenameAgrees !== false`
+  ([[project-reviewer-field-aware-verification]] / `docs/REVIEWER_FIELD_AWARE_VERIFICATION_DESIGN.md`).
+  `!== false` (not `=== true`) so non-Track-A callers that leave forenameAgrees
+  undefined are unaffected. `forenameFullyAgrees` hard-fails initial-only records —
+  the accepted abstain-not-mis-verify cost (PI-named-selectable S235 mitigates).
+This memory stays `active` because the **principle** (fail-closed forename gate;
+initial-only must not verify a full-name candidate without a 2nd signal) remains
+the guard for any future identity/name-matching/COI work.
 
 ## Recall Rule
 Read before touching reviewer verification / name-matching / COI in
-`lib/services/discovery-service.js` or extending the identity resolver. This is a
-live correctness hazard, independent of whether the bigger redesign
-([[project-reviewer-finder-retrieval-redesign]]) proceeds.
+`lib/services/discovery-service.js` or extending the identity resolver. The
+original hazard is largely closed (see status update above); treat the fix
+direction below as the standing invariant, not unbuilt work.
 
 ## The hazard (reproduced live, S231)
 A **fabricated wrong-forename of a real, active researcher verifies as that real

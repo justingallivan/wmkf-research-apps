@@ -213,7 +213,8 @@ ambiguous-field default are untouched.
    OpenAlex backfill runs on `[...results.verified, ...results.discovered]`
    (`discovery-service.js:336`); its `isTrusted` filter accepts `verified===true`
    / `PROBABLE` / `VERIFIED` (`:397-400`), so spine-verified Track-A suggestions
-   **are** covered — it fills `publications` + `publicationCount5yr` from the
+   **are** covered — it fills the candidate's `c.publications` array + <!-- drain-table:ignore reason=js-candidate-field-not-pg-table -->
+   `publicationCount5yr` field from the
    resolved OpenAlex author. **Caveat:** backfill requires `c.openAlexId`
    (`:404`); the spine sets `openAlexId` only when it selected an OpenAlex record
    (`:839`), so a `probable`-via-ORCID-employment result with *no* selected
