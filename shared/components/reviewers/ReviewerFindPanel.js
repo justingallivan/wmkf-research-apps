@@ -64,6 +64,8 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
     lookingUp: false,
     lookupMsg: null, // { tone: 'ok' | 'warn', text }
     orcidAutofilled: false, // true iff the orcid field was set by a lookup (not typed)
+    lookupResult: null,
+    resolution: null,
   });
 
   const runIngestion = useCallback(async () => {
@@ -124,6 +126,10 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
         next.orcid = '';
         next.orcidAutofilled = false;
       }
+      if (field === 'name' || field === 'email' || field === 'affiliation' || field === 'orcid') {
+        next.lookupResult = null;
+        next.resolution = null;
+      }
       return next;
     });
   };
@@ -131,9 +137,34 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
   const freshManual = (over = {}) => ({
     name: '', email: '', affiliation: '', orcid: '', note: '',
     saving: false, error: null, added: null, lookingUp: false, lookupMsg: null,
-    orcidAutofilled: false,
+    orcidAutofilled: false, lookupResult: null, resolution: null,
     ...over,
   });
+
+  const lookupReviewer = async ({ name, email, affiliation, orcid }) => {
+    const res = await fetch('/api/workbench/reviewer-lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        email: email || undefined,
+        affiliation: affiliation || undefined,
+        orcid: orcid || undefined,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Reviewer lookup failed (${res.status})`);
+    return data;
+  };
+
+  const resolutionForConfident = (result) => {
+    if (result?.outcome !== 'confident') return null;
+    if (result.match?.reviewerId) {
+      return { mode: 'reuse_reviewer', reviewerId: result.match.reviewerId, contactId: result.match.contactId || undefined };
+    }
+    if (result.match?.contactId) return { mode: 'reuse_contact', contactId: result.match.contactId };
+    return null;
+  };
 
   // ORCID iD lookup: name (+ optional affiliation/email) → ORCID via the
   // fail-safe resolver. Fills the ORCID field on a confident match; abstains
@@ -185,6 +216,24 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
             orcidAutofilled: true,
             lookupMsg: { tone: 'ok', text: `Found ${data.matchedName || submittedName}${where}${corro}${emailOk}. Confirm it's the right person before adding.` },
           }));
+          try {
+            const reviewerLookup = await lookupReviewer({
+              name: submittedName,
+              email: submittedEmail,
+              affiliation: manual.affiliation.trim(),
+              orcid: data.orcid,
+            });
+            if (requestIdRef.current !== submittedRequestId) return;
+            apply(() => ({
+              lookupResult: reviewerLookup,
+              resolution: resolutionForConfident(reviewerLookup),
+            }));
+          } catch {
+            if (requestIdRef.current !== submittedRequestId) return;
+            apply(() => ({
+              lookupMsg: { tone: 'warn', text: 'ORCID was found, but existing-reviewer lookup failed. Try Add reviewer again.' },
+            }));
+          }
         }
       } else if (data.ambiguous) {
         apply(() => ({
@@ -201,6 +250,28 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
     }
   };
 
+  const submitManualReviewer = async (resolution) => {
+    const name = manual.name.trim();
+    const res = await fetch('/api/workbench/manual-reviewer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId,
+        name,
+        email: manual.email.trim() || undefined,
+        affiliation: manual.affiliation.trim() || undefined,
+        orcid: manual.orcid.trim() || undefined,
+        note: manual.note.trim() || undefined,
+        resolution: resolution || undefined,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || `Could not add reviewer (${res.status})`);
+    }
+    return data;
+  };
+
   const addManualReviewer = async (ev) => {
     ev.preventDefault();
     if (!requestId || manual.saving) return;
@@ -212,22 +283,26 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
     setManual((prev) => ({ ...prev, saving: true, error: null, added: null }));
     const submittedRequestId = requestId;
     try {
-      const res = await fetch('/api/workbench/manual-reviewer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requestId,
+      let resolution = manual.resolution;
+      if (!resolution) {
+        const lookup = await lookupReviewer({
           name,
-          email: manual.email.trim() || undefined,
-          affiliation: manual.affiliation.trim() || undefined,
-          orcid: manual.orcid.trim() || undefined,
-          note: manual.note.trim() || undefined,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || `Could not add reviewer (${res.status})`);
+          email: manual.email.trim().toLowerCase(),
+          affiliation: manual.affiliation.trim(),
+          orcid: manual.orcid.trim(),
+        });
+        if (requestIdRef.current !== submittedRequestId) return;
+        if (lookup.outcome === 'confident') {
+          resolution = resolutionForConfident(lookup);
+          setManual((prev) => ({ ...prev, lookupResult: lookup, resolution }));
+        } else if (lookup.outcome === 'none') {
+          resolution = { mode: 'create_new' };
+        } else {
+          setManual((prev) => ({ ...prev, saving: false, lookupResult: lookup, resolution: null }));
+          return;
+        }
       }
+      const data = await submitManualReviewer(resolution);
       if (requestIdRef.current !== submittedRequestId) return;
       setManual(freshManual({ added: data.candidate || { name } }));
       if (onSaved) onSaved();
@@ -236,6 +311,21 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
       setManual((prev) => ({ ...prev, saving: false, error: e.message }));
     }
   };
+
+  const chooseResolution = (resolution) => {
+    setManual((prev) => ({ ...prev, resolution, error: null }));
+  };
+
+  const createDespiteLookup = () => {
+    setManual((prev) => ({ ...prev, resolution: { mode: 'create_new' }, error: null }));
+  };
+
+  const renderContext = (context) => {
+    const bits = [context?.email, context?.affiliation, context?.hasOrcid ? 'ORCID' : null].filter(Boolean);
+    return bits.join(' · ');
+  };
+
+  const lookupDecision = manual.lookupResult;
 
   const data = ingest.data;
   const recommended = data?.recommended || [];
@@ -331,6 +421,85 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
           <p className={`text-xs ${manual.lookupMsg.tone === 'ok' ? 'text-green-700' : 'text-amber-700'}`}>
             {manual.lookupMsg.text}
           </p>
+        )}
+        {lookupDecision?.outcome === 'confident' && (
+          <div className="border border-green-200 bg-green-50 rounded p-3 text-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium text-green-900">Use existing person</p>
+                <p className="text-green-800">
+                  {lookupDecision.match?.context?.name || manual.name || 'Existing reviewer'}
+                  {lookupDecision.match?.matchKey ? ` · matched by ${lookupDecision.match.matchKey}` : ''}
+                </p>
+                {renderContext(lookupDecision.match?.context) && (
+                  <p className="text-xs text-green-700 mt-1">{renderContext(lookupDecision.match.context)}</p>
+                )}
+              </div>
+              {lookupDecision.match?.context?.active === false && (
+                <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800">Inactive</span>
+              )}
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => chooseResolution(resolutionForConfident(lookupDecision))}
+                className={`px-2 py-1 rounded border text-xs ${manual.resolution ? 'bg-green-900 text-white border-green-900' : 'bg-white text-green-900 border-green-300'}`}
+              >
+                Reuse this person
+              </button>
+              <button type="button" onClick={createDespiteLookup} className="px-2 py-1 rounded border border-gray-300 text-xs bg-white text-gray-700">
+                Create new instead
+              </button>
+            </div>
+          </div>
+        )}
+        {lookupDecision?.outcome === 'candidates' && (
+          <div className="border border-amber-200 bg-amber-50 rounded p-3 text-sm">
+            <p className="font-medium text-amber-900">Confirm existing person</p>
+            <div className="mt-2 space-y-2">
+              {(lookupDecision.candidates || []).map((candidate, idx) => {
+                const key = `${candidate.source}-${candidate.reviewerId || candidate.contactId || idx}`;
+                const resolution = candidate.reviewerId
+                  ? { mode: 'reuse_reviewer', reviewerId: candidate.reviewerId, contactId: candidate.contactId || undefined }
+                  : { mode: 'reuse_contact', contactId: candidate.contactId };
+                const selected = manual.resolution && (
+                  (manual.resolution.reviewerId && manual.resolution.reviewerId === resolution.reviewerId) ||
+                  (manual.resolution.contactId && manual.resolution.contactId === resolution.contactId)
+                );
+                return (
+                  <button
+                    type="button"
+                    key={key}
+                    onClick={() => chooseResolution(resolution)}
+                    className={`w-full text-left border rounded p-2 ${selected ? 'border-gray-900 bg-white' : 'border-amber-200 bg-white/70'}`}
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-gray-900">{candidate.context?.name || 'Existing person'}</span>
+                      <span className="text-xs text-gray-500">
+                        {candidate.source}{candidate.matchKey ? ` · ${candidate.matchKey}` : ''}
+                        {candidate.context?.active === false ? ' · inactive' : ''}
+                      </span>
+                    </span>
+                    {renderContext(candidate.context) && <span className="block text-xs text-gray-600 mt-1">{renderContext(candidate.context)}</span>}
+                  </button>
+                );
+              })}
+            </div>
+            <button type="button" onClick={createDespiteLookup} className="mt-2 px-2 py-1 rounded border border-gray-300 text-xs bg-white text-gray-700">
+              Create new instead
+            </button>
+          </div>
+        )}
+        {lookupDecision?.outcome === 'conflict' && (
+          <div className="border border-red-200 bg-red-50 rounded p-3 text-sm">
+            <p className="font-medium text-red-900">Identity conflict</p>
+            <p className="text-red-800 mt-1">
+              Existing reviewer/contact records disagree for this add ({lookupDecision.reason}). Choose create-new only if this is a different person.
+            </p>
+            <button type="button" onClick={createDespiteLookup} className="mt-2 px-2 py-1 rounded border border-red-300 text-xs bg-white text-red-800">
+              Create new person
+            </button>
+          </div>
         )}
         <label className="block">
           <span className="block text-xs text-gray-500 mb-1">Note</span>
