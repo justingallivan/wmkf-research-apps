@@ -9,6 +9,7 @@ import { requireAppAccess } from '../../../lib/utils/auth';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
+import { normalizeOrcid } from '../../../lib/utils/orcid-normalize';
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
 import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
 import * as reviewerSuggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
@@ -44,11 +45,15 @@ export default async function handler(req, res) {
   const email = cleanString(body.email, MAX_EMAIL).toLowerCase();
   const affiliation = cleanString(body.affiliation, MAX_AFFILIATION);
   const note = cleanString(body.note, MAX_NOTE);
+  const orcidRaw = cleanString(body.orcid, 64);
+  const orcidNorm = orcidRaw ? normalizeOrcid(orcidRaw) : { state: 'empty' };
+  const orcid = orcidNorm.state === 'valid' ? orcidNorm.id : null;
 
   if (!requestId) return res.status(400).json({ error: 'requestId is required (akoya_request GUID)' });
   if (!GUID_RE.test(requestId)) return res.status(400).json({ error: 'requestId must be a GUID' });
   if (!name) return res.status(400).json({ error: 'name is required' });
   if (email && !EMAIL_RE.test(email)) return res.status(400).json({ error: 'email must be a valid email address' });
+  if (orcidRaw && !orcid) return res.status(400).json({ error: 'orcid must be a valid ORCID iD' });
 
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
 
@@ -81,6 +86,16 @@ export default async function handler(req, res) {
         await researcherAdapter.updateById(potentialReviewerId, { emailSource: 'manual' }, { actingUserSystemId });
       }
 
+      // A staff-provided ORCID (looked up via /orcid-lookup or typed) is persisted
+      // FILL-ONLY — upsertByPotentialReviewer writes wmkf_orcid/wmkf_orcidurl only
+      // when absent, so it never overwrites a resolver-sourced or reviewer-attested
+      // (sticky `confirmed`) ORCID, and it never touches wmkf_identitystatus. Staff
+      // input here is lower-trust than a reviewer self-report.
+      const orcidUrl = orcid ? `https://orcid.org/${orcid}` : null;
+      if (orcid) {
+        await researcherAdapter.upsertByPotentialReviewer(potentialReviewerId, { orcid, orcidUrl }, { actingUserSystemId });
+      }
+
       const suggestion = await reviewerSuggestionAdapter.ensureStaffManualCandidate({
         potentialReviewerId,
         requestId,
@@ -106,6 +121,8 @@ export default async function handler(req, res) {
           name,
           email: email || null,
           affiliation: affiliation || null,
+          orcid: orcid || null,
+          orcidUrl,
           sources: ['staff_manual'],
           manualAdded: true,
           applicantRecommended: false,

@@ -56,10 +56,13 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
     name: '',
     email: '',
     affiliation: '',
+    orcid: '',
     note: '',
     saving: false,
     error: null,
     added: null,
+    lookingUp: false,
+    lookupMsg: null, // { tone: 'ok' | 'warn', text }
   });
 
   const runIngestion = useCallback(async () => {
@@ -107,7 +110,62 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
   useEffect(() => { loadProposal(); }, [loadProposal]);
 
   const updateManual = (field, value) => {
-    setManual((prev) => ({ ...prev, [field]: value, error: null, added: null }));
+    setManual((prev) => ({ ...prev, [field]: value, error: null, added: null, lookupMsg: null }));
+  };
+
+  const freshManual = (over = {}) => ({
+    name: '', email: '', affiliation: '', orcid: '', note: '',
+    saving: false, error: null, added: null, lookingUp: false, lookupMsg: null,
+    ...over,
+  });
+
+  // ORCID iD lookup: name (+ optional affiliation/email) → ORCID via the
+  // fail-safe resolver. Fills the ORCID field on a confident match; abstains
+  // (message only, nothing attached) when ambiguous or not found, so a wrong
+  // namesake's iD is never silently filled in.
+  const lookupOrcid = async () => {
+    const name = manual.name.trim();
+    if (!name || manual.lookingUp) return;
+    setManual((prev) => ({ ...prev, lookingUp: true, lookupMsg: null }));
+    const submittedRequestId = requestId;
+    try {
+      const res = await fetch('/api/workbench/orcid-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          affiliation: manual.affiliation.trim() || undefined,
+          email: manual.email.trim() || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (requestIdRef.current !== submittedRequestId) return;
+      if (data.found && data.orcid) {
+        const where = data.matchedInstitution ? ` · ${data.matchedInstitution}` : '';
+        const corro = data.institutionCorroborated ? ' (institution matches)' : '';
+        setManual((prev) => ({
+          ...prev,
+          orcid: data.orcid,
+          lookingUp: false,
+          lookupMsg: { tone: 'ok', text: `Found ${data.matchedName || name}${where}${corro}. Confirm it's the right person before adding.` },
+        }));
+      } else if (data.ambiguous) {
+        setManual((prev) => ({
+          ...prev,
+          lookingUp: false,
+          lookupMsg: { tone: 'warn', text: `Multiple possible matches${data.candidateCount ? ` (${data.candidateCount})` : ''} — none attached. Add an affiliation to disambiguate, or enter the ORCID iD manually.` },
+        }));
+      } else {
+        setManual((prev) => ({
+          ...prev,
+          lookingUp: false,
+          lookupMsg: { tone: 'warn', text: data.reason || 'No confident ORCID match found. Enter it manually if you have it.' },
+        }));
+      }
+    } catch {
+      if (requestIdRef.current !== submittedRequestId) return;
+      setManual((prev) => ({ ...prev, lookingUp: false, lookupMsg: { tone: 'warn', text: 'ORCID lookup failed. Try again or enter it manually.' } }));
+    }
   };
 
   const addManualReviewer = async (ev) => {
@@ -129,6 +187,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
           name,
           email: manual.email.trim() || undefined,
           affiliation: manual.affiliation.trim() || undefined,
+          orcid: manual.orcid.trim() || undefined,
           note: manual.note.trim() || undefined,
         }),
       });
@@ -137,15 +196,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
         throw new Error(data.error || `Could not add reviewer (${res.status})`);
       }
       if (requestIdRef.current !== submittedRequestId) return;
-      setManual({
-        name: '',
-        email: '',
-        affiliation: '',
-        note: '',
-        saving: false,
-        error: null,
-        added: data.candidate || { name },
-      });
+      setManual(freshManual({ added: data.candidate || { name } }));
       if (onSaved) onSaved();
     } catch (e) {
       if (requestIdRef.current !== submittedRequestId) return;
@@ -220,6 +271,34 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
             />
           </label>
         </div>
+        <div className="flex items-end gap-2">
+          <label className="block flex-1">
+            <span className="block text-xs text-gray-500 mb-1">ORCID iD</span>
+            <input
+              type="text"
+              value={manual.orcid}
+              onChange={(ev) => updateManual('orcid', ev.target.value)}
+              disabled={!canManage || manual.saving}
+              placeholder="0000-0000-0000-0000"
+              maxLength={64}
+              className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white disabled:bg-gray-50"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={lookupOrcid}
+            disabled={!canManage || manual.saving || manual.lookingUp || !manual.name.trim()}
+            className="px-3 py-1.5 border border-gray-300 rounded text-sm whitespace-nowrap disabled:opacity-50"
+            title="Search ORCID by name + affiliation"
+          >
+            {manual.lookingUp ? 'Searching…' : 'Find ORCID'}
+          </button>
+        </div>
+        {manual.lookupMsg && (
+          <p className={`text-xs ${manual.lookupMsg.tone === 'ok' ? 'text-green-700' : 'text-amber-700'}`}>
+            {manual.lookupMsg.text}
+          </p>
+        )}
         <label className="block">
           <span className="block text-xs text-gray-500 mb-1">Note</span>
           <textarea

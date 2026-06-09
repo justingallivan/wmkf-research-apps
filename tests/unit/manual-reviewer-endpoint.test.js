@@ -27,8 +27,10 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
 }));
 
 const updateById = jest.fn(async () => {});
+const upsertByPotentialReviewer = jest.fn(async () => ({ id: 'pr-1', created: false }));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   updateById: (...a) => updateById(...a),
+  upsertByPotentialReviewer: (...a) => upsertByPotentialReviewer(...a),
 }));
 
 const ensureStaffManualCandidate = jest.fn(async () => ({ id: 'sug-1', created: true, selected: true }));
@@ -151,5 +153,36 @@ describe('write contract', () => {
     await handler(post({ requestId: REQ, name: 'Ada Lovelace' }), r);
     expect(r.statusCode).toBe(409);
     expect(r.body.code).toBe('applicant_excluded');
+  });
+});
+
+describe('orcid', () => {
+  it('persists a valid ORCID fill-only and returns it', async () => {
+    const r = res();
+    await handler(post({ requestId: REQ, name: 'Ada Lovelace', orcid: '0000-0002-1825-0097' }), r);
+    expect(r.statusCode).toBe(200);
+    expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+      'pr-1',
+      { orcid: '0000-0002-1825-0097', orcidUrl: 'https://orcid.org/0000-0002-1825-0097' },
+      { actingUserSystemId: 'u-1' },
+    );
+    expect(r.body.candidate.orcid).toBe('0000-0002-1825-0097');
+    expect(r.body.candidate.orcidUrl).toBe('https://orcid.org/0000-0002-1825-0097');
+  });
+
+  it('rejects an invalid ORCID with 400 and writes nothing', async () => {
+    const r = res();
+    await handler(post({ requestId: REQ, name: 'Ada Lovelace', orcid: 'not-an-orcid' }), r);
+    expect(r.statusCode).toBe(400);
+    expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
+    expect(upsertByEmail).not.toHaveBeenCalled();
+  });
+
+  it('no ORCID → no ORCID persist, response orcid is null', async () => {
+    const r = res();
+    await handler(post({ requestId: REQ, name: 'Ada Lovelace' }), r);
+    expect(r.statusCode).toBe(200);
+    expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
+    expect(r.body.candidate.orcid).toBeNull();
   });
 });
