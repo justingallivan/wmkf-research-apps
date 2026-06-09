@@ -67,10 +67,8 @@ function isUnresolvedIdentity(candidate) {
 }
 
 function hasResolvedIdentity(candidate, enrichment) {
-  const status = candidate?.identityStatus || enrichment?.identity?.status || null;
-  return candidate?.verified === true
-    || status === 'confirmed' || status === 'probable'
-    || candidate?.verificationStatus === 'verified' || candidate?.verificationStatus === 'probable';
+  const status = enrichment?.identity?.status || null;
+  return status === 'confirmed' || status === 'probable';
 }
 
 // Codex HIGH (S235): when a cited/PI-named candidate is allowed through save WITHOUT a resolved
@@ -167,6 +165,7 @@ export default async function handler(req, res) {
         const expertiseForDv = Array.isArray(candidate.expertiseAreas)
           ? candidate.expertiseAreas.filter(Boolean).join('; ')
           : (candidate.expertise || null);
+        const gatedExpertiseForDv = contactBlocked ? null : expertiseForDv;
 
         const sources = saveSourceListForCandidate(candidate);
         if (sources.length === 0) sources.push('unknown');
@@ -217,7 +216,8 @@ export default async function handler(req, res) {
           name: candidate.name,
           email: candidateEmail,
           affiliation: candidateAffiliation,
-          expertise: expertiseForDv,
+          expertise: gatedExpertiseForDv,
+          // Proposal-scoped reasoning is retained even when contact/profile fields are blocked.
           whyChosen: matchReason || null,
         }, { actingUserSystemId });
 
@@ -238,10 +238,10 @@ export default async function handler(req, res) {
           i10Index: blockScholar ? null : (candidate.i10Index ?? enrichment.i10Index ?? null),
           totalCitations: blockScholar ? null : (candidate.totalCitations ?? enrichment.totalCitations ?? null),
           affiliation: candidateAffiliation,
-          department: candidate.department || enrichment.department || null,
+          department: contactBlocked ? null : (candidate.department || enrichment.department || null),
           website: candidateWebsite,
           facultyPageUrl: candidateFacultyPageUrl,
-          keywords: expertiseForDv,
+          keywords: gatedExpertiseForDv,
         }, { actingUserSystemId });
 
         // Persist the resolver decision on the person; on a downgrade, also CLEAR

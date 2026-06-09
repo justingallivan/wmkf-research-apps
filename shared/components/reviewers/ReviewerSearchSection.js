@@ -155,6 +155,13 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
   const citations = c.totalCitations ?? enr.totalCitations ?? null;
   const coauthorships = Array.isArray(c.coauthorships) ? c.coauthorships : [];
 
+  // A cited/PI-named candidate the spine couldn't auto-verify is selectable (the PI vouched for
+  // them) but its contact/bibliometrics are force-nulled at save (save-candidates) until identity
+  // is confirmed. Suppress the contact/affiliation/metric display so the card matches that promise
+  // (Codex post-impl #4); show only name + reasoning + the amber "verify identity" pill.
+  const identityUnverified = provenanceGroupOf(c) !== 'needs_identity_review'
+    && (c.needsIdentification === true || c.identityStatus === 'unresolved' || c.verificationStatus === 'unresolved');
+
   const border = checked ? 'border-blue-500 bg-blue-50'
     : hasAnyCOI ? 'border-red-300 bg-red-50'
     : hasPotentialConcern ? 'border-amber-300 bg-amber-50'
@@ -184,7 +191,7 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
               </Pill>
             )}
           </div>
-          {c.affiliation && (
+          {!identityUnverified && c.affiliation && (
             <p className="text-xs text-gray-500 mt-0.5 truncate" title={enr.priorAffiliation ? `Current affiliation (per ${affiliationSourceLabel(c.affiliationSource || enr.affiliationSource)}); previously: ${enr.priorAffiliation}` : undefined}>
               {c.affiliation}
               {affiliationProvenance(c.affiliationSource || enr.affiliationSource) && (
@@ -252,21 +259,21 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
               {pubCount} publications
               {confidence !== undefined && <span className="text-gray-400">({Math.round(confidence * 100)}% expertise match)</span>}
             </span>
-            {hIndex != null && <span>· h-index {hIndex}</span>}
-            {citations != null && <span>· {citations.toLocaleString()} citations</span>}
+            {!identityUnverified && hIndex != null && <span>· h-index {hIndex}</span>}
+            {!identityUnverified && citations != null && <span>· {citations.toLocaleString()} citations</span>}
             {c.isApplicantRecommended
               ? <Pill tone="green">Applicant recommended</Pill>
               : <Pill tone={provenanceGroupOf(c) === 'needs_identity_review' ? 'amber' : 'gray'}>{provenanceLabel}</Pill>}
             {/* A cited/PI-named candidate the spine couldn't auto-verify is SELECTABLE (the PI
                 vouched for them) but its contact/bibliometrics are force-nulled at save until
-                identity is confirmed — flag that so staff verify before inviting. */}
-            {provenanceGroupOf(c) !== 'needs_identity_review'
-              && (c.needsIdentification === true || c.identityStatus === 'unresolved' || c.verificationStatus === 'unresolved') && (
+                identity is confirmed — flag that, and suppress the unverified contact/metrics
+                display below so the card matches the "no contact saved" promise. */}
+            {identityUnverified && (
               <Pill tone="amber">⚠ Verify identity — no contact saved until confirmed</Pill>
             )}
           </div>
 
-          {(email || website || orcidUrl) && (
+          {!identityUnverified && (email || website || orcidUrl) && (
             <div className="mt-2 flex items-center flex-wrap gap-2 text-xs">
               {email && (
                 <a

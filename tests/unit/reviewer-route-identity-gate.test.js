@@ -183,14 +183,24 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   // author vouched for this specific person), but ALL contact + identity-derived fields are
   // force-nulled at the boundary (Codex HIGH) — a selectable-but-unverified row can't carry a
   // wrong-person email/ORCID. System-discovered unresolved rows are still 422-rejected.
-  test('PI-named UNRESOLVED candidate is saved (not rejected) with contact force-nulled', async () => {
+  test('PI-named row without resolver verdict ignores forged verified body claims and keeps only proposal-scoped reasoning', async () => {
     const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{
       name: 'Olga Smirnova', source: 'proposal_named',
-      needsIdentification: true, identityStatus: 'unresolved',
+      needsIdentification: true,
+      verified: true, identityStatus: 'confirmed', verificationStatus: 'verified',
       email: 'maybe-namesake@example.edu', affiliation: 'Max-Born-Institute', website: 'https://example.edu',
+      department: 'Plasma Physics',
+      expertise: 'attosecond science',
       orcid: '0000-0002-9999-9999',
+      reasoning: 'The PI named this reviewer in the proposal.',
+      relevanceScore: 87,
       contactEnrichment: {
         email: 'maybe-namesake@example.edu', emailSource: 'serp_search',
+        department: 'Laser Research',
+        orcidId: '0000-0002-9999-9999',
+        googleScholarId: 'NAMESAKE',
+        hIndex: 25,
+        totalCitations: 2500,
         emailPersistAllowed: true, websitePersistAllowed: true, affiliationPersistAllowed: true,
       },
     }] } };
@@ -202,12 +212,21 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     const person = potentialReviewerAdapter.upsertByEmail.mock.calls[0][0];
     expect(person.email).toBeNull();
     expect(person.affiliation).toBeNull();
+    expect(person.expertise).toBeNull();
+    expect(person.whyChosen).toBe('The PI named this reviewer in the proposal.');
     const researcher = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
     expect(researcher.email).toBeNull();
     expect(researcher.orcid).toBeNull();
     expect(researcher.website).toBeNull();
     expect(researcher.facultyPageUrl).toBeNull();
     expect(researcher.googleScholarId).toBeNull();
+    expect(researcher.department).toBeNull();
+    expect(researcher.keywords).toBeNull();
+
+    const suggestion = reviewerSuggestionAdapter.upsert.mock.calls[0][0];
+    expect(suggestion.matchReason).toBe('The PI named this reviewer in the proposal.');
+    expect(suggestion.relevanceScore).toBe(87);
+    expect(suggestion.suggestionLabel).toBeNull();
   });
 
   test('a system-discovered (literature_retrieved) UNRESOLVED candidate is still 422-rejected', async () => {
