@@ -1,9 +1,19 @@
 # Field-Aware Track-A Verification Routing — Design Spec
 
-> **Status:** Design spec, drafted 2026-06-08; **revised post Codex design review
-> (NO-GO → revised design below).** Pre-implementation; **no code changes until
-> approved.** Live-state claims are marked `[VERIFIED via source]`; design choices
-> are marked `[PROPOSED]`.
+> **Status:** **IMPLEMENTED & SHIPPED S236** through the full Codex loop (design
+> review NO-GO → revised → pre-impl GO-WITH-CHANGES → impl → post-impl FIX-FIRST →
+> fixed). Both changes committed. Live-state claims are marked `[VERIFIED via
+> source]`; design choices are marked `[PROPOSED]`.
+>
+> **Post-impl review outcome (Codex):** CHECK 1-3 + 5 CONFIRMED-OK (rename clean,
+> truth-table correct, gate doesn't regress non-Track-A callers, inert guard
+> harmless). **CHECK 4 (SHOULD-FIX) FIXED:** `mapSpineVerificationResult` omitted
+> `affiliationHistory`, so spine-verified (non-biomedical) reviewers silently
+> skipped the former-institution COI scan (`deduplication-service.js:288`). Now
+> plumbs ORCID employment history (`reviewer-identity-evidence.js` →
+> `orcidAffiliations` → `affiliationHistory`); a strict improvement that also
+> closes the same pre-existing gap for PubMed-off spine users. CHECK 6 covered by
+> 2 new tests.
 >
 > **Objective:** Stop dumping every Claude-suggested reviewer for a
 > non-biomedical (e.g. physics) proposal into the read-only "Unverified

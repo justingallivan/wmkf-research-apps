@@ -243,6 +243,55 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
     });
   });
 
+  test('spine-verified candidate carries ORCID employment history as affiliationHistory (former-institution COI)', async () => {
+    // Codex S236 post-impl CHECK 4: deduplication-service scans former-institution
+    // COI only when affiliationHistory is an array. The spine path must supply it
+    // (from ORCID employments) or non-biomedical reviewers silently skip that check.
+    ReviewerIdentityEvidence.evaluateSuggestion.mockResolvedValueOnce({
+      status: 'confirmed',
+      resolverStatus: 'confirmed',
+      orcid: '0000-0002-1825-0097',
+      selectedRecord: { openAlexId: 'https://openalex.org/A1', lastKnownInstitution: 'ETH Zurich' },
+      orcidAffiliations: ['ETH Zurich', 'Johns Hopkins University'], // former: JHU
+      anchors: [{ type: 'affiliation_match', weight: 'strong' }],
+      sources: { openalex: 'ok', orcid: 'ok' },
+      reason: 'confirmed',
+      identity: { status: 'confirmed', anchors: [] },
+    });
+
+    const result = await runVerification(
+      { name: 'Robert Sang', expertiseAreas: ['attosecond physics'] },
+      { 'Robert Sang[Author]': [article('1', 'Robert Sang'), article('2', 'Robert Sang'), article('3', 'Robert Sang')] },
+      { searchPubmed: false, proposalInfo: { primaryResearchArea: 'Physics' } },
+    );
+
+    expect(result.verified).toHaveLength(1);
+    expect(Array.isArray(result.verified[0].affiliationHistory)).toBe(true);
+    expect(result.verified[0].affiliationHistory).toEqual(['ETH Zurich', 'Johns Hopkins University']);
+  });
+
+  test('spine-verified candidate with no ORCID history falls back to current institution array', async () => {
+    ReviewerIdentityEvidence.evaluateSuggestion.mockResolvedValueOnce({
+      status: 'confirmed',
+      resolverStatus: 'confirmed',
+      orcid: '0000-0002-1825-0097',
+      selectedRecord: { openAlexId: 'https://openalex.org/A1', lastKnownInstitution: 'ETH Zurich' },
+      orcidAffiliations: [],
+      anchors: [{ type: 'affiliation_match', weight: 'strong' }],
+      sources: { openalex: 'ok', orcid: 'ok' },
+      reason: 'confirmed',
+      identity: { status: 'confirmed', anchors: [] },
+    });
+
+    const result = await runVerification(
+      { name: 'Robert Sang', expertiseAreas: ['attosecond physics'] },
+      { 'Robert Sang[Author]': [article('1', 'Robert Sang'), article('2', 'Robert Sang'), article('3', 'Robert Sang')] },
+      { searchPubmed: false, proposalInfo: { primaryResearchArea: 'Physics' } },
+    );
+
+    expect(result.verified[0].affiliationHistory).toEqual(['ETH Zurich']);
+  });
+
   test('proposal-named source maps to proposal_named provenance while References stays parametric', async () => {
     const skipped = await DiscoveryService.verifyClaudeSuggestions([
       { name: 'Dr. Proposal Named', source: 'Mentioned in proposal', expertiseAreas: [] },
