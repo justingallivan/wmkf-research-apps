@@ -1,117 +1,114 @@
-# Session 237 Prompt: Reviewer field-aware verification + manual add/ORCID + regression fix shipped
+# Session 238 Prompt: Reviewer manual-add dedup shipped + relevancescore incident fixed; reviewer-finder prompt redesign on the table
 
-## Session 236 Summary
+## Session 237 Summary
 
-A long session, all shipped to `main` (auto-deploys to prod). Two arcs ran the full Codex loop
-(design → pre-impl → impl → post-impl); a third was a live-testing-driven regression caught and
-fixed same session.
+A long, multi-arc session, all on `main` (auto-deploys to prod). Three arcs, all run through the
+Codex loop.
 
 ### What Was Completed
 
-1. **Reviewer-search UI fixes** (`38bf9ab`) — two PD-reported issues on a physics search:
-   the "Unverified suggestions" label hardcoded "PubMed couldn't confirm these" (relabeled
-   database-neutral); a Claude suggestion that *also* verified from a DB search appeared under
-   BOTH headings (added `unverifiedToShow` dedup — the verified row wins). `ReviewerSearchSection.js`.
+1. **S236 manual-add / ORCID post-impl fixes** (`971ec97`) — Codex post-impl review of the S236
+   manual-add + ORCID work found 6 real issues, all fixed: exclusion-gate-before-identity-writes,
+   fill-only `emailSource`, option-scoped ORCID `strictAmbiguity`, stale-name lookup guard,
+   `emailMatches` gating, and a client invalidation when an identity field changes.
 
-2. **Field-aware Track-A verification** (`d03e09a` + post-impl `c6ba84b`; spec `2788ae2`; memory
-   `7c17d71`, `02182d3`) — the big arc. Root cause of #1: Track-A verification of Claude's named
-   suggestions was **PubMed-only**, so non-biomedical (physics/chem/CS) suggestions all failed.
-   - **Change 1:** new `DiscoveryService.suggestionVerifierRouting()` routes clearly-non-biomedical
-     proposals to the OpenAlex/ORCID spine instead of PubMed. `pubMedVerificationContract` left
-     field-UNAWARE so the coauthor-COI gate at `discover.js:244` is untouched (Codex E.2 catch).
-   - **Change 2:** forename-gate the spine promotions (was ungated). **NOTE: this Change 2 caused
-     the regression in #4 — see below; its gate semantic was fixed later this session.**
-   - **Post-impl fix:** spine-verified candidates now carry `affiliationHistory` (from ORCID
-     employments) so former-institution COI still fires (Codex CHECK 4).
-   - Side-effect logged: `evaluateCrossFieldNamesakeGuard` is now inert for physical/eng proposals
-     → parked in new `project-deferred-code-cleanup` backlog memory (retire later, verify callers).
+2. **Manual-add cross-store dedup — PR #21, MERGED** (`d611130`, `bac7818`, merge `9178fce`) — the
+   big feature arc. Manual reviewer-add now checks BOTH stores (`wmkf_potentialreviewer` + CRM
+   `contact`) before minting a person, including the **former-PI case** (contact-only → create
+   reviewer + link). New read-only `/api/workbench/reviewer-lookup` (tiered ORCID→email→name,
+   ambiguity-aware `top:2`, cross-store conflict + reverse-link detection); `manual-reviewer` gained
+   a `resolution` contract + create-and-link (link-last + hardened `setContactLink`); orchestration
+   extracted to `lib/services/reviewer-identity-lookup.js`. Design: rev3 after 2 Codex pre-impl
+   passes; Codex implemented, I reviewed/fixed + post-impl-reviewed; **18/18 live read-only smoke**
+   (`scripts/smoke-reviewer-lookup-dedup.mjs`). ⚠️ The **write path (create-and-link) was NOT
+   live-smoked** (would leave an un-deletable contact in prod) — wants a manual UI click-through.
 
-3. **Manual reviewer add → ORCID lookup** (`d8a6bd9`, `8c19b0a`, `42aa9fe`) — **NOT Codex-reviewed
-   (self-reviewed only); pending next session (see top of S236 prompt / the note still applies).**
-   - Reviewed + committed Codex's Phase-1 manual add (`d8a6bd9`): new `/api/workbench/manual-reviewer`,
-     `ensureStaffManualCandidate` adapter (idempotent, source-union, fail-closed on excluded, reselect).
-   - Renamed "Add reviewer" → "Manually Add New Reviewer", moved below search / above verify via a
-     `manualAddSlot` passed into `ReviewerSearchSection` (`8c19b0a`).
-   - **ORCID lookup** (`42aa9fe`): new read-only `/api/workbench/orcid-lookup` reusing
-     `ORCIDService.findContact` (name-match-gated, abstains on ambiguity); "Find ORCID" button +
-     ORCID field on the form; a staff ORCID is persisted **fill-only** via `upsertByPotentialReviewer`
-     (never overwrites resolver/attested ORCID, never touches `wmkf_identitystatus`). Open question
-     for review: fill-only vs allow staff *correction*; ORCID search uses name+affiliation, not email.
+3. **PRODUCTION INCIDENT — reviewer saves silently failing** (`dad3a26`, `9f4e378`) — PD reported a
+   searched reviewer (Tanja Mittag, request 1002852) wouldn't save, no error. Root cause (live
+   Dataverse 400, Codex-confirmed): `wmkf_appreviewersuggestion.wmkf_relevancescore` is a Double
+   bounded **[0,1]**, but `save-candidates` writes a **0–100** score → any candidate scoring >1 hit a
+   400 the per-row try/catch swallowed (orphan person, no candidate, no error). **Silently dropping
+   the best-ranked candidates since the S223 scale change.** Fix: widened the field `[0,1]→[0,100]`
+   in prod (PUT-full-definition + `PublishXml` via `scripts/widen-relevancescore-max.mjs` — **`PATCH`
+   returns 405**; ran + verified live), `[0,100]` clamp guard in the adapter, and made the failure
+   LOUD (`save-candidates` 500+errors when nothing saves; both Find clients show the failed name +
+   error). `scripts/find-orphan-reviewers.mjs` (read-only) found 3 orphans (Mittag, Lavrik,
+   Madabhushi) — heal on re-save, no cleanup needed.
 
-4. **Forename-gate REGRESSION fix (Keller/Sang)** (`b2245d0` + Codex follow-up `28a764d`) — a PD
-   flagged two proposal-named physics reviewers (Ursula Keller, Robert Sang) coming back UNVERIFIED
-   (0 pubs, no email) though previously verified. Live spine probe proved cause: Change 2's gate
-   (`forenameAgrees !== false`) treated OpenAlex initial-only records ("U. Keller", "R. T. Sang")
-   as "wrong forename" and demoted confirmed→unresolved despite affiliation_match[strong] +
-   orcid_employment_corroborated[strong]. **Fix:** gate on a forename **contradiction** (both full
-   AND different — the "Alfred vs Alain" signature), not initial-only. New `forenamesContradict()`;
-   resolver gates `:172`/`:175` on `forenameContradicts !== true`. The `:188` employment-only path
-   (no affiliation_match) keeps strict `forenameAgrees === true`. Codex review: SHIP (hazard not
-   reopened). Live spine now returns `confirmed` for both.
+4. **Reviewer-finder diagnosis (why 1002852 surfaced ~6 of 12, all "database")** — investigated;
+   NOT a bug, a signal-starvation story: (a) the Workbench folds PubMed-verified Claude suggestions
+   into "Literature-retrieved" (no Claude label, unlike the standalone); (b) **`load-proposal`
+   reuses grant-reporting's `classifyFile`, which demotes Phase-I docs** (correct for a Phase II
+   goals-assessment, wrong here) → only the 136KB `ProjectDescription.pdf` loads, not the full app;
+   (c) **Phase I collects no bibliography + this narrative had no inline refs**; (d) **the PI
+   excluded the field's 3 leading peers** (Ahel/Pascal/Luger, "overlapping research programs") — the
+   same names the narrative cited — and the exclude filter clobbered them. Logged 2 memories.
+
+5. **Reviewer-finder prompt redesign — design discussion + draft** (`docs/REVIEWER_FINDER_PROMPT_DECOMPOSITION_DESIGN.md`,
+   draft, **NOT committed/built**) — the current analyze prompt is overloaded (extract + generate +
+   query-craft in one call) and stale. Drafted a **field-primer + decomposition** sketch (primer =
+   async pre-computed at submission → out of the latency budget; standalone PD deliverable). 2 Codex
+   passes reshaped it to *extend* the existing `REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` (which
+   already specifies the decomposition) and added the machine-readable primer→candidate boundary.
 
 ### Commits (all on `main`, pushed)
-- `38bf9ab` UI label + dedup · `2788ae2` design spec · `d03e09a` Change 1+2 · `c6ba84b` COI fix
-- `7c17d71` memory · `02182d3` cleanup-backlog memory
-- `d8a6bd9` manual add (Codex, reviewed) · `8c19b0a` rename/reposition · `42aa9fe` ORCID lookup
-- `b2245d0` forename-gate regression fix · `28a764d` Codex follow-up coverage
+- `971ec97` S237 post-impl fixes · `d453c9b` dedup design rev3 · `d611130` Codex dedup impl ·
+  `91e06c5` test-mock fixes · `bac7818` lib extraction + e2e smoke · `9178fce` **merge PR #21**
+- `d9f4803` canonical-counts reconcile (Justin) · `dad3a26` relevancescore widen + loud failures ·
+  `9f4e378` widen-script PUT+publish fix · `0a15594` schema-deploy memory gotcha #5
+- `7f0ab8a` proposal-doc-context memory · `bd3bd4f` exclusion-policy memory
 
 ## Potential Next Steps
 
-### 1. Codex review of the manual-add / ORCID work (PENDING — promised)
-`42aa9fe` (ORCID lookup, new route + identity persistence) and `8c19b0a`. Focus: the fill-only vs
-staff-correction persistence policy; ORCID search not using email. Run the Codex post-impl loop.
+### 1. Reviewer-finder prompt redesign — first concrete step
+The design is drafted + Codex-reviewed (extends `REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md`). The
+recommended de-risk first step: a **shadow, non-candidate-producing prototype** — structured
+extraction + **people-agnostic** field primer + query/`sourcePlan` generation → feed only the
+queries into existing retrieval → compare yield/latency/false-positives. Do NOT prototype "primer
+names people" first. Decide before building: web tooling, primer caching/scope, prompt-version
+migration, eval metrics.
 
-### 2. Confirm the regression fix in the real flow
-Re-run a physics reviewer search and verify Keller / Sang come back **verified with pubs+email**.
-The initial-only over-block likely hit other good reviewers too since Change 2 shipped — not just
-those two. `npm run smoke:reviewer-contact` for the broader contact battery.
+### 2. Manual-add dedup — verify the write path live
+PR #21 merged but the create-and-link write path wasn't live-smoked. Manual UI click-through in
+the Workbench Find tab (add someone who exists as a contact-only / former PI) before relying on it.
 
-### 3. Deferred cleanup backlog
-`[[project-deferred-code-cleanup]]` — retire the now-inert `evaluateCrossFieldNamesakeGuard`
-(verify no live caller first). Read at the start of any cleanup session.
+### 3. Open POLICY decision — applicant-exclusion breadth (needs the foundation)
+`[[project-applicant-exclusion-policy-pending]]` — a PI can exclude the whole peer set with one soft
+"overlapping programs" line, clobbering Claude's signal. Sub-question for a quick UX win: surface
+**excluded-but-suggested** peers (and Claude-origin) in the Workbench Find tab so the PD can judge.
 
-### 4. Carryover from S235 (still open)
-Smirnova sparse-affiliation selection-collision (hard); sticky-`confirmed` discrepancy
-reconciliation ([[project-reviewer-self-report-orcid-sticky-confirmed]] vs spine emitting confirmed).
+### 4. Next-cycle input fix (combined Phase I+II)
+`[[project-reviewer-finder-proposal-doc-context]]` — build the **Power Automate flow** that
+assembles ONE clean reviewer-finding doc (narrative + bibliography; drop budget/board/biosketches).
+Also: give the Reviewer Finder its own doc selector so `classifyFile` no longer demotes Phase I.
 
-### 5. Broader direction (NOT this arc)
-Reviewer-finder RETRIEVAL REDESIGN ([[project-reviewer-finder-retrieval-redesign]]); the field-aware
-routing shipped this session is a compatible interim step that reduces the physics-recall cliff.
+### 5. Carryover from S236 (still open)
+Smirnova sparse-affiliation selection collision; the automated-resolver-emits-`confirmed` vs
+sticky-sentinel discrepancy.
 
-## Standing context / guardrails
-- **`main` auto-deploys to prod on push. Commit/push only when asked. Stage by explicit path.**
-  `npm run build` green before pushing — Codex CANNOT run build/jest; run them yourself.
-- **Delegating to Codex = isolated git worktree off HEAD → commit first**
-  ([[feedback-commit-before-delegating-to-worktree-agent]]). Pass a self-contained prompt; embed
-  uncommitted spec text inline if it isn't committed yet.
-- **No backticks in `git commit -m "…"` (double-quoted bash runs them as command substitution and
-  mangles the message).** Use single quotes, or avoid backticks.
-- Identity principles: **identity-confirmed ≠ contact-validated; anchor-or-abstain**
-  ([[project-reviewer-contact-enrichment-anchoring]]); the spine is **fail-dangerous** — abstains
-  rather than mis-verify ([[project-reviewer-verify-fail-dangerous]]). **Forename gate = block a
-  CONTRADICTION (both full + different), not an initial-only record (S236 lesson).**
-- Keep the Codex loop: spec → design review → implement → post-impl review → reconcile → merge.
+## Loose ends / gotchas
+- **`docs/REVIEWER_ONBOARDING_FLOW_MOCKUP.md` is UNTRACKED and not from this session** (created
+  14:51 by Justin/another agent — reviewer-portal onboarding flow + mockups). Left uncommitted on
+  purpose; decide whether to keep/commit it.
+- `main` auto-deploys to prod on push. Commit/push only when asked. No backticks in `git commit -m`.
+- Delegating to Codex = isolated worktree off HEAD → commit first; embed uncommitted text inline.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/services/discovery-service.js` | `suggestionVerifierRouting` (field-aware Track-A), `pubMedVerificationContract` (COI gate, field-unaware), `mapSpineVerificationResult`. |
-| `lib/services/reviewer-identity-evidence.js` | `forenameFullyAgrees`, `forenamesContradict` (both in `_internals`), `buildAnchors`, spine selection. |
-| `lib/services/reviewer-identity-resolver.js` | `classifySpineEvidence` — `:172/:175` forename-contradiction gate; `:188` employment-only strict gate. |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | `ensureStaffManualCandidate` (manual add). |
-| `lib/dataverse/adapters/researcher.js` | `upsertByPotentialReviewer` (fill-only ORCID/metrics writer). |
-| `pages/api/workbench/manual-reviewer.js` | Manual add endpoint (+ fill-only ORCID persist). |
-| `pages/api/workbench/orcid-lookup.js` | Read-only ORCID lookup (reuses `ORCIDService.findContact`). |
-| `shared/components/reviewers/ReviewerFindPanel.js` | Manual-add form (state + `manualAddSlot`, ORCID lookup). |
-| `docs/REVIEWER_FIELD_AWARE_VERIFICATION_DESIGN.md` | Field-aware verification + forename-gate spec (incl. the regression history). |
-| `docs/REVIEWER_MANUAL_ADD_DESIGN.md` | Manual add Phase-1 design. |
+| `pages/api/workbench/reviewer-lookup.js` | Thin shell → `lib/services/reviewer-identity-lookup.js` (cross-store dedup orchestration) |
+| `pages/api/workbench/manual-reviewer.js` | Manual add + `resolution` contract + create-and-link |
+| `lib/dataverse/adapters/{potential-reviewer,contact}.js` | `findBy{Email,Orcid}Candidates`, `searchByName`, `findByContactId`, hardened `setContactLink` |
+| `pages/api/reviewer-finder/save-candidates.js` | relevancescore clamp + loud failure (500 on all-fail) |
+| `scripts/widen-relevancescore-max.mjs` | Dataverse attr-widen deploy script (PUT+publish; ran in prod) |
+| `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` | The retrieval-first redesign (decomposition home) |
+| `docs/REVIEWER_FINDER_PROMPT_DECOMPOSITION_DESIGN.md` | Field-primer draft (extends the plan; not built) |
 
 ## Testing
-
 ```bash
-npx jest reviewer discovery identity contact provenance save manual-reviewer orcid-lookup
-npm run build
-npm run smoke:reviewer-contact                 # live + offline contact-anchoring battery
+npx jest reviewer save-candidates suggestion          # reviewer/save/suggestion battery
+node --import ./scripts/lib/use-extensionless.mjs scripts/smoke-reviewer-lookup-dedup.mjs  # live dedup read smoke
+npm run build && npm run lint                          # green before pushing (Codex can't run these)
 # full startup gate set: see .claude/skills/start
 ```
