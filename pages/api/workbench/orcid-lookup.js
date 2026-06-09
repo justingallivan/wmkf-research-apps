@@ -63,6 +63,10 @@ export default async function handler(req, res) {
       clientId,
       clientSecret,
       throwOnError: false,
+      // No downstream forename/email gate on this path (unlike the identity spine),
+      // and the staff email is not a search key — so abstain on multiple distinct
+      // name-matching ORCIDs rather than picking one just for being contactable.
+      strictAmbiguity: true,
     });
 
     // null → no name-confident record; {status:'ambiguous'} → multiple distinct

@@ -21,9 +21,25 @@ jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { getRecord: (...a) => getRecord(...a) },
 }));
 
-const upsertByEmail = jest.fn(async () => ({ id: 'pr-1', created: true }));
+const PR = '11111111-2222-3333-4444-555555555555';
+const CONTACT = '22222222-3333-4444-5555-666666666666';
+const createReviewer = jest.fn(async () => ({ id: PR, created: true }));
+const getReviewerById = jest.fn(async () => ({ wmkf_potentialreviewersid: PR }));
+const setContactLink = jest.fn(async () => ({ action: 'link' }));
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
-  upsertByEmail: (...a) => upsertByEmail(...a),
+  create: (...a) => createReviewer(...a),
+  getById: (...a) => getReviewerById(...a),
+  setContactLink: (...a) => setContactLink(...a),
+}));
+
+const getContactById = jest.fn();
+jest.mock('../../lib/dataverse/adapters/contact', () => ({
+  getById: (...a) => getContactById(...a),
+}));
+
+const lookupReviewerIdentity = jest.fn(async () => ({ outcome: 'none' }));
+jest.mock('../../pages/api/workbench/reviewer-lookup', () => ({
+  lookupReviewerIdentity: (...a) => lookupReviewerIdentity(...a),
 }));
 
 const updateById = jest.fn(async () => {});
@@ -69,7 +85,9 @@ beforeEach(() => {
     wmkf_meetingdate: '2026-06-01',
     _wmkf_programareaserved_value_formatted: 'Science',
   });
-  upsertByEmail.mockResolvedValue({ id: 'pr-1', created: true });
+  createReviewer.mockResolvedValue({ id: PR, created: true });
+  lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
+  getContactById.mockResolvedValue(null);
   ensureStaffManualCandidate.mockResolvedValue({ id: 'sug-1', created: true, selected: true });
 });
 
@@ -115,15 +133,22 @@ describe('write contract', () => {
     }), r);
 
     expect(r.statusCode).toBe(200);
-    expect(upsertByEmail).toHaveBeenCalledWith(expect.objectContaining({
+    expect(createReviewer).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Ada Lovelace',
       email: 'ada@example.edu',
       affiliation: 'Example University',
       whyChosen: 'Prior panelist.',
     }), { actingUserSystemId: 'u-1' });
-    expect(updateById).toHaveBeenCalledWith('pr-1', { emailSource: 'manual' }, { actingUserSystemId: 'u-1' });
+    // emailSource is now fill-only via upsertByPotentialReviewer, not an
+    // unconditional updateById overwrite (finding 5).
+    expect(updateById).not.toHaveBeenCalled();
+    expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+      PR,
+      expect.objectContaining({ emailSource: 'manual' }),
+      { actingUserSystemId: 'u-1' },
+    );
     expect(ensureStaffManualCandidate).toHaveBeenCalledWith(expect.objectContaining({
-      potentialReviewerId: 'pr-1',
+      potentialReviewerId: PR,
       requestId: REQ,
       suggestionLabel: 'Manual add proposal — Ada Lovelace',
       grantCycleCode: 'J26',
@@ -139,10 +164,11 @@ describe('write contract', () => {
     await handler(post({ requestId: REQ, name: 'Grace Hopper' }), r);
     expect(r.statusCode).toBe(200);
     expect(updateById).not.toHaveBeenCalled();
+    expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
     expect(r.body.candidate.invitable).toBe(false);
   });
 
-  it('409s when an excluded row wins', async () => {
+  it('409s when an excluded row wins, without any identity-bearing person write', async () => {
     ensureStaffManualCandidate.mockResolvedValueOnce({
       id: 'sug-excluded',
       created: false,
@@ -150,9 +176,91 @@ describe('write contract', () => {
       skippedExcluded: true,
     });
     const r = res();
-    await handler(post({ requestId: REQ, name: 'Ada Lovelace' }), r);
+    // Include email + ORCID so the test proves the exclusion gate fires BEFORE
+    // those writes (finding 4): a rejected re-add must not relabel emailSource
+    // or fill ORCID on the global person row.
+    await handler(post({
+      requestId: REQ,
+      name: 'Ada Lovelace',
+      email: 'ada@example.edu',
+      orcid: '0000-0002-1825-0097',
+    }), r);
     expect(r.statusCode).toBe(409);
     expect(r.body.code).toBe('applicant_excluded');
+    expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
+    expect(updateById).not.toHaveBeenCalled();
+  });
+});
+
+describe('resolution contract', () => {
+  it('refuses name-tier reuse without an explicit selected id', async () => {
+    lookupReviewerIdentity.mockResolvedValueOnce({
+      outcome: 'candidates',
+      candidates: [{ source: 'reviewer', matchKey: 'name', reviewerId: PR, contactId: null, context: { name: 'Ada Lovelace', active: true } }],
+    });
+    const r = res();
+    await handler(post({ requestId: REQ, name: 'Ada Lovelace' }), r);
+    expect(r.statusCode).toBe(409);
+    expect(r.body.code).toBe('resolution_required');
+    expect(createReviewer).not.toHaveBeenCalled();
+  });
+
+  it('rejects reuse_contact when typed email differs from the contact email', async () => {
+    lookupReviewerIdentity.mockResolvedValueOnce({ outcome: 'none' });
+    getContactById.mockResolvedValueOnce({
+      contactid: CONTACT,
+      fullname: 'Ada Lovelace',
+      emailaddress1: 'ada@crm.edu',
+      wmkf_orcid: null,
+    });
+    const r = res();
+    await handler(post({
+      requestId: REQ,
+      name: 'Ada Lovelace',
+      email: 'ada@typed.edu',
+      resolution: { mode: 'reuse_contact', contactId: CONTACT },
+    }), r);
+    expect(r.statusCode).toBe(409);
+    expect(r.body.code).toBe('email_mismatch');
+    expect(createReviewer).not.toHaveBeenCalled();
+  });
+
+  it('creates, gates, carries forward fill-only, then links a chosen contact', async () => {
+    lookupReviewerIdentity.mockResolvedValueOnce({
+      outcome: 'confident',
+      match: { reviewerId: null, contactId: CONTACT, matchKey: 'email', nameConsistent: true, context: { name: 'Ada Lovelace', email: 'ada@crm.edu', active: true } },
+    });
+    getContactById.mockResolvedValueOnce({
+      contactid: CONTACT,
+      fullname: 'Ada Lovelace',
+      emailaddress1: 'ada@crm.edu',
+      wmkf_orcid: '0000-0002-1825-0097',
+    });
+    const r = res();
+    await handler(post({ requestId: REQ, name: 'Ada Lovelace', email: 'ada@crm.edu' }), r);
+    expect(r.statusCode).toBe(200);
+    expect(createReviewer).toHaveBeenCalled();
+    expect(ensureStaffManualCandidate).toHaveBeenCalledWith(expect.objectContaining({ potentialReviewerId: PR }), { actingUserSystemId: 'u-1' });
+    expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+      PR,
+      expect.objectContaining({ emailSource: 'manual', orcid: '0000-0002-1825-0097' }),
+      { actingUserSystemId: 'u-1' },
+    );
+    expect(setContactLink).toHaveBeenCalledWith(PR, CONTACT, { actingUserSystemId: 'u-1' });
+  });
+
+  it('retry after prior link failure heals by linking an existing reviewer to the contact', async () => {
+    lookupReviewerIdentity.mockResolvedValueOnce({
+      outcome: 'confident',
+      match: { reviewerId: PR, contactId: CONTACT, matchKey: 'email', nameConsistent: true, context: { name: 'Ada Lovelace', email: 'ada@crm.edu', active: true } },
+    });
+    getReviewerById.mockResolvedValueOnce({ wmkf_potentialreviewersid: PR, _wmkf_contact_value: null });
+    getContactById.mockResolvedValueOnce({ contactid: CONTACT, fullname: 'Ada Lovelace', emailaddress1: 'ada@crm.edu' });
+    const r = res();
+    await handler(post({ requestId: REQ, name: 'Ada Lovelace', email: 'ada@crm.edu' }), r);
+    expect(r.statusCode).toBe(200);
+    expect(createReviewer).not.toHaveBeenCalled();
+    expect(setContactLink).toHaveBeenCalledWith(PR, CONTACT, { actingUserSystemId: 'u-1' });
   });
 });
 
@@ -162,7 +270,7 @@ describe('orcid', () => {
     await handler(post({ requestId: REQ, name: 'Ada Lovelace', orcid: '0000-0002-1825-0097' }), r);
     expect(r.statusCode).toBe(200);
     expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
-      'pr-1',
+      PR,
       { orcid: '0000-0002-1825-0097', orcidUrl: 'https://orcid.org/0000-0002-1825-0097' },
       { actingUserSystemId: 'u-1' },
     );
@@ -175,7 +283,7 @@ describe('orcid', () => {
     await handler(post({ requestId: REQ, name: 'Ada Lovelace', orcid: 'not-an-orcid' }), r);
     expect(r.statusCode).toBe(400);
     expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
-    expect(upsertByEmail).not.toHaveBeenCalled();
+    expect(createReviewer).not.toHaveBeenCalled();
   });
 
   it('no ORCID → no ORCID persist, response orcid is null', async () => {
