@@ -23,7 +23,7 @@ the PI-trail corpus lane, peer-group parsing, facet generation, or the two net-n
   `requestId`**. PI name + institution come only from `analysisResult.proposalInfo.proposalAuthors`
   and `.authorInstitution` (`discover.js:196,226`), which `analyze.js` extracts from proposal text.
   This is the path that misresolved "Wen Li" → "Yanping Li" and guessed "Wayne State" (§12.2).
-- **Three consumers of that identity in `discover.js`:**
+- **Consumers of that identity `[VERIFIED via source — incl. Codex #1 catch]`:**
   1. `deriveProposalAuthorNames(proposalInfo)` → `DeduplicationService.filterProposalAuthors()` —
      hard name-fuzzy exclude of the PI/co-Is from candidates (`discover.js:196,201,326`;
      `deduplication-service.js:319-345`).
@@ -31,6 +31,12 @@ the PI-trail corpus lane, peer-group parsing, facet generation, or the two net-n
      exclude) of same-institution candidates (`discover.js:230,348`; `deduplication-service.js:265-309`).
   3. `DiscoveryService.checkCoauthorshipsForCandidates(candidates, proposalAuthors)` — PubMed
      coauthor COI (`discover.js:252`; `discovery-service.js:2207-2257`).
+  4. **HARD institution drop (originally missed by this doc):** `DeduplicationService.filterConflicts(
+     deduplicated, authorInstitution)` runs *inside* `DiscoveryService.discover()`
+     (`discovery-service.js:259`) and **removes** Track-B candidates whose affiliation matches the LLM
+     `authorInstitution` (`deduplication-service.js:filterConflicts` returns `false` → dropped). So
+     institution COI is not purely a soft flag; part of it is a silent recall-affecting hard drop. This is
+     the crux of the Chunk-1/Chunk-2 split (§9).
 - **`requestId` is available client-side but not forwarded.** Workbench: `ReviewerSearchSection`
   prop, POSTs at `ReviewerSearchSection.js:559-577`. Standalone: `uploadedFiles[0]?.sourceProposal?.requestId`,
   POSTs at `reviewer-finder.js:966-978`. `save-candidates` and `load-proposal` already take `requestId`.
@@ -97,18 +103,18 @@ the service stays context-agnostic and unit-testable.
   ```
   Emit one `progress` event describing the outcome (`resolved` with canonical name/institution, or the
   `reason` when inert) — visibility without changing control flow.
-- **Augment the three consumers** (only when `piIdentity.resolved`):
+- **Augment the consumers** (only when `piIdentity.resolved`; Chunk 1 = items 1 + 3, item 2 deferred):
   1. **Author exclusion + coauthor set:** add `piIdentity.canonicalName` to the `proposalAuthors` array
      before `filterProposalAuthors` and `checkCoauthorshipsForCandidates`. (Union with the LLM-derived
      names — never drop them; the canonical name fixes the case where the LLM name was wrong/missing.)
-  2. **Institution COI:** call `markInstitutionCOI` with the **union** of `{ authorInstitution (LLM),
-     piIdentity.institution (OpenAlex last-known) }`. Because institution COI is a *soft flag*, adding a
-     second institution only ever flags **more** candidates for human review — safe, and it recovers the
-     case where the LLM institution was hallucinated/missing. (Needs `markInstitutionCOI` to accept
-     multiple institutions, or to be called twice and OR the flags — see Q3.)
-  3. **Identity-level PI exclusion:** drop any candidate whose **resolved** `orcid` or
-     `openAlexAuthorId` equals the PI's — identity equality, never name equality (§12.4/§12.5 safety).
-     This catches a PI who slipped the name-fuzzy filter (e.g. name variant) but is identity-resolved.
+  2. **Institution COI — DEFERRED to Chunk 2 (Codex #1/#4/#8, §9).** Originally proposed here as a safe
+     soft-flag union; review showed it entangles a *hard* drop (`filterConflicts`), an *overwrite* bug in
+     `markInstitutionCOI`, a post-hoc recompute in `enrich-contacts`, and a recall **policy fork**. Out of
+     Chunk 1. Chunk 1 leaves institution COI on the LLM `authorInstitution` **everywhere** (no drift).
+  3. **Identity-level PI exclusion:** drop any candidate whose **resolved** `orcid`/`orcidId` or
+     `openAlexId`/`openAlexAuthorId` equals the PI's — identity equality, never name equality
+     (§12.4/§12.5 safety) — **gated on `identityStatus` confirmed/probable** (Codex #5: unresolved rows
+     still carry these fields, so the gate is mandatory). Catches a PI who slipped the name-fuzzy filter.
 - **Nothing is removed.** Every existing filter still runs on the existing inputs; the structured
   identity only *adds* names/institutions/identity-exclusions.
 
@@ -126,7 +132,7 @@ the service stays context-agnostic and unit-testable.
 - **No new provenance kind, no schema/migration, no new route.** `discover.js` stays in the security
   matrix as-is (body-param addition only); run `check:api-routes` to confirm.
 
-## 4. Open questions for Codex (pre-impl)
+## 4. Open questions for Codex (pre-impl) — ANSWERED, see §9 for verdicts/folds
 
 - **Q1 (authz scope):** Is app-level `requireAppAccess('reviewer-finder','reviewers')` sufficient before
   reading this request's PI contact, or should we assert per-request access? Note the rest of `discover.js`
@@ -165,18 +171,28 @@ the service stays context-agnostic and unit-testable.
   (`npx jest reviewer discovery suggestion disposition save-candidates search-logic`); `npm run build && npm run lint`.
 
 ## 6. Files touched
-- `lib/services/openalex-service.js` (+`getAuthorByOrcid`)
-- `lib/services/proposal-pi-identity.js` (new)
-- `pages/api/reviewer-finder/discover.js` (accept `requestId`, resolve, augment 3 consumers)
-- `lib/services/deduplication-service.js` (`markInstitutionCOI` multi-institution, pending Q3)
+**Chunk 1 (this increment — identity + name + gated identity-exclusion; drift-free):**
+- `lib/services/openalex-service.js` (+`getAuthorByOrcid`; reuse checksum-validating ORCID normalizer — Codex #12)
+- `lib/services/proposal-pi-identity.js` (new; forename-gated guard via existing resolver/`getProfile` — Codex #3)
+- `pages/api/reviewer-finder/discover.js` (accept+GUID-validate `requestId`, resolve, augment name set +
+  gated identity-exclusion, abort-rethrow fail-open, durable `piIdentityStatus` in stats — Codex #5/#9/#13/#18)
+- `pages/api/workbench/enrich-recommended.js` (same name augmentation for COI parity — Codex #7)
 - `shared/components/reviewers/ReviewerSearchSection.js`, `pages/reviewer-finder.js` (send `requestId`)
 - Tests under `tests/`.
 
+**Chunk 2 (follow-up — institution COI overhaul; gated on the §9 policy decision):**
+- `lib/services/deduplication-service.js` (multi-institution one-pass helper for both `markInstitutionCOI`
+  AND `filterConflicts` — Codex #4), `discovery-service.js` (pass structured institution into `discover()`),
+  `enrich-contacts.js` + its client (plumb structured institution so recompute can't clobber — Codex #8).
+
 ## 7. Rollback / safety
 Fail-open at every step: missing `requestId`, missing PL, missing/invalid ORCID, name mismatch, or any
-thrown error → `piIdentity = null` → the pipeline runs exactly as it does today. The structured identity
-can only add exclusions/flags, never remove an existing one, so the worst-case regression is
-**over-flagging institution COI** (a soft, human-reviewed flag), not a missed COI or a wrong hard-exclude.
+**non-abort** thrown error → `piIdentity = null` → the pipeline runs exactly as it does today.
+**CORRECTION (Codex #1, #13 — see §9):** the earlier "worst case = over-flagging a soft flag" claim was
+**wrong**. Institution COI is *partly a HARD drop* (`filterConflicts`, `discovery-service.js:259`), and the
+fail-open `catch` must **rethrow** `AbortError` / `reviewer_time_budget_exceeded` rather than swallow them.
+The real safety contract is in §9: name/identity augmentation is purely additive and safe; institution-COI
+changes touch a hard filter and a recall policy fork and are therefore **deferred to Chunk 2**.
 
 ## 8. Out of scope (later §12 increments)
 - ORCID works-list / PI-trail corpus lane and `referenced_works` expansion (would be unconsumed now).
@@ -184,3 +200,51 @@ can only add exclusions/flags, never remove an existing one, so the worst-case r
 - The two net-new COI gates: advisor/advisee + all-time-collaborator (§12.7) — net-new design, not wiring.
 - Recency-weighted ranking.
 - Email-domain-based institution COI (a different mechanism than name-match `markInstitutionCOI`).
+
+## 9. Codex pre-impl review — verdicts, folded changes, rescope (S240, 2026-06-10)
+
+Codex's full review is in the session transcript (shared verbatim). Each finding independently verified
+against source before folding. Verdict legend: ✅ confirmed-and-folded · ⚠️ confirmed-deferred-to-Chunk-2 ·
+↔ partial/scoped · ℹ️ accepted-as-polish.
+
+| # | Sev | Verdict | Resolution |
+|---|---|---|---|
+| 1 | HIGH | ✅ `[VERIFIED discovery-service.js:259]` | `filterConflicts` hard-drops on institution; the doc's "soft-flag only / can't regress" safety claim was **wrong**. §2, §3.3, §7 corrected. Institution COI → **Chunk 2**. |
+| 2 | MED | ↔ Q1 | App-level `requireAppAccess` is the **existing** posture for every requestId-scoped reviewer route (org-open); Chunk 1 matches that posture and **documents it explicitly** rather than adding a per-request gate (that would be a broader policy change, not this increment). |
+| 3 | HIGH | ✅ Q2 | Do **not** trust OpenAlex `displayName` alone. Guard uses ORCID `getProfile` name + the existing **forename gate** (`reviewer-identity-evidence`) before accepting the PI author. Abstain on mismatch. |
+| 4 | HIGH | ⚠️ Q3 | `markInstitutionCOI` overwrites; calling twice loses an institution. Needs a **one-pass multi-institution helper** shared by `markInstitutionCOI` + `filterConflicts`. → **Chunk 2**. |
+| 5 | HIGH | ✅ Q4 | Identity-exclusion **must** gate on `identityStatus` confirmed/probable before comparing id union (unresolved rows carry the fields). Folded into §3.3 item 3. |
+| 6 | MED | ✅ Q5 | Start the deadline timer **before** PI resolution; keep resolution bounded + abort-aware. Folded with #13. |
+| 7 | HIGH | ✅ Q6 | Deferring `enrich-recommended` would create COI drift on the **name** axis too. Chunk 1 now wires the name augmentation into `enrich-recommended.js` for parity. |
+| 8 | HIGH | ⚠️ | `enrich-contacts.js:143-148` recompute would clobber a structured-PI institution flag. Since institution COI is Chunk 2, the clobber is moot in Chunk 1 (institution stays LLM-based everywhere). Fixed **with** the Chunk-2 institution work, not before. |
+| 9 | MED | ✅ | Validate `requestId` as a GUID; emit an explicit inert-reason SSE event instead of swallowing malformed input. |
+| 10 | MED | ✅ | `getAuthorByOrcid` is genuinely new; tests must cover single-object, unexpected `results` wrapper, 404→null, URL construction (encoded vs raw embedded ORCID URL), redirect. |
+| 11 | MED | ✅ | Pin the exact `/authors/https://orcid.org/<id>` URL form in a unit test before prod reliance. |
+| 12 | MED | ✅ | Reuse the **checksum-validating** ORCID normalizer (`reviewer-work-author-resolver`), not the prefix-strip-only one, before building the lookup URL / comparing identities. |
+| 13 | HIGH | ✅ | Fail-open `catch` must **rethrow** `AbortError` / `reviewer_time_budget_exceeded`; only swallow resolution misses + outages. §7 corrected. |
+| 14 | MED | ⚠️ | Prefer structured-request / ORCID-current affiliation over OpenAlex stale `last_known_institutions[0]`. Relevant only once institution COI lands → **Chunk 2**. |
+| 15 | MED | ✅ | Test that canonical PI name is **appended + de-duped** into `deriveProposalAuthorNames()` output, never replacing PI + co-Is. |
+| 16 | MED | ↔ | `checkCoauthorshipsForCandidates` has no `signal` today (pre-existing). Threading it is real but a **separate** budget-hardening item; noted, not bundled into Chunk 1 to keep the chunk focused. |
+| 17 | LOW | ✅ | Use existing `ORCIDService.getProfile` for the PI name/affiliation guard (with #3) instead of a brand-new ORCID method. |
+| 18 | INFO | ✅ | Add a non-sensitive `piIdentityStatus` + reason to the final `stats` SSE event for post-stream observability. |
+
+### Rescope (the material change)
+The "quick win" splits into two chunks because institution COI is entangled with a **hard recall-affecting
+drop** across three routes plus an overwrite bug:
+
+- **Chunk 1 — PI identity + name exclusion (safe, drift-free, this increment):** `getAuthorByOrcid` +
+  `resolveProposalPI` (forename-guarded) + `discover.js`/`enrich-recommended.js` name augmentation +
+  gated identity-exclusion + `requestId` plumbing + abort-safe budget + observability + tests. **Purely
+  additive** to exclusion; cannot reduce recall; institution COI untouched and identical everywhere.
+- **Chunk 2 — institution COI overhaul (follow-up, needs the policy decision below):** one-pass
+  multi-institution helper for `markInstitutionCOI` + `filterConflicts`, structured institution into
+  `discover()` + `enrich-contacts` + `enrich-recommended`, ORCID-current affiliation preference.
+
+### Open policy decision for Justin/foundation (blocks Chunk 2, not Chunk 1)
+`filterConflicts` currently **hard-drops** same-institution candidates using the (sometimes hallucinated)
+LLM institution. Swapping in the accurate structured institution makes COI correct but raises the S238
+**recall-over-precision** question ([[project-reviewer-recall-over-precision]]): should institution COI
+*hard-drop* candidates at all, or *flag-and-surface* them for the PD to judge? This mirrors the open
+[[project-applicant-exclusion-policy-pending]] decision and is the foundation's call, not an implementation
+detail. Chunk 2 is gated on it.
+
