@@ -1247,6 +1247,93 @@ as direction, but pin the specifics before they become thresholds/UX. The four f
 
 Items 1 and 3 remain the build-time rigidity points — settle them when that work starts.
 
+### 8f. Track-B activity-signal flaw (the "h-index 61 vs 2 publications" paradox) — CONFIRMED, fix scoped
+
+`[VERIFIED via source + Codex adjudication, S238]` Triangulated three independent ways
+(the live paradox below, Codex's line-level code adjudication, and the funnel math) — this
+is a real structural flaw, not a shifting read.
+
+**The paradox.** On request 1002794 (physics), a confirmed-identity Olga Smirnova
+(h-index 61, ~14k citations) surfaced flagged `lowPublicationCount` with **"2 publications"**,
+ranked **28th**. Reconciliation: the two numbers measure different things — h-index is a
+career bibliometric (display only; ranking excludes it, `relevance-score.js`), while
+"2 publications" is the size of the candidate's `publications[]` array, which for Track-B is
+built **from this run's keyword-search hits**, not the author's corpus.
+
+**The origination funnel (verified).** One proposal *narrative* (e.g. `ProjectDescription.pdf`)
+→ **one overloaded Claude call** (`createAnalysisPrompt`, `shared/config/prompts/reviewer-finder.js`)
+that emits metadata + reviewer names + PART-3 `searchQueries` together → ~3 queries per source,
+each **3–6 words**, "methods/organisms/phenomena/systems", no author names → each query fetches
+the **top 50** recent papers (`searchPubMed`, 5-yr `pdat` filter) → each paper mints **one**
+candidate from a **single author position** (PubMed/arXiv = last author `discovery-service.js:1149-1164,1210`;
+bioRxiv/chemRxiv = corresponding/first `:1278,1341`) with `publications: [that one paper]` →
+dedup merges by author (`deduplication-service.js:192,228`, no preprint/DOI dedup at the merge).
+
+**The funnel math (the operator's point, S238).** ~3 queries × top-50 × single-author-position
+≈ up to 150 author-instances; in a *busy* field those are mostly **distinct** people, so the
+expected per-author count is **~1**. Empirically on 1002794 (run-specific — the exact split
+varies run to run, which is itself the nondeterminism finding): the great majority of discovered
+candidates were flagged `<3` (≈75–80 of ≈83–85 across two runs, most with exactly 1 paper); only
+a handful cleared `MIN_PUBLICATIONS=3`. So the `≥3` bar — intended as an
+"active researcher" filter — actually measures **query-result concentration**, which is near-zero
+for almost everyone. It fails in *both* directions: it buries real leaders who matched only one
+facet as senior author, and the few who clear it are senior-/prolific-lab authors matching
+multiple query facets (a senior-bias signal, not a best-reviewer signal).
+
+**Two root mechanisms (Codex precisions applied):**
+1. **Wrong instrument.** Track-B `publications.length` = query coverage, not productivity
+   (`partitionByPublicationBar`, `discovery-service.js:~274`).
+2. **Wrong ordering — and the *flag* is not what buries her.** The burial is driven by a low,
+   *finite* `publicationCount5yr` flowing into the recency scorer (`deduplication-service.js:229`,
+   `relevance-score.js:50,111`); the `lowPublicationCount` flag is a *parallel* symptom of the
+   same root, not the cause. Both are computed from the search hits **before** identity resolution
+   (`:294`) and the OpenAlex works backfill (`:348`). Backfill then can't fix it: it targets only
+   candidates with an OpenAlex id **and empty `publications`** (`:414,417`) — a 2-hit candidate is
+   not a target — and only sets `publicationCount5yr` when `!Number.isFinite` (`:440`), but dedup
+   already set a finite low value (`deduplication-service.js:229`). Nothing re-evaluates either
+   field after `confirmed` identity (`:945`).
+
+**Principle (DECIDED).** Once an identity is resolved to `confirmed`/`probable` against
+OpenAlex/ORCID, the activity/standing signal must come from **that resolved author's real recent
+corpus**, never from incidental keyword-hit counts.
+
+#### Fix scope
+
+**Part 1 — Activity-from-resolved-corpus (near-term, in-pipeline; the higher-leverage change).**
+After `resolveTrackBIdentities`, for every `confirmed`/`probable` Track-B candidate with a resolved
+OpenAlex/ORCID author id:
+- **Widen the backfill target** (`backfillOpenAlexPublications`) from "empty `publications` only"
+  to "any confirmed/probable candidate", and have it **overwrite** `publicationCount5yr` from the
+  resolved author's real recent (≤5-yr) works — not just fill when absent. (Both the target
+  condition `:414,417` and the `!Number.isFinite` guard `:440` must change for this path.)
+- **Re-evaluate `lowPublicationCount` after resolution**: clear it when the *real* recent-works
+  count ≥ threshold; keep it (now meaningful) when the real corpus is genuinely thin.
+- **Stop gating/flagging confirmed identities on the search-hit count.** For *unresolved*
+  candidates the search-hit count is the only signal we have — keep surfacing them as a warning
+  (Fix #1 behaviour) rather than dropping.
+- **Sequencing complication (must address):** identity resolution is capped at
+  `TRACK_B_IDENTITY_RESOLUTION_LIMIT=25` and the *pre-resolution* ranking that selects which 25 to
+  resolve uses the same broken search-hit signal — so a heavyweight with 1 hit can be **deferred
+  and never resolved**, and Part 1's repair never reaches them. Options: raise/elastic cap; select
+  for resolution by a signal other than hit-count (e.g. resolve all distinct authors with any
+  topical match, budget permitting); or resolve-then-rank in passes. Decide before building.
+- **Risks/verify:** more OpenAlex calls (bounded by candidate count — check latency budget);
+  overwriting `publicationCount5yr` shifts rankings broadly → validate on a sample that the
+  heavyweights rise and nothing good regresses (reuse the smoke + overlap harness,
+  `scripts/smoke-discover-dispositions.mjs`).
+
+**Part 2 — Origination ceiling (redesign-scope; a post-resolution patch CANNOT fix this).**
+PubMed/arXiv mint only last authors and bioRxiv/chemRxiv only corresponding/first, so a heavyweight
+who is not in those positions in any returned paper is **never minted as a candidate** in that run
+— and the 3–6-word query crowd is large and surface-biased. This is the §4.4 author-extraction rule
+(take **all** authors) and the §4.1/§4.5 retrieval redesign (field-routed sources + cited-reference
+lane + decomposed, non-overloaded query generation). Part 1 raises the ceiling for people who *do*
+get minted + resolved; Part 2 is what gets the right people minted in the first place.
+
+**Not in scope here** (tracked separately): the initial-only coauthor-COI namesake bug (the
+"Jian Wu / 10 papers" false COI, §8c / §5.1) — a different defect in the COI search, not the
+activity signal.
+
 ---
 
 ## Quick decided / deferred / retracted index
@@ -1263,6 +1350,7 @@ Items 1 and 3 remain the build-time rigidity points — settle them when that wo
 - COI: hard-drop the permanent policy conflicts (proposal-authors, same-institution); flag/surface the rest; soft-flag inferred/borderline (never gate); batch-relative retain-with-status for the recoverable kinds (§8b).
 - Co-authorship is graded (count/position/recency/list-size); binary flag harms methods-axis recall (§8b).
 - The cheap two-axis spread check is NOT optional in the first shadow run (re-prices §3, §8a).
+- Track-B activity signal must come from the RESOLVED-identity real corpus, never search-hit counts; the `MIN_PUBLICATIONS≥3` bar measures query-result concentration (CONFIRMED flaw, fix scoped, §8f).
 
 **DEFERRED (optional, later):**
 - The coverage/bias metric, narrowed to "spread across competent sub-communities" (§3).
