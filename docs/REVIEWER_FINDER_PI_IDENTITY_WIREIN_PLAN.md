@@ -240,11 +240,23 @@ drop** across three routes plus an overwrite bug:
   multi-institution helper for `markInstitutionCOI` + `filterConflicts`, structured institution into
   `discover()` + `enrich-contacts` + `enrich-recommended`, ORCID-current affiliation preference.
 
-### Open policy decision for Justin/foundation (blocks Chunk 2, not Chunk 1)
-`filterConflicts` currently **hard-drops** same-institution candidates using the (sometimes hallucinated)
-LLM institution. Swapping in the accurate structured institution makes COI correct but raises the S238
-**recall-over-precision** question ([[project-reviewer-recall-over-precision]]): should institution COI
-*hard-drop* candidates at all, or *flag-and-surface* them for the PD to judge? This mirrors the open
-[[project-applicant-exclusion-policy-pending]] decision and is the foundation's call, not an implementation
-detail. Chunk 2 is gated on it.
+### Chunk-2 policy — RESOLVED by Justin (S240) — see [[project-reviewer-coi-rely-on-self-disclosure]]
+The "hard-drop vs flag" framing was mostly a non-issue: S238 already sanctions same-institution as a
+correct hard drop ([[project-reviewer-recall-over-precision]]:36-38). Justin's S240 decisions:
+- **CURRENT same-institution → keep the hard drop**, but fix the input: feed the accurate **structured**
+  PI institution into `filterConflicts` instead of the hallucinated LLM one. Net recall *gain* (stops
+  dropping at a wrongly-guessed institution; catches the real same-institution COIs it misses today).
+- **HISTORICAL / former-shared institution → does NOT count.** Neither drop nor flag. This **removes**
+  shipped S229 behavior: `markInstitutionCOI`'s `affiliationHistory` scan, `institutionCOIDetails.historical`,
+  and the "Former shared institution" badge (verify live callers before deleting — touches the Workbench +
+  standalone cards + save path + `enrich-contacts` recompute).
+- **General rule:** don't emit PD-unverifiable soft flags — PDs don't re-verify them and the product's job
+  is to *cut* manual searching. Relationship/inferred conflicts are handled by reviewer **self-disclosure**
+  at accept/decline, not by system flags.
+
+**Boundary RESOLVED (Justin S240):** (1) **retire** the model `POTENTIAL_CONCERNS` amber advisory (S229) —
+it's the canonical PD-unverifiable inferred flag (remove capture/render/persist + reseed the prompt to drop
+the COI→POTENTIAL_CONCERNS instruction); (2) **keep** co-author COI grading — shared-paper counts are
+factual/verifiable. So Chunk 2 = {structured institution into the current-institution hard drop; remove
+historical-institution COI; retire POTENTIAL_CONCERNS; keep co-author COI}. Chunk 1 is unaffected.
 

@@ -52,6 +52,7 @@
 - Reviewer data model / migration: project-reviewer-postgres-to-dataverse-migration.md; project-reviewer-finder-dataverse-entry-path.md; project-appresearcher-collapse-post-pilot.md
 - Reviewer matching / institution / contacts: project-reviewer-institution-match.md; project-contact-promotion-permission.md; project-institution-foundation-liaison.md
 - Reviewer COI concern surfacing + former-institution COI + from-scratch test reset (S229): project-reviewer-coi-concern-surfacing.md
+- Reviewer COI PHILOSOPHY (S240 — hard-act only on self-evident policy conflicts: proposal-authors + CURRENT same-institution; rely on reviewer self-disclosure; NO PD-unverifiable soft flags; HISTORICAL institution doesn't count; narrows S229): project-reviewer-coi-rely-on-self-disclosure.md
 - Reviewer RECALL-OVER-PRECISION reframe (S238 — review is a floor/gate not a ranker; optimize coverage/spread, surface-don't-silently-drop, COI graded; canonical design in ../docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md Part C): project-reviewer-recall-over-precision.md
 - Reviewer RANKING (recency must outweigh citations/h-index): project-reviewer-ranking-recency-over-citations.md
 - Reviewer invariants (counts, history, excluded): project-reviewer-count-invariant.md; project-reviewer-history-data-quality.md; project-excluded-reviewers-often-in-pool.md
