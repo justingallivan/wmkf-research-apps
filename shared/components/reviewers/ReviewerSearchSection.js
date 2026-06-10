@@ -561,6 +561,10 @@ export default function ReviewerSearchSection({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           analysisResult,
+          // S240: let the server resolve the structured PI identity (Project Leader
+          // contact → wmkf_orcid → exact OpenAlex author) for exclusion + COI.
+          // Optional; absent/malformed → server falls back to proposal-text identity.
+          requestId: requestId || null,
           // Server-side dedup: filter already-surfaced/excluded/saved names out of
           // the database results BEFORE the per-candidate Claude reasoning call, so
           // a re-run doesn't re-spend reasoning tokens (S224). Client filterExcluded

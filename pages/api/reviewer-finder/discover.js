@@ -19,6 +19,9 @@ import { loadModelOverrides } from '../../../lib/services/model-override-loader'
 import { deriveProposalAuthorNames } from '../../../lib/utils/proposal-authors';
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
 import { withReviewerProvenance } from '../../../lib/utils/reviewer-provenance';
+import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { resolveProposalPI, excludePiIdentity } from '../../../lib/services/proposal-pi-identity';
+import { ContactParser } from '../../../lib/utils/contact-parser';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -85,7 +88,12 @@ export default async function handler(req, res) {
       // per-candidate Claude reasoning call — so a re-run doesn't re-spend tokens
       // reasoning over people we already have. The client also hard-filters
       // (defense-in-depth); this is the token-saver.
-      excludedNames = []
+      excludedNames = [],
+      // Structured-PI identity (S240): the akoya_request GUID lets the SERVER
+      // resolve the proposal PI from Dataverse (Project Leader → contact wmkf_orcid
+      // → exact OpenAlex author) instead of trusting the LLM-extracted name. Optional
+      // — absent or malformed → the route behaves exactly as before (fail-open).
+      requestId = null
     } = req.body;
 
     const apiKey = process.env.CLAUDE_API_KEY;
@@ -134,6 +142,37 @@ export default async function handler(req, res) {
       deadlineController.abort(e);
     }, budgetSeconds * 1000);
 
+    // Structured-PI identity resolution (S240). Runs under the budget deadline that
+    // just started (Codex #6) and inside a Dynamics bypass (this route has none
+    // otherwise). Fail-OPEN: any non-abort failure leaves piIdentity unresolved and
+    // the pipeline behaves exactly as before; an abort/budget signal is RETHROWN so
+    // the timeout surfaces (Codex #13).
+    let piIdentity = null;
+    if (requestId) {
+      try {
+        piIdentity = await bypassDynamicsRestrictions(
+          'reviewer-discover-pi-identity',
+          () => resolveProposalPI(requestId, { signal: deadlineController.signal })
+        );
+      } catch (err) {
+        if (deadlineController.signal.aborted
+          || err?.name === 'AbortError'
+          || err?.code === 'openalex_timeout'
+          || err?.code === 'reviewer_time_budget_exceeded') {
+          throw err;
+        }
+        console.error('[Discover API] PI identity resolution failed (fail-open):', err.message);
+        piIdentity = { resolved: false, reason: 'resolution_error' };
+      }
+      sendEvent('progress', {
+        stage: 'pi_identity',
+        status: piIdentity?.resolved ? 'resolved' : 'inert',
+        message: piIdentity?.resolved
+          ? `PI identity resolved via ORCID: ${piIdentity.canonicalName}${piIdentity.institution ? ` (${piIdentity.institution})` : ''}`
+          : `Structured PI identity unavailable (${piIdentity?.reason || 'unknown'}) — using proposal-text identity`,
+      });
+    }
+
     sendEvent('progress', {
       stage: 'discovery',
       message: 'Starting database discovery...',
@@ -177,6 +216,28 @@ export default async function handler(req, res) {
       }
     }
 
+    // IDENTITY-level PI exclusion (S240, Codex #5): if a candidate resolves to the
+    // PI's exact identity (shared ORCID / same OpenAlex author id) it is the PI under
+    // a name variant the fuzzy author filter could miss. Gated on confirmed/probable.
+    if (piIdentity?.resolved) {
+      const before = discoveryResults.verified.length + discoveryResults.unverified.length + discoveryResults.discovered.length;
+      const v = excludePiIdentity(discoveryResults.verified, piIdentity);
+      const u = excludePiIdentity(discoveryResults.unverified, piIdentity);
+      const d = excludePiIdentity(discoveryResults.discovered, piIdentity);
+      discoveryResults.verified = v.kept;
+      discoveryResults.unverified = u.kept;
+      discoveryResults.discovered = d.kept;
+      const removed = before - (v.kept.length + u.kept.length + d.kept.length);
+      if (removed > 0) {
+        const names = [...v.removed, ...u.removed, ...d.removed].map((c) => c.name).filter(Boolean);
+        sendEvent('progress', {
+          stage: 'author_filter',
+          status: 'excluded_pi_identity',
+          message: `Excluded ${removed} candidate(s) matching the PI's resolved identity (ORCID/OpenAlex): ${names.join(', ')}`
+        });
+      }
+    }
+
     sendEvent('progress', {
       stage: 'discovery',
       status: 'verified',
@@ -194,6 +255,16 @@ export default async function handler(req, res) {
     // used by enrich-recommended.js (S213 parity — co-PIs were previously
     // dropped here, so a co-PI could slip through as a candidate/coauthor-clean).
     const proposalAuthors = deriveProposalAuthorNames(analysisResult.proposalInfo);
+    // APPEND the canonical PI name from the structured identity (S240, Codex #15) so
+    // the name-fuzzy author filter + coauthor-COI check use the authoritative name
+    // even when the LLM extracted it wrong/missing. Append-and-dedupe — never replace
+    // the LLM-derived PI + co-investigators (a co-PI dropped here is a COI hole).
+    if (piIdentity?.resolved && piIdentity.canonicalName) {
+      const piNorm = ContactParser.normalizeNameForMatch(ContactParser.stripHonorifics(piIdentity.canonicalName));
+      const already = proposalAuthors.some((n) =>
+        ContactParser.namesMatch(piNorm, ContactParser.normalizeNameForMatch(ContactParser.stripHonorifics(n))));
+      if (!already) proposalAuthors.push(piIdentity.canonicalName);
+    }
     let verifiedCandidates = withProvenanceList(discoveryResults.verified);
 
     {
@@ -376,6 +447,13 @@ export default async function handler(req, res) {
     if (deadlineController.signal.aborted) {
       throw deadlineController.signal.reason || new Error('reviewer_time_budget_exceeded');
     }
+
+    // Durable observability for the fail-open PI resolution (Codex #18): a progress
+    // event is transient, so stamp a non-sensitive status onto the final stats so
+    // "no structured-PI coverage" is visible after the stream closes.
+    discoveryResults.stats.piIdentity = requestId
+      ? { resolved: !!piIdentity?.resolved, reason: piIdentity?.resolved ? null : (piIdentity?.reason || 'unknown') }
+      : { resolved: false, reason: 'no_request_id' };
 
     verifiedWithCOI = withProvenanceList(verifiedWithCOI);
     const unverifiedWithProvenance = withProvenanceList(discoveryResults.unverified);

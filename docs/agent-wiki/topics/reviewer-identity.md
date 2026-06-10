@@ -1,14 +1,16 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-08
+last_verified: 2026-06-10
 stale_after_days: 45
 owner: reviewer-finder
 source_files:
   - lib/services/contact-enrichment-service.js
+  - lib/services/proposal-pi-identity.js
   - lib/dataverse/adapters/potential-reviewer.js
   - lib/dataverse/adapters/reviewer-suggestion.js
   - lib/dataverse/adapters/researcher.js
+  - pages/api/reviewer-finder/discover.js
   - pages/api/reviewer-finder/save-candidates.js
   - pages/api/reviewer-finder/my-candidates.js
   - pages/api/review-manager/send-emails.js
@@ -59,6 +61,7 @@ Use this page before work on reviewer identity, enrichment, ORCID propagation, c
   - The gate must survive a Find-roster reload — `pruneCandidateForRoster` persists `identityStatus`/`needsIdentification`/`verificationStatus`, else a deferred candidate re-surfaces as selectable.
   - **PI-named / cited exemption (S235):** a candidate whose provenance kind is `cited_reference` or `proposal_named` (the proposal author named/cited THIS specific person) is NOT hard-blocked when unresolved — `provenanceGroupOf` routes it to the selectable `cited_or_proposal_named` group even when unresolved (`isIdentityReviewExemptProvenance` checked BEFORE the unresolved gate), and `save-candidates` does NOT 422 it. BUT the save boundary force-nulls ALL contact + identity-derived fields (email/website/faculty-page/affiliation/ORCID/Scholar/bibliometrics) until identity is confirmed/probable (`contactBlockedForUnresolvedExempt`, Codex HIGH) — so a selectable-but-unverified row can't carry a wrong-person email. The card shows an amber "⚠ Verify identity — no contact saved until confirmed" pill. System-discovered (`literature_retrieved`, incl. Slice-E deferred Track-B) stays hard-blocked.
 - Invite-confidence gate (Slice G, S235): `send-emails.js` independently computes `emailConfidence(person)` (`lib/utils/reviewer-invite.js`) from `wmkf_emailsource`+`wmkf_identitystatus` and REFUSES a LOW-confidence recipient unless that recipient's `suggestionId` is in the request's `confirmedLowConfidenceIds` allowlist (skip reason `email_unconfirmed`). The acknowledgement is recipient-specific, NOT a batch boolean (Codex post-impl #6: a batch boolean would let a row that became LOW after preview ride on another row's confirmation). HIGH = `orcid`/`pubmed`/`institution_page`, or `serp_search`/`claude_search` on a `confirmed`/`probable` identity; LOW = `manual`, `affiliation`, unknown/null source, or a search email on an unconfirmed identity. **Scoped to `templateType==='invitation'`** (first contact); post-acceptance materials/followup/thankyou are NOT gated. `render-emails.js` stamps `emailConfidence` per draft (the modal DTO is too thin to compute it); `InviteEmailModal` shows the warning + one-click "confirm & send" and sets the flag. Manual email edits (`my-candidates.js`) stamp `emailSource='manual'` via the researcher adapter so staff-typed addresses read LOW. The API is the enforced boundary — the modal acknowledgement alone is not trusted.
+- Structured-PI identity (S240): `discover.js` and `enrich-recommended.js` resolve the proposal PI from STRUCTURED Dataverse data (`resolveProposalPI` in `lib/services/proposal-pi-identity.js`: request `_wmkf_projectleader_value`→contact `wmkf_orcid`→exact OpenAlex author via `OpenAlexService.getAuthorByOrcid`) instead of trusting the LLM-extracted PI name. It is server-resolved from the request GUID (clients send `requestId`; never a client-claimed identity), runs in a Dynamics bypass under the time budget, and is FAIL-OPEN + AUGMENT-ONLY: it appends the canonical PI name to the author-exclusion/coauthor set (never replaces the LLM PI + co-Is) and identity-excludes candidates sharing the PI's exact ORCID/OpenAlex id — GATED on `confirmed`/`probable` (unresolved rows keep their id fields, so acting on them would risk a namesake). A mis-entered ORCID is caught by a forename/surname name guard (`forenamesContradict`, exported from `reviewer-identity-evidence.js`) → abstain. Institution COI is NOT yet wired to this (Chunk 2 — see `docs/REVIEWER_FINDER_PI_IDENTITY_WIREIN_PLAN.md`).
 - Faculty-page email recovery (Slice F, S235) is the ZERO-SSRF path, NOT a server fetch: `my-candidates` GET returns `facultyPageUrl` (selects `wmkf_facultypageurl`); `CandidatesPanel` shows a "find on faculty page →" link on no-email candidates; staff read the address there and enter it via `CandidateEditModal` → manual stamp → Slice-G confirm. The automated server-side fetch was Codex-reviewed (READY WITH NAMED CHANGES — undici IP-pinning dispatcher, `scholarVerifiedEmail`-only allowlist, IPv6 private-IP blocklist) but deliberately NOT built (`docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md` §D). If revisiting auto-fetch, that doc has the verified SSRF mechanism — do NOT add a server-side external-page fetch without it.
 
 ## Standard Probe
