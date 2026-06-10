@@ -1,113 +1,113 @@
-# Session 238 Prompt: Reviewer manual-add dedup shipped + relevancescore incident fixed; reviewer-finder prompt redesign on the table
+# Session 239 Prompt: Reviewer-finder recall flaw confirmed + rescue dossier prepared for a fresh-model review
 
-## Session 237 Summary
+## Session 238 Summary
 
-A long, multi-arc session, all on `main` (auto-deploys to prod). Three arcs, all run through the
-Codex loop.
+All on `main` (auto-deploys to prod). The session started as "ship two small reviewer-finder
+fixes," ran them through the Codex loop, then **live-smoked them — and the smokes exposed a deeper,
+structural recall flaw**. It ended by preparing a **rescue dossier** for a fresh Claude model,
+because we're worried we're circling (patching candidate *handling* while *origination* stays broken).
 
 ### What Was Completed
 
-1. **S236 manual-add / ORCID post-impl fixes** (`971ec97`) — Codex post-impl review of the S236
-   manual-add + ORCID work found 6 real issues, all fixed: exclusion-gate-before-identity-writes,
-   fill-only `emailSource`, option-scoped ORCID `strictAmbiguity`, stale-name lookup guard,
-   `emailMatches` gating, and a client invalidation when an identity field changes.
+1. **Three discover-disposition fixes — SHIPPED + LIVE-VERIFIED** (`10ef27f`, `25110c8`, `3c79bac`).
+   All "surface, don't silently drop," on the recall-over-precision thesis:
+   - **Track-B `<3`-pub → warning, not drop** (`partitionByPublicationBar`). Dedup of a
+     preprint+published pair can push a real reviewer under the bar.
+   - **`isRelevant: No` cull → surfaced + ranked-last + named** (`aiFlaggedNotRelevant`,
+     `rankAllCandidates`). Was a silent, count-only parametric cull of *grounded* people.
+   - **Coauthor COI graded** `likely`/`possible` (`gradeCoauthorCOI`, max-shared-with-one-author ≥3
+     = likely). A single hub-artifact paper now reads amber, not red — protects methods experts.
+   - Codex post-impl review caught 3 real consumer-safety bugs (Workbench re-rank undid "ranked
+     last"; roster DTO dropped the new fields → reload regression; persisted COI notes ignored
+     severity) — all fixed, confirmed clean by a 2nd Codex pass.
 
-2. **Manual-add cross-store dedup — PR #21, MERGED** (`d611130`, `bac7818`, merge `9178fce`) — the
-   big feature arc. Manual reviewer-add now checks BOTH stores (`wmkf_potentialreviewer` + CRM
-   `contact`) before minting a person, including the **former-PI case** (contact-only → create
-   reviewer + link). New read-only `/api/workbench/reviewer-lookup` (tiered ORCID→email→name,
-   ambiguity-aware `top:2`, cross-store conflict + reverse-link detection); `manual-reviewer` gained
-   a `resolution` contract + create-and-link (link-last + hardened `setContactLink`); orchestration
-   extracted to `lib/services/reviewer-identity-lookup.js`. Design: rev3 after 2 Codex pre-impl
-   passes; Codex implemented, I reviewed/fixed + post-impl-reviewed; **18/18 live read-only smoke**
-   (`scripts/smoke-reviewer-lookup-dedup.mjs`). ⚠️ The **write path (create-and-link) was NOT
-   live-smoked** (would leave an un-deletable contact in prod) — wants a manual UI click-through.
+2. **Design docs consolidated into ONE** (`10ef27f`). `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md`
+   is now canonical: Part A (retrieval-first plan), Part B (field primer), Part C (S238 discussion).
+   Removed the decomposition + refinements docs; repointed references.
 
-3. **PRODUCTION INCIDENT — reviewer saves silently failing** (`dad3a26`, `9f4e378`) — PD reported a
-   searched reviewer (Tanja Mittag, request 1002852) wouldn't save, no error. Root cause (live
-   Dataverse 400, Codex-confirmed): `wmkf_appreviewersuggestion.wmkf_relevancescore` is a Double
-   bounded **[0,1]**, but `save-candidates` writes a **0–100** score → any candidate scoring >1 hit a
-   400 the per-row try/catch swallowed (orphan person, no candidate, no error). **Silently dropping
-   the best-ranked candidates since the S223 scale change.** Fix: widened the field `[0,1]→[0,100]`
-   in prod (PUT-full-definition + `PublishXml` via `scripts/widen-relevancescore-max.mjs` — **`PATCH`
-   returns 405**; ran + verified live), `[0,100]` clamp guard in the adapter, and made the failure
-   LOUD (`save-candidates` 500+errors when nothing saves; both Find clients show the failed name +
-   error). `scripts/find-orphan-reviewers.mjs` (read-only) found 3 orphans (Mittag, Lavrik,
-   Madabhushi) — heal on re-save, no cleanup needed.
+3. **CONFIRMED structural flaw — Track-B activity signal (§8f)** (`c7af6ea`). The
+   "Olga Smirnova h-index 61 but '2 publications', ranked 28th" paradox. A Track-B candidate's pub
+   count = **keyword-search-hit concentration**, not the author's corpus: ~3 queries × top-50 ×
+   one-author-per-paper → in a busy field, ~everyone has count ≈1, so `MIN_PUBLICATIONS≥3` buries
+   real leaders and misfires. Triangulated 3 ways (live runs, the funnel math, **Codex line-level
+   code adjudication**). Fix scoped in §8f (in-pipeline: re-eval activity from the *resolved* author
+   corpus + widen the OpenAlex backfill, plus a cap-25 selection complication; redesign-scope:
+   non-origination — single-author-position minting means heavyweights are sometimes never minted).
 
-4. **Reviewer-finder diagnosis (why 1002852 surfaced ~6 of 12, all "database")** — investigated;
-   NOT a bug, a signal-starvation story: (a) the Workbench folds PubMed-verified Claude suggestions
-   into "Literature-retrieved" (no Claude label, unlike the standalone); (b) **`load-proposal`
-   reuses grant-reporting's `classifyFile`, which demotes Phase-I docs** (correct for a Phase II
-   goals-assessment, wrong here) → only the 136KB `ProjectDescription.pdf` loads, not the full app;
-   (c) **Phase I collects no bibliography + this narrative had no inline refs**; (d) **the PI
-   excluded the field's 3 leading peers** (Ahel/Pascal/Luger, "overlapping research programs") — the
-   same names the narrative cited — and the exclude filter clobbered them. Logged 2 memories.
+4. **Read-only live smoke harness** (`6d7837d`, `0d49d07`) —
+   `scripts/smoke-discover-dispositions.mjs`. Runs the real pipeline on a request, dumps lane
+   attribution (Track-A vs Track-B) + disposition flags + an overlap table vs a known reviewer set.
+   This is how §3/§8f were measured. Confirmed run-to-run **nondeterminism** (each run surfaces a
+   different expert subset).
 
-5. **Reviewer-finder prompt redesign — design discussion + draft** (since merged into
-   `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` Part B, S238) — the current analyze prompt is overloaded (extract + generate +
-   query-craft in one call) and stale. Drafted a **field-primer + decomposition** sketch (primer =
-   async pre-computed at submission → out of the latency budget; standalone PD deliverable). 2 Codex
-   passes reshaped it to *extend* the existing `REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` (which
-   already specifies the decomposition) and added the machine-readable primer→candidate boundary.
+5. **RESCUE DOSSIER** (`788f836`) — `docs/REVIEWER_FINDER_RESCUE_DOSSIER.md`. A self-contained,
+   honest brief written **for a fresh Claude model**: the objective + what "good" means, the
+   as-built architecture (with code refs), and **every strategy tried and how each fell short**. It
+   explicitly asks the new model to *challenge our framing first, code second* — including whether
+   the retrieval-first redesign is even the right path (Codex flagged that as asserted, not proven).
 
 ### Commits (all on `main`, pushed)
-- `971ec97` S237 post-impl fixes · `d453c9b` dedup design rev3 · `d611130` Codex dedup impl ·
-  `91e06c5` test-mock fixes · `bac7818` lib extraction + e2e smoke · `9178fce` **merge PR #21**
-- `d9f4803` canonical-counts reconcile (Justin) · `dad3a26` relevancescore widen + loud failures ·
-  `9f4e378` widen-script PUT+publish fix · `0a15594` schema-deploy memory gotcha #5
-- `7f0ab8a` proposal-doc-context memory · `bd3bd4f` exclusion-policy memory
+- `10ef27f` Track-B <3 warning + doc consolidation · `25110c8` off-topic surfacing + graded COI ·
+  `3c79bac` post-impl fixes · `8e818cc` doc: mark shipped · `4da142b`/`a106e32` recall-over-precision
+  memory (+ router gate fix) · `6d7837d`/`0d49d07` smoke harness + lane/overlap · `c7af6ea` §8f
+  finding + scoped fix · `788f836` rescue dossier
 
 ## Potential Next Steps
 
-### 1. Reviewer-finder prompt redesign — first concrete step
-The design is drafted + Codex-reviewed (extends `REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md`). The
-recommended de-risk first step: a **shadow, non-candidate-producing prototype** — structured
-extraction + **people-agnostic** field primer + query/`sourcePlan` generation → feed only the
-queries into existing retrieval → compare yield/latency/false-positives. Do NOT prototype "primer
-names people" first. Decide before building: web tooling, primer caching/scope, prompt-version
-migration, eval metrics.
+### 1. THE RESCUE (primary intent) — hand the dossier to the new model
+Point the freshly-released Claude model at `docs/REVIEWER_FINDER_RESCUE_DOSSIER.md` (it links to
+everything else). Goal: a fresh take on the *approach* before more code. **Do not assume
+retrieval-first is the answer** — the dossier asks the model to pressure-test that. Bring its
+verdict back before committing to a build direction.
 
-### 2. Manual-add dedup — verify the write path live
-PR #21 merged but the create-and-link write path wasn't live-smoked. Manual UI click-through in
-the Workbench Find tab (add someone who exists as a contact-only / former PI) before relying on it.
+### 2. §8f Part 1 fix — activity-from-resolved-corpus (if proceeding incrementally)
+After identity resolution, for confirmed/probable Track-B candidates: widen `backfillOpenAlexPublications`
+(today only runs on empty `publications`, only sets count when `!Number.isFinite`) to **overwrite**
+`publicationCount5yr` from the resolved author's real recent works; re-evaluate `lowPublicationCount`;
+stop gating confirmed identities on the search-hit count. **Settle first:** the cap-25 selection — the
+pre-resolution ranking that picks which 25 to resolve uses the same broken signal, so heavyweights can
+be deferred and never resolved (Part 1 never reaches them). Validate with the smoke + overlap harness.
 
-### 3. Open POLICY decision — applicant-exclusion breadth (needs the foundation)
-`[[project-applicant-exclusion-policy-pending]]` — a PI can exclude the whole peer set with one soft
-"overlapping programs" line, clobbering Claude's signal. Sub-question for a quick UX win: surface
-**excluded-but-suggested** peers (and Claude-origin) in the Workbench Find tab so the PD can judge.
+### 3. Coauthor-COI namesake fix (separate defect, §8c/§5.1)
+The "Jian Wu / 10 papers with Wen Li" FALSE COI — initial-only `Wu J AND Li W` PubMed search conflates
+namesakes (the example paper was biomedical, on a physics proposal). Proposed: field-gate the PubMed
+coauthor check (don't run it for non-biomedical) + forename-gate where it does run.
 
-### 4. Next-cycle input fix (combined Phase I+II)
-`[[project-reviewer-finder-proposal-doc-context]]` — build the **Power Automate flow** that
-assembles ONE clean reviewer-finding doc (narrative + bibliography; drop budget/board/biosketches).
-Also: give the Reviewer Finder its own doc selector so `classifyFile` no longer demotes Phase I.
+### 4. The retrieval redesign itself (Part 2 / origination ceiling)
+All-authors extraction (not single-position), field-routed sources, cited-reference lane, decomposed
+(non-overloaded) query generation. The dossier's whole point: this is the unsolved core, but the
+new model may reframe it.
 
-### 5. Carryover from S236 (still open)
-Smirnova sparse-affiliation selection collision; the automated-resolver-emits-`confirmed` vs
-sticky-sentinel discrepancy.
+### 5. Carryover (still open, untouched)
+Manual-add dedup **write path** never live-smoked (PR #21); applicant-exclusion breadth policy;
+combined Phase I+II PA doc-assembly; Smirnova sparse-affiliation collision (S236).
 
 ## Loose ends / gotchas
-- **`docs/REVIEWER_ONBOARDING_FLOW_MOCKUP.md` is UNTRACKED and not from this session** (created
-  14:51 by Justin/another agent — reviewer-portal onboarding flow + mockups). Left uncommitted on
-  purpose; decide whether to keep/commit it.
-- `main` auto-deploys to prod on push. Commit/push only when asked. No backticks in `git commit -m`.
-- Delegating to Codex = isolated worktree off HEAD → commit first; embed uncommitted text inline.
+- `main` auto-deploys to prod on push. No backticks in `git commit -m` (use a message file for
+  multi-line). Codex runs in an isolated worktree off HEAD → commit (or embed inline) before delegating.
+- **Smoke result files are gitignored** (`smoke-results-*.txt`) — reproducible via the harness; the
+  two from S238 (requests 1002794 / 1002794-lanes) are on the local Mac for review only.
+- The overlap numbers in the smokes are **run-specific** (fuzzy name matching, no identity anchor) —
+  trust the *direction* (low, variable overlap), not exact counts.
+- Be wary of conclusion-drift: this session's reviewer-recall read shifted twice before Codex pinned
+  it. Verify against source/live runs before asserting.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `pages/api/workbench/reviewer-lookup.js` | Thin shell → `lib/services/reviewer-identity-lookup.js` (cross-store dedup orchestration) |
-| `pages/api/workbench/manual-reviewer.js` | Manual add + `resolution` contract + create-and-link |
-| `lib/dataverse/adapters/{potential-reviewer,contact}.js` | `findBy{Email,Orcid}Candidates`, `searchByName`, `findByContactId`, hardened `setContactLink` |
-| `pages/api/reviewer-finder/save-candidates.js` | relevancescore clamp + loud failure (500 on all-fail) |
-| `scripts/widen-relevancescore-max.mjs` | Dataverse attr-widen deploy script (PUT+publish; ran in prod) |
-| `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` | **Canonical reviewer-finder design doc** (S238): Part A retrieval-first plan · Part B field-primer · Part C S238 refinements + code findings |
+| `docs/REVIEWER_FINDER_RESCUE_DOSSIER.md` | **START HERE for the rescue** — problem + failed-strategy history for the fresh model |
+| `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` | Canonical design (Part A plan · B primer · C S238 discussion; **§8f** = the recall flaw + scoped fix) |
+| `scripts/smoke-discover-dispositions.mjs` | Read-only live smoke: lane attribution + disposition flags + `--compare-file` overlap |
+| `lib/services/discovery-service.js` | Track-A/B discovery; `searchPubMed`, `partitionByPublicationBar`, `resolveTrackBIdentities`, `backfillOpenAlexPublications`, `gradeCoauthorCOI` |
+| `shared/config/prompts/reviewer-finder.js` | The one overloaded analyze prompt (PART 3 = the keyword query generation) |
+| `pages/api/reviewer-finder/discover.js` | Stage-2 route orchestration (disposition fixes live here + in the service) |
 
 ## Testing
 ```bash
-npx jest reviewer save-candidates suggestion          # reviewer/save/suggestion battery
-node --import ./scripts/lib/use-extensionless.mjs scripts/smoke-reviewer-lookup-dedup.mjs  # live dedup read smoke
+npx jest reviewer discovery suggestion disposition save-candidates search-logic   # reviewer battery
+# Live read-only smoke (real LLM + scholarly APIs, NO writes); --compare-file for overlap:
+node --import ./scripts/lib/use-extensionless.mjs scripts/smoke-discover-dispositions.mjs --request 1002794 --compare-file scripts/compare-1002794-production.txt
 npm run build && npm run lint                          # green before pushing (Codex can't run these)
 # full startup gate set: see .claude/skills/start
 ```
