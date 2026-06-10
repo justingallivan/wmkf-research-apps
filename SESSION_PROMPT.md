@@ -1,130 +1,133 @@
-# Session 239 Prompt: Reviewer-finder recall flaw confirmed + rescue dossier prepared for a fresh-model review
+# Session 240 Prompt: Reviewer-origination — validated multi-lane direction (NOT-YET to build)
 
-> ⚠️ **PARALLEL WORK STREAM (added 2026-06-10).** A separate session (Claude or Codex)
-> is working **reviewer onboarding** on its own branch/worktree — do **not** touch it from
-> this main tree:
+> ⚠️ **PARALLEL WORK STREAM (active, added 2026-06-10).** A separate session (Claude or
+> Codex) is working **reviewer onboarding** on its own branch/worktree — do **not** touch
+> it from this main tree:
 > - **Branch:** `feat/reviewer-onboarding-no-bill-this-cycle` · **Worktree:**
 >   `/Users/gallivan/Code/WMKF_onboarding` (own checkout; `node_modules` + `.env.local`
 >   symlinked, so no `npm install`). Launch that session with cwd = the worktree so it
 >   can't switch this tree's branch (it did, accidentally, via Codex on 2026-06-10).
 > - **Status:** 1 commit (`4110c41`, deferred-bill onboarding impl + phone +
->   `docs/REVIEWER_ONBOARDING_FLOW_MOCKUP.md`) ahead of `main`, 27 behind; **no PR**;
->   drop-onto-`main` is conflict-free (merge-tree clean) but **not yet reviewed/CI'd** →
+>   `docs/REVIEWER_ONBOARDING_FLOW_MOCKUP.md`) ahead of `main`, 27+ behind; **no PR**;
+>   drop-onto-`main` was conflict-free (merge-tree clean) but **not yet reviewed/CI'd** →
 >   land via a **reviewed PR**, not a fast-forward to prod-`main`.
 > - **Ownership split:** the onboarding session owns its branch (`lib/bill/*`,
 >   `external/review/*`, `Stage2aView`, the mockup doc). **This main session owns `main`
->   (reviewer-ORIGINATION work) AND all shared repo-wide files** — `MEMORY.md`,
->   `SESSION_PROMPT.md`, `package.json`, `docs/CANONICAL_COUNTS`/fact docs — to avoid
->   merge collisions. See `.claude/skills/agent-coordination` + `docs/AGENT_COLLABORATION_PLAN.md`.
+>   (reviewer-ORIGINATION work) AND shared repo-wide files** — `MEMORY.md`,
+>   `SESSION_PROMPT.md`, `package.json`, `docs/CANONICAL_COUNTS`/fact docs. See
+>   `.claude/skills/agent-coordination` + `docs/AGENT_COLLABORATION_PLAN.md`.
 
-## Session 238 Summary
+## Session 239 Summary
 
-All on `main` (auto-deploys to prod). The session started as "ship two small reviewer-finder
-fixes," ran them through the Codex loop, then **live-smoked them — and the smokes exposed a deeper,
-structural recall flaw**. It ended by preparing a **rescue dossier** for a fresh Claude model,
-because we're worried we're circling (patching candidate *handling* while *origination* stays broken).
+All on `main` (auto-deploys to prod). S238 ended by preparing a **rescue dossier** worried
+we were circling — patching candidate *handling* while *origination* stayed broken. S239
+took the rescue verdict, **empirically validated the origination diagnosis with three
+read-only probes + two independent Codex passes**, and landed a **safety-reviewed
+validated-direction strategy** (design only — **NOT BUILT**).
 
 ### What Was Completed
 
-1. **Three discover-disposition fixes — SHIPPED + LIVE-VERIFIED** (`10ef27f`, `25110c8`, `3c79bac`).
-   All "surface, don't silently drop," on the recall-over-precision thesis:
-   - **Track-B `<3`-pub → warning, not drop** (`partitionByPublicationBar`). Dedup of a
-     preprint+published pair can push a real reviewer under the bar.
-   - **`isRelevant: No` cull → surfaced + ranked-last + named** (`aiFlaggedNotRelevant`,
-     `rankAllCandidates`). Was a silent, count-only parametric cull of *grounded* people.
-   - **Coauthor COI graded** `likely`/`possible` (`gradeCoauthorCOI`, max-shared-with-one-author ≥3
-     = likely). A single hub-artifact paper now reads amber, not red — protects methods experts.
-   - Codex post-impl review caught 3 real consumer-safety bugs (Workbench re-rank undid "ranked
-     last"; roster DTO dropped the new fields → reload regression; persisted COI notes ignored
-     severity) — all fixed, confirmed clean by a 2nd Codex pass.
+1. **Rescue verdict verified, not trusted.** The fresh-model rescue review (it agreed
+   origination is the diseased layer but pushed *grounded* over the full redesign) made
+   live-checkable claims — I verified them: OpenAlex Frebel canonical record = **323 works**
+   (the "6" was a name-search stub artifact), and author-aggregation returns real ranked
+   people. Corrected the plan's stale §2.3/§6 "OpenAlex disqualified/metrics-unreliable"
+   claim (`3dbd3f9`).
 
-2. **Design docs consolidated into ONE** (`10ef27f`). `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md`
-   is now canonical: Part A (retrieval-first plan), Part B (field primer), Part C (S238 discussion).
-   Removed the decomposition + refinements docs; repointed references.
+2. **Probe #1 — grounded-origination** (`scripts/probe-grounded-origination.mjs`, `3bd5b90`).
+   Measured the **disease**: ~92–98% of surfaced candidates are **keyword-reconstructed**
+   (Track-B `query_seed`), domain-independent; pure hallucination (`barred_parametric`) ≈ **0**.
+   Recall gap: a grounded person-level query recovers real leaders the keyword crawl misses
+   (Corkum/Krausz physics; Muir chem-bio; Samson DNA-repair). Findings doc `63db72a`.
 
-3. **CONFIRMED structural flaw — Track-B activity signal (§8f)** (`c7af6ea`). The
-   "Olga Smirnova h-index 61 but '2 publications', ranked 28th" paradox. A Track-B candidate's pub
-   count = **keyword-search-hit concentration**, not the author's corpus: ~3 queries × top-50 ×
-   one-author-per-paper → in a busy field, ~everyone has count ≈1, so `MIN_PUBLICATIONS≥3` buries
-   real leaders and misfires. Triangulated 3 ways (live runs, the funnel math, **Codex line-level
-   code adjudication**). Fix scoped in §8f (in-pipeline: re-eval activity from the *resolved* author
-   corpus + widen the OpenAlex backfill, plus a cap-25 selection complication; redesign-scope:
-   non-origination — single-author-position minting means heavyweights are sometimes never minted).
+3. **Codex falsification pass (origination verdict)** → **SURVIVE-WITH-CAVEATS**. Its one
+   correct structural catch: "guess" over-loaded the word — adopted as
+   **"keyword-reconstructed"**. Key reframe (Justin): the disease is the keyword *MECHANISM*
+   (paper-match + 1-author minting), **not** LLM keywords — keyword→author-*aggregation* is fine.
 
-4. **Read-only live smoke harness** (`6d7837d`, `0d49d07`) —
-   `scripts/smoke-discover-dispositions.mjs`. Runs the real pipeline on a request, dumps lane
-   attribution (Track-A vs Track-B) + disposition flags + an overlap table vs a known reviewer set.
-   This is how §3/§8f were measured. Confirmed run-to-run **nondeterminism** (each run surfaces a
-   different expert subset).
+4. **Probe #2 — Tier-3 applicant trail** (`scripts/probe-applicant-trail-origination.mjs`,
+   `fef704b`→`3ad8eb9`). Justin's key inputs drove two findings:
+   - **PI identity is STRUCTURED + free:** `akoya_request._wmkf_projectleader_value` → a
+     `contact` carrying `wmkf_orcid` → **exact** OpenAlex (no namesake). Supersedes LLM
+     extraction (which misresolved "Wen Li" → "Yanping Li"). [[project-reviewer-pi-identity-structured]]
+   - **OpenAlex MERGES same-name authors** → use the **ORCID works list** as the corpus,
+     not the author cluster (rescued Wen Li: chemistry blob → Keller/Corkum/Krausz).
+     [[project-openalex-merge-use-orcid-works]]
+   - 3-request map: continuing-line **WIN** (Albanese, Wen Li post-fix); **pivot** (Ted Abel,
+     novel DNA-repair hypothesis) covered by **peer-groups + topic-aggregation** (the
+     narrative names "Madabhushi and Tsai"), not the PI-trail.
 
-5. **RESCUE DOSSIER** (`788f836`) — `docs/REVIEWER_FINDER_RESCUE_DOSSIER.md`. A self-contained,
-   honest brief written **for a fresh Claude model**: the objective + what "good" means, the
-   as-built architecture (with code refs), and **every strategy tried and how each fell short**. It
-   explicitly asks the new model to *challenge our framing first, code second* — including whether
-   the retrieval-first redesign is even the right path (Codex flagged that as asserted, not proven).
+5. **Validated-direction strategy §12** in `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md`
+   (`f842d63`). **Multi-lane harvesters** (cited-DOI · PI-trail · peer-groups ·
+   topic-aggregation); **coverage = union, confidence = convergence ON IDENTITY (shared
+   ORCID / exact work authorship), never on a name**.
+
+6. **Codex strategy-doc review (2 passes)** → **NOT-YET**; safety corrections applied
+   (`ed72b6a`, `8c60585`): retired the unsafe name-convergence claim; scoped ORCID-works
+   tradeoffs + inert fallback; COI is broader than the trail (advisor/advisee +
+   all-time-collaborator have **no gate today** = net-new); named the integration seams.
+
+7. **Memories captured** (`af2662e`): [[project-reviewer-origination-multilane]] +
+   the two gotcha files above. **Parallel onboarding worktree** set up (banner ↑).
 
 ### Commits (all on `main`, pushed)
-- `10ef27f` Track-B <3 warning + doc consolidation · `25110c8` off-topic surfacing + graded COI ·
-  `3c79bac` post-impl fixes · `8e818cc` doc: mark shipped · `4da142b`/`a106e32` recall-over-precision
-  memory (+ router gate fix) · `6d7837d`/`0d49d07` smoke harness + lane/overlap · `c7af6ea` §8f
-  finding + scoped fix · `788f836` rescue dossier
+- `0de146f` drain-table fix · `3bd5b90` probe#1 · `63db72a` findings · `3dbd3f9` §2.3 fix ·
+  `f1815de` review-request · `fef704b`/`3ad8eb9` probe#2 (Tier-3 ORCID) · `f842d63` §12 ·
+  `ed72b6a`/`8c60585` Codex safety fixes · `af2662e` memories · `acebec8` parallel-stream pointer
 
 ## Potential Next Steps
 
-### 1. THE RESCUE (primary intent) — hand the dossier to the new model
-Point the freshly-released Claude model at `docs/REVIEWER_FINDER_RESCUE_DOSSIER.md` (it links to
-everything else). Goal: a fresh take on the *approach* before more code. **Do not assume
-retrieval-first is the answer** — the dossier asks the model to pressure-test that. Bring its
-verdict back before committing to a build direction.
+### 1. Reviewer-origination — the NOT-YET build work (primary)
+Per Codex, the **doc-level safety items are cleared; what remains is design/implementation.**
+In rough leverage order:
+- **Quick win, broad benefit:** wire the **structured-ORCID PI identity** (request Project
+  Leader → contact `wmkf_orcid`) into the live pipeline — it improves PI exclusion + COI
+  everywhere, not just the trail. Add an OpenAlex call to `lib/services/openalex-service.js`
+  (ORCID→author, ORCID works list); do **not** promote probe raw-`fetch` code as-is.
+- **Identity-equality corroboration** — how lanes prove "same person" (shared ORCID / exact
+  work authorship); never name overlap. The ranking layer counts corroboration only at
+  identity level.
+- **Two net-new COI gates** — advisor/advisee + all-time-collaborator (today prompt-text only).
+- **Peer-group parsing lane** (designed, unbuilt) — extract "Peer Groups: X and Y" → resolve
+  each to a specific identity before promotion.
+- **Facet generation** — broader/atomic queries (5-word MeSH strings → OpenAlex corpora of 0–20).
+- Wire all lanes INTO `discover()` / `reviewer-provenance` / `save-candidates` / Workbench —
+  not a parallel pipeline.
+Canonical design: `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md` §12. Read
+[[project-reviewer-origination-multilane]] first.
 
-### 2. §8f Part 1 fix — activity-from-resolved-corpus (if proceeding incrementally)
-After identity resolution, for confirmed/probable Track-B candidates: widen `backfillOpenAlexPublications`
-(today only runs on empty `publications`, only sets count when `!Number.isFinite`) to **overwrite** <!-- drain-table:ignore reason=candidate-field-not-pg-table -->
-`publicationCount5yr` from the resolved author's real recent works; re-evaluate `lowPublicationCount`;
-stop gating confirmed identities on the search-hit count. **Settle first:** the cap-25 selection — the
-pre-resolution ranking that picks which 25 to resolve uses the same broken signal, so heavyweights can
-be deferred and never resolved (Part 1 never reaches them). Validate with the smoke + overlap harness.
-
-### 3. Coauthor-COI namesake fix (separate defect, §8c/§5.1)
-The "Jian Wu / 10 papers with Wen Li" FALSE COI — initial-only `Wu J AND Li W` PubMed search conflates
-namesakes (the example paper was biomedical, on a physics proposal). Proposed: field-gate the PubMed
-coauthor check (don't run it for non-biomedical) + forename-gate where it does run.
-
-### 4. The retrieval redesign itself (Part 2 / origination ceiling)
-All-authors extraction (not single-position), field-routed sources, cited-reference lane, decomposed
-(non-overloaded) query generation. The dossier's whole point: this is the unsolved core, but the
-new model may reframe it.
-
-### 5. Carryover (still open, untouched)
-Manual-add dedup **write path** never live-smoked (PR #21); applicant-exclusion breadth policy;
-combined Phase I+II PA doc-assembly; Smirnova sparse-affiliation collision (S236).
+### 2. Carryover (still open from S238)
+Manual-add dedup **write path** never live-smoked (PR #21); applicant-exclusion breadth
+policy (`project-applicant-exclusion-policy-pending`); combined Phase I+II PA doc-assembly.
 
 ## Loose ends / gotchas
-- `main` auto-deploys to prod on push. No backticks in `git commit -m` (use a message file for
-  multi-line). Codex runs in an isolated worktree off HEAD → commit (or embed inline) before delegating.
-- **Smoke result files are gitignored** (`smoke-results-*.txt`) — reproducible via the harness; the
-  two from S238 (requests 1002794 / 1002794-lanes) are on the local Mac for review only.
-- The overlap numbers in the smokes are **run-specific** (fuzzy name matching, no identity anchor) —
-  trust the *direction* (low, variable overlap), not exact counts.
-- Be wary of conclusion-drift: this session's reviewer-recall read shifted twice before Codex pinned
-  it. Verify against source/live runs before asserting.
+- `main` auto-deploys to prod on push. No backticks in `git commit -m` (use a message file).
+  Codex runs in an ISOLATED worktree off HEAD → commit before delegating.
+- **Probe result files are gitignored** (`smoke-results-*.txt`); the probes are read-only +
+  reproducible (each makes ≤2 paid LLM calls / public API calls; Tier-3 probe is LLM-free).
+- **Identity-equality safety rule** is load-bearing: two lanes agreeing on a NAME is not
+  identity proof — would reintroduce the wrong-email/affiliation failure the save-path
+  force-null gate exists to prevent. See [[project-reviewer-verify-fail-dangerous]].
+- Router `MEMORY.md` is slightly over its soft byte target (under the hard cap) — a trim
+  pass is due eventually.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_FINDER_RESCUE_DOSSIER.md` | **START HERE for the rescue** — problem + failed-strategy history for the fresh model |
-| `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` | Canonical design (Part A plan · B primer · C S238 discussion; **§8f** = the recall flaw + scoped fix) |
-| `scripts/smoke-discover-dispositions.mjs` | Read-only live smoke: lane attribution + disposition flags + `--compare-file` overlap |
-| `lib/services/discovery-service.js` | Track-A/B discovery; `searchPubMed`, `partitionByPublicationBar`, `resolveTrackBIdentities`, `backfillOpenAlexPublications`, `gradeCoauthorCOI` |
-| `shared/config/prompts/reviewer-finder.js` | The one overloaded analyze prompt (PART 3 = the keyword query generation) |
-| `pages/api/reviewer-finder/discover.js` | Stage-2 route orchestration (disposition fixes live here + in the service) |
+| `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md` | **Canonical** — §12 = validated multi-lane origination direction (+ Codex safety corrections) |
+| `docs/REVIEWER_FINDER_ORIGINATION_PROBE_FINDINGS.md` | Probe #1 disease-metric + recall-gap writeup |
+| `docs/REVIEWER_FINDER_REVIEW_REQUEST.md` | Handoff prompt for a fresh model to review the direction |
+| `scripts/probe-grounded-origination.mjs` | Read-only: disease metric + topic-aggregation + reference lane |
+| `scripts/probe-applicant-trail-origination.mjs` | Read-only, LLM-free: PI-trail via structured ORCID + ORCID-works |
+| `.claude-memory/project-reviewer-origination-multilane.md` | The validated direction (router entry) |
 
 ## Testing
 ```bash
+# Read-only origination probes (reproducible):
+node --import ./scripts/lib/use-extensionless.mjs scripts/probe-grounded-origination.mjs --request 1002794
+node --import ./scripts/lib/use-extensionless.mjs scripts/probe-applicant-trail-origination.mjs --request 1002794   # LLM-free
 npx jest reviewer discovery suggestion disposition save-candidates search-logic   # reviewer battery
-# Live read-only smoke (real LLM + scholarly APIs, NO writes); --compare-file for overlap:
-node --import ./scripts/lib/use-extensionless.mjs scripts/smoke-discover-dispositions.mjs --request 1002794 --compare-file scripts/compare-1002794-production.txt
-npm run build && npm run lint                          # green before pushing (Codex can't run these)
+npm run build && npm run lint                          # green before pushing
 # full startup gate set: see .claude/skills/start
 ```
