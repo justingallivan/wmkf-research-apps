@@ -52,6 +52,34 @@ describe('DiscoveryService Track B identity merge gates', () => {
     expect(qualified.every((c) => c.lowPublicationCount === undefined)).toBe(true);
   });
 
+  test('gradeCoauthorCOI tiers on the strongest single-author tie, not the total (S238)', () => {
+    // No shared papers → no COI grade.
+    expect(DiscoveryService.gradeCoauthorCOI({ hasCoauthorship: false, maxSharedWithOneAuthor: 0 })).toBeNull();
+    // A single shared paper (likely a hub artifact) → 'possible', not a hard COI.
+    expect(DiscoveryService.gradeCoauthorCOI({ hasCoauthorship: true, maxSharedWithOneAuthor: 1 })).toBe('possible');
+    expect(DiscoveryService.gradeCoauthorCOI({ hasCoauthorship: true, maxSharedWithOneAuthor: 2 })).toBe('possible');
+    // A sustained tie (>= threshold) with one author → 'likely' (real conflict).
+    expect(DiscoveryService.gradeCoauthorCOI({ hasCoauthorship: true, maxSharedWithOneAuthor: 3 })).toBe('likely');
+    expect(DiscoveryService.gradeCoauthorCOI({ hasCoauthorship: true, maxSharedWithOneAuthor: 8 })).toBe('likely');
+  });
+
+  test('rankAllCandidates surfaces AI-flagged-off-topic candidates but sorts them last (S238)', () => {
+    const ranked = DiscoveryService.rankAllCandidates({
+      verified: [],
+      discovered: [
+        { name: 'OffTopic High', publications: [], aiFlaggedNotRelevant: true },
+        { name: 'OnTopic A', publications: [] },
+        { name: 'OnTopic B', publications: [] },
+      ],
+    }, []);
+
+    // Nothing is dropped — all three survive.
+    expect(ranked).toHaveLength(3);
+    // The flagged candidate is surfaced but ranked last, regardless of its score.
+    expect(ranked[ranked.length - 1].name).toBe('OffTopic High');
+    expect(ranked.filter((c) => c.aiFlaggedNotRelevant)).toHaveLength(1);
+  });
+
   test('bioRxiv-only contamination check reads post-dedup sources and keeps cross-source candidates', () => {
     expect(DiscoveryService.isCrossFieldDiscoveredContamination(
       { primaryResearchArea: 'quantum materials engineering' },
