@@ -1137,13 +1137,12 @@ before any staff-visible disposition. (My first pass found only the `isRelevant`
 wrongly called everything else "flag-not-drop"; Codex's S238 review surfaced the rest — see the
 CORRECTION bullet below.)
 
-- **Co-authorship COI flag is BINARY.** `checkCoauthorHistory` collects per-author
-  `paperCount` + recent papers (`discovery-service.js:2093-2102`) but the verdict is
-  `hasCoauthorship = coauthorships.length > 0` (`:2113`) → `hasCoauthorCOI` (`:2180`): **1
-  shared paper == 8.** The grading texture is collected and thrown away. Co-author search uses
-  initial-only PubMed format `LastName F` (`:2123-2138`) → namesake-prone (can **over**-flag a
-  wrong same-initial person, feeding over-recusal). It is a **flag, not a drop**.
-- **SILENT DROP GATE — `isRelevant !== false`** (`discover.js:307`). Track-B
+- **Co-authorship COI flag was BINARY — FIXED S238 (8d fix 1).** `checkCoauthorHistory` collected
+  per-author `paperCount` + recent papers but the verdict was `hasCoauthorship = length > 0` → **1
+  shared paper == 8**, grading texture thrown away. Now graded via `coauthorCOIStrength`
+  ('likely'/'possible'). (Still open: co-author search uses initial-only PubMed format `LastName F`
+  → namesake-prone, can **over**-flag a same-initial person; it remains a **flag, not a drop**.)
+- **SILENT DROP GATE — `isRelevant !== false` — FIXED S238 (8d fix 2).** (`discover.js:307`). Track-B
   database-discovered (real, retrieved) candidates tagged `RELEVANT: No` by the **second Claude
   reasoning call** (`reviewer-finder.js:436`) are filtered out with **count-only** reporting
   (`:310-315`) — **no names streamed.** A parametric Claude judgment culling *grounded* real
@@ -1189,10 +1188,17 @@ CORRECTION bullet below.)
   parametric-invention concern is scoped to the "known experts" portion, not the whole pool.
 
 **Shippable fixes, independent of the big redesign:**
-1. **Grade the co-authorship flag** on the `paperCount` already collected (+ author position,
-   recency, co-author-list size) → directly protects methods-axis recall (8b). _(open)_
-2. **Make the `isRelevant` drop visible** — report dropped names, or down-rank instead of
-   hard-dropping → restores the surface-don't-silently-exclude posture (8b). _(open)_
+1. **SHIPPED S238 — graded co-authorship COI.** `hasCoauthorCOI` stays boolean for all
+   consumers; new `coauthorCOIStrength` ('likely' vs 'possible') from `gradeCoauthorCOI` tiers
+   on the strongest single co-author tie (`COAUTHOR_COI_STRONG_MIN`=3). A single shared paper now
+   reads as amber "possible coauthor overlap (may be incidental)" instead of a red COI — protects
+   methods-axis recall (8b). Both Find clients + persisted COI notes + exports gate on strength;
+   roster DTO persists it. (Author position / list-size not used — co-author search doesn't fetch
+   them; count-based v1.)
+2. **SHIPPED S238 — `isRelevant` drop made visible.** The reasoning pass no longer hard-drops
+   off-topic Track-B candidates; they are kept, tagged `aiFlaggedNotRelevant`, sorted last
+   (server + Workbench re-rank), shown with a warning in both clients, and reported by name.
+   Restores the surface-don't-silently-exclude posture (8b).
 3. **SHIPPED S238 — Track-B `<3`-pubs is now a warning, not a silent drop.**
    `DiscoveryService.partitionByPublicationBar` keeps under-bar candidates (tagged
    `lowPublicationCount`) and surfaces them instead of filtering them out; qualified (`>=` MIN)
@@ -1229,16 +1235,17 @@ as direction, but pin the specifics before they become thresholds/UX. The four f
    read-only unresolved states. SETTLED: hard-drop proposal-authors AND same-institution (policy,
    §8c) [Justin, S238]. Still to decide: co-authorship COI → graded retained status; batch-relative
    "held out initially, recoverable later" for the *recoverable* kinds only.
-2. **`isRelevant` handling.** Hard-drop vs down-rank vs separate "not recommended" bucket — and
-   stream the dropped names either way.
+2. **`isRelevant` handling — RESOLVED S238 (8d fix 2):** chose down-rank-and-flag (kept, sorted
+   last, warned, names streamed) over hard-drop / separate bucket.
 3. **Track-B pre-reasoning filters** (excluding institution-COI = settled policy, and `<3` pubs =
    FIXED S238 → warning). The remaining silent filters (dedup, cross-field contamination) still
    remove real retrieved candidates. Decide: keep as hard gates *with named audit output*;
    convert to retained low-confidence candidates; or apply only after a staff-visible status.
-4. **Coauthor-COI grading thresholds.** Count-only tiers vs count+recency vs
-   count+position+list-size; and the UI language for "obvious COI" vs "soft relationship."
+4. **Coauthor-COI grading thresholds — RESOLVED S238 (8d fix 1):** v1 grades on max shared papers
+   with one author (≥3 = 'likely'/red, 1-2 = 'possible'/amber). Recency / author-position /
+   list-size deferred (the co-author search doesn't fetch them yet).
 
-These are the build-time rigidity points — settle them when we start building, not now.
+Items 1 and 3 remain the build-time rigidity points — settle them when that work starts.
 
 ---
 
