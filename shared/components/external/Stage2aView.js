@@ -206,6 +206,16 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
           setError('Someone else updated this invitation while you were viewing it. Please refresh and try again.');
         } else if (json.reason === 'policy_misconfigured') {
           setError('We hit a configuration error on our end. The Foundation has been notified.');
+        } else if (json.reason === 'payment_contact_required') {
+          // Server rejected an incomplete payment-contact set (mailing address +
+          // phone required this cycle for manual honorarium payment). The client
+          // pre-validates so this is a defensive path — flag the named fields
+          // inline so the reviewer sees exactly what to complete.
+          const fields = Array.isArray(json.fields)
+            ? json.fields.filter((f) => ADDRESS_FIELD_KEYS.has(f))
+            : [];
+          if (fields.length) setAddressErrors(fields);
+          setError('Please complete your mailing address and phone number to receive the honorarium.');
         } else if (resp.status === 400 && VALIDATION_REASON_COPY[json.reason]) {
           // Surface the specific server validation reason and, when it points at
           // a named address field, flag that field inline.
