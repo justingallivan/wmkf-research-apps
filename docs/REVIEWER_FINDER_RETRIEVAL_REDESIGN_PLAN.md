@@ -144,9 +144,17 @@ Key reads:
   it (common-name conflation). PubMed is dependable depth **for biomedicine only**.
 - **OpenAlex + ORCID cover the PubMed-blind field (astro) on presence/identity** —
   OA found 100% and returned an **inline ORCID** for most; ORCID-direct 92%.
-- **OpenAlex finds, but its science records are fragmented** — implausibly low
-  `works_count` for senior astronomers (Frebel 6, Gieles 1). Trust OA for
-  *presence + ORCID discovery*, not for *completeness/metrics*.
+- **OpenAlex finds; its canonical (ORCID-anchored) records are complete — the
+  "fragmented records / low `works_count`" reading was a NAME-SEARCH ARTIFACT.**
+  `[CORRECTED S239 via scripts/probe-grounded-origination.mjs — see docs/REVIEWER_FINDER_ORIGINATION_PROBE_FINDINGS.md]`
+  A naive author-search returns the canonical record *plus* ORCID-less stub shards
+  that share the name; the original probe picked a stub. Live re-check: Frebel's
+  canonical record = **323 works + ORCID + MIT** (the "6" was a 0-citation,
+  ORCID-less stub). Disambiguation is trivial — prefer the ORCID-bearing /
+  highest-cited record — so OA metrics on the *resolved* record ARE trustworthy.
+  This corrects the original "trust OA for presence only, not metrics" conclusion.
+  (Distinct from §4's claim, which is about OA *coverage* as exhaustive
+  ground-truth and still stands — see §8d's role-scope qualifier.)
 - **Semantic Scholar ≈ OpenAlex on recall but inferior for identity** — its
   `author/search` returned **0 ORCIDs** (would need a 2nd `/author/{id}` call,
   doubling load under its 1 req/s limit) and shows severe fragmentation
@@ -595,8 +603,9 @@ proposal-author + institution marking but no coauthor-history (`discover.js:310,
 
 ## 6. Coverage & sourcing decisions
 - **Cross-field spine = OpenAlex + ORCID** (OA for breadth + inline ORCID
-  discovery; ORCID as the hard key). **Trust OA for presence/identity, not
-  completeness/metrics.**
+  discovery; ORCID as the hard key). **Trust OA for presence/identity — and, on the
+  ORCID-anchored canonical record, for recent-works metrics** (the earlier
+  "not metrics" caveat was a name-search stub artifact; corrected S239 — see §2.3).
 - **PubMed = biomedical depth only** (non-biomedical presence is sparse-real +
   namesake-conflated — unreliable to either cover or verify; see §2.3).
 - **Field-routed depth:** NASA ADS / arXiv for astro-physics; DBLP for CS;
