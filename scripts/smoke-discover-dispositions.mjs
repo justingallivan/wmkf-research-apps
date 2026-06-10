@@ -49,6 +49,7 @@ function parseArgs(argv) {
     else if (a === '--file-key') out.fileKey = next();
     else if (a === '--list-files') out.listFiles = true;
     else if (a === '--reviewer-count') out.reviewerCount = parseInt(next(), 10) || 12;
+    else if (a === '--compare-file') out.compareFile = next();
     else if (a === '--help' || a === '-h') out.help = true;
   }
   return out;
@@ -224,6 +225,55 @@ async function main() {
     console.log(`    grades present: ${anyLikely ? "'likely' " : ''}${anyPossible ? "'possible'" : ''}`.trim() || '    (only one tier this run)');
   } else {
     console.log('    (no coauthor overlaps with proposal authors this run)');
+  }
+
+  // ── Lane attribution + roster/ranked dump (S238 recall investigation) ──
+  // In the combined ranked list, isClaudeSuggestion===true marks the Track-A / spine
+  // lane (Claude-suggested, identity-verified) and false marks the Track-B keyword
+  // discovery lane. This is the exact distinction the production "Literature-retrieved"
+  // group blurs (it folds spine-verified Claude suggestions in with DB discoveries).
+  const laneOf = (c) => (c.isClaudeSuggestion ? 'A' : 'B'); // A = Track-A/spine, B = Track-B keyword
+  const idOf = (c) => c.identityStatus || c.verificationStatus || (c.verified ? 'verified' : 'unresolved');
+  const flagsOf = (c) => {
+    const t = [];
+    if (c.lowPublicationCount) t.push(`low-pub(${c.lowPublicationCountFound})`);
+    if (c.aiFlaggedNotRelevant) t.push('off-topic');
+    if (c.coauthorCOIStrength) t.push(`COI:${c.coauthorCOIStrength}`);
+    return t.length ? t.join(',') : '—';
+  };
+
+  const trackA = ranked.filter((c) => c.isClaudeSuggestion);
+  console.log(`\n${line}\nVERIFIED / TRACK-A (spine-verified Claude suggestions) — ${trackA.length}\n${line}`);
+  trackA.forEach((c) => console.log(`  [${idOf(c).padEnd(10)}] ${c.name}  ·  ${(Array.isArray(c.sources) ? c.sources.join('+') : c.source) || '—'}  ·  ${flagsOf(c)}`));
+
+  console.log(`\n${line}\nFULL RANKED LIST (${ranked.length}) — pos · lane · identity · flags · name\n${line}`);
+  ranked.forEach((c, i) => console.log(`  ${String(i + 1).padStart(3)}. ${laneOf(c)} · ${idOf(c).padEnd(10)} · ${flagsOf(c).padEnd(22)} · ${c.name}`));
+
+  // ── Overlap vs a known reviewer set (e.g. a prior production run) ──
+  if (args.compareFile) {
+    const compareNames = readFileSync(args.compareFile, 'utf8').split('\n').map((s) => s.trim()).filter(Boolean);
+    console.log(`\n${line}\nOVERLAP vs ${args.compareFile} (${compareNames.length} names)\n${line}`);
+    const buckets = { 'TRACK-A (clean slate)': [], 'TRACK-B clean': [], 'TRACK-B weak tail (low-pub/off-topic)': [], ABSENT: [] };
+    for (const name of compareNames) {
+      const matches = ranked.filter((c) => DeduplicationService.areNamesSimilar(name, c.name));
+      if (matches.length === 0) { buckets.ABSENT.push(`${name}`); continue; }
+      // Prefer the strongest match (Track-A, then clean Track-B, then weak).
+      const best = matches.sort((a, b) => {
+        const score = (c) => (c.isClaudeSuggestion ? 3 : 0) + (!c.lowPublicationCount && !c.aiFlaggedNotRelevant ? 1 : 0);
+        return score(b) - score(a);
+      })[0];
+      const pos = ranked.indexOf(best) + 1;
+      const tag = `${name}  →  matched "${best.name}" (rank ${pos}, ${idOf(best)}, ${flagsOf(best)})`;
+      if (best.isClaudeSuggestion) buckets['TRACK-A (clean slate)'].push(tag);
+      else if (!best.lowPublicationCount && !best.aiFlaggedNotRelevant) buckets['TRACK-B clean'].push(tag);
+      else buckets['TRACK-B weak tail (low-pub/off-topic)'].push(tag);
+    }
+    for (const [bucket, items] of Object.entries(buckets)) {
+      console.log(`\n  ▸ ${bucket}: ${items.length}`);
+      items.forEach((t) => console.log(`      • ${t}`));
+    }
+    const surfaced = compareNames.length - buckets.ABSENT.length;
+    console.log(`\n  SUMMARY: ${surfaced}/${compareNames.length} surfaced anywhere · ${buckets['TRACK-A (clean slate)'].length + buckets['TRACK-B clean'].length} on a clean slate · ${buckets.ABSENT.length} absent`);
   }
 
   console.log(`\n${line}`);
