@@ -228,8 +228,12 @@ that **cross-lane convergence must be on resolved IDENTITY (shared ORCID / exact
 authorship), never on a shared name** (§12.4–§12.5), that COI is broader than the
 trail's co-author exclusion (§12.8), and that the ORCID-works fix has scoped tradeoffs
 (§12.3). Codex's overall verdict on building this as-written was **NOT-YET**; this
-revision resolves the doc-level safety items, leaving the COI-per-lane wiring and the
-service integration seams (§12.8) as design work before implementation.
+revision clears the *identity/name-convergence* and *ORCID-fallback* safety items at
+the doc level. **Still open before implementation:** COI-per-lane — and note that
+**advisor/advisee and all-time-collaborator COI have NO deterministic production gate
+today** (prompt-text only), so those are *net-new gate design*, not wiring an existing
+gate (the gates that exist are proposal-author filtering, institutional COI, and PubMed
+coauthorship — §12.8) — plus the service integration seams (§12.8).
 
 ### 12.1 The disease, measured `[VERIFIED via probe]`
 
@@ -353,10 +357,14 @@ the correct one is opportunistic harvest over the union of available signals.
 - **Recency-weighting** is still to be implemented; the probe ranks freq-then-recency.
 - The probe's 200-reference resolution cap is a sampling bound, not a design limit.
 - **COI is broader than the trail's exclusion (Codex).** The PI-trail only removes the
-  PI + their *recent DOI-bearing* co-authors. It does **not** cover all-time
-  collaborators, institutional COI, named co-investigators, or advisor/advisee ties.
-  Every lane's candidates must still pass the **production COI gates** before
-  selectability — the trail's co-author drop is a head-start, not a substitute.
+  PI + their *recent DOI-bearing* co-authors. Every lane's candidates must still pass
+  the **existing production COI gates** — proposal-author filter, institutional COI,
+  PubMed coauthorship (§12.8) — before selectability; the trail's co-author drop is a
+  head-start, not a substitute. **Two COI classes have NO gate today and are net-new
+  design, not wiring:** *all-time collaborators* (outside the recent DOI corpus) and
+  *advisor/advisee ties* (currently prompt-text only — `reviewer-finder.js:105-107` —
+  not deterministic). Until those gates exist, candidates from every lane carry residual
+  COI risk on those two axes; this is implementation work, not a doc-level claim to make.
 
 ### 12.8 What this does NOT change — and the integration seams (Codex)
 
@@ -376,7 +384,9 @@ those contracts, never porting probe code as-is. The seams that must own the new
 - `lib/utils/reviewer-provenance.js` — provenance kinds, groups, save-source mapping,
   selectability (`provenanceGroupOf`).
 - COI gates in `pages/api/reviewer-finder/discover.js` (proposal-author filter,
-  institutional-COI mark, PubMed coauthorship) — every lane routes through these.
+  institutional-COI mark, PubMed coauthorship) — every lane routes through these. These
+  are the gates that **exist**; advisor/advisee + all-time-collaborator COI are NOT
+  gated here and require net-new design (§12.7).
 - `pages/api/reviewer-finder/save-candidates.js` — force-nulls contact/identity fields
   for unresolved rows. The cardinal boundary: **a name-converged-but-unresolved
   candidate is NOT a confirmed identity** and must stay non-selectable.
