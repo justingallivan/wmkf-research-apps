@@ -1,5 +1,22 @@
 # Session 239 Prompt: Reviewer-finder recall flaw confirmed + rescue dossier prepared for a fresh-model review
 
+> ⚠️ **PARALLEL WORK STREAM (added 2026-06-10).** A separate session (Claude or Codex)
+> is working **reviewer onboarding** on its own branch/worktree — do **not** touch it from
+> this main tree:
+> - **Branch:** `feat/reviewer-onboarding-no-bill-this-cycle` · **Worktree:**
+>   `/Users/gallivan/Code/WMKF_onboarding` (own checkout; `node_modules` + `.env.local`
+>   symlinked, so no `npm install`). Launch that session with cwd = the worktree so it
+>   can't switch this tree's branch (it did, accidentally, via Codex on 2026-06-10).
+> - **Status:** 1 commit (`4110c41`, deferred-bill onboarding impl + phone +
+>   `docs/REVIEWER_ONBOARDING_FLOW_MOCKUP.md`) ahead of `main`, 27 behind; **no PR**;
+>   drop-onto-`main` is conflict-free (merge-tree clean) but **not yet reviewed/CI'd** →
+>   land via a **reviewed PR**, not a fast-forward to prod-`main`.
+> - **Ownership split:** the onboarding session owns its branch (`lib/bill/*`,
+>   `external/review/*`, `Stage2aView`, the mockup doc). **This main session owns `main`
+>   (reviewer-ORIGINATION work) AND all shared repo-wide files** — `MEMORY.md`,
+>   `SESSION_PROMPT.md`, `package.json`, `docs/CANONICAL_COUNTS`/fact docs — to avoid
+>   merge collisions. See `.claude/skills/agent-coordination` + `docs/AGENT_COLLABORATION_PLAN.md`.
+
 ## Session 238 Summary
 
 All on `main` (auto-deploys to prod). The session started as "ship two small reviewer-finder
