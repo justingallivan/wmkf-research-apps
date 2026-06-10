@@ -640,6 +640,13 @@ export default function ReviewerSearchSection({
       const proposalKeywords = (analysisResult.proposalInfo?.keywords || '')
         .split(',').map((k) => k.trim()).filter(Boolean);
       enriched = rankByRelevance(enriched.map((c) => withReviewerProvenance(c)), proposalKeywords);
+      // Preserve the server's "AI-flagged-off-topic sorts last" guarantee (S238) — the
+      // shared scorer orders by relevance score only and would otherwise promote a flagged
+      // candidate back to the top after enrichment.
+      const offTopic = enriched.filter((c) => c.aiFlaggedNotRelevant);
+      if (offTopic.length > 0) {
+        enriched = [...enriched.filter((c) => !c.aiFlaggedNotRelevant), ...offTopic];
+      }
 
       setCandidates(enriched);
       setUnverified(unverifiedKept.map((c) => withReviewerProvenance(c)));

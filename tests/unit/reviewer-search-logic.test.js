@@ -289,3 +289,41 @@ describe('pruneCandidateForRoster — identity-review markers survive reload (Sl
     expect(provenanceGroupOf(pruned)).not.toBe('needs_identity_review');
   });
 });
+
+describe('pruneCandidateForRoster — S238 graded-COI + warning markers survive reload', () => {
+  // Without these, a roster reload silently regresses a 'possible' overlap to red (the
+  // UI fallback treats a missing strength as 'likely') and drops the off-topic /
+  // few-publications warnings entirely.
+  it('preserves coauthorCOIStrength and the shared-paper counts', () => {
+    const pruned = pruneCandidateForRoster({
+      name: 'Jane Smith',
+      hasCoauthorCOI: true,
+      coauthorCOIStrength: 'possible',
+      coauthorSharedPaperTotal: 2,
+      coauthorMaxWithOneAuthor: 1,
+    });
+    expect(pruned.hasCoauthorCOI).toBe(true);
+    expect(pruned.coauthorCOIStrength).toBe('possible');
+    expect(pruned.coauthorSharedPaperTotal).toBe(2);
+    expect(pruned.coauthorMaxWithOneAuthor).toBe(1);
+  });
+
+  it('preserves aiFlaggedNotRelevant and lowPublicationCount warnings', () => {
+    const pruned = pruneCandidateForRoster({
+      name: 'Jane Smith',
+      aiFlaggedNotRelevant: true,
+      lowPublicationCount: true,
+      lowPublicationCountFound: 2,
+    });
+    expect(pruned.aiFlaggedNotRelevant).toBe(true);
+    expect(pruned.lowPublicationCount).toBe(true);
+    expect(pruned.lowPublicationCountFound).toBe(2);
+  });
+
+  it('defaults the markers to false/null when absent (no accidental flags)', () => {
+    const pruned = pruneCandidateForRoster({ name: 'Jane Smith', affiliation: 'MIT' });
+    expect(pruned.coauthorCOIStrength).toBeNull();
+    expect(pruned.aiFlaggedNotRelevant).toBe(false);
+    expect(pruned.lowPublicationCount).toBe(false);
+  });
+});

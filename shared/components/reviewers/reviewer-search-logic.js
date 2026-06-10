@@ -191,6 +191,15 @@ export function pruneCandidateForRoster(c) {
     potentialConcerns: c.potentialConcerns || null,
     hasCoauthorCOI: !!c.hasCoauthorCOI,
     coauthorships: Array.isArray(c.coauthorships) ? c.coauthorships : [],
+    // S238 graded coauthor COI + thin-evidence/off-topic warnings — persist so the
+    // card's severity and warnings survive a roster reload (else a 'possible' overlap
+    // regresses to red via the UI fallback, and the warnings vanish entirely).
+    coauthorCOIStrength: c.coauthorCOIStrength || null,
+    coauthorSharedPaperTotal: Number.isFinite(c.coauthorSharedPaperTotal) ? c.coauthorSharedPaperTotal : null,
+    coauthorMaxWithOneAuthor: Number.isFinite(c.coauthorMaxWithOneAuthor) ? c.coauthorMaxWithOneAuthor : null,
+    aiFlaggedNotRelevant: !!c.aiFlaggedNotRelevant,
+    lowPublicationCount: !!c.lowPublicationCount,
+    lowPublicationCountFound: Number.isFinite(c.lowPublicationCountFound) ? c.lowPublicationCountFound : null,
     institutionMismatch: !!c.institutionMismatch,
     suggestedInstitution: c.suggestedInstitution || null,
     expertiseMismatch: !!c.expertiseMismatch,

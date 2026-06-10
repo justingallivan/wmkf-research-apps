@@ -1325,7 +1325,9 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
       }
 
       if (candidate.hasCoauthorCOI && candidate.coauthorships) {
-        markdown += `**🚨 Coauthor COI:** Has co-authored papers with proposal authors:\n`;
+        markdown += candidate.coauthorCOIStrength === 'possible'
+          ? `**⚠️ Possible coauthor overlap (may be incidental):** Shared paper(s) with proposal authors:\n`
+          : `**🚨 Coauthor COI:** Has co-authored papers with proposal authors:\n`;
         candidate.coauthorships.forEach(coauth => {
           markdown += `- ${coauth.paperCount} paper(s) with ${coauth.proposalAuthor}\n`;
         });
@@ -1379,7 +1381,7 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
       // Build COI warning string
       const coiParts = [];
       if (candidate.hasInstitutionCOI) coiParts.push('Institution COI');
-      if (candidate.hasCoauthorCOI) coiParts.push('Coauthor COI');
+      if (candidate.hasCoauthorCOI) coiParts.push(candidate.coauthorCOIStrength === 'possible' ? 'Possible coauthor overlap' : 'Coauthor COI');
       const coiWarning = coiParts.length > 0 ? coiParts.join(', ') : 'No';
 
       const reasoning = (candidate.reasoning || candidate.generatedReasoning || '').replace(/"/g, '""');
