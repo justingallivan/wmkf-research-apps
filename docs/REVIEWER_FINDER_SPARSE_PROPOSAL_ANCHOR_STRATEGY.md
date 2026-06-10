@@ -221,8 +221,15 @@ Reproducible scripts (no writes; result files gitignored):
 - `scripts/probe-applicant-trail-origination.mjs` — Tier-3 PI trail via structured
   ORCID identity + ORCID-works corpus.
 
-The independent Codex falsification of the origination verdict (S239) is folded in
-where relevant; its one correct structural catch (the "guess" label) is adopted in §12.1.
+Two independent Codex reviews (S239) are folded in: the origination-verdict
+falsification (its correct catch — the "guess" label — is adopted in §12.1) and a
+review of THIS doc, whose safety findings are applied throughout §12 — most importantly
+that **cross-lane convergence must be on resolved IDENTITY (shared ORCID / exact work
+authorship), never on a shared name** (§12.4–§12.5), that COI is broader than the
+trail's co-author exclusion (§12.8), and that the ORCID-works fix has scoped tradeoffs
+(§12.3). Codex's overall verdict on building this as-written was **NOT-YET**; this
+revision resolves the doc-level safety items, leaving the COI-per-lane wiring and the
+service integration seams (§12.8) as design work before implementation.
 
 ### 12.1 The disease, measured `[VERIFIED via probe]`
 
@@ -240,11 +247,16 @@ question instead, by several grounded routes (§12.4).
 
 The PI is the request's **Project Leader**: `akoya_request._wmkf_projectleader_value`
 → a `contact` that already carries `wmkf_orcid`. ORCID → exact OpenAlex author. **No
-LLM extraction, no fuzzy name/institution match, no namesake hazard.** Confirmed for
-all three PIs (Wen Li `0000-0002-3721-4008`, Katherine Albanese `0000-0002-2336-1621`,
-Ted Abel `0000-0003-2423-4592`). This **supersedes** the LLM-extract identity path
-(§5 steps 1, 9): the earlier fuzzy resolver misresolved "Wen Li" → "Yanping Li" with
-false confidence; the structured ORCID path removes the hazard at the root.
+LLM extraction, no fuzzy name/institution match, no name-*search* namesake hazard**
+(ORCID is the hard key). Confirmed for all three PIs (Wen Li `0000-0002-3721-4008`,
+Katherine Albanese `0000-0002-2336-1621`, Ted Abel `0000-0003-2423-4592`). This
+**supersedes** the LLM-extract identity path (§5 steps 1, 9): the earlier fuzzy
+resolver misresolved "Wen Li" → "Yanping Li" with false confidence; the structured
+ORCID path removes that hazard at the root. **Residual risk (Codex):** a *mis-entered*
+ORCID on the contact would silently resolve to the wrong person — so the implementation
+must cross-check the contact name against the ORCID-registry record (verified manually
+for all three; e.g. `0000-0002-3721-4008` → ORCID registry = Wen Li, Wayne State). The
+probe does not yet enforce this check.
 
 ### 12.3 Corpus: the ORCID works list, not the OpenAlex author cluster `[VERIFIED via probe]`
 
@@ -255,39 +267,70 @@ organic-chemistry record (311 works, none his). **Fix:** take the PI corpus from
 to OpenAlex for their references + co-authors. Verified: Wen Li's ORCID works are clean
 attosecond physics, and the trail then surfaces Keller, Dörner, **Corkum**, **Krausz**,
 Kling, Vrakking — the field's leaders, and exactly the people the keyword pipeline
-missed. Two cheap guards catch the contamination when it happens: PI email-domain vs
-OpenAlex last-known-institution mismatch, and anchor-titles vs proposal-topic mismatch.
+missed. Two guards *flag* contamination — PI email-domain vs OpenAlex
+last-known-institution mismatch, and anchor-titles vs proposal-topic mismatch — but in
+the probe they only **print a warning for human judgment**; the implementation must make
+them deterministic.
+
+**Scoped tradeoffs (Codex).** The ORCID-works list avoids OpenAlex's *merge* failure
+but is not a free lunch: it is (a) **DOI-filtered** — works without a DOI are dropped;
+(b) **recency-filtered** (≤N years); and (c) **user-curated** — an ORCID profile can be
+incomplete, stale, or padded with non-author works. So it trades a merge failure for
+curation/coverage gaps. **Fallback contract:** when the contact has no ORCID, or the
+ORCID yields zero recent DOI-bearing works, the PI-trail lane goes **inert** and the
+proposal is carried by the other lanes (§12.4) — it does not fall back to the
+merge-prone OpenAlex author cluster.
 
 ### 12.4 The lanes are independent harvesters — coverage = union, confidence = convergence `[VALIDATED DIRECTION]`
 
 Reframe of §4's ladder: **do not treat the tiers as a fragile fallback chain.** Run
 every lane the proposal's signals enable; the candidate set is their **union**, and
-confidence comes from **convergence** across lanes. All lanes converge on real,
-ORCID/OpenAlex-resolved, COI-screened people; the LLM never names a reviewer.
+confidence comes from **convergence** across lanes — where *convergence means two lanes
+resolve to the SAME IDENTITY (shared ORCID or exact authorship of a specific work), not
+the same name string* (§12.5). In the proposed grounded lanes the LLM never names a
+reviewer — people are derived only from resolved works (this is the *target*; the
+current production pipeline's Track A still has Claude suggest names, then verifies
+them, and is out of scope for §12 until grounded coverage is proven, per the findings
+doc's open question).
 
 | Lane | Best for | S239 evidence |
 |---|---|---|
 | Cited-reference (inline DOIs) | any proposal that has them | strongest when present; 2/3 Phase-I docs had **none** |
-| PI citation trail (Tier 3, ORCID-anchored) | continuing-line proposals | **WIN** on 1002794 (post ORCID-works fix) + 1002959 (Baker, DeGrado, Kortemme, Fleishman); COI-pre-cleaned |
-| Proposal-named / peer-groups | the applicant pointing at central people | strongest single signal; surname-only needs corroboration (§7) |
+| PI citation trail (Tier 3, ORCID-anchored) | continuing-line proposals | **WIN** on 1002794 (post ORCID-works fix) + 1002959 (Baker, DeGrado, Kortemme, Fleishman); PI co-authors excluded — necessary, not sufficient COI (§12.8) |
+| Proposal-named / peer-groups | the applicant pointing at central people | strongest single signal; a mention must **resolve to a specific ORCID/identity** before promotion — name-only is unsafe (§7, `REVIEWER_TRACK_B_IDENTITY_SPEC.md`) |
 | Topic → author-aggregation | **pivot** proposals (PI corpus ≠ the proposal's novel field) | surfaced the DNA-repair specialists (Samson, van Loon, Bjørås, **Madabhushi**) for 1003020 that the PI-trail could not |
 
 **Worked example — 1003020 (the "pivot"):** PI Ted Abel is proposing a novel
 DNA-repair-as-memory-substrate hypothesis *not* in his corpus, so the PI-trail surfaces
-his established neuro field and misses the frontier. But the proposal **names
-Madabhushi** (a DSB-in-memory researcher) in its peer groups, **and** topic-aggregation
-independently surfaces him. Two lanes converging does double work: it **resolves the
-surname-only namesake risk** and **confirms topic relevance** at once. 1003020 is *not*
-a system failure — it is well-covered by the non-PI-trail lanes. The PI-trail's blind
-spot is one lane's limit, not the system's.
+his established neuro field and misses the frontier. But the proposal narrative names
+the peer group directly — *"Peer Groups: Madabhushi and Tsai described how DNA damage
+regulates gene expression"* `[VERIFIED — proposal text, per Justin 2026-06-10]` —
+naming the two DSB-in-memory leaders (Ram Madabhushi, Li-Huei Tsai), **and**
+topic-aggregation independently surfaces a Madabhushi. So the proposal hands us the
+right people the PI-trail cannot.
+
+**What convergence does and does NOT buy here (Codex safety correction).** Two lanes
+agreeing on the *name* "Madabhushi" is **not** identity proof and must **not** make him
+selectable — that would reintroduce the wrong-affiliation/wrong-email failure the
+save-path force-null gate exists to prevent, and it contradicts §7 and
+`REVIEWER_TRACK_B_IDENTITY_SPEC.md`. Convergence is only valid when both lanes resolve
+to the **same identity** (a shared ORCID, or exact authorship of a specific DSB-in-memory
+work). A surname in a peer-group sentence is a high-value *anchor* to resolve, not a
+candidate. So 1003020 is well-covered in the sense that the right anchors are *present*
+in non-PI-trail lanes — but promotion still requires per-person identity resolution.
+Neither probe implements peer-group parsing yet; that lane is designed, not validated.
 
 ### 12.5 Ranking: corroboration + recency `[VALIDATED DIRECTION]`
 
-Rank by **cross-lane corroboration** (a candidate surfaced by ≥2 lanes outranks one
-surfaced by one — e.g. Madabhushi via peer-group + topic) and **recency** (references
-skew to foundational work → senior/emeritus bias; recency-weight to surface active
-mid-career people). This is the recall-over-precision posture applied to grounded
-origination: surface, don't silently drop; let convergence and recency order the pool.
+Rank by **cross-lane corroboration** and **recency**. Corroboration counts **only when
+lanes resolve to the same IDENTITY** (shared ORCID or exact authorship of a specific
+work) — a candidate confirmed by ≥2 lanes *at the identity level* outranks one from a
+single lane. **Name-string overlap across lanes is NOT corroboration** and must never
+substitute for identity equality (Codex; §7; `REVIEWER_TRACK_B_IDENTITY_SPEC.md`).
+Recency: references skew to foundational work → senior/emeritus bias; recency-weight to
+surface active mid-career people. This is the recall-over-precision posture applied to
+grounded origination: surface, don't silently drop; let *identity-level* convergence and
+recency order the pool.
 
 ### 12.6 Posture `[VALIDATED DIRECTION]`
 
@@ -309,12 +352,37 @@ the correct one is opportunistic harvest over the union of available signals.
   are correctly the dominant field.
 - **Recency-weighting** is still to be implemented; the probe ranks freq-then-recency.
 - The probe's 200-reference resolution cap is a sampling bound, not a design limit.
+- **COI is broader than the trail's exclusion (Codex).** The PI-trail only removes the
+  PI + their *recent DOI-bearing* co-authors. It does **not** cover all-time
+  collaborators, institutional COI, named co-investigators, or advisor/advisee ties.
+  Every lane's candidates must still pass the **production COI gates** before
+  selectability — the trail's co-author drop is a head-start, not a substitute.
 
-### 12.8 What this does NOT change
+### 12.8 What this does NOT change — and the integration seams (Codex)
 
 Persistence, provenance vocabulary, identity/COI gates, and selectability still follow
 the existing model (§3, §6, §8) and `docs/REVIEWER_PROVENANCE_MODEL.md`. Lanes map onto
 existing provenance kinds (`cited_reference`, `proposal_named`, `literature_retrieved`).
 No new provenance label, ranking change, or UI ships without the full
 caller→persistence→consumer reconcile in §10.
+
+**The probes are read-only diagnostics, not a parallel pipeline.** They use raw
+`fetch` and bypass the production contracts; building §12 means adding lanes *into*
+those contracts, never porting probe code as-is. The seams that must own the new lanes:
+
+- `DiscoveryService.discover()` — Track A/B output shape + bounded identity resolution.
+- `lib/services/openalex-service.js` — must gain the new calls (ORCID→author, ORCID
+  works list, author-aggregation); the probes' inline `fetch`es do not belong in prod.
+- `lib/utils/reviewer-provenance.js` — provenance kinds, groups, save-source mapping,
+  selectability (`provenanceGroupOf`).
+- COI gates in `pages/api/reviewer-finder/discover.js` (proposal-author filter,
+  institutional-COI mark, PubMed coauthorship) — every lane routes through these.
+- `pages/api/reviewer-finder/save-candidates.js` — force-nulls contact/identity fields
+  for unresolved rows. The cardinal boundary: **a name-converged-but-unresolved
+  candidate is NOT a confirmed identity** and must stay non-selectable.
+- Workbench UI (`ReviewerSearchSection.js`) — groups by `provenanceGroupOf`, blocks
+  needs-review selection.
+
+Per Codex, building this is the **NOT-YET** work: wire the lanes into these seams with
+identity-equality corroboration and per-lane COI, not a side pipeline.
 
