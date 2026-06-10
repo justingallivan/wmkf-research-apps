@@ -1281,14 +1281,14 @@ facet as senior author, and the few who clear it are senior-/prolific-lab author
 multiple query facets (a senior-bias signal, not a best-reviewer signal).
 
 **Two root mechanisms (Codex precisions applied):**
-1. **Wrong instrument.** Track-B `publications.length` = query coverage, not productivity
+1. **Wrong instrument.** Track-B `publications.length` = query coverage, not productivity <!-- drain-table:ignore reason=candidate-field-not-pg-table -->
    (`partitionByPublicationBar`, `discovery-service.js:~274`).
 2. **Wrong ordering — and the *flag* is not what buries her.** The burial is driven by a low,
    *finite* `publicationCount5yr` flowing into the recency scorer (`deduplication-service.js:229`,
    `relevance-score.js:50,111`); the `lowPublicationCount` flag is a *parallel* symptom of the
    same root, not the cause. Both are computed from the search hits **before** identity resolution
    (`:294`) and the OpenAlex works backfill (`:348`). Backfill then can't fix it: it targets only
-   candidates with an OpenAlex id **and empty `publications`** (`:414,417`) — a 2-hit candidate is
+   candidates with an OpenAlex id **and empty `publications`** (`:414,417`) — a 2-hit candidate is <!-- drain-table:ignore reason=candidate-field-not-pg-table -->
    not a target — and only sets `publicationCount5yr` when `!Number.isFinite` (`:440`), but dedup
    already set a finite low value (`deduplication-service.js:229`). Nothing re-evaluates either
    field after `confirmed` identity (`:945`).
@@ -1302,7 +1302,7 @@ corpus**, never from incidental keyword-hit counts.
 **Part 1 — Activity-from-resolved-corpus (near-term, in-pipeline; the higher-leverage change).**
 After `resolveTrackBIdentities`, for every `confirmed`/`probable` Track-B candidate with a resolved
 OpenAlex/ORCID author id:
-- **Widen the backfill target** (`backfillOpenAlexPublications`) from "empty `publications` only"
+- **Widen the backfill target** (`backfillOpenAlexPublications`) from "empty `publications` only" <!-- drain-table:ignore reason=candidate-field-not-pg-table -->
   to "any confirmed/probable candidate", and have it **overwrite** `publicationCount5yr` from the
   resolved author's real recent (≤5-yr) works — not just fill when absent. (Both the target
   condition `:414,417` and the `!Number.isFinite` guard `:440` must change for this path.)

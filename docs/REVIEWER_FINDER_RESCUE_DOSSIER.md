@@ -147,7 +147,7 @@ Roughly chronological. The pattern to notice is at the end.
 
 7. **The activity-signal flaw (§8f, S238): diagnosed, fix scoped, NOT built.** See §3. A two-part
    fix is scoped in the plan (in-pipeline: re-evaluate activity from the *resolved* author's real
-   corpus + widen the OpenAlex backfill, which today only runs on empty-`publications` and only sets
+   corpus + widen the OpenAlex backfill, which today only runs on empty-`publications` and only sets <!-- drain-table:ignore reason=candidate-field-not-pg-table -->
    the count when not-finite; plus a cap-25 selection complication — the pre-resolution ranking that
    picks which 25 to resolve uses the *same broken signal*, so heavyweights can be deferred and never
    resolved). And a redesign-scope part: **non-origination** — a heavyweight not in the minted author

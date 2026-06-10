@@ -62,7 +62,7 @@ verdict back before committing to a build direction.
 
 ### 2. §8f Part 1 fix — activity-from-resolved-corpus (if proceeding incrementally)
 After identity resolution, for confirmed/probable Track-B candidates: widen `backfillOpenAlexPublications`
-(today only runs on empty `publications`, only sets count when `!Number.isFinite`) to **overwrite**
+(today only runs on empty `publications`, only sets count when `!Number.isFinite`) to **overwrite** <!-- drain-table:ignore reason=candidate-field-not-pg-table -->
 `publicationCount5yr` from the resolved author's real recent works; re-evaluate `lowPublicationCount`;
 stop gating confirmed identities on the search-hit count. **Settle first:** the cap-25 selection — the
 pre-resolution ranking that picks which 25 to resolve uses the same broken signal, so heavyweights can
