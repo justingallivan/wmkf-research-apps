@@ -28,6 +28,30 @@ describe('DiscoveryService Track B identity merge gates', () => {
     expect(out.discovered).toHaveLength(1);
   });
 
+  test('partitionByPublicationBar surfaces under-bar candidates as a tagged warning, never drops them', () => {
+    const filtered = [
+      { name: 'Qualified A', publications: [{}, {}, {}] },        // 3 → qualified
+      { name: 'Qualified B', publications: [{}, {}, {}, {}] },    // 4 → qualified
+      { name: 'Thin C', publications: [{}, {}] },                 // 2 → low-pub
+      { name: 'Thin D', publications: [] },                       // 0 → low-pub
+      { name: 'Thin E' },                                         // missing → low-pub
+    ];
+
+    const { qualified, lowPublication } = DiscoveryService.partitionByPublicationBar(filtered);
+
+    // No candidate is dropped — every input is accounted for in one of the two buckets.
+    expect(qualified.length + lowPublication.length).toBe(filtered.length);
+    expect(qualified.map((c) => c.name)).toEqual(['Qualified A', 'Qualified B']);
+
+    // Under-bar candidates are surfaced (not filtered) and carry the warning flag + count.
+    expect(lowPublication.map((c) => c.name)).toEqual(['Thin C', 'Thin D', 'Thin E']);
+    expect(lowPublication.every((c) => c.lowPublicationCount === true)).toBe(true);
+    expect(lowPublication.map((c) => c.lowPublicationCountFound)).toEqual([2, 0, 0]);
+
+    // Qualified candidates are untouched (no warning flag).
+    expect(qualified.every((c) => c.lowPublicationCount === undefined)).toBe(true);
+  });
+
   test('bioRxiv-only contamination check reads post-dedup sources and keeps cross-source candidates', () => {
     expect(DiscoveryService.isCrossFieldDiscoveredContamination(
       { primaryResearchArea: 'quantum materials engineering' },

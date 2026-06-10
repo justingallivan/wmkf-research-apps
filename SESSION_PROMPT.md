@@ -44,8 +44,8 @@ Codex loop.
    excluded the field's 3 leading peers** (Ahel/Pascal/Luger, "overlapping research programs") — the
    same names the narrative cited — and the exclude filter clobbered them. Logged 2 memories.
 
-5. **Reviewer-finder prompt redesign — design discussion + draft** (`docs/REVIEWER_FINDER_PROMPT_DECOMPOSITION_DESIGN.md`,
-   draft, **NOT committed/built**) — the current analyze prompt is overloaded (extract + generate +
+5. **Reviewer-finder prompt redesign — design discussion + draft** (since merged into
+   `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` Part B, S238) — the current analyze prompt is overloaded (extract + generate +
    query-craft in one call) and stale. Drafted a **field-primer + decomposition** sketch (primer =
    async pre-computed at submission → out of the latency budget; standalone PD deliverable). 2 Codex
    passes reshaped it to *extend* the existing `REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` (which
@@ -102,8 +102,7 @@ sticky-sentinel discrepancy.
 | `lib/dataverse/adapters/{potential-reviewer,contact}.js` | `findBy{Email,Orcid}Candidates`, `searchByName`, `findByContactId`, hardened `setContactLink` |
 | `pages/api/reviewer-finder/save-candidates.js` | relevancescore clamp + loud failure (500 on all-fail) |
 | `scripts/widen-relevancescore-max.mjs` | Dataverse attr-widen deploy script (PUT+publish; ran in prod) |
-| `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` | The retrieval-first redesign (decomposition home) |
-| `docs/REVIEWER_FINDER_PROMPT_DECOMPOSITION_DESIGN.md` | Field-primer draft (extends the plan; not built) |
+| `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` | **Canonical reviewer-finder design doc** (S238): Part A retrieval-first plan · Part B field-primer · Part C S238 refinements + code findings |
 
 ## Testing
 ```bash

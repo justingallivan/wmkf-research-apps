@@ -306,6 +306,14 @@ function CandidateCard({ candidate, selected, onSelect, readOnly = false }) {
             </div>
           )}
 
+          {/* Few-publications warning (S238) — surfaced, not dropped: the count can be
+              undercounted when a preprint and its published version collapse to one. */}
+          {candidate.lowPublicationCount && (
+            <div className="mt-2 p-2 bg-amber-100 border border-amber-300 rounded text-xs text-amber-800">
+              <span className="font-medium">⚠️ Few publications found ({Number.isFinite(candidate.lowPublicationCountFound) ? candidate.lowPublicationCountFound : (candidate.publications?.length || 0)}):</span> below the usual minimum — surfaced rather than dropped, since the count can be undercounted (e.g. a preprint and its published version collapsing to one). Verify activity manually.
+            </div>
+          )}
+
           <div className="mt-2">
             <p className="text-sm text-gray-700">
               <span className="font-medium">Why: </span>

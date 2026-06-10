@@ -153,6 +153,11 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
   const provenanceLabel = provenanceLabelForCandidate(c);
   const pubs = Array.isArray(c.publications) ? c.publications : [];
   const pubCount = c.publicationCount5yr || pubs.length || 0;
+  // Track-B candidate surfaced below the minimum-publication bar (S238) — a warning,
+  // not a drop: the count can be undercounted when dedup collapses a preprint + its
+  // published version of the same work.
+  const lowPublicationCount = !!c.lowPublicationCount;
+  const lowPublicationFound = Number.isFinite(c.lowPublicationCountFound) ? c.lowPublicationCountFound : pubs.length;
   const enr = c.contactEnrichment || {};
   const email = c.email || enr.email || null;
   const website = c.website || enr.website || null;
@@ -252,6 +257,12 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
           {hasExpertiseMismatch && Array.isArray(c.expertiseAreas) && c.expertiseAreas.length > 0 && (
             <div className="mt-2 p-2 bg-orange-100 border border-orange-300 rounded text-xs text-orange-800">
               <span className="font-medium">⚠️ Expertise mismatch:</span> Claude claimed “{c.expertiseAreas.slice(0, 2).join(', ')}” but no publications matched these terms.
+            </div>
+          )}
+
+          {lowPublicationCount && (
+            <div className="mt-2 p-2 bg-amber-100 border border-amber-300 rounded text-xs text-amber-800">
+              <span className="font-medium">⚠️ Few publications found ({lowPublicationFound}):</span> below the usual minimum — surfaced rather than dropped, since the count can be undercounted (e.g. a preprint and its published version collapsing to one). Verify activity manually.
             </div>
           )}
 
