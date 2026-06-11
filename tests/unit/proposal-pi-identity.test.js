@@ -12,10 +12,14 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 jest.mock('../../lib/services/openalex-service', () => ({
   OpenAlexService: { getAuthorByOrcid: jest.fn() },
 }));
+jest.mock('../../lib/services/orcid-service', () => ({
+  ORCIDService: { getProfile: jest.fn() },
+}));
 
 const { DynamicsService } = require('../../lib/services/dynamics-service');
 const { OpenAlexService } = require('../../lib/services/openalex-service');
-const { resolveProposalPI, excludePiIdentity } = require('../../lib/services/proposal-pi-identity');
+const { ORCIDService } = require('../../lib/services/orcid-service');
+const { resolveProposalPI, excludePiIdentity, appendPiName } = require('../../lib/services/proposal-pi-identity');
 
 const GUID = '11111111-1111-1111-1111-111111111111';
 const PL_ID = '22222222-2222-2222-2222-222222222222';
@@ -151,6 +155,84 @@ describe('resolveProposalPI', () => {
     DynamicsService.getRecord.mockRejectedValue(new Error('dataverse 500'));
     const out = await resolveProposalPI(GUID);
     expect(out).toMatchObject({ resolved: false, reason: 'request_read_failed' });
+  });
+
+  // Codex post-impl #2: a mis-entered ORCID on a contact with NO usable name must
+  // ABSTAIN, not resolve as a confirmed (wrong) PI.
+  test('ABSTAINS (name_uncheckable) when the contact has no usable name', async () => {
+    mockDynamics({
+      request: { _wmkf_projectleader_value: PL_ID },
+      contact: { wmkf_orcid: ORCID }, // no fullname/firstname/lastname
+    });
+    OpenAlexService.getAuthorByOrcid.mockResolvedValue({ openAlexId: 'A9', displayName: 'Some Person' });
+    const out = await resolveProposalPI(GUID);
+    expect(out).toMatchObject({ resolved: false, reason: 'name_uncheckable' });
+  });
+
+  test('ABSTAINS (name_uncheckable) when no authoritative name is available', async () => {
+    mockDynamics({
+      request: { _wmkf_projectleader_value: PL_ID },
+      contact: { fullname: 'Wen Li', wmkf_orcid: ORCID },
+    });
+    OpenAlexService.getAuthorByOrcid.mockResolvedValue({ openAlexId: 'A9', displayName: null });
+    const out = await resolveProposalPI(GUID); // no ORCID creds in test env → registry null
+    expect(out).toMatchObject({ resolved: false, reason: 'name_uncheckable' });
+  });
+
+  // Codex post-impl #1: the budget signal must be honored INSIDE the resolver.
+  test('rethrows when the time-budget signal fires during resolution', async () => {
+    const controller = new AbortController();
+    mockDynamics({
+      request: { _wmkf_projectleader_value: PL_ID },
+      contact: { fullname: 'Wen Li', wmkf_orcid: ORCID },
+    });
+    // Abort after the first Dynamics read resolves; the post-read guard must throw.
+    DynamicsService.getRecord.mockImplementation(async (table) => {
+      if (table === 'akoya_requests') { controller.abort(Object.assign(new Error('budget'), { code: 'reviewer_time_budget_exceeded' })); return { _wmkf_projectleader_value: PL_ID }; }
+      return { fullname: 'Wen Li', wmkf_orcid: ORCID };
+    });
+    await expect(resolveProposalPI(GUID, { signal: controller.signal })).rejects.toBeTruthy();
+  });
+
+  // Codex post-impl #3 / pre-impl #3: the ORCID-registry name is a SECOND guard.
+  test('ABSTAINS when the ORCID-registry name contradicts even if OpenAlex name matches', async () => {
+    const prevId = process.env.ORCID_CLIENT_ID;
+    const prevSecret = process.env.ORCID_CLIENT_SECRET;
+    process.env.ORCID_CLIENT_ID = 'id';
+    process.env.ORCID_CLIENT_SECRET = 'secret';
+    try {
+      mockDynamics({
+        request: { _wmkf_projectleader_value: PL_ID },
+        contact: { fullname: 'John Smith', wmkf_orcid: ORCID },
+      });
+      OpenAlexService.getAuthorByOrcid.mockResolvedValue({ openAlexId: 'A9', displayName: 'John Smith' });
+      ORCIDService.getProfile.mockResolvedValue({ givenNames: 'Jane', familyName: 'Smith' });
+      const out = await resolveProposalPI(GUID);
+      expect(out).toMatchObject({ resolved: false, reason: 'name_mismatch' });
+    } finally {
+      process.env.ORCID_CLIENT_ID = prevId;
+      process.env.ORCID_CLIENT_SECRET = prevSecret;
+    }
+  });
+});
+
+describe('appendPiName', () => {
+  test('appends the canonical PI name to the existing author list', () => {
+    expect(appendPiName(['Co Investigator'], { resolved: true, canonicalName: 'Wen Li' }))
+      .toEqual(['Co Investigator', 'Wen Li']);
+  });
+
+  test('NEVER replaces the existing PI + co-investigators', () => {
+    const out = appendPiName(['LLM PI', 'Co-PI A', 'Co-PI B'], { resolved: true, canonicalName: 'Real PI' });
+    expect(out).toEqual(['LLM PI', 'Co-PI A', 'Co-PI B', 'Real PI']);
+  });
+
+  test('de-dupes when the PI name is already present (case/spacing insensitive)', () => {
+    expect(appendPiName(['wen  li'], { resolved: true, canonicalName: 'Wen Li' })).toEqual(['wen  li']);
+  });
+
+  test('no-op when the PI is unresolved', () => {
+    expect(appendPiName(['A'], { resolved: false })).toEqual(['A']);
   });
 });
 

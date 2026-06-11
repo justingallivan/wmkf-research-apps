@@ -20,8 +20,7 @@ import { deriveProposalAuthorNames } from '../../../lib/utils/proposal-authors';
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
 import { withReviewerProvenance } from '../../../lib/utils/reviewer-provenance';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
-import { resolveProposalPI, excludePiIdentity } from '../../../lib/services/proposal-pi-identity';
-import { ContactParser } from '../../../lib/utils/contact-parser';
+import { resolveProposalPI, excludePiIdentity, appendPiName } from '../../../lib/services/proposal-pi-identity';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -254,17 +253,12 @@ export default async function handler(req, res) {
     // be reviewers. Derived via the shared helper so this matches the COI set
     // used by enrich-recommended.js (S213 parity — co-PIs were previously
     // dropped here, so a co-PI could slip through as a candidate/coauthor-clean).
-    const proposalAuthors = deriveProposalAuthorNames(analysisResult.proposalInfo);
     // APPEND the canonical PI name from the structured identity (S240, Codex #15) so
     // the name-fuzzy author filter + coauthor-COI check use the authoritative name
-    // even when the LLM extracted it wrong/missing. Append-and-dedupe — never replace
-    // the LLM-derived PI + co-investigators (a co-PI dropped here is a COI hole).
-    if (piIdentity?.resolved && piIdentity.canonicalName) {
-      const piNorm = ContactParser.normalizeNameForMatch(ContactParser.stripHonorifics(piIdentity.canonicalName));
-      const already = proposalAuthors.some((n) =>
-        ContactParser.namesMatch(piNorm, ContactParser.normalizeNameForMatch(ContactParser.stripHonorifics(n))));
-      if (!already) proposalAuthors.push(piIdentity.canonicalName);
-    }
+    // even when the LLM extracted it wrong/missing. appendPiName appends-and-dedupes —
+    // never replaces the LLM-derived PI + co-investigators (a co-PI dropped here is a
+    // COI hole). No-op when the PI is unresolved.
+    const proposalAuthors = appendPiName(deriveProposalAuthorNames(analysisResult.proposalInfo), piIdentity);
     let verifiedCandidates = withProvenanceList(discoveryResults.verified);
 
     {

@@ -240,6 +240,24 @@ drop** across three routes plus an overwrite bug:
   multi-institution helper for `markInstitutionCOI` + `filterConflicts`, structured institution into
   `discover()` + `enrich-contacts` + `enrich-recommended`, ORCID-current affiliation preference.
 
+### Codex POST-impl review of Chunk 1 (commit 70e78f0) — verdicts & follow-up fold
+All verified against the committed code; folded in a follow-up commit (not an amend).
+- **#1 HIGH — abort/budget not honored inside `resolveProposalPI`.** ✅ Real. The budget
+  could fire during a Dynamics read and the inert `{resolved:false}` would mask it. Added a
+  `throwIfAborted(signal)` guard after each Dynamics await.
+- **#2 HIGH — fail-dangerous missing-name path.** ✅ Real and important. `nameGuardPasses`
+  returned `true` when a name was missing → a mis-entered ORCID on a blank-name contact
+  would resolve as a confirmed wrong PI. Replaced with `evaluateNameGuard`, which **abstains
+  (`name_uncheckable`)** when the contact has no usable name OR no authoritative name source.
+- **#3 MED — ORCID-registry name check (pre-impl #3/#17).** ✅ Folded. The guard now also
+  checks the **ORCID-registry name** (`ORCIDService.getProfile`, best-effort: missing creds /
+  404 / non-abort error → skip; abort rethrown) as a second authoritative source; a candidate
+  must agree with EVERY available name. (Best-effort, so it adds defense without a new hard
+  dependency.) Also extracted `appendPiName` so the append+dedup is unit-tested (#15) and shared
+  by discover + enrich-recommended instead of duplicated.
+- Tests added: `name_uncheckable`, in-resolver abort rethrow, registry-name contradiction,
+  `appendPiName` (4), getAuthorByOrcid signal-threading. 39 new-unit + 550 reviewer-battery green.
+
 ### Chunk-2 policy — RESOLVED by Justin (S240) — see [[project-reviewer-coi-rely-on-self-disclosure]]
 The "hard-drop vs flag" framing was mostly a non-issue: S238 already sanctions same-institution as a
 correct hard drop ([[project-reviewer-recall-over-precision]]:36-38). Justin's S240 decisions:

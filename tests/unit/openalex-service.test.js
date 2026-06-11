@@ -168,6 +168,13 @@ describe('OpenAlexService.getAuthorByOrcid (S240)', () => {
     expect(url).not.toContain('https%3A%2F%2Forcid.org');
   });
 
+  test('threads the abort signal through to safeFetch (Codex #10)', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({ id: 'A1', display_name: 'X' }));
+    const controller = new AbortController();
+    await OpenAlexService.getAuthorByOrcid(VALID_ORCID, { signal: controller.signal });
+    expect(safeFetch.mock.calls[0][1].signal).toBeTruthy();
+  });
+
   test('tolerates a defensive results[] wrapper (Codex #10)', async () => {
     safeFetch.mockResolvedValue(jsonResponse({
       results: [{ id: 'https://openalex.org/A1', display_name: 'Wrapped Author' }],

@@ -34,7 +34,7 @@ import { safeFetch } from '../../../lib/utils/safe-fetch';
 import { normalizeName } from '../../../lib/utils/name-normalization';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { deriveProposalAuthorNames } from '../../../lib/utils/proposal-authors';
-import { resolveProposalPI } from '../../../lib/services/proposal-pi-identity';
+import { resolveProposalPI, appendPiName } from '../../../lib/services/proposal-pi-identity';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
@@ -230,20 +230,15 @@ export default async function handler(req, res) {
       // the PI only (reviewer-finder.js:243); the shared helper folds in
       // `coInvestigators` so a recommendee who co-authored with a listed co-PI is
       // also flagged. discover.js now derives the SAME set (S213 parity closed).
-      const proposalAuthors = deriveProposalAuthorNames(proposalInfo);
       // S240 parity with discover.js (Codex #7): append the canonical PI name from
       // the structured identity (request → Project Leader contact → wmkf_orcid →
       // exact OpenAlex author) so the coauthor-COI check uses the authoritative name
       // even when the LLM extracted it wrong/missing. Already inside the Dynamics
-      // bypass; fail-open + append-only (never replaces the LLM PI + co-Is).
+      // bypass; fail-open + append-only (appendPiName never replaces the LLM PI + co-Is).
+      let proposalAuthors = deriveProposalAuthorNames(proposalInfo);
       try {
         const pi = await resolveProposalPI(requestId, { signal: deadlineController.signal });
-        if (pi?.resolved && pi.canonicalName) {
-          const piNorm = ContactParser.normalizeNameForMatch(ContactParser.stripHonorifics(pi.canonicalName));
-          const already = proposalAuthors.some((n) =>
-            ContactParser.namesMatch(piNorm, ContactParser.normalizeNameForMatch(ContactParser.stripHonorifics(n))));
-          if (!already) proposalAuthors.push(pi.canonicalName);
-        }
+        proposalAuthors = appendPiName(proposalAuthors, pi);
       } catch (err) {
         if (deadlineController.signal.aborted
           || err?.name === 'AbortError'
