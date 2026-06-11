@@ -1,6 +1,6 @@
 # P2 residual: private-blob migration for the generic uploader
 
-**Status:** 🟡 Pilot + file-loader cohort shipped & read-path live-smoked 2026-06-11 — `expense-reporter` (pilot), plus `phase-i-dynamics` + `grant-reporting` via the now-private-aware `lib/utils/file-loader.js` (`lib/utils/uploaded-blob.js`). Live smokes passed (`smoke-private-upload.mjs` for the store; `smoke-private-file-loader.mjs` for the shared `loadFile` chokepoint). **`phase-i-dynamics` + `grant-reporting` PROMOTED TO PRODUCTION 2026-06-11** (prod token + their flags set + deployed; grant-reporting prod-verified — live upload → private store, URL 403, extraction ran). Remaining: promote `expense-reporter` (its prod flag is unset → still public in prod), the browser-facing download proxy, and the remaining (browser-render) consumers (list below). Concrete design + what-shipped: `docs/security-audit/PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`.
+**Status:** 🟡 Pilot + file-loader cohort shipped & read-path live-smoked 2026-06-11 — `expense-reporter` (pilot), plus `phase-i-dynamics` + `grant-reporting` via the now-private-aware `lib/utils/file-loader.js` (`lib/utils/uploaded-blob.js`). Live smokes passed (`smoke-private-upload.mjs` for the store; `smoke-private-file-loader.mjs` for the shared `loadFile` chokepoint). **All three consumers (`expense-reporter` + `phase-i-dynamics` + `grant-reporting`) PROMOTED TO PRODUCTION 2026-06-11** (prod token + all three flags set + deployed; grant-reporting prod-verified — live upload → private store, URL 403, extraction ran). Remaining: the browser-facing download proxy and the remaining (browser-render) consumers (list below). Concrete design + what-shipped: `docs/security-audit/PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`.
 **Origin:** Security audit 2026-05-21, finding P2. Created 2026-05-21 alongside A5 (endpoint consolidation), which partially addressed P2.
 
 ## Rollout status (2026-06-11)
@@ -13,10 +13,11 @@
   Store `wmkf-uploads-private` + `UPLOADS_BLOB_RW_TOKEN` **provisioned 2026-06-11
   (dev + preview + production)**. **Live smoke PASSED** (`smoke-private-upload.mjs` + a real
   expense-reporter upload→extract run locally against the store: receipts landed
-  in the private store, URL returns HTTP 403). The prod token is set, BUT
-  **`expense-reporter`'s prod flag is NOT set** (`NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB`
-  exists only in Preview), so it **still uploads public in production** — promotion is
-  a one-line `vercel env add` + redeploy when desired.
+  in the private store, URL returns HTTP 403). **PROMOTED TO PRODUCTION 2026-06-11** —
+  `NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB=true` set in Production + deployed
+  (`wmkfresearchapps-njdq4gr5y`), so new prod receipts now go to the private store. Shares
+  the same prod-verified store/token/read path as grant-reporting; a direct browser
+  spot-check is optional.
 - ✅ **`lib/utils/file-loader.js` is now private-aware** (2026-06-11) — its `upload`
   branch delegates to `readUploadedBlobBuffer` (private `pathname` read, or `safeFetch`
   for legacy public). So its callers (`grant-reporting/extract`, `phase-i-dynamics`
