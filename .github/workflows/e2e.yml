@@ -4,6 +4,8 @@ name: E2E (Playwright)
 # when the reviewer/external flow or the harness itself changes — not on the
 # many docs/memory-only PRs (those are covered by the Tests + check:* gates).
 on:
+  # Manual trigger — re-run the suite from the Actions tab without a dummy commit.
+  workflow_dispatch: {}
   pull_request:
     paths:
       - 'pages/api/external/**'
