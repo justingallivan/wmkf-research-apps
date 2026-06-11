@@ -1,14 +1,10 @@
-# Session 241 Prompt: Reviewer COI Chunk 2b + push the unpushed Chunk-2a stack
+# Session 241 Prompt: Reviewer COI Chunk 2b (retire POTENTIAL_CONCERNS)
 
-> ⚠️ **GIT STATE — READ FIRST.** `main` **diverged** during S240. The parallel
-> reviewer-onboarding stream landed **PR #23** (`8d2edae`, BILL/onboarding + Stage-2a
-> e2e) on top of S240's Chunk-1 push. As of end-of-S240, local `main` is **5 commits
-> ahead / 8 behind** `origin/main`. The 5 local commits are reviewer **COI Chunk 2 +
-> 2a** (design + impl, **Codex-SHIP, NOT pushed → NOT in prod**). Code files are
-> **disjoint** from PR #23; the only rebase conflict is `.claude-memory/MEMORY.md`
-> (both edited). **Before any push: `git fetch && git pull --rebase origin main`,
-> resolve MEMORY.md, re-run the gate set, then push.** A plain push is rejected
-> (non-fast-forward). `main` auto-deploys to prod on push.
+> ✅ **GIT STATE.** End-of-S240 the Chunk-2a stack was rebased onto the onboarding
+> PR #23 (`8d2edae`) and pushed — `origin/main` = **`fcbb258`**, local in sync.
+> **Chunk 2a is in prod.** Rebase was clean (reviewer-finder files disjoint from PR
+> #23). Verified pre-push: build + 2182 unit tests + all 15 startup gates green on the
+> integrated tree. `main` auto-deploys to prod on push.
 
 ## Session 240 Summary
 
@@ -27,7 +23,7 @@ implement → post-impl review → fold → re-review until SHIP).
    + `excludePiIdentity` gated on confirmed/probable) + `OpenAlexService.getAuthorByOrcid`.
    Clients send `requestId`. **Codex: SHIP.** Pushed (b19b3b9) → now in `origin/main`.
 
-2. **Chunk 2a — institution COI (BUILT, Codex SHIP, UNPUSHED).** Per the S240 COI
+2. **Chunk 2a — institution COI (SHIPPED to prod, `fcbb258`; Codex SHIP).** Per the S240 COI
    policy ([[project-reviewer-coi-rely-on-self-disclosure]]): current same-institution
    is now a **HARD DROP on BOTH tracks** matched against the **UNION** of PI
    institutions (ORCID-current + OpenAlex-last-known + LLM); **historical/former-shared
@@ -56,21 +52,24 @@ implement → post-impl review → fold → re-review until SHIP).
 ### Commits (chronological)
 - **Chunk 1 (in prod):** `7b19db6` design · `49b5b65` pre-impl fold · `e896a93` policy
   · `70e78f0` impl · `6d3952a` post-impl fold · `689beea`/`b19b3b9` abort-guard folds
-- **Chunk 2 design (LOCAL):** `d778a81` · `96ca819`
-- **Chunk 2a (LOCAL, unpushed):** `977dd92` impl · `0fa8e55` post-impl fold ·
-  `15b5aa8` re-review fold
-- **(this doc commit)** Document S240 + create S241 prompt
+- **Chunk 2 design:** `d778a81` · `96ca819`
+- **Chunk 2a (in prod):** `977dd92` impl · `0fa8e55` post-impl fold · `15b5aa8`
+  re-review fold (rebased onto `8d2edae`, pushed as part of `fcbb258`)
+- **Docs:** S240 writeup + S241 prompt (this commit)
+- All of the above are on `origin/main` at `fcbb258`.
 
 ## Potential Next Steps
 
-### 1. Land Chunk 2a (git housekeeping + deploy)
-`git pull --rebase origin main` onto `8d2edae` (resolve MEMORY.md only), re-run the
-full startup gate set, then push → deploys the institution-COI behavior change to prod.
-This is the **first real behavior change** of the COI overhaul (same-institution
-candidates now hard-dropped; historical flag/badge gone), so smoke the reviewer search
-after deploy.
+### 1. Smoke-check Chunk 2a in prod (just deployed)
+Chunk 2a (`fcbb258`) is the **first real behavior change** of the COI overhaul —
+same-institution candidates now hard-dropped on both tracks; the historical flag/badge
+is gone; `save-candidates` rejects same-institution rows. Run a reviewer search on a
+request whose PI shares an institution with a likely candidate and confirm: the
+same-institution candidate is excluded (with the PD excluded-summary), no "Former
+shared institution" badges appear, and a post-enrichment same-institution row can't be
+saved. (Verify-prod is the only step not done in S240.)
 
-### 2. Build Chunk 2b — retire `POTENTIAL_CONCERNS` (coupled; do via the Codex loop)
+### 2. Build Chunk 2b — retire `POTENTIAL_CONCERNS` (the primary build; coupled; via the Codex loop)
 Code retirement (parse/render/persist + validator + repair prompt + tests) is decoupled
 from the prompt reseed (code ignores the field regardless). **Justin runs the prod
 reseed.** Watch: removing the field must NOT push COI back into REASONING (keep

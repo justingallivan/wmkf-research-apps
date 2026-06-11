@@ -27,7 +27,7 @@ co-author COI, the model `POTENTIAL_CONCERNS` advisory, or "should we warn the P
 - **HISTORICAL / former-shared institution does NOT count** — neither drop nor flag.
 
 ## Build status (S240)
-**Chunk 2a = BUILT (committed, UNPUSHED as of S240): institution COI.** Current same-institution
+**Chunk 2a = SHIPPED to prod (S240, `fcbb258`): institution COI.** Current same-institution
 is now a HARD DROP on both tracks against the PI-institution UNION; historical/former-shared COI
 RETIRED; authoritative save-gate in `save-candidates`; canonical institution maps in the agent-wiki
 `reviewer-identity` topic + `docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`. **Chunk 2b = NOT BUILT:
