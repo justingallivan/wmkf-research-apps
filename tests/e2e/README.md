@@ -51,6 +51,6 @@ npx next build --webpack && npx next start -p 3100
 
 ## CI
 
-`.github/workflows/e2e.yml` runs this suite on PRs that touch the reviewer/external
-flow or the harness (path-filtered to avoid running on docs-only PRs). The HTML report
-is uploaded as a build artifact on every run.
+[`.github/workflows/e2e.yml`](../../.github/workflows/e2e.yml) runs this suite on PRs
+that touch the reviewer/external flow or the harness (path-filtered to avoid running on
+docs-only PRs). The HTML report is uploaded as a build artifact on every run.
