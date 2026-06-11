@@ -26,12 +26,25 @@ import {
 } from '../../../lib/services/grant-cycles-dataverse';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { proxifyBlobUrl } from '../../../lib/utils/blob-proxy';
+import { isPrivateCycleMaterialPathname, cycleMaterialDownloadPath } from '../../../lib/utils/cycle-material-ref';
 
-function proxifyAttachments(attachments) {
+// Resolve a single material's user-visible download URL: a PRIVATE ref (template
+// pathname or attachment with access:'private') → the record-scoped cycle-material
+// proxy; a legacy PUBLIC blob URL → the org-asset blob-proxy. Private refs have no
+// public URL, so without this a client would receive a bare, non-downloadable
+// pathname (Codex SLICE2-3).
+function materialDownloadUrl(cycleId, { value, access }) {
+  if ((access === 'private' && value) || isPrivateCycleMaterialPathname(value)) {
+    return cycleMaterialDownloadPath(cycleId, value);
+  }
+  return value ? proxifyBlobUrl(value) : value;
+}
+
+function proxifyAttachments(cycleId, attachments) {
   if (!attachments || !Array.isArray(attachments)) return attachments;
   return attachments.map(att => ({
     ...att,
-    blobUrl: att.blobUrl ? proxifyBlobUrl(att.blobUrl) : att.blobUrl,
+    blobUrl: materialDownloadUrl(cycleId, { value: att.pathname || att.blobUrl, access: att.access }),
   }));
 }
 
@@ -39,8 +52,8 @@ function proxifyAttachments(attachments) {
 function proxifyCycle(cycle) {
   return {
     ...cycle,
-    reviewTemplateBlobUrl: proxifyBlobUrl(cycle.reviewTemplateBlobUrl),
-    additionalAttachments: proxifyAttachments(cycle.additionalAttachments),
+    reviewTemplateBlobUrl: materialDownloadUrl(cycle.id, { value: cycle.reviewTemplateBlobUrl }),
+    additionalAttachments: proxifyAttachments(cycle.id, cycle.additionalAttachments),
   };
 }
 

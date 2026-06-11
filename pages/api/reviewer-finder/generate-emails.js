@@ -33,6 +33,8 @@ import { loadModelOverrides } from '../../../lib/services/model-override-loader'
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
 import { BASE_CONFIG, getModelForApp } from '../../../shared/config/baseConfig';
 import { safeFetch, isAllowedUrl } from '../../../lib/utils/safe-fetch';
+import { readUploadedBlobBuffer } from '../../../lib/utils/uploaded-blob';
+import { isPrivateCycleMaterialPathname } from '../../../lib/utils/cycle-material-ref';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
@@ -279,13 +281,28 @@ export default async function handler(req, res) {
       });
 
       // Fetch review template (shared across all emails)
-      if (reviewTemplateBlobUrl && isAllowedUrl(reviewTemplateBlobUrl)) {
+      if (reviewTemplateBlobUrl) {
         try {
-          const templateResponse = await safeFetch(reviewTemplateBlobUrl);
-          if (templateResponse.ok) {
-            const buffer = Buffer.from(await templateResponse.arrayBuffer());
-            const urlPath = new URL(reviewTemplateBlobUrl).pathname;
-            const ext = urlPath.split('.').pop()?.toLowerCase() || 'pdf';
+          // Private cycle materials (cycle-materials/ prefix) are read server-side
+          // from the private store; legacy public URLs via safeFetch. Both yield a
+          // Buffer + file extension for the email attachment. (Phase 1 migration —
+          // a private template MUST NOT fall through to the public branch, where
+          // isAllowedUrl would reject the bare pathname and silently drop it.)
+          let buffer = null;
+          let ext = 'pdf';
+          if (isPrivateCycleMaterialPathname(reviewTemplateBlobUrl)) {
+            buffer = await readUploadedBlobBuffer({ access: 'private', pathname: reviewTemplateBlobUrl });
+            ext = reviewTemplateBlobUrl.split('.').pop()?.toLowerCase() || 'pdf';
+          } else if (isAllowedUrl(reviewTemplateBlobUrl)) {
+            const templateResponse = await safeFetch(reviewTemplateBlobUrl);
+            if (templateResponse.ok) {
+              buffer = Buffer.from(await templateResponse.arrayBuffer());
+              ext = new URL(reviewTemplateBlobUrl).pathname.split('.').pop()?.toLowerCase() || 'pdf';
+            } else {
+              console.warn('Failed to fetch review template:', templateResponse.status);
+            }
+          }
+          if (buffer) {
             const contentType = ext === 'docx'
               ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
               : ext === 'doc'
@@ -300,33 +317,38 @@ export default async function handler(req, res) {
               stage: 'fetching_attachments',
               message: 'Fetched review template'
             });
-          } else {
-            console.warn('Failed to fetch review template:', templateResponse.status);
           }
         } catch (err) {
           console.error('Error fetching review template:', err.message);
         }
       }
 
-      // Fetch additional attachments (shared across all emails)
+      // Fetch additional attachments (shared across all emails). Private attachments
+      // carry { pathname, access:'private' }; legacy public ones carry a blobUrl.
       for (const attachment of additionalAttachments) {
-        if (!attachment.blobUrl || !isAllowedUrl(attachment.blobUrl)) continue;
         try {
-          const response = await safeFetch(attachment.blobUrl);
-          if (response.ok) {
-            const buffer = Buffer.from(await response.arrayBuffer());
-            sharedAttachments.push({
-              filename: attachment.filename || 'Attachment.pdf',
-              contentType: attachment.contentType || 'application/octet-stream',
-              content: buffer
-            });
-            sendEvent('progress', {
-              stage: 'fetching_attachments',
-              message: `Fetched ${attachment.filename}`
-            });
+          let buffer = null;
+          if (attachment.access === 'private' && attachment.pathname) {
+            buffer = await readUploadedBlobBuffer({ access: 'private', pathname: attachment.pathname });
+          } else if (attachment.blobUrl && isAllowedUrl(attachment.blobUrl)) {
+            const response = await safeFetch(attachment.blobUrl);
+            if (response.ok) {
+              buffer = Buffer.from(await response.arrayBuffer());
+            } else {
+              console.warn(`Failed to fetch additional attachment ${attachment.filename}:`, response.status);
+            }
           } else {
-            console.warn(`Failed to fetch additional attachment ${attachment.filename}:`, response.status);
+            continue;
           }
+          sharedAttachments.push({
+            filename: attachment.filename || 'Attachment.pdf',
+            contentType: attachment.contentType || 'application/octet-stream',
+            content: buffer
+          });
+          sendEvent('progress', {
+            stage: 'fetching_attachments',
+            message: `Fetched ${attachment.filename}`
+          });
         } catch (err) {
           console.error(`Error fetching additional attachment ${attachment.filename}:`, err.message);
         }

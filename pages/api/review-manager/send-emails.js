@@ -44,6 +44,8 @@ import { findByShortCode as findCycleByShortCode } from '../../../lib/services/g
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { safeFetch, isAllowedUrl } from '../../../lib/utils/safe-fetch';
+import { readUploadedBlobBuffer } from '../../../lib/utils/uploaded-blob';
+import { isPrivateCycleMaterialPathname } from '../../../lib/utils/cycle-material-ref';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
@@ -214,13 +216,15 @@ export default async function handler(req, res) {
       }
       if (Array.isArray(firstCycle?.additional_attachments)) {
         for (const a of firstCycle.additional_attachments) {
-          const url = a.blobUrl || a.url;
-          if (url && !attachmentCache.has(url)) {
+          // Private attachments carry { pathname, access:'private' }; legacy public
+          // ones carry blobUrl/url. Pass the JSON filename through for private refs.
+          const ref = (a.access === 'private' && a.pathname) ? a.pathname : (a.blobUrl || a.url);
+          if (ref && !attachmentCache.has(ref)) {
             try {
-              const att = await fetchAttachment(url, attachmentCache);
+              const att = await fetchAttachment(ref, attachmentCache, a.filename);
               if (att) sharedAttachments.push(att);
             } catch (err) {
-              console.warn('Failed to fetch additional attachment:', url, err.message);
+              console.warn('Failed to fetch additional attachment:', ref, err.message);
             }
           }
         }
@@ -537,21 +541,34 @@ function plainTextToHtml(text) {
   return linked.replace(/\r\n|\r|\n/g, '<br>');
 }
 
-async function fetchAttachment(url, cache) {
-  if (cache.has(url)) return cache.get(url);
-  if (!isAllowedUrl(url)) {
-    console.warn('fetchAttachment blocked non-allowed URL:', url);
-    return null;
-  }
-  const response = await safeFetch(url);
-  if (!response.ok) return null;
+// `ref` is either a legacy public blob URL or a private cycle-material pathname
+// (cycle-materials/ prefix). Private refs are read server-side from the private
+// store (Phase 1) and would otherwise be blocked by isAllowedUrl and silently
+// dropped. `explicitFilename` (from the attachment JSON) wins when provided.
+async function fetchAttachment(ref, cache, explicitFilename) {
+  if (cache.has(ref)) return cache.get(ref);
 
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const contentType = response.headers.get('content-type') || 'application/octet-stream';
-  const urlPath = new URL(url).pathname;
-  const filename = urlPath.split('/').pop() || 'attachment';
+  let buffer;
+  let contentType;
+  let filename;
+
+  if (isPrivateCycleMaterialPathname(ref)) {
+    buffer = await readUploadedBlobBuffer({ access: 'private', pathname: ref });
+    contentType = 'application/octet-stream';
+    filename = explicitFilename || ref.split('/').pop() || 'attachment';
+  } else {
+    if (!isAllowedUrl(ref)) {
+      console.warn('fetchAttachment blocked non-allowed URL:', ref);
+      return null;
+    }
+    const response = await safeFetch(ref);
+    if (!response.ok) return null;
+    buffer = Buffer.from(await response.arrayBuffer());
+    contentType = response.headers.get('content-type') || 'application/octet-stream';
+    filename = explicitFilename || new URL(ref).pathname.split('/').pop() || 'attachment';
+  }
 
   const attachment = { filename, contentType, content: buffer };
-  cache.set(url, attachment);
+  cache.set(ref, attachment);
   return attachment;
 }
