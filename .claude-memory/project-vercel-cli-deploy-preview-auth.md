@@ -3,7 +3,7 @@ name: project-vercel-cli-deploy-preview-auth
 description: WMKF Vercel project deploys via CLI only (no GitHub git-integration); preview hash URLs fail Azure AD redirect — smoke auth-gated changes on localhost or add the exact URL to Azure
 metadata:
   type: project
-  status: current
+  status: active
 ---
 
 The `wmkf_research_apps` Vercel project has **no GitHub git-integration**
