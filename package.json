@@ -25,6 +25,8 @@
     "test:prompts": "jest tests/unit/prompts",
     "test:utils": "jest tests/unit/utils",
     "e2e:pr4": "node scripts/pr4-e2e.js",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "test:ci": "jest --ci --coverage --watchAll=false",
     "check:api-routes": "node scripts/check-api-route-security-matrix.js",
     "check:atlas": "node scripts/check-application-state-atlas.js",
@@ -84,6 +86,7 @@
   },
   "devDependencies": {
     "@babel/parser": "^7.29.7",
+    "@playwright/test": "^1.60.0",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
