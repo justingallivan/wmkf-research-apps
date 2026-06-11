@@ -138,6 +138,18 @@ it('serves the private template with attachment + nosniff + no-store headers', a
   );
 });
 
+it('prefix-only classifier: an attachment with access:private but NO prefix is not served', async () => {
+  // The single classifier is the cycle-materials/ prefix, NOT the JSON access field
+  // (Codex SLICE2-5-VERIFY: a divergent access-vs-prefix check dropped attachments).
+  findById.mockResolvedValue(makeCycle({
+    additionalAttachments: [{ pathname: 'no-prefix-attachment.pdf', access: 'private', filename: 'x.pdf' }],
+  }));
+  const r = res();
+  await handler({ method: 'GET', query: { cycleId: 'cycle-guid-1', pathname: 'no-prefix-attachment.pdf' } }, r);
+  expect(r.statusCode).toBe(404);
+  expect(readUploadedBlobBuffer).not.toHaveBeenCalled();
+});
+
 it('serves a private additional attachment by pathname', async () => {
   const r = res();
   await handler({ method: 'GET', query: { cycleId: 'cycle-guid-1', pathname: ATT_PATH } }, r);

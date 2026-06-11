@@ -328,7 +328,7 @@ export default async function handler(req, res) {
       for (const attachment of additionalAttachments) {
         try {
           let buffer = null;
-          if (attachment.access === 'private' && attachment.pathname) {
+          if (isPrivateCycleMaterialPathname(attachment.pathname)) {
             buffer = await readUploadedBlobBuffer({ access: 'private', pathname: attachment.pathname });
           } else if (attachment.blobUrl && isAllowedUrl(attachment.blobUrl)) {
             const response = await safeFetch(attachment.blobUrl);
@@ -340,6 +340,9 @@ export default async function handler(req, res) {
           } else {
             continue;
           }
+          // A failed public fetch leaves buffer null — do NOT push an empty MIME
+          // part (the private branch throws on failure and is caught below).
+          if (!buffer) continue;
           sharedAttachments.push({
             filename: attachment.filename || 'Attachment.pdf',
             contentType: attachment.contentType || 'application/octet-stream',

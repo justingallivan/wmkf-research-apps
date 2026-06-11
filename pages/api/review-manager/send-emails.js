@@ -216,9 +216,11 @@ export default async function handler(req, res) {
       }
       if (Array.isArray(firstCycle?.additional_attachments)) {
         for (const a of firstCycle.additional_attachments) {
-          // Private attachments carry { pathname, access:'private' }; legacy public
-          // ones carry blobUrl/url. Pass the JSON filename through for private refs.
-          const ref = (a.access === 'private' && a.pathname) ? a.pathname : (a.blobUrl || a.url);
+          // Private attachments carry a cycle-materials/ pathname; legacy public ones
+          // carry blobUrl/url. The classifier is the prefix (uniform across consumers
+          // — Codex SLICE2-5-VERIFY), not the JSON access field. Pass the JSON filename
+          // through for private refs.
+          const ref = isPrivateCycleMaterialPathname(a.pathname) ? a.pathname : (a.blobUrl || a.url);
           if (ref && !attachmentCache.has(ref)) {
             try {
               const att = await fetchAttachment(ref, attachmentCache, a.filename);

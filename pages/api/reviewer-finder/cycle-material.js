@@ -28,10 +28,12 @@ import { readUploadedBlobBuffer } from '../../../lib/utils/uploaded-blob';
 import { isPrivateCycleMaterialPathname } from '../../../lib/utils/cycle-material-ref';
 
 // Collect the cycle's private materials as pathname → { filename }. This is the
-// record-scope allowlist: only these pathnames may be served for this cycle. The
-// template is private iff its stored value is a private cycle-material pathname
-// (strict `cycle-materials/` prefix — see lib/utils/cycle-material-ref.js);
-// attachments carry an explicit `access: 'private'` flag.
+// record-scope allowlist: only these pathnames may be served for this cycle. Both
+// the template and each attachment are private iff their stored pathname is a
+// private cycle-material pathname (strict `cycle-materials/` prefix — see
+// lib/utils/cycle-material-ref.js). The prefix is the SINGLE classifier across every
+// consumer (route, grant-cycles GET, both email reads) so they never disagree about
+// what is private (Codex SLICE2-5-VERIFY).
 function privateMaterialsOf(cycle) {
   const map = new Map();
   if (isPrivateCycleMaterialPathname(cycle?.reviewTemplateBlobUrl)) {
@@ -39,7 +41,7 @@ function privateMaterialsOf(cycle) {
   }
   const atts = Array.isArray(cycle?.additionalAttachments) ? cycle.additionalAttachments : [];
   for (const att of atts) {
-    if (att && att.access === 'private' && typeof att.pathname === 'string' && att.pathname) {
+    if (att && isPrivateCycleMaterialPathname(att.pathname)) {
       map.set(att.pathname, { filename: att.filename || 'attachment' });
     }
   }

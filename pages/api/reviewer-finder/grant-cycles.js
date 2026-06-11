@@ -28,13 +28,15 @@ import { requireAppAccess } from '../../../lib/utils/auth';
 import { proxifyBlobUrl } from '../../../lib/utils/blob-proxy';
 import { isPrivateCycleMaterialPathname, cycleMaterialDownloadPath } from '../../../lib/utils/cycle-material-ref';
 
-// Resolve a single material's user-visible download URL: a PRIVATE ref (template
-// pathname or attachment with access:'private') → the record-scoped cycle-material
-// proxy; a legacy PUBLIC blob URL → the org-asset blob-proxy. Private refs have no
-// public URL, so without this a client would receive a bare, non-downloadable
-// pathname (Codex SLICE2-3).
-function materialDownloadUrl(cycleId, { value, access }) {
-  if ((access === 'private' && value) || isPrivateCycleMaterialPathname(value)) {
+// Resolve a single material's user-visible download URL. The single classifier for
+// "private" across ALL consumers is the strict `cycle-materials/` pathname prefix
+// (isPrivateCycleMaterialPathname) — NOT the JSON `access` field — so the proxy
+// route, grant-cycles GET, and both email server-reads agree (Codex SLICE2-5-VERIFY:
+// a divergent classifier silently dropped non-prefixed private attachments in
+// send-emails). A private ref → the record-scoped cycle-material proxy; a legacy
+// public blob URL → the org-asset blob-proxy (Codex SLICE2-3).
+function materialDownloadUrl(cycleId, value) {
+  if (isPrivateCycleMaterialPathname(value)) {
     return cycleMaterialDownloadPath(cycleId, value);
   }
   return value ? proxifyBlobUrl(value) : value;
@@ -44,7 +46,7 @@ function proxifyAttachments(cycleId, attachments) {
   if (!attachments || !Array.isArray(attachments)) return attachments;
   return attachments.map(att => ({
     ...att,
-    blobUrl: materialDownloadUrl(cycleId, { value: att.pathname || att.blobUrl, access: att.access }),
+    blobUrl: materialDownloadUrl(cycleId, att.pathname || att.blobUrl),
   }));
 }
 
@@ -52,7 +54,7 @@ function proxifyAttachments(cycleId, attachments) {
 function proxifyCycle(cycle) {
   return {
     ...cycle,
-    reviewTemplateBlobUrl: materialDownloadUrl(cycle.id, { value: cycle.reviewTemplateBlobUrl }),
+    reviewTemplateBlobUrl: materialDownloadUrl(cycle.id, cycle.reviewTemplateBlobUrl),
     additionalAttachments: proxifyAttachments(cycle.id, cycle.additionalAttachments),
   };
 }

@@ -103,24 +103,35 @@ discriminator** (Codex SLICE2-4 push-back folded):
   `lib/utils/cycle-material-ref.js` (`CYCLE_MATERIAL_PREFIX`,
   `isPrivateCycleMaterialPathname`, `cycleMaterialDownloadPath`) so the route and every
   slice-2 reader agree.
+- **The prefix is the SINGLE classifier for BOTH the template and attachments** (Codex
+  SLICE2-5-VERIFY). An attachment is private iff `isPrivateCycleMaterialPathname(att.pathname)`
+  — **not** its JSON `access` field. Slice 3 still writes `access:'private'` as metadata,
+  but no reader keys off it; using `access` in one consumer and the prefix in another caused
+  a fail-silent divergence (a non-prefixed private attachment was dropped only by
+  `send-emails`). One classifier everywhere = no disagreement.
 
-### C. Read legs branch on access (with back-compat)
+### C. Read legs branch on the prefix classifier (with back-compat)
 
-- **grant-cycles GET** (`proxifyCycle`, SLICE2-3): for a private ref, return the new
-  proxy URL via `cycleMaterialDownloadPath(cycleId, pathname)`; for a legacy public URL,
-  keep `proxifyBlobUrl` (→ `blob-proxy.js`). Both the template and each attachment go
-  through the same per-ref helper. (Private attachments have no `blobUrl`, so the current
-  `proxifyAttachments` would emit no downloadable URL — the helper fixes that.)
-- **generate-emails** (SLICE2-1, HIGH): the template branch
-  (`isAllowedUrl(reviewTemplateBlobUrl)` → `safeFetch`) and the attachment loop
-  (`if (!attachment.blobUrl ...) continue`) both silently drop private refs. Add a private
-  branch: `access==='private' && pathname` → `readUploadedBlobBuffer({access:'private',
-  pathname})`; keep `safeFetch` for public URLs.
-- **send-emails** (SLICE2-2, HIGH): `fetchAttachment(url)` is gated by `isAllowedUrl` and
-  returns `null` for a private pathname. Normalize cycle refs to
-  `{ access, pathname, url, filename }` where they are loaded, and make `fetchAttachment`
-  accept that shape with a private branch. The attachment list read of `a.blobUrl || a.url`
-  must also pick up `a.pathname`.
+Every reader classifies via `isPrivateCycleMaterialPathname` (the prefix), so a private
+ref routes to `readUploadedBlobBuffer` / the proxy and a legacy public ref keeps its
+`safeFetch` / `blob-proxy` path.
+
+- **grant-cycles GET** (`proxifyCycle`, SLICE2-3): a private ref → the proxy URL via
+  `cycleMaterialDownloadPath(cycle.id, pathname)`; a legacy public URL → `proxifyBlobUrl`.
+  Both template and each attachment go through the same `materialDownloadUrl(cycleId, value)`
+  helper. (Private attachments have no `blobUrl`, so the old `proxifyAttachments` emitted no
+  downloadable URL — the helper fixes that.)
+- **generate-emails** (SLICE2-1, HIGH): the template branch and the attachment loop add a
+  private branch (`isPrivateCycleMaterialPathname(pathname)` →
+  `readUploadedBlobBuffer({access:'private', pathname})`); public URLs keep `safeFetch`.
+  **Guard:** a failed public `safeFetch` leaves `buffer` null, so each push is preceded by
+  `if (!buffer) continue` — the restructure must NOT push an empty MIME part (Codex
+  SLICE2-1-VERIFY regression, fixed).
+- **send-emails** (SLICE2-2, HIGH): `fetchAttachment(ref, cache, explicitFilename)` detects
+  a private cycle-material pathname by prefix and reads it via `readUploadedBlobBuffer`
+  (throws on failure → caught + skipped by the callers, never cached); public URLs keep the
+  `isAllowedUrl`/`safeFetch` path. The attachment loop selects `a.pathname` (prefix-private)
+  else `a.blobUrl || a.url`.
 
 ### D. Back-compat
 
