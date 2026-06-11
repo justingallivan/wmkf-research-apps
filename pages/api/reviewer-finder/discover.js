@@ -302,15 +302,20 @@ export default async function handler(req, res) {
         { signal: deadlineController.signal, deadlineAt }
       );
 
-      // Filter out irrelevant candidates (those marked as not relevant by Claude)
-      const beforeFilter = enhancedDiscovered.length;
-      enhancedDiscovered = enhancedDiscovered.filter(c => c.isRelevant !== false);
-      const filtered = beforeFilter - enhancedDiscovered.length;
-
-      if (filtered > 0) {
+      // SURFACE (do NOT silently drop) candidates the reasoning pass marked off-topic
+      // (S238). This gate culled GROUNDED, retrieval-originated real people on a
+      // parametric Claude judgment with count-only visibility — the exact LLM-gatekeeping
+      // the redesign exists to remove. Keep them, tag them so the UI warns and the ranker
+      // sinks them to the bottom, and report the NAMES instead of a bare count.
+      const aiFlaggedNames = enhancedDiscovered.filter(c => c.isRelevant === false).map(c => c.name);
+      if (aiFlaggedNames.length > 0) {
+        enhancedDiscovered = enhancedDiscovered.map(c =>
+          c.isRelevant === false ? { ...c, aiFlaggedNotRelevant: true } : c
+        );
         sendEvent('progress', {
           stage: 'filtering',
-          message: `Filtered out ${filtered} irrelevant candidates from database discoveries`
+          status: 'ai_flagged_not_relevant',
+          message: `${aiFlaggedNames.length} database candidate(s) flagged by AI as possibly off-topic — surfaced (ranked last), not dropped: ${aiFlaggedNames.join(', ')}`
         });
       }
     }

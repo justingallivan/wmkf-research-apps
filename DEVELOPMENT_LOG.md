@@ -10,6 +10,20 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer manual-add cross-store dedup + a silent save-failure incident (Session 237)
+
+**Milestone:** Two production reviewer-workbench changes. (1) Manual reviewer-add now de-duplicates across **both** identity stores (`wmkf_potentialreviewer` + CRM `contact`) before minting a person — incl. the former-PI case (contact-only → create reviewer + link). (2) A production **incident**: well-ranked candidates had been **silently failing to save since the S223 relevance-score scale change** — `wmkf_appreviewersuggestion.wmkf_relevancescore` is bounded `[0,1]` but the code writes a 0–100 score, so any candidate scoring >1 hit a Dataverse 400 that the per-row try/catch swallowed (orphan person row, no candidate, no error). Diagnosed live on Tanja Mittag / request 1002852.
+
+**Sessions:** 237. Both arcs ran the Codex loop (design/diagnosis → review → implement → review): PR #21 had 2 Codex pre-impl design passes + a post-impl review; the incident root cause was Codex-confirmed before the fix.
+
+**Ship state:**
+- **Manual-add dedup** (PR #21, merge `9178fce`): new read-only `/api/workbench/reviewer-lookup` (tiered ORCID→email→name, ambiguity-aware `top:2`, cross-store conflict + reverse-link detection); `manual-reviewer` gains a `resolution` contract + create-and-link (link-last, hardened `setContactLink`); orchestration extracted to `lib/services/reviewer-identity-lookup.js`; 18/18 live read-only smoke. Plus S237 post-impl fixes to the S236 manual-add/ORCID work (`971ec97`).
+- **relevancescore incident** (`dad3a26`, `9f4e378`): widened the Dataverse field `[0,1]→[0,100]` (PUT-full-definition + `PublishXml` via `scripts/widen-relevancescore-max.mjs` — **`PATCH` returns 405**; ran + verified against prod), a `[0,100]` clamp guard in the adapter, and stopped the silent failure (`save-candidates` returns 500+errors when nothing saved; both Find clients surface the failed name + error).
+
+**Why it matters:** the dedup change stops fragmenting reviewer identity at manual entry; the incident fix stops silently dropping the *best-ranked* candidates (had been doing so for ~6 months) and makes future save failures loud instead of invisible.
+
+**Pointers:** `docs/REVIEWER_MANUAL_ADD_DEDUP_DESIGN.md` (rev3); new memory gotcha — Dataverse attr-update = PUT+publish not PATCH (`project-dataverse-schema-deploy-gotchas` #5). Commits `971ec97`/`d611130`/`bac7818`/merge `9178fce` (dedup), `dad3a26`/`9f4e378` (incident). Forward design (NOT built): `docs/REVIEWER_FINDER_PROMPT_DECOMPOSITION_DESIGN.md` + memories `project-reviewer-finder-proposal-doc-context`, `project-applicant-exclusion-policy-pending`.
+
 ## June 2026 — Reviewer contact + invite safety: namesake-collapse closed end-to-end (Sessions 234–235)
 
 **Milestone:** Production hardening that closes the namesake-collapse bug class at the contact + invite layer — the downstream half of the identity incident S232 began. A reviewer's identity could resolve correctly while *contact/bibliometric enrichment* attached a namesake's email/website/metrics (request 1002794: Smirnova got an ITMO namesake's email; Chen got a *pianist's* gmail + Van Cliburn page). Governing principle adopted: **identity-confirmed ≠ contact-validated — anchor every contact detail to the resolved identity or abstain.**

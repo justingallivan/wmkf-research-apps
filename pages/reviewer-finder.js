@@ -172,7 +172,12 @@ function CandidateCard({ candidate, selected, onSelect, readOnly = false }) {
 
   const hasCoauthorCOI = candidate.hasCoauthorCOI;
   const hasInstitutionCOI = candidate.hasInstitutionCOI;
-  const hasAnyCOI = hasCoauthorCOI || hasInstitutionCOI;
+  // S238 graded coauthor COI (see ReviewerSearchSection): 'likely' = strong tie (red),
+  // 'possible' = may be incidental (amber). Pre-S238 candidates without strength → 'likely'.
+  const coauthorStrength = candidate.coauthorCOIStrength || (hasCoauthorCOI ? 'likely' : null);
+  const hasStrongCoauthorCOI = coauthorStrength === 'likely';
+  const hasPossibleCoauthorCOI = coauthorStrength === 'possible';
+  const hasAnyCOI = hasStrongCoauthorCOI || hasInstitutionCOI;
   // Parser normalizes no-concern values to null; trim guards a whitespace-only
   // value so the advisory block matches the Workbench card. (Codex nit.)
   const potentialConcerns = typeof candidate.potentialConcerns === 'string' ? candidate.potentialConcerns.trim() : '';
@@ -255,18 +260,18 @@ function CandidateCard({ candidate, selected, onSelect, readOnly = false }) {
             </div>
           )}
 
-          {/* Coauthor COI warning */}
+          {/* Coauthor COI warning (S238 graded: strong tie = red, possible/incidental = amber) */}
           {candidate.hasCoauthorCOI && candidate.coauthorships && candidate.coauthorships.length > 0 && (
-            <div className="mt-2 p-2 bg-red-50 border border-red-300 rounded text-xs text-red-800">
-              <span className="font-medium">🚨 Coauthor COI:</span> Co-authored {
+            <div className={`mt-2 p-2 rounded text-xs border ${hasStrongCoauthorCOI ? 'bg-red-50 border-red-300 text-red-800' : 'bg-amber-100 border-amber-300 text-amber-800'}`}>
+              <span className="font-medium">{hasStrongCoauthorCOI ? '🚨 Coauthor COI:' : '⚠️ Possible coauthor overlap:'}</span> Co-authored {
                 candidate.coauthorships.reduce((sum, c) => sum + c.paperCount, 0)
-              } paper(s) with proposal author(s):
+              } paper(s) with proposal author(s){hasPossibleCoauthorCOI ? ' — may be incidental (e.g. a shared large-collaboration paper); verify' : ''}:
               <ul className="mt-1 ml-4 list-disc">
                 {candidate.coauthorships.map((coauth, idx) => (
                   <li key={idx}>
                     <strong>{coauth.proposalAuthor}</strong> ({coauth.paperCount} paper{coauth.paperCount > 1 ? 's' : ''})
                     {coauth.recentPapers && coauth.recentPapers.length > 0 && (
-                      <span className="text-red-600"> - e.g., "{coauth.recentPapers[0].title?.substring(0, 60)}..."</span>
+                      <span className={hasStrongCoauthorCOI ? 'text-red-600' : 'text-amber-700'}> - e.g., "{coauth.recentPapers[0].title?.substring(0, 60)}..."</span>
                     )}
                   </li>
                 ))}
@@ -303,6 +308,21 @@ function CandidateCard({ candidate, selected, onSelect, readOnly = false }) {
             <div className="mt-2 p-2 bg-orange-100 border border-orange-300 rounded text-xs text-orange-800">
               <span className="font-medium">⚠️ Expertise mismatch:</span> Claude claimed expertise in "{candidate.expertiseAreas.slice(0, 2).join(', ')}"
               but no publications found with these specific terms. Actual research focus may differ.
+            </div>
+          )}
+
+          {/* Few-publications warning (S238) — surfaced, not dropped: the count can be
+              undercounted when a preprint and its published version collapse to one. */}
+          {candidate.lowPublicationCount && (
+            <div className="mt-2 p-2 bg-amber-100 border border-amber-300 rounded text-xs text-amber-800">
+              <span className="font-medium">⚠️ Few publications found ({Number.isFinite(candidate.lowPublicationCountFound) ? candidate.lowPublicationCountFound : (candidate.publications?.length || 0)}):</span> below the usual minimum — surfaced rather than dropped, since the count can be undercounted (e.g. a preprint and its published version collapsing to one). Verify activity manually.
+            </div>
+          )}
+
+          {/* AI-flagged-off-topic warning (S238) — surfaced + ranked last, not dropped. */}
+          {candidate.aiFlaggedNotRelevant && (
+            <div className="mt-2 p-2 bg-amber-100 border border-amber-300 rounded text-xs text-amber-800">
+              <span className="font-medium">⚠️ AI flagged as possibly off-topic:</span> the reasoning pass judged this literature-retrieved author a weak topical match — surfaced (ranked last) rather than dropped. Verify relevance manually.
             </div>
           )}
 
@@ -1305,7 +1325,9 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
       }
 
       if (candidate.hasCoauthorCOI && candidate.coauthorships) {
-        markdown += `**🚨 Coauthor COI:** Has co-authored papers with proposal authors:\n`;
+        markdown += candidate.coauthorCOIStrength === 'possible'
+          ? `**⚠️ Possible coauthor overlap (may be incidental):** Shared paper(s) with proposal authors:\n`
+          : `**🚨 Coauthor COI:** Has co-authored papers with proposal authors:\n`;
         candidate.coauthorships.forEach(coauth => {
           markdown += `- ${coauth.paperCount} paper(s) with ${coauth.proposalAuthor}\n`;
         });
@@ -1359,7 +1381,7 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
       // Build COI warning string
       const coiParts = [];
       if (candidate.hasInstitutionCOI) coiParts.push('Institution COI');
-      if (candidate.hasCoauthorCOI) coiParts.push('Coauthor COI');
+      if (candidate.hasCoauthorCOI) coiParts.push(candidate.coauthorCOIStrength === 'possible' ? 'Possible coauthor overlap' : 'Coauthor COI');
       const coiWarning = coiParts.length > 0 ? coiParts.join(', ') : 'No';
 
       const reasoning = (candidate.reasoning || candidate.generatedReasoning || '').replace(/"/g, '""');

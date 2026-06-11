@@ -143,7 +143,14 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
   const hasAnyMismatch = hasInstitutionMismatch || hasExpertiseMismatch;
   const hasInstitutionCOI = !!c.hasInstitutionCOI;
   const hasCoauthorCOI = !!c.hasCoauthorCOI;
-  const hasAnyCOI = hasInstitutionCOI || hasCoauthorCOI;
+  // S238 graded coauthor COI: 'likely' (strong tie) reads as a real conflict (red);
+  // 'possible' (1..threshold-1 shared papers) may be incidental and reads softer (amber).
+  // Fallback for any pre-S238 candidate lacking the strength field: treat as 'likely'.
+  const coauthorStrength = c.coauthorCOIStrength || (hasCoauthorCOI ? 'likely' : null);
+  const hasStrongCoauthorCOI = coauthorStrength === 'likely';
+  const hasPossibleCoauthorCOI = coauthorStrength === 'possible';
+  // Only a strong (likely) coauthor tie or an institution COI drives the red treatment.
+  const hasAnyCOI = hasInstitutionCOI || hasStrongCoauthorCOI;
   // Model-flagged concern (POTENTIAL_CONCERNS). The parser normalizes "None
   // identified" and its variants to null (isNoConcernText), so any non-empty
   // value here is a real warning.
@@ -153,6 +160,14 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
   const provenanceLabel = provenanceLabelForCandidate(c);
   const pubs = Array.isArray(c.publications) ? c.publications : [];
   const pubCount = c.publicationCount5yr || pubs.length || 0;
+  // Track-B candidate surfaced below the minimum-publication bar (S238) — a warning,
+  // not a drop: the count can be undercounted when dedup collapses a preprint + its
+  // published version of the same work.
+  const lowPublicationCount = !!c.lowPublicationCount;
+  const lowPublicationFound = Number.isFinite(c.lowPublicationCountFound) ? c.lowPublicationCountFound : pubs.length;
+  // AI-flagged-off-topic (S238) — surfaced + sorted last, not dropped; the reasoning
+  // pass judged this retrieved candidate possibly off-topic. A warning, never a gate.
+  const aiFlaggedNotRelevant = !!c.aiFlaggedNotRelevant;
   const enr = c.contactEnrichment || {};
   const email = c.email || enr.email || null;
   const website = c.website || enr.website || null;
@@ -215,14 +230,20 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
             </div>
           )}
           {hasCoauthorCOI && coauthorships.length > 0 && (
-            <div className="mt-2 p-2 bg-red-50 border border-red-300 rounded text-xs text-red-800">
-              <span className="font-medium">🚨 Coauthor COI:</span> Co-authored {coauthorships.reduce((s, co) => s + (co.paperCount || 0), 0)} paper(s) with proposal author(s):
+            <div className={`mt-2 p-2 rounded text-xs border ${hasStrongCoauthorCOI ? 'bg-red-50 border-red-300 text-red-800' : 'bg-amber-100 border-amber-300 text-amber-800'}`}>
+              <span className="font-medium">
+                {hasStrongCoauthorCOI
+                  ? `🚨 Coauthor COI:`
+                  : `⚠️ Possible coauthor overlap:`}
+              </span>{' '}
+              Co-authored {coauthorships.reduce((s, co) => s + (co.paperCount || 0), 0)} paper(s) with proposal author(s)
+              {hasPossibleCoauthorCOI && <span> — may be incidental (e.g. a shared large-collaboration paper); verify</span>}:
               <ul className="mt-1 ml-4 list-disc">
                 {coauthorships.map((co, idx) => (
                   <li key={idx}>
                     <strong>{co.proposalAuthor}</strong> ({co.paperCount} paper{co.paperCount > 1 ? 's' : ''})
                     {co.recentPapers?.[0]?.title && (
-                      <span className="text-red-600"> — e.g., “{co.recentPapers[0].title.substring(0, 60)}…”</span>
+                      <span className={hasStrongCoauthorCOI ? 'text-red-600' : 'text-amber-700'}> — e.g., “{co.recentPapers[0].title.substring(0, 60)}…”</span>
                     )}
                   </li>
                 ))}
@@ -252,6 +273,17 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
           {hasExpertiseMismatch && Array.isArray(c.expertiseAreas) && c.expertiseAreas.length > 0 && (
             <div className="mt-2 p-2 bg-orange-100 border border-orange-300 rounded text-xs text-orange-800">
               <span className="font-medium">⚠️ Expertise mismatch:</span> Claude claimed “{c.expertiseAreas.slice(0, 2).join(', ')}” but no publications matched these terms.
+            </div>
+          )}
+
+          {lowPublicationCount && (
+            <div className="mt-2 p-2 bg-amber-100 border border-amber-300 rounded text-xs text-amber-800">
+              <span className="font-medium">⚠️ Few publications found ({lowPublicationFound}):</span> below the usual minimum — surfaced rather than dropped, since the count can be undercounted (e.g. a preprint and its published version collapsing to one). Verify activity manually.
+            </div>
+          )}
+          {aiFlaggedNotRelevant && (
+            <div className="mt-2 p-2 bg-amber-100 border border-amber-300 rounded text-xs text-amber-800">
+              <span className="font-medium">⚠️ AI flagged as possibly off-topic:</span> the reasoning pass judged this literature-retrieved author a weak topical match — surfaced (ranked last) rather than dropped. Verify relevance manually.
             </div>
           )}
 
@@ -608,6 +640,13 @@ export default function ReviewerSearchSection({
       const proposalKeywords = (analysisResult.proposalInfo?.keywords || '')
         .split(',').map((k) => k.trim()).filter(Boolean);
       enriched = rankByRelevance(enriched.map((c) => withReviewerProvenance(c)), proposalKeywords);
+      // Preserve the server's "AI-flagged-off-topic sorts last" guarantee (S238) — the
+      // shared scorer orders by relevance score only and would otherwise promote a flagged
+      // candidate back to the top after enrichment.
+      const offTopic = enriched.filter((c) => c.aiFlaggedNotRelevant);
+      if (offTopic.length > 0) {
+        enriched = [...enriched.filter((c) => !c.aiFlaggedNotRelevant), ...offTopic];
+      }
 
       setCandidates(enriched);
       setUnverified(unverifiedKept.map((c) => withReviewerProvenance(c)));

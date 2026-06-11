@@ -97,3 +97,6 @@ scripts/.w6-drop-backup/
 scripts/.orcid-cross-store.json
 scripts/.orcid-contact-direct.json
 scripts/.orcid-contact-provenance.json
+
+# Reviewer-finder smoke run artifacts (reproducible via scripts/smoke-discover-dispositions.mjs; local review only, S238)
+smoke-results-*.txt

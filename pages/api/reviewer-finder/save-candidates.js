@@ -187,7 +187,9 @@ export default async function handler(req, res) {
           matchReason += ' [Institution COI: Same institution as proposal PI]';
         }
         if (candidate.hasCoauthorCOI) {
-          matchReason += ' [Coauthor COI: Has co-authored with proposal authors]';
+          matchReason += candidate.coauthorCOIStrength === 'possible'
+            ? ' [Possible coauthor overlap: shared paper(s) with proposal author(s) — may be incidental]'
+            : ' [Coauthor COI: Has co-authored with proposal authors]';
         }
 
         // Identity gate (Phase 2 — REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md).

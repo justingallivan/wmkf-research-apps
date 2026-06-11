@@ -1,4 +1,30 @@
-# Reviewer Finder — Retrieval-First Redesign Plan
+# Reviewer Finder — Canonical Design Doc
+
+> **CONSOLIDATED S238.** This is the single canonical reviewer-finder design doc. It
+> merges three formerly-separate files (the other two were deleted; this filename was
+> kept because it carried the most inbound references):
+> - **Part A — Retrieval-First Redesign Plan** (below): the spine — problem/root-cause,
+>   empirical evidence, fan-out→mosaic→adjudicate architecture, provenance model, typed
+>   failures, sequencing. Mechanics live here.
+> - **Part B — Field Primer + Prompt Decomposition** (was
+>   `REVIEWER_FINDER_PROMPT_DECOMPOSITION_DESIGN.md`): the async-precomputed field primer
+>   and its hard "primer never creates candidates" boundary.
+> - **Part C — Design Refinements (S238 discussion)** (was
+>   `REVIEWER_FINDER_DESIGN_REFINEMENTS.md`): the reframes + decisions + verified code
+>   findings + shipped fixes from the S238 design discussions.
+>
+> **Where the parts differ, Part C governs *intent/priorities* (it is the latest
+> thinking) and Part A governs the *detailed mechanics*.** Key Part-C reframes that update
+> Part A's emphasis: **recall over precision** (review is a floor/gate, not a ranker — so
+> coverage/spread is the primary signal and the fine ranking machinery is lower-leverage);
+> **COI is surface-not-gate** except the permanent policy conflicts (proposal-authors,
+> same-institution); and the **primer's people-free `fieldMap` may seed queries but never
+> creates candidates**. Internal cross-references between the parts that say "this extends
+> [the other doc]" now mean "see the relevant Part of this doc."
+
+---
+
+## Part A — Retrieval-First Redesign Plan
 
 Status: **DESIGN.** Phase-1 verify-hardening (forename gate + soft mismatch flags
 + PubMed year basis) is **SHIPPED to `main` in S231** (commits `a3e6cbb`,
@@ -118,9 +144,17 @@ Key reads:
   it (common-name conflation). PubMed is dependable depth **for biomedicine only**.
 - **OpenAlex + ORCID cover the PubMed-blind field (astro) on presence/identity** —
   OA found 100% and returned an **inline ORCID** for most; ORCID-direct 92%.
-- **OpenAlex finds, but its science records are fragmented** — implausibly low
-  `works_count` for senior astronomers (Frebel 6, Gieles 1). Trust OA for
-  *presence + ORCID discovery*, not for *completeness/metrics*.
+- **OpenAlex finds; its canonical (ORCID-anchored) records are complete — the
+  "fragmented records / low `works_count`" reading was a NAME-SEARCH ARTIFACT.**
+  `[CORRECTED S239 via scripts/probe-grounded-origination.mjs — see docs/REVIEWER_FINDER_ORIGINATION_PROBE_FINDINGS.md]`
+  A naive author-search returns the canonical record *plus* ORCID-less stub shards
+  that share the name; the original probe picked a stub. Live re-check: Frebel's
+  canonical record = **323 works + ORCID + MIT** (the "6" was a 0-citation,
+  ORCID-less stub). Disambiguation is trivial — prefer the ORCID-bearing /
+  highest-cited record — so OA metrics on the *resolved* record ARE trustworthy.
+  This corrects the original "trust OA for presence only, not metrics" conclusion.
+  (Distinct from §4's claim, which is about OA *coverage* as exhaustive
+  ground-truth and still stands — see §8d's role-scope qualifier.)
 - **Semantic Scholar ≈ OpenAlex on recall but inferior for identity** — its
   `author/search` returned **0 ORCIDs** (would need a 2nd `/author/{id}` call,
   doubling load under its 1 req/s limit) and shows severe fragmentation
@@ -569,8 +603,9 @@ proposal-author + institution marking but no coauthor-history (`discover.js:310,
 
 ## 6. Coverage & sourcing decisions
 - **Cross-field spine = OpenAlex + ORCID** (OA for breadth + inline ORCID
-  discovery; ORCID as the hard key). **Trust OA for presence/identity, not
-  completeness/metrics.**
+  discovery; ORCID as the hard key). **Trust OA for presence/identity — and, on the
+  ORCID-anchored canonical record, for recent-works metrics** (the earlier
+  "not metrics" caveat was a name-search stub artifact; corrected S239 — see §2.3).
 - **PubMed = biomedical depth only** (non-biomedical presence is sparse-real +
   namesake-conflated — unreliable to either cover or verify; see §2.3).
 - **Field-routed depth:** NASA ADS / arXiv for astro-physics; DBLP for CS;
@@ -669,3 +704,669 @@ lives in §2.2 here rather than in carried code, to avoid bit-rot.
 - Related existing docs: `REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md`,
   `REVIEWER_RECENCY_WEIGHTING_PLAN.md`, `REVIEWER_WEB_DISCOVERY_PLAN.md`
   (abandoned — the ungrounded-generation precedent this plan avoids repeating).
+
+---
+
+## Part B — Field Primer + Prompt Decomposition
+
+*(Formerly `REVIEWER_FINDER_PROMPT_DECOMPOSITION_DESIGN.md`. Where it says "the redesign plan" / "this EXTENDS …", read Part A above.)*
+
+
+> **Status:** DRAFT / iterating (S237). Not built. **This EXTENDS — does not duplicate —
+> `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md`**, which already specifies the
+> retrieval-first decomposition (Stage 0 extract-&-plan with *no parametric names*,
+> field-routed retrieval, the hypothesis-builder/mosaic layer, the provenance model,
+> typed failure outcomes, COI parity, and a shadow-run-before-cutover). The **new**
+> contribution here is the **field primer** and the decision to **pre-compute it
+> asynchronously at submission**. Codex pre-impl review (S237) folded in.
+
+## What's already decided (in the redesign plan — reuse, don't re-spec)
+
+`REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` already covers the decomposition itself:
+- **Stage 0** — Claude extracts topical facts + `grantScreening` + `proposalPeople` +
+  `referenceIds` + `sourcePlan` + `qualityChecks`, **no background-knowledge candidate
+  names**; identity facts (PI/institution) come from Dataverse (§4.1, §4.4).
+- **Stage 1** — candidates *originate from grounded retrieval*, field-routed (§4.1).
+- **Stage 2** — hypothesis-builder/mosaic clusters author-instances → person hypotheses (§4.3).
+- **Stage 3** — adjudicate via `ReviewerIdentityResolver` + recency rank (§4.1, §4.3).
+- Typed failures (`analysis_invalid`, `reviewers_not_required`, `retrieval_failed`),
+  COI parity across lanes, structured-JSON output + retry/repair, fan-out time budgets,
+  prompt rewrite, and §7 sequencing incl. a shadow run.
+
+**My earlier sketch's "Step 2 = reviewer suggestion" was wrong** (Codex): if it means Claude
+*names people*, it contradicts the retrieval-first rule. Candidates must originate from
+retrieval; Claude parametric names are **barred or grounded-seed-only (ground-or-drop)**.
+Treat that decomposition as settled by the plan; this doc only adds the primer + staging.
+
+## The new piece: the field primer
+
+**Intent.** Start from Claude's knowledge, then point it at the wider internet and have it
+write a **structured, cited review of the research field** for a proposal: what the field is,
+its sub-areas, key methods, current frontiers/open questions, the landscape of active
+research communities, and notable venues — each claim tied to a real, resolvable source.
+
+**Two roles:**
+1. **Standalone PD deliverable.** A non-specialist program director gets an orienting field
+   map — valuable *on its own*, even when reviewer yield is thin (e.g. a thin Phase-I
+   narrative, or a proposal whose best peers were all self-excluded). Degrades gracefully.
+2. **Scaffold** for the redesign's Stage 0/1: its sub-areas/methods/venues become inputs to
+   the **`sourcePlan`** and field-routing and to query seeds — *not* a candidate source.
+
+**KEY DECISION — pre-compute it asynchronously at submission (latency non-issue).**
+The primer is generated **soon after proposal submission**, as a **standalone, cached,
+durable artifact** — NOT part of the synchronous reviewer-finder run. This removes it from
+the latency budget entirely (Codex's top concern; the synchronous path is already ~50s+50s
+before enrichment per `project-serpapi-budget-latency`). When a PD later runs discovery, the
+primer is already there to read and to seed Stage 0/1.
+
+## The hard boundary — the primer can NOT create candidates (Codex: non-negotiable)
+
+The real risk isn't only "the primer names someone and we treat them as a candidate." It's
+**framing contamination**: the web-sourced primer frames the field around certain
+communities/people, then a downstream prompt regenerates the same fabricated-affiliation
+failure through that framing, and grounded verification confirms the nearest real namesake
+(the exact failure class in the redesign plan §1, §5.1, and `project-reviewer-web-discovery-abandoned`).
+
+So the boundary is **machine-readable and code-enforced**, not prose:
+- Primer output is partitioned into:
+  - **`fieldMap`** — `subAreas[]`, `methods[]`, `frontiers[]`, `venues[]`, `searchTerms[]`.
+    These may seed `sourcePlan` / queries (they carry no person identity).
+  - **`unverifiedLeads[]`** — any named groups/people, each with its provenance URL and a
+    flag. A lead is *never* a candidate field.
+- **Only the grounded lanes** (cited-reference / literature-retrieved → hypothesis-builder →
+  resolver, per the plan) may create candidate **identity / affiliation / contact /
+  eligibility** fields. A primer lead may at most become a *grounded-seed query* that must
+  ground-or-drop through PubMed/ORCID/OpenAlex — affiliation/contact always from the verified
+  record, never the primer.
+- The primer's prose is **never** the source of an email, affiliation, or "confirmed" reviewer.
+
+**Citations ≠ grounding.** Web content is UNTRUSTED (A7) — wrap it. Treat each citation as a
+claim to validate (URL resolves, source is the type claimed, claim is supported), and never
+let a citation become identity evidence.
+
+## Staging (your "smaller steps / more focused tasks")
+
+The primer is itself one **decoupled** stage; break it further so each task is small:
+- **P1 — knowledge draft:** Claude writes a structured field map from its own knowledge (no web).
+- **P2 — web-grounded revision:** web search → revise/cite the field map; emit `fieldMap`.
+- **P3 — leads partition:** extract any named groups/people into `unverifiedLeads[]` with URLs
+  (kept strictly out of `fieldMap`).
+Each is independently promptable/versionable. The synchronous decomposition (Stage 0–3)
+follows the plan's §7 sequencing; the primer slots in *ahead of and beside* it as a cached input.
+
+## Open decisions (primer-specific — add to the plan's §8 open items)
+
+1. **Web tooling:** Claude-native web search vs a separate retrieval layer (the abandoned attempt
+   used Perplexity `sonar` *for reviewers* — a different, higher-risk use).
+2. **Primer scope:** people-agnostic field map only, vs the partitioned `unverifiedLeads[]`
+   above. Recommend the partition (keeps leads, enforces the boundary structurally).
+3. **Caching / scope / freshness:** request-scoped? proposal-version-scoped? regenerate on
+   resubmission? where stored (Blob? Dataverse?)?
+4. **PD UX:** present it explicitly as an *orienting field review, not verified reviewer
+   evidence* — mirroring the old web panel's deliberate isolation from ranking/COI/save.
+5. **Prompt-version migration:** new prompt names (`reviewer-finder.field-primer.*`,
+   `reviewer-finder.extract`, …) break the resolver/override/validator wiring keyed to
+   `reviewer-finder.analyze`/`.score-candidates` — plan names, validators, fallbacks, and
+   stale-override handling up front.
+6. **Evaluation before build:** does a people-agnostic primer measurably improve Stage-0/1
+   `sourcePlan`/query quality (yield, false-affiliation rate, field coverage) in a shadow run?
+   Is the primer itself useful to PDs (acceptance/usefulness)? Define metrics first.
+
+## First step (de-risk — Codex + plan §7.7)
+
+A **shadow, non-candidate-producing prototype** on a small set of prior proposals: structured
+extraction + **people-agnostic** primer + query/`sourcePlan` generation → feed **only the
+generated queries** into the existing retrieval → compare yield / latency / false-positives
+against the current path. **Do not** prototype "primer names people" first — that tests the most
+dangerous behavior before the safe scaffold is proven. Pair with rebuilding the parameterized
+analyze-evaluation harness the plan calls for (§Artifacts).
+
+## Relationship to existing work
+Extends `REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` (the decomposition + hypothesis layer +
+typed failures + sequencing). Respects `project-reviewer-web-discovery-abandoned` (web stays out
+of naming/verification; enforced by the machine-readable boundary). Pairs with
+`project-reviewer-finder-proposal-doc-context` (the PA-assembled doc improves the *input*; the
+primer + decomposition improve how we *use* it). Aligns with `project-reviewer-finder-retrieval-redesign`.
+
+---
+
+## Part C — Design Refinements (S238 discussion)
+
+*(Formerly `REVIEWER_FINDER_DESIGN_REFINEMENTS.md`. Cross-references to the decomposition / redesign docs mean Parts B / A above.)*
+
+
+> **Purpose / how to use this Part.** This is a refinement layer on top of Parts B
+> (field primer) and A (retrieval-first plan) above. It captures conclusions from a
+> design discussion and is meant to **hone** the existing spec, not replace it.
+> Each item is tagged **DECIDED**, **REFRAMED**, **DEFERRED**, or **RETRACTED** so
+> the changes are easy to apply. Where a conclusion overturns something said earlier
+> in the discussion, that is stated explicitly so stale reasoning isn't reintroduced.
+
+---
+
+## 0. The organizing principle (applies everywhere)
+
+**One objective per unit of work.** The original failure — a single prompt asked to
+read, research, synthesize, and emit machine output at once — is the same failure that
+showed up in the *design process itself* (conflating "build the primer" with "prove the
+primer isn't biased," plus a substrate argument, all held in one context). The remedy is
+the same at every scale: isolate objectives. Independently corroborated by Silva et al.
+(see §6): isolating planning, critique, and rewriting lets each step work under a
+constrained subgoal.
+
+**Two separate problems, not one.** The rest of this document is organized around the
+single most useful clarification from the discussion:
+
+1. **The primer** — a buildable deliverable, mostly already specced, low contention.
+2. **The bias / coverage measurement** — a quality check on the primer. Optional, later,
+   and the source of nearly all the complexity. It is **not** required to ship a primer.
+
+The substrate debate (OpenAlex / Semantic Scholar / PubMed / iCite) lives *entirely
+inside* problem #2. If the measurement is deferred, that whole thread goes quiet.
+
+---
+
+## 1. The primer (DECIDED — buildable now)
+
+The primer is the real goal: orient a **non-specialist program director** to a research
+field. Structure is already in the spec and unchanged:
+
+- **P1 — knowledge draft:** structured field map from model knowledge, no web.
+- **P2 — web-grounded revision:** web search → revise/cite → emit `fieldMap`.
+- **P3 — leads partition:** named groups/people → `unverifiedLeads[]` with provenance,
+  kept strictly out of `fieldMap`.
+- **Hard boundary unchanged:** the primer never creates candidate reviewers. `fieldMap`
+  (people-free: `subAreas[]`, `methods[]`, `frontiers[]`, `venues[]`, `searchTerms[]`)
+  may seed `sourcePlan`/queries; `unverifiedLeads[]` is never a candidate field. Boundary
+  is code-enforced, not prose.
+- **Async pre-compute at submission**, cached durable artifact, out of the synchronous
+  latency budget. Unchanged.
+
+### What the discussion actually changed about the primer
+
+- **DECIDED — the primer is a NEUTRAL, accurate field map.** Lay out the field's
+  mainstream structure plainly so staff can apply their own judgment to a clean map.
+- **RETRACTED — do NOT instruct the primer to surface or editorialize "divergent /
+  heterodox perspectives."** An earlier version of this discussion added that instruction;
+  it is now withdrawn. Reasoning is in §2: the critical/contrarian function belongs to
+  the humans, and a primer that pre-loads it risks nudging a non-specialist PD into
+  treating the system's framing as the critical take.
+
+---
+
+## 2. What the review process actually is (REFRAMED — changes the quality bar)
+
+This reframe is the most consequential outcome and should propagate into how every
+component's quality target is written.
+
+- The review process is a **distributed system with redundancy and checks-and-balances**,
+  **not a brittle pipeline with a single critical path.**
+- **Staff are dispositive; reviewers provide signal, not a verdict.** Staff can see when a
+  reviewer trashes something merely for breaking with dogma, and discount it.
+- The premise-challenging / "goes against the dogma" function is **distributed across both
+  staff and reviewers** — including the mainstream "in-crowd," who are often *reasonable
+  skeptics* and frequently give good comments even on heterodox proposals. These are
+  **soft distinctions, not fixed roles.** Not every proposal is heterodox.
+- Genuine disagreement in reviews is often a *feature*: staff are sometimes drawn to a
+  proposal precisely *because* it challenges dogma, so the reviewer pool's mainstream lean
+  and the staff's contrarian lean produce a productive tension. That tension is the
+  product, not a defect to engineer away.
+
+**Implication for build quality:** the primer (and its metric) must be **useful and
+honest, not airtight or load-bearing.** Directional quality is acceptable. It is one input
+into a human judgment that has its own downstream correctives. Do not design any single
+component as if a coverage gap or slightly skewed map propagates uncaught to a bad
+decision — the system tolerates imperfect parts by design. (Prior turns over-engineered on
+the opposite, brittle-pipeline assumption; that assumption is wrong.)
+
+**RETRACTED — "find the rare premise-challenging reviewer" as a system objective.** The
+system was never supposed to locate the contrarian. That function is the humans'. The
+metric's job is correspondingly narrower (see §3).
+
+**DECIDED — the applicant-suggested-reviewer exclusion is load-bearing, not nice-to-have.**
+Friends-of-PI are the one reviewer population biased in the *applicant's* direction with no
+skeptical counterweight. Removing them (using the existing provenance field) is what makes
+"in-crowd reviewer" and "reasonable skeptic" the same person. Keep this exclusion firmly in
+the design.
+
+---
+
+## 3. The coverage / bias metric (DEFERRED — optional, later, narrowed)
+
+- **Status: optional and later.** Not needed to ship a primer. A worse-is-fine first
+  validation is to read primer outputs by eye against fields the team already knows. That
+  unblocks building today while this question stays open.
+- **Narrowed goal.** The metric is **not** "detect the heterodox / fringe voice." It is:
+  *does the seeded reviewer pool spread across the relevant competent sub-communities, or
+  collapse onto one cluster?* I.e. a **redundancy check** — five reviewers from one cluster
+  is a weaker signal than five spread across the relevant ones, regardless of anyone's
+  position on the dogma.
+- **Why this is the robust framing.** Checking *spread across well-indexed mainstream
+  communities* is exactly the check that survives the field-dependent indexing problems in
+  §4 — because it does not depend on detecting thinly-published fringe work. The metric
+  gets easier and more honest the moment it stops trying to find the contrarian.
+- **It is a sanity check, not a gate.** Directional is enough; the distributed human checks
+  (§2) absorb the rest.
+
+---
+
+## 4. Citation substrate (DEFERRED — inside §3; per-field, not universal)
+
+The substrate question only matters if/when the metric in §3 is built. Conclusions:
+
+- **OpenAlex is disqualified as a ground-truth backbone.** Its coverage is
+  **field-dependent** (it tracks open-access density, which varies by field norms /
+  mandates / economics). Its gaps correlate with the *dangerous* axis (less-OA corners
+  skew non-Anglophone, less-commercial, more-theoretical), so indexing failure would be
+  **indistinguishable from, and correlated with, the bias the metric is meant to detect.**
+  That makes it worse than no instrument *in the ground-truth role*.
+- **The observed problem is corpus COVERAGE, not graph/clustering ability.** Present papers
+  cluster fine; the weak link is which papers are present. This decouples corpus assembly
+  (a retrieval problem) from clustering (sound). It narrows the fix considerably.
+- **Semantic Scholar** was tried earlier in this project and was less promising than hoped.
+- **Biomedical core (the strong case):** assemble the corpus from **PubMed** (trusted
+  coverage, already the load-bearing retrieval substrate), take citation edges from the
+  **NIH Open Citation Collection (iCite)** (anchored to MEDLINE indexing, not OA density),
+  use **MeSH** for cluster labeling (replaces contrast-derived keyword extraction). Because
+  the clustering substrate == the trusted retrieval substrate, the
+  indexing-vs-coverage confound dissolves and the metric is *calibrated* here.
+- **Outside biomedicine (chem / materials / physics):** no coverage-trusted citation
+  substrate currently. The clustering backbone is unavailable; the metric is *directional
+  at best*; the primer leans harder on the P1 knowledge draft + targeted retrieval.
+  Field-specific indices exist (e.g. INSPIRE for HEP) but chasing them per field is likely
+  not worth it at current volume.
+- **Architecturally cheap:** this is **substrate-per-field**, a parameter on routing the
+  spec already has (field-routed retrieval + `sourcePlan`). Label the metric *calibrated*
+  in the biomedical case and *directional* elsewhere. No new machinery.
+
+---
+
+## 5. Source-role principle (DECIDED — recurring, generalizes)
+
+**What gates a source is the ROLE it plays, not its type.**
+
+- **As a query/seed generator:** patchiness is tolerable. A missed seed is a recoverable
+  missed query. (OpenAlex, a thin citation graph, etc. are acceptable *here*.)
+- **As ground truth for "what the field contains":** patchiness is disqualifying. Gaps
+  become false findings. (This is why OpenAlex fails the §4 ground-truth role.)
+- **Non-scholarly sources (news, press releases):** legitimate as *frontier signals* that
+  generate queries — they sometimes point at an emerging area ahead of the formal
+  literature. They must **not** be what is *cited* as establishing state of the art. Any
+  frontier claim surviving into the cited `fieldMap` must resolve to something checkable.
+- **Provenance should record the role** (seed-only vs cited-claim), not just the URL, so
+  the boundary is on what the source is *doing*. ("Citations ≠ grounding" from the existing
+  spec is the same principle: a citation is a claim to validate, never automatically
+  identity/affiliation evidence.)
+
+---
+
+## 6. Lessons distilled from Silva et al. (transferable, with cautions)
+
+*Silva, Gouveia, Zielinski, Oliveira, Amancio, Bruno, Oliveira Jr. "AI-Assisted Tools for
+Scientific Review Writing: Opportunities and Cautions." ACS Appl. Mater. Interfaces 2025,
+17, 47795–47805. CC-BY 4.0.* An empirical proof-of-concept for automated review-paper
+generation; their goal is far beyond ours, but several findings transfer.
+
+- **TRANSFERABLE — their best input strategy.** Build a citation network from a broad
+  query → community detection (Infomap) → derive cluster keywords by *contrast* (terms
+  over-represented in a cluster vs. all others) → sample input papers *proportional to
+  cluster size*. The clustering machinery is sound and maps onto both the field-structure
+  seed (P1/P2) and the §3 coverage metric. (Substrate caveat per §4 — use PubMed/iCite, not
+  their OpenAlex, for our biomedical core.)
+- **CAUTION — single-source capture.** Removing *one* paper from a 138-paper input changed
+  the output dramatically; one document's vocabulary overlap let it dominate similarity
+  retrieval across many queries. This is framing contamination **from inside a clean,
+  web-free corpus** — the `fieldMap`/`unverifiedLeads` boundary does not catch it because
+  nothing crossed the boundary. **Mitigation:** proportional cluster sampling (not global
+  top-k), and run >1 seeding while watching for a single recurring dominant source. This is
+  the concrete reason the coverage check is worth running routinely (as hygiene, per §2 —
+  not as an ideological guard).
+- **CORROBORATION — decomposition.** They reach our §0 principle independently.
+- **CORROBORATION — citation handling.** References resolve to real DOIs (via Crossref),
+  validation is deterministic (Python, not an LLM step); they name the still-unbuilt hard
+  layer as "does the source actually support the claim" — exactly our "citations ≠
+  grounding."
+- **CALIBRATION — quality ceiling.** Nine-expert evaluation of their best version:
+  "excellent starting point, better than a student/postdoc draft, major-to-minor revision,
+  *not* publishable." That tier sits comfortably **at or above the PD-orientation bar** —
+  encouraging for the primer. The tier they *couldn't* reach (deep critical / divergent
+  analysis) is **not our reviewer bar either**, because per §2 that function is distributed
+  to the humans.
+- **OBJECTIVE — now aligned (note, since an earlier turn said the opposite).** Their system
+  optimizes for faithful, comprehensive representation of the field's consensus. Earlier in
+  the discussion this was framed as the *opposite* of what we want. After the §2 reframe it
+  is actually **aligned**: we want a neutral mainstream map, and the heterodoxy lives in the
+  humans. Their consensus-fidelity objective is the right objective for *our primer*. (They
+  flag consensus-default as a weakness *for review writing*; for our use it is acceptable.)
+
+---
+
+## 7. Next step (unchanged from existing spec, with a pointer)
+
+The **shadow, people-agnostic, non-candidate-producing prototype** is still step one (per
+the redesign plan §7 / the decomposition doc's "First step"). The only addition from this
+discussion: **point it at a biomedical proposal first**, where corpus ground truth is
+firmest (§4), before trusting any number it produces in a field where the corpus can't be
+trusted.
+
+---
+
+## 8. Session 238 discussion — process reframe, COI calibration, verified code findings
+
+A second design discussion (S238). The conceptual items below are **intentionally
+under-defined in places** — they are direction, not build spec. The *code findings* at the
+end are `[VERIFIED via source]` and precise. Where an item sharpens or qualifies §2–§5 it
+says so.
+
+### 8a. Process / objective reframes
+
+- **REFRAMED — recall over precision (empirical).** A 10-year retrospective found
+  **essentially no correlation between reviewer ratings and project success among *funded*
+  projects.** This is selection-biased (we only observe funded outcomes), and the honest read
+  is restriction-of-range: review functions as a **floor / gate** (screen out the
+  clearly-bad), not a **ranker** (resolve which good ones succeed). Implication: optimize
+  **coverage/recall of competent sub-communities**; **relax fine-grained rating precision.**
+  Do **not** over-read this into "reviewer quality doesn't matter" — the selection bias
+  forbids that conclusion. This is the empirical warrant for §2's quality-bar relaxation, but
+  ONLY on the precision axis (see 8a-spread).
+- **REFRAMED — the slate is a toe-hold (0→~75 %), seeding a referral-driven search.** Many
+  invited reviewers decline but **suggest alternatives**; staff iterate on those referrals.
+  Decline→refer→iterate is **snowball sampling**, and expert referral is the real convergence
+  engine — better-grounded than anything the system synthesizes. The system owns the
+  cold-start; humans + referrals own the rest → **invest proportionally** (don't over-engineer
+  the first slate to "perfect"; the process is built to correct individual misfires).
+- **DECIDED — collective seed *spread* is the non-relaxable property (8a-spread).** Snowball
+  sampling stays in the seed's neighborhood, so a **collapsed seed is entrenched by
+  iteration, not fixed.** Per-person precision is relaxable (decline/referral corrects it);
+  **collective spread is not.** This is exactly the false-negative / coverage axis: staff
+  cannot correct a sub-community the system never surfaces, and referral can't escape a
+  neighborhood the seed never entered. The distributed-human redundancy of §2 absorbs
+  **false positives** (a weak reviewer gets discounted); it does **not** absorb
+  **false negatives** (a missing community). Apply §2's "directional is fine" to ranking, NOT
+  to coverage.
+- **DECIDED — two-axis fit is a built-in spread floor + a cheap eval anchor.** A competent
+  slate needs **field-question experts** (the big questions) AND **methods/technique experts**
+  (are the methods satisfactory) — usually *different communities*. Maps onto `fieldMap`
+  (`subAreas`/`frontiers` vs `methods`). Cheap, human-anchorable evaluation for the shadow
+  prototype: on a known biomedical proposal, do the generated queries/seeds **surface both
+  communities**, or collapse to one? That is a spread check with ground truth, without the
+  deferred §3 substrate metric.
+- **RE-PRICES §3 (reconciliation, not contradiction).** §3 files the coverage/bias metric as
+  "optional, later." 8a keeps that true for the **rigorous citation-substrate instrument**
+  (§4) — still deferred — but **elevates the coverage *property* itself to the primary quality
+  signal**, because the retrospective says spread (the gate) carries the value while ranking
+  precision (the ceiling) does not. Net: the *cheap* spread check (two-axis eyeball on a known
+  biomedical proposal) is **not** optional and belongs in the first shadow run; only the
+  *heavy* substrate-calibrated metric stays deferred. Read §3's "optional/directional" as
+  scoped to the instrument, not to coverage as an objective.
+
+### 8b. COI calibration
+
+- **REFRAMED — the dominant COI failure is over-recusal, not under-detection.** Potential
+  reviewers are **abundantly cautious and self-declare**, removing themselves from contention.
+  So a system-side COI **false positive (over-exclusion) is the expensive error** — it stacks
+  on the reviewers' own over-caution and collapses an already-thin pool. The system must not
+  become a *third* over-recuser. (Scope, §8c: the over-exclusion this warns against is
+  **inferred / borderline** COI, NOT the obvious high-precision kind. Track-B's silent
+  institution-COI **hard drop** (`filterConflicts`) is **policy-correct** — per foundation policy
+  same-institution is *always* a conflict and would never be invited, so dropping it costs
+  nothing [Justin, S238]. Track-A surfaces the same signal via `markInstitutionCOI`; the
+  disposition differs but neither is the failure mode.)
+- **DECIDED — calibrate by detection *precision*, not COI severity.** **Hard-flag up front the
+  obvious / high-precision COI** (same institution, substantial co-publication, applicant-named,
+  recent coauthor) — these are true-positives the staff wouldn't invite in the initial batch
+  anyway, so the cost is ~zero. **Soft-flag the inferred / borderline; never gate on it** — the
+  reviewer's own conservatism is the backstop. Keep COI on the obvious signals already built;
+  **resist extending into inference.**
+- **DECIDED — batch-relative retain-with-status, for the RECOVERABLE COI kinds only.**
+  Borderline cases (e.g. a single hub-artifact co-authorship) may legitimately re-enter later
+  iterations (referral, pool thinning), so represent them as a **status/flag on a retained
+  candidate**, not a hard removal — a held-out coauthor is recoverable, matching the snowball
+  reality. This does **not** apply to **permanent** conflicts: same-institution is always a
+  conflict by foundation policy and correctly stays a hard drop (§8c) [Justin, S238].
+- **DECIDED — co-authorship is a graded proxy with a low-end false-positive mechanism.** A
+  *single* shared paper is often a **hub artifact**: a corresponding-author X invites A and B
+  as collaborators for specific techniques; A and B co-appear without a real relationship. 8
+  shared papers is a genuine collaboration; 1 may be noise. Disambiguating texture (**count,
+  author position, recency, co-author-list size**) is computable. **A naive binary
+  co-authorship flag disproportionately penalizes methods-experts** — the technique people who
+  get invited onto many groups' papers — i.e. exactly the methods-axis half of the spread
+  requirement. So co-authorship texture **protects methods-axis recall**; it is not cosmetic.
+- **NOTE — adjacent high-leverage lever (out of finder scope).** If over-recusal is a *main*
+  failure mode, clarifying at **invitation time** what actually constitutes a disqualifying
+  conflict (vs. a disclosable-but-fine relationship) could recover more pool than any
+  finder-side change. Lives in the invite/onboarding flow.
+
+### 8c. Verified code findings (S238, `[VERIFIED via source]`)
+
+Traced the live Track-A (Claude-verified) + Track-B (DB-discovered) disposition. The question
+was: *is anything excluded by a gate staff would never see?* Answer: **yes — several**, almost
+all on the Track-B (database-retrieved) path, which runs a gauntlet of silent hard filters
+before any staff-visible disposition. (My first pass found only the `isRelevant` gate and
+wrongly called everything else "flag-not-drop"; Codex's S238 review surfaced the rest — see the
+CORRECTION bullet below.)
+
+- **Co-authorship COI flag was BINARY — FIXED S238 (8d fix 1).** `checkCoauthorHistory` collected
+  per-author `paperCount` + recent papers but the verdict was `hasCoauthorship = length > 0` → **1
+  shared paper == 8**, grading texture thrown away. Now graded via `coauthorCOIStrength`
+  ('likely'/'possible'). (Still open: co-author search uses initial-only PubMed format `LastName F`
+  → namesake-prone, can **over**-flag a same-initial person; it remains a **flag, not a drop**.)
+- **SILENT DROP GATE — `isRelevant !== false` — FIXED S238 (8d fix 2).** (`discover.js:307`). Track-B
+  database-discovered (real, retrieved) candidates tagged `RELEVANT: No` by the **second Claude
+  reasoning call** (`reviewer-finder.js:436`) are filtered out with **count-only** reporting
+  (`:310-315`) — **no names streamed.** A parametric Claude judgment culling *grounded* real
+  people, invisible to staff = the LLM-gatekeeping the redesign exists to remove. (Defaults to
+  relevant when Claude is silent, so it only acts on explicit "No"s — but those are unlogged by
+  name.)
+- **Proposal-author filter — VISIBLE for Track-A, COUNT-ONLY for Track-B.** Removes PI/co-Is
+  (`discover.js:199-222,318-338` → `deduplication-service.js:319-345`). The **verified** path
+  streams excluded **names** (`discover.js:210-217`); the **discovered** path streams only a
+  **count** — names are logged server-side, not surfaced (`discover.js:326-334`).
+- **Track-B silent hard-drop gauntlet (CORRECTION — this is the real answer to "what would I
+  never see").** Before any staff-visible disposition, database-discovered (real, retrieved)
+  candidates pass through several **silent hard filters**, most reporting only a count or
+  nothing: (a) exact excluded/already-surfaced-name partition on verified+unverified+discovered
+  (`discover.js:158-178`, count-only); (b) verified-name dedup against Track-A
+  (`discovery-service.js:241-244`); (c) cross-field contamination drop
+  (`discovery-service.js:248-250`); (d) **institution-conflict HARD DROP** via `filterConflicts`
+  — same-institution `return false`, only a `stats.filteredByCOI` count
+  (`discovery-service.js:254-261` → `deduplication-service.js:356-374`); (e) `<3` publications
+  drop — **FIXED S238**: now surfaced as a `lowPublicationCount` warning via
+  `partitionByPublicationBar`, not dropped (§8d fix 3). Plus Stage-1 validation drops
+  placeholders/incomplete/duplicate/excluded suggestions before discovery
+  (`reviewer-finder.js:546-578`).
+- **What IS flag-not-drop (the corrected, narrower claim):** Track-A institution COI
+  (route-level `markInstitutionCOI`, "flag, don't filter" `discover.js:225`); Track-A coauthor
+  COI (above); forename/institution/expertise mismatch — only the **forename gate** demotes
+  verified→`unverified[]` (still surfaced), institution/expertise are soft flags; Track-A `<3`
+  pubs → `unverified[]` (`discovery-service.js:695-707`, UI read-only). Ranking is **sort-only**
+  (`relevance-score.js:95-99`); `filterByHIndex`/`filterByMinimumQualifications` is **dead code**
+  (no live caller). **My earlier "flag-not-drop everywhere else" was wrong** — it described the
+  Track-A route path and missed the Track-B service-path drops above.
+- **§8b "surfaces, doesn't exclude" is Track-A-only — and the Track-B drop is CORRECT.** For
+  Track-B, institution COI is a **hard exclude** (`filterConflicts`), but per foundation policy
+  same-institution is *always* a conflict, so the drop is **right, not a gap** [Justin, S238].
+  The retain-with-status principle (8b) applies to *recoverable/borderline* COI (co-authorship),
+  not to institution. (My earlier "this violates the principle" framing was wrong.)
+- **Upstream invisibilities (before discover runs):** excluded names are fed into the *analyze
+  prompt* so Claude doesn't generate them, plus the exact-name partition above. **Track-A is NOT
+  purely parametric** (Codex correction): the analyze prompt explicitly asks for
+  proposal-mentioned names + reference authors *before* known experts
+  (`reviewer-finder.js:81-85`) and `normalizeSuggestionSource` preserves
+  `SOURCE: Mentioned in proposal` → `proposal_named` (`discovery-service.js:741-759`). The
+  parametric-invention concern is scoped to the "known experts" portion, not the whole pool.
+
+**Shippable fixes, independent of the big redesign:**
+1. **SHIPPED S238 — graded co-authorship COI.** `hasCoauthorCOI` stays boolean for all
+   consumers; new `coauthorCOIStrength` ('likely' vs 'possible') from `gradeCoauthorCOI` tiers
+   on the strongest single co-author tie (`COAUTHOR_COI_STRONG_MIN`=3). A single shared paper now
+   reads as amber "possible coauthor overlap (may be incidental)" instead of a red COI — protects
+   methods-axis recall (8b). Both Find clients + persisted COI notes + exports gate on strength;
+   roster DTO persists it. (Author position / list-size not used — co-author search doesn't fetch
+   them; count-based v1.)
+2. **SHIPPED S238 — `isRelevant` drop made visible.** The reasoning pass no longer hard-drops
+   off-topic Track-B candidates; they are kept, tagged `aiFlaggedNotRelevant`, sorted last
+   (server + Workbench re-rank), shown with a warning in both clients, and reported by name.
+   Restores the surface-don't-silently-exclude posture (8b).
+3. **SHIPPED S238 — Track-B `<3`-pubs is now a warning, not a silent drop.**
+   `DiscoveryService.partitionByPublicationBar` keeps under-bar candidates (tagged
+   `lowPublicationCount`) and surfaces them instead of filtering them out; qualified (`>=` MIN)
+   candidates keep priority for the identity-resolution budget, low-pub ones are appended after
+   and resolved only if budget remains. Both Find clients render a "Few publications found"
+   warning. Motivated by dedup undercount (a preprint + its published version collapsing to one
+   can push a real reviewer under the bar) [Justin, S238]. Regression test in
+   `tests/unit/discovery-track-b-identity.test.js`.
+4. **(Optional, lower priority) Count→name reporting for the OTHER Track-B silent drops** (dedup,
+   cross-field contamination) for staff auditability. **NOT** institution-COI — that hard drop is
+   policy-correct and stays [Justin, S238].
+
+### 8d. Open — Codex's prior-review caveats on this doc (reconcile when building)
+
+From the S238 Codex review of §1–§7 (treat as a build-time rigor check, per the "Codex informs
+rigidity once we build" stance): §4's OpenAlex "**DISQUALIFIED**" needs a **role-scope
+qualifier** (it is disqualified as *metric ground-truth*, but the redesign plan endorses
+OpenAlex+ORCID as the cross-field **spine** for presence/seeding — §5's own role principle);
+"the confound **dissolves**" for PubMed+iCite+MeSH is overstated (at most "calibrated", and the
+plan still lists richer-XML/MeSH/ORCID parsing as prerequisites); and the Silva et al. specifics
+(Infomap, the one-paper dominance finding, the quality-ceiling rating) are **unverified against
+the actual paper** — treat as external evidence pending source review, not settled authority.
+
+### 8e. Lock before building (Codex S238 — its rigidity informing the build, not the discussion)
+
+Codex independently verified §8c against source (confirmed the binary coauthor flag and the
+silent `isRelevant` drop; surfaced the Track-B gauntlet I'd missed) and judged §8a/§8b reasoning
+**sound** (recall-over-precision correctly scoped, §3 re-pricing coherent, snowball/two-axis
+clean). The over-recusal premise it flagged as **plausible-but-unverified domain reasoning** — fine
+as direction, but pin the specifics before they become thresholds/UX. The four forks to settle
+**before** writing code (each changes API-response shape, UI sections, and staff auditability):
+
+1. **Disposition model for COI candidates.** Current code mixes hard removal, flags, and
+   read-only unresolved states. SETTLED: hard-drop proposal-authors AND same-institution (policy,
+   §8c) [Justin, S238]. Still to decide: co-authorship COI → graded retained status; batch-relative
+   "held out initially, recoverable later" for the *recoverable* kinds only.
+2. **`isRelevant` handling — RESOLVED S238 (8d fix 2):** chose down-rank-and-flag (kept, sorted
+   last, warned, names streamed) over hard-drop / separate bucket.
+3. **Track-B pre-reasoning filters** (excluding institution-COI = settled policy, and `<3` pubs =
+   FIXED S238 → warning). The remaining silent filters (dedup, cross-field contamination) still
+   remove real retrieved candidates. Decide: keep as hard gates *with named audit output*;
+   convert to retained low-confidence candidates; or apply only after a staff-visible status.
+4. **Coauthor-COI grading thresholds — RESOLVED S238 (8d fix 1):** v1 grades on max shared papers
+   with one author (≥3 = 'likely'/red, 1-2 = 'possible'/amber). Recency / author-position /
+   list-size deferred (the co-author search doesn't fetch them yet).
+
+Items 1 and 3 remain the build-time rigidity points — settle them when that work starts.
+
+### 8f. Track-B activity-signal flaw (the "h-index 61 vs 2 publications" paradox) — CONFIRMED, fix scoped
+
+`[VERIFIED via source + Codex adjudication, S238]` Triangulated three independent ways
+(the live paradox below, Codex's line-level code adjudication, and the funnel math) — this
+is a real structural flaw, not a shifting read.
+
+**The paradox.** On request 1002794 (physics), a confirmed-identity Olga Smirnova
+(h-index 61, ~14k citations) surfaced flagged `lowPublicationCount` with **"2 publications"**,
+ranked **28th**. Reconciliation: the two numbers measure different things — h-index is a
+career bibliometric (display only; ranking excludes it, `relevance-score.js`), while
+"2 publications" is the size of the candidate's `publications[]` array, which for Track-B is
+built **from this run's keyword-search hits**, not the author's corpus.
+
+**The origination funnel (verified).** One proposal *narrative* (e.g. `ProjectDescription.pdf`)
+→ **one overloaded Claude call** (`createAnalysisPrompt`, `shared/config/prompts/reviewer-finder.js`)
+that emits metadata + reviewer names + PART-3 `searchQueries` together → ~3 queries per source,
+each **3–6 words**, "methods/organisms/phenomena/systems", no author names → each query fetches
+the **top 50** recent papers (`searchPubMed`, 5-yr `pdat` filter) → each paper mints **one**
+candidate from a **single author position** (PubMed/arXiv = last author `discovery-service.js:1149-1164,1210`;
+bioRxiv/chemRxiv = corresponding/first `:1278,1341`) with `publications: [that one paper]` →
+dedup merges by author (`deduplication-service.js:192,228`, no preprint/DOI dedup at the merge).
+
+**The funnel math (the operator's point, S238).** ~3 queries × top-50 × single-author-position
+≈ up to 150 author-instances; in a *busy* field those are mostly **distinct** people, so the
+expected per-author count is **~1**. Empirically on 1002794 (run-specific — the exact split
+varies run to run, which is itself the nondeterminism finding): the great majority of discovered
+candidates were flagged `<3` (≈75–80 of ≈83–85 across two runs, most with exactly 1 paper); only
+a handful cleared `MIN_PUBLICATIONS=3`. So the `≥3` bar — intended as an
+"active researcher" filter — actually measures **query-result concentration**, which is near-zero
+for almost everyone. It fails in *both* directions: it buries real leaders who matched only one
+facet as senior author, and the few who clear it are senior-/prolific-lab authors matching
+multiple query facets (a senior-bias signal, not a best-reviewer signal).
+
+**Two root mechanisms (Codex precisions applied):**
+1. **Wrong instrument.** Track-B `publications.length` = query coverage, not productivity <!-- drain-table:ignore reason=candidate-field-not-pg-table -->
+   (`partitionByPublicationBar`, `discovery-service.js:~274`).
+2. **Wrong ordering — and the *flag* is not what buries her.** The burial is driven by a low,
+   *finite* `publicationCount5yr` flowing into the recency scorer (`deduplication-service.js:229`,
+   `relevance-score.js:50,111`); the `lowPublicationCount` flag is a *parallel* symptom of the
+   same root, not the cause. Both are computed from the search hits **before** identity resolution
+   (`:294`) and the OpenAlex works backfill (`:348`). Backfill then can't fix it: it targets only
+   candidates with an OpenAlex id **and empty `publications`** (`:414,417`) — a 2-hit candidate is <!-- drain-table:ignore reason=candidate-field-not-pg-table -->
+   not a target — and only sets `publicationCount5yr` when `!Number.isFinite` (`:440`), but dedup
+   already set a finite low value (`deduplication-service.js:229`). Nothing re-evaluates either
+   field after `confirmed` identity (`:945`).
+
+**Principle (DECIDED).** Once an identity is resolved to `confirmed`/`probable` against
+OpenAlex/ORCID, the activity/standing signal must come from **that resolved author's real recent
+corpus**, never from incidental keyword-hit counts.
+
+#### Fix scope
+
+**Part 1 — Activity-from-resolved-corpus (near-term, in-pipeline; the higher-leverage change).**
+After `resolveTrackBIdentities`, for every `confirmed`/`probable` Track-B candidate with a resolved
+OpenAlex/ORCID author id:
+- **Widen the backfill target** (`backfillOpenAlexPublications`) from "empty `publications` only" <!-- drain-table:ignore reason=candidate-field-not-pg-table -->
+  to "any confirmed/probable candidate", and have it **overwrite** `publicationCount5yr` from the
+  resolved author's real recent (≤5-yr) works — not just fill when absent. (Both the target
+  condition `:414,417` and the `!Number.isFinite` guard `:440` must change for this path.)
+- **Re-evaluate `lowPublicationCount` after resolution**: clear it when the *real* recent-works
+  count ≥ threshold; keep it (now meaningful) when the real corpus is genuinely thin.
+- **Stop gating/flagging confirmed identities on the search-hit count.** For *unresolved*
+  candidates the search-hit count is the only signal we have — keep surfacing them as a warning
+  (Fix #1 behaviour) rather than dropping.
+- **Sequencing complication (must address):** identity resolution is capped at
+  `TRACK_B_IDENTITY_RESOLUTION_LIMIT=25` and the *pre-resolution* ranking that selects which 25 to
+  resolve uses the same broken search-hit signal — so a heavyweight with 1 hit can be **deferred
+  and never resolved**, and Part 1's repair never reaches them. Options: raise/elastic cap; select
+  for resolution by a signal other than hit-count (e.g. resolve all distinct authors with any
+  topical match, budget permitting); or resolve-then-rank in passes. Decide before building.
+- **Risks/verify:** more OpenAlex calls (bounded by candidate count — check latency budget);
+  overwriting `publicationCount5yr` shifts rankings broadly → validate on a sample that the
+  heavyweights rise and nothing good regresses (reuse the smoke + overlap harness,
+  `scripts/smoke-discover-dispositions.mjs`).
+
+**Part 2 — Origination ceiling (redesign-scope; a post-resolution patch CANNOT fix this).**
+PubMed/arXiv mint only last authors and bioRxiv/chemRxiv only corresponding/first, so a heavyweight
+who is not in those positions in any returned paper is **never minted as a candidate** in that run
+— and the 3–6-word query crowd is large and surface-biased. This is the §4.4 author-extraction rule
+(take **all** authors) and the §4.1/§4.5 retrieval redesign (field-routed sources + cited-reference
+lane + decomposed, non-overloaded query generation). Part 1 raises the ceiling for people who *do*
+get minted + resolved; Part 2 is what gets the right people minted in the first place.
+
+**Not in scope here** (tracked separately): the initial-only coauthor-COI namesake bug (the
+"Jian Wu / 10 papers" false COI, §8c / §5.1) — a different defect in the COI search, not the
+activity signal.
+
+---
+
+## Quick decided / deferred / retracted index
+
+**DECIDED (apply now):**
+- Primer = neutral, accurate, mainstream field map (§1).
+- Primer quality bar = useful + honest, not load-bearing (§2).
+- Applicant-suggested-reviewer exclusion is load-bearing (§2).
+- Source gated by role, not type; provenance records role (§5).
+- Mitigate single-source capture via proportional cluster sampling + multi-seeding (§6).
+- Recall over precision; review is a floor/gate not a ranker (10-yr retrospective, §8a).
+- Collective seed *spread* is non-relaxable (snowball entrenches it); precision is (§8a).
+- Two-axis fit (questions + methods) = spread floor + cheap eval anchor (§8a).
+- COI: hard-drop the permanent policy conflicts (proposal-authors, same-institution); flag/surface the rest; soft-flag inferred/borderline (never gate); batch-relative retain-with-status for the recoverable kinds (§8b).
+- Co-authorship is graded (count/position/recency/list-size); binary flag harms methods-axis recall (§8b).
+- The cheap two-axis spread check is NOT optional in the first shadow run (re-prices §3, §8a).
+- Track-B activity signal must come from the RESOLVED-identity real corpus, never search-hit counts; the `MIN_PUBLICATIONS≥3` bar measures query-result concentration (CONFIRMED flaw, fix scoped, §8f).
+
+**DEFERRED (optional, later):**
+- The coverage/bias metric, narrowed to "spread across competent sub-communities" (§3).
+- Citation substrate, per-field: PubMed + iCite/MeSH for biomedical, directional elsewhere (§4).
+
+**RETRACTED (do not reintroduce):**
+- Instructing the primer to surface/editorialize divergent perspectives (§1, §2).
+- "Find the rare premise-challenging reviewer" as a system objective (§2).
+- OpenAlex (or any single graph) as the metric's required ground-truth backbone (§4).
+- The framing that Silva et al.'s objective is the opposite of ours (§6).

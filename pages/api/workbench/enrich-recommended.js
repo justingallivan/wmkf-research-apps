@@ -400,7 +400,9 @@ export default async function handler(req, res) {
         if (!unconfirmedMatch && c.suggestionId && (c.hasInstitutionCOI || c.hasCoauthorCOI)) {
           let reason = 'Recommended by applicant (legacy reviewer slot).';
           if (c.hasInstitutionCOI) reason += ' [Institution COI: Same institution as proposal PI]';
-          if (c.hasCoauthorCOI) reason += ' [Coauthor COI: Has co-authored with proposal authors]';
+          if (c.hasCoauthorCOI) reason += c.coauthorCOIStrength === 'possible'
+            ? ' [Possible coauthor overlap: shared paper(s) with proposal author(s) — may be incidental]'
+            : ' [Coauthor COI: Has co-authored with proposal authors]';
           try {
             await reviewerSuggestionAdapter.setMatchReason(c.suggestionId, reason, { actingUserSystemId });
           } catch (err) {

@@ -1,117 +1,133 @@
-# Session 237 Prompt: Reviewer field-aware verification + manual add/ORCID + regression fix shipped
+# Session 240 Prompt: Reviewer-origination — validated multi-lane direction (NOT-YET to build)
 
-## Session 236 Summary
+> ⚠️ **PARALLEL WORK STREAM (active, added 2026-06-10).** A separate session (Claude or
+> Codex) is working **reviewer onboarding** on its own branch/worktree — do **not** touch
+> it from this main tree:
+> - **Branch:** `feat/reviewer-onboarding-no-bill-this-cycle` · **Worktree:**
+>   `/Users/gallivan/Code/WMKF_onboarding` (own checkout; `node_modules` + `.env.local`
+>   symlinked, so no `npm install`). Launch that session with cwd = the worktree so it
+>   can't switch this tree's branch (it did, accidentally, via Codex on 2026-06-10).
+> - **Status:** 1 commit (`4110c41`, deferred-bill onboarding impl + phone +
+>   `docs/REVIEWER_ONBOARDING_FLOW_MOCKUP.md`) ahead of `main`, 27+ behind; **no PR**;
+>   drop-onto-`main` was conflict-free (merge-tree clean) but **not yet reviewed/CI'd** →
+>   land via a **reviewed PR**, not a fast-forward to prod-`main`.
+> - **Ownership split:** the onboarding session owns its branch (`lib/bill/*`,
+>   `external/review/*`, `Stage2aView`, the mockup doc). **This main session owns `main`
+>   (reviewer-ORIGINATION work) AND shared repo-wide files** — `MEMORY.md`,
+>   `SESSION_PROMPT.md`, `package.json`, `docs/CANONICAL_COUNTS`/fact docs. See
+>   `.claude/skills/agent-coordination` + `docs/AGENT_COLLABORATION_PLAN.md`.
 
-A long session, all shipped to `main` (auto-deploys to prod). Two arcs ran the full Codex loop
-(design → pre-impl → impl → post-impl); a third was a live-testing-driven regression caught and
-fixed same session.
+## Session 239 Summary
+
+All on `main` (auto-deploys to prod). S238 ended by preparing a **rescue dossier** worried
+we were circling — patching candidate *handling* while *origination* stayed broken. S239
+took the rescue verdict, **empirically validated the origination diagnosis with three
+read-only probes + two independent Codex passes**, and landed a **safety-reviewed
+validated-direction strategy** (design only — **NOT BUILT**).
 
 ### What Was Completed
 
-1. **Reviewer-search UI fixes** (`38bf9ab`) — two PD-reported issues on a physics search:
-   the "Unverified suggestions" label hardcoded "PubMed couldn't confirm these" (relabeled
-   database-neutral); a Claude suggestion that *also* verified from a DB search appeared under
-   BOTH headings (added `unverifiedToShow` dedup — the verified row wins). `ReviewerSearchSection.js`.
+1. **Rescue verdict verified, not trusted.** The fresh-model rescue review (it agreed
+   origination is the diseased layer but pushed *grounded* over the full redesign) made
+   live-checkable claims — I verified them: OpenAlex Frebel canonical record = **323 works**
+   (the "6" was a name-search stub artifact), and author-aggregation returns real ranked
+   people. Corrected the plan's stale §2.3/§6 "OpenAlex disqualified/metrics-unreliable"
+   claim (`3dbd3f9`).
 
-2. **Field-aware Track-A verification** (`d03e09a` + post-impl `c6ba84b`; spec `2788ae2`; memory
-   `7c17d71`, `02182d3`) — the big arc. Root cause of #1: Track-A verification of Claude's named
-   suggestions was **PubMed-only**, so non-biomedical (physics/chem/CS) suggestions all failed.
-   - **Change 1:** new `DiscoveryService.suggestionVerifierRouting()` routes clearly-non-biomedical
-     proposals to the OpenAlex/ORCID spine instead of PubMed. `pubMedVerificationContract` left
-     field-UNAWARE so the coauthor-COI gate at `discover.js:244` is untouched (Codex E.2 catch).
-   - **Change 2:** forename-gate the spine promotions (was ungated). **NOTE: this Change 2 caused
-     the regression in #4 — see below; its gate semantic was fixed later this session.**
-   - **Post-impl fix:** spine-verified candidates now carry `affiliationHistory` (from ORCID
-     employments) so former-institution COI still fires (Codex CHECK 4).
-   - Side-effect logged: `evaluateCrossFieldNamesakeGuard` is now inert for physical/eng proposals
-     → parked in new `project-deferred-code-cleanup` backlog memory (retire later, verify callers).
+2. **Probe #1 — grounded-origination** (`scripts/probe-grounded-origination.mjs`, `3bd5b90`).
+   Measured the **disease**: ~92–98% of surfaced candidates are **keyword-reconstructed**
+   (Track-B `query_seed`), domain-independent; pure hallucination (`barred_parametric`) ≈ **0**.
+   Recall gap: a grounded person-level query recovers real leaders the keyword crawl misses
+   (Corkum/Krausz physics; Muir chem-bio; Samson DNA-repair). Findings doc `63db72a`.
 
-3. **Manual reviewer add → ORCID lookup** (`d8a6bd9`, `8c19b0a`, `42aa9fe`) — **NOT Codex-reviewed
-   (self-reviewed only); pending next session (see top of S236 prompt / the note still applies).**
-   - Reviewed + committed Codex's Phase-1 manual add (`d8a6bd9`): new `/api/workbench/manual-reviewer`,
-     `ensureStaffManualCandidate` adapter (idempotent, source-union, fail-closed on excluded, reselect).
-   - Renamed "Add reviewer" → "Manually Add New Reviewer", moved below search / above verify via a
-     `manualAddSlot` passed into `ReviewerSearchSection` (`8c19b0a`).
-   - **ORCID lookup** (`42aa9fe`): new read-only `/api/workbench/orcid-lookup` reusing
-     `ORCIDService.findContact` (name-match-gated, abstains on ambiguity); "Find ORCID" button +
-     ORCID field on the form; a staff ORCID is persisted **fill-only** via `upsertByPotentialReviewer`
-     (never overwrites resolver/attested ORCID, never touches `wmkf_identitystatus`). Open question
-     for review: fill-only vs allow staff *correction*; ORCID search uses name+affiliation, not email.
+3. **Codex falsification pass (origination verdict)** → **SURVIVE-WITH-CAVEATS**. Its one
+   correct structural catch: "guess" over-loaded the word — adopted as
+   **"keyword-reconstructed"**. Key reframe (Justin): the disease is the keyword *MECHANISM*
+   (paper-match + 1-author minting), **not** LLM keywords — keyword→author-*aggregation* is fine.
 
-4. **Forename-gate REGRESSION fix (Keller/Sang)** (`b2245d0` + Codex follow-up `28a764d`) — a PD
-   flagged two proposal-named physics reviewers (Ursula Keller, Robert Sang) coming back UNVERIFIED
-   (0 pubs, no email) though previously verified. Live spine probe proved cause: Change 2's gate
-   (`forenameAgrees !== false`) treated OpenAlex initial-only records ("U. Keller", "R. T. Sang")
-   as "wrong forename" and demoted confirmed→unresolved despite affiliation_match[strong] +
-   orcid_employment_corroborated[strong]. **Fix:** gate on a forename **contradiction** (both full
-   AND different — the "Alfred vs Alain" signature), not initial-only. New `forenamesContradict()`;
-   resolver gates `:172`/`:175` on `forenameContradicts !== true`. The `:188` employment-only path
-   (no affiliation_match) keeps strict `forenameAgrees === true`. Codex review: SHIP (hazard not
-   reopened). Live spine now returns `confirmed` for both.
+4. **Probe #2 — Tier-3 applicant trail** (`scripts/probe-applicant-trail-origination.mjs`,
+   `fef704b`→`3ad8eb9`). Justin's key inputs drove two findings:
+   - **PI identity is STRUCTURED + free:** `akoya_request._wmkf_projectleader_value` → a
+     `contact` carrying `wmkf_orcid` → **exact** OpenAlex (no namesake). Supersedes LLM
+     extraction (which misresolved "Wen Li" → "Yanping Li"). [[project-reviewer-pi-identity-structured]]
+   - **OpenAlex MERGES same-name authors** → use the **ORCID works list** as the corpus,
+     not the author cluster (rescued Wen Li: chemistry blob → Keller/Corkum/Krausz).
+     [[project-openalex-merge-use-orcid-works]]
+   - 3-request map: continuing-line **WIN** (Albanese, Wen Li post-fix); **pivot** (Ted Abel,
+     novel DNA-repair hypothesis) covered by **peer-groups + topic-aggregation** (the
+     narrative names "Madabhushi and Tsai"), not the PI-trail.
+
+5. **Validated-direction strategy §12** in `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md`
+   (`f842d63`). **Multi-lane harvesters** (cited-DOI · PI-trail · peer-groups ·
+   topic-aggregation); **coverage = union, confidence = convergence ON IDENTITY (shared
+   ORCID / exact work authorship), never on a name**.
+
+6. **Codex strategy-doc review (2 passes)** → **NOT-YET**; safety corrections applied
+   (`ed72b6a`, `8c60585`): retired the unsafe name-convergence claim; scoped ORCID-works
+   tradeoffs + inert fallback; COI is broader than the trail (advisor/advisee +
+   all-time-collaborator have **no gate today** = net-new); named the integration seams.
+
+7. **Memories captured** (`af2662e`): [[project-reviewer-origination-multilane]] +
+   the two gotcha files above. **Parallel onboarding worktree** set up (banner ↑).
 
 ### Commits (all on `main`, pushed)
-- `38bf9ab` UI label + dedup · `2788ae2` design spec · `d03e09a` Change 1+2 · `c6ba84b` COI fix
-- `7c17d71` memory · `02182d3` cleanup-backlog memory
-- `d8a6bd9` manual add (Codex, reviewed) · `8c19b0a` rename/reposition · `42aa9fe` ORCID lookup
-- `b2245d0` forename-gate regression fix · `28a764d` Codex follow-up coverage
+- `0de146f` drain-table fix · `3bd5b90` probe#1 · `63db72a` findings · `3dbd3f9` §2.3 fix ·
+  `f1815de` review-request · `fef704b`/`3ad8eb9` probe#2 (Tier-3 ORCID) · `f842d63` §12 ·
+  `ed72b6a`/`8c60585` Codex safety fixes · `af2662e` memories · `acebec8` parallel-stream pointer
 
 ## Potential Next Steps
 
-### 1. Codex review of the manual-add / ORCID work (PENDING — promised)
-`42aa9fe` (ORCID lookup, new route + identity persistence) and `8c19b0a`. Focus: the fill-only vs
-staff-correction persistence policy; ORCID search not using email. Run the Codex post-impl loop.
+### 1. Reviewer-origination — the NOT-YET build work (primary)
+Per Codex, the **doc-level safety items are cleared; what remains is design/implementation.**
+In rough leverage order:
+- **Quick win, broad benefit:** wire the **structured-ORCID PI identity** (request Project
+  Leader → contact `wmkf_orcid`) into the live pipeline — it improves PI exclusion + COI
+  everywhere, not just the trail. Add an OpenAlex call to `lib/services/openalex-service.js`
+  (ORCID→author, ORCID works list); do **not** promote probe raw-`fetch` code as-is.
+- **Identity-equality corroboration** — how lanes prove "same person" (shared ORCID / exact
+  work authorship); never name overlap. The ranking layer counts corroboration only at
+  identity level.
+- **Two net-new COI gates** — advisor/advisee + all-time-collaborator (today prompt-text only).
+- **Peer-group parsing lane** (designed, unbuilt) — extract "Peer Groups: X and Y" → resolve
+  each to a specific identity before promotion.
+- **Facet generation** — broader/atomic queries (5-word MeSH strings → OpenAlex corpora of 0–20).
+- Wire all lanes INTO `discover()` / `reviewer-provenance` / `save-candidates` / Workbench —
+  not a parallel pipeline.
+Canonical design: `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md` §12. Read
+[[project-reviewer-origination-multilane]] first.
 
-### 2. Confirm the regression fix in the real flow
-Re-run a physics reviewer search and verify Keller / Sang come back **verified with pubs+email**.
-The initial-only over-block likely hit other good reviewers too since Change 2 shipped — not just
-those two. `npm run smoke:reviewer-contact` for the broader contact battery.
+### 2. Carryover (still open from S238)
+Manual-add dedup **write path** never live-smoked (PR #21); applicant-exclusion breadth
+policy (`project-applicant-exclusion-policy-pending`); combined Phase I+II PA doc-assembly.
 
-### 3. Deferred cleanup backlog
-`[[project-deferred-code-cleanup]]` — retire the now-inert `evaluateCrossFieldNamesakeGuard`
-(verify no live caller first). Read at the start of any cleanup session.
-
-### 4. Carryover from S235 (still open)
-Smirnova sparse-affiliation selection-collision (hard); sticky-`confirmed` discrepancy
-reconciliation ([[project-reviewer-self-report-orcid-sticky-confirmed]] vs spine emitting confirmed).
-
-### 5. Broader direction (NOT this arc)
-Reviewer-finder RETRIEVAL REDESIGN ([[project-reviewer-finder-retrieval-redesign]]); the field-aware
-routing shipped this session is a compatible interim step that reduces the physics-recall cliff.
-
-## Standing context / guardrails
-- **`main` auto-deploys to prod on push. Commit/push only when asked. Stage by explicit path.**
-  `npm run build` green before pushing — Codex CANNOT run build/jest; run them yourself.
-- **Delegating to Codex = isolated git worktree off HEAD → commit first**
-  ([[feedback-commit-before-delegating-to-worktree-agent]]). Pass a self-contained prompt; embed
-  uncommitted spec text inline if it isn't committed yet.
-- **No backticks in `git commit -m "…"` (double-quoted bash runs them as command substitution and
-  mangles the message).** Use single quotes, or avoid backticks.
-- Identity principles: **identity-confirmed ≠ contact-validated; anchor-or-abstain**
-  ([[project-reviewer-contact-enrichment-anchoring]]); the spine is **fail-dangerous** — abstains
-  rather than mis-verify ([[project-reviewer-verify-fail-dangerous]]). **Forename gate = block a
-  CONTRADICTION (both full + different), not an initial-only record (S236 lesson).**
-- Keep the Codex loop: spec → design review → implement → post-impl review → reconcile → merge.
+## Loose ends / gotchas
+- `main` auto-deploys to prod on push. No backticks in `git commit -m` (use a message file).
+  Codex runs in an ISOLATED worktree off HEAD → commit before delegating.
+- **Probe result files are gitignored** (`smoke-results-*.txt`); the probes are read-only +
+  reproducible (each makes ≤2 paid LLM calls / public API calls; Tier-3 probe is LLM-free).
+- **Identity-equality safety rule** is load-bearing: two lanes agreeing on a NAME is not
+  identity proof — would reintroduce the wrong-email/affiliation failure the save-path
+  force-null gate exists to prevent. See [[project-reviewer-verify-fail-dangerous]].
+- Router `MEMORY.md` is slightly over its soft byte target (under the hard cap) — a trim
+  pass is due eventually.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/services/discovery-service.js` | `suggestionVerifierRouting` (field-aware Track-A), `pubMedVerificationContract` (COI gate, field-unaware), `mapSpineVerificationResult`. |
-| `lib/services/reviewer-identity-evidence.js` | `forenameFullyAgrees`, `forenamesContradict` (both in `_internals`), `buildAnchors`, spine selection. |
-| `lib/services/reviewer-identity-resolver.js` | `classifySpineEvidence` — `:172/:175` forename-contradiction gate; `:188` employment-only strict gate. |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | `ensureStaffManualCandidate` (manual add). |
-| `lib/dataverse/adapters/researcher.js` | `upsertByPotentialReviewer` (fill-only ORCID/metrics writer). |
-| `pages/api/workbench/manual-reviewer.js` | Manual add endpoint (+ fill-only ORCID persist). |
-| `pages/api/workbench/orcid-lookup.js` | Read-only ORCID lookup (reuses `ORCIDService.findContact`). |
-| `shared/components/reviewers/ReviewerFindPanel.js` | Manual-add form (state + `manualAddSlot`, ORCID lookup). |
-| `docs/REVIEWER_FIELD_AWARE_VERIFICATION_DESIGN.md` | Field-aware verification + forename-gate spec (incl. the regression history). |
-| `docs/REVIEWER_MANUAL_ADD_DESIGN.md` | Manual add Phase-1 design. |
+| `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md` | **Canonical** — §12 = validated multi-lane origination direction (+ Codex safety corrections) |
+| `docs/REVIEWER_FINDER_ORIGINATION_PROBE_FINDINGS.md` | Probe #1 disease-metric + recall-gap writeup |
+| `docs/REVIEWER_FINDER_REVIEW_REQUEST.md` | Handoff prompt for a fresh model to review the direction |
+| `scripts/probe-grounded-origination.mjs` | Read-only: disease metric + topic-aggregation + reference lane |
+| `scripts/probe-applicant-trail-origination.mjs` | Read-only, LLM-free: PI-trail via structured ORCID + ORCID-works |
+| `.claude-memory/project-reviewer-origination-multilane.md` | The validated direction (router entry) |
 
 ## Testing
-
 ```bash
-npx jest reviewer discovery identity contact provenance save manual-reviewer orcid-lookup
-npm run build
-npm run smoke:reviewer-contact                 # live + offline contact-anchoring battery
+# Read-only origination probes (reproducible):
+node --import ./scripts/lib/use-extensionless.mjs scripts/probe-grounded-origination.mjs --request 1002794
+node --import ./scripts/lib/use-extensionless.mjs scripts/probe-applicant-trail-origination.mjs --request 1002794   # LLM-free
+npx jest reviewer discovery suggestion disposition save-candidates search-logic   # reviewer battery
+npm run build && npm run lint                          # green before pushing
 # full startup gate set: see .claude/skills/start
 ```
