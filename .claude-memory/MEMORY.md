@@ -60,7 +60,7 @@
 - App access / auth / admin: project-app-access-control.md; project-admin-dashboard.md; project-api-credit-monitoring.md
 - Security (A7 prompt-injection hardening): project-a7-prompt-injection-hardening.md
 - Virtual Review Panel: project-virtual-review-panel.md
-- Dev environment / secrets: project-dev-environment.md; project-vercel-sensitive-env-pull-empty.md
+- Dev environment / secrets (Vercel deploy = CLI only, no git-integration → preview-auth gotcha): project-dev-environment.md; project-vercel-sensitive-env-pull-empty.md; project-vercel-cli-deploy-preview-auth.md
 - Claude config (~/.claude) git-synced across home/office, auto-pulls on launch: claude-config-git-sync.md
 - Local build + git gotchas: local-jest-build-environment.md; env-broken-git-autogc.md
 - Strategy / system model: project-system-model.md; project-strategy-direction.md
