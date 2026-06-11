@@ -194,6 +194,22 @@ describe('resolveProposalPI', () => {
     await expect(resolveProposalPI(GUID, { signal: controller.signal })).rejects.toBeTruthy();
   });
 
+  // Codex re-review: a budget firing ALONGSIDE a non-abort Dynamics read error must
+  // NOT be masked by the inert request_read_failed/contact_read_failed return.
+  test('rethrows the abort when the signal fired and the Dynamics read also errored (non-abort)', async () => {
+    const controller = new AbortController();
+    controller.abort(Object.assign(new Error('budget'), { code: 'reviewer_time_budget_exceeded' }));
+    DynamicsService.getRecord.mockRejectedValue(new Error('dataverse 500')); // non-abort error
+    await expect(resolveProposalPI(GUID, { signal: controller.signal })).rejects.toBeTruthy();
+  });
+
+  test('does not throw at entry when the signal is not aborted', async () => {
+    const controller = new AbortController();
+    mockDynamics({ request: { akoya_requestid: GUID }, contact: null });
+    const out = await resolveProposalPI(GUID, { signal: controller.signal });
+    expect(out).toEqual({ resolved: false, reason: 'no_project_leader' });
+  });
+
   // Codex post-impl #3 / pre-impl #3: the ORCID-registry name is a SECOND guard.
   test('ABSTAINS when the ORCID-registry name contradicts even if OpenAlex name matches', async () => {
     const prevId = process.env.ORCID_CLIENT_ID;
