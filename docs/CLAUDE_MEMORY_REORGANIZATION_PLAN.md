@@ -354,6 +354,15 @@ Suggested new lightweight check:
 - Every linked `.md` file in `MEMORY.md` must exist.
 - Every active topic file should have `metadata.status`.
 
+> **Implemented + hardened (2026-06-10).** This suggested check became
+> `scripts/check-memory-router.js`, which is now the authority over the
+> thresholds above. It hard-caps `MEMORY.md` at **12KB** (the old 12KB comfort
+> target was promoted from warn-only to a hard failure; the 18KB ceiling above is
+> retained only as an unreachable legacy constant), still enforces the 150-line
+> cap, and additionally fails any `- ` router entry whose prose (file refs
+> stripped) exceeds 200 chars — pushing dense domain detail into the agent wiki
+> (`docs/agent-wiki/`). Per `docs/MEMORY_ROUTER_WIKI_RECOMMENDATIONS_2026-06-11.md`.
+
 Do not block this reorganization on writing a perfect CI gate. The first deliverable is a better memory structure.
 
 ### Phase 6: Validate
@@ -370,7 +379,7 @@ node scripts/check-memory-drift.js --no-write
 Then manually verify:
 
 - Every linked memory file exists.
-- `MEMORY.md` is under 150 lines and 18KB.
+- `MEMORY.md` is under 150 lines and 18KB (the implemented gate now hard-caps at 12KB — see the Phase 5 note).
 - Top active routes point to current files.
 - Stale files are not in the task-routing hot path unless the line says they are closed/archive reference only.
 - No structural live-state claim is presented as memory-only ground truth.
@@ -407,7 +416,7 @@ Do not mix with app code changes.
 The reorganization is complete when all are true:
 
 - `.claude-memory/MEMORY.md` is a compact router, not a prose encyclopedia.
-- `MEMORY.md` is under 150 lines and 18KB.
+- `MEMORY.md` is under 150 lines and 18KB (the implemented gate now hard-caps at 12KB — see the Phase 5 note).
 - The startup index has clear routing for the major active domains:
   - reviewer workbench/lifecycle
   - reviewer identity/ORCID

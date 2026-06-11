@@ -1,6 +1,8 @@
 # Project Memory Router
 
 > Routing table, not the memory itself. Each line answers: "for THIS task, which 1–3 files do I read before acting?" Read the routed files **in full** before acting. Structural live-state (schemas, source-of-truth, read/write paths, drop status) lives in the **Atlas**, not here — memory is intent, lessons, and hazards. If memory conflicts with code / Atlas / a live probe, the probe wins → mark the memory `status: stale`.
+>
+> Domain detail (reviewer-finder, intake, Dynamics) now lives in the **agent wiki** — read the topic page FIRST, then the routed memory file(s): ../docs/agent-wiki/index.md
 
 ## Startup
 - Current handoff: ../SESSION_PROMPT.md
@@ -33,44 +35,24 @@
 - Stakeholder/email tone: feedback-stakeholder-email-tone.md; feedback-review-panel-tone.md
 
 ## Task Routing
-- Reviewer-finder EOD-S222 topics (#1 timeout + #2 recency/affiliation SHIPPED; #3 Perplexity web-discovery shipped S225–S227 then EVALUATED → ABANDONED S230): project-reviewer-finder-next-topics.md
-- Reviewer web-discovery / Perplexity reviewer-agent EVALUATED → ABANDONED S230 (verified hallucination of reviewers + affiliations; don't re-attempt ungrounded): project-reviewer-web-discovery-abandoned.md
-- Reviewer-finder RETRIEVAL REDESIGN direction (S231 — demote Claude generator → field-routed retrieval/fan-out; provenance model; OpenAlex+ORCID spine; reuse existing resolver+ranker; NOT BUILT): project-reviewer-finder-retrieval-redesign.md
-- Reviewer ORIGINATION multi-lane VALIDATED direction (S239 — cited-DOI / PI-trail / peer-groups / topic-aggregation; coverage=union, confidence=convergence ON IDENTITY not name; keyword MECHANISM was the disease not keywords; canonical ../docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md §12; NOT BUILT): project-reviewer-origination-multilane.md
-- Reviewer-finder PROPOSAL-DOC context (Phase I = thin signal, no bibliography → under-delivers; NEXT cycle combines I+II w/ bibliography — build a Power Automate flow to assemble ONE clean reviewer doc; + classifyFile demotes Phase-I bug): project-reviewer-finder-proposal-doc-context.md
-- Applicant EXCLUSION breadth = OPEN POLICY DECISION (needs foundation, not Justin alone): a PI can exclude the whole peer set with one soft "overlapping programs" line; it clobbers Claude's proposal-named signal; should the PD see excluded-but-suggested?: project-applicant-exclusion-policy-pending.md
-- Reviewer VERIFY fail-dangerous HAZARD (S231 — fabricated wrong-forename verified against real same-initial namesake; LARGELY CLOSED S235-S236: forename gates now on BOTH PubMed + spine verify paths; principle still a forward guard): project-reviewer-verify-fail-dangerous.md
-- Reviewer FIELD-AWARE verification (SHIPPED S236 — non-biomedical proposals verify Track-A via OpenAlex/ORCID spine not PubMed; pubMedVerificationContract stays field-UNAWARE to not break coauthor-COI gate; spine-verified must match PubMed candidate shape): project-reviewer-field-aware-verification.md
-- Reviewer CONTACT-enrichment namesake fix (S234 — identity resolution works; CONTACT/bibliometric enrichment was the locus; anchor-to-resolved-identity-or-abstain; identity-confirmed ≠ contact-validated; Fixes A–D merged S234; Fix E deferred-candidate gate + roster-marker persistence + server 422 shipped S235): project-reviewer-contact-enrichment-anchoring.md
-- Reviewer enrichment fan-out / SerpAPI budget (~15k/mo, cost not the limiter; LATENCY is — don't add per-candidate round-trips): project-serpapi-budget-latency.md
-- Reviewer Workbench / lifecycle: project-reviewer-apps-redesign-direction.md; project-reviewer-workbench-invite-workflow.md; project-reviewer-lifecycle.md
-- Find-tab durable roster + cross-run search dedup (SHIPPED S224; operational PG table, don't drop-carryover) + clearing/resetting a request's reviewers (use `scripts/reset-request-reviewers.mjs`, don't hand-roll): project-reviewer-find-roster.md
-- Reviewer identity resolver / ORCID: project-reviewer-identity-resolution.md; project-reviewer-identity-resolution-phase1.md; project-reviewer-self-report-orcid-sticky-confirmed.md
-- Reviewer PI identity is STRUCTURED (request Project Leader → contact wmkf_orcid → exact OpenAlex; NOT LLM-extracted) + OpenAlex MERGES same-name authors → use the ORCID works list as corpus: project-reviewer-pi-identity-structured.md; project-openalex-merge-use-orcid-works.md
-- Reviewer identity fragmentation (why the resolver exists): reviewer-identity-fragmentation.md
-- Reviewer lifecycle automation (cron/reminders) + address: project-reviewer-lifecycle-automation.md; project-reviewer-address-collection-provisional.md
+> Reviewer / intake / Dynamics lines carry a `→ wiki:<topic>` pointer — read that agent-wiki topic page before the routed memory file(s).
+- Reviewer origination / retrieval (multilane VALIDATED-not-built; web-discovery ABANDONED S230 don't re-attempt; recall>precision; recency>citations) → wiki:reviewer-origination: project-reviewer-origination-multilane.md; project-reviewer-finder-retrieval-redesign.md; project-reviewer-recall-over-precision.md; project-reviewer-web-discovery-abandoned.md; project-reviewer-finder-next-topics.md; project-reviewer-ranking-recency-over-citations.md
+- Reviewer proposal-doc context (Phase-I thin signal; combine I+II w/ bibliography next cycle): project-reviewer-finder-proposal-doc-context.md
+- Applicant EXCLUSION breadth = OPEN POLICY DECISION (one soft "overlapping programs" line can clobber the peer set; needs foundation): project-applicant-exclusion-policy-pending.md
+- Reviewer identity / ORCID / verify / contact-enrichment / structured-PI-identity → wiki:reviewer-identity: project-reviewer-identity-resolution.md; project-reviewer-identity-resolution-phase1.md; project-reviewer-self-report-orcid-sticky-confirmed.md; project-reviewer-pi-identity-structured.md; project-openalex-merge-use-orcid-works.md; reviewer-identity-fragmentation.md; project-reviewer-verify-fail-dangerous.md; project-reviewer-field-aware-verification.md; project-reviewer-contact-enrichment-anchoring.md
+- Reviewer COI policy (S240: hard-act only on proposal-authors + CURRENT same-institution; rely on self-disclosure; historical doesn't count) → wiki:reviewer-identity: project-reviewer-coi-rely-on-self-disclosure.md; project-reviewer-coi-concern-surfacing.md
+- Reviewer enrichment fan-out / SerpAPI budget (LATENCY is the limiter, not cost): project-serpapi-budget-latency.md
+- Reviewer Workbench / lifecycle / address: project-reviewer-apps-redesign-direction.md; project-reviewer-workbench-invite-workflow.md; project-reviewer-lifecycle.md; project-reviewer-lifecycle-automation.md; project-reviewer-address-collection-provisional.md
+- Find-tab durable roster + cross-run dedup (SHIPPED S224, don't drop-carryover; reset via scripts/reset-request-reviewers.mjs): project-reviewer-find-roster.md
 - Reviewer data model / migration: project-reviewer-postgres-to-dataverse-migration.md; project-reviewer-finder-dataverse-entry-path.md; project-appresearcher-collapse-post-pilot.md
 - Reviewer matching / institution / contacts: project-reviewer-institution-match.md; project-contact-promotion-permission.md; project-institution-foundation-liaison.md
-- Reviewer COI concern surfacing + former-institution COI + from-scratch test reset (S229): project-reviewer-coi-concern-surfacing.md
-- Reviewer COI PHILOSOPHY (S240 — hard-act only on self-evident policy conflicts: proposal-authors + CURRENT same-institution; rely on reviewer self-disclosure; NO PD-unverifiable soft flags; HISTORICAL institution doesn't count; narrows S229): project-reviewer-coi-rely-on-self-disclosure.md
-- Reviewer RECALL-OVER-PRECISION reframe (S238 — review is a floor/gate not a ranker; optimize coverage/spread, surface-don't-silently-drop, COI graded; canonical design in ../docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md Part C): project-reviewer-recall-over-precision.md
-- Reviewer RANKING (recency must outweigh citations/h-index): project-reviewer-ranking-recency-over-citations.md
 - Reviewer invariants (counts, history, excluded): project-reviewer-count-invariant.md; project-reviewer-history-data-quality.md; project-excluded-reviewers-often-in-pool.md
-- External reviewer flow / accept-decline / files: project-external-reviewer-file-access.md; project-reviewer-accept-decline-links.md; project-sharepoint-integration.md
-- Intake portal (scope + capture): project-intake-portal-skinny-scope.md; project-intake-portal-reviewer-capture.md; project-machine-legible-form-capture.md
-- Intake portal (auth + institution match): project-intake-portal-external-id-foundation.md; project-intake-portal-institution-match.md; project-dataverse-creator-privileges.md
-- Intake portal (pilot decisions + slice-0 + UI todos): project-intake-portal-pilot-decisions-2026-05-13.md; slice0-deactivate-not-delete-recalc.md; project-intake-portal-ui-todo.md
-- Intake virus-scan e2e (MUST before next cycle): project-intake-portal-virus-scan-e2e-deferred.md; project-virus-scanning-it-context.md; project-cloudmersive-advanced-endpoint.md
-- Dataverse schema / probes / OData: project-dataverse-schema-deploy-gotchas.md; project-dataverse-odata-null-filter.md; project-living-taxonomy-principle.md
-- Dynamics CRM facts (fields, lifecycle, temporal): project-akoya-request-pd-fields.md; project-grant-lifecycle-states-confirmed.md; akoya-temporal-axis-encodings.md
-- Dynamics CRM (users + email): project-dynamics-crm-users.md; project-dynamics-email.md
-- Dynamics CRM (OData limits + AI fields): project-dynamics-crm-limitations.md; project-dynamics-ai-writeback.md
-- Dynamics identity reconciliation / impersonation: project-dynamics-identity-reconciliation.md
-- Dynamics Explorer (core + schema): project-dynamics-explorer-details.md; project-dynamics-explorer-schema-diff.md
-- Dynamics Explorer (reuse direction + feedback-admin anti-rebuild): project-dynamics-explorer-reuse-power-tools.md; project-dynamics-feedback-admin-shipped.md
-- Dataverse Power Tools (find&fix + bulk export): project-dataverse-power-tools.md; dataverse-export-floor-scoping.md
+- External reviewer portal (accept/decline, tokens, files, E2E harness, prod-automation hazard) → wiki:external-reviewer-portal: project-external-reviewer-file-access.md; project-reviewer-accept-decline-links.md; project-sharepoint-integration.md; project-reviewer-accept-prod-automation.md; project-e2e-playwright-harness.md
+- Intake portal (scope/capture/auth/institution-match/virus-scan/pilot/UI) → wiki:intake-portal: project-intake-portal-skinny-scope.md; project-intake-portal-reviewer-capture.md; project-machine-legible-form-capture.md; project-intake-portal-external-id-foundation.md; project-intake-portal-institution-match.md; project-dataverse-creator-privileges.md; project-intake-portal-pilot-decisions-2026-05-13.md; slice0-deactivate-not-delete-recalc.md; project-intake-portal-ui-todo.md; project-intake-portal-virus-scan-e2e-deferred.md; project-virus-scanning-it-context.md; project-cloudmersive-advanced-endpoint.md
+- Dataverse / Dynamics (schema/probes/OData/Explorer/PowerTools/identity-reconciliation/sandbox) → wiki:dataverse-dynamics: project-dataverse-schema-deploy-gotchas.md; project-dataverse-odata-null-filter.md; project-living-taxonomy-principle.md; project-dynamics-crm-users.md; project-dynamics-email.md; project-dynamics-crm-limitations.md; project-dynamics-ai-writeback.md; project-dynamics-identity-reconciliation.md; project-dynamics-explorer-details.md; project-dynamics-explorer-schema-diff.md; project-dynamics-explorer-reuse-power-tools.md; project-dynamics-feedback-admin-shipped.md; project-dataverse-power-tools.md; dataverse-export-floor-scoping.md; project-dynamics-sandbox-state.md
+- Dynamics CRM facts (akoya request/PD fields, grant lifecycle, temporal): project-akoya-request-pd-fields.md; project-grant-lifecycle-states-confirmed.md; akoya-temporal-axis-encodings.md
 - Prompt / Executor work: project-prompt-storage-strategy.md; project-dynamics-as-prompt-ground-truth.md; project-pdf-processing-tiers.md
-- Reviewer-finder prompt → Dataverse migration (admin + per-user editing, SHIPPED S222): project-reviewer-prompt-dataverse-migration.md
+- Reviewer-finder prompt → Dataverse migration (SHIPPED S222): project-reviewer-prompt-dataverse-migration.md
 - BILL / honoraria: project-bill-honorarium-integration.md; akoya-request-honorarium-nomenclature.md; akoya-payment-field-semantics.md
 - No banking/PII in Dataverse (firm constraint): project-no-banking-pii-in-dataverse.md
 - App access / auth / admin: project-app-access-control.md; project-admin-dashboard.md; project-api-credit-monitoring.md
@@ -78,11 +60,8 @@
 - Virtual Review Panel: project-virtual-review-panel.md
 - Dev environment / secrets: project-dev-environment.md; project-vercel-sensitive-env-pull-empty.md
 - Local build + git gotchas: local-jest-build-environment.md; env-broken-git-autogc.md
-- Dynamics sandbox (NOT drop-in usable): project-dynamics-sandbox-state.md
-- Testing the reviewer-accept flow (real-prod accept CREATEs a honorarium akoya_request → fires AkoyaGo plugins + classic workflows + a live Bill.com payment flow + contact→Business-Central sync; gate real-prod on human PA review, MOCK the data layer for automated tests; read-only probe `scripts/probe-dataverse-automation.js`): project-reviewer-accept-prod-automation.md
-- Playwright browser-E2E harness for the reviewer portal (`tests/e2e/`, `npm run test:e2e`; mocks the data layer; runs against `next build --webpack && next start`, NOT next dev; CI-gated `.github/workflows/e2e.yml`): project-e2e-playwright-harness.md
 - Strategy / system model: project-system-model.md; project-strategy-direction.md
-- Root instruction file / hooks / rules / instruction-adherence (Codex writing enforcement harnesses next): project-claude-instruction-architecture.md
+- Root instruction file / hooks / rules / instruction-adherence: project-claude-instruction-architecture.md
 - Roadmap (historical snapshots — cross-check current strategy): project-app-roadmap-2026-04-25.md; project-phase-i-summary-app-winddown.md
 - Phasing / cycle scoping: project-grant-phasing-evolution.md; feedback-cycle-vs-executor-scope.md; feedback-concepts-vs-phase-i.md
 - Planned: review pipeline + proposal extracts: project-staged-review-pipeline.md; project-proposal-context-extraction.md
@@ -90,7 +69,7 @@
 - Planned: post-award + new AI capabilities: project-awardee-onboarding.md; project-new-ai-capabilities.md
 - IRS verify-EIN (code+data shipped, cron unfired, no consumer yet): project-irs-exempt-verification.md
 - Decision log: decision-module-typeless-warning-accept.md
-- Deferred code cleanup backlog (read at START of any cleanup/dead-code session; inert-but-not-yet-deleted code + safe-retirement preconditions; append here instead of deleting inline): project-deferred-code-cleanup.md
+- Deferred code cleanup backlog (read at START of any cleanup/dead-code session): project-deferred-code-cleanup.md
 
 ## User Context
 - Power Automate familiarity (Justin none / Connor moderate): user-powerautomate.md

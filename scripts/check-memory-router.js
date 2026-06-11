@@ -13,12 +13,19 @@
  * Hard failures (exit 1):
  *   1. MEMORY.md missing.
  *   2. MEMORY.md > MAX_LINES lines.
- *   3. MEMORY.md > MAX_BYTES bytes.
+ *   3. MEMORY.md > TARGET_BYTES bytes. (Hardened 2026-06-10: the old comfort
+ *      target is now a hard cap so router creep fails instead of warning. The
+ *      legacy MAX_BYTES ceiling is retained as an exported constant but is no
+ *      longer reachable — anything over TARGET fails first.)
  *   4. A `*.md` link in MEMORY.md does not resolve.
  *   5. A topic file (.claude-memory/*.md except MEMORY.md) is missing a
  *      `status:` frontmatter key, or has an unrecognized status value.
+ *   6. A `- ` router entry whose prose (file refs + separators stripped) is
+ *      longer than MAX_PROSE_LEN chars — a dense operational summary that
+ *      belongs in the agent wiki, not the router. File-ref lists are not
+ *      counted, so a line may route to many memory files.
  *
- * Soft warning (does not fail): MEMORY.md over the TARGET_BYTES comfort budget.
+ * No soft warnings remain: the byte budget is now enforced.
  *
  * Run with `--self-test` to exercise the validators against synthetic fixtures
  * (see check-memory-router-self-test.js, which shells out with that flag).
@@ -33,8 +40,9 @@ const MEM_DIR = path.join(__dirname, '..', '.claude-memory');
 const MEMORY_MD = path.join(MEM_DIR, 'MEMORY.md');
 
 const MAX_LINES = 150;        // hard cap (plan: stay below even after growth)
-const MAX_BYTES = 18 * 1024;  // hard cap 18KB
-const TARGET_BYTES = 12 * 1024; // comfort target (warn only)
+const MAX_BYTES = 18 * 1024;  // legacy ceiling (retained for API stability; unreachable — TARGET fails first)
+const TARGET_BYTES = 12 * 1024; // hard cap (hardened 2026-06-10; was warn-only)
+const MAX_PROSE_LEN = 200;    // per `- ` router entry, after stripping `.md` refs + separators
 const VALID_STATUS = new Set(['active', 'stale', 'closed', 'superseded']);
 
 /**
@@ -56,9 +64,25 @@ function validateStore(memDir) {
   const lines = raw.split('\n').length;
 
   if (lines > MAX_LINES) errors.push(`MEMORY.md is ${lines} lines (hard cap ${MAX_LINES}).`);
-  if (bytes > MAX_BYTES) errors.push(`MEMORY.md is ${bytes} bytes (hard cap ${MAX_BYTES}).`);
-  if (bytes > TARGET_BYTES && bytes <= MAX_BYTES) {
-    warnings.push(`MEMORY.md is ${bytes} bytes, over the ${TARGET_BYTES}-byte comfort target (still under the ${MAX_BYTES} hard cap).`);
+  if (bytes > TARGET_BYTES) {
+    errors.push(`MEMORY.md is ${bytes} bytes (over the ${TARGET_BYTES}-byte cap).`);
+  }
+
+  // Router-prose density: a `- ` entry whose prose (file refs + separators
+  // stripped) exceeds MAX_PROSE_LEN is a dense operational summary that belongs
+  // in the agent wiki, not the router. Long file-ref lists are NOT counted.
+  const allLines = raw.split('\n');
+  for (let i = 0; i < allLines.length; i++) {
+    const line = allLines[i];
+    if (!line.startsWith('- ')) continue;
+    const prose = line
+      .replace(/[A-Za-z0-9._/-]+\.md/g, '')
+      .replace(/[;:]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (prose.length > MAX_PROSE_LEN) {
+      errors.push(`MEMORY.md line ${i + 1} exceeds the ${MAX_PROSE_LEN}-char router-prose cap (prose ${prose.length}): move detail to the agent wiki.`);
+    }
   }
 
   // 4. Every *.md link in MEMORY.md must resolve (relative to memDir).
@@ -107,6 +131,6 @@ function main() {
   console.log(`memory-router OK — MEMORY.md ${Buffer.byteLength(raw, 'utf8')} bytes / ${raw.split('\n').length} lines; ${topicCount} topic file(s), all links resolve + all carry a valid status.`);
 }
 
-module.exports = { validateStore, MAX_LINES, MAX_BYTES, TARGET_BYTES, VALID_STATUS };
+module.exports = { validateStore, MAX_LINES, MAX_BYTES, TARGET_BYTES, MAX_PROSE_LEN, VALID_STATUS };
 
 if (require.main === module) main();

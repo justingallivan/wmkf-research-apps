@@ -1,7 +1,7 @@
 ---
 agent_wiki: index
 status: active
-last_verified: 2026-06-07
+last_verified: 2026-06-10
 stale_after_days: 90
 owner: agent-operations
 source_files:
@@ -32,7 +32,11 @@ This wiki is a compact retrieval layer for recurring agent work. It routes agent
 
 | Task trigger | Read first | Canonical follow-up |
 |---|---|---|
-| Reviewer identity, ORCID, affiliation, contact propagation, candidate persistence, ranking signals | [Reviewer Identity](topics/reviewer-identity.md) | `docs/APPLICATION_STATE_ATLAS.md`, `docs/atlas/dataverse-wmkf-potentialreviewers.md`, `docs/atlas/dataverse-wmkf-appreviewersuggestion.md` |
+| Reviewer identity, ORCID, affiliation, contact propagation, candidate persistence, ranking signals, **COI / PI identity** | [Reviewer Identity](topics/reviewer-identity.md) | `docs/APPLICATION_STATE_ATLAS.md`, `docs/atlas/dataverse-wmkf-potentialreviewers.md`, `docs/atlas/dataverse-wmkf-appreviewersuggestion.md` |
+| Reviewer origination / retrieval lanes, provenance, ranking posture, recall-vs-precision, web-discovery-abandoned | [Reviewer Origination](topics/reviewer-origination.md) | `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md`, `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` |
+| External reviewer portal, accept/decline, review tokens, E2E harness, prod-automation hazard, SharePoint files | [External Reviewer Portal](topics/external-reviewer-portal.md) | `docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md`, `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`, `tests/e2e/README.md` |
+| Intake portal: draft capture, submit, attachments, intake blob token, virus-scan, institution match | [Intake Portal](topics/intake-portal.md) | `docs/INTAKE_PORTAL_DESIGN.md`, `docs/atlas/dataverse-akoya-request.md` |
+| Dataverse / Dynamics: schema deploy, OData, probes, Dynamics Explorer, Power Tools, identity reconciliation | [Dataverse & Dynamics](topics/dataverse-dynamics.md) | `docs/APPLICATION_STATE_ATLAS.md`, `docs/atlas/dataverse-akoya-request.md`, `docs/DYNAMICS_SCHEMA_ANNOTATION.md` |
 
 ## Maintenance
 
