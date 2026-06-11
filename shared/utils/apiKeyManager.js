@@ -2,6 +2,11 @@ import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const SALT = 'api-key-salt';
+// GCM authentication tag length in bytes. Pinned so a caller cannot present a
+// truncated tag: without an explicit length, Node's setAuthTag accepts short
+// GCM tags (4/6/8/10/12/14/16 bytes), weakening forgery resistance. See
+// docs/security-audit/SECURITY_AUDIT_2026-06-11.md Phase 7.
+const AUTH_TAG_LENGTH = 16;
 
 function getSecretKey() {
   const key = process.env.API_SECRET_KEY;
@@ -26,7 +31,7 @@ export class ApiKeyManager {
     try {
       const key = crypto.scryptSync(getSecretKey(), SALT, 32);
       const iv = crypto.randomBytes(16);
-      const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+      const cipher = crypto.createCipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
 
       let encrypted = cipher.update(apiKey, 'utf8', 'hex');
       encrypted += cipher.final('hex');
@@ -53,15 +58,24 @@ export class ApiKeyManager {
   decryptFromClient(encryptedData) {
     try {
       const { encrypted, iv, authTag } = encryptedData;
-      
+
+      // Reject a truncated/oversized auth tag before it reaches setAuthTag:
+      // pinning the length is what makes the GCM integrity check meaningful
+      // against a tampered client-supplied tag.
+      const authTagBuf = Buffer.from(authTag, 'hex');
+      if (authTagBuf.length !== AUTH_TAG_LENGTH) {
+        throw new Error(`Invalid auth tag length: expected ${AUTH_TAG_LENGTH} bytes, got ${authTagBuf.length}`);
+      }
+
       const key = crypto.scryptSync(getSecretKey(), SALT, 32);
       const decipher = crypto.createDecipheriv(
         ALGORITHM,
         key,
-        Buffer.from(iv, 'hex')
+        Buffer.from(iv, 'hex'),
+        { authTagLength: AUTH_TAG_LENGTH }
       );
-      
-      decipher.setAuthTag(Buffer.from(authTag, 'hex'));
+
+      decipher.setAuthTag(authTagBuf);
       
       let decrypted = decipher.update(encrypted, 'hex', 'utf8');
       decrypted += decipher.final('utf8');

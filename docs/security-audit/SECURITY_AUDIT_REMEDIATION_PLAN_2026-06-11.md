@@ -14,7 +14,7 @@ This plan corrects the deficiencies recorded in `docs/security-audit/SECURITY_AU
 | API route guard gate warns on intentionally HMAC-protected BILL routes | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | ✅ Done (2026-06-11) — Phase 4 shipped; `verifyInternalCall`/`verifyBillWebhook` recognized when matrix documents the HMAC boundary; `check:api-routes:self-test` added |
 | Local scanner lane is blocked by Semgrep CA trust-store failure; `gitleaks`/`trivy` unavailable locally | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | Narrowed — Semgrep works on primary dev machine (Addendum); only `gitleaks`/`trivy` install remains |
 | Moderate dependency advisories remain | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | Open (re-confirmed 5 moderate) |
-| 5 Semgrep OWASP/js/node hardening findings (GCM `authTagLength` ×2; blob-proxy content-type; admin markdown sanitization; download-document res.send) | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 + Addendum | Open |
+| 5 Semgrep OWASP/js/node hardening findings (GCM `authTagLength` ×2; blob-proxy content-type; admin markdown sanitization; download-document res.send) | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 + Addendum | In progress — `apiKeyManager.js` GCM resolved 2026-06-11; 4 remaining |
 
 ## Remediation Invariants
 
@@ -236,7 +236,7 @@ Goal: clear the 5 findings the OWASP/js/node ruleset surfaced in the 2026-06-11 
 
 Implementation steps (ordered by leverage):
 
-1. `shared/utils/apiKeyManager.js:58` — pass `{ authTagLength: 16 }` to `createDecipheriv` and validate the decoded client-supplied tag is exactly 16 bytes before `setAuthTag`. Mirror on the encrypt side.
+1. ✅ **Done 2026-06-11** — `shared/utils/apiKeyManager.js` pins `AUTH_TAG_LENGTH = 16` via `authTagLength` on `createCipheriv`/`createDecipheriv` and rejects any tag whose decoded length is not 16 bytes before `setAuthTag`. Regression tests cover truncated + oversized tags; Semgrep re-scan of the file is clean.
 2. `lib/utils/encryption.js:90` — pass `{ authTagLength: AUTH_TAG_LENGTH }` to `createDecipheriv` (tag length is already fixed by the slice at `:87`, so this is defense-in-depth).
 3. `pages/api/blob-proxy.js:78` — do not forward an untrusted upstream `Content-Type` for inline render: force `Content-Disposition: attachment` and add `X-Content-Type-Options: nosniff`, or whitelist safe content types. Fold into the Phase 1 Blob proxy work if Phase 1 lands first.
 4. `shared/components/admin/PoliciesSection.js:138` — confirm `renderPolicyMarkdown` sanitizes (e.g. DOMPurify); if not, sanitize the HTML before `dangerouslySetInnerHTML`. Admin-authored content, so low priority.
@@ -280,4 +280,4 @@ Stop and re-plan if any of these appear:
 - [x] Phase 4 HMAC route gate hygiene complete. (2026-06-11)
 - [ ] Phase 5 scanner lane repair complete or delegated to CI evidence (Semgrep already green on primary dev machine; `gitleaks`/`trivy` install + originating-machine CA fix outstanding).
 - [ ] Phase 6 dependency advisory review complete.
-- [ ] Phase 7 Semgrep OWASP/js/node hardening pass complete or residuals accepted.
+- [ ] Phase 7 Semgrep OWASP/js/node hardening pass complete or residuals accepted. (apiKeyManager GCM done 2026-06-11; 4 remaining: encryption.js GCM, blob-proxy, download-document, PoliciesSection.)

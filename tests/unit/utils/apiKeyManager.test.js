@@ -89,8 +89,26 @@ describe('ApiKeyManager', () => {
         iv: 'invalid',
         authTag: 'invalid'
       };
-      
+
       expect(() => apiKeyManager.decryptFromClient(invalidEncrypted)).toThrow('Failed to decrypt API key');
+    });
+
+    test('rejects a truncated GCM auth tag (no short-tag forgery)', () => {
+      const apiKey = 'sk-ant-tag-length-guard';
+      const encrypted = apiKeyManager.encryptForClient(apiKey);
+      // A correct tag is 16 bytes (32 hex chars); truncate to 12 bytes.
+      expect(encrypted.authTag.length).toBe(32);
+      const truncated = { ...encrypted, authTag: encrypted.authTag.slice(0, 24) };
+
+      expect(() => apiKeyManager.decryptFromClient(truncated)).toThrow('Failed to decrypt API key');
+    });
+
+    test('rejects an over-length auth tag', () => {
+      const apiKey = 'sk-ant-tag-length-guard-2';
+      const encrypted = apiKeyManager.encryptForClient(apiKey);
+      const oversized = { ...encrypted, authTag: encrypted.authTag + '00' }; // 17 bytes
+
+      expect(() => apiKeyManager.decryptFromClient(oversized)).toThrow('Failed to decrypt API key');
     });
   });
 
