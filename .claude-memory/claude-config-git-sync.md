@@ -4,6 +4,7 @@ description: ~/.claude is a git repo synced across home/office machines; auto-pu
 metadata: 
   node_type: memory
   type: reference
+  status: active
   originSessionId: 8ca2ceaf-bb48-4bb1-8208-f8bccc762ba8
 ---
 
