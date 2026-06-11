@@ -202,15 +202,15 @@ Validation:
 
 ### P3 - Semgrep OWASP/js/node ruleset surfaces 5 unreviewed hardening findings
 
-Status: VERIFIED via Semgrep `p/javascript`+`p/nodejs`+`p/owasp-top-ten` (Addendum re-run)
+Status: VERIFIED via Semgrep `p/javascript`+`p/nodejs`+`p/owasp-top-ten` (Addendum re-run) → ✅ ALL 5 RESOLVED 2026-06-11 (Phase 7). OWASP re-scan returns 0 findings on the five files.
 
 These were not visible in the original audit because Semgrep did not execute there. Triaged live against source (each `setAuthTag`/disposition/validation path read):
 
-- **ERROR — `lib/utils/encryption.js:90`** `createDecipheriv` GCM without `authTagLength`. Mitigated: `setAuthTag()` is called (`:91`) and the tag is sliced at a fixed `AUTH_TAG_LENGTH` offset (`:87`), so caller cannot truncate it. **Low** — add `{ authTagLength: AUTH_TAG_LENGTH }` as defense-in-depth.
+- **ERROR — `lib/utils/encryption.js:90`** `createDecipheriv` GCM without `authTagLength`. Mitigated: `setAuthTag()` is called (`:91`) and the tag is sliced at a fixed `AUTH_TAG_LENGTH` offset (`:87`), so caller cannot truncate it. **Low**. ✅ **RESOLVED** — threaded `{ authTagLength: AUTH_TAG_LENGTH }` into `createCipheriv` + `createDecipheriv` (defense-in-depth).
 - **ERROR — `shared/utils/apiKeyManager.js:58`** `createDecipheriv` GCM without `authTagLength`. `setAuthTag()` called (`:64`) but the tag is client-supplied hex (`Buffer.from(authTag,'hex')`), so its byte length is not enforced. **Low-moderate** (client-encrypted API-key path; client attacking its own stored data). ✅ **RESOLVED 2026-06-11** — pinned `AUTH_TAG_LENGTH = 16` via `authTagLength` on both `createCipheriv`/`createDecipheriv` and a reject-if-not-16-bytes guard before `setAuthTag`; regression tests added (truncated + oversized tag). Semgrep re-scan: file clean.
-- **WARNING — `pages/api/blob-proxy.js:78`** forwards upstream `Content-Type` verbatim (`:69`) then `res.send(buffer)`. A blob stored as `text/html` could render inline under the app origin → reflected/stored XSS surface. Auth-gated, `private` cache. **Low-moderate**; couples with the P2 private-Blob work — consider forcing `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
-- **WARNING — `pages/api/dynamics-explorer/download-document.js:86`** `res.send(buffer)` but with `Content-Disposition: attachment` (`:82`, forces download not inline), SharePoint-derived mimeType, and upstream folder/request-GUID validation (`:60`-`72`). **Low / near-false-positive.**
-- **WARNING — `shared/components/admin/PoliciesSection.js:138`** `dangerouslySetInnerHTML` on `renderPolicyMarkdown(slot.activeVersion.body)`. Admin-only component, admin-authored content. **Low / needs-review** — confirm `renderPolicyMarkdown` sanitizes (e.g. DOMPurify) or that body is trusted.
+- **WARNING — `pages/api/blob-proxy.js:78`** forwards upstream `Content-Type` verbatim (`:69`) then `res.send(buffer)`. A blob stored as `text/html` could render inline under the app origin → reflected/stored XSS surface. Auth-gated, `private` cache. **Low-moderate**. ✅ **RESOLVED** — `X-Content-Type-Options: nosniff` always + forced `attachment` disposition for inline-renderable types (html/svg/xml); `res.send` annotated `nosemgrep` (binary proxy, accepted residual).
+- **WARNING — `pages/api/dynamics-explorer/download-document.js:86`** `res.send(buffer)` but with `Content-Disposition: attachment` (`:82`, forces download not inline), SharePoint-derived mimeType, and upstream folder/request-GUID validation (`:60`-`72`). **Low / near-false-positive.** ✅ **RESOLVED** — added `X-Content-Type-Options: nosniff`; `res.send` annotated `nosemgrep` (accepted residual).
+- **WARNING — `shared/components/admin/PoliciesSection.js:138`** `dangerouslySetInnerHTML` on `renderPolicyMarkdown(slot.activeVersion.body)`. Admin-only component, admin-authored content. **Low / false-positive** — `renderPolicyMarkdown` (`shared/utils/policy-markdown.js:83`) already sanitizes via a strict DOMPurify allowlist and the server validator rejects raw HTML. ✅ **RESOLVED** — both sites (`:138`,`:269`) annotated `nosemgrep` with rationale.
 
 Risk category:
 
@@ -219,8 +219,8 @@ Risk category:
 
 Recommendation:
 
-- Treat as a single low-priority hardening pass (remediation plan Phase 7), not a release blocker.
-- Prioritize `apiKeyManager.js` `authTagLength` + tag-length validation and the `blob-proxy.js` content-type hardening (fold the latter into the P2 Blob proxy work).
+- ✅ Done as a single low-priority hardening pass (remediation plan Phase 7, 2026-06-11). All 5 cleared; OWASP re-scan 0 findings on the five files.
+- Real hardening: GCM `authTagLength` (×2), `nosniff` + forced-download on the two binary proxies. False positive: `PoliciesSection` (already DOMPurify-sanitized). Two binary `res.send` sites annotated as accepted residuals.
 
 Validation:
 
@@ -277,7 +277,7 @@ Validation:
 4. Add HMAC-aware recognition or fixtures to `check-api-route-security-matrix.js` to avoid recurring false-positive warnings.
 5. Fix Semgrep CA/tooling on the machine that failed (it works on the primary dev machine — see Addendum) and install `gitleaks`/`trivy`, or rely on CI scanner artifacts for the scanner lane.
 6. Review moderate dependency advisories in a dependency-maintenance pass; do not run `npm audit fix --force` blindly.
-7. Clear the remaining Semgrep OWASP/js/node hardening findings (Addendum) — `apiKeyManager.js` GCM resolved 2026-06-11; remaining: `encryption.js` GCM defense-in-depth, blob-proxy content-type, download-document res.send, admin markdown sanitization — as a single low-priority pass.
+7. ✅ Done 2026-06-11 — all 5 Semgrep OWASP/js/node hardening findings (Addendum) cleared in a single Phase 7 pass; OWASP re-scan returns 0 findings on the five files.
 
 ## Addendum - 2026-06-11 scanner re-run (primary dev machine)
 
