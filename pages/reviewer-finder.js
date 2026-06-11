@@ -968,6 +968,10 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           analysisResult: analysisData,
+          // S240: structured PI identity for exclusion + COI. Only present when the
+          // proposal was loaded from CRM (sourceProposal carries the request GUID);
+          // pure-upload flows send null and the server uses proposal-text identity.
+          requestId: uploadedFiles[0]?.sourceProposal?.requestId || null,
           options: {
             searchPubmed: searchSources.pubmed,
             searchArxiv: searchSources.arxiv,

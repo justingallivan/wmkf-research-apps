@@ -137,3 +137,73 @@ describe('OpenAlexService work lookup', () => {
     expect(url).not.toContain('filter=');
   });
 });
+
+describe('OpenAlexService.getAuthorByOrcid (S240)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const VALID_ORCID = '0000-0002-1825-0097'; // canonical, checksum-valid
+
+  test('resolves an ORCID to a single author record via the path form (no percent-encoding)', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({
+      id: 'https://openalex.org/A5060668110',
+      display_name: 'Wen Li',
+      orcid: `https://orcid.org/${VALID_ORCID}`,
+      last_known_institutions: [{ display_name: 'Wayne State University' }],
+      works_count: 69,
+    }));
+
+    const out = await OpenAlexService.getAuthorByOrcid(VALID_ORCID);
+
+    expect(out).toMatchObject({
+      openAlexId: 'https://openalex.org/A5060668110',
+      displayName: 'Wen Li',
+      orcid: VALID_ORCID,
+      lastKnownInstitution: 'Wayne State University',
+    });
+    // Codex #11: pin the exact URL form — the embedded ORCID URL is NOT percent-encoded.
+    const url = safeFetch.mock.calls[0][0];
+    expect(url).toContain(`/authors/https://orcid.org/${VALID_ORCID}`);
+    expect(url).not.toContain('https%3A%2F%2Forcid.org');
+  });
+
+  test('threads the abort signal through to safeFetch (Codex #10)', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({ id: 'A1', display_name: 'X' }));
+    const controller = new AbortController();
+    await OpenAlexService.getAuthorByOrcid(VALID_ORCID, { signal: controller.signal });
+    expect(safeFetch.mock.calls[0][1].signal).toBeTruthy();
+  });
+
+  test('tolerates a defensive results[] wrapper (Codex #10)', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({
+      results: [{ id: 'https://openalex.org/A1', display_name: 'Wrapped Author' }],
+    }));
+    const out = await OpenAlexService.getAuthorByOrcid(VALID_ORCID);
+    expect(out.openAlexId).toBe('https://openalex.org/A1');
+    expect(out.displayName).toBe('Wrapped Author');
+  });
+
+  test('returns null on 404 (no OpenAlex record for the ORCID)', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({}, 404));
+    const out = await OpenAlexService.getAuthorByOrcid(VALID_ORCID);
+    expect(out).toBeNull();
+  });
+
+  test('returns null for a malformed / checksum-invalid ORCID WITHOUT calling the API', async () => {
+    const out = await OpenAlexService.getAuthorByOrcid('1234567'); // wrong shape
+    expect(out).toBeNull();
+    expect(safeFetch).not.toHaveBeenCalled();
+  });
+
+  test('returns null when the payload has no author id', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({ meta: { count: 0 } }));
+    const out = await OpenAlexService.getAuthorByOrcid(VALID_ORCID);
+    expect(out).toBeNull();
+  });
+
+  test('propagates non-404 errors (e.g. abort/timeout)', async () => {
+    safeFetch.mockRejectedValue(Object.assign(new Error('boom'), { code: 'openalex_timeout' }));
+    await expect(OpenAlexService.getAuthorByOrcid(VALID_ORCID)).rejects.toThrow('boom');
+  });
+});
