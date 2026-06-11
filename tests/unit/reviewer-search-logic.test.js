@@ -8,8 +8,32 @@ import {
   parseExcludeList,
   filterExcluded,
   pruneCandidateForRoster,
+  sanitizeInstitutionCOIDetails,
 } from '../../shared/components/reviewers/reviewer-search-logic.js';
 const { provenanceGroupOf } = require('../../lib/utils/reviewer-provenance');
+
+describe('sanitizeInstitutionCOIDetails (S240)', () => {
+  test('strips legacy .historical, keeps piInstitution + reviewerInstitution', () => {
+    expect(sanitizeInstitutionCOIDetails({ piInstitution: 'JHU', reviewerInstitution: 'JHU', historical: true }))
+      .toEqual({ piInstitution: 'JHU', reviewerInstitution: 'JHU' });
+  });
+  test('null / empty / non-object → null', () => {
+    expect(sanitizeInstitutionCOIDetails(null)).toBeNull();
+    expect(sanitizeInstitutionCOIDetails({})).toBeNull();
+    expect(sanitizeInstitutionCOIDetails({ historical: true })).toBeNull();
+  });
+});
+
+describe('pruneCandidateForRoster — institutionCOIDetails (S240)', () => {
+  test('persists a sanitized detail (no .historical)', () => {
+    const out = pruneCandidateForRoster({
+      name: 'Dr P', hasInstitutionCOI: true,
+      institutionCOIDetails: { piInstitution: 'MIT', reviewerInstitution: 'MIT', historical: false },
+    });
+    expect(out.institutionCOIDetails).toEqual({ piInstitution: 'MIT', reviewerInstitution: 'MIT' });
+    expect(out.institutionCOIDetails).not.toHaveProperty('historical');
+  });
+});
 
 describe('mergeEnrichment', () => {
   const candidates = [

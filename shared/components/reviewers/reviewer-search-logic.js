@@ -8,7 +8,7 @@
 // implementation. Re-exported below so existing client imports keep working.
 import { normalizeReviewerName as _normalizeReviewerName, partitionByExcluded } from '../../../lib/utils/reviewer-name-match';
 import { mayPersistIdentity } from '../../../lib/services/reviewer-identity-resolver';
-import { buildReviewerProvenance } from '../../../lib/utils/reviewer-provenance';
+import { buildReviewerProvenance, sanitizeInstitutionCOIDetails as _sanitizeInstitutionCOIDetails } from '../../../lib/utils/reviewer-provenance';
 
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen
@@ -27,16 +27,9 @@ import { buildReviewerProvenance } from '../../../lib/utils/reviewer-provenance'
  * @param {Array<{name: string, contactEnrichment: object}>|null|undefined} enrichmentResults
  * @returns {object[]}
  */
-// Institution-COI detail carries only { piInstitution, reviewerInstitution } now
-// (S240 Chunk 2a). Strip any legacy `.historical` field so a roster row saved before
-// the historical-COI retirement isn't reloaded and rendered as a current conflict
-// (Codex post-impl WARN). Returns null when there's no usable detail.
-export function sanitizeInstitutionCOIDetails(detail) {
-  if (!detail || typeof detail !== 'object') return null;
-  const piInstitution = detail.piInstitution || null;
-  const reviewerInstitution = detail.reviewerInstitution || null;
-  return (piInstitution || reviewerInstitution) ? { piInstitution, reviewerInstitution } : null;
-}
+// Re-export the canonical sanitizer (lib/utils/reviewer-provenance) so existing
+// client imports keep working while server (roster-store) + client share ONE impl.
+export const sanitizeInstitutionCOIDetails = _sanitizeInstitutionCOIDetails;
 
 export function mergeEnrichment(candidates, enrichmentResults) {
   if (!Array.isArray(candidates)) return [];

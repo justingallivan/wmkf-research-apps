@@ -1759,16 +1759,17 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
             </div>
           )}
 
-          {/* Needs-identity-review Section (Slice E): identity-unresolved rows are shown
-              for context but are read-only — not selectable/savable as vetted reviewers. */}
+          {/* Not-selectable Section: identity-unresolved (Slice E) OR current
+              same-institution COI (S240 Chunk 2a) rows are shown for context but
+              read-only — not selectable/savable. Each card shows its own reason. */}
           {allCandidates.some(c => !isSelectable(c)) && (
             <div className="mt-6">
               <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                 <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs">
-                  Needs identity review
+                  Not selectable
                 </span>
                 <span className="text-gray-400">
-                  ({allCandidates.filter(c => !isSelectable(c)).length} — identity unconfirmed, not selectable)
+                  ({allCandidates.filter(c => !isSelectable(c)).length} — identity unconfirmed or institution COI)
                 </span>
               </h4>
               <div className="space-y-3">

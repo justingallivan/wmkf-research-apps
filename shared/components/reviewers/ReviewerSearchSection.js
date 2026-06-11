@@ -1130,7 +1130,7 @@ export default function ReviewerSearchSection({
                             )}
                             <div className="space-y-2">
                               {section.items.map((c) => (
-                                readOnlySection
+                                (readOnlySection || !isSelectable(c))
                                   ? <CandidateCard key={candKey(c)} candidate={c} readOnly onExclude={excludeCandidate} />
                                   : <CandidateCard key={candKey(c)} candidate={c} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} />
                               ))}
