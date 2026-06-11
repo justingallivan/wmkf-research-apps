@@ -142,7 +142,7 @@ Validation:
 
 ### P3 - API route guard gate warns on intentionally HMAC-protected BILL routes
 
-Status: VERIFIED
+Status: VERIFIED → ✅ RESOLVED 2026-06-11 (remediation Phase 4). `check-api-route-security-matrix.js` now recognizes `verifyInternalCall`/`verifyBillWebhook` as guards when the route's matrix row documents a shared-secret/HMAC boundary; both BILL routes no longer warn, truly unguarded routes still do. Added `check:api-routes:self-test` (5 fixtures + missing-route hard-fail).
 
 Evidence:
 

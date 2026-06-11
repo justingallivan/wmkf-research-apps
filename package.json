@@ -29,6 +29,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:ci": "jest --ci --coverage --watchAll=false",
     "check:api-routes": "node scripts/check-api-route-security-matrix.js",
+    "check:api-routes:self-test": "node scripts/check-api-route-security-matrix-self-test.js",
     "check:atlas": "node scripts/check-application-state-atlas.js",
     "check:atlas:self-test": "node scripts/check-coverage-self-test.js",
     "check:doc-currency": "node scripts/check-doc-currency.js",

@@ -10,8 +10,8 @@ This plan corrects the deficiencies recorded in `docs/security-audit/SECURITY_AU
 |---|---|---|
 | Generic uploader creates public Blob artifacts for sensitive document workflows | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 | Open |
 | Shared Executor calls Claude with raw `fetch` instead of canonical `LLMClient` | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 | Open |
-| `AI_DATA_FLOW_MATRIX.md` is stale for contact enrichment transport | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | Open |
-| API route guard gate warns on intentionally HMAC-protected BILL routes | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | Open |
+| `AI_DATA_FLOW_MATRIX.md` is stale for contact enrichment transport | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | ✅ Done (2026-06-11) — Phase 3 shipped; 5 stale call sites reconciled to `LLMClient`, residual risk preserved; `check:fact-consistency` green |
+| API route guard gate warns on intentionally HMAC-protected BILL routes | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | ✅ Done (2026-06-11) — Phase 4 shipped; `verifyInternalCall`/`verifyBillWebhook` recognized when matrix documents the HMAC boundary; `check:api-routes:self-test` added |
 | Local scanner lane is blocked by Semgrep CA trust-store failure; `gitleaks`/`trivy` unavailable locally | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | Narrowed — Semgrep works on primary dev machine (Addendum); only `gitleaks`/`trivy` install remains |
 | Moderate dependency advisories remain | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | Open (re-confirmed 5 moderate) |
 | 5 Semgrep OWASP/js/node hardening findings (GCM `authTagLength` ×2; blob-proxy content-type; admin markdown sanitization; download-document res.send) | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 + Addendum | Open |
@@ -276,8 +276,8 @@ Stop and re-plan if any of these appear:
 
 - [ ] Phase 1 private Blob proof slice implemented and verified.
 - [ ] Phase 2 Executor transport convergence implemented and verified.
-- [ ] Phase 3 AI data-flow matrix reconcile complete.
-- [ ] Phase 4 HMAC route gate hygiene complete.
+- [x] Phase 3 AI data-flow matrix reconcile complete. (2026-06-11)
+- [x] Phase 4 HMAC route gate hygiene complete. (2026-06-11)
 - [ ] Phase 5 scanner lane repair complete or delegated to CI evidence (Semgrep already green on primary dev machine; `gitleaks`/`trivy` install + originating-machine CA fix outstanding).
 - [ ] Phase 6 dependency advisory review complete.
 - [ ] Phase 7 Semgrep OWASP/js/node hardening pass complete or residuals accepted.

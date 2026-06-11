@@ -92,7 +92,7 @@ Before reading any session context, run the project's CI gates to surface rubric
 Run **every** `check:*` gate, not a subset — a gate left out of this list is a gate that can sit red and unnoticed (this is exactly how `check:prompt-storage-mentions` was red for ~1 session: it wasn't in the old short list, and `check:doc-currency` before it sat red ~8 sessions). Run each gate and its `:self-test` **sequentially, never in parallel** — the self-tests write synthetic fixtures into paths the main gate scans (CLAUDE.md "Operating rules"). The `&&` below pairs each gate with its self-test so a red gate skips its own self-test but the next gate still runs:
 ```bash
 npm run check:migrations-manifest                                              # migrations-manifest ↔ on-disk .sql files
-npm run check:api-routes                                                       # API route security matrix coverage
+npm run check:api-routes && npm run check:api-routes:self-test                 # API route security matrix coverage (+ HMAC guard recognition)
 npm run check:atlas && npm run check:atlas:self-test                           # Application State Atlas coverage
 npm run check:doc-currency && npm run check:doc-currency:self-test             # doc-currency drift (was red & unnoticed ~8 sessions)
 npm run check:fact-consistency && npm run check:fact-consistency:self-test     # registered scalar drift across docs/memory
