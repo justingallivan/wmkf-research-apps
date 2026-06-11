@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { upload } from '@vercel/blob/client';
+import { CYCLE_MATERIAL_PREFIX } from '../../lib/utils/cycle-material-ref';
 import EmailTemplateEditor from './EmailTemplateEditor';
 import { STORAGE_KEYS } from './EmailSettingsPanel';
 import { useProfile } from '../context/ProfileContext';
@@ -21,6 +22,20 @@ import {
   resolveStoredCycle,
   formatCycleForStorage,
 } from '../config/reviewerFinderPreferences';
+
+// Phase 1 private-blob migration of grant-cycle materials (review template +
+// additional attachments). Behind a flag (default public) until smoked. When on,
+// uploads go to the dedicated private store under the CYCLE_MATERIAL_PREFIX, and we
+// persist the blob PATHNAME (not a public URL) so the prefix-based classifier
+// (lib/utils/cycle-material-ref.js) routes every server-read + the download proxy.
+function cycleMaterialUpload(filename) {
+  const usePrivate = process.env.NEXT_PUBLIC_REVIEWER_FINDER_PRIVATE_CYCLE_MATERIALS === 'true';
+  return {
+    usePrivate,
+    access: usePrivate ? 'private' : 'public',
+    uploadPath: usePrivate ? `${CYCLE_MATERIAL_PREFIX}${filename}` : filename,
+  };
+}
 
 // Default grant cycle settings
 const DEFAULT_GRANT_CYCLE = {
@@ -361,15 +376,21 @@ export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
     setUploadingTemplate(true);
     try {
       // Upload to Vercel Blob via the client-token flow (/api/upload-handler).
-      const blob = await upload(file.name, file, {
-        access: 'public',
+      // Flag-gated private mode (Phase 1): private uploads land in the dedicated
+      // store under the cycle-materials/ prefix and persist the PATHNAME; public
+      // (default) persists the public URL, unchanged.
+      const { usePrivate, access, uploadPath } = cycleMaterialUpload(file.name);
+      const blob = await upload(uploadPath, file, {
+        access,
+        clientPayload: JSON.stringify({ access }),
         handleUploadUrl: '/api/upload-handler',
       });
 
-      // Update grant cycle with the blob URL
+      // Store the private pathname (classifier reads the cycle-materials/ prefix)
+      // or the legacy public URL.
       setGrantCycle(prev => ({
         ...prev,
-        reviewTemplateBlobUrl: blob.url,
+        reviewTemplateBlobUrl: usePrivate ? blob.pathname : blob.url,
         reviewTemplateFilename: file.name
       }));
       setSaveStatus(null);
@@ -399,21 +420,33 @@ export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
     setUploadingAdditional(true);
     try {
       // Upload to Vercel Blob via the client-token flow (/api/upload-handler).
-      const blob = await upload(file.name, file, {
-        access: 'public',
+      // Flag-gated private mode (Phase 1) — see handleTemplateUpload.
+      const { usePrivate, access, uploadPath } = cycleMaterialUpload(file.name);
+      const blob = await upload(uploadPath, file, {
+        access,
+        clientPayload: JSON.stringify({ access }),
         handleUploadUrl: '/api/upload-handler',
       });
 
-      // Add to additional attachments array
+      // Private attachment → { pathname, access }; legacy public → { blobUrl }.
+      // The cycle-materials/ prefix on the pathname is the classifier every reader uses.
+      const attachment = usePrivate
+        ? {
+            pathname: blob.pathname,
+            access: 'private',
+            filename: file.name,
+            contentType: file.type || 'application/octet-stream',
+          }
+        : {
+            blobUrl: blob.url,
+            filename: file.name,
+            contentType: file.type || 'application/octet-stream',
+          };
       setGrantCycle(prev => ({
         ...prev,
         additionalAttachments: [
           ...(prev.additionalAttachments || []),
-          {
-            blobUrl: blob.url,
-            filename: file.name,
-            contentType: file.type || 'application/octet-stream'
-          }
+          attachment,
         ]
       }));
       setSaveStatus(null);

@@ -1,11 +1,16 @@
 # Phase 1 — authenticated private-blob download proxy + cycle-materials migration
 
-**Status:** 🟨 SLICE 1 SHIPPED + CODEX-REVIEWED (2026-06-11). The record-scoped proxy
-route (`pages/api/reviewer-finder/cycle-material.js` + tests) is merged; Codex confirmed
-**no record-scope bypass** (exact-match allowlist) and solid null/mixed-mode handling.
-Slices 2–3 (persist private refs + branch the readers + flip the uploaders) are designed
-below with Codex's findings folded. Builds on the completed file-loader cohort
-(`PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`).
+**Status:** 🟨 SLICES 1–3 CODE-COMPLETE + CODEX-REVIEWED (2026-06-11); flag-gated
+(default public), **live e2e smoke pending**. Slice 1 = the record-scoped proxy route
+(`pages/api/reviewer-finder/cycle-material.js`; Codex: no record-scope bypass). Slice 2 =
+all readers private-aware (`grant-cycles` GET, `generate-emails`, `send-emails`) +
+`maintenance-service` data-loss fix (Codex-verified; two findings folded). Slice 3 =
+`SettingsModal`'s template + attachment uploads flip to `access="private"` under the
+`cycle-materials/` prefix behind `NEXT_PUBLIC_REVIEWER_FINDER_PRIVATE_CYCLE_MATERIALS`
+(default public), persisting the blob **pathname**. Builds on the completed file-loader
+cohort (`PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`). **Remaining:** set the flag in
+dev/preview + browser e2e smoke (upload a template in SettingsModal → it lands private →
+generate/send-emails attaches it via private read → blob URL 403), then prod promotion.
 
 ## Codex review (2026-06-11) — folded
 
@@ -160,12 +165,16 @@ enabled:
 The four legs move in lockstep per material (a private upload whose email
 server-read still `safeFetch`es a 403 URL breaks attachments). Order:
 1. ✅ **DONE** — Proxy route + record-scope + tests (`cycle-material.js`), Codex-reviewed.
-2. Shared `cycle-material-ref.js` helper + read-leg branching (grant-cycles GET +
-   both email routes) + `maintenance-service` safety (§E) + back-compat. Readers become
-   private-aware while no private refs exist yet (legacy public path unchanged).
-3. Modal uploaders flag-gated → `access="private"` + `pathPrefix="cycle-materials/"`;
-   persist pathname refs; end-to-end smoke (upload template in SettingsModal → render via
-   proxy 403-unauth → generate-emails attaches it via private read).
+2. ✅ **DONE** — Shared `cycle-material-ref.js` helper + read-leg branching (grant-cycles GET +
+   both email routes) + `maintenance-service` safety (§E) + back-compat. Readers private-aware
+   while no private refs exist yet (legacy public path unchanged). Codex-verified.
+3. ✅ **CODE-COMPLETE** — `SettingsModal`'s template + attachment `upload()` handlers
+   flag-gated → `access="private"` under the `cycle-materials/` prefix, persisting the blob
+   pathname (`NEXT_PUBLIC_REVIEWER_FINDER_PRIVATE_CYCLE_MATERIALS`, default public). No
+   `EmailGeneratorModal`/`FileUploaderSimple` change (the modals use direct `upload()`, and
+   neither renders the ref as a clickable link). **Remaining: live e2e smoke** (set the flag
+   in dev/preview → upload a template → confirm it lands private + 403 + generate/send-emails
+   attaches it via the private read), then prod promotion.
 
 ## Resolved decisions
 

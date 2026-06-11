@@ -1,6 +1,6 @@
 # P2 residual: private-blob migration for the generic uploader
 
-**Status:** 🟡 Pilot + file-loader cohort shipped & read-path live-smoked 2026-06-11 — `expense-reporter` (pilot), plus `phase-i-dynamics` + `grant-reporting` via the now-private-aware `lib/utils/file-loader.js` (`lib/utils/uploaded-blob.js`). Live smokes passed (`smoke-private-upload.mjs` for the store; `smoke-private-file-loader.mjs` for the shared `loadFile` chokepoint). **All three consumers (`expense-reporter` + `phase-i-dynamics` + `grant-reporting`) PROMOTED TO PRODUCTION 2026-06-11** (prod token + all three flags set + deployed; grant-reporting prod-verified — live upload → private store, URL 403, extraction ran). Remaining: the browser-facing download proxy and the remaining (browser-render) consumers (list below). Concrete design + what-shipped: `docs/security-audit/PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`.
+**Status:** 🟡 Pilot + file-loader cohort shipped & read-path live-smoked 2026-06-11 — `expense-reporter` (pilot), plus `phase-i-dynamics` + `grant-reporting` via the now-private-aware `lib/utils/file-loader.js` (`lib/utils/uploaded-blob.js`). Live smokes passed (`smoke-private-upload.mjs` for the store; `smoke-private-file-loader.mjs` for the shared `loadFile` chokepoint). **All three consumers (`expense-reporter` + `phase-i-dynamics` + `grant-reporting`) PROMOTED TO PRODUCTION 2026-06-11** (prod token + all three flags set + deployed; grant-reporting prod-verified — live upload → private store, URL 403, extraction ran). The browser-render consumer (reviewer-finder **grant-cycle materials**) + its record-scoped **download proxy** are now **code-complete + Codex-reviewed** (flag-gated `NEXT_PUBLIC_REVIEWER_FINDER_PRIVATE_CYCLE_MATERIALS`, default public; **live e2e smoke pending**) — see `docs/security-audit/DOWNLOAD_PROXY_DESIGN_2026-06-11.md`. Concrete design + what-shipped: `docs/security-audit/PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`.
 **Origin:** Security audit 2026-05-21, finding P2. Created 2026-05-21 alongside A5 (endpoint consolidation), which partially addressed P2.
 
 ## Rollout status (2026-06-11)
@@ -45,8 +45,13 @@
   `Content-Disposition: attachment`), the blob URL returned **HTTP 403** unauthenticated,
   and extraction ran (the server-side private read worked in prod). Completes the
   file-loader cohort.
-- ⏳ **Browser-render consumers** (templates/attachments via `proxifyBlobUrl`,
-  `blob-proxy.js`) — need the new authenticated download proxy (record/app-scoped).
+- 🟨 **Browser-render consumer — reviewer-finder grant-cycle materials** (review template +
+  additional attachments, formerly public via `proxifyBlobUrl`/`blob-proxy.js`):
+  **code-complete + Codex-reviewed 2026-06-11**, flag-gated (`NEXT_PUBLIC_REVIEWER_FINDER_PRIVATE_CYCLE_MATERIALS`,
+  default public). Ships the record-scoped download proxy `pages/api/reviewer-finder/cycle-material`
+  + private-aware `grant-cycles` GET / `generate-emails` / `send-emails` + private uploads in
+  `SettingsModal` + a `maintenance-service` data-loss fix. **Live e2e smoke pending.** Full design:
+  `docs/security-audit/DOWNLOAD_PROXY_DESIGN_2026-06-11.md`.
 - ⏳ Remaining `FileUploaderSimple` consumers below — flip to `access="private"` +
   pathname once their read path is private-aware.
 
