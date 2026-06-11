@@ -85,7 +85,16 @@ function GrantReporting() {
 
   const proposalRef = useMemo(() => {
     if (uploadedProposal) {
-      return { source: 'upload', fileUrl: uploadedProposal.url, filename: uploadedProposal.filename };
+      // Carry pathname + access so extract.js (via file-loader →
+      // readUploadedBlobBuffer) reads a private blob by pathname; a legacy
+      // public upload (no access) still resolves via its fileUrl.
+      return {
+        source: 'upload',
+        fileUrl: uploadedProposal.url,
+        pathname: uploadedProposal.pathname,
+        access: uploadedProposal.access,
+        filename: uploadedProposal.filename,
+      };
     }
     const f = findFileByKey(proposalPick);
     if (f && f.library && f.folder) {
@@ -96,7 +105,13 @@ function GrantReporting() {
 
   const reportRef = useMemo(() => {
     if (uploadedReport) {
-      return { source: 'upload', fileUrl: uploadedReport.url, filename: uploadedReport.filename };
+      return {
+        source: 'upload',
+        fileUrl: uploadedReport.url,
+        pathname: uploadedReport.pathname,
+        access: uploadedReport.access,
+        filename: uploadedReport.filename,
+      };
     }
     const f = findFileByKey(reportPick);
     if (f && f.library && f.folder) {
@@ -378,13 +393,22 @@ function GrantReporting() {
           <FileUploaderSimple
             onFilesUploaded={(files) => {
               if (files && files.length > 0) {
-                setUploaded({ url: files[0].url, filename: files[0].filename });
+                setUploaded({
+                  url: files[0].url,
+                  pathname: files[0].pathname,
+                  access: files[0].access,
+                  filename: files[0].filename,
+                });
                 setPick('');
               }
             }}
             multiple={false}
             accept=".pdf,.docx,.doc"
             hideFileList={false}
+            // Phase 1: grant proposals + reports are sensitive — upload as private
+            // blobs when enabled. extract.js reads them server-side by pathname via
+            // file-loader. Gated (default public) until smoked.
+            access={process.env.NEXT_PUBLIC_GRANT_REPORTING_PRIVATE_BLOB === 'true' ? 'private' : 'public'}
           />
           {uploaded && (
             <p className="mt-2 text-sm text-green-700">

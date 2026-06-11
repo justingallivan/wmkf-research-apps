@@ -24,8 +24,11 @@
   `NEXT_PUBLIC_PHASE_I_DYNAMICS_PRIVATE_BLOB` (default `public`); the `fileRef` now
   carries `pathname`+`access`, read server-side via the private-aware file-loader.
   Build/lint/tests green. **Live smoke + prod flag pending** (same shared store/token).
-- ⏳ **`grant-reporting`** — remaining file-loader consumer (proposal + report uploads);
-  same change as phase-i-dynamics.
+- 🟡 **`grant-reporting`** — page migrated (2026-06-11): both uploaders (proposal +
+  report, one shared `renderDocPicker`) gated by `NEXT_PUBLIC_GRANT_REPORTING_PRIVATE_BLOB`
+  (default `public`); both fileRefs carry `pathname`+`access`; `extract.js` passes them
+  through to the private-aware file-loader. Build/lint/tests green. **Live smoke + prod
+  flag pending.** Completes the file-loader cohort.
 - ⏳ **Browser-render consumers** (templates/attachments via `proxifyBlobUrl`,
   `blob-proxy.js`) — need the new authenticated download proxy (record/app-scoped).
 - ⏳ Remaining `FileUploaderSimple` consumers below — flip to `access="private"` +
