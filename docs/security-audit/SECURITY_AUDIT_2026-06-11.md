@@ -43,9 +43,9 @@ Results:
 - `npm run check:atlas` passed: 34 Postgres tables and 32 Dataverse entity sets covered.
 - `npm run check:atlas:self-test` passed: 12/12 coverage patterns detected.
 - `npm run check:fact-consistency` passed: 343 live doc/memory files scanned; canonical facts current (`app-definition-count=18`, `requireappaccess-endpoint-count=60`, `api-route-file-count=108`).
-- `npm audit --audit-level=high` required network access, then passed with no high-severity failures but reported 5 moderate vulnerabilities: `postcss <8.5.10` through `next`, and `uuid <11.1.1` through `exceljs` and `next-auth`.
-- `semgrep` was installed but did not execute. Both normal and metrics-disabled runs failed before scanning with `Failed to create system store X509 authenticator: ca-certs: empty trust anchors`.
-- `gitleaks` and `trivy` were not installed locally.
+- `npm audit --audit-level=high` required network access, then passed with no high-severity failures but reported 5 moderate vulnerabilities: `postcss <8.5.10` through `next`, and `uuid <11.1.1` through `exceljs` and `next-auth`. (Re-confirmed exactly on 2026-06-11 primary dev machine: `{moderate:5, high:0, critical:0}`.)
+- `semgrep` was installed but did not execute in the original run. Both normal and metrics-disabled runs failed before scanning with `Failed to create system store X509 authenticator: ca-certs: empty trust anchors`. **This blocker was environment-specific** — Semgrep 1.165.0 ran cleanly when re-run on the primary dev machine (see Addendum); results are recorded there.
+- `gitleaks` and `trivy` were not installed locally (still uninstalled on the primary dev machine).
 - Focused Jest passed:
   - `tests/unit/external-rate-limit.test.js`: 18/18.
   - `tests/unit/webhook-bill.test.js` + `tests/unit/bill-onboard-reviewer.test.js`: 52/52.
@@ -172,28 +172,59 @@ Validation:
 
 ### P3 - Local scanner lane is blocked by Semgrep CA trust-store failure
 
-Status: UNVERIFIED scanner results / VERIFIED tooling blocker
+Status: PARTIALLY RETRACTED — the Semgrep blocker was environment-specific (see Addendum). `gitleaks`/`trivy` still uninstalled.
 
-Evidence:
+Evidence (original audit run):
 
 - `semgrep --config=.semgrep/token-audit.yaml --exclude=node_modules --exclude=.next lib/ pages/` failed before scanning with `Failed to create system store X509 authenticator: ca-certs: empty trust anchors`.
 - Retrying with `SEMGREP_SEND_METRICS=off` produced the same failure.
 - `gitleaks` and `trivy` are not installed locally.
 - Prior checked-in scanner precedent exists at `docs/security-audit/SEMGREP_AUDIT_REPORT.md`, but this audit did not refresh those scan results.
 
+Correction (2026-06-11, primary dev machine — see Addendum below):
+
+- Semgrep 1.165.0 executes cleanly here; the CA trust-anchor failure did NOT reproduce. The blocker is machine/environment-specific, not a repo defect.
+- `gitleaks` and `trivy` remain uninstalled on this machine — that part stands.
+
 Risk category:
 
-- Local verification gap.
+- Local verification gap (now narrowed to the originating machine's Semgrep install + missing gitleaks/trivy).
 
 Recommendation:
 
-- Fix local Semgrep CA/trust-store setup or run scanners in CI/devcontainer where trust anchors are present.
+- Fix Semgrep CA/trust-store setup on the machine that failed, or run scanners in CI/devcontainer where trust anchors are present.
 - Install or rely on CI for `gitleaks` and `trivy`.
-- Do not mark scanner lanes green until actual current scans execute.
+- Do not mark scanner lanes green until actual current scans execute (now satisfied for Semgrep on this machine — see Addendum).
 
 Validation:
 
 - Current successful Semgrep, Gitleaks, and Trivy outputs, or linked CI run artifacts.
+
+### P3 - Semgrep OWASP/js/node ruleset surfaces 5 unreviewed hardening findings
+
+Status: VERIFIED via Semgrep `p/javascript`+`p/nodejs`+`p/owasp-top-ten` (Addendum re-run)
+
+These were not visible in the original audit because Semgrep did not execute there. Triaged live against source (each `setAuthTag`/disposition/validation path read):
+
+- **ERROR — `lib/utils/encryption.js:90`** `createDecipheriv` GCM without `authTagLength`. Mitigated: `setAuthTag()` is called (`:91`) and the tag is sliced at a fixed `AUTH_TAG_LENGTH` offset (`:87`), so caller cannot truncate it. **Low** — add `{ authTagLength: AUTH_TAG_LENGTH }` as defense-in-depth.
+- **ERROR — `shared/utils/apiKeyManager.js:58`** `createDecipheriv` GCM without `authTagLength`. `setAuthTag()` called (`:64`) but the tag is client-supplied hex (`Buffer.from(authTag,'hex')`), so its byte length is not enforced. **Low-moderate** (client-encrypted API-key path; client attacking its own stored data). Add `authTagLength` and validate tag length.
+- **WARNING — `pages/api/blob-proxy.js:78`** forwards upstream `Content-Type` verbatim (`:69`) then `res.send(buffer)`. A blob stored as `text/html` could render inline under the app origin → reflected/stored XSS surface. Auth-gated, `private` cache. **Low-moderate**; couples with the P2 private-Blob work — consider forcing `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
+- **WARNING — `pages/api/dynamics-explorer/download-document.js:86`** `res.send(buffer)` but with `Content-Disposition: attachment` (`:82`, forces download not inline), SharePoint-derived mimeType, and upstream folder/request-GUID validation (`:60`-`72`). **Low / near-false-positive.**
+- **WARNING — `shared/components/admin/PoliciesSection.js:138`** `dangerouslySetInnerHTML` on `renderPolicyMarkdown(slot.activeVersion.body)`. Admin-only component, admin-authored content. **Low / needs-review** — confirm `renderPolicyMarkdown` sanitizes (e.g. DOMPurify) or that body is trusted.
+
+Risk category:
+
+- OWASP A03 Injection (XSS class) for the response-write / `dangerouslySetInnerHTML` warnings.
+- OWASP A02 Cryptographic Failures (GCM tag-length hardening).
+
+Recommendation:
+
+- Treat as a single low-priority hardening pass (remediation plan Phase 7), not a release blocker.
+- Prioritize `apiKeyManager.js` `authTagLength` + tag-length validation and the `blob-proxy.js` content-type hardening (fold the latter into the P2 Blob proxy work).
+
+Validation:
+
+- `semgrep --config=p/javascript --config=p/nodejs --config=p/owasp-top-ten --exclude=node_modules --exclude=.next --exclude=docs lib/ pages/ shared/` returns 0 findings after fixes (or documented accepted residuals).
 
 ### P3 - Moderate dependency advisories remain
 
@@ -244,5 +275,20 @@ Validation:
 2. Migrate or wrap Executor Claude transport through `LLMClient`/`safeFetch` while preserving cache-control semantics.
 3. Update `docs/AI_DATA_FLOW_MATRIX.md` for contact enrichment's current transport and current residual risk.
 4. Add HMAC-aware recognition or fixtures to `check-api-route-security-matrix.js` to avoid recurring false-positive warnings.
-5. Fix local Semgrep CA/tooling or rely on CI scanner artifacts for the scanner lane.
+5. Fix Semgrep CA/tooling on the machine that failed (it works on the primary dev machine — see Addendum) and install `gitleaks`/`trivy`, or rely on CI scanner artifacts for the scanner lane.
 6. Review moderate dependency advisories in a dependency-maintenance pass; do not run `npm audit fix --force` blindly.
+7. Clear the 5 Semgrep OWASP/js/node hardening findings (Addendum) — GCM `authTagLength`, blob-proxy content-type, admin markdown sanitization — as a single low-priority pass.
+
+## Addendum - 2026-06-11 scanner re-run (primary dev machine)
+
+The original audit ran where Semgrep was blocked by a CA trust-store failure. Re-run on the primary dev machine (Semgrep 1.165.0); network/registry reachable:
+
+| Command | Result |
+|---|---|
+| `semgrep --config=.semgrep/token-audit.yaml … lib/ pages/` | ✅ 9 rules, 283 files, **0 findings** |
+| `semgrep --config=p/secrets … .` | ✅ 43 rules, 917 files, **0 findings** |
+| `semgrep --config=p/javascript --config=p/nodejs --config=p/owasp-top-ten … lib/ pages/ shared/` | ⚠️ **5 findings** (2 ERROR, 3 WARNING) |
+| `npm audit --audit-level=high` | 5 moderate, 0 high/critical (matches original) |
+| `gitleaks` / `trivy` | not installed — not run |
+
+The 5 OWASP-ruleset findings are detailed in the finding "Semgrep OWASP/js/node ruleset surfaces 5 unreviewed hardening findings" above and tracked as Phase 7 in the remediation plan. None is a release blocker; all triaged Low / Low-moderate with mitigating controls already present (`setAuthTag` called at both GCM sites; `attachment` disposition on the document download; admin-only policy editor).

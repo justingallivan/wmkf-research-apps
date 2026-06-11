@@ -12,8 +12,9 @@ This plan corrects the deficiencies recorded in `docs/security-audit/SECURITY_AU
 | Shared Executor calls Claude with raw `fetch` instead of canonical `LLMClient` | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 | Open |
 | `AI_DATA_FLOW_MATRIX.md` is stale for contact enrichment transport | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | Open |
 | API route guard gate warns on intentionally HMAC-protected BILL routes | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | Open |
-| Local scanner lane is blocked by Semgrep CA trust-store failure; `gitleaks`/`trivy` unavailable locally | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | Open |
-| Moderate dependency advisories remain | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | Open |
+| Local scanner lane is blocked by Semgrep CA trust-store failure; `gitleaks`/`trivy` unavailable locally | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | Narrowed — Semgrep works on primary dev machine (Addendum); only `gitleaks`/`trivy` install remains |
+| Moderate dependency advisories remain | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | Open (re-confirmed 5 moderate) |
+| 5 Semgrep OWASP/js/node hardening findings (GCM `authTagLength` ×2; blob-proxy content-type; admin markdown sanitization; download-document res.send) | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 + Addendum | Open |
 
 ## Remediation Invariants
 
@@ -170,10 +171,12 @@ Phase completion criteria:
 
 Goal: make scanner evidence refreshable instead of carrying stale prior scan reports.
 
+Status update (2026-06-11 Addendum): Semgrep already works on the primary dev machine (1.165.0; token-audit, `p/secrets`, and `p/javascript`+`p/nodejs`+`p/owasp-top-ten` all executed). Remaining gaps: the Semgrep CA failure on the *originating* audit machine, and `gitleaks`/`trivy` not installed anywhere local.
+
 Implementation options:
 
 1. Local-first:
-   - fix Semgrep CA trust-store configuration;
+   - fix Semgrep CA trust-store configuration on the machine that failed (works on the primary dev machine, so this is per-machine, not a repo fix);
    - install `gitleaks`;
    - install `trivy`;
    - document exact install/run commands if they differ from `SECURITY_AUDIT_RUNBOOK.md`.
@@ -227,14 +230,37 @@ Phase completion criteria:
 
 - `npm audit --audit-level=high` is clean, or each remaining moderate advisory is explicitly documented with rationale and owner acceptance.
 
+## Phase 7 - Semgrep OWASP/js/node Hardening Pass
+
+Goal: clear the 5 findings the OWASP/js/node ruleset surfaced in the 2026-06-11 Addendum re-run. All triaged Low / Low-moderate with mitigating controls already present; this is a hardening pass, not a release blocker.
+
+Implementation steps (ordered by leverage):
+
+1. `shared/utils/apiKeyManager.js:58` — pass `{ authTagLength: 16 }` to `createDecipheriv` and validate the decoded client-supplied tag is exactly 16 bytes before `setAuthTag`. Mirror on the encrypt side.
+2. `lib/utils/encryption.js:90` — pass `{ authTagLength: AUTH_TAG_LENGTH }` to `createDecipheriv` (tag length is already fixed by the slice at `:87`, so this is defense-in-depth).
+3. `pages/api/blob-proxy.js:78` — do not forward an untrusted upstream `Content-Type` for inline render: force `Content-Disposition: attachment` and add `X-Content-Type-Options: nosniff`, or whitelist safe content types. Fold into the Phase 1 Blob proxy work if Phase 1 lands first.
+4. `shared/components/admin/PoliciesSection.js:138` — confirm `renderPolicyMarkdown` sanitizes (e.g. DOMPurify); if not, sanitize the HTML before `dangerouslySetInnerHTML`. Admin-authored content, so low priority.
+5. `pages/api/dynamics-explorer/download-document.js:86` — already has `attachment` disposition + folder/request validation; treat as near-false-positive. Add `X-Content-Type-Options: nosniff` for parity, or annotate as accepted.
+
+Validation:
+
+```bash
+semgrep --config=p/javascript --config=p/nodejs --config=p/owasp-top-ten --exclude=node_modules --exclude=.next --exclude=docs lib/ pages/ shared/
+```
+
+Phase completion criteria:
+
+- The OWASP/js/node ruleset returns 0 findings, or each remaining finding is annotated as an accepted residual with rationale.
+
 ## Recommended Order
 
 1. Phase 3 doc reconcile can land immediately because it is low risk and removes stale audit guidance.
 2. Phase 4 gate hygiene can land immediately after or alongside Phase 3.
 3. Phase 2 Executor transport convergence should be next because it is a shared high-consequence AI path but bounded to one service and tests.
-4. Phase 1 private Blob proof slice should be planned as its own implementation session because it touches UI, API, Blob storage, consumers, and compatibility.
-5. Phase 5 scanner repair can happen opportunistically or in CI/tooling time.
-6. Phase 6 dependency review should be a separate dependency-maintenance pass, not mixed into feature/security code unless an advisory becomes high severity.
+4. Phase 1 private Blob proof slice should be planned as its own implementation session because it touches UI, API, Blob storage, consumers, and compatibility. Fold the Phase 7 blob-proxy content-type hardening into it.
+5. Phase 7 Semgrep hardening pass can land opportunistically; the `apiKeyManager.js` `authTagLength`/tag-length item is the highest-leverage single fix and can go anytime.
+6. Phase 5 scanner repair can happen opportunistically or in CI/tooling time.
+7. Phase 6 dependency review should be a separate dependency-maintenance pass, not mixed into feature/security code unless an advisory becomes high severity.
 
 ## Stop Conditions
 
@@ -252,5 +278,6 @@ Stop and re-plan if any of these appear:
 - [ ] Phase 2 Executor transport convergence implemented and verified.
 - [ ] Phase 3 AI data-flow matrix reconcile complete.
 - [ ] Phase 4 HMAC route gate hygiene complete.
-- [ ] Phase 5 scanner lane repair complete or delegated to CI evidence.
+- [ ] Phase 5 scanner lane repair complete or delegated to CI evidence (Semgrep already green on primary dev machine; `gitleaks`/`trivy` install + originating-machine CA fix outstanding).
 - [ ] Phase 6 dependency advisory review complete.
+- [ ] Phase 7 Semgrep OWASP/js/node hardening pass complete or residuals accepted.
