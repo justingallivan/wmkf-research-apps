@@ -135,7 +135,7 @@ function SlotPanel({ slot, onPublishedReload }) {
             <div className="text-sm font-medium text-gray-800">{slot.activeVersion.title}</div>
             <div
               className="prose prose-sm max-w-none mt-2 text-gray-700"
-              dangerouslySetInnerHTML={{ __html: renderPolicyMarkdown(slot.activeVersion.body || '') }}
+              dangerouslySetInnerHTML={/* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- renderPolicyMarkdown sanitizes via DOMPurify strict allowlist; server validator rejects raw HTML */ { __html: renderPolicyMarkdown(slot.activeVersion.body || '') }}
             />
           </div>
         ) : (
@@ -266,7 +266,7 @@ function PublishForm({ slot, onSuccess, onOutcome }) {
           <div className="text-[10px] uppercase text-gray-500 mb-2">Preview</div>
           <div
             className="prose prose-sm max-w-none text-gray-800"
-            dangerouslySetInnerHTML={{ __html: renderPolicyMarkdown(body) }}
+            dangerouslySetInnerHTML={/* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- renderPolicyMarkdown sanitizes via DOMPurify strict allowlist; server validator rejects raw HTML */ { __html: renderPolicyMarkdown(body) }}
           />
         </div>
       )}

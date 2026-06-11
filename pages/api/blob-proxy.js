@@ -67,14 +67,30 @@ export default async function handler(req, res) {
     const contentLength = blobResponse.headers.get('content-length');
 
     if (contentType) res.setHeader('Content-Type', contentType);
-    if (contentDisposition) res.setHeader('Content-Disposition', contentDisposition);
     if (contentLength) res.setHeader('Content-Length', contentLength);
+
+    // A blob stored as text/html or image/svg+xml would execute script under
+    // our origin if a leaked-then-authenticated proxy URL were opened inline.
+    // Force download for inline-renderable types; honor the upstream
+    // disposition otherwise. Always send nosniff so the browser cannot
+    // MIME-sniff a declared-safe type into an executable one. (These blobs are
+    // email templates / attachments — downloaded, never inline media.)
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    const RENDERABLE = /^(text\/html|application\/xhtml\+xml|image\/svg\+xml|text\/xml|application\/xml)\b/i;
+    if (contentType && RENDERABLE.test(contentType)) {
+      res.setHeader('Content-Disposition', 'attachment');
+    } else if (contentDisposition) {
+      res.setHeader('Content-Disposition', contentDisposition);
+    }
 
     // Cache for 5 minutes (authenticated users only)
     res.setHeader('Cache-Control', 'private, max-age=300');
 
-    // Stream the response body
+    // Stream the response body. res.send of a fetched buffer is the intended
+    // behavior for a binary blob proxy; nosniff + forced-download (above)
+    // neutralize the inline-XSS vector Semgrep flags here.
     const buffer = await blobResponse.arrayBuffer();
+    // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
     res.send(Buffer.from(buffer));
   } catch (error) {
     console.error('Blob proxy error:', error);

@@ -82,7 +82,13 @@ export default async function handler(req, res) {
     res.setHeader('Content-Disposition', `attachment; filename="${resolvedName.replace(/"/g, '\\"')}"`);
     res.setHeader('Content-Length', size);
     res.setHeader('Cache-Control', 'private, max-age=300');
+    // Belt-and-suspenders with the attachment disposition: stop the browser
+    // MIME-sniffing a SharePoint file into an inline-executable type.
+    res.setHeader('X-Content-Type-Options', 'nosniff');
 
+    // Binary file download (attachment disposition + nosniff + upstream
+    // folder/request-GUID validation above). res.send of the buffer is correct.
+    // nosemgrep: javascript.express.security.audit.xss.direct-response-write.direct-response-write
     res.send(buffer);
   } catch (error) {
     console.error('Document download error:', error.message);
