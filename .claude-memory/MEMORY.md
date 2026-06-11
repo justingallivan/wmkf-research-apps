@@ -80,6 +80,7 @@
 - Local build + git gotchas: local-jest-build-environment.md; env-broken-git-autogc.md
 - Dynamics sandbox (NOT drop-in usable): project-dynamics-sandbox-state.md
 - Testing the reviewer-accept flow (real-prod accept CREATEs a honorarium akoya_request → fires AkoyaGo plugins + classic workflows + a live Bill.com payment flow + contact→Business-Central sync; gate real-prod on human PA review, MOCK the data layer for automated tests; read-only probe `scripts/probe-dataverse-automation.js`): project-reviewer-accept-prod-automation.md
+- Playwright browser-E2E harness for the reviewer portal (`tests/e2e/`, `npm run test:e2e`; mocks the data layer; runs against `next build --webpack && next start`, NOT next dev; CI-gated `.github/workflows/e2e.yml`): project-e2e-playwright-harness.md
 - Strategy / system model: project-system-model.md; project-strategy-direction.md
 - Root instruction file / hooks / rules / instruction-adherence (Codex writing enforcement harnesses next): project-claude-instruction-architecture.md
 - Roadmap (historical snapshots — cross-check current strategy): project-app-roadmap-2026-04-25.md; project-phase-i-summary-app-winddown.md
