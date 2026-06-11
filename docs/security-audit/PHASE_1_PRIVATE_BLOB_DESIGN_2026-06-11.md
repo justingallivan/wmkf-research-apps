@@ -1,6 +1,8 @@
 # Phase 1 design — private-blob upload + authenticated download proxy
 
-**Status:** Reviewed by Codex 2026-06-11 (verdict REVISE — corrections folded below). Resolve the open ownership-model decision + the access-enforcement probe before implementation.
+**Status:** ✅ PILOT IMPLEMENTED 2026-06-11 (expense-reporter). SDK verified, design decisions resolved, pilot shipped server-read-only. Reviewed by Codex (REVISE — folded). **Remaining (later phases):** the browser-facing download proxy + `file-loader.js` private read + the other ~14 consumers. See "Implementation notes" at the end.
+
+> ⚠️ **Live smoke still required:** the pilot is unit-tested + builds, but a real private upload→read against the Vercel Blob store has NOT been run from this environment. Verify a live receipt upload + expense extraction in `expense-reporter` (and that the blob is not publicly fetchable) before flipping any default. Depends on the store supporting private access + `BLOB_READ_WRITE_TOKEN` being present in the `process-expenses` runtime.
 **Source finding:** `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 — "Generic uploader still creates public Blob artifacts for sensitive document workflows."
 **Builds on:** `docs/security-audit/P2_PRIVATE_BLOB_MIGRATION.md` (origin/scoping — this doc is the concrete implementation design + pilot slice).
 **Remediation tracker:** `docs/security-audit/SECURITY_AUDIT_REMEDIATION_PLAN_2026-06-11.md` Phase 1.
@@ -179,3 +181,54 @@ once, or if private client-upload is unsupported and the server-upload fallback'
 `SettingsModal` grant-cycle review templates/attachments (staff-authored org assets,
 lower risk — `P2_PRIVATE_BLOB_MIGRATION.md:54`-`58`); the full 15+ consumer rollout
 (later phases); pre-existing public-blob re-hosting.
+
+---
+
+## Implementation notes (2026-06-11) — what actually shipped
+
+The sections above are the **full-initiative** design (private upload + download
+proxy + `file-loader` + ownership + the ~15 consumers). The **expense-reporter
+pilot** that shipped is a narrower, lower-risk slice — the earlier "Files touched
+(pilot)" / proxy / `file-loader` items are **deferred to later consumers**, not part
+of this pilot. Authoritative record of the shipped change:
+
+**SDK verified (`@vercel/blob@2.3.0`, step 1 done):** client `upload()` accepts
+`access:'public'|'private'` and returns `pathname`; server `get(pathname, {access:'private'})`
+reads private blobs (`{stream,headers,blob}`) with `BLOB_READ_WRITE_TOKEN`.
+`onBeforeGenerateToken` **cannot** set/override `access` (its return `Pick` excludes
+it) — access is client-asserted. Acceptable under the authorized-staff / code-level
+threat model: our client sets `private`, and the real boundary is the read path (no
+auth-free URL + the consumer route's existing `requireAppAccess`).
+
+**Why the pilot needs no proxy / no `file-loader` change:** `expense-reporter` reads
+its uploads **only server-side** — `process-expenses.js` fetched `file.url` to feed
+Claude (image vision + PDF text); there is no browser-rendered blob. So the pilot
+swaps that server read for a private read. The browser-facing download proxy and the
+`file-loader.js` private read remain required for **later** consumers that render or
+text-extract blobs (e.g. Grant Reporting / Phase-I via `file-loader`; template
+attachments via `proxifyBlobUrl`).
+
+**Ownership model (resolved):** app-scoped, mirroring `download-review.js` — the
+consumer route (`process-expenses`) already gates reads with
+`requireAppAccess('expense-reporter')`, and the private blob has no public URL. No
+new `{pathname→owner}` table for the pilot; record-scoping layers in for consumers
+that have records.
+
+**Shipped files:**
+- `lib/utils/uploaded-blob.js` (new) — `readUploadedBlobBuffer({access,pathname,url})`:
+  private → lazy-`import('@vercel/blob')` `get(pathname,{access:'private'})`; public/
+  legacy → `safeFetch(url)`. The shared private-read chokepoint future consumers reuse.
+  `@vercel/blob` is lazy-imported so public-only consumers/tests don't load the SDK.
+- `shared/components/FileUploaderSimple.js` — new `access='public'` prop (passed to
+  `upload()`); descriptor now returns `pathname` + `access`.
+- `pages/expense-reporter.js` — uploader set to `access="private"`.
+- `pages/api/process-expenses.js` — both reads now go through `readUploadedBlobBuffer`
+  (was `safeFetch(file.url)`); back-compat: a legacy/public ref (no `access`) still
+  reads via `safeFetch`.
+- Tests: `tests/unit/utils/uploaded-blob.test.js` (8, incl. back-compat + error paths);
+  the A7 `process-expenses` integration test still passes (public refs unaffected).
+
+**Verified:** helper 8/8 + A7 2/2 green; `npm run build` + `eslint` clean. **NOT
+verified:** a live private upload→read against the Vercel store (see status banner).
+
+No new API route was added, so `API_ROUTE_SECURITY_MATRIX` is unchanged.

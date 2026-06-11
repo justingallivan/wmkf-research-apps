@@ -319,6 +319,10 @@ function ExpenseReporter() {
               onFilesUploaded={handleFilesUploaded}
               multiple={true}
               accept=".pdf,.png,.jpg,.jpeg"
+              // Phase 1 pilot: receipts/invoices are sensitive — upload as
+              // private blobs (no auth-free URL). process-expenses reads them
+              // server-side by pathname.
+              access="private"
             />
 
             {uploadedFiles.length > 0 && (

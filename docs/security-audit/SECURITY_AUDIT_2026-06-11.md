@@ -55,7 +55,7 @@ Results:
 
 ### P2 - Generic uploader still creates public Blob artifacts for sensitive document workflows
 
-Status: VERIFIED
+Status: VERIFIED → 🟡 PILOT SHIPPED 2026-06-11 (remediation Phase 1). `expense-reporter` now uploads private blobs (`FileUploaderSimple access="private"`) and reads them server-side by `pathname` via `lib/utils/uploaded-blob.js` (`get(pathname,{access:'private'})`); no auth-free URL is created for receipts. Unit-tested + build green. **Still open:** a live upload→read smoke, the browser-facing download proxy + `file-loader` private read, and the remaining ~14 consumers. Design + what-shipped: `docs/security-audit/PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`.
 
 Evidence:
 
@@ -271,7 +271,7 @@ Validation:
 
 ## Recommended Next Steps
 
-1. Keep the private Blob migration as the top open security initiative for sensitive document exposure.
+1. 🟡 Private Blob migration — pilot shipped 2026-06-11 (`expense-reporter`, Phase 1); remains the top open initiative for the remaining consumers + the download proxy + a live smoke.
 2. ✅ Done 2026-06-11 (Phase 2) — Executor Claude transport migrated to `LLMClient.complete()`; cache-control semantics preserved and regression-pinned.
 3. Update `docs/AI_DATA_FLOW_MATRIX.md` for contact enrichment's current transport and current residual risk.
 4. Add HMAC-aware recognition or fixtures to `check-api-route-security-matrix.js` to avoid recurring false-positive warnings.

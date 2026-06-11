@@ -4,7 +4,7 @@ import { nextRateLimiter } from '../../shared/api/middleware/rateLimiter';
 import { BASE_CONFIG, getModelForApp } from '../../shared/config/baseConfig';
 import { loadModelOverrides } from '../../lib/services/model-override-loader';
 import { requireAppAccess } from '../../lib/utils/auth';
-import { safeFetch } from '../../lib/utils/safe-fetch';
+import { readUploadedBlobBuffer } from '../../lib/utils/uploaded-blob';
 import {
   DATA_CLASSES,
   wrapUntrustedContent,
@@ -209,14 +209,10 @@ export default async function handler(req, res) {
           // For images, we'll send them directly to Claude's vision API
           sendProgress(`Analyzing image: ${file.filename}`);
 
-          // Fetch the image from blob storage
-          const imageResponse = await safeFetch(file.url);
-          if (!imageResponse.ok) {
-            throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
-          }
-
-          const imageBuffer = await imageResponse.arrayBuffer();
-          const base64Image = Buffer.from(imageBuffer).toString('base64');
+          // Read the receipt image server-side: private blob by pathname (no
+          // auth-free URL) or legacy public URL. See lib/utils/uploaded-blob.js.
+          const imageBuffer = await readUploadedBlobBuffer(file);
+          const base64Image = imageBuffer.toString('base64');
 
           // Create a message with image for Claude's vision API
           const messages = [{
@@ -293,12 +289,7 @@ export default async function handler(req, res) {
           // For PDFs, use existing file processor
           sendProgress(`Extracting text from PDF: ${file.filename}`);
 
-          const fileResponse = await safeFetch(file.url);
-          if (!fileResponse.ok) {
-            throw new Error(`Failed to fetch file: ${fileResponse.statusText}`);
-          }
-
-          const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
+          const fileBuffer = await readUploadedBlobBuffer(file);
           const { text } = await fileProcessor.processFile(fileBuffer, file.filename);
 
           if (!text || text.trim().length < 5) {

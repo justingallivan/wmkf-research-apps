@@ -2,12 +2,18 @@ import { useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import styles from './FileUploader.module.css';
 
-export default function FileUploaderSimple({ 
+export default function FileUploaderSimple({
   onFilesUploaded, // Changed from onFilesSelected to onFilesUploaded
-  multiple = true, 
+  multiple = true,
   accept = '.pdf',
   maxSize = 50 * 1024 * 1024, // Full 50MB limit with blob storage
   hideFileList = false,
+  // Blob access mode. Default 'public' preserves legacy behavior; consumers
+  // handling sensitive documents pass 'private' (Phase 1) — the blob then has
+  // no auth-free URL and must be read server-side by `pathname` (see
+  // lib/utils/uploaded-blob.js). The returned descriptor carries `pathname`
+  // and `access` so the server read path can resolve it.
+  access = 'public',
 }) {
   const [files, setFiles] = useState([]);
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -48,7 +54,7 @@ export default function FileUploaderSimple({
         
         console.log(`Starting blob upload for: ${file.name}`);
         const blob = await upload(file.name, file, {
-          access: 'public',
+          access,
           handleUploadUrl: '/api/upload-handler',
           onProgress: (progress) => {
             console.log(`Upload progress for ${file.name}:`, progress);
@@ -62,6 +68,8 @@ export default function FileUploaderSimple({
         
         uploadedBlobs.push({
           url: blob.url,
+          pathname: blob.pathname,
+          access,
           filename: file.name,
           size: file.size,
           originalFile: file

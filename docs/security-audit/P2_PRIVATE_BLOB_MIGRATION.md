@@ -1,7 +1,20 @@
 # P2 residual: private-blob migration for the generic uploader
 
-**Status:** Open / scoped — not yet started.
+**Status:** 🟡 Pilot shipped 2026-06-11 — `expense-reporter` migrated to private upload + server-side read (`lib/utils/uploaded-blob.js`). Remaining: live upload→read smoke, the browser-facing download proxy, the `file-loader.js` private read, and the other consumers (list below). Concrete design + what-shipped: `docs/security-audit/PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`.
 **Origin:** Security audit 2026-05-21, finding P2. Created 2026-05-21 alongside A5 (endpoint consolidation), which partially addressed P2.
+
+## Rollout status (2026-06-11)
+
+- ✅ **`expense-reporter`** (pilot) — private upload; `process-expenses.js` reads via
+  `readUploadedBlobBuffer` (server-side `get(pathname,{access:'private'})`), legacy
+  public URLs still supported. Server-read-only, so no proxy needed for this consumer.
+- ⏳ **Browser-render consumers** (templates/attachments via `proxifyBlobUrl`,
+  `blob-proxy.js`) — need the new authenticated download proxy (record/app-scoped).
+- ⏳ **`file-loader.js` consumers** (Grant Reporting, Phase-I writeback, etc.) — switch
+  the shared loader's `upload` source from `safeFetch(fileUrl)` to a private
+  `pathname` read.
+- ⏳ Remaining `FileUploaderSimple` consumers below — flip to `access="private"` +
+  pathname once their read path is private-aware.
 
 ## Problem
 
