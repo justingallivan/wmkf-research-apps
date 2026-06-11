@@ -18,8 +18,10 @@
  *      legacy MAX_BYTES ceiling is retained as an exported constant but is no
  *      longer reachable — anything over TARGET fails first.)
  *   4. A `*.md` link in MEMORY.md does not resolve.
- *   5. A topic file (.claude-memory/*.md except MEMORY.md) is missing a
- *      `status:` frontmatter key, or has an unrecognized status value.
+ *   5. A topic file (.claude-memory/*.md except MEMORY.md) has no YAML
+ *      frontmatter, no `status:` key WITHIN that frontmatter, or an unrecognized
+ *      status value. The check is scoped to the leading `---` block so body prose
+ *      mentioning "status:" cannot satisfy it.
  *   6. A `- ` router entry whose prose (file refs + separators stripped) is
  *      longer than MAX_PROSE_LEN chars — a dense operational summary that
  *      belongs in the agent wiki, not the router. File-ref lists are not
@@ -98,16 +100,30 @@ function validateStore(memDir) {
     if (!fs.existsSync(resolved)) errors.push(`MEMORY.md links a missing file: ${ref}`);
   }
 
-  // 5. Every topic file must declare a recognized status.
+  // 5. Every topic file must declare a recognized status IN its frontmatter.
+  //    The check is scoped to the leading `---` block (top-level or nested under
+  //    `metadata:`), NOT the whole file: prose that merely mentions "status:"
+  //    must not satisfy the requirement, and a file with no frontmatter at all is
+  //    caught. (Hardened 2026-06-10 after an auto-memory write reached main with
+  //    no frontmatter status; the old unscoped /m regex could be fooled by body text.)
   const topicFiles = fs.readdirSync(memDir)
     .filter((f) => f.endsWith('.md') && f !== 'MEMORY.md');
+  const valid = [...VALID_STATUS].join(', ');
   for (const f of topicFiles) {
     const body = fs.readFileSync(path.join(memDir, f), 'utf8');
-    const m = body.match(/^\s*status:\s*(\S+)/m);
+    const fm = body.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!fm) {
+      errors.push(`${f}: missing YAML frontmatter (need a \`---\` block with a \`status:\` key, one of ${valid}).`);
+      continue;
+    }
+    const m = fm[1].match(/^\s*status:\s*(.+?)\s*$/m);
     if (!m) {
-      errors.push(`${f}: no \`status:\` frontmatter key.`);
-    } else if (!VALID_STATUS.has(m[1])) {
-      errors.push(`${f}: unrecognized status \`${m[1]}\` (expected one of ${[...VALID_STATUS].join(', ')}).`);
+      errors.push(`${f}: no \`status:\` key in frontmatter (expected one of ${valid}).`);
+      continue;
+    }
+    const value = m[1].replace(/^['"]|['"]$/g, '');
+    if (!VALID_STATUS.has(value)) {
+      errors.push(`${f}: unrecognized status \`${value}\` (expected one of ${valid}).`);
     }
   }
 

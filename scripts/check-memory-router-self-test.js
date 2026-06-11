@@ -58,6 +58,34 @@ const goodTopic = '---\nname: x\ndescription: y\nmetadata:\n  type: project\n  s
   assert(errors.some((e) => e.includes('unrecognized status')), 'bogus status flagged');
 }
 
+// 4a. Status nested under metadata: in frontmatter → OK (the auto-memory shape).
+{
+  const dir = mkStore('# Router\n', { 'a.md': '---\nname: x\nmetadata:\n  type: reference\n  status: active\n---\nbody\n' });
+  const { errors } = validateStore(dir);
+  assert(errors.length === 0, 'status nested under metadata passes');
+}
+
+// 4b. Status only in the BODY (not frontmatter) → error (old /m regex was fooled).
+{
+  const dir = mkStore('# Router\n', { 'a.md': '---\nname: x\n---\n\nbody mentions status: active here\n' });
+  const { errors } = validateStore(dir);
+  assert(errors.some((e) => e.includes('no `status:` key in frontmatter')), 'body-only status is rejected');
+}
+
+// 4c. No frontmatter at all (status in body) → error.
+{
+  const dir = mkStore('# Router\n', { 'a.md': '# no frontmatter\nstatus: active\n\nbody\n' });
+  const { errors } = validateStore(dir);
+  assert(errors.some((e) => e.includes('missing YAML frontmatter')), 'missing frontmatter flagged');
+}
+
+// 4d. Quoted status value in frontmatter → OK.
+{
+  const dir = mkStore('# Router\n', { 'a.md': '---\nstatus: "active"\n---\nbody\n' });
+  const { errors } = validateStore(dir);
+  assert(errors.length === 0, 'quoted status value passes');
+}
+
 // 5. Oversized MEMORY.md (too many lines) → error.
 {
   const big = '# Router\n' + Array(MAX_LINES + 5).fill('- x: a.md').join('\n') + '\n';
@@ -124,4 +152,4 @@ if (failures) {
   console.error(`memory-router self-test FAILED — ${failures} case(s).`);
   process.exit(1);
 }
-console.log('memory-router self-test OK — 10/10 cases behaved as expected.');
+console.log('memory-router self-test OK — 14/14 cases behaved as expected.');
