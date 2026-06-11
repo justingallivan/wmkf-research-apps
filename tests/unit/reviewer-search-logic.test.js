@@ -95,17 +95,19 @@ describe('mergeEnrichment', () => {
 
   // Codex P2#1: institution COI is re-evaluated against the post-enrichment
   // affiliation; the merge promotes it only when the route flagged coiRecomputed.
-  test('promotes a recomputed COI (override discover) when coiRecomputed is set', () => {
+  test('promotes a recomputed COI (override discover) when coiRecomputed is set, stripping legacy historical', () => {
     const out = mergeEnrichment(
       [{ name: 'Dr. F', hasInstitutionCOI: false, institutionCOIDetails: null }],
       [{ name: 'Dr. F', contactEnrichment: {
         coiRecomputed: true,
         hasInstitutionCOI: true,
+        // a legacy payload may still carry historical — the merge must strip it (S240)
         institutionCOIDetails: { piInstitution: 'JHU', reviewerInstitution: 'JHU', historical: true },
       } }],
     );
     expect(out[0].hasInstitutionCOI).toBe(true);
-    expect(out[0].institutionCOIDetails.historical).toBe(true);
+    expect(out[0].institutionCOIDetails).toEqual({ piInstitution: 'JHU', reviewerInstitution: 'JHU' });
+    expect(out[0].institutionCOIDetails).not.toHaveProperty('historical');
   });
 
   test('a recompute that found NO COI overrides a stale discover-true', () => {
@@ -117,13 +119,14 @@ describe('mergeEnrichment', () => {
     expect(out[0].institutionCOIDetails).toBeNull();
   });
 
-  test('keeps the discover COI when the route did NOT recompute (no authorInstitution)', () => {
+  test('keeps the discover COI when the route did NOT recompute, but strips legacy historical', () => {
     const out = mergeEnrichment(
-      [{ name: 'Dr. H', hasInstitutionCOI: true, institutionCOIDetails: { historical: true } }],
+      [{ name: 'Dr. H', hasInstitutionCOI: true, institutionCOIDetails: { piInstitution: 'JHU', reviewerInstitution: 'JHU', historical: true } }],
       [{ name: 'Dr. H', contactEnrichment: { email: 'h@x.edu' } }],
     );
     expect(out[0].hasInstitutionCOI).toBe(true);
-    expect(out[0].institutionCOIDetails.historical).toBe(true);
+    expect(out[0].institutionCOIDetails).toEqual({ piInstitution: 'JHU', reviewerInstitution: 'JHU' });
+    expect(out[0].institutionCOIDetails).not.toHaveProperty('historical');
   });
 });
 

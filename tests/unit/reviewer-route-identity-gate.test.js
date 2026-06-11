@@ -263,6 +263,29 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
   });
 
+  test('S240: a same-institution (hasInstitutionCOI) candidate is hard-rejected, not saved', async () => {
+    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{
+      name: 'Same Institution PI-mate', identityStatus: 'confirmed', hasInstitutionCOI: true,
+    }] } };
+    const res = mockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({ rejectedInstitutionCOI: 1 });
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  });
+
+  test('S240: post-enrichment institution COI (contactEnrichment.coiRecomputed) is hard-rejected even if top-level flag absent', async () => {
+    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{
+      name: 'Enriched Into COI', identityStatus: 'confirmed',
+      contactEnrichment: { coiRecomputed: true, hasInstitutionCOI: true },
+    }] } };
+    const res = mockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(422);
+    expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  });
+
   test('all-failed non-identity save returns non-2xx with per-row errors', async () => {
     reviewerSuggestionAdapter.upsert.mockRejectedValueOnce(new Error('Dataverse range validation failed'));
     const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Range Bug', relevanceScore: 41 }] } };

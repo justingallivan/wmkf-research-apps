@@ -743,7 +743,11 @@ export default function ReviewerSearchSection({
   // (anchor-or-abstain at the UI boundary). It renders read-only in its own section
   // and is excluded from select-all + the save set. The server (save-candidates) also
   // hard-rejects these rows, so this is the friendly gate, not the only one.
-  const isSelectable = (c) => provenanceGroupOf(c) !== 'needs_identity_review';
+  // Not selectable if identity needs review OR there's a current same-institution COI
+  // (S240 Chunk 2a hard drop): discovery already drops these, but enrichment can promote
+  // a current affiliation that matches the PI's institution after the fact — those rows
+  // become unselectable + unsavable (the save-candidates API also hard-rejects them).
+  const isSelectable = (c) => provenanceGroupOf(c) !== 'needs_identity_review' && !c.hasInstitutionCOI;
   const selectableCandidates = displayCandidates.filter(isSelectable);
 
   // A Claude suggestion the server couldn't verify can ALSO surface — and verify —

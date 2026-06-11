@@ -1030,7 +1030,10 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
   // selectable/savable as a vetted reviewer. This page has no provenance grouping, so it
   // gates on the same helper the Workbench uses; `save-candidates` also hard-rejects
   // these rows server-side.
-  const isSelectable = (c) => provenanceGroupOf(c) !== 'needs_identity_review';
+  // Also excludes current same-institution COI rows (S240 Chunk 2a hard drop): enrichment
+  // can promote a current affiliation matching the PI's institution after discovery's drop;
+  // those become unselectable + unsavable (save-candidates also hard-rejects them).
+  const isSelectable = (c) => provenanceGroupOf(c) !== 'needs_identity_review' && !c.hasInstitutionCOI;
 
   const toggleCandidate = (candidate) => {
     if (!isSelectable(candidate)) return; // identity-unresolved rows are not selectable

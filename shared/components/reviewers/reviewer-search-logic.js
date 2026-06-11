@@ -27,6 +27,17 @@ import { buildReviewerProvenance } from '../../../lib/utils/reviewer-provenance'
  * @param {Array<{name: string, contactEnrichment: object}>|null|undefined} enrichmentResults
  * @returns {object[]}
  */
+// Institution-COI detail carries only { piInstitution, reviewerInstitution } now
+// (S240 Chunk 2a). Strip any legacy `.historical` field so a roster row saved before
+// the historical-COI retirement isn't reloaded and rendered as a current conflict
+// (Codex post-impl WARN). Returns null when there's no usable detail.
+export function sanitizeInstitutionCOIDetails(detail) {
+  if (!detail || typeof detail !== 'object') return null;
+  const piInstitution = detail.piInstitution || null;
+  const reviewerInstitution = detail.reviewerInstitution || null;
+  return (piInstitution || reviewerInstitution) ? { piInstitution, reviewerInstitution } : null;
+}
+
 export function mergeEnrichment(candidates, enrichmentResults) {
   if (!Array.isArray(candidates)) return [];
   if (!Array.isArray(enrichmentResults) || enrichmentResults.length === 0) return candidates;
@@ -45,7 +56,7 @@ export function mergeEnrichment(candidates, enrichmentResults) {
       // found none" (override the discover value) from "didn't run" (keep it).
       // (Codex P2#1.)
       hasInstitutionCOI: e.coiRecomputed ? !!e.hasInstitutionCOI : c.hasInstitutionCOI,
-      institutionCOIDetails: e.coiRecomputed ? (e.institutionCOIDetails || null) : (c.institutionCOIDetails || null),
+      institutionCOIDetails: sanitizeInstitutionCOIDetails(e.coiRecomputed ? e.institutionCOIDetails : c.institutionCOIDetails),
       email: e.email || c.email,
       website: e.website || c.website,
       facultyPageUrl: e.facultyPageUrl || c.facultyPageUrl,
@@ -184,7 +195,7 @@ export function pruneCandidateForRoster(c) {
     isApplicantRecommended: !!c.isApplicantRecommended,
     // COI + mismatch detail.
     hasInstitutionCOI: !!c.hasInstitutionCOI,
-    institutionCOIDetails: c.institutionCOIDetails || null,
+    institutionCOIDetails: sanitizeInstitutionCOIDetails(c.institutionCOIDetails),
     // Model-flagged COI/concern from the analyze prompt's POTENTIAL_CONCERNS field
     // (e.g. a former-institution tie the deterministic check misses). Persisted so
     // the card's advisory warning survives a roster reload, like `reasoning`.

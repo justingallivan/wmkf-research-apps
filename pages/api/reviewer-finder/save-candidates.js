@@ -113,6 +113,7 @@ export default async function handler(req, res) {
 
     let savedCount = 0;
     let rejectedUnresolved = 0;
+    let rejectedInstitutionCOI = 0;
     const errors = [];
     // The exact display names that saved successfully — the client flips ONLY
     // these to status='saved' in the Find-tab roster (S224), so a partial-failure
@@ -132,6 +133,28 @@ export default async function handler(req, res) {
             name: candidate.name,
             error: 'Candidate identity is unresolved (needs identity review); not saved.',
             code: 'identity_unresolved',
+          });
+          continue;
+        }
+
+        // S240 Chunk 2a: current same-institution is a HARD policy conflict. Discovery
+        // already drops same-institution candidates; one that reaches save with
+        // hasInstitutionCOI=true is a POST-ENRICHMENT discovery (a promoted current
+        // affiliation that matches a PI institution). Reject it here — the authoritative
+        // gate — so it can never be saved even if a stale client kept it selected.
+        // (Applicant-RECOMMENDED reviewers save via the recommended junction, not this
+        // route, so their flag-not-drop behavior is unaffected.)
+        // Read BOTH the top-level flag AND the post-enrichment recompute, so the gate
+        // holds even when the client didn't promote enrichment's COI onto the candidate
+        // (e.g. the enrich-then-save path filters selection before merging). Authoritative.
+        const enrichmentInstitutionCOI = candidate.contactEnrichment?.coiRecomputed
+          && !!candidate.contactEnrichment?.hasInstitutionCOI;
+        if (candidate.hasInstitutionCOI || enrichmentInstitutionCOI) {
+          rejectedInstitutionCOI += 1;
+          errors.push({
+            name: candidate.name,
+            error: 'Candidate is at the proposal PI’s institution (institution COI); not saved.',
+            code: 'institution_coi',
           });
           continue;
         }
@@ -182,10 +205,9 @@ export default async function handler(req, res) {
           ? candidate.relevanceScore
           : (candidate.verificationConfidence || 0.5);
 
+        // Note: a same-institution row (hasInstitutionCOI) never reaches here — it is
+        // hard-rejected above (S240). So no institution-COI annotation is appended.
         let matchReason = candidate.reasoning || candidate.generatedReasoning || '';
-        if (candidate.hasInstitutionCOI) {
-          matchReason += ' [Institution COI: Same institution as proposal PI]';
-        }
         if (candidate.hasCoauthorCOI) {
           matchReason += candidate.coauthorCOIStrength === 'possible'
             ? ' [Possible coauthor overlap: shared paper(s) with proposal author(s) — may be incidental]'
@@ -280,14 +302,15 @@ export default async function handler(req, res) {
     // If nothing saved AND the only reason was unresolved-identity rejections, this is
     // a validation failure (422), not a generic empty/500 — gives the caller (esp. the
     // standalone Reviewer Finder, which has no client-side identity gate) a clear signal.
-    if (savedCount === 0 && rejectedUnresolved === candidates.length) {
+    if (savedCount === 0 && (rejectedUnresolved + rejectedInstitutionCOI) === candidates.length) {
       return res.status(422).json({
-        error: 'Selected candidates need identity review and were not saved.',
+        error: 'Selected candidates were not saved — they need identity review or are at the PI’s institution.',
         success: false,
         savedCount: 0,
         savedNames,
         totalRequested: candidates.length,
         rejectedUnresolved,
+        rejectedInstitutionCOI,
         errors,
       });
     }
@@ -300,6 +323,7 @@ export default async function handler(req, res) {
         savedNames,
         totalRequested: candidates.length,
         rejectedUnresolved: rejectedUnresolved > 0 ? rejectedUnresolved : undefined,
+        rejectedInstitutionCOI: rejectedInstitutionCOI > 0 ? rejectedInstitutionCOI : undefined,
         errors,
       });
     }
@@ -310,6 +334,7 @@ export default async function handler(req, res) {
       savedNames,
       totalRequested: candidates.length,
       rejectedUnresolved: rejectedUnresolved > 0 ? rejectedUnresolved : undefined,
+      rejectedInstitutionCOI: rejectedInstitutionCOI > 0 ? rejectedInstitutionCOI : undefined,
       errors: errors.length > 0 ? errors : undefined,
     });
 
