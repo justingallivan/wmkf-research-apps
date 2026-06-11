@@ -59,6 +59,7 @@
 - No banking/PII in Dataverse (firm constraint): project-no-banking-pii-in-dataverse.md
 - App access / auth / admin: project-app-access-control.md; project-admin-dashboard.md; project-api-credit-monitoring.md
 - Security (A7 prompt-injection hardening): project-a7-prompt-injection-hardening.md
+- Private-blob download proxy (BUILT but PARKED — legacy-only consumer; reusable pattern for future Postgres-backed private storage): project-download-proxy-parked.md
 - Virtual Review Panel: project-virtual-review-panel.md
 - Dev environment / secrets (Vercel deploy = CLI only, no git-integration → preview-auth gotcha): project-dev-environment.md; project-vercel-sensitive-env-pull-empty.md; project-vercel-cli-deploy-preview-auth.md
 - Claude config (~/.claude) git-synced across home/office, auto-pulls on launch: claude-config-git-sync.md

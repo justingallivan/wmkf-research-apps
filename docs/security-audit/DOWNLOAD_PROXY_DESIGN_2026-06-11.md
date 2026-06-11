@@ -1,16 +1,28 @@
 # Phase 1 — authenticated private-blob download proxy + cycle-materials migration
 
-**Status:** 🟨 SLICES 1–3 CODE-COMPLETE + CODEX-REVIEWED (2026-06-11); flag-gated
-(default public), **live e2e smoke pending**. Slice 1 = the record-scoped proxy route
-(`pages/api/reviewer-finder/cycle-material.js`; Codex: no record-scope bypass). Slice 2 =
-all readers private-aware (`grant-cycles` GET, `generate-emails`, `send-emails`) +
-`maintenance-service` data-loss fix (Codex-verified; two findings folded). Slice 3 =
-`SettingsModal`'s template + attachment uploads flip to `access="private"` under the
-`cycle-materials/` prefix behind `NEXT_PUBLIC_REVIEWER_FINDER_PRIVATE_CYCLE_MATERIALS`
-(default public), persisting the blob **pathname**. Builds on the completed file-loader
-cohort (`PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`). **Remaining:** set the flag in
-dev/preview + browser e2e smoke (upload a template in SettingsModal → it lands private →
-generate/send-emails attaches it via private read → blob URL 403), then prod promotion.
+**Status:** 🅿️ PARKED 2026-06-11 — slices 1–3 CODE-COMPLETE + CODEX-REVIEWED, flag-gated
+(default public) so **inert in production**; **deliberately NOT e2e-smoked or promoted.**
+Slice 1 = the record-scoped proxy route (`pages/api/reviewer-finder/cycle-material.js`;
+Codex: no record-scope bypass). Slice 2 = all readers private-aware (`grant-cycles` GET,
+`generate-emails`, `send-emails`) + `maintenance-service` data-loss fix (Codex-verified; two
+findings folded). Slice 3 = `SettingsModal`'s template + attachment uploads flip to
+`access="private"` under the `cycle-materials/` prefix behind
+`NEXT_PUBLIC_REVIEWER_FINDER_PRIVATE_CYCLE_MATERIALS` (default public), persisting the blob
+**pathname**. Builds on the completed file-loader cohort
+(`PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`).
+
+**Why parked (decision 2026-06-11):** the proxy's only consumer is the
+reviewer-finder/review-manager **grant-cycle email materials** — **low risk** (staff-authored
+org assets) — and both apps are being replaced by the Dataverse-native **Workbench**. So
+smoking/promoting would only harden soon-to-be-legacy code. The proxy is **retained as a
+reusable pattern** (record-scoped private-blob download: `record → requireAppAccess →
+server-side private get → attachment/nosniff/no-store`, with the
+`lib/utils/cycle-material-ref.js` prefix classifier) for an expected future
+**Postgres-backed** private-storage need. **The slice-2 `maintenance-service` fix (a *live*
+data-loss bug — public cycle attachments were reapable after retention) stands regardless.**
+See memory `project-download-proxy-parked`. **To un-park:** set the flag in dev/preview →
+browser e2e smoke (upload template in SettingsModal → lands private → email attaches via
+private read → blob URL 403) → flag + deploy to prod.
 
 ## Codex review (2026-06-11) — folded
 
@@ -172,9 +184,11 @@ server-read still `safeFetch`es a 403 URL breaks attachments). Order:
    flag-gated → `access="private"` under the `cycle-materials/` prefix, persisting the blob
    pathname (`NEXT_PUBLIC_REVIEWER_FINDER_PRIVATE_CYCLE_MATERIALS`, default public). No
    `EmailGeneratorModal`/`FileUploaderSimple` change (the modals use direct `upload()`, and
-   neither renders the ref as a clickable link). **Remaining: live e2e smoke** (set the flag
-   in dev/preview → upload a template → confirm it lands private + 403 + generate/send-emails
-   attaches it via the private read), then prod promotion.
+   neither renders the ref as a clickable link). **PARKED 2026-06-11 — not e2e-smoked or
+   promoted** (low-risk, legacy-only consumer being replaced by the Workbench; see the Status
+   banner + memory `project-download-proxy-parked`). To un-park: set the flag in dev/preview →
+   upload a template → confirm it lands private + 403 + generate/send-emails attaches it via the
+   private read → flag + deploy to prod.
 
 ## Resolved decisions
 
