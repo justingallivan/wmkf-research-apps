@@ -435,7 +435,7 @@ describe('/api/external/review/[token]/respond', () => {
       method: 'POST',
       query: { token: 'good-token' },
       headers: {},
-      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'Town', postalCode: '94000', country: 'US' } },
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'Town', postalCode: '94000', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
     await handler(req, res);
@@ -502,7 +502,7 @@ describe('/api/external/review/[token]/respond', () => {
     verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
       method: 'POST', query: { token: 'good-token' }, headers: {},
-      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US' } },
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
     await handler(req, res);
