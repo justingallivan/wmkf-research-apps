@@ -40,7 +40,16 @@ function PhaseIDynamics() {
 
   const fileRef = useMemo(() => {
     if (uploaded) {
-      return { source: 'upload', fileUrl: uploaded.url, filename: uploaded.filename };
+      // Carry pathname + access so the server (via file-loader →
+      // readUploadedBlobBuffer) reads a private blob by pathname; a legacy
+      // public upload (no access) still resolves via its fileUrl.
+      return {
+        source: 'upload',
+        fileUrl: uploaded.url,
+        pathname: uploaded.pathname,
+        access: uploaded.access,
+        filename: uploaded.filename,
+      };
     }
     const f = findFileByKey(pick);
     if (f && f.library && f.folder) {
@@ -232,13 +241,22 @@ function PhaseIDynamics() {
             <FileUploaderSimple
               onFilesUploaded={(files) => {
                 if (files && files.length > 0) {
-                  setUploaded({ url: files[0].url, filename: files[0].filename });
+                  setUploaded({
+                    url: files[0].url,
+                    pathname: files[0].pathname,
+                    access: files[0].access,
+                    filename: files[0].filename,
+                  });
                   setPick('');
                 }
               }}
               multiple={false}
               accept=".pdf,.docx,.doc"
               hideFileList={false}
+              // Phase 1: Phase-I proposals are sensitive — upload as private blobs
+              // when enabled. summarize/summarize-v2 read them server-side by
+              // pathname via file-loader. Gated (default public) until smoked.
+              access={process.env.NEXT_PUBLIC_PHASE_I_DYNAMICS_PRIVATE_BLOB === 'true' ? 'private' : 'public'}
             />
             {uploaded && (
               <p className="mt-2 text-sm text-green-700">

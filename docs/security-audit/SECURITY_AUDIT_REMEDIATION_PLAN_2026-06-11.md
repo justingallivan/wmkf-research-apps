@@ -8,7 +8,7 @@ This plan corrects the deficiencies recorded in `docs/security-audit/SECURITY_AU
 
 | Finding | Source | Status |
 |---|---|---|
-| Generic uploader creates public Blob artifacts for sensitive document workflows | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 | Pilot done + smoked (2026-06-11) — `expense-reporter` flag-gated private upload (default public) + server-side read via `lib/utils/uploaded-blob.js`; live smoke passed (private store + HTTP 403). Prod promotion + ~14 remaining consumers + download proxy + `file-loader` still open. See `PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md` |
+| Generic uploader creates public Blob artifacts for sensitive document workflows | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 | Pilot done + smoked (2026-06-11) — `expense-reporter` flag-gated private upload (default public) + server-side read via `lib/utils/uploaded-blob.js`; live smoke passed (private store + HTTP 403). `file-loader.js` now private-aware + `phase-i-dynamics` migrated (2026-06-11). Prod promotion + download proxy + `grant-reporting` + remaining consumers still open. See `PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md` |
 | Shared Executor calls Claude with raw `fetch` instead of canonical `LLMClient` | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 | ✅ Done (2026-06-11) — Phase 2 shipped; `callClaude()` → `LLMClient.complete()`, cache_control preserved, 23 Executor tests green, build/lint clean |
 | `AI_DATA_FLOW_MATRIX.md` is stale for contact enrichment transport | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | ✅ Done (2026-06-11) — Phase 3 shipped; 5 stale call sites reconciled to `LLMClient`, residual risk preserved; `check:fact-consistency` green |
 | API route guard gate warns on intentionally HMAC-protected BILL routes | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | ✅ Done (2026-06-11) — Phase 4 shipped; `verifyInternalCall`/`verifyBillWebhook` recognized when matrix documents the HMAC boundary; `check:api-routes:self-test` added |
@@ -278,7 +278,7 @@ Stop and re-plan if any of these appear:
 
 ## Tracking Checklist
 
-- [x] Phase 1 private Blob proof slice implemented + smoked (2026-06-11, `expense-reporter`) — unit-tested + build green; ✅ live upload→read smoke passed (receipts in private store; URL HTTP 403). ⚠️ production promotion (token + flag + deploy) still pending. Download proxy + `file-loader` private read + remaining consumers deferred to later phases.
+- [x] Phase 1 private Blob proof slice implemented + smoked (2026-06-11, `expense-reporter`) — unit-tested + build green; ✅ live upload→read smoke passed (receipts in private store; URL HTTP 403). ⚠️ production promotion (token + flag + deploy) still pending. Follow-on 2026-06-11: `file-loader.js` private read DONE + `phase-i-dynamics` migrated (flag-gated). Download proxy + `grant-reporting` + remaining consumers still to do.
 - [x] Phase 2 Executor transport convergence implemented and verified. (2026-06-11 — `LLMClient.complete()` adapter; cache_control + cache-hit regression-pinned; 23 Executor tests + build green.)
 - [x] Phase 3 AI data-flow matrix reconcile complete. (2026-06-11)
 - [x] Phase 4 HMAC route gate hygiene complete. (2026-06-11)

@@ -15,11 +15,19 @@
   expense-reporter upload→extract run locally against the store: receipts landed
   in the private store, URL returns HTTP 403). **Production token + flag + deploy
   still pending.**
+- ✅ **`lib/utils/file-loader.js` is now private-aware** (2026-06-11) — its `upload`
+  branch delegates to `readUploadedBlobBuffer` (private `pathname` read, or `safeFetch`
+  for legacy public). So its callers (`grant-reporting/extract`, `phase-i-dynamics`
+  summarize + summarize-v2) get private reads just by passing `access`/`pathname` in
+  the FileRef. Unit-tested; back-compat (no consumer change required).
+- 🟡 **`phase-i-dynamics`** — page migrated (2026-06-11): uploader `access` gated by
+  `NEXT_PUBLIC_PHASE_I_DYNAMICS_PRIVATE_BLOB` (default `public`); the `fileRef` now
+  carries `pathname`+`access`, read server-side via the private-aware file-loader.
+  Build/lint/tests green. **Live smoke + prod flag pending** (same shared store/token).
+- ⏳ **`grant-reporting`** — remaining file-loader consumer (proposal + report uploads);
+  same change as phase-i-dynamics.
 - ⏳ **Browser-render consumers** (templates/attachments via `proxifyBlobUrl`,
   `blob-proxy.js`) — need the new authenticated download proxy (record/app-scoped).
-- ⏳ **`file-loader.js` consumers** (Grant Reporting, Phase-I writeback, etc.) — switch
-  the shared loader's `upload` source from `safeFetch(fileUrl)` to a private
-  `pathname` read.
 - ⏳ Remaining `FileUploaderSimple` consumers below — flip to `access="private"` +
   pathname once their read path is private-aware.
 
