@@ -1,6 +1,6 @@
 # Phase 1 design — private-blob upload + authenticated download proxy
 
-**Status:** Design / pre-implementation. For Codex review before coding.
+**Status:** Reviewed by Codex 2026-06-11 (verdict REVISE — corrections folded below). Resolve the open ownership-model decision + the access-enforcement probe before implementation.
 **Source finding:** `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 — "Generic uploader still creates public Blob artifacts for sensitive document workflows."
 **Builds on:** `docs/security-audit/P2_PRIVATE_BLOB_MIGRATION.md` (origin/scoping — this doc is the concrete implementation design + pilot slice).
 **Remediation tracker:** `docs/security-audit/SECURITY_AUDIT_REMEDIATION_PLAN_2026-06-11.md` Phase 1.
@@ -43,33 +43,41 @@
    document can't render inline under the app origin (same lesson as the
    `blob-proxy.js` Phase 7 finding).
 
-## ⚠️ Must verify FIRST (external-platform claim — do not assume)
+## ⚠️ SDK reality (corrected by Codex against installed `@vercel/blob` types)
 
-The current `@vercel/blob` private-access API for **client uploads** must be
-confirmed against the installed SDK version before coding — do not assume the shape
-from memory (per the "verify external platform claims" rule). Specifically:
-- Does `onBeforeGenerateToken` in `handleUpload` accept an `access: 'private'` (or
-  equivalent) so the minted client-upload token produces a private blob?
-- What is the server-side **read** API for a private blob (download/`head` by
-  pathname using `BLOB_READ_WRITE_TOKEN` / the intake token), since a private blob
-  has no auth-free public URL?
-- Does the client `upload()` return a stable `pathname` we can persist and resolve?
+Codex checked the installed SDK types (`@vercel/blob/dist/client.d.ts`). Findings:
+- ✅ Client `upload()` **does** accept `access: 'private'` and returns a stable
+  `pathname` we can persist/resolve.
+- ✅ Server-side private **read** by pathname is supported (`get()` with the
+  RW/intake token) — no auth-free public URL.
+- ❌ **The original design was wrong:** `onBeforeGenerateToken`'s return options do
+  **not** include `access` (`client.d.ts:188,198,298`). Private mode is selected at
+  the **client `upload({ access: 'private' })`** call, not minted by
+  `onBeforeGenerateToken`. `upload-handler` still validates content-type/size and
+  authn, but it is *not* where private access is configured.
 
-Confirm via the Vercel Blob docs + the installed `@vercel/blob` version (and a
-throwaway probe upload in a dev project if needed). If client-upload private mode is
-not supported in the installed version, fall back design: route the bytes through a
-server upload (`put(..., { access:'private' })`) instead of client `upload()`, at the
-cost of the 50 MB body passing through the function — call this out as a branch.
+**Remaining unknown to confirm before coding:** whether `handleUpload` /
+`onBeforeGenerateToken` can **server-enforce or override** the client-requested
+access mode (so a client can't silently request `public`). The callback return type
+excludes `access`, so server-side enforcement may require validating the requested
+access another way (e.g. inspecting `clientPayload`) or accepting that access is
+client-asserted and compensating in the read path. Resolve via a throwaway dev
+probe. If server enforcement is impossible, the fallback is a **server upload**
+(`put(..., { access:'private' })`) routing bytes through the function (50 MB
+through-function cost) — call this out as a branch for sensitive consumers.
 
 ## Target design
 
 1. **Upload (private mode behind a flag/prop).**
-   - `upload-handler`'s `onBeforeGenerateToken` mints **private** tokens when private
-     mode is requested (keep public as the default until the pilot proves out).
    - `FileUploaderSimple` gains a prop (e.g. `access="private"` / `privateBlob`)
-     instead of hard-coding `access: 'public'`; it returns the blob **`pathname`** (in
+     instead of hard-coding `access: 'public'`, and passes `access: 'private'` to the
+     **client `upload()`** call (this — not `onBeforeGenerateToken` — is where access
+     is selected; see SDK reality above). It returns the blob **`pathname`** (in
      addition to / instead of `url`) so consumers persist a stable, resolvable
      reference, not a public URL.
+   - `upload-handler` keeps its authn + content-type/size validation; investigate
+     whether it can server-enforce the requested access mode (open item above). Keep
+     public as the default until the pilot proves out.
 2. **Authenticated download proxy** — new route, e.g. `pages/api/blob/[...path].js`
    or `pages/api/private-blob/download.js`:
    - `requireAuth` minimum; `requireAppAccess(req,res,<appKey>)` where the consumer is
@@ -107,13 +115,44 @@ pre-existing public blobs (re-host vs. leave to expire) as a later step
 
 ## Files touched (pilot)
 
-- `pages/api/upload-handler.js` — private-token branch in `onBeforeGenerateToken`.
-- `shared/components/FileUploaderSimple.js` — `access` prop; return `pathname`.
-- New: `pages/api/blob/[...path].js` (or similar) — authenticated download proxy.
+- `shared/components/FileUploaderSimple.js` — `access` prop; pass `access:'private'`
+  to `upload()`; return `pathname`.
+- `pages/api/upload-handler.js` — keep validation; investigate server-enforcing the
+  requested access mode (not token-minting `access`).
+- **`lib/utils/file-loader.js` (Codex GAP):** this shared loader currently accepts a
+  `fileUrl` and `fetch`es it directly (`:5`,`:6`,`:47`,`:49`,`:51`). It is very likely
+  **the** read chokepoint — make it resolve a private `pathname` via server-side
+  `get()` so every consumer that loads through it gets private reads without
+  per-caller edits. Confirm which pilot/consumers route through it.
+- New: `pages/api/blob/[...path].js` (or similar) — authenticated download proxy
+  (for browser-facing render/download paths, distinct from server-side `file-loader`
+  reads).
 - Pilot page + its processing API route (e.g. `pages/expense-reporter.js` + the
-  expense-processing API) — store/pass pathname; read via proxy.
+  expense-processing API) — store/pass pathname; read via `file-loader`/proxy.
 - `docs/API_ROUTE_SECURITY_MATRIX.md` — new proxy route row.
 - Possibly `docs/AI_DATA_FLOW_MATRIX.md` / atlas if a blob reference is persisted.
+
+## Codex review (2026-06-11) — verdict REVISE, folded
+
+- [OVERSTATED→fixed] `onBeforeGenerateToken` does **not** mint `access`; private mode
+  is the client `upload({access:'private'})` call. Corrected in SDK-reality + Target
+  design. Installed SDK types confirm `upload()` private mode, `pathname` return, and
+  server private read by pathname.
+- [GAP→added] `lib/utils/file-loader.js` (`fetch`es `fileUrl` directly) added to
+  scope as the likely read chokepoint — pathname-only private blobs break it
+  otherwise.
+- [RISK→open decision] **Ownership/authorization model is undefined.** Auth-only
+  pathname proxying is a *bearer-pathname* model — there is no persisted
+  pathname→user/app/record mapping today (the token payload records only the
+  uploader email, inside the token, not persisted; `upload-handler.js:33`-`35`).
+  Before the proxy ships, decide: (a) persist a `{pathname → app/record/uploader}`
+  row at upload time and enforce it on read, or (b) accept auth-gated-only for v1
+  with record-scoping where a record exists. **Recommendation:** at minimum persist
+  app + uploader at upload time so the proxy can enforce `requireAppAccess` + owner,
+  not just "any authenticated user."
+- [GAP→noted] `X-Content-Type-Options: nosniff` must be **pinned by a test on the new
+  route** — the cited `download-review.js` pattern does not set it
+  (`download-review.js:77`-`83`), so it won't be inherited.
 
 ## Tests / verification
 

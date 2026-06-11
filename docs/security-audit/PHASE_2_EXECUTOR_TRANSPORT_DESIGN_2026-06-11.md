@@ -1,6 +1,6 @@
 # Phase 2 design — Executor Claude transport convergence (raw `fetch` → `LLMClient`)
 
-**Status:** Design / pre-implementation. For Codex review before coding.
+**Status:** Reviewed by Codex 2026-06-11 (verdict REVISE — corrections folded below). Ready for implementation.
 **Source finding:** `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 — "Shared Executor still calls Claude with raw `fetch` instead of the canonical `LLMClient`."
 **Remediation tracker:** `docs/security-audit/SECURITY_AUDIT_REMEDIATION_PLAN_2026-06-11.md` Phase 2.
 
@@ -14,10 +14,13 @@
 - no API-key redaction on thrown errors,
 - no `api_usage_log` usage row.
 
-`lib/services/llm-client.js` is the documented canonical wrapper that adds all of
-the above. The Executor is the shared Vercel↔PowerAutomate prompt surface
-(`docs/EXECUTOR_CONTRACT.md`), so transport inconsistency here is higher-leverage
-than a one-off route.
+`lib/services/llm-client.js` is the documented canonical wrapper that adds the
+timeout / retry / safeFetch / redaction transport protections. **Caveat (Codex):**
+`api_usage_log` logging is **conditional on passing `appName`**, not inherent to
+transport convergence (`llm-client.js:317`,`:331`) — see Decision 1; this pass does
+*not* add Executor usage logging. The Executor is the shared Vercel↔PowerAutomate
+prompt surface (`docs/EXECUTOR_CONTRACT.md`), so transport inconsistency here is
+higher-leverage than a one-off route.
 
 ## Key constraint — the cache_control system array
 
@@ -132,8 +135,24 @@ async function callClaude(promptRow, { system, body }) {
 ## Files touched
 
 - `lib/services/execute-prompt.js` — `callClaude()` body only (+ import `LLMClient`).
-- Possibly `docs/EXECUTOR_CONTRACT.md` + `docs/AI_DATA_FLOW_MATRIX.md` row for
-  `execute-prompt.js` if we want to note the transport now goes through `LLMClient`.
+- **Required (Codex):** `docs/EXECUTOR_CONTRACT.md` (`:85`-`86` documents the call
+  step as raw `fetch` — it goes stale the moment this lands) and the
+  `docs/AI_DATA_FLOW_MATRIX.md` `execute-prompt.js` row. Not optional once the
+  transport changes.
+
+## Codex review (2026-06-11) — verdict REVISE, folded
+
+- [OVERSTATED→fixed] `LLMClient` "adds all of the above" implied automatic
+  `api_usage_log`; logging is conditional on `appName`. Corrected in Problem +
+  Decision 1.
+- [GAP→noted] Omitting `appName` *defers* Executor-level usage logging rather than
+  fixing it — **explicitly out of scope** for this pass (see Decision 1 + Out of
+  scope). A separate "consolidate Executor usage accounting" follow-up owns it.
+- [RISK→fixed] `EXECUTOR_CONTRACT.md` update promoted from optional to required
+  (above).
+- Confirmed: cache-control system-array pass-through, raw snake_case downstream
+  reads, `summarize-v2` already logs usage, error-string difference. Transport
+  adapter approach sound → proceed to implementation after these revisions.
 
 ## Tests / verification
 
