@@ -41,16 +41,38 @@ function proseLen(line) {
     .trim().length;
 }
 
-function violations(raw) {
-  const out = [];
-  const bytes = Buffer.byteLength(raw, 'utf8');
+// Numeric budget metrics. Compared monotonically (see breaches) rather than by
+// stringified violation tokens, so a partial cleanup of an already-over-budget
+// file — or any net-neutral/shrinking edit — is never blocked, and line-number
+// shifts can't spoof a "net-new" violation.
+function metrics(raw) {
   const lines = raw.split('\n');
-  if (bytes > TARGET_BYTES) out.push(`bytes ${bytes}>${TARGET_BYTES}`);
-  if (lines.length > MAX_LINES) out.push(`lines ${lines.length}>${MAX_LINES}`);
-  for (let i = 0; i < lines.length; i += 1) {
-    if (!lines[i].startsWith('- ')) continue;
-    const len = proseLen(lines[i]);
-    if (len > MAX_PROSE_LEN) out.push(`prose@L${i + 1} ${len}>${MAX_PROSE_LEN}`);
+  let maxProse = 0;
+  let overCapCount = 0;
+  for (const line of lines) {
+    if (!line.startsWith('- ')) continue;
+    const len = proseLen(line);
+    if (len > maxProse) maxProse = len;
+    if (len > MAX_PROSE_LEN) overCapCount += 1;
+  }
+  return { bytes: Buffer.byteLength(raw, 'utf8'), lines: lines.length, maxProse, overCapCount };
+}
+
+// A dimension breaches only when the proposed file is over that cap AND strictly
+// worse than the current file: bytes/lines that grew, a new over-cap router line
+// (overCapCount up), or the worst router line getting longer. Holding steady or
+// shrinking — even while still over a cap — always passes, honoring the contract.
+function breaches(before, after) {
+  const out = [];
+  if (after.bytes > TARGET_BYTES && after.bytes > before.bytes) {
+    out.push(`bytes ${after.bytes}>${TARGET_BYTES}`);
+  }
+  if (after.lines > MAX_LINES && after.lines > before.lines) {
+    out.push(`lines ${after.lines}>${MAX_LINES}`);
+  }
+  if (after.overCapCount > before.overCapCount
+    || (after.maxProse > MAX_PROSE_LEN && after.maxProse > before.maxProse)) {
+    out.push(`router-line prose ${after.maxProse}>${MAX_PROSE_LEN}`);
   }
   return out;
 }
@@ -85,9 +107,8 @@ process.stdin.on('end', () => {
     }
     if (proposed == null) return; // can't reconstruct the result → fail open
 
-    const before = new Set(violations(current));
-    const net = violations(proposed).filter((v) => !before.has(v));
-    if (net.length === 0) return; // edit does not worsen the router → allow
+    const net = breaches(metrics(current), metrics(proposed));
+    if (net.length === 0) return; // edit does not worsen any over-cap dimension → allow
 
     const bytes = Buffer.byteLength(proposed, 'utf8');
     console.error(

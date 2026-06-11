@@ -15,12 +15,16 @@ write-rate, periodic big-bang cleanups always lose the race.
 **Prevention (installed 2026-06-10), three layers:**
 
 1. **Write-time enforcement.** `.claude/hooks/memory-router-guard.js` (PreToolUse
-   Write|Edit) blocks an edit to MEMORY.md that introduces a *net-new* budget breach
-   (>12KB, >150 lines, or a `- ` line whose prose — `.md` refs stripped — exceeds 200
-   chars). Net-neutral/shrinking edits always pass, so compaction is never trapped.
+   Write|Edit) blocks an edit to MEMORY.md that pushes a budget dimension *further past
+   its cap* — bytes/lines that grow over cap, or a new/longer over-cap `- ` router line
+   (prose measured with `.md` refs stripped, cap 200). The comparison is monotonic
+   before/after, NOT exact-token, so a partial cleanup of an already-over-budget file —
+   and any net-neutral/shrinking edit — always passes (it can never wedge a fix).
    Thresholds single-sourced from `scripts/check-memory-router.js`. The gate was also
    hardened: 12KB warn→hard-fail + the 200-char prose cap (file-ref lists exempt, so a
-   line may route to many files).
+   line may route to many files). NOTE: harness/auto-memory writes don't go through the
+   Write/Edit tools, so they bypass this PreToolUse hook — `check:memory-router` stays
+   the backstop (at session start / CI) for anything the hook can't see.
 
 2. **Signal.** Gate emits an 11KB early-warning band (warns, doesn't fail); the
    SessionStart hook surfaces router pressure when within ~1KB of the cap.
