@@ -69,7 +69,7 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | `BLOB_READ_WRITE_TOKEN` | File upload storage (public shared store `phase-ii-summaries-blob`) | Auto-set when Vercel Blob is linked |
 | `DVX_BLOB_RW_TOKEN` | Dataverse Bulk Export private store (`dvx-export-private`) RW token | Manual — see "Private Blob store provisioning" below |
 | `INTAKE_BLOB_RW_TOKEN` | Applicant intake drain private store (`intake-applicant-private`, `store_Eaui32n6i2wYMS6E`, `iad1`) RW token | Manual — same provisioning shape as DVX |
-| `UPLOADS_BLOB_RW_TOKEN` | Shared document-uploader private store (`uploads-private`) RW token — Phase 1 private-blob migration of `FileUploaderSimple` | Manual — **not yet provisioned**; private uploads fail closed until set. See "Private Blob store provisioning" below |
+| `UPLOADS_BLOB_RW_TOKEN` | Shared document-uploader private store (`wmkf-uploads-private`, `store_WvoDkxrlWniAuJAj`, `iad1`) RW token — Phase 1 private-blob migration of `FileUploaderSimple` | Manual — set in **dev + preview** (2026-06-11); **production pending** a passing smoke. Private uploads fail closed until set. See "Private Blob store provisioning" below |
 | `NODE_ENV` | Environment flag | Auto-set (`production` on Vercel, `development` locally) |
 
 ### Optional — Dynamics Explorer
@@ -203,9 +203,11 @@ These env vars hold RW tokens for **dedicated PRIVATE** Vercel Blob stores. They
 |-----|-----------|----------|--------|
 | `DVX_BLOB_RW_TOKEN` | `dvx-export-private` | (read from dashboard) | `iad1` |
 | `INTAKE_BLOB_RW_TOKEN` | `intake-applicant-private` | `store_Eaui32n6i2wYMS6E` | `iad1` |
-| `UPLOADS_BLOB_RW_TOKEN` | `uploads-private` (provision per the dance below) | (read from dashboard once created) | `iad1` |
+| `UPLOADS_BLOB_RW_TOKEN` | `wmkf-uploads-private` | `store_WvoDkxrlWniAuJAj` | `iad1` |
 
-`UPLOADS_BLOB_RW_TOKEN` backs the **private-blob migration of the shared document uploader** (Phase 1; `FileUploaderSimple access="private"` → `pages/api/upload-handler.js` mints the client token against this store, and `lib/utils/uploaded-blob.js` reads private blobs with it). It is **not yet provisioned**; until it is, `process-expenses` (and any future private consumer) fails closed — the `expense-reporter` private flag (`NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB`) must stay `public` until this token + store exist and a live upload→read smoke passes.
+`UPLOADS_BLOB_RW_TOKEN` backs the **private-blob migration of the shared document uploader** (Phase 1; `FileUploaderSimple access="private"` → `pages/api/upload-handler.js` mints the client token against this store, and `lib/utils/uploaded-blob.js` reads private blobs with it). **Provisioned 2026-06-11** in **dev + preview**; **production token + the `NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB` flag are still pending** a passing `node scripts/smoke-private-upload.mjs` + a live expense-reporter upload smoke on preview. Until the prod token is set, `process-expenses` (and any future private consumer) fails closed there, and the flag must stay `public`.
+
+> **Note (2026-06-11): the modern dashboard/CLI auto-connect uses the OIDC model.** When `wmkf-uploads-private` was connected it auto-created `BLOB_STORE_ID` (pointing at the private store) + `BLOB_WEBHOOK_PUBLIC_KEY` and **no** static RW token. That conflicts with this repo's explicit-per-store-token model (it would make the private store the default for token-less `@vercel/blob` calls). Fix applied: the RW token was copied from the store dashboard into `UPLOADS_BLOB_RW_TOKEN`, and `BLOB_STORE_ID` + `BLOB_WEBHOOK_PUBLIC_KEY` were **removed** (`vercel env rm`). For future private stores, either decline the auto-connect or remove those two vars afterward and wire only the explicit token.
 
 ### Why the CLI workflow is awkward
 

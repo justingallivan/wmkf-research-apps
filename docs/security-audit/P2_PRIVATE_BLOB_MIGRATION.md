@@ -6,10 +6,13 @@
 ## Rollout status (2026-06-11)
 
 - ✅ **`expense-reporter`** (pilot) — code shipped; private upload **flag-gated**
-  (`NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB`, default `public`) pending a live smoke.
+  (`NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB`, default `public`).
   `process-expenses.js` reads via `readUploadedBlobBuffer` (server-side
   `get(pathname,{access:'private'})` for private, `safeFetch` for legacy public).
   Server-read-only, so no proxy needed for this consumer.
+  Store `wmkf-uploads-private` + `UPLOADS_BLOB_RW_TOKEN` **provisioned 2026-06-11
+  (dev + preview)**; production token + flag pending `node scripts/smoke-private-upload.mjs`
+  + a live preview upload smoke.
 - ⏳ **Browser-render consumers** (templates/attachments via `proxifyBlobUrl`,
   `blob-proxy.js`) — need the new authenticated download proxy (record/app-scoped).
 - ⏳ **`file-loader.js` consumers** (Grant Reporting, Phase-I writeback, etc.) — switch

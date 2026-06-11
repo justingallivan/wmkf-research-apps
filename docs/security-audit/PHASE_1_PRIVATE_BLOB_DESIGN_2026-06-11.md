@@ -2,7 +2,7 @@
 
 **Status:** ✅ PILOT IMPLEMENTED 2026-06-11 (expense-reporter). SDK verified, design decisions resolved, pilot shipped server-read-only. Reviewed by Codex (REVISE — folded). **Remaining (later phases):** the browser-facing download proxy + `file-loader.js` private read + the other ~14 consumers. See "Implementation notes" at the end.
 
-> ⚠️ **Provisioning + live smoke still required.** Private blobs use a **dedicated private store** (`uploads-private`) with its own `UPLOADS_BLOB_RW_TOKEN` — NOT the public `BLOB_READ_WRITE_TOKEN` store (Codex BUG: PUT/GET private against the public token fails at the Blob API layer; see `docs/CREDENTIALS_RUNBOOK.md`). That store + token are **not yet provisioned**; until then the code fails closed (upload-handler returns 503, the read throws). Before flipping `NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB` to `true`: provision the store + token, then run a live receipt upload→extract in `expense-reporter` and confirm the blob is not publicly fetchable.
+> ⚠️ **Production wiring + live smoke still pending.** Private blobs use a **dedicated private store** (`wmkf-uploads-private`, `store_WvoDkxrlWniAuJAj`, iad1) with its own `UPLOADS_BLOB_RW_TOKEN` — NOT the public `BLOB_READ_WRITE_TOKEN` store (Codex BUG: PUT/GET private against the public token fails at the Blob API layer; see `docs/CREDENTIALS_RUNBOOK.md`). **Provisioned 2026-06-11 in dev + preview**; production token + the `NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB` flag are still pending. Where the token is unset the code fails closed (upload-handler 503, read throws). Before flipping the flag to `true` in prod: run `node scripts/smoke-private-upload.mjs` (PUT/GET/public-URL-blocked) + a live receipt upload→extract on a preview deploy.
 **Source finding:** `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 — "Generic uploader still creates public Blob artifacts for sensitive document workflows."
 **Builds on:** `docs/security-audit/P2_PRIVATE_BLOB_MIGRATION.md` (origin/scoping — this doc is the concrete implementation design + pilot slice).
 **Remediation tracker:** `docs/security-audit/SECURITY_AUDIT_REMEDIATION_PLAN_2026-06-11.md` Phase 1.
@@ -218,7 +218,7 @@ verify) is noted inline as the future tightening if receipt policy requires it. 
 new `{pathname→owner}` table for the pilot.
 
 **Dedicated private store (Codex BUG fix):** private blobs go to a **separate**
-`uploads-private` store via `UPLOADS_BLOB_RW_TOKEN`, never the public
+`wmkf-uploads-private` store via `UPLOADS_BLOB_RW_TOKEN`, never the public
 `BLOB_READ_WRITE_TOKEN` store. `upload-handler` picks the private token when the
 client signals `clientPayload:{access:'private'}`, and `readUploadedBlobBuffer` reads
 with it; both **fail closed** (503 / throw) if the token is unset. Store + token are
@@ -258,7 +258,7 @@ No new API route was added, so `API_ROUTE_SECURITY_MATRIX` is unchanged.
 ### Codex post-impl review (folded 2026-06-11) — verdict was REVISE
 
 - **[BUG] dedicated private store/token** → fixed: `UPLOADS_BLOB_RW_TOKEN` +
-  `uploads-private` store; upload-handler routes private uploads there and reads use
+  `wmkf-uploads-private` store; upload-handler routes private uploads there and reads use
   it; both fail closed if unset; documented in `CREDENTIALS_RUNBOOK.md`.
 - **[RISK] known-pathname cross-user read** → resolved by explicitly documenting the
   staff-shared, app-scoped model inline in `process-expenses.js` (Codex-offered
