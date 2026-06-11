@@ -221,7 +221,10 @@ that have records.
   `@vercel/blob` is lazy-imported so public-only consumers/tests don't load the SDK.
 - `shared/components/FileUploaderSimple.js` — new `access='public'` prop (passed to
   `upload()`); descriptor now returns `pathname` + `access`.
-- `pages/expense-reporter.js` — uploader set to `access="private"`.
+- `pages/expense-reporter.js` — uploader `access` gated behind
+  `NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB` (default `'public'`), so production is
+  unaffected until the env flag is flipped after a live smoke. The read path handles
+  both modes, so the flag only governs new uploads.
 - `pages/api/process-expenses.js` — both reads now go through `readUploadedBlobBuffer`
   (was `safeFetch(file.url)`); back-compat: a legacy/public ref (no `access`) still
   reads via `safeFetch`.

@@ -55,7 +55,7 @@ Results:
 
 ### P2 - Generic uploader still creates public Blob artifacts for sensitive document workflows
 
-Status: VERIFIED → 🟡 PILOT SHIPPED 2026-06-11 (remediation Phase 1). `expense-reporter` now uploads private blobs (`FileUploaderSimple access="private"`) and reads them server-side by `pathname` via `lib/utils/uploaded-blob.js` (`get(pathname,{access:'private'})`); no auth-free URL is created for receipts. Unit-tested + build green. **Still open:** a live upload→read smoke, the browser-facing download proxy + `file-loader` private read, and the remaining ~14 consumers. Design + what-shipped: `docs/security-audit/PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`.
+Status: VERIFIED → 🟡 PILOT SHIPPED 2026-06-11 (remediation Phase 1). `expense-reporter` can upload private blobs — **flag-gated** by `NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB` (default `public`, so prod is unchanged until a live smoke) — and `process-expenses` reads them server-side by `pathname` via `lib/utils/uploaded-blob.js` (`get(pathname,{access:'private'})`); when enabled, no auth-free URL is created for receipts. Unit-tested + build green. **Still open:** flip the flag after a live upload→read smoke, the browser-facing download proxy + `file-loader` private read, and the remaining ~14 consumers. Design + what-shipped: `docs/security-audit/PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`.
 
 Evidence:
 

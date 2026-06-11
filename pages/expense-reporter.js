@@ -321,8 +321,12 @@ function ExpenseReporter() {
               accept=".pdf,.png,.jpg,.jpeg"
               // Phase 1 pilot: receipts/invoices are sensitive — upload as
               // private blobs (no auth-free URL). process-expenses reads them
-              // server-side by pathname.
-              access="private"
+              // server-side by pathname. Gated behind a flag (default public)
+              // until a live private upload→read smoke confirms the store
+              // supports private access; flip NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB
+              // to 'true' to enable. The read path handles both modes, so the
+              // flag only controls new uploads.
+              access={process.env.NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB === 'true' ? 'private' : 'public'}
             />
 
             {uploadedFiles.length > 0 && (
