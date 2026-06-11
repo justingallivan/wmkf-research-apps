@@ -55,6 +55,11 @@ export default function FileUploaderSimple({
         console.log(`Starting blob upload for: ${file.name}`);
         const blob = await upload(file.name, file, {
           access,
+          // Signal access intent to /api/upload-handler so it can mint the
+          // token for the dedicated private store (the public store token can't
+          // write private blobs). `access` alone is not visible server-side in
+          // onBeforeGenerateToken, so it travels via clientPayload.
+          clientPayload: JSON.stringify({ access }),
           handleUploadUrl: '/api/upload-handler',
           onProgress: (progress) => {
             console.log(`Upload progress for ${file.name}:`, progress);

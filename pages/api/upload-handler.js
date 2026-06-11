@@ -12,7 +12,35 @@ export default async function handler(req, res) {
   if (!session) return;
 
   try {
+    // Private uploads must target the DEDICATED private Blob store, not the
+    // public shared store bound to BLOB_READ_WRITE_TOKEN — PUT/GET a private
+    // blob with the public token fails at the Blob API layer (see
+    // docs/CREDENTIALS_RUNBOOK.md "Private Blob store provisioning"). The store
+    // token must be the SAME across both handleUpload events (generate-token
+    // and upload-completed), so resolve the requested access from whichever
+    // field is present: the client sets `clientPayload` on the generate event,
+    // and we echo `access` into `tokenPayload` so the completed event resolves
+    // to the same token.
+    let requestedAccess = 'public';
+    try {
+      const raw = req.body?.payload?.clientPayload ?? req.body?.payload?.tokenPayload;
+      if (raw) requestedAccess = JSON.parse(raw)?.access === 'private' ? 'private' : 'public';
+    } catch {
+      // Malformed payload → treat as public (the default, safe choice).
+    }
+
+    let token; // undefined → SDK default (public BLOB_READ_WRITE_TOKEN)
+    if (requestedAccess === 'private') {
+      token = process.env.UPLOADS_BLOB_RW_TOKEN;
+      if (!token) {
+        return res.status(503).json({
+          error: 'Private uploads are not configured (UPLOADS_BLOB_RW_TOKEN missing)',
+        });
+      }
+    }
+
     const jsonResponse = await handleUpload({
+      token,
       body: req.body,
       request: req,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
@@ -32,7 +60,10 @@ export default async function handler(req, res) {
           maximumSizeInBytes: 50 * 1024 * 1024, // 50MB limit
           tokenPayload: JSON.stringify({
             uploadedAt: new Date().toISOString(),
-            userId: session.user?.email || 'authenticated'
+            userId: session.user?.email || 'authenticated',
+            // Echo access so the upload-completed event (which carries
+            // tokenPayload, not clientPayload) resolves to the same store token.
+            access: requestedAccess,
           })
         };
       },

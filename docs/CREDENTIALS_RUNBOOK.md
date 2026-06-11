@@ -69,6 +69,7 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | `BLOB_READ_WRITE_TOKEN` | File upload storage (public shared store `phase-ii-summaries-blob`) | Auto-set when Vercel Blob is linked |
 | `DVX_BLOB_RW_TOKEN` | Dataverse Bulk Export private store (`dvx-export-private`) RW token | Manual — see "Private Blob store provisioning" below |
 | `INTAKE_BLOB_RW_TOKEN` | Applicant intake drain private store (`intake-applicant-private`, `store_Eaui32n6i2wYMS6E`, `iad1`) RW token | Manual — same provisioning shape as DVX |
+| `UPLOADS_BLOB_RW_TOKEN` | Shared document-uploader private store (`uploads-private`) RW token — Phase 1 private-blob migration of `FileUploaderSimple` | Manual — **not yet provisioned**; private uploads fail closed until set. See "Private Blob store provisioning" below |
 | `NODE_ENV` | Environment flag | Auto-set (`production` on Vercel, `development` locally) |
 
 ### Optional — Dynamics Explorer
@@ -194,14 +195,17 @@ This is the most common maintenance task. Both `AZURE_AD_CLIENT_SECRET` and `DYN
 
 ---
 
-## Private Blob store provisioning (`DVX_BLOB_RW_TOKEN`, `INTAKE_BLOB_RW_TOKEN`)
+## Private Blob store provisioning (`DVX_BLOB_RW_TOKEN`, `INTAKE_BLOB_RW_TOKEN`, `UPLOADS_BLOB_RW_TOKEN`)
 
-Both env vars hold RW tokens for **dedicated PRIVATE** Vercel Blob stores. They are deliberately separate from the shared `BLOB_READ_WRITE_TOKEN` (which is bound to the public `phase-ii-summaries-blob` store used by uploads / reviewer-finder / review-manager / maintenance) and must NOT be conflated. Apps that PUT or GET against a private store with the public token will fail at the Blob API layer.
+These env vars hold RW tokens for **dedicated PRIVATE** Vercel Blob stores. They are deliberately separate from the shared `BLOB_READ_WRITE_TOKEN` (which is bound to the public `phase-ii-summaries-blob` store used by uploads / reviewer-finder / review-manager / maintenance) and must NOT be conflated. Apps that PUT or GET against a private store with the public token will fail at the Blob API layer.
 
 | Var | Store name | Store ID | Region |
 |-----|-----------|----------|--------|
 | `DVX_BLOB_RW_TOKEN` | `dvx-export-private` | (read from dashboard) | `iad1` |
 | `INTAKE_BLOB_RW_TOKEN` | `intake-applicant-private` | `store_Eaui32n6i2wYMS6E` | `iad1` |
+| `UPLOADS_BLOB_RW_TOKEN` | `uploads-private` (provision per the dance below) | (read from dashboard once created) | `iad1` |
+
+`UPLOADS_BLOB_RW_TOKEN` backs the **private-blob migration of the shared document uploader** (Phase 1; `FileUploaderSimple access="private"` → `pages/api/upload-handler.js` mints the client token against this store, and `lib/utils/uploaded-blob.js` reads private blobs with it). It is **not yet provisioned**; until it is, `process-expenses` (and any future private consumer) fails closed — the `expense-reporter` private flag (`NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB`) must stay `public` until this token + store exist and a live upload→read smoke passes.
 
 ### Why the CLI workflow is awkward
 

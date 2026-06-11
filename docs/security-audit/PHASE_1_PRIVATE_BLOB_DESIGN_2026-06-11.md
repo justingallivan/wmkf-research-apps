@@ -2,7 +2,7 @@
 
 **Status:** ✅ PILOT IMPLEMENTED 2026-06-11 (expense-reporter). SDK verified, design decisions resolved, pilot shipped server-read-only. Reviewed by Codex (REVISE — folded). **Remaining (later phases):** the browser-facing download proxy + `file-loader.js` private read + the other ~14 consumers. See "Implementation notes" at the end.
 
-> ⚠️ **Live smoke still required:** the pilot is unit-tested + builds, but a real private upload→read against the Vercel Blob store has NOT been run from this environment. Verify a live receipt upload + expense extraction in `expense-reporter` (and that the blob is not publicly fetchable) before flipping any default. Depends on the store supporting private access + `BLOB_READ_WRITE_TOKEN` being present in the `process-expenses` runtime.
+> ⚠️ **Provisioning + live smoke still required.** Private blobs use a **dedicated private store** (`uploads-private`) with its own `UPLOADS_BLOB_RW_TOKEN` — NOT the public `BLOB_READ_WRITE_TOKEN` store (Codex BUG: PUT/GET private against the public token fails at the Blob API layer; see `docs/CREDENTIALS_RUNBOOK.md`). That store + token are **not yet provisioned**; until then the code fails closed (upload-handler returns 503, the read throws). Before flipping `NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB` to `true`: provision the store + token, then run a live receipt upload→extract in `expense-reporter` and confirm the blob is not publicly fetchable.
 **Source finding:** `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 — "Generic uploader still creates public Blob artifacts for sensitive document workflows."
 **Builds on:** `docs/security-audit/P2_PRIVATE_BLOB_MIGRATION.md` (origin/scoping — this doc is the concrete implementation design + pilot slice).
 **Remediation tracker:** `docs/security-audit/SECURITY_AUDIT_REMEDIATION_PLAN_2026-06-11.md` Phase 1.
@@ -208,19 +208,34 @@ swaps that server read for a private read. The browser-facing download proxy and
 text-extract blobs (e.g. Grant Reporting / Phase-I via `file-loader`; template
 attachments via `proxifyBlobUrl`).
 
-**Ownership model (resolved):** app-scoped, mirroring `download-review.js` — the
-consumer route (`process-expenses`) already gates reads with
-`requireAppAccess('expense-reporter')`, and the private blob has no public URL. No
-new `{pathname→owner}` table for the pilot; record-scoping layers in for consumers
-that have records.
+**Ownership model (resolved):** app-scoped staff-shared, mirroring `download-review.js`
+— the consumer route (`process-expenses`) gates reads with
+`requireAppAccess('expense-reporter')`, and the private blob has no public URL. Any
+`expense-reporter` user can read any receipt by `pathname` (documented inline at
+`process-expenses.js`); this is a strict improvement over the prior public-blob
+posture (no auth at all). Per-uploader isolation (prefix pathname with profile id +
+verify) is noted inline as the future tightening if receipt policy requires it. No
+new `{pathname→owner}` table for the pilot.
+
+**Dedicated private store (Codex BUG fix):** private blobs go to a **separate**
+`uploads-private` store via `UPLOADS_BLOB_RW_TOKEN`, never the public
+`BLOB_READ_WRITE_TOKEN` store. `upload-handler` picks the private token when the
+client signals `clientPayload:{access:'private'}`, and `readUploadedBlobBuffer` reads
+with it; both **fail closed** (503 / throw) if the token is unset. Store + token are
+**not yet provisioned** — see `docs/CREDENTIALS_RUNBOOK.md`.
 
 **Shipped files:**
 - `lib/utils/uploaded-blob.js` (new) — `readUploadedBlobBuffer({access,pathname,url})`:
-  private → lazy-`import('@vercel/blob')` `get(pathname,{access:'private'})`; public/
-  legacy → `safeFetch(url)`. The shared private-read chokepoint future consumers reuse.
-  `@vercel/blob` is lazy-imported so public-only consumers/tests don't load the SDK.
+  private → lazy-`import('@vercel/blob')` `get(pathname,{access:'private',token:UPLOADS_BLOB_RW_TOKEN})`
+  (fail-closed if token unset); public/legacy → `safeFetch(url)`. The shared
+  private-read chokepoint future consumers reuse. `@vercel/blob` is lazy-imported so
+  public-only consumers/tests don't load the SDK.
+- `pages/api/upload-handler.js` — reads `clientPayload.access`; for private uploads
+  mints the client token against the private store (`UPLOADS_BLOB_RW_TOKEN`) and
+  returns 503 if it's unset. Public uploads unchanged (default token).
 - `shared/components/FileUploaderSimple.js` — new `access='public'` prop (passed to
-  `upload()`); descriptor now returns `pathname` + `access`.
+  `upload()` + sent via `clientPayload:{access}`); descriptor now returns `pathname` +
+  `access`. (Codex confirmed the added descriptor keys don't break other consumers.)
 - `pages/expense-reporter.js` — uploader `access` gated behind
   `NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB` (default `'public'`), so production is
   unaffected until the env flag is flipped after a live smoke. The read path handles
@@ -228,10 +243,31 @@ that have records.
 - `pages/api/process-expenses.js` — both reads now go through `readUploadedBlobBuffer`
   (was `safeFetch(file.url)`); back-compat: a legacy/public ref (no `access`) still
   reads via `safeFetch`.
-- Tests: `tests/unit/utils/uploaded-blob.test.js` (8, incl. back-compat + error paths);
-  the A7 `process-expenses` integration test still passes (public refs unaffected).
+- `pages/api/process-expenses.js` — both reads now go through `readUploadedBlobBuffer`
+  (was `safeFetch(file.url)`); back-compat: a legacy/public ref (no `access`) still
+  reads via `safeFetch`. Staff-shared access scope documented inline.
+- Tests: `tests/unit/utils/uploaded-blob.test.js` (incl. token pass-through +
+  fail-closed-when-token-unset, back-compat, error paths); the A7 `process-expenses`
+  integration test still passes (public refs unaffected).
 
-**Verified:** helper 8/8 + A7 2/2 green; `npm run build` + `eslint` clean. **NOT
+**Verified:** helper + A7 tests green; `npm run build` + `eslint` clean. **NOT
 verified:** a live private upload→read against the Vercel store (see status banner).
 
 No new API route was added, so `API_ROUTE_SECURITY_MATRIX` is unchanged.
+
+### Codex post-impl review (folded 2026-06-11) — verdict was REVISE
+
+- **[BUG] dedicated private store/token** → fixed: `UPLOADS_BLOB_RW_TOKEN` +
+  `uploads-private` store; upload-handler routes private uploads there and reads use
+  it; both fail closed if unset; documented in `CREDENTIALS_RUNBOOK.md`.
+- **[RISK] known-pathname cross-user read** → resolved by explicitly documenting the
+  staff-shared, app-scoped model inline in `process-expenses.js` (Codex-offered
+  option), with per-uploader binding noted as the future tightening.
+- **[RISK] client-asserted access** → accepted under the authorized-staff threat
+  model; the dedicated-store routing + fail-closed reads bound the blast radius
+  (a non-private upload simply isn't readable as private).
+- **[GAP] tests** → added token pass-through + fail-closed unit cases. A full
+  `process-expenses` route-level private test (success + misconfig + all-files-fail)
+  remains a follow-up; the helper + route inline behavior cover the core paths.
+- **[NIT] back-compat / stream buffering** → Codex confirmed no break and that the
+  stream→buffer read matches the SDK shape; no change needed.

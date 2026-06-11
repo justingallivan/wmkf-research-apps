@@ -13,9 +13,15 @@ import { get as getBlob } from '@vercel/blob';
 import { safeFetch } from '../../../lib/utils/safe-fetch';
 import { readUploadedBlobBuffer } from '../../../lib/utils/uploaded-blob';
 
+const ORIGINAL_TOKEN = process.env.UPLOADS_BLOB_RW_TOKEN;
 beforeEach(() => {
   getBlob.mockReset();
   safeFetch.mockReset();
+  process.env.UPLOADS_BLOB_RW_TOKEN = 'vercel_blob_rw_test';
+});
+afterAll(() => {
+  if (ORIGINAL_TOKEN === undefined) delete process.env.UPLOADS_BLOB_RW_TOKEN;
+  else process.env.UPLOADS_BLOB_RW_TOKEN = ORIGINAL_TOKEN;
 });
 
 describe('readUploadedBlobBuffer', () => {
@@ -24,10 +30,22 @@ describe('readUploadedBlobBuffer', () => {
 
     const buf = await readUploadedBlobBuffer({ access: 'private', pathname: 'private/expense-reporter/r.pdf' });
 
-    expect(getBlob).toHaveBeenCalledWith('private/expense-reporter/r.pdf', { access: 'private' });
+    expect(getBlob).toHaveBeenCalledWith('private/expense-reporter/r.pdf', {
+      access: 'private',
+      token: 'vercel_blob_rw_test',
+    });
     expect(safeFetch).not.toHaveBeenCalled();
     expect(Buffer.isBuffer(buf)).toBe(true);
     expect([...buf]).toEqual([1, 2, 3]);
+  });
+
+  test('private read fails closed when UPLOADS_BLOB_RW_TOKEN is unset (no public-store fallback)', async () => {
+    delete process.env.UPLOADS_BLOB_RW_TOKEN;
+    await expect(
+      readUploadedBlobBuffer({ access: 'private', pathname: 'private/expense-reporter/r.pdf' }),
+    ).rejects.toThrow('UPLOADS_BLOB_RW_TOKEN is not set');
+    expect(getBlob).not.toHaveBeenCalled();
+    expect(safeFetch).not.toHaveBeenCalled();
   });
 
   test('legacy/public reference (no access) fetches the public url via safeFetch', async () => {

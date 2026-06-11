@@ -127,7 +127,18 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Require authentication + app access
+  // Require authentication + app access.
+  //
+  // Access scope for uploaded receipts (Phase 1 private blobs): STAFF-SHARED,
+  // app-scoped. Any user with `expense-reporter` access can submit a private
+  // blob `pathname` here and have it read, including one uploaded by another
+  // staff member — this route does NOT bind a pathname to its uploader. This
+  // matches the shared-staff model documented in
+  // `pages/api/review-manager/download-review.js` and is a strict improvement
+  // over the previous public-blob posture (which required no auth at all). If a
+  // future policy needs per-uploader isolation for receipts, prefix the upload
+  // pathname with the uploader's profile id and verify it against
+  // `access.profileId` here before reading.
   const access = await requireAppAccess(req, res, 'expense-reporter');
   if (!access) return;
   await loadModelOverrides();
