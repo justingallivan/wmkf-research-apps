@@ -17,7 +17,7 @@ Out of scope:
 
 - Live Vercel/Dataverse/SharePoint permission probing.
 - Full browser smoke testing.
-- Full semantic review of all 108 API routes.
+- Full semantic review of all 108 API routes. <!-- fact-consistency:ignore fact=api-route-file-count as-of=2026-06-11 reason=historical -->
 - Code remediation; this report records findings and validation evidence only.
 
 ## Automated Checks
@@ -39,7 +39,7 @@ npx jest tests/unit/execute-prompt-payload-boundary.test.js tests/unit/execute-p
 
 Results:
 
-- `npm run check:api-routes` passed and covered 108 route files. It warned on two routes without recognized guard tokens: `/api/bill/onboard-reviewer` and `/api/webhooks/bill`.
+- `npm run check:api-routes` passed and covered 108 route files. It warned on two routes without recognized guard tokens: `/api/bill/onboard-reviewer` and `/api/webhooks/bill`. <!-- fact-consistency:ignore fact=api-route-file-count as-of=2026-06-11 reason=historical -->
 - `npm run check:atlas` passed: 34 Postgres tables and 32 Dataverse entity sets covered.
 - `npm run check:atlas:self-test` passed: 12/12 coverage patterns detected.
 - `npm run check:fact-consistency` passed: 343 live doc/memory files scanned; canonical facts current (`app-definition-count=18`, `requireappaccess-endpoint-count=60`, `api-route-file-count=108`).
@@ -261,7 +261,7 @@ Validation:
 
 ## Strong Controls Observed
 
-- API route matrix coverage is current for 108 route files.
+- API route matrix coverage is current for 108 route files. <!-- fact-consistency:ignore fact=api-route-file-count as-of=2026-06-11 reason=historical -->
 - Atlas and fact-consistency gates passed.
 - External reviewer token rate limiting has explicit per-token/per-IP behavior, invalid-token spike alerting, degraded-limiter alerting, and focused tests.
 - BILL webhook/internal routes use raw-body HMAC verification, fail closed on missing production secrets, cap body size, and have focused tests.
