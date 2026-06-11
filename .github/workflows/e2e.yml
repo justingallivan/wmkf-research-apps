@@ -1,0 +1,69 @@
+name: E2E (Playwright)
+
+# Browser E2E for the external reviewer portal. Path-filtered so it runs only
+# when the reviewer/external flow or the harness itself changes — not on the
+# many docs/memory-only PRs (those are covered by the Tests + check:* gates).
+on:
+  # Manual trigger — re-run the suite from the Actions tab without a dummy commit.
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'pages/api/external/**'
+      - 'pages/external/**'
+      - 'shared/components/external/**'
+      # lib/bill = the honorarium-onboarding orchestrator + service the accept
+      # path invokes; a change here can alter the e2e-covered accept behavior.
+      - 'lib/bill/**'
+      - 'tests/e2e/**'
+      - 'playwright.config.js'
+      - 'package.json'
+      - '.github/workflows/e2e.yml'
+  push:
+    branches: [main]
+
+jobs:
+  e2e:
+    name: Playwright
+    runs-on: ubuntu-latest
+    # ~3-4 min expected; guard against a build/server hang (GitHub's default is 6h).
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Cache the chromium binary (~100-150 MB) across runs; key on the lockfile
+      # so a Playwright version bump busts it. OS deps are not cached, so install
+      # them on a cache hit too.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+      - run: npx playwright install-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+      # playwright.config.js's webServer builds (`next build --webpack`) and
+      # serves (`next start`) the app, then the specs run against it with the
+      # portal API routes route-mocked (no Dataverse). The build needs no
+      # secrets, but `next start` runs in production mode where next-auth
+      # refuses to boot without a secret — so the step below supplies throwaway
+      # CI values. instrumentation's cold-start monitors stay best-effort/try-catch.
+      - run: npm run test:e2e
+        env:
+          # THROWAWAY CI values — the portal route under test is token-public
+          # and the data layer is route-mocked, so no real auth/secret is used.
+          NEXTAUTH_SECRET: e2e-not-a-real-secret
+          NEXTAUTH_URL: http://localhost:3100
+          AUTH_REQUIRED: 'false'
+      # Keep the HTML report for debugging a failed run.
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
