@@ -26,11 +26,19 @@ co-author COI, the model `POTENTIAL_CONCERNS` advisory, or "should we warn the P
   unverifiable flag is net-negative, not neutral.
 - **HISTORICAL / former-shared institution does NOT count** — neither drop nor flag.
 
+## Build status (S240)
+**Chunk 2a = BUILT (committed, UNPUSHED as of S240): institution COI.** Current same-institution
+is now a HARD DROP on both tracks against the PI-institution UNION; historical/former-shared COI
+RETIRED; authoritative save-gate in `save-candidates`; canonical institution maps in the agent-wiki
+`reviewer-identity` topic + `docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`. **Chunk 2b = NOT BUILT:
+retire the AI `POTENTIAL_CONCERNS` advisory** (coupled prompt/validator/repair/render/persist +
+prod Dataverse reseed Justin runs). Co-author COI KEPT.
+
 ## What this changes / implicates (verify before acting — touches shipped S229 work)
-- **REMOVE historical-institution COI** (S229, da60679): `markInstitutionCOI`'s `affiliationHistory`
-  scan + `institutionCOIDetails.historical` + the "Former shared institution" badge. This is the Chunk-2
-  institution-COI work in `docs/REVIEWER_FINDER_PI_IDENTITY_WIREIN_PLAN.md` §9.
-- **RETIRE the model `POTENTIAL_CONCERNS` amber advisory** (S229, Justin S240): it's the model
+- **[DONE Chunk 2a]** ~~REMOVE historical-institution COI~~ (S229, da60679): `markInstitutionCOI` is now
+  current-only; `institutionCOIDetails.historical` + the "Former shared institution" badge removed
+  (legacy `.historical` scrubbed on read via `sanitizeInstitutionCOIDetails`). Shipped in Chunk 2a.
+- **[NOT BUILT — Chunk 2b]** RETIRE the model `POTENTIAL_CONCERNS` amber advisory (S229, Justin S240): it's the model
   freelancing inferred "potential concern" notes — the canonical PD-unverifiable flag. Remove the
   capture/render (`parseAnalysisResponse` POTENTIAL_CONCERNS normalize, both cards' amber note,
   `pruneCandidateForRoster` persistence) AND the prompt instruction that routes COI→POTENTIAL_CONCERNS

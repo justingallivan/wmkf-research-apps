@@ -1,133 +1,107 @@
-# Session 240 Prompt: Reviewer-origination — validated multi-lane direction (NOT-YET to build)
+# Session 241 Prompt: Reviewer COI Chunk 2b + push the unpushed Chunk-2a stack
 
-> ⚠️ **PARALLEL WORK STREAM (active, added 2026-06-10).** A separate session (Claude or
-> Codex) is working **reviewer onboarding** on its own branch/worktree — do **not** touch
-> it from this main tree:
-> - **Branch:** `feat/reviewer-onboarding-no-bill-this-cycle` · **Worktree:**
->   `/Users/gallivan/Code/WMKF_onboarding` (own checkout; `node_modules` + `.env.local`
->   symlinked, so no `npm install`). Launch that session with cwd = the worktree so it
->   can't switch this tree's branch (it did, accidentally, via Codex on 2026-06-10).
-> - **Status:** 1 commit (`4110c41`, deferred-bill onboarding impl + phone +
->   `docs/REVIEWER_ONBOARDING_FLOW_MOCKUP.md`) ahead of `main`, 27+ behind; **no PR**;
->   drop-onto-`main` was conflict-free (merge-tree clean) but **not yet reviewed/CI'd** →
->   land via a **reviewed PR**, not a fast-forward to prod-`main`.
-> - **Ownership split:** the onboarding session owns its branch (`lib/bill/*`,
->   `external/review/*`, `Stage2aView`, the mockup doc). **This main session owns `main`
->   (reviewer-ORIGINATION work) AND shared repo-wide files** — `MEMORY.md`,
->   `SESSION_PROMPT.md`, `package.json`, `docs/CANONICAL_COUNTS`/fact docs. See
->   `.claude/skills/agent-coordination` + `docs/AGENT_COLLABORATION_PLAN.md`.
+> ⚠️ **GIT STATE — READ FIRST.** `main` **diverged** during S240. The parallel
+> reviewer-onboarding stream landed **PR #23** (`8d2edae`, BILL/onboarding + Stage-2a
+> e2e) on top of S240's Chunk-1 push. As of end-of-S240, local `main` is **5 commits
+> ahead / 8 behind** `origin/main`. The 5 local commits are reviewer **COI Chunk 2 +
+> 2a** (design + impl, **Codex-SHIP, NOT pushed → NOT in prod**). Code files are
+> **disjoint** from PR #23; the only rebase conflict is `.claude-memory/MEMORY.md`
+> (both edited). **Before any push: `git fetch && git pull --rebase origin main`,
+> resolve MEMORY.md, re-run the gate set, then push.** A plain push is rejected
+> (non-fast-forward). `main` auto-deploys to prod on push.
 
-## Session 239 Summary
+## Session 240 Summary
 
-All on `main` (auto-deploys to prod). S238 ended by preparing a **rescue dossier** worried
-we were circling — patching candidate *handling* while *origination* stayed broken. S239
-took the rescue verdict, **empirically validated the origination diagnosis with three
-read-only probes + two independent Codex passes**, and landed a **safety-reviewed
-validated-direction strategy** (design only — **NOT BUILT**).
+S240 built the first two increments of the S239-validated multi-lane reviewer
+origination work, each through the full Codex loop (design → pre-impl review → fold →
+implement → post-impl review → fold → re-review until SHIP).
 
 ### What Was Completed
 
-1. **Rescue verdict verified, not trusted.** The fresh-model rescue review (it agreed
-   origination is the diseased layer but pushed *grounded* over the full redesign) made
-   live-checkable claims — I verified them: OpenAlex Frebel canonical record = **323 works**
-   (the "6" was a name-search stub artifact), and author-aggregation returns real ranked
-   people. Corrected the plan's stale §2.3/§6 "OpenAlex disqualified/metrics-unreliable"
-   claim (`3dbd3f9`).
+1. **Chunk 1 — structured-ORCID PI identity (SHIPPED + IN PROD).** Resolves the
+   proposal PI from structured Dataverse (request `_wmkf_projectleader_value` →
+   contact `wmkf_orcid` → exact OpenAlex author) instead of the LLM-extracted name,
+   and uses it to strengthen PI exclusion + coauthor-COI in `discover.js` (+ parity in
+   `enrich-recommended.js`). Fail-open, augment-only. New `lib/services/proposal-pi-identity.js`
+   (`resolveProposalPI` with a two-source mis-entered-ORCID name guard + `appendPiName`
+   + `excludePiIdentity` gated on confirmed/probable) + `OpenAlexService.getAuthorByOrcid`.
+   Clients send `requestId`. **Codex: SHIP.** Pushed (b19b3b9) → now in `origin/main`.
 
-2. **Probe #1 — grounded-origination** (`scripts/probe-grounded-origination.mjs`, `3bd5b90`).
-   Measured the **disease**: ~92–98% of surfaced candidates are **keyword-reconstructed**
-   (Track-B `query_seed`), domain-independent; pure hallucination (`barred_parametric`) ≈ **0**.
-   Recall gap: a grounded person-level query recovers real leaders the keyword crawl misses
-   (Corkum/Krausz physics; Muir chem-bio; Samson DNA-repair). Findings doc `63db72a`.
+2. **Chunk 2a — institution COI (BUILT, Codex SHIP, UNPUSHED).** Per the S240 COI
+   policy ([[project-reviewer-coi-rely-on-self-disclosure]]): current same-institution
+   is now a **HARD DROP on BOTH tracks** matched against the **UNION** of PI
+   institutions (ORCID-current + OpenAlex-last-known + LLM); **historical/former-shared
+   institution COI RETIRED**; **authoritative save-gate** in `save-candidates`
+   (rejects same-institution rows incl. post-enrichment); ORCID-current affiliation
+   preferred; co-author COI kept. `markInstitutionCOI` soft flag now survives only on
+   the applicant-recommended (flag-not-drop) + post-enrichment paths. 602
+   reviewer/identity tests green.
 
-3. **Codex falsification pass (origination verdict)** → **SURVIVE-WITH-CAVEATS**. Its one
-   correct structural catch: "guess" over-loaded the word — adopted as
-   **"keyword-reconstructed"**. Key reframe (Justin): the disease is the keyword *MECHANISM*
-   (paper-match + 1-author minting), **not** LLM keywords — keyword→author-*aggregation* is fine.
+3. **Chunk 2b — designed, NOT built.** Retire the AI `POTENTIAL_CONCERNS` advisory.
+   Codex flagged it as **fully coupled**: the field is required by the prompt validator
+   (`prompt-validators.js:71`) + repair prompt (`claude-reviewer-service.js:88`), so
+   templates + validator + repair + render + persist + ~5 test files + the **prod
+   Dataverse reseed** (`seed-reviewer-finder-prompts.js --execute`, **Justin runs**)
+   all move together. Design in `docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md` §6 (Chunk 2b).
 
-4. **Probe #2 — Tier-3 applicant trail** (`scripts/probe-applicant-trail-origination.mjs`,
-   `fef704b`→`3ad8eb9`). Justin's key inputs drove two findings:
-   - **PI identity is STRUCTURED + free:** `akoya_request._wmkf_projectleader_value` → a
-     `contact` carrying `wmkf_orcid` → **exact** OpenAlex (no namesake). Supersedes LLM
-     extraction (which misresolved "Wen Li" → "Yanping Li"). [[project-reviewer-pi-identity-structured]]
-   - **OpenAlex MERGES same-name authors** → use the **ORCID works list** as the corpus,
-     not the author cluster (rescued Wen Li: chemistry blob → Keller/Corkum/Krausz).
-     [[project-openalex-merge-use-orcid-works]]
-   - 3-request map: continuing-line **WIN** (Albanese, Wen Li post-fix); **pivot** (Ted Abel,
-     novel DNA-repair hypothesis) covered by **peer-groups + topic-aggregation** (the
-     narrative names "Madabhushi and Tsai"), not the PI-trail.
+### Decisions captured (Justin, S240)
+- Reviewer COI philosophy: hard-act only on self-evident policy conflicts
+  (proposal-authors + CURRENT same-institution); rely on reviewer self-disclosure for
+  relationship/inferred conflicts; **no PD-unverifiable soft flags**; historical
+  institution doesn't count. → [[project-reviewer-coi-rely-on-self-disclosure]].
+- Track A current-same-institution → hard-drop (both tracks uniform).
+- Institution COI → match the **union** of known PI institutions.
+- Applicant-recommended path → **flag, not drop** (don't silently hide the applicant's pick).
 
-5. **Validated-direction strategy §12** in `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md`
-   (`f842d63`). **Multi-lane harvesters** (cited-DOI · PI-trail · peer-groups ·
-   topic-aggregation); **coverage = union, confidence = convergence ON IDENTITY (shared
-   ORCID / exact work authorship), never on a name**.
-
-6. **Codex strategy-doc review (2 passes)** → **NOT-YET**; safety corrections applied
-   (`ed72b6a`, `8c60585`): retired the unsafe name-convergence claim; scoped ORCID-works
-   tradeoffs + inert fallback; COI is broader than the trail (advisor/advisee +
-   all-time-collaborator have **no gate today** = net-new); named the integration seams.
-
-7. **Memories captured** (`af2662e`): [[project-reviewer-origination-multilane]] +
-   the two gotcha files above. **Parallel onboarding worktree** set up (banner ↑).
-
-### Commits (all on `main`, pushed)
-- `0de146f` drain-table fix · `3bd5b90` probe#1 · `63db72a` findings · `3dbd3f9` §2.3 fix ·
-  `f1815de` review-request · `fef704b`/`3ad8eb9` probe#2 (Tier-3 ORCID) · `f842d63` §12 ·
-  `ed72b6a`/`8c60585` Codex safety fixes · `af2662e` memories · `acebec8` parallel-stream pointer
+### Commits (chronological)
+- **Chunk 1 (in prod):** `7b19db6` design · `49b5b65` pre-impl fold · `e896a93` policy
+  · `70e78f0` impl · `6d3952a` post-impl fold · `689beea`/`b19b3b9` abort-guard folds
+- **Chunk 2 design (LOCAL):** `d778a81` · `96ca819`
+- **Chunk 2a (LOCAL, unpushed):** `977dd92` impl · `0fa8e55` post-impl fold ·
+  `15b5aa8` re-review fold
+- **(this doc commit)** Document S240 + create S241 prompt
 
 ## Potential Next Steps
 
-### 1. Reviewer-origination — the NOT-YET build work (primary)
-Per Codex, the **doc-level safety items are cleared; what remains is design/implementation.**
-In rough leverage order:
-- **Quick win, broad benefit:** wire the **structured-ORCID PI identity** (request Project
-  Leader → contact `wmkf_orcid`) into the live pipeline — it improves PI exclusion + COI
-  everywhere, not just the trail. Add an OpenAlex call to `lib/services/openalex-service.js`
-  (ORCID→author, ORCID works list); do **not** promote probe raw-`fetch` code as-is.
-- **Identity-equality corroboration** — how lanes prove "same person" (shared ORCID / exact
-  work authorship); never name overlap. The ranking layer counts corroboration only at
-  identity level.
-- **Two net-new COI gates** — advisor/advisee + all-time-collaborator (today prompt-text only).
-- **Peer-group parsing lane** (designed, unbuilt) — extract "Peer Groups: X and Y" → resolve
-  each to a specific identity before promotion.
-- **Facet generation** — broader/atomic queries (5-word MeSH strings → OpenAlex corpora of 0–20).
-- Wire all lanes INTO `discover()` / `reviewer-provenance` / `save-candidates` / Workbench —
-  not a parallel pipeline.
-Canonical design: `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md` §12. Read
-[[project-reviewer-origination-multilane]] first.
+### 1. Land Chunk 2a (git housekeeping + deploy)
+`git pull --rebase origin main` onto `8d2edae` (resolve MEMORY.md only), re-run the
+full startup gate set, then push → deploys the institution-COI behavior change to prod.
+This is the **first real behavior change** of the COI overhaul (same-institution
+candidates now hard-dropped; historical flag/badge gone), so smoke the reviewer search
+after deploy.
 
-### 2. Carryover (still open from S238)
-Manual-add dedup **write path** never live-smoked (PR #21); applicant-exclusion breadth
-policy (`project-applicant-exclusion-policy-pending`); combined Phase I+II PA doc-assembly.
+### 2. Build Chunk 2b — retire `POTENTIAL_CONCERNS` (coupled; do via the Codex loop)
+Code retirement (parse/render/persist + validator + repair prompt + tests) is decoupled
+from the prompt reseed (code ignores the field regardless). **Justin runs the prod
+reseed.** Watch: removing the field must NOT push COI back into REASONING (keep
+"REASONING fitness-only, no COI anywhere"). Design: `docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`.
 
-## Loose ends / gotchas
-- `main` auto-deploys to prod on push. No backticks in `git commit -m` (use a message file).
-  Codex runs in an ISOLATED worktree off HEAD → commit before delegating.
-- **Probe result files are gitignored** (`smoke-results-*.txt`); the probes are read-only +
-  reproducible (each makes ≤2 paid LLM calls / public API calls; Tier-3 probe is LLM-free).
-- **Identity-equality safety rule** is load-bearing: two lanes agreeing on a NAME is not
-  identity proof — would reintroduce the wrong-email/affiliation failure the save-path
-  force-null gate exists to prevent. See [[project-reviewer-verify-fail-dangerous]].
-- Router `MEMORY.md` is slightly over its soft byte target (under the hard cap) — a trim
-  pass is due eventually.
+### 3. Later multi-lane origination increments (NOT in 2a/2b)
+PI-trail corpus lane (ORCID works list), peer-group parsing, topic→author facet
+generation, the two net-new COI gates (advisor/advisee + all-time-collaborator),
+recency-weighted ranking. Canonical: `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md` §12.
+
+### 4. Carryover (still open from S238)
+Manual-add dedup write path never live-smoked (PR #21); applicant-exclusion breadth
+policy ([[project-applicant-exclusion-policy-pending]]); combined Phase I+II PA doc-assembly.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md` | **Canonical** — §12 = validated multi-lane origination direction (+ Codex safety corrections) |
-| `docs/REVIEWER_FINDER_ORIGINATION_PROBE_FINDINGS.md` | Probe #1 disease-metric + recall-gap writeup |
-| `docs/REVIEWER_FINDER_REVIEW_REQUEST.md` | Handoff prompt for a fresh model to review the direction |
-| `scripts/probe-grounded-origination.mjs` | Read-only: disease metric + topic-aggregation + reference lane |
-| `scripts/probe-applicant-trail-origination.mjs` | Read-only, LLM-free: PI-trail via structured ORCID + ORCID-works |
-| `.claude-memory/project-reviewer-origination-multilane.md` | The validated direction (router entry) |
+| `lib/services/proposal-pi-identity.js` | Chunk 1+2a: resolveProposalPI, appendPiName, excludePiIdentity, piInstitutions union |
+| `lib/services/deduplication-service.js` | `filterConflicts`/`markInstitutionCOI` now accept an institution array; current-only |
+| `pages/api/reviewer-finder/discover.js` | builds the union; hard-drops both tracks |
+| `pages/api/reviewer-finder/save-candidates.js` | authoritative institution-COI reject gate |
+| `lib/utils/reviewer-provenance.js` | `sanitizeInstitutionCOIDetails` (canonical; server+client) |
+| `docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md` | Chunk 2 design + Codex folds + 2a/2b split |
+| `docs/REVIEWER_FINDER_PI_IDENTITY_WIREIN_PLAN.md` | Chunk 1 design + full Codex history |
+| `docs/agent-wiki/topics/reviewer-identity.md` | live institution-COI + structured-PI behavior map |
 
 ## Testing
 ```bash
-# Read-only origination probes (reproducible):
-node --import ./scripts/lib/use-extensionless.mjs scripts/probe-grounded-origination.mjs --request 1002794
-node --import ./scripts/lib/use-extensionless.mjs scripts/probe-applicant-trail-origination.mjs --request 1002794   # LLM-free
-npx jest reviewer discovery suggestion disposition save-candidates search-logic   # reviewer battery
-npm run build && npm run lint                          # green before pushing
+npx jest reviewer discovery identity dedup coauthor evidence enrich institution save provenance
+npm run build && npm run lint
 # full startup gate set: see .claude/skills/start
+# After rebasing + before pushing 2a, re-run the gate set (esp. check:agent-wiki, check:api-routes).
 ```
