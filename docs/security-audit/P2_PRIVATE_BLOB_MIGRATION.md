@@ -1,6 +1,6 @@
 # P2 residual: private-blob migration for the generic uploader
 
-**Status:** 🟡 Pilot + file-loader cohort shipped & read-path live-smoked 2026-06-11 — `expense-reporter` (pilot), plus `phase-i-dynamics` + `grant-reporting` via the now-private-aware `lib/utils/file-loader.js` (`lib/utils/uploaded-blob.js`). Live smokes passed (`smoke-private-upload.mjs` for the store; `smoke-private-file-loader.mjs` for the shared `loadFile` chokepoint). Remaining: production promotion (token + per-app flag + deploy), the browser-facing download proxy, and the remaining (browser-render) consumers (list below). Concrete design + what-shipped: `docs/security-audit/PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`.
+**Status:** 🟡 Pilot + file-loader cohort shipped & read-path live-smoked 2026-06-11 — `expense-reporter` (pilot), plus `phase-i-dynamics` + `grant-reporting` via the now-private-aware `lib/utils/file-loader.js` (`lib/utils/uploaded-blob.js`). Live smokes passed (`smoke-private-upload.mjs` for the store; `smoke-private-file-loader.mjs` for the shared `loadFile` chokepoint). **`phase-i-dynamics` + `grant-reporting` PROMOTED TO PRODUCTION 2026-06-11** (prod token + their flags set + deployed; grant-reporting prod-verified — live upload → private store, URL 403, extraction ran). Remaining: promote `expense-reporter` (its prod flag is unset → still public in prod), the browser-facing download proxy, and the remaining (browser-render) consumers (list below). Concrete design + what-shipped: `docs/security-audit/PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`.
 **Origin:** Security audit 2026-05-21, finding P2. Created 2026-05-21 alongside A5 (endpoint consolidation), which partially addressed P2.
 
 ## Rollout status (2026-06-11)
@@ -11,10 +11,12 @@
   `get(pathname,{access:'private'})` for private, `safeFetch` for legacy public).
   Server-read-only, so no proxy needed for this consumer.
   Store `wmkf-uploads-private` + `UPLOADS_BLOB_RW_TOKEN` **provisioned 2026-06-11
-  (dev + preview)**. **Live smoke PASSED** (`smoke-private-upload.mjs` + a real
+  (dev + preview + production)**. **Live smoke PASSED** (`smoke-private-upload.mjs` + a real
   expense-reporter upload→extract run locally against the store: receipts landed
-  in the private store, URL returns HTTP 403). **Production token + flag + deploy
-  still pending.**
+  in the private store, URL returns HTTP 403). The prod token is set, BUT
+  **`expense-reporter`'s prod flag is NOT set** (`NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB`
+  exists only in Preview), so it **still uploads public in production** — promotion is
+  a one-line `vercel env add` + redeploy when desired.
 - ✅ **`lib/utils/file-loader.js` is now private-aware** (2026-06-11) — its `upload`
   branch delegates to `readUploadedBlobBuffer` (private `pathname` read, or `safeFetch`
   for legacy public). So its callers (`grant-reporting/extract`, `phase-i-dynamics`
@@ -28,13 +30,20 @@
   `NEXT_PUBLIC_PHASE_I_DYNAMICS_PRIVATE_BLOB` (default `public`); the `fileRef` now
   carries `pathname`+`access`, read server-side via the private-aware file-loader.
   Build/lint/tests green. **Read-path live smoke PASSED** (shared file-loader chokepoint,
-  above). **Prod flag + deploy still pending.**
+  above). **PROMOTED TO PRODUCTION 2026-06-11** — `NEXT_PUBLIC_PHASE_I_DYNAMICS_PRIVATE_BLOB`
+  set in Production + deployed (`dpl_Cd6MGvsGvYgcqW8LHPNV4j7Wg5oA`). Rides grant-reporting's
+  prod-verified read path (same `file-loader` chokepoint, store, and token); a direct
+  browser spot-check is still worthwhile but not required.
 - ✅ **`grant-reporting`** — page migrated (2026-06-11): both uploaders (proposal +
   report, one shared `renderDocPicker`) gated by `NEXT_PUBLIC_GRANT_REPORTING_PRIVATE_BLOB`
   (default `public`); both fileRefs carry `pathname`+`access`; `extract.js` passes them
   through to the private-aware file-loader. Build/lint/tests green. **Read-path live smoke
-  PASSED** (shared file-loader chokepoint, above). **Prod flag + deploy still pending.**
-  Completes the file-loader cohort.
+  PASSED** (shared file-loader chokepoint, above). **PROMOTED TO PRODUCTION + PROD-VERIFIED
+  2026-06-11** — flag set in Production + deployed (`dpl_Cd6MGvsGvYgcqW8LHPNV4j7Wg5oA`); a
+  live prod upload landed in the **private** store (`wvodkxrlwniaujaj.private.blob…`,
+  `Content-Disposition: attachment`), the blob URL returned **HTTP 403** unauthenticated,
+  and extraction ran (the server-side private read worked in prod). Completes the
+  file-loader cohort.
 - ⏳ **Browser-render consumers** (templates/attachments via `proxifyBlobUrl`,
   `blob-proxy.js`) — need the new authenticated download proxy (record/app-scoped).
 - ⏳ Remaining `FileUploaderSimple` consumers below — flip to `access="private"` +
