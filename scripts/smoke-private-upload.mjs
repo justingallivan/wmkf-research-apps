@@ -9,11 +9,13 @@
  *   3. Assert the blob's own URL is NOT publicly fetchable (the whole point).
  *   4. Clean up.
  *
- * Run after provisioning, with the token in the environment:
+ * Run after provisioning, passing the token directly:
  *   UPLOADS_BLOB_RW_TOKEN=vercel_blob_rw_... node scripts/smoke-private-upload.mjs
- * or pull it from Vercel first:
- *   vercel env pull .env.smoke --environment=preview && \
- *     env $(grep UPLOADS_BLOB_RW_TOKEN .env.smoke | xargs) node scripts/smoke-private-upload.mjs
+ *
+ * NOTE: `vercel env pull` does NOT work here — `UPLOADS_BLOB_RW_TOKEN` is a
+ * SENSITIVE Vercel env var, which pulls back EMPTY (see memory
+ * project-vercel-sensitive-env-pull-empty). Paste the token value (from the
+ * store's dashboard) on the command line instead.
  *
  * Exit 0 = private upload/read works and the blob is not public. Non-zero = a
  * real failure (bad token, wrong/public store, or the URL is fetchable).
