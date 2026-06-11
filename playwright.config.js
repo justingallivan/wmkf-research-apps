@@ -28,7 +28,12 @@ module.exports = defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
-  reporter: process.env.CI ? 'line' : 'list',
+  // Always emit the HTML report (so the CI upload-artifact step has something to
+  // archive) alongside the console reporter. `open: 'never'` keeps it from trying
+  // to launch a browser in CI / non-interactive runs.
+  reporter: process.env.CI
+    ? [['line'], ['html', { open: 'never' }]]
+    : [['list'], ['html', { open: 'never' }]],
   timeout: 30_000,
   expect: { timeout: 5_000 },
   use: {
