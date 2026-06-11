@@ -17,8 +17,8 @@ import { requireAppAccess } from '../../lib/utils/auth';
 import { findById } from '../../lib/services/grant-cycles-dataverse';
 import { readUploadedBlobBuffer } from '../../lib/utils/uploaded-blob';
 
-const TEMPLATE_PATH = 'review-template-aB3xQ.docx';
-const ATT_PATH = 'cycle-attachment-Zk9pP.pdf';
+const TEMPLATE_PATH = 'cycle-materials/review-template-aB3xQ.docx';
+const ATT_PATH = 'cycle-materials/cycle-attachment-Zk9pP.pdf';
 const PUBLIC_URL = 'https://abc123.public.blob.vercel-storage.com/old-template-xyz.docx';
 
 function makeCycle(overrides = {}) {
@@ -88,6 +88,30 @@ it('404 when the cycle does not exist', async () => {
 it('RECORD-SCOPE: 404 for a pathname not belonging to the cycle (does not read the blob)', async () => {
   const r = res();
   await handler({ method: 'GET', query: { cycleId: 'cycle-guid-1', pathname: 'someone-elses-secret.pdf' } }, r);
+  expect(r.statusCode).toBe(404);
+  expect(readUploadedBlobBuffer).not.toHaveBeenCalled();
+});
+
+it('RECORD-SCOPE: a pathname that is a PREFIX of an allowed path is rejected (404)', async () => {
+  const r = res();
+  await handler({ method: 'GET', query: { cycleId: 'cycle-guid-1', pathname: 'cycle-materials/review-template-aB3xQ' } }, r);
+  expect(r.statusCode).toBe(404);
+  expect(readUploadedBlobBuffer).not.toHaveBeenCalled();
+});
+
+it('RECORD-SCOPE: an allowed path with a trailing query string is rejected (404)', async () => {
+  const r = res();
+  await handler({ method: 'GET', query: { cycleId: 'cycle-guid-1', pathname: `${TEMPLATE_PATH}?x=1` } }, r);
+  expect(r.statusCode).toBe(404);
+  expect(readUploadedBlobBuffer).not.toHaveBeenCalled();
+});
+
+it('strict prefix: a non-prefixed bare pathname in the template field is NOT treated as private', async () => {
+  // A legacy/oddball value without the cycle-materials/ prefix must not be servable
+  // as private — the discriminator is the prefix, not "anything that is not a URL".
+  findById.mockResolvedValue(makeCycle({ reviewTemplateBlobUrl: 'review-template.docx', additionalAttachments: [] }));
+  const r = res();
+  await handler({ method: 'GET', query: { cycleId: 'cycle-guid-1', pathname: 'review-template.docx' } }, r);
   expect(r.statusCode).toBe(404);
   expect(readUploadedBlobBuffer).not.toHaveBeenCalled();
 });

@@ -1,7 +1,22 @@
 # Phase 1 — authenticated private-blob download proxy + cycle-materials migration
 
-**Status:** 🟧 DESIGN (2026-06-11). No code yet. Builds on the completed file-loader
-cohort (`PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`). Pending Codex design review.
+**Status:** 🟨 SLICE 1 SHIPPED + CODEX-REVIEWED (2026-06-11). The record-scoped proxy
+route (`pages/api/reviewer-finder/cycle-material.js` + tests) is merged; Codex confirmed
+**no record-scope bypass** (exact-match allowlist) and solid null/mixed-mode handling.
+Slices 2–3 (persist private refs + branch the readers + flip the uploaders) are designed
+below with Codex's findings folded. Builds on the completed file-loader cohort
+(`PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`).
+
+## Codex review (2026-06-11) — folded
+
+Slice 1: no bypass found (exact `Map.get(pathname)`); LOW content-type-from-filename
+(acceptable under forced `attachment`+`nosniff`); INFO 404-timing side channel (a
+patient caller could distinguish "attached-but-gone" from "not-this-cycle" — accepted).
+Slice 2 findings drive the plan below: **HIGH** both email routes silently drop private
+materials (`generate-emails` `isAllowedUrl`/`safeFetch`, `send-emails` `fetchAttachment`);
+**MEDIUM** `grant-cycles` GET has no private-proxy branch; **MEDIUM** storage discriminator
+fragility → resolved with the strict-prefix rule below; **MEDIUM** `maintenance-service`
+blob cleanup is an UNLISTED consumer (data-loss hazard) → new §E.
 
 ## Why this, why now
 
@@ -71,25 +86,41 @@ Behind a flag (`NEXT_PUBLIC_REVIEWER_FINDER_PRIVATE_CYCLE_MATERIALS`, default
 `public`), the two modals pass `access="private"` to `FileUploaderSimple` and persist
 the **pathname** + **access**, not the public URL.
 
-Storage approach (minimize schema change):
+Storage approach (minimize schema change) — **RESOLVED: option (a) + strict-prefix
+discriminator** (Codex SLICE2-4 push-back folded):
 - **Attachments** are already JSON → extend each element to
   `{ pathname, access: 'private', filename }` (add keys; no schema change).
-- **Template** has only `wmkf_reviewtemplateurl` (string) + filename. **Open
-  decision (for Codex):** (a) store the **pathname** in `wmkf_reviewtemplateurl` and
-  discriminate by value shape (`https://…` = legacy public; otherwise = private
-  pathname) — no schema change but relies on shape inference; vs (b) add an explicit
-  `wmkf_reviewtemplateaccess` choice column (clean discriminator, but a Dataverse
-  schema deploy with the documented gotchas). Leaning (a) for parity with the
-  in-band attachments JSON, with a defensive `access` field where we can.
+- **Template** has only `wmkf_reviewtemplateurl` (string) + filename. Store the
+  **pathname** there for private materials (no schema change, parity with attachments).
+  The legacy-public-vs-private discriminator is **NOT** the fragile "not http://" rule —
+  it is a **strict allowlist prefix**: private cycle-material uploads are written under a
+  fixed `CYCLE_MATERIAL_PREFIX = 'cycle-materials/'` pathname prefix, and a stored value
+  counts as private **iff it starts with that prefix** (and is not an http(s) URL).
+  Everything else (https URLs, protocol-relative `//…`, malformed legacy values) is
+  treated as legacy-public — fail-safe toward the unchanged public path, never toward a
+  private read. The prefix is added at upload time (slice 3) via a new
+  `FileUploaderSimple` `pathPrefix` prop. Shared logic lives in a new
+  `lib/utils/cycle-material-ref.js` (`CYCLE_MATERIAL_PREFIX`,
+  `isPrivateCycleMaterialPathname`, `cycleMaterialDownloadPath`) so the route and every
+  slice-2 reader agree.
 
 ### C. Read legs branch on access (with back-compat)
 
-- **grant-cycles GET:** for a private ref, return the new proxy URL
-  (`/api/reviewer-finder/cycle-material?cycleId=…&pathname=…`); for a legacy public
-  URL, keep `proxifyBlobUrl` (→ `blob-proxy.js`). One helper decides per ref.
-- **generate-emails / send-emails:** for a private ref, read via
-  `readUploadedBlobBuffer({ access:'private', pathname })`; for legacy public, keep
-  `safeFetch(url)`. `fetchAttachment` gains a private branch keyed by pathname.
+- **grant-cycles GET** (`proxifyCycle`, SLICE2-3): for a private ref, return the new
+  proxy URL via `cycleMaterialDownloadPath(cycleId, pathname)`; for a legacy public URL,
+  keep `proxifyBlobUrl` (→ `blob-proxy.js`). Both the template and each attachment go
+  through the same per-ref helper. (Private attachments have no `blobUrl`, so the current
+  `proxifyAttachments` would emit no downloadable URL — the helper fixes that.)
+- **generate-emails** (SLICE2-1, HIGH): the template branch
+  (`isAllowedUrl(reviewTemplateBlobUrl)` → `safeFetch`) and the attachment loop
+  (`if (!attachment.blobUrl ...) continue`) both silently drop private refs. Add a private
+  branch: `access==='private' && pathname` → `readUploadedBlobBuffer({access:'private',
+  pathname})`; keep `safeFetch` for public URLs.
+- **send-emails** (SLICE2-2, HIGH): `fetchAttachment(url)` is gated by `isAllowedUrl` and
+  returns `null` for a private pathname. Normalize cycle refs to
+  `{ access, pathname, url, filename }` where they are loaded, and make `fetchAttachment`
+  accept that shape with a private branch. The attachment list read of `a.blobUrl || a.url`
+  must also pick up `a.pathname`.
 
 ### D. Back-compat
 
@@ -98,23 +129,40 @@ Existing cycles keep their **public** `wmkf_reviewtemplateurl` + attachment
 `safeFetch` unchanged. Only **new** uploads (flag on) are private. No backfill /
 re-host of existing public materials in this slice (later step, if ever).
 
+### E. Blob cleanup must be private-aware (Codex SLICE2-5, data-loss hazard)
+
+`lib/services/maintenance-service.js` (~`:347-370`) scans cycles for orphaned blobs but
+reads **only** `wmkf_reviewtemplateurl` into a URL set, and ignores
+`wmkf_additionalattachments` entirely. Post-migration this is a DATA-LOSS risk: a private
+**pathname** sitting in the template field would be fed into public-URL cleanup logic, and
+all attachments (public or private) are invisible to the scanner → could be deleted as
+orphans. Required before any private cycle material exists in an environment with cleanup
+enabled:
+- include `wmkf_additionalattachments` in the scan;
+- partition the inventory into **public-store URLs** vs **private-store pathnames** (via
+  `isPrivateCycleMaterialPathname`), and never run a public-store deletion pass against a
+  private pathname (and vice-versa). Until the scanner handles the private store
+  explicitly, **fence private pathnames out of any deletion set** (treat as referenced).
+
 ## Slicing
 
 The four legs move in lockstep per material (a private upload whose email
-server-read still `safeFetch`es a 403 URL breaks attachments). Proposed order:
-1. Proxy route + record-scope + tests (serves nothing until B persists a private ref,
-   but unit-testable with a stubbed cycle).
-2. Storage refs + read-leg branching (grant-cycles GET + email routes) + back-compat.
-3. Modal uploaders flag-gated → private; end-to-end smoke (upload template in
-   SettingsModal → render via proxy 403-unauth → generate-emails attaches it).
+server-read still `safeFetch`es a 403 URL breaks attachments). Order:
+1. ✅ **DONE** — Proxy route + record-scope + tests (`cycle-material.js`), Codex-reviewed.
+2. Shared `cycle-material-ref.js` helper + read-leg branching (grant-cycles GET +
+   both email routes) + `maintenance-service` safety (§E) + back-compat. Readers become
+   private-aware while no private refs exist yet (legacy public path unchanged).
+3. Modal uploaders flag-gated → `access="private"` + `pathPrefix="cycle-materials/"`;
+   persist pathname refs; end-to-end smoke (upload template in SettingsModal → render via
+   proxy 403-unauth → generate-emails attaches it via private read).
 
-## Open decisions (for Codex design review)
+## Resolved decisions
 
-1. Template storage discriminator: value-shape inference vs. new Dataverse column (B).
-2. Proxy identifier: `cycleId + pathname` (record-scoped, chosen) vs. an opaque token.
-   Chosen keeps it stateless and record-scoped without a new mapping table.
-3. Is the lower-risk classification still worth the four-leg cost now, or defer behind
-   finishing the remaining server-read consumers first? (User chose to proceed.)
+1. Template storage discriminator: **option (a) + strict `cycle-materials/` prefix
+   allowlist** (not "not-http" shape inference) — §B. Fail-safe toward public.
+2. Proxy identifier: `cycleId + pathname` (record-scoped, stateless, no mapping table).
+3. Worth the four-leg cost now: yes (user chose to proceed; gives the proxy a real
+   record-scoped consumer and closes the public-blob posture for cycle materials).
 
 ## Not in scope
 

@@ -25,19 +25,16 @@
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { findById } from '../../../lib/services/grant-cycles-dataverse';
 import { readUploadedBlobBuffer } from '../../../lib/utils/uploaded-blob';
-
-// A private ref is a bare blob pathname; a legacy/public ref is an http(s) URL.
-function isPrivatePathname(value) {
-  if (typeof value !== 'string' || value.length === 0) return false;
-  const lower = value.toLowerCase();
-  return !lower.startsWith('http://') && !lower.startsWith('https://');
-}
+import { isPrivateCycleMaterialPathname } from '../../../lib/utils/cycle-material-ref';
 
 // Collect the cycle's private materials as pathname → { filename }. This is the
-// record-scope allowlist: only these pathnames may be served for this cycle.
+// record-scope allowlist: only these pathnames may be served for this cycle. The
+// template is private iff its stored value is a private cycle-material pathname
+// (strict `cycle-materials/` prefix — see lib/utils/cycle-material-ref.js);
+// attachments carry an explicit `access: 'private'` flag.
 function privateMaterialsOf(cycle) {
   const map = new Map();
-  if (isPrivatePathname(cycle?.reviewTemplateBlobUrl)) {
+  if (isPrivateCycleMaterialPathname(cycle?.reviewTemplateBlobUrl)) {
     map.set(cycle.reviewTemplateBlobUrl, { filename: cycle.reviewTemplateFilename || 'review-template' });
   }
   const atts = Array.isArray(cycle?.additionalAttachments) ? cycle.additionalAttachments : [];
