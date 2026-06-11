@@ -33,10 +33,17 @@ jobs:
       - run: npx playwright install --with-deps chromium
       # playwright.config.js's webServer builds (`next build --webpack`) and
       # serves (`next start`) the app, then the specs run against it with the
-      # portal API routes route-mocked (no Dataverse). No runtime secrets are
-      # needed — the build runs without them (same as the Tests workflow), and
-      # instrumentation's cold-start monitors are best-effort/try-catch.
+      # portal API routes route-mocked (no Dataverse). The build needs no
+      # secrets, but `next start` runs in production mode where next-auth
+      # refuses to boot without a secret — so the step below supplies throwaway
+      # CI values. instrumentation's cold-start monitors stay best-effort/try-catch.
       - run: npm run test:e2e
+        env:
+          # THROWAWAY CI values — the portal route under test is token-public
+          # and the data layer is route-mocked, so no real auth/secret is used.
+          NEXTAUTH_SECRET: e2e-not-a-real-secret
+          NEXTAUTH_URL: http://localhost:3100
+          AUTH_REQUIRED: 'false'
       # Keep the HTML report for debugging a failed run.
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
