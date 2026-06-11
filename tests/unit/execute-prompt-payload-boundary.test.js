@@ -381,3 +381,66 @@ describe('executePrompt — declarative payload boundary', () => {
     expect(runRow.payload.wmkf_ai_rawoutput).not.toContain('A multi-paragraph Phase I summary');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 2 (2026-06-11): Executor Claude transport now goes through LLMClient
+// instead of a raw fetch. These pin the load-bearing invariants that the
+// migration must preserve: the cache_control system array still reaches the
+// API verbatim (stable cache-key prefix), and cache-hit detection still fires
+// off the re-shaped snake_case usage. The request still flows through one
+// fetch (LLMClient → safeFetch → global.fetch), proving the canonical
+// transport is in the path.
+// ---------------------------------------------------------------------------
+
+describe('executePrompt — LLMClient transport (Phase 2)', () => {
+  test('outbound Claude request preserves the cache_control system array via LLMClient/safeFetch', async () => {
+    PROMPT_ROW = buildPromptRow({ variables: [], systemPrompt: 'SYS', promptBody: 'BODY' });
+
+    await executePrompt({
+      promptName: 'phase-i.summary',
+      overrideVariables: {},
+      runSource: 'Vercel Test',
+    });
+
+    // Exactly one request — through LLMClient → safeFetch → the mocked global.fetch.
+    expect(fetchedBodies.length).toBe(1);
+    const sent = JSON.parse(fetchedBodies[0].body);
+    expect(Array.isArray(sent.system)).toBe(true);
+    expect(sent.system[0]).toEqual(expect.objectContaining({
+      type: 'text',
+      cache_control: { type: 'ephemeral' },
+    }));
+    expect(sent.system[0].text).toContain('SYS');
+    expect(sent.messages[0]).toEqual(expect.objectContaining({ role: 'user' }));
+  });
+
+  test('cache-hit detection fires when the API reports cache_read tokens (re-shape preserved)', async () => {
+    const standardFetch = global.fetch;
+    global.fetch = jest.fn(async (url, init) => {
+      fetchedBodies.push({ url, body: init?.body || '' });
+      return {
+        ok: true,
+        status: 200,
+        text: async () => '',
+        json: async () => ({
+          content: [{ type: 'text', text: 'A cached Phase I summary well over twenty characters long.' }],
+          usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 1234 },
+          model: 'claude-test',
+          stop_reason: 'end_turn',
+        }),
+      };
+    });
+    try {
+      PROMPT_ROW = buildPromptRow({ variables: [], systemPrompt: 'SYS', promptBody: 'BODY' });
+      const result = await executePrompt({
+        promptName: 'phase-i.summary',
+        overrideVariables: {},
+        runSource: 'Vercel Test',
+      });
+      expect(result.cacheHit).toBe(true);
+      expect(result.usage.cache_read_input_tokens).toBe(1234);
+    } finally {
+      global.fetch = standardFetch;
+    }
+  });
+});

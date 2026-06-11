@@ -1,6 +1,6 @@
 # Phase 2 design — Executor Claude transport convergence (raw `fetch` → `LLMClient`)
 
-**Status:** Reviewed by Codex 2026-06-11 (verdict REVISE — corrections folded below). Ready for implementation.
+**Status:** ✅ IMPLEMENTED 2026-06-11. Reviewed by Codex (REVISE — corrections folded below), then shipped. `callClaude()` now uses `LLMClient.complete()`; 23 Executor tests green (incl. 2 new cache_control/cache-hit regression pins); build + lint clean. `EXECUTOR_CONTRACT.md` step 6 + `AI_DATA_FLOW_MATRIX.md` row updated. Deferred (explicitly out of scope): consolidating Executor `api_usage_log` accounting.
 **Source finding:** `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 — "Shared Executor still calls Claude with raw `fetch` instead of the canonical `LLMClient`."
 **Remediation tracker:** `docs/security-audit/SECURITY_AUDIT_REMEDIATION_PLAN_2026-06-11.md` Phase 2.
 

@@ -85,7 +85,7 @@ Validation:
 
 ### P2 - Shared Executor still calls Claude with raw `fetch` instead of the canonical `LLMClient`
 
-Status: VERIFIED
+Status: VERIFIED → ✅ RESOLVED 2026-06-11 (remediation Phase 2). `callClaude()` (`execute-prompt.js`) now calls `LLMClient.complete()` and re-shapes the normalized response back to the raw Anthropic shape the Executor consumes; the `cache_control` system array is preserved verbatim. 23 Executor tests pass (incl. 2 new regression pins on cache_control + cache-hit); build + lint clean. `EXECUTOR_CONTRACT.md` step 6 + `AI_DATA_FLOW_MATRIX.md` row updated. Design: `docs/security-audit/PHASE_2_EXECUTOR_TRANSPORT_DESIGN_2026-06-11.md`.
 
 Evidence:
 
@@ -272,7 +272,7 @@ Validation:
 ## Recommended Next Steps
 
 1. Keep the private Blob migration as the top open security initiative for sensitive document exposure.
-2. Migrate or wrap Executor Claude transport through `LLMClient`/`safeFetch` while preserving cache-control semantics.
+2. ✅ Done 2026-06-11 (Phase 2) — Executor Claude transport migrated to `LLMClient.complete()`; cache-control semantics preserved and regression-pinned.
 3. Update `docs/AI_DATA_FLOW_MATRIX.md` for contact enrichment's current transport and current residual risk.
 4. Add HMAC-aware recognition or fixtures to `check-api-route-security-matrix.js` to avoid recurring false-positive warnings.
 5. Fix Semgrep CA/tooling on the machine that failed (it works on the primary dev machine — see Addendum) and install `gitleaks`/`trivy`, or rely on CI scanner artifacts for the scanner lane.

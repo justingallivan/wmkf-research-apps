@@ -9,7 +9,7 @@ This plan corrects the deficiencies recorded in `docs/security-audit/SECURITY_AU
 | Finding | Source | Status |
 |---|---|---|
 | Generic uploader creates public Blob artifacts for sensitive document workflows | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 | Open |
-| Shared Executor calls Claude with raw `fetch` instead of canonical `LLMClient` | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 | Open |
+| Shared Executor calls Claude with raw `fetch` instead of canonical `LLMClient` | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 | ✅ Done (2026-06-11) — Phase 2 shipped; `callClaude()` → `LLMClient.complete()`, cache_control preserved, 23 Executor tests green, build/lint clean |
 | `AI_DATA_FLOW_MATRIX.md` is stale for contact enrichment transport | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | ✅ Done (2026-06-11) — Phase 3 shipped; 5 stale call sites reconciled to `LLMClient`, residual risk preserved; `check:fact-consistency` green |
 | API route guard gate warns on intentionally HMAC-protected BILL routes | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | ✅ Done (2026-06-11) — Phase 4 shipped; `verifyInternalCall`/`verifyBillWebhook` recognized when matrix documents the HMAC boundary; `check:api-routes:self-test` added |
 | Local scanner lane is blocked by Semgrep CA trust-store failure; `gitleaks`/`trivy` unavailable locally | `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P3 | Narrowed — Semgrep works on primary dev machine (Addendum); only `gitleaks`/`trivy` install remains |
@@ -277,7 +277,7 @@ Stop and re-plan if any of these appear:
 ## Tracking Checklist
 
 - [ ] Phase 1 private Blob proof slice implemented and verified.
-- [ ] Phase 2 Executor transport convergence implemented and verified.
+- [x] Phase 2 Executor transport convergence implemented and verified. (2026-06-11 — `LLMClient.complete()` adapter; cache_control + cache-hit regression-pinned; 23 Executor tests + build green.)
 - [x] Phase 3 AI data-flow matrix reconcile complete. (2026-06-11)
 - [x] Phase 4 HMAC route gate hygiene complete. (2026-06-11)
 - [ ] Phase 5 scanner lane repair complete or delegated to CI evidence (Semgrep already green on primary dev machine; `gitleaks`/`trivy` install + originating-machine CA fix outstanding).
