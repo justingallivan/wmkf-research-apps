@@ -291,4 +291,6 @@ The original audit ran where Semgrep was blocked by a CA trust-store failure. Re
 | `npm audit --audit-level=high` | 5 moderate, 0 high/critical (matches original) |
 | `gitleaks` / `trivy` | not installed — not run |
 
+Not entirely new: the checked-in `docs/security-audit/general-security-results.json` (Semgrep 1.154.0, 2026-05-22) already recorded 3 of these 5 — both GCM `gcm-no-tag-length` sites and the `blob-proxy.js` direct-response-write. The `p/owasp-top-ten` ruleset added the `download-document.js` direct-response-write and the `PoliciesSection.js` `dangerouslySetInnerHTML`. They were latent because the June audit did not re-run Semgrep.
+
 The 5 OWASP-ruleset findings are detailed in the finding "Semgrep OWASP/js/node ruleset surfaces 5 unreviewed hardening findings" above and tracked as Phase 7 in the remediation plan. None is a release blocker; all triaged Low / Low-moderate with mitigating controls already present (`setAuthTag` called at both GCM sites; `attachment` disposition on the document download; admin-only policy editor).

@@ -1,6 +1,6 @@
 # AI Data Flow Matrix
 
-Last updated: 2026-05-04
+Last updated: 2026-06-11
 
 ## Purpose
 
@@ -86,11 +86,11 @@ Recommended next step: keep provider policy changes explicit in config and tests
 
 ### P2 - Legacy/direct Anthropic fetch paths bypass the canonical wrapper
 
-`ContactEnrichmentService.claudeWebSearch`, `health-checker`, and the old module demo still use direct `fetch` calls. `ClaudeReviewerService` previously did as well, but has since been migrated to `LLMClient`. Some remaining paths are low sensitivity, but the direct-fetch pattern bypasses `LLMClient`'s timeout, safeFetch, retry, and redaction behavior.
+`health-checker` and the old module demo still use direct `fetch` calls. `ClaudeReviewerService` and `ContactEnrichmentService.claudeWebSearch` previously did as well, but have since been migrated to `LLMClient` (contact enrichment as of the A7 follow-up — `lib/services/contact-enrichment-service.js:1082` routes through `LLMClient`, preserving the `web_search` tool via `complete()`'s `tools` passthrough). Some remaining paths are low sensitivity, but the direct-fetch pattern bypasses `LLMClient`'s timeout, safeFetch, retry, and redaction behavior.
 
 Recommended next step: migrate remaining production Claude callers to `LLMClient` or `safeFetch` as appropriate. Prioritize paths where the wrapper adds meaningful timeout, redaction, retry, or allowlist behavior.
 
-**Status (2026-05-04): partially addressed.** `ClaudeReviewerService` now uses `LLMClient` for reviewer-finder analysis and discovered-candidate reasoning, and content-bearing debug logs are gated behind `DEBUG_REVIEWER_FINDER`. Remaining direct-fetch paths should still be reviewed, but the highest-volume reviewer-finder path is no longer the priority migration target.
+**Status (2026-06-11): mostly addressed.** `ClaudeReviewerService` uses `LLMClient` for reviewer-finder analysis and discovered-candidate reasoning (content-bearing debug logs gated behind `DEBUG_REVIEWER_FINDER`), and `ContactEnrichmentService.claudeWebSearch` now routes through `LLMClient` as well (A7 follow-up, `contact-enrichment-service.js:1082`), wrapping the candidate identity string as untrusted external content (`dataClass: EXTERNAL_API_TEXT`, 2k cap) before the call. The remaining direct-fetch paths are `health-checker` (low — static "Hello", acceptable) and the `modules/expertise_matching` demo (confirm production-reachability or archive). The residual data risk for contact enrichment is unchanged: candidate name + institution still leave the app via Claude web search.
 
 ### P2 - AI-run logs persist generated outputs with large limits
 
@@ -114,7 +114,7 @@ Recommended next step: use this as the model for "redact before external AI, red
 |---|---|---|---|---|---|---|---|
 | `/api/reviewer-finder/analyze` via `ClaudeReviewerService.analyzeProposal` | Anthropic Claude | Proposal text from upload/blob, additional notes, excluded names, reviewer count/settings | Body limit 10 MB; proposal text capped at 100,000 chars by `ai-payload-boundary` before prompt construction | Usage metadata; generated proposal info/reviewer suggestions returned to client and later saved by user flows | App access, rate limit, `safeFetch` for blob input, `LLMClient` for Anthropic transport, explicit AI payload boundary metadata | High | Direct Anthropic `fetch` has been removed from `ClaudeReviewerService`; proposal text now has an explicit cap/source/data-class boundary. |
 | `/api/reviewer-finder/generate-emails` | Anthropic Claude | Candidate/reviewer details, proposal info, base email body | Per-email prompt; `maxTokens: 512` | Generated email returned/saved; usage metadata | App access; uses `LLMClient` | Medium | Sends reviewer + proposal context. Reasonable, but keep prompt fields tight. |
-| `/api/reviewer-finder/enrich-contacts` / `ContactEnrichmentService.claudeWebSearch` | Anthropic Claude with web search | Candidate name and institution | Minimal prompt; `max_tokens: 256`; one web search | Enriched contact info returned/saved | App access, rate limit, server-side credentials only | Medium | Direct Anthropic `fetch`; candidate PII/name sent to Claude/web search. Migrate to `LLMClient` or `safeFetch`. |
+| `/api/reviewer-finder/enrich-contacts` / `ContactEnrichmentService.claudeWebSearch` | Anthropic Claude with web search | Candidate name and institution | Minimal prompt; `max_tokens: 256`; one web search | Enriched contact info returned/saved | App access, rate limit, `LLMClient` transport (timeout/safeFetch/retry/redaction), untrusted-content wrapping of candidate identity | Medium | Now uses `LLMClient` (`web_search` tool preserved via `complete()` passthrough). Residual risk: candidate name/institution still sent to Claude/web search. |
 | `/api/process`, `/api/process-legacy` | Anthropic Claude | Extracted Phase II proposal text; filename; generated summary reused for structured extraction | Proposal text bounded by `ai-payload-boundary` before both summary and structured-extraction prompts; legacy preserves 15k/10k asymmetric caps | Summary and structured data returned; extracted text included in response object | App access, rate limit, `LLMClient`, `safeFetch` for blob input, explicit AI payload boundary metadata | High | Main remaining code risk is returning full extracted text in API response and duplicating bounded text across summary + extraction calls. Confirm UI need or remove from response. |
 | `/api/process-phase-i` | Anthropic Claude | Extracted Phase I proposal text | Proposal text bounded at 100,000 chars before both summary and structured-extraction prompts | Summary/structured data returned | App access, `LLMClient`, explicit AI payload boundary metadata | High | Same response-minimization issue as `/api/process`. |
 | `/api/process-phase-i-writeup` | Anthropic Claude | Extracted Phase I writeup/proposal text | Proposal text bounded at 100,000 chars before both writeup and structured-extraction prompts | Writeup/structured data returned | App access, `LLMClient`, explicit AI payload boundary metadata | High | Same response-minimization issue as `/api/process`. |
@@ -135,7 +135,7 @@ Recommended next step: use this as the model for "redact before external AI, red
 | `/api/cron/log-analysis` | Anthropic Claude | Redacted Vercel error summaries: timestamp, path, message | Up to 50 entries; `maxTokens: 1024` | Alert message/metadata stored; output redacted again | Cron secret, input redaction, output redaction, `LLMClient` | Low | Good reference pattern. |
 | `lib/utils/health-checker.js` | Anthropic Claude | Static "Hello" health-check prompt | `max_tokens: 10` | Health status only | Cron/admin health surface | Low | Direct `fetch` acceptable risk, but can migrate to `safeFetch` for consistency. |
 | `lib/services/claude-reviewer-service.js` | Anthropic Claude | Reviewer-finder prompts containing bounded proposal text, reviewer criteria, notes/exclusions | Proposal text capped at 100,000 chars by `ai-payload-boundary`; `LLMClient` retry/fallback behavior | Usage metadata through `LLMClient` | Called behind reviewer-finder app access; `LLMClient` transport with `safeFetch`, timeout, retry, redacted errors; explicit AI payload boundary metadata | High | Direct `fetch` migration and proposal-text boundary are complete for the reviewer-finder analysis path. |
-| `lib/services/contact-enrichment-service.js` | Anthropic Claude web search | Candidate name and institution | Minimal prompt, one web search | Contact enrichment result | Server-side credentials only | Medium | Direct `fetch`; migrate to canonical wrapper/tool handling where feasible. |
+| `lib/services/contact-enrichment-service.js` | Anthropic Claude web search | Candidate name and institution | Minimal prompt, one web search | Contact enrichment result | `LLMClient` transport (timeout/safeFetch/retry/redaction); untrusted-content wrapping of candidate identity; server-side credentials | Medium | Migrated to `LLMClient` (`:1082`; `web_search` tool preserved via `complete()` passthrough). Residual risk: candidate name/institution still sent to Claude/web search. |
 | `lib/services/multi-llm-service.js` | Anthropic/OpenAI/Gemini/Perplexity | Arbitrary caller prompt, often proposal review prompts | Large max-token default | Usage metadata | `safeFetch`; provider env keys | High | Exposure depends entirely on caller. Needs caller-level matrix references. |
 | `modules/expertise_matching/src/reviewer_matcher.jsx` | Anthropic Claude | Browser-side prompt for local/module reviewer matching | Demo/module code path, not main API | Unknown | Direct browser/component fetch | Medium | Confirm whether this module is production-reachable. If not, archive or document as non-production. |
 
@@ -160,8 +160,9 @@ Recommended next step: use this as the model for "redact before external AI, red
    - 🟡 If token costs keep rising, add per-table default `select` behavior plus system-prompt guidance.
 
 4. **Remaining direct Anthropic fetch paths**
-   - Review `ContactEnrichmentService.claudeWebSearch`, `health-checker`, and older/demo/module paths.
-   - Migrate production paths to `LLMClient` or `safeFetch` where the wrapper adds meaningful protection.
+   - ✅ `ContactEnrichmentService.claudeWebSearch` migrated to `LLMClient` (A7 follow-up).
+   - 🟡 Review `health-checker` (low — static health ping) and the `modules/expertise_matching` demo (confirm production-reachability or archive).
+   - Migrate remaining production paths to `LLMClient` or `safeFetch` where the wrapper adds meaningful protection.
 
 5. **Payload-boundary governance**
    - Keep `lib/utils/ai-payload-boundary.js` as the route/service convention for non-Executor paths.
