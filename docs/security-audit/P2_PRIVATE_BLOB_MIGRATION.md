@@ -1,6 +1,6 @@
 # P2 residual: private-blob migration for the generic uploader
 
-**Status:** 🟡 Pilot shipped 2026-06-11 — `expense-reporter` migrated to private upload + server-side read (`lib/utils/uploaded-blob.js`). Remaining: live upload→read smoke, the browser-facing download proxy, the `file-loader.js` private read, and the other consumers (list below). Concrete design + what-shipped: `docs/security-audit/PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`.
+**Status:** 🟡 Pilot + file-loader cohort shipped & read-path live-smoked 2026-06-11 — `expense-reporter` (pilot), plus `phase-i-dynamics` + `grant-reporting` via the now-private-aware `lib/utils/file-loader.js` (`lib/utils/uploaded-blob.js`). Live smokes passed (`smoke-private-upload.mjs` for the store; `smoke-private-file-loader.mjs` for the shared `loadFile` chokepoint). Remaining: production promotion (token + per-app flag + deploy), the browser-facing download proxy, and the remaining (browser-render) consumers (list below). Concrete design + what-shipped: `docs/security-audit/PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md`.
 **Origin:** Security audit 2026-05-21, finding P2. Created 2026-05-21 alongside A5 (endpoint consolidation), which partially addressed P2.
 
 ## Rollout status (2026-06-11)
@@ -19,16 +19,22 @@
   branch delegates to `readUploadedBlobBuffer` (private `pathname` read, or `safeFetch`
   for legacy public). So its callers (`grant-reporting/extract`, `phase-i-dynamics`
   summarize + summarize-v2) get private reads just by passing `access`/`pathname` in
-  the FileRef. Unit-tested; back-compat (no consumer change required).
-- 🟡 **`phase-i-dynamics`** — page migrated (2026-06-11): uploader `access` gated by
+  the FileRef. Unit-tested; back-compat (no consumer change required). **Live chokepoint
+  smoke PASSED** (2026-06-11) — `scripts/smoke-private-file-loader.mjs` PUTs a real DOCX
+  private and reads+extracts it through `loadFile({access:'private',pathname})` against
+  the live store (marker text round-trips; blob URL HTTP 403). Covers BOTH file-loader
+  consumers, since they share this read path.
+- ✅ **`phase-i-dynamics`** — page migrated (2026-06-11): uploader `access` gated by
   `NEXT_PUBLIC_PHASE_I_DYNAMICS_PRIVATE_BLOB` (default `public`); the `fileRef` now
   carries `pathname`+`access`, read server-side via the private-aware file-loader.
-  Build/lint/tests green. **Live smoke + prod flag pending** (same shared store/token).
-- 🟡 **`grant-reporting`** — page migrated (2026-06-11): both uploaders (proposal +
+  Build/lint/tests green. **Read-path live smoke PASSED** (shared file-loader chokepoint,
+  above). **Prod flag + deploy still pending.**
+- ✅ **`grant-reporting`** — page migrated (2026-06-11): both uploaders (proposal +
   report, one shared `renderDocPicker`) gated by `NEXT_PUBLIC_GRANT_REPORTING_PRIVATE_BLOB`
   (default `public`); both fileRefs carry `pathname`+`access`; `extract.js` passes them
-  through to the private-aware file-loader. Build/lint/tests green. **Live smoke + prod
-  flag pending.** Completes the file-loader cohort.
+  through to the private-aware file-loader. Build/lint/tests green. **Read-path live smoke
+  PASSED** (shared file-loader chokepoint, above). **Prod flag + deploy still pending.**
+  Completes the file-loader cohort.
 - ⏳ **Browser-render consumers** (templates/attachments via `proxifyBlobUrl`,
   `blob-proxy.js`) — need the new authenticated download proxy (record/app-scoped).
 - ⏳ Remaining `FileUploaderSimple` consumers below — flip to `access="private"` +

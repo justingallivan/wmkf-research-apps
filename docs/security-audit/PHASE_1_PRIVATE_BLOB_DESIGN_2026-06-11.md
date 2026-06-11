@@ -1,6 +1,6 @@
 # Phase 1 design — private-blob upload + authenticated download proxy
 
-**Status:** ✅ PILOT IMPLEMENTED + SMOKED 2026-06-11 (expense-reporter). SDK verified, design decisions resolved, pilot shipped server-read-only, Codex-reviewed (REVISE — folded), live smoke passed. **Follow-on (2026-06-11):** `lib/utils/file-loader.js` is now private-aware (delegates to `readUploadedBlobBuffer`); `phase-i-dynamics` and `grant-reporting` are migrated (flag-gated) — the full file-loader consumer cohort. **Remaining (later phases):** the browser-facing download proxy and the other (browser-render) consumers. See "Implementation notes" at the end.
+**Status:** ✅ PILOT IMPLEMENTED + SMOKED 2026-06-11 (expense-reporter). SDK verified, design decisions resolved, pilot shipped server-read-only, Codex-reviewed (REVISE — folded), live smoke passed. **Follow-on (2026-06-11):** `lib/utils/file-loader.js` is now private-aware (delegates to `readUploadedBlobBuffer`); `phase-i-dynamics` and `grant-reporting` are migrated (flag-gated) — the full file-loader consumer cohort. **Read path live-smoked (2026-06-11):** `scripts/smoke-private-file-loader.mjs` round-trips a real DOCX through `loadFile({access:'private',pathname})` against the live store (text extracts; URL HTTP 403) — covers both cohort consumers, which share the chokepoint. **Remaining (later phases):** production promotion (token + per-app flag + deploy) for the cohort, the browser-facing download proxy, and the other (browser-render) consumers. See "Implementation notes" at the end.
 
 > ✅ **Live smoke PASSED 2026-06-11; production promotion pending.** Private blobs use a **dedicated private store** (`wmkf-uploads-private`, `store_WvoDkxrlWniAuJAj`, iad1) with its own `UPLOADS_BLOB_RW_TOKEN` — NOT the public `BLOB_READ_WRITE_TOKEN` store. **Verified end-to-end** (run locally against the real store, flag on): `scripts/smoke-private-upload.mjs` passed; a live expense-reporter receipt upload → extraction worked; the receipts landed in the **private** store; and the receipt URL returns **HTTP 403** unauthenticated. **Remaining:** add `UPLOADS_BLOB_RW_TOKEN` + `NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB=true` to **production** and `vercel deploy --prod`. (`UPLOADS_BLOB_RW_TOKEN` is set in dev + preview; where unset the code fails closed — upload-handler 503, read throws.)
 **Source finding:** `docs/security-audit/SECURITY_AUDIT_2026-06-11.md` P2 — "Generic uploader still creates public Blob artifacts for sensitive document workflows."
@@ -203,10 +203,11 @@ auth-free URL + the consumer route's existing `requireAppAccess`).
 **Why the pilot needs no proxy / no `file-loader` change:** `expense-reporter` reads
 its uploads **only server-side** — `process-expenses.js` fetched `file.url` to feed
 Claude (image vision + PDF text); there is no browser-rendered blob. So the pilot
-swaps that server read for a private read. The browser-facing download proxy and the
-`file-loader.js` private read remain required for **later** consumers that render or
-text-extract blobs (e.g. Grant Reporting / Phase-I via `file-loader`; template
-attachments via `proxifyBlobUrl`).
+swaps that server read for a private read. The `file-loader.js` private read (needed
+by the **text-extract** consumers — Grant Reporting / Phase-I) has **since shipped +
+live-smoked** (2026-06-11; see the status banner + `scripts/smoke-private-file-loader.mjs`).
+The browser-facing **download proxy** remains required for the **render** consumers that
+need an auth-gated URL (template attachments via `proxifyBlobUrl`).
 
 **Ownership model (resolved):** app-scoped staff-shared, mirroring `download-review.js`
 — the consumer route (`process-expenses`) gates reads with
