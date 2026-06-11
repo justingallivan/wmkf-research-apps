@@ -79,6 +79,7 @@
 - Dev environment / secrets: project-dev-environment.md; project-vercel-sensitive-env-pull-empty.md
 - Local build + git gotchas: local-jest-build-environment.md; env-broken-git-autogc.md
 - Dynamics sandbox (NOT drop-in usable): project-dynamics-sandbox-state.md
+- Testing the reviewer-accept flow (real-prod accept CREATEs a honorarium akoya_request → fires AkoyaGo plugins + classic workflows + a live Bill.com payment flow + contact→Business-Central sync; gate real-prod on human PA review, MOCK the data layer for automated tests; read-only probe `scripts/probe-dataverse-automation.js`): project-reviewer-accept-prod-automation.md
 - Strategy / system model: project-system-model.md; project-strategy-direction.md
 - Root instruction file / hooks / rules / instruction-adherence (Codex writing enforcement harnesses next): project-claude-instruction-architecture.md
 - Roadmap (historical snapshots — cross-check current strategy): project-app-roadmap-2026-04-25.md; project-phase-i-summary-app-winddown.md

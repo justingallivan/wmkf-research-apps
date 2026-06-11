@@ -23,6 +23,7 @@ function makeData(overrides = {}) {
       state: 'CA',
       postalCode: '94000',
       country: 'US',
+      phone: '+1 555 123 4567',
     },
     ...(overrides.prefill || {}),
   };
@@ -63,6 +64,8 @@ describe('Stage2aView payment-address card', () => {
     expect(screen.getByDisplayValue('123 Main St')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Townsville')).toBeInTheDocument();
     expect(screen.getByDisplayValue('94000')).toBeInTheDocument();
+    // Phone is collected in the address card (required this cycle for manual payment).
+    expect(screen.getByDisplayValue('+1 555 123 4567')).toBeInTheDocument();
     // Country select reflects the prefilled ISO-2 code.
     expect(screen.getByRole('combobox')).toHaveValue('US');
   });
@@ -91,7 +94,7 @@ describe('Stage2aView payment-address card', () => {
 });
 
 describe('missingAddressFields', () => {
-  const complete = { line1: '1 St', line2: '', city: 'T', state: '', postalCode: '9', country: 'US' };
+  const complete = { line1: '1 St', line2: '', city: 'T', state: '', postalCode: '9', country: 'US', phone: '+1 555 0100' };
 
   it('returns [] for a complete required set (line2/state optional)', () => {
     expect(missingAddressFields(complete)).toEqual([]);
@@ -102,6 +105,8 @@ describe('missingAddressFields', () => {
     expect(missingAddressFields({ ...complete, city: '  ' })).toContain('city');
     expect(missingAddressFields({ ...complete, postalCode: '' })).toContain('postalCode');
     expect(missingAddressFields({ ...complete, country: '' })).toContain('country');
+    expect(missingAddressFields({ ...complete, phone: '' })).toContain('phone');
+    expect(missingAddressFields({ ...complete, phone: '   ' })).toContain('phone');
   });
 
   it('flags a country that is not exactly 2 chars (server contract)', () => {

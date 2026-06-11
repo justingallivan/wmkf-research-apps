@@ -1,6 +1,7 @@
 # BILL Chunk 4 Design — respond.js accept-path extension + amount-as-setting + Full-real-fix hardening
 
 **Status:** draft for pre-impl Codex review (S199, 2026-05-29)
+**⚠️ Current-cycle (2026-06-09):** automated BILL onboarding DEFERRED — the chunk-4 accept path still creates the honorarium + PATCHes address/phone, but `onboardReviewer()` short-circuits to `status: 'deferred'` (no BILL, NO alert) when `BILL_ONBOARDING_DEFERRED=true`. The `alert_only` references below are the BILL-disabled fallback, superseded by the deferral gate this cycle; address+phone are now server-enforced (`422 payment_contact_required`). Parent doc's current-cycle update is authoritative.
 **Parent:** `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md` (umbrella plan, Connor sign-off 2026-05-26)
 **Hardening source:** `docs/REVIEWER_BILL_HARDENING_FINDINGS.md` (S198 deep-pass; 3 money-adjacent P1s)
 **Sibling shipped chunks:** 1 (junction lookup `wmkf_HonorariumRequest`), 2-3 (`lib/bill/`), 6 (`/api/bill/onboard-reviewer` + service), 7a (webhook scaffold)

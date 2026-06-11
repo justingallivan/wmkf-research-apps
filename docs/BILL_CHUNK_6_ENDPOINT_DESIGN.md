@@ -1,6 +1,7 @@
 # BILL Chunk 6 Design — `/api/bill/onboard-reviewer` Endpoint
 
 **Status:** draft for pre-impl Codex review
+**⚠️ Current-cycle (2026-06-09):** automated BILL onboarding is DEFERRED — `onboardReviewer()` returns `status: 'deferred'` (no BILL call, NO alert) when `BILL_ONBOARDING_DEFERRED=true`, at higher precedence than the `alert_only` fallback documented below. The status union and alert-only section below predate the `deferred` gate; the parent doc's current-cycle update is authoritative.
 **Parent:** `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md` (the umbrella plan)
 **Sibling shipped chunks:** 2-3 (`lib/bill/`), 7a (`pages/api/webhooks/bill.js` scaffold)
 **Sibling pending chunks:** 4 (extend `respond.js` accept path — blocked on Connor's `wmkf_HonorariumRequest` junction lookup), 5 (Stage 2a UI address inputs)

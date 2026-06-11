@@ -150,6 +150,35 @@ describe('onboardReviewer — BILL_ENABLED=false fallback', () => {
   });
 });
 
+describe('onboardReviewer — BILL_ONBOARDING_DEFERRED (this-cycle gate)', () => {
+  afterEach(() => {
+    delete process.env.BILL_ONBOARDING_DEFERRED;
+    delete process.env.BILL_ENABLED;
+  });
+
+  test('returns deferred without calling BILL and WITHOUT firing an alert', async () => {
+    process.env.BILL_ONBOARDING_DEFERRED = 'true';
+    const { notifyCalls, deps } = makeDeps();
+    const result = await onboardReviewer(BASE_INPUT, deps);
+    expect(result.status).toBe('deferred');
+    expect(result.ok).toBe(true);
+    expect(deps.billClient.createBillVendor).not.toHaveBeenCalled();
+    expect(deps.dynamics.getRecord).not.toHaveBeenCalled();
+    // Unlike alert_only, the deferred gate stays silent — payment is manual.
+    expect(notifyCalls).toEqual([]);
+  });
+
+  test('deferred takes precedence over BILL_ENABLED=true (no BILL, no alert)', async () => {
+    process.env.BILL_ONBOARDING_DEFERRED = 'true';
+    process.env.BILL_ENABLED = 'true';
+    const { notifyCalls, deps } = makeDeps();
+    const result = await onboardReviewer(BASE_INPUT, deps);
+    expect(result.status).toBe('deferred');
+    expect(deps.billClient.createBillVendor).not.toHaveBeenCalled();
+    expect(notifyCalls).toEqual([]);
+  });
+});
+
 describe('onboardReviewer — BILL failure phases', () => {
   beforeEach(() => { process.env.BILL_ENABLED = 'true'; });
   afterEach(() => { delete process.env.BILL_ENABLED; });

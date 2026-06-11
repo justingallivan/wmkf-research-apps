@@ -81,10 +81,13 @@ function validateContactEdits(edits) {
 }
 
 // Reviewer mailing-address caps (chunk-4). Address is PATCHed to contact.address1_*
-// and fed to BILL vendor onboarding. Absent address is allowed here (the honorarium
-// row + provenance are still created; BILL onboarding degrades/alerts on missing
-// address); a malformed/oversized field returns a clean 400.
-const ADDRESS_MAX = { line1: 200, line2: 200, city: 100, state: 100, postalCode: 20, country: 2 };
+// (phone → address1_telephone1) and fed to BILL vendor onboarding. `validateAddress`
+// owns SHAPE/LENGTH/country-code validity only — it stays lenient on emptiness (a
+// malformed/oversized field returns a clean 400; an absent/empty field passes here).
+// PRESENCE of the full payment-contact set (mailing address + phone) is enforced
+// separately on a non-opted-out accept by missingRequiredAddressFields below (422),
+// so manual honorarium payment this cycle always has a contact address + phone.
+const ADDRESS_MAX = { line1: 200, line2: 200, city: 100, state: 100, postalCode: 20, country: 2, phone: 40 };
 function validateAddress(address) {
   if (address === undefined || address === null) return null;
   if (typeof address !== 'object' || Array.isArray(address)) return { reason: 'invalid_address' };
@@ -99,6 +102,18 @@ function validateAddress(address) {
     return { reason: 'invalid_country', field: 'country' };
   }
   return null;
+}
+
+// Payment-contact fields a reviewer MUST supply when taking the honorarium —
+// mirrors REQUIRED_ADDRESS_FIELDS in Stage2aView (line2/state stay optional).
+// Enforced server-side on a non-opted-out FRESH accept (below) so manual payment
+// this cycle always has a mailing address + phone, even on a non-form (direct)
+// POST that bypasses the client's own completeness check. `validateAddress` above
+// still owns shape/length/country-code validity; this owns presence.
+const REQUIRED_ADDRESS_FIELDS = ['line1', 'city', 'postalCode', 'country', 'phone'];
+export function missingRequiredAddressFields(address) {
+  const a = address && typeof address === 'object' && !Array.isArray(address) ? address : {};
+  return REQUIRED_ADDRESS_FIELDS.filter((k) => !String(a[k] ?? '').trim());
 }
 const REVIEW_STATUS_MATERIALS_SENT = 100000001;
 const RESPONSE_TYPE_ACCEPTED = 100000000;
@@ -233,12 +248,34 @@ export default async function handler(req, res) {
     // step, which may not have completed on the first attempt (Codex pre-impl
     // P1 #2). The honorarium step is itself idempotent.
     const isAcceptRepeat = accepted && !declined;
+    // Opt-out honors BOTH the request body AND the persisted flag (a reviewer who
+    // declined-with-opt-out then returns to accept stays opted out; and a re-accept
+    // whose body omits the flag must not mint a honorarium for someone who opted
+    // out on the original accept — Codex post-impl F2). Computed once here so the
+    // fresh-accept payment-contact guard and the honorarium step below agree.
+    const optedOut = body.honorariumOptOut === true || suggestion.wmkf_honorariumoptout === true;
 
     if (!isAcceptRepeat) {
       const policyAcks = body.policyAcks || {};
       for (const slot of STAGE_2A_POLICY_SLOTS) {
         if (policyAcks[slot] !== true) {
           return res.status(400).json({ ok: false, reason: 'policy_ack_required', slot });
+        }
+      }
+      // A non-opted-out reviewer MUST supply a complete mailing address + phone so
+      // staff can pay the honorarium manually this cycle (BILL onboarding deferred).
+      // The client enforces this too, but the server is the only guarantee on a
+      // public token endpoint — a direct POST could otherwise create a honorarium
+      // with no contact info. Fresh accept only: a re-accept is an idempotent
+      // honorarium retry and must not be re-blocked once the first (guarded) accept
+      // already captured these. validateAddress (above) already rejected a malformed
+      // address with a 400; this rejects an incomplete one with a 422.
+      if (!optedOut) {
+        const missingAddress = missingRequiredAddressFields(body.address);
+        if (missingAddress.length) {
+          return res
+            .status(422)
+            .json({ ok: false, reason: 'payment_contact_required', fields: missingAddress });
         }
       }
       // Active-child sanity: re-fetch active versions at accept time.
@@ -291,14 +328,9 @@ export default async function handler(req, res) {
     }
 
     // ── Honorarium onboarding (NON-FATAL to the accept) ────────────────────
-    // Runs on both fresh accept and re-accept; gated on opt-out. Any failure
-    // alerts and is left for the resume sweep / a later re-accept — it never
-    // converts a committed accept into a 500.
-    //
-    // Opt-out honors BOTH the request body AND the persisted flag (Codex
-    // post-impl F2): a re-accept whose body omits honorariumOptOut must not
-    // mint a honorarium for a reviewer who opted out on the original accept.
-    const optedOut = body.honorariumOptOut === true || suggestion.wmkf_honorariumoptout === true;
+    // Runs on both fresh accept and re-accept; gated on opt-out (computed above).
+    // Any failure alerts and is left for the resume sweep / a later re-accept — it
+    // never converts a committed accept into a 500.
     let honContactId = null;
     if (!optedOut) {
       try {

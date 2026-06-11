@@ -31,12 +31,13 @@ import { COUNTRIES } from '../../config/countries';
 // Payment-address fields the reviewer must complete to receive the honorarium.
 // line2 + state stay optional (many countries have no sub-national state, and
 // the downstream BILL contract treats both as optional). Mirrors the server's
-// validateAddress field set in respond.js.
-export const REQUIRED_ADDRESS_FIELDS = ['line1', 'city', 'postalCode', 'country'];
+// validateAddress field set in respond.js. Phone is required this cycle so staff
+// have a contact number for manual honorarium payment (BILL onboarding deferred).
+export const REQUIRED_ADDRESS_FIELDS = ['line1', 'city', 'postalCode', 'country', 'phone'];
 
 // Server-side address fields that can be flagged inline when /respond rejects
 // a value (keys match respond.js ADDRESS_MAX exactly).
-const ADDRESS_FIELD_KEYS = new Set(['line1', 'line2', 'city', 'state', 'postalCode', 'country']);
+const ADDRESS_FIELD_KEYS = new Set(['line1', 'line2', 'city', 'state', 'postalCode', 'country', 'phone']);
 
 /**
  * Required address fields that are empty OR (for country) not a 2-char code.
@@ -106,6 +107,7 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
     state: prefillAddress.state || '',
     postalCode: prefillAddress.postalCode || '',
     country: prefillAddress.country || '',
+    phone: prefillAddress.phone || '',
   });
   // Which required address fields to flag after a blocked submit attempt.
   const [addressErrors, setAddressErrors] = useState([]);
@@ -204,6 +206,16 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
           setError('Someone else updated this invitation while you were viewing it. Please refresh and try again.');
         } else if (json.reason === 'policy_misconfigured') {
           setError('We hit a configuration error on our end. The Foundation has been notified.');
+        } else if (json.reason === 'payment_contact_required') {
+          // Server rejected an incomplete payment-contact set (mailing address +
+          // phone required this cycle for manual honorarium payment). The client
+          // pre-validates so this is a defensive path — flag the named fields
+          // inline so the reviewer sees exactly what to complete.
+          const fields = Array.isArray(json.fields)
+            ? json.fields.filter((f) => ADDRESS_FIELD_KEYS.has(f))
+            : [];
+          if (fields.length) setAddressErrors(fields);
+          setError('Please complete your mailing address and phone number to receive the honorarium.');
         } else if (resp.status === 400 && VALIDATION_REASON_COPY[json.reason]) {
           // Surface the specific server validation reason and, when it points at
           // a named address field, flag that field inline.
@@ -454,6 +466,12 @@ function AddressCard({ address, errors, onUpdate, disabled, prefilled }) {
         <CountrySelect
           value={address.country} onChange={(v) => onUpdate('country', v)}
           disabled={disabled} error={hasError('country')}
+        />
+        <Field
+          name="phone" label="Phone number" value={address.phone} onChange={(v) => onUpdate('phone', v)}
+          type="tel" placeholder="e.g., +1 555 123 4567"
+          disabled={disabled} required error={hasError('phone')}
+          errorMessage="Phone number is required."
         />
       </div>
     </div>
