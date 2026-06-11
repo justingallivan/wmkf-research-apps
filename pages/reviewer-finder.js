@@ -243,7 +243,7 @@ function CandidateCard({ candidate, selected, onSelect, readOnly = false }) {
           {/* Institution COI warning */}
           {candidate.hasInstitutionCOI && (
             <div className="mt-2 p-2 bg-red-50 border border-red-300 rounded text-xs text-red-800">
-              <span className="font-medium">🏛️ Institution COI:</span> {candidate.institutionCOIDetails?.historical ? 'Former shared institution with proposal PI' : 'Same institution as proposal PI'}
+              <span className="font-medium">🏛️ Institution COI:</span> Same institution as proposal PI
               {candidate.institutionCOIDetails && (
                 <span className="ml-1">
                   ({candidate.institutionCOIDetails.reviewerInstitution})
@@ -1219,8 +1219,10 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
           candidates: selected,
           options: enrichmentOptions,
           // Lets the route re-evaluate institution COI on the post-enrichment
-          // affiliation so the badge stays accurate (Codex P2#1).
+          // affiliation so the badge stays accurate (Codex P2#1). requestId lets the
+          // server use the structured PI-institution union, matching discover (S240).
           authorInstitution: analysisResult?.proposalInfo?.authorInstitution || null,
+          requestId: uploadedFiles[0]?.sourceProposal?.requestId || null,
         }),
       });
 

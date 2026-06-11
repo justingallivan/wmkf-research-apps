@@ -19,7 +19,7 @@ jest.mock('../../lib/services/orcid-service', () => ({
 const { DynamicsService } = require('../../lib/services/dynamics-service');
 const { OpenAlexService } = require('../../lib/services/openalex-service');
 const { ORCIDService } = require('../../lib/services/orcid-service');
-const { resolveProposalPI, excludePiIdentity, appendPiName } = require('../../lib/services/proposal-pi-identity');
+const { resolveProposalPI, excludePiIdentity, appendPiName, piInstitutions } = require('../../lib/services/proposal-pi-identity');
 
 const GUID = '11111111-1111-1111-1111-111111111111';
 const PL_ID = '22222222-2222-2222-2222-222222222222';
@@ -137,7 +137,9 @@ describe('resolveProposalPI', () => {
       openAlexAuthorId: 'https://openalex.org/A5060668110',
       canonicalName: 'Wen Li',
       contactName: 'Wen Li',
-      institution: 'Wayne State University',
+      currentAffiliation: null, // no ORCID creds in test env → getProfile not called
+      lastKnownInstitution: 'Wayne State University',
+      institution: 'Wayne State University', // currentAffiliation || lastKnown
       emailDomain: 'wayne.edu',
     });
   });
@@ -229,6 +231,32 @@ describe('resolveProposalPI', () => {
       process.env.ORCID_CLIENT_ID = prevId;
       process.env.ORCID_CLIENT_SECRET = prevSecret;
     }
+  });
+});
+
+describe('piInstitutions (union)', () => {
+  test('unions ORCID-current + OpenAlex-last-known + LLM authorInstitution, deduped', () => {
+    const pi = { resolved: true, currentAffiliation: 'Wayne State University', lastKnownInstitution: 'Yantai University' };
+    expect(piInstitutions(pi, 'Wayne State Univ.')).toEqual(
+      // 'Wayne State University' and 'Wayne State Univ.' are distinct raw strings (norm only
+      // collapses case/space), so both survive — over-inclusion is acceptable for a hard drop.
+      ['Wayne State University', 'Yantai University', 'Wayne State Univ.']
+    );
+  });
+
+  test('dedupes case/space-insensitively', () => {
+    const pi = { resolved: true, currentAffiliation: 'MIT', lastKnownInstitution: 'mit ' };
+    expect(piInstitutions(pi, 'MIT')).toEqual(['MIT']);
+  });
+
+  test('unresolved PI → only the LLM institution', () => {
+    expect(piInstitutions({ resolved: false }, 'Stanford')).toEqual(['Stanford']);
+    expect(piInstitutions(null, 'Stanford')).toEqual(['Stanford']);
+  });
+
+  test('nothing known → empty (caller falls back to today behavior)', () => {
+    expect(piInstitutions({ resolved: false }, null)).toEqual([]);
+    expect(piInstitutions(null, '')).toEqual([]);
   });
 });
 

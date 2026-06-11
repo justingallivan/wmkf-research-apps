@@ -34,7 +34,7 @@ import { safeFetch } from '../../../lib/utils/safe-fetch';
 import { normalizeName } from '../../../lib/utils/name-normalization';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { deriveProposalAuthorNames } from '../../../lib/utils/proposal-authors';
-import { resolveProposalPI, appendPiName } from '../../../lib/services/proposal-pi-identity';
+import { resolveProposalPI, appendPiName, piInstitutions } from '../../../lib/services/proposal-pi-identity';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
@@ -223,22 +223,13 @@ export default async function handler(req, res) {
       //    a recommendee who fails PubMed verification must NOT display as
       //    "clean" when their known institution matches the PI's (Codex post-impl).
       let coiChecked = [...verified, ...unverified];
-      if (proposalInfo.authorInstitution) {
-        coiChecked = DeduplicationService.markInstitutionCOI(coiChecked, proposalInfo.authorInstitution);
-      }
-      // Coauthor COI vs PI + co-investigators. `proposalAuthors` is normalized to
-      // the PI only (reviewer-finder.js:243); the shared helper folds in
-      // `coInvestigators` so a recommendee who co-authored with a listed co-PI is
-      // also flagged. discover.js now derives the SAME set (S213 parity closed).
-      // S240 parity with discover.js (Codex #7): append the canonical PI name from
-      // the structured identity (request → Project Leader contact → wmkf_orcid →
-      // exact OpenAlex author) so the coauthor-COI check uses the authoritative name
-      // even when the LLM extracted it wrong/missing. Already inside the Dynamics
-      // bypass; fail-open + append-only (appendPiName never replaces the LLM PI + co-Is).
-      let proposalAuthors = deriveProposalAuthorNames(proposalInfo);
+
+      // S240: resolve the structured PI ONCE — used for both the institution-COI union
+      // and the canonical PI name for coauthor COI. Already inside the Dynamics bypass.
+      // Fail-open on non-abort errors; abort/budget rethrown.
+      let pi = null;
       try {
-        const pi = await resolveProposalPI(requestId, { signal: deadlineController.signal });
-        proposalAuthors = appendPiName(proposalAuthors, pi);
+        pi = await resolveProposalPI(requestId, { signal: deadlineController.signal });
       } catch (err) {
         if (deadlineController.signal.aborted
           || err?.name === 'AbortError'
@@ -248,6 +239,24 @@ export default async function handler(req, res) {
         }
         console.error('[enrich-recommended] PI identity resolution failed (fail-open):', err.message);
       }
+
+      // Institution COI on the applicant-recommended path = FLAG, not drop (S240 D3):
+      // the applicant explicitly named these reviewers, so surface a same-institution
+      // conflict for the PD rather than silently dropping their pick. Current-affiliation
+      // only (no historical), matched against the PI-institution UNION (structured +
+      // LLM); falls back to the LLM authorInstitution when the PI is unresolved.
+      const recInstitutions = piInstitutions(pi, proposalInfo.authorInstitution);
+      if (recInstitutions.length) {
+        coiChecked = DeduplicationService.markInstitutionCOI(coiChecked, recInstitutions);
+      }
+
+      // Coauthor COI vs PI + co-investigators. `proposalAuthors` is normalized to
+      // the PI only (reviewer-finder.js:243); the shared helper folds in
+      // `coInvestigators` so a recommendee who co-authored with a listed co-PI is
+      // also flagged. discover.js now derives the SAME set (S213 parity closed).
+      // S240 parity (Codex #7): appendPiName folds the structured canonical PI name in
+      // (append-only, never replaces the LLM PI + co-Is).
+      const proposalAuthors = appendPiName(deriveProposalAuthorNames(proposalInfo), pi);
       if (pubmedVerificationContract.enabled && proposalAuthors.length > 0 && coiChecked.length > 0) {
         coiChecked = await DiscoveryService.checkCoauthorshipsForCandidates(
           coiChecked,

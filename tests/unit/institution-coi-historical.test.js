@@ -1,26 +1,33 @@
 /**
  * @jest-environment node
  *
- * Former-institution COI: a reviewer who shared an institution with the PI in the
- * PAST and has since moved is a genuine conflict the recency-best current
- * affiliation hides. markInstitutionCOI scans the affiliation HISTORY to catch it.
- * (S229 — surfaced by Taekjip Ha: ex-Johns Hopkins, now Harvard, on a JHU proposal.)
+ * Institution COI is CURRENT-affiliation only (S240, Chunk 2a). Former/historical
+ * shared institution no longer counts — reviewers self-disclose relationship
+ * conflicts, and a PD-unverifiable flag adds manual-search burden
+ * (project-reviewer-coi-rely-on-self-disclosure). This file is the regression guard
+ * that the historical scan is GONE, plus coverage of the multi-institution (union)
+ * form. `affiliationHistory` is still aggregated by dedup (producer kept) but is no
+ * longer a COI input.
  */
 const { DeduplicationService } = require('../../lib/services/deduplication-service');
 
-describe('markInstitutionCOI — current + historical', () => {
+describe('markInstitutionCOI — current-only (historical removed, S240)', () => {
   const PI_INST = 'Johns Hopkins University';
 
-  test('current shared institution flags COI (not marked historical)', () => {
+  test('current shared institution flags COI (no historical field)', () => {
     const [r] = DeduplicationService.markInstitutionCOI(
       [{ name: 'A', affiliation: 'Department of Biophysics, Johns Hopkins University, Baltimore, MD' }],
       PI_INST
     );
     expect(r.hasInstitutionCOI).toBe(true);
-    expect(r.institutionCOIDetails.historical).toBe(false);
+    expect(r.institutionCOIDetails).toEqual({
+      piInstitution: PI_INST,
+      reviewerInstitution: 'Department of Biophysics, Johns Hopkins University, Baltimore, MD',
+    });
+    expect(r.institutionCOIDetails).not.toHaveProperty('historical');
   });
 
-  test('former shared institution (moved away) flags COI as historical', () => {
+  test('former shared institution (moved away) is NO LONGER flagged', () => {
     const [r] = DeduplicationService.markInstitutionCOI(
       [{
         name: 'Taekjip Ha',
@@ -32,48 +39,63 @@ describe('markInstitutionCOI — current + historical', () => {
       }],
       PI_INST
     );
-    expect(r.hasInstitutionCOI).toBe(true);
-    expect(r.institutionCOIDetails.historical).toBe(true);
-    expect(r.institutionCOIDetails.reviewerInstitution).toMatch(/Johns Hopkins/);
+    expect(r.hasInstitutionCOI).toBe(false);
+    expect(r.institutionCOIDetails).toBeNull();
   });
 
   test('no shared institution anywhere → no COI', () => {
     const [r] = DeduplicationService.markInstitutionCOI(
-      [{
-        name: 'B',
-        affiliation: 'Stanford University',
-        affiliationHistory: ['Stanford University', 'UC Berkeley'],
-      }],
+      [{ name: 'B', affiliation: 'Stanford University', affiliationHistory: ['Stanford University', 'UC Berkeley'] }],
       PI_INST
     );
     expect(r.hasInstitutionCOI).toBe(false);
     expect(r.institutionCOIDetails).toBeNull();
   });
 
-  test('current match short-circuits the history scan (stays non-historical)', () => {
+  test('UNION (array): flags a match against ANY institution in the set', () => {
+    const union = ['MIT', 'Johns Hopkins University'];
     const [r] = DeduplicationService.markInstitutionCOI(
-      [{
-        name: 'C',
-        affiliation: 'Johns Hopkins University',
-        affiliationHistory: ['Johns Hopkins University', 'MIT'],
-      }],
-      PI_INST
+      [{ name: 'C', affiliation: 'Johns Hopkins University' }],
+      union
     );
     expect(r.hasInstitutionCOI).toBe(true);
-    expect(r.institutionCOIDetails.historical).toBe(false);
+    expect(r.institutionCOIDetails.piInstitution).toBe('Johns Hopkins University');
   });
 
-  test('no affiliationHistory present → behaves exactly as the current-only check', () => {
-    const [r] = DeduplicationService.markInstitutionCOI(
-      [{ name: 'D', affiliation: 'Harvard Medical School' }],
-      PI_INST
-    );
-    expect(r.hasInstitutionCOI).toBe(false);
+  test('empty institution / empty union → no-op', () => {
+    expect(DeduplicationService.markInstitutionCOI([{ name: 'D', affiliation: 'X' }], null)[0].hasInstitutionCOI).toBeUndefined();
+    expect(DeduplicationService.markInstitutionCOI([{ name: 'D', affiliation: 'X' }], [])[0].hasInstitutionCOI).toBeUndefined();
   });
 });
 
-describe('deduplicateAndStore — affiliationHistory for Track B (Codex P2)', () => {
-  test('aggregates distinct affiliations across same-author rows', async () => {
+describe('filterConflicts — hard drop on the institution union (S240)', () => {
+  test('drops candidates at ANY union institution; keeps the rest', () => {
+    const researchers = [
+      { name: 'Same-A', affiliation: 'Johns Hopkins University' },
+      { name: 'Same-B', primaryAffiliation: 'MIT' },
+      { name: 'Clean', affiliation: 'Stanford University' },
+    ];
+    const kept = DeduplicationService.filterConflicts(researchers, ['Johns Hopkins University', 'MIT']);
+    expect(kept.map((r) => r.name)).toEqual(['Clean']);
+  });
+
+  test('single-string form still works (back-compat)', () => {
+    const kept = DeduplicationService.filterConflicts(
+      [{ name: 'X', affiliation: 'Stanford University' }, { name: 'Y', affiliation: 'MIT' }],
+      'MIT'
+    );
+    expect(kept.map((r) => r.name)).toEqual(['X']);
+  });
+
+  test('empty institution set → no drop', () => {
+    const researchers = [{ name: 'X', affiliation: 'MIT' }];
+    expect(DeduplicationService.filterConflicts(researchers, [])).toEqual(researchers);
+    expect(DeduplicationService.filterConflicts(researchers, null)).toEqual(researchers);
+  });
+});
+
+describe('deduplicateAndStore — affiliationHistory producer kept (COI-inert)', () => {
+  test('still aggregates distinct affiliations across same-author rows', async () => {
     const merged = await DeduplicationService.deduplicateAndStore([
       { name: 'Jane Smith', affiliation: 'Johns Hopkins University', publications: [{ title: 'a' }], source: 'pubmed' },
       { name: 'Jane Smith', affiliation: 'Harvard Medical School', publications: [{ title: 'b' }], source: 'pubmed' },
@@ -84,12 +106,16 @@ describe('deduplicateAndStore — affiliationHistory for Track B (Codex P2)', ()
     );
   });
 
-  test('Track B former-institution tie is flagged historical once history is present', async () => {
+  test('a former-only institution tie is NOT flagged (historical retired)', async () => {
     const merged = await DeduplicationService.deduplicateAndStore([
       { name: 'Jane Smith', affiliation: 'Harvard Medical School', publications: [{ title: 'a' }], source: 'pubmed' },
       { name: 'Jane Smith', affiliation: 'Johns Hopkins University', publications: [{ title: 'b' }], source: 'pubmed' },
     ]);
+    // dedup keeps the most-recent affiliation as current; JHU is only in history now.
     const [withCOI] = DeduplicationService.markInstitutionCOI(merged, 'Johns Hopkins University');
-    expect(withCOI.hasInstitutionCOI).toBe(true);
+    // If the recency-best current affiliation is Harvard, JHU-in-history must NOT flag.
+    if ((withCOI.affiliation || withCOI.primaryAffiliation) !== 'Johns Hopkins University') {
+      expect(withCOI.hasInstitutionCOI).toBe(false);
+    }
   });
 });

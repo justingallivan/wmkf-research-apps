@@ -27,6 +27,8 @@ import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
+import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { resolveProposalPI, piInstitutions } from '../../../lib/services/proposal-pi-identity';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -63,7 +65,7 @@ export default async function handler(req, res) {
   // load overrides itself rather than relying on a warm process.
   await loadModelOverrides();
 
-  const { candidates, options = {}, authorInstitution = null } = req.body;
+  const { candidates, options = {}, authorInstitution = null, requestId = null } = req.body;
 
   // Validate input
   if (!candidates || !Array.isArray(candidates) || candidates.length === 0) {
@@ -122,15 +124,40 @@ export default async function handler(req, res) {
       },
     });
 
-    // Re-evaluate institution COI on the POST-enrichment affiliation. Enrichment
-    // may promote an identity-trusted current affiliation (ORCID/Scholar) over the
-    // PubMed-recency one that /discover computed COI against, which would otherwise
-    // leave hasInstitutionCOI / institutionCOIDetails.historical stale relative to
-    // the affiliation the card now shows. Reuses the same markInstitutionCOI logic
-    // (current + historical) so server and client never diverge. The `coiRecomputed`
-    // marker lets the client merge override a now-false COI (vs. when we didn't run,
-    // when authorInstitution is absent, leaving the discover value intact). (Codex P2#1, S229.)
-    if (authorInstitution && Array.isArray(results?.enriched)) {
+    // S240 Chunk 2a: resolve the PI-institution UNION server-side (structured
+    // ORCID-current + OpenAlex last-known + LLM authorInstitution) so the recompute
+    // matches discover's hard drop instead of clobbering it with the LLM-only value
+    // (Codex #8). Fail-open: no requestId / unresolved → the LLM authorInstitution.
+    let coiInstitutions = authorInstitution;
+    if (requestId) {
+      try {
+        const pi = await bypassDynamicsRestrictions(
+          'reviewer-enrich-contacts-pi-identity',
+          () => resolveProposalPI(requestId, { signal: deadlineController.signal })
+        );
+        const union = piInstitutions(pi, authorInstitution);
+        if (union.length) coiInstitutions = union;
+      } catch (err) {
+        if (deadlineController.signal.aborted
+          || err?.name === 'AbortError'
+          || err?.code === 'openalex_timeout'
+          || err?.code === 'reviewer_time_budget_exceeded') {
+          throw err;
+        }
+        console.error('[enrich-contacts] PI identity resolution failed (fail-open):', err.message);
+      }
+    }
+
+    // Re-evaluate institution COI on the POST-enrichment affiliation. Enrichment may
+    // promote an identity-trusted current affiliation (ORCID/Scholar) over the
+    // PubMed-recency one /discover computed COI against, which would otherwise leave
+    // hasInstitutionCOI / institutionCOIDetails stale relative to the affiliation the
+    // card now shows. CURRENT-affiliation only (S240 — historical no longer counts).
+    // The `coiRecomputed` marker lets the client merge override a now-false COI (vs.
+    // when we didn't run, when no institution is known, leaving the discover value
+    // intact). (Codex P2#1, S229.)
+    const haveCoiInstitutions = Array.isArray(coiInstitutions) ? coiInstitutions.length : !!coiInstitutions;
+    if (haveCoiInstitutions && Array.isArray(results?.enriched)) {
       const origList = Array.isArray(candidates) ? candidates : [];
       results.enriched.forEach((r, idx) => {
         if (!r || !r.contactEnrichment) return;
@@ -141,8 +168,8 @@ export default async function handler(req, res) {
         if (!orig || orig.name !== r.name) orig = origList.find((c) => c.name === r.name) || {};
         const effectiveAffiliation = r.contactEnrichment.affiliation || orig.affiliation || null;
         const [evaluated] = DeduplicationService.markInstitutionCOI(
-          [{ affiliation: effectiveAffiliation, affiliationHistory: orig.affiliationHistory }],
-          authorInstitution
+          [{ affiliation: effectiveAffiliation }],
+          coiInstitutions
         );
         r.contactEnrichment.coiRecomputed = true;
         r.contactEnrichment.hasInstitutionCOI = evaluated.hasInstitutionCOI;

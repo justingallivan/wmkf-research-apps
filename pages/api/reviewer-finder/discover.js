@@ -20,7 +20,7 @@ import { deriveProposalAuthorNames } from '../../../lib/utils/proposal-authors';
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
 import { withReviewerProvenance } from '../../../lib/utils/reviewer-provenance';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
-import { resolveProposalPI, excludePiIdentity, appendPiName } from '../../../lib/services/proposal-pi-identity';
+import { resolveProposalPI, excludePiIdentity, appendPiName, piInstitutions } from '../../../lib/services/proposal-pi-identity';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -182,11 +182,17 @@ export default async function handler(req, res) {
     const { DiscoveryService } = require('../../../lib/services/discovery-service');
 
     // Run discovery
+    // PI-institution UNION for the institution hard drop (S240 Chunk 2a): structured
+    // ORCID-current + OpenAlex last-known + LLM authorInstitution. Empty → discover()
+    // falls back to the LLM authorInstitution (today's behavior).
+    const piInsts = piInstitutions(piIdentity, analysisResult.proposalInfo?.authorInstitution);
+
     const discoveryResults = await DiscoveryService.discover(analysisResult, {
       searchPubmed,
       searchArxiv,
       searchBiorxiv,
       searchChemrxiv,
+      piInstitutions: piInsts,
       signal: deadlineController.signal,
       onProgress: (progress) => {
         sendEvent('progress', progress);
@@ -287,21 +293,31 @@ export default async function handler(req, res) {
       }
     }
 
-    // Mark institution COI (same institution as PI) - flag, don't filter
+    // Institution COI = HARD DROP (S240 Chunk 2a, both tracks). Current same-institution
+    // is a foundation policy conflict, so Track A (Claude-suggested) candidates at any PI
+    // institution are removed from the selectable pool, not just flagged — matched against
+    // the PI-institution UNION (structured-preferred, LLM fallback). Track B was already
+    // dropped inside DiscoveryService.discover(). A PD-facing excluded summary is emitted.
     const authorInstitution = analysisResult.proposalInfo?.authorInstitution;
+    const coiInstitutions = (Array.isArray(piInsts) && piInsts.length) ? piInsts : authorInstitution;
     let verifiedWithCOI = verifiedCandidates;
 
-    if (authorInstitution) {
-      verifiedWithCOI = DeduplicationService.markInstitutionCOI(verifiedWithCOI, authorInstitution);
-      const institutionCOICount = verifiedWithCOI.filter(c => c.hasInstitutionCOI).length;
-
-      if (institutionCOICount > 0) {
+    if (coiInstitutions && (Array.isArray(coiInstitutions) ? coiInstitutions.length : true)) {
+      const beforeInst = verifiedWithCOI.length;
+      const keptInst = DeduplicationService.filterConflicts(verifiedWithCOI, coiInstitutions);
+      const droppedInst = beforeInst - keptInst.length;
+      if (droppedInst > 0) {
+        const droppedNames = verifiedWithCOI
+          .filter(c => !keptInst.some(k => k === c))
+          .map(c => c.name)
+          .filter(Boolean);
         sendEvent('progress', {
           stage: 'coi_check',
-          status: 'institution_coi',
-          message: `Found ${institutionCOICount} candidate(s) from ${authorInstitution} (same institution as PI)`
+          status: 'institution_coi_excluded',
+          message: `Excluded ${droppedInst} Claude-suggested candidate(s) at the PI's institution: ${droppedNames.join(', ')}`
         });
       }
+      verifiedWithCOI = keptInst;
     }
 
     // Check for coauthor COI if we have proposal authors (reuse the shared array)
@@ -408,18 +424,10 @@ export default async function handler(req, res) {
       }
     }
 
-    // Mark institution COI on discovered candidates too
-    if (authorInstitution && enhancedDiscovered.length > 0) {
-      enhancedDiscovered = DeduplicationService.markInstitutionCOI(enhancedDiscovered, authorInstitution);
-      const discoveredInstCOI = enhancedDiscovered.filter(c => c.hasInstitutionCOI).length;
-      if (discoveredInstCOI > 0) {
-        sendEvent('progress', {
-          stage: 'coi_check',
-          status: 'discovered_institution_coi',
-          message: `Found ${discoveredInstCOI} discovered candidate(s) from ${authorInstitution}`
-        });
-      }
-    }
+    // Discovered (Track B) candidates were ALREADY hard-dropped on the PI-institution
+    // union inside DiscoveryService.discover() (filterConflicts), so no institution-COI
+    // pass is needed here (S240 Chunk 2a — the former markInstitutionCOI soft flag was
+    // removed; current same-institution is a hard drop, not a flag).
 
     // Combine and rank all candidates
     const proposalKeywords = analysisResult.proposalInfo?.keywords?.split(',').map(k => k.trim()) || [];

@@ -225,7 +225,7 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
 
           {hasInstitutionCOI && (
             <div className="mt-2 p-2 bg-red-50 border border-red-300 rounded text-xs text-red-800">
-              <span className="font-medium">🏛️ Institution COI:</span> {c.institutionCOIDetails?.historical ? 'Former shared institution with proposal PI' : 'Same institution as proposal PI'}
+              <span className="font-medium">🏛️ Institution COI:</span> Same institution as proposal PI
               {c.institutionCOIDetails?.reviewerInstitution && <span className="ml-1">({c.institutionCOIDetails.reviewerInstitution})</span>}
             </div>
           )}
@@ -618,8 +618,10 @@ export default function ReviewerSearchSection({
               options: { usePubmed: true, useOrcid: true, useSerpSearch: true, useClaudeSearch: true },
               // Lets the route re-evaluate institution COI on the post-enrichment
               // affiliation so the badge stays accurate after a current-affiliation
-              // promotion (Codex P2#1).
+              // promotion (Codex P2#1). requestId lets the server use the structured
+              // PI-institution union, matching discover's hard drop (S240).
               authorInstitution: analysisResult?.proposalInfo?.authorInstitution || null,
+              requestId: requestId || null,
             }),
           });
           let enrichmentResults = null;
