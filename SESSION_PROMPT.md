@@ -1,9 +1,12 @@
 # Session 242 Prompt: Reviewer COI Chunk 2b (still queued) — after the S241 memory-router prevention work
 
-> ✅ **GIT STATE.** `origin/main` = **`e5176f4`**, local in sync, working tree clean.
-> S241 pushed 4 commits (`c7f01e3..e5176f4`). All are docs + hooks + a CI gate —
-> **no app-runtime paths touched**, so the prod deploy is a no-op for the grant apps.
-> Verified pre-push: all memory/wiki/doc gates + self-tests green.
+> ✅ **GIT STATE.** `origin/main` = **`5e5dc11`**, local in sync, working tree clean.
+> S241 pushed the 4 memory-router commits (`c7f01e3..e5176f4`) + the `91f3ea3` handoff.
+> Two follow-ons landed after: `f07c13f` (another window — records `~/.claude` git-sync,
+> see [[claude-config-git-sync]]) and `5e5dc11` (a belt-and-suspenders `/stop` fix: that
+> other-window commit had added a memory file with no `status:` key, red-gating
+> `check:memory-router` on main; fixed). All are docs + hooks + a CI gate — **no
+> app-runtime paths touched**. Verified pre-push: all memory/wiki/doc gates + self-tests green.
 >
 > ⚠️ **NEW HOOK ACTIVE NEXT SESSION.** S241 added a PreToolUse write-time guard on
 > `.claude-memory/MEMORY.md` (`.claude/hooks/memory-router-guard.js`). Hooks load at
