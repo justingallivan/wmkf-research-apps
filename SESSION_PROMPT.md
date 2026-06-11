@@ -1,12 +1,13 @@
 # Session 242 Prompt: Reviewer COI Chunk 2b (still queued) — after the S241 memory-router prevention work
 
-> ✅ **GIT STATE.** `origin/main` = **`5e5dc11`**, local in sync, working tree clean.
-> S241 pushed the 4 memory-router commits (`c7f01e3..e5176f4`) + the `91f3ea3` handoff.
-> Two follow-ons landed after: `f07c13f` (another window — records `~/.claude` git-sync,
-> see [[claude-config-git-sync]]) and `5e5dc11` (a belt-and-suspenders `/stop` fix: that
-> other-window commit had added a memory file with no `status:` key, red-gating
-> `check:memory-router` on main; fixed). All are docs + hooks + a CI gate — **no
-> app-runtime paths touched**. Verified pre-push: all memory/wiki/doc gates + self-tests green.
+> ✅ **GIT STATE.** `origin/main` = **`367e28d`**, local in sync, working tree clean.
+> S241 pushed the 4 memory-router commits (`c7f01e3..e5176f4`) + the `91f3ea3` handoff,
+> then follow-ons: `f07c13f` (another window — records `~/.claude` git-sync, see
+> [[claude-config-git-sync]]); `5e5dc11` (belt-and-suspenders `/stop` fix — that other-window
+> commit added a memory file with no `status:` key, red-gating `check:memory-router` on
+> main); `7b2a1fd` (handoff pointer refresh); `367e28d` (hardened the gate's status check —
+> see "What Was Completed" #5). All are docs + hooks + a CI gate — **no app-runtime paths
+> touched**. Verified pre-push: all memory/wiki/doc gates + self-tests green.
 >
 > ⚠️ **NEW HOOK ACTIVE NEXT SESSION.** S241 added a PreToolUse write-time guard on
 > `.claude-memory/MEMORY.md` (`.claude/hooks/memory-router-guard.js`). Hooks load at
@@ -47,6 +48,14 @@ it doesn't recur. Full Codex loop (review → fold → re-review until SHIP) on 
    now nudges on `.claude-memory/*.md` writes. Three layers: enforcement + signal +
    discoverability. Rationale in [[project-memory-router-trap-prevention]].
 
+5. **`check:memory-router` status check hardened** (`367e28d`) — the status check used an
+   unscoped regex matching `status:` ANYWHERE in the file; scoped it to the leading
+   frontmatter block (require frontmatter, require a `status:` within it, strip quotes,
+   validate). Closes a false-negative where body prose mentioning "status:" satisfied the
+   requirement. NB the auto-memory writer bypasses PreToolUse hooks, so this GATE — not a
+   hook — is what catches its output (cf. `f07c13f`/`5e5dc11`). Self-test 10 → 14; 145 live
+   files green.
+
 ### Codex review notes (folded)
 - Review #1 (cleanup): under-populated `watch_paths` (3 topics), an overstated
   prod-accept hazard, a dropped "timeout/time-budget" trigger, a stale 18KB ref — all folded.
@@ -59,6 +68,9 @@ it doesn't recur. Full Codex loop (review → fold → re-review until SHIP) on 
 - `4b2d5a9` fold Codex review #1
 - `22f741a` write-time guard + wiki discoverability
 - `e5176f4` fix guard fail-closed bug (monotonic comparison)
+- `5e5dc11` add missing status frontmatter (fix red gate from other-window commit)
+- `7b2a1fd` refresh handoff git-state pointer
+- `367e28d` harden memory-router status check (frontmatter-scoped)
 
 ### Operational note
 - The shared Codex runtime **wedged** mid-review once (dead PID, vanished broker socket).
