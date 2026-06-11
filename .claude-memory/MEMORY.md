@@ -10,6 +10,7 @@
 - Ground-truth / self-correction rules: ../docs/CLAUDE_REMEDIATION_PLAN.md
 - Memory storage invariant (symlink/slug): memory-store-propagation.md
 - This router's contract + reorg history: ../docs/CLAUDE_MEMORY_REORGANIZATION_PLAN.md
+- Router budget trap + write-time guard + wiki valve (why MEMORY.md stays terse): project-memory-router-trap-prevention.md
 
 ## Always-Read Guardrails (damage / wasted-work preventers)
 - Destructive carryover or bulk delete: feedback-verify-before-destructive-carryover.md; feedback-list-and-confirm-before-bulk-deletes.md

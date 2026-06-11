@@ -362,6 +362,15 @@ Suggested new lightweight check:
 > cap, and additionally fails any `- ` router entry whose prose (file refs
 > stripped) exceeds 200 chars — pushing dense domain detail into the agent wiki
 > (`docs/agent-wiki/`). Per `docs/MEMORY_ROUTER_WIKI_RECOMMENDATIONS_2026-06-11.md`.
+>
+> **The gate alone wasn't enough** — it only fires at session start/CI, so the
+> session that bloats the router doesn't feel it (this is why it crept back over
+> budget in under a week). Enforcement is now also at **write time**:
+> `.claude/hooks/memory-router-guard.js` (PreToolUse Write|Edit) blocks an edit
+> that introduces a *net-new* budget breach against the same thresholds, with a
+> message routing detail to the wiki; an 11KB early-warning band + a SessionStart
+> pressure note surface it before the block. Rationale + the three-layer design:
+> memory `project-memory-router-trap-prevention`.
 
 Do not block this reorganization on writing a perfect CI gate. The first deliverable is a better memory structure.
 

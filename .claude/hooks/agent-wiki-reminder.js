@@ -80,6 +80,22 @@ process.stdin.on('end', () => {
     if (relativePath.startsWith('..')) return;
     if (relativePath.startsWith('docs/agent-wiki/')) return;
 
+    // Writing durable memory is the moment to ask whether this belongs in the
+    // wiki. MEMORY.md itself is governed by memory-router-guard; nudge only the
+    // topic files (.claude-memory/*.md) so detail flows to the wiki, not the
+    // auto-loaded router.
+    if (/^\.claude-memory\/.+\.md$/.test(relativePath) && relativePath !== '.claude-memory/MEMORY.md') {
+      const msg =
+        `Agent wiki: you are writing durable memory (\`${relativePath}\`). If this is recurring ` +
+        'domain detail (reviewer-finder, external-reviewer portal, intake, Dataverse/Dynamics), the ' +
+        'agent wiki (docs/agent-wiki/index.md) is the retrieval launch-pad — put source/Atlas/hazard ' +
+        'routing in the relevant topic page (or add one), and keep memory to intent/lessons. Advisory.';
+      process.stdout.write(JSON.stringify({
+        hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: msg },
+      }));
+      return;
+    }
+
     const hits = topics(root).filter((topic) =>
       topic.watchPaths.some((pattern) => matches(pattern, relativePath)));
     if (!hits.length) return;

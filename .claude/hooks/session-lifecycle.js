@@ -125,13 +125,36 @@ function additionalContext(hookEventName, message) {
   }));
 }
 
+// Once-per-session-open: route domain work to the agent wiki (discoverability —
+// the wiki is the retrieval launch-pad, but only if agents are reminded to read
+// it during planning, not just when a watched path is edited) and surface memory
+// router pressure early, before the write-time guard has to block an edit.
+function wikiAndRouterNotes(root) {
+  const notes = [
+    'Agent wiki: for reviewer-finder, external-reviewer portal, intake, or Dataverse/Dynamics work, read docs/agent-wiki/index.md first — it routes to the source files, Atlas pages, and prior hazards for that domain before you edit, and is the cheap home for domain detail. Update the matching topic page when you change durable behavior.',
+  ];
+  try {
+    const memBytes = fs.statSync(path.join(root, '.claude-memory', 'MEMORY.md')).size;
+    const CAP = 12 * 1024;
+    const WARN = 11 * 1024;
+    if (memBytes > WARN) {
+      notes.push(`Memory router pressure: .claude-memory/MEMORY.md is ${memBytes}B, within ${CAP - memBytes}B of the ${CAP}B hard cap. Put the next domain's detail in a docs/agent-wiki/topics/ page and add only a terse router line — the write-time guard will block a bloating edit.`);
+    }
+  } catch {
+    // MEMORY.md unreadable; skip the pressure note.
+  }
+  return notes;
+}
+
 function start(input, root, file) {
+  const notes = wikiAndRouterNotes(root);
   const existing = loadState(file);
   if (existing) {
     const failures = invariantFailures(root);
     if (failures.length) {
-      additionalContext('SessionStart', `Agent symlink diagnostic: ${failures.map((item) => item.name).join(', ')}. Existing session baseline was preserved across resume/compact.`);
+      notes.push(`Agent symlink diagnostic: ${failures.map((item) => item.name).join(', ')}. Existing session baseline was preserved across resume/compact.`);
     }
+    additionalContext('SessionStart', notes.join('\n\n'));
     return;
   }
   const state = {
@@ -146,8 +169,9 @@ function start(input, root, file) {
   saveState(file, state);
 
   if (state.baselineInvariantFailures.length) {
-    additionalContext('SessionStart', `Agent symlink diagnostic: already broken at session start: ${state.baselineInvariantFailures.join(', ')}. Run \`npm run check:agent-invariants\` and repair before changing these paths.`);
+    notes.push(`Agent symlink diagnostic: already broken at session start: ${state.baselineInvariantFailures.join(', ')}. Run \`npm run check:agent-invariants\` and repair before changing these paths.`);
   }
+  additionalContext('SessionStart', notes.join('\n\n'));
 }
 
 function record(input, root, file) {

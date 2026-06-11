@@ -17,6 +17,17 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/memory-router-guard.js\"",
+            "timeout": 10,
+            "statusMessage": "memory-router budget check"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/scope-claim-reminder.js\" 2>/dev/null || true",
             "timeout": 10,
             "statusMessage": "scope-claim check"

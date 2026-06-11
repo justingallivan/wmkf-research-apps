@@ -11,7 +11,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { validateStore, MAX_LINES, TARGET_BYTES, MAX_PROSE_LEN } = require('./check-memory-router.js');
+const { validateStore, MAX_LINES, TARGET_BYTES, WARN_BYTES, MAX_PROSE_LEN } = require('./check-memory-router.js');
 
 let failures = 0;
 function assert(cond, label) {
@@ -105,8 +105,23 @@ const goodTopic = '---\nname: x\ndescription: y\nmetadata:\n  type: project\n  s
   assert(errors.length === 0, 'many-file router line passes cleanly');
 }
 
+// 10. Bytes in the early-warning band (WARN_BYTES < bytes <= TARGET_BYTES) →
+//     warning, NOT error. Many short lines so prose/line caps stay clear.
+{
+  const line = '- ' + 'x'.repeat(100); // ~102 bytes, prose 100 < cap
+  let body = '# Router\n';
+  while (Buffer.byteLength(body, 'utf8') <= WARN_BYTES) body += line + '\n';
+  assert(Buffer.byteLength(body, 'utf8') > WARN_BYTES, 'fixture 10 is over WARN_BYTES');
+  assert(Buffer.byteLength(body, 'utf8') <= TARGET_BYTES, 'fixture 10 stays under TARGET_BYTES');
+  assert(body.split('\n').length <= MAX_LINES, 'fixture 10 stays under MAX_LINES');
+  const dir = mkStore(body, { 'a.md': goodTopic });
+  const { errors, warnings } = validateStore(dir);
+  assert(errors.length === 0, 'early-warning band does not fail');
+  assert(warnings.some((w) => w.includes('hard cap')), 'early-warning band warns');
+}
+
 if (failures) {
   console.error(`memory-router self-test FAILED — ${failures} case(s).`);
   process.exit(1);
 }
-console.log('memory-router self-test OK — 9/9 cases behaved as expected.');
+console.log('memory-router self-test OK — 10/10 cases behaved as expected.');
