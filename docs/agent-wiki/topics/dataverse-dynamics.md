@@ -20,9 +20,12 @@ canonical_docs:
   - docs/DATAVERSE_POWER_TOOLS_DESIGN.md
 watch_paths:
   - lib/services/dynamics-service.js
+  - lib/services/dynamics-context.js
   - lib/services/dynamics-odata-validator.js
   - lib/services/dynamics-identity-service.js
+  - lib/services/dynamics-explorer-taxonomy.js
   - lib/dataverse/**
+  - pages/dynamics-explorer.js
   - pages/api/dynamics-explorer/**
 update_triggers:
   - Dataverse / Dynamics schema, probe, or OData query changes

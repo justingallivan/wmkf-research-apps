@@ -105,8 +105,8 @@ Purpose: startup routing table.
 Target budget:
 
 - 60 to 90 lines.
-- Under 12KB.
-- Must stay below 150 lines and 18KB even after growth.
+- Under 12KB — this is the **enforced** hard cap as of 2026-06-10 (`check-memory-router.js`); see the Phase 5 note.
+- Must stay below 150 lines (also enforced). The 18KB figure is retained only as an unreachable legacy constant — the 12KB cap fails first.
 
 The index should answer:
 

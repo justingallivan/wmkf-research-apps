@@ -22,6 +22,9 @@ watch_paths:
   - pages/api/reviewer-finder/discover.js
   - pages/api/reviewer-finder/analyze.js
   - lib/services/discovery-service.js
+  - lib/services/openalex-service.js
+  - lib/services/orcid-service.js
+  - lib/services/pubmed-service.js
   - lib/services/deduplication-service.js
   - lib/utils/reviewer-provenance.js
 update_triggers:

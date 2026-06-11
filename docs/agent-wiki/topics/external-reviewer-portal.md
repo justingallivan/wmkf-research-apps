@@ -25,7 +25,10 @@ watch_paths:
   - pages/external/review/**
   - pages/api/external/review/**
   - pages/api/review-manager/**
+  - shared/components/external/**
   - tests/e2e/**
+  - playwright.config.js
+  - .github/workflows/e2e.yml
 update_triggers:
   - external reviewer accept / decline / upload flow changes
   - review token issuance, regeneration, or revocation changes
@@ -57,11 +60,12 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 
 ## Recurring Hazards
 
-- **Real-prod accept fires a live automation chain — never smoke it against prod.**
+- **Real-prod accept fires a live automation chain — never run automated/unfenced prod accept tests.**
   A reviewer accept CREATEs a honorarium `akoya_request`, which fires AkoyaGo plugins
   + classic workflows + a live Bill.com payment flow + a contact→Business-Central sync.
-  Gate any real-prod accept on human PA review, and **MOCK the data layer** for
-  automated tests. Read-only probe: `scripts/probe-dataverse-automation.js`. Full
+  **MOCK the data layer** for automated tests; a real-prod accept is a human-supervised
+  one-off gated on the Power-Automate owner (Connor) confirming the honorarium/payment
+  flows won't act. Read-only probe: `scripts/probe-dataverse-automation.js`. Full
   hazard: memory `project-reviewer-accept-prod-automation`.
 - **E2E harness runs against a real build, not `next dev`.** The Playwright
   reviewer-portal harness (`tests/e2e/`, `npm run test:e2e`) mocks the data layer and
