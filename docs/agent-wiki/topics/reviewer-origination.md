@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-10
+last_verified: 2026-06-12
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -57,6 +57,20 @@ candidate *is* (identity, contact, COI, PI identity), use the
   Optimize coverage/spread, surface-don't-silently-drop, grade COI rather than hard
   hide where policy doesn't require it. Canonical: redesign plan Part C; memory
   `project-reviewer-recall-over-precision`.
+- **Forward sniff-test experiment RESULT (S246):** a pilot of the plan's forward
+  decision experiment ran on 10 D26 Phase-I proposals (PD sniff test substituting
+  for accept/decline). **Claude-assisted origination beat the *minimal* grounded arm**
+  (OpenAlex topic→author aggregation + cited-refs) — 65% vs 35% pick-rate where
+  quantified; grounded full of wrong-field/deceased/trainee candidates; it re-found
+  the applicant's own recommended reviewers 1/50 vs Claude's 11/50. **Keep Claude as
+  the origination spine; defer retrieval-first cutover.** Crucial precision (avoid
+  overclaim): the arm that lost was a **bare** topic→author aggregation (no ORCID-works
+  anchoring, no field-routed expansion), NOT the ORCID-works-anchored multilane design.
+  §12 itself treats topic→author aggregation as a *valid* lane, and the OpenAlex-merge
+  hazard below is specifically about an author *cluster as a named-person/PI corpus* —
+  so this does NOT refute the multilane direction or that lane. Canonical:
+  `docs/REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md`; memory
+  `project-reviewer-origination-experiment-result`.
 
 ## Recurring Hazards
 

@@ -37,7 +37,7 @@
 
 ## Task Routing
 > Reviewer / intake / Dynamics lines carry a `→ wiki:<topic>` pointer — read that agent-wiki topic page before the routed memory file(s).
-- Reviewer origination / retrieval (multilane VALIDATED-not-built; web-discovery ABANDONED S230; recall>precision; recency>citations) → wiki:reviewer-origination: project-reviewer-origination-multilane.md; project-reviewer-finder-retrieval-redesign.md; project-reviewer-recall-over-precision.md; project-reviewer-web-discovery-abandoned.md; project-reviewer-ranking-recency-over-citations.md
+- Reviewer origination / retrieval (multilane VALIDATED-not-built; web-discovery ABANDONED S230; recall>precision; recency>citations) → wiki:reviewer-origination: project-reviewer-origination-multilane.md; project-reviewer-finder-retrieval-redesign.md; project-reviewer-recall-over-precision.md; project-reviewer-web-discovery-abandoned.md; project-reviewer-ranking-recency-over-citations.md; project-reviewer-origination-experiment-result.md
 - Reviewer-finder shipped improvements (call timeout/time-budget S223; recency ranking S224; web-discovery ABANDONED S230) → wiki:reviewer-origination: project-reviewer-finder-next-topics.md
 - Reviewer proposal-doc context (Phase-I thin signal; combine I+II w/ bibliography next cycle): project-reviewer-finder-proposal-doc-context.md
 - Applicant EXCLUSION breadth = OPEN POLICY DECISION (one soft "overlapping programs" line can clobber the peer set; needs foundation): project-applicant-exclusion-policy-pending.md

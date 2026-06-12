@@ -27,18 +27,35 @@
  * in-topic-active authors the grounded lanes surface that the current pipeline
  * MISSES entirely (the recall gap).
  *
- * READ-ONLY. Same side-effect profile as smoke-discover-dispositions: 2 paid LLM
- * calls + api_usage_log rows; NO reviewer/grant/roster/Dataverse writes. The only
- * things sent to public scholarly APIs are (a) the analyze keyword queries — which
- * Track B already sends to PubMed/arXiv in prod — and (b) public reference DOIs.
- * No applicant identity, no raw proposal text leaves the box.
+ * READ-ONLY w.r.t. live data. Same side-effect profile as smoke-discover-
+ * dispositions: 2 paid LLM calls + api_usage_log rows; NO reviewer/grant/roster/
+ * Dataverse writes. The only things sent to public scholarly APIs are (a) the
+ * analyze keyword queries — which Track B already sends to PubMed/arXiv in prod —
+ * and (b) public reference DOIs. No applicant identity, no raw proposal text leaves
+ * the box.
+ *
+ * BLINDED SNIFF-TEST MODE (--blinded-sheet <dir>): in addition to the stdout
+ * diagnostic, emits a per-request human-judgment harness for the origination
+ * experiment (REVIEWER_FINDER_ORIGINATION_PLAN.md §3): a source-BLINDED, NAME-ONLY
+ * candidate slate written to <dir>/<request>.sheet.md, plus a hidden arm-membership
+ * key to <dir>/<request>.key.json. Three arms, deduped + shuffled under neutral IDs:
+ *   A = current pipeline (Track A + Track B, ranked)
+ *   B = grounded retrieval (G1 OpenAlex author-aggregation + G2 cited-author)
+ *   C = applicant's recommended reviewers (Dataverse wmkf_potentialreviewer1..5)
+ * Dataverse PI/Co-PIs + applicant-excluded names are dropped from arms A/B (self/COI;
+ * never from C). NO per-candidate context is shown — name resolution from a bare name
+ * is unreliable and would leak arm B (which is id-grounded by construction); the judge
+ * resolves unrecognized names on demand. The judge sees only the sheet; the coordinator
+ * rejoins arms via the key after judgment. This writes LOCAL files only — still NO
+ * Dataverse/Postgres-roster writes. Keep <dir> out of git.
  *
  * Usage:
  *   node --import ./scripts/lib/use-extensionless.mjs scripts/probe-grounded-origination.mjs --request <num|GUID>
  *       [--file-key "lib::folder::name"] [--list-files] [--reviewer-count N]
  *       [--years 5] [--per-facet 25] [--max-dois 80]
+ *       [--blinded-sheet <dir>] [--arm1-cap 20] [--g1-top 15]
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
 function loadEnvLocal() {
   try {
@@ -59,7 +76,7 @@ const OA = 'https://api.openalex.org';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function parseArgs(argv) {
-  const out = { reviewerCount: 12, years: 5, perFacet: 25, maxDois: 80 };
+  const out = { reviewerCount: 12, years: 5, perFacet: 25, maxDois: 80, arm1Cap: 20, g1Top: 15 };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -70,6 +87,9 @@ function parseArgs(argv) {
     else if (a === '--years') out.years = parseInt(next(), 10) || 5;
     else if (a === '--per-facet') out.perFacet = parseInt(next(), 10) || 25;
     else if (a === '--max-dois') out.maxDois = parseInt(next(), 10) || 80;
+    else if (a === '--blinded-sheet') out.blindedSheet = next();
+    else if (a === '--arm1-cap') out.arm1Cap = parseInt(next(), 10) || 20;
+    else if (a === '--g1-top') out.g1Top = parseInt(next(), 10) || 15;
     else if (a === '--help' || a === '-h') out.help = true;
   }
   return out;
@@ -159,6 +179,51 @@ async function resolveDoiAuthors(doi) {
   return { doi, title: w.title, authors };
 }
 
+// Per-candidate context (affiliation/topics) is deliberately NOT shown on the
+// blinded sheet: reliable identity resolution from a free-text name is the hard
+// reviewer-identity problem (famous names collide with prolific homonyms), and
+// arm-B candidates carry correct OpenAlex ids by construction while arm-A/C names
+// don't — so any context column would be systematically fuller for the grounded
+// arm and leak it. The sheet shows NAME ONLY; the judge resolves anyone they don't
+// recognize on demand (correct ORCID/PubMed dossier) before finalizing.
+
+function shuffleInPlace(arr) {
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// ── Dataverse applicant context (ground truth for the blinded sniff test) ──
+// One READ-ONLY getRecord on the request. processAnnotations() turns each
+// `_<lookup>_value@…FormattedValue` into `_<lookup>_value_formatted`, so a single
+// $select of the lookup *_value fields hands back display names with no extra
+// round trips. Yields: PI + Co-PIs (self/COI exclusion), applicant institution
+// (institution-COI tag), applicant recommended reviewers (Arm C ground truth),
+// and the free-text excluded-reviewer list (dropped from the slate).
+async function loadApplicantContext(DynamicsService, requestId) {
+  const slotVals = (p, n) => Array.from({ length: n }, (_, i) => `_${p}${i + 1}_value`);
+  const select = [
+    '_wmkf_projectleader_value',
+    ...slotVals('wmkf_copi', 5),
+    '_akoya_applicantid_value',
+    ...slotVals('wmkf_potentialreviewer', 5),
+    'wmkf_excludedreviewers',
+  ].join(',');
+  const r = await DynamicsService.getRecord('akoya_requests', requestId, { select });
+  const fmt = (k) => r[`${k}_formatted`] || null;
+  const pi = fmt('_wmkf_projectleader_value');
+  const coPis = [1, 2, 3, 4, 5].map((n) => fmt(`_wmkf_copi${n}_value`)).filter(Boolean);
+  const institution = fmt('_akoya_applicantid_value');
+  const recommended = [1, 2, 3, 4, 5].map((n) => fmt(`_wmkf_potentialreviewer${n}_value`)).filter(Boolean);
+  const excludedText = (r.wmkf_excludedreviewers || '').trim();
+  const excludedNames = excludedText
+    ? excludedText.split(/[\n;,]|\band\b/i).map((s) => cleanName(s)).filter((s) => s.length > 2)
+    : [];
+  return { pi, coPis, institution, recommended, excludedText, excludedNames };
+}
+
 async function main() {
   const { DynamicsService } = await import('../lib/services/dynamics-service.js');
   const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
@@ -191,6 +256,15 @@ async function main() {
   console.log('━'.repeat(78));
   console.log(`REQUEST  ${rec.akoya_requestnum}  ·  ${rec.akoya_title || '(untitled)'}`);
   console.log('━'.repeat(78));
+
+  // Applicant ground truth (only needed for the blinded sniff-test sheet).
+  const applicant = args.blindedSheet ? await loadApplicantContext(DynamicsService, requestId) : null;
+  if (applicant) {
+    console.log(`APPLICANT CONTEXT (Dataverse) · institution: ${applicant.institution || '—'}`);
+    console.log(`  PI: ${applicant.pi || '—'} · Co-PIs: ${applicant.coPis.join(', ') || '—'}`);
+    console.log(`  recommended reviewers (Arm C): ${applicant.recommended.join(', ') || '— (none on record)'}`);
+    console.log(`  excluded reviewers: ${applicant.excludedNames.join(', ') || '—'}`);
+  }
 
   // 2. List + pick + download proposal (READ-ONLY)
   const buckets = await getRequestSharePointBuckets(requestId, rec.akoya_requestnum);
@@ -371,8 +445,88 @@ async function main() {
   console.log(`  G2 (≥2 cited works or first/last author): ${g2Missed.length}/${g2Strong.length} ABSENT from current pipeline`);
   g2Missed.slice(0, 20).forEach((a) => console.log(`     ✗ ${a.name}  (${a.doiCount} cited works${a.anchor ? ', anchor' : ''})`));
 
+  // ── BLINDED SNIFF-TEST SHEET + HIDDEN KEY ──
+  if (args.blindedSheet) {
+    console.log(`\n${line}\nBLINDED SNIFF-TEST — building source-blinded slate (arm 1 ∪ arm 2 ∪ arm C)\n${line}`);
+    // Arm 1 = current pipeline's surfaced+ranked slate (capped). Arm 2 = grounded
+    // G1 (top by spread+output) + G2 strong (≥2 cited works or first/last author).
+    // Arm C = applicant's recommended reviewers from Dataverse (ground truth).
+    const arm1 = ranked.slice(0, args.arm1Cap).map((c) => ({ name: cleanName(c.name), id: null, arms: ['A'] }));
+    const arm2 = [
+      ...g1Authors.slice(0, args.g1Top).map((a) => ({ name: cleanName(a.name), id: a.id, arms: ['B'] })),
+      ...g2Authors.filter((a) => a.doiCount >= 2 || a.anchor).map((a) => ({ name: cleanName(a.name), id: a.id, arms: ['B'] })),
+    ];
+    const armC = (applicant?.recommended || []).map((n) => ({ name: cleanName(n), id: null, arms: ['C'] }));
+    // Slate exclusion (COI/self) = LLM-derived proposal authors ∪ Dataverse PI/Co-PIs
+    // ∪ applicant-excluded names. Applied to origination arms only — Arm C (the
+    // applicant's own picks) is never dropped.
+    const exclusionNames = [
+      ...proposalAuthors,
+      ...(applicant ? [applicant.pi, ...applicant.coPis, ...applicant.excludedNames] : []),
+    ].filter(Boolean);
+    const isExcludedName = (name) => exclusionNames.some((x) => DeduplicationService.areNamesSimilar(x, name));
+    // Merge by name similarity; a person in multiple arms keeps every membership
+    // (an Arm-A or Arm-B candidate that also lands in Arm C is the recall signal).
+    const unified = [];
+    const addCand = (c) => {
+      if (!c.name) return;
+      if (!c.arms.includes('C') && isExcludedName(c.name)) return; // drop self/COI from origination arms
+      const hit = unified.find((u) => DeduplicationService.areNamesSimilar(u.name, c.name));
+      if (hit) { c.arms.forEach((a) => { if (!hit.arms.includes(a)) hit.arms.push(a); }); if (!hit.id && c.id) hit.id = c.id; return; }
+      unified.push({ name: c.name, id: c.id || null, arms: [...c.arms] });
+    };
+    [...arm1, ...arm2, ...armC].forEach(addCand);
+    console.log(`  ${unified.length} distinct candidates (arm1 ${arm1.length} ∪ arm2 ${arm2.length} ∪ armC ${armC.length}, deduped, ${exclusionNames.length} self/COI/excluded names removed from origination arms)`);
+    shuffleInPlace(unified);
+    const reqNum = rec.akoya_requestnum;
+    unified.forEach((c, i) => { c.blindId = `${reqNum}-${String(i + 1).padStart(2, '0')}`; });
+
+    mkdirSync(args.blindedSheet, { recursive: true });
+    const esc = (s) => String(s == null ? '' : s).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+    // Name-only sheet: arm/source hidden, NO context column (context can't be
+    // resolved reliably from a name and would leak the grounded arm — see helper
+    // note above). The judge resolves unrecognized names on demand.
+    const rows = unified.map((c) => `| ${c.blindId} | ${esc(c.name)} | ☐ |`).join('\n');
+    const sheet = `# Blinded reviewer sniff-test — Request ${reqNum}: ${rec.akoya_title || '(untitled)'}
+
+For each candidate below, judge from the proposal context: **would you have picked this person as a potential reviewer for THIS proposal?**
+Mark the last column **pick** or **no** (or fill the ☐). Source/arm is deliberately hidden.
+
+No affiliation/field is shown — reliable identity resolution from a name alone is unreliable and would leak the arm. For any name you don't recognize, ask for a dossier (ORCID/PubMed) before deciding.
+
+| ID | Name | Would pick? |
+|----|------|-------------|
+${rows}
+
+**Coverage call:** could you staff a review panel from this slate? **yes / no** — and if no, what's missing?
+`;
+    const key = {
+      request: reqNum,
+      title: rec.akoya_title || null,
+      arm1Cap: args.arm1Cap,
+      g1Top: args.g1Top,
+      applicant: applicant
+        ? { institution: applicant.institution, pi: applicant.pi, coPis: applicant.coPis, recommended: applicant.recommended, excluded: applicant.excludedNames }
+        : null,
+      counts: { arm1: arm1.length, arm2: arm2.length, armC: armC.length, unified: unified.length },
+      candidates: unified.map((c) => ({ blindId: c.blindId, name: c.name, arms: c.arms, oaId: c.id || null })),
+    };
+    const sheetPath = `${args.blindedSheet}/${reqNum}.sheet.md`;
+    const keyPath = `${args.blindedSheet}/${reqNum}.key.json`;
+    writeFileSync(sheetPath, sheet);
+    writeFileSync(keyPath, `${JSON.stringify(key, null, 2)}\n`);
+    const has = (c, a) => c.arms.includes(a);
+    const cTotal = unified.filter((c) => has(c, 'C')).length;
+    const cByA = unified.filter((c) => has(c, 'C') && has(c, 'A')).length;
+    const cByB = unified.filter((c) => has(c, 'C') && has(c, 'B')).length;
+    const abOverlap = unified.filter((c) => has(c, 'A') && has(c, 'B')).length;
+    console.log(`  overlap — A∩B: ${abOverlap} · applicant-recommended(C) re-surfaced by A: ${cByA}/${cTotal} · by B: ${cByB}/${cTotal}`);
+    console.log(`  ✎ blinded sheet → ${sheetPath}`);
+    console.log(`  🔒 hidden key   → ${keyPath}   (do NOT show the judge until after judgment)`);
+  }
+
   console.log(`\n${line}`);
-  console.log('Read-only: no reviewer/grant/roster/Dataverse writes. LLM telemetry rows written as in prod.');
+  console.log('Read-only w.r.t. live data: no reviewer/grant/roster/Dataverse writes. LLM telemetry rows written as in prod.');
   console.log('Interpretation: high DISEASE % + large RECALL GAP ⇒ origination is the diseased layer and the');
   console.log('grounded person-level lanes recover candidates the keyword/parametric origination cannot.');
   console.log(line);

@@ -2,7 +2,7 @@
 
 Date: 2026-06-12
 
-Status: ACTIVE PLAN
+Status: ACTIVE PLAN — a pilot of the §3 forward experiment was **RUN (S246, 2026-06-12)**. Result: for the D26 Phase-I cohort, **Claude-assisted beats the minimal grounded arm** → the "Claude-assisted wins" gate fires for the practical cutover question; the ORCID-works-anchored multilane design + live accept/decline outcomes remain untested. Full result: `docs/REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md`. §4 below is updated accordingly.
 
 Supersedes: `docs/REVIEWER_FINDER_ORIGINATION_EVIDENCE_2026-06-12.md` section 6
 
@@ -129,7 +129,7 @@ In all outcomes, do not use J26 saved tags as the deciding evidence.
 
 ## SECTION 4 - OPEN QUESTION AND FAIR ACCOUNTING OF SECTION 12
 
-Origination direction remains open. The current evidence supports neither "Claude-assisted should remain the long-term origination spine" nor "grounded-lane-only should replace it now." The causal question requires the forward, source-blinded decision experiment above.
+Origination direction is **no longer fully open** as of the S246 pilot. The §3 forward experiment was run (`docs/REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md`): on the **D26 Phase-I cohort**, with the PD's expert sniff test substituting for accept/decline outcomes, **Claude-assisted origination beats the minimal grounded arm** (OpenAlex topic→author aggregation + cited-reference resolution) — Claude 65% vs grounded 35% pick-rate where quantified, grounded riddled with wrong-field / deceased / trainee candidates. So the **"Claude-assisted wins" gate fires** for the practical cutover question: keep Claude as the origination spine, defer the retrieval-first inversion. What **remains open** is the stricter question — whether the **ORCID-works-anchored multilane** design (§12, *not* the bare topic→author-aggregation arm that was actually tested) could compete under **live accept/decline** outcomes. That was not tested; it is neither confirmed nor refuted.
 
 Section 12 of `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md` deserves a fair accounting:
 
@@ -139,4 +139,4 @@ Section 12 of `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md` deserves
 
 J26 neither refutes nor validates Section 12. It cannot refute Section 12 because saved-tag zeros are confounded by pre-resolution dedup, top-25 identity resolution, and save-time rejection of unresolved system-discovered candidates. It cannot validate Section 12 because Section 12's grounded lanes were not run as a blinded production candidate source with actual accept/decline/referral outcomes.
 
-Section 12 evidence is from a thin pilot: three read-only probes, not a production experiment. It is enough to justify a forward grounded-lane experiment; it is not enough to confirm at scale or authorize cutover.
+Section 12 evidence is from a thin pilot: three read-only probes, not a production experiment. It is enough to justify a forward grounded-lane experiment; it is not enough to confirm at scale or authorize cutover. **Update (S246):** the forward pilot that ran tested a *different, weaker* grounded arm — **bare** OpenAlex topic→author aggregation + cited-reference resolution, with no ORCID-works anchoring — **not** §12's ORCID-works-anchored lanes. That arm lost decisively. Be precise (avoid overclaim): §12 itself treats topic→author aggregation as a *valid* lane (with caveats), and the named-person OpenAlex-cluster hazard (`project-openalex-merge-use-orcid-works`) is specifically about using an author *cluster as a PI corpus* — which this arm did not do. So the result does **not** refute §12 or its topic→author lane: the ORCID-works approach remains unconfirmed-and-unrefuted, and the S246 result does **not** authorize cutover *against* a properly-built §12 grounded arm.
