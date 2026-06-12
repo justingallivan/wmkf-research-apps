@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Phase 1 private-blob: document uploads cut over to a private store in production (Session 243)
+
+**Milestone:** Production cutover. The three server-read document-upload consumers — `expense-reporter`, `phase-i-dynamics`, `grant-reporting` — now upload sensitive documents to a **dedicated private Vercel Blob store** (`wmkf-uploads-private`, no auth-free URL) and read them server-side by `pathname`, instead of the public store. Closes the security audit's P2 "generic uploader creates public Blob artifacts" finding for the server-read cohort. Flag-gated per-app (default public); all three promoted, grant-reporting **prod-verified live** (upload → private store, blob URL HTTP 403, extraction ran).
+
+**Sessions:** 243 (builds on S242's Phase-1 start). Each slice ran the Codex design→review loop.
+
+**Ship state:**
+- Smoked the shared `file-loader` private-read chokepoint (`scripts/smoke-private-file-loader.mjs`, covers both Dynamics consumers); promoted all three `NEXT_PUBLIC_*_PRIVATE_BLOB` flags + `UPLOADS_BLOB_RW_TOKEN` to prod and deployed.
+- Built a record-scoped private-blob **download proxy** + cycle-materials migration (reviewer-finder grant-cycle email template/attachments), Codex-reviewed twice — then **PARKED** (low-risk, legacy-only consumer; reviewer-finder + review-manager are being replaced by the Workbench). Inert in prod (flag default-public).
+- Slice-2 also fixed a *live* `maintenance-service` data-loss bug (public cycle attachments were reapable as orphans after retention).
+
+**Why it matters:** new sensitive grant/expense document uploads no longer get auth-free public Blob URLs in production; and the codebase now has a reusable record-scoped private-download pattern for the expected future Postgres-backed storage.
+
+**Pointers:** `docs/security-audit/PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md` (cohort, prod-promoted), `docs/security-audit/DOWNLOAD_PROXY_DESIGN_2026-06-11.md` (proxy, parked), memory `project-download-proxy-parked`. Commits `ac31c82`→`535260e` (S243).
+
 ## June 2026 — Reviewer manual-add cross-store dedup + a silent save-failure incident (Session 237)
 
 **Milestone:** Two production reviewer-workbench changes. (1) Manual reviewer-add now de-duplicates across **both** identity stores (`wmkf_potentialreviewer` + CRM `contact`) before minting a person — incl. the former-PI case (contact-only → create reviewer + link). (2) A production **incident**: well-ranked candidates had been **silently failing to save since the S223 relevance-score scale change** — `wmkf_appreviewersuggestion.wmkf_relevancescore` is bounded `[0,1]` but the code writes a 0–100 score, so any candidate scoring >1 hit a Dataverse 400 that the per-row try/catch swallowed (orphan person row, no candidate, no error). Diagnosed live on Tanja Mittag / request 1002852.
