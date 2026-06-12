@@ -14,6 +14,11 @@ Read before changing reviewer contact/Scholar enrichment fan-out, retry/fallback
 that adds per-candidate external round-trips. Pairs with [[project-api-credit-monitoring]] and
 [[project-reviewer-contact-enrichment-anchoring]].
 
+**Scope note:** "cost is not the limiter" below is about per-call **fan-out design** (you won't hit
+the 15k/mo cap) — NOT a claim that the SerpAPI *subscription* is good value. At $150/mo it's the
+project's largest expense and its value has eroded (capability loss + free alternatives); that
+cost-justification + migration story lives in [[project-serpapi-capability-erosion]] (2026-06-11).
+
 ## The fact (user-stated, S234)
 The SerpAPI plan allows **~15,000 calls/month** — ample. Early enrichment design was shaped by
 cost-minimization (contact search skipped if a free tier already found an email; single-shot per
