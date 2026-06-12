@@ -64,7 +64,7 @@ function parseArgs(argv) {
     const a = argv[i];
     const next = () => argv[++i];
     if (a === '--request') out.request = next();
-    else if (a === '--file-key') out.fileKey = next();
+    else if (a === '--file-key') (out.fileKeys = out.fileKeys || []).push(next());
     else if (a === '--list-files') out.listFiles = true;
     else if (a === '--reviewer-count') out.reviewerCount = parseInt(next(), 10) || 12;
     else if (a === '--years') out.years = parseInt(next(), 10) || 5;
@@ -207,16 +207,38 @@ async function main() {
     }
   }
   if (args.listFiles) { allFiles.forEach((f) => console.log(`  [${f.classification.padEnd(9)}] ${fileKeyOf(f)}`)); return; }
-  const picked = args.fileKey ? allFiles.find((f) => fileKeyOf(f) === args.fileKey) : pickProposalBestGuess(allFiles);
-  if (!picked) { console.error('No proposal file. Use --list-files / --file-key.'); process.exit(2); }
-  console.log(`PROPOSAL  ${fileKeyOf(picked)}`);
-  const dl = await GraphService.downloadFileByPath(picked.library, picked.folder, picked.name);
-  let text;
-  if ((dl.mimeType || '').includes('pdf') || /\.pdf$/i.test(picked.name)) {
-    text = (await (await import('pdf-parse')).default(dl.buffer)).text;
-  } else { text = dl.buffer.toString('utf8'); }
+  // File selection: one or more explicit --file-key(s) → download + CONCATENATE in
+  // the order given; else the single best-guess proposal. Concatenation faithfully
+  // reconstructs cycles whose proposal context was split across documents (J26:
+  // 1-page summary carrying the PEER GROUPS + 2-page description with the ideas) —
+  // the document model is cycle-coupled (see project-reviewer-finder-proposal-doc-context).
+  let pickedFiles;
+  if (args.fileKeys?.length) {
+    pickedFiles = args.fileKeys.map((k) => {
+      const f = allFiles.find((af) => fileKeyOf(af) === k);
+      if (!f) { console.error(`No file matching --file-key "${k}". Use --list-files.`); process.exit(2); }
+      return f;
+    });
+  } else {
+    const best = pickProposalBestGuess(allFiles);
+    if (!best) { console.error('No proposal file. Use --list-files / --file-key.'); process.exit(2); }
+    pickedFiles = [best];
+  }
+  async function parseFileText(f) {
+    const dl = await GraphService.downloadFileByPath(f.library, f.folder, f.name);
+    if ((dl.mimeType || '').includes('pdf') || /\.pdf$/i.test(f.name)) {
+      return (await (await import('pdf-parse')).default(dl.buffer)).text;
+    }
+    return dl.buffer.toString('utf8');
+  }
+  const parts = [];
+  for (const f of pickedFiles) {
+    console.log(`PROPOSAL  ${fileKeyOf(f)}`);
+    parts.push((await parseFileText(f)) || '');
+  }
+  const text = parts.join('\n\n===== DOCUMENT BREAK =====\n\n');
   if (!text || text.trim().length < 100) { console.error('Proposal text too short.'); process.exit(2); }
-  console.log(`PARSED    ${text.length.toLocaleString()} chars\n`);
+  console.log(`PARSED    ${text.length.toLocaleString()} chars${pickedFiles.length > 1 ? ` (${pickedFiles.length} docs concatenated)` : ''}\n`);
 
   // 3. Analyze (real LLM) — gives PART 1 keywords, PART 3 queries, PART 2 suggestions.
   await loadModelOverrides();
