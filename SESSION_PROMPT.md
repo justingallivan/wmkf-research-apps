@@ -1,10 +1,9 @@
 # Session 247 Prompt: reviewer-finder origination — direction SETTLED for D26 Phase-I (Claude-assisted wins)
 
-> **GIT — READ FIRST.** This session's work is on branch **`reviewer-origination-experiment`**
-> (1 commit `d89265b`), **NOT merged to `main`** (main still at `c8a203a`). The merge/PR
-> decision was left to Justin and is **still pending**. If you start on `main` you will see the
-> STALE S245 "direction OPEN" framing — check out the branch (or merge it) before acting on
-> reviewer origination. Nothing is pushed to remote `main`.
+> **GIT.** S246 work is **merged to `main` and pushed** (`d89265b` experiment + tooling,
+> `0285e6f` this handoff). The branch `reviewer-origination-experiment` is now redundant
+> (can be deleted). Origination direction is SETTLED for the D26 Phase-I cohort — the S245
+> "direction OPEN" framing is superseded.
 
 ## Session 246 — what happened
 
@@ -24,13 +23,10 @@ beats the bare grounded arm.** Then verified the write-up with Codex and correct
 5. **Codex-verified** the doc claims; corrected the one overclaim Codex caught (don't conflate §12's *valid* topic→author lane with the separate "OpenAlex author-cluster as PI corpus" hazard). All doc/memory gates green.
 
 ### Commits
-- `d89265b` — docs(reviewer-origination): S246 forward sniff-test experiment result + tooling (on branch `reviewer-origination-experiment`)
+- `d89265b` — docs(reviewer-origination): S246 forward sniff-test experiment result + tooling
+- `0285e6f` — docs(session): S247 handoff (both merged to `main`, pushed)
 
 ## Potential Next Steps
-
-### 0. Decide the branch (do this first)
-Merge `reviewer-origination-experiment` → `main` + push, or open a PR. The work is verified
-(Codex) and gates-green; it's just awaiting Justin's merge call.
 
 ### 1. Direction-independent ships (what actually helps D26 — the experiment says invest HERE)
 - **Recall sampling** — more `analyze` draws / higher candidate count (people are lost to undersampling regardless of arm; 39/50 of the applicant's own recs were found by neither arm).
