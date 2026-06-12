@@ -1,50 +1,60 @@
-# Session 245 Prompt: reviewer-finder origination — direction OPEN, decision plan settled
+# Session 247 Prompt: reviewer-finder origination — direction SETTLED for D26 Phase-I (Claude-assisted wins)
 
-> **GIT.** Local `main` is **ahead of `origin/main` by 10 commits** (`f17fa3b..d1f7ea8`) —
-> **NOT pushed.** Push when ready. One of these is a **live PROD change**: `13800e3`
-> reseeded the prod Dataverse `reviewer-finder.analyze` prompt (seniority relaxation).
+> **GIT — READ FIRST.** This session's work is on branch **`reviewer-origination-experiment`**
+> (1 commit `d89265b`), **NOT merged to `main`** (main still at `c8a203a`). The merge/PR
+> decision was left to Justin and is **still pending**. If you start on `main` you will see the
+> STALE S245 "direction OPEN" framing — check out the branch (or merge it) before acting on
+> reviewer origination. Nothing is pushed to remote `main`.
 
-## Session 244 — what happened
+## Session 246 — what happened
 
-S244 started as "scope the reviewer-finder origination redesign for D26" and turned into
-a long **epistemic correction** about what the production data actually supports. Net: the
-"demote Claude origination, rebuild on grounded retrieval" premise (§12) is **neither
-confirmed nor refuted** by the J26 data — the question is genuinely **OPEN**, and the way
-to settle it is a forward experiment, now specced.
+S245 left reviewer-finder origination direction **genuinely OPEN** and specced a forward
+source-grounded experiment to settle it. **S246 ran that experiment** (as a pilot) and
+**settled the practical direction for the D26 Phase-I cohort: Claude-assisted origination
+beats the bare grounded arm.** Then verified the write-up with Codex and corrected one overclaim.
 
-### Shipped / committed (10 commits)
-- `b848624` docs: reconciled Workbench reviewer-lifecycle status (Phases 0–3 shipped, 5 sub-tabs).
-- `42811bc` docs: prompt-decomposition + grounded field-review design (pre-impl; Codex-reviewed).
-- `70c9230` memory: **SerpAPI is the largest expense ($150/mo) + value eroded** → free-stack migration path (`project-serpapi-capability-erosion`).
-- `61d5659` feat(probe): `probe-grounded-origination.mjs` takes repeatable `--file-key` (cycle-coupled doc concat).
-- `13800e3` **feat: relaxed the analyze-prompt seniority de-prioritization — PROD Dataverse reseeded.** Confirmed it recovers good active seniors (Fukuto).
-- `82ceb4b` memory: endorsed **referral-capture** feature (`project-reviewer-referral-capture`).
-- `f9b7f6c`→`1561179` docs: J26 origination **evidence** doc (v1→v2; Codex found both overstated).
-- `c3dfb98`→`d1f7ea8` docs: **`REVIEWER_FINDER_ORIGINATION_PLAN.md`** — Codex-authored, Claude-reviewed, Codex-re-reviewed (SHIP/REVISE, zero reverts).
+### What was completed
+1. **Built the experiment harness** (read-only w.r.t. live data; OpenAlex + 2 LLM calls/proposal; NO Dataverse writes):
+   - `scripts/probe-grounded-origination.mjs --blinded-sheet` — emits a per-request 3-arm slate (A=current pipeline, B=grounded G1 OpenAlex topic→author agg + G2 cited-DOI, C=applicant `wmkf_potentialreviewer1..5`) + hidden arm key. PI/Co-PI/excluded names (from Dataverse) dropped from A/B not C.
+   - `scripts/origination-sniff-sources.mjs` — source-labeled markdown + topic-anchored dossiers (affiliation/field/active-span; flags trainee/deceased/merged).
+   - `scripts/origination-sniff-tally.mjs` — per-arm pick-rate from the judged sheets.
+2. **Ran 10 D26 Phase-I proposals** (`1002865, 1002878, 1002886, 1002902, 1002904, 1002913, 1002914, 1002967, 1002971, 1003019`). Justin = the PD oracle (sniff test "would I pick this person?" substituting for accept/decline).
+3. **Result:** 1002878 blind — A **13/20 (65%)** vs B **8/23 (35%)** vs C 4/5 (80%); across all 10 grounded re-found the applicant's own recs **1/50** vs Claude **11/50** (39/50 found by neither). Grounded pool riddled with wrong-field/deceased/trainee. → **"Claude-assisted wins" gate: keep Claude spine, defer retrieval-first cutover.**
+4. **Wrote it up + reconciled** the S245 "OPEN" status: new `docs/REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md`; updated `REVIEWER_FINDER_ORIGINATION_PLAN.md` (status + §4), agent-wiki `topics/reviewer-origination.md`, memory `project-reviewer-origination-experiment-result.md` + router.
+5. **Codex-verified** the doc claims; corrected the one overclaim Codex caught (don't conflate §12's *valid* topic→author lane with the separate "OpenAlex author-cluster as PI corpus" hazard). All doc/memory gates green.
 
-### The key finding (read the two docs before any reviewer-origination work)
-- `docs/REVIEWER_FINDER_ORIGINATION_EVIDENCE_2026-06-12.md` — J26 saved-tag data is **confounded by the save/dedup pipeline** (verified-name dedup pre-resolution `discovery-service.js:246`; top-25 identity budget `:295`; unresolved system-discovered rows rejected at save `save-candidates.js:56,127`). So `scholarly-only saved = 0` is **nearly inevitable by construction** and says nothing reliable about origination. It licenses only "Claude-present survival under historical instrumentation."
-- **Instrument lesson:** single/few `analyze` draws *undercount* Claude recall (sampling variance — union grew 12→17→21). The DB is the instrument, not probe re-runs. And even the DB `invited/accepted` booleans "include defaults / are not engagement signals" (`READINESS_AUDIT_2026-05-25.md:406`) — **Justin's own per-proposal confirmations are the real ground truth.**
+### Commits
+- `d89265b` — docs(reviewer-origination): S246 forward sniff-test experiment result + tooling (on branch `reviewer-origination-experiment`)
 
-## Potential next steps
+## Potential Next Steps
 
-### 1. The decisive build: forward source-blinded experiment
-`docs/REVIEWER_FINDER_ORIGINATION_PLAN.md` is settled. It pits **arm 1 (current Claude-assisted)** vs **arm 2 (retrieval-first: Claude plans facets but NEVER names reviewers — the §12 design, NOT "Claude-free")**, optional **arm 3 (deterministic facets)**. Co-equal primaries: accept+referral rate AND coverage/starvation. Reconciles with the redesign plan's build→invert→cutover sequencing. **Before running:** build a blinding transform (the UI shows source today — `ReviewerSearchSection.js:306`), a grounded-lane runner (ORCID-works + OpenAlex + Claude-planned facets), outcome capture; **fill the bracketed thresholds with real numbers first.**
+### 0. Decide the branch (do this first)
+Merge `reviewer-origination-experiment` → `main` + push, or open a PR. The work is verified
+(Codex) and gates-green; it's just awaiting Justin's merge call.
 
-### 2. Direction-INDEPENDENT ships (don't wait on the experiment)
-- **Seniority relaxation** — DONE (live).
-- **Recall sampling** — bump `analyze` candidate count / multiple draws (real people are lost to undersampling regardless of which direction wins).
-- **Referral capture** (`project-reviewer-referral-capture`) for the human/referral tail (free-text→person resolution; reuse manual-add S236 + identity spine).
-- **SerpAPI → free-stack cost migration** (`project-serpapi-capability-erosion`): metrics→Semantic Scholar, lit-search→S2/OpenAlex, PubPeer native; downgrade/exit the flat sub (~$1,800/yr → tens).
+### 1. Direction-independent ships (what actually helps D26 — the experiment says invest HERE)
+- **Recall sampling** — more `analyze` draws / higher candidate count (people are lost to undersampling regardless of arm; 39/50 of the applicant's own recs were found by neither arm).
+- **Referral capture** (`project-reviewer-referral-capture`).
+- **SerpAPI → free-stack migration** (`project-serpapi-capability-erosion`).
 
-### 3. Entangled — do NOT ship to prod before the experiment
-The prompt-decomposition (read → mini-review/why-now → **facets**) and the grounded one-pager: the *facet/origination* parts are the treatment being tested. The model/legibility parts (staff one-pager prose, ranking text) are separable. See `REVIEWER_FINDER_PROMPT_DECOMPOSITION_DESIGN.md`.
+### 2. If grounded is ever revisited
+Build the **ORCID-works-anchored multilane** (per §12) with field-routed expansion — NOT bare topic→author aggregation — and judge against **real accept/decline**, not a sniff test. The experiment does NOT license cutover against a properly-built grounded arm.
 
-### 4. Carryover (still open from S242/S243, unchanged, verify-before-acting)
+### 3. Carryover (still open from S242–S245, verify-before-acting)
 - Reviewer COI **Chunk 2b** (retire `POTENTIAL_CONCERNS`) — deferred; ⚠️ destructive.
-- expense-reporter prod spot-check (low-pri); download proxy is **PARKED** (not a to-do).
+- expense-reporter prod spot-check (low-pri); download proxy is **PARKED**.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md` | The experiment result + caveats + decision |
+| `docs/REVIEWER_FINDER_ORIGINATION_PLAN.md` | Plan; §4 reconciled OPEN→result |
+| `scripts/probe-grounded-origination.mjs` | `--blinded-sheet` 3-arm emitter |
+| `scripts/origination-sniff-{sources,tally}.mjs` | Dossiers + per-arm pick-rate |
+| `.claude-memory/project-reviewer-origination-experiment-result.md` | The durable lesson |
 
 ## Gotchas
-- `UPLOADS_BLOB_RW_TOKEN` is SENSITIVE (`vercel env pull` returns it empty; already in `.env.local`).
-- Reviewer probes are read-only but make **paid LLM calls + write `api_usage_log`**; run unsandboxed (network to Dynamics/SharePoint/OpenAlex/Claude).
-- D26 reviewer-finding is the near-term real deadline; the experiment is for settling direction, not a D26 blocker — the direction-independent ships (§2) are what help D26.
+- **`tmp/origination-sniff/` dossiers are degraded** — a regen hit the OpenAlex rate/daily quota (thousands of calls made today). The `*.key.json` files are intact and authoritative; only the `*.sources.md` dossiers are stale. Regenerate with `node scripts/origination-sniff-sources.mjs` once quota resets (~24h). `tmp/` is gitignored (real reviewer names stay local).
+- Minor: `scripts/origination-sniff-sources.mjs:11` header comment says "title = field anchor" but the code uses title + Arm-B topics (left unfixed per "just correct the docs").
+- Reviewer probes make paid LLM calls + write `api_usage_log`; run unsandboxed (network to Dynamics/SharePoint/OpenAlex/Claude).
