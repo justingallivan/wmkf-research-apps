@@ -2,7 +2,9 @@
 
 **Per-PD navigation model for the grant lifecycle: the D26 patch and the J27 build.**
 
-> **Status:** Draft for discussion (Connor / Sarah). Drafted 2026-05-31 (Session 206) from the clickable mockup at `docs/mockups/lifecycle-ui-mockup.html` and a working session with Justin. Captures decisions that are **locked**, plans that are **proposed**, and dependencies that are **open**. No `/workbench` UI, routes, or write-paths exist yet — but one piece of **schema groundwork is already deployed**: `wmkf_appreviewersuggestion.wmkf_completedat` (the PD-closeout timestamp; wave5, prod 2026-05-28). See §3.4 / §6.
+> **Status:** Draft for discussion (Connor / Sarah). Drafted 2026-05-31 (Session 206) from the clickable mockup at `docs/mockups/lifecycle-ui-mockup.html` and a working session with Justin. Captures decisions that are **locked**, plans that are **proposed**, and dependencies that are **open**.
+>
+> **BUILD UPDATE (2026-06-11, verified against source):** the D26 reviewer dashboard has since SHIPPED — `/workbench` (tier-2) + `/workbench/[requestId]` (tier-3) with the **Reviewers tab live** (Workbench Phases 0–3). The shipped Reviewers tab has **5** sub-tabs (Find · Candidates · Invite · Track · Completed) — one more than the 4-tab design below; the **Candidates** saved-roster tab was added S211. The other 9 request-lifecycle tabs are still placeholders. This scoping doc remains the *design rationale* (the what/why); for authoritative phase-by-phase build status see `docs/REQUEST_WORKBENCH_BUILD_PLAN.md`. Schema groundwork called out at drafting time is deployed: `wmkf_appreviewersuggestion.wmkf_completedat` (PD-closeout timestamp; wave5, prod 2026-05-28). See §3.4 / §6.
 >
 > **How to read this:** §1–§5 are for everyone. §6 (dependencies) is where Connor's items live. §7–§8 are scope fences and technical detail you can skim. Where a claim depends on live Dynamics/Dataverse state it is marked `[verified]` or `[open]`.
 
@@ -78,7 +80,7 @@ Each tab is an existing capability re-homed and pre-loaded with the proposal. Th
 **Access:** both the Tools menu and the per-request Workbench tabs filter by the **same per-user app-access grants** the app uses today (Dataverse `wmkf_appuserappaccesses`, admin-managed in `/admin`; `Layout.js` → `hasAccess()`). **A Workbench tab can map to more than one existing grant** — the **Reviewers** tab consolidates *both* `reviewer-finder` (Find) and `review-manager` (Invite/Track/Completed). **Decided (S206): collapse the two into a single new `reviewers` grant** — one tab = one grant. The separate `reviewer-finder` / `review-manager` grants were only an artifact of the two apps being built at different times; since the Workbench merges the apps, the access merges too. **Migration:** when built, convert existing `reviewer-finder` / `review-manager` grants to `reviewers` and retire the two old keys from `appRegistry.js` (a destructive change — verify live callers at that time). (The mockup ignores access entirely and shows everything, for legibility.)
 
 ### 3.3 The Reviewers tab — locked structure
-**Four sub-tabs, with status badges on the bar** (decided S206, after comparing a 3-tab "Roster" variant):
+**Four sub-tabs, with status badges on the bar** (decided S206, after comparing a 3-tab "Roster" variant). *(Shipped with a 5th sub-tab: a **Candidates** saved-roster tab between Find and Invite — the persistent home for saved-but-not-yet-invited candidates, added S211. The four below are the design funnel; Candidates is the roster home that the 3-tab "Roster" variant had folded into one table.)*
 
 | Sub-tab | What it does | Badge (work remaining) |
 |---|---|---|
@@ -187,7 +189,7 @@ The current and next cycles have different shapes, so the rollout differs.
 
 ## 7. Scope fences
 
-**In scope, now (D26):** the reviewer dashboard (request queue + Workbench Reviewers tab, 4-tab) + Reviewer Pool + the allowlist pre-population. This is what Phase II peer review and honoraria need by mid-June.
+**In scope, now (D26):** the reviewer dashboard (request queue + Workbench Reviewers tab, designed 4-tab / shipped 5-tab — see §3.3) + Reviewer Pool + the allowlist pre-population. This is what Phase II peer review and honoraria need by mid-June. *(Status: the dashboard + Reviewers tab SHIPPED; Reviewer Pool is still pending — see the build-plan doc.)*
 
 **Explicitly out of scope for the D26 build:**
 - The triage / cycle dashboard (J27).
