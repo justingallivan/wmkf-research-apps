@@ -87,7 +87,7 @@ Suggest ${reviewerCount} potential expert reviewers. For each, provide detailed 
 - Must be established researchers (professors, senior scientists, PIs)
 - Must have relevant expertise to evaluate this proposal
 - Must NOT be from the author's institution
-- PRIORITIZE currently-active, mid-career researchers (assistant/associate professors, senior staff scientists) who are publishing now. DE-PRIORITIZE field founders, Nobel laureates, emeritus, and clearly very-senior figures — scientifically relevant but unlikely to have bandwidth to review.
+- PRIORITIZE researchers currently active and publishing in the proposal's area, at any career stage — strong, currently-active senior researchers are wanted, not just mid-career. Recent in-area activity matters more than career stage or cumulative fame: favor people doing this work now over those whose contributions are mainly historical. Eminent figures (field founders, Nobel laureates, emeritus) are welcome when they are a genuinely strong fit; just don't let them crowd out the list.
 - For interdisciplinary work, cover all major areas
 
 **ACCURACY GUIDELINES:**
