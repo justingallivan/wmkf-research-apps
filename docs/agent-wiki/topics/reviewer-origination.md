@@ -41,6 +41,49 @@ lanes, provenance, ranking, and the recall-vs-precision posture. For who a
 candidate *is* (identity, contact, COI, PI identity), use the
 [Reviewer Identity](reviewer-identity.md) page instead.
 
+## Genesis & corrected posture (READ FIRST)
+
+**The tool worked in production (J26).** Claude proposes a candidate pool → staff
+curate against priorities, using the surfaced papers to drop the occasional bad one
+→ reviewer *declines* yield referral suggestions. That human-in-the-loop,
+recall-oriented workflow produced usable panels. This lived-success signal is the
+strongest evidence we have, and it was systematically under-weighted during the
+redesign (the origination plan's §1 "stop mining J26" caveat was right about the
+narrow *causal* question but had the side effect of discounting the *workflow*
+success — a different, valid signal).
+
+**Why the retrieval-first detour happened (S231).** A validation pass became a
+bug-hunt that found two different things and conflated them: (a) a REAL verify-path
+bug — hallucinated forenames laundering into real near-namesakes (a fabricated "Dr.
+Alfred Laederach" verified against the real Alain Laederach at 100% confidence),
+which justified a proportionate verify/identity fix; and (b) a theory critique —
+"LLM-as-generator is stale / senior-biased / hallucination-prone." (a) got the right
+fix (forename/exact-existence gate, field-aware verification, recency ranking —
+shipped). (b) got OVER-extrapolated into "demote Claude from candidate generator to a
+non-naming retrieval-first engine" — an inference from Claude's failure modes that was
+NEVER measured against whether grounded retrieval *originates* better.
+
+**S246 measured it: Claude wins** (`project-reviewer-origination-experiment-result`).
+The extrapolation was wrong — the off-organism noise came from the *grounded* arm, not
+Claude (origination probe, 1002878: every plant-virologist candidate was grounded-arm
+only). The pipeline's weak link is DOWNSTREAM identity resolution (see the
+namesake-collision worked example in `reviewer-identity.md`), not origination.
+
+**Corrected posture:**
+- KEEP Claude as the origination engine — recall-oriented, human-curated.
+- KEEP the edge-hardening the detour produced: exact-existence/forename gate,
+  field-aware + (next) ORCID-anchored resolution, recency ranking, recall-over-precision
+  (review is a floor, not a ranker), referral capture, and §12/multilane as a TARGETED
+  tool for the genuinely-sparse tail ONLY.
+- PARK retrieval-first inversion as the *primary engine* (deferred by S246; §12/multilane
+  remains valid + unrefuted as a sparse-tail tool, just not the engine).
+- CAUTION — don't over-correct the over-correction: Claude's senior-bias and the
+  niche/pivot/sparse tail are REAL (the S231 probe found 2/10 analyze under-deliveries).
+  Keep *targeted* hardening for that tail; just don't mistake it for an engine problem.
+
+Read the `## Direction` bullets below as the lane mechanics under this posture — a
+sparse-tail toolkit, not a mandate to replace Claude.
+
 ## Direction (validated, mostly NOT BUILT)
 
 - **Multi-lane origination is the validated direction (S239), not yet built.**
