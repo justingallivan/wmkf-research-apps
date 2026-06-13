@@ -5,7 +5,8 @@
  *
  * Accepts analysis results from Stage 1 and:
  * - Track A: Verifies Claude's suggestions via PubMed
- * - Track B: Discovers new candidates from database searches
+ * - Track B: Discovers new candidates from database searches — ARCHIVED OFF S248
+ *   (DiscoveryService.TRACK_B_ENABLED=false; gated, dormant). Produces no candidates today.
  * - Generates reasoning for discovered candidates (second Claude call)
  *
  * Uses streaming SSE for real-time progress updates.

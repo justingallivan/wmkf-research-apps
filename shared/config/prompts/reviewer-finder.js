@@ -3,7 +3,9 @@
  *
  * This module provides prompts for the tiered reviewer discovery system:
  * - Stage 1: Claude analysis (reasoning + search queries)
- * - Stage 2: Database discovery (verification + new candidates)
+ * - Stage 2: Database discovery (Track A verification; Track-B "new candidates"
+ *   archived off S248 — DiscoveryService.TRACK_B_ENABLED=false, so the Stage-1
+ *   search queries are emitted but currently unused)
  *
  * A7 prompt-injection hardening (Part 5): the Stage 1 proposal text is
  * UNTRUSTED (U-FILE) and the Stage 2 database-discovered candidate list is
