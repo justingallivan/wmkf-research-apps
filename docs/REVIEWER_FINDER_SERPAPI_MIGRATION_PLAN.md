@@ -364,10 +364,12 @@ metrics-gate decoupling is intentional with no correctness regression; consumer 
 complete). All three actionable findings fixed (commit after `242d96c`):
 - **[HIGH] Registrable-domain over-broadening.** The curated `MULTI_LABEL_SUFFIXES` list silently
   returned a bare public suffix (e.g. `edu.ph`, absent from the list) as the "verified domain", so
-  the keep-biased email guard matched `anyone@x.edu.ph` and could persist a namesake email. Replaced
-  the fixed list with a PATTERN (known second-level token + 2-letter ccTLD → eTLD+1 = last three
-  labels) that generalizes to unlisted ccTLD suffixes, and FAILS CLOSED (null → guard skips) on a
-  bare two-label suffix. IDN/Unicode homepages remain fail-safe (guard no-ops, never over-keeps).
+  the keep-biased email guard matched `anyone@x.edu.ph` and could persist a namesake email. A first
+  fix (a pattern heuristic) still leaked the next omitted educational suffix (Codex 3rd pass found
+  `school.ge`), so `registrableDomainFromUrl` now uses the **canonical Mozilla Public Suffix List
+  via the `psl` dependency** (Justin's call) — ends the whack-a-mole class. FAILS CLOSED (null →
+  guard skips) on a bare suffix, IP literal, or unparseable host. IDN/Unicode homepages remain
+  fail-safe (the ASCII-only `_normalizeDomain` no-ops, never over-keeps).
 - **[LOW] Track-B no-ORCID candidates missed metrics** — they carry `openAlexAuthorId`, not
   `openAlexId`. The spine-path read now falls back to `candidate.openAlexAuthorId`.
 - **[LOW] OpenAlex outage was indistinguishable from no-anchor** — a non-abort lookup error left

@@ -330,16 +330,19 @@ describe('registrableDomainFromUrl — eTLD+1 extraction for the email-domain gu
     expect(registrableDomainFromUrl('https://research.unimelb.edu.au')).toBe('unimelb.edu.au');
   });
 
-  test('generalizes to UNLISTED ccTLD suffixes (Codex S251 HIGH — no over-broad eTLD)', () => {
-    // edu.ph was not in the old curated list → it wrongly returned `edu.ph`, letting
-    // `anyone@x.edu.ph` match the verified domain. The pattern returns the eTLD+1.
+  test('uses the full PSL — no over-broad eTLD for any educational suffix (Codex S251)', () => {
+    // edu.ph (1st pass) and school.ge (3rd pass) were both missing from the old hand-rolled
+    // set, wrongly returning the bare suffix and letting `anyone@x.<suffix>` match. psl.get
+    // returns the true eTLD+1 for both.
     expect(registrableDomainFromUrl('https://www.university.edu.ph')).toBe('university.edu.ph');
-    expect(registrableDomainFromUrl('https://lab.go.kr')).toBe('lab.go.kr');
+    expect(registrableDomainFromUrl('https://www.alpha.school.ge')).toBe('alpha.school.ge');
   });
 
-  test('fails CLOSED (null) on a bare two-label public suffix (no institution label)', () => {
+  test('fails CLOSED (null) on a bare public suffix (no registrable label) or IP literal', () => {
     expect(registrableDomainFromUrl('https://edu.ph')).toBeNull();
     expect(registrableDomainFromUrl('https://ac.uk')).toBeNull();
+    expect(registrableDomainFromUrl('https://school.ge')).toBeNull();
+    expect(registrableDomainFromUrl('https://127.0.0.1')).toBeNull(); // psl quirk guarded
   });
 
   test('keeps a normal two-label registrable under a 2-letter ccTLD', () => {
