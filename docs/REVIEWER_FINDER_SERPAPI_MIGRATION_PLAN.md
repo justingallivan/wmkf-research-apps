@@ -57,6 +57,52 @@ downgrade (~$100/mo saved) becomes possible — but that is a **billing-dashboar
 
 ## Slice 1 — Scholar metrics → OpenAlex (the contact-correctness slice)
 
+> **Split into 1a then 1b after the S250 Codex pre-impl review (HIGH).** The enrichment
+> path today has **no OpenAlex author evidence**: `_finalize` calls
+> `resolveIdentity(evidenceFromEnrichment(...))` with only `scholar` + `orcid` anchors
+> (`reviewer-identity-resolver.js:45-68`), and `_attachScholarMetrics`
+> (`contact-enrichment-service.js:667-680`) gates purely on the Scholar profile's own
+> `nameMismatch`/`institutionMismatch` flags. Removing Scholar therefore removes the
+> identity gate that decides whether metrics/domain may be trusted — it must be **replaced
+> with an explicit OpenAlex author contract first**, not bolted on. A full OpenAlex-anchored
+> spine already exists (`reviewer-identity-evidence.js` + `classifySpineEvidence`, resolver
+> `1.2.0-openalex-orcid-spine`) — it runs in discovery, not enrichment. Reuse it; do not
+> invent new rules.
+
+### Slice 1a — OpenAlex author identity contract in the enrichment path (do FIRST)
+
+**Files:** `lib/services/reviewer-identity-resolver.js`, `lib/services/reviewer-identity-evidence.js`,
+`lib/services/contact-enrichment-service.js`.
+
+**Accept/abstain rules for the OpenAlex author used to source metrics + the domain guard:**
+1. **ORCID anchor present** → `OpenAlexService.getAuthorByOrcid(orcid)`. ORCID is the hard
+   identity key → **accept, no namesake risk** (the strong path).
+2. **No ORCID** → **never accept a bare first-match `searchAuthors` hit.** Either (preferred)
+   consume the **spine's already-resolved** OpenAlex author id + verdict threaded from
+   discovery, or run the spine resolution (`reviewer-identity-evidence`) and require
+   `mayPersistIdentity(status)` (probable/confirmed) **with the forename gate**
+   (`classifySpineEvidence` `spine.forenameContradicts !== true`) before the author may be
+   used. ⚠ **Verify first:** does the candidate reach enrichment carrying a spine author id?
+   Today it does **not** (`contact-enrichment-service.js` has no `openAlexId`) — so this is
+   either a discovery→enrichment handoff change (thread it) or an in-enrichment spine call.
+3. **No accepted author** → **ABSTAIN**: no metrics, no domain-guard action,
+   `scholarPersistAllowed=false`, leave the free Scholar search link. Mirrors today's
+   Scholar-mismatch → skip (`contact-enrichment-service.js:667-680`).
+4. **Domain guard** (`_validateEmailAgainstVerifiedDomain`, `contact-enrichment-service.js:210-241`)
+   may **only** confirm (`emailPersistAllowed=true`) or drop a scraped email **when the
+   OpenAlex author passed the gate** — never on an unverified name-search match. (Codex MEDIUM:
+   the institution-homepage domain is only as good as the author match; the "harder identity"
+   rationale holds only on the ORCID path.)
+
+**Resolver wiring:** removing the Scholar metrics call also removes the `scholar_profile`
+tierResult, so `evidenceFromEnrichment` + `scholarAnchor` (`reviewer-identity-resolver.js:45-89`)
+need updating. Add/route an OpenAlex-author anchor (reuse the spine's `affiliation_match` /
+`orcid_employment_corroborated` / `authorship_grounded` anchor types) so the enrichment-path
+resolver verdict reflects the OpenAlex author rather than a now-absent scholar anchor. Tests for
+the resolver must cover the new anchor + the abstain path.
+
+### Slice 1b — metrics + domain endpoint replacement (depends on 1a)
+
 **Files:** `lib/services/openalex-service.js`, `lib/services/contact-enrichment-service.js`,
 (retire the Scholar paths in `lib/services/serp-contact-service.js`).
 
@@ -70,14 +116,10 @@ downgrade (~$100/mo saved) becomes possible — but that is a **billing-dashboar
 - **= 2 paid SerpAPI calls per candidate** (independent of the Tier-4 contact search, which stays).
 
 ### New flow (OpenAlex)
-1. **Resolve the OpenAlex author** (reuse the identity spine's resolution where possible):
-   - ORCID anchor present → `OpenAlexService.getAuthorByOrcid(orcid)` — hard key, **no namesake
-     risk**.
-   - No ORCID → `OpenAlexService.searchAuthors(name)` + disambiguate by institution/topic, with
-     the **same abstain-on-mismatch gating** that #2's `nameMismatch`/`institutionMismatch` flags
-     provided today. Prefer reusing `reviewer-identity-resolver`/`reviewer-identity-evidence`
-     rather than re-implementing. ⚠ **Verify during impl:** does the candidate already arrive
-     with a resolved OpenAlex author id from discovery? If so, skip this resolution (latency win).
+1. **Resolve the OpenAlex author per the Slice 1a contract** (above) — do **not** restate it
+   loosely here: ORCID hard-key accept; no-ORCID requires the spine `mayPersistIdentity` +
+   forename gate (never a bare first-match); abstain when no author passes. Steps 2–5 below run
+   **only** on an author that cleared 1a.
 2. **Metrics** from the author record (requires extending `mapAuthorRecord`): set `ce.hIndex`,
    `ce.i10Index`, `ce.totalCitations`.
 3. **Affiliation** (authority-2 candidate): set from `last_known_institutions[0].display_name`.
@@ -99,22 +141,39 @@ downgrade (~$100/mo saved) becomes possible — but that is a **billing-dashboar
   (and the now-unused helpers: `institutionConflicts`, `extractScholarDisplayName`,
   `scholarNameMismatch`, `_numOrNull`) unless still referenced. `findContact` (#1) **stays**.
 
-### Field / provenance changes (durable — reconcile)
-- `affiliationSource` gains `openalex_current`; the `scholar_current` value is retired for new
-  enrichments (grep consumers in `_applyAffiliationOverride` + UI before renaming the field).
-- The verified-domain field (`scholarVerifiedEmail`) is now institution-homepage-derived —
-  consider renaming to `verifiedInstitutionDomain`; update `_validateEmailAgainstVerifiedDomain`
-  + any consumers in the same pass.
+### Field / provenance changes (durable — reconcile, NOT a local refactor) (Codex MEDIUM+LOW)
+- **`affiliationSource` gains `openalex_current`** (retiring `scholar_current` for new
+  enrichments). A new provenance value renders as **no label** unless every consumer that
+  switches on `scholar_current`/`orcid_current` is updated. Explicit consumer checklist (grep
+  first to confirm current — these are Codex-cited starting points, not the verified-complete
+  set): `_applyAffiliationOverride`; `pages/reviewer-finder.js` (merge/save promotion,
+  ~226-231, ~1068-1076, ~1120-1134); `shared/components/reviewers/ReviewerSearchSection.js`
+  (~113-123, ~218-223); `shared/components/reviewers/reviewer-search-logic.js`
+  (merge/prune/restore, ~59-70, ~150-163, ~224-230); Workbench card provenance labels.
+- **`scholarVerifiedEmail` → `verifiedInstitutionDomain`** is **durable-fact reconciliation**,
+  not an internal rename. Beyond `_validateEmailAgainstVerifiedDomain`, the name appears in:
+  `scripts/smoke-reviewer-contact-anchoring.mjs` (~70-145),
+  `tests/unit/contact-enrichment-affiliation-pin.test.js` (~388-445),
+  `docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md` (~47-78),
+  `docs/REVIEWER_CONTACT_INVITE_FEATURES_AND_PROD_TESTS.md` (~67-73). Run `/sweep`-style
+  reconciliation across code + tests + smoke + docs in one pass (CLAUDE.md durable-docs rule),
+  or keep the old field name to avoid the blast radius — decide explicitly, don't half-rename.
 - `googleScholarId` = null for new candidates; UI must render the search link when ID absent
   (already the fallback).
 
-### Latency
-- ORCID-anchored: ≤2 free OpenAlex calls (author + institution); fewer if the author id is
-  already resolved upstream. Net **win** vs. today's 2 paid sequential SerpAPI calls.
-- Name-search: 1 search + disambiguation + 1 institution = ~2 free calls + namesake gating.
+### Latency / call count (Codex MEDIUM+LOW — claim corrected)
+- **Cost / call-count win is real and is the claim we make:** 0 paid SerpAPI calls vs. today's
+  2 paid sequential calls, replaced by **≤2 *logical* OpenAlex lookups** (author + institution).
+  "Logical lookups" not "HTTP requests": `fetchJsonWithRetry` (`openalex-service.js:62-101`) may
+  retry on a retryable failure, so physical attempts can exceed 2.
+- **No parallelism claim.** Slice 1 is a like-for-like swap and does **not** include a
+  scheduling refactor; enrichment still processes candidates sequentially and `_finalize`
+  (`contact-enrichment-service.js:722-728`) still awaits metrics/domain after the Tier-3/4
+  contact search. The OpenAlex lookups remain serialized exactly where the Scholar calls were —
+  we claim fewer/free calls, not lower wall-clock from parallelization. (A scheduling refactor
+  is a separate, later optimization if latency measurements demand it.)
 - OpenAlex polite pool (with `mailto`) is more generous than the ~1 rps figure in
-  `project-serpapi-capability-erosion`; the ≤2 added calls are parallelizable with other
-  per-candidate enrichment.
+  `project-serpapi-capability-erosion`.
 
 ### Tests
 - Unit: `mapAuthorRecord` surfaces h/i10/cites + institution ref; `getInstitution` domain
@@ -141,6 +200,11 @@ Lower contact-correctness stakes than Slice 1.
   (**already exists**) per PI.
 - Note: OpenAlex abstracts are inverted-index — reconstruct if a snippet is needed.
 - Keep the `Promise.allSettled` fan-out shape; drop the `SERP_API_KEY` branch.
+- **Source/key compatibility (Codex LOW):** `searchAll` returns a `googleScholar` key and each
+  result carries `source: 'google_scholar'` (`literature-search-service.js:47-54`, `216-275`).
+  Consumers (analyze/integrity collation) may key on those labels — make an explicit decision:
+  keep the `googleScholar` key/`source` strings for compatibility, or rename and update every
+  consumer in the same pass. Don't silently change the label.
 
 ## Slice 3 — PubPeer → PubPeer Developer API
 
@@ -154,6 +218,14 @@ Lower contact-correctness stakes than Slice 1.
   and we revisit.
 - Reshape: the API returns structured publication/comment records; feed them to the existing
   Haiku summarizer (or summarize structurally). `searchNews` (#7) stays on SerpAPI.
+- **Scope is `screenApplicants`, not just `searchPubPeer` (Codex MEDIUM).** Today both PubPeer
+  and news are gated behind one `effectiveSerpKey` (`integrity-service.js:88-172`). Once PubPeer
+  moves to `PUBPEER_API_KEY`, the two sources need **separate availability gating + source-specific
+  error text** in `screenApplicants` (news may run while PubPeer is unconfigured, and vice-versa).
+- **Preserve the `sources.pubpeer` shape** consumed by the integrity UI/export
+  (`pages/integrity-screener.js` ~190-192, ~506-519, ~635-646) — the API replacement must emit
+  the same shape (`hasConcerns`, `summary`, `resultCount`, `searchUrl`, …) or update those
+  renderers in the same slice.
 
 ## Cross-cutting
 
@@ -168,11 +240,39 @@ Lower contact-correctness stakes than Slice 1.
   persistence → UI).
 
 ## Recommended sequencing
-1. **Slice 1** (metrics → OpenAlex) — highest value (kills the login-wall risk, latency win, hot
-   path, contact-correctness). Do first.
-2. **Slice 2** (literature / PI-pubs) — straightforward, reuses `getWorksByAuthor`.
-3. **Slice 3** (PubPeer) — gated on confirming the PubPeer API; can be deferred/separate.
-4. **Post-migration:** confirm real SerpAPI call volume in the billing dashboard → decide on the
+1. **Slice 1a** (OpenAlex author identity contract in enrichment) — **before** any endpoint swap.
+   Defines accept/abstain + resolver evidence. The contact-correctness foundation.
+2. **Slice 1b** (metrics + domain endpoint replacement) — depends on 1a. Kills the login-wall
+   risk; free/fewer calls; hot path.
+3. **Slice 2** (literature / PI-pubs) — straightforward, reuses `getWorksByAuthor`.
+4. **Slice 3** (PubPeer) — gated on confirming the PubPeer API; scope includes `screenApplicants`
+   gating + integrity UI/export shape; can be deferred/separate.
+5. **Post-migration:** confirm real SerpAPI call volume in the billing dashboard → decide on the
    Hobby-tier downgrade (Justin, out-of-repo).
+
+## Codex pre-impl review (S250) — disposition
+
+Reviewer: `codex:codex-rescue`, against commit `a134d2e`. All findings **ACCEPTED and folded**
+above (Justin: "Accept and fold"). One refinement on Codex's instruction: the latency finding is
+folded by **dropping the parallelism claim** (Slice 1 stays a like-for-like swap), not by adding a
+scheduling refactor.
+
+- **[HIGH] Slice 1 OpenAlex no-ORCID identity contract underspecified** → folded into **Slice 1a**:
+  explicit accept/abstain rules (ORCID hard-key accept; no-ORCID requires spine `mayPersistIdentity`
+  + forename gate; abstain otherwise; never first-match), resolver evidence wiring.
+- **[MEDIUM] Domain guard only "harder identity" on the ORCID path** → folded: domain guard may act
+  only when the OpenAlex author passed the gate (Slice 1a rule 4).
+- **[MEDIUM] Latency parallelism claim ungrounded** → folded: parallelism claim removed; claim
+  cost/call-count only; "≤2 *logical* lookups".
+- **[LOW] Physical HTTP attempts can exceed 2 on retry** → folded: "logical lookups" wording.
+- **[MEDIUM] `openalex_current` needs UI/merge updates beyond `_applyAffiliationOverride`** → folded:
+  consumer checklist expanded (reviewer-finder page, ReviewerSearchSection, reviewer-search-logic).
+- **[LOW] `scholarVerifiedEmail` rename spans tests/smoke/docs** → folded: treated as durable
+  reconciliation (or keep the name) — decide explicitly.
+- **[MEDIUM] Slice 3 scope too narrow** → folded: scope expanded to `screenApplicants` source
+  gating + `sources.pubpeer` shape compatibility.
+- **[MEDIUM] Slice 1 resolver contract before endpoint replacement** → folded: the 1a/1b split.
+- **[LOW] Slice 2 source/key semantics** → folded: explicit compatibility decision for the
+  `googleScholar` key / `source` strings.
 </content>
 </invoke>
