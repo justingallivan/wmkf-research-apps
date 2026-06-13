@@ -76,7 +76,10 @@ downgrade (~$100/mo saved) becomes possible — but that is a **billing-dashboar
 
 **Accept/abstain rules for the OpenAlex author used to source metrics + the domain guard:**
 1. **ORCID anchor present** → `OpenAlexService.getAuthorByOrcid(orcid)`. ORCID is the hard
-   identity key → **accept, no namesake risk** (the strong path).
+   identity key → the strong path. **The resolver re-proves the hard key** (post-impl HIGH):
+   the producer must pass both the resolved record's `orcid` and the looked-up `claimedOrcid`,
+   and the anchor is accepted only when they match — a bare `acceptPath: 'orcid'` flag is
+   rejected (`orcid_unproven` / `orcid_mismatch`).
 2. **No ORCID** → **never accept a bare first-match `searchAuthors` hit.** Either (preferred)
    consume the **spine's already-resolved** OpenAlex author id + verdict threaded from
    discovery, or run the spine resolution (`reviewer-identity-evidence`) and require
@@ -101,13 +104,19 @@ need updating. Add/route an OpenAlex-author anchor (reuse the spine's `affiliati
 resolver verdict reflects the OpenAlex author rather than a now-absent scholar anchor. Tests for
 the resolver must cover the new anchor + the abstain path.
 
-**Concrete evidence key/DTO (Codex re-review LOW):** the accepted author rides on a new
-`contactEnrichment.tierResults.openalex_author` key (replacing the `scholar_profile` slot
-`evidenceFromEnrichment` reads at `reviewer-identity-resolver.js:46-59`), shape:
+**Concrete evidence key/DTO (Codex re-review LOW; hardened by post-impl HIGH):** the accepted
+author rides on a `contactEnrichment.tierResults.openalex_author` key (replacing the
+`scholar_profile` slot `evidenceFromEnrichment` reads), shape:
 `{ openAlexId, displayName, lastKnownInstitution, ror, acceptPath: 'orcid' | 'spine',
-identityStatus, forenameContradicts, hIndex, i10Index, citedByCount }`. `evidenceFromEnrichment`
-maps this into the OpenAlex-author anchor; `null` (no accepted author) → no anchor → abstain. Name
-this shape in code before implementation begins; do not leave it to implementation-time guess.
+orcid, claimedOrcid, identityStatus, forenameContradicts, hIndex, i10Index, citedByCount }`.
+The resolver **re-proves acceptance (allowlist gating), it does not trust the producer's label**
+(Slice 1a, SHIPPED `395294e` + hardening): an anchor passes ONLY when `acceptPath === 'orcid'`
+**and** `normOrcid(orcid) === normOrcid(claimedOrcid)` (the hard-key proof), OR
+`acceptPath === 'spine'` **and** `mayPersistIdentity(identityStatus)` **and**
+`forenameContradicts !== true`. Every other shape (unknown/missing acceptPath, missing
+`identityStatus`, unproven/mismatched ORCID) → rejected anchor → abstain. **1b's producer must
+populate `orcid` + `claimedOrcid` on the ORCID path** (`getAuthorByOrcid` record ORCID + the
+looked-up ORCID), or the resolver rejects it. `null` (no author) → no anchor → abstain.
 
 ### Slice 1b — metrics + domain endpoint replacement (depends on 1a)
 
@@ -287,3 +296,14 @@ scheduling refactor.
 - **[LOW] Evidence key/DTO for the accepted OpenAlex author unnamed** → folded into Slice 1a
   (concrete `tierResults.openalex_author` shape below).
 - **[LOW] Stray `</content>`/`</invoke>` tags at EOF** → fixed (Write artifact removed).
+
+### Codex post-impl review of Slice 1a (`395294e`) — folded (hardening commit)
+Verdict was **BLOCKED — fix before 1b**; all three fixed:
+- **[HIGH] Fail-OPEN gate on unknown shapes** → inverted to an **allowlist** (prove-good): unknown/
+  missing `acceptPath` (`unknown_accept_path`) and missing `identityStatus` (`identity_unknown`)
+  now reject instead of passing as a strong anchor.
+- **[MEDIUM] ORCID path trusted a bare flag** → resolver now requires `orcid`+`claimedOrcid` in
+  the DTO and accepts only on a normalized match (`orcid_unproven`/`orcid_mismatch` otherwise).
+- **[MEDIUM] Unstable id canonicalization** → `shortOpenAlexAuthorId` extracts the `A\d+` token
+  from any URL/query form, so `canonicalKey`/`value` dedup is stable.
+6 new fail-closed/canonicalization tests added (44 total, suites green).

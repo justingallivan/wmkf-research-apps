@@ -230,10 +230,12 @@ describe('resolveIdentity — OpenAlex/ORCID spine anchor rules', () => {
 
 describe('resolveIdentity — OpenAlex-author anchor (Slice 1a contract)', () => {
   // The accepted-author DTO the enrichment metrics step (1b) writes to
-  // tierResults.openalex_author. The resolver reads only the identity fields.
+  // tierResults.openalex_author. The resolver re-proves acceptance (allowlist).
+  const ORC = '0000-0002-1825-0097';
   const oaOrcid = (over = {}) => ({
     openAlexId: 'https://openalex.org/A5023888391', displayName: 'Jane Roe',
     lastKnownInstitution: 'MIT', ror: 'https://ror.org/042nb2s44', acceptPath: 'orcid',
+    orcid: ORC, claimedOrcid: ORC,   // hard-key proof: record's ORCID == looked-up ORCID
     identityStatus: 'probable', forenameContradicts: false,
     hIndex: 24, i10Index: 32, citedByCount: 5577, ...over,
   });
@@ -243,7 +245,7 @@ describe('resolveIdentity — OpenAlex-author anchor (Slice 1a contract)', () =>
     identityStatus: 'probable', forenameContradicts: false, ...over,
   });
 
-  test('accepted ORCID-path author → probable, lone STRONG anchor', () => {
+  test('accepted ORCID-path author (proven match) → probable, lone STRONG anchor', () => {
     const out = r({ name: 'Jane Roe' }, { openAlexAuthor: oaOrcid() });
     expect(out.status).toBe('probable');
     expect(out.confidenceBand).toBe('medium');
@@ -251,7 +253,7 @@ describe('resolveIdentity — OpenAlex-author anchor (Slice 1a contract)', () =>
     expect(out.anchors[0].type).toBe('openalex_author_orcid');
     expect(out.anchors[0].weight).toBe('strong');
     expect(out.anchors[0].canonicalKey).toBe('openalex:A5023888391');
-    expect(out.anchors[0].value).toBe('A5023888391'); // short id, URL prefix stripped
+    expect(out.anchors[0].value).toBe('A5023888391');
   });
 
   test('accepted spine-path author (persist-worthy, no contradiction) → probable', () => {
@@ -276,13 +278,47 @@ describe('resolveIdentity — OpenAlex-author anchor (Slice 1a contract)', () =>
     expect(out.rejectedAnchors[0].reason).toBe('identity_unresolved');
   });
 
-  test('ORCID-path author is NOT forename/status-gated (the ORCID is the hard identity key)', () => {
-    // Even with contradiction/non-persist fields set, the ORCID path is trusted —
-    // getAuthorByOrcid resolves the record's OWN ORCID, so there is no namesake question.
+  // Codex post-impl HIGH: allowlist gating must FAIL CLOSED on every non-proving shape,
+  // not just on explicitly-bad values. A missing/unknown acceptPath or a missing
+  // identityStatus must NOT silently become a passing strong anchor.
+  test('spine-path author with a MISSING identityStatus fails closed → unresolved', () => {
+    const out = r({ name: 'Jane Roe' }, { openAlexAuthor: oaSpine({ identityStatus: undefined }) });
+    expect(out.status).toBe('unresolved');
+    expect(out.anchors).toHaveLength(0);
+    expect(out.rejectedAnchors[0].reason).toBe('identity_unknown');
+  });
+
+  test('author with an UNKNOWN/missing acceptPath fails closed → unresolved', () => {
+    const out = r({ name: 'Jane Roe' }, { openAlexAuthor: { openAlexId: 'https://openalex.org/A1', identityStatus: 'probable' } });
+    expect(out.status).toBe('unresolved');
+    expect(out.anchors).toHaveLength(0);
+    expect(out.rejectedAnchors[0].reason).toBe('unknown_accept_path');
+  });
+
+  test('ORCID-path author with a MISMATCHED record/claimed ORCID fails closed → unresolved', () => {
+    const out = r({ name: 'Jane Roe' }, { openAlexAuthor: oaOrcid({ orcid: '0000-0003-9999-9999' }) });
+    expect(out.status).toBe('unresolved');
+    expect(out.anchors).toHaveLength(0);
+    expect(out.rejectedAnchors[0].reason).toBe('orcid_mismatch');
+  });
+
+  test('ORCID-path author with NO ORCID proof (bare flag) fails closed → unresolved', () => {
+    const out = r({ name: 'Jane Roe' }, { openAlexAuthor: oaOrcid({ orcid: null, claimedOrcid: null }) });
+    expect(out.status).toBe('unresolved');
+    expect(out.rejectedAnchors[0].reason).toBe('orcid_unproven');
+  });
+
+  test('a PROVEN ORCID match overrides forename/status gates (the ORCID is the identity)', () => {
+    // With the hard-key match proven, forename contradiction / non-persist status are moot.
     const out = r({ name: 'Jane Roe' }, { openAlexAuthor: oaOrcid({ forenameContradicts: true, identityStatus: 'unresolved' }) });
     expect(out.status).toBe('probable');
     expect(out.anchors[0].type).toBe('openalex_author_orcid');
     expect(out.rejectedAnchors).toHaveLength(0);
+  });
+
+  test('ORCID match is case/URL-form insensitive', () => {
+    const out = r({ name: 'Jane Roe' }, { openAlexAuthor: oaOrcid({ orcid: 'https://orcid.org/0000-0002-1825-0097', claimedOrcid: '0000-0002-1825-0097' }) });
+    expect(out.status).toBe('probable');
   });
 
   test('OpenAlex author resolves even when a Scholar anchor is rejected (parallel to the ORCID rescue case)', () => {
@@ -300,11 +336,17 @@ describe('resolveIdentity — OpenAlex-author anchor (Slice 1a contract)', () =>
     expect(out.anchors).toHaveLength(0);
   });
 
-  test('a malformed author (no openAlexId) is ignored, not crashed on', () => {
-    const out = r({ name: 'Jane Roe' }, { openAlexAuthor: { acceptPath: 'orcid', identityStatus: 'probable' } });
+  test('an unparseable openAlexId (no A-id token) is ignored, not crashed on', () => {
+    const out = r({ name: 'Jane Roe' }, { openAlexAuthor: { openAlexId: 'https://openalex.org/not-an-id', acceptPath: 'orcid', orcid: ORC, claimedOrcid: ORC } });
     expect(out.status).toBe('unresolved');
     expect(out.anchors).toHaveLength(0);
     expect(out.rejectedAnchors).toHaveLength(0);
+  });
+
+  test('canonical id is the A-token extracted from any URL form (stable dedup)', () => {
+    const out = r({ name: 'Jane Roe' }, { openAlexAuthor: oaOrcid({ openAlexId: 'https://openalex.org/A5023888391?foo=1' }) });
+    expect(out.anchors[0].canonicalKey).toBe('openalex:A5023888391');
+    expect(out.anchors[0].value).toBe('A5023888391');
   });
 });
 
@@ -348,7 +390,7 @@ describe('evidenceFromEnrichment — normalizes contactEnrichment', () => {
   });
 
   test('pulls the openalex_author tier into evidence.openAlexAuthor → resolves probable', () => {
-    const ce = { tierResults: { openalex_author: { openAlexId: 'https://openalex.org/A1', acceptPath: 'orcid', identityStatus: 'probable' } } };
+    const ce = { tierResults: { openalex_author: { openAlexId: 'https://openalex.org/A1', acceptPath: 'orcid', orcid: '0000-0002-1825-0097', claimedOrcid: '0000-0002-1825-0097', identityStatus: 'probable' } } };
     const ev = evidenceFromEnrichment(ce, {});
     expect(ev.openAlexAuthor.openAlexId).toBe('https://openalex.org/A1');
     const out = r({ name: 'Jane Roe' }, ev);
