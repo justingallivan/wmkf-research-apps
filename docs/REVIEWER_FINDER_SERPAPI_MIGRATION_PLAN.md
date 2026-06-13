@@ -118,6 +118,19 @@ The resolver **re-proves acceptance (allowlist gating), it does not trust the pr
 populate `orcid` + `claimedOrcid` on the ORCID path** (`getAuthorByOrcid` record ORCID + the
 looked-up ORCID), or the resolver rejects it. `null` (no author) → no anchor → abstain.
 
+**⚠ 1b producer authoring constraints (Codex 3rd-pass LOWs — the resolver trusts its
+producer, so 1b must not feed it laundered input):**
+1. **Source `orcid` + `claimedOrcid` only from the real lookup** — `claimedOrcid` = the ORCID
+   we called `getAuthorByOrcid` with (already checksum-validated by that method), `orcid` =
+   that record's returned ORCID. Never synthesize both from one unvalidated string: the resolver
+   compares for equality but does **not** checksum/format-validate, so two identical garbage
+   strings would pass `orcid_mismatch`. The upstream `getAuthorByOrcid` validation is the real
+   guard — keep it on the path.
+2. **Pass only the canonical `mapAuthorRecord.openAlexId`** into the DTO — never an assembled or
+   user-influenced URL. The resolver's `shortOpenAlexAuthorId` extracts the first `A\d+` token
+   anywhere in the string (first-match-wins, no min-length), so a non-canonical URL
+   (`…/W123/A1`, `?x=A5`) could mis-extract.
+
 ### Slice 1b — metrics + domain endpoint replacement (depends on 1a)
 
 **Files:** `lib/services/openalex-service.js`, `lib/services/contact-enrichment-service.js`,
@@ -307,3 +320,10 @@ Verdict was **BLOCKED — fix before 1b**; all three fixed:
 - **[MEDIUM] Unstable id canonicalization** → `shortOpenAlexAuthorId` extracts the `A\d+` token
   from any URL/query form, so `canonicalKey`/`value` dedup is stable.
 6 new fail-closed/canonicalization tests added (44 total, suites green).
+
+### Codex 3rd-pass re-review of the 1a hardening (`8a7ce2e`) — VERDICT: CLEAN-TO-BUILD-1B
+All three originals re-confirmed FIXED. Two "NOT-REPRODUCIBLE" probes (fail-anchor
+classification leak; residual gate on the proven-ORCID path) confirmed the intended behavior.
+Two new LOWs, both explicitly **1b authoring constraints, not 1a defects** — recorded above as
+the "1b producer authoring constraints" callout (source ORCID fields from the real lookup; pass
+only the canonical `mapAuthorRecord.openAlexId`). No 1a code change warranted.
