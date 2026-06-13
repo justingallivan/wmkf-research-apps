@@ -879,6 +879,15 @@ field. Structure is already in the spec and unchanged:
   (people-free: `subAreas[]`, `methods[]`, `frontiers[]`, `venues[]`, `searchTerms[]`)
   may seed `sourcePlan`/queries; `unverifiedLeads[]` is never a candidate field. Boundary
   is code-enforced, not prose.
+  - **Reconciliation (S248): the SHIPPED standalone primer service MAY name experts in
+    its staff-facing prose.** The invariant is *"never CREATES CANDIDATES,"* not "never
+    prints a name." The `people-free fieldMap` / `unverifiedLeads[]` partition is the
+    discipline for the *scaffold* role (a `fieldMap` that seeds the retrieval pipeline);
+    the **standalone staff deliverable** (`lib/services/field-primer-service.js`,
+    Executor prompt `field-primer.generate`, S248) has **no candidate write-path** —
+    output target `kind:'none'`, no discovery/save/COI — so naming experts there cannot
+    breach the invariant. Decided with Justin. See
+    `docs/REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md` Stage 0.
 - **Async pre-compute at submission**, cached durable artifact, out of the synchronous
   latency budget. Unchanged.
 

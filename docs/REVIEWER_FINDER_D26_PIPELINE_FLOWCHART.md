@@ -23,8 +23,8 @@ Sources: `docs/REVIEWER_FINDER_ORIGINATION_PLAN.md`,
 
 ```mermaid
 flowchart TD
-    subgraph PRIMER["0 · Field Primer — async (standalone PD deliverable; other roles TBD)"]
-        PR["Field primer: cited field map + people-free fieldMap<br/>(query-seed scaffold role deferred)"]
+    subgraph PRIMER["0 · Field Primer — SHIPPED v1 (standalone staff deliverable; knowledge-only)"]
+        PR["Field primer service (field-primer.generate)<br/>names experts · returns structured primer · NOT a candidate source"]
     end
 
     subgraph INPUT["1 · Intake"]
@@ -86,8 +86,8 @@ flowchart TD
     classDef dead fill:#5a5a5a,stroke:#777,color:#fff,stroke-dasharray:4 3
     classDef open fill:#6a1b9a,stroke:#8e24aa,color:#fff
 
-    class P,CA,TA,ID,DD,RK,COI,CUR,ROSTER,ENR,SAVE,INVITE exists
-    class RS,IDFIX,SERP,REF,PR build
+    class P,CA,TA,ID,DD,RK,COI,CUR,ROSTER,ENR,SAVE,INVITE,PR exists
+    class RS,IDFIX,SERP,REF build
     class WEB,GROUNDED,TB dead
     class EXC,AppRecs open
 ```
@@ -113,17 +113,29 @@ off / abandoned / deferred (don't wire in).
   to `UNRESOLVED` (forename gate, empirically confirmed), then the identity gate blocks
   it from save/select.
 
-## Stage 0 · Field Primer (DECIDED — buildable now, NOT BUILT; roles still open)
+## Stage 0 · Field Primer (SHIPPED v1, S248 — standalone staff deliverable, knowledge-only)
 
-A standalone, cited field overview of the proposal's research area, generated async at
-submission. Decided design: staged (knowledge draft → web-grounded revision → leads
-partition), with a **code-enforced boundary that it never creates candidate reviewers**
-(`fieldMap` people-free may seed queries; `unverifiedLeads[]` is never a candidate
-field). Its *standalone PD-deliverable* role is direction-independent and buildable now;
-its *query-seed scaffold* role is coupled to the deferred retrieval-first redesign.
+A standalone, staff-facing overview of the proposal's research field (what it is,
+sub-areas, methods, frontiers, communities, venues, **named experts**, where the proposal
+sits). **Built S248** as a service through the shared Executor:
 
-**Open (role discussion was not finished):** primary audience/role, field breadth, and
-whether the prose names groups/people. Resolve before building.
+- **Service** `lib/services/field-primer-service.js` → **Executor** prompt
+  `field-primer.generate` (Dataverse `wmkf_ai_prompts`, sonnet). Callable from a route now
+  or an earlier-in-process step later (all-override prompt — proposal text in, no requestId).
+- **Route** `POST /api/field-primer/generate` (`requireAppAccess('reviewer-finder')`);
+  **CLI** `scripts/generate-field-primer.mjs` → markdown for this cycle (no UI yet).
+- **Decoupled from candidates** — output target `kind:'none'` (returned, not persisted);
+  **no** discovery/save/COI write path. This is why it **may name experts** (decided with
+  Justin, S248): the redesign plan's "primer never names people" boundary is really
+  *"never CREATES CANDIDATES"* — naming experts in staff prose doesn't breach it. Output is
+  labeled "orienting field review — not vetted reviewer suggestions."
+- **A7**: proposal text declared `untrusted` → Executor wraps + injects the preamble.
+
+**Roles — decided (S248):** standalone PD deliverable is the live role; the query-seed
+*scaffold* role stays coupled to the deferred retrieval-first redesign. **v1 is
+knowledge-only** (no web); a web-grounded literature-search increment is a **next-cycle
+follow-up**. Named experts are model-knowledge (real but unvetted; staleness/fame-bias
+flagged in the primer's own caveats).
 
 ## 🟩 What exists today (live pipeline)
 
@@ -177,7 +189,8 @@ whether the prose names groups/people. Resolve before building.
   one pool biased toward the applicant with no skeptical counterweight; e.g. an applicant
   suggested Benner), but one soft "overlapping programs" line can over-broaden it and
   clobber the peer set. Needs a foundation decision.
-- **Field primer roles/shape** (Stage 0) — audience, breadth, named-people boundary.
+- **Field primer** (Stage 0) — roles/shape DECIDED + v1 SHIPPED (S248). Remaining: the
+  web-grounded literature-search increment (next cycle) and a UI (CLI-only for now).
 
 ## ⬛ Off / don't wire in (abandoned/deferred)
 

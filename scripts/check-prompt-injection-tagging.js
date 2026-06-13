@@ -359,6 +359,18 @@ const SURFACES = [
     status: 'migrated',
     callSiteFiles: ['pages/api/cron/log-analysis.js'],
   },
+  {
+    // Executor-driven (field-primer.generate, via pages/api/field-primer/generate.js).
+    // Hardening lives in execute-prompt.js (#20): wrapUntrustedContent +
+    // buildUntrustedContentPreamble injected for the untrusted proposal_text
+    // variable. The prompt code file carries no markers of its own; it is
+    // registered here so the unregistered-prompt-file check tracks it.
+    id: 'field-primer-generate',
+    inv: 25,
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/field-primer.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the
