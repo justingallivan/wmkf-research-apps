@@ -115,6 +115,39 @@ sparse-tail toolkit, not a mandate to replace Claude.
   `docs/REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md`; memory
   `project-reviewer-origination-experiment-result`.
 
+## Track B — archived working code (storage shed)
+
+**Status: OFF, archived in code (S248).** `DiscoveryService.TRACK_B_ENABLED = false`
+(`lib/services/discovery-service.js`) gates the four Track-B DB-search blocks. The code
+is **intact and dormant**, kept for future repurposing — flip the one constant to
+re-enable. This is a code-level switch by design, **NOT** an admin/user toggle and **NOT**
+`searchPubmed` (that flag also routes Track-A verification via `suggestionVerifierRouting`,
+so flipping it would change Track A — the coupling trap).
+
+**What Track B was:** the second origination lane — Claude's `analyze` step emits
+`searchQueries` (keyword queries per source); Track B runs them against **PubMed / arXiv /
+bioRxiv / chemRxiv** (`searchPubMed`/`searchArXiv`/`searchBioRxiv`/`searchChemRxiv`) and
+turns the **authors of matching papers** into new candidate reviewers, then resolves the top
+`TRACK_B_IDENTITY_RESOLUTION_LIMIT` (=25) through the OpenAlex/ORCID spine and dedups against
+the Track-A verified set. All of that machinery is preserved.
+
+**Why archived (the evidence):**
+- **~0 contribution to saved panels** last cycle — `scholarly-only-saved ≈ 0` by
+  construction (pre-resolution dedup + the 25-cap identity budget + the save-gate reject
+  unresolved system-discovered rows). See `REVIEWER_FINDER_ORIGINATION_PLAN.md` §1.
+- **Noise on thin Phase-I signal** — attribution on 1002878 (S248): every plant-virologist
+  candidate was Track-B/grounded-only (organism-blind topic→author aggregation); it also
+  surfaces trainees (PI-vs-trainee indistinguishable) and deceased figures.
+- **Latency** — A/B isolation (`scripts/profile-trackb-ab.mjs`) measured Track B at ~27s
+  (≈3× a Track-A-only run; one example local run). Archiving reclaims it.
+- Recall is now served by **Claude recall-sampling (count 12→15)** + **referral capture**,
+  not a grounded keyword lane.
+
+**To re-enable / repurpose:** flip `TRACK_B_ENABLED = true`. If grounded origination is ever
+revisited properly, do NOT just re-enable bare Track B — build the **ORCID-works-anchored
+multilane** (§12) with organism/field-scoped facets + the trainee/deceased filter, judged on
+real accept/decline. The bare keyword→author lane is what underperformed.
+
 ## Recurring Hazards
 
 - **Web-discovery via an ungrounded LLM was EVALUATED and ABANDONED (S230).**

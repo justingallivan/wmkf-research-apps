@@ -35,7 +35,7 @@ flowchart TD
     subgraph ORIG["2 · Origination — Claude is the ENGINE"]
         CA["Claude Analysis: suggest reviewer NAMES<br/>(origination spine)"]
         RS["Recall sampling: count 12→15 (single deeper draw)"]
-        TB["Track B: DB keyword→author origination<br/>DECIDED OFF (disable pending) — ~0 saved-set contribution"]
+        TB["Track B: DB keyword→author origination<br/>OFF — archived in code (TRACK_B_ENABLED=false)"]
         WEB["Perplexity web-discovery"]
     end
 
@@ -101,14 +101,13 @@ off / abandoned / deferred (don't wire in).
 - **Claude-assisted origination is the engine.** S246's "Claude-assisted wins" gate
   fired for the D26 Phase-I cohort. Keep the Claude spine; defer the retrieval-first
   inversion.
-- **Track B — DECIDED off; code-disable still PENDING.** As of S248 the live code still
-  defaults the Track-B DB-search toggles ON (`discovery-service.js`); the decision is made
-  but the disable is not yet applied (see build item #4). It contributed ~0 to the saved set
-  last cycle (origination plan §1: `scholarly-only-saved ≈ 0`, by construction —
-  pre-resolution dedup + identity budget + save-gate) and Claude alone supplies enough even
-  at count=12. NOTE: disabling must null `searchQueries`, NOT flip `searchPubmed` (that flag
-  also routes Track-A verification — see the coupling in `discovery-service.js`
-  `suggestionVerifierRouting`).
+- **Track B — OFF, archived in code (S248).** `DiscoveryService.TRACK_B_ENABLED = false`
+  gates the four DB-search blocks; the Track-B code is left **intact and dormant** for future
+  repurposing (flip the one constant to re-enable). It contributed ~0 to the saved set last
+  cycle (origination plan §1: `scholarly-only-saved ≈ 0`, by construction — pre-resolution
+  dedup + identity budget + save-gate) and Claude alone supplies enough even at count=12. The
+  switch is deliberately code-level (NOT `searchPubmed`, which also routes Track-A
+  verification; NOT a user/admin toggle). Domain record: agent-wiki reviewer-origination.
 - **The weak link is downstream identity resolution, not origination.** The
   attribution probes showed it: the plant-virologist noise was a *grounded-arm*
   artifact (Claude named zero); the Christina case showed origination found a real,
@@ -204,8 +203,9 @@ named personnel is a sensible future add — NOT yet implemented.)
 3. **Referral capture** ("add suggested candidate") — a declining reviewer's free-text
    suggestion → resolved candidate; reuse manual-add (S236) + identity spine with
    abstain-or-confirm safety. One of the three signals that made last cycle work.
-4. **Disable Track B** — remove the DB keyword→author origination lane from the
-   production parallel path (it ran but contributed ~0 to saved panels).
+4. **Disable Track B** — ✅ DONE (S248): archived behind `DiscoveryService.TRACK_B_ENABLED
+   = false`; code left dormant for future repurposing (it ran but contributed ~0 to saved
+   panels and cost ~27s). See the ⬛ section + agent-wiki reviewer-origination.
 5. **SerpAPI → free-stack migration** — $150/mo, value eroded; 4 of 6 uses replaceable.
 6. **Verify-loop latency — MEASURED, not the bottleneck (deprioritized).** All latency
    figures below are **single example local runs** from the committed profiling scripts
@@ -233,9 +233,10 @@ named personnel is a sensible future add — NOT yet implemented.)
 
 ## ⬛ Off / don't wire in (abandoned/deferred)
 
-- **Track B (DB keyword→author origination)** — DECIDED OFF; **code-disable still pending**
-  (live code defaults it on). Noisy on thin signal, ~0 marginal recall, ~0 saved-set
-  contribution last cycle. Recall comes from Claude recall-sampling + referrals instead.
+- **Track B (DB keyword→author origination)** — OFF, **archived in code** (S248,
+  `TRACK_B_ENABLED = false`; dormant + reusable). Noisy on thin signal, ~0 marginal recall,
+  ~0 saved-set contribution last cycle, ~27s latency. Recall comes from Claude recall-sampling
+  + referrals instead.
 - **Perplexity web-discovery** (as a *reviewer* source) — abandoned S230 (hallucinated
   reviewers + fabricated affiliations). (Web search for the *field primer* is a
   different, safer use — people-free field map only.)
