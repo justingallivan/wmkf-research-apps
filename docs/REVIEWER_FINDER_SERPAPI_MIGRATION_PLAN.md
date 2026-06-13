@@ -1,6 +1,7 @@
 # Reviewer-Finder SerpAPI → Free-Stack Migration Plan
 
-> **Status:** Slices 1a + 1b + 2 SHIPPED (S250–S251). Slice 3 (PubPeer) PLANNED.
+> **Status:** Slices 1a + 1b + 2 SHIPPED (S250–S251). Slice 3 (PubPeer) **BLOCKED** — no public
+> PubPeer API exists; PubPeer stays on SerpAPI pending sanctioned access (email sent S251). See Slice 3.
 > **Author:** Justin Gallivan + Claude.
 > **Date:** 2026-06-13.
 > **Why:** SerpAPI is the project's largest single monthly line item (~$150/mo Production,
@@ -22,12 +23,14 @@ Seven SerpAPI engine call-sites across three services. The audit's "6 uses" grou
 | 3 | `serp-contact-service.fetchScholarMetrics` | `google_scholar_author` | h-index / i10 / citations + current affiliation + verified-email-**domain** hint | **REPLACE** → OpenAlex |
 | 4 | `literature-search._searchGoogleScholar` | `google_scholar` | Novelty literature search | **REPLACE** → OpenAlex works |
 | 5 | `literature-search._searchPIPubs` | `google_scholar` | PI publications | **REPLACE** → OpenAlex |
-| 6 | `integrity-service.searchPubPeer` | `google` + `site:pubpeer.com` | PubPeer integrity | **REPLACE** → PubPeer API |
+| 6 | `integrity-service.searchPubPeer` | `google` + `site:pubpeer.com` | PubPeer integrity | **REPLACE — BLOCKED**: no public PubPeer API (see Slice 3); stays on SerpAPI |
 | 7 | `integrity-service.searchNews` | `google_news` | News integrity | **KEEP** — irreplaceable |
 
-After the migration, residual SerpAPI = **#1 (contact) + #7 (news)** only. A Hobby-tier
-downgrade (~$100/mo saved) becomes possible — but that is a **billing-dashboard decision**
-(real call volume), out-of-repo, made *after* the code lands. Not part of any slice.
+Residual SerpAPI after Slices 1–2 = **#1 (contact) + #6 (PubPeer) + #7 (news)**. #6 would drop
+only if PubPeer grants sanctioned API access (Slice 3 is BLOCKED — see below); #1 + #7 are
+irreducible keepers. The bulk of the per-call volume (the per-candidate Scholar metrics, #2/#3)
+is already gone, so a **Hobby-tier downgrade** (~$100/mo) is worth evaluating now — but that is a
+**billing-dashboard decision** (real call volume), out-of-repo. Not part of any slice.
 
 ## Decisions
 
@@ -302,26 +305,58 @@ Built as designed. Resolved decisions:
 - 3 new tests (getWorksByAuthor yearFrom filter; resolvedInstitution payload). Full suite green
   (167 suites / 2415 tests).
 
-## Slice 3 — PubPeer → PubPeer Developer API
+## Slice 3 — PubPeer → (sanctioned API) — BLOCKED, stays on SerpAPI
 
-**File:** `lib/services/integrity-service.js` (`searchPubPeer`). Most self-contained slice.
-- **Prereqs:** (a) register for a free PubPeer Developer API key → add `PUBPEER_API_KEY` to
-  `lib/utils/tracked-secrets.js` + `docs/CREDENTIALS_RUNBOOK.md`; (b) add `pubpeer.com` (or the
-  API host) to the `safeFetch` allowlist (`lib/utils/safe-fetch.js`) — **not currently
-  permitted**.
-- ⚠ **Verify before coding:** PubPeer API endpoint shape + access terms (external claim — do not
-  assume). If the API requires a paid/approved tier we don't have, this slice stays on SerpAPI
-  and we revisit.
-- Reshape: the API returns structured publication/comment records; feed them to the existing
+**File:** `lib/services/integrity-service.js` (`searchPubPeer`).
+
+> **⚠ VERIFIED S251 — the premise was wrong.** The S250 plan assumed a "PubPeer Developer API"
+> that we could register for and key into. **It does not exist as a self-serve, documented API.**
+> Verified from primary sources:
+> - PubPeer's own FAQ (`pubpeer.com/static/faq`) says an API is **"coming soon"** and to **contact
+>   them** for a key — i.e., not generally available, no published endpoint/terms.
+> - The ONLY working programmatic surface today is the **undocumented endpoint the official browser
+>   extension uses** (`PubPeerFoundation/PubPeerBrowserExtensions`, `js/contentScript/pubpeer.js`):
+>   `POST https://pubpeer.com/v3/publications?devkey=PubMed<BrowserName>`, JSON body of DOIs/PMIDs,
+>   returns `{ feedbacks: [...] }`. The `devkey` is a **hardcoded, non-secret string baked into the
+>   public extension** (e.g. `PubMedChrome`) — NOT a per-developer registered key.
+>
+> **Therefore Slice 3 as planned is not buildable now.** Decision (S251): **PubPeer stays on
+> SerpAPI** (`site:pubpeer.com`, #6) — the plan's own escape hatch ("no API → stays on SerpAPI").
+> A sanctioned-access **email was sent to PubPeer (S251)** requesting a real key/terms; if granted,
+> the slice becomes buildable. Do **not** call the `/v3/publications` endpoint server-side without
+> explicit sanction — see the load-vs-authorization note below.
+>
+> **Load vs authorization (why we did NOT just switch to the direct endpoint).** These are
+> different axes and they point opposite ways:
+> - *Load on PubPeer:* the SerpAPI `site:pubpeer.com` route hits **Google's index, not PubPeer** —
+>   zero real-time load on PubPeer. The `/v3/publications` endpoint is the ONLY route that touches
+>   PubPeer's DB. So the Google route is *lighter* on PubPeer, not heavier ("gentler on their
+>   infrastructure" is the wrong argument for sanctioned access).
+> - *Authorization:* querying Google's public index is unambiguously permitted; calling PubPeer's
+>   undocumented endpoint with **their extension's** hardcoded devkey, for a use it wasn't offered
+>   for (batch server screening, not interactive per-pageview), with no terms permitting it, is the
+>   grey part. The real reasons to want sanctioned access are **accuracy** (DOI-based vs fuzzy
+>   name-based Google) and **consent/durability** (our own key, won't break on an extension build).
+
+**If/when sanctioned access is granted, the build is:**
+- **Prereqs:** add `PUBPEER_API_KEY` (or the sanctioned devkey) to `lib/utils/tracked-secrets.js` +
+  `docs/CREDENTIALS_RUNBOOK.md`; add `pubpeer.com` (or the API host) to the `safeFetch` allowlist
+  (`lib/utils/safe-fetch.js`) — **not currently permitted**.
+- Reshape: the endpoint returns structured publication/comment records; feed them to the existing
   Haiku summarizer (or summarize structurally). `searchNews` (#7) stays on SerpAPI.
 - **Scope is `screenApplicants`, not just `searchPubPeer` (Codex MEDIUM).** Today both PubPeer
   and news are gated behind one `effectiveSerpKey` (`integrity-service.js:88-172`). Once PubPeer
-  moves to `PUBPEER_API_KEY`, the two sources need **separate availability gating + source-specific
+  moves to its own key, the two sources need **separate availability gating + source-specific
   error text** in `screenApplicants` (news may run while PubPeer is unconfigured, and vice-versa).
 - **Preserve the `sources.pubpeer` shape** consumed by the integrity UI/export
   (`pages/integrity-screener.js` ~190-192, ~506-519, ~635-646) — the API replacement must emit
   the same shape (`hasConcerns`, `summary`, `resultCount`, `searchUrl`, …) or update those
   renderers in the same slice.
+- Note the migration is DOI/PMID-based (the endpoint keys on publication ids), so the screen would
+  shift from name-based to publication-based matching — more precise, but it needs the applicant's
+  DOIs/PMIDs (already available from the PubMed/OpenAlex enrichment data; no extra PubPeer calls to
+  obtain them). Volume estimate for the access request: ≈1 batched request per person vetted
+  (~hundreds per review cycle), cacheable per person.
 
 ## Cross-cutting
 
@@ -341,10 +376,12 @@ Built as designed. Resolved decisions:
 2. **Slice 1b** (metrics + domain endpoint replacement) — **SHIPPED S251.** Killed the login-wall
    risk; free/fewer calls; hot path. (Disposition under the Slice 1b heading above.)
 3. **Slice 2** (literature / PI-pubs) — **SHIPPED S251.** Reuses `getWorksByAuthor`; added `searchWorks`.
-4. **Slice 3** (PubPeer) — gated on confirming the PubPeer API; scope includes `screenApplicants`
-   gating + integrity UI/export shape; can be deferred/separate.
-5. **Post-migration:** confirm real SerpAPI call volume in the billing dashboard → decide on the
-   Hobby-tier downgrade (Justin, out-of-repo).
+4. **Slice 3** (PubPeer) — **BLOCKED**: no public PubPeer API exists (verified S251); stays on
+   SerpAPI. Unblocks only if PubPeer grants sanctioned access (email sent S251). Build scope (for
+   then) = `screenApplicants` source gating + integrity UI/export shape.
+5. **Now (post-1–2):** confirm real SerpAPI call volume in the billing dashboard → decide on the
+   **Hobby-tier downgrade** (Justin, out-of-repo). The per-candidate Scholar calls are already
+   gone, so this is worth evaluating now even with PubPeer (#6) still on SerpAPI.
 
 ## Codex pre-impl review (S250) — disposition
 
