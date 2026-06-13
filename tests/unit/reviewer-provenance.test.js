@@ -150,4 +150,26 @@ describe('referred provenance (S249)', () => {
   test('save-source list carries the referred kind', () => {
     expect(saveSourceListForCandidate(referred())).toContain('referred');
   });
+
+  // Durability (Codex review fix): a my-candidates reload rebuilds the row with
+  // sources ['staff_manual','referred'] + referredBy parsed from the match reason.
+  // The kind must re-derive to referred, NOT degrade to barred_parametric.
+  test('a reloaded referral DTO (sources include referred) re-derives kind referred', () => {
+    const reloaded = { name: 'Tim Newhouse', sources: ['staff_manual', 'referred'], referredBy: 'Dr. Abby Doyle' };
+    const p = buildReviewerProvenance(reloaded);
+    expect(p.kind).toBe(PROVENANCE_KINDS.REFERRED);
+    expect(p.referredBy).toBe('Dr. Abby Doyle');
+    expect(provenanceGroupOf(reloaded)).toBe('cited_or_proposal_named'); // still selectable-with-verify
+  });
+
+  test('sources-plural alone (referredBy parse failed) still re-derives kind referred', () => {
+    const p = buildReviewerProvenance({ name: 'X', sources: ['staff_manual', 'referred'] });
+    expect(p.kind).toBe(PROVENANCE_KINDS.REFERRED);
+  });
+
+  test('early-return path carries a top-level referredBy onto a provenance object that lacks it', () => {
+    const provenanceWithoutReferrer = { kind: 'referred', sources: [], seedRole: 'referred_by', groundingWorkIds: [] };
+    const p = buildReviewerProvenance({ name: 'X', provenance: provenanceWithoutReferrer, referredBy: 'Dr. Abby Doyle' });
+    expect(p.referredBy).toBe('Dr. Abby Doyle');
+  });
 });

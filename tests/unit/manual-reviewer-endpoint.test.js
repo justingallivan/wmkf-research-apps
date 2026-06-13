@@ -306,9 +306,13 @@ describe('referral capture (S249)', () => {
     }), r);
 
     expect(r.statusCode).toBe(200);
-    // Durable home of the referrer: the match reason (no new Dataverse field).
+    // Durable home of the referrer: the match reason (no new Dataverse field) AND the
+    // `referred` source token, so the provenance kind survives a my-candidates reload.
     expect(ensureStaffManualCandidate).toHaveBeenCalledWith(
-      expect.objectContaining({ matchReason: 'Referred by Dr. Abby Doyle. Synthesis expert.' }),
+      expect.objectContaining({
+        matchReason: 'Referred by Dr. Abby Doyle. Synthesis expert.',
+        sources: ['staff_manual', 'referred'],
+      }),
       { actingUserSystemId: 'u-1' },
     );
     expect(createReviewer).toHaveBeenCalledWith(
@@ -319,7 +323,7 @@ describe('referral capture (S249)', () => {
     expect(r.body.candidate).toMatchObject({
       referredBy: 'Dr. Abby Doyle',
       provenanceKind: 'referred',
-      sources: ['referred'],
+      sources: ['staff_manual', 'referred'],
     });
   });
 

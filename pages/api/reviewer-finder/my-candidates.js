@@ -171,6 +171,14 @@ async function handleGet(req, res, access) {
       const sources = typeof s.wmkf_sources === 'string'
         ? s.wmkf_sources.split(',').map((x) => x.trim()).filter(Boolean)
         : (s.wmkf_sources || []);
+      // S249: a referral persists `referred` in wmkf_sources; the referrer lives in the
+      // match-reason prefix ("Referred by {name}."). Reconstruct referredBy so the client's
+      // buildReviewerProvenance re-derives kind `referred` (label + ranking + selectable-exempt)
+      // rather than degrading to barred_parametric on reload.
+      const referredMatch = sources.includes('referred')
+        ? String(s.wmkf_matchreason || '').match(/^Referred by (.+?)\.(?:\s|$)/)
+        : null;
+      const referredBy = referredMatch ? referredMatch[1].trim() : null;
       byRequest[reqId].candidates.push({
         suggestionId: s.wmkf_appreviewersuggestionid,
         potentialReviewerId: s._wmkf_potentialreviewer_value || null,
@@ -196,6 +204,9 @@ async function handleGet(req, res, access) {
         relevanceScore: s.wmkf_relevancescore,
         reasoning: s.wmkf_matchreason,
         sources,
+        // S249: present only for referrals — drives the client's `referred` provenance
+        // (kind + "Referred by X" label + grounded-rank bonus + selectable-with-verify).
+        referredBy,
         // Applicant-recommended (intake/applicant-reviewer ingestion) vs.
         // staff/Claude-discovered (null disposition). Excluded rows carry
         // wmkf_selected=false and never reach this selected-only list, so the

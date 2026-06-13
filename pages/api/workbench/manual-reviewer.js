@@ -220,6 +220,10 @@ export default async function handler(req, res) {
       // above is acceptable on an excluded reviewer — they are a real human
       // and exclusion is per-request, not a global "never record" — but we stop
       // short of relabeling or filling contact identity for a row we're rejecting.
+      // A referral persists `referred` alongside `staff_manual` so the provenance kind
+      // survives a my-candidates reload (it was staff-entered AND referred). A plain
+      // manual add stays `staff_manual` only.
+      const sourceTokens = referredBy ? ['staff_manual', 'referred'] : ['staff_manual'];
       const suggestion = await reviewerSuggestionAdapter.ensureStaffManualCandidate({
         potentialReviewerId,
         requestId,
@@ -227,6 +231,7 @@ export default async function handler(req, res) {
         grantCycleCode: cycleCode,
         programArea,
         matchReason,
+        sources: sourceTokens,
       }, { actingUserSystemId });
 
       if (suggestion.skippedExcluded) {
@@ -277,7 +282,7 @@ export default async function handler(req, res) {
           affiliation: responseAffiliation || null,
           orcid: carryOrcid || null,
           orcidUrl: carryOrcidUrl,
-          sources: referredBy ? ['referred'] : ['staff_manual'],
+          sources: sourceTokens,
           // `referredBy` + `provenanceKind` drive the client's provenance (kind `referred`,
           // selectable-with-verify, grounded-rank bonus, "Referred by X" card label).
           referredBy: referredBy || null,
