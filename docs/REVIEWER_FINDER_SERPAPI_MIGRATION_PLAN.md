@@ -1,6 +1,6 @@
 # Reviewer-Finder SerpAPI → Free-Stack Migration Plan
 
-> **Status:** Slice 1a SHIPPED (S250) + Slice 1b SHIPPED (S251). Slices 2 & 3 PLANNED.
+> **Status:** Slices 1a + 1b + 2 SHIPPED (S250–S251). Slice 3 (PubPeer) PLANNED.
 > **Author:** Justin Gallivan + Claude.
 > **Date:** 2026-06-13.
 > **Why:** SerpAPI is the project's largest single monthly line item (~$150/mo Production,
@@ -265,6 +265,27 @@ Lower contact-correctness stakes than Slice 1.
   keep the `googleScholar` key/`source` strings for compatibility, or rename and update every
   consumer in the same pass. Don't silently change the label.
 
+### Slice 2 disposition — SHIPPED (S251)
+Built as designed. Resolved decisions:
+- **`searchWorks(query, {yearFrom})` helper added** to `openalex-service.js` (full-text works
+  search + `from_publication_date:<year>-01-01` recency filter). `mapWorkRecord` extended with
+  `citedByCount` + a reconstructed `abstract` (new `reconstructAbstract` from the inverted index;
+  the literature layer truncates the snippet to 300 chars, parity with the other DBs).
+- **`_searchGoogleScholar` → `_searchOpenAlexWorks`** (top-4 novelty queries, year≥now−5);
+  **`_searchPIPubs`** now resolves the PI via `searchAuthors` + a distinctive-token institution
+  overlap (`_pickAuthorForPI`; acronym→full-name is out of scope — best-effort, the collation
+  prompt re-filters PI pubs) → `getWorksByAuthor`. `Promise.allSettled` shape kept; `SERP_API_KEY`
+  branch dropped.
+- **Honest source rename (Justin's call):** `searchAll` key `googleScholar` → `openAlex`;
+  per-result `source: 'google_scholar'` → `'openalex'`. Reconciled the LLM-facing label in the
+  collation prompt prose + the `source` enum hint + the Stage-0d intelligence prose
+  (`shared/config/prompts/virtual-review-panel.js`) and the Stage-0b progress message
+  (`panel-review-service.js`). The Stage-0c output schema does NOT enforce the `source` value
+  (`optStr`), so no schema change. `check:prompt-injection-tagging` re-run green.
+- Tests: new `tests/unit/literature-search-service.test.js`; `searchWorks`/`reconstructAbstract`
+  unit tests; integration mock key `googleScholar`→`openAlex`. Full suite green (167 suites / 2413).
+- Residual SerpAPI after Slice 2 = **#1 contact + #6 PubPeer + #7 news**. #6 is Slice 3.
+
 ## Slice 3 — PubPeer → PubPeer Developer API
 
 **File:** `lib/services/integrity-service.js` (`searchPubPeer`). Most self-contained slice.
@@ -303,7 +324,7 @@ Lower contact-correctness stakes than Slice 1.
    Defines accept/abstain + resolver evidence. The contact-correctness foundation.
 2. **Slice 1b** (metrics + domain endpoint replacement) — **SHIPPED S251.** Killed the login-wall
    risk; free/fewer calls; hot path. (Disposition under the Slice 1b heading above.)
-3. **Slice 2** (literature / PI-pubs) — straightforward, reuses `getWorksByAuthor`. **NEXT.**
+3. **Slice 2** (literature / PI-pubs) — **SHIPPED S251.** Reuses `getWorksByAuthor`; added `searchWorks`.
 4. **Slice 3** (PubPeer) — gated on confirming the PubPeer API; scope includes `screenApplicants`
    gating + integrity UI/export shape; can be deferred/separate.
 5. **Post-migration:** confirm real SerpAPI call volume in the billing dashboard → decide on the

@@ -7,7 +7,7 @@ jest.mock('../../lib/utils/safe-fetch.js', () => ({
 }));
 
 const { safeFetch } = require('../../lib/utils/safe-fetch.js');
-const { OpenAlexService, registrableDomainFromUrl } = require('../../lib/services/openalex-service');
+const { OpenAlexService, registrableDomainFromUrl, reconstructAbstract } = require('../../lib/services/openalex-service');
 
 const jsonResponse = (payload, status = 200) => ({
   ok: status >= 200 && status < 300,
@@ -315,6 +315,63 @@ describe('OpenAlexService.getInstitution (Slice 1b verified-domain source)', () 
     safeFetch.mockClear();
     expect(await OpenAlexService.getInstitution('')).toBeNull();
     expect(safeFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('OpenAlexService.searchWorks (Slice 2 — novelty literature)', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('searches works, applies the recency filter, and maps abstract + cites', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({
+      meta: { count: 1 },
+      results: [{
+        id: 'https://openalex.org/W1',
+        display_name: 'A novel result',
+        publication_year: 2024,
+        cited_by_count: 17,
+        abstract_inverted_index: { We: [0], show: [1], novelty: [2] },
+        authorships: [{ author: { id: 'A1', display_name: 'Jane Roe' } }],
+      }],
+    }));
+
+    const out = await OpenAlexService.searchWorks('novel topic', { yearFrom: 2021, limit: 5 });
+
+    expect(out.totalCount).toBe(1);
+    expect(out.records[0]).toMatchObject({
+      title: 'A novel result',
+      year: 2024,
+      citedByCount: 17,
+      abstract: 'We show novelty',
+    });
+    const url = safeFetch.mock.calls[0][0];
+    expect(url).toMatch(/search=novel\+topic/);
+    expect(url).toMatch(/filter=from_publication_date%3A2021-01-01/);
+  });
+
+  test('empty query → no API call', async () => {
+    const out = await OpenAlexService.searchWorks('   ');
+    expect(out).toEqual({ totalCount: 0, records: [] });
+    expect(safeFetch).not.toHaveBeenCalled();
+  });
+
+  test('omits the recency filter when yearFrom is not an integer', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({ meta: { count: 0 }, results: [] }));
+    await OpenAlexService.searchWorks('q', {});
+    expect(safeFetch.mock.calls[0][0]).not.toMatch(/from_publication_date/);
+  });
+});
+
+describe('reconstructAbstract — OpenAlex inverted-index → text', () => {
+  test('places tokens at their positions and joins', () => {
+    expect(reconstructAbstract({ The: [0], quick: [1], brown: [2], fox: [3] })).toBe('The quick brown fox');
+    // repeated token at multiple positions
+    expect(reconstructAbstract({ a: [0, 2], b: [1] })).toBe('a b a');
+  });
+
+  test('null / non-object / empty → null', () => {
+    expect(reconstructAbstract(null)).toBeNull();
+    expect(reconstructAbstract([])).toBeNull();
+    expect(reconstructAbstract({})).toBeNull();
   });
 });
 

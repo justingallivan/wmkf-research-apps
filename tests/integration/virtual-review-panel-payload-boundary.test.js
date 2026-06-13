@@ -105,7 +105,7 @@ jest.mock('../../lib/services/literature-search-service', () => ({
       arxiv: [],
       biorxiv: [],
       chemrxiv: [],
-      googleScholar: [],
+      openAlex: [],
     })),
   },
 }));
