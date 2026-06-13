@@ -4,183 +4,174 @@ Date: 2026-06-12
 
 Operational plan for finding appropriate reviewers for the **D26 Phase-I** cycle,
 with each pipeline stage marked by status. Direction reflects the **S246 forward
-sniff-test experiment**, which fired the "Claude-assisted wins" gate for this cohort.
+sniff-test experiment** ("Claude-assisted wins" gate) plus the attribution probes and
+corrected-posture reconciliation worked out this session.
+
+The core posture: **Claude is the origination engine** (recall-oriented, human-curated);
+the grounded-*origination* family (Track B keyword→author, and the retrieval-first
+multilane) is **parked**; the real leverage is **downstream** — identity-resolution
+recall, human curation, and the decline→referral loop.
 
 Sources: `docs/REVIEWER_FINDER_ORIGINATION_PLAN.md`,
 `docs/REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md`,
-`docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` (Part B + Part C — the field primer),
-`docs/agent-wiki/topics/reviewer-origination.md`, `docs/REVIEWER_FINDER.md`.
+`docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md`,
+`docs/agent-wiki/topics/reviewer-origination.md` (genesis & corrected posture),
+`docs/agent-wiki/topics/reviewer-identity.md` (namesake-collision worked example),
+`docs/REVIEWER_FINDER.md`.
 
 ## Flowchart
 
 ```mermaid
 flowchart TD
-    subgraph PRIMER["0 · Field Primer — async at submission (standalone, cached, durable)"]
-        PR1["P1 · knowledge draft (no web)"]
-        PR2["P2 · web-grounded revision → cited fieldMap"]
-        PR3["P3 · leads partition → unverifiedLeads[]"]
-        PRDOC["Standalone field overview<br/>(durable PD deliverable)"]
-        FMAP["fieldMap (people-free)<br/>subAreas/methods/frontiers/venues/searchTerms"]
+    subgraph PRIMER["0 · Field Primer — async (standalone PD deliverable; other roles TBD)"]
+        PR["Field primer: cited field map + people-free fieldMap<br/>(query-seed scaffold role deferred)"]
     end
 
-    subgraph INPUT["1 · Proposal Intake"]
-        P[D26 Phase-I proposal PDF]
-        AppRecs["Applicant's own recs<br/>wmkf_potentialreviewer1..5"]
+    subgraph INPUT["1 · Intake"]
+        P[D26 Phase-I proposal]
+        AppRecs["Applicant recs (wmkf_potentialreviewer1..5)<br/>⚠ friends-of-PI bias"]
     end
 
-    subgraph ANALYZE["2 · Analysis & Origination"]
-        CA["Claude Analysis (analyze.js)<br/>extract title/abstract/PI/inst<br/>+ SUGGEST reviewer names"]
-        TB["DB Discovery (discover.js)<br/>PubMed · ArXiv · BioRxiv · ChemRxiv"]
-        RS["Recall sampling:<br/>more draws / higher candidate count"]
+    subgraph ORIG["2 · Origination — Claude is the ENGINE"]
+        CA["Claude Analysis: suggest reviewer NAMES<br/>(origination spine)"]
+        RS["Recall sampling: more draws / count"]
+        TB["Track B: DB keyword→author origination<br/>OFF — ~0 contribution to saved set last cycle"]
         WEB["Perplexity web-discovery"]
     end
 
-    subgraph RESOLVE["3 · Identity, Dedup, Rank"]
-        ID["Identity resolution<br/>OpenAlex · ORCID · PubMed spine"]
-        DD["Dedup / union coverage<br/>deduplication-service"]
-        RK["Recency-weighted ranking<br/>recency &gt; citations/h-index<br/>current-affiliation pinning"]
+    subgraph GROUND["3 · Ground · Resolve · Rank"]
+        TA["Track A: verify/ground names · PubMed/OpenAlex/ORCID<br/>✓ forename-gated (Laederach closed)"]
+        ID["Identity resolution (OpenAlex/ORCID/PubMed spine)"]
+        IDFIX["recall-harden: field-aware + ORCID-anchored<br/>(stop losing low-footprint correct names — Christina)"]
+        DD["Dedup / union coverage"]
+        RK["Recency-weighted ranking"]
     end
 
-    subgraph GATE["4 · Safety & COI"]
-        COI["COI grading<br/>self-disclosure + same-institution"]
+    subgraph GATE["4 · Safety"]
+        COI["COI grading (self-disclosure + same-institution)"]
         EXC["Applicant-exclusion policy"]
     end
 
-    subgraph CURATE["5 · Curation & Outcome"]
-        ROSTER["Find-tab durable roster<br/>+ cross-run dedup"]
-        ENR["Contact enrichment (5-tier)<br/>+ SerpAPI calls"]
-        SERP["SerpAPI &rarr; free-stack migration"]
-        REF["Referral capture<br/>'add suggested candidate'"]
-        SAVE["Save &rarr; Dataverse<br/>wmkf_potentialreviewer"]
-        EMAIL["Email generation (.eml)<br/>+ invite/track"]
+    subgraph HUMAN["5 · Human curation & outcome — the load-bearing loop"]
+        CUR["Staff curate vs priorities<br/>surfaced papers → drop bad ones"]
+        ROSTER["Durable roster + cross-run dedup"]
+        ENR["Contact enrichment (5-tier) + SerpAPI"]
+        SERP["SerpAPI → free-stack"]
+        SAVE["Save → Dataverse"]
+        INVITE["Invite / email (.eml)"]
+        REF["Decline → referral capture<br/>'add suggested candidate'"]
     end
 
-    GROUNDED["ORCID-works multilane (§12)<br/>retrieval-first cutover"]
+    GROUNDED["Grounded retrieval-first multilane (§12)"]
 
-    P --> PR1 --> PR2 --> PR3
-    PR2 --> PRDOC
-    PR2 --> FMAP
-    FMAP -. seeds queries (redesign Stage 0/1, deferred) .-> TB
-    PR3 -. leads NEVER become candidates .-x ID
-
+    P --> PR
     P --> CA
-    P --> TB
-    AppRecs --> ID
-    CA --> ID
-    TB --> ID
     RS -.feeds.-> CA
-    RS -.feeds.-> TB
+    AppRecs --> ID
+    CA --> TA --> ID
+    TB -. OFF .-x ID
     WEB -. removed .-x ID
+    PR -. leads NEVER become candidates .-x ID
+    ID --- IDFIX
     ID --> DD --> RK --> COI
     EXC -.-> COI
-    COI --> ROSTER --> ENR --> SAVE --> EMAIL
-    SERP -.replaces.-> ENR
-    EMAIL --> REF
-    REF -.re-enters pool.-> ID
-    GROUNDED -. deferred .-x ID
+    COI --> CUR --> ROSTER --> ENR --> SAVE --> INVITE
+    SERP -. replaces .-> ENR
+    INVITE --> REF
+    REF -. re-enters pool .-> CUR
+    GROUNDED -. deferred (same family as Track B) .-x ID
 
     classDef exists fill:#1b5e20,stroke:#2e7d32,color:#fff
     classDef build fill:#f9a825,stroke:#f57f17,color:#000
     classDef dead fill:#5a5a5a,stroke:#777,color:#fff,stroke-dasharray:4 3
     classDef open fill:#6a1b9a,stroke:#8e24aa,color:#fff
 
-    class P,AppRecs,CA,TB,ID,DD,RK,COI,ROSTER,ENR,SAVE,EMAIL exists
-    class RS,REF,SERP,PR1,PR2,PR3,PRDOC,FMAP build
-    class WEB,GROUNDED dead
-    class EXC open
+    class P,CA,TA,ID,DD,RK,COI,CUR,ROSTER,ENR,SAVE,INVITE exists
+    class RS,IDFIX,SERP,REF,PR build
+    class WEB,GROUNDED,TB dead
+    class EXC,AppRecs open
 ```
 
-**Legend** — 🟩 green = exists/shipped · 🟨 amber = needs building/fixing (the
-experiment says invest here) · 🟪 purple = open policy decision · ⬛ gray/dashed-X =
-built-but-abandoned or deferred (don't wire in).
+**Legend** — 🟩 green = exists/shipped · 🟨 amber = needs building/fixing (incl. the
+Track-B disable, a change item) · 🟪 purple = open policy decision · ⬛ gray/dashed-X =
+off / abandoned / deferred (don't wire in).
 
-## What's settled (the S246 decision)
+## What's settled (S246 + this session)
 
-The forward sniff-test experiment fired the **"Claude-assisted wins" gate** for the
-D26 Phase-I cohort. The **spine stays Claude-assisted origination** (the green path:
-Claude suggests names + DB discovery, then resolve/dedup/rank). The retrieval-first
-**ORCID-works multilane (§12)** cutover is **deferred** — not refuted, just not yet
-built against a properly-anchored arm and not yet judged on real accept/decline.
+- **Claude-assisted origination is the engine.** S246's "Claude-assisted wins" gate
+  fired for the D26 Phase-I cohort. Keep the Claude spine; defer the retrieval-first
+  inversion.
+- **Track B is OFF.** It contributed ~0 to the saved set last cycle (origination plan
+  §1: `scholarly-only-saved ≈ 0`, by construction — pre-resolution dedup + identity
+  budget + save-gate). Claude alone supplies enough candidates even at count=12.
+  Disabling it is a real code change in `discover.js` / `discovery-service.js`.
+- **The weak link is downstream identity resolution, not origination.** The
+  attribution probes showed it: the plant-virologist noise was a *grounded-arm*
+  artifact (Claude named zero); the Christina case showed origination found a real,
+  relevant person that *resolution* lost (namesake collision + fragmentation).
+- **The Laederach class is closed.** Track-A verify now demotes a hallucinated forename
+  to `UNRESOLVED` (forename gate, empirically confirmed), then the identity gate blocks
+  it from save/select.
 
-## Stage 0 · Field Primer (DECIDED — buildable now, NOT BUILT)
+## Stage 0 · Field Primer (DECIDED — buildable now, NOT BUILT; roles still open)
 
-The field primer is a **structured, cited review of the proposal's research field** —
-what the field is, its sub-areas, key methods, current frontiers, active research
-communities, and notable venues, each claim tied to a resolvable source. It has two
-roles:
+A standalone, cited field overview of the proposal's research area, generated async at
+submission. Decided design: staged (knowledge draft → web-grounded revision → leads
+partition), with a **code-enforced boundary that it never creates candidate reviewers**
+(`fieldMap` people-free may seed queries; `unverifiedLeads[]` is never a candidate
+field). Its *standalone PD-deliverable* role is direction-independent and buildable now;
+its *query-seed scaffold* role is coupled to the deferred retrieval-first redesign.
 
-1. **Standalone PD deliverable (direction-independent).** A non-specialist program
-   director gets an orienting field map — valuable *on its own*, even when reviewer
-   yield is thin (thin Phase-I narrative, or a proposal whose best peers all
-   self-excluded). It degrades gracefully and is **not** gated behind the deferred
-   retrieval-first cutover.
-2. **Scaffold** for query/source planning: its people-free `fieldMap` may seed
-   queries — but is **never** a candidate source.
-
-Decided design (Part B + Part C §1):
-
-- **Async pre-compute at submission**, stored as a cached durable artifact — out of
-  the synchronous reviewer-finder latency budget entirely.
-- **Staged:** P1 knowledge draft (no web) → P2 web-grounded revision → cited
-  `fieldMap` → P3 partition any named people into `unverifiedLeads[]`.
-- **Hard, code-enforced boundary:** the primer **never creates candidate reviewers**.
-  `fieldMap` (people-free: `subAreas/methods/frontiers/venues/searchTerms`) may seed
-  queries; `unverifiedLeads[]` is never a candidate field. A lead may at most become a
-  grounded-seed query that must ground-or-drop through PubMed/ORCID/OpenAlex —
-  affiliation/contact always from the verified record, never the primer prose.
-- **Neutral, accurate field map.** Lay out the field's mainstream structure plainly;
-  do NOT editorialize "heterodox/divergent perspectives" (the critical function is the
-  humans'). Directional quality is acceptable — it is one input to a human judgment
-  with downstream correctives, not a load-bearing/airtight component.
-- **Bias/coverage metric is DEFERRED** — optional, later, narrowed to a
-  spread-across-sub-communities redundancy check. **Not** required to ship the primer;
-  eyeball-validate first.
-
-First step (de-risk): a shadow, non-candidate-producing prototype on prior proposals —
-extraction + people-agnostic primer + query generation → feed only the generated
-queries into existing retrieval → compare yield/latency/false-positives. Do **not**
-prototype "primer names people" first.
+**Open (role discussion was not finished):** primary audience/role, field breadth, and
+whether the prose names groups/people. Resolve before building.
 
 ## 🟩 What exists today (live pipeline)
 
-- **Claude Analysis** + name suggestion (`analyze.js`) — the origination spine
-- **DB Discovery** across PubMed/ArXiv/BioRxiv/ChemRxiv (`discover.js` / `discovery-service.js`)
+- **Claude Analysis** + name suggestion (`analyze.js`) — the origination engine
+- **Track A — verify/ground** Claude's names against PubMed/OpenAlex/ORCID,
+  **✓ forename-gated** (the Laederach failure is closed)
 - **Identity resolution** on the OpenAlex/ORCID/PubMed spine + **dedup/union coverage**
 - **Recency-weighted ranking** (S224: recency > citations, current-affiliation pinning)
 - **COI grading** (S240: self-disclosure + current same-institution)
+- **Human curation** — staff select against priorities, using each candidate's surfaced
+  papers to drop the occasional bad one (the load-bearing, human-in-the-loop step)
 - **Find-tab durable roster** with cross-run dedup (S224)
 - **Contact enrichment** (5-tier), **save to Dataverse**, **email/.eml generation**
 - Admin-configurable **search time budget** (S223)
 
-## 🟨 What needs building/fixing (where the experiment says to invest)
+## 🟨 What needs building/fixing (the leverage is downstream)
 
-1. **Field primer** (Stage 0 above) — DECIDED/buildable; its standalone-deliverable
-   role is direction-independent.
-2. **Recall sampling** — more `analyze` draws / higher candidate count. The
-   experiment's sharpest finding: **39/50 of applicants' own recommended reviewers
-   were found by *neither* arm** — people are lost to undersampling regardless of
-   direction. Highest-leverage origination fix.
-3. **Referral capture** ("add suggested candidate") — a declining reviewer often
-   free-texts a colleague; reuse manual-add (S236) + identity spine with
-   abstain-or-confirm safety. Validated as how panels actually fill perspective gaps
-   (1002379: Doyle → referred Newhouse).
-4. **SerpAPI → free-stack migration** — $150/mo, value eroded; 4 of 6 uses
-   replaceable with free academic APIs.
+1. **Identity-resolution recall hardening** — field-aware + ORCID-anchored resolution so
+   low-footprint *correct* names aren't lost to famous namesakes (the Christina case).
+   Highest-leverage, and it's an *identity* fix, not an origination one.
+2. **Recall sampling** — more `analyze` draws / higher candidate count. 39/50 of
+   applicants' own recommended reviewers were found by neither path — we under-sample
+   real people. This is now the recall lever (replacing Track B).
+3. **Referral capture** ("add suggested candidate") — a declining reviewer's free-text
+   suggestion → resolved candidate; reuse manual-add (S236) + identity spine with
+   abstain-or-confirm safety. One of the three signals that made last cycle work.
+4. **Disable Track B** — remove the DB keyword→author origination lane from the
+   production parallel path (it ran but contributed ~0 to saved panels).
+5. **SerpAPI → free-stack migration** — $150/mo, value eroded; 4 of 6 uses replaceable.
 
-## 🟪 Open policy decision
+## 🟪 Open policy / design decisions
 
-- **Applicant-exclusion breadth** — the applicant-suggested-reviewer exclusion is
-  load-bearing (friends-of-PI are the one pool biased toward the applicant with no
-  skeptical counterweight), but one soft "overlapping programs" line can over-broaden
-  it and clobber the peer set. Needs a foundation decision before it's wired into the
-  COI/exclusion gate.
+- **Applicant-exclusion breadth** — the exclusion is load-bearing (friends-of-PI are the
+  one pool biased toward the applicant with no skeptical counterweight; e.g. an applicant
+  suggested Benner), but one soft "overlapping programs" line can over-broaden it and
+  clobber the peer set. Needs a foundation decision.
+- **Field primer roles/shape** (Stage 0) — audience, breadth, named-people boundary.
 
-## ⬛ Don't wire in (abandoned/deferred)
+## ⬛ Off / don't wire in (abandoned/deferred)
 
-- **Perplexity web-discovery** (as a *reviewer* source) — built S225–S227, then
-  **abandoned S230** (verifiably hallucinated reviewers + fabricated affiliations). UI
-  option removed. (Note: web search for the *field primer* is a different, safer use —
-  it produces a people-free field map, never named candidates.)
+- **Track B (DB keyword→author origination)** — OFF. Noisy on thin signal, ~0 marginal
+  recall, ~0 saved-set contribution last cycle. Recall comes from Claude recall-sampling
+  + referrals instead.
+- **Perplexity web-discovery** (as a *reviewer* source) — abandoned S230 (hallucinated
+  reviewers + fabricated affiliations). (Web search for the *field primer* is a
+  different, safer use — people-free field map only.)
 - **ORCID-works multilane / retrieval-first cutover** — deferred until a
-  properly-anchored §12 arm is built *and* judged on live accept/decline.
+  properly-anchored §12 arm is built *and* judged on live accept/decline. Same parked
+  grounded-origination family as Track B; remains valid + unrefuted as a sparse-tail
+  tool, just not the engine.
 - **COI Chunk 2b** (retire `POTENTIAL_CONCERNS`) — destructive carryover, deferred/unverified.
