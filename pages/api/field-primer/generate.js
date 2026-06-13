@@ -14,7 +14,7 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
-import { generateFieldPrimer } from '../../../lib/services/field-primer-service';
+import { generateFieldPrimer, groundPrimerExperts } from '../../../lib/services/field-primer-service';
 
 const APP_KEY = 'reviewer-finder';
 
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
   // Warm the model-override cache before the Executor resolves the prompt's model.
   await loadModelOverrides();
 
-  const { proposalText, focus } = req.body || {};
+  const { proposalText, focus, ground } = req.body || {};
   if (!proposalText || typeof proposalText !== 'string' || proposalText.trim().length < 50) {
     return res.status(400).json({ error: 'proposalText is required (min ~50 chars).' });
   }
@@ -45,6 +45,12 @@ export default async function handler(req, res) {
       focus: typeof focus === 'string' ? focus : undefined,
       runSource: 'Vercel Interactive',
     });
+    // Ground named experts against OpenAlex (default on) — catches the
+    // forename-hallucination class. Fail-soft: leave experts ungrounded on error.
+    if (ground !== false && primer && Array.isArray(primer.experts)) {
+      try { primer.experts = await groundPrimerExperts(primer.experts); }
+      catch (e) { console.warn('[field-primer/generate] expert grounding failed:', e.message); }
+    }
     return res.status(200).json({ primer, runId, model });
   } catch (err) {
     console.error('[field-primer/generate] failed:', err.message);

@@ -82,7 +82,7 @@ function pickProposalBestGuess(files) {
 
 const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 enterDynamicsBypassForScript('generate-field-primer');
-const { generateFieldPrimer, renderPrimerMarkdown } = await import('../lib/services/field-primer-service.js');
+const { generateFieldPrimer, groundPrimerExperts, renderPrimerMarkdown } = await import('../lib/services/field-primer-service.js');
 
 let proposalText;
 let title;
@@ -152,6 +152,13 @@ if (!proposalText || proposalText.trim().length < 100) {
 
 const t0 = Date.now();
 const { primer, runId, model } = await generateFieldPrimer({ proposalText, focus, runSource: 'Vercel Test' });
+
+if (!has('--no-ground') && Array.isArray(primer.experts) && primer.experts.length) {
+  console.log(`Grounding ${primer.experts.length} experts against OpenAlex…`);
+  try { primer.experts = await groundPrimerExperts(primer.experts); }
+  catch (e) { console.warn(`  grounding failed (${e.message}); leaving experts ungrounded`); }
+}
+
 const md = renderPrimerMarkdown(primer, { title });
 
 mkdirSync('tmp', { recursive: true });

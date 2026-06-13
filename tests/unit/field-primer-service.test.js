@@ -5,10 +5,15 @@
 jest.mock('../../lib/services/execute-prompt.js', () => ({
   executePrompt: jest.fn(),
 }));
+jest.mock('../../lib/services/openalex-service.js', () => ({
+  OpenAlexService: { searchAuthors: jest.fn() },
+}));
 
 import { executePrompt } from '../../lib/services/execute-prompt.js';
+import { OpenAlexService } from '../../lib/services/openalex-service.js';
 import {
   generateFieldPrimer,
+  groundPrimerExperts,
   renderPrimerMarkdown,
   FIELD_PRIMER_PROMPT_NAME,
   PRIMER_SECTIONS,
@@ -93,5 +98,80 @@ describe('exports', () => {
   test('prompt name and section list are stable', () => {
     expect(FIELD_PRIMER_PROMPT_NAME).toBe('field-primer.generate');
     expect(PRIMER_SECTIONS).toEqual(Object.keys(SAMPLE_PRIMER));
+  });
+});
+
+describe('groundPrimerExperts (uses the real forenamesContradict; OpenAlex mocked)', () => {
+  // Author DB keyed by search query. A confirmed expert seeds the field profile
+  // (biology/genome) used to disambiguate the rest.
+  const DB = {
+    'Andrew Lang': [{ displayName: 'Andrew Lang', worksCount: 80, topics: ['Biology', 'Genome', 'Microbiology'], openAlexId: 'A-lang', orcid: null }],
+    'Oksana Zhaxybayeva': [], // the hallucinated forename → 0 hits (mirrors live OpenAlex)
+    'Zhaxybayeva': [
+      { displayName: 'Olga Zhaxybayeva', worksCount: 151, topics: ['Biology', 'Genome', 'Genetics'], openAlexId: 'A-olga', orcid: '0000-0001' },
+      { displayName: 'Elmira Zhaxybayeva', worksCount: 9, topics: ['Food science', 'Chemistry'], openAlexId: 'A-elmira', orcid: null },
+    ],
+    'Alice Smith': [],
+    'Smith': [
+      { displayName: 'Bob Smith', worksCount: 40, topics: ['Biology', 'Genetics'], openAlexId: 'A-bob', orcid: null },
+      { displayName: 'Carol Smith', worksCount: 35, topics: ['Biology', 'Genome'], openAlexId: 'A-carol', orcid: null },
+    ],
+  };
+  // Real OpenAlex search is case-insensitive; surnameOf lowercases its query, so
+  // match keys case-insensitively.
+  const lookup = (db, q) => {
+    const k = Object.keys(db).find((key) => key.toLowerCase() === String(q).toLowerCase());
+    return k ? db[k] : [];
+  };
+  beforeEach(() => {
+    OpenAlexService.searchAuthors.mockReset();
+    OpenAlexService.searchAuthors.mockImplementation(async (q) => {
+      const records = lookup(DB, q);
+      return { totalCount: records.length, records };
+    });
+  });
+
+  test('confirms an exact match, CORRECTS a hallucinated forename, and abstains on ambiguity', async () => {
+    const experts = [
+      { name: 'Andrew Lang', affiliation: 'Memorial U', why_relevant: 'GTA ecology' },
+      { name: 'Oksana Zhaxybayeva', affiliation: 'Dartmouth', why_relevant: 'computational GTA' },
+      { name: 'Alice Smith', affiliation: 'Somewhere', why_relevant: 'generic' },
+    ];
+    const out = await groundPrimerExperts(experts);
+
+    // exact match → confirmed
+    expect(out[0].grounding.status).toBe('confirmed');
+    expect(out[0].grounding.resolvedName).toBe('Andrew Lang');
+
+    // the headline: wrong forename, right surname+field, one dominant in-field author → corrected to Olga
+    expect(out[1].grounding.status).toBe('corrected');
+    expect(out[1].grounding.resolvedName).toBe('Olga Zhaxybayeva');
+    expect(out[1].name).toBe('Oksana Zhaxybayeva'); // original preserved
+    expect(out[1].grounding.worksCount).toBe(151);
+
+    // two in-field namesakes, neither dominant → never auto-bind → unverified
+    expect(out[2].grounding.status).toBe('unverified');
+  });
+
+  test('disables corrections when no expert seeds a field profile (fail-safe)', async () => {
+    OpenAlexService.searchAuthors.mockImplementation(async (q) => {
+      // only the surname search returns an author; nothing confirms in pass 1 → empty field profile
+      const records = String(q).toLowerCase() === 'zhaxybayeva' ? DB['Zhaxybayeva'] : [];
+      return { totalCount: records.length, records };
+    });
+    const out = await groundPrimerExperts([{ name: 'Oksana Zhaxybayeva' }]);
+    expect(out[0].grounding.status).toBe('unverified'); // empty profile → no correction
+  });
+
+  test('renderPrimerMarkdown surfaces the grounding markers', () => {
+    const md = renderPrimerMarkdown({
+      experts: [
+        { name: 'Andrew Lang', affiliation: 'Memorial U', why_relevant: 'x', grounding: { status: 'confirmed', resolvedName: 'Andrew Lang' } },
+        { name: 'Oksana Zhaxybayeva', affiliation: 'Dartmouth', why_relevant: 'y', grounding: { status: 'corrected', resolvedName: 'Olga Zhaxybayeva' } },
+      ],
+    });
+    expect(md).toContain('Olga Zhaxybayeva');
+    expect(md).toMatch(/model named "Oksana Zhaxybayeva"/);
+    expect(md).toContain('✓');
   });
 });

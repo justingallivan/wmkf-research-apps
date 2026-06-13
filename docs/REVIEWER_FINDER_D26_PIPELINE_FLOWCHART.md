@@ -133,11 +133,18 @@ sits). **Built S248** as a service through the shared Executor:
 
 **Roles — decided (S248):** standalone PD deliverable is the live role; the query-seed
 *scaffold* role stays coupled to the deferred retrieval-first redesign. **v1 is
-knowledge-only** (no web); a web-grounded literature-search increment is a **next-cycle
-follow-up**. Named experts are model-knowledge (real but unvetted; staleness/fame-bias
-flagged in the primer's own caveats).
+knowledge-only** for the field map/frontiers; a web-grounded literature-search increment
+for those is a **next-cycle follow-up**. Named experts are model-generated but now
+**grounded against OpenAlex** (v2 below — confirmed / forename-corrected / flagged-unverified):
+grounding catches hallucinated *names*, while each expert's relevance rationale and exact
+affiliation stay model-generated, and the primer's caveats still flag staleness/fame-bias.
 
-**v2 priority — expert-name grounding (concrete failure observed S248).** On the real
+**v2 expert-name grounding — SHIPPED S248** (`groundPrimerExperts`, on by default in the
+route + CLI). Verified live: the hallucinated **"Oksana Zhaxybayeva" → corrected to "Olga
+Zhaxybayeva"** (151 works, ORCID), `Andrew Lang` → confirmed, ambiguous namesakes → flagged
+unverified. The motivating failure and the design follow.
+
+**Motivating failure (S248).** On the real
 1002878 run, the primer named **"Oksana Zhaxybayeva"** — the right surname, institution,
 and field (computational GTA biology) but a **hallucinated forename**: the real researcher
 is **Olga Zhaxybayeva** (OpenAlex: 151 works; "Oksana Zhaxybayeva" → 0 results). This is
