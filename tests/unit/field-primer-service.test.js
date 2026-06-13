@@ -153,6 +153,7 @@ describe('groundPrimerExperts (uses the real forenamesContradict; OpenAlex mocke
     expect(out[2].grounding.status).toBe('corrected');
     expect(out[2].grounding.resolvedName).toBe('Olga Zhaxybayeva');
     expect(out[2].grounding.needsVerification).toBe(true);
+    expect(out[2].grounding.corroboration).toBe('first-initial'); // Oksana/Olga share "O"
     expect(out[2].name).toBe('Oksana Zhaxybayeva'); // original preserved
     expect(out[2].grounding.worksCount).toBe(151);
 
@@ -168,6 +169,44 @@ describe('groundPrimerExperts (uses the real forenamesContradict; OpenAlex mocke
     ]);
     expect(out[2].grounding.status).toBe('unverified');
     expect(out[2].grounding.note).toMatch(/namesake/i);
+  });
+
+  test('does NOT suggest a correction when the forename differs with no initial/affiliation corroboration', async () => {
+    OpenAlexService.searchAuthors.mockImplementation(async (q) => {
+      const db = {
+        'andrew lang': [{ displayName: 'Andrew Lang', worksCount: 80, topics: ['Biology', 'Genome'], openAlexId: 'A1' }],
+        'j. thomas beatty': [{ displayName: 'J. Thomas Beatty', worksCount: 90, topics: ['Biology', 'Genome'], openAlexId: 'A2' }],
+        'bob zhaxybayeva': [], // hallucinated → 0 hits
+        zhaxybayeva: [{ displayName: 'Olga Zhaxybayeva', worksCount: 151, topics: ['Biology', 'Genome'], openAlexId: 'A3' }],
+      };
+      const records = db[String(q).toLowerCase()] || [];
+      return { totalCount: records.length, records };
+    });
+    const out = await groundPrimerExperts([
+      { name: 'Andrew Lang' }, { name: 'J. Thomas Beatty' },
+      { name: 'Bob Zhaxybayeva', affiliation: 'Dartmouth' }, // initial b≠o; no institution to match
+    ]);
+    expect(out[2].grounding.status).toBe('unverified'); // NOT corrected — would be a different person
+    expect(out[2].grounding.note).toMatch(/different forename|corroboration/i);
+  });
+
+  test('suggests a correction via AFFILIATION match even when the first initial differs', async () => {
+    OpenAlexService.searchAuthors.mockImplementation(async (q) => {
+      const db = {
+        'andrew lang': [{ displayName: 'Andrew Lang', worksCount: 80, topics: ['Biology', 'Genome'], openAlexId: 'A1' }],
+        'j. thomas beatty': [{ displayName: 'J. Thomas Beatty', worksCount: 90, topics: ['Biology', 'Genome'], openAlexId: 'A2' }],
+        'xavier zhaxybayeva': [],
+        zhaxybayeva: [{ displayName: 'Olga Zhaxybayeva', worksCount: 151, topics: ['Biology', 'Genome'], openAlexId: 'A3', lastKnownInstitution: 'Dartmouth College' }],
+      };
+      const records = db[String(q).toLowerCase()] || [];
+      return { totalCount: records.length, records };
+    });
+    const out = await groundPrimerExperts([
+      { name: 'Andrew Lang' }, { name: 'J. Thomas Beatty' },
+      { name: 'Xavier Zhaxybayeva', affiliation: 'Dartmouth' }, // initial x≠o, BUT Dartmouth matches
+    ]);
+    expect(out[2].grounding.status).toBe('corrected');
+    expect(out[2].grounding.corroboration).toBe('affiliation');
   });
 
   test('disables corrections when no field anchor forms (fail-safe)', async () => {

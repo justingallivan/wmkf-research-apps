@@ -92,8 +92,8 @@ flowchart TD
     class EXC,AppRecs open
 ```
 
-**Legend** — 🟩 green = exists/shipped · 🟨 amber = needs building/fixing (incl. the
-Track-B disable, a change item) · 🟪 purple = open policy decision · ⬛ gray/dashed-X =
+**Legend** — 🟩 green = exists/shipped · 🟨 amber = needs building/fixing · 🟪 purple =
+open policy decision · ⬛ gray/dashed-X =
 off / abandoned / deferred (don't wire in).
 
 ## What's settled (S246 + this session)
@@ -142,8 +142,9 @@ for those is a **next-cycle follow-up**. Named experts are model-generated but n
 grounding catches hallucinated *names*, while each expert's relevance rationale and exact
 affiliation stay model-generated, and the primer's caveats still flag staleness/fame-bias.
 
-**v2 expert-name grounding — SHIPPED S248** (`groundPrimerExperts`, always on in the route +
-CLI; uses `OpenAlexService` + `forenamesContradict`, NOT proposal-personnel cross-checking).
+**v2 expert-name grounding — SHIPPED S248** (`groundPrimerExperts`, always on in the route;
+the CLI has a `--no-ground` debug flag. Uses `OpenAlexService` + `forenamesContradict`, NOT
+proposal-personnel cross-checking).
 Verified live: `Andrew Lang` / `J. Thomas Beatty` → confirmed (and they **anchor the
 field**); the hallucinated **"Oksana Zhaxybayeva" → SUGGESTED-corrected to "Olga
 Zhaxybayeva"** (151 works, ORCID; flagged *verify same person*); a famous off-field namesake
@@ -151,7 +152,13 @@ Zhaxybayeva"** (151 works, ORCID; flagged *verify same person*); a famous off-fi
 namesake safety: a single wrong exact-match can't poison the field anchor (needs ≥2
 confirmers sharing topics), corrections clear a higher works floor and are SUGGESTED (not
 silently trusted), and an exact name resolving OFF the anchored field is flagged a possible
-namesake. The motivating failure and the design follow.
+namesake. **Second Codex pass (S248)** then downgraded the residual to MEDIUM (no save path)
+and prompted a corroboration upgrade: a suggested correction now requires a **shared first
+initial** (the hallucination class preserves it — Oksana/**O**lga) **OR a matching
+affiliation** (cheap, reuses `searchAuthors` `lastKnownInstitution` when present), else it is
+flagged unverified. Grounding is a name-PLAUSIBILITY check, not identity proof; reliable
+affiliation/ORCID matching (per-candidate full-author fetch) remains the deeper next
+increment. The motivating failure and the design follow.
 
 **Motivating failure (S248).** On the real
 1002878 run, the primer named **"Oksana Zhaxybayeva"** — the right surname, institution,
@@ -218,7 +225,10 @@ named personnel is a sensible future add — NOT yet implemented.)
    nice-to-have, not urgent. The real post-Claude latency lever is **Track-B-off**, now
    **MEASURED at ~27s** (≈3× a Track-A-only run; `scripts/profile-trackb-ab.mjs` A/B:
    7 queries → 147 discovered, top-24 resolved through the OpenAlex/ORCID spine before
-   the 25 cap). STILL UNMEASURED end-to-end:
+   the 25 cap). NOTE: that ~27s was measured **before** Track B was archived (S248); the A/B
+   script can no longer reproduce it without first flipping `TRACK_B_ENABLED = true`, since
+   the code now gates the searches on that constant regardless of `searchQueries`. STILL
+   UNMEASURED end-to-end:
    analyze wall-clock (~50s est.), OpenAlex publication backfill, and contact
    enrichment / SerpAPI — profile those next if the slowness perception persists.
 

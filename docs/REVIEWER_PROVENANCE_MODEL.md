@@ -41,7 +41,7 @@ flowchart TD
     A --> I["proposalInfo + COI context"]
 
     S --> TA{{"Track A — verify EACH suggested<br/>name in PubMed (verifyClaudeSuggestions)"}}
-    Q --> TB{{"Track B — literature search<br/>PubMed / arXiv / bioRxiv / chemRxiv"}}
+    Q --> TB{{"Track B — literature search (ARCHIVED OFF S248)<br/>PubMed / arXiv / bioRxiv / chemRxiv"}}
 
     TA -->|"≥3 pubs AND full-forename match<br/>(S231 forename gate)"| V["VERIFIED candidate<br/>source = claude_suggestion<br/>verificationSource = pubmed"]
     TA -->|"initial-only match / &lt;3 pubs / no person"| U["UNRESOLVED<br/>(pushed to unverified[])"]
@@ -84,7 +84,7 @@ kind, and neither earns a ranking advantage.
 | `cited_reference` | DOI/PMID → exact authorship | `[PROPOSED]` (Step 4) | Top precision; +25 bonus |
 | `proposal_named` | proposal text (expert-authored) | `[PROPOSED]` (Step 4) | High-value + COI flag; +25 bonus |
 | `applicant_suggested` | the applicant | existing flow | Own UI group |
-| `literature_retrieved` | the databases | **the spine today** (Track A verified + Track B) | Hypotheses until resolved; no bonus |
+| `literature_retrieved` | the databases | **the spine today** (Track A verified; Track B archived off S248 — `DiscoveryService.TRACK_B_ENABLED=false`, dormant) | Hypotheses until resolved; no bonus |
 | `grounded_seed` | a query seed that grounded | `[PROPOSED]` | Ground-or-drop |
 | `barred_parametric` | training data only | **Track A unverified today** | Needs identity review → `[PROPOSED]` drop |
 
