@@ -101,6 +101,14 @@ need updating. Add/route an OpenAlex-author anchor (reuse the spine's `affiliati
 resolver verdict reflects the OpenAlex author rather than a now-absent scholar anchor. Tests for
 the resolver must cover the new anchor + the abstain path.
 
+**Concrete evidence key/DTO (Codex re-review LOW):** the accepted author rides on a new
+`contactEnrichment.tierResults.openalex_author` key (replacing the `scholar_profile` slot
+`evidenceFromEnrichment` reads at `reviewer-identity-resolver.js:46-59`), shape:
+`{ openAlexId, displayName, lastKnownInstitution, ror, acceptPath: 'orcid' | 'spine',
+identityStatus, forenameContradicts, hIndex, i10Index, citedByCount }`. `evidenceFromEnrichment`
+maps this into the OpenAlex-author anchor; `null` (no accepted author) → no anchor → abstain. Name
+this shape in code before implementation begins; do not leave it to implementation-time guess.
+
 ### Slice 1b — metrics + domain endpoint replacement (depends on 1a)
 
 **Files:** `lib/services/openalex-service.js`, `lib/services/contact-enrichment-service.js`,
@@ -274,5 +282,8 @@ scheduling refactor.
 - **[MEDIUM] Slice 1 resolver contract before endpoint replacement** → folded: the 1a/1b split.
 - **[LOW] Slice 2 source/key semantics** → folded: explicit compatibility decision for the
   `googleScholar` key / `source` strings.
-</content>
-</invoke>
+
+### Codex re-review (S250, against `885e577`) — 9/9 prior findings RESOLVED; 2 new LOWs folded
+- **[LOW] Evidence key/DTO for the accepted OpenAlex author unnamed** → folded into Slice 1a
+  (concrete `tierResults.openalex_author` shape below).
+- **[LOW] Stray `</content>`/`</invoke>` tags at EOF** → fixed (Write artifact removed).
