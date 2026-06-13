@@ -104,8 +104,10 @@ describe('exports', () => {
 describe('groundPrimerExperts (uses the real forenamesContradict; OpenAlex mocked)', () => {
   // Author DB keyed by search query. A confirmed expert seeds the field profile
   // (biology/genome) used to disambiguate the rest.
+  // Two biology confirmers (Lang + Beatty) so a consensus field anchor forms.
   const DB = {
     'Andrew Lang': [{ displayName: 'Andrew Lang', worksCount: 80, topics: ['Biology', 'Genome', 'Microbiology'], openAlexId: 'A-lang', orcid: null }],
+    'J. Thomas Beatty': [{ displayName: 'J. Thomas Beatty', worksCount: 90, topics: ['Biology', 'Genome', 'Microbiology'], openAlexId: 'A-beatty', orcid: null }],
     'Oksana Zhaxybayeva': [], // the hallucinated forename → 0 hits (mirrors live OpenAlex)
     'Zhaxybayeva': [
       { displayName: 'Olga Zhaxybayeva', worksCount: 151, topics: ['Biology', 'Genome', 'Genetics'], openAlexId: 'A-olga', orcid: '0000-0001' },
@@ -116,6 +118,8 @@ describe('groundPrimerExperts (uses the real forenamesContradict; OpenAlex mocke
       { displayName: 'Bob Smith', worksCount: 40, topics: ['Biology', 'Genetics'], openAlexId: 'A-bob', orcid: null },
       { displayName: 'Carol Smith', worksCount: 35, topics: ['Biology', 'Genome'], openAlexId: 'A-carol', orcid: null },
     ],
+    // An exact-name match that lands OFF the anchored (biology) field — a namesake.
+    'Q. Physicist': [{ displayName: 'Q. Physicist', worksCount: 200, topics: ['Physics', 'Particle physics'], openAlexId: 'A-phys', orcid: null }],
   };
   // Real OpenAlex search is case-insensitive; surnameOf lowercases its query, so
   // match keys case-insensitively.
@@ -131,29 +135,42 @@ describe('groundPrimerExperts (uses the real forenamesContradict; OpenAlex mocke
     });
   });
 
-  test('confirms an exact match, CORRECTS a hallucinated forename, and abstains on ambiguity', async () => {
+  test('confirms exact matches, SUGGESTS a forename correction, and abstains on ambiguity', async () => {
     const experts = [
       { name: 'Andrew Lang', affiliation: 'Memorial U', why_relevant: 'GTA ecology' },
+      { name: 'J. Thomas Beatty', affiliation: 'UBC', why_relevant: 'GTA' },
       { name: 'Oksana Zhaxybayeva', affiliation: 'Dartmouth', why_relevant: 'computational GTA' },
       { name: 'Alice Smith', affiliation: 'Somewhere', why_relevant: 'generic' },
     ];
     const out = await groundPrimerExperts(experts);
 
-    // exact match → confirmed
+    // two exact biology matches → confirmed (and they form the field anchor)
     expect(out[0].grounding.status).toBe('confirmed');
-    expect(out[0].grounding.resolvedName).toBe('Andrew Lang');
+    expect(out[1].grounding.status).toBe('confirmed');
 
-    // the headline: wrong forename, right surname+field, one dominant in-field author → corrected to Olga
-    expect(out[1].grounding.status).toBe('corrected');
-    expect(out[1].grounding.resolvedName).toBe('Olga Zhaxybayeva');
-    expect(out[1].name).toBe('Oksana Zhaxybayeva'); // original preserved
-    expect(out[1].grounding.worksCount).toBe(151);
+    // the headline: wrong forename, right surname+field, one dominant in-field author →
+    // SUGGESTED correction to Olga, flagged needsVerification (never silently trusted)
+    expect(out[2].grounding.status).toBe('corrected');
+    expect(out[2].grounding.resolvedName).toBe('Olga Zhaxybayeva');
+    expect(out[2].grounding.needsVerification).toBe(true);
+    expect(out[2].name).toBe('Oksana Zhaxybayeva'); // original preserved
+    expect(out[2].grounding.worksCount).toBe(151);
 
     // two in-field namesakes, neither dominant → never auto-bind → unverified
-    expect(out[2].grounding.status).toBe('unverified');
+    expect(out[3].grounding.status).toBe('unverified');
   });
 
-  test('disables corrections when no expert seeds a field profile (fail-safe)', async () => {
+  test('flags an exact-name match that resolves OFF the anchored field as a possible namesake', async () => {
+    const out = await groundPrimerExperts([
+      { name: 'Andrew Lang' },
+      { name: 'J. Thomas Beatty' }, // two biology confirmers → anchor = biology
+      { name: 'Q. Physicist' }, // exact-name hit, but in physics → off-field
+    ]);
+    expect(out[2].grounding.status).toBe('unverified');
+    expect(out[2].grounding.note).toMatch(/namesake/i);
+  });
+
+  test('disables corrections when no field anchor forms (fail-safe)', async () => {
     OpenAlexService.searchAuthors.mockImplementation(async (q) => {
       // only the surname search returns an author; nothing confirms in pass 1 → empty field profile
       const records = String(q).toLowerCase() === 'zhaxybayeva' ? DB['Zhaxybayeva'] : [];
@@ -170,7 +187,8 @@ describe('groundPrimerExperts (uses the real forenamesContradict; OpenAlex mocke
         { name: 'Oksana Zhaxybayeva', affiliation: 'Dartmouth', why_relevant: 'y', grounding: { status: 'corrected', resolvedName: 'Olga Zhaxybayeva' } },
       ],
     });
-    expect(md).toContain('Olga Zhaxybayeva');
+    expect(md).toContain('likely Olga Zhaxybayeva');
+    expect(md).toMatch(/verify same person/i);
     expect(md).toMatch(/model named "Oksana Zhaxybayeva"/);
     expect(md).toContain('✓');
   });

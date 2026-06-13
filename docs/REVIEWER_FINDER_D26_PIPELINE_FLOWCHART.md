@@ -35,7 +35,7 @@ flowchart TD
     subgraph ORIG["2 · Origination — Claude is the ENGINE"]
         CA["Claude Analysis: suggest reviewer NAMES<br/>(origination spine)"]
         RS["Recall sampling: count 12→15 (single deeper draw)"]
-        TB["Track B: DB keyword→author origination<br/>OFF — ~0 contribution to saved set last cycle"]
+        TB["Track B: DB keyword→author origination<br/>DECIDED OFF (disable pending) — ~0 saved-set contribution"]
         WEB["Perplexity web-discovery"]
     end
 
@@ -101,10 +101,14 @@ off / abandoned / deferred (don't wire in).
 - **Claude-assisted origination is the engine.** S246's "Claude-assisted wins" gate
   fired for the D26 Phase-I cohort. Keep the Claude spine; defer the retrieval-first
   inversion.
-- **Track B is OFF.** It contributed ~0 to the saved set last cycle (origination plan
-  §1: `scholarly-only-saved ≈ 0`, by construction — pre-resolution dedup + identity
-  budget + save-gate). Claude alone supplies enough candidates even at count=12.
-  Disabling it is a real code change in `discover.js` / `discovery-service.js`.
+- **Track B — DECIDED off; code-disable still PENDING.** As of S248 the live code still
+  defaults the Track-B DB-search toggles ON (`discovery-service.js`); the decision is made
+  but the disable is not yet applied (see build item #4). It contributed ~0 to the saved set
+  last cycle (origination plan §1: `scholarly-only-saved ≈ 0`, by construction —
+  pre-resolution dedup + identity budget + save-gate) and Claude alone supplies enough even
+  at count=12. NOTE: disabling must null `searchQueries`, NOT flip `searchPubmed` (that flag
+  also routes Track-A verification — see the coupling in `discovery-service.js`
+  `suggestionVerifierRouting`).
 - **The weak link is downstream identity resolution, not origination.** The
   attribution probes showed it: the plant-virologist noise was a *grounded-arm*
   artifact (Claude named zero); the Christina case showed origination found a real,
@@ -139,28 +143,36 @@ for those is a **next-cycle follow-up**. Named experts are model-generated but n
 grounding catches hallucinated *names*, while each expert's relevance rationale and exact
 affiliation stay model-generated, and the primer's caveats still flag staleness/fame-bias.
 
-**v2 expert-name grounding — SHIPPED S248** (`groundPrimerExperts`, on by default in the
-route + CLI). Verified live: the hallucinated **"Oksana Zhaxybayeva" → corrected to "Olga
-Zhaxybayeva"** (151 works, ORCID), `Andrew Lang` → confirmed, ambiguous namesakes → flagged
-unverified. The motivating failure and the design follow.
+**v2 expert-name grounding — SHIPPED S248** (`groundPrimerExperts`, always on in the route +
+CLI; uses `OpenAlexService` + `forenamesContradict`, NOT proposal-personnel cross-checking).
+Verified live: `Andrew Lang` / `J. Thomas Beatty` → confirmed (and they **anchor the
+field**); the hallucinated **"Oksana Zhaxybayeva" → SUGGESTED-corrected to "Olga
+Zhaxybayeva"** (151 works, ORCID; flagged *verify same person*); a famous off-field namesake
+(Edward Witten, physics) → **unverified**. **Hardened after a Codex review (S248)** —
+namesake safety: a single wrong exact-match can't poison the field anchor (needs ≥2
+confirmers sharing topics), corrections clear a higher works floor and are SUGGESTED (not
+silently trusted), and an exact name resolving OFF the anchored field is flagged a possible
+namesake. The motivating failure and the design follow.
 
 **Motivating failure (S248).** On the real
 1002878 run, the primer named **"Oksana Zhaxybayeva"** — the right surname, institution,
 and field (computational GTA biology) but a **hallucinated forename**: the real researcher
 is **Olga Zhaxybayeva** (OpenAlex: 151 works; "Oksana Zhaxybayeva" → 0 results). This is
 the same forename-hallucination class as the Laederach verify bug, but the knowledge-only
-primer has **no verification step**. The v2 fix is an **expert-grounding pass reusing the
-existing identity spine** (`reviewer-identity-resolver` / `OpenAlexService`): resolve each
-named expert — exact name resolves → confirm; name fails but **surname + field** resolves
-unambiguously → correct the forename from the record (or flag); ambiguous / common surname
-→ **flag "unverified," never auto-correct to a namesake** (the Christina lesson). v1 stopgap
+primer has **no verification step**. The v2 fix is an **expert-grounding pass** over
+`OpenAlexService` + `forenamesContradict` (the identity-evidence forename comparator —
+NOT the full `reviewer-identity-resolver`): resolve each named expert — exact name resolves
+in-field → confirm; name fails but **surname + field** resolves to one dominant author →
+**suggest** the forename from the record (flagged verify); ambiguous / common surname / no
+field anchor → **flag "unverified," never auto-bind a namesake** (the Christina lesson). v1 stopgap
 (shipped S248): the prompt now warns explicitly that names — including first names — may be
 wrong and must be verified. **Confirmed the stopgap does NOT stop the hallucination** — a
 re-run still produced "Oksana," and the model's own caveat shows Zhaxybayeva is a **Co-PI
 named in the proposal text**, so the correct forename was *in the input* and the model still
 overrode it from memory. Knowledge-only generation can't reliably copy a name from the
-document in front of it → grounding (cross-check expert names against the proposal's named
-personnel AND OpenAlex/ORCID) is the only real fix; the caveat just makes the labeling honest.
+document in front of it → grounding expert names against OpenAlex/ORCID is the real fix; the
+caveat just makes the labeling honest. (A further cross-check against the proposal's own
+named personnel is a sensible future add — NOT yet implemented.)
 
 ## 🟩 What exists today (live pipeline)
 
@@ -195,7 +207,9 @@ personnel AND OpenAlex/ORCID) is the only real fix; the caveat just makes the la
 4. **Disable Track B** — remove the DB keyword→author origination lane from the
    production parallel path (it ran but contributed ~0 to saved panels).
 5. **SerpAPI → free-stack migration** — $150/mo, value eroded; 4 of 6 uses replaceable.
-6. **Verify-loop latency — MEASURED, not the bottleneck (deprioritized).** Profiled
+6. **Verify-loop latency — MEASURED, not the bottleneck (deprioritized).** All latency
+   figures below are **single example local runs** from the committed profiling scripts
+   (reproducible, not CI-tracked artifacts) — directional, not benchmarks. Profiled
    `verifyClaudeSuggestions` on the real 1002878 Arm-A names
    (`scripts/profile-reviewer-verify.mjs`, live PubMed/OpenAlex): ~2.8s/candidate
    sequential, **42.8s for 15 / 34.5s for 12 — the 12→15 bump costs only +8.4s**, far
@@ -219,9 +233,9 @@ personnel AND OpenAlex/ORCID) is the only real fix; the caveat just makes the la
 
 ## ⬛ Off / don't wire in (abandoned/deferred)
 
-- **Track B (DB keyword→author origination)** — OFF. Noisy on thin signal, ~0 marginal
-  recall, ~0 saved-set contribution last cycle. Recall comes from Claude recall-sampling
-  + referrals instead.
+- **Track B (DB keyword→author origination)** — DECIDED OFF; **code-disable still pending**
+  (live code defaults it on). Noisy on thin signal, ~0 marginal recall, ~0 saved-set
+  contribution last cycle. Recall comes from Claude recall-sampling + referrals instead.
 - **Perplexity web-discovery** (as a *reviewer* source) — abandoned S230 (hallucinated
   reviewers + fabricated affiliations). (Web search for the *field primer* is a
   different, safer use — people-free field map only.)
