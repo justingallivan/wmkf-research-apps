@@ -1,6 +1,6 @@
 # Reviewer-Finder SerpAPI → Free-Stack Migration Plan
 
-> **Status:** PLANNED (S250) — no code written yet.
+> **Status:** Slice 1a SHIPPED (S250) + Slice 1b SHIPPED (S251). Slices 2 & 3 PLANNED.
 > **Author:** Justin Gallivan + Claude.
 > **Date:** 2026-06-13.
 > **Why:** SerpAPI is the project's largest single monthly line item (~$150/mo Production,
@@ -131,7 +131,36 @@ producer, so 1b must not feed it laundered input):**
    anywhere in the string (first-match-wins, no min-length), so a non-canonical URL
    (`…/W123/A1`, `?x=A5`) could mis-extract.
 
-### Slice 1b — metrics + domain endpoint replacement (depends on 1a)
+### Slice 1b — metrics + domain endpoint replacement (depends on 1a) — SHIPPED (S251)
+
+> **Implementation disposition (S251).** Built as designed below, with these resolved decisions:
+> - **No-ORCID path reuses the discovery spine, does NOT re-run it.** The plan floated "in-enrichment
+>   spine call vs thread from discovery"; the spine already attaches `openAlexId`+`identityStatus`
+>   to candidates (`discovery-service.mapSpineVerificationResult`), so 1b reuses that verdict via a
+>   new `OpenAlexService.getAuthorById` (metrics only). A candidate with neither ORCID nor a carried
+>   spine author id → ABSTAIN (no metrics). This keeps the hot path at ≤2 logical lookups (the plan's
+>   latency claim) — a fresh in-enrichment spine would have blown past it.
+> - **Metrics decoupled from the paid `useSerpSearch` toggle.** OpenAlex is free, so metrics run
+>   whenever there's an identity anchor (was gated on the SerpAPI toggle). `useSerpSearch` still gates
+>   the Tier-4 `findContact` email search (#1, KEEP).
+> - **Full honest field rename (Justin's call).** `scholarVerifiedEmail`→`verifiedInstitutionDomain`,
+>   `scholarAffiliations`→`openAlexAffiliation`, `affiliationSource:'scholar_current'`→`'openalex_current'`,
+>   `tierResults.scholar_profile`→`tierResults.openalex_author`, `_attachScholarMetrics`→`_attachOpenAlexMetrics`.
+>   Reconciled across the consumer set found by grep (broader than the plan's starting list): the affiliation-
+>   pin label sites (`reviewer-finder.js`, `ReviewerSearchSection.js` — added `openalex_current`→'OpenAlex',
+>   kept `scholar_current` for legacy roster rows) AND the `scholar_profile.skipped` persistence fallback in
+>   FOUR consumers (`saveToDatabase`, `save-candidates.js`, `enrich-recommended.js`, `reviewer-search-logic.js`).
+> - **#2 dropped** (recommended): `googleScholarId=null`; new candidates keep the free search link.
+> - **Shared accept gate:** `isOpenAlexAuthorAccepted` exported from the resolver so the metrics step and
+>   the resolver re-proof use ONE allowlist (the domain guard runs before the resolver verdict exists, so
+>   the metrics step must gate acceptance itself — no drift).
+> - **New `getInstitution` + registrable-domain (eTLD+1) extractor** (curated multi-label-suffix list;
+>   `web.mit.edu`→`mit.edu`, `www.ox.ac.uk`→`ox.ac.uk`). `api.openalex.org` was already SSRF-allowlisted.
+> - **Serp Scholar methods KEPT** (not deleted): dormant S215/S219 scripts reference them; severed from
+>   enrichment + a deprecation banner added. `findContact` (#1) stays live.
+> - Tests: rewrote `contact-enrichment-scholar-metrics` + the affiliation-pin/guard/route-gate suites to
+>   OpenAlex; added `openalex-service` unit tests (metrics, `getAuthorById`, `getInstitution`,
+>   registrable-domain). Full suite green (166 suites / 2397 tests); offline contact-anchoring smoke green.
 
 **Files:** `lib/services/openalex-service.js`, `lib/services/contact-enrichment-service.js`,
 (retire the Scholar paths in `lib/services/serp-contact-service.js`).
@@ -270,11 +299,11 @@ Lower contact-correctness stakes than Slice 1.
   persistence → UI).
 
 ## Recommended sequencing
-1. **Slice 1a** (OpenAlex author identity contract in enrichment) — **before** any endpoint swap.
+1. **Slice 1a** (OpenAlex author identity contract in enrichment) — **SHIPPED S250.**
    Defines accept/abstain + resolver evidence. The contact-correctness foundation.
-2. **Slice 1b** (metrics + domain endpoint replacement) — depends on 1a. Kills the login-wall
-   risk; free/fewer calls; hot path.
-3. **Slice 2** (literature / PI-pubs) — straightforward, reuses `getWorksByAuthor`.
+2. **Slice 1b** (metrics + domain endpoint replacement) — **SHIPPED S251.** Killed the login-wall
+   risk; free/fewer calls; hot path. (Disposition under the Slice 1b heading above.)
+3. **Slice 2** (literature / PI-pubs) — straightforward, reuses `getWorksByAuthor`. **NEXT.**
 4. **Slice 3** (PubPeer) — gated on confirming the PubPeer API; scope includes `screenApplicants`
    gating + integrity UI/export shape; can be deferred/separate.
 5. **Post-migration:** confirm real SerpAPI call volume in the billing dashboard → decide on the

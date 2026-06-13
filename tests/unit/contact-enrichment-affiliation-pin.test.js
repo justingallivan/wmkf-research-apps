@@ -15,6 +15,7 @@
  */
 const { ContactEnrichmentService } = require('../../lib/services/contact-enrichment-service');
 const { SerpContactService } = require('../../lib/services/serp-contact-service');
+const { OpenAlexService } = require('../../lib/services/openalex-service');
 const { ORCIDService } = require('../../lib/services/orcid-service');
 const { ContactParser } = require('../../lib/utils/contact-parser');
 
@@ -114,6 +115,12 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
     // Tier-4 SerpAPI email search runs (no email found) — stub it offline so the
     // override tests stay deterministic and don't hit the network.
     jest.spyOn(SerpContactService, 'findContact').mockResolvedValue(null);
+    // Slice 1b: bibliometrics + the affiliation candidate + verified domain come from
+    // OpenAlex now. Default the lookups to "no author" / "no institution"; each test
+    // overrides getAuthorByOrcid when it wants an accepted (strong-anchor) author.
+    jest.spyOn(OpenAlexService, 'getAuthorByOrcid').mockResolvedValue(null);
+    jest.spyOn(OpenAlexService, 'getAuthorById').mockResolvedValue(null);
+    jest.spyOn(OpenAlexService, 'getInstitution').mockResolvedValue(null);
   });
   afterEach(() => jest.restoreAllMocks());
 
@@ -126,25 +133,25 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
     useClaudeSearch: false,
   };
 
-  // A non-mismatched Scholar profile (weak anchor) carrying a current affiliation.
-  function mockScholar({ affiliations = null } = {}) {
-    jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue({
-      scholarProfileUrl: 'https://scholar.google.com/citations?user=SCH',
-      scholarId: 'SCH', nameMismatch: false, institutionMismatch: false,
-    });
-    jest.spyOn(SerpContactService, 'fetchScholarMetrics').mockResolvedValue({
-      hIndex: 30, i10Index: 50, totalCitations: 4000, scholarAffiliations: affiliations, scholarEmail: null,
+  // An ACCEPTED OpenAlex author (ORCID path, strong anchor) carrying a current
+  // last-known institution. `orcid` MUST equal the ORCID enrichment looks up by
+  // (the candidate's resolved orcidId), or the resolver rejects the anchor.
+  function mockOpenAlexAuthor(orcid, { institution = null, institutionId = null } = {}) {
+    OpenAlexService.getAuthorByOrcid.mockResolvedValue({
+      openAlexId: 'https://openalex.org/A777', displayName: 'Author', orcid,
+      lastKnownInstitution: institution, lastKnownInstitutionId: institutionId, lastKnownInstitutionRor: null,
+      hIndex: 30, i10Index: 50, citedByCount: 4000, topics: [], worksCount: 10,
     });
   }
 
-  test('ORCID current affiliation wins on a trusted (probable) verdict', async () => {
+  test('ORCID current affiliation wins over the OpenAlex candidate on a trusted verdict', async () => {
     // Institution-corroborated public ORCID → STRONG anchor → probable.
     jest.spyOn(ORCIDService, 'findContact').mockResolvedValue({
-      status: 'resolved', orcidId: '0000-0001', orcidUrl: 'https://orcid.org/0000-0001',
+      status: 'resolved', orcidId: '0000-0002-1825-0097', orcidUrl: 'https://orcid.org/0000-0002-1825-0097',
       name: 'Jane Roe', email: null, affiliation: 'Harvard University',
       institutionCorroborated: true, matchedInstitution: 'Harvard University', source: 'orcid_profile',
     });
-    mockScholar({ affiliations: 'Stanford University (Scholar says)' });
+    mockOpenAlexAuthor('0000-0002-1825-0097', { institution: 'Stanford University (OpenAlex says)' });
 
     const out = await ContactEnrichmentService.enrichCandidate(
       { name: 'Jane Roe', affiliation: 'Old Postdoc Institute', publications: [] },
@@ -152,37 +159,36 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
     );
     const ce = out.contactEnrichment;
     expect(ce.identity.status).toBe('probable');
-    expect(ce.affiliation).toBe('Harvard University');     // ORCID wins over Scholar
+    expect(ce.affiliation).toBe('Harvard University');     // ORCID wins over OpenAlex
     expect(ce.affiliationSource).toBe('orcid_current');
     expect(ce.priorAffiliation).toBe('Old Postdoc Institute');
     expect(out.affiliation).toBe('Harvard University');    // promoted to top-level
   });
 
-  test('Scholar current affiliation pins when ORCID has none but the verdict is still probable', async () => {
-    // ORCID weak (name-match, NOT institution-corroborated) + Scholar weak →
-    // two weak anchors → probable. ORCID carries no affiliation, so Scholar wins.
+  test('OpenAlex current affiliation pins when ORCID has none but the verdict is probable', async () => {
+    // ORCID weak (name-match, NOT institution-corroborated, no affiliation) + an
+    // ACCEPTED OpenAlex author (strong) → probable. OpenAlex affiliation wins.
     jest.spyOn(ORCIDService, 'findContact').mockResolvedValue({
-      status: 'resolved', orcidId: '0000-0002', orcidUrl: 'https://orcid.org/0000-0002',
+      status: 'resolved', orcidId: '0000-0001-5109-3700', orcidUrl: 'https://orcid.org/0000-0001-5109-3700',
       name: 'John Doe', email: null, affiliation: null,
       institutionCorroborated: false, matchedInstitution: null, source: 'orcid_profile',
     });
-    mockScholar({ affiliations: 'MIT (current, per Scholar)' });
+    mockOpenAlexAuthor('0000-0001-5109-3700', { institution: 'MIT (current, per OpenAlex)' });
 
     const out = await ContactEnrichmentService.enrichCandidate(
       { name: 'John Doe', affiliation: 'Grad School U', publications: [] },
       baseOpts,
     );
     const ce = out.contactEnrichment;
-    expect(ce.identity.status).toBe('probable');           // 2 weak anchors
-    expect(ce.affiliation).toBe('MIT (current, per Scholar)');
-    expect(ce.affiliationSource).toBe('scholar_current');
+    expect(ce.identity.status).toBe('probable');           // strong OpenAlex anchor
+    expect(ce.affiliation).toBe('MIT (current, per OpenAlex)');
+    expect(ce.affiliationSource).toBe('openalex_current');
   });
 
   test('NO override on an unresolved verdict — keeps PubMed-recency affiliation', async () => {
-    // Lone Scholar weak anchor, no ORCID → unresolved. Even though Scholar
-    // surfaced a current affiliation, an untrusted match must not "correct" it.
+    // No ORCID and no accepted OpenAlex author → no anchors → unresolved. The
+    // affiliation candidate only exists on acceptance, so nothing can "correct" it.
     jest.spyOn(ORCIDService, 'findContact').mockResolvedValue(null);
-    mockScholar({ affiliations: 'Wrong Person University' });
 
     const out = await ContactEnrichmentService.enrichCandidate(
       { name: 'Ambiguous Name', affiliation: 'PubMed Recency Institute', publications: [] },
@@ -196,15 +202,34 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
     expect(out.affiliation).toBe('PubMed Recency Institute');
   });
 
+  test('_applyAffiliationOverride does NOT pin an OpenAlex candidate under an unresolved verdict', () => {
+    // Direct guard coverage: even if an openAlexAffiliation candidate were present,
+    // an unresolved/ambiguous verdict must keep the discovery affiliation.
+    const result = {
+      affiliation: 'PubMed Recency Institute',
+      contactEnrichment: {
+        affiliation: 'PubMed Recency Institute',
+        affiliationSource: 'pubmed_recency',
+        orcidAffiliation: null,
+        openAlexAffiliation: 'Wrong Person University',
+        identity: { status: 'unresolved' },
+      },
+    };
+    ContactEnrichmentService._applyAffiliationOverride(result);
+    expect(result.contactEnrichment.affiliation).toBe('PubMed Recency Institute');
+    expect(result.contactEnrichment.affiliationSource).toBe('pubmed_recency');
+  });
+
   test('default provenance is pubmed_recency when no current source is collected', async () => {
-    // ORCID corroborated (probable) but exposes no affiliation, Scholar none →
-    // nothing to pin → keep discovery affiliation, tagged pubmed_recency.
+    // ORCID corroborated (probable) but exposes no affiliation; OpenAlex author
+    // accepted but its last-known institution is null → nothing to pin → keep
+    // discovery affiliation, tagged pubmed_recency.
     jest.spyOn(ORCIDService, 'findContact').mockResolvedValue({
-      status: 'resolved', orcidId: '0000-0003', orcidUrl: 'https://orcid.org/0000-0003',
+      status: 'resolved', orcidId: '0000-0003-1419-2405', orcidUrl: 'https://orcid.org/0000-0003-1419-2405',
       name: 'Pat Lee', email: null, affiliation: null,
       institutionCorroborated: true, matchedInstitution: 'Discovery Institute', source: 'orcid_profile',
     });
-    mockScholar({ affiliations: null });
+    mockOpenAlexAuthor('0000-0003-1419-2405', { institution: null });
 
     const out = await ContactEnrichmentService.enrichCandidate(
       { name: 'Pat Lee', affiliation: 'Discovery Institute', publications: [] },
@@ -218,7 +243,6 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
 
   test('publicationCount5yr is threaded onto contactEnrichment for the client re-rank', async () => {
     jest.spyOn(ORCIDService, 'findContact').mockResolvedValue(null);
-    mockScholar({ affiliations: null });
 
     const out = await ContactEnrichmentService.enrichCandidate(
       { name: 'Counted Person', affiliation: 'Some U', publicationCount5yr: 4, publications: [] },
@@ -239,7 +263,7 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
       primaryUrl: 'https://example.edu/jane',
       currentAffiliation: 'Example University',
     });
-    jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue(null);
+    mockOpenAlexAuthor('0000-0002-1825-0097', { institution: 'Example University' });
 
     const out = await ContactEnrichmentService.enrichCandidate(
       { name: 'Jane Roe', affiliation: 'Example University', orcid: '0000-0002-1825-0097', publications: [] },
@@ -261,7 +285,7 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
       email: 'also-wrong@example.edu',
       institution: 'Different University',
     });
-    jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue(null);
+    mockOpenAlexAuthor('0000-0002-1825-0097', { institution: 'Example University' });
 
     const out = await ContactEnrichmentService.enrichCandidate(
       { name: 'Jane Roe', affiliation: 'Example University', orcid: '0000-0002-1825-0097', publications: [] },
@@ -279,7 +303,7 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
     expect(out.contactEnrichment.tierResults.serp_search.rejectedReason).toBe('identity_anchor_contradiction');
   });
 
-  test('ORCID current affiliation anchors contact and Scholar searches without mutating the input candidate', async () => {
+  test('effective ORCID affiliation flows to the contact searches without mutating the input candidate', async () => {
     const input = { name: 'Olga Smirnova', affiliation: null, orcid: '0000-0002-7746-5733', publications: [] };
     jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue({
       orcidId: '0000-0002-7746-5733',
@@ -292,7 +316,7 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
     });
     const claudeSpy = jest.spyOn(ContactEnrichmentService, 'claudeWebSearch').mockResolvedValue(null);
     const contactSpy = jest.spyOn(SerpContactService, 'findContact').mockResolvedValue(null);
-    const scholarSpy = jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue(null);
+    mockOpenAlexAuthor('0000-0002-7746-5733', { institution: 'Max-Born-Institute' });
 
     await ContactEnrichmentService.enrichCandidate(input, {
       credentials: { orcidClientId: 'c', orcidClientSecret: 's', claudeApiKey: 'ck', serpApiKey: 'sk' },
@@ -304,29 +328,27 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
 
     expect(claudeSpy.mock.calls[0][0].affiliation).toBe('Max-Born-Institute');
     expect(contactSpy.mock.calls[0][0].affiliation).toBe('Max-Born-Institute');
-    expect(scholarSpy.mock.calls[0][0].affiliation).toBe('Max-Born-Institute');
     expect(input.affiliation).toBeNull();
   });
 
-  test('Scholar-verified domain confirms a real institutional email (mbi-berlin recovery)', async () => {
-    // The live regression: olga.smirnova@mbi-berlin.de IS her email; the old
-    // lexical guard rejected it because mbi-berlin.de (MBI acronym + city) is not
-    // in the verbose official name. The Scholar-verified domain corroborates it.
+  test('OpenAlex-verified domain confirms a real institutional email (mbi-berlin recovery)', async () => {
+    // The live regression: olga.smirnova@mbi-berlin.de IS her email; the old lexical
+    // guard rejected it because mbi-berlin.de (MBI acronym + city) is not in the
+    // verbose official name. Slice 1b re-sources the verified domain from the OpenAlex
+    // author's institution homepage (web → mbi-berlin.de), corroborating it.
     jest.spyOn(ContactEnrichmentService, 'claudeWebSearch').mockResolvedValue(null);
     jest.spyOn(SerpContactService, 'findContact').mockResolvedValue({
       email: 'olga.smirnova@mbi-berlin.de',
       website: 'https://mbi-berlin.de/p/olgasmirnova',
     });
-    jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue({
-      scholarProfileUrl: 'https://scholar.google.com/citations?user=wsyVUeMAAAAJ',
-      scholarId: 'wsyVUeMAAAAJ',
-    });
-    jest.spyOn(SerpContactService, 'fetchScholarMetrics').mockResolvedValue({
-      scholarEmail: 'Verified email at mbiberlin.de', hIndex: 61, totalCitations: 14000,
+    mockOpenAlexAuthor('0000-0002-7746-5733', { institution: 'Max-Born-Institute', institutionId: 'https://openalex.org/I4210117284' });
+    OpenAlexService.getInstitution.mockResolvedValue({
+      openAlexId: 'https://openalex.org/I4210117284', displayName: 'Max Born Institute',
+      ror: null, homepageUrl: 'https://mbi-berlin.de', domain: 'mbi-berlin.de',
     });
 
     const out = await ContactEnrichmentService.enrichCandidate(
-      { name: 'Olga Smirnova', affiliation: 'Max-Born-Institute for Nonlinear Optics and Short Pulse Spectroscopy', publications: [] },
+      { name: 'Olga Smirnova', affiliation: 'Max-Born-Institute for Nonlinear Optics and Short Pulse Spectroscopy', orcid: '0000-0002-7746-5733', publications: [] },
       {
         credentials: { claudeApiKey: 'ck', serpApiKey: 'sk' },
         usePubmed: false,
@@ -338,9 +360,10 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
 
     expect(out.contactEnrichment.email).toBe('olga.smirnova@mbi-berlin.de');
     expect(out.contactEnrichment.emailPersistAllowed).toBe(true);
+    expect(out.contactEnrichment.verifiedInstitutionDomain).toBe('mbi-berlin.de');
   });
 
-  test('no institution anchor and no ORCID abstains from bare-name contact and Scholar lookup', async () => {
+  test('no institution anchor and no ORCID abstains from bare-name contact and metrics', async () => {
     const claudeSpy = jest.spyOn(ContactEnrichmentService, 'claudeWebSearch').mockResolvedValue({
       email: 'nickchenyj@gmail.com',
       website: 'https://www.cliburn.org/yanjun-chen',
@@ -348,10 +371,6 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
     const contactSpy = jest.spyOn(SerpContactService, 'findContact').mockResolvedValue({
       email: 'nickchenyj@gmail.com',
       website: 'https://www.cliburn.org/yanjun-chen',
-    });
-    const scholarSpy = jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue({
-      scholarProfileUrl: 'https://scholar.google.com/citations?user=WRONG',
-      scholarId: 'WRONG',
     });
 
     const out = await ContactEnrichmentService.enrichCandidate(
@@ -373,7 +392,8 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
 
     expect(claudeSpy).not.toHaveBeenCalled();
     expect(contactSpy).not.toHaveBeenCalled();
-    expect(scholarSpy).not.toHaveBeenCalled();
+    expect(OpenAlexService.getAuthorByOrcid).not.toHaveBeenCalled();
+    expect(OpenAlexService.getAuthorById).not.toHaveBeenCalled();
     expect(out.contactEnrichment.email).toBeNull();
     expect(out.contactEnrichment.website).toBeNull();
     expect(out.contactEnrichment.googleScholarId).toBeNull();
@@ -385,10 +405,10 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
   });
 });
 
-describe('ContactEnrichmentService._validateEmailAgainstVerifiedDomain — Scholar-domain contact validation', () => {
-  const run = (email, scholarVerifiedEmail) => {
+describe('ContactEnrichmentService._validateEmailAgainstVerifiedDomain — verified-domain contact validation', () => {
+  const run = (email, verifiedInstitutionDomain) => {
     const ce = {
-      email, emailSource: 'serp_search', emailPersistAllowed: true, scholarVerifiedEmail,
+      email, emailSource: 'serp_search', emailPersistAllowed: true, verifiedInstitutionDomain,
       website: 'https://example.org/x', websiteSource: 'serp_search', websitePersistAllowed: true,
       facultyPageUrl: 'https://example.org/fac',
     };
@@ -396,47 +416,47 @@ describe('ContactEnrichmentService._validateEmailAgainstVerifiedDomain — Schol
     return ce;
   };
 
-  test('KEEPS an email whose domain matches the Scholar-verified domain (mbi-berlin vs mbiberlin)', () => {
-    const ce = run('olga.smirnova@mbi-berlin.de', 'Verified email at mbiberlin.de');
+  test('KEEPS an email whose domain matches the verified domain (mbi-berlin vs mbiberlin)', () => {
+    const ce = run('olga.smirnova@mbi-berlin.de', 'mbiberlin.de');
     expect(ce.email).toBe('olga.smirnova@mbi-berlin.de');
     expect(ce.emailPersistAllowed).toBe(true);
   });
 
   test('KEEPS a subdomain email (phys.ethz.ch confirmed by ethz.ch)', () => {
-    const ce = run('keller@phys.ethz.ch', 'Verified email at ethz.ch');
+    const ce = run('keller@phys.ethz.ch', 'ethz.ch');
     expect(ce.email).toBe('keller@phys.ethz.ch');
     expect(ce.emailPersistAllowed).toBe(true);
   });
 
-  test('DROPS a namesake email that contradicts the Scholar-verified domain (ifmo vs mbiberlin)', () => {
-    const ce = run('olga.smirnova@metalab.ifmo.ru', 'Verified email at mbiberlin.de');
+  test('DROPS a namesake email that contradicts the verified domain (ifmo vs mbiberlin)', () => {
+    const ce = run('olga.smirnova@metalab.ifmo.ru', 'mbiberlin.de');
     expect(ce.email).toBeNull();
     expect(ce.website).toBeNull();
     expect(ce.emailPersistAllowed).toBe(false);
     expect(ce.contactStatusReason).toBe('verified_domain_contradiction');
   });
 
-  test('NO-OP when there is no Scholar-verified domain (trusts the institution-scoped search)', () => {
+  test('NO-OP when there is no verified domain (trusts the institution-scoped search)', () => {
     const ce = run('someone@unverifiable.edu', null);
     expect(ce.email).toBe('someone@unverifiable.edu');
     expect(ce.emailPersistAllowed).toBe(true);
   });
 
   test('boundary match only — does NOT treat summit.edu as matching verified mit.edu (drops the namesake)', () => {
-    const ce = run('prof@summit.edu', 'Verified email at mit.edu');
+    const ce = run('prof@summit.edu', 'mit.edu');
     expect(ce.email).toBeNull();
     expect(ce.contactStatusReason).toBe('verified_domain_contradiction');
   });
 
   test('boundary match only — does NOT treat notred.ac.uk.evil as matching verified ed.ac.uk', () => {
-    const ce = run('x@notred.ac.uk.evil', 'Verified email at ed.ac.uk');
+    const ce = run('x@notred.ac.uk.evil', 'ed.ac.uk');
     expect(ce.email).toBeNull();
   });
 
-  test('NEVER drops a researcher-maintained ORCID email on a Scholar-domain mismatch (trusted source)', () => {
+  test('NEVER drops a researcher-maintained ORCID email on a verified-domain mismatch (trusted source)', () => {
     const ce = {
       email: 'olga@personal-domain.org', emailSource: 'orcid', emailPersistAllowed: true,
-      scholarVerifiedEmail: 'Verified email at mbiberlin.de',
+      verifiedInstitutionDomain: 'mbiberlin.de',
       website: null, websiteSource: null, facultyPageUrl: null,
     };
     ContactEnrichmentService._validateEmailAgainstVerifiedDomain(ce);
@@ -445,7 +465,7 @@ describe('ContactEnrichmentService._validateEmailAgainstVerifiedDomain — Schol
   });
 
   test('NO-OP when there is no email to validate', () => {
-    const ce = run(null, 'Verified email at ethz.ch');
+    const ce = run(null, 'ethz.ch');
     expect(ce.email).toBeNull();
   });
 });

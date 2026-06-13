@@ -305,7 +305,7 @@ export default async function handler(req, res) {
         // sourced fields; scholarSkipped is the Phase-1 fallback (scholar id/url +
         // metrics) when no verdict is present. The adapter treats null as a no-op;
         // a true downgrade additionally CLEARS stale values via clearIdentityFields.
-        const scholarSkipped = !!ce.tierResults?.scholar_profile?.skipped;
+        const scholarSkipped = !!ce.tierResults?.openalex_author?.skipped;
         const identity = ce.identity || null;
         const blockByIdentity = !!identity && !mayPersistIdentity(identity.status);
 

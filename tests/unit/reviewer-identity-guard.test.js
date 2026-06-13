@@ -10,6 +10,7 @@
  */
 const { ContactEnrichmentService } = require('../../lib/services/contact-enrichment-service');
 const { SerpContactService } = require('../../lib/services/serp-contact-service');
+const { OpenAlexService } = require('../../lib/services/openalex-service');
 const { ORCIDService } = require('../../lib/services/orcid-service');
 const { ContactParser } = require('../../lib/utils/contact-parser');
 
@@ -58,79 +59,78 @@ describe('SerpContactService.scholarNameMismatch', () => {
   });
 });
 
-describe('_attachScholarMetrics — identity gate before persisting metrics', () => {
+describe('_attachOpenAlexMetrics — identity gate before persisting metrics (Slice 1b)', () => {
+  const ORCID = '0000-0002-1825-0097';
+  const author = (orcid) => ({
+    openAlexId: 'https://openalex.org/A1', displayName: 'Author', orcid,
+    lastKnownInstitution: 'MIT', lastKnownInstitutionId: 'https://openalex.org/I1', lastKnownInstitutionRor: null,
+    hIndex: 120, i10Index: 200, citedByCount: 80000, topics: [], worksCount: 10,
+  });
+
   beforeEach(() => {
     jest.spyOn(ContactEnrichmentService, 'saveToDatabase').mockResolvedValue(undefined);
     jest.spyOn(ContactParser, 'extractPrimaryEmail').mockReturnValue('x@mit.edu');
+    jest.spyOn(OpenAlexService, 'getInstitution').mockResolvedValue(null);
   });
   afterEach(() => jest.restoreAllMocks());
 
-  const enrich = (name) => ContactEnrichmentService.enrichCandidate(
-    { name, affiliation: 'MIT' },
-    { credentials: { serpApiKey: 'k' }, useSerpSearch: true, usePubmed: false, useOrcid: false, useClaudeSearch: false },
+  const enrich = (candidate) => ContactEnrichmentService.enrichCandidate(
+    candidate,
+    { credentials: {}, usePubmed: false, useOrcid: false, useClaudeSearch: false },
   );
 
-  test('name mismatch → metrics NOT attached, skip reason recorded', async () => {
-    jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue({
-      scholarProfileUrl: 'https://scholar.google.com/citations?user=NAK',
-      scholarId: 'NAK',
-      scholarDisplayName: 'Masayuki Nakano',
-      nameMismatch: true,
-      institutionMismatch: false,
-    });
-    const metricsSpy = jest.spyOn(SerpContactService, 'fetchScholarMetrics').mockResolvedValue({ hIndex: 99, i10Index: 50, totalCitations: 12345 });
+  test('ORCID record whose id ≠ the looked-up ORCID → metrics NOT attached, gate-fail recorded', async () => {
+    // getAuthorByOrcid returns a record whose .orcid differs (merged/mismatched author) —
+    // the resolver re-proves the hard key, so this is rejected.
+    jest.spyOn(OpenAlexService, 'getAuthorByOrcid').mockResolvedValue(author('0000-0003-9999-9998'));
+    const byIdSpy = jest.spyOn(OpenAlexService, 'getAuthorById');
 
-    const out = await enrich('Li-Huei Tsai');
+    const out = await enrich({ name: 'Li-Huei Tsai', affiliation: 'MIT', orcid: ORCID });
 
-    expect(metricsSpy).not.toHaveBeenCalled();
     expect(out.contactEnrichment.hIndex == null).toBe(true);
     expect(out.contactEnrichment.googleScholarId == null).toBe(true);
-    expect(out.contactEnrichment.tierResults.scholar_profile.skipped).toBe('name_mismatch');
-    expect(out.contactEnrichment.scholarIdentityStatus).toBe('unverified');
+    expect(out.contactEnrichment.tierResults.openalex_author.skipped).toBe('identity_gate_failed');
+    expect(byIdSpy).not.toHaveBeenCalled();
   });
 
-  test('institution mismatch still skips (regression)', async () => {
-    jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue({
-      scholarProfileUrl: 'https://scholar.google.com/citations?user=OTH',
-      scholarId: 'OTH',
-      nameMismatch: false,
-      institutionMismatch: true,
-    });
-    const metricsSpy = jest.spyOn(SerpContactService, 'fetchScholarMetrics').mockResolvedValue({ hIndex: 1, i10Index: 1, totalCitations: 1 });
+  test('carried spine author id with a non-persist-worthy status → gate fails, no metrics', async () => {
+    jest.spyOn(OpenAlexService, 'getAuthorById').mockResolvedValue(author(null));
 
-    const out = await enrich('Li-Huei Tsai');
+    const out = await enrich({ name: 'Li-Huei Tsai', affiliation: 'MIT', openAlexId: 'A1', identityStatus: 'unresolved' });
 
-    expect(metricsSpy).not.toHaveBeenCalled();
-    expect(out.contactEnrichment.tierResults.scholar_profile.skipped).toBe('institution_mismatch');
+    expect(out.contactEnrichment.hIndex == null).toBe(true);
+    expect(out.contactEnrichment.tierResults.openalex_author.skipped).toBe('identity_gate_failed');
   });
 
-  test('clean match → metrics attach + status probable', async () => {
-    jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue({
-      scholarProfileUrl: 'https://scholar.google.com/citations?user=TSAI',
-      scholarId: 'TSAI',
-      nameMismatch: false,
-      institutionMismatch: false,
-    });
-    jest.spyOn(SerpContactService, 'fetchScholarMetrics').mockResolvedValue({ hIndex: 120, i10Index: 200, totalCitations: 80000 });
+  test('no identity anchor (no ORCID / no spine id) → abstain, skip reason recorded', async () => {
+    const byOrcidSpy = jest.spyOn(OpenAlexService, 'getAuthorByOrcid');
 
-    const out = await enrich('Li-Huei Tsai');
+    const out = await enrich({ name: 'Li-Huei Tsai', affiliation: 'MIT' });
+
+    expect(byOrcidSpy).not.toHaveBeenCalled();
+    expect(out.contactEnrichment.hIndex == null).toBe(true);
+    expect(out.contactEnrichment.tierResults.openalex_author.skipped).toBe('identity_anchor_required');
+  });
+
+  test('clean ORCID match → metrics attach (no Scholar deep-link id — #2 dropped)', async () => {
+    jest.spyOn(OpenAlexService, 'getAuthorByOrcid').mockResolvedValue(author(ORCID));
+
+    const out = await enrich({ name: 'Li-Huei Tsai', affiliation: 'MIT', orcid: ORCID });
 
     expect(out.contactEnrichment.hIndex).toBe(120);
-    expect(out.contactEnrichment.googleScholarId).toBe('TSAI');
-    expect(out.contactEnrichment.scholarIdentityStatus).toBe('probable');
+    expect(out.contactEnrichment.i10Index).toBe(200);
+    expect(out.contactEnrichment.totalCitations).toBe(80000);
+    expect(out.contactEnrichment.googleScholarId).toBeNull();
+    expect(out.contactEnrichment.tierResults.openalex_author.acceptPath).toBe('orcid');
   });
 
-  test('enrichCandidate attaches the resolver verdict (contactEnrichment.identity)', async () => {
-    jest.spyOn(SerpContactService, 'findScholarProfile').mockResolvedValue({
-      scholarProfileUrl: 'https://scholar.google.com/citations?user=TSAI',
-      scholarId: 'TSAI', nameMismatch: false, institutionMismatch: false,
-    });
-    jest.spyOn(SerpContactService, 'fetchScholarMetrics').mockResolvedValue({ hIndex: 120, i10Index: 200, totalCitations: 80000 });
+  test('enrichCandidate attaches the resolver verdict — proven ORCID → probable (strong anchor)', async () => {
+    jest.spyOn(OpenAlexService, 'getAuthorByOrcid').mockResolvedValue(author(ORCID));
 
-    const out = await enrich('Li-Huei Tsai');
-    // ORCID off in this block → lone Scholar weak anchor → unresolved.
+    const out = await enrich({ name: 'Li-Huei Tsai', affiliation: 'MIT', orcid: ORCID });
+
     expect(out.contactEnrichment.identity).toBeTruthy();
-    expect(out.contactEnrichment.identity.status).toBe('unresolved');
+    expect(out.contactEnrichment.identity.status).toBe('probable');
     expect(out.contactEnrichment.identity.resolverVersion).toBeTruthy();
   });
 });

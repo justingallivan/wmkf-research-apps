@@ -223,7 +223,7 @@ export default async function handler(req, res) {
         //     (enrichment didn't run) — blocks the scholar id/url + metrics only.
         // Passing null is a safe no-op in the adapter (pruneEmpty drops it); a true
         // downgrade additionally CLEARS any stale value below via clearIdentityFields.
-        const scholarSkipped = !!enrichment.tierResults?.scholar_profile?.skipped;
+        const scholarSkipped = !!enrichment.tierResults?.openalex_author?.skipped;
         const identity = enrichment.identity || null;
         // A candidate loaded from the durable Find-tab roster has had its
         // identity/tierResults pruned away, but `pruneCandidateForRoster` left

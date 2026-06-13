@@ -112,11 +112,13 @@ function formatSaveFailureDetails(errors = []) {
 
 // Affiliation-pin provenance (S224 #16). enrichment may replace the discovery
 // (PubMed-recency) affiliation with an identity-trusted CURRENT one from ORCID
-// or Scholar. Return a short source label for the "current (per X)" badge, or
-// null for the default pubmed_recency / unset case (no badge — it's the norm).
+// or OpenAlex (Slice 1b; `scholar_current` kept for legacy roster rows). Return a
+// short source label for the "current (per X)" badge, or null for the default
+// pubmed_recency / unset case (no badge — it's the norm).
 function affiliationProvenance(source) {
   if (source === 'orcid_current') return 'ORCID';
-  if (source === 'scholar_current') return 'Scholar';
+  if (source === 'openalex_current') return 'OpenAlex';
+  if (source === 'scholar_current') return 'Scholar'; // legacy roster rows (pre-Slice-1b)
   return null;
 }
 function affiliationSourceLabel(source) {

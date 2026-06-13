@@ -7,7 +7,7 @@ jest.mock('../../lib/utils/safe-fetch.js', () => ({
 }));
 
 const { safeFetch } = require('../../lib/utils/safe-fetch.js');
-const { OpenAlexService } = require('../../lib/services/openalex-service');
+const { OpenAlexService, registrableDomainFromUrl } = require('../../lib/services/openalex-service');
 
 const jsonResponse = (payload, status = 200) => ({
   ok: status >= 200 && status < 300,
@@ -45,6 +45,11 @@ describe('OpenAlexService.searchAuthors', () => {
       displayName: 'Robert Sang',
       orcid: '0000-0002-1825-0097',
       lastKnownInstitution: 'Griffith University',
+      lastKnownInstitutionId: null,
+      lastKnownInstitutionRor: null,
+      hIndex: null,
+      i10Index: null,
+      citedByCount: null,
       topics: ['Attosecond physics'],
       worksCount: 345,
     }]);
@@ -205,5 +210,128 @@ describe('OpenAlexService.getAuthorByOrcid (S240)', () => {
   test('propagates non-404 errors (e.g. abort/timeout)', async () => {
     safeFetch.mockRejectedValue(Object.assign(new Error('boom'), { code: 'openalex_timeout' }));
     await expect(OpenAlexService.getAuthorByOrcid(VALID_ORCID)).rejects.toThrow('boom');
+  });
+});
+
+describe('mapAuthorRecord — Slice 1b bibliometrics + institution refs', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('surfaces h-index / i10 / cites + the institution id & ror', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({
+      id: 'https://openalex.org/A1',
+      display_name: 'Metric Author',
+      orcid: 'https://orcid.org/0000-0002-1825-0097',
+      summary_stats: { h_index: 24, i10_index: 32 },
+      cited_by_count: 5577,
+      last_known_institutions: [{
+        id: 'https://openalex.org/I63966007',
+        display_name: 'Massachusetts Institute of Technology',
+        ror: 'https://ror.org/042nb2s44',
+      }],
+      works_count: 100,
+    }));
+
+    const out = await OpenAlexService.getAuthorByOrcid('0000-0002-1825-0097');
+    expect(out).toMatchObject({
+      hIndex: 24,
+      i10Index: 32,
+      citedByCount: 5577,
+      lastKnownInstitution: 'Massachusetts Institute of Technology',
+      lastKnownInstitutionId: 'https://openalex.org/I63966007',
+      lastKnownInstitutionRor: 'https://ror.org/042nb2s44',
+    });
+  });
+
+  test('missing summary_stats / cited_by_count → null metrics (never fabricated)', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({
+      id: 'https://openalex.org/A2', display_name: 'No Metrics', works_count: 3,
+    }));
+    const out = await OpenAlexService.getAuthorByOrcid('0000-0002-1825-0097');
+    expect(out.hIndex).toBeNull();
+    expect(out.i10Index).toBeNull();
+    expect(out.citedByCount).toBeNull();
+    expect(out.lastKnownInstitutionId).toBeNull();
+    expect(out.lastKnownInstitutionRor).toBeNull();
+  });
+});
+
+describe('OpenAlexService.getAuthorById (Slice 1b)', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('resolves a short A-id via /authors/I-less path form', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({
+      id: 'https://openalex.org/A777', display_name: 'Spine Author',
+      summary_stats: { h_index: 9, i10_index: 4 }, cited_by_count: 123, works_count: 20,
+    }));
+    const out = await OpenAlexService.getAuthorById('https://openalex.org/A777');
+    expect(out).toMatchObject({ openAlexId: 'https://openalex.org/A777', hIndex: 9, citedByCount: 123 });
+    expect(safeFetch.mock.calls[0][0]).toContain('/authors/A777');
+  });
+
+  test('returns null (no API call) for a non-author id', async () => {
+    const out = await OpenAlexService.getAuthorById('I12345'); // institution id, not an author
+    expect(out).toBeNull();
+    expect(safeFetch).not.toHaveBeenCalled();
+  });
+
+  test('returns null on 404', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({}, 404));
+    const out = await OpenAlexService.getAuthorById('A999');
+    expect(out).toBeNull();
+  });
+});
+
+describe('OpenAlexService.getInstitution (Slice 1b verified-domain source)', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('resolves an OpenAlex institution id to its registrable homepage domain', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({
+      id: 'https://openalex.org/I63966007',
+      display_name: 'Massachusetts Institute of Technology',
+      ror: 'https://ror.org/042nb2s44',
+      homepage_url: 'https://web.mit.edu',
+    }));
+    const out = await OpenAlexService.getInstitution('https://openalex.org/I63966007');
+    expect(out).toMatchObject({ displayName: 'Massachusetts Institute of Technology', domain: 'mit.edu' });
+    expect(safeFetch.mock.calls[0][0]).toContain('/institutions/I63966007');
+  });
+
+  test('falls back to the ROR path form when given a ROR', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({
+      id: 'https://openalex.org/I1', display_name: 'X', homepage_url: 'https://www.ox.ac.uk/',
+    }));
+    const out = await OpenAlexService.getInstitution('https://ror.org/052gg0110');
+    expect(out.domain).toBe('ox.ac.uk'); // multi-label suffix handled (not ac.uk)
+    expect(safeFetch.mock.calls[0][0]).toContain('/institutions/https://ror.org/052gg0110');
+  });
+
+  test('null homepage → null domain; 404 → null; empty input → null (no call)', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({ id: 'https://openalex.org/I2', display_name: 'Y' }));
+    expect((await OpenAlexService.getInstitution('I2')).domain).toBeNull();
+
+    safeFetch.mockResolvedValue(jsonResponse({}, 404));
+    expect(await OpenAlexService.getInstitution('I3')).toBeNull();
+
+    safeFetch.mockClear();
+    expect(await OpenAlexService.getInstitution('')).toBeNull();
+    expect(safeFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('registrableDomainFromUrl — eTLD+1 extraction for the email-domain guard', () => {
+  test('strips scheme/path and a www. subdomain to the registrable domain', () => {
+    expect(registrableDomainFromUrl('https://web.mit.edu')).toBe('mit.edu');
+    expect(registrableDomainFromUrl('https://www.stanford.edu/dept')).toBe('stanford.edu');
+    expect(registrableDomainFromUrl('http://mbi-berlin.de')).toBe('mbi-berlin.de');
+  });
+
+  test('handles multi-label academic suffixes (last THREE labels)', () => {
+    expect(registrableDomainFromUrl('https://www.ox.ac.uk/')).toBe('ox.ac.uk');
+    expect(registrableDomainFromUrl('https://research.unimelb.edu.au')).toBe('unimelb.edu.au');
+  });
+
+  test('null/empty input → null', () => {
+    expect(registrableDomainFromUrl(null)).toBeNull();
+    expect(registrableDomainFromUrl('')).toBeNull();
   });
 });

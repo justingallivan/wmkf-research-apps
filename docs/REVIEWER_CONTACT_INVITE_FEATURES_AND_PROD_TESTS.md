@@ -64,13 +64,14 @@ merged `9396658`.
   `wmkf_emailaddress`.
 - **Fix D — identity-note clarity.** `buildIdentityNote` surfaces `authorship_grounded`
   (previously read as a topic-only "confirmed").
-- **Scholar-verified-domain validation** (`_validateEmailAgainstVerifiedDomain`, runs in
-  `_finalize`): a candidate email is checked against the **Google-Scholar-verified
-  institutional domain** (`scholarVerifiedEmail`, e.g. "Verified email at mbi-berlin.de") via
-  a **boundary-anchored** domain match (hyphen-insensitive, subdomain-aware). A clear
-  contradiction drops a *search-sourced* namesake email; ORCID/PubMed (trusted-source) emails
-  are never dropped; with no verified domain, the scoped search is trusted. This replaced a
-  brittle lexical institution-**name** guard that had wrongly rejected Smirnova's real address.
+- **Verified-domain validation** (`_validateEmailAgainstVerifiedDomain`, runs in
+  `_finalize`): a candidate email is checked against the **verified institutional domain**
+  (`verifiedInstitutionDomain`, e.g. `mbi-berlin.de`) via a **boundary-anchored** domain match
+  (hyphen-insensitive, subdomain-aware). A clear contradiction drops a *search-sourced*
+  namesake email; ORCID/PubMed (trusted-source) emails are never dropped; with no verified
+  domain, the scoped search is trusted. This replaced a brittle lexical institution-**name**
+  guard that had wrongly rejected Smirnova's real address. (Slice 1b re-sourced the domain from
+  the OpenAlex author's institution homepage; it was the Google-Scholar self-reported domain.)
 
 ### 1.2 Prod validation
 

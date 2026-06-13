@@ -147,9 +147,9 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
 
-  test('scholarSkipped fallback (no verdict) → Scholar fields nulled, ORCID kept, no decision/clear', async () => {
+  test('openalex_author skipped fallback (no verdict) → Scholar fields nulled, ORCID kept, no decision/clear', async () => {
     const ce = enrichmentFor(null);                                  // identity absent
-    ce.tierResults = { scholar_profile: { skipped: 'name_mismatch' } };
+    ce.tierResults = { openalex_author: { skipped: 'identity_gate_failed' } };
     const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr X', contactEnrichment: ce }] } };
     const res = mockRes();
     await handler(req, res);

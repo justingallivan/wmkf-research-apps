@@ -136,7 +136,7 @@ export function pruneCandidateForRoster(c) {
   //   blockByIdentity = identity present AND verdict < probable
   //   blockScholar    = blockByIdentity OR the Scholar profile was name/inst-skipped
   const identity = e.identity || null;
-  const scholarSkipped = !!e.tierResults?.scholar_profile?.skipped;
+  const scholarSkipped = !!e.tierResults?.openalex_author?.skipped;
   const identityPersistAllowed = !identity || mayPersistIdentity(identity.status);
   const scholarPersistAllowed = identityPersistAllowed && !scholarSkipped;
   return {

@@ -227,7 +227,7 @@ function CandidateCard({ candidate, selected, onSelect, readOnly = false }) {
             // Affiliation-pin provenance (S224 #16): enrichment may have replaced
             // the discovery affiliation with an identity-trusted CURRENT one.
             const affSource = candidate.affiliationSource || candidate.contactEnrichment?.affiliationSource;
-            const affVia = affSource === 'orcid_current' ? 'ORCID' : affSource === 'scholar_current' ? 'Scholar' : null;
+            const affVia = affSource === 'orcid_current' ? 'ORCID' : affSource === 'openalex_current' ? 'OpenAlex' : affSource === 'scholar_current' ? 'Scholar' : null;
             const prior = candidate.contactEnrichment?.priorAffiliation;
             return (
               <p

@@ -67,9 +67,9 @@ const domainOf = (email) => (email && email.includes('@') ? email.split('@').pop
 // OFFLINE LAYER
 // =============================================================================
 section('OFFLINE — _validateEmailAgainstVerifiedDomain decision matrix');
-function validate(email, scholarVerifiedEmail, emailSource = 'serp_search') {
+function validate(email, verifiedInstitutionDomain, emailSource = 'serp_search') {
   const ce = {
-    email, emailSource, emailPersistAllowed: true, scholarVerifiedEmail,
+    email, emailSource, emailPersistAllowed: true, verifiedInstitutionDomain,
     website: 'https://example.org/x', websiteSource: 'serp_search', websitePersistAllowed: true,
     facultyPageUrl: 'https://example.org/fac',
   };
@@ -77,25 +77,27 @@ function validate(email, scholarVerifiedEmail, emailSource = 'serp_search') {
   return ce;
 }
 {
-  let ce = validate('olga.smirnova@mbi-berlin.de', 'Verified email at mbiberlin.de');
+  // Slice 1b: the verified domain is now the OpenAlex institution homepage registrable
+  // domain (bare, e.g. mbiberlin.de) instead of Scholar's "Verified email at X" string.
+  let ce = validate('olga.smirnova@mbi-berlin.de', 'mbiberlin.de');
   expect('hyphen-insensitive MATCH keeps email + sets persistAllowed (mbi-berlin ↔ mbiberlin)',
     ce.email === 'olga.smirnova@mbi-berlin.de' && ce.emailPersistAllowed === true);
 
-  ce = validate('keller@phys.ethz.ch', 'Verified email at ethz.ch');
+  ce = validate('keller@phys.ethz.ch', 'ethz.ch');
   expect('subdomain MATCH keeps email (phys.ethz.ch ↔ ethz.ch)', ce.email === 'keller@phys.ethz.ch');
 
-  ce = validate('olga.smirnova@metalab.ifmo.ru', 'Verified email at mbiberlin.de');
+  ce = validate('olga.smirnova@metalab.ifmo.ru', 'mbiberlin.de');
   expect('clear CONTRADICTION drops a search-sourced namesake email (ifmo vs mbiberlin)',
     ce.email === null && ce.contactStatusReason === 'verified_domain_contradiction');
 
-  ce = validate('prof@summit.edu', 'Verified email at mit.edu');
+  ce = validate('prof@summit.edu', 'mit.edu');
   expect('boundary-only: summit.edu does NOT match mit.edu (dropped, not falsely kept)', ce.email === null);
 
-  ce = validate('x@notred.ac.uk.evil', 'Verified email at ed.ac.uk');
+  ce = validate('x@notred.ac.uk.evil', 'ed.ac.uk');
   expect('boundary-only: notred.ac.uk.evil does NOT match ed.ac.uk (dropped)', ce.email === null);
 
-  ce = validate('olga@personal-domain.org', 'Verified email at mbiberlin.de', 'orcid');
-  expect('TRUSTED source (orcid) email survives a Scholar-domain mismatch', ce.email === 'olga@personal-domain.org' && ce.emailPersistAllowed === true);
+  ce = validate('olga@personal-domain.org', 'mbiberlin.de', 'orcid');
+  expect('TRUSTED source (orcid) email survives a verified-domain mismatch', ce.email === 'olga@personal-domain.org' && ce.emailPersistAllowed === true);
 
   ce = validate('someone@unverifiable.edu', null);
   expect('NO verified domain → no-op, trust the scoped search', ce.email === 'someone@unverifiable.edu');
@@ -138,7 +140,7 @@ if (OFFLINE_ONLY || !haveLive) {
   {
     const out = await enrich({ name: 'Olga Smirnova', orcid: '0000-0002-7746-5733', affiliation: null, publications: [] });
     const e = out.contactEnrichment || {};
-    if (VERBOSE) console.log('   ', JSON.stringify({ email: e.email, persist: e.emailPersistAllowed, status: e.contactStatus, scholarVerified: e.scholarVerifiedEmail }));
+    if (VERBOSE) console.log('   ', JSON.stringify({ email: e.email, persist: e.emailPersistAllowed, status: e.contactStatus, verifiedDomain: e.verifiedInstitutionDomain }));
     const dom = domainOf(e.email);
     // INVARIANTS
     expect('anchored candidate is not false-abstained', e.contactStatus !== 'unresolved');

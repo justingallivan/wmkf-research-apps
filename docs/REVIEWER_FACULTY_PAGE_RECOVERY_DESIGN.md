@@ -46,7 +46,9 @@ high-value reviewer can actually be invited (the email is the product goal). Ide
   regex extractor (no LLM) — returns all emails in text, lowercased, false-positive-filtered.
 - [VERIFIED] In `contact-enrichment-service.js`: `_effectiveInstitution(candidate, ce)` (the
   anchored institution), `_hasOrcidAnchor(candidate, ce)`, `_normalizeDomain(...)`,
-  `ce.scholarVerifiedEmail` (Google-Scholar-verified institutional domain),
+  `ce.verifiedInstitutionDomain` (verified institutional domain; Slice 1b re-sourced it from
+  the OpenAlex author's institution homepage — was the Google-Scholar self-reported domain
+  `ce.scholarVerifiedEmail`),
   `ce.facultyPageUrl`, `ce.emailPersistAllowed`, and `_validateEmailAgainstVerifiedDomain(ce)`
   (runs in `_finalize`, sets `emailPersistAllowed` on a domain match). These are the anchor +
   validation primitives Slice F reuses.
@@ -74,7 +76,7 @@ Recover ONLY when ALL hold (server re-checks; never trusts the client):
 - the candidate is **identity-anchored**: `_effectiveInstitution` present OR `_hasOrcidAnchor`;
 - there is **no accepted email** (`!emailPersistAllowed` / no persisted `wmkf_emailaddress`);
 - a `facultyPageUrl`/`website` is present whose host **matches the anchored institution
-  domain** (the `scholarVerifiedEmail` domain, or the effective-institution domain).
+  domain** (the `verifiedInstitutionDomain`, or the effective-institution domain).
 Never for abstained/unanchored candidates. At most once per candidate per request (bounded).
 
 ## 4. F2 — hardened fetch (SECURITY-CRITICAL; EXTEND `safe-fetch.js`, do NOT write a new wrapper)
@@ -91,8 +93,8 @@ existing HTTPS + manual-redirect-per-hop logic and ADDS, on every hop:
    (host re-resolves to an internal IP between check and connect), PIN the validated IP: use
    an undici dispatcher / `connect.lookup` that returns only the pre-validated address and
    rejects a mismatch. Is full IP-pinning required here, or is resolve-then-check sufficient
-   given the domain is NOT free user input (it comes from the Scholar-verified institutional
-   email / anchored institution)? Recommend pinning — it's the correct SSRF posture.
+   given the domain is NOT free user input (it comes from the verified institutional
+   domain / anchored institution)? Recommend pinning — it's the correct SSRF posture.
 3. **max-body cap** — enforce a byte limit WHILE streaming the body (don't trust
    `Content-Length` alone); abort past `maxBytes` (e.g. 2 MB).
 4. **content-type gate** — only read the body when `Content-Type` is `text/html` (or `text/*`).
@@ -101,7 +103,7 @@ is attacker-controllable, so an LLM here is a prompt-injection vector.
 
 ## 5. F3 — validation + persistence
 The parsed email is still run through `_validateEmailAgainstVerifiedDomain` (domain must match
-the anchored/Scholar domain). On a match: set `emailSource: 'institution_page'`,
+the anchored/verified institutional domain). On a match: set `emailSource: 'institution_page'`,
 `emailPersistAllowed: true`, and treat it as HIGH-confidence (NOT in the droppable
 search-source set; and HIGH for the Slice-G invite gate — `institution_page` is already in the
 Slice-G HIGH set). Persist via the same field-gated save path. Pick the email whose domain
@@ -115,14 +117,14 @@ matches the anchored domain when the page yields several.
 ## Q. Questions for Codex
 1. **SSRF (§4.2):** is resolve-then-check-private-IP sufficient, or is full IP-pinning
    (undici `connect.lookup` returning the validated IP) required, given the domain is derived
-   from the Scholar-verified institutional email, not free user input? What's the correct
+   from the verified institutional domain, not free user input? What's the correct
    Node/undici mechanism to pin the IP through `fetch` + manual redirects in THIS codebase?
 2. **Extend vs new module:** add `safeFetchExternalPage` to `safe-fetch.js` (one wrapper, your
    plan-review guidance) vs a `lib/utils/faculty-page-fetch.js` that composes safe-fetch
    primitives — which keeps the SSRF logic most reviewable?
 3. **Trigger (§3):** is "host matches the anchored institution domain" the right safety
    predicate, and where does the anchored domain most reliably come from
-   (`scholarVerifiedEmail` domain vs `_effectiveInstitution`)?
+   (`verifiedInstitutionDomain` vs `_effectiveInstitution`)?
 4. **Endpoint vs tier (§2):** on-demand endpoint over Tier-5 — agree given the latency budget?
 5. **maxBytes / content-type:** right caps; any header/stream-handling gotcha with undici in
    this Next.js runtime?
