@@ -59,7 +59,7 @@ flowchart TD
         SERP["SerpAPI → free-stack"]
         SAVE["Save → Dataverse"]
         INVITE["Invite / email (.eml)"]
-        REF["Decline → referral capture<br/>'add suggested candidate'"]
+        REF["Decline → referral capture ✅ S249<br/>'add or refer a reviewer'"]
     end
 
     GROUNDED["Grounded retrieval-first multilane (§12)"]
@@ -86,8 +86,8 @@ flowchart TD
     classDef dead fill:#5a5a5a,stroke:#777,color:#fff,stroke-dasharray:4 3
     classDef open fill:#6a1b9a,stroke:#8e24aa,color:#fff
 
-    class P,CA,TA,ID,DD,RK,COI,CUR,ROSTER,ENR,SAVE,INVITE,PR,RS exists
-    class IDFIX,SERP,REF build
+    class P,CA,TA,ID,DD,RK,COI,CUR,ROSTER,ENR,SAVE,INVITE,PR,RS,REF exists
+    class IDFIX,SERP build
     class WEB,GROUNDED,TB dead
     class EXC,AppRecs open
 ```
@@ -222,9 +222,14 @@ named personnel is a sensible future add — NOT yet implemented.)
    entries). The downstream gates already catch padding (placeholder/incomplete detection in
    `validateReviewerAnalysis`, the Track-A forename gate, the identity save-gate), but a live
    confirmation is the prerequisite before raising the default above 15.
-3. **Referral capture** ("add suggested candidate") — a declining reviewer's free-text
-   suggestion → resolved candidate; reuse manual-add (S236) + identity spine with
-   abstain-or-confirm safety. One of the three signals that made last cycle work.
+3. **Referral capture** ("add or refer a reviewer") — ✅ SHIPPED S249. A declining
+   reviewer's free-text suggestion → resolved candidate; reuses manual-add (S236) +
+   the hardened identity spine with abstain-or-confirm safety. New `referred`
+   provenance kind (grounded-rank bonus + selectable-with-verify like proposal_named);
+   referrer stored in the match reason (no new Dataverse field) + persisted as a
+   `referred` source so it survives reload. One of the three signals that made last
+   cycle work. Codex-reviewed (durability). Design:
+   `docs/REVIEWER_FINDER_REFERRAL_CAPTURE_DESIGN.md`.
 4. **Disable Track B** — ✅ DONE (S248): archived behind `DiscoveryService.TRACK_B_ENABLED
    = false`; code left dormant for future repurposing (it ran but contributed ~0 to saved
    panels and cost ~27s). See the ⬛ section + agent-wiki reviewer-origination.

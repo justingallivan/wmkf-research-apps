@@ -45,7 +45,7 @@
 - Reviewer COI policy (S240: hard-act only on proposal-authors + CURRENT same-institution; rely on self-disclosure; historical doesn't count) → wiki:reviewer-identity: project-reviewer-coi-rely-on-self-disclosure.md; project-reviewer-coi-concern-surfacing.md
 - Reviewer enrichment fan-out / SerpAPI (LATENCY limits fan-out design; SUBSCRIPTION value eroded — $150/mo largest expense, capability loss + free alternatives): project-serpapi-budget-latency.md; project-serpapi-capability-erosion.md
 - Reviewer Workbench / lifecycle / address: project-reviewer-apps-redesign-direction.md; project-reviewer-workbench-invite-workflow.md; project-reviewer-lifecycle.md; project-reviewer-lifecycle-automation.md; project-reviewer-address-collection-provisional.md
-- Reviewer REFERRAL capture (endorsed S244 — "add suggested candidate"; free-text→person resolution is the hard part; reuses manual-add S236 + identity spine, abstain-or-confirm): project-reviewer-referral-capture.md
+- Reviewer REFERRAL capture (SHIPPED S249 — "add or refer a reviewer"; referred provenance + referrer-in-matchreason; reuses manual-add S236 + hardened identity spine): project-reviewer-referral-capture.md
 - Find-tab durable roster + cross-run dedup (SHIPPED S224, don't drop-carryover; reset via scripts/reset-request-reviewers.mjs): project-reviewer-find-roster.md
 - Reviewer data model / migration: project-reviewer-postgres-to-dataverse-migration.md; project-reviewer-finder-dataverse-entry-path.md; project-appresearcher-collapse-post-pilot.md
 - Reviewer matching / institution / contacts: project-reviewer-institution-match.md; project-contact-promotion-permission.md; project-institution-foundation-liaison.md

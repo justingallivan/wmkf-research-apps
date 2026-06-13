@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-referral-capture
-description: "Endorsed feature (S244, Justin): 'add suggested candidate' — capture reviewer-REFERRED candidates. A contacted reviewer who declines/responds often suggests a colleague via FREE TEXT (name ± institution/context). The hard part is resolving that free text to a real person; reuses manual-reviewer-add (S236) + the identity spine, with abstain-or-confirm safety (never auto-resolve to a namesake)."
+description: "SHIPPED S249 (was endorsed S244): 'add or refer a reviewer' — capture reviewer-REFERRED candidates. A contacted reviewer who declines/responds often suggests a colleague via FREE TEXT. The hard part (free text → real person) was already solved by manual-reviewer-add (S236) + the hardened identity spine (abstain-or-confirm, never auto-resolve to a namesake); referral capture is a thin provenance+referrer layer over it. Codex-reviewed."
 metadata:
   node_type: memory
   type: project
@@ -10,8 +10,19 @@ metadata:
 ---
 
 ## Recall Rule
-Read when building the Workbench invite/track flow, manual reviewer add, or any
+Read when touching the Workbench invite/track flow, manual reviewer add, or any
 reviewer free-text → identity resolution.
+
+## Status: SHIPPED S249
+Built as a thin layer over manual-add: `referredBy` on `manual-reviewer.js` →
+`referred` provenance kind (`reviewer-provenance.js`; grounded-rank bonus +
+identity-review-exempt/selectable-with-verify like `proposal_named`) + the referrer
+in the durable match reason (no new Dataverse field) + a `referred` `wmkf_sources`
+token so it survives a `my-candidates` reload. UI: the manual-add card is now "Add
+or Refer a Reviewer" (`ReviewerFindPanel.js`). Codex-reviewed (the durability
+reload gap was the HIGH it caught — fixed). Design + decisions:
+`docs/REVIEWER_FINDER_REFERRAL_CAPTURE_DESIGN.md`. The sections below are the
+original S244 design intent, now realized.
 
 ## Why (validated S244)
 The J26 coverage tests showed referral chains are how panels actually fill
