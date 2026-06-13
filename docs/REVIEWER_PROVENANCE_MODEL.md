@@ -114,6 +114,11 @@ are untouched, so they cancel in the delta):
   subset**, so verified-Claude candidates keep their relative order, and **the only
   possible reordering is at a Track-A / Track-B boundary** (an A dropping below a B).
 
+> **Note (S248):** Track B is now **archived off** (`DiscoveryService.TRACK_B_ENABLED=false`),
+> so the discovered set is empty and there are **no Track-B candidates** in practice — the
+> Track-A/Track-B boundary reordering above is **moot** until Track B is re-enabled. The
+> per-candidate delta analysis remains valid for the code as written.
+
 **Observed in the Session 232 sample (2 research requests; small, not a population
 rate — analyze is stochastic, so candidate sets vary slightly run-to-run):** the
 displayed tables were 11 Track-A / 1 Track-B (1002959) and 9 Track-A / 0 Track-B

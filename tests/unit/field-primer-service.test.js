@@ -161,6 +161,15 @@ describe('groundPrimerExperts (uses the real forenamesContradict; OpenAlex mocke
     expect(out[3].grounding.status).toBe('unverified');
   });
 
+  test('strips a leading honorific before taking the first initial ("Dr. Oksana" still corrects)', async () => {
+    const out = await groundPrimerExperts([
+      { name: 'Andrew Lang' }, { name: 'J. Thomas Beatty' }, // anchor
+      { name: 'Dr. Oksana Zhaxybayeva', affiliation: 'Dartmouth' }, // "Dr." must not make the initial "d"
+    ]);
+    expect(out[2].grounding.status).toBe('corrected');
+    expect(out[2].grounding.corroboration).toBe('first-initial');
+  });
+
   test('flags an exact-name match that resolves OFF the anchored field as a possible namesake', async () => {
     const out = await groundPrimerExperts([
       { name: 'Andrew Lang' },

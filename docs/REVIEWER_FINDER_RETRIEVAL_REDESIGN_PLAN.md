@@ -1,5 +1,12 @@
 # Reviewer Finder — Canonical Design Doc
 
+> **STATUS BANNER (S248): Track B is ARCHIVED OFF.** `DiscoveryService.TRACK_B_ENABLED=false`
+> gates the four DB-search blocks; the code is dormant + reusable. Present-tense references
+> below to "Track B discovers…" / "current Track B" / "live Track-A + Track-B" are
+> **architectural/historical** — Track B produces no candidates today. See
+> `docs/REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md` + agent-wiki reviewer-origination
+> ("Track B — archived working code").
+
 > **CONSOLIDATED S238.** This is the single canonical reviewer-finder design doc. It
 > merges three formerly-separate files (the other two were deleted; this filename was
 > kept because it carried the most inbound references):
