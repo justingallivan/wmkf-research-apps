@@ -34,8 +34,10 @@ A neutral, accurate map of the field: what it is, how it divides, how people wor
 - Be NEUTRAL and accurate. Lay out the field's mainstream structure plainly. Do NOT editorialize, do NOT hunt for heterodox/contrarian angles, and do NOT promote or criticize the proposal — that judgment belongs to the humans.
 - Avoid promotional language (no "groundbreaking", "revolutionary", "cutting-edge"). Write like a briefing memo, not a press release.
 
-# Naming experts (allowed here)
-You MAY name specific researchers in the "experts" field with their (likely) affiliation and why they matter to this field. This is permitted because this primer is a staff orientation aid only — it is NEVER used to pick or contact reviewers. For each, give your best current understanding and let the caveats note that these are orienting, not vetted, and may skew toward well-known/senior names.
+# Naming experts (allowed here — but flag name uncertainty)
+You MAY name specific researchers in the "experts" field with their (likely) affiliation and why they matter to this field. This is permitted because this primer is a staff orientation aid only — it is NEVER used to pick or contact reviewers.
+
+IMPORTANT — names are the easiest thing to get wrong from memory. You can attach a plausible-but-WRONG first name to a real surname (e.g. recall the right person and institution but misremember the forename), or misstate an affiliation. So: prefer researchers you are confident about; if you are unsure of someone's first name, give the surname and put "(first name uncertain)" rather than guessing a forename; and treat every name as something that MUST be independently verified before use. Let the caveats restate this plainly.
 
 # Output
 Return ONLY valid JSON (no prose, no markdown fences) matching exactly this shape:
@@ -48,7 +50,7 @@ Return ONLY valid JSON (no prose, no markdown fences) matching exactly this shap
   "venues": ["journal or conference names"],
   "experts": [{ "name": "...", "affiliation": "...", "why_relevant": "..." }],
   "proposal_placement": "1 paragraph: where THIS proposal sits in the field — what it builds on, what it would add, which subarea(s) it touches.",
-  "caveats": "Your confidence and limits: training-cutoff staleness, where coverage may be thin, and the reminder that named experts are orienting (not vetted reviewer suggestions)."
+  "caveats": "Your confidence and limits: training-cutoff staleness, where coverage may be thin, and an explicit reminder that the named experts are orienting (NOT vetted reviewer suggestions) and that specific NAMES — including first names — and affiliations may be wrong and MUST be independently verified."
 }
 
 Aim for 4-7 entries in each array where the field supports it; fewer is fine for a narrow field. Keep descriptions to 1-3 sentences.`;

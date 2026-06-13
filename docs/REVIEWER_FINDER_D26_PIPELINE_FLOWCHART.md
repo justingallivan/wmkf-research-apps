@@ -137,6 +137,24 @@ knowledge-only** (no web); a web-grounded literature-search increment is a **nex
 follow-up**. Named experts are model-knowledge (real but unvetted; staleness/fame-bias
 flagged in the primer's own caveats).
 
+**v2 priority — expert-name grounding (concrete failure observed S248).** On the real
+1002878 run, the primer named **"Oksana Zhaxybayeva"** — the right surname, institution,
+and field (computational GTA biology) but a **hallucinated forename**: the real researcher
+is **Olga Zhaxybayeva** (OpenAlex: 151 works; "Oksana Zhaxybayeva" → 0 results). This is
+the same forename-hallucination class as the Laederach verify bug, but the knowledge-only
+primer has **no verification step**. The v2 fix is an **expert-grounding pass reusing the
+existing identity spine** (`reviewer-identity-resolver` / `OpenAlexService`): resolve each
+named expert — exact name resolves → confirm; name fails but **surname + field** resolves
+unambiguously → correct the forename from the record (or flag); ambiguous / common surname
+→ **flag "unverified," never auto-correct to a namesake** (the Christina lesson). v1 stopgap
+(shipped S248): the prompt now warns explicitly that names — including first names — may be
+wrong and must be verified. **Confirmed the stopgap does NOT stop the hallucination** — a
+re-run still produced "Oksana," and the model's own caveat shows Zhaxybayeva is a **Co-PI
+named in the proposal text**, so the correct forename was *in the input* and the model still
+overrode it from memory. Knowledge-only generation can't reliably copy a name from the
+document in front of it → grounding (cross-check expert names against the proposal's named
+personnel AND OpenAlex/ORCID) is the only real fix; the caveat just makes the labeling honest.
+
 ## 🟩 What exists today (live pipeline)
 
 - **Claude Analysis** + name suggestion (`analyze.js`) — the origination engine
