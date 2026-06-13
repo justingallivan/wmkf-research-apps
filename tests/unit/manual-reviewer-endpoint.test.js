@@ -294,3 +294,54 @@ describe('orcid', () => {
     expect(r.body.candidate.orcid).toBeNull();
   });
 });
+
+describe('referral capture (S249)', () => {
+  it('referredBy encodes the referrer into the durable match reason and tags the candidate referred', async () => {
+    const r = res();
+    await handler(post({
+      requestId: REQ,
+      name: 'Tim Newhouse',
+      referredBy: 'Dr. Abby Doyle',
+      note: 'Synthesis expert.',
+    }), r);
+
+    expect(r.statusCode).toBe(200);
+    // Durable home of the referrer: the match reason (no new Dataverse field).
+    expect(ensureStaffManualCandidate).toHaveBeenCalledWith(
+      expect.objectContaining({ matchReason: 'Referred by Dr. Abby Doyle. Synthesis expert.' }),
+      { actingUserSystemId: 'u-1' },
+    );
+    expect(createReviewer).toHaveBeenCalledWith(
+      expect.objectContaining({ whyChosen: 'Referred by Dr. Abby Doyle. Synthesis expert.' }),
+      { actingUserSystemId: 'u-1' },
+    );
+    // DTO drives the client provenance (kind referred + label).
+    expect(r.body.candidate).toMatchObject({
+      referredBy: 'Dr. Abby Doyle',
+      provenanceKind: 'referred',
+      sources: ['referred'],
+    });
+  });
+
+  it('referredBy with no note still records the referrer; absent referredBy stays a plain manual add', async () => {
+    let r = res();
+    await handler(post({ requestId: REQ, name: 'Tim Newhouse', referredBy: 'Dr. Abby Doyle' }), r);
+    expect(ensureStaffManualCandidate).toHaveBeenCalledWith(
+      expect.objectContaining({ matchReason: 'Referred by Dr. Abby Doyle.' }),
+      { actingUserSystemId: 'u-1' },
+    );
+    expect(r.body.candidate.provenanceKind).toBe('referred');
+
+    jest.clearAllMocks();
+    getRecord.mockResolvedValue({ akoya_requestid: REQ, akoya_title: 'T', wmkf_meetingdate: '2026-06-01', _wmkf_programareaserved_value_formatted: 'Science' });
+    createReviewer.mockResolvedValue({ id: PR, created: true });
+    lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
+    ensureStaffManualCandidate.mockResolvedValue({ id: 'sug-1', created: true, selected: true });
+
+    r = res();
+    await handler(post({ requestId: REQ, name: 'Ada Lovelace' }), r);
+    expect(r.body.candidate.sources).toEqual(['staff_manual']);
+    expect(r.body.candidate.referredBy).toBeNull();
+    expect(r.body.candidate.provenanceKind).toBeUndefined();
+  });
+});

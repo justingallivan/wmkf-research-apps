@@ -58,6 +58,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
     affiliation: '',
     orcid: '',
     note: '',
+    referredBy: '', // S249: who suggested this candidate → tags provenance `referred`
     saving: false,
     error: null,
     added: null,
@@ -135,7 +136,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
   };
 
   const freshManual = (over = {}) => ({
-    name: '', email: '', affiliation: '', orcid: '', note: '',
+    name: '', email: '', affiliation: '', orcid: '', note: '', referredBy: '',
     saving: false, error: null, added: null, lookingUp: false, lookupMsg: null,
     orcidAutofilled: false, lookupResult: null, resolution: null,
     ...over,
@@ -262,6 +263,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
         affiliation: manual.affiliation.trim() || undefined,
         orcid: manual.orcid.trim() || undefined,
         note: manual.note.trim() || undefined,
+        referredBy: manual.referredBy.trim() || undefined,
         resolution: resolution || undefined,
       }),
     });
@@ -354,7 +356,10 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
   const manualAddCard = (
     <Card hover={false}>
       <div className="flex items-center justify-between mb-2">
-        <p className="font-medium text-gray-900">Manually Add New Reviewer</p>
+        <div>
+          <p className="font-medium text-gray-900">Add or Refer a Reviewer</p>
+          <p className="text-xs text-gray-500">Add a reviewer manually, or capture one a contacted reviewer suggested — fill “Referred by” to tag it as a referral.</p>
+        </div>
         {manual.saving && <Spinner />}
       </div>
       <form onSubmit={addManualReviewer} className="space-y-3">
@@ -501,6 +506,18 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
             </button>
           </div>
         )}
+        <label className="block">
+          <span className="block text-xs text-gray-500 mb-1">Referred by <span className="text-gray-400">(optional — the reviewer who suggested this person)</span></span>
+          <input
+            type="text"
+            value={manual.referredBy}
+            onChange={(ev) => updateManual('referredBy', ev.target.value)}
+            disabled={!canManage || manual.saving}
+            maxLength={180}
+            placeholder="e.g. Dr. Abby Doyle"
+            className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white disabled:bg-gray-50"
+          />
+        </label>
         <label className="block">
           <span className="block text-xs text-gray-500 mb-1">Note</span>
           <textarea

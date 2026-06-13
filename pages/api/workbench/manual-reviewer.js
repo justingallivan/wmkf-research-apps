@@ -3,6 +3,14 @@
  *
  * POST one sparse staff-entered reviewer into a request's durable candidate
  * pool. This is Phase 1 only: no enrichment runs here.
+ *
+ * Also captures REFERRALS (S249): when `referredBy` is supplied (a contacted
+ * reviewer suggested this person), the candidate is tagged provenance `referred`
+ * — a strong human signal, selectable-with-verify and grounded-rank-bonused like
+ * proposal_named — and the referrer is recorded in the durable match reason. The
+ * free-text → identity resolution (lookup → resolve/confirm/409) is the SAME
+ * abstain-or-confirm flow as manual add; only the provenance + referrer differ.
+ * Design: docs/REVIEWER_FINDER_REFERRAL_CAPTURE_DESIGN.md.
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
@@ -84,6 +92,7 @@ export default async function handler(req, res) {
   const email = cleanString(body.email, MAX_EMAIL).toLowerCase();
   const affiliation = cleanString(body.affiliation, MAX_AFFILIATION);
   const note = cleanString(body.note, MAX_NOTE);
+  const referredBy = cleanString(body.referredBy, MAX_NAME);
   const orcidRaw = cleanString(body.orcid, 64);
   const orcidNorm = orcidRaw ? normalizeOrcid(orcidRaw) : { state: 'empty' };
   const orcid = orcidNorm.state === 'valid' ? orcidNorm.id : null;
@@ -118,7 +127,11 @@ export default async function handler(req, res) {
 
       const cycleCode = request.wmkf_meetingdate ? meetingDateToCycleCode(request.wmkf_meetingdate) : null;
       const programArea = request._wmkf_programareaserved_value_formatted || null;
-      const matchReason = note || 'Manually added by staff.';
+      // Durable home of the referrer (D1: no new Dataverse field) — encode it in the
+      // match reason staff already read on the suggestion/person rows.
+      const matchReason = referredBy
+        ? `Referred by ${referredBy}.${note ? ` ${note}` : ''}`
+        : (note || 'Manually added by staff.');
 
       let selectedResolution = resolution;
       const lookup = await lookupReviewerIdentity({ name, email: email || null, affiliation: affiliation || null, orcid });
@@ -264,7 +277,11 @@ export default async function handler(req, res) {
           affiliation: responseAffiliation || null,
           orcid: carryOrcid || null,
           orcidUrl: carryOrcidUrl,
-          sources: ['staff_manual'],
+          sources: referredBy ? ['referred'] : ['staff_manual'],
+          // `referredBy` + `provenanceKind` drive the client's provenance (kind `referred`,
+          // selectable-with-verify, grounded-rank bonus, "Referred by X" card label).
+          referredBy: referredBy || null,
+          provenanceKind: referredBy ? 'referred' : undefined,
           manualAdded: true,
           applicantRecommended: false,
           invitable: !!responseEmail,

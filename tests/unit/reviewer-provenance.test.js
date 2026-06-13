@@ -6,6 +6,10 @@ const {
   buildReviewerProvenance,
   saveSourceListForCandidate,
   provenanceGroupOf,
+  provenanceLabelForCandidate,
+  hasGroundedProvenanceRankingBonus,
+  isIdentityReviewExemptProvenance,
+  PROVENANCE_KINDS,
 } = require('../../lib/utils/reviewer-provenance');
 
 describe('reviewer provenance DTO helper', () => {
@@ -99,5 +103,51 @@ describe('reviewer provenance DTO helper', () => {
       needsIdentification: true, identityStatus: 'unresolved',
     };
     expect(provenanceGroupOf(deferred)).toBe('needs_identity_review');
+  });
+});
+
+// S249 referral capture — a contacted reviewer suggested this person.
+describe('referred provenance (S249)', () => {
+  const referred = (over = {}) => ({ name: 'Tim Newhouse', referredBy: 'Dr. Abby Doyle', ...over });
+
+  test('a referredBy candidate gets kind=referred + seedRole=referred_by + the referrer passthrough', () => {
+    const p = buildReviewerProvenance(referred());
+    expect(p.kind).toBe(PROVENANCE_KINDS.REFERRED);
+    expect(p.seedRole).toBe('referred_by');
+    expect(p.referredBy).toBe('Dr. Abby Doyle');
+  });
+
+  test('non-referred provenance objects keep their shape (no referredBy key)', () => {
+    const p = buildReviewerProvenance({ name: 'X', source: 'proposal_named' });
+    expect(p).not.toHaveProperty('referredBy');
+  });
+
+  test('referred is a grounded-ranking-bonus kind (≈ proposal_named)', () => {
+    expect(hasGroundedProvenanceRankingBonus(referred())).toBe(true);
+  });
+
+  test('referred is identity-review-exempt → selectable-with-verify even when unresolved', () => {
+    expect(isIdentityReviewExemptProvenance(PROVENANCE_KINDS.REFERRED)).toBe(true);
+    const unresolvedReferral = referred({
+      needsIdentification: true, identityStatus: 'unresolved', verificationStatus: 'unresolved',
+    });
+    expect(provenanceGroupOf(unresolvedReferral)).toBe('cited_or_proposal_named');
+  });
+
+  test('the card label names the referrer', () => {
+    expect(provenanceLabelForCandidate(referred())).toBe('Referred by Dr. Abby Doyle');
+    expect(provenanceLabelForCandidate({ name: 'Y', referredBy: '', provenanceKind: 'referred' })).toBe('Referred');
+  });
+
+  test('referredBy survives a roster round-trip (provenance object reload)', () => {
+    const first = buildReviewerProvenance(referred());
+    // Simulate reload: the candidate now carries the persisted provenance object.
+    const reloaded = buildReviewerProvenance({ name: 'Tim Newhouse', provenance: first });
+    expect(reloaded.kind).toBe(PROVENANCE_KINDS.REFERRED);
+    expect(reloaded.referredBy).toBe('Dr. Abby Doyle');
+  });
+
+  test('save-source list carries the referred kind', () => {
+    expect(saveSourceListForCandidate(referred())).toContain('referred');
   });
 });
