@@ -164,8 +164,10 @@ whether the prose names groups/people. Resolve before building.
    sequential, **42.8s for 15 / 34.5s for 12 — the 12→15 bump costs only +8.4s**, far
    under the 600s budget. So the Track-A verify loop is *not* the 10-min risk, and
    parallelizing it (bounded concurrency, pattern exists in `discovery-service.js`) is a
-   nice-to-have, not urgent. The real post-Claude latency lever is **Track-B-off**
-   (removes the 4 DB searches + ≤25 Track-B resolutions). STILL UNMEASURED end-to-end:
+   nice-to-have, not urgent. The real post-Claude latency lever is **Track-B-off**, now
+   **MEASURED at ~27s** (≈3× a Track-A-only run; `scripts/profile-trackb-ab.mjs` A/B:
+   7 queries → 147 discovered, top-24 resolved through the OpenAlex/ORCID spine before
+   the 25 cap). STILL UNMEASURED end-to-end:
    analyze wall-clock (~50s est.), OpenAlex publication backfill, and contact
    enrichment / SerpAPI — profile those next if the slowness perception persists.
 
