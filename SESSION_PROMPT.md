@@ -1,107 +1,96 @@
-# Session 250 Prompt: direction-independent reviewer-finder — 3 of 4 shipped (recall 12→15, identity rescue, referral capture); SerpAPI→free-stack is the carryover
+# Session 251 Prompt: SerpAPI→free-stack migration — plan converged + Slice 1a shipped; Slice 1b is next
 
-> **GIT.** All S249 work is on `main`, pushed (`b65196c..cb0dee8`, 6 commits).
+> **GIT.** All S250 work is on `main`. ⚠ At S250 stop the branch was **13 commits ahead of
+> origin** (this session's 6 + the S249 set the S249 prompt wrongly marked "pushed"). `/stop`
+> pushed them — confirm `git status` shows up to date at S251 start; if not, `git push origin main`.
 > Working tree clean at handoff.
 
-## Session 249 — what happened
+## Session 250 — what happened
 
-Worked **item 2 from the S248 next-steps** ("direction-independent reviewer-finder
-ships — the experiment says invest HERE"). Justin picked **all four** sub-workstreams,
-**depth-first**. Shipped **3 of 4**, each committed, tested, gates-green, and (for the
-two safety-critical ones) **Codex-reviewed to convergence**. SerpAPI→free-stack is the
-clean carryover.
+Worked **item 1 from the S249 next-steps**: the **SerpAPI → free-stack migration** (the carryover
+— SerpAPI is the largest monthly expense, ~$150/mo, value eroded). Justin steered it as a careful
+plan-first, Codex-gated effort. **Scoped → planned → Codex-reviewed the design twice → shipped +
+hardened Slice 1a → Codex-reviewed the impl twice.** No endpoint has been swapped yet; Slice 1a is
+purely additive (no production behavior change).
 
 ### What was completed
 
-1. **Recall sampling 12→15 — SHIPPED (`b65196c`).** The recall lever per the D26
-   flowchart §2: a single deeper draw (Claude is consistent at temp 0.3, so extra draws
-   are wasted). Introduced **one** `DEFAULT_REVIEWER_COUNT` constant in
-   `shared/config/reviewerFinderPreferences.js`, replacing **10 scattered `12` literals**
-   (prompt module, composer, service, analyze route, both UI sliders). Default-contract
-   tests added; D26 flowchart + agent-wiki + S244 evidence-doc §6 reconciled.
-   - ⚠ **One open item:** the **padding-ceiling live check** — confirm on a real D26
-     proposal that count=15 returns *real* names, not fabricated padding (S231 saw 1003063
-     pad to 17). The downstream gates (placeholder/forename/identity) catch padding, so 15
-     is safe to ship; the live check is the **prerequisite before raising the default
-     above 15** (flagged in flowchart §2). Needs API key + a real proposal.
+1. **Migration plan — `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md` (the central artifact).**
+   Verified all **7 SerpAPI engine call-sites** across 3 services (`serp-contact-service`,
+   `literature-search-service`, `integrity-service`). **KEEP** #1 contact `google` + #7
+   `google_news` (irreplaceable); **REPLACE** the rest. Locked two decisions (both verified live):
+   - **Metrics → OpenAlex, not Semantic Scholar** — OpenAlex `summary_stats` gives h_index **+
+     i10_index** + cited_by_count (S2 lacks i10); already in-repo + SSRF-allowlisted.
+   - **Verified-email-domain guard re-sourced from OpenAlex** institution `homepage_url`
+     (ROR-resolved, ORCID-anchored) — better than Scholar's self-reported domain. Email *sourcing*
+     (PubMed/ORCID/Claude/SerpAPI Tier-4) is **untouched** by the whole migration.
 
-2. **Identity work-grounding rescue — SHIPPED + Codex-reviewed (`6e5146e`, fix `f026fba`).**
-   The corrected-posture weak link. Field-aware *ranking* was already shipped (S236); the
-   remaining loss was the **abstain** of a correct low-footprint researcher whose coarse
-   OpenAlex `x_concepts` miss the field text + Claude gave no institution.
-   `rescueByWorkGrounding` (`reviewer-identity-evidence.js`) re-tests her actual recent
-   **work titles** (`getWorksByAuthor`), forename-gated, with her **own ORCID works list**
-   (new `ORCIDService.getWorks`) as a merge-immune veto/corroborator. **Purely additive**
-   (only rescues prior abstains), `probable` ceiling, exactly-one-or-abstain. Codex caught
-   2 real bugs (collision-blind-spot-past-the-cap HIGH; single-generic-token MEDIUM) —
-   both fixed + regression-tested.
-
-3. **Referral capture — SHIPPED (full incl. UI) + Codex-reviewed (`7b5f5f6`, fix `b09c698`, docs `cb0dee8`).**
-   "Add or Refer a Reviewer". The hard part (free-text→identity, abstain-or-confirm) was
-   already built in the S236 manual-add path; referral capture is a thin layer: a new
-   `referred` provenance kind (grounded-rank bonus + selectable-with-verify like
-   `proposal_named`), `referredBy` stored in the durable match reason (no new Dataverse
-   field) **and** as a `referred` `wmkf_sources` token so it survives a `my-candidates`
-   reload, + a "Referred by" field on the manual-add card. Codex caught the **durability
-   HIGH** (referral degraded to `staff_manual` on reload) — fixed in both the persist
-   (`ensureStaffManualCandidate` `sources` param) and reconstruct (`my-candidates` parses
-   the referrer back) halves. Design: `docs/REVIEWER_FINDER_REFERRAL_CAPTURE_DESIGN.md`.
+2. **Slice 1a — OpenAlex-author identity contract in the resolver — SHIPPED + Codex-converged
+   (`395294e`, hardening `8a7ce2e`).** Codex's pre-impl HIGH: the enrichment path has **no**
+   OpenAlex author evidence today (resolver sees only scholar+orcid anchors; `_attachScholarMetrics`
+   gates on Scholar's own mismatch flags), so removing Scholar removes the trust gate — the
+   contract must land first. Built it in `reviewer-identity-resolver.js`:
+   `evidenceFromEnrichment` reads `tierResults.openalex_author`; new `openAlexAuthorAnchor` is an
+   **allowlist** (prove-good) — passes ONLY on a proven ORCID match (`orcid`==`claimedOrcid`) or a
+   persist-worthy + non-contradicted spine verdict; everything else → rejected anchor → abstain.
+   Codex post-impl caught the gate was originally **fail-OPEN** on unknown shapes (BLOCKED verdict)
+   — fixed. 3rd Codex pass: **CLEAN-TO-BUILD-1B**.
 
 ### Commits (6)
-`b65196c` recall 12→15 · `6e5146e` identity rescue · `f026fba` rescue Codex fixes ·
-`7b5f5f6` referral capture · `b09c698` referral Codex/durability fixes ·
-`cb0dee8` referral docs reconcile.
+`a134d2e` plan · `885e577` fold pre-impl review · `1c5d05c` fold re-review ·
+`395294e` Slice 1a · `8a7ce2e` Slice 1a hardening · `066daa7` 3rd-pass disposition + 1b constraints.
 
 ## Potential Next Steps
 
-### 1. SerpAPI → free-stack migration (#4 — the carryover, not started)
-The remaining item-2 workstream. $150/mo, the largest single expense; value eroded.
-Per memory `project-serpapi-capability-erosion` ~4 of 6 uses are replaceable by free
-alternatives. **Scope it first** (read `project-serpapi-budget-latency` +
-`project-serpapi-capability-erosion` + the 6 enrichment use-sites in
-`lib/services/contact-enrichment-service.js`) — which uses move to which free source,
-in what order, and the latency impact — before touching code. A real migration; worth
-its own focused session.
+### 1. Slice 1b — metrics + domain endpoint swap (THE next task; depends on 1a, now clean)
+Rewrite `ContactEnrichmentService._attachScholarMetrics` to: resolve the OpenAlex author
+(`getAuthorByOrcid` on the ORCID path; the `reviewer-identity-evidence` spine on the no-ORCID
+path), fetch metrics from OpenAlex (extend `mapAuthorRecord` to surface h/i10/cites + institution
+ref), re-source the domain via a new `OpenAlexService.getInstitution`, **write the
+`tierResults.openalex_author` DTO**, and retire the Scholar calls (`findScholarProfileViaGoogle` +
+`fetchScholarMetrics`) in `serp-contact-service.js`. `findContact` (#1) stays.
+- **⚠ Two 1b producer authoring constraints (Codex 3rd-pass LOWs — in the plan):**
+  (a) source `orcid`+`claimedOrcid` only from the real `getAuthorByOrcid` lookup (the resolver
+  compares but does NOT checksum-validate — the upstream validation is the guard); (b) pass only
+  the canonical `mapAuthorRecord.openAlexId`, never an assembled URL.
+- Field/provenance reconcile (durable, in the plan): `affiliationSource` gains `openalex_current`;
+  decide explicitly on the `scholarVerifiedEmail`→`verifiedInstitutionDomain` rename (spans
+  code+tests+smoke+docs) or keep the name; expand the consumer checklist.
 
-### 2. Smaller follow-ups from the shipped work
-- **Recall:** run the padding-ceiling live check (above) before raising count >15.
-- **Identity:** the deeper **ORCID-works-anchored origination corpus** (resolve ORCID-work
-  DOIs → OpenAlex for co-authors/aggregation) — the larger increment beyond the rescue.
-- **Referral:** no `my-candidates` endpoint test file exists; the referrer-reconstruction
-  regex is covered only indirectly (provenance re-derivation test). Optional: add a
-  `my-candidates` test that asserts a `referred`-sourced row reconstructs `referredBy`.
+### 2. Slices 2 & 3 (after 1b)
+- **Slice 2:** literature/PI-pubs `google_scholar` → OpenAlex works (reuses `getWorksByAuthor`);
+  explicit `googleScholar` key/`source`-string compatibility decision.
+- **Slice 3:** PubPeer `site:pubpeer.com` → PubPeer Developer API — **gated** on verifying the API
+  exists/terms; needs SSRF-allowlist add + `PUBPEER_API_KEY`; scope includes `screenApplicants`
+  source gating + `sources.pubpeer` shape compat. `searchNews` (#7) stays.
+- **Post-migration:** confirm real SerpAPI call volume in the billing dashboard → decide on the
+  Hobby-tier downgrade (~$100/mo saved; Justin, out-of-repo).
 
-### 3. Carryover (verify-before-acting — unchanged from S248)
+### 3. Older carryover (verify-before-acting — unchanged)
+- Recall padding-ceiling live check before raising count >15 (needs API key + real proposal).
 - Reviewer COI **Chunk 2b** (retire `POTENTIAL_CONCERNS`) — ⚠ destructive, deferred.
-- Trim the analyze prompt's dead Stage-1 `searchQueries` (Track B is off).
+- Trim the analyze prompt's dead Stage-1 `searchQueries`.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `shared/config/reviewerFinderPreferences.js` | `DEFAULT_REVIEWER_COUNT = 15` (single source of truth) |
-| `lib/services/reviewer-identity-evidence.js` | `rescueByWorkGrounding` + `fetchOrcidWorks` (identity rescue) |
-| `lib/services/orcid-service.js` | new `getWorks(orcid)` — ORCID self-asserted works titles |
-| `lib/utils/reviewer-provenance.js` | `REFERRED` kind (grounded-rank + exempt-selectable) |
-| `pages/api/workbench/manual-reviewer.js` | `referredBy` → match reason + `referred` source token |
-| `pages/api/reviewer-finder/my-candidates.js` | reconstructs `referredBy` from the match reason on reload |
-| `docs/REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md` | canonical pipeline picture (RS/IDFIX/REF status updated) |
-| `docs/REVIEWER_FINDER_REFERRAL_CAPTURE_DESIGN.md` | referral design + decisions (D1–D5) |
+| `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md` | The migration plan — slices, DTO, 1b constraints, 3 Codex disposition logs |
+| `lib/services/reviewer-identity-resolver.js` | Slice 1a: `openAlexAuthorAnchor` + `evidenceFromEnrichment` openalex_author read |
+| `tests/unit/reviewer-identity-resolver.test.js` | 44 tests incl. the 1a allowlist/fail-closed/canonicalization cases |
+| `lib/services/contact-enrichment-service.js` | `_attachScholarMetrics` (the 1b rewrite target) + `_validateEmailAgainstVerifiedDomain` |
+| `lib/services/serp-contact-service.js` | Scholar calls to retire in 1b (#2 `findScholarProfileViaGoogle`, #3 `fetchScholarMetrics`); `findContact` (#1) stays |
+| `lib/services/openalex-service.js` | `getAuthorByOrcid` (exists); 1b adds metrics to `mapAuthorRecord` + new `getInstitution` |
+| `lib/services/reviewer-identity-evidence.js` | The OpenAlex/ORCID spine 1b's no-ORCID path reuses (`evaluateSuggestion`) |
 
 ## Gotchas
-- **`grep`/`rg` output is corrupting identifiers + digits** this session (e.g.
-  `provenanceGroupOf`→`n`, `manualAdded`→`ned`, `:126`→`:n6`). Use the **Read tool** for
-  file *content* and exact line numbers; trust grep only for *which files* match. See
-  `project-rtk-grep-output-corruption`.
-- **`temperature` is rejected by opus-tier 4.7/4.8 + Fable 5** (400) — removed along with
-  `top_p`/`top_k`; steer via `output_config.effort`. Reviewer-finder runs on the **sonnet**
-  tier (Sonnet 4.6, accepts temperature), so its "reviewer diversity" slider **is live**.
-  It would only break if `CLAUDE_MODEL_REVIEWER_FINDER` were set to an opus-4.7+/Fable id
-  (a guard worth adding if reviewer-finder ever moves to opus).
-- **Referral durability:** the `referred` kind survives reload only because BOTH halves
-  are in place — `wmkf_sources` carries `referred` AND `my-candidates` parses the
-  "Referred by {name}." match-reason prefix. Don't remove either half.
-- **Identity rescue is `probable`-ceiling + forename-gated by design** — a rescued match
-  is selectable-with-verify (Slice-G invite gate), never auto-trusted. Don't "upgrade" it
-  to confirmed without independent ORCID-employment corroboration.
-- Reviewer-finder is currently access-locked to Justin only.
+- **`git commit -m "…"` with backticks corrupts the message** — backticks inside double quotes are
+  command-substituted by bash (ate `orcid`/`claimedOrcid` this session; amended `8a7ce2e`). Use
+  single-quoted `-m '…'`, or `-F <file>`.
+- **Slice 1a is additive — nothing writes `tierResults.openalex_author` yet**, so live behavior is
+  unchanged until 1b lands the producer. The agent-wiki / D26 flowchart reconcile happens at
+  migration *completion*, not now (resolver behavior in production is unchanged).
+- **`grep`/`rg` may still corrupt identifiers+digits** (`project-rtk-grep-output-corruption`) — use
+  Read for exact content/line numbers; trust grep only for *which files* match.
+- Reviewer-finder is access-locked to Justin only.
+</content>
