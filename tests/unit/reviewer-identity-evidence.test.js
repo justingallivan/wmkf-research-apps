@@ -223,7 +223,9 @@ describe('ReviewerIdentityEvidence.evaluateSuggestion', () => {
       topics: ['Organic synthesis'], lastKnownInstitution: 'Some Teaching College', ...overrides,
     });
     const physicsSuggestion = { name: 'Robert Sang', expertiseAreas: ['attosecond science'] };
-    const physicsProposal = { proposalInfo: { primaryResearchArea: 'Attosecond physics' } };
+    // Field text rich enough that an on-topic title shares ≥2 distinct tokens (the rescue
+    // grounding threshold — one generic token is not enough).
+    const physicsProposal = { proposalInfo: { primaryResearchArea: 'Attosecond physics', title: 'Ultrafast electron dynamics' } };
 
     test('rescues a forename-agreeing author whose recent work titles are on-topic → probable', async () => {
       OpenAlexService.searchAuthors.mockResolvedValue({ totalCount: 2, records: [offConcept()] });
@@ -231,7 +233,7 @@ describe('ReviewerIdentityEvidence.evaluateSuggestion', () => {
         totalCount: 1,
         records: [{ title: 'Attosecond electron dynamics in helium' }],
       });
-      jest.spyOn(ORCIDService, 'getWorks').mockResolvedValue(['Attosecond streaking of photoemission']);
+      jest.spyOn(ORCIDService, 'getWorks').mockResolvedValue(['Attosecond electron streaking measurements']);
       jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue(null);
 
       const out = await ReviewerIdentityEvidence.evaluateSuggestion(physicsSuggestion, physicsProposal);
@@ -305,6 +307,48 @@ describe('ReviewerIdentityEvidence.evaluateSuggestion', () => {
 
       expect(out.status).toBe('abstain');
       expect(out.reason).toBe('rescue_work_grounding_collision');
+    });
+
+    test('COLLISION beyond the probe cap: a lone grounded match abstains when forename-agreeing candidates go unprobed', async () => {
+      // 4 same-forename records all score 0; only A1 is on-topic, A2/A3 off-topic, A4 is
+      // never probed (cap = 3). The lone A1 grounding must NOT be promoted — a 4th on-topic
+      // namesake can't be ruled out, so abstain (Codex review fix: the slice must not hide a collision).
+      OpenAlexService.searchAuthors.mockResolvedValue({
+        totalCount: 4,
+        records: [
+          offConcept({ openAlexId: 'https://openalex.org/A1', orcid: null }),
+          offConcept({ openAlexId: 'https://openalex.org/A2', orcid: null }),
+          offConcept({ openAlexId: 'https://openalex.org/A3', orcid: null }),
+          offConcept({ openAlexId: 'https://openalex.org/A4', orcid: null }),
+        ],
+      });
+      OpenAlexService.getWorksByAuthor.mockImplementation((authorId) => Promise.resolve(
+        String(authorId).includes('A1')
+          ? { totalCount: 1, records: [{ title: 'Attosecond electron dynamics in helium' }] }
+          : { totalCount: 1, records: [{ title: 'Organic total synthesis of natural products' }] },
+      ));
+
+      const out = await ReviewerIdentityEvidence.evaluateSuggestion(physicsSuggestion, physicsProposal);
+
+      expect(out.status).toBe('abstain');
+      expect(out.reason).toBe('rescue_work_grounding_collision');
+    });
+
+    test('a single shared GENERIC token does not ground a wrong person → abstain', async () => {
+      // Field and title share only the generic word "cell" — one cross-domain token must
+      // not be enough to promote (Codex review fix: rescue requires ≥2 distinct shared tokens).
+      OpenAlexService.searchAuthors.mockResolvedValue({ totalCount: 2, records: [offConcept()] });
+      OpenAlexService.getWorksByAuthor.mockResolvedValue({
+        totalCount: 1, records: [{ title: 'Solar cell efficiency in perovskite photovoltaics' }],
+      });
+
+      const out = await ReviewerIdentityEvidence.evaluateSuggestion(
+        { name: 'Robert Sang', expertiseAreas: [] },
+        { proposalInfo: { primaryResearchArea: 'Single cell RNA imaging' } },
+      );
+
+      expect(out.status).toBe('abstain');
+      expect(out.reason).toBe('no_openalex_affiliation_or_topic_match');
     });
 
     test('does not run when the normal path already resolves (additive only)', async () => {
