@@ -17,6 +17,7 @@ import {
   ANALYZE_USER_PROMPT_TEMPLATE,
   SCORE_CANDIDATES_USER_PROMPT_TEMPLATE,
 } from '../../shared/config/prompts/reviewer-finder-dynamics.js';
+import { DEFAULT_REVIEWER_COUNT } from '../../shared/config/reviewerFinderPreferences.js';
 
 const WRAPPED = '[[WMKF-UNTRUSTED-CONTENT nonce=deadbeef]]\nProposal body here.\n[[/WMKF-UNTRUSTED-CONTENT nonce=deadbeef]]';
 const NONCE = 'deadbeef';
@@ -54,6 +55,26 @@ describe('buildAnalyzeBlockVars matches legacy conditional layout', () => {
     expect(v.additional_notes_block).toBe('**ADDITIONAL CONTEXT FROM USER:**\nX\n');
     expect(v.excluded_names_block).toBe('\n**EXCLUDED NAMES (conflicts of interest - do NOT suggest these):**\nA, B\n');
     expect(v.reviewer_count).toBe('9');
+  });
+});
+
+describe('default reviewer count is the single shared constant (S249: 12→15)', () => {
+  it('DEFAULT_REVIEWER_COUNT is 15 (recall lever)', () => {
+    expect(DEFAULT_REVIEWER_COUNT).toBe(15);
+  });
+  it('buildAnalyzeBlockVars falls back to DEFAULT_REVIEWER_COUNT when count omitted', () => {
+    const v = buildAnalyzeBlockVars({ additionalNotes: '', excludedNames: [] });
+    expect(v.reviewer_count).toBe(String(DEFAULT_REVIEWER_COUNT));
+  });
+  it('createAnalysisPrompt and composeAnalyzePrompt agree on the omitted-count default', () => {
+    const fromCode = createAnalysisPrompt(WRAPPED, '', [], undefined, [NONCE]);
+    const fromComposer = composeAnalyzePrompt({
+      body: ANALYZE_USER_PROMPT_TEMPLATE,
+      proposalText: WRAPPED,
+      nonces: [NONCE],
+    });
+    expect(fromComposer).toBe(fromCode);
+    expect(fromCode).toContain(`Suggest ${DEFAULT_REVIEWER_COUNT} potential expert reviewers`);
   });
 });
 

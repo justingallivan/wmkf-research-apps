@@ -22,6 +22,7 @@ import {
 import { interpolate } from '../../../lib/services/prompt-store';
 import { SCORE_CANDIDATES_USER_PROMPT_TEMPLATE } from './reviewer-finder-dynamics';
 import { normalizeReviewerName, buildExcludedSet } from '../../../lib/utils/reviewer-name-match';
+import { DEFAULT_REVIEWER_COUNT } from '../reviewerFinderPreferences';
 
 // Cap for the Stage 2 candidate block (U-EXT). Generous — a batch of
 // candidates with three publication titles each stays well under this.
@@ -40,7 +41,7 @@ const DEBUG_REVIEWER_FINDER = process.env.DEBUG_REVIEWER_FINDER === 'true';
 // `wrappedProposal` is the proposal text already wrapped by
 // `wrapUntrustedContent` (A7 Part 5). ClaudeReviewerService.analyzeProposal
 // does this with source `reviewer-finder.analyze.proposalText`.
-export function createAnalysisPrompt(wrappedProposal, additionalNotes = '', excludedNames = [], reviewerCount = 12, nonces = []) {
+export function createAnalysisPrompt(wrappedProposal, additionalNotes = '', excludedNames = [], reviewerCount = DEFAULT_REVIEWER_COUNT, nonces = []) {
   const excludedSection = excludedNames.length > 0
     ? `\n**EXCLUDED NAMES (conflicts of interest - do NOT suggest these):**\n${excludedNames.join(', ')}\n`
     : '';
@@ -531,7 +532,7 @@ function hasReviewerDetail(suggestion) {
  */
 export function validateReviewerAnalysis(result, opts = {}) {
   const {
-    reviewerCount = 12,
+    reviewerCount = DEFAULT_REVIEWER_COUNT,
     stopReason = null,
     excludedNames = [],
     analysisPurpose = 'search',
@@ -542,7 +543,7 @@ export function validateReviewerAnalysis(result, opts = {}) {
   const nonPlaceholder = originalSuggestions.filter(s => !isPlaceholderSuggestion(s));
 
   const isSearch = analysisPurpose !== 'proposal_info';
-  const requested = Number.isFinite(Number(reviewerCount)) ? Math.max(0, Number(reviewerCount)) : 12;
+  const requested = Number.isFinite(Number(reviewerCount)) ? Math.max(0, Number(reviewerCount)) : DEFAULT_REVIEWER_COUNT;
   const suggestionFloor = Math.min(requested, Math.max(3, Math.ceil(requested / 2)));
 
   // Sanitize quality issues out of the surfaced list rather than hard-failing on

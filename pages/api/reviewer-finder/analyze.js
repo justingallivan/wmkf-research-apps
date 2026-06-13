@@ -19,6 +19,7 @@ import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { safeFetch } from '../../../lib/utils/safe-fetch';
 import { ClaudeReviewerService } from '../../../lib/services/claude-reviewer-service';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
+import { DEFAULT_REVIEWER_COUNT } from '../../../shared/config/reviewerFinderPreferences';
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
 
 const limiter = nextRateLimiter({ max: 10 });
@@ -185,7 +186,7 @@ export default async function handler(req, res) {
       additionalNotes: additionalNotes || '',
       excludedNames: excludedNames || [],
       temperature: temperature !== undefined ? temperature : 0.3,
-      reviewerCount: reviewerCount || 12,
+      reviewerCount: reviewerCount || DEFAULT_REVIEWER_COUNT,
       userProfileId,
       signal: deadlineController.signal,
       deadlineAt,

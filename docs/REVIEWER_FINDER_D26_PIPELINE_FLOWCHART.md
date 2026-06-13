@@ -34,7 +34,7 @@ flowchart TD
 
     subgraph ORIG["2 · Origination — Claude is the ENGINE"]
         CA["Claude Analysis: suggest reviewer NAMES<br/>(origination spine)"]
-        RS["Recall sampling: count 12→15 (single deeper draw)"]
+        RS["Recall sampling: count 12→15 (single deeper draw) — SHIPPED S249"]
         TB["Track B: DB keyword→author origination<br/>OFF — archived in code (TRACK_B_ENABLED=false)"]
         WEB["Perplexity web-discovery"]
     end
@@ -86,8 +86,8 @@ flowchart TD
     classDef dead fill:#5a5a5a,stroke:#777,color:#fff,stroke-dasharray:4 3
     classDef open fill:#6a1b9a,stroke:#8e24aa,color:#fff
 
-    class P,CA,TA,ID,DD,RK,COI,CUR,ROSTER,ENR,SAVE,INVITE,PR exists
-    class RS,IDFIX,SERP,REF build
+    class P,CA,TA,ID,DD,RK,COI,CUR,ROSTER,ENR,SAVE,INVITE,PR,RS exists
+    class IDFIX,SERP,REF build
     class WEB,GROUNDED,TB dead
     class EXC,AppRecs open
 ```
@@ -199,14 +199,20 @@ named personnel is a sensible future add — NOT yet implemented.)
 1. **Identity-resolution recall hardening** — field-aware + ORCID-anchored resolution so
    low-footprint *correct* names aren't lost to famous namesakes (the Christina case).
    Highest-leverage, and it's an *identity* fix, not an origination one.
-2. **Recall sampling — single deeper draw (count 12→15), NOT extra calls.** Claude is
-   consistent at temp 0.3, so re-drawing returns the same head (wasted call); a deeper
-   single draw walks further down the same ranked list and surfaces tail names in one
-   call. 39/50 of applicants' own recommended reviewers were found by neither path — a
-   *magnitude* signal that the pool is shallow (not a target to chase; the applicant
-   list carries friends-of-PI bias). Watch the padding ceiling (the S231 probe saw
-   1003063 padded to 17 with hallucinated entries) — validate 15 returns real names
-   before going higher. This is the recall lever (replacing Track B).
+2. **Recall sampling — single deeper draw (count 12→15), NOT extra calls. ✅ SHIPPED S249.**
+   The default candidate count was raised 12→15 via a single shared constant
+   (`DEFAULT_REVIEWER_COUNT` in `shared/config/reviewerFinderPreferences.js`, imported by
+   the prompt, composer, service, analyze route, and both UI sliders — no more scattered
+   literals). Claude is consistent at temp 0.3, so re-drawing returns the same head (wasted
+   call); a deeper single draw walks further down the same ranked list and surfaces tail
+   names in one call. 39/50 of applicants' own recommended reviewers were found by neither
+   path — a *magnitude* signal that the pool is shallow (not a target to chase; the applicant
+   list carries friends-of-PI bias). This is the recall lever (replacing Track B). **Still
+   open — the padding-ceiling check:** confirm on a live run that 15 returns *real* names,
+   not fabricated padding (the S231 probe saw 1003063 padded to 17 with hallucinated
+   entries). The downstream gates already catch padding (placeholder/incomplete detection in
+   `validateReviewerAnalysis`, the Track-A forename gate, the identity save-gate), but a live
+   confirmation is the prerequisite before raising the default above 15.
 3. **Referral capture** ("add suggested candidate") — a declining reviewer's free-text
    suggestion → resolved candidate; reuse manual-add (S236) + identity spine with
    abstain-or-confirm safety. One of the three signals that made last cycle work.

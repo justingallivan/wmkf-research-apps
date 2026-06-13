@@ -23,7 +23,7 @@ import EmailGeneratorModal from '../shared/components/EmailGeneratorModal';
 import SettingsModal from '../shared/components/SettingsModal';
 import { getModelDisplayName } from '../shared/utils/modelNames';
 import { BASE_CONFIG } from '../shared/config/baseConfig';
-import { resolveStoredCycle, formatCycleForStorage } from '../shared/config/reviewerFinderPreferences';
+import { resolveStoredCycle, formatCycleForStorage, DEFAULT_REVIEWER_COUNT } from '../shared/config/reviewerFinderPreferences';
 import ProfileContext from '../shared/context/ProfileContext';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import { readSseStream } from '../shared/components/reviewers/sse';
@@ -682,7 +682,7 @@ function NewSearchTab({ apiCapabilities, onCandidatesSaved, searchState, setSear
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [excludedNames, setExcludedNames] = useState('');
   const [temperature, setTemperature] = useState(0.3); // Default: conservative, predictable
-  const [reviewerCount, setReviewerCount] = useState(12); // Default: 12 candidates
+  const [reviewerCount, setReviewerCount] = useState(DEFAULT_REVIEWER_COUNT); // recall lever; see reviewerFinderPreferences
   const [searchSources, setSearchSources] = useState({
     pubmed: true,
     arxiv: true,

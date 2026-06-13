@@ -4,6 +4,21 @@
  * Postgres `user_preferences` table was retired 2026-05-12). These settings
  * are per-user and persisted when a profile is selected.
  */
+/**
+ * Default candidate count for a reviewer-finder analyze draw.
+ *
+ * S249: raised 12 → 15. This is the recall lever — a single deeper draw walks
+ * further down Claude's ranked list and surfaces tail names in one call;
+ * re-drawing at temp 0.3 just returns the same head (wasted call). It replaces
+ * the recall Track B used to add (now archived off). The UI slider range stays
+ * 1–25. Canonical rationale + the "watch the padding ceiling; validate that 15
+ * returns real names before going higher" caveat live in
+ * docs/REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md §2. Single source of truth —
+ * every analyze default (prompt, composer, service, route, both UI sliders)
+ * imports this rather than re-hardcoding the number.
+ */
+export const DEFAULT_REVIEWER_COUNT = 15;
+
 export const PREFERENCE_KEYS = {
   SENDER_INFO: 'reviewer_finder_sender_info',
   GRANT_CYCLE_SETTINGS: 'reviewer_finder_grant_cycle_settings',

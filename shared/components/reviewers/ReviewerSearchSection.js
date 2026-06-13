@@ -53,6 +53,7 @@ import {
   provenanceLabelForCandidate,
   withReviewerProvenance,
 } from '../../../lib/utils/reviewer-provenance';
+import { DEFAULT_REVIEWER_COUNT } from '../../config/reviewerFinderPreferences';
 
 // The four literature sources the discover endpoint understands. The user picks
 // which to query (parity with the standalone Reviewer Finder); at least one must
@@ -435,7 +436,7 @@ export default function ReviewerSearchSection({
   const [excludedRemoved, setExcludedRemoved] = useState(0);
   const [searchSources, setSearchSources] = useState({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
   const noSourcesSelected = !Object.values(searchSources).some(Boolean);
-  const [reviewerCount, setReviewerCount] = useState(12); // how many candidates Claude is asked to suggest
+  const [reviewerCount, setReviewerCount] = useState(DEFAULT_REVIEWER_COUNT); // how many candidates Claude is asked to suggest (recall lever; see reviewerFinderPreferences)
   const [temperature, setTemperature] = useState(0.3); // "reviewer diversity": 0.3 conservative → 1.0 creative
   const [additionalNotes, setAdditionalNotes] = useState(''); // optional extra instructions for Claude
 
@@ -469,7 +470,7 @@ export default function ReviewerSearchSection({
     setExcludedRemoved(0); setRosterNote(null);
     setRosterActive([]); setRosterExcluded([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false);
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
-    setReviewerCount(12);
+    setReviewerCount(DEFAULT_REVIEWER_COUNT);
     setTemperature(0.3);
     setAdditionalNotes('');
     setRecPhase('idle'); setRecCandidates([]); setRecProgress([]); setRecError(null);

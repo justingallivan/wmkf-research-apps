@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-12
+last_verified: 2026-06-13
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -140,7 +140,9 @@ the Track-A verified set. All of that machinery is preserved.
   surfaces trainees (PI-vs-trainee indistinguishable) and deceased figures.
 - **Latency** — A/B isolation (`scripts/profile-trackb-ab.mjs`) measured Track B at ~27s
   (≈3× a Track-A-only run; one example local run). Archiving reclaims it.
-- Recall is now served by **Claude recall-sampling (count 12→15)** + **referral capture**,
+- Recall is now served by **Claude recall-sampling** — the default candidate count was
+  raised **12→15 (SHIPPED S249**, single deeper draw; `DEFAULT_REVIEWER_COUNT` in
+  `shared/config/reviewerFinderPreferences.js`) — plus **referral capture (still pending)**,
   not a grounded keyword lane.
 
 **To re-enable / repurpose:** flip `TRACK_B_ENABLED = true`. If grounded origination is ever

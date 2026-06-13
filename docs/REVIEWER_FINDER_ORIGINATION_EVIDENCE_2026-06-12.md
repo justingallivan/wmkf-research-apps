@@ -146,6 +146,11 @@ source-blinded quality.** Do not demote Track-A before grounded coverage is prov
 - **Recall sampling**: bump `analyze` candidate count / multiple draws — the
   multi-draw variance (12→17→21) shows real people are lost to undersampling
   regardless of which origination direction wins.
+  **[S248 refinement → S249 SHIPPED — supersedes the "multiple draws" half of this
+  rec]** S248 tested re-drawing and found Claude is *consistent* at temp 0.3 (extra
+  draws return the same head, a wasted call), so the lever is a **single deeper draw**,
+  not multiple draws; the default candidate count was raised **12→15 (S249)**. See
+  `docs/REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md` §2 for the current statement.
 - **Referral capture** (`project-reviewer-referral-capture`) for the `unknown` tail.
 - **SerpAPI → free-stack cost migration** (`project-serpapi-capability-erosion`).
 - **Prompt-decomposition + staff one-pager** — as a search-basis + legibility
