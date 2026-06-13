@@ -168,7 +168,7 @@ ${raw.text}
 
 From these results, produce a structured summary. For each item, assess how directly relevant it is to the proposal.
 
-IMPORTANT — PI name disambiguation: Common names (e.g., "Bo Li", "Wei Wang", "Li Zhang") may match publications by DIFFERENT researchers at different institutions in different fields. When building the piPublicationSummary, only include publications that are plausibly by the PI named in this proposal (match institution, department, and research field). If in doubt, exclude the paper rather than attribute it to the wrong person. Flag any ambiguity in notableGaps.
+IMPORTANT — PI name disambiguation: Common names (e.g., "Bo Li", "Wei Wang", "Li Zhang") may match publications by DIFFERENT researchers at different institutions in different fields. Each piPublications entry includes a "resolvedInstitution" — the institution of the author the database actually matched. If that resolvedInstitution clearly conflicts with the proposal PI's institution/field, treat the publications as a likely WRONG namesake and exclude them. When building the piPublicationSummary, only include publications that are plausibly by the PI named in this proposal (match institution, department, and research field). If in doubt, exclude the paper rather than attribute it to the wrong person. Flag any ambiguity in notableGaps.
 
 Return as JSON:
 {

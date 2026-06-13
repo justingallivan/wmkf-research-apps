@@ -286,6 +286,22 @@ Built as designed. Resolved decisions:
   unit tests; integration mock key `googleScholar`→`openAlex`. Full suite green (167 suites / 2413).
 - Residual SerpAPI after Slice 2 = **#1 contact + #6 PubPeer + #7 news**. #6 is Slice 3.
 
+**Codex post-impl review (`d90d4e0`) — areas 1/6 clean; `per-page` confirmed correct; 1 MEDIUM + 2 LOW folded:**
+- **[MEDIUM] PI recency filter silently dropped** — `_searchPIPubs` passed `yearFrom` to
+  `getWorksByAuthor`, which didn't accept it (PI pubs came back unfiltered by year, unlike the
+  old `as_ylo`). Added a `yearFrom` → `from_publication_date` AND-clause to `getWorksByAuthor`
+  (the spine-rescue path omits it, unchanged).
+- **[LOW] PI namesake mitigation** — surfaced the *resolved* OpenAlex author's `lastKnownInstitution`
+  as `resolvedInstitution` in the PI-pubs payload, and instructed the collation prompt to exclude a
+  publications set whose resolvedInstitution conflicts with the proposal PI's institution (closes the
+  acronym-can't-token-match gap from the prompt side).
+- **[LOW] stale labels** — fixed two non-runtime "Google Scholar" references (a panel-review-service
+  Stage-0b comment + `docs/VIRTUAL_REVIEW_PANEL.md`).
+- **[MEDIUM→resolved] `per-page` param** — confirmed correct: all five OpenAlex methods use the
+  hyphenated `per-page` and the production identity spine relies on them; not a regression.
+- 3 new tests (getWorksByAuthor yearFrom filter; resolvedInstitution payload). Full suite green
+  (167 suites / 2415 tests).
+
 ## Slice 3 — PubPeer → PubPeer Developer API
 
 **File:** `lib/services/integrity-service.js` (`searchPubPeer`). Most self-contained slice.

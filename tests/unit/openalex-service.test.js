@@ -361,6 +361,25 @@ describe('OpenAlexService.searchWorks (Slice 2 — novelty literature)', () => {
   });
 });
 
+describe('OpenAlexService.getWorksByAuthor — yearFrom recency filter (Slice 2)', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('ANDs from_publication_date into the author filter when yearFrom is given', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({ meta: { count: 0 }, results: [] }));
+    await OpenAlexService.getWorksByAuthor('https://openalex.org/A1', { yearFrom: 2020, limit: 15 });
+    const url = safeFetch.mock.calls[0][0];
+    expect(url).toMatch(/filter=author\.id%3AA1%2Cfrom_publication_date%3A2020-01-01/);
+  });
+
+  test('omits the recency filter when yearFrom is absent (spine rescue path unchanged)', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({ meta: { count: 0 }, results: [] }));
+    await OpenAlexService.getWorksByAuthor('A1');
+    const url = safeFetch.mock.calls[0][0];
+    expect(url).toMatch(/filter=author\.id%3AA1(&|$)/);
+    expect(url).not.toMatch(/from_publication_date/);
+  });
+});
+
 describe('reconstructAbstract — OpenAlex inverted-index → text', () => {
   test('places tokens at their positions and joins', () => {
     expect(reconstructAbstract({ The: [0], quick: [1], brown: [2], fox: [3] })).toBe('The quick brown fox');

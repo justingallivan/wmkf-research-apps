@@ -16,7 +16,7 @@ Thin design / operations reference for the Virtual Review Panel app. Created S19
 Orchestrated by `PanelReviewService` in `lib/services/panel-review-service.js`; multi-provider transport via `MultiLLMService` in `lib/services/multi-llm-service.js`.
 
 1. **(Optional) Stage 0a — Claim extraction.** Claude only; extracts structured claim data from proposal text.
-2. **(Optional) Stage 0b — Database searches.** `LiteratureSearchService.searchAll(claimData)` queries PubMed, arXiv, bioRxiv, ChemRxiv, Google Scholar in parallel. No LLM call.
+2. **(Optional) Stage 0b — Database searches.** `LiteratureSearchService.searchAll(claimData)` queries PubMed, arXiv, bioRxiv, ChemRxiv, OpenAlex in parallel. No LLM call. (Novelty + PI-publication search moved from SerpAPI Google Scholar to free OpenAlex works in S251 — see `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md`.)
 3. **(Optional) Stage 0c — Search collation.** Claude only (Haiku); operates on extracted `claimData` plus raw search results, **not** raw proposal text.
 4. **(Optional) Stage 0d — Perplexity synthesis.** Runs only when Perplexity is configured AND allowed by `VRP_ALLOWED_PROVIDERS`; synthesizes field landscape from claims + collated results.
 5. **(Optional) Stage 1 — Claim verification.** Each selected provider checks claims against literature.

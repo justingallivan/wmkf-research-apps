@@ -75,8 +75,13 @@ describe('LiteratureSearchService._searchPIPubs (PI publications)', () => {
     const out = await LiteratureSearchService._searchPIPubs(
       [{ name: 'Bo Li', institution: 'Massachusetts Institute of Technology' }], 'biology');
 
-    expect(worksSpy).toHaveBeenCalledWith('A_RIGHT', expect.anything()); // institution-matched author
-    expect(out[0]).toMatchObject({ piName: 'Bo Li', institution: 'Massachusetts Institute of Technology' });
+    // institution-matched author + recency filter threaded through (Codex S251 MEDIUM)
+    expect(worksSpy).toHaveBeenCalledWith('A_RIGHT', expect.objectContaining({ yearFrom: new Date().getFullYear() - 5 }));
+    expect(out[0]).toMatchObject({
+      piName: 'Bo Li',
+      institution: 'Massachusetts Institute of Technology',
+      resolvedInstitution: 'Massachusetts Institute of Technology', // surfaced for the LLM cross-check
+    });
     expect(out[0].publications[0]).toMatchObject({ title: 'PI paper', citedBy: 42, year: '2024' });
   });
 
