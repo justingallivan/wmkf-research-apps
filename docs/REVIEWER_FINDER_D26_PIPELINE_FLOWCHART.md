@@ -34,7 +34,7 @@ flowchart TD
 
     subgraph ORIG["2 · Origination — Claude is the ENGINE"]
         CA["Claude Analysis: suggest reviewer NAMES<br/>(origination spine)"]
-        RS["Recall sampling: more draws / count"]
+        RS["Recall sampling: count 12→15 (single deeper draw)"]
         TB["Track B: DB keyword→author origination<br/>OFF — ~0 contribution to saved set last cycle"]
         WEB["Perplexity web-discovery"]
     end
@@ -144,15 +144,30 @@ whether the prose names groups/people. Resolve before building.
 1. **Identity-resolution recall hardening** — field-aware + ORCID-anchored resolution so
    low-footprint *correct* names aren't lost to famous namesakes (the Christina case).
    Highest-leverage, and it's an *identity* fix, not an origination one.
-2. **Recall sampling** — more `analyze` draws / higher candidate count. 39/50 of
-   applicants' own recommended reviewers were found by neither path — we under-sample
-   real people. This is now the recall lever (replacing Track B).
+2. **Recall sampling — single deeper draw (count 12→15), NOT extra calls.** Claude is
+   consistent at temp 0.3, so re-drawing returns the same head (wasted call); a deeper
+   single draw walks further down the same ranked list and surfaces tail names in one
+   call. 39/50 of applicants' own recommended reviewers were found by neither path — a
+   *magnitude* signal that the pool is shallow (not a target to chase; the applicant
+   list carries friends-of-PI bias). Watch the padding ceiling (the S231 probe saw
+   1003063 padded to 17 with hallucinated entries) — validate 15 returns real names
+   before going higher. This is the recall lever (replacing Track B).
 3. **Referral capture** ("add suggested candidate") — a declining reviewer's free-text
    suggestion → resolved candidate; reuse manual-add (S236) + identity spine with
    abstain-or-confirm safety. One of the three signals that made last cycle work.
 4. **Disable Track B** — remove the DB keyword→author origination lane from the
    production parallel path (it ran but contributed ~0 to saved panels).
 5. **SerpAPI → free-stack migration** — $150/mo, value eroded; 4 of 6 uses replaceable.
+6. **Verify-loop latency — MEASURED, not the bottleneck (deprioritized).** Profiled
+   `verifyClaudeSuggestions` on the real 1002878 Arm-A names
+   (`scripts/profile-reviewer-verify.mjs`, live PubMed/OpenAlex): ~2.8s/candidate
+   sequential, **42.8s for 15 / 34.5s for 12 — the 12→15 bump costs only +8.4s**, far
+   under the 600s budget. So the Track-A verify loop is *not* the 10-min risk, and
+   parallelizing it (bounded concurrency, pattern exists in `discovery-service.js`) is a
+   nice-to-have, not urgent. The real post-Claude latency lever is **Track-B-off**
+   (removes the 4 DB searches + ≤25 Track-B resolutions). STILL UNMEASURED end-to-end:
+   analyze wall-clock (~50s est.), OpenAlex publication backfill, and contact
+   enrichment / SerpAPI — profile those next if the slowness perception persists.
 
 ## 🟪 Open policy / design decisions
 
