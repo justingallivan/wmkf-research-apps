@@ -356,3 +356,22 @@ classification leak; residual gate on the proven-ORCID path) confirmed the inten
 Two new LOWs, both explicitly **1b authoring constraints, not 1a defects** — recorded above as
 the "1b producer authoring constraints" callout (source ORCID fields from the real lookup; pass
 only the canonical `mapAuthorRecord.openAlexId`). No 1a code change warranted.
+
+### Codex post-impl review of Slice 1b (`242d96c`) — trust boundary CLEAN; 1 HIGH + 2 LOW folded
+7 adversarial probes. The producer→resolver trust boundary was confirmed sound (NOT-REPRODUCIBLE:
+shared accept gate has no pass/fail divergence; ORCID hard-key proof honors both 1b constraints;
+metrics-gate decoupling is intentional with no correctness regression; consumer reconciliation
+complete). All three actionable findings fixed (commit after `242d96c`):
+- **[HIGH] Registrable-domain over-broadening.** The curated `MULTI_LABEL_SUFFIXES` list silently
+  returned a bare public suffix (e.g. `edu.ph`, absent from the list) as the "verified domain", so
+  the keep-biased email guard matched `anyone@x.edu.ph` and could persist a namesake email. Replaced
+  the fixed list with a PATTERN (known second-level token + 2-letter ccTLD → eTLD+1 = last three
+  labels) that generalizes to unlisted ccTLD suffixes, and FAILS CLOSED (null → guard skips) on a
+  bare two-label suffix. IDN/Unicode homepages remain fail-safe (guard no-ops, never over-keeps).
+- **[LOW] Track-B no-ORCID candidates missed metrics** — they carry `openAlexAuthorId`, not
+  `openAlexId`. The spine-path read now falls back to `candidate.openAlexAuthorId`.
+- **[LOW] OpenAlex outage was indistinguishable from no-anchor** — a non-abort lookup error left
+  `tierResults.openalex_author` unset. The catch now records `{ skipped: 'openalex_error' }`
+  (fail-closed for the persistence/UI fallbacks).
+5 new tests (registrable-domain generalization + fail-closed; Track-B `openAlexAuthorId`; outage
+marker). Full suite green (166 suites / 2402 tests).

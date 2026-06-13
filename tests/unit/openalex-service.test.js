@@ -330,8 +330,26 @@ describe('registrableDomainFromUrl — eTLD+1 extraction for the email-domain gu
     expect(registrableDomainFromUrl('https://research.unimelb.edu.au')).toBe('unimelb.edu.au');
   });
 
-  test('null/empty input → null', () => {
+  test('generalizes to UNLISTED ccTLD suffixes (Codex S251 HIGH — no over-broad eTLD)', () => {
+    // edu.ph was not in the old curated list → it wrongly returned `edu.ph`, letting
+    // `anyone@x.edu.ph` match the verified domain. The pattern returns the eTLD+1.
+    expect(registrableDomainFromUrl('https://www.university.edu.ph')).toBe('university.edu.ph');
+    expect(registrableDomainFromUrl('https://lab.go.kr')).toBe('lab.go.kr');
+  });
+
+  test('fails CLOSED (null) on a bare two-label public suffix (no institution label)', () => {
+    expect(registrableDomainFromUrl('https://edu.ph')).toBeNull();
+    expect(registrableDomainFromUrl('https://ac.uk')).toBeNull();
+  });
+
+  test('keeps a normal two-label registrable under a 2-letter ccTLD', () => {
+    expect(registrableDomainFromUrl('https://phys.ethz.ch')).toBe('ethz.ch');
+    expect(registrableDomainFromUrl('https://uni-frankfurt.de')).toBe('uni-frankfurt.de');
+  });
+
+  test('null/empty/host-less input → null', () => {
     expect(registrableDomainFromUrl(null)).toBeNull();
     expect(registrableDomainFromUrl('')).toBeNull();
+    expect(registrableDomainFromUrl('https://localhost')).toBeNull();
   });
 });

@@ -87,7 +87,7 @@ describe('enrichCandidate — OpenAlex metrics fetched even for early-email cand
     expect(out.contactEnrichment.hIndex).toBe(42);
   });
 
-  test('no-ORCID candidate carrying a discovery-spine OpenAlex author id uses getAuthorById', async () => {
+  test('no-ORCID candidate carrying a discovery-spine OpenAlex author id (openAlexId) uses getAuthorById', async () => {
     jest.spyOn(ContactParser, 'extractPrimaryEmail').mockReturnValue('s@mit.edu');
 
     const out = await ContactEnrichmentService.enrichCandidate(
@@ -99,6 +99,33 @@ describe('enrichCandidate — OpenAlex metrics fetched even for early-email cand
     expect(byIdSpy).toHaveBeenCalledWith('A5023888391', expect.anything());
     expect(out.contactEnrichment.hIndex).toBe(42);
     expect(out.contactEnrichment.tierResults.openalex_author.acceptPath).toBe('spine');
+  });
+
+  test('Track-B candidate carrying openAlexAuthorId (not openAlexId) also gets metrics (Codex S251 LOW)', async () => {
+    jest.spyOn(ContactParser, 'extractPrimaryEmail').mockReturnValue('tb@mit.edu');
+
+    const out = await ContactEnrichmentService.enrichCandidate(
+      { name: 'Dr. TB', affiliation: 'MIT', openAlexAuthorId: 'https://openalex.org/A5023888391', identityStatus: 'probable' },
+      { credentials: {}, usePubmed: false, useOrcid: false, useClaudeSearch: false },
+    );
+
+    expect(byIdSpy).toHaveBeenCalledWith('https://openalex.org/A5023888391', expect.anything());
+    expect(out.contactEnrichment.hIndex).toBe(42);
+    expect(out.contactEnrichment.tierResults.openalex_author.acceptPath).toBe('spine');
+  });
+
+  test('a non-abort OpenAlex outage records skipped=openalex_error (not silently unset)', async () => {
+    jest.spyOn(ContactParser, 'extractPrimaryEmail').mockReturnValue('e@mit.edu');
+    byOrcidSpy.mockRejectedValue(new Error('503 Service Unavailable'));
+
+    const out = await ContactEnrichmentService.enrichCandidate(
+      { name: 'Dr. E', affiliation: 'MIT', orcid: ORCID },
+      { credentials: {}, usePubmed: false, useOrcid: false, useClaudeSearch: false },
+    );
+
+    expect(out.contactEnrichment.hIndex == null).toBe(true);
+    expect(out.contactEnrichment.scholarPersistAllowed).toBe(false);
+    expect(out.contactEnrichment.tierResults.openalex_author.skipped).toBe('openalex_error');
   });
 
   test('persist:false skips saveToDatabase (caller owns the writeback); default persists', async () => {
