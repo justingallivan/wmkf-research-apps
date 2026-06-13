@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Field Primer shipped; Track B archived; reviewer-finder origination posture corrected (Session 248)
+
+**Milestone:** A new capability shipped + a deprecated one removed + a strategic reframe. (1) **Field Primer** — a standalone, staff-facing overview of a proposal's research field (sub-areas, methods, frontiers, communities, venues, named experts), built end-to-end through the shared Executor (`field-primer.generate` live in prod Dataverse `wmkf_ai_prompts`, sonnet), with a route + CLI, decoupled from reviewer candidates. v2 grounds named experts against OpenAlex (confirmed/suggested-correction/unverified) — caught a live forename hallucination (Oksana→Olga Zhaxybayeva). (2) **Track B** (DB keyword→author origination) **archived off** (`DiscoveryService.TRACK_B_ENABLED=false`, dormant) after A/B-confirming it cost ~27s and contributed ~0 to saved panels. (3) The S231 retrieval-first redesign was reframed as an **overcorrection**: Claude is the origination engine; the weak link is downstream identity resolution.
+
+**Sessions:** 248. Three Codex adversarial passes (HIGH→MEDIUM→LOW, converged) + a `/sweep`.
+
+**Ship state:**
+- Field primer: `lib/services/field-primer-service.js` (`generateFieldPrimer` + `groundPrimerExperts`), `POST /api/field-primer/generate`, `scripts/generate-field-primer.mjs` (`--request <id>` real PDF). Knowledge-only v1; web-grounded literature search deferred to next cycle.
+- Track B code intact + dormant (flip one constant to re-enable); storage-shed record in agent-wiki reviewer-origination.
+- Namesake-safety hardened: consensus field anchor + first-initial/affiliation corroboration on corrections; honest "name-plausibility, not identity-proof" labeling. Residual MEDIUM accepted (no save path).
+
+**Why it matters:** First field-orientation deliverable for program directors (usable now via CLI); reclaims ~27s + removes noise from the reviewer-finder discovery path; and re-points reviewer-finder investment at recall + identity-resolution rather than a grounded-origination rebuild.
+
+**Pointers:** `docs/REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md`; agent-wiki `reviewer-origination.md` (Genesis & corrected posture) + `reviewer-identity.md` (namesake worked example). Commits `1471fd1` (primer v1) → `86d58e7` (/sweep); Track B archive `31ad105`.
+
 ## June 2026 — Phase 1 private-blob: document uploads cut over to a private store in production (Session 243)
 
 **Milestone:** Production cutover. The three server-read document-upload consumers — `expense-reporter`, `phase-i-dynamics`, `grant-reporting` — now upload sensitive documents to a **dedicated private Vercel Blob store** (`wmkf-uploads-private`, no auth-free URL) and read them server-side by `pathname`, instead of the public store. Closes the security audit's P2 "generic uploader creates public Blob artifacts" finding for the server-read cohort. Flag-gated per-app (default public); all three promoted, grant-reporting **prod-verified live** (upload → private store, blob URL HTTP 403, extraction ran).
