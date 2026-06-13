@@ -1,10 +1,12 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-12
+last_verified: 2026-06-13
 stale_after_days: 45
 owner: reviewer-finder
 source_files:
+  - lib/services/reviewer-identity-evidence.js
+  - lib/services/reviewer-identity-resolver.js
   - lib/services/contact-enrichment-service.js
   - lib/services/proposal-pi-identity.js
   - lib/dataverse/adapters/potential-reviewer.js
@@ -66,6 +68,8 @@ Use this page before work on reviewer identity, enrichment, ORCID propagation, c
 - Faculty-page email recovery (Slice F, S235) is the ZERO-SSRF path, NOT a server fetch: `my-candidates` GET returns `facultyPageUrl` (selects `wmkf_facultypageurl`); `CandidatesPanel` shows a "find on faculty page →" link on no-email candidates; staff read the address there and enter it via `CandidateEditModal` → manual stamp → Slice-G confirm. The automated server-side fetch was Codex-reviewed (READY WITH NAMED CHANGES — undici IP-pinning dispatcher, `scholarVerifiedEmail`-only allowlist, IPv6 private-IP blocklist) but deliberately NOT built (`docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md` §D). If revisiting auto-fetch, that doc has the verified SSRF mechanism — do NOT add a server-side external-page fetch without it.
 
 - **Worked example — namesake-collision recall loss (origination probe, 2026-06-12).** A Claude-named Track-A candidate failed to resolve (`oaId` null) not because the person was fabricated but because **citation-ranked author search resolves the wrong cluster.** Reproducible against live OpenAlex: a real low-footprint researcher (~24 works / ~115 cites) with a *directly on-topic* recent paper shares a name with a **famous unrelated namesake** (a psychologist, ~101 works / ~3,261 cites) that ranks #1 in `GET /authors?search=`; the real person is #2, and her own works are **fragmented across ≥3 author clusters** (`First Last`, `First Last X`, `Last X. First`). Default top-1 name resolution therefore either lands on the wrong person or abstains — and abstaining (`oaId` null) is the SAFE branch: binding the namesake's institution/email to her name would be the wrong-person-invite failure (`project-reviewer-verify-fail-dangerous`). Root fixes: field-aware resolution (rank by proposal-field match, not citations — `project-reviewer-field-aware-verification`) and/or ORCID-works anchoring (pull works from the ORCID record, skipping the name search — `project-openalex-merge-use-orcid-works`). This is a RECALL loss on the *identity* side, not origination: origination found a real, relevant person; resolution dropped her. The specific name + proposal are kept in the local gitignored probe artifacts per the names-stay-local norm. Related: `reviewer-identity-fragmentation`.
+
+  **Partly addressed — work-grounding rescue (SHIPPED S249).** Field-aware *ranking* was already shipped (S236: `scoreRecord`/`selectRecord` score by affiliation+topic overlap, NOT citations — so the famous namesake does not win by citation count). The remaining loss was the **abstain** case: a correct low-footprint person scores 0 because her coarse OpenAlex `x_concepts` don't token-overlap the proposal field text AND Claude gave no usable institution. `reviewer-identity-evidence.js` now adds a **work-grounding rescue** (`rescueByWorkGrounding`) that fires ONLY on `no_openalex_affiliation_or_topic_match`: for the top-3 **forename-fully-agreeing** candidate authors it fetches recent **work titles** (`OpenAlexService.getWorksByAuthor`) and re-tests field overlap against the actual titles, with the author's **own ORCID works list** (`ORCIDService.getWorks`, merge-immune per `project-openalex-merge-use-orcid-works`) as a second corroborator — an informative (≥5-title) off-topic ORCID corpus VETOES the match (likely cluster contamination); a sparse list is uninformative. It promotes via an `authorship_grounded` (strong) anchor with a **`probable` ceiling** (selectable-with-verify, not auto-trusted), requires EXACTLY ONE work-grounded candidate (else abstain), and is **purely additive** — it can only resolve a name the normal path already abstained on, never alter an existing verdict. Safety invariant preserved (`project-reviewer-verify-fail-dangerous`): the strict forename gate means it cannot bind a wrong-forename namesake. Tests: `tests/unit/reviewer-identity-evidence.test.js` (`describe('work-grounding rescue')`). The deeper ORCID-works-anchored *origination* corpus (resolve ORCID-work DOIs → OpenAlex for co-authors/aggregation) remains a separate, larger increment.
 
 ## Standard Probe
 

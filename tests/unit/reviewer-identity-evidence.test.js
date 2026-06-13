@@ -5,6 +5,7 @@
 jest.mock('../../lib/services/openalex-service', () => ({
   OpenAlexService: {
     searchAuthors: jest.fn(),
+    getWorksByAuthor: jest.fn(),
   },
 }));
 
@@ -28,6 +29,9 @@ describe('ReviewerIdentityEvidence.evaluateSuggestion', () => {
   beforeEach(() => {
     jest.restoreAllMocks();
     process.env = { ...originalEnv, ORCID_CLIENT_ID: 'c', ORCID_CLIENT_SECRET: 's' };
+    // Default: the work-grounding rescue (S249) finds nothing, so it never changes a
+    // normal-path verdict. Rescue tests override these per-case.
+    OpenAlexService.getWorksByAuthor.mockReset().mockResolvedValue({ totalCount: 0, records: [] });
   });
 
   afterEach(() => {
@@ -208,6 +212,117 @@ describe('ReviewerIdentityEvidence.evaluateSuggestion', () => {
     );
 
     expect(out.status).toBe('unresolved');
+  });
+
+  // --- S249 work-grounding rescue ------------------------------------------------------
+  // A correct low-footprint researcher abstains on the normal path (her coarse x_concepts
+  // miss the field, Claude gave no usable institution); her recent WORK TITLES rescue her.
+  describe('work-grounding rescue', () => {
+    // Scores 0 on the normal path: off-topic x_concepts + no usable institution.
+    const offConcept = (overrides = {}) => record({
+      topics: ['Organic synthesis'], lastKnownInstitution: 'Some Teaching College', ...overrides,
+    });
+    const physicsSuggestion = { name: 'Robert Sang', expertiseAreas: ['attosecond science'] };
+    const physicsProposal = { proposalInfo: { primaryResearchArea: 'Attosecond physics' } };
+
+    test('rescues a forename-agreeing author whose recent work titles are on-topic → probable', async () => {
+      OpenAlexService.searchAuthors.mockResolvedValue({ totalCount: 2, records: [offConcept()] });
+      OpenAlexService.getWorksByAuthor.mockResolvedValue({
+        totalCount: 1,
+        records: [{ title: 'Attosecond electron dynamics in helium' }],
+      });
+      jest.spyOn(ORCIDService, 'getWorks').mockResolvedValue(['Attosecond streaking of photoemission']);
+      jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue(null);
+
+      const out = await ReviewerIdentityEvidence.evaluateSuggestion(physicsSuggestion, physicsProposal);
+
+      expect(out.status).toBe('probable');
+      expect(out.anchors.map((a) => a.type)).toContain('authorship_grounded');
+      expect(out.anchors.map((a) => a.type)).not.toContain('topic_match'); // x_concepts didn't match — sole signal is work-grounding
+      expect(out.identityNote).toMatch(/work-grounded authorship/);
+    });
+
+    test('FAIL-SAFE: a wrong-forename namesake with on-topic works is NOT rescued', async () => {
+      OpenAlexService.searchAuthors.mockResolvedValue({
+        totalCount: 2, records: [offConcept({ displayName: 'Olga Smirnova' })],
+      });
+      OpenAlexService.getWorksByAuthor.mockResolvedValue({
+        totalCount: 1, records: [{ title: 'Attosecond electron dynamics' }],
+      });
+      jest.spyOn(ORCIDService, 'getWorks').mockResolvedValue(['Attosecond physics review']);
+
+      const out = await ReviewerIdentityEvidence.evaluateSuggestion(
+        { name: 'Olaf Smirnova', expertiseAreas: ['attosecond science'] }, physicsProposal,
+      );
+
+      expect(out.status).toBe('abstain'); // forename Olaf ≠ Olga → never probed for work-grounding
+      expect(out.reason).toBe('no_openalex_affiliation_or_topic_match');
+    });
+
+    test('VETO: an informative ORCID works list that is OFF-topic blocks the rescue', async () => {
+      OpenAlexService.searchAuthors.mockResolvedValue({ totalCount: 2, records: [offConcept()] });
+      OpenAlexService.getWorksByAuthor.mockResolvedValue({
+        totalCount: 1, records: [{ title: 'Attosecond electron dynamics in helium' }],
+      });
+      // 5+ ORCID titles, all off-topic → the OpenAlex author cluster is likely a merge /
+      // wrong person for this ORCID; veto rather than bind.
+      jest.spyOn(ORCIDService, 'getWorks').mockResolvedValue([
+        'Synthesis of polyketides', 'Catalytic asymmetric hydrogenation', 'Total synthesis of taxol',
+        'Organocatalysis review', 'Cross-coupling methodology',
+      ]);
+
+      const out = await ReviewerIdentityEvidence.evaluateSuggestion(physicsSuggestion, physicsProposal);
+
+      expect(out.status).toBe('abstain');
+    });
+
+    test('a SPARSE off-topic ORCID list is uninformative and does NOT veto → still probable', async () => {
+      OpenAlexService.searchAuthors.mockResolvedValue({ totalCount: 2, records: [offConcept()] });
+      OpenAlexService.getWorksByAuthor.mockResolvedValue({
+        totalCount: 1, records: [{ title: 'Attosecond electron dynamics in helium' }],
+      });
+      jest.spyOn(ORCIDService, 'getWorks').mockResolvedValue(['One unrelated paper']); // < veto threshold
+      jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue(null);
+
+      const out = await ReviewerIdentityEvidence.evaluateSuggestion(physicsSuggestion, physicsProposal);
+
+      expect(out.status).toBe('probable');
+    });
+
+    test('COLLISION: two forename-agreeing work-grounded namesakes abstain rather than guess', async () => {
+      OpenAlexService.searchAuthors.mockResolvedValue({
+        totalCount: 2,
+        records: [
+          offConcept({ openAlexId: 'https://openalex.org/A1', orcid: null }),
+          offConcept({ openAlexId: 'https://openalex.org/A2', orcid: null }),
+        ],
+      });
+      OpenAlexService.getWorksByAuthor.mockResolvedValue({
+        totalCount: 1, records: [{ title: 'Attosecond electron dynamics' }],
+      });
+
+      const out = await ReviewerIdentityEvidence.evaluateSuggestion(physicsSuggestion, physicsProposal);
+
+      expect(out.status).toBe('abstain');
+      expect(out.reason).toBe('rescue_work_grounding_collision');
+    });
+
+    test('does not run when the normal path already resolves (additive only)', async () => {
+      // Normal affiliation+topic match → selected without rescue; getWorksByAuthor untouched.
+      OpenAlexService.searchAuthors.mockResolvedValue({ totalCount: 1, records: [record()] });
+      jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue({
+        orcidId: '0000-0002-1825-0097', currentAffiliation: 'Griffith University',
+        affiliations: [{ organization: 'Griffith University', current: true }],
+      });
+
+      const out = await ReviewerIdentityEvidence.evaluateSuggestion(
+        { name: 'Robert Sang', suggestedInstitution: 'Griffith University', expertiseAreas: ['attosecond science'] },
+        { proposalInfo: { primaryResearchArea: 'Physics' } },
+      );
+
+      expect(out.status).toBe('confirmed');
+      expect(OpenAlexService.getWorksByAuthor).not.toHaveBeenCalled();
+    });
   });
 
   test('OpenAlex outage abstains instead of verifying from partial evidence', async () => {

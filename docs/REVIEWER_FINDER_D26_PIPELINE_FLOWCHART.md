@@ -42,7 +42,7 @@ flowchart TD
     subgraph GROUND["3 · Ground · Resolve · Rank"]
         TA["Track A: verify/ground names · PubMed/OpenAlex/ORCID<br/>✓ forename-gated (Laederach closed)"]
         ID["Identity resolution (OpenAlex/ORCID/PubMed spine)"]
-        IDFIX["recall-harden: field-aware + ORCID-anchored<br/>(stop losing low-footprint correct names — Christina)"]
+        IDFIX["recall-harden: work-grounding rescue ✅ S249<br/>(field-aware ranking S236; deeper ORCID-works corpus still open)"]
         DD["Dedup / union coverage"]
         RK["Recency-weighted ranking"]
     end
@@ -196,9 +196,18 @@ named personnel is a sensible future add — NOT yet implemented.)
 
 ## 🟨 What needs building/fixing (the leverage is downstream)
 
-1. **Identity-resolution recall hardening** — field-aware + ORCID-anchored resolution so
+1. **Identity-resolution recall hardening — work-grounding rescue ✅ SHIPPED S249.** So
    low-footprint *correct* names aren't lost to famous namesakes (the Christina case).
-   Highest-leverage, and it's an *identity* fix, not an origination one.
+   Field-aware *ranking* was already shipped (S236, citation bias removed). S249 adds the
+   **work-grounding rescue** in `reviewer-identity-evidence.js` (`rescueByWorkGrounding`):
+   when field-scoring would abstain, it re-tests the candidate's actual recent **work
+   titles** (`getWorksByAuthor`) — forename-gated, with the author's **own ORCID works
+   list** (`ORCIDService.getWorks`) as a merge-immune corroborator/veto — and promotes a
+   single grounded match to `probable`. Purely additive (only rescues prior abstains);
+   safety preserved (strict forename gate ⇒ no namesake binding). Domain detail +
+   invariants: `docs/agent-wiki/topics/reviewer-identity.md` worked-example. **Still open
+   (deeper increment):** ORCID-works-anchored *origination* — resolve ORCID-work DOIs →
+   OpenAlex for co-authors/aggregation (a larger build, not this rescue).
 2. **Recall sampling — single deeper draw (count 12→15), NOT extra calls. ✅ SHIPPED S249.**
    The default candidate count was raised 12→15 via a single shared constant
    (`DEFAULT_REVIEWER_COUNT` in `shared/config/reviewerFinderPreferences.js`, imported by
