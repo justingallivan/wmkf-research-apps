@@ -21,7 +21,15 @@ is a CONTRACT read in many places. The reflex (from Codex): treat every changed 
 that is *read* somewhere I haven't looked yet, and grep the SYMBOL is the proof — not reasoning
 about the flow.
 
-**How to apply:** before declaring a symbol's surface covered, grep the symbol repo-wide and prove:
+**Grep the FIELD, not just the mapping helper (S257 refinement).** When I first ran this audit for
+`held` I grepped the map variables (`RESPONSE_TYPE_MAP`/`RESPONSE_TYPE_BY_VALUE`) and found 3
+consumers — but a Codex code review then caught a 4th (`my-candidates.js`) that reads the **raw field
+`wmkf_responsetype`** without importing either map, so the map-symbol grep missed it. Always grep the
+lowest-level persisted identifier (the Dataverse/Postgres column name), which is a superset of the
+helper-variable hits.
+
+**How to apply:** before declaring a symbol's surface covered, grep the symbol repo-wide (the raw
+field name first, then the mapping helpers) and prove:
 - **Maps are symmetric** — a write-map almost always has a reverse read-map; find both (one without
   the value returns `undefined` to consumers).
 - **Select/projection lists come in ≥2** — add the field to each, not the first found.
