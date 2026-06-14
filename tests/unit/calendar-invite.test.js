@@ -14,13 +14,40 @@ describe('toIcsDate', () => {
     expect(toIcsDate('not-a-date')).toBeNull();
     expect(toIcsDate(20260701)).toBeNull();
   });
+  test('impossible-but-well-formed dates → null (round-trip validation, Codex chunk-5)', () => {
+    expect(toIcsDate('2026-02-31')).toBeNull(); // JS would normalize to Mar 3
+    expect(toIcsDate('2026-13-40')).toBeNull();
+    expect(toIcsDate('2026-00-10')).toBeNull();
+  });
 });
 
 describe('buildReviewHoldIcs', () => {
   test('returns null (degrade) when there is no usable meeting date', () => {
     expect(buildReviewHoldIcs({ meetingDate: null, requestNumber: 'R-1' })).toBeNull();
     expect(buildReviewHoldIcs({ meetingDate: 'garbage' })).toBeNull();
+    expect(buildReviewHoldIcs({ meetingDate: '2026-02-31' })).toBeNull(); // impossible date degrades too
     expect(buildReviewHoldIcs({})).toBeNull();
+  });
+
+  test('every physical line is ≤75 octets (RFC 5545 folding) and continuations start with a space', () => {
+    // A long request number forces the UID + description well past 75 octets.
+    const att = buildReviewHoldIcs({ meetingDate: '2026-07-01', requestNumber: 'REQ-0000000001-LONG-CYCLE-2026', nowIso: '2026-06-14T17:00:00Z' });
+    const lines = att.content.toString('utf-8').split('\r\n');
+    for (const line of lines) {
+      expect(Buffer.byteLength(line, 'utf-8')).toBeLessThanOrEqual(75);
+    }
+    // A folded continuation line is introduced by exactly one leading space.
+    const folded = lines.filter((l) => l.startsWith(' '));
+    expect(folded.length).toBeGreaterThan(0);
+  });
+
+  test('UID sanitizes unsafe request-number characters (no injection / line break)', () => {
+    const att = buildReviewHoldIcs({ meetingDate: '2026-07-01', requestNumber: 'R 1;\r\nDTSTART:evil' });
+    const ics = att.content.toString('utf-8');
+    // The unsafe chars are stripped — UID is a single safe token.
+    expect(ics).toContain('UID:wmkf-reviewer-hold-R1DTSTARTevil@wmkf');
+    // No injected DTSTART line from the malicious request number (only the real one).
+    expect(ics.match(/^DTSTART/gm) || []).toHaveLength(1);
   });
 
   test('builds a PUBLISH all-day VEVENT attachment from the meeting date', () => {

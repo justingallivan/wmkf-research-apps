@@ -261,8 +261,14 @@ Each chunk is independently committable. A chunk's red gate (where it has one) b
 > new `templateCarriesCalendarInvite` (`hold`). `send-emails.js` builds a per-recipient
 > `calendarAttachments` lane (from the recipient's request date, NON-FATAL try/catch) concatenated
 > AFTER the `recipientMayReceiveAttachments` materials gate — so a held (non-accepted) reviewer gets
-> the .ics while materials stay gated. Dormant until chunk 6 sends `templateType:'hold'`. +12 tests
-> (calendar-invite + reviewer-invite allowlist/calendar); full suite 2438 green; build clean.
+> the .ics while materials stay gated. Dormant until chunk 6 sends `templateType:'hold'`. +15 tests
+> (calendar-invite + reviewer-invite allowlist/calendar); full suite 2441 green; build clean.
+> **Codex review (SHIP WITH NAMED CHANGES) → applied:** RFC 5545 line-folding (≤75 octets);
+> strict `toIcsDate` round-trip validation (impossible dates like 2026-02-31 now degrade to null);
+> sanitized UID token (strips CRLF/separators — no injection). **Deferred to Chunk 7:** route-level
+> send-emails tests for the calendar lane (throw-degrade keeps recipient `sent`; held reviewer gets
+> .ics but no materials) — no SSE-handler harness exists yet and the lane is dormant until the chunk-6
+> hold send is live; the harness belongs with that wiring.
 - **Do:** small `.ics` builder (VCALENDAR/VEVENT, `METHOD:PUBLISH`) from the review window /
   `wmkf_meetingdate`. Thread it through a **separate `calendarAttachments` array** built only
   from trusted server-side request fields, concatenated **after** `recipientMayReceiveAttachments`
@@ -313,6 +319,12 @@ Each chunk is independently committable. A chunk's red gate (where it has one) b
   shape + gate-bypass + degradation; and an explicit **automation-safety** test asserting a hold
   fires **no** honorarium onboarding and sets no `wmkf_accepted`. Also update the two existing
   `applyStage2aResponse` caller tests for the new action + guard message (see chunk 3).
+  - **Carried from chunk-5 Codex review:** route-level `send-emails` calendar-lane tests — build a
+    (currently nonexistent) SSE-handler harness and assert (a) a forced `buildReviewHoldIcs` throw
+    keeps the recipient `sent` (degrade), and (b) a held/non-accepted reviewer on `templateType:'hold'`
+    gets the `.ics` but **no** proposal materials. Best done once chunk 6 makes the hold send live.
+  - **NOTE — much of chunk 7 already landed inline per chunk** (chunks 2/3/4/5 shipped their own
+    tests). This chunk is the gap-closer (the route-level lane tests above) + a final coverage sweep.
 - **Acceptance:** `npx jest --testPathPatterns "reviewer|external|respond"` green; full
   `npm test && npm run lint && npm run build` green.
 
