@@ -1,95 +1,111 @@
-# Session 253 Prompt: memory router restructured to hub-link form; reviewer wiki doc-debt named
+# Session 254 Prompt: reviewer doc-debt reconciled + dead Stage-1 searchQueries trimmed (repo + prod)
 
-> **GIT.** All S252 work is on `main` and **pushed** (HEAD `5374856`). Working tree clean.
+> **GIT.** All S253 work is on `main` and **pushed** (HEAD `8f87ae1`). Working tree clean. 11 commits.
 
-## Session 252 — what happened
+## Session 253 — what happened
 
-Restructured the durable-memory **router** (`.claude-memory/MEMORY.md`) from flat per-domain
-leaf-file fanout into compact **hub links**, relieving the cap pressure that had been warning at
-every startup. Codex drafted it in a tmp package; reviewed it across **three** critical passes
-(orphans → preservation → canonical-doc ownership), each folded back before applying. 1 commit, pushed.
+Two threads, both finished and verified: (1) the **reviewer wiki doc-debt** from S252's next-steps, and
+(2) trimming the analyze prompt's **dead Stage-1 `searchQueries`** (an older carryover) — including the
+live prod Dataverse prompt row. Two Codex review passes were run and folded back.
 
 ### What was completed
 
-1. **`MEMORY.md` compaction (`5374856`).** 11,319 B / 84 lines → **4,171 B / 62 lines** (was 969 B
-   from the 12,288 B hard cap; now ~8 KB headroom). Sections: Startup / Always-Read Guardrails /
-   Working Norms / Task Routing / User Context / Archive. Task routes now point at wiki **topic hubs**
-   instead of listing every leaf file. **All 141 currently-routed leaf memories remain reachable
-   (zero orphans, verified by `comm` against the real post-apply corpus).**
+1. **Maintained enforcement-contracts reference (`3f48487`).** Created
+   `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` — the single maintained home for the **8 live
+   fail-closed contracts** (Slice-E asymmetry, PI-named/cited/**referred** force-null exemption,
+   Slice-G invite-confidence allowlist, structured-PI fail-open, S240 institution-COI hard drop,
+   OpenAlex bibliometrics, faculty-page zero-SSRF, work-grounding rescue). Each traced to `file:line`
+   and `[VERIFIED 2026-06-13]`. The `rejectedInstitutionCOI` gate had **no documentary home outside
+   the wiki** before this (verified). Reconciled the post-S251 "Google Scholar profile links" drift in
+   `REVIEWER_FINDER.md`, `guides/REVIEWER_FINDER.md`, and a prod-test.
 
-2. **Agent wiki expanded.** `index.md` router table now covers all **12** topics. **6 new topic pages**
-   added (dev-environment, finance-honoraria, prompt-executor, reviewer-workbench-lifecycle,
-   security-auth, strategy-roadmap); `dataverse-dynamics` + `intake-portal` refreshed with
-   `## Durable Memory` sections.
+2. **Thinned `reviewer-identity.md` to hub+pointer (`f271583`).** Its 8 contract bullets now route to
+   the reference (added to `canonical_docs`). Kept the wiki-specific ground rules, hazards, namesake
+   worked-example, durable-memory, probe.
 
-3. **4 rich pages preserved (append-only deltas, NOT rewrites).** `reviewer-identity`,
-   `reviewer-origination`, `integrity-screener`, `external-reviewer-portal` got only a `## Durable Memory`
-   section appended. **Their rich current-state synthesis was deliberately kept** — see the doc-debt
-   item below for why.
+3. **Reconciled 9 stale/imprecise design-doc status banners** (`7fbe16a`, `6f5add7`, `e093567`,
+   `8f87ae1`) — each **verified against live source first** (a classifier agent over-claimed; caught a
+   hallucination + a false positive). Examples: RESOLUTION_PLAN "no code yet"→shipped; COI_CHUNK2 split
+   to 2a-shipped/2b-not-built; ORCID_BACKPROPAGATION→shipped (`backprop-reviewer-orcid.js` +
+   `backfill-contact-orcid.js`); **MANUAL_ADD_DEDUP→shipped** (Codex caught my too-narrow probe — it
+   lives in `pages/api/workbench/`, not `reviewer-finder/`).
 
-### Commit (1)
-`5374856` docs(memory): restructure router to hub-link form; offload leaf lists to wiki topics.
+4. **`searchQueries` trim (`437af3f` + Codex fixes `63c700e`).** Removed analyze PART 3 (PubMed/arXiv/
+   bioRxiv/chemRxiv query generation) from **both** the code template (`createAnalysisPrompt`) and the
+   Dynamics/stored template (`ANALYZE_USER_PROMPT_TEMPLATE`), byte-parity preserved. Removed the dead
+   parser, `allSearchQueries`, the `missing_queries`/`truncated_or_missing_queries` validations, the
+   PART 3 required-labels in `prompt-validators`, and (Codex catch) the **repair-prompt prose** that
+   still asked for a query section. `parseAnalysisResponse` keeps a stable empty `searchQueries` shape
+   so guarded consumers (discovery-service, logging) are untouched. Reconciled current-state docs
+   (`AI_PROMPTS_DETAILED`, `REVIEWER_PROVENANCE_MODEL`, `RETRIEVAL_REDESIGN_PLAN` note, reviewer-origination
+   wiki) + 2 design/diagnosis docs. Full suite **2415 green**, lint + build + A7 gate clean.
 
-## ⚠ Continuity guardrails — READ before touching memory/wiki
+5. **Prod prompt row republished.** The live Dataverse `reviewer-finder.analyze` row (v1) still had
+   PART 3; **Justin ran `node --env-file=.env.local scripts/seed-reviewer-finder-prompts.js --execute
+   --only=analyze`**. Re-audited read-only: now `hasPart3Header:false`, two-part, 4637 B (was 5785).
 
-- **The router is now hub-link form. Do NOT re-expand it** back to flat per-domain leaf-file lists.
-  New durable memory goes into the relevant wiki topic's `## Durable Memory` section (+ its leaf file),
-  **not** a new root router line. A new root line is only for a genuinely cross-cutting guardrail.
-  The `memory-router-guard.js` hook will block a bloating root edit — work with it.
-- The 4 rich wiki pages (`reviewer-identity` etc.) carry **load-bearing current-state synthesis**, not
-  redundant restatement. Do **not** thin them until the doc-debt below is done.
+6. **New feedback memory (`6afd69b`).** `feedback-truncation-is-breakage-not-completion.md` — a
+   truncated/short tool result is a BREAKAGE signal (re-run/narrow/paginate), and a "not built / no
+   home" claim needs a COMPLETE search of every plausible dir. Born from the dedup miss (probe scoped to
+   one dir). Routed under Working Norms → completion posture.
+
+### Commits (11)
+`3f48487` enforcement-contracts ref + Scholar drift · `f271583` thin reviewer-identity · `7fbe16a` +
+`6f5add7` banner reconciliations · `5cbc8fb` guide tier-list fix · `9be7c60` Codex doc fixes · `6afd69b`
+truncation memory · `e093567` FINDER_REVIEW_REQUEST historical · `437af3f` searchQueries trim · `63c700e`
+Codex trim fixes · `8f87ae1` PART-3 notes in 2 design docs.
+
+## ⚠ Continuity guardrails — READ before reviewer/wiki/prompt work
+
+- **`docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` is now the maintained owner** of the 8 live gates.
+  Update it (and bump Last verified) in the same commit when you change any enforcement point.
+- **`reviewer-identity.md` is thinned (hub+pointer).** The OTHER 3 rich wiki pages (`reviewer-origination`,
+  `integrity-screener`, `external-reviewer-portal`) are **deliberately NOT thinned** — their facts have
+  non-wiki homes and their residual content is hazard-routing, not orphaned spec. Do NOT thin them
+  without first giving their unique synthesis a maintained owner. (PubPeer sanctioned-access detail is
+  fullest in the integrity-screener wiki; promote to `SERPAPI_MIGRATION_PLAN` before any future thinning.)
+- **`searchQueries` empty-shape is intentional.** `parseAnalysisResponse` returns
+  `{pubmed:[],arxiv:[],biorxiv:[],chemrxiv:[]}` by design. Re-enabling Track B (`TRACK_B_ENABLED`) now
+  ALSO needs PART 3 query generation restored (prompt + parser + `prompt-validators` labels) — flipping
+  the flag alone runs against empty queries. See reviewer-origination wiki "To re-enable".
+- Memory router stays **hub-link form** — do NOT re-expand to flat per-domain leaf lists (S252).
+- `grep`/`rg` may corrupt identifiers+digits (`project-rtk-grep-output-corruption`) — use Read for exact
+  content; and a truncated/empty grep is breakage, not "clean" (`feedback-truncation-is-breakage`).
 
 ## Potential Next Steps
 
-### 1. Reviewer wiki doc-debt — promote enforcement contracts into a maintained reference (then thin the wiki)
-**Why this exists:** the reviewer `docs/` set is ~51 files, almost all design-time `*_PLAN/_DESIGN/_SPEC`
-snapshots, none reconciled to what shipped. `docs/REVIEWER_FINDER.md` is a feature overview and is
-already drifted (still says "Google Scholar links" post-OpenAlex migration). So the
-`reviewer-identity` wiki page became the **de-facto current-state reference**, and at least one
-load-bearing fact — the `save-candidates.js` **`rejectedInstitutionCOI`** durable COI gate — has
-**no other documentary home** (verified: appears in zero non-wiki docs). Thinning now = real loss.
+### 1. COI **Chunk 2b** — retire the AI `POTENTIAL_CONCERNS` advisory (⚠ destructive, deferred)
+The only substantive in-repo build left. Chunk 2a (institution-COI hard drop) shipped; 2b removes the
+PD-unverifiable amber advisory from the **prompt** (`shared/config/prompts/reviewer-finder.js`),
+**validator** (`lib/utils/prompt-validators.js`), and **UI** (`pages/reviewer-finder.js`). Design:
+`docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md` (banner already split 2a/2b). Destructive → needs Justin's
+explicit go; do the verify-callers pre-flight first.
 
-**The work:** create/designate a maintained current-state reference that OWNS the live enforcement
-contracts, then reduce the rich wiki pages to hub+pointer. At minimum the reference must own:
-- Slice-E client/server identity-gate asymmetry (`provenanceGroupOf` / `save-candidates` 422)
-- PI-named/cited unresolved exemption + contact force-nulling (`contactBlockedForUnresolvedExempt`)
-- Slice-G invite-confidence recipient allowlist (`confirmedLowConfidenceIds` / `emailConfidence`)
-- Structured-PI identity fail-open / augment-only (`resolveProposalPI` / `forenamesContradict`)
-- S240 current-institution COI hard-drop + `rejectedInstitutionCOI` durable gate
-- S251 OpenAlex bibliometrics / verified-domain migration (`_attachOpenAlexMetrics`)
-- Faculty-page recovery SSRF boundary (`verifiedInstitutionDomain`)
-- Namesake / work-grounding rescue safety contract (`rescueByWorkGrounding`)
+### 2. Older carryover (externally blocked — verify before acting)
+- Recall padding-ceiling live check before raising count >15 (needs API key + a real proposal).
+- SerpAPI **Hobby-tier downgrade** eval (Justin, out-of-repo billing dashboard).
+- PubPeer migration — **parked, externally gated; do NOT proactively resurface.**
 
-Of the 8, only bibliometrics (→ `SERPAPI_MIGRATION_PLAN`) and faculty-recovery
-(→ `FACULTY_PAGE_RECOVERY_DESIGN` §D) are already doc-owned. The rest are wiki-only or design-time-only.
-Consider also marking the ~51 design docs `historical` once their live facts are promoted.
-
-### 2. Deferred hook candidates (post-restructure; cherry-pick, do NOT bulk-adopt)
-Best signal-to-noise: (a) extend `check:memory-router` to flag routes mixing a hub link + many leaves
-(protects the new structure); (b) external-literal-in-code scanner (backstops
-`feedback-no-fabricated-placeholder-values`). Skip "warn on durable-doc edit without a sweep note" —
-it fires on every small edit. Full list in the tmp brief.
-
-### 3. Older carryover (verify-before-acting — unchanged from S251/S250)
-- SerpAPI Hobby-tier downgrade eval (Justin, out-of-repo billing dashboard).
-- PubPeer (parked — externally gated; do NOT proactively resurface).
-- Recall padding-ceiling live check before raising count >15 (needs API key + real proposal).
-- Reviewer COI **Chunk 2b** (retire `POTENTIAL_CONCERNS`) — ⚠ destructive, deferred (`docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`).
-- Trim the analyze prompt's dead Stage-1 `searchQueries`.
+### 3. Tiny follow-up
+- `score-candidates` prod prompt row was **not** reseeded this session (unchanged — fine). If you ever
+  edit `SCORE_CANDIDATES_USER_PROMPT_TEMPLATE`, reseed it too (`--only=score-candidates`).
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `.claude-memory/MEMORY.md` | Restructured router (hub-link form — do not re-expand) |
-| `docs/agent-wiki/index.md` | Expanded 12-topic router table |
-| `docs/agent-wiki/topics/reviewer-identity.md` | De-facto current-state reference for identity/COI/invite enforcement contracts (preserve until doc-debt #1) |
-| `docs/agent-wiki/topics/{dev-environment,finance-honoraria,prompt-executor,reviewer-workbench-lifecycle,security-auth,strategy-roadmap}.md` | 6 new topic hubs |
-| `/private/tmp/wmkf-memory-wiki-draft/` | Codex's draft package + `REVIEW_BRIEF.md` (tmp; full rationale, hook list, doc-debt list) |
+| `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` | NEW — maintained owner of the 8 live fail-closed gates |
+| `docs/agent-wiki/topics/reviewer-identity.md` | Thinned hub+pointer → the reference above |
+| `shared/config/prompts/reviewer-finder{,-dynamics}.js` | analyze prompt — PART 3 removed S253 (byte-parity pair) |
+| `lib/utils/prompt-validators.js` | parse-contract required labels (PART 3 labels removed) |
+| `lib/services/claude-reviewer-service.js` | repair prompt (query-section prose removed); resolves via composer |
+| `scripts/seed-reviewer-finder-prompts.js` | republishes the prod analyze/score rows (`--execute` = prod write) |
+| `.claude-memory/feedback-truncation-is-breakage-not-completion.md` | NEW feedback memory |
 
-## Gotchas
-- `/private/tmp/wmkf-memory-wiki-draft/` is **tmp, not in the repo** — it disappears on reboot. The
-  authoritative state is what was committed; the brief's doc-debt list is reproduced in Next Step #1 above.
-- Relevant gates after memory/wiki edits: `check:agent-wiki`, `check:memory-router`,
-  `check:agent-invariants` (each + self-test), sequentially.
-- `grep`/`rg` may corrupt identifiers+digits (`project-rtk-grep-output-corruption`) — use Read for exact content.
+## Testing
+```bash
+npx jest --testPathPatterns "reviewer|discovery|prompt"   # 655 green
+npm test && npm run lint && npm run build                 # full suite 2415 green
+# read-only audit of the live analyze prompt row (needs prod approval):
+#   node --env-file=.env.local -e "..."  (fetchCurrentPrompt('reviewer-finder.analyze'))
+```
