@@ -71,14 +71,28 @@ hook · (+ this S255 doc commit).
 
 ## Potential Next Steps
 
-### 1. Older carryover (externally blocked — verify before acting)
-- Recall padding-ceiling live check before raising count >15 (needs API key + a real proposal).
-- SerpAPI **Hobby-tier downgrade** eval (Justin, out-of-repo billing dashboard).
+### ★ CYCLE OBJECTIVE — reviewer finding → validation → invitation, END TO END
+This is the main thread for the coming cycle (next few days). Lead with it; do not let the
+deferred housekeeping below crowd it out. The three stages and their deeper maps:
+- **Finding (origination)** — `docs/agent-wiki/topics/reviewer-origination.md`. Claude is the
+  validated origination engine (S246); edge-hardening shipped; **referral capture still pending**;
+  multilane / retrieval-first parked as a sparse-tail tool, not the engine.
+- **Validation (identity resolution)** — `docs/agent-wiki/topics/reviewer-identity.md` +
+  `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` (8 fail-closed gates shipped). Known weak link
+  is downstream identity resolution (namesake collision); the ORCID-works-anchored corpus is the
+  larger deferred increment.
+- **Invitation** — `docs/agent-wiki/topics/external-reviewer-portal.md` +
+  `reviewer-workbench-lifecycle.md`. Token-authed accept/decline portal + invite-confidence gating
+  shipped; **a real-prod accept fires a live honorarium/payment chain — human-supervised, gated on
+  Connor** (`project-reviewer-accept-prod-automation`).
 
-### 2. Tiny follow-ups
-- `score-candidates` prod prompt row unchanged this session — reseed only if you edit its template.
-- The `affiliationHistory` producers are COI-inert dead code (deferred review,
-  `project-deferred-code-cleanup`) — not urgent.
+Goal is to drive the chain end to end; **confirm scope with Justin before building new infra.**
+
+### Deferred / externally-blocked (do NOT lead with these; verify before acting)
+- Recall padding-ceiling live check before raising count >15 (needs API key + a real proposal).
+- SerpAPI Hobby-tier downgrade eval (Justin, out-of-repo billing dashboard).
+- `score-candidates` prod prompt reseed — only if you edit its template (unchanged S254).
+- `affiliationHistory` producers — COI-inert dead code, deferred (`project-deferred-code-cleanup`).
 
 ## Parked — do NOT surface in startup summaries
 > These are user-recall-only. Do not echo them into `/start`'s Potential Next Steps
