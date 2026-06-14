@@ -296,7 +296,20 @@ Each chunk is independently committable. A chunk's red gate (where it has one) b
   sends the email (date in body) with the recipient in `sent`, not `failed`. Unit test the
   `.ics` string shape + the gate-bypass routing + the degradation path.
 
-### Chunk 6 — Email copy: hold invitation + "proposals ready" finalize trigger
+### Chunk 6 — Email copy: hold invitation + "proposals ready" finalize trigger ✅ DONE (S257)
+> **S257 build status:** COMPLETE (send-path + copy). `DEFAULT_TEMPLATES.hold` (lightweight
+> "hold your spot", `{{externalLink}}`, no materials promise) + `DEFAULT_TEMPLATES.finalize`
+> ("proposal ready — finalize", `{{externalLink}}`) added to `email-template-store.js`
+> (+`TEMPLATE_TYPES`/labels → surface in `EmailTemplatesModal` for staff editing). `send-emails.js`:
+> lifecycle branches — `hold` mirrors invitation (invited+emailSentAt, **no** reviewstatus/responsetype),
+> `finalize` records emailSentAt only. **Safety:** the first-contact **confidence gate** AND the
+> duplicate-send guard now also cover `hold` (same unproven first-contact address as invitation —
+> S234 wrong-address risk); `finalize` is re-sendable. The `.ics` rides `hold` via the chunk-5
+> calendar lane. +6 tests; full suite 2447 green; build clean.
+> **Deferred to go-live (UI trigger):** a staff affordance to actually SEND `templateType:'hold'`
+> /`'finalize'` (InviteEmailModal hardcodes `'invitation'`). The send PATH + copy are ready; the
+> button/mode + the readiness-flip trigger for the finalize blast are go-live wiring, like the
+> readiness predicate itself. Until then the new types are dormant (no caller sends them).
 - **Do:** (a) invitation/hold-ask copy (lightweight, "hold your spot"); (b) a "proposals are
   ready — please finalize" email sent when readiness flips, linking back to the same portal
   (now showing finalize). Likely new `templateType`(s) in the Review Manager send path
@@ -379,7 +392,8 @@ must be *visible* in the workbench, not silently misclassified.
 | `lib/services/dynamics-service.js` | `addEmailAttachment` — content-type agnostic, no change needed; reference for `.ics` (5) |
 | `pages/api/review-manager/send-emails.js` | ✅ S257 — per-recipient `calendarAttachments` lane (.ics); chunk-6 wires the hold templateType (5,6) |
 | `lib/external/calendar-invite.js` | ✅ S257 — `buildReviewHoldIcs` (RFC 5545 PUBLISH save-the-date) (5) |
-| `lib/utils/reviewer-invite.js` | ✅ S257 — `sendAllowsAttachments` denylist→allowlist + `templateCarriesCalendarInvite` (5) |
+| `lib/utils/reviewer-invite.js` | ✅ S257 — `sendAllowsAttachments` denylist→allowlist + `templateCarriesCalendarInvite` (5); `shouldSkipDuplicateInvitation` covers `hold` (6) |
+| `shared/components/reviewers/email-template-store.js` | ✅ S257 — `hold` + `finalize` default copy + types (6) |
 | `pages/api/review-manager/reviewers.js` | `RESPONSE_TYPE_BY_VALUE` read-map — add `held` (1,8) |
 | `pages/reviewer-finder.js` | `candidateMatchesEmailFilter` — add `held` bucket, guard `pending` (8) |
 | `pages/api/workbench/dashboard.js` | count aggregator — add `held` count; phase signal (audit #7) (8) |

@@ -6,7 +6,7 @@
  * /api/user-preferences. This replaces the old browser-localStorage template
  * store (Review Manager) and the hardcoded invitation constant (Workbench).
  *
- * Types: invitation, materials, followup, thankyou — each { subject, body }.
+ * Types: invitation, hold, finalize, materials, followup, thankyou — each { subject, body }.
  *
  * Placeholder note: bodies use server placeholders ({{greeting}}, {{proposalTitle}},
  * {{piInstitution}}, {{externalLink}}, {{reviewDueDate}}, {{signature}}, …) resolved
@@ -18,10 +18,12 @@
 
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
 
-export const TEMPLATE_TYPES = ['invitation', 'materials', 'followup', 'thankyou'];
+export const TEMPLATE_TYPES = ['invitation', 'hold', 'finalize', 'materials', 'followup', 'thankyou'];
 
 export const TEMPLATE_TYPE_LABELS = {
   invitation: 'Invitation',
+  hold: 'Hold (agree in principle)',
+  finalize: 'Finalize (proposal ready)',
   materials: 'Materials (post-accept)',
   followup: 'Follow-up reminder',
   thankyou: 'Thank-you',
@@ -43,6 +45,36 @@ Review timeline:
 - Completed reviews are due by {{reviewDue}}.
 
 If you accept, the same link gives you access to the proposal materials and the review form. We would be grateful for your expertise.
+
+{{signature}}`,
+  },
+  hold: {
+    subject: 'Hold your spot: upcoming W. M. Keck Foundation review panel',
+    body: `{{greeting}},
+
+The W. M. Keck Foundation is lining up reviewers for an upcoming panel, and we'd be grateful for your expertise. The proposal isn't quite ready yet — so for now we're simply asking whether you'd be willing to hold your spot.
+
+Please use your secure personal link to let us know:
+{{externalLink}}
+
+There's no commitment to specifics today — you won't see proposal materials yet, and the conflict-of-interest / AI-use acknowledgements and any honorarium details all come later. Once the proposal is released, we'll email you everything you need (and a calendar hold is attached to this message).
+
+Thank you for considering it.
+
+{{signature}}`,
+  },
+  finalize: {
+    subject: 'Ready for your review: {{proposalTitle}}',
+    body: `{{greeting}},
+
+Thank you for holding your spot. The proposal "{{proposalTitle}}" from {{piInstitution}} is now ready for review.
+
+Please use your secure personal link to confirm the final details — the conflict-of-interest and AI-use acknowledgements, and how you'd like any honorarium handled — and to access the proposal materials:
+{{externalLink}}
+
+We ask that you complete this step by {{reviewDueDate}}. The same link will give you the materials and the review form once you've confirmed.
+
+We're grateful for your time and expertise.
 
 {{signature}}`,
   },

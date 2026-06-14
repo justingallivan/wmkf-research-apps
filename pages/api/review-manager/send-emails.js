@@ -286,13 +286,15 @@ export default async function handler(req, res) {
       // — the staff one-click "confirm & send". This is what stops an unknowing invite to a
       // wrong/namesake address (the S234 pianist-Chen failure).
       //
-      // Scoped to the INVITATION (first contact): once a reviewer accepts via the magic link
-      // sent to this address, the address is proven, so post-acceptance sends
-      // (materials/followup/thankyou, the ReviewerManagePanel flow) are NOT re-gated — same
-      // invitation-only scope as shouldSkipDuplicateInvitation.
+      // Scoped to FIRST CONTACT (invitation OR hold): the hold ask goes to the same
+      // unproven address as the invitation, so it carries the same wrong/namesake risk
+      // and is gated identically. Once a reviewer engages via the magic link sent to this
+      // address, it's proven, so post-engagement sends (materials/followup/thankyou/finalize,
+      // the ReviewerManagePanel flow) are NOT re-gated — same scope as shouldSkipDuplicateInvitation.
       const confidence = emailConfidence(person);
       const lowConfidenceConfirmed = confirmedLowConfidenceIdSet.has(draft.suggestionId);
-      if (templateType === 'invitation' && confidence.level === 'low' && !lowConfidenceConfirmed) {
+      const isFirstContact = templateType === 'invitation' || templateType === 'hold';
+      if (isFirstContact && confidence.level === 'low' && !lowConfidenceConfirmed) {
         skipped.push({
           suggestionId: draft.suggestionId,
           candidateName: name,
@@ -479,12 +481,20 @@ export default async function handler(req, res) {
               thankYouSentAt: now,
               reviewStatus: 'complete',
             }, { actingUserSystemId });
-          } else if (templateType === 'invitation') {
-            // Pre-acceptance: mark invited + when the email went out, but do NOT
-            // touch wmkf_reviewstatus — status only advances to 'accepted' when
-            // the reviewer accepts in the external portal.
+          } else if (templateType === 'invitation' || templateType === 'hold') {
+            // First contact (invitation OR hold ask): mark invited + when the email
+            // went out, but do NOT touch wmkf_reviewstatus and do NOT set
+            // wmkf_responsetype — the reviewer sets held/accepted/declined themselves
+            // in the external portal. Both stamp the same first-contact fields.
             await suggestionAdapter.updateLifecycle(s.suggestionId, {
               invited: true,
+              emailSentAt: now,
+            }, { actingUserSystemId });
+          } else if (templateType === 'finalize') {
+            // "Proposal ready — please finalize" nudge to a held reviewer. Records the
+            // send (emailSentAt) only; never touches wmkf_reviewstatus or wmkf_responsetype
+            // (the reviewer finalizes via the portal, which runs the full accept path).
+            await suggestionAdapter.updateLifecycle(s.suggestionId, {
               emailSentAt: now,
             }, { actingUserSystemId });
           }

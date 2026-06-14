@@ -17,10 +17,15 @@ describe('shouldSkipDuplicateInvitation', () => {
   test('allowResend overrides the guard (deliberate re-invite)', () => {
     expect(shouldSkipDuplicateInvitation({ templateType: 'invitation', allowResend: true, invited: true })).toBe(false);
   });
-  test('non-invitation types are never skipped (materials/followup are re-sendable)', () => {
-    for (const templateType of ['materials', 'followup', 'thankyou']) {
+  test('non-first-contact types are never skipped (materials/followup/thankyou/finalize are re-sendable)', () => {
+    for (const templateType of ['materials', 'followup', 'thankyou', 'finalize']) {
       expect(shouldSkipDuplicateInvitation({ templateType, allowResend: false, invited: true })).toBe(false);
     }
+  });
+  test('hold is first contact too — an already-invited hold ask is skipped (chunk 6)', () => {
+    expect(shouldSkipDuplicateInvitation({ templateType: 'hold', allowResend: false, invited: true })).toBe(true);
+    expect(shouldSkipDuplicateInvitation({ templateType: 'hold', allowResend: false, invited: false })).toBe(false);
+    expect(shouldSkipDuplicateInvitation({ templateType: 'hold', allowResend: true, invited: true })).toBe(false);
   });
 });
 
