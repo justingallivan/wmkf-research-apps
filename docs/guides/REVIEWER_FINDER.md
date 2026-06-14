@@ -52,12 +52,12 @@ This tab shows all saved reviewers grouped by proposal. From here you can:
 
 ### Enriching Contacts
 
-Select candidates and click **Enrich Contacts** to search for their email addresses through a 5-tier lookup system:
-1. Existing database records
-2. ORCID profiles
-3. PubMed author affiliations
-4. Google Scholar pages
-5. Institutional directory search
+Select candidates and click **Enrich Contacts** to search for their email addresses through a tiered lookup (free tiers first, paid tiers only on opt-in):
+1. Existing database records / an email embedded in the affiliation string
+2. PubMed author affiliations (free)
+3. ORCID profiles (free)
+4. Claude web search (paid — opt-in)
+5. SerpAPI Google search (paid — opt-in)
 
 ### Generating Invitation Emails
 
