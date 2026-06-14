@@ -79,6 +79,12 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   generation or response handling can silently break in-flight invitations; see
   memory `project-reviewer-accept-decline-links`.
 
+## Durable Memory
+
+- File access and SharePoint: `project-external-reviewer-file-access`, `project-sharepoint-integration`.
+- Accept/decline links and prod automation: `project-reviewer-accept-decline-links`, `project-reviewer-accept-prod-automation`.
+- E2E harness: `project-e2e-playwright-harness`.
+
 ## Standard Probe
 
 ```bash

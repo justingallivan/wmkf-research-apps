@@ -72,6 +72,15 @@ Use this page before work on reviewer identity, enrichment, ORCID propagation, c
 
   **Partly addressed — work-grounding rescue (SHIPPED S249).** Field-aware *ranking* was already shipped (S236: `scoreRecord`/`selectRecord` score by affiliation+topic overlap, NOT citations — so the famous namesake does not win by citation count). The remaining loss was the **abstain** case: a correct low-footprint person scores 0 because her coarse OpenAlex `x_concepts` don't token-overlap the proposal field text AND Claude gave no usable institution. `reviewer-identity-evidence.js` now adds a **work-grounding rescue** (`rescueByWorkGrounding`) that fires ONLY on `no_openalex_affiliation_or_topic_match`: for the top-3 **forename-fully-agreeing** candidate authors it fetches recent **work titles** (`OpenAlexService.getWorksByAuthor`) and re-tests field overlap against the actual titles, with the author's **own ORCID works list** (`ORCIDService.getWorks`, merge-immune per `project-openalex-merge-use-orcid-works`) as a second corroborator — an informative (≥5-title) off-topic ORCID corpus VETOES the match (likely cluster contamination); a sparse list is uninformative. It promotes via an `authorship_grounded` (strong) anchor with a **`probable` ceiling** (selectable-with-verify, not auto-trusted), requires EXACTLY ONE work-grounded candidate (else abstain), and is **purely additive** — it can only resolve a name the normal path already abstained on, never alter an existing verdict. Safety invariant preserved (`project-reviewer-verify-fail-dangerous`): the strict forename gate means it cannot bind a wrong-forename namesake. Tests: `tests/unit/reviewer-identity-evidence.test.js` (`describe('work-grounding rescue')`). The deeper ORCID-works-anchored *origination* corpus (resolve ORCID-work DOIs → OpenAlex for co-authors/aggregation) remains a separate, larger increment.
 
+## Durable Memory
+
+- Identity resolution spine: `project-reviewer-identity-resolution`, `project-reviewer-identity-resolution-phase1`, `reviewer-identity-fragmentation`.
+- ORCID and OpenAlex: `project-reviewer-self-report-orcid-sticky-confirmed`, `project-openalex-merge-use-orcid-works`.
+- Safety posture: `project-reviewer-verify-fail-dangerous`, `project-reviewer-field-aware-verification`.
+- Contact enrichment: `project-reviewer-contact-enrichment-anchoring`, `project-serpapi-budget-latency`, `project-serpapi-capability-erosion`.
+- Structured PI and COI: `project-reviewer-pi-identity-structured`, `project-reviewer-coi-rely-on-self-disclosure`, `project-reviewer-coi-concern-surfacing`.
+- Matching and institution contacts: `project-reviewer-institution-match`, `project-contact-promotion-permission`, `project-institution-foundation-liaison`.
+
 ## Standard Probe
 
 Start with:

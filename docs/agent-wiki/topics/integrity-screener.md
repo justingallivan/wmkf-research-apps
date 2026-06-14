@@ -41,6 +41,11 @@ Sources 2 + 3 are both gated behind one `effectiveSerpKey` today (`integrity-ser
 consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `searchUrl`, …) rendered in
 `pages/integrity-screener.js`.
 
+## Durable Memory
+
+- SerpAPI cost/posture: `project-serpapi-budget-latency`, `project-serpapi-capability-erosion`.
+- External platform verification posture: `feedback-verify-external-platform-claims`, `feedback-cite-ground-truth`.
+
 ## SerpAPI migration status (S251)
 
 The reviewer-finder SerpAPI→free-stack migration (`docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md`)

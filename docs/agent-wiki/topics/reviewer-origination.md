@@ -166,6 +166,16 @@ real accept/decline. The bare keyword→author lane is what underperformed.
   Power Automate flow. Memory `project-reviewer-finder-proposal-doc-context`.
 - **OpenAlex MERGES same-name authors.** Use the ORCID works list as the corpus, not
   a name lookup. Memory `project-openalex-merge-use-orcid-works`.
+- **Applicant exclusion breadth is an open policy decision** — one vague
+  overlapping-program line can over-prune the peer set. Memory
+  `project-applicant-exclusion-policy-pending`.
+
+## Durable Memory
+
+- Origination direction and redesign: `project-reviewer-origination-multilane`, `project-reviewer-finder-retrieval-redesign`, `project-reviewer-origination-experiment-result`.
+- Recall/ranking/web-discovery: `project-reviewer-recall-over-precision`, `project-reviewer-web-discovery-abandoned`, `project-reviewer-ranking-recency-over-citations`.
+- Shipped/next topics and proposal-doc context: `project-reviewer-finder-next-topics`, `project-reviewer-finder-proposal-doc-context`.
+- Applicant exclusion policy: `project-applicant-exclusion-policy-pending`.
 
 ## Standard Probe
 

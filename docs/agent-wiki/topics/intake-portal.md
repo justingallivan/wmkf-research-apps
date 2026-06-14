@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-10
+last_verified: 2026-06-13
 stale_after_days: 60
 owner: intake-portal
 source_files:
@@ -33,37 +33,32 @@ update_triggers:
 
 # Intake Portal
 
-Use this page before work on the applicant intake portal: draft capture, submit,
-attachment handling, the intake blob path, and intake→Dataverse mapping.
+Use this page before work on applicant intake: draft capture, submit, attachment
+handling, intake Blob storage, auth/external identity, institution match, and
+intake-to-Dataverse mapping.
 
 ## Ground Rules
 
-- **Private intake Blob operations use `INTAKE_BLOB_RW_TOKEN`, never the shared
-  Blob token** (CLAUDE.md safety invariant). `lib/utils/intake-blob.js` is the
-  boundary; verify the token before changing upload/attach paths.
-- Scope is deliberately skinny — capture-first, machine-legible form fields. Don't
-  widen the schema casually; memory `project-intake-portal-skinny-scope` and
-  `project-machine-legible-form-capture`.
-- Auth is external-id / foundation-anchored, not session identity; institution
-  match runs at capture. Memory `project-intake-portal-external-id-foundation`,
-  `project-intake-portal-institution-match`, `project-dataverse-creator-privileges`.
-- **No banking / PII in Dataverse** (firm constraint). Memory
-  `project-no-banking-pii-in-dataverse`.
+- Private intake Blob operations use `INTAKE_BLOB_RW_TOKEN`, never the shared Blob token.
+- Scope is deliberately skinny: capture-first and machine-legible form fields.
+- External identity and institution match are foundation-anchored; do not accept authenticated/person identity from client input when server context supplies it.
+- No banking/PII belongs in Dataverse.
+- Live-state for tables, entities, read/write paths, and migration status lives in the Atlas.
+
+## Durable Memory
+
+- Scope and pilot posture: `project-intake-portal-skinny-scope`, `project-intake-portal-pilot-decisions-2026-05-13`.
+- Reviewer capture and field capture: `project-intake-portal-reviewer-capture`, `project-machine-legible-form-capture`.
+- External ID, institution match, creator privileges: `project-intake-portal-external-id-foundation`, `project-intake-portal-institution-match`, `project-dataverse-creator-privileges`.
+- Slice-0 behavior and UI TODOs: `slice0-deactivate-not-delete-recalc`, `project-intake-portal-ui-todo`.
+- Virus scan and Cloudmersive: `project-intake-portal-virus-scan-e2e-deferred`, `project-virus-scanning-it-context`, `project-cloudmersive-advanced-endpoint`.
+- Cross-topic hard constraint: `project-no-banking-pii-in-dataverse`.
 
 ## Recurring Hazards
 
-- **Virus-scan e2e is DEFERRED and MUST run before the next cycle.** The Cloudmersive
-  advanced-endpoint path was built but not end-to-end verified. Memory
-  `project-intake-portal-virus-scan-e2e-deferred`, `project-virus-scanning-it-context`,
-  `project-cloudmersive-advanced-endpoint`.
-- **Slice-0 deactivates, it does not delete (recalc).** A removed line is
-  deactivated and budget recalculated, never hard-deleted. Memory
-  `slice0-deactivate-not-delete-recalc`.
-- Pilot decisions (2026-05-13) and open UI TODOs are captured in memory
-  `project-intake-portal-pilot-decisions-2026-05-13` and
-  `project-intake-portal-ui-todo` — read before re-deciding settled questions.
-- Live-state for intake drafts / aggregates is in the Atlas and
-  `docs/atlas/dataverse-akoya-request.md`; the Atlas wins over any claim here.
+- Virus-scan E2E was deferred and must run before the next cycle.
+- Slice-0 deactivates and recalculates; it does not hard-delete removed lines.
+- Pilot decisions and UI TODOs should be read before re-deciding settled questions.
 
 ## Standard Probe
 
@@ -71,5 +66,5 @@ attachment handling, the intake blob path, and intake→Dataverse mapping.
 rg -n "INTAKE_BLOB_RW_TOKEN|intakeDraft|attachToken|deactivat|recalc|cloudmersive" lib pages docs
 ```
 
-Then read `intake-draft-service.js` and the relevant `pages/api/intake/*` route in
-full before changing capture or attachment behavior.
+Then read `intake-draft-service.js` and the relevant `pages/api/intake/*` route
+in full before changing capture or attachment behavior.

@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-10
+last_verified: 2026-06-13
 stale_after_days: 60
 owner: dynamics-platform
 source_files:
@@ -15,7 +15,7 @@ source_files:
   - pages/dynamics-explorer.js
 canonical_docs:
   - docs/APPLICATION_STATE_ATLAS.md
-  - docs/atlas/dataverse-akoya-request.md
+  - docs/atlas/
   - docs/DYNAMICS_SCHEMA_ANNOTATION.md
   - docs/DATAVERSE_POWER_TOOLS_DESIGN.md
 watch_paths:
@@ -35,36 +35,31 @@ update_triggers:
 
 # Dataverse & Dynamics
 
-Use this page before work touching the Dynamics/Dataverse data layer: schema
-deploys, OData queries, probes, the Dynamics Explorer, and Power Tools. **The
-Atlas remains the source of truth for tables, entity sets, and read/write paths** —
-this page routes; the Atlas adjudicates.
+Use this page before Dynamics/Dataverse work: schema deploys, OData queries,
+probes, Dynamics Explorer, Power Tools, identity reconciliation, CRM lifecycle
+fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 
 ## Ground Rules
 
-- Use explicit Dynamics restriction context and preserve fail-closed auth and
-  restriction behavior (CLAUDE.md safety invariant). `dynamics-context.js` carries it.
-- Validate OData before issuing it: `lib/services/dynamics-odata-validator.js`.
-- Live-state for any specific entity (`akoya_request`, etc.) lives in the Atlas and
-  its `docs/atlas/` page. Do not restate schema here as fresh truth; cite the Atlas.
+- Use explicit Dynamics restriction context and preserve fail-closed auth.
+- Validate OData before issuing it.
+- Entity/table schemas, read/write paths, source-of-truth, and drop status live in the Atlas.
+- Existing databases use `node scripts/apply-migrations.js`; `scripts/setup-database.js` is fresh-install-only.
+
+## Durable Memory
+
+- Schema/OData/taxonomy: `project-dataverse-schema-deploy-gotchas`, `project-dataverse-odata-null-filter`, `project-living-taxonomy-principle`.
+- CRM users/email/limitations/writeback: `project-dynamics-crm-users`, `project-dynamics-email`, `project-dynamics-crm-limitations`, `project-dynamics-ai-writeback`.
+- Identity reconciliation and sandbox state: `project-dynamics-identity-reconciliation`, `project-dynamics-sandbox-state`.
+- Explorer and Power Tools: `project-dynamics-explorer-details`, `project-dynamics-explorer-schema-diff`, `project-dynamics-explorer-reuse-power-tools`, `project-dynamics-feedback-admin-shipped`, `project-dataverse-power-tools`.
+- Export and lifecycle facts: `dataverse-export-floor-scoping`, `project-akoya-request-pd-fields`, `project-grant-lifecycle-states-confirmed`, `akoya-temporal-axis-encodings`.
 
 ## Recurring Hazards
 
-- **OData null filters do not behave like SQL.** Confirm null-filter syntax before
-  trusting a query. Memory `project-dataverse-odata-null-filter`.
-- **Schema-deploy has gotchas** (publisher prefixes, option-set timing, publish
-  steps). Memory `project-dataverse-schema-deploy-gotchas`; expand enums over new
-  child tables (memory `feedback-human-legibility-schema-principle`,
-  `project-living-taxonomy-principle`).
-- **The Dynamics sandbox is NOT drop-in usable** — don't assume parity with prod.
-  Memory `project-dynamics-sandbox-state`.
-- **OData has row/query limits and AI-field quirks.** Memory
-  `project-dynamics-crm-limitations`, `project-dynamics-ai-writeback`.
-- **Identity reconciliation / impersonation is subtle** — Dynamics users map to
-  contacts in non-obvious ways. Memory `project-dynamics-identity-reconciliation`,
-  `project-dynamics-crm-users`.
-- **Reuse the Power Tools surface; don't rebuild the Explorer.** Memory
-  `project-dynamics-explorer-reuse-power-tools`, `project-dataverse-power-tools`.
+- OData null filters do not behave like SQL.
+- The sandbox is not drop-in prod parity.
+- Do not rebuild Explorer behavior when the Power Tools surface should be reused.
+- Treat any Dataverse/Power Automate/Azure claim as external-platform state; verify before asserting.
 
 ## Standard Probe
 
@@ -72,5 +67,5 @@ this page routes; the Atlas adjudicates.
 rg -n "odata|\\$filter|RetrieveMultiple|restrictionContext|impersonat|publisherPrefix" lib/services lib/dataverse pages/api/dynamics-explorer docs
 ```
 
-Then read `dynamics-service.js` + the relevant Atlas entity page in full before
+Then read `dynamics-service.js` plus the relevant Atlas entity page before
 issuing a query or deploying schema.
