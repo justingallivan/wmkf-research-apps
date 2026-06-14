@@ -35,7 +35,7 @@ describe('golden: shipped templates satisfy their own contracts', () => {
 });
 
 describe('golden: a canned response using the contract labels parses', () => {
-  it('parseAnalysisResponse yields a suggestion + queries', () => {
+  it('parseAnalysisResponse yields a suggestion; Stage-1 search queries are no longer parsed (removed S253)', () => {
     const canned = [
       'TITLE: Test', 'PRINCIPAL_INVESTIGATOR: Dr. A', 'PRIMARY_RESEARCH_AREA: Bio',
       'KEYWORDS: x, y', 'ABSTRACT: An abstract.', '', 'REVIEWER:', 'NAME: Dr. Foo',
@@ -46,7 +46,8 @@ describe('golden: a canned response using the contract labels parses', () => {
     const r = parseAnalysisResponse(canned);
     expect(r.reviewerSuggestions).toHaveLength(1);
     expect(r.reviewerSuggestions[0].name).toBe('Dr. Foo');
-    expect(r.searchQueries.pubmed.length).toBe(2);
+    // PART 3 removed S253 — query lines, even if a model emits them, are ignored; shape stays empty.
+    expect(r.searchQueries.pubmed).toEqual([]);
   });
   it('parseDiscoveredReasoningResponse sets relevance from the labels', () => {
     const candidates = [{ name: 'X' }, { name: 'Y' }];

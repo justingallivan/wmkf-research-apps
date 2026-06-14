@@ -6,7 +6,6 @@
  * Accepts a proposal (via Vercel Blob URL or direct text) and returns:
  * - Proposal metadata
  * - Reviewer suggestions with reasoning
- * - Optimized search queries for databases
  * - Summary page extraction (if PDF and summaryPages specified)
  *
  * Uses streaming SSE for real-time progress updates.
@@ -219,7 +218,6 @@ export default async function handler(req, res) {
     sendEvent('result', {
       proposalInfo: result.proposalInfo,
       reviewerSuggestions: result.reviewerSuggestions,
-      searchQueries: result.searchQueries,
       validation: result.validation,
       summaryBlobUrl: summaryBlobUrl,
       summaryFilename: summaryFilename
@@ -228,7 +226,6 @@ export default async function handler(req, res) {
     sendEvent('complete', {
       message: 'Analysis complete',
       suggestionCount: result.reviewerSuggestions?.length || 0,
-      queryCount: Object.values(result.searchQueries || {}).flat().length,
       summaryExtracted: !!summaryBlobUrl
     });
 

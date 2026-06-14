@@ -29,7 +29,7 @@ describe('Reviewer Finder A7 hardening', () => {
     // The wrapped proposal block is last — only the trailing instruction
     // follows it.
     const afterClose = prompt.split(`[[/WMKF-UNTRUSTED-CONTENT nonce=${wrapped.nonce}]]`)[1];
-    expect(afterClose.trim()).toBe('Now analyze the proposal and provide all three parts:');
+    expect(afterClose.trim()).toBe('Now analyze the proposal and provide both parts:');
     // Staff note is a trusted instruction — it appears before the wrapped
     // proposal block's open sentinel (not inside it).
     expect(prompt).toContain('staff note');

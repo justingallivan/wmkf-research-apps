@@ -199,7 +199,7 @@ ${PART_3}`;
     expect(result.reviewerSuggestions[0].name).toBe('Dr. Jack Klein');
   });
 
-  test('queries still parse alongside markdown reviewer blocks', () => {
+  test('search queries are no longer parsed, even if a model emits them (removed S253)', () => {
     const response = `${PROPOSAL_METADATA}
 ## PART 2: REVIEWER SUGGESTIONS
 
@@ -215,7 +215,8 @@ ${PART_3}`;
 
     const result = parseAnalysisResponse(response);
     expect(result.reviewerSuggestions).toHaveLength(1);
-    expect(result.searchQueries.pubmed).toEqual(['cell signaling query', 'apoptosis query']);
+    // PART 3 removed S253 — the parser no longer extracts query lines; shape stays empty.
+    expect(result.searchQueries.pubmed).toEqual([]);
   });
 });
 

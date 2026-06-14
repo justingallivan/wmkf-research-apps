@@ -124,12 +124,15 @@ re-enable. This is a code-level switch by design, **NOT** an admin/user toggle a
 `searchPubmed` (that flag also routes Track-A verification via `suggestionVerifierRouting`,
 so flipping it would change Track A — the coupling trap).
 
-**What Track B was:** the second origination lane — Claude's `analyze` step emits
+**What Track B was:** the second origination lane — Claude's `analyze` step *used to* emit
 `searchQueries` (keyword queries per source); Track B runs them against **PubMed / arXiv /
 bioRxiv / chemRxiv** (`searchPubMed`/`searchArXiv`/`searchBioRxiv`/`searchChemRxiv`) and
 turns the **authors of matching papers** into new candidate reviewers, then resolves the top
 `TRACK_B_IDENTITY_RESOLUTION_LIMIT` (=25) through the OpenAlex/ORCID spine and dedups against
-the Track-A verified set. All of that machinery is preserved.
+the Track-A verified set. The `discovery-service` search machinery is preserved, but the
+**prompt-side query generation (analyze PART 3) was removed S253** — `analyze` now emits an
+empty `searchQueries` shape (Track-B-only output, dead while the lane is off). Re-enabling the
+lane therefore needs the queries regenerated too (see "To re-enable" below).
 
 **Why archived (the evidence):**
 - **~0 contribution to saved panels** last cycle — `scholarly-only-saved ≈ 0` by
@@ -145,10 +148,14 @@ the Track-A verified set. All of that machinery is preserved.
   `shared/config/reviewerFinderPreferences.js`) — plus **referral capture (still pending)**,
   not a grounded keyword lane.
 
-**To re-enable / repurpose:** flip `TRACK_B_ENABLED = true`. If grounded origination is ever
-revisited properly, do NOT just re-enable bare Track B — build the **ORCID-works-anchored
-multilane** (§12) with organism/field-scoped facets + the trainee/deceased filter, judged on
-real accept/decline. The bare keyword→author lane is what underperformed.
+**To re-enable / repurpose:** flipping `TRACK_B_ENABLED = true` is **no longer sufficient on its
+own** — the analyze prompt's PART 3 query generation was removed S253, so the lane would run
+against empty `searchQueries`. A re-enable also needs query generation restored (re-add PART 3 to
+both `createAnalysisPrompt` and `ANALYZE_USER_PROMPT_TEMPLATE`, plus the parser + the
+`prompt-validators` required labels). But if grounded origination is ever revisited properly, do
+NOT just re-enable bare Track B — build the **ORCID-works-anchored multilane** (§12) with
+organism/field-scoped facets + the trainee/deceased filter, judged on real accept/decline. The
+bare keyword→author lane is what underperformed.
 
 ## Recurring Hazards
 
