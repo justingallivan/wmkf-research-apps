@@ -90,9 +90,10 @@ fastest prod signal but not full coverage.
 *Verify:* card shows no email; in Dataverse the person row has empty `wmkf_emailaddress`.
 
 **T1.3 — Wrong-domain email is dropped, right one kept.**
-*Steps:* pick a candidate whose Scholar profile shows "Verified email at `<domain>`" and whose
-snippet also surfaces a different-domain namesake address.
-*Expected:* the address whose domain matches the Scholar-verified domain is persisted; the
+*Steps:* pick a candidate with an OpenAlex-resolved `verifiedInstitutionDomain` (post-S251 this
+replaces the retired Scholar "Verified email at `<domain>`" hint) and whose search snippet also
+surfaces a different-domain namesake address.
+*Expected:* the address whose domain matches the verified institution domain is persisted; the
 contradicting namesake address is not. A trusted ORCID/PubMed email is kept even on a mismatch.
 *Verify:* `wmkf_emailaddress` holds the domain-matched address; `wmkf_emailsource` reflects the
 real source.

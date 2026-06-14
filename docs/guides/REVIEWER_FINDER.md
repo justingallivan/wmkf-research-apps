@@ -30,7 +30,7 @@ The Reviewer Finder has two tabs:
 ### 3. Review Candidates
 
 Each candidate card shows:
-- **Name and affiliation** with a link to their Google Scholar profile
+- **Name and affiliation** with a Google Scholar **search** link (name+institution pre-filled; not a deep profile link)
 - **Expertise keywords** extracted from their publications
 - **Relevance reasoning** — why this person is a good match
 - **Warning badges** — institution overlap with the PI, or other potential conflicts

@@ -14,7 +14,7 @@ Complete pipeline for finding and contacting expert reviewers:
 ## Key Features
 
 - Institution/expertise mismatch warnings
-- Google Scholar profile links for all candidates
+- Google Scholar **search** links for all candidates (name+institution pre-filled; exact `user=ID` profile deep-links were dropped in the S251 OpenAlex migration, `googleScholarId=null` — bibliometrics now source from OpenAlex, see `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md`)
 - PI/author self-suggestion prevention
 - Claude retry logic with Haiku fallback on rate limits
 - Temperature control (0.3-1.0) and configurable reviewer count
