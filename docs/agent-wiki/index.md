@@ -37,6 +37,7 @@ This wiki is a compact retrieval layer for recurring agent work. It routes agent
 | External reviewer portal, accept/decline, review tokens, E2E harness, prod-automation hazard, SharePoint files | [External Reviewer Portal](topics/external-reviewer-portal.md) | `docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md`, `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`, `tests/e2e/README.md` |
 | Intake portal: draft capture, submit, attachments, intake blob token, virus-scan, institution match | [Intake Portal](topics/intake-portal.md) | `docs/INTAKE_PORTAL_DESIGN.md`, `docs/atlas/dataverse-akoya-request.md` |
 | Dataverse / Dynamics: schema deploy, OData, probes, Dynamics Explorer, Power Tools, identity reconciliation | [Dataverse & Dynamics](topics/dataverse-dynamics.md) | `docs/APPLICATION_STATE_ATLAS.md`, `docs/atlas/dataverse-akoya-request.md`, `docs/DYNAMICS_SCHEMA_ANNOTATION.md` |
+| Applicant integrity screening (Retraction Watch / PubPeer / News), SerpAPI residual, parked PubPeer-API future item | [Integrity Screener](topics/integrity-screener.md) | `docs/APPLICATION_STATE_ATLAS.md`, `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md` |
 
 ## Maintenance
 

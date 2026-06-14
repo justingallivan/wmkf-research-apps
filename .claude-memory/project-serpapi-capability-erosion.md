@@ -1,6 +1,6 @@
 ---
 name: project-serpapi-capability-erosion
-description: "SerpAPI is the project's LARGEST monthly expense ($150/mo Production ~15k calls, Justin-confirmed 2026-06-11). A 2026-06-11 audit found its value eroded: google_scholar_profiles is DEAD (Google login wall). MIGRATION STATUS (S251): Scholar metrics+domain (#2/#3, Slice 1b) and lit/PI-pubs (#4/#5, Slice 2) SHIPPED off SerpAPI → OpenAlex (NOT Semantic Scholar). PubPeer (#6) is BLOCKED — no public PubPeer API exists (verified); stays on SerpAPI, email sent. Residual = contact (#1) + PubPeer (#6) + news (#7)."
+description: "SerpAPI is the project's LARGEST monthly expense ($150/mo Production ~15k calls, Justin-confirmed 2026-06-11). A 2026-06-11 audit found its value eroded: google_scholar_profiles is DEAD (Google login wall). MIGRATION STATUS (S251): Scholar metrics+domain (#2/#3, Slice 1b) and lit/PI-pubs (#4/#5, Slice 2) SHIPPED off SerpAPI → OpenAlex (NOT Semantic Scholar). PubPeer (#6) stays on SerpAPI — no public PubPeer API exists (verified); its migration is retired as a slice + parked as a contingent future item (full context in the integrity-screener agent-wiki topic). Residual = contact (#1) + PubPeer (#6) + news (#7)."
 metadata:
   node_type: memory
   type: project
@@ -42,9 +42,11 @@ only; actual call volume + invoice live in the SerpAPI billing dashboard, not th
     (**Slice 1b**); kills the login-wall risk + removes the 2 hot-path paid calls.
   - `google_scholar` lit/novelty + PI-pubs → OpenAlex works `searchWorks`/`getWorksByAuthor`
     (**Slice 2**).
-- **PubPeer (`site:pubpeer.com` via `google`) — BLOCKED, NOT replaced. The "PubPeer Developer API"
-  does not exist** (verified S251 from primary sources — see [[project-pubpeer-no-public-api]]).
-  Stays on SerpAPI; sanctioned-access email sent. Do NOT re-assume an API is available.
+- **PubPeer (`site:pubpeer.com` via `google`) — NOT replaced; stays on SerpAPI. The "PubPeer
+  Developer API" does not exist** (verified S251 from primary sources). Its migration is retired as
+  a slice + parked as a contingent future item — full context (facts, endpoint, load-vs-auth,
+  build-if-granted) in `docs/agent-wiki/topics/integrity-screener.md`. Do NOT re-assume an API is
+  available, and do NOT proactively resurface it (Justin recalls it on demand if PubPeer replies).
 - **Hobby-tier downgrade** (~$100/mo): the bulk of volume (per-candidate Scholar calls) is gone, so
   evaluate it NOW against real billing-dashboard volume — even though PubPeer (#6) keeps a residual
   SerpAPI call. Residual = contact (#1) + PubPeer (#6) + news (#7).

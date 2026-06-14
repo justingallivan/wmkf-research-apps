@@ -1,7 +1,9 @@
 # Reviewer-Finder SerpAPI → Free-Stack Migration Plan
 
-> **Status:** Slices 1a + 1b + 2 SHIPPED (S250–S251). Slice 3 (PubPeer) **BLOCKED** — no public
-> PubPeer API exists; PubPeer stays on SerpAPI pending sanctioned access (email sent S251). See Slice 3.
+> **Status:** **COMPLETE** — Slices 1a + 1b + 2 SHIPPED (S250–S251). The reviewer-finder metrics +
+> literature paths are off SerpAPI. PubPeer integrity (#6) stays on SerpAPI: no public PubPeer API
+> exists, so its migration is **retired as a slice** and parked as a contingent future item (see
+> "PubPeer integrity" below + the integrity-screener agent-wiki topic).
 > **Author:** Justin Gallivan + Claude.
 > **Date:** 2026-06-13.
 > **Why:** SerpAPI is the project's largest single monthly line item (~$150/mo Production,
@@ -23,11 +25,11 @@ Seven SerpAPI engine call-sites across three services. The audit's "6 uses" grou
 | 3 | `serp-contact-service.fetchScholarMetrics` | `google_scholar_author` | h-index / i10 / citations + current affiliation + verified-email-**domain** hint | **REPLACE** → OpenAlex |
 | 4 | `literature-search._searchGoogleScholar` | `google_scholar` | Novelty literature search | **REPLACE** → OpenAlex works |
 | 5 | `literature-search._searchPIPubs` | `google_scholar` | PI publications | **REPLACE** → OpenAlex |
-| 6 | `integrity-service.searchPubPeer` | `google` + `site:pubpeer.com` | PubPeer integrity | **REPLACE — BLOCKED**: no public PubPeer API (see Slice 3); stays on SerpAPI |
+| 6 | `integrity-service.searchPubPeer` | `google` + `site:pubpeer.com` | PubPeer integrity | **STAYS on SerpAPI** — no public PubPeer API (parked future item; see below) |
 | 7 | `integrity-service.searchNews` | `google_news` | News integrity | **KEEP** — irreplaceable |
 
 Residual SerpAPI after Slices 1–2 = **#1 (contact) + #6 (PubPeer) + #7 (news)**. #6 would drop
-only if PubPeer grants sanctioned API access (Slice 3 is BLOCKED — see below); #1 + #7 are
+only if PubPeer grants sanctioned API access (no public API today — see "PubPeer integrity" below); #1 + #7 are
 irreducible keepers. The bulk of the per-call volume (the per-candidate Scholar metrics, #2/#3)
 is already gone, so a **Hobby-tier downgrade** (~$100/mo) is worth evaluating now — but that is a
 **billing-dashboard decision** (real call volume), out-of-repo. Not part of any slice.
@@ -287,7 +289,7 @@ Built as designed. Resolved decisions:
   (`optStr`), so no schema change. `check:prompt-injection-tagging` re-run green.
 - Tests: new `tests/unit/literature-search-service.test.js`; `searchWorks`/`reconstructAbstract`
   unit tests; integration mock key `googleScholar`→`openAlex`. Full suite green (167 suites / 2413).
-- Residual SerpAPI after Slice 2 = **#1 contact + #6 PubPeer + #7 news**. #6 is Slice 3.
+- Residual SerpAPI after Slice 2 = **#1 contact + #6 PubPeer + #7 news**. #6 stays on SerpAPI (no public PubPeer API).
 
 **Codex post-impl review (`d90d4e0`) — areas 1/6 clean; `per-page` confirmed correct; 1 MEDIUM + 2 LOW folded:**
 - **[MEDIUM] PI recency filter silently dropped** — `_searchPIPubs` passed `yearFrom` to
@@ -295,9 +297,9 @@ Built as designed. Resolved decisions:
   old `as_ylo`). Added a `yearFrom` → `from_publication_date` AND-clause to `getWorksByAuthor`
   (the spine-rescue path omits it, unchanged).
 - **[LOW] PI namesake mitigation** — surfaced the *resolved* OpenAlex author's `lastKnownInstitution`
-  as `resolvedInstitution` in the PI-pubs payload, and instructed the collation prompt to exclude a
-  publications set whose resolvedInstitution conflicts with the proposal PI's institution (closes the
-  acronym-can't-token-match gap from the prompt side).
+  as `resolvedInstitution` in the PI-pubs payload, and instructed the collation prompt to drop a
+  PI-publication set whose resolvedInstitution conflicts with the proposal PI's institution (closes
+  the acronym-can't-token-match gap from the prompt side).
 - **[LOW] stale labels** — fixed two non-runtime "Google Scholar" references (a panel-review-service
   Stage-0b comment + `docs/VIRTUAL_REVIEW_PANEL.md`).
 - **[MEDIUM→resolved] `per-page` param** — confirmed correct: all five OpenAlex methods use the
@@ -305,58 +307,21 @@ Built as designed. Resolved decisions:
 - 3 new tests (getWorksByAuthor yearFrom filter; resolvedInstitution payload). Full suite green
   (167 suites / 2415 tests).
 
-## Slice 3 — PubPeer → (sanctioned API) — BLOCKED, stays on SerpAPI
+## PubPeer integrity — stays on SerpAPI (parked future item, NOT an open slice)
 
-**File:** `lib/services/integrity-service.js` (`searchPubPeer`).
+The originally-planned third slice ("migrate PubPeer to a PubPeer Developer API") **is not
+buildable: that API does not exist** (verified S251 from primary sources — PubPeer's FAQ says an API
+is "coming soon / contact us"; the only programmatic surface is the browser extension's undocumented
+`/v3/publications` endpoint with a devkey hardcoded into the public extension, not ours). So PubPeer
+integrity (`integrity-service.searchPubPeer`, #6) **stays on SerpAPI** (`site:pubpeer.com`).
 
-> **⚠ VERIFIED S251 — the premise was wrong.** The S250 plan assumed a "PubPeer Developer API"
-> that we could register for and key into. **It does not exist as a self-serve, documented API.**
-> Verified from primary sources:
-> - PubPeer's own FAQ (`pubpeer.com/static/faq`) says an API is **"coming soon"** and to **contact
->   them** for a key — i.e., not generally available, no published endpoint/terms.
-> - The ONLY working programmatic surface today is the **undocumented endpoint the official browser
->   extension uses** (`PubPeerFoundation/PubPeerBrowserExtensions`, `js/contentScript/pubpeer.js`):
->   `POST https://pubpeer.com/v3/publications?devkey=PubMed<BrowserName>`, JSON body of DOIs/PMIDs,
->   returns `{ feedbacks: [...] }`. The `devkey` is a **hardcoded, non-secret string baked into the
->   public extension** (e.g. `PubMedChrome`) — NOT a per-developer registered key.
->
-> **Therefore Slice 3 as planned is not buildable now.** Decision (S251): **PubPeer stays on
-> SerpAPI** (`site:pubpeer.com`, #6) — the plan's own escape hatch ("no API → stays on SerpAPI").
-> A sanctioned-access **email was sent to PubPeer (S251)** requesting a real key/terms; if granted,
-> the slice becomes buildable. Do **not** call the `/v3/publications` endpoint server-side without
-> explicit sanction — see the load-vs-authorization note below.
->
-> **Load vs authorization (why we did NOT just switch to the direct endpoint).** These are
-> different axes and they point opposite ways:
-> - *Load on PubPeer:* the SerpAPI `site:pubpeer.com` route hits **Google's index, not PubPeer** —
->   zero real-time load on PubPeer. The `/v3/publications` endpoint is the ONLY route that touches
->   PubPeer's DB. So the Google route is *lighter* on PubPeer, not heavier ("gentler on their
->   infrastructure" is the wrong argument for sanctioned access).
-> - *Authorization:* querying Google's public index is unambiguously permitted; calling PubPeer's
->   undocumented endpoint with **their extension's** hardcoded devkey, for a use it wasn't offered
->   for (batch server screening, not interactive per-pageview), with no terms permitting it, is the
->   grey part. The real reasons to want sanctioned access are **accuracy** (DOI-based vs fuzzy
->   name-based Google) and **consent/durability** (our own key, won't break on an extension build).
+This is **retired as a numbered slice** and parked as a low-priority, externally-gated future item:
+a sanctioned-access email was sent to PubPeer (S251); if they grant a real key, we revisit. It is
+**not** active work and should not be resurfaced each session.
 
-**If/when sanctioned access is granted, the build is:**
-- **Prereqs:** add `PUBPEER_API_KEY` (or the sanctioned devkey) to `lib/utils/tracked-secrets.js` +
-  `docs/CREDENTIALS_RUNBOOK.md`; add `pubpeer.com` (or the API host) to the `safeFetch` allowlist
-  (`lib/utils/safe-fetch.js`) — **not currently permitted**.
-- Reshape: the endpoint returns structured publication/comment records; feed them to the existing
-  Haiku summarizer (or summarize structurally). `searchNews` (#7) stays on SerpAPI.
-- **Scope is `screenApplicants`, not just `searchPubPeer` (Codex MEDIUM).** Today both PubPeer
-  and news are gated behind one `effectiveSerpKey` (`integrity-service.js:88-172`). Once PubPeer
-  moves to its own key, the two sources need **separate availability gating + source-specific
-  error text** in `screenApplicants` (news may run while PubPeer is unconfigured, and vice-versa).
-- **Preserve the `sources.pubpeer` shape** consumed by the integrity UI/export
-  (`pages/integrity-screener.js` ~190-192, ~506-519, ~635-646) — the API replacement must emit
-  the same shape (`hasConcerns`, `summary`, `resultCount`, `searchUrl`, …) or update those
-  renderers in the same slice.
-- Note the migration is DOI/PMID-based (the endpoint keys on publication ids), so the screen would
-  shift from name-based to publication-based matching — more precise, but it needs the applicant's
-  DOIs/PMIDs (already available from the PubMed/OpenAlex enrichment data; no extra PubPeer calls to
-  obtain them). Volume estimate for the access request: ≈1 batched request per person vetted
-  (~hundreds per review cycle), cacheable per person.
+**Full context — verified facts, the load-vs-authorization reasoning, and the build-if-granted scope
+— lives in the integrity-screener agent-wiki topic** (`docs/agent-wiki/topics/integrity-screener.md`),
+so it is retrievable on demand without nagging. Recall it only if PubPeer responds.
 
 ## Cross-cutting
 
@@ -376,9 +341,9 @@ Built as designed. Resolved decisions:
 2. **Slice 1b** (metrics + domain endpoint replacement) — **SHIPPED S251.** Killed the login-wall
    risk; free/fewer calls; hot path. (Disposition under the Slice 1b heading above.)
 3. **Slice 2** (literature / PI-pubs) — **SHIPPED S251.** Reuses `getWorksByAuthor`; added `searchWorks`.
-4. **Slice 3** (PubPeer) — **BLOCKED**: no public PubPeer API exists (verified S251); stays on
-   SerpAPI. Unblocks only if PubPeer grants sanctioned access (email sent S251). Build scope (for
-   then) = `screenApplicants` source gating + integrity UI/export shape.
+4. **PubPeer (#6)** — **RETIRED as a slice.** No public PubPeer API exists (verified S251); stays on
+   SerpAPI. Parked contingent future item if PubPeer grants sanctioned access (email sent S251) —
+   full context in the integrity-screener agent-wiki topic, not an open work item here.
 5. **Now (post-1–2):** confirm real SerpAPI call volume in the billing dashboard → decide on the
    **Hobby-tier downgrade** (Justin, out-of-repo). The per-candidate Scholar calls are already
    gone, so this is worth evaluating now even with PubPeer (#6) still on SerpAPI.
@@ -402,7 +367,7 @@ scheduling refactor.
   consumer checklist expanded (reviewer-finder page, ReviewerSearchSection, reviewer-search-logic).
 - **[LOW] `scholarVerifiedEmail` rename spans tests/smoke/docs** → folded: treated as durable
   reconciliation (or keep the name) — decide explicitly.
-- **[MEDIUM] Slice 3 scope too narrow** → folded: scope expanded to `screenApplicants` source
+- **[MEDIUM] PubPeer scope too narrow** → folded: scope expanded to `screenApplicants` source
   gating + `sources.pubpeer` shape compatibility.
 - **[MEDIUM] Slice 1 resolver contract before endpoint replacement** → folded: the 1a/1b split.
 - **[LOW] Slice 2 source/key semantics** → folded: explicit compatibility decision for the
