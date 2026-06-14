@@ -173,7 +173,10 @@ Each chunk is independently committable. A chunk's red gate (where it has one) b
 > `not_ready` (fresh accept before release). Readiness gate exempts `isAcceptRepeat`; repeat-hold
 > short-circuits 200 idempotent before the adapter (no `wmkf_heldat` re-stamp). With the predicate
 > still returning `true`, hold POSTs 409 `already_released` and accept is ungated — so chunk 3 is also
-> zero-behavior-change until go-live. +11 integration tests; full suite 2418 green; lint 0 errors.
+> zero-behavior-change until go-live. +17 integration tests; full suite 2424 green; lint 0 errors.
+> Codex review (SHIP WITH NAMED CHANGES) → applied: reordered the hold branch so the `accepted`
+> row-state guard precedes the `ready` guard (an accepted+ready hold now reports `already_accepted`,
+> not `already_released`); added the remaining transition-matrix test cells.
 - **Do:** add a third action. It writes `wmkf_responsetype=held`, `wmkf_heldat=now`, optional
   `contactEdits`; it does **NOT** require acks, does **NOT** require a payment contact, does
   **NOT** call `ensureHonorariumOnboarding`, does **NOT** set `wmkf_accepted`. Reuse the same

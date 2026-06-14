@@ -233,17 +233,19 @@ export default async function handler(req, res) {
 
     // ── Hold (pre-accept "agree in principle") ──────────────────────────────
     if (body.action === 'hold') {
-      // Once the proposal is released, the reviewer should FINALIZE, not hold.
+      // Row-state truth precedes readiness: a finalized accept can't downgrade to hold
+      // regardless of release state (Codex chunk-3: an accepted+ready hold must report
+      // `already_accepted`, not `already_released`).
+      if (accepted) {
+        return res.status(409).json({ ok: false, reason: 'already_accepted' });
+      }
+      // Once the proposal is released, a not-yet-accepted reviewer should FINALIZE, not hold.
       if (ready) {
         return res.status(409).json({
           ok: false,
           reason: 'already_released',
           message: 'This proposal has been released for review — please complete your response.',
         });
-      }
-      // No downgrade from a finalized accept.
-      if (accepted) {
-        return res.status(409).json({ ok: false, reason: 'already_accepted' });
       }
       // Idempotent repeat hold: already held → return without re-stamping wmkf_heldat
       // (the adapter would overwrite it). Mirrors the decline idempotency short-circuit.

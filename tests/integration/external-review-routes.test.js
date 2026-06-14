@@ -695,5 +695,82 @@ describe('/api/external/review/[token]/respond', () => {
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'invalid_action' }));
   });
+
+  // ── Remaining transition-matrix cells (Codex chunk-3 #2) ──
+  it('accepted + READY + hold → 409 already_accepted (row state wins over readiness; Codex guard-order fix)', async () => {
+    ready();
+    const res = createMockRes();
+    await handler(holdReq({ wmkf_accepted: true }), res);
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'already_accepted' }));
+  });
+
+  it('declined → hold (flip) when not ready → 200, adapter called with action:hold', async () => {
+    notReady();
+    const res = createMockRes();
+    await handler(holdReq({ wmkf_declined: true, wmkf_responsetype: 100000001 }), res);
+    expect(applyStage2aResponse).toHaveBeenCalledWith(
+      'suggestion-1', expect.objectContaining({ action: 'hold' }), expect.anything(),
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('held → accept (finalize) when READY → runs the full accept path (acks/honorarium)', async () => {
+    ready();
+    const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
+    verifySuggestionToken.mockResolvedValue({
+      ...fresh,
+      suggestion: { ...fresh.suggestion, wmkf_responsetype: 100000004 }, // held, not accepted
+    });
+    const req = createMockReq({
+      method: 'POST', query: { token: 'good-token' }, headers: {},
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(applyStage2aResponse).toHaveBeenCalledWith('suggestion-1', expect.objectContaining({ action: 'accept' }), expect.anything());
+    expect(ensureHonorariumOnboarding).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('held → accept (finalize) when NOT ready → 409 not_ready (held reviewer cannot finalize pre-release)', async () => {
+    notReady();
+    verifySuggestionToken.mockResolvedValue({
+      ...fresh,
+      suggestion: { ...fresh.suggestion, wmkf_responsetype: 100000004 },
+    });
+    const req = createMockReq({
+      method: 'POST', query: { token: 'good-token' }, headers: {},
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'not_ready' }));
+  });
+
+  it('held → decline (flip) → 200, adapter called with action:decline', async () => {
+    notReady();
+    verifySuggestionToken.mockResolvedValue({
+      ...fresh,
+      suggestion: { ...fresh.suggestion, wmkf_responsetype: 100000004 },
+    });
+    const req = createMockReq({ method: 'POST', query: { token: 'good-token' }, headers: {}, body: { action: 'decline', decline: {} } });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(applyStage2aResponse).toHaveBeenCalledWith('suggestion-1', expect.objectContaining({ action: 'decline' }), expect.anything());
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('withdrawn_sufficient + hold → 409 withdrawn_sufficient (terminal lock applies to hold)', async () => {
+    notReady();
+    const res = createMockRes();
+    await handler(holdReq({ wmkf_responsetype: 100000003 }), res);
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'withdrawn_sufficient' }));
+  });
 });
 
