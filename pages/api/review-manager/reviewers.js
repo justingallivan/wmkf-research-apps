@@ -56,12 +56,9 @@ const REVIEW_STATUS_BY_VALUE = {
   100000004: 'complete',
 };
 
-const RESPONSE_TYPE_BY_VALUE = {
-  100000000: 'accepted',
-  100000001: 'declined',
-  100000002: 'no_response',
-  100000004: 'held',
-};
+// Canonical read map (numeric → string), derived from the adapter's write map so the
+// two can't drift and `held`/`withdrawn_sufficient` are always covered (audit #7).
+const RESPONSE_TYPE_BY_VALUE = suggestionAdapter.RESPONSE_TYPE_BY_VALUE;
 
 function deriveTokenState(s) {
   if (!s.wmkf_externaltokenhash) return 'not_minted';

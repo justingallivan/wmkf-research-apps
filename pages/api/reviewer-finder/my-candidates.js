@@ -219,7 +219,11 @@ async function handleGet(req, res, access) {
         declined: !!s.wmkf_declined,
         notes: s.wmkf_notes || null,
         emailSentAt: s.wmkf_emailsentat || null,
-        responseType: s.wmkf_responsetype || null,
+        // Map the numeric optionset → the string code the finder UI compares against
+        // (=== 'accepted'/'declined'/'held'/'no_response'). Emitting the raw number
+        // meant every string comparison silently missed AND held had no bucket; the
+        // derived RESPONSE_TYPE_BY_VALUE keeps this symmetric with the write map.
+        responseType: suggestionAdapter.RESPONSE_TYPE_BY_VALUE[s.wmkf_responsetype] ?? null,
         responseReceivedAt: s.wmkf_responsereceivedat || null,
         savedAt: s.createdon,
       });

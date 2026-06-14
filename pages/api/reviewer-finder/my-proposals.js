@@ -160,13 +160,14 @@ async function listProposalsInCycle(res, pd, cycleCode, status) {
     const slotsFilled = ['1', '2', '3', '4', '5'].filter(
       (n) => r[`_wmkf_potentialreviewer${n}_value`]
     ).length;
-    const c = counts[r.akoya_requestid] || { invited: 0, accepted: 0, declined: 0 };
+    const c = counts[r.akoya_requestid] || { invited: 0, accepted: 0, declined: 0, held: 0 };
     return {
       requestId: r.akoya_requestid,
       requestNumber: r.akoya_requestnum,
       reviewerInvited: c.invited,
       reviewerAccepted: c.accepted,
       reviewerDeclined: c.declined,
+      reviewerHeld: c.held,
       meetingDate: r.wmkf_meetingdate,
       meetingDateFormatted: r.wmkf_meetingdate_formatted || null,
       abstract: r.wmkf_abstract || null,
@@ -221,10 +222,11 @@ async function fetchReviewerCounts(requestIds) {
     for (const s of records) {
       const rid = s._wmkf_request_value;
       if (!rid) continue;
-      if (!out[rid]) out[rid] = { invited: 0, accepted: 0, declined: 0 };
+      if (!out[rid]) out[rid] = { invited: 0, accepted: 0, declined: 0, held: 0 };
       if (s.wmkf_invited === true || s.wmkf_emailsentat) out[rid].invited += 1;
       if (s.wmkf_accepted === true || s.wmkf_responsetype === RESPONSE_TYPE_MAP.accepted) out[rid].accepted += 1;
       if (s.wmkf_declined === true || s.wmkf_responsetype === RESPONSE_TYPE_MAP.declined) out[rid].declined += 1;
+      if (s.wmkf_responsetype === RESPONSE_TYPE_MAP.held) out[rid].held += 1;
     }
   }
   return out;

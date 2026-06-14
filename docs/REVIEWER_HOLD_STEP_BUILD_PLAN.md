@@ -363,7 +363,16 @@ Each chunk is independently committable. A chunk's red gate (where it has one) b
 - **Acceptance:** `npx jest --testPathPatterns "reviewer|external|respond"` green; full
   `npm test && npm run lint && npm run build` green.
 
-### Chunk 8 — Staff-side `held` visibility & round-trip (Codex 2nd-pass #3)
+### Chunk 8 — Staff-side `held` visibility & round-trip (Codex 2nd-pass #3) ✅ DONE (S257)
+> **S257 build status:** COMPLETE. Centralized the read map: `RESPONSE_TYPE_BY_VALUE` (derived
+> inverse of `RESPONSE_TYPE_MAP`) now lives in the adapter and is imported by `reviewers.js`
+> (dedup, also fixes the pre-existing missing `withdrawn_sufficient`). **Key fix:** `my-candidates.js`
+> now maps numeric→string `responseType` (was emitting the raw number — every finder string
+> comparison silently missed AND held had no bucket; this also fixes a pre-existing display/banner
+> bug). Finder: `held` filter bucket + count + indigo "Held" chip; held auto-excluded from `pending`
+> (carries `responseType:'held'`). Counts: `dashboard.js` held rollup + a distinct `held` workRemaining
+> phase ("slate secured"); `my-proposals.js` `reviewerHeld`. +2 tests (symmetric map); full suite 2465
+> green; build clean.
 The cycle goal is that **staff gain confidence they hold a committed slate** — so held reviewers
 must be *visible* in the workbench, not silently misclassified.
 - **Do:** (a) read-map already extended in Chunk 1 (`RESPONSE_TYPE_BY_VALUE`); (b) **map the
@@ -392,8 +401,9 @@ must be *visible* in the workbench, not silently misclassified.
 - **Acceptance:** a held suggestion renders in the workbench under a `held` status (not `pending`,
   not blank); status counts include held; the default Review-Manager "accepted" scope still
   excludes held (held `wmkf_accepted=false`, [VERIFIED `reviewers.js:119` filters `wmkf_accepted === true`]).
-- **[OPEN — light]:** confirm with Justin how prominently the workbench should surface the held
-  slate (own column vs. filter only) — UI polish, not a blocker.
+- **[BUILT, refine-optional]:** the finder now shows a `held` count + clickable "Held" chip
+  (filter), and the dashboard surfaces a `held` workRemaining phase. Whether held also deserves its
+  own column / more prominence is a Justin call — UI polish, not a blocker.
 
 ---
 
@@ -404,7 +414,7 @@ must be *visible* in the workbench, not silently misclassified.
 | `scripts/extend-responsetype-picklist.mjs` | template for the idempotent `held=100000004` add (chunk 1) |
 | `scripts/extend-responsetype-picklist-held.mjs` | ✅ S257 — the `held` picklist add (run against live Dataverse) (1) |
 | `scripts/add-reviewer-suggestion-heldat-column.mjs` | ✅ S257 — the `wmkf_heldat` column-create (run before select-list edits) (1) |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | `RESPONSE_TYPE_MAP`, `FIELD_SELECT`, `applyStage2aResponse`, `updateLifecycle` — add `held` + decide `heldAt` write path (1,3) |
+| `lib/dataverse/adapters/reviewer-suggestion.js` | ✅ S257 — `RESPONSE_TYPE_MAP.held`, derived `RESPONSE_TYPE_BY_VALUE`, `FIELD_SELECT`, `applyStage2aResponse` hold branch (1,3,8) |
 | `lib/external/verify-suggestion-token.js` | `SUGGESTION_SELECT` — the portal's actual read path; add `wmkf_heldat` (1, Codex #3) |
 | `pages/api/external/review/[token]/respond.js` | add `action:'hold'` + transition matrix + readiness write-layer gate (3) |
 | `lib/external/proposal-readiness.js` | ✅ S257 — `isProposalReadyForReviewers` predicate (go-live gate); both layers read it (2,3) |
@@ -416,11 +426,11 @@ must be *visible* in the workbench, not silently misclassified.
 | `lib/external/calendar-invite.js` | ✅ S257 — `buildReviewHoldIcs` (RFC 5545 PUBLISH save-the-date) (5) |
 | `lib/utils/reviewer-invite.js` | ✅ S257 — `sendAllowsAttachments` denylist→allowlist + `templateCarriesCalendarInvite` (5); `shouldSkipDuplicateInvitation` covers `hold` (6) |
 | `shared/components/reviewers/email-template-store.js` | ✅ S257 — `hold` + `finalize` default copy + types (6) |
-| `pages/api/review-manager/reviewers.js` | `RESPONSE_TYPE_BY_VALUE` read-map — add `held` (1,8) |
-| `pages/reviewer-finder.js` | `candidateMatchesEmailFilter` — add `held` bucket, guard `pending` (8) |
-| `pages/api/workbench/dashboard.js` | count aggregator — add `held` count; phase signal (audit #7) (8) |
-| `pages/api/reviewer-finder/my-proposals.js` | PI-facing count aggregator — add `held` count (audit #7) (8) |
-| `pages/api/reviewer-finder/my-candidates.js` | emits raw numeric `responseType` — map to string + `held` bucket (Codex ch1/2 review) (8) |
+| `pages/api/review-manager/reviewers.js` | ✅ S257 — uses the adapter's derived `RESPONSE_TYPE_BY_VALUE` (dedup) (1,8) |
+| `pages/reviewer-finder.js` | ✅ S257 — `held` filter bucket + count + "Held" chip; `pending` auto-guarded (8) |
+| `pages/api/workbench/dashboard.js` | ✅ S257 — `held` count + distinct `held` workRemaining phase (8) |
+| `pages/api/reviewer-finder/my-proposals.js` | ✅ S257 — PI-facing `reviewerHeld` count (8) |
+| `pages/api/reviewer-finder/my-candidates.js` | ✅ S257 — maps numeric→string `responseType` (fixes a pre-existing bug; enables `held`) (8) |
 | `lib/services/reviewer-suggestion-sweep.js` | no_response timeout — VERIFIED skips held (no change) (1) |
 | `shared/forms/phase-ii-research-2026-06/map-to-dynamics.js` | writes `wmkf_phaseiisubmittedat` (readiness precondition, ref for chunk 2) |
 
@@ -435,6 +445,6 @@ npm test && npm run lint && npm run build                 # full suite
 
 1. **[OPEN — Justin/Connor]** the post-QA "release to reviewers" signal feeding
    `isProposalReadyForReviewers`. Localized to one predicate (chunk 2).
-2. **[OPEN — Justin, light]** how prominently the workbench should surface the held slate
-   (own column vs. filter only). UI polish, not a blocker (chunk 8).
+2. **[BUILT, refine-optional — Justin]** held now has a finder count + "Held" filter chip and a
+   dashboard `held` phase; whether to give it its own column is optional UI polish (chunk 8).
 3. **Atlas/docs** reviewer page enumerating `wmkf_responsetype` values must gain `held` (chunk 1).

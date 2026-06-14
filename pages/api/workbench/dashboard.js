@@ -248,11 +248,14 @@ async function fetchReviewerRollup(requestIds) {
     for (const s of records) {
       const rid = s._wmkf_request_value;
       if (!rid) continue;
-      const o = out[rid] || (out[rid] = { candidates: 0, invited: 0, accepted: 0, declined: 0, completed: 0 });
+      const o = out[rid] || (out[rid] = { candidates: 0, invited: 0, accepted: 0, declined: 0, held: 0, completed: 0 });
       o.candidates += 1;
       if (s.wmkf_invited === true || s.wmkf_emailsentat) o.invited += 1;
       if (s.wmkf_accepted === true || s.wmkf_responsetype === RESPONSE_TYPE_MAP.accepted) o.accepted += 1;
       if (s.wmkf_declined === true || s.wmkf_responsetype === RESPONSE_TYPE_MAP.declined) o.declined += 1;
+      // Held = agreed in principle (pre-finalize). Counted distinctly so staff can see a
+      // committed slate before reviewers finalize; a held row is also counted in `invited`.
+      if (s.wmkf_responsetype === RESPONSE_TYPE_MAP.held) o.held += 1;
       if (s.wmkf_reviewstatus === REVIEW_STATUS_COMPLETE) o.completed += 1;
     }
   }
@@ -260,7 +263,7 @@ async function fetchReviewerRollup(requestIds) {
 }
 
 function projectProposal(r, c, allowlisted) {
-  const counts = c || { candidates: 0, invited: 0, accepted: 0, declined: 0, completed: 0 };
+  const counts = c || { candidates: 0, invited: 0, accepted: 0, declined: 0, held: 0, completed: 0 };
   const cycleCode = r.wmkf_meetingdate ? meetingDateToCycleCode(r.wmkf_meetingdate) : null;
   return {
     requestId: r.akoya_requestid,
@@ -292,12 +295,16 @@ function projectProposal(r, c, allowlisted) {
  *   find    — fewer candidates than needed reviewers
  *   invite  — candidates exist but none/too-few invited
  *   awaiting — invited, still short of enough acceptances
+ *   held    — enough reviewers agreed in principle (slate secured), not yet finalized
  *   review  — enough accepted, reviews not all in
  *   done    — enough completed
  */
 function deriveWorkRemaining(c) {
   if (c.completed >= REVIEWERS_NEEDED) return 'done';
   if (c.accepted >= REVIEWERS_NEEDED) return 'review';
+  // A committed slate (enough holds) ranks above plain 'awaiting' so staff can see the
+  // slate is secured even before reviewers finalize.
+  if (c.held >= REVIEWERS_NEEDED) return 'held';
   if (c.invited > 0) return 'awaiting';
   if (c.candidates > 0) return 'invite';
   return 'find';

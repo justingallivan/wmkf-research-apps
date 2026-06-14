@@ -3045,6 +3045,7 @@ function MyCandidatesTab({ refreshTrigger, userProfileId }) {
     if (emailStatusFilter === 'not_invited') return !c.invited && !c.emailSentAt;
     if (emailStatusFilter === 'invited') return c.invited || c.emailSentAt;
     if (emailStatusFilter === 'pending') return c.emailSentAt && !c.responseType && !c.accepted && !c.declined;
+    if (emailStatusFilter === 'held') return c.responseType === 'held';
     if (emailStatusFilter === 'accepted') return c.accepted || c.responseType === 'accepted';
     if (emailStatusFilter === 'declined') return c.declined || c.responseType === 'declined';
     if (emailStatusFilter === 'bounced') return c.responseType === 'bounced';
@@ -3091,6 +3092,7 @@ function MyCandidatesTab({ refreshTrigger, userProfileId }) {
     notInvited: allCandidates.filter(c => !c.invited && !c.emailSentAt).length,
     invited: allCandidates.filter(c => c.invited || c.emailSentAt).length,
     pending: allCandidates.filter(c => c.emailSentAt && !c.responseType && !c.accepted && !c.declined).length,
+    held: allCandidates.filter(c => c.responseType === 'held').length,
     accepted: allCandidates.filter(c => c.accepted || c.responseType === 'accepted').length,
     declined: allCandidates.filter(c => c.declined || c.responseType === 'declined').length,
     bounced: allCandidates.filter(c => c.responseType === 'bounced').length,
@@ -3256,6 +3258,15 @@ function MyCandidatesTab({ refreshTrigger, userProfileId }) {
               >
                 <div className="text-xl font-bold text-yellow-600">{metrics.pending}</div>
                 <div className="text-xs text-yellow-600">Awaiting</div>
+              </button>
+              <button
+                onClick={() => setEmailStatusFilter(emailStatusFilter === 'held' ? 'all' : 'held')}
+                className={`text-center p-2 rounded-lg transition-colors ${
+                  emailStatusFilter === 'held' ? 'bg-indigo-200 ring-2 ring-indigo-400' : 'bg-indigo-50 hover:bg-indigo-100'
+                }`}
+              >
+                <div className="text-xl font-bold text-indigo-600">{metrics.held}</div>
+                <div className="text-xs text-indigo-600">Held</div>
               </button>
               <button
                 onClick={() => setEmailStatusFilter(emailStatusFilter === 'accepted' ? 'all' : 'accepted')}
