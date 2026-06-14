@@ -74,12 +74,19 @@ hook · (+ this S255 doc commit).
 ### 1. Older carryover (externally blocked — verify before acting)
 - Recall padding-ceiling live check before raising count >15 (needs API key + a real proposal).
 - SerpAPI **Hobby-tier downgrade** eval (Justin, out-of-repo billing dashboard).
-- PubPeer migration — **parked, externally gated; do NOT proactively resurface.**
 
 ### 2. Tiny follow-ups
 - `score-candidates` prod prompt row unchanged this session — reseed only if you edit its template.
 - The `affiliationHistory` producers are COI-inert dead code (deferred review,
   `project-deferred-code-cleanup`) — not urgent.
+
+## Parked — do NOT surface in startup summaries
+> These are user-recall-only. Do not echo them into `/start`'s Potential Next Steps
+> or any unprompted output; act only when the named un-park trigger actually fires.
+> See `feedback-dont-resurface-parked-items`.
+- **PubPeer migration off SerpAPI** — contingent on a sanctioned-API reply from PubPeer
+  (Justin emailed them S251; suspects no reply). Full context + un-park trigger live in
+  `docs/agent-wiki/topics/integrity-screener.md` and `project-serpapi-capability-erosion`.
 
 ## Key Files Reference
 

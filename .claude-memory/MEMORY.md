@@ -32,6 +32,7 @@
 - No performative contrition: feedback-no-performative-contrition.md
 - React async/effect edits: feedback-profile-context-runtime-bugs.md
 - Prior-context lookup: feedback-check-memory-before-asking-user.md
+- Startup / next-step summary (omit parked items): feedback-dont-resurface-parked-items.md
 - Codex app/delegation loop: project-codex-design-pre-impl-iteration.md; project-codex-recurring-review.md; feedback-commit-before-delegating-to-worktree-agent.md
 - Grep/search posture: feedback-grep-general-codebase-terms.md
 - Schema and stakeholder tone: feedback-human-legibility-schema-principle.md; feedback-stakeholder-email-tone.md; feedback-review-panel-tone.md
