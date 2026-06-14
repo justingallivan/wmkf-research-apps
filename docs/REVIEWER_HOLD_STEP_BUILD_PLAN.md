@@ -373,6 +373,13 @@ Each chunk is independently committable. A chunk's red gate (where it has one) b
 > (carries `responseType:'held'`). Counts: `dashboard.js` held rollup + a distinct `held` workRemaining
 > phase ("slate secured"); `my-proposals.js` `reviewerHeld`. +2 tests (symmetric map); full suite 2465
 > green; build clean.
+> **Codex review (SHIP WITH NAMED CHANGES → applied):** MED — `deriveWorkRemaining` mixed case
+> (e.g. 2 accepted + 1 held, needed 3) fell through to `awaiting`; now the held tier counts
+> `accepted + held >= REVIEWERS_NEEDED` (+ exported & tested incl. the mixed case). LOW×2 (consumer
+> fan-out I'd missed) — added `held` to the workbench `STAGE_META` chip (`pages/workbench.js`,
+> "Slate held") and `reviewerHeld` to the reviewer-finder proposal-picker count. Codex confirmed the
+> numeric→string switch, reviewers read-map swap, fan-out completeness, and the symmetric-map test
+> all clean. Full suite 2472 green.
 The cycle goal is that **staff gain confidence they hold a committed slate** — so held reviewers
 must be *visible* in the workbench, not silently misclassified.
 - **Do:** (a) read-map already extended in Chunk 1 (`RESPONSE_TYPE_BY_VALUE`); (b) **map the

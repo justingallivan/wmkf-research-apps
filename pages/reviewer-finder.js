@@ -612,8 +612,10 @@ function ProposalPickerCard({ onProposalLoaded, onError }) {
                       const invited = p.reviewerInvited ?? p.reviewerSlotsFilled;
                       const accepted = p.reviewerAccepted ?? 0;
                       const declined = p.reviewerDeclined ?? 0;
+                      const held = p.reviewerHeld ?? 0;
                       if (invited === 0) return 'no reviewers invited yet';
                       const parts = [`${invited} invited`];
+                      if (held > 0) parts.push(`${held} held`);
                       if (accepted > 0) parts.push(`${accepted} accepted`);
                       if (declined > 0) parts.push(`${declined} declined`);
                       parts.push('goal: 3');

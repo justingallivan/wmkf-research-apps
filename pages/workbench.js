@@ -17,6 +17,7 @@ const STAGE_META = {
   find: { label: 'Find reviewers', cls: 'bg-rose-100 text-rose-800' },
   invite: { label: 'Invite', cls: 'bg-amber-100 text-amber-800' },
   awaiting: { label: 'Awaiting replies', cls: 'bg-blue-100 text-blue-800' },
+  held: { label: 'Slate held', cls: 'bg-violet-100 text-violet-800' },
   review: { label: 'In review', cls: 'bg-indigo-100 text-indigo-800' },
   done: { label: 'Complete', cls: 'bg-green-100 text-green-800' },
 };

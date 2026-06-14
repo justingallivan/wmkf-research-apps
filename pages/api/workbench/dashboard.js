@@ -299,12 +299,14 @@ function projectProposal(r, c, allowlisted) {
  *   review  — enough accepted, reviews not all in
  *   done    — enough completed
  */
-function deriveWorkRemaining(c) {
+export function deriveWorkRemaining(c) {
   if (c.completed >= REVIEWERS_NEEDED) return 'done';
   if (c.accepted >= REVIEWERS_NEEDED) return 'review';
-  // A committed slate (enough holds) ranks above plain 'awaiting' so staff can see the
-  // slate is secured even before reviewers finalize.
-  if (c.held >= REVIEWERS_NEEDED) return 'held';
+  // A committed slate ranks above plain 'awaiting' so staff see it's secured before
+  // reviewers finalize. Count accepted + held together: a proposal whose shortfall is
+  // made up by holds (e.g. 2 accepted + 1 held when 3 are needed) is still committed
+  // (Codex chunk-8 — the mixed case must not fall through to 'awaiting').
+  if (c.accepted + c.held >= REVIEWERS_NEEDED) return 'held';
   if (c.invited > 0) return 'awaiting';
   if (c.candidates > 0) return 'invite';
   return 'find';
