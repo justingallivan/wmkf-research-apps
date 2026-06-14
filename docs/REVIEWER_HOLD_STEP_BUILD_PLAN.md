@@ -132,20 +132,32 @@ Each chunk is independently committable. A chunk's red gate (where it has one) b
   and `check:atlas` are unaffected, but update the relevant `docs/atlas/` reviewer page if it
   enumerates `wmkf_responsetype` values.
 
-### Chunk 2 — `isProposalReadyForReviewers` predicate + readiness-gated view dispatch
+### Chunk 2 — `isProposalReadyForReviewers` predicate + readiness-gated view dispatch ✅ DONE (S257)
+> **S257 build status:** COMPLETE. New module `lib/external/proposal-readiness.js` exports
+> `isProposalReadyForReviewers(request)`. `computeEngagementState(s, isReady = true)` now exported
+> from `context.js` with the hold dispatch; call site computes `ready` once and passes it. Returns
+> `isReady`, `held`, and `heldAt` (the latter partially closes the chunk-1 "/context threading" TODO).
+> 20 unit tests (`tests/unit/compute-engagement-state.test.js`); eslint clean; 560 reviewer/external
+> tests green.
+> **⚠ GO-LIVE ORDERING (Mode-B finding):** flipping readiness to "not ready" routes fresh reviewers
+> to `hold-invite`/`held` views that the Dispatcher does NOT yet render (chunk 4) → UnknownState
+> screen. So `isProposalReadyForReviewers` ships returning **`true`** (treat as ready ⇒ bypass hold,
+> zero behavior change; no `held` rows exist until chunk 3). The go-live step is to flip it to the
+> real release signal (false until staff release) **after** chunks 3/4/6 ship. This is the single
+> localization point.
 - **Do:** add `isProposalReadyForReviewers(request)` (new helper, single source of truth for
-  the readiness signal — `grep` confirms zero existing refs). It is consumed by **two layers**:
-  the view dispatch (this chunk) AND the write boundary (chunk 3, `respond.js`). Thread it into
-  `computeEngagementState` — signature grows to take `request` (or a precomputed `isReady` bool).
-  [VERIFIED current sig is `computeEngagementState(s)` at `context.js:266`; single caller is
-  `context.js:66`, so the signature change is safe.] New dispatch:
+  the readiness signal — `grep` confirmed zero existing refs). Consumed by **two layers**:
+  the view dispatch (this chunk) AND the write boundary (chunk 3, `respond.js`). Threaded into
+  `computeEngagementState` as a precomputed `isReady` bool (keeps the dispatch pure + testable).
+  [VERIFIED single caller was `context.js:66`, so the signature change was safe.] Dispatch:
   - no prior response & **not** ready → `hold-invite` (lightweight ask)
   - `responsetype === held` & **not** ready → `held` (confirmation + calendar)
   - no prior response **or** `held` & **ready** → `stage2a` (the existing full accept form = finalize)
-  - all existing branches (accepted-pre-materials, declined, stage2b, submitted, withdrawn-sufficient) unchanged.
-- **Acceptance:** unit tests over `computeEngagementState` for the four new combinations +
-  regression that every existing view still resolves. The predicate is the **only** place the
-  readiness signal is read, in **both** the view layer (here) and the write layer (chunk 3).
+  - all existing branches (accepted-pre-materials, declined, stage2b, submitted, withdrawn-sufficient) unchanged + verified under both readiness values.
+- **Acceptance:** ✅ unit tests over `computeEngagementState` for the four new combinations +
+  regression that every existing view still resolves under both `isReady` values. The predicate is
+  the **only** place the readiness signal is read, in **both** the view layer (here) and the write
+  layer (chunk 3).
 - **[OPEN — Justin/Connor, NOT a blocker]:** the real post-QA "release to reviewers" signal.
   [VERIFIED] `wmkf_phaseiisubmittedat` (written by
   `shared/forms/phase-ii-research-2026-06/map-to-dynamics.js`) marks RECEIPT / start of the QA
@@ -316,7 +328,8 @@ must be *visible* in the workbench, not silently misclassified.
 | `lib/dataverse/adapters/reviewer-suggestion.js` | `RESPONSE_TYPE_MAP`, `FIELD_SELECT`, `applyStage2aResponse`, `updateLifecycle` — add `held` + decide `heldAt` write path (1,3) |
 | `lib/external/verify-suggestion-token.js` | `SUGGESTION_SELECT` — the portal's actual read path; add `wmkf_heldat` (1, Codex #3) |
 | `pages/api/external/review/[token]/respond.js` | add `action:'hold'` + transition matrix + readiness write-layer gate (3) |
-| `pages/api/external/review/[token]/context.js` | `computeEngagementState` + readiness gate (2) |
+| `lib/external/proposal-readiness.js` | ✅ S257 — `isProposalReadyForReviewers` predicate (go-live gate); both layers read it (2,3) |
+| `pages/api/external/review/[token]/context.js` | ✅ S257 — `computeEngagementState(s, isReady)` exported + hold dispatch; call site computes readiness (2) |
 | `pages/external/review/[token].js` | Dispatcher switch — add `hold-invite`/`held` (4) |
 | `shared/components/external/HoldView.js` | new component (4) |
 | `lib/services/dynamics-service.js` | `addEmailAttachment` — content-type agnostic, no change needed; reference for `.ics` (5) |
