@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-13
+last_verified: 2026-06-14
 stale_after_days: 90
 owner: dev-ops
 source_files:
@@ -41,6 +41,16 @@ Claude config sync, and environment-specific gotchas.
 - Claude config sync: `claude-config-git-sync`.
 - Local Jest/build/git gotchas: `local-jest-build-environment`, `env-broken-git-autogc`.
 - Decision log: `decision-module-typeless-warning-accept`.
+
+## Gotchas
+
+- **`scripts/reset-request-reviewers.mjs` protects applicant-sourced rows by
+  default.** It clears a single request's reviewer working state for testing. Rows
+  the applicant proposed (`wmkf_applicantdisposition` non-null, or `applicant` in
+  `wmkf_sources`) are SKIPPED unless you pass `--include-applicant` — a test reset
+  must not clobber applicant input. Dry-run by default; reversible soft-delete
+  unless `--hard`. To undo a soft-delete, `scripts/restore-request-reviewers-selected.mjs`
+  flips `wmkf_selected` back to true.
 
 ## Standard Probe
 

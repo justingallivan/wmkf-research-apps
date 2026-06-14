@@ -11,6 +11,10 @@
  *      request. SOFT-deleted by default (wmkf_selected=false: disappears from the
  *      workbench, reversible, and re-save-safe). `--hard` truly deletes the rows.
  *      Skipped entirely with `--roster-only`.
+ *      APPLICANT-SOURCED ROWS ARE PROTECTED BY DEFAULT — rows the applicant
+ *      proposed (wmkf_applicantdisposition non-null, i.e. recommended/excluded, or
+ *      `applicant` in wmkf_sources) are skipped, since they are applicant input, not
+ *      test-generated surfaced state. Pass `--include-applicant` to clear them too.
  *   3. `akoya_request.wmkf_potentialreviewer1..5` invite slots — reported always;
  *      cleared only with `--include-slots` (best-effort $ref disassociation).
  *
@@ -27,6 +31,7 @@
  *     --hard            hard-delete the Dataverse suggestions instead of soft-delete
  *     --roster-only     only clear the Postgres find-roster (leave Dataverse alone)
  *     --include-slots   also clear akoya_request.wmkf_potentialreviewer1..5 slots
+ *     --include-applicant  ALSO clear applicant-sourced rows (default: protect them)
  *     --help
  */
 
@@ -61,6 +66,7 @@ const EXECUTE = has('--execute');
 const HARD = has('--hard');
 const ROSTER_ONLY = has('--roster-only');
 const INCLUDE_SLOTS = has('--include-slots');
+const INCLUDE_APPLICANT = has('--include-applicant');
 
 if (!requestArg) {
   console.error('ERROR: --request <akoya_requestnum|GUID> is required. This script never runs globally.');
@@ -81,7 +87,7 @@ enterDynamicsBypassForScript('reset-request-reviewers');
 
 const mode = EXECUTE ? '\x1b[31mEXECUTE (live changes)\x1b[0m' : 'DRY-RUN (no changes)';
 console.log(`\n=== reset-request-reviewers — ${mode} ===`);
-console.log(`Target: ${requestArg}${ROSTER_ONLY ? '  [roster-only]' : ''}${HARD ? '  [hard-delete]' : ''}${INCLUDE_SLOTS ? '  [include-slots]' : ''}\n`);
+console.log(`Target: ${requestArg}${ROSTER_ONLY ? '  [roster-only]' : ''}${HARD ? '  [hard-delete]' : ''}${INCLUDE_SLOTS ? '  [include-slots]' : ''}${INCLUDE_APPLICANT ? '  [include-applicant]' : '  [applicant-protected]'}\n`);
 
 // --- resolve request → GUID + slot values -------------------------------------
 const SLOT_VALUE_FIELDS = [1, 2, 3, 4, 5].map((n) => `_wmkf_potentialreviewer${n}_value`);
@@ -143,18 +149,31 @@ if (ROSTER_ONLY) {
 } else {
   console.log(`--- [2] Dataverse wmkf_appreviewersuggestion (${HARD ? 'HARD delete' : 'soft-delete'}) ---`);
   try {
-    // ALL rows for the request (no selected/excluded filter — full cleanup).
-    const { records } = await DynamicsService.queryRecords('wmkf_appreviewersuggestions', {
+    // ALL rows for the request (no selected/excluded filter). Applicant-sourced
+    // rows are partitioned out below and protected unless --include-applicant.
+    const { records: allRows } = await DynamicsService.queryRecords('wmkf_appreviewersuggestions', {
       select: [
         'wmkf_appreviewersuggestionid', 'wmkf_suggestionlabel', 'wmkf_selected',
         'wmkf_invited', 'wmkf_accepted', 'wmkf_declined', 'wmkf_reviewfilename',
-        'wmkf_reviewsharepointfolder',
+        'wmkf_reviewsharepointfolder', 'wmkf_applicantdisposition', 'wmkf_sources',
       ].join(','),
       filter: `_wmkf_request_value eq ${requestGuid}`,
       top: 500,
     });
+    // Applicant-sourced = has an applicant disposition (recommended/excluded), or
+    // carries the `applicant` token in wmkf_sources. These are applicant input,
+    // not test-generated surfaced state — protected unless --include-applicant.
+    const isApplicantSourced = (r) =>
+      r.wmkf_applicantdisposition != null ||
+      String(r.wmkf_sources || '').split(',').map((s) => s.trim()).includes('applicant');
+    const applicantRows = allRows.filter(isApplicantSourced);
+    if (applicantRows.length) {
+      console.log(`  \x1b[36m${applicantRows.length} applicant-sourced row(s) ${INCLUDE_APPLICANT ? 'WILL be cleared (--include-applicant)' : 'PROTECTED (skipped)'}:\x1b[0m`);
+      for (const r of applicantRows) console.log(`    ⊘ ${r.wmkf_suggestionlabel || '(no label)'}`);
+    }
+    const records = INCLUDE_APPLICANT ? allRows : allRows.filter((r) => !isApplicantSourced(r));
     if (records.length === 0) {
-      console.log('  (no suggestion rows for this request)\n');
+      console.log('  (no clearable suggestion rows for this request)\n');
     } else {
       let liveCount = 0;
       for (const r of records) {
