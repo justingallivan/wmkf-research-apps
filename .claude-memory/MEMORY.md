@@ -24,6 +24,8 @@
 - External platform capability claim: feedback-verify-external-platform-claims.md; feedback-cite-ground-truth.md
 - External literal in code (email/URL/ID/contact): feedback-no-fabricated-placeholder-values.md
 - Relay Codex/reviewer output: feedback-share-codex-verbatim.md; feedback-surface-full-review-findings.md
+- New/changed enum value, column, or status (plan or code): feedback-symbol-consumer-fanout.md
+- "idempotent"/"no re-stamp"/"reuse existing guard"/"backward compatible" claim: feedback-idempotency-name-the-mechanism.md
 - rtk reference: project-rtk-grep-output-corruption.md
 
 ## Working Norms

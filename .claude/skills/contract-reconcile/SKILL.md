@@ -1,6 +1,6 @@
 ---
 name: contract-reconcile
-description: Whole-flow contract verification before declaring a review or an implementation done. Use when reviewing a plan / verifying findings / confirm-or-refute, or when implementing across layers — especially with a new table, migration, or API route; cross-run dedup; partial / batch save; streaming, await, background, or fire-and-forget work; shared-helper extraction; or "durable state" / "docs are drifted". Traces caller→persistence→consumer, runs six audits, and labels every state claim [VERIFIED / PLANNED / ASSUMED / STALE]. Auto-fire on those triggers; also runnable as /contract-reconcile.
+description: Whole-flow contract verification before declaring a review or an implementation done. Use when reviewing a plan / verifying findings / confirm-or-refute, or when implementing across layers — especially with a new table, migration, or API route; cross-run dedup; partial / batch save; streaming, await, background, or fire-and-forget work; shared-helper extraction; or "durable state" / "docs are drifted". Traces caller→persistence→consumer, runs seven audits, and labels every state claim [VERIFIED / PLANNED / ASSUMED / STALE]. Auto-fire on those triggers; also runnable as /contract-reconcile.
 allowed-tools: Read, Grep, Glob, Edit, Bash(grep:*, rg:*, git diff:*, git log:*, git status:*, ls:*, npm run check\:*)
 ---
 
@@ -36,11 +36,13 @@ Write these before any claim. If I can't fill one, I haven't read enough yet.
 
 `[VERIFIED via file:line]` · `[VERIFIED via command]` · `[PLANNED]` (in the plan, not yet built) · `[ASSUMED]` (plausible, unproven — never act destructively on it) · `[STALE/CONFLICT]` (contradicted by live code/another source).
 
+**Mechanism, not assertion.** "idempotent" / "no-op on repeat" / "only-once" / "no re-stamp" / "dedup" is `[ASSUMED]` until you cite the enforcing guard at `file:line` (early-return before the write, conditional `WHERE … IS NULL` / `ON CONFLICT DO NOTHING`, unique key, generation guard). An unconditional write under an idempotency claim is a defect, not a verified property.
+
 ## Step 3 — Trace the contract (mark N/A explicitly, never silently skip)
 
 1 user/caller → 2 client state → 3 request payload → 4 route auth/validation/body-parser → 5 service/helper → 6 persistence write/read → 7 response shape → 8 consumer state/render → 9 docs/tests/gates.
 
-## Step 4 — Run the six audits (run the ones in scope; say which are N/A)
+## Step 4 — Run the seven audits (run the ones in scope; say which are N/A)
 
 1. **Whole-flow** — every hop in Step 3 accounted for.
 2. **Partial-success** — unit of success? does the response return success/failure *identifiers* or only a count? does the client update state for *only the successful* items? can failed rows stay retryable? can `success:true` happen when every row failed?
@@ -48,6 +50,12 @@ Write these before any claim. If I can't fill one, I haven't read enough yet.
 4. **Helper-extraction** — name what the helper may do and what it must NOT collapse. Check call sites for differing semantics. (Exact normalized-name exclusion ≠ fuzzy author matching; UI dedupe ≠ identity resolution; display pruning ≠ persistence sanitization unless the persisted DTO is explicitly defined + gated.)
 5. **Durable-surface** — for a new/changed durable surface, confirm each that applies: migration file · migration manifest (`npm run prebuild`) · Atlas page (`docs/atlas/`, `check:atlas`) · API route security matrix (`check:api-routes`) · `CANONICAL_COUNTS` + `check:fact-consistency` (route/endpoint counts shift) · source-header / service-catalog entry · cap/cleanup strategy · tests for the new contract · the gate that would catch the omission.
 6. **Doc-reconcile** — for durable docs/memory, **delegate to `/sweep`** (don't re-implement it): read the whole target, grep the repo for the same fact, fix frontmatter + summary + body + tail + linked docs in one pass; never append a correction beside the old contradiction.
+7. **Symbol-consumer fan-out** — for any new/changed enum value, persisted column, or status: grep the SYMBOL (not the flow) and prove every READ surface handles it. A verified write path is half a proof; the defects hide on the read side.
+   - **Maps are symmetric:** a write-map (`X_MAP`) almost always has a reverse read-map (`X_BY_VALUE`). Find both — a value in one but not the other returns `undefined` to consumers.
+   - **Select lists come in ≥2:** the same row often has more than one projection/`select` list (e.g. an adapter `FIELD_SELECT` AND a separate token-verifier `SUGGESTION_SELECT`). Grep the field; add it to each, not just the first found.
+   - **Boolean guards fail open:** any guard shaped `return v !== 'x'` (denylist) is wrong-by-default for a new value. Read the default branch — "what does this return for the NEW value?" Prefer converting to an allowlist.
+   - **Buckets must be total:** every staff filter / count / badge that branches on the status must place the new value in exactly ONE bucket — not zero (row vanishes), not the wrong one (e.g. `pending = !responseType` silently swallows a new status).
+   - **State machines are complete only across all terminals:** a row's "done" can be set by a sibling column or a side-channel writer (cron / webhook / bulk update) that bypasses the main guard. Grep every column that signals terminal; confirm the new state is handled in each reader.
 
 ## Step 5 — Output contract
 
@@ -84,4 +92,4 @@ If a claim has no `file:line` / command behind it, label it `[ASSUMED]` and eith
 
 ## Anti-patterns this skill blocks (say the evidence, not the phrase)
 
-"This should be fine" (no file evidence) · "The plan says…" as implementation evidence · "No callers" (no `rg`) · "Only docs" (no whole-file reconcile) · "Shared helper" (no preserved-difference list) · "Saved successfully" (response returns only a count) · any post-await state write with no stale-context check in streamed/request-scoped UI.
+"This should be fine" (no file evidence) · "The plan says…" as implementation evidence · "No callers" (no `rg`) · "Only docs" (no whole-file reconcile) · "Shared helper" (no preserved-difference list) · "Saved successfully" (response returns only a count) · any post-await state write with no stale-context check in streamed/request-scoped UI · "idempotent" (no named guard at `file:line`) · "reuse existing guards" (didn't read the default branch for the new value) · "single source of truth" (didn't grep the literal + map var for other sites) · "backward compatible" (didn't trace the read path) · "added the enum value" (verified the write map only — read map / 2nd select list / filter buckets unchecked) · "staff UI unaffected" (didn't read each status branch).
