@@ -53,7 +53,8 @@ import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-sug
 import * as contactAdapter from '../../../lib/dataverse/adapters/contact';
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
 import { backPropReviewerOrcidToContact } from '../../../lib/services/backprop-reviewer-orcid';
-import { shouldSkipDuplicateInvitation, sendAllowsAttachments, recipientMayReceiveAttachments, emailConfidence } from '../../../lib/utils/reviewer-invite';
+import { shouldSkipDuplicateInvitation, sendAllowsAttachments, templateCarriesCalendarInvite, recipientMayReceiveAttachments, emailConfidence } from '../../../lib/utils/reviewer-invite';
+import { buildReviewHoldIcs } from '../../../lib/external/calendar-invite';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -332,7 +333,25 @@ export default async function handler(req, res) {
       // caller-supplied templateType. A pre-acceptance recipient (an invitation,
       // or any mislabeled send) gets NO attachments (Codex S211 stop-gate). The
       // `allowAttachments` (templateType) gate above just avoids fetching them.
-      const recipientAttachments = recipientMayReceiveAttachments(suggestion) ? sharedAttachments : [];
+      const materialAttachments = recipientMayReceiveAttachments(suggestion) ? sharedAttachments : [];
+      // Calendar invite (.ics) is a SERVER-generated, always-allowed lane — NOT proposal
+      // material — concatenated AFTER the wmkf_accepted gate so a held (non-accepted)
+      // reviewer still gets the save-the-date while materials stay gated. Built per
+      // recipient from their request's meeting date; NON-FATAL — a calendar build error
+      // logs and the email still ships with the date in the body (chunk 5 "degrade, not fail").
+      let calendarAttachments = [];
+      if (templateCarriesCalendarInvite(templateType)) {
+        try {
+          const ics = buildReviewHoldIcs({
+            meetingDate: request?.wmkf_meetingdate,
+            requestNumber: request?.akoya_requestnum,
+          });
+          if (ics) calendarAttachments = [ics];
+        } catch (icsErr) {
+          console.warn(`Failed to build calendar invite for ${name}:`, icsErr.message);
+        }
+      }
+      const recipientAttachments = [...materialAttachments, ...calendarAttachments];
 
       try {
         const { emailId } = await DynamicsService.createAndSendEmail({

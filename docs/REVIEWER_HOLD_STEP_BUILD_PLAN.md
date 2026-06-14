@@ -254,7 +254,15 @@ Each chunk is independently committable. A chunk's red gate (where it has one) b
   token renders Stage2aView (finalize) for both fresh and held. Browser-back behaves like the
   existing override pattern.
 
-### Chunk 5 — `.ics` generation + distinct attachment threading
+### Chunk 5 — `.ics` generation + distinct attachment threading ✅ DONE (S257)
+> **S257 build status:** COMPLETE. New `lib/external/calendar-invite.js` (`buildReviewHoldIcs`,
+> RFC 5545 PUBLISH all-day VEVENT from `wmkf_meetingdate`; returns null on a missing/bad date →
+> degrade). `sendAllowsAttachments` flipped to an ALLOWLIST (`materials`/`followup`/`thankyou`);
+> new `templateCarriesCalendarInvite` (`hold`). `send-emails.js` builds a per-recipient
+> `calendarAttachments` lane (from the recipient's request date, NON-FATAL try/catch) concatenated
+> AFTER the `recipientMayReceiveAttachments` materials gate — so a held (non-accepted) reviewer gets
+> the .ics while materials stay gated. Dormant until chunk 6 sends `templateType:'hold'`. +12 tests
+> (calendar-invite + reviewer-invite allowlist/calendar); full suite 2438 green; build clean.
 - **Do:** small `.ics` builder (VCALENDAR/VEVENT, `METHOD:PUBLISH`) from the review window /
   `wmkf_meetingdate`. Thread it through a **separate `calendarAttachments` array** built only
   from trusted server-side request fields, concatenated **after** `recipientMayReceiveAttachments`
@@ -357,8 +365,9 @@ must be *visible* in the workbench, not silently misclassified.
 | `pages/external/review/[token].js` | Dispatcher switch — add `hold-invite`/`held` (4) |
 | `shared/components/external/HoldView.js` | new component (4) |
 | `lib/services/dynamics-service.js` | `addEmailAttachment` — content-type agnostic, no change needed; reference for `.ics` (5) |
-| `pages/api/review-manager/send-emails.js` | hold/finalize templateTypes + `.ics` distinct-attachment threading (5,6) |
-| `lib/utils/reviewer-invite.js` | `sendAllowsAttachments` denylist→allowlist; `recipientMayReceiveAttachments` (ref) (5) |
+| `pages/api/review-manager/send-emails.js` | ✅ S257 — per-recipient `calendarAttachments` lane (.ics); chunk-6 wires the hold templateType (5,6) |
+| `lib/external/calendar-invite.js` | ✅ S257 — `buildReviewHoldIcs` (RFC 5545 PUBLISH save-the-date) (5) |
+| `lib/utils/reviewer-invite.js` | ✅ S257 — `sendAllowsAttachments` denylist→allowlist + `templateCarriesCalendarInvite` (5) |
 | `pages/api/review-manager/reviewers.js` | `RESPONSE_TYPE_BY_VALUE` read-map — add `held` (1,8) |
 | `pages/reviewer-finder.js` | `candidateMatchesEmailFilter` — add `held` bucket, guard `pending` (8) |
 | `pages/api/workbench/dashboard.js` | count aggregator — add `held` count; phase signal (audit #7) (8) |

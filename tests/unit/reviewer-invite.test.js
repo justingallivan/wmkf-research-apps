@@ -5,7 +5,7 @@
  * to an already-invited candidate is skipped unless an explicit re-invite, while
  * materials/followup/thankyou stay re-sendable.
  */
-const { shouldSkipDuplicateInvitation, sendAllowsAttachments, recipientMayReceiveAttachments, emailConfidence } = require('../../lib/utils/reviewer-invite');
+const { shouldSkipDuplicateInvitation, sendAllowsAttachments, templateCarriesCalendarInvite, recipientMayReceiveAttachments, emailConfidence } = require('../../lib/utils/reviewer-invite');
 
 describe('shouldSkipDuplicateInvitation', () => {
   test('skips an already-invited invitation by default', () => {
@@ -31,6 +31,22 @@ describe('sendAllowsAttachments — no materials on a pre-acceptance invitation'
   test('post-acceptance types may carry attachments', () => {
     for (const t of ['materials', 'followup', 'thankyou']) {
       expect(sendAllowsAttachments(t)).toBe(true);
+    }
+  });
+  test('allowlist (not denylist): hold, finalize-trigger, and any UNKNOWN type carry NO materials', () => {
+    for (const t of ['hold', 'finalize-ready', 'whatever-new-type', '', undefined]) {
+      expect(sendAllowsAttachments(t)).toBe(false);
+    }
+  });
+});
+
+describe('templateCarriesCalendarInvite — the .ics save-the-date lane', () => {
+  test('hold carries the calendar invite', () => {
+    expect(templateCarriesCalendarInvite('hold')).toBe(true);
+  });
+  test('material-bearing + invitation types do NOT carry a calendar invite', () => {
+    for (const t of ['materials', 'followup', 'thankyou', 'invitation', undefined]) {
+      expect(templateCarriesCalendarInvite(t)).toBe(false);
     }
   });
 });
