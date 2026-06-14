@@ -71,22 +71,33 @@ hook · (+ this S255 doc commit).
 
 ## Potential Next Steps
 
-### ★ CYCLE OBJECTIVE — reviewer finding → validation → invitation, END TO END
-This is the main thread for the coming cycle (next few days). Lead with it; do not let the
-deferred housekeeping below crowd it out. The three stages and their deeper maps:
-- **Finding (origination)** — `docs/agent-wiki/topics/reviewer-origination.md`. Claude is the
-  validated origination engine (S246); edge-hardening shipped; **referral capture still pending**;
-  multilane / retrieval-first parked as a sparse-tail tool, not the engine.
-- **Validation (identity resolution)** — `docs/agent-wiki/topics/reviewer-identity.md` +
-  `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` (8 fail-closed gates shipped). Known weak link
-  is downstream identity resolution (namesake collision); the ORCID-works-anchored corpus is the
-  larger deferred increment.
-- **Invitation** — `docs/agent-wiki/topics/external-reviewer-portal.md` +
-  `reviewer-workbench-lifecycle.md`. Token-authed accept/decline portal + invite-confidence gating
-  shipped; **a real-prod accept fires a live honorarium/payment chain — human-supervised, gated on
-  Connor** (`project-reviewer-accept-prod-automation`).
+### ★ CYCLE OBJECTIVE — park a confirmed reviewer slate before Phase II (the "hold" step)
+Main thread for the coming cycle (next few days); lead with it. Full plan + code finding:
+memory `project-reviewer-hold-step-decouple`.
 
-Goal is to drive the chain end to end; **confirm scope with Justin before building new infra.**
+**The plan (Justin, S256 — confirmed):** this is the LAST cycle with a delay before Phase II
+proposals arrive — exploit it. Build a **pre-accept "hold/soft-confirm" step** so the flow is
+find → validate → invite → **hold** → calendar invite → park. A reviewer agrees in principle now,
+sits tight, and is told when proposals will land. **Defer** COI/AI policy acks + honorarium payment
++ proposal delivery to a later "finalize" (weeks out, when Phase II ships).
+
+**Why a build, not a run (code finding, verified S256):** the current Stage-2a accept
+(`pages/api/external/review/[token]/respond.js`) hard-requires BOTH policy acks (`reviewer-coi` +
+`reviewer-ai-use`) AND a full payment contact at accept time, and runs honorarium onboarding —
+there is no confirm-without-commitment path today. The hold step is the gap; it also keeps the
+Connor-gated honorarium/Bill.com prod automation (`project-reviewer-accept-prod-automation`) from
+firing this cycle.
+
+**Design constraint — merge-forward:** model "hold" as a real engagement state that "finalize"
+transitions out of (hold → finalize), so next cycle (no delay) the two collapse into one continuous
+accept. No throwaway scaffolding. Mechanics delegated to us; pick what's easiest this cycle that
+still merges. Chosen: option 1 (new pre-accept hold) over splitting accept or staff-side-only.
+
+**Next concrete step:** scope the build — trace the engagement state machine (`respond.js` +
+`lib/dataverse/adapters/reviewer-suggestion.js` `applyStage2aResponse`, the `wmkf_reviewstatus` /
+`wmkf_responsetype` states), find/confirm the calendar-invite mechanism, and the portal UX for hold.
+Three-stage deeper maps: `reviewer-origination.md`, `reviewer-identity.md`,
+`external-reviewer-portal.md`, `reviewer-workbench-lifecycle.md`.
 
 ### Deferred / externally-blocked (do NOT lead with these; verify before acting)
 - Recall padding-ceiling live check before raising count >15 (needs API key + a real proposal).
