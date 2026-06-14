@@ -67,10 +67,15 @@ Belongs at hold-confirmation time (review window / `wmkf_meetingdate`). Decide b
 "save-the-date" email body as a fast-follow.
 
 **Next concrete step (where we stopped):** Justin tired, paused before building. Resume order agreed:
-1. **Spike the one real unknown first** — confirm the Graph email send path (`send-emails.js` → Graph)
-   can attach an `.ics`. Cheap; settles whether the calendar piece needs a fallback.
-2. **Write a `docs/` build plan** with per-chunk acceptance criteria, then run **`/contract-reconcile`**
-   before any code (cross-layer + schema + state-machine surface).
+1. ✅ DONE (S257) **Spiked the `.ics` unknown.** Transport is **Dynamics email activities**
+   (`send-emails.js` → `DynamicsService.createAndSendEmail` → `addEmailAttachment`), **NOT** Graph
+   (`graph-service.js` is SharePoint files only). `addEmailAttachment` is content-type agnostic →
+   `.ics` attaches with zero new infra; build it now (no fallback needed). Caveat: it must be a
+   distinct always-allowed attachment or the `wmkf_accepted` materials gate strips it from a held
+   reviewer; use `METHOD:PUBLISH` + date in body text.
+2. ✅ DONE (S257) **Build plan + `/contract-reconcile`.** Plan: `docs/REVIEWER_HOLD_STEP_BUILD_PLAN.md`
+   (READY WITH NAMED CHANGES, now folded in: hold transition matrix, readiness write-layer gate,
+   `.ics`-degradation). Codex adversarial pass pending before/during implementation.
 
 Rough chunk list: (1) schema `held` + `wmkf_heldat`; (2) `isProposalReadyForReviewers` predicate +
 readiness-gated view dispatch in `context.js::computeEngagementState`; (3) `respond.js` `action:'hold'`
