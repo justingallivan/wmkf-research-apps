@@ -1,61 +1,78 @@
-# Session 252 Prompt: SerpAPI→free-stack migration COMPLETE (1b + 2 shipped); PubPeer parked
+# Session 253 Prompt: memory router restructured to hub-link form; reviewer wiki doc-debt named
 
-> **GIT.** All S251 work is on `main` and **pushed** (confirmed up to date at S251 stop, HEAD `8a5f667`).
-> Working tree clean.
+> **GIT.** All S252 work is on `main` and **pushed** (HEAD `5374856`). Working tree clean.
 
-## Session 251 — what happened
+## Session 252 — what happened
 
-Executed the S250 SerpAPI→free-stack migration plan to completion. **Shipped Slice 1b + Slice 2**
-(reviewer-finder academic data off paid Google Scholar → free OpenAlex), each implement → Codex
-post-impl review → fold. Then **verified the PubPeer reality, retired the "Slice 3" label**, parked
-PubPeer as a wiki future-item, and ran `/sweep`. 8 commits, all pushed. Full suite green (2415 tests).
+Restructured the durable-memory **router** (`.claude-memory/MEMORY.md`) from flat per-domain
+leaf-file fanout into compact **hub links**, relieving the cap pressure that had been warning at
+every startup. Codex drafted it in a tmp package; reviewed it across **three** critical passes
+(orphans → preservation → canonical-doc ownership), each folded back before applying. 1 commit, pushed.
 
 ### What was completed
 
-1. **Slice 1b — Scholar metrics + verified-domain guard → OpenAlex** (`242d96c`, hardening `25d73a7`/`90d10e5`).
-   `ContactEnrichmentService._attachOpenAlexMetrics` (was `_attachScholarMetrics`): resolves the
-   OpenAlex author via ORCID hard-key (`getAuthorByOrcid`) or the carried discovery-spine id
-   (`getAuthorById` on `candidate.openAlexId`/`openAlexAuthorId` + `identityStatus`) — never a bare
-   name-search; no anchor → ABSTAIN. Writes the 1a-contract `tierResults.openalex_author` DTO the
-   resolver re-proves (shared `isOpenAlexAuthorAccepted` gate). Verified-email-domain guard re-sourced
-   from the OpenAlex institution homepage; eTLD+1 via the **`psl`** dependency (added). Metrics decoupled
-   from the paid `useSerpSearch` toggle. #2 (exact Scholar deep-link) dropped → `googleScholarId=null`.
-   Full honest field rename (`scholarVerifiedEmail`→`verifiedInstitutionDomain`, etc.).
+1. **`MEMORY.md` compaction (`5374856`).** 11,319 B / 84 lines → **4,171 B / 62 lines** (was 969 B
+   from the 12,288 B hard cap; now ~8 KB headroom). Sections: Startup / Always-Read Guardrails /
+   Working Norms / Task Routing / User Context / Archive. Task routes now point at wiki **topic hubs**
+   instead of listing every leaf file. **All 141 currently-routed leaf memories remain reachable
+   (zero orphans, verified by `comm` against the real post-apply corpus).**
 
-2. **Slice 2 — literature/PI-pubs novelty search → OpenAlex** (`d90d4e0`, hardening `96c6e13`).
-   `OpenAlexService.searchWorks` (recency-filtered) + inverted-index abstract reconstruction;
-   `_searchPIPubs` resolves the PI by name+institution-token overlap → `getWorksByAuthor` (now
-   `yearFrom`-filtered). Honest `googleScholar`→`openAlex` / `google_scholar`→`openalex` source-label
-   rename through the Haiku collation prompt.
+2. **Agent wiki expanded.** `index.md` router table now covers all **12** topics. **6 new topic pages**
+   added (dev-environment, finance-honoraria, prompt-executor, reviewer-workbench-lifecycle,
+   security-auth, strategy-roadmap); `dataverse-dynamics` + `intake-portal` refreshed with
+   `## Durable Memory` sections.
 
-3. **PubPeer ("Slice 3") retired + parked** (`d8b22be`, `c9f5d45`). **No public PubPeer API exists**
-   (verified from primary sources: FAQ says "coming soon / contact us"; the only programmatic surface
-   is the browser extension's undocumented `/v3/publications?devkey=PubMed<Browser>` with a hardcoded
-   devkey, not ours). PubPeer integrity **stays on SerpAPI**. The "Slice 3" label is retired; full
-   context parked in the **integrity-screener agent-wiki topic**. A sanctioned-access **email was sent
-   to PubPeer** (Justin; he suspects no reply — recall on demand if they respond, do NOT proactively resurface).
+3. **4 rich pages preserved (append-only deltas, NOT rewrites).** `reviewer-identity`,
+   `reviewer-origination`, `integrity-screener`, `external-reviewer-portal` got only a `## Durable Memory`
+   section appended. **Their rich current-state synthesis was deliberately kept** — see the doc-debt
+   item below for why.
 
-4. **`/sweep`** (`8a5f667`): reconciled 6 stale "Google Scholar via SerpAPI" stack/cost claims in
-   system-level docs (CREDENTIALS_RUNBOOK, SYSTEM_OVERVIEW, etc.) that the 1b/2 doc pass had missed.
+### Commit (1)
+`5374856` docs(memory): restructure router to hub-link form; offload leaf lists to wiki topics.
 
-### Commits (8)
-`242d96c` 1b · `25d73a7` 1b hardening · `90d10e5` 1b psl · `d90d4e0` Slice 2 · `96c6e13` Slice 2 hardening ·
-`d8b22be` PubPeer reality · `c9f5d45` retire Slice 3 + wiki park · `8a5f667` /sweep.
+## ⚠ Continuity guardrails — READ before touching memory/wiki
+
+- **The router is now hub-link form. Do NOT re-expand it** back to flat per-domain leaf-file lists.
+  New durable memory goes into the relevant wiki topic's `## Durable Memory` section (+ its leaf file),
+  **not** a new root router line. A new root line is only for a genuinely cross-cutting guardrail.
+  The `memory-router-guard.js` hook will block a bloating root edit — work with it.
+- The 4 rich wiki pages (`reviewer-identity` etc.) carry **load-bearing current-state synthesis**, not
+  redundant restatement. Do **not** thin them until the doc-debt below is done.
 
 ## Potential Next Steps
 
-The SerpAPI migration is **done** — no active code work remains on it. Open items:
+### 1. Reviewer wiki doc-debt — promote enforcement contracts into a maintained reference (then thin the wiki)
+**Why this exists:** the reviewer `docs/` set is ~51 files, almost all design-time `*_PLAN/_DESIGN/_SPEC`
+snapshots, none reconciled to what shipped. `docs/REVIEWER_FINDER.md` is a feature overview and is
+already drifted (still says "Google Scholar links" post-OpenAlex migration). So the
+`reviewer-identity` wiki page became the **de-facto current-state reference**, and at least one
+load-bearing fact — the `save-candidates.js` **`rejectedInstitutionCOI`** durable COI gate — has
+**no other documentary home** (verified: appears in zero non-wiki docs). Thinning now = real loss.
 
-### 1. SerpAPI Hobby-tier downgrade evaluation (Justin, out-of-repo)
-The per-candidate Scholar calls (the bulk of volume) are gone. Worth checking real SerpAPI call
-volume in the billing dashboard and deciding on the Hobby-tier downgrade (~$100/mo). Residual SerpAPI
-= contact (#1) + PubPeer (#6) + news (#7).
+**The work:** create/designate a maintained current-state reference that OWNS the live enforcement
+contracts, then reduce the rich wiki pages to hub+pointer. At minimum the reference must own:
+- Slice-E client/server identity-gate asymmetry (`provenanceGroupOf` / `save-candidates` 422)
+- PI-named/cited unresolved exemption + contact force-nulling (`contactBlockedForUnresolvedExempt`)
+- Slice-G invite-confidence recipient allowlist (`confirmedLowConfidenceIds` / `emailConfidence`)
+- Structured-PI identity fail-open / augment-only (`resolveProposalPI` / `forenamesContradict`)
+- S240 current-institution COI hard-drop + `rejectedInstitutionCOI` durable gate
+- S251 OpenAlex bibliometrics / verified-domain migration (`_attachOpenAlexMetrics`)
+- Faculty-page recovery SSRF boundary (`verifiedInstitutionDomain`)
+- Namesake / work-grounding rescue safety contract (`rescueByWorkGrounding`)
 
-### 2. PubPeer (parked — externally gated; do NOT proactively resurface)
-Only revisit if PubPeer replies to the access-request email. Full context + build-if-granted scope in
-`docs/agent-wiki/topics/integrity-screener.md`.
+Of the 8, only bibliometrics (→ `SERPAPI_MIGRATION_PLAN`) and faculty-recovery
+(→ `FACULTY_PAGE_RECOVERY_DESIGN` §D) are already doc-owned. The rest are wiki-only or design-time-only.
+Consider also marking the ~51 design docs `historical` once their live facts are promoted.
 
-### 3. Older carryover (verify-before-acting — unchanged from S250)
+### 2. Deferred hook candidates (post-restructure; cherry-pick, do NOT bulk-adopt)
+Best signal-to-noise: (a) extend `check:memory-router` to flag routes mixing a hub link + many leaves
+(protects the new structure); (b) external-literal-in-code scanner (backstops
+`feedback-no-fabricated-placeholder-values`). Skip "warn on durable-doc edit without a sweep note" —
+it fires on every small edit. Full list in the tmp brief.
+
+### 3. Older carryover (verify-before-acting — unchanged from S251/S250)
+- SerpAPI Hobby-tier downgrade eval (Justin, out-of-repo billing dashboard).
+- PubPeer (parked — externally gated; do NOT proactively resurface).
 - Recall padding-ceiling live check before raising count >15 (needs API key + real proposal).
 - Reviewer COI **Chunk 2b** (retire `POTENTIAL_CONCERNS`) — ⚠ destructive, deferred (`docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`).
 - Trim the analyze prompt's dead Stage-1 `searchQueries`.
@@ -64,19 +81,15 @@ Only revisit if PubPeer replies to the access-request email. Full context + buil
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md` | The migration plan — per-slice disposition + all Codex logs (status: COMPLETE) |
-| `docs/agent-wiki/topics/integrity-screener.md` | NEW — integrity screener + the parked PubPeer future-item (full context) |
-| `lib/services/openalex-service.js` | `getAuthorById`/`getInstitution`/`searchWorks` + `psl` registrable-domain + metrics on `mapAuthorRecord` |
-| `lib/services/contact-enrichment-service.js` | `_attachOpenAlexMetrics` (1b) |
-| `lib/services/literature-search-service.js` | `_searchOpenAlexWorks` + `_searchPIPubs` (2) |
-| `lib/services/reviewer-identity-resolver.js` | `isOpenAlexAuthorAccepted` (shared 1a accept gate) |
+| `.claude-memory/MEMORY.md` | Restructured router (hub-link form — do not re-expand) |
+| `docs/agent-wiki/index.md` | Expanded 12-topic router table |
+| `docs/agent-wiki/topics/reviewer-identity.md` | De-facto current-state reference for identity/COI/invite enforcement contracts (preserve until doc-debt #1) |
+| `docs/agent-wiki/topics/{dev-environment,finance-honoraria,prompt-executor,reviewer-workbench-lifecycle,security-auth,strategy-roadmap}.md` | 6 new topic hubs |
+| `/private/tmp/wmkf-memory-wiki-draft/` | Codex's draft package + `REVIEW_BRIEF.md` (tmp; full rationale, hook list, doc-debt list) |
 
 ## Gotchas
-- **PubPeer has NO public API** — do not re-scope a "PubPeer Developer API" migration; it doesn't exist
-  (`docs/agent-wiki/topics/integrity-screener.md`). The capability-erosion memory also records this.
-- **`psl`** is a new runtime dependency (Public Suffix List, for the verified-domain eTLD+1). `npm install`
-  surfaced 5 pre-existing moderate advisories in the tree (NOT from psl) — unrelated, worth a separate `npm audit`.
-- Serp Scholar methods (`findScholarProfile`/`fetchScholarMetrics`) are **kept** (dormant S215/S219 scripts
-  reference them) with a deprecation banner — severed from enrichment. `findContact` (#1) stays live.
+- `/private/tmp/wmkf-memory-wiki-draft/` is **tmp, not in the repo** — it disappears on reboot. The
+  authoritative state is what was committed; the brief's doc-debt list is reproduced in Next Step #1 above.
+- Relevant gates after memory/wiki edits: `check:agent-wiki`, `check:memory-router`,
+  `check:agent-invariants` (each + self-test), sequentially.
 - `grep`/`rg` may corrupt identifiers+digits (`project-rtk-grep-output-corruption`) — use Read for exact content.
-- Reviewer-finder is access-locked to Justin only.
