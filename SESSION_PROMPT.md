@@ -93,6 +93,14 @@ transitions out of (hold → finalize), so next cycle (no delay) the two collaps
 accept. No throwaway scaffolding. Mechanics delegated to us; pick what's easiest this cycle that
 still merges. Chosen: option 1 (new pre-accept hold) over splitting accept or staff-side-only.
 
+**Readiness trigger (resolved S256):** hold→finalize is gated on **proposal readiness** behind a
+single `isProposalReadyForReviewers(request)` predicate. Cue: the Phase-II-becomes-staff-visible
+event = ready-for-reviewers. Candidate signal already in data: `wmkf_phaseiisubmittedat` (written by
+`shared/forms/phase-ii-research-2026-06/map-to-dynamics.js`). **Justin todo (w/ Connor):** confirm
+whether staff-visibility gates anything beyond that timestamp. Interim: manual staff "release"
+override so the chain is testable now. **Still open:** ICS calendar-invite scope (net-new; build-now
+vs save-the-date email fast-follow). Full design: `project-reviewer-hold-step-decouple`.
+
 **Next concrete step:** scope the build — trace the engagement state machine (`respond.js` +
 `lib/dataverse/adapters/reviewer-suggestion.js` `applyStage2aResponse`, the `wmkf_reviewstatus` /
 `wmkf_responsetype` states), find/confirm the calendar-invite mechanism, and the portal UX for hold.

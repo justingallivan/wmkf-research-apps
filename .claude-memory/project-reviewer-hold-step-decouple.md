@@ -46,3 +46,28 @@ lends itself to the merge.
 **Decision chosen:** option 1 (new pre-accept hold step) over splitting the existing accept or
 staff-side-only handling. Related: [[project-reviewer-workbench-invite-workflow]],
 [[project-reviewer-lifecycle]], [[project-reviewer-address-collection-provisional]].
+
+## Readiness trigger — what flips hold → finalize (decision, S256)
+
+The portal shows the lightweight HoldView vs the full finalize (Stage2aView) based on **proposal
+readiness**, NOT a throwaway flag — so next cycle (no delay) "ready" is true from the start and the
+reviewer lands straight on finalize (hold collapses to zero). Justin's cue: the **Phase II
+submission housekeeping that makes a proposal visible to STAFF is the same moment it's ready to share
+with accepted REVIEWERS** — one "proposal is ready" event, two audiences.
+
+**Build accommodation:** gate finalize behind a single predicate `isProposalReadyForReviewers(request)`
+so the exact Dataverse flag is one swap-later detail, never a blocker. Interim: a manual staff
+"release to reviewers" override so the full chain is testable before the real signal is wired.
+
+**Concrete candidate signal (verified S256):** our Phase II intake already PATCHes
+`wmkf_phaseiisubmittedat` onto `akoya_request` on submit
+(`shared/forms/phase-ii-research-2026-06/map-to-dynamics.js`) — a ready-made "Phase II is in"
+timestamp. **Justin's todo (with Connor):** confirm whether the staff-visibility housekeeping gates
+anything BEYOND that timestamp (a QA/release step) or whether `wmkf_phaseiisubmittedat` alone is
+sufficient. Not a stopper for the build. Related: [[project-reviewer-accept-prod-automation]].
+
+## Still open (S256)
+
+- **ICS calendar invite scope** — true `.ics` (VEVENT) attachment is net-new (no calendar mechanism
+  exists anywhere in the repo); decide build-now vs ship hold + "save-the-date" email body as a
+  fast-follow. The invite belongs at hold-confirmation time (review window / `wmkf_meetingdate`).
