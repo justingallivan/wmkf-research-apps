@@ -81,6 +81,7 @@ describe('HoldView — confirmed sub-state', () => {
     render(<HoldView data={data} token="tok" confirmed onRequestDecline={onRequestDecline} onHeld={() => {}} />);
 
     expect(screen.getByText(/your spot is held/i)).toBeInTheDocument();
+    expect(screen.getByText(/held on June 14, 2026/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hold my spot' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Switch to declining/i }));
     expect(onRequestDecline).toHaveBeenCalled();

@@ -26,11 +26,19 @@ function formatMonthYear(meetingDate) {
   return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
+// heldAt is a full ISO datetime; show a friendly day for the "held on" confirmation.
+function formatHeldDate(heldAt) {
+  if (!heldAt) return null;
+  const d = new Date(heldAt);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+}
+
 export default function HoldView({ data, token, confirmed, onRequestDecline, onHeld }) {
   const proposal = data.proposal || {};
   const etag = data.etag;
   const canFlipState = data.engagementState?.canFlipState;
-  const heldAt = data.engagementState?.heldAt;
+  const heldOn = formatHeldDate(data.engagementState?.heldAt);
   const meetingWindow = formatMonthYear(proposal.meetingDate);
 
   const [submitting, setSubmitting] = useState(false);
@@ -94,7 +102,8 @@ export default function HoldView({ data, token, confirmed, onRequestDecline, onH
         <div className="space-y-3 text-sm text-gray-700">
           <p>
             You've agreed in principle to review for the
-            {meetingWindow ? ` ${meetingWindow}` : ''} panel. There's nothing more to do right now.
+            {meetingWindow ? ` ${meetingWindow}` : ''} panel{heldOn ? `, held on ${heldOn}` : ''}.
+            There's nothing more to do right now.
           </p>
           <p>
             When the proposal is ready, we'll email you the materials and a calendar
