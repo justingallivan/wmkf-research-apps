@@ -1,87 +1,64 @@
-# Session 257 Prompt: Reviewer "hold step" — scoping done, build next
+# Session 258 Prompt: Reviewer "hold step" — BUILT (gated); go-live next
 
-> **GIT.** All S256 work is on `main`. Working tree clean. 5 commits (all docs/memory — no code).
-> Verify push state at startup.
+> **GIT.** All S257 work is on `main`, pushed. Working tree clean. 23 commits — the full hold-step
+> build (chunks 1–8, each Codex-reviewed) + verification hardening. Verify push state at startup.
+> **NEW commit guard:** a PreToolUse(Bash) hook now BLOCKS `git commit` on status/enum
+> producer↔consumer parity drift (`check:status-enum-parity`). If a commit is blocked, add the new
+> value to its consumer (label map / filter bucket / count) — see the error message.
 
-## Session 256 — what happened
+## Session 257 — what happened
 
-A planning/calibration session, no code. Three threads, all landed in durable docs + memory:
+Built the **entire reviewer "hold step"** end to end — all 8 chunks from
+`docs/REVIEWER_HOLD_STEP_BUILD_PLAN.md` — each with an adversarial Codex review and fixes applied.
+Full suite **2472 green**, build clean. **Still a ZERO-BEHAVIOR-CHANGE deploy** — nothing is live
+yet (see "go-live switches" below).
 
-1. **Stopped startup summaries from resurfacing parked items (`ec115a5`).** "Do NOT resurface" now
-   means *omit from any unprompted output, including `/start`'s Potential Next Steps* — I'd been
-   echoing the parked PubPeer item, the exact attention-pull the flag exists to prevent. New memory
-   `feedback-dont-resurface-parked-items`; relocated PubPeer into a fenced "Parked — do NOT surface"
-   section the next `/start` skips.
+### What was completed (chunk → commits)
+1. **Schema** — `wmkf_responsetype` option `held=100000004` + `wmkf_heldat` DateTime created **live**
+   in Dataverse (idempotent scripts, run by Justin); maps + both select lists. `47c0b1f`, `b6f769e`.
+2. **Readiness predicate + view dispatch** — `lib/external/proposal-readiness.js`
+   `isProposalReadyForReviewers` (go-live gate, returns `true` for now); `computeEngagementState(s, isReady)`
+   adds `hold-invite`/`held` views. `005dc9c`, `514596a`.
+3. **`respond.js action:'hold'`** — transition matrix, readiness write-gate (repeat-accept exempt),
+   review-received lock, repeat-hold idempotency. `8c7064d`, `d5de119`.
+4. **HoldView** component + dispatcher wiring (ask / confirmed). `fd99b7f`, `d068788`.
+5. **`.ics` save-the-date** (`calendar-invite.js`, RFC 5545 PUBLISH) + `calendarAttachments` lane;
+   `sendAllowsAttachments` denylist→allowlist. `41ba3b62`, `db96ed3`.
+6. **Email copy + send wiring** — `hold` + `finalize` templates; first-contact confidence/duplicate
+   guards extended to `hold`; finalize held-eligibility gate; unknown-type fail-closed. `28c2db8`, `7fcfed2`.
+7. **Tests** — send-emails SSE route harness (materials-strip, degrade, finalize gate, batch). `8488230`, `ec8940e`.
+8. **Staff held visibility** — derived `RESPONSE_TYPE_BY_VALUE`; `my-candidates` numeric→string fix;
+   finder `held` chip+count; dashboard `held` phase; PI `reviewerHeld`. `8a293d9`, `4cc1c54`.
 
-2. **Re-led the workbench with the reviewer mission (`717ec5f`).** Potential Next Steps had drifted
-   into externally-blocked micro-todos with the actual cycle mission absent. Promoted **reviewer
-   finding → validation → invitation, end to end** to the headline; demoted the blocked items into a
-   "do NOT lead with these" bucket.
-
-3. **Reviewer "hold step" cycle plan — confirmed + scoped (`0d00bb0`, `bff67f3`, `bf88e01`).** The
-   main thread. Justin's goal: park a confirmed slate of reviewers BEFORE Phase II proposals arrive,
-   deferring COI/AI acks + payment + proposal delivery to a later finalize. Did a full caller →
-   persistence → consumer trace of the external-reviewer accept flow and produced a concrete design
-   (below). Full design + code findings: memory **`project-reviewer-hold-step-decouple`**.
-
-### Commits (this session)
-`ec115a5` parked-item resurfacing fix · `717ec5f` workbench leads with mission · `0d00bb0` hold-step
-plan captured · `bff67f3` readiness trigger resolved · `bf88e01` readiness model corrected.
+Plus **verification-posture hardening** (the cadence caught 2 fail-open HIGHs, a guard-order bug, a
+false-confidence test, repeated consumer-fan-out misses): new contract-reconcile audits + memories
+(`feedback-symbol-consumer-fanout`, `feedback-idempotency-name-the-mechanism`,
+`feedback-scrutinize-exemptions-and-fallthrough`) AND a **deterministic control** —
+`check:status-enum-parity` + the commit-guard hook. `0bc587e`, `5fc9b77`, `09490d6`, `6863c86`, `b45bac2a`.
 
 ## Potential Next Steps
 
-### ★ CYCLE OBJECTIVE — park a confirmed reviewer slate before Phase II (the "hold" step)
-Main thread; lead with it. Full plan + code findings: memory `project-reviewer-hold-step-decouple`.
+### ★ GO-LIVE — flip the two switches that activate the hold flow
+The build is complete and dormant. Two switches turn it on (both deliberately left off):
 
-**The plan (confirmed S256):** build a **pre-accept "hold/soft-confirm" step** so the flow is
-find → validate → invite → **hold** → calendar invite → park. A reviewer agrees in principle now,
-sits tight, is told when proposals land. **Defer** COI/AI acks + honorarium payment + proposal
-delivery to a later "finalize."
+1. **`isProposalReadyForReviewers(request)`** (`lib/external/proposal-readiness.js`) returns `true`
+   today (treat-as-ready ⇒ bypass hold, preserving the current accept flow). Flip it to the real
+   **post-QA "release to reviewers" signal** (false until staff release). **[OPEN — Justin/Connor]:**
+   identify that signal (or add an explicit staff "release" control). `wmkf_phaseiisubmittedat` is
+   RECEIPT, not readiness. **Do NOT flip before the UI trigger below ships** — a not-ready fresh
+   reviewer would hit a `hold-invite` view with no way for staff to have sent the hold ask.
+2. **Staff UI trigger** to send `templateType:'hold'` / `'finalize'`. The send path + copy are ready;
+   `shared/components/reviewers/InviteEmailModal.js` hardcodes `templateType:'invitation'`. Needs a
+   staff affordance (a mode/toggle) to send the hold ask + the finalize nudge.
 
-**Why a build, not a run (verified S256):** the current Stage-2a accept
-(`pages/api/external/review/[token]/respond.js`) hard-requires BOTH policy acks (`reviewer-coi` +
-`reviewer-ai-use`) AND a full payment contact at accept time, and runs honorarium onboarding — there
-is no confirm-without-commitment path today. The hold step is the gap; it also keeps the Connor-gated
-honorarium/Bill.com prod automation (`project-reviewer-accept-prod-automation`) from firing this cycle
-(hold never sets `wmkf_accepted` and never calls `ensureHonorariumOnboarding`).
+Sequence: build the UI trigger → flip the predicate. Until both, the flow is inert (no caller sends
+`hold`; readiness is always true). Recommend a Codex review of the go-live wiring.
 
-**Design (from the S256 trace):**
-- **Hold = a new `wmkf_responsetype` value `held (100000004)` + `wmkf_heldat`** — NOT `reviewstatus`
-  (staff pipeline), NOT `wmkf_accepted` (reserved for finalize; honorarium + Review-Manager key off
-  it). Adding the option = the known idempotent picklist-extend (`scripts/extend-responsetype-picklist.mjs`).
-- **Finalize = the existing accept path, unchanged.** `held → accepted` is just
-  `applyStage2aResponse('accept')`; the state machine already supports "unresponded → accepted."
-- **Merge-forward:** in steady state hold→finalize run back-to-back through a short staff-QA window
-  (the gap shrinks but never hits zero). Permanent infrastructure, not scaffolding.
-
-**Readiness trigger (resolved S256):** gate finalize behind a single `isProposalReadyForReviewers(request)`
-predicate. **"Phase II submitted" ≠ "ready to send" —** staff run a QA pass (figures render? shareable?)
-between receipt and release that Justin expects to persist, so readiness = the staff **"release to
-reviewers" after QA**, most likely a PERMANENT staff control. `wmkf_phaseiisubmittedat` (written by
-`shared/forms/phase-ii-research-2026-06/map-to-dynamics.js`) marks RECEIPT / a precondition, not
-readiness. **Justin todo (w/ Connor):** identify the post-QA staff-release signal (or confirm we add an
-explicit "release to reviewers" control) — NOT a blocker; the predicate localizes it.
-
-**Open lever:** **ICS calendar invite** is net-new (no calendar mechanism exists anywhere in the repo).
-Belongs at hold-confirmation time (review window / `wmkf_meetingdate`). Decide build-now vs ship hold +
-"save-the-date" email body as a fast-follow.
-
-**Next concrete step (where we stopped):** Justin tired, paused before building. Resume order agreed:
-1. ✅ DONE (S257) **Spiked the `.ics` unknown.** Transport is **Dynamics email activities**
-   (`send-emails.js` → `DynamicsService.createAndSendEmail` → `addEmailAttachment`), **NOT** Graph
-   (`graph-service.js` is SharePoint files only). `addEmailAttachment` is content-type agnostic →
-   `.ics` attaches with zero new infra; build it now (no fallback needed). Caveat: it must be a
-   distinct always-allowed attachment or the `wmkf_accepted` materials gate strips it from a held
-   reviewer; use `METHOD:PUBLISH` + date in body text.
-2. ✅ DONE (S257) **Build plan + `/contract-reconcile`.** Plan: `docs/REVIEWER_HOLD_STEP_BUILD_PLAN.md`
-   (READY WITH NAMED CHANGES, now folded in: hold transition matrix, readiness write-layer gate,
-   `.ics`-degradation). Codex adversarial pass pending before/during implementation.
-
-Rough chunk list: (1) schema `held` + `wmkf_heldat`; (2) `isProposalReadyForReviewers` predicate +
-readiness-gated view dispatch in `context.js::computeEngagementState`; (3) `respond.js` `action:'hold'`
-(no acks/payment, never honorarium); (4) HoldView portal component; (5) `.ics` (spike → build or
-fallback); (6) invitation-email copy + a "proposals ready" finalize-trigger email; (7) tests incl.
-automation-safety (hold fires no honorarium).
+### Housekeeping
+- **Atlas:** the reviewer page that enumerates `wmkf_responsetype` values should gain `held`
+  (the picklist value is live in Dataverse). Run `npm run check:atlas` after.
+- **`deriveWorkRemaining` 'held' phase** is in the dashboard API + `STAGE_META` chip; confirm with
+  Justin whether held deserves its own workbench column (UI polish, not a blocker).
 
 ### Deferred / externally-blocked (do NOT lead with these; verify before acting)
 - Recall padding-ceiling live check before raising count >15 (needs API key + a real proposal).
@@ -96,30 +73,38 @@ automation-safety (hold fires no honorarium).
   emailed them S251; suspects no reply). Context + un-park trigger:
   `docs/agent-wiki/topics/integrity-screener.md` and `project-serpapi-capability-erosion`.
 
-## ⚠ Continuity guardrails (still live from prior sessions)
+## ⚠ Continuity guardrails (still live)
+- **Hold step is BUILT but DORMANT.** Don't mistake "built" for "live": `isProposalReadyForReviewers`
+  returns `true`, nothing sends `templateType:'hold'`, so `hold-invite`/`held` views are unreachable
+  in prod. Full design + decisions: `project-reviewer-hold-step-decouple`; surfaces +
+  per-chunk Codex outcomes: `docs/REVIEWER_HOLD_STEP_BUILD_PLAN.md`.
+- **`held` lifecycle facts:** `wmkf_heldat` is written ONLY by the hold response path (not
+  `updateLifecycle`); `RESPONSE_TYPE_BY_VALUE` is a DERIVED inverse of `RESPONSE_TYPE_MAP` (don't
+  hand-edit it). The no_response timeout sweep correctly skips held (responsetype non-null).
 - **COI Chunk 2 fully shipped (2a S240 + 2b S254).** `docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md` is
-  HISTORICAL. Current COI policy: `project-reviewer-coi-rely-on-self-disclosure`; live gates:
-  `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`.
-- **`POTENTIAL_CONCERNS` parser terminator is intentional** (`parseAnalysisResponse` parse-and-discards
-  a stray field). Do NOT remove unless certain no prompt can still emit it.
+  HISTORICAL. Current COI policy: `project-reviewer-coi-rely-on-self-disclosure`.
+- **`POTENTIAL_CONCERNS` parser terminator is intentional** — do NOT remove.
 - Memory router stays **hub-link form**; `grep`/`rg` may corrupt identifiers+digits
   (`project-rtk-grep-output-corruption`) — use Read for exact content.
 
-## Key Files Reference (hold-step build)
+## Key Files Reference (hold step — all BUILT this session)
 
-| File | Purpose |
-|------|---------|
-| `pages/api/external/review/[token]/respond.js` | accept/decline handler — add `action:'hold'`; today hard-requires acks+payment |
-| `pages/api/external/review/[token]/context.js` | `computeEngagementState` view dispatch — add readiness-gated hold/finalize routing |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | `applyStage2aResponse` + `RESPONSE_TYPE_MAP`/`REVIEW_STATUS_MAP` — add `held` |
-| `scripts/extend-responsetype-picklist.mjs` | template for the idempotent `held=100000004` picklist add |
-| `pages/api/review-manager/send-emails.js` | invitation email + `wmkf_invited` (templateType='invitation') |
-| `shared/forms/phase-ii-research-2026-06/map-to-dynamics.js` | writes `wmkf_phaseiisubmittedat` (readiness precondition) |
-| `shared/components/external/Stage2aView.js` | the full finalize form; HoldView is its lightweight sibling |
-| `project-reviewer-hold-step-decouple` (memory) | full design, decisions, open items |
+| File | Role |
+|------|------|
+| `docs/REVIEWER_HOLD_STEP_BUILD_PLAN.md` | the plan with per-chunk status + Codex outcomes |
+| `lib/external/proposal-readiness.js` | `isProposalReadyForReviewers` — the go-live switch (#1) |
+| `shared/components/reviewers/InviteEmailModal.js` | hardcodes `'invitation'` — the go-live UI trigger (#2) |
+| `pages/api/external/review/[token]/respond.js` | `action:'hold'` + readiness write-gate + transition matrix |
+| `pages/api/external/review/[token]/context.js` | `computeEngagementState(s, isReady)` view dispatch |
+| `shared/components/external/HoldView.js` | the hold ask / confirmed portal views |
+| `lib/external/calendar-invite.js` | `.ics` PUBLISH save-the-date builder |
+| `pages/api/review-manager/send-emails.js` | calendarAttachments lane + hold/finalize lifecycle |
+| `lib/dataverse/adapters/reviewer-suggestion.js` | `RESPONSE_TYPE_MAP.held`, derived `RESPONSE_TYPE_BY_VALUE`, hold write |
+| `scripts/check-status-enum-parity.js` + `.claude/hooks/enum-parity-commit-guard.js` | the new commit-blocking parity control |
 
 ## Testing
 ```bash
-npx jest --testPathPatterns "reviewer|external|respond"   # reviewer + external-portal suites
-npm test && npm run lint && npm run build                 # full suite (was 2384 green at S254)
+npx jest --testPathPatterns "reviewer|external|respond|hold|calendar|engagement"  # hold-step suites
+npm test && npm run lint && npm run build   # full suite (2472 green at S257)
+npm run check:status-enum-parity            # the new parity gate (also blocks commits)
 ```

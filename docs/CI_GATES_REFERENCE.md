@@ -95,6 +95,14 @@ Validates `docs/agent-wiki/` as a subordinate retrieval layer rather than a para
 - Reminder: `.claude/hooks/agent-wiki-reminder.js` is advisory; it nudges when edits match a topic's `watch_paths`.
 - Self-test: `scripts/check-agent-wiki-self-test.js`.
 
+### `check:status-enum-parity` — producer↔consumer key parity (S257)
+
+Guards the "producer-without-consumer-sweep" defect class: a value added to a producer set (an enum / status / `workRemaining` stage) but NOT to a consumer that maps/labels/buckets it, so the new value falls through unstyled / uncounted / unhandled. Enforces a registry of producer↔consumer key-parity invariants (currently `deriveWorkRemaining` stages ⊆ `STAGE_META` chips). **Extend the registry** when adding a producer set whose values must be mirrored by a consumer (label map / filter bucket / count rollup); runtime- or test-enforced pairs (derived inverses, throwing merges) need no entry.
+
+- Scope: `scripts/check-status-enum-parity.js`, `.claude/hooks/enum-parity-commit-guard.js`.
+- **Commit control:** a PreToolUse(Bash) hook runs the gate on `git commit` and BLOCKS (exit 2) on drift — the deterministic enforcement behind the contract-reconcile "complement & fan-out" rule (`feedback-scrutinize-exemptions-and-fallthrough`).
+- Self-test: `node scripts/check-status-enum-parity.js --self-test`.
+
 ## Coverage tool self-tests (binding contract)
 
 When modifying any `scripts/check-*.js` gate (or building a new one), the matching self-test must pass:
@@ -108,6 +116,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:prompt-storage-mentions` | `check:prompt-storage-mentions-self-test` |
 | `check:canonical-pointers` | `check:canonical-pointers-self-test` |
 | `check:agent-wiki` | `check:agent-wiki:self-test` |
+| `check:status-enum-parity` | `check:status-enum-parity:self-test` |
 
 **When external review catches a structural pattern an existing gate missed, the order is mandatory:**
 
