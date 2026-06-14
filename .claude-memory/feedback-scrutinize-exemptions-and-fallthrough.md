@@ -30,6 +30,15 @@ and the gate NOT applied (finalize exempted). Two compounding habits:
   handler fail-open on unknown types?"; same shape as the audit-#7 grep-scope miss in
   [[feedback-symbol-consumer-fanout]]).
 
+**Same trap in TESTS — "passes for the wrong reason" (S257 chunk 7).** I wrote a route test
+asserting "hold attaches no proposal materials" in a setup where **no materials existed to begin
+with** — it proved *absence*, not *exclusion*, and would stay green even if the strip gate were
+deleted. Codex caught it. A negative assertion is only meaningful when the thing-being-excluded is
+actually PRESENT in the setup: to prove a strip/skip/guard, construct the input that WOULD trip it
+(materials that exist, an already-invited row, a low-confidence address) and prove the guard removes
+it. Before trusting a passing test, ask: "would this still pass if the feature were broken?" If yes,
+the test is decorative.
+
 **How to apply (on my OWN new code, build-side):**
 - For every new branch / type / gate, enumerate the COMPLEMENT and state what the system
   does for it. An `if/else-if` with no final `else` is fail-OPEN until proven fail-closed.

@@ -84,6 +84,8 @@ Required named changes: ...
 then: re-read the accepted findings → convert each to an invariant → edit the smallest file set → self-review against the invariants → run scoped tests/gates (gate + its `:self-test` **sequentially**) → report:
 
 **Complement & fall-through check (build-side — run it on YOUR OWN new code).** The defects you ship live in the *negative space* — the inputs your new branch doesn't match, not the ones it does. For every branch, type, or gate you add, enumerate the **complement** and state what the system does for it: an `if/else-if` with no final `else` is **fail-open until proven fail-closed**; a new enum value/templateType/status defaults to *whatever the unhandled path does* — verify that's safe (reject/skip), not just "my new value is handled." You scrutinize what you ADD; force yourself to scrutinize what you EXEMPT and what FALLS THROUGH. When you apply a principle to fix one spot (allowlist this gate, map this consumer), immediately ask **"which sibling surfaces have the same shape?"** and sweep them in the same pass — fixing only the instance in front of you is how the same class re-lands next chunk.
+
+**Tests pass for the wrong reason, too.** A negative assertion ("no materials leak", "not called") only means something when the thing-being-excluded is actually PRESENT in the setup — otherwise it proves *absence*, not *exclusion*, and stays green if the guard is deleted. To test a strip/skip/guard, construct the input that WOULD trip it and prove the guard removes it. Before trusting a passing test ask: **"would this still pass if the feature were broken?"** If yes, it's decorative.
 ```md
 Changed: file — concise behavior change.
 Verified: command / manual check.
