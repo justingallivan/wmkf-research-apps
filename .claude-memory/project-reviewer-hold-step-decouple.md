@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-hold-step-decouple
-description: This cycle's reviewer goal — decouple invite/confirm from policy-acks + honorarium-payment by building a pre-accept "hold" step (find→validate→invite→hold→calendar invite→park), so a confirmed slate of reviewers is parked BEFORE Phase II proposals arrive; COI/AI acks + payment + proposal delivery deferred to a later finalize. Build it to merge cleanly into next cycle's no-delay flow.
+description: This cycle's reviewer goal — decouple invite/confirm from policy-acks + honorarium-payment by building a pre-accept "hold" step (find→validate→invite→hold→calendar invite→park), so a confirmed slate of reviewers is parked BEFORE Phase II proposals arrive; COI/AI acks + payment + proposal delivery deferred to a later finalize. Build it to merge cleanly into the steady-state flow (a short staff-QA window between receipt and release, not zero).
 metadata:
   type: project
   status: active
@@ -37,11 +37,12 @@ existing chain. Bonus: the hold step keeps the Connor-gated honorarium/Bill.com 
 ## Design constraint — merge-forward (Justin, S256)
 
 Build "hold" as a proper engagement state that **"finalize" transitions out of** (hold → finalize),
-so that next cycle — when there is NO delta between agreeing in principle, entering the info (acks +
-payment), and getting the proposal — the two collapse into one continuous accept in a single sitting.
-No throwaway scaffolding: the hold is the permanent front of the flow, just temporally separated from
-finalize this cycle only. Mechanics are delegated to us — pick what's easiest this cycle that still
-lends itself to the merge.
+so that in steady state the gap between agreeing in principle, entering the info (acks + payment), and
+getting the proposal SHRINKS — but does NOT collapse to zero (corrected S256, see readiness trigger
+below: a staff-QA/release step persists every cycle). The merge-forward win is that ONE machinery
+handles both a long buffer (this cycle's Phase II delay) and a short steady-state QA window — not that
+hold ever vanishes. No throwaway scaffolding: the hold + readiness gate are permanent infrastructure.
+Mechanics are delegated to us — pick what's easiest this cycle that still lends itself to the merge.
 
 **Decision chosen:** option 1 (new pre-accept hold step) over splitting the existing accept or
 staff-side-only handling. Related: [[project-reviewer-workbench-invite-workflow]],
@@ -50,21 +51,24 @@ staff-side-only handling. Related: [[project-reviewer-workbench-invite-workflow]
 ## Readiness trigger — what flips hold → finalize (decision, S256)
 
 The portal shows the lightweight HoldView vs the full finalize (Stage2aView) based on **proposal
-readiness**, NOT a throwaway flag — so next cycle (no delay) "ready" is true from the start and the
-reviewer lands straight on finalize (hold collapses to zero). Justin's cue: the **Phase II
-submission housekeeping that makes a proposal visible to STAFF is the same moment it's ready to share
-with accepted REVIEWERS** — one "proposal is ready" event, two audiences.
+readiness**, NOT a throwaway flag. **Crucial correction (Justin, S256): "Phase II submitted" ≠
+"ready to send to reviewers."** Staff run a QA pass between receipt and release (do the figures
+render, is it actually shareable — a holdover from resubmission days that Justin does NOT expect to
+ever fully disappear). So readiness-for-reviewers is the staff's affirmative **"release to
+reviewers" after QA**, not raw submission.
 
-**Build accommodation:** gate finalize behind a single predicate `isProposalReadyForReviewers(request)`
-so the exact Dataverse flag is one swap-later detail, never a blocker. Interim: a manual staff
-"release to reviewers" override so the full chain is testable before the real signal is wired.
+**Build accommodation:** gate finalize behind a single predicate `isProposalReadyForReviewers(request)`.
+The real signal is fundamentally a **staff-released flag** — so the manual staff "release to reviewers"
+action is most likely the **PERMANENT** trigger, not just an interim stand-in. Connor's Phase-II-
+becomes-visible housekeeping is an upstream **precondition** (start of the QA window — you can't
+release what hasn't landed), not the release event itself.
 
-**Concrete candidate signal (verified S256):** our Phase II intake already PATCHes
-`wmkf_phaseiisubmittedat` onto `akoya_request` on submit
-(`shared/forms/phase-ii-research-2026-06/map-to-dynamics.js`) — a ready-made "Phase II is in"
-timestamp. **Justin's todo (with Connor):** confirm whether the staff-visibility housekeeping gates
-anything BEYOND that timestamp (a QA/release step) or whether `wmkf_phaseiisubmittedat` alone is
-sufficient. Not a stopper for the build. Related: [[project-reviewer-accept-prod-automation]].
+**Candidate signals (verified S256):** our Phase II intake PATCHes `wmkf_phaseiisubmittedat` onto
+`akoya_request` on submit (`shared/forms/phase-ii-research-2026-06/map-to-dynamics.js`) — this marks
+RECEIPT / start of the QA window, a precondition, NOT readiness. **Justin's todo (with Connor):**
+identify the staff-release/visibility signal that fires AFTER QA (or confirm we add an explicit staff
+"release to reviewers" control). Not a stopper for the build — `isProposalReadyForReviewers` localizes
+it. Related: [[project-reviewer-accept-prod-automation]].
 
 ## Still open (S256)
 

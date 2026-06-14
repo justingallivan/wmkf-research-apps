@@ -89,17 +89,20 @@ Connor-gated honorarium/Bill.com prod automation (`project-reviewer-accept-prod-
 firing this cycle.
 
 **Design constraint — merge-forward:** model "hold" as a real engagement state that "finalize"
-transitions out of (hold → finalize), so next cycle (no delay) the two collapse into one continuous
-accept. No throwaway scaffolding. Mechanics delegated to us; pick what's easiest this cycle that
-still merges. Chosen: option 1 (new pre-accept hold) over splitting accept or staff-side-only.
+transitions out of (hold → finalize), so in steady state the two run back-to-back through a short
+staff-QA window (the gap shrinks but never hits zero — see readiness trigger). No throwaway
+scaffolding. Mechanics delegated to us; pick what's easiest this cycle that still merges. Chosen:
+option 1 (new pre-accept hold) over splitting accept or staff-side-only.
 
 **Readiness trigger (resolved S256):** hold→finalize is gated on **proposal readiness** behind a
-single `isProposalReadyForReviewers(request)` predicate. Cue: the Phase-II-becomes-staff-visible
-event = ready-for-reviewers. Candidate signal already in data: `wmkf_phaseiisubmittedat` (written by
-`shared/forms/phase-ii-research-2026-06/map-to-dynamics.js`). **Justin todo (w/ Connor):** confirm
-whether staff-visibility gates anything beyond that timestamp. Interim: manual staff "release"
-override so the chain is testable now. **Still open:** ICS calendar-invite scope (net-new; build-now
-vs save-the-date email fast-follow). Full design: `project-reviewer-hold-step-decouple`.
+single `isProposalReadyForReviewers(request)` predicate. **"Phase II submitted" ≠ "ready to send" —**
+staff run a QA pass (figures render? shareable?) between receipt and release that Justin expects to
+persist, so readiness = the staff **"release to reviewers" after QA** (likely a PERMANENT staff
+control, not interim). `wmkf_phaseiisubmittedat` (written by
+`shared/forms/phase-ii-research-2026-06/map-to-dynamics.js`) marks RECEIPT / a precondition, not
+readiness. **Justin todo (w/ Connor):** identify the post-QA staff-release/visibility signal (or
+confirm we add an explicit "release to reviewers" control). **Still open:** ICS calendar-invite scope
+(net-new; build-now vs save-the-date email fast-follow). Full design: `project-reviewer-hold-step-decouple`.
 
 **Next concrete step:** scope the build — trace the engagement state machine (`respond.js` +
 `lib/dataverse/adapters/reviewer-suggestion.js` `applyStage2aResponse`, the `wmkf_reviewstatus` /
