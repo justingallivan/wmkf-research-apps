@@ -38,6 +38,8 @@ Write these before any claim. If I can't fill one, I haven't read enough yet.
 
 **Mechanism, not assertion.** "idempotent" / "no-op on repeat" / "only-once" / "no re-stamp" / "dedup" is `[ASSUMED]` until you cite the enforcing guard at `file:line` (early-return before the write, conditional `WHERE … IS NULL` / `ON CONFLICT DO NOTHING`, unique key, generation guard). An unconditional write under an idempotency claim is a defect, not a verified property.
 
+**Extends to EXEMPTIONS and preconditions.** Whenever you *exempt* a path from a safety gate, or claim "this only happens when X" / "X is already true here" / "the caller only sends this for Y", that exemption is `[ASSUMED]` until the precondition is *enforced* at `file:line`. Exemptions are the dangerous direction: *adding* a gate is visibly safe; *carving an exception out of one* (e.g. "finalize skips the confidence gate because its recipient is already engaged") is where fail-open hides — the assumed state must be checked server-side, not trusted from the caller or the intended use.
+
 ## Step 3 — Trace the contract (mark N/A explicitly, never silently skip)
 
 1 user/caller → 2 client state → 3 request payload → 4 route auth/validation/body-parser → 5 service/helper → 6 persistence write/read → 7 response shape → 8 consumer state/render → 9 docs/tests/gates.
@@ -80,6 +82,8 @@ Required named changes: ...
 | e.g. failed batch rows stay selectable | route + client | route returns `savedNames`; client marks only those |
 
 then: re-read the accepted findings → convert each to an invariant → edit the smallest file set → self-review against the invariants → run scoped tests/gates (gate + its `:self-test` **sequentially**) → report:
+
+**Complement & fall-through check (build-side — run it on YOUR OWN new code).** The defects you ship live in the *negative space* — the inputs your new branch doesn't match, not the ones it does. For every branch, type, or gate you add, enumerate the **complement** and state what the system does for it: an `if/else-if` with no final `else` is **fail-open until proven fail-closed**; a new enum value/templateType/status defaults to *whatever the unhandled path does* — verify that's safe (reject/skip), not just "my new value is handled." You scrutinize what you ADD; force yourself to scrutinize what you EXEMPT and what FALLS THROUGH. When you apply a principle to fix one spot (allowlist this gate, map this consumer), immediately ask **"which sibling surfaces have the same shape?"** and sweep them in the same pass — fixing only the instance in front of you is how the same class re-lands next chunk.
 ```md
 Changed: file — concise behavior change.
 Verified: command / manual check.
@@ -92,4 +96,4 @@ If a claim has no `file:line` / command behind it, label it `[ASSUMED]` and eith
 
 ## Anti-patterns this skill blocks (say the evidence, not the phrase)
 
-"This should be fine" (no file evidence) · "The plan says…" as implementation evidence · "No callers" (no `rg`) · "Only docs" (no whole-file reconcile) · "Shared helper" (no preserved-difference list) · "Saved successfully" (response returns only a count) · any post-await state write with no stale-context check in streamed/request-scoped UI · "idempotent" (no named guard at `file:line`) · "reuse existing guards" (didn't read the default branch for the new value) · "single source of truth" (didn't grep the literal + map var for other sites) · "backward compatible" (didn't trace the read path) · "added the enum value" (verified the write map only — read map / 2nd select list / filter buckets unchecked) · "staff UI unaffected" (didn't read each status branch).
+"This should be fine" (no file evidence) · "The plan says…" as implementation evidence · "No callers" (no `rg`) · "Only docs" (no whole-file reconcile) · "Shared helper" (no preserved-difference list) · "Saved successfully" (response returns only a count) · any post-await state write with no stale-context check in streamed/request-scoped UI · "idempotent" (no named guard at `file:line`) · "reuse existing guards" (didn't read the default branch for the new value) · "single source of truth" (didn't grep the literal + map var for other sites) · "backward compatible" (didn't trace the read path) · "added the enum value" (verified the write map only — read map / 2nd select list / filter buckets unchecked) · "staff UI unaffected" (didn't read each status branch) · "this path is exempt because X is already true" (X not enforced server-side at `file:line`) · "handled the new type" (the if/else-if has no final `else` — unknown input falls open).
