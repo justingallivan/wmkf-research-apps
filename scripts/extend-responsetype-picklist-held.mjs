@@ -42,8 +42,15 @@ for (const o of opts) {
   console.log(`  ${o.Value}: ${o.Label?.UserLocalizedLabel?.Label}`);
 }
 
-if (opts.find(o => o.Value === NEW_VALUE)) {
-  console.log(`\nOption ${NEW_VALUE} already exists. No-op.`);
+const existing = opts.find(o => o.Value === NEW_VALUE);
+if (existing) {
+  const label = existing.Label?.UserLocalizedLabel?.Label;
+  if (label !== NEW_LABEL) {
+    console.error(`\n✗ Option ${NEW_VALUE} already exists but is labelled '${label}', not '${NEW_LABEL}'. `
+      + 'Refusing to no-op — the held value may be colliding with another option.');
+    process.exit(1);
+  }
+  console.log(`\nOption ${NEW_VALUE} (${NEW_LABEL}) already exists. No-op.`);
   process.exit(0);
 }
 
@@ -80,13 +87,17 @@ if (!insertResp.ok) {
   console.error('InsertOptionValue failed — see body above.');
   process.exit(1);
 }
-// The action returns { NewOptionValue: <int> } on success — print it explicitly so we
-// can see whether the value we asked for (100000004) is what Dataverse actually created.
+// The action returns { NewOptionValue: <int> } on success — it MUST match the value we
+// asked for. A drift (publisher option-value-prefix remap) means the code maps are wrong.
 try {
   const parsed = JSON.parse(insertBody);
+  if (parsed && parsed.NewOptionValue !== undefined && parsed.NewOptionValue !== NEW_VALUE) {
+    console.error(`\n✗ Dataverse assigned NewOptionValue ${parsed.NewOptionValue}, not the requested ${NEW_VALUE}. `
+      + 'The code maps (RESPONSE_TYPE_MAP/RESPONSE_TYPE_BY_VALUE) assume 100000004 — do NOT proceed.');
+    process.exit(1);
+  }
   if (parsed && parsed.NewOptionValue !== undefined) {
-    console.log(`NewOptionValue assigned by Dataverse: ${parsed.NewOptionValue}`
-      + (parsed.NewOptionValue === NEW_VALUE ? ' (matches request)' : ' (DIFFERS from requested ' + NEW_VALUE + ')'));
+    console.log(`NewOptionValue assigned by Dataverse: ${parsed.NewOptionValue} (matches request)`);
   }
 } catch { /* non-JSON body — already printed above */ }
 
@@ -97,6 +108,10 @@ const pubResp = await fetch(`${baseUrl}/api/data/v9.2/PublishAllXml`, {
   headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
 });
 console.log(`PublishAllXml → HTTP ${pubResp.status}`);
+if (!pubResp.ok) {
+  console.error(`✗ PublishAllXml failed (${pubResp.status}): ${await pubResp.text()}`);
+  process.exit(1);
+}
 
 // Verify
 const verifyResp = await fetch(checkUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
@@ -106,4 +121,9 @@ for (const o of verify.OptionSet?.Options || []) {
   console.log(`  ${o.Value}: ${o.Label?.UserLocalizedLabel?.Label}`);
 }
 const found = (verify.OptionSet?.Options || []).find(o => o.Value === NEW_VALUE);
-console.log(found ? `\n✓ ${NEW_VALUE} added` : '\n✗ verify still does not show ' + NEW_VALUE + ' (see InsertOptionValue body/NewOptionValue above)');
+if (!found) {
+  console.error(`\n✗ verify still does not show ${NEW_VALUE} after publish — InsertOptionValue returned ok `
+    + 'but the option is absent. Investigate before relying on it.');
+  process.exit(1);
+}
+console.log(`\n✓ ${NEW_VALUE} (${NEW_LABEL}) added and verified`);

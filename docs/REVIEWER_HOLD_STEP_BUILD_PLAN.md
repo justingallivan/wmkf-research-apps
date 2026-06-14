@@ -292,17 +292,22 @@ Each chunk is independently committable. A chunk's red gate (where it has one) b
 ### Chunk 8 — Staff-side `held` visibility & round-trip (Codex 2nd-pass #3)
 The cycle goal is that **staff gain confidence they hold a committed slate** — so held reviewers
 must be *visible* in the workbench, not silently misclassified.
-- **Do:** (a) read-map already extended in Chunk 1 (`RESPONSE_TYPE_BY_VALUE`); (b) add a `held`
-  bucket to the reviewer-finder email-status filter (`pages/reviewer-finder.js:~3047`
-  `candidateMatchesEmailFilter`) and any status count/badge that branches on `responseType`;
+- **Do:** (a) read-map already extended in Chunk 1 (`RESPONSE_TYPE_BY_VALUE`); (b) **map the
+  finder's data source** — [VERIFIED `pages/api/reviewer-finder/my-candidates.js:222`] emits
+  `responseType: s.wmkf_responsetype || null` as a **raw number** (100000004 for held), but the UI
+  (`reviewer-finder.js:3047`) compares **strings** (`=== 'accepted'`). So held (and arguably every
+  status on this path) never matches a string bucket. Map the numeric → string here (reuse
+  `RESPONSE_TYPE_BY_VALUE`) and add a `held` bucket to the finder filter + any status count/badge;
   (c) **guard the `pending` bucket** — [VERIFIED `reviewer-finder.js:3047`] today `pending` =
   `emailSentAt && !responseType && !accepted && !declined`; a `held` row (responseType `held`,
   `accepted=false`) must NOT fall into `pending`, and a held row whose responseType failed to
-  round-trip (undefined) would wrongly count as pending — fixed by the Chunk-1 read-map plus an
-  explicit `held` exclusion.
-- **Count consumers found by audit #7 (S257 — the plan + both Codex passes had missed these):**
-  the `RESPONSE_TYPE_MAP` symbol grep surfaced two more aggregators that count `accepted`/`declined`
-  and would bucket a held row as "invited only," undercounting the committed slate:
+  round-trip (undefined) would wrongly count as pending — fixed by the read-map + the string mapping
+  above + an explicit `held` exclusion.
+- **Count consumers found by audit #7 + the chunk-1/2 Codex review (S257):** the `RESPONSE_TYPE_MAP`
+  symbol grep surfaced two aggregators; the later code review caught a third (`my-candidates.js`, above)
+  that the map-symbol grep had MISSED because it reads the raw field, not the map — lesson: grep the
+  persisted FIELD (`wmkf_responsetype`), not just the mapping-helper variable. All bucket a held row
+  as "invited only," undercounting the committed slate:
   - **`pages/api/workbench/dashboard.js:253-255`** (staff workbench) — held lands in `invited`, not
     `accepted`; `getPhase` (`:300`) keeps the proposal at `awaiting` despite a confirmed slate. Add a
     `held` count + decide whether held counts toward the "enough confirmed" phase signal.
@@ -339,6 +344,7 @@ must be *visible* in the workbench, not silently misclassified.
 | `pages/reviewer-finder.js` | `candidateMatchesEmailFilter` — add `held` bucket, guard `pending` (8) |
 | `pages/api/workbench/dashboard.js` | count aggregator — add `held` count; phase signal (audit #7) (8) |
 | `pages/api/reviewer-finder/my-proposals.js` | PI-facing count aggregator — add `held` count (audit #7) (8) |
+| `pages/api/reviewer-finder/my-candidates.js` | emits raw numeric `responseType` — map to string + `held` bucket (Codex ch1/2 review) (8) |
 | `lib/services/reviewer-suggestion-sweep.js` | no_response timeout — VERIFIED skips held (no change) (1) |
 | `shared/forms/phase-ii-research-2026-06/map-to-dynamics.js` | writes `wmkf_phaseiisubmittedat` (readiness precondition, ref for chunk 2) |
 

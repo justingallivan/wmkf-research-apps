@@ -96,9 +96,17 @@ const pubResp = await fetch(`${baseUrl}/api/data/v9.2/PublishAllXml`, {
   headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
 });
 console.log(`PublishAllXml → HTTP ${pubResp.status}`);
+if (!pubResp.ok) {
+  console.error(`✗ PublishAllXml failed (${pubResp.status}): ${await pubResp.text()}`);
+  process.exit(1);
+}
 
 // Verify
 const verifyResp = await fetch(probeUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
-console.log(verifyResp.ok
-  ? `\n✓ ${LOGICAL_NAME} created on ${ENTITY}`
-  : `\n✗ verify did not find ${LOGICAL_NAME} yet — CreateAttribute returned ok above, so if this persists re-run (the probe will report "already exists") to confirm past a stale metadata read.`);
+if (!verifyResp.ok) {
+  console.error(`\n✗ verify did not find ${LOGICAL_NAME} after publish — CreateAttribute returned ok but the `
+    + 'column is absent. Re-run (the probe will report "already exists") to rule out a stale metadata read; '
+    + 'if it persists, investigate before relying on the column.');
+  process.exit(1);
+}
+console.log(`\n✓ ${LOGICAL_NAME} created on ${ENTITY} and verified`);

@@ -283,7 +283,7 @@ export function computeEngagementState(s, isReady = true) {
   const submitted = !!s.wmkf_reviewreceivedat;
   const accepted = s.wmkf_accepted === true;
   const declined = s.wmkf_declined === true;
-  const held = responseType === RESPONSE_TYPE_HELD;
+  const heldRow = responseType === RESPONSE_TYPE_HELD;
 
   // The lock: once staff have released materials, reviewer self-service flip ends.
   const canFlipState = (reviewStatus === null || reviewStatus < REVIEW_STATUS_MATERIALS_SENT)
@@ -300,7 +300,7 @@ export function computeEngagementState(s, isReady = true) {
     view = 'accepted-pre-materials';
   } else if (declined) {
     view = 'declined';
-  } else if (held) {
+  } else if (heldRow) {
     // Agreed in principle. Once the proposal is released, finalize via the full
     // accept form; until then, show the sit-tight/calendar confirmation.
     view = isReady ? 'stage2a' : 'held';
@@ -309,6 +309,12 @@ export function computeEngagementState(s, isReady = true) {
     // lightweight hold ask.
     view = isReady ? 'stage2a' : 'hold-invite';
   }
+
+  // `held`/`heldAt` describe the ACTIVE held state only — i.e. the row's responsetype
+  // is held AND no terminal/accepted/declined state supersedes it (those win the view
+  // above). This avoids the contradictory `held:true` + `view:'submitted'` combo on an
+  // anomalous held+terminal row (the held branch is only reachable past all of them).
+  const held = heldRow && (view === 'held' || view === 'stage2a');
 
   return {
     view,
@@ -319,7 +325,7 @@ export function computeEngagementState(s, isReady = true) {
     held,
     responseType,
     responseReceivedAt: s.wmkf_responsereceivedat || null,
-    heldAt: s.wmkf_heldat || null,
+    heldAt: held ? (s.wmkf_heldat || null) : null,
     reviewStatus,
   };
 }

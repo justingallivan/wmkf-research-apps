@@ -100,6 +100,63 @@ describe('computeEngagementState — existing states ignore readiness (regressio
   });
 });
 
+describe('computeEngagementState — anomalous held+terminal rows (precedence + no contradictory held flag)', () => {
+  // A held row that also carries a terminal/response marker is "impossible" in the
+  // happy path, but the terminal MUST win the view AND `held`/`heldAt` must not leak
+  // true alongside a terminal view (else consumers see contradictory state).
+  const HELD_AT = '2026-06-14T00:00:00Z';
+
+  test('held + submitted → submitted, held=false, heldAt=null', () => {
+    const r = computeEngagementState(
+      { wmkf_responsetype: RESPONSE_TYPE_HELD, wmkf_heldat: HELD_AT, wmkf_reviewreceivedat: HELD_AT },
+      false,
+    );
+    expect(r.view).toBe('submitted');
+    expect(r.held).toBe(false);
+    expect(r.heldAt).toBeNull();
+  });
+
+  test('held + accepted → accepted-pre-materials, held=false', () => {
+    const r = computeEngagementState(
+      { wmkf_responsetype: RESPONSE_TYPE_HELD, wmkf_heldat: HELD_AT, wmkf_accepted: true },
+      false,
+    );
+    expect(r.view).toBe('accepted-pre-materials');
+    expect(r.held).toBe(false);
+    expect(r.heldAt).toBeNull();
+  });
+
+  test('held + declined → declined, held=false', () => {
+    const r = computeEngagementState(
+      { wmkf_responsetype: RESPONSE_TYPE_HELD, wmkf_heldat: HELD_AT, wmkf_declined: true },
+      false,
+    );
+    expect(r.view).toBe('declined');
+    expect(r.held).toBe(false);
+  });
+
+  test('held + materials_sent → stage2b, held=false', () => {
+    const r = computeEngagementState(
+      { wmkf_responsetype: RESPONSE_TYPE_HELD, wmkf_heldat: HELD_AT, wmkf_reviewstatus: REVIEW_STATUS_MATERIALS_SENT },
+      false,
+    );
+    expect(r.view).toBe('stage2b');
+    expect(r.held).toBe(false);
+  });
+
+  test('active held (no terminal) keeps held=true + heldAt under both readiness values', () => {
+    const notReady = computeEngagementState({ wmkf_responsetype: RESPONSE_TYPE_HELD, wmkf_heldat: HELD_AT }, false);
+    expect(notReady.view).toBe('held');
+    expect(notReady.held).toBe(true);
+    expect(notReady.heldAt).toBe(HELD_AT);
+
+    const ready = computeEngagementState({ wmkf_responsetype: RESPONSE_TYPE_HELD, wmkf_heldat: HELD_AT }, true);
+    expect(ready.view).toBe('stage2a');
+    expect(ready.held).toBe(true);
+    expect(ready.heldAt).toBe(HELD_AT);
+  });
+});
+
 describe('isProposalReadyForReviewers — current go-live gate', () => {
   // Until the staff release signal is wired AND the hold UI ships, every proposal is
   // treated as ready (hold bypassed), preserving today's direct-to-accept flow.
