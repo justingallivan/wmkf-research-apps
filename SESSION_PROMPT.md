@@ -74,12 +74,14 @@ Codex trim fixes · `8f87ae1` PART-3 notes in 2 design docs.
 
 ## Potential Next Steps
 
-### 1. COI **Chunk 2b** — retire the AI `POTENTIAL_CONCERNS` advisory (⚠ destructive, deferred)
-The only substantive in-repo build left. Chunk 2a (institution-COI hard drop) shipped; 2b removes the
-PD-unverifiable amber advisory from the **prompt** (`shared/config/prompts/reviewer-finder.js`),
-**validator** (`lib/utils/prompt-validators.js`), and **UI** (`pages/reviewer-finder.js`). Design:
-`docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md` (banner already split 2a/2b). Destructive → needs Justin's
-explicit go; do the verify-callers pre-flight first.
+### 1. COI **Chunk 2b** — retire the AI `POTENTIAL_CONCERNS` advisory — ✅ SHIPPED S254 (`da6fb70`)
+Done this session after the verify-callers pre-flight + a Codex adversarial review (no blocking defect).
+Removed the PD-unverifiable amber advisory from prompt (both byte-parity files), parser, validator,
+repair prompt, both card renders, and the roster-prune persist. Full suite 2384 green, lint/build/A7 clean.
+Design owner `docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md` is now historical.
+**ONE STEP LEFT (Justin):** reseed the prod Dataverse `analyze` row —
+`node --env-file=.env.local scripts/seed-reviewer-finder-prompts.js --execute --only=analyze`. Until
+then the live prompt still emits the field, which the parser safely parse-and-discards (no UI breakage).
 
 ### 2. Older carryover (externally blocked — verify before acting)
 - Recall padding-ceiling live check before raising count >15 (needs API key + a real proposal).

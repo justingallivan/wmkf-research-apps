@@ -1,13 +1,18 @@
 /**
- * Read-only validation harness for the reviewer-finder ANALYZE prompt (S229 work).
+ * Read-only validation harness for the reviewer-finder ANALYZE prompt (S229 work;
+ * updated S254 for the POTENTIAL_CONCERNS retirement — Chunk 2b).
  *
  * Purpose: run the *production* Stage-1 analyze prompt against a REAL request's
  * FULL proposal narrative (not the abstract) and print the ranked reviewer
- * suggestions + reasoning + concerns, so we can eyeball the S229 changes:
+ * suggestions + reasoning, so we can eyeball:
  *   - ranking favors currently-active / mid-career experts over field founders
  *     (eyeball SENIORITY across the list),
- *   - conflicts land in POTENTIAL_CONCERNS (→ the amber advisory in the UI),
- *   - REASONING stays fitness-only (no COI text bleeding into it).
+ *   - REASONING stays fitness-only — no COI/conflict text. The POTENTIAL_CONCERNS
+ *     amber advisory was RETIRED (S254): the model should emit NO conflict output;
+ *     COI is screened deterministically server-side. The parser drops any lingering
+ *     POTENTIAL_CONCERNS the live prompt still emits before its prod reseed, so this
+ *     harness can no longer observe that field — the REASONING-no-COI check below is
+ *     the surviving signal.
  *
  * Why full proposal, not abstract: production feeds the whole proposal narrative
  * (load-proposal.js → analyze.js parses the full PDF). The thin title+abstract+PI
@@ -292,9 +297,8 @@ async function main() {
   console.log(`  Primary area  ${pInfo.primaryResearchArea || '(none)'}`);
 
   const sugg = result.reviewerSuggestions || [];
-  const withConcerns = sugg.filter((s) => s.potentialConcerns);
   console.log('\n' + '═'.repeat(72));
-  console.log(`REVIEWER SUGGESTIONS  (${sugg.length} total, ${withConcerns.length} with POTENTIAL_CONCERNS)`);
+  console.log(`REVIEWER SUGGESTIONS  (${sugg.length} total)`);
   console.log('═'.repeat(72));
   sugg.forEach((s, i) => {
     console.log(`\n${String(i + 1).padStart(2)}. ${s.name || '(no name)'}`);
@@ -302,10 +306,9 @@ async function main() {
     if (s.seniorityEstimate) console.log(`    Seniority   : ${s.seniorityEstimate}`);
     if (s.expertiseAreas?.length) console.log(`    Expertise   : ${s.expertiseAreas.join(', ')}`);
     if (s.reasoning) console.log(`    Reasoning   : ${trunc(s.reasoning, 600)}`);
-    console.log(`    Concerns    : ${s.potentialConcerns ? `⚠️  ${s.potentialConcerns}` : '— none —'}`);
   });
 
-  // Quick eyeball aids for the three S229 checks.
+  // Quick eyeball aids for the post-S254 invariants.
   console.log('\n' + '═'.repeat(72));
   console.log('EYEBALL SUMMARY');
   console.log('═'.repeat(72));
@@ -316,9 +319,8 @@ async function main() {
   }
   console.log('  Seniority distribution (recency check — want active/mid-career, not all founders):');
   for (const [k, n] of Object.entries(seniority)) console.log(`    ${n}×  ${k}`);
-  console.log(`  Concerns routed to POTENTIAL_CONCERNS: ${withConcerns.length}/${sugg.length}`);
   const reasoningWithConcernWords = sugg.filter((s) => /conflict|co-?author|coi|same institution|collaborat/i.test(s.reasoning || ''));
-  console.log(`  REASONING fields mentioning conflict/COI words (should be ~0 — concerns belong in POTENTIAL_CONCERNS): ${reasoningWithConcernWords.length}`);
+  console.log(`  REASONING fields mentioning conflict/COI words (must be ~0 — the model emits NO conflict output; COI is screened server-side): ${reasoningWithConcernWords.length}`);
   if (reasoningWithConcernWords.length) {
     reasoningWithConcernWords.forEach((s) => console.log(`    ⚠️  ${s.name}: "${trunc(s.reasoning, 160)}"`));
   }
