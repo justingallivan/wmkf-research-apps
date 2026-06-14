@@ -10,7 +10,7 @@
 
 Reviewer Finder is **not** a tool-use agent. It's a multi-step orchestration of:
 1. Single-shot Claude calls (proposal analysis, search-strategy generation, candidate scoring)
-2. External API fetches (PubMed, arXiv, BioRxiv, ChemRxiv, ORCID, Google Scholar via SerpAPI)
+2. External API fetches (PubMed, arXiv, BioRxiv, ChemRxiv, ORCID, OpenAlex; SerpAPI for contact lookup — Scholar metrics/literature migrated to OpenAlex S251)
 3. DB lookups (existing `researchers` / `publications` pool, deduplication, COI filtering)
 4. SSE streaming for progress updates to the UI
 

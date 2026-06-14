@@ -619,9 +619,10 @@ proposal-author + institution marking but no coauthor-history (`discover.js:310,
   INSPIRE for HEP only.
 - **Semantic Scholar = optional corroborator** (CS/AI breadth), not required for
   this portfolio. ORCID via S2 needs the detail endpoint (2nd call).
-- **Cost:** currently integrated scholarly APIs are free except Google Scholar
-  (SerpAPI, paid), but ADS and production Semantic Scholar constraints are still
-  unverified and must be checked before treating them as operationally settled.
+- **Cost:** all integrated scholarly APIs are now free — the paid Google Scholar
+  (SerpAPI) metrics/literature path was migrated to free OpenAlex (S251). ADS and
+  production Semantic Scholar constraints are still unverified and must be checked
+  before treating them as operationally settled.
   For the known free APIs, the constraint is rate limits, not money. The recurring
   spend is the LLM calls. (S2 key obtained S231; 1 req/s cumulative; only public
   author names sent to scholarly APIs — proposal content goes only to Claude.)

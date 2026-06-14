@@ -92,7 +92,7 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | `NCBI_API_KEY` | PubMed higher rate limits | [NCBI Account](https://www.ncbi.nlm.nih.gov/account/settings/) | Free |
 | `ORCID_CLIENT_ID` | Researcher contact lookup **+ identity-spine verification (OpenAlex+ORCID Track-A)** | [ORCID Developer Tools](https://orcid.org/developer-tools) | Free |
 | `ORCID_CLIENT_SECRET` | ORCID authentication | Created with client ID | Free |
-| `SERP_API_KEY` | Google Scholar + PubPeer search | [SerpAPI](https://serpapi.com/) | ~$0.01/search |
+| `SERP_API_KEY` | Reviewer contact lookup + PubPeer + news (integrity). NOT academic search — Scholar metrics/literature migrated to OpenAlex S251 | [SerpAPI](https://serpapi.com/) | ~$0.01/search |
 
 > **Load-bearing for the reviewer identity spine:** the OpenAlex+ORCID Track-A
 > verifier (`reviewer-identity-evidence.js`) uses `ORCID_CLIENT_ID`/`ORCID_CLIENT_SECRET`

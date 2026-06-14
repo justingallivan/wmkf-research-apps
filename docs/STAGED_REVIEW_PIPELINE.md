@@ -76,7 +76,7 @@ For proposals that cleared Stage 1, produce a structured intelligence brief that
 ### Inputs
 - Full proposal text
 - Stage 1 output (for context)
-- API access to: Perplexity (sonar-pro), SerpAPI/Google Scholar, arXiv
+- API access to: Perplexity (sonar-pro), OpenAlex (academic works/authors — replaces the retired SerpAPI/Google Scholar path, S251), arXiv
 
 ### Model Sequence
 This stage runs four sub-tasks, three of which can execute in parallel after the first.
@@ -105,7 +105,7 @@ Key outputs:
 - Open problems this proposal addresses (or claims to)
 - Competing approaches not discussed in the proposal
 
-#### Sub-task C: Prior Art and PI Capability (SerpAPI/Google Scholar, parallel)
+#### Sub-task C: Prior Art and PI Capability (OpenAlex, parallel)
 For each novelty claim, retrieve top hits and assess comparability. Separately, pull PI's recent publication record and identify capability gaps.
 
 Key outputs:

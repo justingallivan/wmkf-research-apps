@@ -34,7 +34,8 @@ All applications are AI-powered, using Anthropic's Claude models. _(This list is
 - **Literature**: PubMed, ArXiv, BioRxiv, ChemRxiv — published research
 - **Researcher profiles**: ORCID — researcher identity and contact info
 - **Federal funding**: NSF Awards API, NIH RePORTER, USAspending.gov
-- **Search**: Google Scholar via SerpAPI — web and academic search
+- **Academic search**: OpenAlex — works, author metrics, literature/PI publications (migrated off Google Scholar/SerpAPI, S251)
+- **Web + news**: SerpAPI — reviewer contact lookup + integrity news
 - **Integrity**: Retraction Watch (63,000+ records), PubPeer
 - **Authentication**: Azure Active Directory — single sign-on
 
