@@ -201,7 +201,7 @@ circle: we keep refining the handling of a candidate pool that is itself unrelia
 2. `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` — the consolidated design (Part A plan,
    Part B primer, Part C the S238 discussion; **§8f** is the latest, sharpest finding + scoped fix).
 3. **Origination code (the suspected root):** `shared/config/prompts/reviewer-finder.js` (PART 3
-   query generation), `lib/services/discovery-service.js` (`discover`, `searchPubMed` ~`:1149`,
+   query generation — **removed S253**, Track-B-only), `lib/services/discovery-service.js` (`discover`, `searchPubMed` ~`:1149`,
    `partitionByPublicationBar` ~`:274`, `resolveTrackBIdentities` ~`:294`, `backfillOpenAlexPublications`
    ~`:348`), `pages/api/reviewer-finder/discover.js` (route orchestration).
 4. **Disposition/precision code:** `lib/services/reviewer-identity-resolver.js`,

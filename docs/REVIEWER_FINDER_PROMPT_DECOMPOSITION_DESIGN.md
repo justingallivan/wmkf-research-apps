@@ -13,10 +13,11 @@
 
 ## 1. Problem
 
-`[VERIFIED via source]` Reviewer-finder today runs **one** Dataverse prompt,
-`reviewer-finder.analyze`, that conflates three different cognitive jobs in one
-call: (PART 2) **name reviewers** from parametric memory, and (PART 3) **generate
-keyword search queries**. A second prompt, `reviewer-finder.score-candidates`,
+`[VERIFIED via source — PART 3 since REMOVED S253, see note]` Reviewer-finder today runs **one**
+Dataverse prompt, `reviewer-finder.analyze`, that conflates multiple cognitive jobs in one
+call: (PART 1) extract proposal metadata and (PART 2) **name reviewers** from parametric memory.
+_(PART 3 — **generate keyword search queries** — was REMOVED S253: it only fed Track B, archived
+off S248. The decomposition proposed below now applies to the surviving PART 1/PART 2 only.)_ A second prompt, `reviewer-finder.score-candidates`,
 writes reasoning over already-discovered candidates. (Resolver:
 `lib/services/reviewer-prompt-resolver.js`; composer
 `lib/services/reviewer-prompt-composer.js`; call path
