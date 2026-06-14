@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer-finder academic data migrated off paid SerpAPI/Google Scholar → free OpenAlex (Session 251)
+
+**Milestone:** Deprecated/costly capability removed. The two paid SerpAPI `google_scholar` paths were migrated to free OpenAlex: (1) **Slice 1b** — contact-enrichment bibliometrics (h-index/i10/citations) + the verified-email-domain guard; (2) **Slice 2** — Virtual-Review-Panel literature/PI-publication novelty search. These per-candidate / per-proposal calls drove the bulk of the ~$150/mo SerpAPI bill (the project's largest line item) and carried an unmonitored Google-Scholar login-wall degradation risk. SerpAPI is now a residual: contact lookup (#1) + PubPeer (#6) + news (#7) only.
+
+**Sessions:** 251 (executing the S250 plan). Per slice: implement → Codex post-impl review → fold findings. Five Codex passes total + one `/sweep`.
+
+**Ship state:**
+- Slice 1b (`242d96c` + hardening `25d73a7`/`90d10e5`): `_attachOpenAlexMetrics` resolves the author by ORCID hard-key or carried discovery-spine id (never a bare name-search), writes the 1a-contract DTO the resolver re-proves (`isOpenAlexAuthorAccepted`); verified-domain guard re-sourced from the OpenAlex institution homepage via the `psl` Public Suffix List (eTLD+1).
+- Slice 2 (`d90d4e0` + hardening `96c6e13`): `OpenAlexService.searchWorks` + inverted-index abstract reconstruction; honest `google_scholar`→`openalex` source-label rename through the collation prompt.
+- PubPeer (was "Slice 3"): **not buildable** — no public PubPeer API exists (verified from primary sources); stays on SerpAPI. Slice label retired; parked as an agent-wiki future-item; access-request email sent to PubPeer.
+
+**Why it matters:** Removes the largest driver of the project's biggest monthly expense, kills the login-wall degradation risk, and makes a SerpAPI Hobby-tier downgrade (~$100/mo) worth evaluating against real billing volume.
+
+**Pointers:** `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md` (per-slice disposition + Codex logs); agent-wiki `integrity-screener.md` (PubPeer parked item) + `reviewer-identity.md` (1b). Commits `242d96c` → `8a5f667`.
+
 ## June 2026 — Field Primer shipped; Track B archived; reviewer-finder origination posture corrected (Session 248)
 
 **Milestone:** A new capability shipped + a deprecated one removed + a strategic reframe. (1) **Field Primer** — a standalone, staff-facing overview of a proposal's research field (sub-areas, methods, frontiers, communities, venues, named experts), built end-to-end through the shared Executor (`field-primer.generate` live in prod Dataverse `wmkf_ai_prompts`, sonnet), with a route + CLI, decoupled from reviewer candidates. v2 grounds named experts against OpenAlex (confirmed/suggested-correction/unverified) — caught a live forename hallucination (Oksana→Olga Zhaxybayeva). (2) **Track B** (DB keyword→author origination) **archived off** (`DiscoveryService.TRACK_B_ENABLED=false`, dormant) after A/B-confirming it cost ~27s and contributed ~0 to saved panels. (3) The S231 retrieval-first redesign was reframed as an **overcorrection**: Claude is the origination engine; the weak link is downstream identity resolution.

@@ -1,96 +1,82 @@
-# Session 251 Prompt: SerpAPI→free-stack migration — plan converged + Slice 1a shipped; Slice 1b is next
+# Session 252 Prompt: SerpAPI→free-stack migration COMPLETE (1b + 2 shipped); PubPeer parked
 
-> **GIT.** All S250 work is on `main`. ⚠ At S250 stop the branch was **13 commits ahead of
-> origin** (this session's 6 + the S249 set the S249 prompt wrongly marked "pushed"). `/stop`
-> pushed them — confirm `git status` shows up to date at S251 start; if not, `git push origin main`.
-> Working tree clean at handoff.
+> **GIT.** All S251 work is on `main` and **pushed** (confirmed up to date at S251 stop, HEAD `8a5f667`).
+> Working tree clean.
 
-## Session 250 — what happened
+## Session 251 — what happened
 
-Worked **item 1 from the S249 next-steps**: the **SerpAPI → free-stack migration** (the carryover
-— SerpAPI is the largest monthly expense, ~$150/mo, value eroded). Justin steered it as a careful
-plan-first, Codex-gated effort. **Scoped → planned → Codex-reviewed the design twice → shipped +
-hardened Slice 1a → Codex-reviewed the impl twice.** No endpoint has been swapped yet; Slice 1a is
-purely additive (no production behavior change).
+Executed the S250 SerpAPI→free-stack migration plan to completion. **Shipped Slice 1b + Slice 2**
+(reviewer-finder academic data off paid Google Scholar → free OpenAlex), each implement → Codex
+post-impl review → fold. Then **verified the PubPeer reality, retired the "Slice 3" label**, parked
+PubPeer as a wiki future-item, and ran `/sweep`. 8 commits, all pushed. Full suite green (2415 tests).
 
 ### What was completed
 
-1. **Migration plan — `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md` (the central artifact).**
-   Verified all **7 SerpAPI engine call-sites** across 3 services (`serp-contact-service`,
-   `literature-search-service`, `integrity-service`). **KEEP** #1 contact `google` + #7
-   `google_news` (irreplaceable); **REPLACE** the rest. Locked two decisions (both verified live):
-   - **Metrics → OpenAlex, not Semantic Scholar** — OpenAlex `summary_stats` gives h_index **+
-     i10_index** + cited_by_count (S2 lacks i10); already in-repo + SSRF-allowlisted.
-   - **Verified-email-domain guard re-sourced from OpenAlex** institution `homepage_url`
-     (ROR-resolved, ORCID-anchored) — better than Scholar's self-reported domain. Email *sourcing*
-     (PubMed/ORCID/Claude/SerpAPI Tier-4) is **untouched** by the whole migration.
+1. **Slice 1b — Scholar metrics + verified-domain guard → OpenAlex** (`242d96c`, hardening `25d73a7`/`90d10e5`).
+   `ContactEnrichmentService._attachOpenAlexMetrics` (was `_attachScholarMetrics`): resolves the
+   OpenAlex author via ORCID hard-key (`getAuthorByOrcid`) or the carried discovery-spine id
+   (`getAuthorById` on `candidate.openAlexId`/`openAlexAuthorId` + `identityStatus`) — never a bare
+   name-search; no anchor → ABSTAIN. Writes the 1a-contract `tierResults.openalex_author` DTO the
+   resolver re-proves (shared `isOpenAlexAuthorAccepted` gate). Verified-email-domain guard re-sourced
+   from the OpenAlex institution homepage; eTLD+1 via the **`psl`** dependency (added). Metrics decoupled
+   from the paid `useSerpSearch` toggle. #2 (exact Scholar deep-link) dropped → `googleScholarId=null`.
+   Full honest field rename (`scholarVerifiedEmail`→`verifiedInstitutionDomain`, etc.).
 
-2. **Slice 1a — OpenAlex-author identity contract in the resolver — SHIPPED + Codex-converged
-   (`395294e`, hardening `8a7ce2e`).** Codex's pre-impl HIGH: the enrichment path has **no**
-   OpenAlex author evidence today (resolver sees only scholar+orcid anchors; `_attachScholarMetrics`
-   gates on Scholar's own mismatch flags), so removing Scholar removes the trust gate — the
-   contract must land first. Built it in `reviewer-identity-resolver.js`:
-   `evidenceFromEnrichment` reads `tierResults.openalex_author`; new `openAlexAuthorAnchor` is an
-   **allowlist** (prove-good) — passes ONLY on a proven ORCID match (`orcid`==`claimedOrcid`) or a
-   persist-worthy + non-contradicted spine verdict; everything else → rejected anchor → abstain.
-   Codex post-impl caught the gate was originally **fail-OPEN** on unknown shapes (BLOCKED verdict)
-   — fixed. 3rd Codex pass: **CLEAN-TO-BUILD-1B**.
+2. **Slice 2 — literature/PI-pubs novelty search → OpenAlex** (`d90d4e0`, hardening `96c6e13`).
+   `OpenAlexService.searchWorks` (recency-filtered) + inverted-index abstract reconstruction;
+   `_searchPIPubs` resolves the PI by name+institution-token overlap → `getWorksByAuthor` (now
+   `yearFrom`-filtered). Honest `googleScholar`→`openAlex` / `google_scholar`→`openalex` source-label
+   rename through the Haiku collation prompt.
 
-### Commits (6)
-`a134d2e` plan · `885e577` fold pre-impl review · `1c5d05c` fold re-review ·
-`395294e` Slice 1a · `8a7ce2e` Slice 1a hardening · `066daa7` 3rd-pass disposition + 1b constraints.
+3. **PubPeer ("Slice 3") retired + parked** (`d8b22be`, `c9f5d45`). **No public PubPeer API exists**
+   (verified from primary sources: FAQ says "coming soon / contact us"; the only programmatic surface
+   is the browser extension's undocumented `/v3/publications?devkey=PubMed<Browser>` with a hardcoded
+   devkey, not ours). PubPeer integrity **stays on SerpAPI**. The "Slice 3" label is retired; full
+   context parked in the **integrity-screener agent-wiki topic**. A sanctioned-access **email was sent
+   to PubPeer** (Justin; he suspects no reply — recall on demand if they respond, do NOT proactively resurface).
+
+4. **`/sweep`** (`8a5f667`): reconciled 6 stale "Google Scholar via SerpAPI" stack/cost claims in
+   system-level docs (CREDENTIALS_RUNBOOK, SYSTEM_OVERVIEW, etc.) that the 1b/2 doc pass had missed.
+
+### Commits (8)
+`242d96c` 1b · `25d73a7` 1b hardening · `90d10e5` 1b psl · `d90d4e0` Slice 2 · `96c6e13` Slice 2 hardening ·
+`d8b22be` PubPeer reality · `c9f5d45` retire Slice 3 + wiki park · `8a5f667` /sweep.
 
 ## Potential Next Steps
 
-### 1. Slice 1b — metrics + domain endpoint swap (THE next task; depends on 1a, now clean)
-Rewrite `ContactEnrichmentService._attachScholarMetrics` to: resolve the OpenAlex author
-(`getAuthorByOrcid` on the ORCID path; the `reviewer-identity-evidence` spine on the no-ORCID
-path), fetch metrics from OpenAlex (extend `mapAuthorRecord` to surface h/i10/cites + institution
-ref), re-source the domain via a new `OpenAlexService.getInstitution`, **write the
-`tierResults.openalex_author` DTO**, and retire the Scholar calls (`findScholarProfileViaGoogle` +
-`fetchScholarMetrics`) in `serp-contact-service.js`. `findContact` (#1) stays.
-- **⚠ Two 1b producer authoring constraints (Codex 3rd-pass LOWs — in the plan):**
-  (a) source `orcid`+`claimedOrcid` only from the real `getAuthorByOrcid` lookup (the resolver
-  compares but does NOT checksum-validate — the upstream validation is the guard); (b) pass only
-  the canonical `mapAuthorRecord.openAlexId`, never an assembled URL.
-- Field/provenance reconcile (durable, in the plan): `affiliationSource` gains `openalex_current`;
-  decide explicitly on the `scholarVerifiedEmail`→`verifiedInstitutionDomain` rename (spans
-  code+tests+smoke+docs) or keep the name; expand the consumer checklist.
+The SerpAPI migration is **done** — no active code work remains on it. Open items:
 
-### 2. Slices 2 & 3 (after 1b)
-- **Slice 2:** literature/PI-pubs `google_scholar` → OpenAlex works (reuses `getWorksByAuthor`);
-  explicit `googleScholar` key/`source`-string compatibility decision.
-- **Slice 3:** PubPeer `site:pubpeer.com` → PubPeer Developer API — **gated** on verifying the API
-  exists/terms; needs SSRF-allowlist add + `PUBPEER_API_KEY`; scope includes `screenApplicants`
-  source gating + `sources.pubpeer` shape compat. `searchNews` (#7) stays.
-- **Post-migration:** confirm real SerpAPI call volume in the billing dashboard → decide on the
-  Hobby-tier downgrade (~$100/mo saved; Justin, out-of-repo).
+### 1. SerpAPI Hobby-tier downgrade evaluation (Justin, out-of-repo)
+The per-candidate Scholar calls (the bulk of volume) are gone. Worth checking real SerpAPI call
+volume in the billing dashboard and deciding on the Hobby-tier downgrade (~$100/mo). Residual SerpAPI
+= contact (#1) + PubPeer (#6) + news (#7).
 
-### 3. Older carryover (verify-before-acting — unchanged)
+### 2. PubPeer (parked — externally gated; do NOT proactively resurface)
+Only revisit if PubPeer replies to the access-request email. Full context + build-if-granted scope in
+`docs/agent-wiki/topics/integrity-screener.md`.
+
+### 3. Older carryover (verify-before-acting — unchanged from S250)
 - Recall padding-ceiling live check before raising count >15 (needs API key + real proposal).
-- Reviewer COI **Chunk 2b** (retire `POTENTIAL_CONCERNS`) — ⚠ destructive, deferred.
+- Reviewer COI **Chunk 2b** (retire `POTENTIAL_CONCERNS`) — ⚠ destructive, deferred (`docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`).
 - Trim the analyze prompt's dead Stage-1 `searchQueries`.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md` | The migration plan — slices, DTO, 1b constraints, 3 Codex disposition logs |
-| `lib/services/reviewer-identity-resolver.js` | Slice 1a: `openAlexAuthorAnchor` + `evidenceFromEnrichment` openalex_author read |
-| `tests/unit/reviewer-identity-resolver.test.js` | 44 tests incl. the 1a allowlist/fail-closed/canonicalization cases |
-| `lib/services/contact-enrichment-service.js` | `_attachScholarMetrics` (the 1b rewrite target) + `_validateEmailAgainstVerifiedDomain` |
-| `lib/services/serp-contact-service.js` | Scholar calls to retire in 1b (#2 `findScholarProfileViaGoogle`, #3 `fetchScholarMetrics`); `findContact` (#1) stays |
-| `lib/services/openalex-service.js` | `getAuthorByOrcid` (exists); 1b adds metrics to `mapAuthorRecord` + new `getInstitution` |
-| `lib/services/reviewer-identity-evidence.js` | The OpenAlex/ORCID spine 1b's no-ORCID path reuses (`evaluateSuggestion`) |
+| `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md` | The migration plan — per-slice disposition + all Codex logs (status: COMPLETE) |
+| `docs/agent-wiki/topics/integrity-screener.md` | NEW — integrity screener + the parked PubPeer future-item (full context) |
+| `lib/services/openalex-service.js` | `getAuthorById`/`getInstitution`/`searchWorks` + `psl` registrable-domain + metrics on `mapAuthorRecord` |
+| `lib/services/contact-enrichment-service.js` | `_attachOpenAlexMetrics` (1b) |
+| `lib/services/literature-search-service.js` | `_searchOpenAlexWorks` + `_searchPIPubs` (2) |
+| `lib/services/reviewer-identity-resolver.js` | `isOpenAlexAuthorAccepted` (shared 1a accept gate) |
 
 ## Gotchas
-- **`git commit -m "…"` with backticks corrupts the message** — backticks inside double quotes are
-  command-substituted by bash (ate `orcid`/`claimedOrcid` this session; amended `8a7ce2e`). Use
-  single-quoted `-m '…'`, or `-F <file>`.
-- **Slice 1a is additive — nothing writes `tierResults.openalex_author` yet**, so live behavior is
-  unchanged until 1b lands the producer. The agent-wiki / D26 flowchart reconcile happens at
-  migration *completion*, not now (resolver behavior in production is unchanged).
-- **`grep`/`rg` may still corrupt identifiers+digits** (`project-rtk-grep-output-corruption`) — use
-  Read for exact content/line numbers; trust grep only for *which files* match.
+- **PubPeer has NO public API** — do not re-scope a "PubPeer Developer API" migration; it doesn't exist
+  (`docs/agent-wiki/topics/integrity-screener.md`). The capability-erosion memory also records this.
+- **`psl`** is a new runtime dependency (Public Suffix List, for the verified-domain eTLD+1). `npm install`
+  surfaced 5 pre-existing moderate advisories in the tree (NOT from psl) — unrelated, worth a separate `npm audit`.
+- Serp Scholar methods (`findScholarProfile`/`fetchScholarMetrics`) are **kept** (dormant S215/S219 scripts
+  reference them) with a deprecation banner — severed from enrichment. `findContact` (#1) stays live.
+- `grep`/`rg` may corrupt identifiers+digits (`project-rtk-grep-output-corruption`) — use Read for exact content.
 - Reviewer-finder is access-locked to Justin only.
-</content>
