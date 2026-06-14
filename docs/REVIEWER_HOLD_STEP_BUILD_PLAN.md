@@ -235,7 +235,15 @@ Each chunk is independently committable. A chunk's red gate (where it has one) b
   (`tests/unit/respond-required-address.test.js`, `tests/integration/external-review-routes.test.js`)
   for the new action + guard message. [VERIFIED these are the only non-adapter callers via `grep`.]
 
-### Chunk 4 — `HoldView` portal component + dispatcher wiring
+### Chunk 4 — `HoldView` portal component + dispatcher wiring ✅ DONE (S257)
+> **S257 build status:** COMPLETE. New `shared/components/external/HoldView.js` (ask + confirmed
+> sub-states, `confirmed` prop). Dispatcher (`pages/external/review/[token].js`) wires `hold-invite`
+> → ask and `held` → confirmed; decline from either routes through the existing `decline-form`
+> override (already in the popstate VALID set). `wmkf_heldat` surfaces via `engagementState.heldAt`
+> (closes the chunk-1/2 "/context threading" TODO). Materials/acks are NOT shown pre-hold. +6 RTL
+> tests (`tests/unit/hold-view.test.js`); full suite 2430 green; `npm run build` clean. Still
+> unreachable in prod until the readiness predicate flips (hold-invite/held only render when not
+> ready); the `.ics`/calendar copy in the confirmed state is text-only until chunk 5.
 - **Do:** new `shared/components/external/HoldView.js`. Two sub-states keyed off
   `engagementState`: **ask** ("Will you review? [Hold my spot] / [Decline]" → POST hold /
   decline) and **confirmed** ("You're confirmed — proposals arrive ~{date}; calendar hold
