@@ -37,6 +37,13 @@ describe('email-template-store — hold + finalize copy (chunk 6)', () => {
     expect(DEFAULT_TEMPLATES.hold.body.toLowerCase()).toContain('hold');
   });
 
+  test('hold copy conditionalizes the calendar claim (the .ics can degrade to null — Codex chunk-6 #6)', () => {
+    // Must NOT unconditionally assert an attachment ("is attached to this message").
+    expect(DEFAULT_TEMPLATES.hold.body).not.toMatch(/calendar hold is attached to this message/i);
+    // It conditionalizes it instead.
+    expect(DEFAULT_TEMPLATES.hold.body.toLowerCase()).toContain('where a panel date');
+  });
+
   test('mergeTemplates returns all types, stored overrides win, defaults fill gaps', () => {
     const merged = mergeTemplates({ hold: { subject: 'Custom hold' } });
     expect(merged.hold.subject).toBe('Custom hold');

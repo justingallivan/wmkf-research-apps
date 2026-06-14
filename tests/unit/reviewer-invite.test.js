@@ -45,6 +45,34 @@ describe('sendAllowsAttachments — no materials on a pre-acceptance invitation'
   });
 });
 
+describe('isKnownTemplateType — fail-closed on unknown types (chunk-6 #4)', () => {
+  const { isKnownTemplateType } = require('../../lib/utils/reviewer-invite');
+  test('all six known types pass', () => {
+    for (const t of ['invitation', 'hold', 'finalize', 'materials', 'followup', 'thankyou']) {
+      expect(isKnownTemplateType(t)).toBe(true);
+    }
+  });
+  test('unknown / empty / undefined are rejected', () => {
+    for (const t of ['bogus', '', undefined, null, 'HOLD']) {
+      expect(isKnownTemplateType(t)).toBe(false);
+    }
+  });
+});
+
+describe('mayReceiveFinalize — finalize is held-only (chunk-6 #3/#7)', () => {
+  const { mayReceiveFinalize } = require('../../lib/utils/reviewer-invite');
+  test('a held row (responsetype 100000004) is eligible', () => {
+    expect(mayReceiveFinalize({ wmkf_responsetype: 100000004 })).toBe(true);
+  });
+  test('fresh / accepted / declined / no-row are NOT eligible', () => {
+    expect(mayReceiveFinalize({ wmkf_responsetype: null })).toBe(false);
+    expect(mayReceiveFinalize({ wmkf_responsetype: 100000000 })).toBe(false); // accepted
+    expect(mayReceiveFinalize({ wmkf_responsetype: 100000001 })).toBe(false); // declined
+    expect(mayReceiveFinalize({})).toBe(false);
+    expect(mayReceiveFinalize(null)).toBe(false);
+  });
+});
+
 describe('templateCarriesCalendarInvite — the .ics save-the-date lane', () => {
   test('hold carries the calendar invite', () => {
     expect(templateCarriesCalendarInvite('hold')).toBe(true);

@@ -57,7 +57,7 @@ The W. M. Keck Foundation is lining up reviewers for an upcoming panel, and we'd
 Please use your secure personal link to let us know:
 {{externalLink}}
 
-There's no commitment to specifics today — you won't see proposal materials yet, and the conflict-of-interest / AI-use acknowledgements and any honorarium details all come later. Once the proposal is released, we'll email you everything you need (and a calendar hold is attached to this message).
+There's no commitment to specifics today — you won't see proposal materials yet, and the conflict-of-interest / AI-use acknowledgements and any honorarium details all come later. Once the proposal is released, we'll email you everything you need. Where a panel date has been set, a calendar hold is included with this message.
 
 Thank you for considering it.
 

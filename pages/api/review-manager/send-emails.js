@@ -53,7 +53,7 @@ import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-sug
 import * as contactAdapter from '../../../lib/dataverse/adapters/contact';
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
 import { backPropReviewerOrcidToContact } from '../../../lib/services/backprop-reviewer-orcid';
-import { shouldSkipDuplicateInvitation, sendAllowsAttachments, templateCarriesCalendarInvite, recipientMayReceiveAttachments, emailConfidence } from '../../../lib/utils/reviewer-invite';
+import { shouldSkipDuplicateInvitation, sendAllowsAttachments, templateCarriesCalendarInvite, isKnownTemplateType, mayReceiveFinalize, recipientMayReceiveAttachments, emailConfidence } from '../../../lib/utils/reviewer-invite';
 import { buildReviewHoldIcs } from '../../../lib/external/calendar-invite';
 
 const limiter = nextRateLimiter({ max: 10 });
@@ -126,6 +126,13 @@ export default async function handler(req, res) {
 
     if (!Array.isArray(drafts) || drafts.length === 0) {
       sendEvent('error', { message: 'drafts array is required' });
+      return res.end();
+    }
+    // Reject an unknown templateType BEFORE any real email goes out — an unhandled
+    // type would otherwise send with no lifecycle stamp and (allowlist) no materials
+    // (Codex chunk-6 #4). Fail closed.
+    if (!isKnownTemplateType(templateType)) {
+      sendEvent('error', { message: `Unknown templateType: ${templateType}` });
       return res.end();
     }
     for (const d of drafts) {
@@ -291,6 +298,22 @@ export default async function handler(req, res) {
       // and is gated identically. Once a reviewer engages via the magic link sent to this
       // address, it's proven, so post-engagement sends (materials/followup/thankyou/finalize,
       // the ReviewerManagePanel flow) are NOT re-gated — same scope as shouldSkipDuplicateInvitation.
+      // Finalize is the held→finalize nudge — valid ONLY for a reviewer who has HELD.
+      // A finalize to a non-held row (fresh/declined/already-accepted) is a wrong target:
+      // skip it server-side so a misdirected finalize can neither bypass the first-contact
+      // confidence gate on an unproven address nor overwrite a non-held row's emailSentAt
+      // (Codex chunk-6 #3/#7).
+      if (templateType === 'finalize' && !mayReceiveFinalize(suggestion)) {
+        skipped.push({ suggestionId: draft.suggestionId, candidateName: name, candidateEmail: email, reason: 'not_held' });
+        sendEvent('progress', {
+          stage: 'sending',
+          current: processed,
+          total: drafts.length,
+          message: `Skipped ${name || '(unnamed)'} (not in held state)`,
+        });
+        continue;
+      }
+
       const confidence = emailConfidence(person);
       const lowConfidenceConfirmed = confirmedLowConfidenceIdSet.has(draft.suggestionId);
       const isFirstContact = templateType === 'invitation' || templateType === 'hold';
