@@ -326,7 +326,14 @@ Each chunk is independently committable. A chunk's red gate (where it has one) b
   on readiness; lifecycle stamping for the new types does not touch `wmkf_reviewstatus`
   (mirrors the invitation branch at `send-emails.js:463`).
 
-### Chunk 7 — Tests, incl. automation-safety
+### Chunk 7 — Tests, incl. automation-safety ✅ DONE (S257)
+> **S257 build status:** COMPLETE. Most coverage landed inline per chunk (2/3/4/5/6). This chunk
+> built the missing **send-emails SSE route harness** (`tests/integration/send-emails-route.test.js`,
+> 5 tests) closing the carried items: hold attaches the `.ics` + no materials; a thrown `.ics` build
+> DEGRADES (recipient still `sent`, no `failed`); `finalize` to a non-held row is skipped `not_held`;
+> `finalize` to a held row sends; unknown templateType errors before any send. Uses the REAL
+> reviewer-invite gates; mocks calendar-invite to force the throw (its content is unit-tested). Full
+> suite 2457 green.
 - **Do:** suite covering: hold action (no acks/payment/honorarium); the full chunk-3
   **transition matrix** incl. the `✗ 409` cells (accepted→hold, the **submitted /
   `wmkf_reviewreceivedat`** row for all three actions, locked states); the **readiness
@@ -339,12 +346,11 @@ Each chunk is independently committable. A chunk's red gate (where it has one) b
   shape + gate-bypass + degradation; and an explicit **automation-safety** test asserting a hold
   fires **no** honorarium onboarding and sets no `wmkf_accepted`. Also update the two existing
   `applyStage2aResponse` caller tests for the new action + guard message (see chunk 3).
-  - **Carried from chunk-5/6 Codex reviews:** route-level `send-emails` tests — build a (currently
-    nonexistent) SSE-handler harness and assert: (a) a forced `buildReviewHoldIcs` throw keeps the
-    recipient `sent` (degrade); (b) a held/non-accepted reviewer on `templateType:'hold'` gets the
-    `.ics` but **no** proposal materials; (c) `templateType:'finalize'` to a non-held row is skipped
-    `not_held` (the loop-skip wiring; the `mayReceiveFinalize` predicate is already unit-tested);
-    (d) an unknown templateType errors before any send. Best done now that chunks 5/6 are in.
+  - ✅ **Carried from chunk-5/6 Codex reviews (DONE S257):** route-level `send-emails` tests — built
+    the SSE-handler harness (`tests/integration/send-emails-route.test.js`) and assert: (a) a forced
+    `buildReviewHoldIcs` throw keeps the recipient `sent` (degrade); (b) `templateType:'hold'` attaches
+    the `.ics` but **no** proposal materials; (c) `templateType:'finalize'` to a non-held row is skipped
+    `not_held`; (d) `finalize` to a held row sends; (e) an unknown templateType errors before any send.
   - **NOTE — much of chunk 7 already landed inline per chunk** (chunks 2/3/4/5 shipped their own
     tests). This chunk is the gap-closer (the route-level lane tests above) + a final coverage sweep.
 - **Acceptance:** `npx jest --testPathPatterns "reviewer|external|respond"` green; full
