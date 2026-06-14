@@ -332,8 +332,15 @@ Each chunk is independently committable. A chunk's red gate (where it has one) b
 > 5 tests) closing the carried items: hold attaches the `.ics` + no materials; a thrown `.ics` build
 > DEGRADES (recipient still `sent`, no `failed`); `finalize` to a non-held row is skipped `not_held`;
 > `finalize` to a held row sends; unknown templateType errors before any send. Uses the REAL
-> reviewer-invite gates; mocks calendar-invite to force the throw (its content is unit-tested). Full
-> suite 2457 green.
+> reviewer-invite gates; mocks calendar-invite to force the throw (its content is unit-tested).
+> **Codex review (NEEDS REWORK → fixed):** the first harness proved "no materials" where none
+> existed (pass-for-wrong-reason). Reworked to 11 tests: a **materials-capable cycle** now proves
+> hold EXCLUDES materials + the recipientMayReceiveAttachments STRIP gate end-to-end (accepted gets
+> materials, non-accepted stripped); added the hold duplicate-skip (`already_invited`), the hold
+> LOW-confidence gate (`email_unconfirmed` + confirmed-low proceeds), lifecycle-stamp assertions
+> (hold=invited+emailSentAt no status; finalize=emailSentAt only; skip/error write nothing), the
+> degrade array shape, a partial-success mixed batch, unknown-type side-effect-absence, and a
+> mockReset so the one-shot throw can't leak. Full suite 2463 green.
 - **Do:** suite covering: hold action (no acks/payment/honorarium); the full chunk-3
   **transition matrix** incl. the `✗ 409` cells (accepted→hold, the **submitted /
   `wmkf_reviewreceivedat`** row for all three actions, locked states); the **readiness
