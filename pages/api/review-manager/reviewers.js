@@ -60,6 +60,7 @@ const RESPONSE_TYPE_BY_VALUE = {
   100000000: 'accepted',
   100000001: 'declined',
   100000002: 'no_response',
+  100000004: 'held',
 };
 
 function deriveTokenState(s) {

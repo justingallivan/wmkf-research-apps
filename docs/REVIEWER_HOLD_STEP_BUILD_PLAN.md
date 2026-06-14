@@ -96,13 +96,18 @@ during the buffer would still finalize and fire honorarium.
 Each chunk is independently committable. A chunk's red gate (where it has one) blocks the next.
 
 ### Chunk 1 — Schema: `held` picklist value + `wmkf_heldat` column
-- **Do:** (a) clone `scripts/extend-responsetype-picklist.mjs` to add `held = 100000004`
-  (label "Held"); (b) add `wmkf_heldat` (DateTime) to `wmkf_appreviewersuggestion` via the
-  solution `wmkfResearchReviewAppSuite`; (c) export `RESPONSE_TYPE_MAP.held = 100000004`
-  (write map) **AND** add `100000004: 'held'` to the read-direction `RESPONSE_TYPE_BY_VALUE` map
-  in `pages/api/review-manager/reviewers.js:59` (Codex 2nd-pass #3) — without it, `held` rows
-  surface as `responseType: undefined` to every staff consumer. The full staff round-trip
-  (filters/counts) is Chunk 8.
+> **S257 build status:** safe code + scripts DONE; live-schema run + select-list edits GATED (see sequencing).
+- **Do:** (a) ✅ `scripts/extend-responsetype-picklist-held.mjs` (clone of the withdrawn_sufficient
+  script, idempotent, probes live optionset); (b) ✅ `scripts/add-reviewer-suggestion-heldat-column.mjs`
+  (DateTime column-create, idempotent — no prior column-create script existed, so this is a new
+  probe-first pattern); (c) ✅ export `RESPONSE_TYPE_MAP.held = 100000004` (write map) **AND**
+  `100000004: 'held'` in the read map `RESPONSE_TYPE_BY_VALUE` (`reviewers.js:59`, Codex 2nd-pass #3).
+- **⚠ SEQUENCING (audit #7 finding):** running the schema scripts must come **before** any code that
+  `$select`s `wmkf_heldat`, because selecting a non-existent column 400s every reviewer-suggestion
+  read. So the select-list edits below are DEFERRED until the column exists in Dataverse.
+- **Pre-existing gap noted (not fixed — out of scope):** `RESPONSE_TYPE_BY_VALUE` is also missing
+  `100000003: 'withdrawn_sufficient'` — a withdrawn_sufficient row already returns `undefined` here.
+  Separate from this build; flagged for a future fix.
 - **Read `wmkf_heldat` everywhere the row is read (Codex #3 — there are TWO select lists).**
   - adapter `FIELD_SELECT` (`reviewer-suggestion.js:14`) — the Review-Manager read path.
   - **`SUGGESTION_SELECT` (`lib/external/verify-suggestion-token.js:22`)** — the **portal's** read
@@ -278,6 +283,16 @@ must be *visible* in the workbench, not silently misclassified.
   `accepted=false`) must NOT fall into `pending`, and a held row whose responseType failed to
   round-trip (undefined) would wrongly count as pending — fixed by the Chunk-1 read-map plus an
   explicit `held` exclusion.
+- **Count consumers found by audit #7 (S257 — the plan + both Codex passes had missed these):**
+  the `RESPONSE_TYPE_MAP` symbol grep surfaced two more aggregators that count `accepted`/`declined`
+  and would bucket a held row as "invited only," undercounting the committed slate:
+  - **`pages/api/workbench/dashboard.js:253-255`** (staff workbench) — held lands in `invited`, not
+    `accepted`; `getPhase` (`:300`) keeps the proposal at `awaiting` despite a confirmed slate. Add a
+    `held` count + decide whether held counts toward the "enough confirmed" phase signal.
+  - **`pages/api/reviewer-finder/my-proposals.js:226-227`** (PI-facing) — same invited-only undercount.
+  - [VERIFIED SAFE, no change] `lib/services/reviewer-suggestion-sweep.js:52` filters
+    `wmkf_responsetype eq null`; a held row is non-null so the no_response timeout **correctly skips
+    held reviewers** (they've agreed in principle, shouldn't be timed out).
 - **Acceptance:** a held suggestion renders in the workbench under a `held` status (not `pending`,
   not blank); status counts include held; the default Review-Manager "accepted" scope still
   excludes held (held `wmkf_accepted=false`, [VERIFIED `reviewers.js:119` filters `wmkf_accepted === true`]).
@@ -291,6 +306,8 @@ must be *visible* in the workbench, not silently misclassified.
 | File | Role in this build |
 |------|--------------------|
 | `scripts/extend-responsetype-picklist.mjs` | template for the idempotent `held=100000004` add (chunk 1) |
+| `scripts/extend-responsetype-picklist-held.mjs` | ✅ S257 — the `held` picklist add (run against live Dataverse) (1) |
+| `scripts/add-reviewer-suggestion-heldat-column.mjs` | ✅ S257 — the `wmkf_heldat` column-create (run before select-list edits) (1) |
 | `lib/dataverse/adapters/reviewer-suggestion.js` | `RESPONSE_TYPE_MAP`, `FIELD_SELECT`, `applyStage2aResponse`, `updateLifecycle` — add `held` + decide `heldAt` write path (1,3) |
 | `lib/external/verify-suggestion-token.js` | `SUGGESTION_SELECT` — the portal's actual read path; add `wmkf_heldat` (1, Codex #3) |
 | `pages/api/external/review/[token]/respond.js` | add `action:'hold'` + transition matrix + readiness write-layer gate (3) |
@@ -302,6 +319,9 @@ must be *visible* in the workbench, not silently misclassified.
 | `lib/utils/reviewer-invite.js` | `sendAllowsAttachments` denylist→allowlist; `recipientMayReceiveAttachments` (ref) (5) |
 | `pages/api/review-manager/reviewers.js` | `RESPONSE_TYPE_BY_VALUE` read-map — add `held` (1,8) |
 | `pages/reviewer-finder.js` | `candidateMatchesEmailFilter` — add `held` bucket, guard `pending` (8) |
+| `pages/api/workbench/dashboard.js` | count aggregator — add `held` count; phase signal (audit #7) (8) |
+| `pages/api/reviewer-finder/my-proposals.js` | PI-facing count aggregator — add `held` count (audit #7) (8) |
+| `lib/services/reviewer-suggestion-sweep.js` | no_response timeout — VERIFIED skips held (no change) (1) |
 | `shared/forms/phase-ii-research-2026-06/map-to-dynamics.js` | writes `wmkf_phaseiisubmittedat` (readiness precondition, ref for chunk 2) |
 
 ## 6. Testing
