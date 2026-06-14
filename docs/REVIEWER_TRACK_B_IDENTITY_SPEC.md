@@ -1,6 +1,14 @@
 # Reviewer Finder — Track-B Identity Discipline (work→author resolution + enrichment anchoring) — SPEC (Fix C)
 
-Status: **PROPOSED**. Builds on the shipped S232 ORCID spine (Track A), the S233 honorific +
+Status (updated S253, 2026-06-13): **PARTIALLY OVERTAKEN — read as historical.** The
+enrichment-anchoring discipline this spec calls for (resolved-identity anchors drive
+contact/bibliometric enrichment instead of bare-name searches; verified-domain drop) SHIPPED and
+is owned by `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` §6–§7. The **Track-B discovery lane**
+this spec wires the spine into was subsequently **ARCHIVED OFF** (S248,
+`DiscoveryService.TRACK_B_ENABLED=false`; see `docs/REVIEWER_FINDER.md` + agent-wiki
+`reviewer-origination`), so the Track-B-specific spine wiring is dormant, not live.
+
+Original status: **PROPOSED**. Builds on the shipped S232 ORCID spine (Track A), the S233 honorific +
 topic-threshold fixes (Fixes 1/2), and the S233 Track-B dedup + cross-field guards (Fixes A/B).
 `[VERIFIED]` = read from current source / observed in the S233 1002794 trace; `[PROPOSED]` = this spec.
 

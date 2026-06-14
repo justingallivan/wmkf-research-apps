@@ -1,7 +1,11 @@
 # Reviewer ORCID Back-Propagation Design (S216)
 
-**Status:** DESIGN rev3 — Codex pre-impl (24 findings, §11) + confirmation pass (§13)
-both folded. Build-ready for PR1.
+**Status:** **SHIPPED** (updated S253, 2026-06-13) — was "DESIGN rev3, build-ready for PR1". Both
+increments are live: PR1 (resolver-gated reviewer ORCIDs flow onto matched contacts at
+outreach/promotion) is `lib/services/backprop-reviewer-orcid.js` via
+`contactAdapter.setOrcidIfAbsent`; PR2 (one-shot historical catch-up of the already-eligible pool)
+is `scripts/backfill-contact-orcid.js`. Both use the fill-only, conflict-surfacing,
+contact-never-created safety described below. Read the design body as historical rationale.
 **Author:** S216. **Depends on:** S214/S215 identity resolver + ORCID backfill
 (`docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md`, memory
 `project-reviewer-identity-resolution-phase1`).

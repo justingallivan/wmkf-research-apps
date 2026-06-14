@@ -1,7 +1,14 @@
 # Reviewer Identity / Contact-Enrichment Fix Plan
 
 Date: 2026-06-08
-Status: PROPOSED — for Codex review before implementation.
+Status: **SHIPPED** (updated S253, 2026-06-13) — was PROPOSED for Codex review. The core fix —
+contact/bibliometric enrichment now consumes the resolved identity's anchors and drops a
+search-sourced email whose domain contradicts the OpenAlex-verified institution domain — is live
+in `lib/services/contact-enrichment-service.js` (`_attachOpenAlexMetrics`,
+`_validateEmailAgainstVerifiedDomain`, `emailPersistAllowed`/`scholarPersistAllowed` gates). The
+live boundary is owned by `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` §6–§7. Read the fixes
+below as the original problem analysis (historical), and re-verify any specific sub-fix against
+source before treating it as open.
 Author: Claude (Opus 4.8), grounded in live trace of request 1002794 + independent code verification.
 
 Related artifacts (all in `docs/`):

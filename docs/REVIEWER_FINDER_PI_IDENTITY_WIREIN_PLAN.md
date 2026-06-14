@@ -1,6 +1,12 @@
 # Reviewer Finder — Structured-ORCID PI Identity Wire-In (Design / Pre-Impl)
 
-> Status: **DESIGN — pre-impl, for Codex review. NOT BUILT.**
+> Status (updated S253, 2026-06-13): **SHIPPED.** The structured-ORCID PI wire-in described here
+> is live — `resolveProposalPI` (`lib/services/proposal-pi-identity.js`) is called from
+> `pages/api/reviewer-finder/discover.js` and drives PI exclusion + institution-COI. The live
+> contract (fail-open, augment-only, `forenamesContradict` guard) is owned by
+> `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` §4. Read the §2 "Current state" below as the
+> pre-build baseline (historical). The deliberately-out-of-scope items (§8: PI-trail corpus lane,
+> peer-group parsing, the two net-new COI gates) remain unbuilt.
 > Author: Claude (S240, 2026-06-10). Canonical strategy: `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md` §12 (esp. §12.2, §12.8).
 > Memories: [[project-reviewer-pi-identity-structured]], [[project-openalex-merge-use-orcid-works]],
 > [[project-reviewer-origination-multilane]], [[project-reviewer-verify-fail-dangerous]].
