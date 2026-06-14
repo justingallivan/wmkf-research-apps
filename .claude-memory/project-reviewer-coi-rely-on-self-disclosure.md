@@ -30,20 +30,24 @@ co-author COI, the model `POTENTIAL_CONCERNS` advisory, or "should we warn the P
 **Chunk 2a = SHIPPED to prod (S240, `fcbb258`): institution COI.** Current same-institution
 is now a HARD DROP on both tracks against the PI-institution UNION; historical/former-shared COI
 RETIRED; authoritative save-gate in `save-candidates`; canonical institution maps in the agent-wiki
-`reviewer-identity` topic + `docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`. **Chunk 2b = NOT BUILT:
-retire the AI `POTENTIAL_CONCERNS` advisory** (coupled prompt/validator/repair/render/persist +
-prod Dataverse reseed Justin runs). Co-author COI KEPT.
+`reviewer-identity` topic + `docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`. **Chunk 2b = SHIPPED (S254):
+retired the AI `POTENTIAL_CONCERNS` advisory** — removed from prompt/validator/repair/render/persist;
+the parser keeps `POTENTIAL_CONCERNS` only as a REASONING terminator (parse-and-discard) so a lingering
+emission can't bleed into reasoning; prod Dataverse `analyze` reseed (`--execute --only=analyze`) is
+Justin's step. Co-author COI KEPT.
 
 ## What this changes / implicates (verify before acting — touches shipped S229 work)
 - **[DONE Chunk 2a]** ~~REMOVE historical-institution COI~~ (S229, da60679): `markInstitutionCOI` is now
   current-only; `institutionCOIDetails.historical` + the "Former shared institution" badge removed
   (legacy `.historical` scrubbed on read via `sanitizeInstitutionCOIDetails`). Shipped in Chunk 2a.
-- **[NOT BUILT — Chunk 2b]** RETIRE the model `POTENTIAL_CONCERNS` amber advisory (S229, Justin S240): it's the model
-  freelancing inferred "potential concern" notes — the canonical PD-unverifiable flag. Remove the
-  capture/render (`parseAnalysisResponse` POTENTIAL_CONCERNS normalize, both cards' amber note,
-  `pruneCandidateForRoster` persistence) AND the prompt instruction that routes COI→POTENTIAL_CONCERNS
-  (the analyze prompt is Dataverse-resolved at runtime — reseed, don't just edit source; see
-  [[project-reviewer-coi-concern-surfacing]] + [[reviewer-finder-prompt-dataverse-migration]]).
+- **[DONE Chunk 2b — S254]** ~~RETIRE the model `POTENTIAL_CONCERNS` amber advisory~~ (S229, Justin S240): the model
+  was freelancing inferred "potential concern" notes — the canonical PD-unverifiable flag. Removed the
+  capture (`parseAnalysisResponse` no longer extracts it; `isNoConcernText` deleted), both cards' amber note,
+  and `pruneCandidateForRoster` persistence, plus the validator/repair tokens and the prompt instruction
+  that routed COI→POTENTIAL_CONCERNS. The parser keeps `POTENTIAL_CONCERNS` ONLY as a REASONING terminator
+  so a lingering field (e.g. a not-yet-reseeded prod row) is dropped, not folded into reasoning. The
+  analyze prompt is Dataverse-resolved at runtime — prod `analyze` row reseed (`--execute --only=analyze`)
+  is Justin's step (see [[project-reviewer-coi-concern-surfacing]] + [[reviewer-finder-prompt-dataverse-migration]]).
 - **KEEP co-author COI** grading (Justin S240): shared-paper counts are *factual* and the PD can see the
   shared papers → verifiable, not an inferred-relationship flag.
 - Does NOT change Chunk 1 (identity + name exclusion).

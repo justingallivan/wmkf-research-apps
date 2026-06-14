@@ -278,7 +278,7 @@ correct hard drop ([[project-reviewer-recall-over-precision]]:36-38). Justin's S
   is to *cut* manual searching. Relationship/inferred conflicts are handled by reviewer **self-disclosure**
   at accept/decline, not by system flags.
 
-**Boundary RESOLVED (Justin S240):** (1) **retire** the model `POTENTIAL_CONCERNS` amber advisory (S229) —
+**Boundary RESOLVED (Justin S240); both chunks now SHIPPED (2a S240, 2b S254):** (1) **retire** the model `POTENTIAL_CONCERNS` amber advisory (S229) —
 it's the canonical PD-unverifiable inferred flag (remove capture/render/persist + reseed the prompt to drop
 the COI→POTENTIAL_CONCERNS instruction); (2) **keep** co-author COI grading — shared-paper counts are
 factual/verifiable. So Chunk 2 = {structured institution into the current-institution hard drop; remove

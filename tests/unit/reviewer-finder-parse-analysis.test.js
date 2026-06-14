@@ -8,7 +8,7 @@
  * regex shape.
  */
 
-import { parseAnalysisResponse, isNoConcernText } from '../../shared/config/prompts/reviewer-finder';
+import { parseAnalysisResponse } from '../../shared/config/prompts/reviewer-finder';
 
 const PROPOSAL_METADATA = `## PART 1: PROPOSAL METADATA
 
@@ -220,73 +220,12 @@ ${PART_3}`;
   });
 });
 
-describe('isNoConcernText — suppress no-concern phrasings, keep real ones', () => {
-  test.each([
-    'None identified',
-    'None',
-    'None.',
-    'N/A',
-    'N.A.',
-    'NA',
-    'nil',
-    'Not applicable',
-    'No concerns identified',
-    'No COI identified',
-    'No apparent conflicts',
-    'No institutional COI identified',
-    'No known competing interests',
-    'No known conflicts identified',
-    'None identified based on available information',
-    'Not applicable based on available information',
-    // Negated-relationship phrasings — the model is stating a tie is ABSENT,
-    // so these are no-concern values (Codex P1).
-    'No known collaboration with the PI',
-    'No co-author relationship with the PI',
-    'No shared institution identified',
-    '   ',
-    '',
-    null,
-    undefined,
-  ])('treats %p as no-concern', (val) => {
-    expect(isNoConcernText(val)).toBe(true);
-  });
-
-  test.each([
-    'Former Johns Hopkins faculty — shared institution with the PI.',
-    'No obvious conflicts, but they collaborated on a 2023 paper.',
-    'No conflicts, but they collaborated in 2023',
-    'None obvious, but they trained together',
-    'Direct competitor on the same grant topic.',
-    'Co-authored with the PI in 2021.',
-    // A no-concern opener followed by a substantive second clause is a real
-    // concern — the sentinel must not swallow the continuation (Codex P1).
-    'No conflicts; they competed for the same grant',
-    'No conflicts — they were postdoc labmates',
-    'No COI, former labmate of the PI',
-  ])('treats %p as a real concern', (val) => {
-    expect(isNoConcernText(val)).toBe(false);
-  });
-});
-
-describe('parseAnalysisResponse — POTENTIAL_CONCERNS normalization', () => {
-  test('no-concern value normalizes to null', () => {
-    const response = `${PROPOSAL_METADATA}
-## PART 2: REVIEWER SUGGESTIONS
-
-REVIEWER:
-NAME: Dr. Alice Smith
-INSTITUTION: Stanford
-EXPERTISE: signaling
-SENIORITY: Senior
-REASONING: Known expert.
-POTENTIAL_CONCERNS: No COI identified
-SOURCE: Known expert
-${PART_3}`;
-    const r = parseAnalysisResponse(response);
-    expect(r.reviewerSuggestions[0].potentialConcerns).toBeNull();
-  });
-
-  test('real concern is preserved', () => {
+describe('parseAnalysisResponse — POTENTIAL_CONCERNS retired (Chunk 2b, S254)', () => {
+  // The field was retired: the prompt no longer asks for it and the parser no
+  // longer extracts it. A lingering emission (e.g. a not-yet-reseeded prod row
+  // in the deploy→reseed window, or a per-user prompt override) must cleanly
+  // TERMINATE reasoning and be dropped — never bleed into the rendered REASONING.
+  test('a lingering POTENTIAL_CONCERNS line is dropped, not folded into reasoning', () => {
     const response = `${PROPOSAL_METADATA}
 ## PART 2: REVIEWER SUGGESTIONS
 
@@ -300,6 +239,32 @@ POTENTIAL_CONCERNS: Former Johns Hopkins faculty — shared institution with the
 SOURCE: Known expert
 ${PART_3}`;
     const r = parseAnalysisResponse(response);
-    expect(r.reviewerSuggestions[0].potentialConcerns).toMatch(/Johns Hopkins/);
+    const reviewer = r.reviewerSuggestions[0];
+    // No advisory field is produced.
+    expect(reviewer.potentialConcerns).toBeUndefined();
+    // Reasoning is clean — the POTENTIAL_CONCERNS line did not bleed in.
+    expect(reviewer.reasoning).toBe('Leading single-molecule biophysicist.');
+    expect(reviewer.reasoning).not.toMatch(/Johns Hopkins/);
+    expect(reviewer.reasoning).not.toMatch(/POTENTIAL_CONCERNS/i);
+    expect(reviewer.source).toBe('Known expert');
+  });
+
+  test('a reviewer block with no POTENTIAL_CONCERNS line (post-reseed shape) parses cleanly', () => {
+    const response = `${PROPOSAL_METADATA}
+## PART 2: REVIEWER SUGGESTIONS
+
+REVIEWER:
+NAME: Dr. Alice Smith
+INSTITUTION: Stanford
+EXPERTISE: signaling
+SENIORITY: Senior
+REASONING: Known expert.
+SOURCE: Known expert
+${PART_3}`;
+    const r = parseAnalysisResponse(response);
+    const reviewer = r.reviewerSuggestions[0];
+    expect(reviewer.reasoning).toBe('Known expert.');
+    expect(reviewer.source).toBe('Known expert');
+    expect(reviewer.potentialConcerns).toBeUndefined();
   });
 });

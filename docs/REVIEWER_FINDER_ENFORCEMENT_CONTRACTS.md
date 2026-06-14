@@ -162,8 +162,9 @@ the durable save boundary**. Matched against the UNION of `piInstitutions(pi, au
 
 > **This contract previously had no documentary home outside the agent wiki** — the
 > `rejectedInstitutionCOI` durable gate appeared in zero non-wiki docs before this reference
-> (S253). The AI `POTENTIAL_CONCERNS` advisory retirement is **Chunk 2b (NOT yet built)** —
-> see `docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`. Policy memory:
+> (S253). The AI `POTENTIAL_CONCERNS` advisory retirement **shipped as Chunk 2b (S254)** — removed
+> from prompt/parser/validator/repair/render/persist; COI is now screened deterministically
+> server-side. See `docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md` (historical). Policy memory:
 > `project-reviewer-coi-rely-on-self-disclosure`.
 
 ---

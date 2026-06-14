@@ -40,7 +40,7 @@ describe('golden: a canned response using the contract labels parses', () => {
       'TITLE: Test', 'PRINCIPAL_INVESTIGATOR: Dr. A', 'PRIMARY_RESEARCH_AREA: Bio',
       'KEYWORDS: x, y', 'ABSTRACT: An abstract.', '', 'REVIEWER:', 'NAME: Dr. Foo',
       'INSTITUTION: MIT', 'EXPERTISE: a, b', 'SENIORITY: Senior', 'REASONING: Because.',
-      'POTENTIAL_CONCERNS: None', 'SOURCE: Known expert', '', 'PUBMED_QUERIES:',
+      'SOURCE: Known expert', '', 'PUBMED_QUERIES:',
       '1. one query here', '2. two query here',
     ].join('\n');
     const r = parseAnalysisResponse(canned);

@@ -220,22 +220,17 @@ describe('filterExcluded', () => {
   });
 });
 
-describe('pruneCandidateForRoster — model-flagged concern survives reload', () => {
-  test('carries potentialConcerns into the roster DTO', () => {
+describe('pruneCandidateForRoster — flags survive reload', () => {
+  test('POTENTIAL_CONCERNS retired (Chunk 2b, S254): a stray potentialConcerns input is dropped from the roster DTO', () => {
     const pruned = pruneCandidateForRoster({
       name: 'Dr. Taekjip Ha',
       affiliation: 'Harvard Medical School',
       reasoning: 'Leading single-molecule biophysicist; directly relevant.',
       potentialConcerns: 'Former Johns Hopkins faculty — shared institution with the PI.',
     });
-    expect(pruned.potentialConcerns).toBe('Former Johns Hopkins faculty — shared institution with the PI.');
-    // Fitness justification stays in its own field, not conflated.
+    expect(pruned.potentialConcerns).toBeUndefined();
+    // Fitness justification still rides in its own field, untouched.
     expect(pruned.reasoning).toMatch(/single-molecule/);
-  });
-
-  test('absent concern normalizes to null', () => {
-    const pruned = pruneCandidateForRoster({ name: 'Jane Smith', affiliation: 'MIT' });
-    expect(pruned.potentialConcerns).toBeNull();
   });
 
   test('verification-incoherence flag survives reload so the ranking down-weight reapplies', () => {

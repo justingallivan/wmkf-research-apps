@@ -96,7 +96,7 @@ Suggest {{reviewer_count}} potential expert reviewers. For each, provide detaile
 **IMPORTANT CRITERIA:**
 - Must be established researchers (professors, senior scientists, PIs)
 - Must have relevant expertise to evaluate this proposal
-- Must NOT be from the author's institution
+- Prefer researchers at a different institution than the author (same-institution conflicts are screened automatically)
 - PRIORITIZE researchers currently active and publishing in the proposal's area, at any career stage — strong, currently-active senior researchers are wanted, not just mid-career. Recent in-area activity matters more than career stage or cumulative fame: favor people doing this work now over those whose contributions are mainly historical. Eminent figures (field founders, Nobel laureates, emeritus) are welcome when they are a genuinely strong fit; just don't let them crowd out the list.
 - For interdisciplinary work, cover all major areas
 
@@ -112,8 +112,7 @@ NAME: [Full name in WESTERN ORDER: FirstName LastName, with optional title. Exam
 INSTITUTION: [Current university/research institution - required for verification]
 EXPERTISE: [2-4 specific areas of expertise, comma-separated]
 SENIORITY: [Early-career / Mid-career / Senior]
-REASONING: [2-3 sentences explaining WHY they are scientifically qualified to review THIS proposal. For names from the proposal, cite where they were mentioned. For others, reference their known work. Do NOT put conflicts of interest, exclusions, or "do not contact" advice here — those belong ONLY in POTENTIAL_CONCERNS.]
-POTENTIAL_CONCERNS: [Any conflict of interest or reason this person may be unsuitable to review THIS proposal — e.g. a former OR current shared institution with the PI, a close collaboration, advisor/advisee ties, or direct competition. Name the specific tie. If none, write "None identified".]
+REASONING: [2-3 sentences explaining WHY they are scientifically qualified to review THIS proposal. For names from the proposal, cite where they were mentioned. For others, reference their known work. Focus ONLY on scientific fitness — do NOT mention conflicts of interest, exclusions, institutional ties, relationships, or "do not contact" advice anywhere; conflict screening is handled separately.]
 SOURCE: ["Mentioned in proposal", "References", "Known expert", or "Field leader"]
 
 ---

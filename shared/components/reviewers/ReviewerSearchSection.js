@@ -154,11 +154,6 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
   const hasPossibleCoauthorCOI = coauthorStrength === 'possible';
   // Only a strong (likely) coauthor tie or an institution COI drives the red treatment.
   const hasAnyCOI = hasInstitutionCOI || hasStrongCoauthorCOI;
-  // Model-flagged concern (POTENTIAL_CONCERNS). The parser normalizes "None
-  // identified" and its variants to null (isNoConcernText), so any non-empty
-  // value here is a real warning.
-  const potentialConcerns = typeof c.potentialConcerns === 'string' ? c.potentialConcerns.trim() : '';
-  const hasPotentialConcern = !!potentialConcerns;
   const reason = c.reasoning || c.generatedReasoning || null;
   const provenanceLabel = provenanceLabelForCandidate(c);
   const pubs = Array.isArray(c.publications) ? c.publications : [];
@@ -190,7 +185,6 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
 
   const border = checked ? 'border-blue-500 bg-blue-50'
     : hasAnyCOI ? 'border-red-300 bg-red-50'
-    : hasPotentialConcern ? 'border-amber-300 bg-amber-50'
     : hasAnyMismatch ? 'border-orange-300 bg-orange-50'
     : isLowConfidence ? 'border-amber-300 bg-amber-50'
     : isWeakMatch ? 'border-yellow-200 bg-yellow-50'
@@ -251,11 +245,6 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
                   </li>
                 ))}
               </ul>
-            </div>
-          )}
-          {hasPotentialConcern && (
-            <div className="mt-2 p-2 bg-amber-100 border border-amber-300 rounded text-xs text-amber-800">
-              <span className="font-medium">⚠️ Potential concern (AI-flagged):</span> {potentialConcerns}
             </div>
           )}
           {isLowConfidence && (

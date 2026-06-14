@@ -1,11 +1,16 @@
 # Reviewer Finder — COI Chunk 2: institution COI + advisory retirement (Design / Pre-Impl)
 
-> Status (updated S253, 2026-06-13): **PARTIALLY SHIPPED.** Change A — institution COI = HARD
+> Status (updated S254, 2026-06-13): **SHIPPED (both chunks).** Change A — institution COI = HARD
 > DROP on the PI-institution UNION (both tracks) + durable save-boundary re-reject
-> (`rejectedInstitutionCOI`) — **SHIPPED as Chunk 2a (S240)**; it is now owned by
+> (`rejectedInstitutionCOI`) — **SHIPPED as Chunk 2a (S240)**, owned by
 > `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` §5. The advisory (`POTENTIAL_CONCERNS`)
-> retirement — **Chunk 2b — remains NOT BUILT**; this doc is its design owner. Read Change A below
-> as historical design rationale; Changes for the advisory retirement as still-open work.
+> retirement — **SHIPPED as Chunk 2b (S254)**: removed from the prompt template (both byte-parity
+> files), parser, validator, repair prompt, both card renders, and the roster-prune persist. The
+> parser keeps `POTENTIAL_CONCERNS` ONLY as a REASONING terminator so a lingering emission (e.g. a
+> not-yet-reseeded prod row in the deploy→reseed window) is parse-and-discarded, never bled into the
+> rendered reasoning. Prod Dataverse `analyze` row reseed is Justin's step
+> (`seed-reviewer-finder-prompts.js --execute --only=analyze`). This whole doc is now historical
+> design rationale.
 > Author: Claude (S240, 2026-06-10). Builds on Chunk 1 (shipped, `b19b3b9`).
 > Policy: [[project-reviewer-coi-rely-on-self-disclosure]] (Justin S240). Prior design +
 > Chunk-1 context: `docs/REVIEWER_FINDER_PI_IDENTITY_WIREIN_PLAN.md` §9.
@@ -26,9 +31,10 @@ emit PD-unverifiable soft flags.** Four changes:
   S229) — neither drop nor flag. **Removal SHIPPED (Chunk 2a): `institutionCOIDetails.historical`
   is gone; `markInstitutionCOI` is current-affiliation only** (see ENFORCEMENT_CONTRACTS §5).
 - **C. RETIRE the AI `POTENTIAL_CONCERNS` amber advisory** (the advisory itself shipped S229) — the
-  canonical PD-unverifiable inferred flag. **Retirement = Chunk 2b, NOT built** — still live in the
-  prompt (`shared/config/prompts/reviewer-finder.js`), validator (`lib/utils/prompt-validators.js`),
-  and UI (`pages/reviewer-finder.js`).
+  canonical PD-unverifiable inferred flag. **Retirement = Chunk 2b, SHIPPED S254** — removed from the
+  prompt (`shared/config/prompts/reviewer-finder{,-dynamics}.js`), parser, validator
+  (`lib/utils/prompt-validators.js`), repair prompt, and UI (`pages/reviewer-finder.js` +
+  `ReviewerSearchSection.js`); prod `analyze` row reseed is Justin's step.
 - **D. Prefer ORCID-current affiliation** over OpenAlex stale `last_known_institutions[0]` for the
   PI institution.
 
@@ -199,7 +205,7 @@ Split into two independent chunks, each its own design→impl→Codex loop:
 - Tests: `filterConflicts` multi-institution + both-track drop; `markInstitutionCOI` current-only;
   update/delete `tests/unit/institution-coi-historical.test.js`, `tests/unit/reviewer-search-logic.test.js`.
 
-### Chunk 2b — Retire POTENTIAL_CONCERNS (decision C; fully coupled)
+### Chunk 2b — Retire POTENTIAL_CONCERNS (decision C; fully coupled) — ✅ SHIPPED S254
 - `shared/config/prompts/reviewer-finder.js` (parse + `isNoConcernText` + template) +
   `reviewer-finder-dynamics.js` (byte-parity); reword the `:89` institution line.
 - `lib/utils/prompt-validators.js:71` (drop required token) + `lib/services/claude-reviewer-service.js:88`

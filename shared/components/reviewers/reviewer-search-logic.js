@@ -189,10 +189,6 @@ export function pruneCandidateForRoster(c) {
     // COI + mismatch detail.
     hasInstitutionCOI: !!c.hasInstitutionCOI,
     institutionCOIDetails: sanitizeInstitutionCOIDetails(c.institutionCOIDetails),
-    // Model-flagged COI/concern from the analyze prompt's POTENTIAL_CONCERNS field
-    // (e.g. a former-institution tie the deterministic check misses). Persisted so
-    // the card's advisory warning survives a roster reload, like `reasoning`.
-    potentialConcerns: c.potentialConcerns || null,
     hasCoauthorCOI: !!c.hasCoauthorCOI,
     coauthorships: Array.isArray(c.coauthorships) ? c.coauthorships : [],
     // S238 graded coauthor COI + thin-evidence/off-topic warnings — persist so the

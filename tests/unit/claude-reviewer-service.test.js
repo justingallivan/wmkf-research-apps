@@ -45,7 +45,6 @@ function analysisResponse({ title = 'Example', reviewers = [], queries = ['cell 
     reviewer.expertiseLine === false ? null : `EXPERTISE: ${reviewer.expertise || 'systems biology, imaging'}`,
     reviewer.seniorityLine === false ? null : `SENIORITY: ${reviewer.seniority || 'Mid-career'}`,
     reviewer.reasoningLine === false ? null : `REASONING: ${reviewer.reasoning || 'Relevant expertise for this proposal.'}`,
-    reviewer.concernsLine === false ? null : `POTENTIAL_CONCERNS: ${reviewer.concerns || 'None identified'}`,
     reviewer.sourceLine === false ? null : `SOURCE: ${reviewer.source || 'Known expert'}`,
     '',
   ].filter(Boolean));
@@ -101,7 +100,6 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
           'EXPERTISE: systems biology, imaging',
           'SENIORITY: Senior',
           'REASONING: Relevant expertise for this proposal.',
-          'POTENTIAL_CONCERNS: None identified',
           'SOURCE: Known expert',
           '',
           'PUBMED_QUERIES:',
@@ -392,7 +390,7 @@ describe('buildAnalyzeRepairInstructions — no longer requests the retired quer
     const validation = { issues: [{ code: 'below_suggestion_floor', message: 'Only 1 usable reviewer suggestion parsed; expected at least 3.', severity: 'error' }] };
     const text = buildAnalyzeRepairInstructions(validation, 3);
     expect(text).not.toMatch(/quer(y|ies)/i);
-    expect(text).toContain('NAME, INSTITUTION, EXPERTISE, SENIORITY, REASONING, POTENTIAL_CONCERNS, and SOURCE');
+    expect(text).toContain('NAME, INSTITUTION, EXPERTISE, SENIORITY, REASONING, and SOURCE');
   });
 
   it('a truncation repair says "truncated", not "omitted the database-search query section"', () => {

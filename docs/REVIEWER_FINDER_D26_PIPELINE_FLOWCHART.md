@@ -274,4 +274,5 @@ named personnel is a sensible future add — NOT yet implemented.)
   properly-anchored §12 arm is built *and* judged on live accept/decline. Same parked
   grounded-origination family as Track B; remains valid + unrefuted as a sparse-tail
   tool, just not the engine.
-- **COI Chunk 2b** (retire `POTENTIAL_CONCERNS`) — destructive carryover, deferred/unverified.
+- **COI Chunk 2b** (retire `POTENTIAL_CONCERNS`) — ✅ SHIPPED S254; the model no longer emits the
+  amber advisory, COI is screened deterministically server-side.
