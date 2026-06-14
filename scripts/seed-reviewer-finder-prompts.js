@@ -158,9 +158,11 @@ const analyzeRow = {
     parseMode: 'raw',
   },
   notes:
-    'Phase 0 seed (Session 111). Combined analyze+suggest+queries prompt. ' +
+    'Phase 0 seed (Session 111). Combined analyze+suggest prompt ' +
+    '(Stage-1 database search-query generation / PART 3 removed S253 — Track-B-only, archived off S248). ' +
     'Source of truth: shared/config/prompts/reviewer-finder-dynamics.js. ' +
-    'Live routes still use legacy createAnalysisPrompt until route refactor.',
+    'Live route resolves this via resolveReviewerPrompt → composeAnalyzePrompt (S222); ' +
+    'createAnalysisPrompt is the byte-parity reference/fallback.',
 };
 
 // ────────────────────────────────────────────────────────────────────────────

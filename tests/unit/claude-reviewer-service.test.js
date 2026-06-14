@@ -19,7 +19,7 @@ jest.mock('../../lib/services/reviewer-prompt-resolver.js', () => {
   };
 });
 
-import { ClaudeReviewerService } from '../../lib/services/claude-reviewer-service.js';
+import { ClaudeReviewerService, buildAnalyzeRepairInstructions } from '../../lib/services/claude-reviewer-service.js';
 import { REVIEWER_FINDER_PROPOSAL_MAX_CHARS } from '../../lib/utils/ai-payload-boundary.js';
 import { validateReviewerAnalysis } from '../../shared/config/prompts/reviewer-finder.js';
 
@@ -384,5 +384,21 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
     expect(result.status).toBe('analysis_invalid');
     expect(result.attempt).toBe(1);
     expect(ClaudeReviewerService._callLLM).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('buildAnalyzeRepairInstructions — no longer requests the retired query section (S253)', () => {
+  it('a validation-failure repair asks only for the two-part contract, never a query section', () => {
+    const validation = { issues: [{ code: 'below_suggestion_floor', message: 'Only 1 usable reviewer suggestion parsed; expected at least 3.', severity: 'error' }] };
+    const text = buildAnalyzeRepairInstructions(validation, 3);
+    expect(text).not.toMatch(/quer(y|ies)/i);
+    expect(text).toContain('NAME, INSTITUTION, EXPERTISE, SENIORITY, REASONING, POTENTIAL_CONCERNS, and SOURCE');
+  });
+
+  it('a truncation repair says "truncated", not "omitted the database-search query section"', () => {
+    const validation = { issues: [{ code: 'truncated_response', message: 'The model stopped because it reached the max token limit.', severity: 'error' }] };
+    const text = buildAnalyzeRepairInstructions(validation, 12);
+    expect(text).toContain('truncated');
+    expect(text).not.toMatch(/quer(y|ies)/i);
   });
 });

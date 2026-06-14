@@ -411,6 +411,11 @@ grep]` no reference extraction or DOI/PMID resolution from proposals exists yet
 (`pubmed-service.js` extracts DOIs from PubMed *API responses*, not reference lists).
 The wire shape is ready; the lane is unbuilt.
 
+> **S253 update:** the keyword `searchQueries` lane analyzed below was removed *at the source* —
+> analyze PART 3 query generation is gone (Track-B-only consumer, archived off S248). The §4.1
+> critique here remains the rationale for that removal and for the cited-reference-first redesign;
+> read the `searchQueries` discussion as design analysis of the former behavior, not current state.
+
 **Why it should be the PRIMARY origination path for question-driven proposals.**
 The keyword `searchQueries` lane (§4.1 / analyze PART 3) is structurally biased
 toward *surface tokens*: the prompt steers Claude to "methods, organisms, phenomena,

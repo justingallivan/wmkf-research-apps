@@ -37,7 +37,7 @@ candidate.
 flowchart TD
     P[Proposal PDF] --> A["Stage 1 — Claude analyze<br/>(analyzeProposal)"]
     A --> S["reviewerSuggestions[]<br/>names from Claude's parametric memory"]
-    A --> Q["analyze PART 3 → searchQueries<br/>per-database TOPIC queries Claude writes<br/>(pubmed/arxiv/biorxiv/chemrxiv; 3–6 words; NO author names)<br/>[PROPOSED successor: schema-constrained sourcePlan]"]
+    A --> Q["analyze PART 3 → searchQueries — REMOVED S253<br/>(was per-database TOPIC queries feeding Track B;<br/>dropped with PART 3 when Track B was archived off S248)<br/>[future successor if grounded origination revisited: schema-constrained sourcePlan]"]
     A --> I["proposalInfo + COI context"]
 
     S --> TA{{"Track A — verify EACH suggested<br/>name in PubMed (verifyClaudeSuggestions)"}}

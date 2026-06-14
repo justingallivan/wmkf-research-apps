@@ -650,12 +650,7 @@ This app runs five stages. The initial analysis is similar to the Concept Evalua
 > - Any conflict of interest concerns
 > - Source ("Mentioned in proposal", "References", "Known expert", "Field leader")
 >
-> **PART 3: DATABASE SEARCH QUERIES**
-> Generate optimized queries for PubMed, arXiv, bioRxiv, and ChemRxiv to find additional reviewers.
-> - Use specific technical terminology from the proposal
-> - Do NOT include author names in queries
-> - Each query should be 3-6 words
-> - PubMed queries should work with MeSH terms where applicable
+> _(PART 3 "DATABASE SEARCH QUERIES" was removed S253 — it only fed Track B, archived off S248. Stage 1 now returns the two parts above.)_
 
 **Rules:**
 
