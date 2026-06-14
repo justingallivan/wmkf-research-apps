@@ -1,6 +1,11 @@
 # Reviewer Finder — COI Chunk 2: institution COI + advisory retirement (Design / Pre-Impl)
 
-> Status: **DESIGN — pre-impl, for Codex review. NOT BUILT.**
+> Status (updated S253, 2026-06-13): **PARTIALLY SHIPPED.** Change A — institution COI = HARD
+> DROP on the PI-institution UNION (both tracks) + durable save-boundary re-reject
+> (`rejectedInstitutionCOI`) — **SHIPPED as Chunk 2a (S240)**; it is now owned by
+> `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` §5. The advisory (`POTENTIAL_CONCERNS`)
+> retirement — **Chunk 2b — remains NOT BUILT**; this doc is its design owner. Read Change A below
+> as historical design rationale; Changes for the advisory retirement as still-open work.
 > Author: Claude (S240, 2026-06-10). Builds on Chunk 1 (shipped, `b19b3b9`).
 > Policy: [[project-reviewer-coi-rely-on-self-disclosure]] (Justin S240). Prior design +
 > Chunk-1 context: `docs/REVIEWER_FINDER_PI_IDENTITY_WIREIN_PLAN.md` §9.

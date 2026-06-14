@@ -1,6 +1,8 @@
 # Reviewer Identity Resolution — redesign plan
 
-**Status:** Design proposal (no code yet). Authored by Codex (S213, 2026-06-02) at the user's request after a persistent false-match problem in Reviewer Finder.
+> **⚠ SUPERSEDED — status banner (S253, 2026-06-13): the "no code yet" framing below is HISTORICAL.** Both recommended phases have since shipped: Phase 1 (Scholar displayed-name guard + do-not-persist-metrics-without-an-identity-confidence-status) and the Phase 2 shared identity resolver — see `docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md` (PR1 S214 + S215 extension SHIPPED) and live `lib/services/reviewer-identity-resolver.js` (the `mayPersistIdentity` gate is enforced at `pages/api/reviewer-finder/save-candidates.js`). The Scholar enrichment path this doc critiques was itself retired in the S251 OpenAlex migration (`_attachScholarMetrics`→`_attachOpenAlexMetrics`). The live enforcement contract is owned by `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`. Read below as the original problem analysis + design rationale, not as open work.
+
+**Status:** Design proposal as originally authored by Codex (S213, 2026-06-02) — **now shipped; see the supersession banner above.** Written at the user's request after a persistent false-match problem in Reviewer Finder.
 
 **Trigger:** Searching "Li-Huei Tsai" (MIT PI) attached the Google Scholar profile of **Masayuki Nakano** — a postdoc *in her lab* (his Scholar affiliation reads "Li-Huei Tsai Lab, Picower Institute, MIT"). The institution-mismatch guard passed (he's genuinely at MIT), and there's no name-identity check, so his h-index/citations landed on her record. This "different person, same institution/lab" failure is recurrent.
 
