@@ -27,7 +27,7 @@
 - rtk reference: project-rtk-grep-output-corruption.md
 
 ## Working Norms
-- Thoroughness / completion posture: feedback-thoroughness-default.md; feedback-drive-to-completion.md
+- Thoroughness / completion posture: feedback-thoroughness-default.md; feedback-drive-to-completion.md; feedback-truncation-is-breakage-not-completion.md
 - Bug found in review: feedback-real-fix-not-design-note.md
 - No performative contrition: feedback-no-performative-contrition.md
 - React async/effect edits: feedback-profile-context-runtime-bugs.md
