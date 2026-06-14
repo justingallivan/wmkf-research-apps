@@ -1,5 +1,12 @@
 # Reviewer-Finder Origination — Review Request (for a fresh model)
 
+> **⚠ HISTORICAL one-shot (S239, 2026-06-10).** A single-use prompt that handed a fresh reviewing
+> model the S239 origination probe findings. That review has since happened and its conclusions are
+> folded into the origination docs (`REVIEWER_FINDER_ORIGINATION_PROBE_FINDINGS.md`,
+> `REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md`,
+> `REVIEWER_FINDER_ORIGINATION_EVIDENCE_2026-06-12.md`). Kept as a record of the review framing —
+> NOT a live request.
+
 **Use:** Run `/start` in the reviewing session first (it loads project context, operating rules, and the memory router), then hand it the prompt below. Today's S239 work is not yet in `SESSION_PROMPT.md`, so the reviewer is pointed explicitly at the findings doc.
 
 ---
