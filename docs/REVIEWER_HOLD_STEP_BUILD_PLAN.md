@@ -165,7 +165,15 @@ Each chunk is independently committable. A chunk's red gate (where it has one) b
   read an explicit staff "release" flag (likely the PERMANENT trigger). The predicate localizes
   the unknown to one function.
 
-### Chunk 3 — `respond.js action:'hold'` + readiness write-layer gate
+### Chunk 3 — `respond.js action:'hold'` + readiness write-layer gate ✅ DONE (S257)
+> **S257 build status:** COMPLETE. `respond.js` gains `action:'hold'`; `applyStage2aResponse`
+> gains the `hold` branch (writes `wmkf_responsetype=held` + `wmkf_heldat`/`wmkf_responsereceivedat`,
+> clears decline state, never accepted/acks/payment/honorarium). New 409s: `review_received_locked`
+> (all actions), `already_released` (hold after release), `already_accepted` (hold on accepted),
+> `not_ready` (fresh accept before release). Readiness gate exempts `isAcceptRepeat`; repeat-hold
+> short-circuits 200 idempotent before the adapter (no `wmkf_heldat` re-stamp). With the predicate
+> still returning `true`, hold POSTs 409 `already_released` and accept is ungated — so chunk 3 is also
+> zero-behavior-change until go-live. +11 integration tests; full suite 2418 green; lint 0 errors.
 - **Do:** add a third action. It writes `wmkf_responsetype=held`, `wmkf_heldat=now`, optional
   `contactEdits`; it does **NOT** require acks, does **NOT** require a payment contact, does
   **NOT** call `ensureHonorariumOnboarding`, does **NOT** set `wmkf_accepted`. Reuse the same

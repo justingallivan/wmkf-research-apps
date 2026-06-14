@@ -1,15 +1,21 @@
 /**
  * POST /api/external/review/[token]/respond
  *
- * Unified accept/decline endpoint for Stage 2a. Discriminated by `action`
- * in the request body — single endpoint instead of two because the
- * server-side guards (token verify, state machine, idempotency, optimistic
- * locking, audit) are identical for both. Email triggers (decline-ack,
- * referral handoff) are deferred to a follow-up build.
+ * Unified accept/decline/hold endpoint for Stage 2a. Discriminated by `action`
+ * in the request body — single endpoint because the server-side guards (token
+ * verify, state machine, idempotency, optimistic locking, audit) are shared.
+ * Email triggers (decline-ack, referral handoff) are deferred to a follow-up build.
+ *
+ * `hold` is the pre-accept "agree in principle" step: sets wmkf_responsetype=held
+ * + wmkf_heldat, with NO acks / payment / honorarium and NO wmkf_accepted. It is
+ * allowed ONLY while the proposal is not yet released (readiness); once released the
+ * reviewer must finalize via `accept`. Readiness also gates a FRESH `accept` (incl.
+ * held→finalize): refused with 409 not_ready until release. A REPEAT accept
+ * (already accepted) is exempt so its idempotent honorarium retry still runs.
  *
  * Request body:
  *   {
- *     action: 'accept' | 'decline',
+ *     action: 'accept' | 'decline' | 'hold',
  *     // For accept:
  *     contactEdits?: {
  *       firstName?, lastName?, nickname?, title?, affiliation?, email?, orcid?
@@ -18,25 +24,28 @@
  *     policyAcks?: { 'reviewer-coi': true, 'reviewer-ai-use': true },
  *     // For decline (all optional):
  *     decline?: { reasonPicklist?, reasonText?, referral? },
+ *     // For hold: contactEdits only (optional).
  *   }
  *
  * Response:
  *   200 OK { ok: true, idempotent?: boolean, engagementState }
- *   400  malformed body / missing acks / invalid picklist value
+ *   400  malformed body / missing acks / invalid picklist value / invalid action
  *   401  token verification failed (use the verifier's reason codes)
  *   404  token not found
- *   409  state-machine guard violation (e.g., flip after materials_sent)
+ *   409  state-machine guard violation: materials_sent_locked, review_received_locked,
+ *        withdrawn_sufficient, already_accepted (hold on an accepted row),
+ *        already_released (hold after release), not_ready (fresh accept before release)
  *   412  optimistic-lock conflict (suggestion row changed underneath)
  *   500  active-child sanity violation (staff misconfiguration) or unexpected
  *
- * Reversibility: a flip from accepted → declined or declined → accepted is
- * a permitted transition while the engagement is in pre-materials state
- * (`wmkf_reviewstatus < materials_sent`). On flip, response stamps refresh;
- * policy ack lookups remain on the row but aren't load-bearing while
- * `wmkf_responsetype = declined`.
+ * Reversibility: a flip among accepted / declined / held is permitted while the
+ * engagement is in pre-materials state (`wmkf_reviewstatus < materials_sent` and no
+ * review received). On flip, response stamps refresh; wmkf_heldat is preserved across
+ * a later finalize (owned by the hold path, never re-stamped on repeat hold).
  */
 
 import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
+import { isProposalReadyForReviewers } from '../../../../../lib/external/proposal-readiness';
 import { applyStage2aResponse } from '../../../../../lib/dataverse/adapters/reviewer-suggestion';
 import { getActivePolicies } from '../../../../../lib/external/policy-fetcher';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
@@ -119,6 +128,7 @@ const REVIEW_STATUS_MATERIALS_SENT = 100000001;
 const RESPONSE_TYPE_ACCEPTED = 100000000;
 const RESPONSE_TYPE_DECLINED = 100000001;
 const RESPONSE_TYPE_WITHDRAWN_SUFFICIENT = 100000003;
+const RESPONSE_TYPE_HELD = 100000004;
 
 // The reviewer's self-reported ORCID for this response: the value they typed
 // this time (delta) OR the one already persisted on the engagement row (which
@@ -170,8 +180,14 @@ export default async function handler(req, res) {
     }
     const { suggestion, request, reviewer } = verified;
 
+    // Proposal readiness gates hold vs finalize at the WRITE boundary (not just the
+    // view): when not ready, a fresh finalize accept is refused and hold is the only
+    // forward move; when ready, hold is refused (the reviewer should finalize). Read
+    // from the single shared predicate so the view and write layers can't disagree.
+    const ready = isProposalReadyForReviewers(request);
+
     const body = req.body || {};
-    if (body.action !== 'accept' && body.action !== 'decline') {
+    if (body.action !== 'accept' && body.action !== 'decline' && body.action !== 'hold') {
       return res.status(400).json({ ok: false, reason: 'invalid_action' });
     }
 
@@ -200,6 +216,65 @@ export default async function handler(req, res) {
         ok: false,
         reason: 'materials_sent_locked',
         message: 'Materials have already been released for this review. To change your response, please contact your Program Director.',
+      });
+    }
+    // A received review is terminal for response transitions (accept/decline/hold).
+    // Normal flow already 409s above via materials_sent (receipt follows release), but
+    // side-channel writers (review-upload.js, mark-received-no-file.js) can stamp
+    // wmkf_reviewreceivedat WITHOUT wmkf_reviewstatus — this closes that gap for all
+    // three actions. Re-upload is a different endpoint and is unaffected.
+    if (suggestion.wmkf_reviewreceivedat) {
+      return res.status(409).json({
+        ok: false,
+        reason: 'review_received_locked',
+        message: 'A review has already been received for this engagement. To change your response, please contact your Program Director.',
+      });
+    }
+
+    // ── Hold (pre-accept "agree in principle") ──────────────────────────────
+    if (body.action === 'hold') {
+      // Once the proposal is released, the reviewer should FINALIZE, not hold.
+      if (ready) {
+        return res.status(409).json({
+          ok: false,
+          reason: 'already_released',
+          message: 'This proposal has been released for review — please complete your response.',
+        });
+      }
+      // No downgrade from a finalized accept.
+      if (accepted) {
+        return res.status(409).json({ ok: false, reason: 'already_accepted' });
+      }
+      // Idempotent repeat hold: already held → return without re-stamping wmkf_heldat
+      // (the adapter would overwrite it). Mirrors the decline idempotency short-circuit.
+      if (responseType === RESPONSE_TYPE_HELD) {
+        return res.status(200).json({
+          ok: true,
+          idempotent: true,
+          engagementState: { view: 'held', accepted: false, declined: false, held: true },
+        });
+      }
+      // Fresh hold, or a flip from declined → held.
+      try {
+        await bypassDynamicsRestrictions('external-respond', () =>
+          applyStage2aResponse(suggestion.wmkf_appreviewersuggestionid, {
+            action: 'hold',
+            contactEdits: body.contactEdits,
+          }, { ifMatch: req.headers['if-match'] || undefined }),
+        );
+      } catch (e) {
+        const msg = e.message || '';
+        if (e.status === 412 || /\b412\b/.test(msg)) {
+          return res.status(412).json({ ok: false, reason: 'concurrent_modification' });
+        }
+        throw e;
+      }
+      // A holding reviewer may give us their ORCID — capture it (non-fatal), as on decline.
+      await captureReviewerSelfReportedOrcid({ reviewer, contactId: null, rawOrcid: selfReportedOrcidOf(body, suggestion) });
+      return res.status(200).json({
+        ok: true,
+        idempotent: false,
+        engagementState: { view: 'held', accepted: false, declined: false, held: true },
       });
     }
 
@@ -256,6 +331,19 @@ export default async function handler(req, res) {
     const optedOut = body.honorariumOptOut === true || suggestion.wmkf_honorariumoptout === true;
 
     if (!isAcceptRepeat) {
+      // Readiness write-layer gate (fresh finalize only). A fresh accept — including
+      // a held→finalize accept (held never sets wmkf_accepted, so isAcceptRepeat is
+      // false) — is refused until the proposal is released; the reviewer should hold
+      // instead. A REPEAT accept (isAcceptRepeat) is EXEMPT: already-accepted rows
+      // exist pre-release and their honorarium retry must still run regardless of
+      // readiness (Codex chunk-3 #1).
+      if (!ready) {
+        return res.status(409).json({
+          ok: false,
+          reason: 'not_ready',
+          message: 'This proposal is not yet released for review.',
+        });
+      }
       const policyAcks = body.policyAcks || {};
       for (const slot of STAGE_2A_POLICY_SLOTS) {
         if (policyAcks[slot] !== true) {
