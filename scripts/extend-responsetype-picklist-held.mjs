@@ -71,11 +71,32 @@ const insertResp = await fetch(insertUrl, {
   }),
 });
 
+// Always surface the raw InsertOptionValue response — a 2xx with no visible option
+// means either a different value was assigned or the verify read hit stale metadata.
+const insertBody = await insertResp.text();
+console.log(`\nInsertOptionValue → HTTP ${insertResp.status}`);
+console.log(`Response body: ${insertBody || '(empty)'}`);
 if (!insertResp.ok) {
-  const text = await insertResp.text();
-  console.error(`InsertOptionValue failed (${insertResp.status}): ${text}`);
+  console.error('InsertOptionValue failed — see body above.');
   process.exit(1);
 }
+// The action returns { NewOptionValue: <int> } on success — print it explicitly so we
+// can see whether the value we asked for (100000004) is what Dataverse actually created.
+try {
+  const parsed = JSON.parse(insertBody);
+  if (parsed && parsed.NewOptionValue !== undefined) {
+    console.log(`NewOptionValue assigned by Dataverse: ${parsed.NewOptionValue}`
+      + (parsed.NewOptionValue === NEW_VALUE ? ' (matches request)' : ' (DIFFERS from requested ' + NEW_VALUE + ')'));
+  }
+} catch { /* non-JSON body — already printed above */ }
+
+// Publish so the metadata read below reflects the change (entity metadata reads are
+// cached org-wide; without a publish the verify can return a stale optionset).
+const pubResp = await fetch(`${baseUrl}/api/data/v9.2/PublishAllXml`, {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+});
+console.log(`PublishAllXml → HTTP ${pubResp.status}`);
 
 // Verify
 const verifyResp = await fetch(checkUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
@@ -85,4 +106,4 @@ for (const o of verify.OptionSet?.Options || []) {
   console.log(`  ${o.Value}: ${o.Label?.UserLocalizedLabel?.Label}`);
 }
 const found = (verify.OptionSet?.Options || []).find(o => o.Value === NEW_VALUE);
-console.log(found ? `\n✓ ${NEW_VALUE} added` : '\n✗ verify failed');
+console.log(found ? `\n✓ ${NEW_VALUE} added` : '\n✗ verify still does not show ' + NEW_VALUE + ' (see InsertOptionValue body/NewOptionValue above)');

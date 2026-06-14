@@ -86,7 +86,19 @@ if (!createResp.ok) {
   console.error(`CreateAttribute failed (${createResp.status}): ${text}`);
   process.exit(1);
 }
+console.log(`CreateAttribute → HTTP ${createResp.status} (ok)`);
+
+// Publish so the verify read reflects the change (entity metadata reads are cached
+// org-wide; without a publish the verify can 404 a column that was just created — a
+// stale-read false alarm, same as the picklist script's first run).
+const pubResp = await fetch(`${baseUrl}/api/data/v9.2/PublishAllXml`, {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+});
+console.log(`PublishAllXml → HTTP ${pubResp.status}`);
 
 // Verify
 const verifyResp = await fetch(probeUrl, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
-console.log(verifyResp.ok ? `\n✓ ${LOGICAL_NAME} created on ${ENTITY}` : '\n✗ verify failed');
+console.log(verifyResp.ok
+  ? `\n✓ ${LOGICAL_NAME} created on ${ENTITY}`
+  : `\n✗ verify did not find ${LOGICAL_NAME} yet — CreateAttribute returned ok above, so if this persists re-run (the probe will report "already exists") to confirm past a stale metadata read.`);

@@ -95,31 +95,36 @@ during the buffer would still finalize and fire honorarium.
 
 Each chunk is independently committable. A chunk's red gate (where it has one) blocks the next.
 
-### Chunk 1 — Schema: `held` picklist value + `wmkf_heldat` column
-> **S257 build status:** safe code + scripts DONE; live-schema run + select-list edits GATED (see sequencing).
+### Chunk 1 — Schema: `held` picklist value + `wmkf_heldat` column ✅ DONE (S257)
+> **S257 build status:** COMPLETE. Both scripts run against live Dataverse —
+> `wmkf_responsetype` option `100000004: Held` and `wmkf_heldat` (DateTime) both confirmed live
+> (CreateAttribute 204 + PublishAllXml 204 + probe verify). Write/read maps + both select lists
+> (`FIELD_SELECT`, `SUGGESTION_SELECT`) updated. The `heldAt` *write* (stamping on hold) is Chunk 3;
+> the staff-side count consumers are Chunk 8. NOTE: the first picklist run printed a false
+> `✗ verify failed` — a stale org-wide metadata read; fixed by adding `PublishAllXml` before verify
+> in both scripts.
 - **Do:** (a) ✅ `scripts/extend-responsetype-picklist-held.mjs` (clone of the withdrawn_sufficient
   script, idempotent, probes live optionset); (b) ✅ `scripts/add-reviewer-suggestion-heldat-column.mjs`
   (DateTime column-create, idempotent — no prior column-create script existed, so this is a new
   probe-first pattern); (c) ✅ export `RESPONSE_TYPE_MAP.held = 100000004` (write map) **AND**
   `100000004: 'held'` in the read map `RESPONSE_TYPE_BY_VALUE` (`reviewers.js:59`, Codex 2nd-pass #3).
-- **⚠ SEQUENCING (audit #7 finding):** running the schema scripts must come **before** any code that
-  `$select`s `wmkf_heldat`, because selecting a non-existent column 400s every reviewer-suggestion
-  read. So the select-list edits below are DEFERRED until the column exists in Dataverse.
+- **⚠ SEQUENCING (audit #7 finding, observed):** the schema scripts had to run **before** the code
+  that `$select`s `wmkf_heldat` (selecting a non-existent column 400s every reviewer-suggestion read).
+  Done in that order this session: scripts run live first, then both select lists updated. ✅
 - **Pre-existing gap noted (not fixed — out of scope):** `RESPONSE_TYPE_BY_VALUE` is also missing
   `100000003: 'withdrawn_sufficient'` — a withdrawn_sufficient row already returns `undefined` here.
   Separate from this build; flagged for a future fix.
-- **Read `wmkf_heldat` everywhere the row is read (Codex #3 — there are TWO select lists).**
-  - adapter `FIELD_SELECT` (`reviewer-suggestion.js:14`) — the Review-Manager read path.
-  - **`SUGGESTION_SELECT` (`lib/external/verify-suggestion-token.js:22`)** — the **portal's** read
-    path. [VERIFIED both `/context` and `/respond` consume the token-verifier's row, NOT the
-    adapter's, so a held-confirmation view that shows "held on {date}" sees nothing unless
-    `wmkf_heldat` is added here too.] Add it to both, and thread it into the `/context`
-    `engagementState`/response if the held view or audit UI displays it.
-- **Decide the `wmkf_heldat` write path (Codex #5).** `updateLifecycle` (`reviewer-suggestion.js:688`)
-  has **no** `heldAt` field. Choose ONE and state it: either (i) add `heldAt → wmkf_heldat` to the
-  `updateLifecycle` map, OR (ii) constrain `wmkf_heldat` writes to the hold response path only
-  (`applyStage2aResponse`/sibling). Recommended: (ii) — keep the hold timestamp owned by the one
-  write path, mirroring how `wmkf_responsereceivedat` is stamped inside `applyStage2aResponse`.
+- ✅ **Read `wmkf_heldat` in both select lists (Codex #3 — there are TWO).** Done:
+  - adapter `FIELD_SELECT` (`reviewer-suggestion.js`) — Review-Manager read path.
+  - `SUGGESTION_SELECT` (`lib/external/verify-suggestion-token.js`) — the portal's read path
+    ([VERIFIED both `/context` and `/respond` consume the token-verifier's row, not the adapter's).
+  - Still TODO in Chunk 4: thread `wmkf_heldat` into the `/context` response/engagementState so the
+    HoldView/audit can render "held on {date}".
+- **Write-path decision (Codex #5) — DECIDED: option (ii).** `wmkf_heldat` is written ONLY by the
+  hold response path (`applyStage2aResponse`/sibling in Chunk 3), NOT via `updateLifecycle` (which
+  has no `heldAt` mapping and stays that way), mirroring how `wmkf_responsereceivedat` is stamped
+  inside `applyStage2aResponse`. Repeat-hold idempotency (no overwrite) is the Chunk-3 route
+  short-circuit.
 - **Acceptance:** picklist probe shows 5 options incl. 100000004; a `getRecord` AND a
   `verifySuggestionToken` round-trip both return `wmkf_heldat`; `RESPONSE_TYPE_MAP.held` resolves.
   Script is idempotent (re-run = no-op).
