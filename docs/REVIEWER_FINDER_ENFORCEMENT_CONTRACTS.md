@@ -65,10 +65,11 @@ re-surfaces as selectable.
 
 ---
 
-## 2. PI-named / cited exemption + contact force-null `[VERIFIED 2026-06-13]`
+## 2. PI-named / cited / referred exemption + contact force-null `[VERIFIED 2026-06-13]`
 
-**Contract.** A candidate whose provenance kind is `cited_reference` or `proposal_named` (the
-proposal author named/cited THIS specific person) is NOT hard-blocked when unresolved — it is
+**Contract.** A candidate whose provenance kind is `cited_reference`, `proposal_named`, or
+`referred` (the proposal author named/cited THIS specific person, or a contacted reviewer referred
+them — a human-grounded signal, S249) is NOT hard-blocked when unresolved — it is
 selectable for identity review. BUT until its identity is confirmed/probable, the save boundary
 **force-nulls ALL contact + identity-derived fields** (email, website, faculty-page, affiliation,
 ORCID, Scholar, bibliometrics, department, expertise). A selectable-but-unverified row therefore
@@ -208,8 +209,11 @@ lookup), `_validateEmailAgainstVerifiedDomain` (`contact-enrichment-service.js:2
 `:761`) drops a SEARCH-sourced email to null when its domain contradicts `verifiedInstitutionDomain`
 — preventing namesake-collapse. ORCID/PubMed/affiliation emails outrank the heuristic.
 
-**Enforcement points.** `lib/services/contact-enrichment-service.js:214-244, 761` · design owner
-for the un-built auto-fetch SSRF mechanism: `docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md` §D.
+**Enforcement points.** The no-fetch/manual-link boundary: `pages/api/reviewer-finder/my-candidates.js:189`
+(returns `facultyPageUrl`, no fetch) · `shared/components/reviewers/CandidatesPanel.js:185` (staff-facing
+"find on faculty page →" link). The related verified-domain guard:
+`lib/services/contact-enrichment-service.js:214-244, 761`. Design owner for the un-built auto-fetch
+SSRF mechanism: `docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md` §D.
 
 ---
 
@@ -243,7 +247,7 @@ exported `:568`). **Audit:** `tests/unit/reviewer-identity-evidence.test.js`
 | # | Contract | Primary enforcement point |
 |---|----------|---------------------------|
 | 1 | Slice-E client/server asymmetry | `save-candidates.js:56-67,305-316` + `reviewer-provenance.js` (`provenanceGroupOf`) |
-| 2 | PI-named/cited exemption + force-null | `save-candidates.js:79-82,172-191` |
+| 2 | PI-named/cited/referred exemption + force-null | `save-candidates.js:79-82,172-191` (kinds: `reviewer-provenance.js` `isIdentityReviewExemptProvenance`) |
 | 3 | Invite-confidence allowlist | `reviewer-invite.js:70-88` + `send-emails.js:292-294` |
 | 4 | Structured-PI fail-open/augment-only | `proposal-pi-identity.js:125+` + `reviewer-identity-evidence.js:316-321` |
 | 5 | S240 institution COI hard drop | `save-candidates.js:116,150-160` + `discover.js`/`DiscoveryService` `filterConflicts` |

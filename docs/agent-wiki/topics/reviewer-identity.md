@@ -60,7 +60,7 @@ source file:line). Read it before changing any of these; do not restate its deta
 no drift). The 8 contracts:
 
 1. **Slice-E identity-unresolved gate** — client FIND select list (`provenanceGroupOf`) is *stricter* than the server save gate (`isUnresolvedIdentity`, 422 on full-batch reject); the asymmetry is intentional.
-2. **PI-named / cited exemption + contact force-null** — `cited_reference`/`proposal_named` rows are selectable when unresolved but ALL contact + identity-derived fields are force-nulled (`contactBlockedForUnresolvedExempt`) until confirmed/probable.
+2. **PI-named / cited / referred exemption + contact force-null** — `cited_reference`/`proposal_named`/`referred` rows (the exempt kinds in `isIdentityReviewExemptProvenance`, S249) are selectable when unresolved but ALL contact + identity-derived fields are force-nulled (`contactBlockedForUnresolvedExempt`) until confirmed/probable.
 3. **Slice-G invite-confidence allowlist** — `send-emails.js` recomputes `emailConfidence` per recipient and refuses LOW unless its `suggestionId` is in `confirmedLowConfidenceIds`; scoped to `templateType==='invitation'`.
 4. **Structured-PI identity** — `resolveProposalPI` is server-resolved from the request GUID, FAIL-OPEN + AUGMENT-ONLY, gated on confirmed/probable, name-guarded by `forenamesContradict`.
 5. **S240 institution COI** — current same-institution is a HARD DROP on both discovery tracks AND re-rejected at the durable save boundary (`rejectedInstitutionCOI`); historical/former-shared COI is retired. `POTENTIAL_CONCERNS` retirement is Chunk 2b (not built — `docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`).

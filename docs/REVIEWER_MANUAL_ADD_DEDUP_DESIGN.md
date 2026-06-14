@@ -1,6 +1,13 @@
 # Reviewer Manual-Add Cross-Store De-duplication Design
 
-> **Status:** PROPOSED (S237), **rev3 — second Codex pre-impl pass folded (NF1–NF3).** Not built.
+> **Status (updated S253, 2026-06-13): SHIPPED.** Cross-store dedup is live in the Workbench
+> manual-add path: `pages/api/workbench/reviewer-lookup.js` (pre-submit lookup) and
+> `pages/api/workbench/manual-reviewer.js` (submit-time, line ~136) both call
+> `lookupReviewerIdentity` (`lib/services/reviewer-identity-lookup.js`), which performs
+> ORCID/email/name cross-store matching with ambiguity + collision handling and resolves to
+> `reuse_reviewer` / `reuse_contact` / `create_new`. Read the design below as historical rationale;
+> re-verify any specific sub-item (NF1–NF3) against source before treating it as open.
+> Original status: PROPOSED (S237), rev3 — second Codex pre-impl pass folded (NF1–NF3).
 > Extends the shipped Phase-1 manual add (`docs/REVIEWER_MANUAL_ADD_DESIGN.md`).
 > Live-state claims are marked `[VERIFIED via X]`; design choices are `[PROPOSED]`.
 >

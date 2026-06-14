@@ -22,9 +22,13 @@ emit PD-unverifiable soft flags.** Four changes:
   which is sometimes hallucinated (Chunk-1 §12.2 "Wayne State"). Replace with a hard drop on both
   tracks matched against the institution union of §2 (D1 + D2). Applicant-recommended path flags
   instead (D3).
-- **B. REMOVE historical / former-shared institution COI** (shipped S229) — neither drop nor flag.
-- **C. RETIRE the AI `POTENTIAL_CONCERNS` amber advisory** (shipped S229) — the canonical
-  PD-unverifiable inferred flag.
+- **B. REMOVE historical / former-shared institution COI** (the historical-COI behavior shipped
+  S229) — neither drop nor flag. **Removal SHIPPED (Chunk 2a): `institutionCOIDetails.historical`
+  is gone; `markInstitutionCOI` is current-affiliation only** (see ENFORCEMENT_CONTRACTS §5).
+- **C. RETIRE the AI `POTENTIAL_CONCERNS` amber advisory** (the advisory itself shipped S229) — the
+  canonical PD-unverifiable inferred flag. **Retirement = Chunk 2b, NOT built** — still live in the
+  prompt (`shared/config/prompts/reviewer-finder.js`), validator (`lib/utils/prompt-validators.js`),
+  and UI (`pages/reviewer-finder.js`).
 - **D. Prefer ORCID-current affiliation** over OpenAlex stale `last_known_institutions[0]` for the
   PI institution.
 
