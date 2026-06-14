@@ -103,6 +103,7 @@ npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging
 npm run check:memory-router && npm run check:memory-router:self-test           # MEMORY.md router shape + valid statuses/links
 npm run check:model-override-warming && npm run check:model-override-warming:self-test # API routes that resolve an LLM model must call loadModelOverrides() first
 npm run check:agent-wiki && npm run check:agent-wiki:self-test                 # agent retrieval-layer structure
+npm run check:status-enum-parity && npm run check:status-enum-parity:self-test # producer↔consumer key parity (status/enum/workRemaining vs label/bucket maps)
 npm run check:memory-drift:no-write                                            # advisory: memory↔code drift (read-only)
 ```
 

@@ -77,6 +77,17 @@
             "statusMessage": "agent-wiki freshness check"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/enum-parity-commit-guard.js\"",
+            "timeout": 30,
+            "statusMessage": "status-enum-parity (commit guard)"
+          }
+        ]
       }
     ],
     "PostToolUse": [

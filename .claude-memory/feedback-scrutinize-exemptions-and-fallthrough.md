@@ -51,3 +51,13 @@ the test is decorative.
 
 Baked into [[contract-reconcile]] (Step 2 exemptions clause + Mode-B complement/fall-through
 self-review + anti-patterns).
+
+**Deterministic control (S257) — because a written rule can't fire itself.** The misses kept
+recurring even after writing the rule down, since I never *ran* the checklist at build time.
+`scripts/check-status-enum-parity.js` (npm `check:status-enum-parity`, in the `/start` gate list)
+enforces a registry of producer↔consumer key-parity invariants, and a PreToolUse(Bash) hook
+`.claude/hooks/enum-parity-commit-guard.js` BLOCKS a `git commit` (exit 2) when they drift —
+verified end-to-end against the exact `held`-missing-from-`STAGE_META` regression. **When you add a
+producer set whose values must be mirrored by a consumer (label map / filter bucket / count rollup),
+add a REGISTRY entry** so the new pair is enforced too. The hook is the control; the prose above is
+why it exists.
