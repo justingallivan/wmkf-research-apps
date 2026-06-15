@@ -1,0 +1,15 @@
+{
+  "name": "akoya_request-fieldprimer",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "_comment": "Isolated followup deploy (S258) for the single Workbench Proposal-tab Field Primer Memo field. Lives in its own wave so `apply-dataverse-schema --wave=2-fieldprimer` creates ONLY this field. Re-running the full wave2 would ALSO try to create the drifted `wmkf_appreviewersuggestion_honorariumrequest` relationship (prod has the honorarium lookup under a different SchemaName, so ensureLookupRelationship would create a duplicate) — hence isolation. Field naming follows the v3 wmkf_ai_<concept> rule. Catalogued in docs/atlas/dataverse-akoya-request.md and docs/WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md.",
+  "attributes": [
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_FieldPrimer",
+      "displayName": "AI Field Primer",
+      "description": "Workbench Proposal-tab Field Primer: JSON envelope of the staff-facing field primer for this proposal's research field (field_overview, subareas, key_methods, frontiers, communities, venues, experts with OpenAlex grounding, proposal_placement, caveats) plus provenance (model/runId/promptName/promptVersion/generatedAt). Written by the field-primer route on PD-triggered generation; see docs/WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md. Staff orientation only — NOT a reviewer-candidate source. JSON payload: parse, don't flatten (documented exception to flat-fields, like wmkf_ai_ReportGoalsAssessment).",
+      "maxLength": 100000
+    }
+  ]
+}
