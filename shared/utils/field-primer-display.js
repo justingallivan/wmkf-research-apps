@@ -8,37 +8,42 @@
  * SCOPE: orientation only. The primer is staff-facing field orientation and is
  * NEVER a reviewer-candidate or CONTACT source (see field-primer-service.js /
  * shared/config/prompts/field-primer.js). So this module surfaces only PUBLIC
- * PROFILE links (ORCID / OpenAlex / Wikipedia) and the already-resolved
- * bibliometrics — never email or any contact channel.
+ * PROFILE links (ORCID / OpenAlex) and the already-resolved bibliometrics —
+ * never email or any contact channel.
  *
- * Dependency-free (safe in the client bundle). All links are built from the
- * grounded identity that `groundPrimerExperts` resolved against OpenAlex; URLs
- * are constructed from validated id tokens (we own the host) rather than trusting
- * a stored URL, and the one stored URL we pass through (Wikipedia) is scheme/host
- * validated. Only `confirmed` / `corrected` experts carry a resolved identity, so
- * `unverified` experts get no links (nothing was resolved to link to).
+ * Dependency-free except for the canonical ORCID checksum normalizer (a pure,
+ * importless helper — safe in the client bundle). Links + metrics are gated to
+ * `confirmed` / `corrected` experts (the only statuses `groundPrimerExperts`
+ * resolves an identity for). Each href is built from a STRICTLY ANCHORED id
+ * token (we own the host), so the produced URLs contain no Markdown
+ * metacharacters and are safe to emit into a `[label](href)` link.
+ *
+ * NOTE on Wikipedia: an earlier draft surfaced a Wikipedia link from OpenAlex's
+ * `ids.wikipedia`, but the live OpenAlex Author endpoint does not return that
+ * field (verified 2026-06-15 against api.openalex.org for Wikipedia-notable
+ * authors — `ids` carries only `openalex` + `orcid`), so the link was always
+ * null. Dropped rather than shipped dead. Revisit via a Wikidata hop if wanted.
  */
 
-// Bare-or-hyphenated ORCID, checksum char may be X. We build the orcid.org URL.
-const ORCID_RE = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/i;
-// OpenAlex author id token (`A` + digits), anywhere in the stored id/URL.
-const OPENALEX_ID_RE = /A\d+/i;
+import { normalizeOrcid } from '../../lib/utils/orcid-normalize';
 
+function isGroundedIdentity(grounding) {
+  return !!grounding && (grounding.status === 'confirmed' || grounding.status === 'corrected');
+}
+
+// Accept only a bare `A<digits>` token or the canonical OpenAlex author URL,
+// ANCHORED end-to-end — `evil-A123` / `https://not-openalex.example/A123` /
+// `fooA123bar` must NOT produce a (falsely trusted) link.
 function openAlexUrl(openAlexId) {
-  const m = String(openAlexId || '').match(OPENALEX_ID_RE);
-  return m ? `https://openalex.org/${m[0].toUpperCase()}` : null;
+  const m = String(openAlexId || '').trim().match(/^(?:https:\/\/openalex\.org\/)?(A\d+)$/i);
+  return m ? `https://openalex.org/${m[1].toUpperCase()}` : null;
 }
 
+// Checksum-validate via the shared normalizer (not a shape-only regex), so a
+// visually-valid but ISO-7064-invalid iD does not render a dead link.
 function orcidUrl(orcid) {
-  const v = String(orcid || '').trim();
-  return ORCID_RE.test(v) ? `https://orcid.org/${v.toUpperCase()}` : null;
-}
-
-// Wikipedia is a stored URL from OpenAlex's `ids.wikipedia`; pass it through only
-// when it is an https Wikipedia article URL (defense-in-depth against a bad value).
-function wikipediaUrl(wikipedia) {
-  const v = String(wikipedia || '').trim();
-  return /^https:\/\/[a-z-]+\.wikipedia\.org\/wiki\/.+/i.test(v) ? v : null;
+  const norm = normalizeOrcid(orcid);
+  return norm.state === 'valid' ? `https://orcid.org/${norm.id}` : null;
 }
 
 /**
@@ -49,27 +54,26 @@ function wikipediaUrl(wikipedia) {
  * @returns {Array<{ label: string, href: string }>}
  */
 export function expertProfileLinks(grounding) {
-  if (!grounding || (grounding.status !== 'confirmed' && grounding.status !== 'corrected')) return [];
+  if (!isGroundedIdentity(grounding)) return [];
   const links = [];
   const orcid = orcidUrl(grounding.orcid);
   if (orcid) links.push({ label: 'ORCID', href: orcid });
   const oa = openAlexUrl(grounding.openAlexId);
   if (oa) links.push({ label: 'OpenAlex', href: oa });
-  const wiki = wikipediaUrl(grounding.wikipedia);
-  if (wiki) links.push({ label: 'Wikipedia', href: wiki });
   return links;
 }
 
 /**
  * Bibliometric chips for a grounded expert (h-index, citation count). Returns
- * `null` when neither metric is present. Numbers only — orienting context, not a
- * ranking signal.
+ * `null` for ungrounded / `unverified` experts (metrics must not lend
+ * credibility to an unverified name) or when neither metric is present. Numbers
+ * only — orienting context, not a ranking signal.
  *
  * @param {Object} grounding - expert.grounding from groundPrimerExperts
  * @returns {string[]|null}
  */
 export function expertMetrics(grounding) {
-  if (!grounding) return null;
+  if (!isGroundedIdentity(grounding)) return null;
   const parts = [];
   if (Number.isFinite(grounding.hIndex)) parts.push(`h-index ${grounding.hIndex}`);
   if (Number.isFinite(grounding.citedByCount)) {

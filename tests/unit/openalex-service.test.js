@@ -50,7 +50,6 @@ describe('OpenAlexService.searchAuthors', () => {
       hIndex: null,
       i10Index: null,
       citedByCount: null,
-      wikipedia: null,
       topics: ['Attosecond physics'],
       worksCount: 345,
     }]);

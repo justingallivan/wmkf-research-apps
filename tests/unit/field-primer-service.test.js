@@ -241,10 +241,10 @@ describe('groundPrimerExperts (uses the real forenamesContradict; OpenAlex mocke
     expect(md).toContain('✓');
   });
 
-  test('carries h-index, citations, and a Wikipedia link through a confirmed grounding', async () => {
+  test('carries h-index + citations through a confirmed grounding (null when absent)', async () => {
     OpenAlexService.searchAuthors.mockImplementation(async (q) => {
       const db = {
-        'andrew lang': [{ displayName: 'Andrew Lang', worksCount: 80, topics: ['Biology', 'Genome'], openAlexId: 'https://openalex.org/A1', orcid: '0000-0002-1111-2222', hIndex: 24, citedByCount: 5577, wikipedia: 'https://en.wikipedia.org/wiki/Andrew_Lang' }],
+        'andrew lang': [{ displayName: 'Andrew Lang', worksCount: 80, topics: ['Biology', 'Genome'], openAlexId: 'https://openalex.org/A1', orcid: '0000-0002-1825-0097', hIndex: 24, citedByCount: 5577 }],
         'j. thomas beatty': [{ displayName: 'J. Thomas Beatty', worksCount: 90, topics: ['Biology', 'Genome'], openAlexId: 'https://openalex.org/A2' }],
       };
       const records = db[String(q).toLowerCase()] || [];
@@ -252,28 +252,45 @@ describe('groundPrimerExperts (uses the real forenamesContradict; OpenAlex mocke
     });
     const out = await groundPrimerExperts([{ name: 'Andrew Lang' }, { name: 'J. Thomas Beatty' }]);
     expect(out[0].grounding).toMatchObject({
-      status: 'confirmed', hIndex: 24, citedByCount: 5577,
-      wikipedia: 'https://en.wikipedia.org/wiki/Andrew_Lang', orcid: '0000-0002-1111-2222',
+      status: 'confirmed', hIndex: 24, citedByCount: 5577, orcid: '0000-0002-1825-0097',
     });
     // absent metrics → explicit null, never undefined/fabricated
     expect(out[1].grounding.hIndex).toBeNull();
     expect(out[1].grounding.citedByCount).toBeNull();
-    expect(out[1].grounding.wikipedia).toBeNull();
   });
 
-  test('renderPrimerMarkdown emits profile links + bibliometrics for grounded experts', () => {
+  test('does NOT carry stray contact keys the model may emit into the persisted expert', async () => {
+    OpenAlexService.searchAuthors.mockImplementation(async (q) => {
+      const db = {
+        'andrew lang': [{ displayName: 'Andrew Lang', worksCount: 80, topics: ['Biology', 'Genome'], openAlexId: 'A1' }],
+        'j. thomas beatty': [{ displayName: 'J. Thomas Beatty', worksCount: 90, topics: ['Biology', 'Genome'], openAlexId: 'A2' }],
+      };
+      const records = db[String(q).toLowerCase()] || [];
+      return { totalCount: records.length, records };
+    });
+    const out = await groundPrimerExperts([
+      { name: 'Andrew Lang', affiliation: 'Memorial U', why_relevant: 'x', email: 'leak@example.com', phone: '555-1234' },
+      { name: 'J. Thomas Beatty' },
+    ]);
+    // primer is NEVER a contact source — extra keys must not survive into the envelope
+    expect(out[0]).toEqual({ name: 'Andrew Lang', affiliation: 'Memorial U', why_relevant: 'x', grounding: expect.any(Object) });
+    expect(out[0].email).toBeUndefined();
+    expect(out[0].phone).toBeUndefined();
+  });
+
+  test('renderPrimerMarkdown emits profile links + bibliometrics for grounded experts only', () => {
     const md = renderPrimerMarkdown({
       experts: [
-        { name: 'Andrew Lang', affiliation: 'Memorial U', why_relevant: 'x', grounding: { status: 'confirmed', openAlexId: 'https://openalex.org/A1', orcid: '0000-0002-1111-2222', wikipedia: 'https://en.wikipedia.org/wiki/Andrew_Lang', hIndex: 24, citedByCount: 5577 } },
-        { name: 'Nobody', affiliation: 'X', why_relevant: 'z', grounding: { status: 'unverified' } },
+        { name: 'Andrew Lang', affiliation: 'Memorial U', why_relevant: 'x', grounding: { status: 'confirmed', openAlexId: 'https://openalex.org/A1', orcid: '0000-0002-1825-0097', hIndex: 24, citedByCount: 5577 } },
+        { name: 'Nobody', affiliation: 'X', why_relevant: 'z', grounding: { status: 'unverified', hIndex: 99 } },
       ],
     });
     expect(md).toContain('h-index 24');
     expect(md).toContain('5,577 citations');
-    expect(md).toContain('[ORCID](https://orcid.org/0000-0002-1111-2222)');
+    expect(md).toContain('[ORCID](https://orcid.org/0000-0002-1825-0097)');
     expect(md).toContain('[OpenAlex](https://openalex.org/A1)');
-    expect(md).toContain('[Wikipedia](https://en.wikipedia.org/wiki/Andrew_Lang)');
-    // unverified expert gets no links/metrics line
-    expect(md).not.toContain('Nobody**\n  ');
+    expect(md).not.toContain('Wikipedia');
+    // unverified expert gets no links/metrics line — and no credibility from h-index
+    expect(md).not.toContain('h-index 99');
   });
 });
