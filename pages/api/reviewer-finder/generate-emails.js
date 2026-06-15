@@ -27,6 +27,7 @@ import {
 
 import { createPersonalizationPrompt } from '../../../shared/config/prompts/email-reviewer';
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { isGuid } from '../../../lib/utils/guid';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { LLMClient } from '../../../lib/services/llm-client';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
@@ -257,6 +258,17 @@ export default async function handler(req, res) {
     const suggestionIds = validCandidates
       .map(c => c.suggestionId)
       .filter(id => id != null);
+
+    // GUID-validate every supplied suggestionId before any of them reaches a
+    // Dataverse selector (findById/getRecord in the lookup below, updateRecord in
+    // the mark-as-sent pass). suggestionId is optional per candidate, but a
+    // present-but-malformed one is rejected (fail closed) — these ids interpolate
+    // raw into the request URL. Candidates without a suggestionId use the
+    // proposalInfo fallback and are unaffected.
+    if (!suggestionIds.every(isGuid)) {
+      sendEvent('error', { message: 'Each candidate suggestionId must be a valid GUID' });
+      return res.end();
+    }
 
     let proposalInfoMap = new Map();
     if (suggestionIds.length > 0) {

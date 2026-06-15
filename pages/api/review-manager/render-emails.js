@@ -32,6 +32,7 @@ import {
   buildTemplateData,
 } from '../../../lib/utils/email-generator';
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { allGuids } from '../../../lib/utils/guid';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
@@ -75,6 +76,11 @@ export default async function handler(req, res) {
 
     if (!Array.isArray(suggestionIds) || suggestionIds.length === 0) {
       return res.status(400).json({ error: 'suggestionIds array is required' });
+    }
+    // GUID-validate every id before findById (record-id selector interpolated
+    // raw into the request URL).
+    if (!allGuids(suggestionIds)) {
+      return res.status(400).json({ error: 'suggestionIds must all be valid GUIDs' });
     }
     if (!template || !template.subject || !template.body) {
       return res.status(400).json({ error: 'template with subject and body is required' });

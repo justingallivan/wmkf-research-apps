@@ -14,6 +14,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { isGuid } from '../../../lib/utils/guid';
 import {
   BASE_CONFIG,
   KECK_GUIDELINES,
@@ -68,6 +69,11 @@ export default async function handler(req, res) {
 
   if (!requestGuid) {
     return res.status(400).json({ error: 'requestGuid is required' });
+  }
+  // GUID-validate before it becomes an akoya_request record-id selector
+  // (getRecord/updateRecord interpolate it raw into the request URL).
+  if (!isGuid(requestGuid)) {
+    return res.status(400).json({ error: 'requestGuid is not a valid GUID' });
   }
   if (!fileRef) {
     return res.status(400).json({ error: 'fileRef is required' });

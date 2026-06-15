@@ -28,6 +28,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { isGuid } from '../../../lib/utils/guid';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { GraphService } from '../../../lib/services/graph-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
@@ -46,6 +47,11 @@ export default async function handler(req, res) {
   const { suggestionId, filename: requestedFilename } = req.query;
   if (!suggestionId || typeof suggestionId !== 'string') {
     return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId required.'] });
+  }
+  // GUID-validate before it becomes a Dataverse record-id selector (getRecord
+  // interpolates it raw into the request URL).
+  if (!isGuid(suggestionId)) {
+    return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId must be a valid GUID.'] });
   }
 
   try {

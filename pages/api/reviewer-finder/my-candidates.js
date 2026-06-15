@@ -21,6 +21,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { isGuid } from '../../../lib/utils/guid';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { resolveByEmail as resolvePD } from '../../../lib/services/program-director-resolver';
@@ -83,6 +84,13 @@ async function handleGet(req, res, access) {
 
     if (mode === 'proposals') {
       return handleProposalsList(req, res, access, { cycleCode });
+    }
+
+    // GUID-validate requestId before it becomes a Dataverse selector
+    // (fetchRequestByIdOrNumber → getRecord). requestNumber is a string lookup,
+    // escaped at its own filter.
+    if (requestId && !isGuid(requestId)) {
+      return res.status(400).json({ error: 'requestId is not a valid GUID' });
     }
 
     let suggestions = [];
@@ -375,6 +383,11 @@ async function handlePatch(req, res, access) {
 
     // ── Bulk by request (proposalId) ──
     if (proposalId !== undefined && suggestionId === undefined) {
+      // GUID-validate before it reaches bulkUpdateByRequest → findByRequest,
+      // which interpolates it raw into an OData `_wmkf_request_value eq …` filter.
+      if (!isGuid(proposalId)) {
+        return res.status(400).json({ error: 'proposalId is not a valid GUID' });
+      }
       const updates = {};
       if (grantCycleCode !== undefined) updates.grantCycleCode = grantCycleCode;
       if (programArea !== undefined) updates.programArea = programArea;
@@ -404,6 +417,11 @@ async function handlePatch(req, res, access) {
 
     if (!suggestionId) {
       return res.status(400).json({ error: 'suggestionId or proposalId is required' });
+    }
+    // GUID-validate before it reaches updateLifecycle / findById (record-id
+    // selectors interpolated raw into the request URL).
+    if (!isGuid(suggestionId)) {
+      return res.status(400).json({ error: 'suggestionId is not a valid GUID' });
     }
 
     // ── Per-suggestion ──
@@ -536,6 +554,11 @@ async function handleDelete(req, res, access) {
     const { suggestionId } = req.body || {};
     if (!suggestionId) {
       return res.status(400).json({ error: 'suggestionId is required' });
+    }
+    // GUID-validate before softDelete → getRecord/updateRecord (record-id
+    // selector interpolated raw into the request URL).
+    if (!isGuid(suggestionId)) {
+      return res.status(400).json({ error: 'suggestionId is not a valid GUID' });
     }
     // Server-authoritative removal (Codex S213 BUG-1 + BUG-3 fix): unselect the
     // row AND revoke any magic link in ONE atomic PATCH (wmkf_selected=false +

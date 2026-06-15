@@ -18,6 +18,7 @@
 
 import { put } from '@vercel/blob';
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { isGuid } from '../../../lib/utils/guid';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { GraphService } from '../../../lib/services/graph-service';
@@ -65,6 +66,11 @@ export default async function handler(req, res) {
   const { requestId, fileKey } = req.body || {};
   if (!requestId) {
     return res.status(400).json({ error: 'requestId is required' });
+  }
+  // GUID-validate before it becomes a Dataverse record-id selector / SharePoint
+  // bucket key (getRecord interpolates it raw into the request URL).
+  if (!isGuid(requestId)) {
+    return res.status(400).json({ error: 'requestId is not a valid GUID' });
   }
 
   return bypassDynamicsRestrictions('reviewer-finder-load-proposal', async () => {

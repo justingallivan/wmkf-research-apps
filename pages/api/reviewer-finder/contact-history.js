@@ -40,6 +40,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { isGuid } from '../../../lib/utils/guid';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
@@ -67,9 +68,10 @@ export default async function handler(req, res) {
   if (!contactId) {
     return res.status(400).json({ error: 'contactId is required' });
   }
-  // Permissive GUID check — Dataverse will 400 on a malformed value anyway,
-  // but rejecting at the edge avoids burning a round-trip for obvious typos.
-  if (!/^[0-9a-fA-F-]{32,40}$/.test(contactId)) {
+  // Strict GUID check — contactId is interpolated into the OData $filter below.
+  // The strict shape (vs. the prior permissive [0-9a-fA-F-]{32,40}) is the same
+  // edge guard every reviewer-surface selector uses (lib/utils/guid.js).
+  if (!isGuid(contactId)) {
     return res.status(400).json({ error: 'contactId must be a GUID' });
   }
 

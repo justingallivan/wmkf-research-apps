@@ -42,6 +42,7 @@
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { findByShortCode as findCycleByShortCode } from '../../../lib/services/grant-cycles-dataverse';
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { isGuid } from '../../../lib/utils/guid';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { safeFetch, isAllowedUrl } from '../../../lib/utils/safe-fetch';
 import { readUploadedBlobBuffer } from '../../../lib/utils/uploaded-blob';
@@ -138,6 +139,12 @@ export default async function handler(req, res) {
     for (const d of drafts) {
       if (!d || !d.suggestionId || !d.subject || !d.body) {
         sendEvent('error', { message: 'each draft must have suggestionId, subject, body' });
+        return res.end();
+      }
+      // GUID-validate before findById/updateLifecycle (record-id selector
+      // interpolated raw into the request URL). Fail closed before any send.
+      if (!isGuid(d.suggestionId)) {
+        sendEvent('error', { message: 'each draft suggestionId must be a valid GUID' });
         return res.end();
       }
     }

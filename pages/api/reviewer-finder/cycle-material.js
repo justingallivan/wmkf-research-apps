@@ -23,6 +23,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { isGuid } from '../../../lib/utils/guid';
 import { findById } from '../../../lib/services/grant-cycles-dataverse';
 import { readUploadedBlobBuffer } from '../../../lib/utils/uploaded-blob';
 import { isPrivateCycleMaterialPathname } from '../../../lib/utils/cycle-material-ref';
@@ -84,6 +85,11 @@ export default async function handler(req, res) {
   const { cycleId, pathname } = req.query;
   if (!cycleId || typeof cycleId !== 'string') {
     return res.status(400).json({ error: 'cycleId is required' });
+  }
+  // GUID-validate before it becomes a grant-cycle record-id selector (findById
+  // builds a Dataverse key-predicate URL from it).
+  if (!isGuid(cycleId)) {
+    return res.status(400).json({ error: 'cycleId is not a valid GUID' });
   }
   if (!pathname || typeof pathname !== 'string') {
     return res.status(400).json({ error: 'pathname is required' });

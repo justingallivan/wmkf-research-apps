@@ -26,6 +26,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { isGuid, allGuids } from '../../../lib/utils/guid';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { resolveByEmail as resolvePD } from '../../../lib/services/program-director-resolver';
@@ -103,6 +104,12 @@ export default async function handler(req, res) {
 async function handleGet(req, res, access) {
   try {
     const { proposalId, requestNumber, cycleCode, status } = req.query;
+
+    // GUID-validate proposalId before it becomes a Dataverse selector
+    // (fetchRequestByIdOrNumber → getRecord). requestNumber is an escaped string lookup.
+    if (proposalId && !isGuid(proposalId)) {
+      return res.status(400).json({ error: 'proposalId is not a valid GUID' });
+    }
 
     let suggestions = [];
     let requestById = {};
@@ -260,6 +267,12 @@ async function handlePatch(req, res, access) {
       if (reviewStatus === undefined) {
         return res.status(400).json({ error: 'reviewStatus required for batch update' });
       }
+      // GUID-validate every id before it reaches updateLifecycle (record-id
+      // selectors interpolated raw into the request URL). Reject the whole batch
+      // on any bad id rather than partially applying.
+      if (!allGuids(suggestionIds)) {
+        return res.status(400).json({ error: 'suggestionIds must all be valid GUIDs' });
+      }
       for (const id of suggestionIds) {
         await suggestionAdapter.updateLifecycle(id, { reviewStatus }, { actingUserSystemId });
       }
@@ -268,6 +281,10 @@ async function handlePatch(req, res, access) {
 
     if (!suggestionId) {
       return res.status(400).json({ error: 'suggestionId, suggestionIds, or proposalId is required' });
+    }
+    // GUID-validate before updateLifecycle (record-id selector interpolated raw).
+    if (!isGuid(suggestionId)) {
+      return res.status(400).json({ error: 'suggestionId is not a valid GUID' });
     }
 
     const lifecycle = {};
