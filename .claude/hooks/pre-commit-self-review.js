@@ -17,12 +17,14 @@
  */
 
 const { execFileSync } = require('child_process');
-const { isGitCommit, isAmend } = require('./lib/git-commit-detect');
 
 let input = '';
 process.stdin.on('data', (c) => { input += c; });
 process.stdin.on('end', () => {
   try {
+    // require INSIDE the try so a missing/broken helper fails OPEN (this hook is
+    // already non-blocking, but keep all three commit hooks uniform — Codex S259 #1).
+    const { isGitCommit, isAmend } = require('./lib/git-commit-detect');
     const data = JSON.parse(input);
     if (!data || data.tool_name !== 'Bash') return;
     const cmd = (data.tool_input && data.tool_input.command) || '';

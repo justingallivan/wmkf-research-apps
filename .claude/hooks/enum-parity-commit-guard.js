@@ -13,12 +13,15 @@
 
 const { execFileSync } = require('child_process');
 const path = require('path');
-const { isGitCommit } = require('./lib/git-commit-detect');
 
 let input = '';
 process.stdin.on('data', (c) => { input += c; });
 process.stdin.on('end', () => {
   try {
+    // require INSIDE the try so a missing/broken helper fails OPEN (the catch
+    // swallows it) rather than crashing the process with a non-2 exit whose
+    // block/allow behavior is undefined for a PreToolUse hook (Codex S259 #1).
+    const { isGitCommit } = require('./lib/git-commit-detect');
     const data = JSON.parse(input);
     if (!data || data.tool_name !== 'Bash') return;
     const cmd = (data.tool_input && data.tool_input.command) || '';

@@ -13,18 +13,36 @@
  *       the substring `git commit` inside unrelated text.
  * (Codex S259 review, finding B4.)
  *
- * Approach: split the command on shell separators (&& || ; | newline) so a
- * compound `git add . && git commit` is seen, then within each segment find the
- * `git` token and walk PAST git's global options (skipping the separate value of
- * value-taking options like `-c key=val`) to the first subcommand token — match
- * iff it is exactly `commit`.
+ * Approach: strip quoted spans (so a `git commit` mention inside a `-m "…"`
+ * message or an `echo "git commit"` string is not seen as a command), then split
+ * on shell separators (&& || ; | newline and `(` `)` grouping) so a compound
+ * `git add . && git commit` or a subshell `(git commit …)` is seen, then within
+ * each segment find the `git` token and walk PAST git's global options (skipping
+ * the separate value of value-taking options like `-c key=val`) to the first
+ * subcommand token — match iff it is exactly `commit`.
  *
- * This APPROXIMATES shell parsing (it does not model quoting, heredocs, or
- * subshells). That trade is deliberate: these hooks fail OPEN, so the cost of a
- * rare false-positive is one extra gate run on a clean tree (harmless), while the
- * property that matters — never MISSING a real `git commit` form — is what the
- * token walk buys. Bias is toward detecting a commit, not toward suppressing one.
+ * This APPROXIMATES shell parsing (it does not model heredoc bodies, nested
+ * escapes, or `git` reached only through a variable/alias). That trade is
+ * deliberate: these hooks fail OPEN, so the cost of a rare false-positive is one
+ * extra gate run on a clean tree (harmless), while the property that matters —
+ * never MISSING a real `git commit` form — is what the token walk buys. Matching
+ * stays liberal (any `git` token in a segment, not only at segment start) on
+ * purpose: anchoring to the start would risk a false NEGATIVE on an unlisted
+ * command prefix, the one direction a BLOCKING guard must not take.
+ *
+ * Codex (S259, follow-up review) confirmed GLOBAL_OPTS_WITH_VALUE is complete and
+ * flagged the quoted-message / subshell / require-placement gaps addressed here.
  */
+
+// Remove double-, single-, and backtick-quoted spans (honoring backslash escapes)
+// so their contents are never tokenized as a command. Replace with a space so
+// adjacent tokens do not fuse.
+function stripQuoted(s) {
+  return s
+    .replace(/"(?:[^"\\]|\\.)*"/g, ' ')
+    .replace(/'(?:[^'\\]|\\.)*'/g, ' ')
+    .replace(/`(?:[^`\\]|\\.)*`/g, ' ');
+}
 
 // `git` global options that consume a SEPARATE following argument; their value
 // must be skipped so it is not mistaken for the subcommand. (`--opt=value` and
@@ -56,12 +74,14 @@ function segmentIsGitCommit(segment) {
  *  in any segment of a compound command). */
 function isGitCommit(cmd) {
   if (typeof cmd !== 'string' || cmd.length === 0) return false;
-  return cmd.split(/&&|\|\||;|\n|\|/).some(segmentIsGitCommit);
+  return stripQuoted(cmd).split(/&&|\|\||;|\n|\||\(|\)/).some(segmentIsGitCommit);
 }
 
-/** True iff the command carries `--amend` (used to skip amend commits). */
+/** True iff the command carries the `--amend` FLAG (used to skip amend commits).
+ *  Quoted spans are stripped first so `--amend` inside a commit MESSAGE does not
+ *  falsely trigger a skip. */
 function isAmend(cmd) {
-  return typeof cmd === 'string' && /--amend\b/.test(cmd);
+  return typeof cmd === 'string' && /--amend\b/.test(stripQuoted(cmd));
 }
 
 module.exports = { isGitCommit, isAmend };
