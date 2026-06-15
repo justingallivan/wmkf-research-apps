@@ -24,14 +24,40 @@ function money(n) {
   return typeof n === 'number' && Number.isFinite(n) ? USD.format(n) : '—';
 }
 
-function downloadUrl(requestId, file) {
+function docUrl(requestId, file, { inline = false } = {}) {
   const p = new URLSearchParams({
     requestId,
     library: file.library,
     folder: file.folder,
     filename: file.name,
   });
+  if (inline) p.set('disposition', 'inline');
   return `/api/workbench/download-proposal-document?${p.toString()}`;
+}
+
+// Only PDFs view usefully (and safely) inline; everything else is download-only.
+function isViewable(file) {
+  return /\.pdf$/i.test(file?.name || '') || file?.mimeType === 'application/pdf';
+}
+
+function DocActions({ requestId, file }) {
+  return (
+    <span className="flex items-center gap-3 shrink-0">
+      {isViewable(file) && (
+        <a
+          className="text-sm font-medium text-indigo-600 hover:underline"
+          href={docUrl(requestId, file, { inline: true })}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          View
+        </a>
+      )}
+      <a className="text-sm font-medium text-indigo-600 hover:underline" href={docUrl(requestId, file)}>
+        Download
+      </a>
+    </span>
+  );
 }
 
 function Field({ label, children }) {
@@ -85,9 +111,7 @@ function DocumentsSection({ requestId, docs, error }) {
           <li key={s.key} className="flex items-center justify-between gap-3 py-2">
             <span className="text-sm text-gray-700">{s.label}</span>
             {s.found ? (
-              <a className="text-sm font-medium text-indigo-600 hover:underline" href={downloadUrl(requestId, s)}>
-                Download
-              </a>
+              <DocActions requestId={requestId} file={s} />
             ) : (
               <span className="text-xs text-gray-400">not found</span>
             )}
@@ -100,10 +124,9 @@ function DocumentsSection({ requestId, docs, error }) {
           <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Other documents</p>
           <ul className="space-y-1">
             {others.map((d) => (
-              <li key={`${d.folder}/${d.name}`}>
-                <a className="text-sm text-indigo-600 hover:underline" href={downloadUrl(requestId, d)}>
-                  {d.name}
-                </a>
+              <li key={`${d.folder}/${d.name}`} className="flex items-center justify-between gap-3 py-1">
+                <span className="text-sm text-gray-700 truncate">{d.name}</span>
+                <DocActions requestId={requestId} file={d} />
               </li>
             ))}
           </ul>

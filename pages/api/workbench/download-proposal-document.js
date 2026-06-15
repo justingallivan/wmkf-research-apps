@@ -29,6 +29,12 @@ export const config = {
 // Request folders follow `{requestNumber}_{GUIDNoHyphensUpper}`.
 const REQUEST_FOLDER_RE = /^(\d+)_([0-9A-F]{32})$/;
 
+// `disposition=inline` is honored ONLY for non-executable, viewable types — so a
+// proposal PDF opens in the browser viewer, but an HTML/SVG file (which could run
+// script in our origin) can never be served inline. Everything else stays an
+// attachment. Combined with X-Content-Type-Options: nosniff, this is fail-closed.
+const SAFE_INLINE_MIME = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'text/plain']);
+
 function guidToFolderSuffix(requestId) {
   const stripped = String(requestId).replace(/-/g, '').toUpperCase();
   return /^[0-9A-F]{32}$/.test(stripped) ? stripped : null;
@@ -92,8 +98,14 @@ export default async function handler(req, res) {
         String(filename),
       );
 
+      // Inline only when explicitly requested AND the type is safe to render in
+      // the browser; otherwise force download. nosniff (below) stops content-type
+      // confusion, so a non-PDF can't be coerced into inline script execution.
+      const wantInline = String(req.query.disposition || '').toLowerCase() === 'inline';
+      const dispType = wantInline && SAFE_INLINE_MIME.has(mimeType) ? 'inline' : 'attachment';
+
       res.setHeader('Content-Type', mimeType);
-      res.setHeader('Content-Disposition', `attachment; filename="${resolvedName.replace(/"/g, '\\"')}"`);
+      res.setHeader('Content-Disposition', `${dispType}; filename="${resolvedName.replace(/"/g, '\\"')}"`);
       res.setHeader('Content-Length', size);
       res.setHeader('Cache-Control', 'private, max-age=300');
       res.setHeader('X-Content-Type-Options', 'nosniff');
