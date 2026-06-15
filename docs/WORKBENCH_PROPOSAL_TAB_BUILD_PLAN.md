@@ -33,7 +33,7 @@ generation + persistence + regenerate; the enabling route/app-access/helper work
 | Field shown | Dataverse source | Note |
 |---|---|---|
 | PI | `wmkf_projectleader` (→ contacts) | formatted value |
-| Co-PIs | `wmkf_apprequestperson` junction (UNION-read w/ projectleader, per `contact-history.js`) | legacy `wmkf_copi1..5` retired |
+| Co-PIs | `wmkf_apprequestperson` junction (UNION-read w/ projectleader, per `contact-history.js`) | **names only** (Justin S258); legacy `wmkf_copi1..5` retired |
 | Abstract | `wmkf_abstract` | |
 | Requested Amount | `akoya_request` | NOT `akoya_request_base`; verified $1.3M on 1002836 |
 | Total Project Budget | `akoya_expenses` | = `akoya_request` + `wmkf_totalothersources`; verified $1.56M on 1002836 |
@@ -72,8 +72,9 @@ Page.docx`** (redundant — it's the Top section):
 - **New Dataverse Memo field `wmkf_ai_fieldprimer`** (JSON envelope: the 9 primer
   sections + expert-grounding verdicts + provenance `generatedAt/model/runId/promptVersion`).
   Mirrors `wmkf_ai_dataextract` (Memo-JSON) and the v3 naming convention.
-- **Lifecycle:** field null → show "Generate field primer" button; populated → render +
-  "Regenerate" (bypasses skip-if-populated overwrite guard).
+- **Lifecycle:** field null → show a plain "Generate field primer" button (NO LLM-cost/confirm
+  warning — staff know it's an AI call, Justin S258); populated → render + "Regenerate"
+  (bypasses skip-if-populated overwrite guard).
 - **Route gains a `requestId` mode:** pull the proposal (`ProjectDescription.pdf` via the
   shared classifier) from SharePoint, extract, generate, **ground experts**, then write the
   JSON back. The write happens AFTER grounding (so the stored blob carries OpenAlex verdicts)
@@ -105,10 +106,14 @@ the download-document proxy pattern · `ReviewersTab` as the panel-component pre
 
 ## 8. Open questions for the design pass
 
+Open (Codex to resolve):
 1. One proposal-tab endpoint vs. extend `resolve-request` + a separate docs endpoint?
 2. Primer generate: synchronous request (route `maxDuration` is already 800s) vs. background?
 3. Where exactly does the per-cycle filename→label map live (config module shape)?
-4. Co-PI display: how much of the junction to surface (names only vs. role/effort)?
+
+Resolved (Justin, S258):
+- **Co-PI display: names only** (not role/effort) — see §3.1.
+- **Primer generate UX: plain button, no LLM-cost/confirm warning** — staff know — see §4.
 
 ## 9. Done = 
 
