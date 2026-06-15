@@ -19,6 +19,7 @@
  * Executor (executePrompt → field-primer.generate). See docs/EXECUTOR_CONTRACT.md.
  */
 
+import { randomUUID } from 'crypto';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { generateFieldPrimer, groundPrimerExperts } from '../../../lib/services/field-primer-service';
@@ -88,24 +89,33 @@ export default async function handler(req, res) {
 
       const priorValue = rec.wmkf_ai_fieldprimer || null;
 
-      // Already generated → return it, no paid call.
+      // Already generated → return it, no paid call. (regenerate bypasses this.)
       const existing = parseFieldPrimerEnvelope(priorValue);
       if (existing && !regenerate) {
         return res.status(200).json({ envelope: existing, persisted: true, reused: true });
       }
-      // Another session is mid-generation → tell the client to wait.
+      // A FRESH lease means another session is mid-generation — block EVERYONE,
+      // including regenerate (don't stomp an in-flight generation). Stale leases
+      // (TTL-expired / future-dated) fall through and are re-claimable.
       const lease = parseFieldPrimerLease(priorValue, nowMs);
-      if (lease && lease.fresh && !regenerate) {
+      if (lease && lease.fresh) {
         return res.status(200).json({ status: 'generating' });
       }
+      // Fail closed: without an ETag the claim can't be atomic, so we can't
+      // single-flight safely. Better to ask the caller to retry than risk a
+      // double cold generation.
+      if (!rec._etag) {
+        return res.status(503).json({ error: 'Could not acquire a generation lock; please try again.' });
+      }
 
-      // Atomically claim the generation lease (ETag optimistic concurrency). A
-      // racing claim 412s on the stale ETag and backs off — only one cold
-      // generation runs per request.
+      // Atomically claim the generation lease (ETag optimistic concurrency) with a
+      // unique nonce so the final persist can verify we still own it. A racing
+      // claim 412s on the stale ETag and backs off — only one cold generation runs.
+      const myNonce = randomUUID();
       try {
         await DynamicsService.updateRecord(
           'akoya_requests', rec.akoya_requestid,
-          { wmkf_ai_fieldprimer: makeFieldPrimerLease(nowIso) },
+          { wmkf_ai_fieldprimer: makeFieldPrimerLease(nowIso, myNonce) },
           { ifMatch: rec._etag },
         );
       } catch (e) {
@@ -159,17 +169,33 @@ export default async function handler(req, res) {
         promptVersion: gen.promptVersion ?? null,
         primer,
       };
+      // Persist ONLY if we still own the lease (nonce match), conditionally on a
+      // fresh ETag — so a regenerate/slow generator can't overwrite a newer
+      // envelope, and we never clobber a peer that reclaimed an expired lease.
       try {
-        await DynamicsService.updateRecord('akoya_requests', rec.akoya_requestid, {
-          wmkf_ai_fieldprimer: JSON.stringify(envelope),
+        const cur = await DynamicsService.getRecord('akoya_requests', rec.akoya_requestid, {
+          select: 'wmkf_ai_fieldprimer',
         });
+        const curLease = parseFieldPrimerLease(cur.wmkf_ai_fieldprimer, Date.now());
+        if (curLease && curLease.nonce === myNonce) {
+          await DynamicsService.updateRecord(
+            'akoya_requests', rec.akoya_requestid,
+            { wmkf_ai_fieldprimer: JSON.stringify(envelope) },
+            { ifMatch: cur._etag },
+          );
+          return res.status(200).json({ envelope, persisted: true });
+        }
+        // We lost ownership (lease expired + reclaimed, or a peer already wrote a
+        // result). Prefer the stored result; otherwise return ours unpersisted.
+        const curEnv = parseFieldPrimerEnvelope(cur.wmkf_ai_fieldprimer);
+        if (curEnv) return res.status(200).json({ envelope: curEnv, persisted: true, reused: true });
+        return res.status(200).json({ envelope, persisted: false, persistError: true });
       } catch (e) {
         console.error('[field-primer/generate] persist failed:', e.message);
-        // Generation succeeded; surface it even though the write failed. The lease
+        // Generation succeeded; surface it even though the write failed. Our lease
         // self-expires after the TTL, so a later retry can re-claim.
         return res.status(200).json({ envelope, persisted: false, persistError: true });
       }
-      return res.status(200).json({ envelope, persisted: true });
     });
   }
 

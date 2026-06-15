@@ -40,17 +40,24 @@ export function parseFieldPrimerEnvelope(raw) {
 }
 
 /**
- * Parse a stored value into a generation lease. Returns { startedAt, fresh } or
- * null. `nowMs` is passed in by the caller (no Date.now() in shared code).
+ * Parse a stored value into a generation lease. Returns { startedAt, nonce, fresh }
+ * or null. `nowMs` is passed in by the caller (no Date.now() in shared code).
+ * A future-dated lease (age < 0 — clock skew or tampering) is treated as NOT fresh
+ * so it can never block generation indefinitely.
  */
 export function parseFieldPrimerLease(raw, nowMs) {
   const env = asObject(raw);
   if (!env || env.schema !== FIELD_PRIMER_LEASE_SCHEMA || typeof env.startedAt !== 'string') return null;
   const startedMs = Date.parse(env.startedAt);
   if (Number.isNaN(startedMs)) return null;
-  return { startedAt: env.startedAt, fresh: nowMs - startedMs < FIELD_PRIMER_LEASE_TTL_MS };
+  const age = nowMs - startedMs;
+  return {
+    startedAt: env.startedAt,
+    nonce: typeof env.nonce === 'string' ? env.nonce : null,
+    fresh: age >= 0 && age < FIELD_PRIMER_LEASE_TTL_MS,
+  };
 }
 
-export function makeFieldPrimerLease(startedAtIso) {
-  return JSON.stringify({ schema: FIELD_PRIMER_LEASE_SCHEMA, startedAt: startedAtIso });
+export function makeFieldPrimerLease(startedAtIso, nonce) {
+  return JSON.stringify({ schema: FIELD_PRIMER_LEASE_SCHEMA, startedAt: startedAtIso, nonce });
 }

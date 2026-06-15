@@ -124,18 +124,24 @@ function PrimerList({ title, items, render }) {
   );
 }
 
+// Coerce a primer field to a renderable string — the LLM output is parseable but
+// not per-field schema-validated, so an object/array value must never reach React
+// as a child (it would throw). Non-string/number → ''.
+const str = (v) => (typeof v === 'string' || typeof v === 'number' ? String(v) : '');
+
 function PrimerView({ envelope }) {
   const p = envelope?.primer || {};
   const venues = Array.isArray(p.venues) ? p.venues.filter((v) => typeof v === 'string' && v.trim()) : [];
+  const overview = str(p.field_overview);
+  const placement = str(p.proposal_placement);
+  const caveats = str(p.caveats);
   return (
     <div className="space-y-4">
-      {p.field_overview && (
-        <p className="text-sm text-gray-700 whitespace-pre-wrap">{p.field_overview}</p>
-      )}
-      <PrimerList title="Subareas" items={p.subareas} render={(s) => <span><span className="font-medium text-gray-900">{s.name}</span>{s.description ? ` — ${s.description}` : ''}</span>} />
-      <PrimerList title="Key methods" items={p.key_methods} render={(m) => <span><span className="font-medium text-gray-900">{m.name}</span>{m.description ? ` — ${m.description}` : ''}</span>} />
-      <PrimerList title="Frontiers" items={p.frontiers} render={(f) => <span><span className="font-medium text-gray-900">{f.frontier}</span>{f.why_now ? ` — ${f.why_now}` : ''}</span>} />
-      <PrimerList title="Communities" items={p.communities} render={(c) => <span><span className="font-medium text-gray-900">{c.name}</span>{c.description ? ` — ${c.description}` : ''}</span>} />
+      {overview && <p className="text-sm text-gray-700 whitespace-pre-wrap">{overview}</p>}
+      <PrimerList title="Subareas" items={p.subareas} render={(s) => <span><span className="font-medium text-gray-900">{str(s.name)}</span>{str(s.description) ? ` — ${str(s.description)}` : ''}</span>} />
+      <PrimerList title="Key methods" items={p.key_methods} render={(m) => <span><span className="font-medium text-gray-900">{str(m.name)}</span>{str(m.description) ? ` — ${str(m.description)}` : ''}</span>} />
+      <PrimerList title="Frontiers" items={p.frontiers} render={(f) => <span><span className="font-medium text-gray-900">{str(f.frontier)}</span>{str(f.why_now) ? ` — ${str(f.why_now)}` : ''}</span>} />
+      <PrimerList title="Communities" items={p.communities} render={(c) => <span><span className="font-medium text-gray-900">{str(c.name)}</span>{str(c.description) ? ` — ${str(c.description)}` : ''}</span>} />
       {venues.length > 0 && (
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Venues</p>
@@ -144,25 +150,25 @@ function PrimerView({ envelope }) {
       )}
       <PrimerList title="Experts (orienting only — verify before use)" items={p.experts} render={(e) => (
         <span>
-          <span className="font-medium text-gray-900">{e.name}</span>
-          {e.affiliation ? ` (${e.affiliation})` : ''}
+          <span className="font-medium text-gray-900">{str(e.name)}</span>
+          {str(e.affiliation) ? ` (${str(e.affiliation)})` : ''}
           <GroundingBadge grounding={e.grounding} />
-          {e.grounding?.status === 'corrected' && e.grounding?.resolvedName ? (
-            <span className="text-amber-700"> → did you mean {e.grounding.resolvedName}?</span>
+          {e.grounding?.status === 'corrected' && str(e.grounding?.resolvedName) ? (
+            <span className="text-amber-700"> → did you mean {str(e.grounding.resolvedName)}?</span>
           ) : null}
-          {e.why_relevant ? <span className="block text-gray-600">{e.why_relevant}</span> : null}
+          {str(e.why_relevant) ? <span className="block text-gray-600">{str(e.why_relevant)}</span> : null}
         </span>
       )} />
-      {p.proposal_placement && (
+      {placement && (
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Where this proposal sits</p>
-          <p className="text-sm text-gray-700 whitespace-pre-wrap">{p.proposal_placement}</p>
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">{placement}</p>
         </div>
       )}
-      {p.caveats && (
+      {caveats && (
         <div className="bg-amber-50 border border-amber-100 rounded-md p-3">
           <p className="text-xs uppercase tracking-wide text-amber-700 mb-1">Caveats</p>
-          <p className="text-sm text-amber-900 whitespace-pre-wrap">{p.caveats}</p>
+          <p className="text-sm text-amber-900 whitespace-pre-wrap">{caveats}</p>
         </div>
       )}
     </div>
