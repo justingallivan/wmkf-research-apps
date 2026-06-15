@@ -10,6 +10,8 @@
  */
 
 const assert = require('assert');
+const path = require('path');
+const { spawnSync } = require('child_process');
 const { isGitCommit, isAmend } = require('./git-commit-detect');
 
 const MATCH = [
@@ -24,6 +26,10 @@ const MATCH = [
   'git --git-dir=/x commit',                 // --opt=value form
   'git --git-dir /x commit',                 // --opt value (separate) form
   'git -c core.autocrlf=false commit',       // single -c=value then commit
+  'git -C "path with spaces/repo" commit',   // quoted value for a value-taking global option
+  'git -c "user.name=x" commit',             // quoted value must not make the skip consume commit
+  'git --git-dir "/tmp/repo.git" commit',    // quoted separate value for long global option
+  'git -C repo\\(old\\) commit',             // escaped parens in a value must not split away commit
   'git -P commit',                           // bare paginate flag, no value
   'git add . && git commit -m y',            // second segment of a compound
   'git add -A ; git commit',
@@ -34,6 +40,7 @@ const MATCH = [
   'sudo git commit -m y',                    // sudo prefix
   'GIT_AUTHOR_NAME=x git commit',            // leading env assignment
   'git commit -m "Justin\'s fix"',           // apostrophe inside a double-quoted message
+  "git commit -m 'oops with no closing quote", // unterminated quote is left literal; liberal matcher still sees commit
 ];
 
 const NO_MATCH = [
@@ -87,5 +94,38 @@ for (const [c, want] of AMEND_CASES) {
   catch { failures++; console.error(`  ✗ isAmend(${JSON.stringify(c)}) — expected ${want}`); }
 }
 
+// Blocking commit guards must fail OPEN if the shared trigger helper is missing
+// or broken at load time. This locks the require-inside-try contract: the process
+// exits 0 (allow) rather than 2 (block).
+const BLOCKING_GUARDS = [
+  'enum-parity-commit-guard.js',
+  'trust-boundary-guid-commit-guard.js',
+];
+for (const hook of BLOCKING_GUARDS) {
+  const hookPath = path.resolve(__dirname, '..', hook);
+  const script = `
+    const Module = require('module');
+    const originalLoad = Module._load;
+    Module._load = function(request, parent, isMain) {
+      if (request === './lib/git-commit-detect') throw new Error('synthetic broken helper');
+      return originalLoad.apply(this, arguments);
+    };
+    require(${JSON.stringify(hookPath)});
+  `;
+  const child = spawnSync(process.execPath, ['-e', script], {
+    input: JSON.stringify({
+      tool_name: 'Bash',
+      tool_input: { command: 'git commit -m x' },
+      cwd: path.resolve(__dirname, '..', '..', '..'),
+    }),
+    encoding: 'utf8',
+  });
+  try { assert.strictEqual(child.status, 0); console.log(`  ✓ ${hook} fails open when git-commit-detect load throws`); }
+  catch {
+    failures++;
+    console.error(`  ✗ ${hook} should fail open on helper load error; status=${child.status} stderr=${JSON.stringify(child.stderr)}`);
+  }
+}
+
 if (failures) { console.error(`\ngit-commit-detect test FAILED — ${failures} case(s).`); process.exit(1); }
-console.log(`\ngit-commit-detect test OK — ${MATCH.length + NO_MATCH.length + LIBERAL_TRUE.length + AMEND_CASES.length} cases.`);
+console.log(`\ngit-commit-detect test OK — ${MATCH.length + NO_MATCH.length + LIBERAL_TRUE.length + AMEND_CASES.length + BLOCKING_GUARDS.length} cases.`);

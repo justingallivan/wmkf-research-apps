@@ -35,13 +35,14 @@
  */
 
 // Remove double-, single-, and backtick-quoted spans (honoring backslash escapes)
-// so their contents are never tokenized as a command. Replace with a space so
-// adjacent tokens do not fuse.
+// so their contents are never tokenized as a command. Replace each span with a
+// placeholder token so value-taking git globals (`git -C "path" commit`) still
+// have a value token to skip; adjacent spaces prevent token fusion.
 function stripQuoted(s) {
   return s
-    .replace(/"(?:[^"\\]|\\.)*"/g, ' ')
-    .replace(/'(?:[^'\\]|\\.)*'/g, ' ')
-    .replace(/`(?:[^`\\]|\\.)*`/g, ' ');
+    .replace(/"(?:[^"\\]|\\.)*"/g, ' __QUOTED__ ')
+    .replace(/'(?:[^'\\]|\\.)*'/g, ' __QUOTED__ ')
+    .replace(/`(?:[^`\\]|\\.)*`/g, ' __QUOTED__ ');
 }
 
 // `git` global options that consume a SEPARATE following argument; their value
@@ -74,7 +75,7 @@ function segmentIsGitCommit(segment) {
  *  in any segment of a compound command). */
 function isGitCommit(cmd) {
   if (typeof cmd !== 'string' || cmd.length === 0) return false;
-  return stripQuoted(cmd).split(/&&|\|\||;|\n|\||\(|\)/).some(segmentIsGitCommit);
+  return stripQuoted(cmd).split(/&&|\|\||;|\n|\||(?<!\\)\(|(?<!\\)\)/).some(segmentIsGitCommit);
 }
 
 /** True iff the command carries the `--amend` FLAG (used to skip amend commits).
