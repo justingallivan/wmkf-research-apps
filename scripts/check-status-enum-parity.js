@@ -87,6 +87,23 @@ function registry() {
     });
   }
 
+  // 2. akoya_requeststatus class enum → Status-tab badge map (equal: every class
+  //    needs a display badge AND no orphan badge). Group A, S260: the Status tab
+  //    consumes STATUS_CLASS via CLASS_META; a new server class without a badge
+  //    would render the raw status with no styling.
+  {
+    const consts = read('lib/services/dataverse-export/constants.js');
+    const statusTab = read('shared/components/workbench/StatusTab.js');
+    checks.push({
+      name: 'STATUS_CLASS ⇔ Status-tab CLASS_META',
+      producer: 'STATUS_CLASS keys (lib/services/dataverse-export/constants.js)',
+      consumer: 'CLASS_META keys (shared/components/workbench/StatusTab.js)',
+      produced: extractObjectKeys(consts, 'STATUS_CLASS'),
+      consumed: extractObjectKeys(statusTab, 'CLASS_META'),
+      rule: 'equal',
+    });
+  }
+
   // NOTE — reviewer email template parity (TEMPLATE_TYPES ↔ DEFAULT_TEMPLATES ↔
   // TEMPLATE_TYPE_LABELS) is intentionally NOT registered here: it's already enforced
   // at RUNTIME (mergeTemplates dereferences DEFAULT_TEMPLATES[type] and throws on a
@@ -97,22 +114,27 @@ function registry() {
   return checks;
 }
 
+// Validate one registered invariant; returns failure message(s) ([] = clean).
+// An EMPTY extraction is a failure, not a pass: a registered pair always has
+// keys, so an empty result means an extractor silently stopped matching (a format
+// change) and the gate would otherwise pass VACUOUSLY (Codex S260).
+function validateCheck(c) {
+  if (!Array.isArray(c.produced) || !Array.isArray(c.consumed)) {
+    return [`${c.name}: could not extract keys (producer=${c.produced}, consumer=${c.consumed}) — extraction may need updating.`];
+  }
+  if (c.produced.length === 0 || c.consumed.length === 0) {
+    return [`${c.name}: extracted an EMPTY set (producer=${c.produced.length} key(s), consumer=${c.consumed.length} key(s)) — a registered invariant must have keys; an extractor likely stopped matching. Fix the extractor; do NOT let the gate pass vacuously.`];
+  }
+  const { missing, extra } = parity(c.produced, c.consumed, c.rule);
+  const bits = [];
+  if (missing.length) bits.push(`produced but not consumed (${c.consumer}): ${missing.join(', ')}`);
+  if (extra.length) bits.push(`consumed but not produced (${c.producer}): ${extra.join(', ')}`);
+  return bits.length ? [`${c.name} — ${bits.join('; ')}`] : [];
+}
+
 function runLive() {
   const checks = registry();
-  const failures = [];
-  for (const c of checks) {
-    if (!Array.isArray(c.produced) || !Array.isArray(c.consumed)) {
-      failures.push(`${c.name}: could not extract keys (producer=${c.produced}, consumer=${c.consumed}) — extraction may need updating.`);
-      continue;
-    }
-    const { missing, extra } = parity(c.produced, c.consumed, c.rule);
-    if (missing.length || extra.length) {
-      const bits = [];
-      if (missing.length) bits.push(`produced but not consumed (${c.consumer}): ${missing.join(', ')}`);
-      if (extra.length) bits.push(`consumed but not produced (${c.producer}): ${extra.join(', ')}`);
-      failures.push(`${c.name} — ${bits.join('; ')}`);
-    }
-  }
+  const failures = checks.flatMap(validateCheck);
   if (failures.length) {
     console.error('✗ status-enum-parity FAILED — a producer value has no matching consumer entry:');
     for (const f of failures) console.error(`  • ${f}`);
@@ -144,6 +166,13 @@ function selfTest() {
   ok('catches held missing from STAGE_META', parity(extractReturnedStrings(dashFixture, 'deriveWorkRemaining'), extractObjectKeys(wbMissing, 'STAGE_META'), 'subset').missing.join() === 'held');
   const wbComplete = "const STAGE_META = {\n  review: {},\n  held: {},\n  find: {},\n};";
   ok('passes when STAGE_META has held', parity(extractReturnedStrings(dashFixture, 'deriveWorkRemaining'), extractObjectKeys(wbComplete, 'STAGE_META'), 'subset').missing.length === 0);
+
+  // validateCheck — the no-vacuous-pass guard (Codex S260)
+  ok('validateCheck: empty produced set is flagged (no vacuous pass)', validateCheck({ name: 'x', produced: [], consumed: ['a'], rule: 'equal' }).length === 1);
+  ok('validateCheck: empty consumed set is flagged', validateCheck({ name: 'x', produced: ['a'], consumed: [], rule: 'equal' }).length === 1);
+  ok('validateCheck: null extraction is flagged', validateCheck({ name: 'x', produced: null, consumed: ['a'], rule: 'equal' }).length === 1);
+  ok('validateCheck: non-empty matching sets are clean', validateCheck({ name: 'x', produced: ['a'], consumed: ['a'], rule: 'equal' }).length === 0);
+  ok('validateCheck: real drift is flagged', validateCheck({ name: 'x', produced: ['a', 'b'], consumed: ['a'], rule: 'equal' }).length === 1);
 
   let failed = 0;
   for (const [label, cond] of cases) {

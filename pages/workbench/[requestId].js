@@ -1,12 +1,14 @@
 /**
  * Request Workbench — per-request shell (tier-3).
  *
- * Renders the request context header + the tab strip. The Reviewers tab is live
- * (Phase 2: Invite/Track/Completed via the shared ReviewerManagePanel; Phase 3:
- * the Find sub-tab — applicant-reviewer ingestion + in-panel search). The Proposal
- * tab is also live (documents + AI content + Field Primer, S258/S260); the other
- * 8 tabs are placeholders for the rest of the request lifecycle. Tab + sub-tab
- * selection is query-string driven (?tab=reviewers&sub=invite) for deep-links.
+ * Renders the request context header + the tab strip. LIVE tabs: Reviewers
+ * (Phase 2 Invite/Track/Completed via ReviewerManagePanel; Phase 3 Find —
+ * applicant-reviewer ingestion + in-panel search), Proposal (documents + AI
+ * content + Field Primer, S258/S260), and — Group A, S260 — Overview (per-request
+ * command center) + Status (read-only akoya_requeststatus reflection). The other
+ * 6 tabs are placeholders for the rest of the request lifecycle. The default
+ * landing is Overview. Tab + sub-tab selection is query-string driven
+ * (?tab=reviewers&sub=invite) for deep-links.
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -20,9 +22,11 @@ import { useProfile } from '../../shared/context/ProfileContext';
 import { PREFERENCE_KEYS } from '../../shared/config/reviewerFinderPreferences';
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 import ProposalTab from '../../shared/components/workbench/ProposalTab';
+import OverviewTab from '../../shared/components/workbench/OverviewTab';
+import StatusTab from '../../shared/components/workbench/StatusTab';
 import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
 
-// Reviewers (Phases 2–3) and Proposal are the live tabs; the other 8 are
+// Live tabs: Overview, Proposal, Reviewers (Phases 2–3), Status; the other 6 are
 // placeholders for the full request lifecycle. Order matches the build plan's tab strip.
 const TABS = [
   { key: 'overview', label: 'Overview' },
@@ -46,7 +50,7 @@ function WorkbenchRequest() {
   const { requestId } = router.query;
 
   const tabParam = typeof router.query.tab === 'string' ? router.query.tab : null;
-  const activeTab = tabParam && TAB_KEYS.has(tabParam) ? tabParam : 'reviewers';
+  const activeTab = tabParam && TAB_KEYS.has(tabParam) ? tabParam : 'overview';
 
   const [ctx, setCtx] = useState(null);
   const [error, setError] = useState(null);
@@ -140,7 +144,13 @@ function WorkbenchRequest() {
         </nav>
       </div>
 
-      {activeTab === 'reviewers' ? (
+      {activeTab === 'overview' ? (
+        <OverviewTab
+          context={ctx}
+          requestId={typeof requestId === 'string' ? requestId : ''}
+          onSelectTab={selectTab}
+        />
+      ) : activeTab === 'reviewers' ? (
         <ReviewersTab
           requestId={typeof requestId === 'string' ? requestId : ''}
           context={ctx}
@@ -149,6 +159,8 @@ function WorkbenchRequest() {
         />
       ) : activeTab === 'proposal' ? (
         <ProposalTab context={ctx} />
+      ) : activeTab === 'status' ? (
+        <StatusTab context={ctx} />
       ) : (
         <Card hover={false}>
           <p className="text-sm text-gray-500">This panel is coming in a later update.</p>

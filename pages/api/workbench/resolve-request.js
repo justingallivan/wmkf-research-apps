@@ -13,6 +13,7 @@ import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
 import { fetchCoPIs } from '../../../lib/services/proposal-participants';
+import { classifyStatus, STATUS_CLASS } from '../../../lib/services/dataverse-export/constants';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -102,6 +103,14 @@ export default async function handler(req, res) {
         cycleLabel: cycleCode ? cycleCodeToLabel(cycleCode) : null,
         meetingDate: r.wmkf_meetingdate || null,
         requestStatus: r.akoya_requeststatus || null,
+        // Status tab (S260): canonical class for the read-only Status display,
+        // via the shared akoya_requeststatus value→class map. A status present
+        // but absent from the authoritative map ⇒ UNCLASSIFIED (shown raw, never
+        // coerced); null status ⇒ null. The board decides; the Workbench only
+        // reflects this string. See lib/services/dataverse-export/constants.js.
+        statusClass: r.akoya_requeststatus
+          ? (classifyStatus(r.akoya_requeststatus)?.class || STATUS_CLASS.UNCLASSIFIED)
+          : null,
         institution: r.wmkf_organizationname || r._akoya_applicantid_value_formatted || null,
         applicant: r._akoya_applicantid_value_formatted || null,
         projectLeader: r._wmkf_projectleader_value_formatted || null,
