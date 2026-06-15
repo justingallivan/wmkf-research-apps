@@ -97,7 +97,7 @@ function ExtractedData({ raw }) {
 }
 
 function GroundingBadge({ grounding }) {
-  if (!grounding?.status) return null;
+  if (!grounding?.status || typeof grounding.status !== 'string') return null;
   const map = {
     confirmed: ['confirmed', 'bg-green-100 text-green-700'],
     corrected: ['suggested correction', 'bg-amber-100 text-amber-800'],

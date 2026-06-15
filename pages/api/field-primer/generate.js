@@ -178,6 +178,9 @@ export default async function handler(req, res) {
         });
         const curLease = parseFieldPrimerLease(cur.wmkf_ai_fieldprimer, Date.now());
         if (curLease && curLease.nonce === myNonce) {
+          if (!cur._etag) {
+            return res.status(200).json({ envelope, persisted: false, persistError: true });
+          }
           await DynamicsService.updateRecord(
             'akoya_requests', rec.akoya_requestid,
             { wmkf_ai_fieldprimer: JSON.stringify(envelope) },
