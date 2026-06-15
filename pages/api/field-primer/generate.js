@@ -10,6 +10,8 @@
  *     ProjectDescription from SharePoint, generates, grounds experts, and
  *     PERSISTS a JSON envelope to `akoya_request.wmkf_ai_fieldprimer`. Idempotent:
  *     returns the stored primer without a paid call unless `regenerate:true`.
+ *     Concurrency: an ETag-conditional generation LEASE ensures only one cold
+ *     generation runs per request — a racing request gets `{status:'generating'}`.
  *   - { proposalText, focus? } — standalone (CLI / ad-hoc). Generates + returns,
  *     NO persistence (no request to write to).
  *
@@ -24,24 +26,19 @@ import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
 import { getProposalText } from '../../../lib/services/workbench-proposal-documents';
+import {
+  FIELD_PRIMER_ENVELOPE_SCHEMA,
+  parseFieldPrimerEnvelope,
+  parseFieldPrimerLease,
+  makeFieldPrimerLease,
+} from '../../../shared/utils/field-primer-envelope';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ENVELOPE_SCHEMA = 'field-primer/v1';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '2mb' } },
   maxDuration: 800,
 };
-
-function parseEnvelope(raw) {
-  if (!raw) return null;
-  try {
-    const env = JSON.parse(raw);
-    return env && env.primer ? env : null;
-  } catch {
-    return null;
-  }
-}
 
 // Ground named experts against OpenAlex — a safety control (catches the
 // forename-hallucination class), so there's no off switch. Fail-soft.
@@ -71,12 +68,15 @@ export default async function handler(req, res) {
   const { proposalText, focus, requestId, regenerate } = req.body || {};
   const focusArg = typeof focus === 'string' ? focus : undefined;
 
-  // ---- Mode A: requestId (Workbench) — persisted -----------------------------
+  // ---- Mode A: requestId (Workbench) — persisted, single-flight -------------
   if (requestId !== undefined && requestId !== null && requestId !== '') {
     if (!GUID_RE.test(String(requestId))) {
       return res.status(400).json({ error: 'requestId is not a valid GUID' });
     }
     return bypassDynamicsRestrictions('field-primer-generate', async () => {
+      const nowIso = new Date().toISOString();
+      const nowMs = Date.now();
+
       let rec;
       try {
         rec = await DynamicsService.getRecord('akoya_requests', String(requestId), {
@@ -86,22 +86,57 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: `No request found for ${requestId}` });
       }
 
-      // Already generated and not regenerating → return it, no paid call.
-      const existing = parseEnvelope(rec.wmkf_ai_fieldprimer);
+      const priorValue = rec.wmkf_ai_fieldprimer || null;
+
+      // Already generated → return it, no paid call.
+      const existing = parseFieldPrimerEnvelope(priorValue);
       if (existing && !regenerate) {
         return res.status(200).json({ envelope: existing, persisted: true, reused: true });
       }
+      // Another session is mid-generation → tell the client to wait.
+      const lease = parseFieldPrimerLease(priorValue, nowMs);
+      if (lease && lease.fresh && !regenerate) {
+        return res.status(200).json({ status: 'generating' });
+      }
 
-      // Pull the proposal text (ProjectDescription) from SharePoint.
+      // Atomically claim the generation lease (ETag optimistic concurrency). A
+      // racing claim 412s on the stale ETag and backs off — only one cold
+      // generation runs per request.
+      try {
+        await DynamicsService.updateRecord(
+          'akoya_requests', rec.akoya_requestid,
+          { wmkf_ai_fieldprimer: makeFieldPrimerLease(nowIso) },
+          { ifMatch: rec._etag },
+        );
+      } catch (e) {
+        const re = await DynamicsService.getRecord('akoya_requests', rec.akoya_requestid, { select: 'wmkf_ai_fieldprimer' });
+        const reEnv = parseFieldPrimerEnvelope(re.wmkf_ai_fieldprimer);
+        if (reEnv) return res.status(200).json({ envelope: reEnv, persisted: true, reused: true });
+        return res.status(200).json({ status: 'generating' });
+      }
+
+      // We hold the lease. Restore the prior value on ANY failure so a crashed
+      // generation never leaves the field stuck on a lease, and a failed
+      // REGENERATE doesn't destroy the existing primer.
+      const restorePrior = async () => {
+        try {
+          await DynamicsService.updateRecord('akoya_requests', rec.akoya_requestid, { wmkf_ai_fieldprimer: priorValue });
+        } catch (e) {
+          console.error('[field-primer/generate] lease restore failed:', e.message);
+        }
+      };
+
       const cycleCode = rec.wmkf_meetingdate ? meetingDateToCycleCode(rec.wmkf_meetingdate) : null;
       let proposal;
       try {
         proposal = await getProposalText(rec.akoya_requestid, rec.akoya_requestnum, cycleCode);
       } catch (e) {
         console.error('[field-primer/generate] proposal fetch failed:', e.message);
+        await restorePrior();
         return res.status(502).json({ error: 'Could not read the proposal document from SharePoint.' });
       }
       if (!proposal || !proposal.text || proposal.text.trim().length < 50) {
+        await restorePrior();
         return res.status(400).json({ error: 'No readable Project Description document found for this request.' });
       }
 
@@ -110,34 +145,28 @@ export default async function handler(req, res) {
         gen = await generateFieldPrimer({ proposalText: proposal.text, focus: focusArg, runSource: 'Vercel Interactive' });
       } catch (e) {
         console.error('[field-primer/generate] generation failed:', e.message);
+        await restorePrior();
         return res.status(500).json({ error: 'Field primer generation failed.' });
       }
       const primer = await groundExperts(gen.primer);
 
       const envelope = {
-        schema: ENVELOPE_SCHEMA,
-        generatedAt: new Date().toISOString(),
+        schema: FIELD_PRIMER_ENVELOPE_SCHEMA,
+        generatedAt: nowIso,
         model: gen.model,
         runId: gen.runId,
         promptName: gen.promptName,
         promptVersion: gen.promptVersion ?? null,
         primer,
       };
-
-      // Pre-write re-check: if another tab persisted one while we generated, don't
-      // clobber it (unless regenerate was explicit).
       try {
-        const now = await DynamicsService.getRecord('akoya_requests', rec.akoya_requestid, { select: 'wmkf_ai_fieldprimer' });
-        const concurrent = parseEnvelope(now.wmkf_ai_fieldprimer);
-        if (concurrent && !regenerate) {
-          return res.status(200).json({ envelope: concurrent, persisted: true, reused: true });
-        }
         await DynamicsService.updateRecord('akoya_requests', rec.akoya_requestid, {
           wmkf_ai_fieldprimer: JSON.stringify(envelope),
         });
       } catch (e) {
         console.error('[field-primer/generate] persist failed:', e.message);
-        // Generation succeeded; surface the primer even though the write failed.
+        // Generation succeeded; surface it even though the write failed. The lease
+        // self-expires after the TTL, so a later retry can re-claim.
         return res.status(200).json({ envelope, persisted: false, persistError: true });
       }
       return res.status(200).json({ envelope, persisted: true });

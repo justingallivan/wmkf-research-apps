@@ -11,8 +11,9 @@
  * fetched here from /api/workbench/proposal-documents (request-scoped).
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card } from '../Layout';
+import { parseFieldPrimerEnvelope } from '../../utils/field-primer-envelope';
 
 const USD = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -95,16 +96,6 @@ function ExtractedData({ raw }) {
   );
 }
 
-function parseEnvelope(raw) {
-  if (!raw) return null;
-  try {
-    const env = JSON.parse(raw);
-    return env && env.primer ? env : null;
-  } catch {
-    return null;
-  }
-}
-
 function GroundingBadge({ grounding }) {
   if (!grounding?.status) return null;
   const map = {
@@ -117,12 +108,15 @@ function GroundingBadge({ grounding }) {
 }
 
 function PrimerList({ title, items, render }) {
-  if (!Array.isArray(items) || items.length === 0) return null;
+  // The LLM output is parseable JSON but not schema-validated per-item, so guard
+  // against null/non-object array entries before rendering.
+  const safe = Array.isArray(items) ? items.filter((it) => it && typeof it === 'object') : [];
+  if (safe.length === 0) return null;
   return (
     <div>
       <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">{title}</p>
       <ul className="space-y-1.5">
-        {items.map((it, i) => (
+        {safe.map((it, i) => (
           <li key={i} className="text-sm text-gray-700">{render(it)}</li>
         ))}
       </ul>
@@ -132,6 +126,7 @@ function PrimerList({ title, items, render }) {
 
 function PrimerView({ envelope }) {
   const p = envelope?.primer || {};
+  const venues = Array.isArray(p.venues) ? p.venues.filter((v) => typeof v === 'string' && v.trim()) : [];
   return (
     <div className="space-y-4">
       {p.field_overview && (
@@ -141,10 +136,10 @@ function PrimerView({ envelope }) {
       <PrimerList title="Key methods" items={p.key_methods} render={(m) => <span><span className="font-medium text-gray-900">{m.name}</span>{m.description ? ` — ${m.description}` : ''}</span>} />
       <PrimerList title="Frontiers" items={p.frontiers} render={(f) => <span><span className="font-medium text-gray-900">{f.frontier}</span>{f.why_now ? ` — ${f.why_now}` : ''}</span>} />
       <PrimerList title="Communities" items={p.communities} render={(c) => <span><span className="font-medium text-gray-900">{c.name}</span>{c.description ? ` — ${c.description}` : ''}</span>} />
-      {Array.isArray(p.venues) && p.venues.length > 0 && (
+      {venues.length > 0 && (
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Venues</p>
-          <p className="text-sm text-gray-700">{p.venues.join(' · ')}</p>
+          <p className="text-sm text-gray-700">{venues.join(' · ')}</p>
         </div>
       )}
       <PrimerList title="Experts (orienting only — verify before use)" items={p.experts} render={(e) => (
@@ -175,14 +170,28 @@ function PrimerView({ envelope }) {
 }
 
 function FieldPrimer({ requestId, initialRaw }) {
-  const [envelope, setEnvelope] = useState(() => parseEnvelope(initialRaw));
+  const [envelope, setEnvelope] = useState(() => parseFieldPrimerEnvelope(initialRaw));
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
+  const [pending, setPending] = useState(false); // another session is generating
+  const reqRef = useRef(0);
+
+  // Reset state (and invalidate any in-flight generate) when the request — or its
+  // persisted primer — changes, so a stale response can't apply to another request.
+  useEffect(() => {
+    reqRef.current += 1;
+    setEnvelope(parseFieldPrimerEnvelope(initialRaw));
+    setGenerating(false);
+    setError(null);
+    setPending(false);
+  }, [requestId, initialRaw]);
 
   const generate = async (regenerate) => {
     if (!requestId) return;
+    const token = reqRef.current;
     setGenerating(true);
     setError(null);
+    setPending(false);
     try {
       const res = await fetch('/api/field-primer/generate', {
         method: 'POST',
@@ -190,12 +199,14 @@ function FieldPrimer({ requestId, initialRaw }) {
         body: JSON.stringify({ requestId, ...(regenerate ? { regenerate: true } : {}) }),
       });
       const body = await res.json().catch(() => ({}));
+      if (token !== reqRef.current) return; // request changed mid-flight — ignore stale response
       if (!res.ok) throw new Error(body.error || `Generation failed (${res.status})`);
-      setEnvelope(body.envelope || null);
+      if (body.envelope) setEnvelope(body.envelope);
+      else if (body.status === 'generating') setPending(true);
     } catch (e) {
-      setError(e.message);
+      if (token === reqRef.current) setError(e.message);
     } finally {
-      setGenerating(false);
+      if (token === reqRef.current) setGenerating(false);
     }
   };
 
@@ -203,34 +214,28 @@ function FieldPrimer({ requestId, initialRaw }) {
     <div>
       <div className="flex items-center justify-between gap-3 mb-1">
         <dt className="text-xs uppercase tracking-wide text-gray-400">Field Primer</dt>
-        {envelope ? (
-          <button
-            type="button"
-            onClick={() => generate(true)}
-            disabled={generating}
-            className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
-          >
-            {generating ? 'Regenerating…' : 'Regenerate'}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => generate(false)}
-            disabled={generating}
-            className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
-          >
-            {generating ? 'Generating…' : 'Generate field primer'}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => generate(!!envelope)}
+          disabled={generating}
+          className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
+        >
+          {generating
+            ? (envelope ? 'Regenerating…' : 'Generating…')
+            : (envelope ? 'Regenerate' : 'Generate field primer')}
+        </button>
       </div>
       {error && <p className="text-sm text-amber-600 mb-2">{error}</p>}
+      {pending && !envelope && (
+        <p className="text-sm text-gray-500">Another session is generating this primer — refresh in a moment.</p>
+      )}
       {generating && !envelope && (
         <p className="text-sm text-gray-500">Generating the field primer — this can take up to a minute…</p>
       )}
       {envelope ? (
         <PrimerView envelope={envelope} />
       ) : (
-        !generating && <p className="text-sm text-gray-500">Not yet generated.</p>
+        !generating && !pending && <p className="text-sm text-gray-500">Not yet generated.</p>
       )}
     </div>
   );
