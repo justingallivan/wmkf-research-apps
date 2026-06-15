@@ -25,6 +25,7 @@ import { isReviewerMaterial } from '../../../../../lib/external/reviewer-materia
 import { getActivePolicies } from '../../../../../lib/external/policy-fetcher';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 import { normalizeCountryToIso2 } from '../../../../../shared/config/countries';
+import { fetchCoPIs } from '../../../../../lib/services/proposal-participants';
 
 // Slots Stage 2a renders. Hardcoded per build plan §4a.
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
@@ -330,38 +331,8 @@ export function computeEngagementState(s, isReady = true) {
   };
 }
 
-/**
- * Build the co-PI display list from the wmkf_apprequestperson junction.
- * Returns an array of display name strings ordered by `wmkf_authorposition`
- * then by createdon.
- *
- * Source: junction only. Per docs/INTAKE_PORTAL_SCHEMA_CHANGES.md, the
- * legacy `wmkf_copi1..5_value` slot fields are obsolete read-only legacy
- * post-S139 backfill — new code reads junction exclusively. The UNION
- * strategy in the schema doc applies only to the PI lookup, not co-PIs.
- */
-async function fetchCoPIs(requestId) {
-  if (!requestId) return [];
-  const { records } = await DynamicsService.queryRecords('wmkf_apprequestpersons', {
-    select: '_wmkf_contact_value,wmkf_authorposition',
-    expand: 'wmkf_Contact($select=fullname,firstname,lastname)',
-    filter: `_wmkf_request_value eq ${requestId} and wmkf_role eq 100000001`,
-    orderby: 'wmkf_authorposition asc,createdon asc',
-    top: 50, // defensive cap; expected cardinality is 0-5 per request
-  });
-
-  const byContactId = new Map();
-  for (const row of records) {
-    const cid = row._wmkf_contact_value;
-    if (!cid || byContactId.has(cid)) continue;
-    const c = row.wmkf_Contact;
-    const name = c?.fullname
-      || [c?.firstname, c?.lastname].filter(Boolean).join(' ').trim();
-    if (!name) continue;
-    byContactId.set(cid, name);
-  }
-  return Array.from(byContactId.values());
-}
+// fetchCoPIs is now shared — see lib/services/proposal-participants.js (S258,
+// extracted so the Workbench Proposal tab and this context route share it).
 
 /**
  * Stage 2a contact-form prefill. Priority per build plan §3:

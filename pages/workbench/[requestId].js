@@ -18,6 +18,7 @@ import { useAppAccess } from '../../shared/context/AppAccessContext';
 import { useProfile } from '../../shared/context/ProfileContext';
 import { PREFERENCE_KEYS } from '../../shared/config/reviewerFinderPreferences';
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
+import ProposalTab from '../../shared/components/workbench/ProposalTab';
 import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
 
 // Reviewers is the live tab (Phases 2–3); the other 9 are placeholders for the
@@ -145,6 +146,8 @@ function WorkbenchRequest() {
           canManage={canManage}
           settings={reviewerSettings}
         />
+      ) : activeTab === 'proposal' ? (
+        <ProposalTab context={ctx} />
       ) : (
         <Card hover={false}>
           <p className="text-sm text-gray-500">This panel is coming in a later update.</p>

@@ -12,6 +12,7 @@ import { requireAppAccess } from '../../../lib/utils/auth';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
+import { fetchCoPIs } from '../../../lib/services/proposal-participants';
 
 const SELECT = [
   'akoya_requestid',
@@ -24,6 +25,17 @@ const SELECT = [
   '_wmkf_projectleader_value',
   '_wmkf_grantprogram_value',
   '_wmkf_programdirector_value',
+  // Proposal-tab top section (S258). akoya_request = Requested Amount,
+  // akoya_expenses = Total Project Budget (verified live on 1002836). Use the
+  // non-_base fields; _base are the transaction-currency shadows.
+  'wmkf_abstract',
+  'akoya_request',
+  'akoya_expenses',
+  // Proposal-tab AI section — existing live fields (NOT wmkf_ai_fieldprimer; the
+  // primer render/generate is a later Workbench phase).
+  'wmkf_ai_fitrationale',
+  'wmkf_ai_summary',
+  'wmkf_ai_dataextract',
 ].join(',');
 
 export default async function handler(req, res) {
@@ -68,6 +80,9 @@ export default async function handler(req, res) {
       }
 
       const cycleCode = r.wmkf_meetingdate ? meetingDateToCycleCode(r.wmkf_meetingdate) : null;
+      // Co-PIs from the junction (names only). Non-critical — a failure must not
+      // 500 the header/context load, so degrade to an empty list.
+      const coPIs = await fetchCoPIs(r.akoya_requestid).catch(() => []);
       return res.status(200).json({
         success: true,
         requestId: r.akoya_requestid,
@@ -86,6 +101,22 @@ export default async function handler(req, res) {
         // UI gate (compare against the session's dynamicsSystemuserId). Server
         // stays org-open; this is cosmetic. See REQUEST_WORKBENCH_BUILD_PLAN §Phase 2.
         programDirectorId: r._wmkf_programdirector_value || null,
+        // Proposal tab — top section (S258). PI mirrors projectLeader (the
+        // wmkf_projectleader lookup); amounts are Money numbers (or null).
+        proposalInfo: {
+          pi: r._wmkf_projectleader_value_formatted || null,
+          coPIs,
+          abstract: r.wmkf_abstract || null,
+          requestedAmount: r.akoya_request ?? null,
+          totalProjectBudget: r.akoya_expenses ?? null,
+        },
+        // Proposal tab — AI section (existing live fields; dataExtract is a JSON
+        // string the client parses).
+        aiContent: {
+          fitRationale: r.wmkf_ai_fitrationale || null,
+          summary: r.wmkf_ai_summary || null,
+          dataExtract: r.wmkf_ai_dataextract || null,
+        },
       });
     } catch (err) {
       console.error('workbench resolve-request error:', err);
