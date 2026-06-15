@@ -6,10 +6,10 @@
  * up by holds must read 'held', not fall through to 'awaiting'). REVIEWERS_NEEDED = 3.
  */
 jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: {} }));
-jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
-jest.mock('../../lib/services/dynamics-context', () => ({ bypassDynamicsRestrictions: (_l, fn) => fn && fn() }));
 
-const { deriveWorkRemaining } = require('../../pages/api/workbench/dashboard');
+// deriveWorkRemaining moved from the dashboard route to the shared rollup service
+// (S260, shared with the per-request Overview rollup endpoint).
+const { deriveWorkRemaining } = require('../../lib/services/reviewer-rollup');
 
 const c = (over) => ({ candidates: 0, invited: 0, accepted: 0, declined: 0, held: 0, completed: 0, ...over });
 

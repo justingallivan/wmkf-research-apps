@@ -21,10 +21,11 @@ const baseCtx = {
   aiContent: { fitRationale: 'x', summary: null, dataExtract: null, fieldPrimer: null },
 };
 
-function mockReviewers(reviewers) {
+// Mock the lightweight per-request rollup endpoint (/api/workbench/reviewer-rollup).
+function mockRollup({ counts = {}, needed = 3, workRemaining = 'find', hint = 'No reviewer candidates yet — start finding reviewers.' } = {}) {
   return jest.spyOn(global, 'fetch').mockResolvedValue({
     ok: true,
-    json: async () => ({ success: true, proposals: [{ reviewers }] }),
+    json: async () => ({ success: true, counts, needed, workRemaining, hint }),
   });
 }
 
@@ -52,7 +53,7 @@ describe('StatusTab', () => {
 
 describe('OverviewTab', () => {
   it('renders the request snapshot incl. PI, institution, amount, and status badge', async () => {
-    mockReviewers([]);
+    mockRollup();
     render(<OverviewTab context={baseCtx} requestId="r1" onSelectTab={() => {}} />);
     expect(screen.getByText('Dr. Jane Smith')).toBeInTheDocument();
     expect(screen.getByText('Example University')).toBeInTheDocument();
@@ -62,33 +63,34 @@ describe('OverviewTab', () => {
   });
 
   it('marks present AI artifacts and leaves absent ones muted', async () => {
-    mockReviewers([]);
+    mockRollup();
     render(<OverviewTab context={baseCtx} requestId="r1" onSelectTab={() => {}} />);
     expect(screen.getByText('✓ Fit rationale')).toBeInTheDocument();
     expect(screen.getByText('— Field primer')).toBeInTheDocument();
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
   });
 
-  it('buckets reviewers via the shared helpers and shows an action hint', async () => {
-    mockReviewers([
-      { reviewStatus: 'accepted' },     // outstanding (invite)
-      { reviewStatus: 'under_review' }, // outstanding (track) + under review
-      { reviewStatus: 'complete' },     // complete
-    ]);
+  it('renders the rollup funnel counts + the server hint', async () => {
+    mockRollup({
+      counts: { candidates: 5, invited: 4, accepted: 3, declined: 0, held: 0, completed: 1 },
+      needed: 3,
+      workRemaining: 'review',
+      hint: 'Enough reviewers accepted — reviews in progress.',
+    });
     render(<OverviewTab context={baseCtx} requestId="r1" onSelectTab={() => {}} />);
-    // accepted total = 3
-    await screen.findByText('3');
-    expect(screen.getByText(/still need action/i)).toBeInTheDocument();
+    expect(await screen.findByText('5')).toBeInTheDocument();   // candidates
+    expect(screen.getByText('3 / 3')).toBeInTheDocument();      // accepted / needed
+    expect(screen.getByText('Enough reviewers accepted — reviews in progress.')).toBeInTheDocument();
   });
 
-  it('hints to start in Reviewers when none have accepted', async () => {
-    mockReviewers([]);
+  it('shows the find-stage hint when nothing has started', async () => {
+    mockRollup(); // defaults: empty counts, workRemaining 'find'
     render(<OverviewTab context={baseCtx} requestId="r1" onSelectTab={() => {}} />);
-    expect(await screen.findByText(/No reviewers accepted yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/start finding reviewers/i)).toBeInTheDocument();
   });
 
   it('deep-links via onSelectTab', async () => {
-    mockReviewers([]);
+    mockRollup();
     const onSelectTab = jest.fn();
     render(<OverviewTab context={baseCtx} requestId="r1" onSelectTab={onSelectTab} />);
     fireEvent.click(screen.getByText('Manage reviewers →'));
@@ -97,7 +99,7 @@ describe('OverviewTab', () => {
   });
 
   it('AI artifact chips deep-link to the Proposal tab', async () => {
-    mockReviewers([]);
+    mockRollup();
     const onSelectTab = jest.fn();
     render(<OverviewTab context={baseCtx} requestId="r1" onSelectTab={onSelectTab} />);
     fireEvent.click(screen.getByText('✓ Fit rationale'));
@@ -105,13 +107,19 @@ describe('OverviewTab', () => {
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
   });
 
-  it('tolerates a drifted non-array reviewers payload without crashing', async () => {
+  it('tolerates a drifted non-object counts payload without crashing', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
-      json: async () => ({ success: true, proposals: [{ reviewers: null }] }),
+      json: async () => ({ success: true, counts: null, needed: 3, workRemaining: 'find', hint: 'No reviewer candidates yet — start finding reviewers.' }),
     });
     render(<OverviewTab context={baseCtx} requestId="r1" onSelectTab={() => {}} />);
-    // falls back to the empty set → the no-reviewers hint, no throw
-    expect(await screen.findByText(/No reviewers accepted yet/i)).toBeInTheDocument();
+    // counts falls back to {} → zeros render, hint still shows, no throw
+    expect(await screen.findByText(/start finding reviewers/i)).toBeInTheDocument();
+  });
+
+  it('shows an error line when the rollup fetch fails', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
+    render(<OverviewTab context={baseCtx} requestId="r1" onSelectTab={() => {}} />);
+    expect(await screen.findByText(/Couldn’t load reviewer progress/i)).toBeInTheDocument();
   });
 });

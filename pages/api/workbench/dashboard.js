@@ -30,11 +30,10 @@ import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { resolveByEmail } from '../../../lib/services/program-director-resolver';
 import { meetingDateToCycleCode, cycleCodeToOdataFilter, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
-import { RESPONSE_TYPE_MAP, notExcludedFilter } from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import { D26_ALLOWLIST_CYCLE_CODE, D26_ALLOWLIST_REQUEST_NUMS } from '../../../shared/config/d26Allowlist';
-
-const REVIEW_STATUS_COMPLETE = 100000004;
-const REVIEWERS_NEEDED = 3; // confirmed-reviewer invariant; 5 slots are over-invite buffer
+// Reviewer rollup + work-remaining derivation are shared with the per-request
+// Overview tab (via /api/workbench/reviewer-rollup); single source of truth.
+import { fetchReviewerRollup, deriveWorkRemaining, REVIEWERS_NEEDED } from '../../../lib/services/reviewer-rollup';
 
 const PROPOSAL_SELECT = [
   'akoya_requestid',
@@ -228,40 +227,6 @@ async function fetchAllowlisted(pd, scope, cycleFilter) {
   return out;
 }
 
-/**
- * Per-request reviewer rollup from wmkf_appreviewersuggestion (selected + not
- * applicant-excluded). Dashboard-local — does not reuse my-proposals'
- * fetchReviewerCounts so my-proposals stays untouched. Chunked OR-chain at 25;
- * queryAllRecords paginates (queryRecords silently caps top at 100).
- */
-async function fetchReviewerRollup(requestIds) {
-  if (!requestIds || requestIds.length === 0) return {};
-  const out = {};
-  const CHUNK = 25;
-  for (let i = 0; i < requestIds.length; i += CHUNK) {
-    const chunk = requestIds.slice(i, i + CHUNK);
-    const orChain = chunk.map((id) => `_wmkf_request_value eq ${id}`).join(' or ');
-    const { records } = await DynamicsService.queryAllRecords('wmkf_appreviewersuggestions', {
-      select: '_wmkf_request_value,wmkf_invited,wmkf_accepted,wmkf_declined,wmkf_emailsentat,wmkf_responsetype,wmkf_reviewstatus',
-      filter: `(${orChain}) and wmkf_selected eq true and ${notExcludedFilter()}`,
-    });
-    for (const s of records) {
-      const rid = s._wmkf_request_value;
-      if (!rid) continue;
-      const o = out[rid] || (out[rid] = { candidates: 0, invited: 0, accepted: 0, declined: 0, held: 0, completed: 0 });
-      o.candidates += 1;
-      if (s.wmkf_invited === true || s.wmkf_emailsentat) o.invited += 1;
-      if (s.wmkf_accepted === true || s.wmkf_responsetype === RESPONSE_TYPE_MAP.accepted) o.accepted += 1;
-      if (s.wmkf_declined === true || s.wmkf_responsetype === RESPONSE_TYPE_MAP.declined) o.declined += 1;
-      // Held = agreed in principle (pre-finalize). Counted distinctly so staff can see a
-      // committed slate before reviewers finalize; a held row is also counted in `invited`.
-      if (s.wmkf_responsetype === RESPONSE_TYPE_MAP.held) o.held += 1;
-      if (s.wmkf_reviewstatus === REVIEW_STATUS_COMPLETE) o.completed += 1;
-    }
-  }
-  return out;
-}
-
 function projectProposal(r, c, allowlisted) {
   const counts = c || { candidates: 0, invited: 0, accepted: 0, declined: 0, held: 0, completed: 0 };
   const cycleCode = r.wmkf_meetingdate ? meetingDateToCycleCode(r.wmkf_meetingdate) : null;
@@ -288,28 +253,6 @@ function projectProposal(r, c, allowlisted) {
     // (overdue, recommended-but-unenriched) lands with the Manage/Find panels.
     workRemaining: deriveWorkRemaining(counts),
   };
-}
-
-/**
- * Single-word stage cue, computed from the rollup counts:
- *   find    — fewer candidates than needed reviewers
- *   invite  — candidates exist but none/too-few invited
- *   awaiting — invited, still short of enough acceptances
- *   held    — enough reviewers agreed in principle (slate secured), not yet finalized
- *   review  — enough accepted, reviews not all in
- *   done    — enough completed
- */
-export function deriveWorkRemaining(c) {
-  if (c.completed >= REVIEWERS_NEEDED) return 'done';
-  if (c.accepted >= REVIEWERS_NEEDED) return 'review';
-  // A committed slate ranks above plain 'awaiting' so staff see it's secured before
-  // reviewers finalize. Count accepted + held together: a proposal whose shortfall is
-  // made up by holds (e.g. 2 accepted + 1 held when 3 are needed) is still committed
-  // (Codex chunk-8 — the mixed case must not fall through to 'awaiting').
-  if (c.accepted + c.held >= REVIEWERS_NEEDED) return 'held';
-  if (c.invited > 0) return 'awaiting';
-  if (c.candidates > 0) return 'invite';
-  return 'find';
 }
 
 function summarize(proposals) {

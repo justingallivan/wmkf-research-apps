@@ -5,19 +5,18 @@
  * a fast answer to "where is this request and what do I do next." v1 is
  * deliberately scoped to data that already has a live source:
  *   - the request `context` the shell already loaded (resolve-request)
- *   - the accepted-reviewer set from /api/review-manager/reviewers?proposalId=,
- *     bucketed with the shared reviewer-modes helpers (the same logic the
- *     Reviewers tab uses — no duplicated stage maps).
+ *   - the per-request reviewer-stage rollup from /api/workbench/reviewer-rollup
+ *     (the shared lightweight count path — counts only, no person/researcher
+ *     fan-out; the server derives the funnel counts + the "what next" hint).
  *
  * Out of v1 (no live source yet — lands as those tabs are built): writeup status
  * and returned-review state. The full actionability rule set (`isActionableForPD`)
- * is also deferred — the "next step" line here is a light heuristic, not that rule.
+ * is also deferred — the rollup `hint` here is a light heuristic, not that rule.
  */
 
 import { useState, useEffect, useRef } from 'react';
 import { Card } from '../Layout';
 import { StatusBadge } from './StatusTab';
-import { countForMode, workRemainingForMode } from '../reviewers/reviewer-modes';
 
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const money = (n) => (typeof n === 'number' && Number.isFinite(n) ? USD.format(n) : '—');
@@ -70,32 +69,27 @@ function aiArtifacts(ai = {}) {
   ].map(([label, v]) => ({ label, present: !!v }));
 }
 
-function ReviewerProgress({ requestId, onSelectTab }) {
-  const [state, setState] = useState({ status: 'loading', reviewers: [] });
+function ReviewerProgress({ requestId }) {
+  const [state, setState] = useState({ status: 'loading', data: null });
   const reqRef = useRef(0);
 
   useEffect(() => {
     if (!requestId) return undefined;
     const token = (reqRef.current += 1);
     let cancelled = false;
-    setState({ status: 'loading', reviewers: [] });
-    // NOTE (Codex S260): this reuses the Reviewers-tab endpoint, which fans out to
-    // person/researcher lookups to build full reviewer objects — heavier than the
-    // counts we need, and Overview is the default tab. The accepted set is small
-    // (often zero), so the cost is bounded for now; the lighter fix is a per-request
-    // rollup endpoint extracted from dashboard.js's reviewerRollupByRequest. Deferred.
-    fetch(`/api/review-manager/reviewers?proposalId=${encodeURIComponent(requestId)}`)
+    setState({ status: 'loading', data: null });
+    // Lightweight per-request rollup (counts only, no person/researcher fan-out —
+    // Codex S260). Returns { counts, needed, workRemaining, hint }.
+    fetch(`/api/workbench/reviewer-rollup?requestId=${encodeURIComponent(requestId)}`)
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
         if (cancelled || token !== reqRef.current) return;
         if (!res.ok || !body.success) throw new Error(body.error || `Failed (${res.status})`);
-        // Defensive: only trust an array — a drifted success shape must never reach
-        // the reviewer-modes .filter() helpers (Codex S260).
-        const raw = body.proposals && body.proposals[0] && body.proposals[0].reviewers;
-        setState({ status: 'ready', reviewers: Array.isArray(raw) ? raw : [] });
+        const counts = body.counts && typeof body.counts === 'object' ? body.counts : {};
+        setState({ status: 'ready', data: { counts, needed: body.needed, hint: body.hint } });
       })
       .catch(() => {
-        if (!cancelled && token === reqRef.current) setState({ status: 'error', reviewers: [] });
+        if (!cancelled && token === reqRef.current) setState({ status: 'error', data: null });
       });
     return () => { cancelled = true; };
   }, [requestId]);
@@ -103,27 +97,18 @@ function ReviewerProgress({ requestId, onSelectTab }) {
   if (state.status === 'loading') return <p className="text-sm text-gray-500">Loading reviewer progress…</p>;
   if (state.status === 'error') return <p className="text-sm text-amber-600">Couldn’t load reviewer progress.</p>;
 
-  const { reviewers } = state;
-  const accepted = reviewers.length; // reviewers.js returns the accepted set
-  const underReview = countForMode(reviewers, 'track');
-  const complete = countForMode(reviewers, 'completed');
-  const outstanding = workRemainingForMode(reviewers, 'track') + workRemainingForMode(reviewers, 'invite');
-
-  // Light "what next" heuristic (NOT the deferred isActionableForPD rule set).
-  let hint;
-  if (accepted === 0) hint = 'No reviewers accepted yet — start in the Reviewers tab.';
-  else if (outstanding > 0) hint = `${outstanding} reviewer${outstanding === 1 ? '' : 's'} still need action (materials or a returned review).`;
-  else if (complete === accepted) hint = 'All accepted reviews are complete.';
-  else hint = 'Reviewers are in progress.';
+  const { counts, needed, hint } = state.data;
+  const n = (v) => (Number.isFinite(v) ? v : 0);
 
   return (
     <div className="space-y-3">
-      <dl className="grid grid-cols-3 gap-4">
-        <Field label="Accepted">{accepted}</Field>
-        <Field label="Under review">{underReview}</Field>
-        <Field label="Complete">{complete}</Field>
+      <dl className="grid grid-cols-4 gap-4">
+        <Field label="Candidates">{n(counts.candidates)}</Field>
+        <Field label="Invited">{n(counts.invited)}</Field>
+        <Field label="Accepted">{Number.isFinite(needed) ? `${n(counts.accepted)} / ${needed}` : n(counts.accepted)}</Field>
+        <Field label="Complete">{n(counts.completed)}</Field>
       </dl>
-      <p className="text-sm text-gray-600">{hint}</p>
+      {hint && <p className="text-sm text-gray-600">{hint}</p>}
     </div>
   );
 }
@@ -206,7 +191,7 @@ export default function OverviewTab({ context, requestId, onSelectTab }) {
         title="Reviewers"
         action={<TabLink onSelectTab={onSelectTab} tab="reviewers">Manage reviewers →</TabLink>}
       >
-        <ReviewerProgress requestId={requestId} onSelectTab={onSelectTab} />
+        <ReviewerProgress requestId={requestId} />
       </Section>
     </div>
   );

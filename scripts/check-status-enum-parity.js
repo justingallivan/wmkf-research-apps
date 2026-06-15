@@ -71,19 +71,36 @@ function registry() {
   const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
   const checks = [];
 
-  // 1. dashboard workRemaining stages → workbench STAGE_META chip labels (subset).
+  // 1. workRemaining stages → workbench STAGE_META chip labels (subset).
   //    The exact pair that bit S257 chunk 8: deriveWorkRemaining returned 'held' but
   //    STAGE_META had no entry, so the chip rendered an unstyled raw string.
+  //    deriveWorkRemaining moved to lib/services/reviewer-rollup.js (S260, shared with
+  //    the per-request Overview rollup) — read it from there now.
   {
-    const dash = read('pages/api/workbench/dashboard.js');
+    const rollup = read('lib/services/reviewer-rollup.js');
     const wb = read('pages/workbench.js');
     checks.push({
       name: 'workRemaining stages ⊆ STAGE_META chips',
-      producer: 'deriveWorkRemaining() returns (dashboard.js)',
+      producer: 'deriveWorkRemaining() returns (reviewer-rollup.js)',
       consumer: 'STAGE_META keys (workbench.js)',
-      produced: extractReturnedStrings(dash, 'deriveWorkRemaining'),
+      produced: extractReturnedStrings(rollup, 'deriveWorkRemaining'),
       consumed: extractObjectKeys(wb, 'STAGE_META'),
       rule: 'subset',
+    });
+  }
+
+  // 1b. workRemaining stages ⇔ WORK_REMAINING_LABEL (equal: every stage the Overview
+  //     rollup endpoint can return MUST have a "what next" label, and no orphan label).
+  //     Both live in reviewer-rollup.js (S260).
+  {
+    const rollup = read('lib/services/reviewer-rollup.js');
+    checks.push({
+      name: 'workRemaining stages ⇔ WORK_REMAINING_LABEL',
+      producer: 'deriveWorkRemaining() returns (reviewer-rollup.js)',
+      consumer: 'WORK_REMAINING_LABEL keys (reviewer-rollup.js)',
+      produced: extractReturnedStrings(rollup, 'deriveWorkRemaining'),
+      consumed: extractObjectKeys(rollup, 'WORK_REMAINING_LABEL'),
+      rule: 'equal',
     });
   }
 
