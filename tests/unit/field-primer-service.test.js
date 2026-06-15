@@ -278,6 +278,29 @@ describe('groundPrimerExperts (uses the real forenamesContradict; OpenAlex mocke
     expect(out[0].phone).toBeUndefined();
   });
 
+  test('grounds experts concurrently (bounded) while preserving input order', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    OpenAlexService.searchAuthors.mockImplementation(async (q) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 10)); // hold the slot so overlap is observable
+      inFlight -= 1;
+      // displayName === query → same surname, no forename contradiction → exact match
+      return { totalCount: 1, records: [{ displayName: q, worksCount: 50, topics: ['Biology', 'Genome'], openAlexId: `A-${q}` }] };
+    });
+    const names = ['Anna Alpha', 'Bob Beta', 'Cara Gamma', 'Dan Delta', 'Eve Epsilon', 'Finn Zeta', 'Gail Eta', 'Hugo Theta'];
+    const out = await groundPrimerExperts(names.map((name) => ({ name })));
+
+    // order preserved across the worker pool, every expert resolved
+    expect(out.map((o) => o.name)).toEqual(names);
+    expect(out.every((o) => o.grounding.status === 'confirmed')).toBe(true);
+    // genuinely concurrent (more than one in flight)…
+    expect(peak).toBeGreaterThan(1);
+    // …but bounded by GROUND_CONCURRENCY (5), not all 8 at once
+    expect(peak).toBeLessThanOrEqual(5);
+  });
+
   test('renderPrimerMarkdown emits profile links + bibliometrics for grounded experts only', () => {
     const md = renderPrimerMarkdown({
       experts: [
