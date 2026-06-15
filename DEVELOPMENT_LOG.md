@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Request Workbench Proposal tab shipped; Field Primer becomes a self-serve persisted product (Session 258)
+
+**Milestone:** First non-Reviewers Workbench tab goes live, and the Field Primer graduates from a CLI/route-only artifact (S248) to a staff self-serve, persisted product. The **Proposal tab** (`tab=proposal`, previously a placeholder) renders three sections — Dataverse info (PI/co-PIs/abstract/Requested Amount=`akoya_request`/Total Project Budget=`akoya_expenses`), Phase I documents (slot-matched SharePoint list + a request-folder-GUID + Phase-I-membership-scoped download/inline-View proxy), and AI content (existing `wmkf_ai_*` + the Field Primer). The **Field Primer** gained a `requestId` mode that pulls `ProjectDescription` from SharePoint, generates, grounds experts vs OpenAlex, and **persists** a JSON envelope to a new prod field `akoya_request.wmkf_ai_fieldprimer`, single-flighted by an ETag-conditional generation lease (no double paid call, nonce-verified final write).
+
+**Sessions:** 258. Codex design loop (2 passes) → phased build (Phases 1–6) → per-phase Codex review (Field Primer took 3 review rounds to clean: lease holes, lost-update, null-safety). New prod field deployed via an isolated schema wave to avoid wave2 drift. Closed with a meta-remediation: a pre-commit self-review hook for the recurring review-churn failure modes.
+
+**Ship state:**
+- Proposal tab + 2 new routes (`/api/workbench/proposal-documents`, `/download-proposal-document`), per-cycle doc config (D26 interim filename-match bridge), shared SharePoint/Graph reuse.
+- `wmkf_ai_fieldprimer` (Memo/JSON) live in prod; shared envelope/lease validator (`shared/utils/field-primer-envelope.js`) keeps route↔UI in sync.
+- Advisory `.claude/hooks/pre-commit-self-review.js` + `feedback-self-review-before-delegating-review` memory; fan-out audit caught a missing requestId GUID-check in `resolve-request`.
+
+**Why it matters:** PDs get an in-app proposal viewer (kills the SharePoint read-pain) and on-demand field orientation, persisted per request. Establishes the Workbench tab pattern beyond Reviewers. The D26 doc resolution is explicitly interim — J27 moves to Dataverse-table doc references (`project-j27-doc-capture-evolution`).
+
+**Pointers:** `docs/WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md` (spec + resolved design Qs); Atlas `docs/atlas/dataverse-akoya-request.md` (the new field); `docs/CODEX_REVIEW_PROMPT_hook-self-review.md` (queued hook review). Commits `bf3a87ec` → `c79fceb8` (19).
+
 ## June 2026 — Reviewer-finder academic data migrated off paid SerpAPI/Google Scholar → free OpenAlex (Session 251)
 
 **Milestone:** Deprecated/costly capability removed. The two paid SerpAPI `google_scholar` paths were migrated to free OpenAlex: (1) **Slice 1b** — contact-enrichment bibliometrics (h-index/i10/citations) + the verified-email-domain guard; (2) **Slice 2** — Virtual-Review-Panel literature/PI-publication novelty search. These per-candidate / per-proposal calls drove the bulk of the ~$150/mo SerpAPI bill (the project's largest line item) and carried an unmonitored Google-Scholar login-wall degradation risk. SerpAPI is now a residual: contact lookup (#1) + PubPeer (#6) + news (#7) only.
