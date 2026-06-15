@@ -33,7 +33,7 @@ generation + persistence + regenerate; the enabling route/app-access/helper work
 | Field shown | Dataverse source | Note |
 |---|---|---|
 | PI | `wmkf_projectleader` (→ contacts) | formatted value |
-| Co-PIs | `wmkf_apprequestperson` junction (UNION-read w/ projectleader, per `contact-history.js`) | **names only** (Justin S258); legacy `wmkf_copi1..5` retired |
+| Co-PIs | `wmkf_apprequestperson` junction, `wmkf_role = 100000001` (Co-PI), ordered by `wmkf_authorposition` | **names only** (Justin S258); **junction-only** — UNION applies to PI *history*, NOT co-PI display (Codex S258, corrected). Reusable precedent: `fetchCoPIs()` in `pages/api/external/review/[token]/context.js` — extract to a shared helper, don't re-implement. Legacy `wmkf_copi1..5` retired |
 | Abstract | `wmkf_abstract` | |
 | Requested Amount | `akoya_request` | NOT `akoya_request_base`; verified $1.3M on 1002836 |
 | Total Project Budget | `akoya_expenses` | = `akoya_request` + `wmkf_totalothersources`; verified $1.56M on 1002836 |
@@ -70,8 +70,10 @@ Page.docx`** (redundant — it's the Top section):
 ## 4. Field Primer persistence (the one net-new capability)
 
 - **New Dataverse Memo field `wmkf_ai_fieldprimer`** (JSON envelope: the 9 primer
-  sections + expert-grounding verdicts + provenance `generatedAt/model/runId/promptVersion`).
-  Mirrors `wmkf_ai_dataextract` (Memo-JSON) and the v3 naming convention.
+  sections + expert-grounding verdicts + provenance `generatedAt/model/runId/promptName`;
+  add `promptVersion` ONLY if the Executor exposes it — the service return currently lacks
+  it, so default null, don't fabricate (Codex S258)). Mirrors `wmkf_ai_dataextract`
+  (Memo-JSON) and the v3 naming convention.
 - **Lifecycle:** field null → show a plain "Generate field primer" button (NO LLM-cost/confirm
   warning — staff know it's an AI call, Justin S258); populated → render + "Regenerate"
   (bypasses skip-if-populated overwrite guard).
@@ -79,15 +81,22 @@ Page.docx`** (redundant — it's the Top section):
   shared classifier) from SharePoint, extract, generate, **ground experts**, then write the
   JSON back. The write happens AFTER grounding (so the stored blob carries OpenAlex verdicts)
   → explicit `updateRecord`, not the Executor's raw-output writeback.
+- **Re-check before persist (Codex S258):** unless `regenerate=true`, re-read
+  `wmkf_ai_fieldprimer` immediately before the `updateRecord` and skip the write if it's now
+  populated — avoids clobbering a primer generated concurrently in another tab.
 - **App-access:** route is gated `reviewer-finder`; Workbench is `reviewers`. Accept `reviewers`.
 
 ## 5. Cross-cutting
 
-- **Consolidate `classifyFile`/`pickProposalBestGuess`** — `classifyFile` is defined in 9
-  files (8 scripts + the exported canonical copy in `grant-reporting/lookup-grant.js`);
-  `load-proposal.js` already imports that canonical copy. Reuse it; do not add another copy.
+- **Reuse `classifyFile`** — defined in 9 files (8 scripts + the exported canonical copy in
+  `grant-reporting/lookup-grant.js`); `load-proposal.js` already imports the canonical copy.
+  Reuse it; do not add another copy. **But do NOT blindly collapse `pickProposalBestGuess`
+  (Codex S258):** its preference diverges across callers — `lookup-grant` prefers `.docx`,
+  while `load-proposal` + the primer CLI prefer `.pdf`. Only centralize the picker if it takes
+  an explicit format-preference arg; the proposal/primer path passes PDF preference.
 - **Data load:** extend `pages/api/workbench/resolve-request.js` (or add a sibling
-  proposal-tab endpoint) to select the Top + AI fields; Codex to decide one-endpoint-vs-two.
+  proposal-tab endpoint) to select the Top + AI fields; documents via the separate
+  `proposal-documents` endpoint (decided — see §8).
 - **Downloads:** record-scoped private proxy via Graph `downloadFile`, gated `reviewers` +
   request scope (model on `dynamics-explorer/download-document.js`).
 
@@ -104,12 +113,19 @@ Page.docx`** (redundant — it's the Top section):
 field-primer service + prompt (`field-primer.generate`, live in prod `wmkf_ai_prompts`) ·
 the download-document proxy pattern · `ReviewersTab` as the panel-component precedent.
 
-## 8. Open questions for the design pass
+## 8. Design questions — resolved
 
-Open (Codex to resolve):
-1. One proposal-tab endpoint vs. extend `resolve-request` + a separate docs endpoint?
-2. Primer generate: synchronous request (route `maxDuration` is already 800s) vs. background?
-3. Where exactly does the per-cycle filename→label map live (config module shape)?
+Resolved (Codex design pass, S258):
+1. **Endpoints:** extend `resolve-request` for Dataverse info + AI fields (same authoritative
+   context the shell already loads); a SEPARATE `proposal-documents` endpoint (Graph failures
+   stay independently tolerable) + a SEPARATE `download-proposal-document` proxy (binary
+   streaming + per-request scope verification).
+2. **Primer generate: synchronous** (route already `maxDuration:800`). Background deferred —
+   it'd need a durable job/status surface, out of D26 scope.
+3. **Per-cycle map:** `shared/config/workbenchProposalDocuments.js` —
+   `PROPOSAL_DOCUMENT_CONFIG_BY_CYCLE` + `getProposalDocumentConfig(cycleCode)`; D26 entry =
+   `phaseFolder:'Phase I'`, `excludeFilenames:['Application Cover Page.docx']`, ordered slots
+   `{key,label,filename}`. Route returns resolved slot data so the UI duplicates no matching.
 
 Resolved (Justin, S258):
 - **Co-PI display: names only** (not role/effort) — see §3.1.
@@ -118,5 +134,5 @@ Resolved (Justin, S258):
 ## 9. Done = 
 
 Build + lint + relevant `check:*` gates (api-routes, atlas, model-override-warming,
-prompt-injection-tagging if the prompt surface changes) green; the four open questions
-resolved in the Codex design before implementation; Atlas updated for the new field.
+prompt-injection-tagging if the prompt surface changes) green; the §8 design questions
+resolved (done); Atlas updated for the new field.
