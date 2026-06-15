@@ -89,6 +89,12 @@
           },
           {
             "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/trust-boundary-guid-commit-guard.js\"",
+            "timeout": 30,
+            "statusMessage": "trust-boundary-guid (commit guard)"
+          },
+          {
+            "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/pre-commit-self-review.js\" 2>/dev/null || true",
             "timeout": 10,
             "statusMessage": "pre-commit self-review"
