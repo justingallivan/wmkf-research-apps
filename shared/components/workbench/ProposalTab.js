@@ -236,7 +236,7 @@ function FieldPrimer({ requestId, initialRaw }) {
         <p className="text-sm text-gray-500">Another session is generating this primer — refresh in a moment.</p>
       )}
       {generating && !envelope && (
-        <p className="text-sm text-gray-500">Generating the field primer — this can take up to a minute…</p>
+        <p className="text-sm text-gray-500">Generating the field primer — this can take several minutes…</p>
       )}
       {envelope ? (
         <PrimerView envelope={envelope} />
