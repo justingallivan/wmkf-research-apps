@@ -95,6 +95,147 @@ function ExtractedData({ raw }) {
   );
 }
 
+function parseEnvelope(raw) {
+  if (!raw) return null;
+  try {
+    const env = JSON.parse(raw);
+    return env && env.primer ? env : null;
+  } catch {
+    return null;
+  }
+}
+
+function GroundingBadge({ grounding }) {
+  if (!grounding?.status) return null;
+  const map = {
+    confirmed: ['confirmed', 'bg-green-100 text-green-700'],
+    corrected: ['suggested correction', 'bg-amber-100 text-amber-800'],
+    unverified: ['unverified', 'bg-gray-100 text-gray-600'],
+  };
+  const [label, cls] = map[grounding.status] || [grounding.status, 'bg-gray-100 text-gray-600'];
+  return <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${cls}`}>{label}</span>;
+}
+
+function PrimerList({ title, items, render }) {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  return (
+    <div>
+      <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">{title}</p>
+      <ul className="space-y-1.5">
+        {items.map((it, i) => (
+          <li key={i} className="text-sm text-gray-700">{render(it)}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function PrimerView({ envelope }) {
+  const p = envelope?.primer || {};
+  return (
+    <div className="space-y-4">
+      {p.field_overview && (
+        <p className="text-sm text-gray-700 whitespace-pre-wrap">{p.field_overview}</p>
+      )}
+      <PrimerList title="Subareas" items={p.subareas} render={(s) => <span><span className="font-medium text-gray-900">{s.name}</span>{s.description ? ` — ${s.description}` : ''}</span>} />
+      <PrimerList title="Key methods" items={p.key_methods} render={(m) => <span><span className="font-medium text-gray-900">{m.name}</span>{m.description ? ` — ${m.description}` : ''}</span>} />
+      <PrimerList title="Frontiers" items={p.frontiers} render={(f) => <span><span className="font-medium text-gray-900">{f.frontier}</span>{f.why_now ? ` — ${f.why_now}` : ''}</span>} />
+      <PrimerList title="Communities" items={p.communities} render={(c) => <span><span className="font-medium text-gray-900">{c.name}</span>{c.description ? ` — ${c.description}` : ''}</span>} />
+      {Array.isArray(p.venues) && p.venues.length > 0 && (
+        <div>
+          <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Venues</p>
+          <p className="text-sm text-gray-700">{p.venues.join(' · ')}</p>
+        </div>
+      )}
+      <PrimerList title="Experts (orienting only — verify before use)" items={p.experts} render={(e) => (
+        <span>
+          <span className="font-medium text-gray-900">{e.name}</span>
+          {e.affiliation ? ` (${e.affiliation})` : ''}
+          <GroundingBadge grounding={e.grounding} />
+          {e.grounding?.status === 'corrected' && e.grounding?.resolvedName ? (
+            <span className="text-amber-700"> → did you mean {e.grounding.resolvedName}?</span>
+          ) : null}
+          {e.why_relevant ? <span className="block text-gray-600">{e.why_relevant}</span> : null}
+        </span>
+      )} />
+      {p.proposal_placement && (
+        <div>
+          <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Where this proposal sits</p>
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">{p.proposal_placement}</p>
+        </div>
+      )}
+      {p.caveats && (
+        <div className="bg-amber-50 border border-amber-100 rounded-md p-3">
+          <p className="text-xs uppercase tracking-wide text-amber-700 mb-1">Caveats</p>
+          <p className="text-sm text-amber-900 whitespace-pre-wrap">{p.caveats}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FieldPrimer({ requestId, initialRaw }) {
+  const [envelope, setEnvelope] = useState(() => parseEnvelope(initialRaw));
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState(null);
+
+  const generate = async (regenerate) => {
+    if (!requestId) return;
+    setGenerating(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/field-primer/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, ...(regenerate ? { regenerate: true } : {}) }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `Generation failed (${res.status})`);
+      setEnvelope(body.envelope || null);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-1">
+        <dt className="text-xs uppercase tracking-wide text-gray-400">Field Primer</dt>
+        {envelope ? (
+          <button
+            type="button"
+            onClick={() => generate(true)}
+            disabled={generating}
+            className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
+          >
+            {generating ? 'Regenerating…' : 'Regenerate'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => generate(false)}
+            disabled={generating}
+            className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
+          >
+            {generating ? 'Generating…' : 'Generate field primer'}
+          </button>
+        )}
+      </div>
+      {error && <p className="text-sm text-amber-600 mb-2">{error}</p>}
+      {generating && !envelope && (
+        <p className="text-sm text-gray-500">Generating the field primer — this can take up to a minute…</p>
+      )}
+      {envelope ? (
+        <PrimerView envelope={envelope} />
+      ) : (
+        !generating && <p className="text-sm text-gray-500">Not yet generated.</p>
+      )}
+    </div>
+  );
+}
+
 function DocumentsSection({ requestId, docs, error }) {
   if (error) {
     return <p className="text-sm text-amber-600">Couldn’t load documents: {error}</p>;
@@ -218,6 +359,7 @@ export default function ProposalTab({ context }) {
             <dt className="text-xs uppercase tracking-wide text-gray-400 mb-1">AI Extracted Data</dt>
             <dd><ExtractedData raw={ai.dataExtract} /></dd>
           </div>
+          <FieldPrimer requestId={requestId} initialRaw={ai.fieldPrimer} />
         </div>
       </Section>
     </div>

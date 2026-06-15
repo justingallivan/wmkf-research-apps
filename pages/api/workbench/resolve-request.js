@@ -31,11 +31,13 @@ const SELECT = [
   'wmkf_abstract',
   'akoya_request',
   'akoya_expenses',
-  // Proposal-tab AI section — existing live fields (NOT wmkf_ai_fieldprimer; the
-  // primer render/generate is a later Workbench phase).
+  // Proposal-tab AI section.
   'wmkf_ai_fitrationale',
   'wmkf_ai_summary',
   'wmkf_ai_dataextract',
+  // Persisted Field Primer JSON envelope (PD-triggered generate writes it via
+  // /api/field-primer/generate; null until generated).
+  'wmkf_ai_fieldprimer',
 ].join(',');
 
 export default async function handler(req, res) {
@@ -116,6 +118,7 @@ export default async function handler(req, res) {
           fitRationale: r.wmkf_ai_fitrationale || null,
           summary: r.wmkf_ai_summary || null,
           dataExtract: r.wmkf_ai_dataextract || null,
+          fieldPrimer: r.wmkf_ai_fieldprimer || null, // JSON envelope string (or null)
         },
       });
     } catch (err) {
