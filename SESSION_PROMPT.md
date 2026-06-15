@@ -1,3 +1,9 @@
+> ★★ **RUN FIRST AT STARTUP (queued S258, 2026-06-14):** hand the saved prompt in
+> `docs/CODEX_REVIEW_PROMPT_hook-self-review.md` to a `codex:codex-rescue` agent and relay
+> the output verbatim — an independent review of the new pre-commit self-review hook
+> (`.claude/hooks/pre-commit-self-review.js`) + its strategy, before relying on it. Then act
+> on the findings. *(This banner is carried forward until the review is done.)*
+
 # Session 258 Prompt: Reviewer "hold step" — BUILT (gated); go-live next
 
 > **GIT.** All S257 work is on `main`, pushed. Working tree clean. 23 commits — the full hold-step
