@@ -5,7 +5,7 @@ type: project
 originSessionId: dbb306e7-a291-40e3-8509-b57067e842e0
 status: active
 scope: dataverse
-last_verified: S147 via memory-content (not re-probed 2026-06-04)
+last_verified: S258 (2026-06-14) — added #6 (wave drift / isolated followup waves), live-probed
 ---
 
 ## Recall Rule
@@ -23,7 +23,7 @@ Do not:
 
 Ground truth: `scripts/apply-dataverse-schema.js`, `lib/services/execute-prompt.js` (correct `@odata.bind`), `scripts/backfill-request-person-junction.js` (paged fetch). Durable behavioral rules; the 5000 cap in `queryAllRecords` is a code fact — verify in current source. See [[project-dataverse-odata-null-filter]].
 
-Four Dataverse behaviors that bite multi-attribute deploys and bulk inserts. Each was rediscovered in S139–S147 after consuming real time; treat as standing knowledge.
+Six Dataverse behaviors that bite multi-attribute deploys and bulk inserts. Each was rediscovered S139–S258 after consuming real time; treat as standing knowledge.
 
 **1. EntityCustomization 429 throttling between metadata writes (`apply-dataverse-schema.js`).**
 - **Why:** Dataverse serializes solution-customization operations across the org. Two concurrent customizations (or one in flight when another arrives) fail the second with 429 / `0x80071151` "Cannot start another [EntityCustomization] because there is a previous one running". Surfaces between attribute creates, between relationship creates, and between alt-key + relationship steps.
@@ -48,3 +48,7 @@ Four Dataverse behaviors that bite multi-attribute deploys and bulk inserts. Eac
 **5. UPDATING an existing attribute's metadata: PUT the full definition + PublishXml — `PATCH` returns 405.**
 - **Why:** `apply-dataverse-schema.js` is **create-only, no updates** (header line 16), so changing a live column (e.g. widening a Double `MaxValue`) has no ready-made tool. The Web API rejects `PATCH` on `EntityDefinitions(LogicalName=…)/Attributes(LogicalName=…)` with **405 "does not support http method 'PATCH'"** (hit S237 widening `wmkf_relevancescore`).
 - **How to apply:** GET the full attribute from the **non-cast** path (the cast path omits `@odata.type`), strip `@odata.*` annotations, set the changed property, set body `@odata.type` to the bare cast name (no leading `#`), **PUT** to the attribute path with header **`MSCRM.MergeLabels: true`**, then POST **`/PublishXml`** for the entity, then verify a read-back. Send the COMPLETE definition (only the one prop changed) — unspecified props reset to defaults; a malformed PUT 400s WITHOUT partially applying (fail-safe). Reference: `scripts/widen-relevancescore-max.mjs`. Adding a PICKLIST option is different — use the `InsertOptionValue` action (`scripts/extend-responsetype-picklist.mjs`).
+
+**6. A full-wave re-run can CREATE DUPLICATE artifacts when the wave's schema-as-code has drifted from prod — deploy single new fields in an ISOLATED followup wave.**
+- **Why:** `apply-dataverse-schema` is create-only and tests existence by **SchemaName**. If prod has an artifact under a *different* SchemaName than the wave spec (created out-of-band — UI / Connor PA / a different script), the ensure-check misses it and the script would **create a duplicate**. S258: a prod **dry-run** of `--wave=2` showed it would `✓ created  rel  wmkf_appreviewersuggestion_honorariumrequest` even though the honorarium lookup `_wmkf_honorariumrequest_value` is already live (Atlas: shipped 2026-05-28). So wave2 has drifted; `--wave=2 --execute` would duplicate that relationship.
+- **How to apply:** To add ONE new attribute to an existing entity, do NOT append it to the big shared wave file and re-run the whole wave. Put it in its own followup wave dir (`wave{N}-<slug>/`) and run `--wave={N}-<slug>` so the blast radius is exactly that artifact. The loader supports string-suffixed waves for this. ALWAYS prod **dry-run first** (omit `--execute`) and read the FULL output — confirm it would create ONLY your artifact. Reference: `lib/dataverse/schema/wave2-fieldprimer/akoya_request-fieldprimer.json` (S258 `wmkf_ai_fieldprimer` add). **Open hazard:** wave2's honorarium-relationship drift is unreconciled — do NOT run full `--wave=2 --execute` until someone reconciles the SchemaName, or it'll create a duplicate relationship.
