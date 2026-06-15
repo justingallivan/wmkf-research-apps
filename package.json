@@ -51,7 +51,9 @@
     "check:model-override-warming": "node scripts/check-model-override-warming.js",
     "check:model-override-warming:self-test": "node scripts/check-model-override-warming-self-test.js",
     "check:status-enum-parity": "node scripts/check-status-enum-parity.js",
-    "check:status-enum-parity:self-test": "node scripts/check-status-enum-parity.js --self-test"
+    "check:status-enum-parity:self-test": "node scripts/check-status-enum-parity.js --self-test",
+    "check:trust-boundary-guid": "node scripts/check-trust-boundary-guid.js",
+    "check:trust-boundary-guid:self-test": "node scripts/check-trust-boundary-guid-self-test.js"
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",
