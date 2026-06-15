@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-13
+last_verified: 2026-06-14
 stale_after_days: 60
 owner: intake-portal
 source_files:
@@ -49,6 +49,7 @@ intake-to-Dataverse mapping.
 
 - Scope and pilot posture: `project-intake-portal-skinny-scope`, `project-intake-portal-pilot-decisions-2026-05-13`.
 - Reviewer capture and field capture: `project-intake-portal-reviewer-capture`, `project-machine-legible-form-capture`.
+- Document-capture → Dataverse-table direction (intake is the natural producer; J27): `project-j27-doc-capture-evolution`.
 - External ID, institution match, creator privileges: `project-intake-portal-external-id-foundation`, `project-intake-portal-institution-match`, `project-dataverse-creator-privileges`.
 - Slice-0 behavior and UI TODOs: `slice0-deactivate-not-delete-recalc`, `project-intake-portal-ui-todo`.
 - Virus scan and Cloudmersive: `project-intake-portal-virus-scan-e2e-deferred`, `project-virus-scanning-it-context`, `project-cloudmersive-advanced-endpoint`.

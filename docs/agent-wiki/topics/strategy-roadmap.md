@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-13
+last_verified: 2026-06-14
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -34,6 +34,7 @@ and broad AI capability planning.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.
 - Phasing/cycle scoping: `project-grant-phasing-evolution`, `feedback-cycle-vs-executor-scope`, `feedback-concepts-vs-phase-i`.
+- J27 document-capture & Proposal-tab evolution (doc→Dataverse-table direction; D26 filename-match is interim; near-term planning): `project-j27-doc-capture-evolution`.
 - Planned review/proposal work: `project-staged-review-pipeline`, `project-proposal-context-extraction`.
 - Planned automation/reports/post-award/AI: `project-backend-automation`, `project-interim-report-automation`, `project-awardee-onboarding`, `project-new-ai-capabilities`.
 - IRS verify-EIN: `project-irs-exempt-verification`.
