@@ -1,61 +1,59 @@
-# Session 259 Prompt: Workbench Proposal tab + Field Primer — SHIPPED
+# Session 260 Prompt: Trust-boundary GUID hardening + blocking gate — SHIPPED
 
-> **GIT.** All S258 work is on `main`, pushed (`12c77512..c79fceb8`, 19 commits). Working tree clean.
-> Build/lint/gates green. **NEW commit hook (advisory):** `.claude/hooks/pre-commit-self-review.js`
-> injects a staged-diff-tailored self-review checklist on every `git commit` (verify-claims / fan-out
-> guards / trust boundaries / concurrency). It does NOT block — it's the forcing function for the
-> failure modes below. The enum-parity guard still BLOCKS commits on parity drift.
+> **GIT.** All S259 work is on `main` (`58d5fd35..0b63b145`, 8 commits). Working tree clean,
+> build/lint/gates green. **NEW BLOCKING commit guard this session:** `check:trust-boundary-guid`
+> now blocks any commit where a client-supplied id reaches a Dataverse selector without a GUID
+> guard (wired in `.claude/settings.json`, alongside the enum-parity guard). All three commit
+> hooks share one trigger `.claude/hooks/lib/git-commit-detect.js`.
 
-## Session 258 — what happened
+## Session 259 — what happened
 
-Built the **entire Workbench Proposal tab end to end** (`docs/WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md`,
-Phases 1–6) + the **Field Primer** generate/persist, each slice Codex-reviewed. Verified live in the
-running app (info + documents + download/View). Also: a new prod Dataverse field, and a remediation
-for the recurring review-churn.
+Acted on the queued S258 Codex review of the pre-commit self-review hook. Codex found the S258
+trust-boundary fan-out was **incomplete** — many reviewer-surface routes passed a client id into a
+Dataverse selector with only a presence check. Closed the exposure, then turned the failure mode
+into a BLOCKING gate, then hardened + (two Codex rounds) the commit-hook trigger that enforces it.
 
-1. **Proposal tab — 3 sections** (`shared/components/workbench/ProposalTab.js`, lit up the placeholder):
-   - **Top** — Dataverse info: PI (`wmkf_projectleader`), co-PIs (junction `wmkf_role=100000001`, names
-     only), abstract, Requested Amount (`akoya_request`), Total Project Budget (`akoya_expenses`).
-   - **Middle** — Phase I documents: per-cycle config (`shared/config/workbenchProposalDocuments.js`),
-     `GET /api/workbench/proposal-documents` (list, slot-match) + `download-proposal-document` (scoped
-     proxy, request-folder GUID + Phase-I membership + safe inline View). Reuses Graph/SharePoint infra.
-   - **Bottom** — AI content: `wmkf_ai_fitrationale/summary/dataextract` + the Field Primer.
-   `fee545dc` (P1), `6225d9f9`/`ecc97f63` (P2), `b97bd385` (View).
-2. **Field Primer generate + persist** — `/api/field-primer/generate` gains a `requestId` mode (app
-   access widened to `reviewers`): pulls `ProjectDescription` from SharePoint, generates, grounds
-   experts vs OpenAlex, **persists a JSON envelope to `wmkf_ai_fieldprimer`** via an **ETag-conditional
-   single-flight LEASE** (idempotent; no double paid call; nonce-verified conditional final write).
-   `8dc9016d` → `765def20` → `926d69ff` → `8be5ef12` (3 Codex rounds to clean). Shared envelope/lease
-   validator: `shared/utils/field-primer-envelope.js`.
-3. **New prod Dataverse field** `akoya_request.wmkf_ai_fieldprimer` (Memo/JSON/100000), deployed live
-   via an **isolated** wave (`lib/dataverse/schema/wave2-fieldprimer/`) — `9100713b`.
-4. **Self-review hook + lesson** — `.claude/hooks/pre-commit-self-review.js` + memory
-   `feedback-self-review-before-delegating-review.md`; the fan-out audit it embodies caught a real miss
-   (`resolve-request` lacked requestId GUID-validation). `10c49802`.
-5. **`reset-request-reviewers.mjs`** now protects applicant-sourced rows by default (`12c77512`); J27
-   doc-capture evolution captured as a durable memory + wiki routing (`bf3a87ec`).
+1. **Trust-boundary security fix** (`58d5fd35`) — new shared validator `lib/utils/guid.js`
+   (`isGuid`/`allGuids`). GUID-validated client ids at the edge across **12 routes**: reviewer-finder
+   (load-proposal, my-candidates, contact-history, cycle-material, generate-emails), review-manager
+   (reviewers, regenerate-token, download-review, mark-received-no-file, render-emails, send-emails),
+   and **`phase-i-dynamics/summarize`** — the one Codex missed, found by an independent fan-out across
+   all 21 sink-bearing routes. `getRecord`/`updateRecord` interpolate the id raw into the request URL;
+   `findByRequest` into an OData `$filter` → over-fetch / IDOR / filter-injection. Defense-in-depth:
+   `reviewer-suggestion.findByRequest` throws on a non-GUID. Audited + confirmed already-safe: workbench
+   routes, field-primer/generate, admin policies/prompts (server ids), external context (token ids),
+   dynamics-explorer (admin-only, GUID-checked at entry).
+2. **Blocking `check:trust-boundary-guid` gate** (`ae016131`, activated `fd94267d`) — AST taint
+   analysis (`scripts/check-trust-boundary-guid.js`) flags any `req.query`/`req.body` id reaching a
+   Dataverse selector without a recognized GUID guard. 16-case self-test (every FAIL fixture proves it
+   catches violations); startup gate + blocking commit guard.
+3. **Commit-hook trigger hardened** (`692a82a4`, Codex rounds `5a78c855` + `2dc40917`) — extracted ONE
+   shared `git-commit-detect.js` (`isGitCommit`/`isAmend`) for all three commit hooks (no trigger drift).
+   Catches global-option forms the old `/\bgit\s+commit\b/` missed (`git -c x=y commit`, `git -C p commit`),
+   ignores `commit-tree`. Design: liberal match (never MISS a real commit — the dangerous direction for a
+   blocking guard), strip-quoted-with-placeholder, fail-OPEN via require-inside-try. 46-case test incl.
+   automated fail-open regressions.
+4. **Wiki capture** (`0b63b145`) — `security-auth.md` → "Trust-Boundary GUID Validation";
+   `dev-environment.md` → "Commit Guards & Triggers". Banner cleared from the prior prompt (`7442bd6d`).
 
 ## Potential Next Steps
 
-1. **✅ DONE (S259) — hook self-review ran + acted on.** Codex's adversarial review of the
-   pre-commit self-review hook found the S258 fan-out was incomplete: many reviewer-surface routes
-   passed a client id into a Dataverse selector with only a presence check. Fixed across all of them
-   + `phase-i/summarize` (`58d5fd35`), added a BLOCKING `check:trust-boundary-guid` gate + self-test +
-   commit guard (`ae016131`, `fd94267d`), and hardened the shared commit-hook trigger regex
-   (`692a82a4`). See `docs/agent-wiki/topics/security-auth.md` → "Trust-Boundary GUID Validation".
-2. **Field-primer expert enrichment (deferred, Justin-requested S258):** make confirmed experts
+1. **Field-primer expert enrichment (deferred, Justin-requested S258):** make confirmed experts
    clickable to ORCID / OpenAlex profiles; optionally a Wikipedia link (`ids.wikipedia`, not currently
    fetched) + the already-mapped h-index/citations. **Profile links only — NO contact/email enrichment**
    (OpenAlex has no emails anyway; keeps the primer orientation-only, not a candidate source). Small.
-3. **J27 document-capture planning (near-term, large):** D26's SharePoint filename-match doc resolution
+2. **J27 document-capture planning (near-term, large):** D26's SharePoint filename-match doc resolution
    is an INTERIM bridge; J27 collects docs differently and the converging target (Justin+Connor) is
    direct Dataverse-table references (`wmkf_requestdocument`-style). Needs a real planning push soon —
    `project-j27-doc-capture-evolution`.
-4. **Reviewer hold-step GO-LIVE (carried from S257, untouched this session):** built but DORMANT. Two
-   switches: (a) a staff UI trigger to send `templateType:'hold'`/`'finalize'`
-   (`InviteEmailModal.js` hardcodes `'invitation'`); (b) flip `isProposalReadyForReviewers` (returns
-   `true` today) to the real post-QA release signal — **[OPEN — Justin/Connor]** identify that signal.
-   Sequence: UI trigger → predicate. `project-reviewer-hold-step-decouple`.
+3. **Reviewer hold-step GO-LIVE (carried from S257, untouched):** built but DORMANT. Two switches:
+   (a) a staff UI trigger to send `templateType:'hold'`/`'finalize'` (`InviteEmailModal.js` hardcodes
+   `'invitation'`); (b) flip `isProposalReadyForReviewers` (returns `true` today) to the real post-QA
+   release signal — **[OPEN — Justin/Connor]** identify that signal. Sequence: UI trigger → predicate.
+   `project-reviewer-hold-step-decouple`.
+4. **Proposal-tab / Field-Primer tests (clean follow-up, carried from S258):** no automated tests for the
+   Proposal-tab routes or Field Primer yet (verified manually). `tests/unit/workbench-proposal-documents.test.js`
+   + `field-primer-request-mode.test.js` are listed in the build plan.
 
 ### Housekeeping (verify before acting)
 - **wave2 schema drift (open hazard):** a prod dry-run showed `--wave=2 --execute` would CREATE a
@@ -71,6 +69,7 @@ for the recurring review-churn.
 - Recall padding-ceiling live check before raising count >15 (needs API key + a real proposal).
 - SerpAPI Hobby-tier downgrade eval (Justin, out-of-repo). `score-candidates` reseed only if you edit
   its template. `affiliationHistory` producers — COI-inert dead code (`project-deferred-code-cleanup`).
+- **Vercel CLI** on this machine is behind (`54.12.2 → 54.14.0`); optional `npm i -g vercel@latest`.
 
 ## Parked — do NOT surface in startup summaries
 > User-recall-only; act only when the named un-park trigger fires (`feedback-dont-resurface-parked-items`).
@@ -78,8 +77,13 @@ for the recurring review-churn.
   S251). `docs/agent-wiki/topics/integrity-screener.md`; `project-serpapi-capability-erosion`.
 
 ## ⚠ Continuity guardrails (still live)
-- **NEW self-review hook is ADVISORY, not blocking** — it injects a checklist at commit; it can't force
-  judgment. Treat it as the reminder to actually fan-out/verify. `feedback-self-review-before-delegating-review`.
+- **`check:trust-boundary-guid` BLOCKS commits** when a client id reaches a Dataverse selector without
+  a GUID guard. Canonical guard: `lib/utils/guid.js` (`isGuid`/`allGuids`). Server-derived ids (read off
+  a row already fetched, or a token-bound row) are trusted. Escape hatch: `// trust-boundary-guid:ignore
+  reason=<id>`. Intra-file taint (interprocedural not modeled). `docs/agent-wiki/topics/security-auth.md`.
+- **All three commit hooks share `.claude/hooks/lib/git-commit-detect.js`.** Editing the trigger? It is
+  liberal-by-design (never miss a real commit) and fails OPEN. `docs/agent-wiki/topics/dev-environment.md`
+  → "Commit Guards & Triggers". The self-review hook is ADVISORY; enum-parity + trust-boundary BLOCK.
 - **`wmkf_ai_fieldprimer` holds ONE of:** a DONE envelope (`schema:'field-primer/v1'`) or a transient
   generation LEASE (`schema:'field-primer/lease'`) or null. Parse via `shared/utils/field-primer-envelope.js`
   — never hand-edit; the route owns the lease/persist contract. Primer is staff orientation only, NEVER a
@@ -91,28 +95,25 @@ for the recurring review-churn.
 - Memory router stays **hub-link form**; `grep`/`rg` may corrupt identifiers+digits
   (`project-rtk-grep-output-corruption`) — use Read for exact content.
 
-## Key Files Reference (Proposal tab — all this session)
+## Key Files Reference (S259 — trust-boundary work)
 
 | File | Role |
 |------|------|
-| `docs/WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md` | the spec (Phases 1–6, design Qs resolved) |
-| `pages/workbench/[requestId].js` | shell — renders `ProposalTab` on `tab=proposal` |
-| `shared/components/workbench/ProposalTab.js` | the 3-section tab + FieldPrimer UI |
-| `pages/api/workbench/resolve-request.js` | top + AI data (now GUID-validates requestId) |
-| `pages/api/workbench/proposal-documents.js` + `download-proposal-document.js` | doc list + scoped proxy |
-| `shared/config/workbenchProposalDocuments.js` | per-cycle Phase I filename→label map (interim) |
-| `lib/services/workbench-proposal-documents.js` | SharePoint list/slot-match + `getProposalText` |
-| `pages/api/field-primer/generate.js` | requestId persist mode + ETag lease |
-| `shared/utils/field-primer-envelope.js` | envelope/lease validator (shared route↔UI) |
-| `lib/dataverse/schema/wave2-fieldprimer/akoya_request-fieldprimer.json` | the new field's schema-as-code |
-| `.claude/hooks/pre-commit-self-review.js` | the new advisory commit hook |
+| `lib/utils/guid.js` | shared edge validator — `isGuid` / `allGuids` (+ `GUID_RE`) |
+| `scripts/check-trust-boundary-guid.js` | AST taint gate: client id → Dataverse selector must be GUID-validated |
+| `scripts/check-trust-boundary-guid-self-test.js` | 16-case self-test (FAIL fixtures + live baseline) |
+| `.claude/hooks/trust-boundary-guid-commit-guard.js` | blocking commit guard (exit 2) wrapping the gate |
+| `.claude/hooks/lib/git-commit-detect.js` | shared `isGitCommit`/`isAmend` trigger for all 3 commit hooks |
+| `.claude/hooks/lib/git-commit-detect.test.js` | 46-case trigger test (incl. fail-open regressions) |
+| `lib/dataverse/adapters/reviewer-suggestion.js` | `findByRequest` now throws on non-GUID (filter-injection chokepoint) |
+| `pages/api/phase-i-dynamics/summarize.js` | the route Codex missed — now GUID-validates `requestGuid` |
 
 ## Testing
 ```bash
 npm run build && npm run lint
-npx jest --testPathPatterns "workbench|field-primer|proposal"   # (note: no dedicated tests yet — see below)
-npm run check:api-routes && npm run check:atlas && npm run check:fact-consistency
+node .claude/hooks/lib/git-commit-detect.test.js                 # 46-case commit-trigger matrix
+npm run check:trust-boundary-guid && npm run check:trust-boundary-guid:self-test
+npm run check:api-routes && npm run check:fact-consistency
 ```
-> **No automated tests** were written for the Proposal-tab routes / Field Primer this session (verified
-> manually in the running app). Adding `tests/unit/workbench-proposal-documents.test.js` +
-> `field-primer-request-mode.test.js` is a clean follow-up (the build plan lists them).
+> Trust-boundary fix is server-side validation only — verified via the gate + self-test (no live app
+> run needed). The reviewer-surface routes return 400 on a malformed id before any Dataverse call.

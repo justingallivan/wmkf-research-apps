@@ -103,6 +103,14 @@ Guards the "producer-without-consumer-sweep" defect class: a value added to a pr
 - **Commit control:** a PreToolUse(Bash) hook runs the gate on `git commit` and BLOCKS (exit 2) on drift — the deterministic enforcement behind the contract-reconcile "complement & fan-out" rule (`feedback-scrutinize-exemptions-and-fallthrough`).
 - Self-test: `node scripts/check-status-enum-parity.js --self-test`.
 
+### `check:trust-boundary-guid` — client id → Dataverse selector must be GUID-validated (S259)
+
+Guards the trust-boundary fan-out defect class: a client-supplied id (`req.query`/`req.body`) reaching a Dataverse record-id selector (`getRecord`/`updateRecord`/`deleteRecord`, or adapter `findById`/`updateLifecycle`/`softDelete`/`findByRequest`/`bulkUpdateByRequest`) with only a presence check. `getRecord`/`updateRecord` interpolate the id raw into the request URL and `findByRequest` into an OData `$filter` → over-fetch / IDOR / filter injection. AST taint analysis (`@babel/parser`) over `pages/api/**`: a tainted id must be validated by a recognized GUID guard (`isGuid`/`allGuids`/`GUID_RE.test`/`.every(isGuid)`/`guidToFolderSuffix`). Canonical edge guard: `lib/utils/guid.js`. Intra-file taint (interprocedural not modeled — documented boundary); escape hatch `// trust-boundary-guid:ignore reason=<id>`.
+
+- Scope: `scripts/check-trust-boundary-guid.js`, `.claude/hooks/trust-boundary-guid-commit-guard.js`. Detail: `docs/agent-wiki/topics/security-auth.md` → "Trust-Boundary GUID Validation".
+- **Commit control:** a PreToolUse(Bash) hook runs the gate on `git commit` and BLOCKS (exit 2) on a missing guard.
+- Self-test: `npm run check:trust-boundary-guid:self-test` (FAIL fixtures prove it catches violations + live-baseline-clean assertion).
+
 ## Coverage tool self-tests (binding contract)
 
 When modifying any `scripts/check-*.js` gate (or building a new one), the matching self-test must pass:
@@ -117,6 +125,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:canonical-pointers` | `check:canonical-pointers-self-test` |
 | `check:agent-wiki` | `check:agent-wiki:self-test` |
 | `check:status-enum-parity` | `check:status-enum-parity:self-test` |
+| `check:trust-boundary-guid` | `check:trust-boundary-guid:self-test` |
 
 **When external review catches a structural pattern an existing gate missed, the order is mandatory:**
 

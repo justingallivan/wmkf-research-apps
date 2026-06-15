@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Trust-boundary IDOR/injection class closed on the reviewer API + permanent blocking gate (Session 259)
+
+**Milestone:** Security hardening + new enforcement infrastructure. An adversarial Codex review (the queued S258 self-review-hook review) found the S258 fan-out was incomplete: across the reviewer-finder / review-manager surface, client-supplied ids (`req.query`/`req.body`) reached Dataverse selectors with only a presence check. `DynamicsService.getRecord`/`updateRecord` interpolate the id raw into the request URL (`${entitySet}(${id})`) and the adapter `findByRequest` into an OData `$filter` — an over-fetch / IDOR / filter-injection class (authenticated-staff scope). Closed it at the edge across 12 routes via a new shared validator `lib/utils/guid.js`, then converted the failure mode into a **blocking CI gate + commit guard** so it can't regress.
+
+**Sessions:** 259. Codex review (relayed verbatim) → verify against source → fix all flagged routes → independent fan-out found one more Codex missed (`phase-i-dynamics/summarize`) → build the gate → two more Codex rounds hardening the commit-hook trigger that enforces it.
+
+**Ship state:**
+- 12 reviewer-surface routes GUID-validate client ids at the edge; `reviewer-suggestion.findByRequest` throws on a non-GUID (filter-injection chokepoint).
+- `check:trust-boundary-guid` (AST taint analysis, `scripts/check-trust-boundary-guid.js`) + 16-case self-test; runs at startup AND blocks commits (`.claude/hooks/trust-boundary-guid-commit-guard.js`).
+- All three commit hooks unified on one shared trigger `.claude/hooks/lib/git-commit-detect.js` (liberal-match/never-miss, fail-open); 46-case test incl. fail-open regressions.
+
+**Why it matters:** Removes a real injectable id surface on the live reviewer API and makes the omission structurally impossible to reintroduce (the gate fails CI / blocks the commit). Establishes the "turn a recurring self-catchable review finding into a precise blocking gate" pattern beyond `check:status-enum-parity`.
+
+**Pointers:** `docs/agent-wiki/topics/security-auth.md` → "Trust-Boundary GUID Validation"; `docs/agent-wiki/topics/dev-environment.md` → "Commit Guards & Triggers"; `docs/CI_GATES_REFERENCE.md`. Commits `58d5fd35` → `0b63b145` (8).
+
 ## June 2026 — Request Workbench Proposal tab shipped; Field Primer becomes a self-serve persisted product (Session 258)
 
 **Milestone:** First non-Reviewers Workbench tab goes live, and the Field Primer graduates from a CLI/route-only artifact (S248) to a staff self-serve, persisted product. The **Proposal tab** (`tab=proposal`, previously a placeholder) renders three sections — Dataverse info (PI/co-PIs/abstract/Requested Amount=`akoya_request`/Total Project Budget=`akoya_expenses`), Phase I documents (slot-matched SharePoint list + a request-folder-GUID + Phase-I-membership-scoped download/inline-View proxy), and AI content (existing `wmkf_ai_*` + the Field Primer). The **Field Primer** gained a `requestId` mode that pulls `ProjectDescription` from SharePoint, generates, grounds experts vs OpenAlex, and **persists** a JSON envelope to a new prod field `akoya_request.wmkf_ai_fieldprimer`, single-flighted by an ETag-conditional generation lease (no double paid call, nonce-verified final write).
