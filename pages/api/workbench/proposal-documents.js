@@ -15,6 +15,8 @@ import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-conte
 import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
 import { listProposalDocuments } from '../../../lib/services/workbench-proposal-documents';
 
+const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
@@ -26,6 +28,7 @@ export default async function handler(req, res) {
 
   const requestId = req.query.requestId ? String(req.query.requestId).trim() : '';
   if (!requestId) return res.status(400).json({ error: 'requestId is required' });
+  if (!GUID_RE.test(requestId)) return res.status(400).json({ error: 'requestId is not a valid GUID' });
 
   return bypassDynamicsRestrictions('workbench-proposal-documents', async () => {
     try {
@@ -40,7 +43,8 @@ export default async function handler(req, res) {
       const requestNumber = rec.akoya_requestnum;
       const cycleCode = rec.wmkf_meetingdate ? meetingDateToCycleCode(rec.wmkf_meetingdate) : null;
 
-      const result = await listProposalDocuments(requestId, requestNumber, cycleCode);
+      // Derive scope only from the resolved record, never the raw query param.
+      const result = await listProposalDocuments(rec.akoya_requestid, requestNumber, cycleCode);
       return res.status(200).json({ success: true, ...result });
     } catch (err) {
       console.error('workbench proposal-documents error:', err);
