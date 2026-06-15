@@ -14,6 +14,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card } from '../Layout';
 import { parseFieldPrimerEnvelope } from '../../utils/field-primer-envelope';
+import { expertProfileLinks, expertMetrics } from '../../utils/field-primer-display';
 
 const USD = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -107,6 +108,37 @@ function GroundingBadge({ grounding }) {
   return <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${cls}`}>{label}</span>;
 }
 
+// Public profile links + bibliometrics for a grounded expert (orientation only —
+// never contact). Renders nothing for unverified/ungrounded experts.
+function ExpertProfile({ grounding }) {
+  const metrics = expertMetrics(grounding);
+  const links = expertProfileLinks(grounding);
+  if (!metrics && links.length === 0) return null;
+  const chips = [];
+  if (metrics) chips.push(...metrics.map((m) => <span key={`m-${m}`} className="text-gray-500">{m}</span>));
+  links.forEach((l) => chips.push(
+    <a
+      key={`l-${l.label}`}
+      href={l.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-indigo-600 hover:underline"
+    >
+      {l.label}
+    </a>
+  ));
+  return (
+    <span className="block text-xs mt-0.5">
+      {chips.map((c, i) => (
+        <span key={i}>
+          {i > 0 ? <span className="text-gray-300"> · </span> : null}
+          {c}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function PrimerList({ title, items, render }) {
   // The LLM output is parseable JSON but not schema-validated per-item, so guard
   // against null/non-object array entries before rendering.
@@ -157,6 +189,7 @@ function PrimerView({ envelope }) {
             <span className="text-amber-700"> → did you mean {str(e.grounding.resolvedName)}?</span>
           ) : null}
           {str(e.why_relevant) ? <span className="block text-gray-600">{str(e.why_relevant)}</span> : null}
+          <ExpertProfile grounding={e.grounding} />
         </span>
       )} />
       {placement && (
