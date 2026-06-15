@@ -1,9 +1,3 @@
-> ★★ **RUN FIRST AT STARTUP (queued S258, 2026-06-14):** hand the saved prompt in
-> `docs/CODEX_REVIEW_PROMPT_hook-self-review.md` to a `codex:codex-rescue` agent and relay
-> the output verbatim — an independent adversarial review of the new pre-commit self-review hook
-> (`.claude/hooks/pre-commit-self-review.js`) + its strategy, before relying on it. Then act
-> on the findings. *(Carried forward until the review is done.)*
-
 # Session 259 Prompt: Workbench Proposal tab + Field Primer — SHIPPED
 
 > **GIT.** All S258 work is on `main`, pushed (`12c77512..c79fceb8`, 19 commits). Working tree clean.
@@ -43,8 +37,12 @@ for the recurring review-churn.
 
 ## Potential Next Steps
 
-1. **★ FIRST — run the hook self-review** (banner above). If Codex finds the strategy weak or a bug,
-   fix before relying on the hook.
+1. **✅ DONE (S259) — hook self-review ran + acted on.** Codex's adversarial review of the
+   pre-commit self-review hook found the S258 fan-out was incomplete: many reviewer-surface routes
+   passed a client id into a Dataverse selector with only a presence check. Fixed across all of them
+   + `phase-i/summarize` (`58d5fd35`), added a BLOCKING `check:trust-boundary-guid` gate + self-test +
+   commit guard (`ae016131`, `fd94267d`), and hardened the shared commit-hook trigger regex
+   (`692a82a4`). See `docs/agent-wiki/topics/security-auth.md` → "Trust-Boundary GUID Validation".
 2. **Field-primer expert enrichment (deferred, Justin-requested S258):** make confirmed experts
    clickable to ORCID / OpenAlex profiles; optionally a Wikipedia link (`ids.wikipedia`, not currently
    fetched) + the already-mapped h-index/citations. **Profile links only — NO contact/email enrichment**

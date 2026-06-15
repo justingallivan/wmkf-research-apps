@@ -1,10 +1,11 @@
 # Codex review prompt — pre-commit self-review hook strategy + implementation
 
-> **RUN AT NEXT STARTUP (queued S258, 2026-06-14).** Hand the prompt below to a
-> `codex:codex-rescue` agent verbatim; relay Codex's output verbatim, then decide
-> what to act on. Context: this hook was built at the end of S258 to stop the same
-> self-catchable failure modes from recurring across Codex review rounds. It has NOT
-> itself been independently reviewed — that's what this is.
+> **✅ COMPLETED (S259, 2026-06-15).** This review was run, relayed verbatim, and acted on.
+> Codex found the S258 trust-boundary fan-out was incomplete; the remediation (per-route GUID
+> validation + a BLOCKING `check:trust-boundary-guid` gate/commit-guard + a hardened commit-hook
+> trigger) shipped in `58d5fd35`, `ae016131`, `fd94267d`, `692a82a4`. See
+> `docs/agent-wiki/topics/security-auth.md` → "Trust-Boundary GUID Validation". The prompt below is
+> retained as a HISTORICAL record of what was asked — it is no longer a startup action.
 >
 > Files under review (all committed at S258, commit `10c49802`):
 > - `.claude/hooks/pre-commit-self-review.js` (the hook)
