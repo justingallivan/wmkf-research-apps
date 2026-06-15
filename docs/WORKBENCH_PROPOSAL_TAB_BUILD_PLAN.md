@@ -70,10 +70,13 @@ Page.docx`** (redundant — it's the Top section):
 ## 4. Field Primer persistence (the one net-new capability)
 
 - **New Dataverse Memo field `wmkf_ai_fieldprimer`** (JSON envelope: the 9 primer
-  sections + expert-grounding verdicts + provenance `generatedAt/model/runId/promptName`;
-  add `promptVersion` ONLY if the Executor exposes it — the service return currently lacks
-  it, so default null, don't fabricate (Codex S258)). Mirrors `wmkf_ai_dataextract`
-  (Memo-JSON) and the v3 naming convention.
+  sections + expert-grounding verdicts + provenance `model/runId/promptName/promptVersion`
+  + `generatedAt`). The Executor DOES expose `meta.promptName`/`meta.promptVersion`/
+  `meta.modelUsed` (`execute-prompt.js:147-156`, returned in `meta`); the field-primer
+  wrapper currently drops promptName/promptVersion (`field-primer-service.js:72`) — surface
+  them from the wrapper (or read `result.meta` in the route) and persist REAL values, not null
+  (Codex S258, verified). `generatedAt` is NOT from the Executor — stamp it at envelope-write
+  time. Mirrors `wmkf_ai_dataextract` (Memo-JSON) and the v3 naming convention.
 - **Lifecycle:** field null → show a plain "Generate field primer" button (NO LLM-cost/confirm
   warning — staff know it's an AI call, Justin S258); populated → render + "Regenerate"
   (bypasses skip-if-populated overwrite guard).
