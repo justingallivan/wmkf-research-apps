@@ -17,6 +17,7 @@
  */
 
 const { execFileSync } = require('child_process');
+const { isGitCommit, isAmend } = require('./lib/git-commit-detect');
 
 let input = '';
 process.stdin.on('data', (c) => { input += c; });
@@ -25,9 +26,9 @@ process.stdin.on('end', () => {
     const data = JSON.parse(input);
     if (!data || data.tool_name !== 'Bash') return;
     const cmd = (data.tool_input && data.tool_input.command) || '';
-    if (!/\bgit\s+commit\b/.test(cmd)) return;
+    if (!isGitCommit(cmd)) return;
     // Skip amends/no-op meta commits where a review checklist is noise.
-    if (/--amend/.test(cmd)) return;
+    if (isAmend(cmd)) return;
 
     const root = data.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
     let staged = [];

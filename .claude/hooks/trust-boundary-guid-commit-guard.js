@@ -16,6 +16,7 @@
 
 const { execFileSync } = require('child_process');
 const path = require('path');
+const { isGitCommit } = require('./lib/git-commit-detect');
 
 let input = '';
 process.stdin.on('data', (c) => { input += c; });
@@ -24,8 +25,9 @@ process.stdin.on('end', () => {
     const data = JSON.parse(input);
     if (!data || data.tool_name !== 'Bash') return;
     const cmd = (data.tool_input && data.tool_input.command) || '';
-    // Only gate actual commits. `git commit --amend`, `-m`, heredoc, -F all contain "git commit".
-    if (!/\bgit\s+commit\b/.test(cmd)) return;
+    // Only gate actual commits (any global-option form; not commit-tree/-graph).
+    // `git commit --amend`, `-m`, heredoc, -F all count.
+    if (!isGitCommit(cmd)) return;
 
     const root = data.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd();
     try {
