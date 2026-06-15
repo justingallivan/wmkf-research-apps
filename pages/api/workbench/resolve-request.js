@@ -14,6 +14,8 @@ import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-conte
 import { meetingDateToCycleCode, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
 import { fetchCoPIs } from '../../../lib/services/proposal-participants';
 
+const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const SELECT = [
   'akoya_requestid',
   'akoya_requestnum',
@@ -57,6 +59,12 @@ export default async function handler(req, res) {
   const requestNumber = req.query.requestNumber ? String(req.query.requestNumber).trim() : '';
   if (!requestId && !requestNumber) {
     return res.status(400).json({ error: 'requestId or requestNumber is required' });
+  }
+  // GUID-validate requestId before it becomes a Dataverse record-id selector
+  // (parity with the other workbench routes). requestNumber is a string lookup,
+  // escaped at its filter below.
+  if (requestId && !GUID_RE.test(requestId)) {
+    return res.status(400).json({ error: 'requestId is not a valid GUID' });
   }
 
   return bypassDynamicsRestrictions('workbench-resolve-request', async () => {

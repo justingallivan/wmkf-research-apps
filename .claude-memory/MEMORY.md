@@ -32,6 +32,7 @@
 ## Working Norms
 - Thoroughness / completion posture: feedback-thoroughness-default.md; feedback-drive-to-completion.md; feedback-truncation-is-breakage-not-completion.md
 - Bug found in review: feedback-real-fix-not-design-note.md
+- Before declaring a slice done / committing code / delegating a review (verify+fan-out+boundary+concurrency self-pass): feedback-self-review-before-delegating-review.md
 - No performative contrition: feedback-no-performative-contrition.md
 - React async/effect edits: feedback-profile-context-runtime-bugs.md
 - Prior-context lookup: feedback-check-memory-before-asking-user.md
