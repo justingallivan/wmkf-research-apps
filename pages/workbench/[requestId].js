@@ -3,8 +3,9 @@
  *
  * Renders the request context header + the tab strip. The Reviewers tab is live
  * (Phase 2: Invite/Track/Completed via the shared ReviewerManagePanel; Phase 3:
- * the Find sub-tab — applicant-reviewer ingestion + in-panel search); the other
- * 9 tabs are placeholders for the rest of the request lifecycle. Tab + sub-tab
+ * the Find sub-tab — applicant-reviewer ingestion + in-panel search). The Proposal
+ * tab is also live (documents + AI content + Field Primer, S258/S260); the other
+ * 8 tabs are placeholders for the rest of the request lifecycle. Tab + sub-tab
  * selection is query-string driven (?tab=reviewers&sub=invite) for deep-links.
  */
 
@@ -21,8 +22,8 @@ import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 import ProposalTab from '../../shared/components/workbench/ProposalTab';
 import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
 
-// Reviewers is the live tab (Phases 2–3); the other 9 are placeholders for the
-// full request lifecycle. Order matches the build plan's tab strip.
+// Reviewers (Phases 2–3) and Proposal are the live tabs; the other 8 are
+// placeholders for the full request lifecycle. Order matches the build plan's tab strip.
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'proposal', label: 'Proposal' },
