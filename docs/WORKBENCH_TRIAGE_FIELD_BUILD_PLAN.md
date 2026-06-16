@@ -1,6 +1,9 @@
 # Workbench Triage Field — build plan (S260)
 
-> **Status:** Pre-implementation. Drafted 2026-06-15 (S260) from the design thread with Justin.
+> **Status:** Stages 0–4 BUILT + DEPLOYED (S261, 2026-06-15) — field live in prod, D26 backfill applied
+> (35 Advancing + 170 Set aside, 205 rows, idempotent). Remaining: §3 dashboard switch (still needs the
+> `[DEFAULT]` cycle-default decision) + §5 allowlist retirement, plus a post-deploy PowerAutomate-trigger
+> confirmation on the bulk write. Drafted 2026-06-15 (S260) from the design thread with Justin.
 >
 > **v4 (2026-06-15): Codex review round 3 folded in.**
 >

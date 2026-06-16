@@ -42,10 +42,12 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
   `lib/services/reviewer-rollup.js` — `deriveWorkRemaining` moved there; the `status-enum-parity` gate now
   reads it from there). **6 placeholder lifecycle tabs remain** (Initial/Pre-Site-Visit/Final Writeup,
   Reviews, Site Visit, Awardee) — scoped in `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` §"Remaining lifecycle tabs".
-- **Triage-field plan READY (not built):** `docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md` (v4, 3 Codex rounds).
-  A new `wmkf_triagestatus` picklist (Advancing/Set aside/null) on **core `akoya_request`** RETIRES the manual
-  `d26Allowlist.js` — declutters the dashboard + surfaces going-forward without a status flip. Staged rollout;
-  prod schema apply + backfill `--execute` are Justin's triggers (heads-up Connor; no PA trigger). J27 expands
+- **Triage-field BUILT + DEPLOYED (S261, `ecdcaed2`/`42823593`):** `docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md` (v4, 3 Codex rounds).
+  A new `wmkf_triagestatus` picklist (Advancing/Set aside/null) on **core `akoya_request`** is LIVE in prod with the
+  D26 backfill applied (35 Advancing + 170 Set aside, 205 rows). It is DESIGNED to retire the manual `d26Allowlist.js`,
+  but the dashboard STILL reads the allowlist — the §3 dashboard switch (needs the cycle-default decision) + §5
+  allowlist retirement are NOT done, so the field has no visibility effect yet. (PA-trigger check on the bulk write
+  still to confirm.) J27 expands
   it (more states + PD-recommendation/authoritative two-layer split) — that's the tier-2 **triage lens** seed.
 - **Standalone app retirement STARTED (verify before acting):** Justin **hid Reviewer Finder + Review Manager
   in the admin panel** (S260). The `/api/reviewer-finder/*` + `/api/review-manager/*` API routes are
