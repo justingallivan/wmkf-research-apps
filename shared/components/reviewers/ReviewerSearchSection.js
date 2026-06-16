@@ -249,7 +249,7 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
           )}
           {isLowConfidence && (
             <div className="mt-2 p-2 bg-amber-100 border border-amber-300 rounded text-xs text-amber-800">
-              <span className="font-medium">⚠️ Low match ({Math.round(confidence * 100)}%):</span> Publications don’t match Claude’s description — could be a different person with the same name.
+              <span className="font-medium">⚠️ Low match ({Math.round(confidence * 100)}%):</span> Publications don't match Claude's description — could be a different person with the same name.
             </div>
           )}
           {isWeakMatch && !hasAnyMismatch && (
@@ -338,7 +338,7 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
             {/* Scholar profile/search link suppressed for selectable-but-unverified rows — it
                 would nudge staff toward a possibly-wrong namesake profile (Codex re-review LOW). */}
             {!identityUnverified && (
-              <a href={scholarUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1" title={hasRealScholar ? 'Open this researcher’s Google Scholar profile' : 'Search Google Scholar for this researcher'}>
+              <a href={scholarUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1" title={hasRealScholar ? "Open this researcher's Google Scholar profile" : 'Search Google Scholar for this researcher'}>
                 🎓 {hasRealScholar ? 'Scholar Profile' : 'Scholar Search'}
               </a>
             )}
@@ -347,7 +347,7 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
                 type="button"
                 onClick={() => onExclude(c)}
                 className="text-xs text-gray-400 hover:text-red-600 ml-auto"
-                title="Set aside — moves to the Excluded list and won’t be surfaced again by a search for this request (recoverable)"
+                title="Set aside — moves to the Excluded list and won't be surfaced again by a search for this request (recoverable)"
               >
                 ✕ Exclude
               </button>
@@ -497,6 +497,16 @@ export default function ReviewerSearchSection({
     if (!excludeEditedRef.current) setExcludeText((excludedNames || []).join(', '));
   }, [excludedNames]);
 
+  // Auto-trigger applicant enrichment once both the proposal (blobUrl) and the
+  // ingested recommendations are ready. Runs independently of the Claude search —
+  // enrichment uses blobUrl directly for COI if no prior analysis result exists.
+  useEffect(() => {
+    const selectableCount = recommended.filter((r) => r.selected !== false).length;
+    if (blobUrl && selectableCount > 0 && recPhase === 'idle' && !recRunningRef.current) {
+      enrichRecommended();
+    }
+  }, [blobUrl, recommended, recPhase, enrichRecommended]);
+
   const pushProgress = useCallback((m) => {
     if (m) setProgress((p) => [...p.slice(-6), m]);
   }, []);
@@ -542,7 +552,7 @@ export default function ReviewerSearchSection({
       // Stream ended cleanly but no result frame arrived — almost always a
       // timed-out or dropped connection during the long Claude analysis, not a
       // content problem. Name the likely cause so the user knows to just retry.
-      if (!analysisResult) throw new Error('The proposal analysis didn’t finish — the connection timed out or dropped before results came back. Please run the search again.');
+      if (!analysisResult) throw new Error("The proposal analysis didn't finish — the connection timed out or dropped before results came back. Please run the search again.");
       if (genRef.current !== myGen) return; // context changed — abort
       setAnalysis(analysisResult);
 
@@ -674,10 +684,10 @@ export default function ReviewerSearchSection({
             setRosterNames((prev) => Array.from(new Set([...prev, ...enriched.map((c) => c.name)])));
             setRosterNote(null);
           } else {
-            setRosterNote('Couldn’t save this search to the request — these candidates may re-appear on a future search.');
+            setRosterNote("Couldn't save this search to the request — these candidates may re-appear on a future search.");
           }
         } catch {
-          if (genRef.current === myGen) setRosterNote('Couldn’t save this search to the request — these candidates may re-appear on a future search.');
+          if (genRef.current === myGen) setRosterNote("Couldn't save this search to the request — these candidates may re-appear on a future search.");
         }
       }
     } catch (e) {
@@ -728,7 +738,9 @@ export default function ReviewerSearchSection({
   // The selectable list = the durable active roster ∪ this run's results, deduped
   // by normalized name (run results win — freshest enrichment). Renders + ranks
   // independent of `phase` so the roster shows on reload without a fresh search.
-  const displayCandidates = dedupeByName([...candidates, ...rosterActive].map((c) => withReviewerProvenance(c)));
+  // recCandidates (enriched applicant-suggested) prepend so fresh enrichment wins
+  // over any stale roster copy of the same person.
+  const displayCandidates = dedupeByName([...recCandidates, ...candidates, ...rosterActive].map((c) => withReviewerProvenance(c)));
 
   // Slice E: a candidate the system could not identity-resolve (deferred Track-B or
   // an unresolved verdict) is visible but NOT selectable/savable as a vetted reviewer
@@ -786,7 +798,7 @@ export default function ReviewerSearchSection({
       // Roll back the optimistic move so the card isn't silently lost.
       setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
       setRosterActive((prev) => dedupeByName([pruned, ...prev]));
-      setRosterNote('Couldn’t exclude that reviewer — please try again.');
+      setRosterNote("Couldn't exclude that reviewer — please try again.");
     }
   }, [requestId]);
 
@@ -806,7 +818,7 @@ export default function ReviewerSearchSection({
     } catch {
       setRosterActive((prev) => prev.filter((c) => candKey(c) !== key));
       setRosterExcluded((prev) => dedupeByName([cand, ...prev]));
-      setRosterNote('Couldn’t promote that reviewer — please try again.');
+      setRosterNote("Couldn't promote that reviewer — please try again.");
     }
   }, [requestId]);
 
@@ -849,7 +861,7 @@ export default function ReviewerSearchSection({
       }
       const failed = toSave.length - saved;
       const failureDetail = failed > 0 ? formatSaveFailureDetails(sData.errors) : '';
-      setSavedMsg(`Saved ${saved} of ${toSave.length} to this request’s candidate pool.${failed > 0 ? ` ${failed} could not be saved${failureDetail ? ` (${failureDetail})` : ''}.` : ''}`);
+      setSavedMsg(`Saved ${saved} of ${toSave.length} to this request's candidate pool.${failed > 0 ? ` ${failed} could not be saved${failureDetail ? ` (${failureDetail})` : ''}.` : ''}`);
       setPhase('done');
 
       // Graduate ONLY the successfully-saved names: flip them to status='saved'
@@ -1037,11 +1049,11 @@ export default function ReviewerSearchSection({
                   placeholder="e.g. Thomas K. Wood, Jens Hör"
                 />
                 {exclusionsUnavailable && (
-                  <p className="text-xs text-amber-700 mt-1">The applicant exclusion list couldn’t be loaded — add exclusions manually above.</p>
+                  <p className="text-xs text-amber-700 mt-1">The applicant exclusion list couldn't be loaded — add exclusions manually above.</p>
                 )}
                 {excludedRaw && (
                   <details className="mt-2">
-                    <summary className="text-xs text-gray-500 cursor-pointer">Applicant’s original text</summary>
+                    <summary className="text-xs text-gray-500 cursor-pointer">Applicant's original text</summary>
                     <pre className="text-xs bg-gray-50 text-gray-700 rounded p-2 mt-1 whitespace-pre-wrap">{excludedRaw}</pre>
                   </details>
                 )}
@@ -1106,18 +1118,23 @@ export default function ReviewerSearchSection({
                       </div>
                       <div className="max-h-[32rem] overflow-y-auto space-y-4 pr-1">
                         {provenanceSections.map((section) => {
-                          // Slice E: the needs-identity-review section is read-only —
-                          // these candidates couldn't be identity-resolved, so they are
-                          // shown for context but not selectable/savable as vetted reviewers.
-                          const readOnlySection = section.key === 'needs_identity_review';
+                          // Slice E: the needs-identity-review section is read-only.
+                          // applicant_suggested is also read-only — those rows are already
+                          // in the pool (no save step needed); invite from the Invite tab.
+                          const readOnlySection = section.key === 'needs_identity_review' || section.key === 'applicant_suggested';
                           return (
                           <div key={section.key}>
                             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
                               {section.title} ({section.items.length})
                             </p>
-                            {readOnlySection && (
+                            {section.key === 'needs_identity_review' && (
                               <p className="text-xs text-gray-400 mb-1.5">
-                                Identity couldn’t be confirmed for these — not selectable. Re-run a search or resolve the identity to consider them.
+                                Identity couldn't be confirmed for these — not selectable. Re-run a search or resolve the identity to consider them.
+                              </p>
+                            )}
+                            {section.key === 'applicant_suggested' && (
+                              <p className="text-xs text-gray-400 mb-1.5">
+                                Named by the applicant — already in this request's candidate pool. Invite from the Invite tab.
                               </p>
                             )}
                             <div className="space-y-2">
@@ -1143,7 +1160,7 @@ export default function ReviewerSearchSection({
                         <button type="button" onClick={runSearch} disabled={!blobUrl || busy || !rosterLoaded} className="text-sm text-gray-500 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Run another search</button>
                       </div>
                       <p className="text-xs text-gray-400">
-                        Saved candidates join this request’s pool and appear in the Invite tab once you invite and they accept. Excluded and already-surfaced candidates are skipped by the next search.
+                        Saved candidates join this request's pool and appear in the Invite tab once you invite and they accept. Excluded and already-surfaced candidates are skipped by the next search.
                       </p>
                     </>
                   )}
@@ -1165,7 +1182,7 @@ export default function ReviewerSearchSection({
                   {unverifiedToShow.length > 0 && (
                     <details className="border border-gray-200 rounded-lg p-2">
                       <summary className="text-xs font-medium text-gray-500 cursor-pointer">
-                        Unverified suggestions ({unverifiedToShow.length}) — couldn’t confirm these in the literature; not selectable
+                        Unverified suggestions ({unverifiedToShow.length}) — couldn't confirm these in the literature; not selectable
                       </summary>
                       <div className="space-y-2 mt-2">
                         {unverifiedToShow.map((c, i) => (
@@ -1184,123 +1201,75 @@ export default function ReviewerSearchSection({
         verify card (state + handlers live in ReviewerFindPanel). */}
     {manualAddSlot}
 
-    {/* Applicant-recommended reviewers + the OPTIONAL verify action, combined into
-        one card below the primary search so it can't be mistaken for the search
-        (S220: a PD ran the verify thinking it was the reviewer search). The card
-        always renders so it still reports "applicant listed none" / ingestion
-        errors; the verify controls appear only when there are selectable
-        recommendations. Verify checks only the applicant's own listed names — it
-        does not find new reviewers. */}
+    {/* Applicant-suggested reviewer status card — ingestion + enrichment state.
+        Enriched candidates surface in the Applicant-suggested provenance section
+        of the main candidate list above; this card is a status surface only.
+        Enrichment fires automatically when both the proposal and the ingested
+        recommendations are ready (no manual trigger required). */}
     <Card hover={false}>
       <div className="flex items-center justify-between mb-2">
-        <p className="font-medium text-gray-900">Optional: verify the applicant’s suggested reviewers</p>
+        <p className="font-medium text-gray-900">Applicant-suggested reviewers</p>
         {(ingestLoading || recPhase === 'running') && <Spinner />}
       </div>
 
-      {/* Applicant-recommended list (materialized candidates) */}
       {ingestError ? (
         <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
-          Couldn’t ingest applicant reviewers: {ingestError}{' '}
+          Couldn't ingest applicant reviewers: {ingestError}{' '}
           <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
         </div>
       ) : ingestLoading ? (
-        <p className="text-sm text-gray-500">Materializing the applicant’s recommended reviewers…</p>
+        <p className="text-sm text-gray-500">Materializing the applicant's recommended reviewers…</p>
       ) : (recommended.length === 0 && recommendedFailed.length === 0 && slotsPopulated === 0) ? (
         <p className="text-sm text-gray-600">The applicant did not list any recommended reviewers for this request.</p>
       ) : (recommended.length === 0 && recommendedFailed.length === 0 && slotsPopulated === null) ? (
-        // No usable signal (older/garbled response). Don't claim "listed none".
         <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
-          Couldn’t confirm the applicant’s recommended reviewers.{' '}
+          Couldn't confirm the applicant's recommended reviewers.{' '}
           <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
         </div>
       ) : (
-        <>
+        <div className="space-y-3">
           {recommendedFailed.length > 0 && (
-            <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm mb-3">
+            <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
               {recommendedFailed.length} of {slotsPopulated ?? (recommended.length + recommendedFailed.length)}{' '}
               applicant-recommended reviewer{recommendedFailed.length === 1 ? '' : 's'} failed to ingest
               {recommendedFailed.some((f) => f.name) && (
                 <> ({recommendedFailed.map((f) => f.name).filter(Boolean).join(', ')})</>
               )}
-              . They are <span className="font-medium">not</span> saved as candidates yet.{' '}
+              .{' '}
               <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
             </div>
           )}
-          {recommended.length > 0 ? (
-            <>
-              <p className="text-sm text-gray-600 mb-3">
-                These were recommended by the applicant and are now saved as candidates for this request.
-                Verify them below to enrich their records, then dispatch from the <span className="font-medium">Invite</span> tab.
-              </p>
-              <ul className="divide-y divide-gray-100">
-                {recommended.map((r) => (
-                  <li key={r.suggestionId || r.potentialReviewerId} className="py-2 flex items-center justify-between gap-3">
-                    <span className="text-sm text-gray-900">{r.name || '(unnamed reviewer)'}</span>
-                    <span className="flex items-center gap-2">
-                      <Pill tone="green">Applicant-suggested</Pill>
-                      {r.selected === false && <Pill tone="red">Removed by staff</Pill>}
-                      {r.skippedExcluded && <Pill tone="red">Excluded — kept</Pill>}
-                      {r.created && <Pill tone="gray">new</Pill>}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <p className="text-sm text-gray-600">
-              None of the applicant’s recommended reviewers could be ingested — retry above.
+          {recPhase === 'idle' && !blobUrl && recCount > 0 && (
+            <p className="text-sm text-gray-500">
+              {recCount} applicant-suggested reviewer{recCount === 1 ? '' : 's'} ingested — waiting for the proposal to load before verifying.
             </p>
-          )}
-        </>
-      )}
-
-      {/* Verify action — only when there are selectable recommendations */}
-      {recCount > 0 && (
-        <div className="mt-4 pt-4 border-t border-gray-100">
-          {(recPhase === 'idle' || recPhase === 'error') && (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-600">
-                This only checks the {recCount} name{recCount === 1 ? '' : 's'} the applicant listed — it does
-                <span className="font-medium"> not</span> find new reviewers. It runs them through the same
-                verification, conflict-of-interest, and contact/citation enrichment and saves the results to their rows.
-              </p>
-              {!blobUrl && <p className="text-xs text-amber-700">Load a proposal document above first (needed for conflict-of-interest checks).</p>}
-              {recError && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{recError}</div>}
-              <button
-                type="button"
-                onClick={enrichRecommended}
-                disabled={!blobUrl}
-                className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {recPhase === 'error' ? 'Try again' : `Verify applicant’s ${recCount} suggested reviewer${recCount === 1 ? '' : 's'}`}
-              </button>
-            </div>
           )}
           {recPhase === 'running' && (
             <div className="space-y-2">
-              <p className="text-sm text-gray-600">Verifying &amp; enriching… this can take several minutes — please keep this tab open.</p>
+              <p className="text-sm text-gray-600">Verifying applicant-suggested reviewers — this can take a minute or two, please keep this tab open.</p>
               <ul className="text-xs text-gray-500 space-y-0.5">
                 {recProgress.map((m, i) => <li key={i}>{m}</li>)}
               </ul>
             </div>
           )}
           {recPhase === 'done' && (
-            <div className="space-y-3">
-              {recCandidates.length === 0 ? (
-                <p className="text-sm text-gray-600">No recommended reviewers could be enriched.</p>
-              ) : (
-                <>
-                  <p className="text-sm text-gray-600">
-                    Verified {recCandidates.length} applicant-suggested reviewer{recCandidates.length === 1 ? '' : 's'} — metrics &amp; conflicts saved to their records.
-                  </p>
-                  <div className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
-                    {recCandidates.map((c, i) => (
-                      <CandidateCard key={`rec-${c.suggestionId || c.name}-${i}`} candidate={c} readOnly />
-                    ))}
-                  </div>
-                  <button type="button" onClick={enrichRecommended} className="text-sm text-gray-500 underline">Re-verify</button>
-                </>
-              )}
+            <p className="text-sm text-gray-600">
+              {recCandidates.length > 0
+                ? `${recCandidates.length} applicant-suggested reviewer${recCandidates.length === 1 ? '' : 's'} verified — see the Applicant-suggested section above.`
+                : 'No applicant-suggested reviewers could be verified.'}
+            </p>
+          )}
+          {recPhase === 'error' && (
+            <div className="space-y-2">
+              <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{recError}</div>
+              <button
+                type="button"
+                onClick={enrichRecommended}
+                disabled={!blobUrl}
+                className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Try again
+              </button>
             </div>
           )}
         </div>

@@ -78,6 +78,17 @@ no drift). The 8 contracts:
 
 - **Worked example — namesake-collision recall loss (origination probe, 2026-06-12).** A Claude-named Track-A candidate failed to resolve (`oaId` null) not because the person was fabricated but because **citation-ranked author search resolves the wrong cluster.** Reproducible against live OpenAlex: a real low-footprint researcher (~24 works / ~115 cites) with a *directly on-topic* recent paper shares a name with a **famous unrelated namesake** (a psychologist, ~101 works / ~3,261 cites) that ranks #1 in `GET /authors?search=`; the real person is #2, and her own works are **fragmented across ≥3 author clusters**. Default top-1 name resolution therefore either lands on the wrong person or abstains — and abstaining (`oaId` null) is the SAFE branch (`project-reviewer-verify-fail-dangerous`). Root fixes shipped: field-aware *ranking* (S236: `scoreRecord`/`selectRecord` rank by affiliation+topic overlap, not citations) and the **work-grounding rescue** for the abstain case (Contract 8 above — see the enforcement reference for the safety invariants). The deeper ORCID-works-anchored *origination* corpus remains a separate, larger increment. Names stay in the local gitignored probe artifacts per the names-stay-local norm. Related: `reviewer-identity-fragmentation`.
 
+## Future Work — Edit-and-Re-Resolve (Deferred)
+
+**Parked 2026-06-16.** A PD sometimes sees a candidate where the *Why* is directionally correct but the resolved person is wrong — typically a namesake collision (e.g., a physics Jian Wu resolving to a China Pharmaceutical University biomedical Jian Wu). The PD has an out-of-band corrective signal (correct institution from a colleague, a relevant paper title, an ORCID) and wants to re-drive identity resolution without discarding the rationale.
+
+What this would require:
+- **Edit surface on the candidate card** — editable identity anchors: institution, ORCID, a known paper title or DOI
+- **Re-resolve endpoint** — runs identity resolution fresh against the corrected anchors, replacing resolved person data (publications, COI, contact) while preserving the original Why
+- **Merge logic** — existing suggestion row updated in place; prior enrichment data cleared and re-run against new identity
+
+Build considerations: the identity resolution pipeline crosses OpenAlex, ORCID, and PubMed lookups; edge cases around partial prior enrichment need careful handling. The `reviewer-identity-fragmentation` memory and the namesake-collision worked example above are directly relevant. Do not conflate this with the applicant-suggested "re-verify" case (which offers little value within a cycle and was intentionally dropped).
+
 ## Durable Memory
 
 - Identity resolution spine: `project-reviewer-identity-resolution`, `project-reviewer-identity-resolution-phase1`, `reviewer-identity-fragmentation`.
