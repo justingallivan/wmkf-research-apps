@@ -1,119 +1,104 @@
-# Session 260 Prompt: Trust-boundary GUID hardening + blocking gate — SHIPPED
+# Session 261 Prompt: Workbench Group A shipped + triage-field plan ready to build
 
-> **GIT.** All S259 work is on `main` (`58d5fd35..0b63b145`, 8 commits). Working tree clean,
-> build/lint/gates green. **NEW BLOCKING commit guard this session:** `check:trust-boundary-guid`
-> now blocks any commit where a client-supplied id reaches a Dataverse selector without a GUID
-> guard (wired in `.claude/settings.json`, alongside the enum-parity guard). All three commit
-> hooks share one trigger `.claude/hooks/lib/git-commit-detect.js`.
+> **GIT.** All S260 work is on `main`. Working tree clean, build/lint/gates green. The triage-field
+> **build plan is review-converged (3 Codex rounds) and implementation-ready** — that's the teed-up next
+> task. No code written for it yet.
 
-## Session 259 — what happened
+## Session 260 — what happened
 
-Acted on the queued S258 Codex review of the pre-commit self-review hook. Codex found the S258
-trust-boundary fan-out was **incomplete** — many reviewer-surface routes passed a client id into a
-Dataverse selector with only a presence check. Closed the exposure, then turned the failure mode
-into a BLOCKING gate, then hardened + (two Codex rounds) the commit-hook trigger that enforces it.
+Three threads: field-primer expert enrichment, the first two Workbench lifecycle tabs (Group A), and a
+long design push that produced a Codex-converged plan for a triage field (which retires the manual D26
+allowlist).
 
-1. **Trust-boundary security fix** (`58d5fd35`) — new shared validator `lib/utils/guid.js`
-   (`isGuid`/`allGuids`). GUID-validated client ids at the edge across **12 routes**: reviewer-finder
-   (load-proposal, my-candidates, contact-history, cycle-material, generate-emails), review-manager
-   (reviewers, regenerate-token, download-review, mark-received-no-file, render-emails, send-emails),
-   and **`phase-i-dynamics/summarize`** — the one Codex missed, found by an independent fan-out across
-   all 21 sink-bearing routes. `getRecord`/`updateRecord` interpolate the id raw into the request URL;
-   `findByRequest` into an OData `$filter` → over-fetch / IDOR / filter-injection. Defense-in-depth:
-   `reviewer-suggestion.findByRequest` throws on a non-GUID. Audited + confirmed already-safe: workbench
-   routes, field-primer/generate, admin policies/prompts (server ids), external context (token ids),
-   dynamics-explorer (admin-only, GUID-checked at entry).
-2. **Blocking `check:trust-boundary-guid` gate** (`ae016131`, activated `fd94267d`) — AST taint
-   analysis (`scripts/check-trust-boundary-guid.js`) flags any `req.query`/`req.body` id reaching a
-   Dataverse selector without a recognized GUID guard. 16-case self-test (every FAIL fixture proves it
-   catches violations); startup gate + blocking commit guard.
-3. **Commit-hook trigger hardened** (`692a82a4`, Codex rounds `5a78c855` + `2dc40917`) — extracted ONE
-   shared `git-commit-detect.js` (`isGitCommit`/`isAmend`) for all three commit hooks (no trigger drift).
-   Catches global-option forms the old `/\bgit\s+commit\b/` missed (`git -c x=y commit`, `git -C p commit`),
-   ignores `commit-tree`. Design: liberal match (never MISS a real commit — the dangerous direction for a
-   blocking guard), strip-quoted-with-placeholder, fail-OPEN via require-inside-try. 46-case test incl.
-   automated fail-open regressions.
-4. **Wiki capture** (`0b63b145`) — `security-auth.md` → "Trust-Boundary GUID Validation";
-   `dev-environment.md` → "Commit Guards & Triggers". Banner cleared from the prior prompt (`7442bd6d`).
+1. **Field-primer expert enrichment** (`6f02e90f` → Codex `8fbae0b6` → `e509e8b7`) — confirmed/corrected
+   field-primer experts are now clickable to **ORCID + OpenAlex** with **h-index + citations**; profile
+   links only, no contact enrichment. Codex review: **dropped Wikipedia** (verified via live API that
+   OpenAlex authors don't expose `ids.wikipedia` — it was always null), anchored/checksum-validated the
+   URLs, allowlisted expert fields so no stray contact key reaches the persisted envelope. Then
+   **parallelized the OpenAlex grounding** (bounded concurrency) — LLM call dominates total latency, but the
+   grounding phase is no longer serial.
+2. **cycle-material stale-test fix** (`d8edc290`) — the S259 GUID guard made 11 tests 400-before-logic
+   (non-GUID fixtures); fixed fixtures + added guard coverage. Was the only stale suite among the 12.
+3. **Workbench Group A — Status + Overview v1** (`f47d1f09` → Codex `66f33b8c`) — the first two of the
+   (then-8) placeholder lifecycle tabs are LIVE; default landing changed `reviewers → overview`. Status =
+   read-only `akoya_requeststatus` + class badge (reuses canonical `classifyStatus`). Overview =
+   per-request command center (ctx snapshot + AI-artifact chips + reviewer-stage strip). Codex review:
+   chips made clickable, reviewer-shape hardened, gate vacuous-pass closed, and the reviewer-stage strip
+   moved to a **new lighter endpoint** `/api/workbench/reviewer-rollup` (extracted `reviewer-rollup.js`
+   shared with the dashboard — no person/researcher fan-out). **6 placeholder tabs now remain.**
+4. **Remaining-tabs scope** (`c2b05281` → Codex `4ea646a3`) — `REQUEST_WORKBENCH_BUILD_PLAN.md` §"Remaining
+   lifecycle tabs — scope (S260)": per-tab re-home/size/dependency, cross-cutting primitives, build order
+   (Group A → writeup spine → Reviews → Site Visit/Awardee). Reconciled the "9→8→6 placeholder" count
+   across docs/memory/page comments.
+5. **Triage-field build plan** (`4dad7885` v2 → `673f8b08` v3 → `df08bb0b` v4) —
+   `docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md`. **3 Codex rounds, converged.** A new `wmkf_triagestatus`
+   picklist on `akoya_request` (Advancing/Set aside/null) replaces the manual `d26Allowlist.js`:
+   declutters the dashboard + surfaces going-forward without a status flip. Architecture stable since v2;
+   rounds 2–3 were precision. v4's fixes were **Codex-authored, Claude-reviewed** (verified every cited
+   helper/precedent is real).
 
 ## Potential Next Steps
 
-1. **Field-primer expert enrichment (deferred, Justin-requested S258):** make confirmed experts
-   clickable to ORCID / OpenAlex profiles; optionally a Wikipedia link (`ids.wikipedia`, not currently
-   fetched) + the already-mapped h-index/citations. **Profile links only — NO contact/email enrichment**
-   (OpenAlex has no emails anyway; keeps the primer orientation-only, not a candidate source). Small.
-2. **J27 document-capture planning (near-term, large):** D26's SharePoint filename-match doc resolution
-   is an INTERIM bridge; J27 collects docs differently and the converging target (Justin+Connor) is
-   direct Dataverse-table references (`wmkf_requestdocument`-style). Needs a real planning push soon —
-   `project-j27-doc-capture-evolution`.
-3. **Reviewer hold-step GO-LIVE (carried from S257, untouched):** built but DORMANT. Two switches:
-   (a) a staff UI trigger to send `templateType:'hold'`/`'finalize'` (`InviteEmailModal.js` hardcodes
-   `'invitation'`); (b) flip `isProposalReadyForReviewers` (returns `true` today) to the real post-QA
-   release signal — **[OPEN — Justin/Connor]** identify that signal. Sequence: UI trigger → predicate.
-   `project-reviewer-hold-step-decouple`.
-4. **Proposal-tab / Field-Primer tests (clean follow-up, carried from S258):** no automated tests for the
-   Proposal-tab routes or Field Primer yet (verified manually). `tests/unit/workbench-proposal-documents.test.js`
-   + `field-primer-request-mode.test.js` are listed in the build plan.
+### 1. **Build the triage field (TEED UP — plan is implementation-ready).** `docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md`
+Staged rollout (§5): metadata probe → field deploy (isolated schema wave) → backfill (dry-run first) →
+dashboard switch → **retire the allowlist last** after a verified backfill. Start with the no-prod-write,
+reviewable pieces: `shared/config/triageStatus.js`, the metadata-probe preflight, the schema wave JSON, the
+`backfill-d26-triage.mjs` script in dry-run, the `POST /api/workbench/triage` route (HARD server gate),
+dashboard query. **Prod schema apply + backfill `--execute` are Justin's triggers** (core-entity field —
+heads-up to Connor; verify NO PowerAutomate trigger). Two `[DEFAULT — confirm at impl]` items: backfill
+abort bounds + the cycle-default algorithm.
 
-### Housekeeping (verify before acting)
-- **wave2 schema drift (open hazard):** a prod dry-run showed `--wave=2 --execute` would CREATE a
-  duplicate `wmkf_appreviewersuggestion_honorariumrequest` relationship (prod has it under a different
-  SchemaName). Do NOT run full `--wave=2 --execute` until reconciled. Single fields → isolated followup
-  waves. `project-dataverse-schema-deploy-gotchas` #6.
-- **Hold-step Atlas/UI** (carried): add `held` to the reviewer `wmkf_responsetype` Atlas page; confirm
-  whether `held` deserves its own workbench column.
-- **Field-primer latency:** generation runs "several minutes" — slowest part is likely the SEQUENTIAL
-  OpenAlex expert grounding. If it annoys, parallelize the grounding lookups (or background-job it).
+### 2. **Reviewer Finder / Review Manager retirement (IN PROGRESS — verify before acting).**
+Justin has **hidden both apps in the admin panel** (S260). NOT yet done, and order matters: the
+`/api/reviewer-finder/*` + `/api/review-manager/*` **API routes are load-bearing for the Workbench** (it
+calls ~15 of them) — do NOT delete the routes. Remaining: (a) verify every legacy-grant holder has the
+`reviewers` grant (live `wmkf_appuserappaccesses` check — can't see from code), (b) delete the standalone
+*pages* (`pages/reviewer-finder.js`, `review-manager.js`), (c) retire the `reviewer-finder`/`review-manager`
+grant keys from `appRegistry.js`. The manual-PDF-upload off-cycle path goes away (Justin: no more PD uploads).
 
-### Deferred / externally-blocked (do NOT lead with these; verify before acting)
-- Recall padding-ceiling live check before raising count >15 (needs API key + a real proposal).
-- SerpAPI Hobby-tier downgrade eval (Justin, out-of-repo). `score-candidates` reseed only if you edit
-  its template. `affiliationHistory` producers — COI-inert dead code (`project-deferred-code-cleanup`).
-- **Vercel CLI** on this machine is behind (`54.12.2 → 54.14.0`); optional `npm i -g vercel@latest`.
+### 3. **Group B — writeup spine.** Initial / Pre-Site-Visit / Final Writeup re-home the flat upload-based
+`phase-i-writeup.js` / `phase-ii-writeup.js` — each needs a request-preload adapter; needs the
+embed-vs-in-app + writeup-collaborator-access decisions (open). `Final` needs Site-Visit findings as input.
 
-## Parked — do NOT surface in startup summaries
-> User-recall-only; act only when the named un-park trigger fires (`feedback-dont-resurface-parked-items`).
-- **PubPeer migration off SerpAPI** — contingent on a sanctioned-API reply from PubPeer (Justin emailed
-  S251). `docs/agent-wiki/topics/integrity-screener.md`; `project-serpapi-capability-erosion`.
+## Design context to carry (D26 document model — Justin, S260)
 
-## ⚠ Continuity guardrails (still live)
-- **`check:trust-boundary-guid` BLOCKS commits** when a client id reaches a Dataverse selector without
-  a GUID guard. Canonical guard: `lib/utils/guid.js` (`isGuid`/`allGuids`). Server-derived ids (read off
-  a row already fetched, or a token-bound row) are trusted. Escape hatch: `// trust-boundary-guid:ignore
-  reason=<id>`. Intra-file taint (interprocedural not modeled). `docs/agent-wiki/topics/security-auth.md`.
-- **All three commit hooks share `.claude/hooks/lib/git-commit-detect.js`.** Editing the trigger? It is
-  liberal-by-design (never miss a real commit) and fails OPEN. `docs/agent-wiki/topics/dev-environment.md`
-  → "Commit Guards & Triggers". The self-review hook is ADVISORY; enum-parity + trust-boundary BLOCK.
-- **`wmkf_ai_fieldprimer` holds ONE of:** a DONE envelope (`schema:'field-primer/v1'`) or a transient
-  generation LEASE (`schema:'field-primer/lease'`) or null. Parse via `shared/utils/field-primer-envelope.js`
-  — never hand-edit; the route owns the lease/persist contract. Primer is staff orientation only, NEVER a
-  reviewer-candidate/contact source.
-- **D26 Proposal-tab doc resolution is an INTERIM bridge** (filename-match under `Phase I`). J27 changes
-  it — `project-j27-doc-capture-evolution`.
-- **Hold step BUILT but DORMANT** (carried): `isProposalReadyForReviewers` returns `true`, nothing sends
-  `hold`. `project-reviewer-hold-step-decouple`; `docs/REVIEWER_HOLD_STEP_BUILD_PLAN.md`.
-- Memory router stays **hub-link form**; `grep`/`rg` may corrupt identifiers+digits
-  (`project-rtk-grep-output-corruption`) — use Read for exact content.
+- **D26 active-document switch:** a request runs on the **Phase I proposal** early; after reviewers are
+  confirmed, the **Phase II proposal arrives** (`akoya_requeststatus = 'Phase II Pending'` = "doc arrived")
+  and becomes the active doc — what's sent to reviewers + the **Pre-Site-Visit Writeup** source. Lives in
+  Dataverse, **consistent naming TBD**. This is a **D26 patch to UNPATCH for J27** (single submission → one
+  Phase I doc throughout). The active-document-switch design is **not yet written**.
+- **Four distinct lifecycle signals** (don't conflate): Triage (staff, visibility) · Invited
+  (`wmkf_phaseistatus`, board → "expect Phase II proposal") · Phase II Pending (doc arrived) · J27 phase
+  trigger (official advance, replaces the allowlist concept). The triage field is the seed of the J27
+  triage lens; J27 expands states + adds the PD-recommendation/authoritative two-layer split.
 
-## Key Files Reference (S259 — trust-boundary work)
+## Continuity guardrails (still live)
+- **Triage field touches the CORE `akoya_request` entity** — prod schema change (feasible via isolated wave,
+  field-primer precedent), heads-up to Connor, **must carry no PA trigger**. Dashboard null-query trap:
+  use `(wmkf_triagestatus eq null or ne 100000001)` (mirror `notExcludedFilter`); bare `ne` drops nulls.
+- **`/api/workbench/reviewer-rollup`** is the lighter per-request reviewer-stage path (shared
+  `lib/services/reviewer-rollup.js`); the dashboard rollup + `deriveWorkRemaining` now live there (the
+  `status-enum-parity` gate reads `deriveWorkRemaining` from `reviewer-rollup.js`, not `dashboard.js`).
+- **Field primer is staff orientation only**, never a reviewer-candidate/contact source. Wikipedia was
+  dropped (OpenAlex authors don't expose it). Profile-link display helpers: `shared/utils/field-primer-display.js`.
+- **`d26Allowlist.js` is the complete multi-PD going-forward set** (colleagues' proposals already promoted) —
+  the triage backfill's `Advancing` source. The test request `1002788` is excluded (→ Set aside).
+
+## Key Files Reference (S260)
 
 | File | Role |
 |------|------|
-| `lib/utils/guid.js` | shared edge validator — `isGuid` / `allGuids` (+ `GUID_RE`) |
-| `scripts/check-trust-boundary-guid.js` | AST taint gate: client id → Dataverse selector must be GUID-validated |
-| `scripts/check-trust-boundary-guid-self-test.js` | 16-case self-test (FAIL fixtures + live baseline) |
-| `.claude/hooks/trust-boundary-guid-commit-guard.js` | blocking commit guard (exit 2) wrapping the gate |
-| `.claude/hooks/lib/git-commit-detect.js` | shared `isGitCommit`/`isAmend` trigger for all 3 commit hooks |
-| `.claude/hooks/lib/git-commit-detect.test.js` | 46-case trigger test (incl. fail-open regressions) |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | `findByRequest` now throws on non-GUID (filter-injection chokepoint) |
-| `pages/api/phase-i-dynamics/summarize.js` | the route Codex missed — now GUID-validates `requestGuid` |
+| `docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md` | v4 triage-field plan (3 Codex rounds) — the next build |
+| `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` | §"Remaining lifecycle tabs — scope (S260)" — the 6 remaining tabs |
+| `shared/components/workbench/StatusTab.js` / `OverviewTab.js` | Group A tabs (live) |
+| `lib/services/reviewer-rollup.js` | shared reviewer rollup + `deriveWorkRemaining` + `WORK_REMAINING_LABEL` |
+| `pages/api/workbench/reviewer-rollup.js` | lighter per-request rollup endpoint |
+| `lib/services/field-primer-service.js` / `shared/utils/field-primer-display.js` | grounding (parallel) + profile links |
 
 ## Testing
 ```bash
 npm run build && npm run lint
-node .claude/hooks/lib/git-commit-detect.test.js                 # 46-case commit-trigger matrix
-npm run check:trust-boundary-guid && npm run check:trust-boundary-guid:self-test
-npm run check:api-routes && npm run check:fact-consistency
+npm test
+npm run check:status-enum-parity && npm run check:status-enum-parity:self-test
+npm run check:trust-boundary-guid && npm run check:api-routes && npm run check:fact-consistency
 ```
-> Trust-boundary fix is server-side validation only — verified via the gate + self-test (no live app
-> run needed). The reviewer-surface routes return 400 on a malformed id before any Dataverse call.

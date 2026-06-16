@@ -35,6 +35,29 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 - **Phase 3 — SHIPPED S210 (`79a2840`) + S211 (`bd95087`):** `ReviewerFindPanel.js` (auto-load proposal, in-panel `analyze→discover→enrich→save` search at full standalone parity), applicant-reviewer ingestion (`/api/workbench/applicant-reviewers.js`, recommended→candidates / excluded→per-request soft-block), and the new **Candidates** saved-roster sub-tab (`CandidatesPanel.js` + real invitations). Manual reviewer add SHIPPED S236 (`/api/workbench/manual-reviewer.js`). So the live Reviewers tab has **5** sub-tabs (Find · Candidates · Invite · Track · Completed), not the 4 of the S206 design. Authoritative phase status: `docs/REQUEST_WORKBENCH_BUILD_PLAN.md`.
 - **Still pending (operational, NOT code — verify, don't assume):** grant the `reviewers` app to the pilot PDs via `/admin`, and browser-smoke `/workbench`. No source artifact proves these are done; treat as open until checked live.
 
+**S260 (2026-06-15) — Group A tabs + triage-field plan + app-retirement started:**
+- **Group A SHIPPED (`f47d1f09`, `66f33b8c`):** the **Overview** (per-request command center) + **Status**
+  (read-only `akoya_requeststatus`) lifecycle tabs are live; default landing flipped `reviewers → overview`.
+  Overview's reviewer-stage strip uses a NEW lighter endpoint `/api/workbench/reviewer-rollup` (shared
+  `lib/services/reviewer-rollup.js` — `deriveWorkRemaining` moved there; the `status-enum-parity` gate now
+  reads it from there). **6 placeholder lifecycle tabs remain** (Initial/Pre-Site-Visit/Final Writeup,
+  Reviews, Site Visit, Awardee) — scoped in `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` §"Remaining lifecycle tabs".
+- **Triage-field plan READY (not built):** `docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md` (v4, 3 Codex rounds).
+  A new `wmkf_triagestatus` picklist (Advancing/Set aside/null) on **core `akoya_request`** RETIRES the manual
+  `d26Allowlist.js` — declutters the dashboard + surfaces going-forward without a status flip. Staged rollout;
+  prod schema apply + backfill `--execute` are Justin's triggers (heads-up Connor; no PA trigger). J27 expands
+  it (more states + PD-recommendation/authoritative two-layer split) — that's the tier-2 **triage lens** seed.
+- **Standalone app retirement STARTED (verify before acting):** Justin **hid Reviewer Finder + Review Manager
+  in the admin panel** (S260). The `/api/reviewer-finder/*` + `/api/review-manager/*` API routes are
+  **load-bearing for the Workbench** (it calls ~15) — do NOT delete them. Remaining: verify all legacy-grant
+  holders have `reviewers` (live `wmkf_appuserappaccesses`), delete the standalone *pages*, retire the
+  `reviewer-finder`/`review-manager` grant keys. Off-cycle PDF upload goes away (Justin: no more PD uploads).
+- **D26 document model (Justin):** active doc is Phase I early, then the **Phase II proposal** (arrives →
+  `akoya_requeststatus = 'Phase II Pending'`) becomes active (sent to reviewers + Pre-Site-Visit Writeup
+  source), Dataverse-stored, consistent naming TBD. **D26 patch to UNPATCH for J27** (single doc throughout).
+  Four distinct signals: Triage (visibility) · Invited (`wmkf_phaseistatus`, board, "expect Phase II") ·
+  Phase II Pending (doc arrived) · J27 phase trigger (official advance, replaces the allowlist concept).
+
 **S205 reprioritization (2026-05-30):** Justin elevated the **tier-3 whole-lifecycle navigation model** (how launcher → cycle dashboard → per-request Workbench fit together as ONE coherent UI, and how the existing standalone apps fold in) to **top-priority next-session work** — distinct from, and now ahead of, the reviewer-lifecycle-slice build. Not started tonight (deferred deliberately). Approach he wants: **build mockups with a Claude browser session** (visual exploration of the navigation model) before/alongside the scoping doc. The architecture below is still the locked frame; the open work is rendering the tier-stitching as something he can see and react to. Nothing built; no scoping doc yet (see end of entry).
 
 **S206 mockup + decisions (2026-05-31):** Built the first clickable navigation mockup at `docs/mockups/lifecycle-ui-mockup.html` (self-contained HTML, committed 3f659a6; NOT a live app change — no `pages/` route). Decisions Justin made driving it:
