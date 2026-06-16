@@ -47,13 +47,9 @@ Two streams completed:
 
 ## Potential Next Steps
 
-### 1. **Run the Graph API write-access probe.**
-```bash
-node scripts/probe-graph-write-access.mjs <requestId>
-```
-Where `<requestId>` is the GUID from the Workbench URL `/workbench/<requestId>`.
-- CONFIRMED → D26 Pre-Site-Visit tab can write Word docs to SharePoint directly
-- 403 → Connor needs to grant write permissions in Azure AD before building
+### 1. ~~**Run the Graph API write-access probe.**~~ **CONFIRMED 2026-06-16.**
+`node scripts/probe-graph-write-access.mjs 1002788` — upload + delete sentinel succeeded.
+D26 Pre-Site-Visit tab can write Word docs to SharePoint directly. No fallback needed.
 
 ### 2. **Share `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md` with Connor.**
 Send him the design doc (or paste into Teams/email). Open questions for him are in the final
@@ -108,5 +104,5 @@ npm run build && npm run lint
 npm test                       # FULL suite — not a subset (feedback-green-requires-full-test-suite)
 npm run check:trust-boundary-guid && npm run check:api-routes && npm run check:fact-consistency
 npm run check:status-enum-parity && npm run check:atlas
-node scripts/probe-graph-write-access.mjs <requestId>   # confirm Graph API write access
+node scripts/probe-graph-write-access.mjs 1002788        # CONFIRMED 2026-06-16 — write access verified
 ```

@@ -7,7 +7,7 @@ metadata:
   originSessionId: 17893605-3207-451d-8190-118bbacd8141
   status: active
   scope: sharepoint
-  last_verified: 2026-05-01 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-06-16 via probe-graph-write-access.mjs (request 1002788)
 ---
 
 ## Recall Rule
@@ -36,7 +36,7 @@ Documents attached to requests are stored in **SharePoint**, not Dynamics.
 
 ## Permissions
 
-`Sites.Selected` granted with both read AND write roles on the akoyaGO site (write granted 2026-04-15, verified end-to-end 2026-05-01 via `scripts/probe-sharepoint-write.js`). `Sites.Selected` is the singular Graph permission name — read vs. write is set per-site at authorization time via `POST /sites/{id}/permissions`.
+`Sites.Selected` granted with both read AND write roles on the akoyaGO site (write granted 2026-04-15, verified end-to-end 2026-05-01 via `scripts/probe-sharepoint-write.js`). Re-verified 2026-06-16 via `scripts/probe-graph-write-access.mjs` (request 1002788 — upload + delete sentinel in `akoya_request` library succeeded). `Sites.Selected` is the singular Graph permission name — read vs. write is set per-site at authorization time via `POST /sites/{id}/permissions`.
 
 ## Multiple Document Libraries
 
