@@ -1,0 +1,18 @@
+{
+  "name": "akoya_request-triagestatus",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "_comment": "Isolated followup deploy (S261) for the single Workbench triage field. Lives in its own wave so `apply-dataverse-schema --wave=2-triagestatus` creates ONLY this field (string-wave loads only this dir). Re-running the full wave2 would ALSO try to create the drifted `wmkf_appreviewersuggestion_honorariumrequest` relationship (prod has the honorarium lookup under a different SchemaName) — hence isolation, same reason as wave2-fieldprimer. Picklist values mirror shared/config/triageStatus.js (the app-side source of truth); this JSON is the Dataverse source of truth and the two MUST stay in sync. schema-apply is CREATION-ONLY (schema-apply.js:264) — it will NOT reconcile a divergent pre-existing field; run scripts/preflight-triagestatus-field.mjs FIRST. MUST carry NO PowerAutomate trigger (verify post-deploy). Publisher prefix wmkf; precedent wmkf_ai_FieldPrimer self-deployed to akoya_request. Catalogued in docs/atlas/dataverse-akoya-request.md and docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md.",
+  "attributes": [
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_TriageStatus",
+      "displayName": "Triage Status",
+      "description": "Workbench triage: staff winnowing of a proposal — in-contention vs set-aside. Reversible, VISIBILITY-ONLY (drives the Workbench dashboard going-forward filter); NOT the official Phase I->II status flip, NOT the board 'Invited' signal, NOT the doc-arrival 'Phase II Pending' signal. null/unset = untriaged. Set via POST /api/workbench/triage (hard manage gate: lead PD or superuser). Additively extensible for J27. See docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md.",
+      "options": [
+        { "value": 100000000, "label": "Advancing", "description": "In contention — surfaced on the going-forward dashboard." },
+        { "value": 100000001, "label": "Set aside", "description": "Winnowed out — hidden from the default dashboard (reversible)." }
+      ]
+    }
+  ]
+}
