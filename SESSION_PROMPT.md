@@ -1,91 +1,106 @@
-# Session 262 Prompt: Triage field fully shipped — next is Group B / reviewer-app retirement
+# Session 263 Prompt: Reviewer retirement done — Group B writeup spine designed, waiting on Connor
 
-> **GIT.** All S261 work is on `main`, pushed. Working tree clean, build/lint/full-suite (179/2520)
-> and all gates green. The **Workbench triage field is fully shipped to prod** (deploy → backfill →
-> dashboard read → per-row flip write → allowlist retired). No teed-up build; pick from Next Steps.
+> **GIT.** All S262 work is on `main`. Working tree clean, all gates green (2520 tests passing).
+> Reviewer Finder / Review Manager retirement shipped. Group B design doc created; build blocked
+> pending Connor's Dataverse + Azure AD inputs. Graph API write-access probe script ready to run.
 
-## Session 261 — what happened
+## Session 262 — what happened
 
-Built and shipped the **Workbench triage field** (`wmkf_triagestatus` on core `akoya_request`) end-to-end,
-replacing the throwaway `d26Allowlist.js`. Also cleared 3 pre-existing stale jest suites.
+Two streams completed:
 
-### What was completed
-1. **Triage field stages 0–4** (`ecdcaed2`) — `shared/config/triageStatus.js` (Advancing=100000000 /
-   Set aside=100000001 / null=untriaged), isolated schema wave (`lib/dataverse/schema/wave2-triagestatus/`),
-   3-way metadata preflight (`scripts/preflight-triagestatus-field.mjs`), dry-run-default 3-bucket backfill
-   (`scripts/backfill-d26-triage.mjs`), and the hard-gated write route `POST /api/workbench/triage`
-   (superuser OR lead-PD; null-PD → 403). 2 Codex rounds; HIGH (1002788 Set-aside contract not enforced)
-   fixed with a non-`--force`-able abort.
-2. **Stale jest suites fixed** (`42823593`) — the S259 GUID guard had left `send-emails-route`,
-   `review-manager-token-routes`, `cross-user-isolation` 400ing on non-GUID fixtures (S260 declared
-   cycle-material "the only stale suite" without a full `npm test`). Fixed fixtures → GUID constants, added
-   guard coverage, and rewrote the vacuous generate-emails isolation case (Codex MEDIUM) to assert the real
-   Dataverse boundary. **New memory: `feedback-green-requires-full-test-suite`.**
-3. **Prod deploy (Justin's triggers)** — schema apply created the field; backfill `--execute` wrote 205 rows
-   (35 Advancing / 170 Set aside), verified idempotent. PA-trigger risk **assessed low + accepted** (only the
-   new field written, status untouched → status-filtered intake flow can't fire; residual = any unfiltered
-   modify-flow, **run-history not spot-checked**).
-4. **§3 dashboard switch** (`e6267553`) — dashboard reads triage: default = Advancing + Phase II Pending,
-   Set aside hidden (toggle `?includeSetAside=1`), untriaged/Concept rows never shown. A **live probe**
-   (`scripts/probe-triage-filter.mjs`) caught that the plan's literal "show all non-set-aside" would have
-   flooded the dashboard 35 → 285 (250 Concept-stage rows share the meeting-date cycle filter); chose the
-   faithful "Advancing + Phase II Pending" scope with Justin. Codex round folded in (full-string filter tests).
-5. **Per-row flip UI** (`509231ba`) — canManage-gated Advancing/Set aside control per row → the write route.
-   Codex round: `canManage` computed **server-side** (no raw systemuserid on the wire), filter-ref refetch
-   guard, row is a keyboard `<div>` (no `<select>` in an `<a>`), in-flight Set.
-6. **§5 allowlist retired** (`832ed5c8`) — cycle picker derives from the PD's meeting-dated proposals
-   (default = latest); `d26Allowlist.js` retired-in-place (header marked; kept as historical/backfill source,
-   NOT deleted). Deviation from plan §5 (meeting-date default vs isActive/reviewDeadline; retire vs delete) —
-   both AS-BUILT-noted.
+### Stream 1 — Reviewer Finder / Review Manager retirement (`94bbbce4`)
 
-### Commits
-- `832ed5c8` retire d26Allowlist from the dashboard (§5)
-- `509231ba` per-row triage flip UI
-- `54a8adde` / `30aa1348` / `67b492e4` triage doc reconciliations (deploy state, PA-trigger note, §3 state)
-- `e6267553` switch dashboard to triage field (§3)
-- `42823593` GUID-shape stale fixtures (3 suites)
-- `ecdcaed2` triage field stages 0–4
+- Live grant probe (`scripts/probe-reviewer-legacy-grants.js`) confirmed no legacy-only users
+- Deleted `pages/reviewer-finder.js` and `pages/review-manager.js`
+- Removed `reviewer-finder` and `review-manager` from `appRegistry.js` and `guideContent.js`
+- Removed `review-manager` model config from `baseConfig.js`; **kept `reviewer-finder`** (Workbench
+  reviewer-pipeline services still call `getModelForApp('reviewer-finder')`)
+- Removed `'review-manager': 'Review Manager'` display-name from `pages/admin.js`; preserved legacy
+  grant display so admin UI doesn't accidentally revoke them via "All" toggles
+- Reconciled `CANONICAL_COUNTS.md` (18→16 apps) and `reviewer-workbench-lifecycle.md` watch_paths
+- All gates green; `reviewer-finder`/`review-manager` keys remain in `requireAppAccess(...)` calls in
+  API routes (deferred until grant migration confirmed via Connor)
+
+### Stream 2 — Group B writeup spine design
+
+- Created `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md` — full design document for sharing with Connor
+- Created `scripts/probe-graph-write-access.mjs` — tests whether Azure AD app registration has
+  SharePoint write access via Graph API
+
+**Architecture agreed:**
+- SharePoint holds Word doc, Dataverse holds URL pointer (`wmkf_ai_initialwriteupurl`,
+  `wmkf_ai_presitevisitwriteupurl` on `akoya_request`)
+- D26 posture: Initial Writeups done manually (no backfill → Initial Writeup tab shows empty state
+  for D26); Pre-Site-Visit NOT started → **build and use new system for D26 as pilot**
+- Generation flows: D26 Pre-Site-Visit staff-triggered from Workbench tab; J27+ Initial Writeup
+  PA auto-triggered on triage=Advancing
+- Executive dashboard (`executive-review` app key) — separate editorial surface for leadership:
+  queries Advancing requests, shows writeup content via Graph API + Open in Word link
+- Prompts must migrate from `.js` files to `wmkf_ai_prompt` before building
+  (`phase-i-writeup.js` → `writeup.initial`; `proposal-summarizer.js` → `writeup.pre-site-visit`)
+
+**Connor's inputs needed before build can start:**
+1. Confirm field names (`wmkf_ai_initialwriteupurl`, `wmkf_ai_presitevisitwriteupurl`) and add to Dataverse
+2. Confirm Graph API write access (or grant `Files.ReadWrite` / `Sites.ReadWrite.All` in Azure AD)
+3. PA flow design for J27 auto-generation (write Word → SharePoint → URL writeback)
+4. Author `writeup.initial` and `writeup.pre-site-visit` prompt rows in `wmkf_ai_prompt`
 
 ## Potential Next Steps
 
-### 1. **Reviewer Finder / Review Manager retirement (CARRYOVER — verify before acting).**
-Justin hid both apps in admin (S260). **Order matters:** the `/api/reviewer-finder/*` + `/api/review-manager/*`
-routes are load-bearing for the Workbench — do NOT delete routes. Remaining: (a) live `wmkf_appuserappaccesses`
-check that every legacy-grant holder has `reviewers`; (b) delete standalone *pages* (`pages/reviewer-finder.js`,
-`review-manager.js`); (c) retire the `reviewer-finder`/`review-manager` grant keys from `appRegistry.js`.
+### 1. **Run the Graph API write-access probe.**
+```bash
+node scripts/probe-graph-write-access.mjs <requestId>
+```
+Where `<requestId>` is the GUID from the Workbench URL `/workbench/<requestId>`.
+- CONFIRMED → D26 Pre-Site-Visit tab can write Word docs to SharePoint directly
+- 403 → Connor needs to grant write permissions in Azure AD before building
 
-### 2. **Group B — writeup spine.** Initial / Pre-Site-Visit / Final Writeup re-home the flat upload-based
-`phase-i-writeup.js` / `phase-ii-writeup.js`; each needs a request-preload adapter; open decisions:
-embed-vs-in-app + writeup-collaborator-access. `Final` needs Site-Visit findings as input.
+### 2. **Share `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md` with Connor.**
+Send him the design doc (or paste into Teams/email). Open questions for him are in the final
+section of the doc. Block until he responds on the four inputs above.
 
-### 3. **Triage future refinements (optional, low urgency).**
-- Principled cycle-default: nearest upcoming `reviewDeadline` among `isActive` `wmkf_appgrantcycle` rows
-  (currently the picker defaults to the PD's latest meeting-dated cycle). Only matters once cycles exist dated
-  beyond the current one.
-- PA-trigger run-history spot-check on the bulk backfill (assessed-low, never confirmed empirically).
-- J27 triage-lens expansion (more states; long-list→short-list; PD-recommendation vs authoritative split).
+### 3. **Group B build** (after Connor confirms prerequisites — in order):
+1. Connor adds `wmkf_ai_initialwriteupurl` and `wmkf_ai_presitevisitwriteupurl` to `akoya_request`
+2. Connor authors `writeup.initial` and `writeup.pre-site-visit` prompt rows in `wmkf_ai_prompt`
+3. Update `pages/api/workbench/resolve-request.js` to return both URL fields in `aiContent`
+4. Build `shared/components/workbench/InitialWriteupTab.js` — URL→fetch→preview + Open in Word
+   (empty state only for D26 since Initial Writeups done manually)
+5. Build `shared/components/workbench/PreSiteVisitWriteupTab.js` — same pattern + Generate draft
+   button calling Executor with `writeup.pre-site-visit` prompt row; writes output to SharePoint;
+   stores URL back in Dataverse; URL capture fallback if write access unavailable
+6. Wire both tabs into `pages/workbench/[requestId].js` (placeholder slots already exist)
+7. Build Executive Dashboard (`executive-review` app key, separate page)
+8. Update `pages/api/process-phase-i-writeup.js` (and related routes) to add `'reviewers'` to
+   `requireAppAccess(...)` so Workbench users can reach them
 
-## Continuity guardrails (still live)
-- **Triage is LIVE in prod.** Dashboard fully triage-driven; `d26Allowlist.js` is retired-in-place (historical
-  only — do NOT wire it back into live code). The going-forward signal is `wmkf_triagestatus`.
-- **Dashboard visibility:** `(Phase II Pending OR triage=Advancing)` minus Set aside; untriaged non-Phase-II
-  (incl. ALL Concept-stage) never shown — the meeting-date cycle filter is coarse (455 D26 rows, only 205 are
-  Phase I Pending). Re-verify with `scripts/probe-triage-filter.mjs`.
-- **Write gate:** `POST /api/workbench/triage` is the authoritative lead-PD/superuser gate; the dashboard's
-  `canManage` is a server-computed cosmetic flag.
+### 4. **Triage future refinements (low urgency — unchanged from S261).**
+- Principled cycle-default via `reviewDeadline` / `isActive` (currently defaults to latest PD cycle)
+- PA-trigger run-history spot-check on bulk backfill
+- J27 triage-lens expansion
+
+## Continuity guardrails
+
+- **`reviewer-finder` model namespace is still live** — do NOT remove from `baseConfig.js`. The
+  Workbench reviewer pipeline services (`lib/services/claude-reviewer-service.js:94`,
+  `lib/services/reviewer-exclusion-parser.js:148`) call `getModelForApp('reviewer-finder')`.
+- **API routes not touched** — `pages/api/reviewer-finder/*` and `pages/api/review-manager/*` are
+  still dual-keyed. Do not remove legacy keys from `requireAppAccess(...)` until Connor confirms
+  all grant holders have `reviewers`.
+- **Triage is LIVE in prod** — `wmkf_triagestatus` is the signal; `d26Allowlist.js` retired-in-place.
 - `git gc.log` warning still printing on commits (unreachable loose objects) — `git prune` not yet run.
 
-## Key Files Reference (S261)
+## Key Files Reference (S262)
 
 | File | Role |
 |------|------|
-| `shared/config/triageStatus.js` | triage constants (single source of truth) |
-| `lib/dataverse/schema/wave2-triagestatus/akoya_request-triagestatus.json` | schema wave (deployed) |
-| `scripts/preflight-triagestatus-field.mjs` / `backfill-d26-triage.mjs` / `probe-triage-filter.mjs` | deploy/backfill/verify (read-only probe) |
-| `pages/api/workbench/triage.js` | hard-gated write route |
-| `pages/api/workbench/dashboard.js` | triage-driven visibility + server `canManage` |
-| `pages/workbench.js` | per-row flip control |
-| `docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md` | plan + AS-BUILT notes (§3, §5) |
+| `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md` | Full writeup spine design doc (share with Connor) |
+| `scripts/probe-graph-write-access.mjs` | Tests Graph API write access; requires requestId from Workbench URL |
+| `scripts/probe-reviewer-legacy-grants.js` | Read-only grant check (already ran; no legacy-only users) |
+| `shared/config/appRegistry.js` | reviewer-finder / review-manager entries removed |
+| `shared/config/baseConfig.js` | reviewer-finder model config KEPT (Workbench callers); review-manager removed |
+| `pages/workbench/[requestId].js` | Placeholder tab slots: `initial-writeup`, `pre-site-visit`, `final-writeup` |
+| `lib/services/graph-service.js` | `uploadFile()` / `deleteFile()` already implemented |
+| `lib/utils/sharepoint-buckets.js` | `getRequestSharePointBuckets()` resolves folder via sharepointdocumentlocations |
 
 ## Testing
 ```bash
@@ -93,5 +108,5 @@ npm run build && npm run lint
 npm test                       # FULL suite — not a subset (feedback-green-requires-full-test-suite)
 npm run check:trust-boundary-guid && npm run check:api-routes && npm run check:fact-consistency
 npm run check:status-enum-parity && npm run check:atlas
-node scripts/probe-triage-filter.mjs   # read-only live: D26 default=35, includeSetAside=205, concepts excluded
+node scripts/probe-graph-write-access.mjs <requestId>   # confirm Graph API write access
 ```

@@ -162,7 +162,7 @@ Retire legacy `reviewer-finder`/`review-manager` keys + delete old pages; real f
 ### Cross-cutting primitives (build once, reused)
 - ✅ Shell + context loader + tab routing (Phase 2)
 - ⬜ **Request-preload adapter** (upload→requestId) for every re-homed upload-based app — Proposal established the pattern; Initial/Pre-Site-Visit/Final/Reviews all need it
-- ⬜ **Writeup embed/re-home primitive** — unblocks Initial / Pre-Site-Visit / Final together (lean: **embed SharePoint co-authoring**, don't rebuild collaborative editing — §3.2)
+- ⬜ **Writeup embed/re-home primitive** — unblocks Initial / Pre-Site-Visit / Final together (**DECIDED S262: embed SharePoint co-authoring** — SharePoint holds Word doc, Dataverse holds URL pointer, Open in Word preserves co-authoring; see `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md`)
 - ⬜ **Returned-review reader** — feed submitted reviews (reviewer rows / `download-review`) into the summarizer (Reviews tab); the summarizer is upload-based today
 - ✅ **Status value→class map** consumer (living taxonomy) — Status tab reuses canonical `classifyStatus`/`STATUS_CLASS`; `STATUS_CLASS ⇔ CLASS_META` is now a `check:status-enum-parity` invariant (S260)
 - ⬜ **`lib/external` generalization** — today it is reviewer-suggestion-specific (token-lifecycle/verifier/materials/upload); only the crypto core is reusable. Awardee (external instance #2) needs the suggestion-specific bits factored out first (§3.6)
@@ -170,7 +170,7 @@ Retire legacy `reviewer-finder`/`review-manager` keys + delete old pages; real f
 
 ### Recommended build order (leverage × dependency)
 1. **Group A — ✅ SHIPPED S260 — coherence wins from data already loaded (no new infra):** `Status` (read-only) + `Overview` v1. Overview v1 was scoped to what has a live source today: `ctx` + the reviewer-stage strip (via `reviewers.js` + shared `reviewer-modes`). Writeup/review state has **no source yet** (the dashboard rollup is reviewer-only), so those Overview signals land later as those tabs are built. The default now lands on **Overview** (`[requestId].js` `activeTab`); dashboard rows still deep-link `?tab=reviewers`. **Still open:** the smart "next step" line is a light heuristic, not the deferred `isActionableForPD` rule set.
-2. **Group B — writeup spine (one decision unblocks two tabs now, the third later):** decide embed-vs-in-app + resolve the writeup-collaborator access set → build the writeup primitive + preload adapter once → `Initial` / `Pre-Site-Visit`. **`Final` waits for Group D** — it needs Site Visit findings as input (see table), so it can't land with the other two.
+2. **Group B — writeup spine (decisions resolved S262 — unblocks two tabs now, the third later):** embed-vs-in-app RESOLVED (embed SharePoint co-authoring); access set RESOLVED (`reviewers` grant) → build the writeup primitive + preload adapter once → `Initial` / `Pre-Site-Visit`. **`Final` waits for Group D** — it needs Site Visit findings as input (see table), so it can't land with the other two.
 3. **Group C — reviews reading:** `Reviews` (re-home `peer-review-summarizer` + the **returned-review reader** primitive). The **dossier read-projection** (§3.7) is adjacent but **needs the access-model work** (the page is `reviewers`-gated today) — it is NOT free from this group alone.
 4. **Group D — human-only + post-award:** `Site Visit` (notes) → then `Final Writeup` (now that Site Visit findings exist) → then `Awardee` last (generalize `lib/external` + new schema; already fenced as future).
 
@@ -178,13 +178,13 @@ Retire legacy `reviewer-finder`/`review-manager` keys + delete old pages; real f
 
 ### Open decisions / blockers (need Justin/Connor before the dependent group)
 - **Overview actionability** (`isActionableForPD`, §6 open) — the summary half is buildable now; the smart "next action" half waits on this.
-- **Writeup: embed-SharePoint vs in-app + the writeup-collaborator access set** (§3.2/§6 open) — gates Group B.
+- **Writeup: embed-SharePoint vs in-app + the writeup-collaborator access set** — **RESOLVED (S262).** SharePoint holds Word doc; Dataverse holds URL pointer (`wmkf_ai_initialwriteupurl`, `wmkf_ai_presitevisitwriteupurl`). Open in Word preserves co-authoring. Access: everyone with `reviewers` grant. See `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md`.
 - **Site-visit notes storage** — new Dataverse field/entity (small schema).
 - **Awardee** — doc-routing schema + (J27) Connor's phase trigger; keep deferred. `[[project-awardee-onboarding]]`.
 
 ### Caveats
 - **The automation tier is out of scope** (§7) — so v1 of each content tab is *PD-triggered generate* (like Proposal / Field Primer today), not event-driven materialization. This matches the live Proposal tab and is fine for v1.
-- The **writeup-collaborator access model** is the one genuinely-unsettled piece that could expand Group B.
+- The **writeup-collaborator access model** was the one genuinely-unsettled piece — **RESOLVED S262:** everyone with the `reviewers` grant. No access-model expansion needed for Group B.
 
 ## CI gates + doc updates
 
