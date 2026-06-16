@@ -10,19 +10,23 @@
  *   GET ?cycleCode=Dxx        → { proposals, rollup } for that cycle.
  *
  * Query params:
- *   ?cycleCode=Dxx|Jxx   the cycle to list (omit → cycle list mode)
- *   ?scope=my|all        my (default) = requests where the caller is lead PD;
- *                        all = every request in the cycle.
+ *   ?cycleCode=Dxx|Jxx     the cycle to list (omit → cycle list mode)
+ *   ?scope=my|all          my (default) = requests where the caller is lead PD;
+ *                          all = every request in the cycle.
+ *   ?includeSetAside=1     also show `Set aside` rows (default hides them).
  *
- * THE ADDITIVE UNION (the reason this endpoint exists rather than reusing
- * my-proposals): the normal reviewer-finding surface is gated to
- * `akoya_requeststatus = 'Phase II Pending'`. The D26 going-forward set is
- * still `Phase I Pending` (advancing it early fires a live PA trigger), so it
- * never appears there. For the D26 cycle we ALSO fetch a committed allowlist of
- * request NUMBERS (shared/config/d26Allowlist.js) regardless of status and union
- * them in. The status-gated branch is unchanged; my-proposals.js is untouched.
- * Once D26 flips to Phase II for real, the allowlist branch becomes a harmless
- * duplicate of the status-gated branch (deduped here) and the config can go.
+ * TRIAGE-DRIVEN VISIBILITY (S261 — replaced the d26Allowlist union): the default
+ * view shows the going-forward set (`wmkf_triagestatus = Advancing`) plus the
+ * normal reviewer-finding surface (`akoya_requeststatus = 'Phase II Pending'`).
+ * `Set aside` is hidden unless ?includeSetAside=1. An UNTRIAGED row shows ONLY if
+ * it is `Phase II Pending` (the normal reviewer-finding surface); untriaged
+ * NON-Phase-II rows — notably every Concept-stage row the coarse meeting-date
+ * cycle filter also matches — are never shown (not reviewer-finding targets). The going-
+ * forward set used to be a committed allowlist of request numbers
+ * (shared/config/d26Allowlist.js); the D26 backfill moved that set onto the
+ * `wmkf_triagestatus` field (35 Advancing / 170 Set aside). The cycle picker
+ * still references D26_ALLOWLIST_CYCLE_CODE; full allowlist retirement is §5 of
+ * docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md. my-proposals.js is untouched.
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
@@ -30,7 +34,8 @@ import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { resolveByEmail } from '../../../lib/services/program-director-resolver';
 import { meetingDateToCycleCode, cycleCodeToOdataFilter, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
-import { D26_ALLOWLIST_CYCLE_CODE, D26_ALLOWLIST_REQUEST_NUMS } from '../../../shared/config/d26Allowlist';
+import { D26_ALLOWLIST_CYCLE_CODE } from '../../../shared/config/d26Allowlist';
+import { TRIAGE_STATUS } from '../../../shared/config/triageStatus';
 // Reviewer rollup + work-remaining derivation are shared with the per-request
 // Overview tab (via /api/workbench/reviewer-rollup); single source of truth.
 import { fetchReviewerRollup, deriveWorkRemaining, REVIEWERS_NEEDED } from '../../../lib/services/reviewer-rollup';
@@ -47,6 +52,7 @@ const PROPOSAL_SELECT = [
   '_wmkf_grantprogram_value',
   '_wmkf_programareaserved_value',
   '_wmkf_programdirector_value',
+  'wmkf_triagestatus',
 ].join(',');
 
 export default async function handler(req, res) {
@@ -76,7 +82,8 @@ export default async function handler(req, res) {
       if (!cycleCode) {
         return await listCycles(res, pd);
       }
-      return await listProposals(res, pd, String(cycleCode), scope);
+      const includeSetAside = req.query.includeSetAside === '1';
+      return await listProposals(res, pd, String(cycleCode), scope, includeSetAside);
     } catch (err) {
       console.error('workbench dashboard error:', err);
       return res.status(500).json({
@@ -149,42 +156,42 @@ async function listCycles(res, pd) {
   });
 }
 
-async function listProposals(res, pd, cycleCode, scope) {
+async function listProposals(res, pd, cycleCode, scope, includeSetAside) {
   const cycleFilter = cycleCodeToOdataFilter(cycleCode);
   if (!cycleFilter) {
     return res.status(400).json({ error: `Invalid cycleCode: ${cycleCode}` });
   }
 
-  // ── Branch 1: status-gated query (the normal reviewer-finding surface) ──
-  // Unchanged predicate: Phase II Pending in the cycle; scope=my adds the lead-PD
-  // filter. For the D26 cycle this currently returns nothing (all Phase I Pending).
-  const statusFilters = [cycleFilter, `akoya_requeststatus eq 'Phase II Pending'`];
-  if (scope === 'my') statusFilters.unshift(`_wmkf_programdirector_value eq ${pd.systemuserid}`);
-  const { records: statusGated } = await DynamicsService.queryAllRecords('akoya_requests', {
+  // ── Triage-driven visibility (S261 — replaces the d26Allowlist union) ──
+  // Default view = the going-forward set (`wmkf_triagestatus = Advancing`) plus
+  // the normal reviewer-finding surface (`akoya_requeststatus = 'Phase II Pending'`).
+  // `Set aside` is hidden unless ?includeSetAside=1. An UNTRIAGED row shows only via
+  // the Phase II Pending status branch; untriaged NON-Phase-II rows — every
+  // Concept-stage row the coarse meeting-date cycle filter also matches — are never
+  // shown (not reviewer-finding targets). The OR groups are parenthesized so they
+  // can't leak past the cycle/scope ANDs.
+  //
+  // Hide-Set-aside uses the null-inclusive pattern (`eq null or ne <Set aside>`,
+  // mirroring reviewer-suggestion.js notExcludedFilter) so a Set-aside row is hidden
+  // even when it also matches the Phase II Pending status clause (Set aside wins).
+  const base = `akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq ${TRIAGE_STATUS.ADVANCING}`;
+  const visibility = includeSetAside
+    ? `(${base} or wmkf_triagestatus eq ${TRIAGE_STATUS.SET_ASIDE})`
+    : `(${base}) and (wmkf_triagestatus eq null or wmkf_triagestatus ne ${TRIAGE_STATUS.SET_ASIDE})`;
+
+  const filters = [`(${cycleFilter})`, visibility];
+  if (scope === 'my') filters.push(`_wmkf_programdirector_value eq ${pd.systemuserid}`);
+
+  const { records } = await DynamicsService.queryAllRecords('akoya_requests', {
     select: PROPOSAL_SELECT,
-    filter: statusFilters.join(' and '),
+    filter: filters.join(' and '),
     orderby: 'akoya_requestnum asc',
   });
 
-  // ── Branch 2: allowlist-by-number (only for the D26 allowlist cycle) ──
-  const byId = new Map();
-  for (const r of statusGated) byId.set(r.akoya_requestid, { row: r, allowlisted: false });
-
-  if (cycleCode.toUpperCase() === D26_ALLOWLIST_CYCLE_CODE) {
-    const allowRows = await fetchAllowlisted(pd, scope, cycleFilter);
-    for (const r of allowRows) {
-      if (!byId.has(r.akoya_requestid)) {
-        byId.set(r.akoya_requestid, { row: r, allowlisted: true });
-      }
-    }
-  }
-
-  const entries = Array.from(byId.values());
-  const requestIds = entries.map((e) => e.row.akoya_requestid).filter(Boolean);
+  const requestIds = records.map((r) => r.akoya_requestid).filter(Boolean);
   const counts = await fetchReviewerRollup(requestIds);
 
-  const proposals = entries.map(({ row, allowlisted }) =>
-    projectProposal(row, counts[row.akoya_requestid], allowlisted));
+  const proposals = records.map((row) => projectProposal(row, counts[row.akoya_requestid]));
 
   // Stable order: number ascending.
   proposals.sort((a, b) => String(a.requestNumber).localeCompare(String(b.requestNumber)));
@@ -195,41 +202,16 @@ async function listProposals(res, pd, cycleCode, scope) {
     cycleCode: cycleCode.toUpperCase(),
     cycleLabel: cycleCodeToLabel(cycleCode),
     scope,
+    includeSetAside: !!includeSetAside,
     rollup: summarize(proposals),
     proposals,
   });
 }
 
-/**
- * Fetch the committed allowlist requests by NUMBER (akoya_requestnum is a STRING
- * field → each value is single-quoted). A defensive meeting-date cycle filter is
- * AND-ed in: every allowlisted request carries a Dec-2026 date (verified), so it
- * never drops a real member but guards against a mistyped number from another
- * cycle. scope=my also
- * AND-s the lead-PD filter so "My" never dumps the whole set on one PD.
- */
-async function fetchAllowlisted(pd, scope, cycleFilter) {
-  const out = [];
-  const CHUNK = 20;
-  for (let i = 0; i < D26_ALLOWLIST_REQUEST_NUMS.length; i += CHUNK) {
-    const chunk = D26_ALLOWLIST_REQUEST_NUMS.slice(i, i + CHUNK);
-    const orChain = chunk
-      .map((n) => `akoya_requestnum eq '${String(n).replace(/'/g, "''")}'`)
-      .join(' or ');
-    const filters = [`(${orChain})`, cycleFilter];
-    if (scope === 'my') filters.push(`_wmkf_programdirector_value eq ${pd.systemuserid}`);
-    const { records } = await DynamicsService.queryAllRecords('akoya_requests', {
-      select: PROPOSAL_SELECT,
-      filter: filters.join(' and '),
-    });
-    out.push(...records);
-  }
-  return out;
-}
-
-function projectProposal(r, c, allowlisted) {
+function projectProposal(r, c) {
   const counts = c || { candidates: 0, invited: 0, accepted: 0, declined: 0, held: 0, completed: 0 };
   const cycleCode = r.wmkf_meetingdate ? meetingDateToCycleCode(r.wmkf_meetingdate) : null;
+  const triageStatus = typeof r.wmkf_triagestatus === 'number' ? r.wmkf_triagestatus : null;
   return {
     requestId: r.akoya_requestid,
     requestNumber: r.akoya_requestnum,
@@ -244,7 +226,11 @@ function projectProposal(r, c, allowlisted) {
     grantProgram: r._wmkf_grantprogram_value_formatted || null,
     programArea: r._wmkf_programareaserved_value_formatted || null,
     programDirector: r._wmkf_programdirector_value_formatted || null,
-    allowlisted: !!allowlisted,
+    // Triage state (S261, replaces `allowlisted`). `advancing` = the going-forward
+    // pill; `setAside` rows only appear when ?includeSetAside=1.
+    triageStatus,
+    advancing: triageStatus === TRIAGE_STATUS.ADVANCING,
+    setAside: triageStatus === TRIAGE_STATUS.SET_ASIDE,
     reviewers: {
       ...counts,
       needed: REVIEWERS_NEEDED,

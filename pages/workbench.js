@@ -8,7 +8,7 @@
  * Data: /api/workbench/dashboard (no cycleCode = cycle list; ?cycleCode = rows).
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Layout, { PageHeader, Card } from '../shared/components/Layout';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
@@ -31,6 +31,7 @@ function WorkbenchDashboard() {
   const [cycles, setCycles] = useState([]);
   const [cycleCode, setCycleCode] = useState(null);
   const [scope, setScope] = useState('my');
+  const [includeSetAside, setIncludeSetAside] = useState(false);
 
   const [proposals, setProposals] = useState([]);
   const [rollup, setRollup] = useState(null);
@@ -59,29 +60,35 @@ function WorkbenchDashboard() {
     return () => { cancelled = true; };
   }, []);
 
-  // Load proposals whenever the selected cycle or scope changes.
-  const loadProposals = useCallback(async (code, sc) => {
+  // Load proposals whenever the selected cycle/scope/toggle changes. A monotonic
+  // request id guards against a slower earlier fetch (e.g. a fast toggle) landing
+  // after — and overwriting — the latest one.
+  const reqIdRef = useRef(0);
+  const loadProposals = useCallback(async (code, sc, incl) => {
     if (!code) return;
+    const myReq = ++reqIdRef.current;
     setLoadingProposals(true);
     setError(null);
     try {
-      const res = await fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(code)}&scope=${sc}`);
+      const res = await fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(code)}&scope=${sc}${incl ? '&includeSetAside=1' : ''}`);
       const body = await res.json().catch(() => ({}));
+      if (reqIdRef.current !== myReq) return; // a newer request superseded this one
       if (!res.ok) throw new Error(body.error || `Failed to load requests (${res.status})`);
       setProposals(body.proposals || []);
       setRollup(body.rollup || null);
     } catch (e) {
+      if (reqIdRef.current !== myReq) return;
       setError(e.message);
       setProposals([]);
       setRollup(null);
     } finally {
-      setLoadingProposals(false);
+      if (reqIdRef.current === myReq) setLoadingProposals(false);
     }
   }, []);
 
   useEffect(() => {
-    if (cycleCode) loadProposals(cycleCode, scope);
-  }, [cycleCode, scope, loadProposals]);
+    if (cycleCode) loadProposals(cycleCode, scope, includeSetAside);
+  }, [cycleCode, scope, includeSetAside, loadProposals]);
 
   return (
     <Layout title="Request Workbench">
@@ -124,6 +131,16 @@ function WorkbenchDashboard() {
           ))}
         </div>
 
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <input
+            type="checkbox"
+            className="rounded border-gray-300"
+            checked={includeSetAside}
+            onChange={(e) => setIncludeSetAside(e.target.checked)}
+          />
+          Show set aside
+        </label>
+
         {rollup && (
           <div className="ml-auto text-sm text-gray-600">
             <span className="font-semibold text-gray-900">{rollup.total}</span> request{rollup.total === 1 ? '' : 's'}
@@ -154,9 +171,14 @@ function WorkbenchDashboard() {
                       <span className="font-semibold text-gray-900">#{p.requestNumber}</span>
                       {p.cycleLabel && <span className="text-xs text-gray-500">{p.cycleLabel}</span>}
                       {p.grantProgram && <span className="text-xs text-gray-500">· {p.grantProgram}</span>}
-                      {p.allowlisted && (
+                      {p.advancing && (
                         <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-800">
                           going-forward
+                        </span>
+                      )}
+                      {p.setAside && (
+                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-200 text-gray-600">
+                          set aside
                         </span>
                       )}
                     </div>

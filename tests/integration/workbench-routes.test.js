@@ -1,7 +1,8 @@
 /**
  * Route tests for the Request Workbench dashboard endpoints (Phase 1):
  *   - auth gating (401 / 403 / reviewers-grant reaches)
- *   - the additive allowlist union for the D26 cycle
+ *   - triage-driven visibility (S261): Advancing + Phase II Pending, hide Set aside,
+ *     ?includeSetAside toggle, scope=my/all parenthesization
  *   - number→GUID resolve
  */
 
@@ -15,6 +16,16 @@ import {
 
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import { resolveByEmail } from '../../lib/services/program-director-resolver';
+import { cycleCodeToOdataFilter } from '../../lib/utils/cycle-code';
+
+// Exact OData fragments the dashboard builds (S261 triage switch). The cycle range
+// is derived from the same helper so the assertions pin STRUCTURE/grouping, not
+// the date-format details — a regression that dropped the cycle filter or changed
+// the parenthesization would fail these.
+const D26_CYCLE = cycleCodeToOdataFilter('D26');
+const TRIAGE_BASE = "akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000";
+const HIDE_SET_ASIDE = '(wmkf_triagestatus eq null or wmkf_triagestatus ne 100000001)';
+const PD_FILTER = '_wmkf_programdirector_value eq pd-1';
 
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
@@ -61,7 +72,7 @@ describe('/api/workbench/dashboard', () => {
     expect(res.status).toHaveBeenCalledWith(403);
   });
 
-  it('cycle-list mode: a reviewers grant gets cycles incl. the D26 allowlist cycle', async () => {
+  it('cycle-list mode: a reviewers grant gets cycles incl. the D26 default/open cycle', async () => {
     mockAuthenticatedUser(1, ['reviewers']);
     // listCycles query: PD has a Dec-2026 proposal → J/D derivation yields D26 anyway,
     // but force a different cycle so we prove D26 is *always* added.
@@ -78,23 +89,24 @@ describe('/api/workbench/dashboard', () => {
     expect(body.defaultCycleCode).toBe('D26');
   });
 
-  it('D26 proposals mode: unions the allowlist-by-number rows on top of the status-gated branch', async () => {
+  it('proposals mode: triage-driven filter (Advancing + Phase II Pending), hides Set aside, no allowlist query', async () => {
     mockAuthenticatedUser(1, ['reviewers']);
+    let proposalFilter = null;
     DynamicsService.queryAllRecords.mockImplementation((entity, opts) => {
       if (entity === 'wmkf_appreviewersuggestions') return Promise.resolve({ records: [] });
-      if (entity === 'akoya_requests' && opts.filter?.includes('akoya_requestnum')) {
-        // allowlist branch — a Phase-I-Pending going-forward request
+      if (entity === 'akoya_requests') {
+        proposalFilter = opts.filter;
         return Promise.resolve({
           records: [{
-            akoya_requestid: 'r-allow',
+            akoya_requestid: 'r-adv',
             akoya_requestnum: '1002836',
             wmkf_meetingdate: '2026-12-11',
             akoya_requeststatus: 'Phase I Pending',
+            wmkf_triagestatus: 100000000, // Advancing
             _wmkf_programdirector_value: 'pd-1',
           }],
         });
       }
-      // status-gated branch returns nothing for D26 (all Phase I Pending)
       return Promise.resolve({ records: [] });
     });
 
@@ -102,24 +114,82 @@ describe('/api/workbench/dashboard', () => {
     await handler(createMockReq({ method: 'GET', query: { cycleCode: 'D26', scope: 'all' } }), res);
 
     expect(res.status).toHaveBeenCalledWith(200);
+    // Exact filter (scope=all): cycle ∧ (Phase II Pending ∨ Advancing) ∧ hide-Set-aside.
+    expect(proposalFilter).toBe(`(${D26_CYCLE}) and (${TRIAGE_BASE}) and ${HIDE_SET_ASIDE}`);
+    expect(proposalFilter).not.toContain('akoya_requestnum'); // allowlist branch is gone
+    expect(proposalFilter).not.toContain('_wmkf_programdirector_value'); // scope=all → no PD filter
+
     const body = res.json.mock.calls[0][0];
     expect(body.proposals).toHaveLength(1);
     expect(body.proposals[0].requestNumber).toBe('1002836');
-    expect(body.proposals[0].allowlisted).toBe(true);
+    expect(body.proposals[0].advancing).toBe(true);
+    expect(body.proposals[0].setAside).toBe(false);
+    expect(body.proposals[0].allowlisted).toBeUndefined(); // replaced by triage fields
     expect(body.proposals[0].cycleCode).toBe('D26');
     expect(body.proposals[0].workRemaining).toBe('find'); // no candidates yet
     expect(body.rollup.total).toBe(1);
   });
 
-  it('a NON-allowlist cycle does not trigger the allowlist branch', async () => {
+  it('?includeSetAside=1 reveals Set aside rows (filter drops the hide clause; row projects setAside)', async () => {
     mockAuthenticatedUser(1, ['reviewers']);
+    let proposalFilter = null;
+    DynamicsService.queryAllRecords.mockImplementation((entity, opts) => {
+      if (entity === 'akoya_requests') {
+        proposalFilter = opts.filter;
+        return Promise.resolve({
+          records: [{
+            akoya_requestid: 'r-aside',
+            akoya_requestnum: '1002999',
+            wmkf_meetingdate: '2026-12-11',
+            akoya_requeststatus: 'Phase I Pending',
+            wmkf_triagestatus: 100000001, // Set aside
+          }],
+        });
+      }
+      return Promise.resolve({ records: [] });
+    });
     const res = createMockRes();
-    await handler(createMockReq({ method: 'GET', query: { cycleCode: 'J26', scope: 'my' } }), res);
+    await handler(createMockReq({ method: 'GET', query: { cycleCode: 'D26', scope: 'all', includeSetAside: '1' } }), res);
+
     expect(res.status).toHaveBeenCalledWith(200);
-    // No queryAllRecords call should carry an akoya_requestnum (allowlist) filter.
-    const calledWithNumberFilter = DynamicsService.queryAllRecords.mock.calls
-      .some(([, opts]) => opts?.filter?.includes('akoya_requestnum'));
-    expect(calledWithNumberFilter).toBe(false);
+    // Exact filter: cycle ∧ (Phase II Pending ∨ Advancing ∨ Set aside); no hide clause.
+    expect(proposalFilter).toBe(`(${D26_CYCLE}) and (${TRIAGE_BASE} or wmkf_triagestatus eq 100000001)`);
+    expect(proposalFilter).not.toContain('ne 100000001'); // hide clause dropped
+    const body = res.json.mock.calls[0][0];
+    expect(body.includeSetAside).toBe(true);
+    expect(body.proposals[0].setAside).toBe(true);
+    expect(body.proposals[0].advancing).toBe(false);
+  });
+
+  it('scope=my appends the lead-PD filter as its own AND term (triage OR stays parenthesized)', async () => {
+    mockAuthenticatedUser(1, ['reviewers']);
+    let proposalFilter = null;
+    DynamicsService.queryAllRecords.mockImplementation((entity, opts) => {
+      if (entity === 'akoya_requests') { proposalFilter = opts.filter; return Promise.resolve({ records: [] }); }
+      return Promise.resolve({ records: [] });
+    });
+    const res = createMockRes();
+    await handler(createMockReq({ method: 'GET', query: { cycleCode: 'D26', scope: 'my' } }), res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    // Exact filter: default + an appended PD AND term; triage OR stays parenthesized.
+    expect(proposalFilter).toBe(`(${D26_CYCLE}) and (${TRIAGE_BASE}) and ${HIDE_SET_ASIDE} and ${PD_FILTER}`);
+  });
+
+  it('default filter cannot surface untriaged Concept rows (visibility requires Phase II Pending or Advancing)', async () => {
+    mockAuthenticatedUser(1, ['reviewers']);
+    let proposalFilter = null;
+    DynamicsService.queryAllRecords.mockImplementation((entity, opts) => {
+      if (entity === 'akoya_requests') { proposalFilter = opts.filter; return Promise.resolve({ records: [] }); }
+      return Promise.resolve({ records: [] });
+    });
+    const res = createMockRes();
+    await handler(createMockReq({ method: 'GET', query: { cycleCode: 'D26', scope: 'all' } }), res);
+    // A Concept row is untriaged AND not Phase II Pending, so it matches neither
+    // side of the base visibility OR → the Dataverse filter excludes it. `eq null`
+    // appears ONLY inside the hide-Set-aside guard, never as a standalone
+    // "include untriaged" clause.
+    expect(proposalFilter).toContain("(akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000)");
+    expect(proposalFilter).toContain('(wmkf_triagestatus eq null or wmkf_triagestatus ne 100000001)');
   });
 
   it('rejects a non-GET method', async () => {
