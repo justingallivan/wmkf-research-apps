@@ -4,7 +4,7 @@
 > (35 Advancing + 170 Set aside, 205 rows, idempotent). §3 dashboard switch DONE (S261) — the dashboard reads
 > the field (Advancing + Phase II Pending shown, Set aside hidden, Concepts excluded; live-probed 35/205).
 > Remaining: §5 allowlist retirement (delete d26Allowlist.js + cycle-picker replacement, which needs the
-> `[DEFAULT]` cycle-default decision) and the per-row triage-flip UI. PA-trigger risk assessed low + accepted
+> `[DEFAULT]` cycle-default decision). The per-row triage-flip UI is DONE (S261). PA-trigger risk assessed low + accepted
 > (only the new field written; `akoya_requeststatus` untouched, so the status-filtered intake flow can't
 > fire; residual = any unfiltered modify-flow, run-history not spot-checked). Drafted 2026-06-15 (S260)
 > from the design thread with Justin.
@@ -111,7 +111,9 @@ must still be `Advancing` or the new query hides it.
 > hidden via the null-inclusive guard unless `?includeSetAside=1`; **untriaged non-Phase-II rows
 > (incl. all Concepts) are never shown.** The Phase II Pending status branch is therefore KEPT (not
 > removed). The cycle picker was left as-is (still references `D26_ALLOWLIST_CYCLE_CODE`); its
-> replacement + the cycle-default decision moved to §5. The per-row triage-flip UI is not built yet.
+> replacement + the cycle-default decision moved to §5. The per-row triage-flip UI is built (S261): a
+> canManage-gated `<select>` on each dashboard row POSTs to `/api/workbench/triage`; the dashboard returns a
+> server-computed `canManage` boolean (no raw systemuserid on the wire).
 > Live-probed: D26 default = 35, includeSetAside = 205, Concepts excluded both ways.
 
 - **Visibility query (Codex r2 RISK E — the correctness trap):** Dataverse-observed behavior (not an OData-spec

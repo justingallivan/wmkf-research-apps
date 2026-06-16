@@ -124,6 +124,8 @@ describe('/api/workbench/dashboard', () => {
     expect(body.proposals[0].requestNumber).toBe('1002836');
     expect(body.proposals[0].advancing).toBe(true);
     expect(body.proposals[0].setAside).toBe(false);
+    expect(body.proposals[0].canManage).toBe(true); // caller is the lead PD
+    expect(body.proposals[0].programDirectorId).toBeUndefined();
     expect(body.proposals[0].allowlisted).toBeUndefined(); // replaced by triage fields
     expect(body.proposals[0].cycleCode).toBe('D26');
     expect(body.proposals[0].workRemaining).toBe('find'); // no candidates yet

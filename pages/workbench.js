@@ -9,9 +9,10 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/router';
 import Layout, { PageHeader, Card } from '../shared/components/Layout';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
+import { TRIAGE_STATUS } from '../shared/config/triageStatus';
 
 const STAGE_META = {
   find: { label: 'Find reviewers', cls: 'bg-rose-100 text-rose-800' },
@@ -27,7 +28,31 @@ function StageChip({ stage }) {
   return <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${m.cls}`}>{m.label}</span>;
 }
 
+// Per-row triage flip (S261). The surrounding row navigates on click/keyboard,
+// so select interactions stop/prevent events before they can trigger navigation.
+// The server computes the visible canManage gate, and POST /api/workbench/triage
+// remains the authoritative lead-PD/superuser gate.
+function TriageControl({ proposal, busy, onSet }) {
+  const value = proposal.advancing ? 'advancing' : proposal.setAside ? 'setAside' : 'untriaged';
+  const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+  return (
+    <select
+      value={value}
+      disabled={busy}
+      onClick={stop}
+      onChange={(e) => { stop(e); onSet(proposal.requestId, e.target.value); }}
+      className="mt-1.5 text-xs border border-gray-300 rounded px-1.5 py-1 bg-white disabled:opacity-50"
+      title="Set triage status"
+    >
+      {value === 'untriaged' && <option value="untriaged" disabled>Set triage…</option>}
+      <option value="advancing">Advancing</option>
+      <option value="setAside">Set aside</option>
+    </select>
+  );
+}
+
 function WorkbenchDashboard() {
+  const router = useRouter();
   const [cycles, setCycles] = useState([]);
   const [cycleCode, setCycleCode] = useState(null);
   const [scope, setScope] = useState('my');
@@ -39,6 +64,10 @@ function WorkbenchDashboard() {
   const [loadingCycles, setLoadingCycles] = useState(true);
   const [loadingProposals, setLoadingProposals] = useState(false);
   const [error, setError] = useState(null);
+
+  // Per-row triage flip: ids currently being saved disable only those controls.
+  const [savingIds, setSavingIds] = useState(() => new Set());
+  const filtersRef = useRef({ cycleCode: null, scope: 'my', includeSetAside: false });
 
   // Load the cycle picker once on mount.
   useEffect(() => {
@@ -87,8 +116,43 @@ function WorkbenchDashboard() {
   }, []);
 
   useEffect(() => {
+    filtersRef.current = { cycleCode, scope, includeSetAside };
+  }, [cycleCode, scope, includeSetAside]);
+
+  useEffect(() => {
     if (cycleCode) loadProposals(cycleCode, scope, includeSetAside);
   }, [cycleCode, scope, includeSetAside, loadProposals]);
+
+  // Flip a request's triage status, then refetch (a row may drop out of the
+  // default view once Set aside). The server enforces the hard manage gate.
+  const setTriage = useCallback(async (requestId, key) => {
+    const triageStatus = key === 'advancing' ? TRIAGE_STATUS.ADVANCING : TRIAGE_STATUS.SET_ASIDE;
+    setSavingIds((prev) => {
+      const next = new Set(prev);
+      next.add(requestId);
+      return next;
+    });
+    setError(null);
+    try {
+      const res = await fetch('/api/workbench/triage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, triageStatus }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `Failed to set triage status (${res.status})`);
+      const { cycleCode: currentCycleCode, scope: currentScope, includeSetAside: currentIncludeSetAside } = filtersRef.current;
+      await loadProposals(currentCycleCode, currentScope, currentIncludeSetAside);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSavingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(requestId);
+        return next;
+      });
+    }
+  }, [loadProposals]);
 
   return (
     <Layout title="Request Workbench">
@@ -162,40 +226,59 @@ function WorkbenchDashboard() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {proposals.map((p) => (
-            <Link key={p.requestId} href={`/workbench/${p.requestId}?tab=reviewers&n=${encodeURIComponent(p.requestNumber)}`} className="block">
-              <Card className="cursor-pointer">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-gray-900">#{p.requestNumber}</span>
-                      {p.cycleLabel && <span className="text-xs text-gray-500">{p.cycleLabel}</span>}
-                      {p.grantProgram && <span className="text-xs text-gray-500">· {p.grantProgram}</span>}
-                      {p.advancing && (
-                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-800">
-                          going-forward
-                        </span>
-                      )}
-                      {p.setAside && (
-                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-200 text-gray-600">
-                          set aside
-                        </span>
+          {proposals.map((p) => {
+            const href = `/workbench/${p.requestId}?tab=reviewers&n=${encodeURIComponent(p.requestNumber)}`;
+            return (
+              <div
+                key={p.requestId}
+                role="button"
+                tabIndex={0}
+                className="block"
+                onClick={() => router.push(href)}
+                onKeyDown={(e) => {
+                  if (e.target?.closest?.('select,button,a,input,textarea')) return;
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    router.push(href);
+                  }
+                }}
+              >
+                <Card className="cursor-pointer">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-gray-900">#{p.requestNumber}</span>
+                        {p.cycleLabel && <span className="text-xs text-gray-500">{p.cycleLabel}</span>}
+                        {p.grantProgram && <span className="text-xs text-gray-500">· {p.grantProgram}</span>}
+                        {p.advancing && (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-800">
+                            going-forward
+                          </span>
+                        )}
+                        {p.setAside && (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-200 text-gray-600">
+                            set aside
+                          </span>
+                        )}
+                      </div>
+                      {p.institution && <div className="text-sm text-gray-700 mt-1 truncate">{p.institution}</div>}
+                      {p.projectLeader && <div className="text-xs text-gray-500 mt-0.5">PI: {p.projectLeader}</div>}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <StageChip stage={p.workRemaining} />
+                      <div className="text-xs text-gray-500 mt-1.5">
+                        {p.reviewers.accepted}/{p.reviewers.needed} accepted
+                        {p.reviewers.candidates ? ` · ${p.reviewers.candidates} found` : ''}
+                      </div>
+                      {p.canManage && (
+                        <TriageControl proposal={p} busy={savingIds.has(p.requestId)} onSet={setTriage} />
                       )}
                     </div>
-                    {p.institution && <div className="text-sm text-gray-700 mt-1 truncate">{p.institution}</div>}
-                    {p.projectLeader && <div className="text-xs text-gray-500 mt-0.5">PI: {p.projectLeader}</div>}
                   </div>
-                  <div className="text-right shrink-0">
-                    <StageChip stage={p.workRemaining} />
-                    <div className="text-xs text-gray-500 mt-1.5">
-                      {p.reviewers.accepted}/{p.reviewers.needed} accepted
-                      {p.reviewers.candidates ? ` · ${p.reviewers.candidates} found` : ''}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </Link>
-          ))}
+                </Card>
+              </div>
+            );
+          })}
         </div>
       )}
     </Layout>

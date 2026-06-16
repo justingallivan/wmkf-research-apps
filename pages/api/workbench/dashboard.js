@@ -29,7 +29,7 @@
  * docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md. my-proposals.js is untouched.
  */
 
-import { requireAppAccess } from '../../../lib/utils/auth';
+import { getUserRole, requireAppAccess } from '../../../lib/utils/auth';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { resolveByEmail } from '../../../lib/services/program-director-resolver';
@@ -77,13 +77,14 @@ export default async function handler(req, res) {
       if (!pd?.systemuserid) {
         return res.status(404).json({ error: `No active Dynamics systemuser found for ${azureEmail}.` });
       }
+      const isSuperuser = (await getUserRole(access.profileId)) === 'superuser';
 
       const { cycleCode } = req.query;
       if (!cycleCode) {
         return await listCycles(res, pd);
       }
       const includeSetAside = req.query.includeSetAside === '1';
-      return await listProposals(res, pd, String(cycleCode), scope, includeSetAside);
+      return await listProposals(res, pd, String(cycleCode), scope, includeSetAside, isSuperuser);
     } catch (err) {
       console.error('workbench dashboard error:', err);
       return res.status(500).json({
@@ -156,7 +157,7 @@ async function listCycles(res, pd) {
   });
 }
 
-async function listProposals(res, pd, cycleCode, scope, includeSetAside) {
+async function listProposals(res, pd, cycleCode, scope, includeSetAside, isSuperuser) {
   const cycleFilter = cycleCodeToOdataFilter(cycleCode);
   if (!cycleFilter) {
     return res.status(400).json({ error: `Invalid cycleCode: ${cycleCode}` });
@@ -191,7 +192,9 @@ async function listProposals(res, pd, cycleCode, scope, includeSetAside) {
   const requestIds = records.map((r) => r.akoya_requestid).filter(Boolean);
   const counts = await fetchReviewerRollup(requestIds);
 
-  const proposals = records.map((row) => projectProposal(row, counts[row.akoya_requestid]));
+  const proposals = records.map((row) => (
+    projectProposal(row, counts[row.akoya_requestid], isSuperuser, pd.systemuserid)
+  ));
 
   // Stable order: number ascending.
   proposals.sort((a, b) => String(a.requestNumber).localeCompare(String(b.requestNumber)));
@@ -208,10 +211,14 @@ async function listProposals(res, pd, cycleCode, scope, includeSetAside) {
   });
 }
 
-function projectProposal(r, c) {
+function projectProposal(r, c, isSuperuser, callerSystemId) {
   const counts = c || { candidates: 0, invited: 0, accepted: 0, declined: 0, held: 0, completed: 0 };
   const cycleCode = r.wmkf_meetingdate ? meetingDateToCycleCode(r.wmkf_meetingdate) : null;
   const triageStatus = typeof r.wmkf_triagestatus === 'number' ? r.wmkf_triagestatus : null;
+  const canManage = isSuperuser || (
+    !!r._wmkf_programdirector_value
+    && String(r._wmkf_programdirector_value).toLowerCase() === String(callerSystemId).toLowerCase()
+  );
   return {
     requestId: r.akoya_requestid,
     requestNumber: r.akoya_requestnum,
@@ -226,6 +233,9 @@ function projectProposal(r, c) {
     grantProgram: r._wmkf_grantprogram_value_formatted || null,
     programArea: r._wmkf_programareaserved_value_formatted || null,
     programDirector: r._wmkf_programdirector_value_formatted || null,
+    // Server-computed visible gate for the per-row triage flip. Matches the
+    // authoritative POST /api/workbench/triage lead-PD/superuser gate.
+    canManage,
     // Triage state (S261, replaces `allowlisted`). `advancing` = the going-forward
     // pill; `setAside` rows only appear when ?includeSetAside=1.
     triageStatus,
