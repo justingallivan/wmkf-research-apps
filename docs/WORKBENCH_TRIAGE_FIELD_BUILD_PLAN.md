@@ -1,8 +1,10 @@
 # Workbench Triage Field — build plan (S260)
 
 > **Status:** Stages 0–4 BUILT + DEPLOYED (S261, 2026-06-15) — field live in prod, D26 backfill applied
-> (35 Advancing + 170 Set aside, 205 rows, idempotent). Remaining: §3 dashboard switch (still needs the
-> `[DEFAULT]` cycle-default decision) + §5 allowlist retirement. PA-trigger risk assessed low + accepted
+> (35 Advancing + 170 Set aside, 205 rows, idempotent). §3 dashboard switch DONE (S261) — the dashboard reads
+> the field (Advancing + Phase II Pending shown, Set aside hidden, Concepts excluded; live-probed 35/205).
+> Remaining: §5 allowlist retirement (delete d26Allowlist.js + cycle-picker replacement, which needs the
+> `[DEFAULT]` cycle-default decision) and the per-row triage-flip UI. PA-trigger risk assessed low + accepted
 > (only the new field written; `akoya_requeststatus` untouched, so the status-filtered intake flow can't
 > fire; residual = any unfiltered modify-flow, run-history not spot-checked). Drafted 2026-06-15 (S260)
 > from the design thread with Justin.
@@ -99,6 +101,18 @@ must still be `Advancing` or the new query hides it.
   `queryAllRecords` paginates (caps 5,000 — safe for D26).
 
 ## 3. Dashboard (`pages/api/workbench/dashboard.js` + `pages/workbench.js`)
+
+> **AS BUILT (S261) — supersedes the bullets below where they conflict.** A live probe
+> (`scripts/probe-triage-filter.mjs`) falsified this section's core assumption: the coarse
+> meeting-date cycle filter matches **455** D26 rows, of which **250 are Concept-stage** (Concept
+> Pending/Done/Denied/Ineligible) — all untriaged. So "remove the status branch and show all
+> non-Set-aside" would have flooded the dashboard 35 → 285. Decision (Justin): the default view is
+> **`akoya_requeststatus eq 'Phase II Pending'` OR `wmkf_triagestatus eq Advancing`**, with Set aside
+> hidden via the null-inclusive guard unless `?includeSetAside=1`; **untriaged non-Phase-II rows
+> (incl. all Concepts) are never shown.** The Phase II Pending status branch is therefore KEPT (not
+> removed). The cycle picker was left as-is (still references `D26_ALLOWLIST_CYCLE_CODE`); its
+> replacement + the cycle-default decision moved to §5. The per-row triage-flip UI is not built yet.
+> Live-probed: D26 default = 35, includeSetAside = 205, Concepts excluded both ways.
 
 - **Visibility query (Codex r2 RISK E — the correctness trap):** Dataverse-observed behavior (not an OData-spec
   guarantee) is that a bare `ne` drops null rows, so an untriaged row would be wrongly hidden. The clause MUST be
