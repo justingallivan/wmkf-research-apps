@@ -28,8 +28,8 @@ export const BASE_CONFIG = {
     'batch-phase-ii':              { model: 'sonnet', fallback: 'haiku' },
     'phase-i-writeup':             { model: 'sonnet', fallback: 'haiku' },
     'phase-ii-writeup':            { model: 'sonnet', fallback: 'haiku' },
+    // Workbench reviewer-finding services still resolve this model namespace.
     'reviewer-finder':             { model: 'sonnet', fallback: 'haiku' },
-    'review-manager':              { model: 'sonnet', fallback: 'haiku' },
     'reviewers':                   { model: 'sonnet', fallback: 'haiku' },
     'peer-review-summarizer':      { model: 'sonnet', fallback: 'haiku' },
     'funding-analysis':            { model: 'sonnet', fallback: 'haiku' },

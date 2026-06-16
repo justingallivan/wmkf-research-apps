@@ -74,8 +74,8 @@ This document maps the full lifecycle of a grant application from submission thr
 | Task | Lifecycle Step | Tool | Status |
 |------|---------------|------|--------|
 | Integrity screening | 9 | Integrity Screener app | Built and running |
-| Reviewer finding | Post-approval | Reviewer Finder app | Built and running |
-| Review management | Post-approval | Review Manager app | Built and running |
+| Reviewer finding | Post-approval | Workbench Reviewers tab | Built and running |
+| Review management | Post-approval | Workbench Reviewers tab | Built and running |
 | Panel review | During PD review | Virtual Review Panel app | Built and running |
 | Expertise matching | 6 (PD assignment) | Expertise Finder app | Built and running |
 | Proposal summarization | Ad-hoc | Phase I/II Writeup apps | Built and running |

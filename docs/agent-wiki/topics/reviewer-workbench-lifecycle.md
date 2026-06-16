@@ -1,11 +1,13 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-13
+last_verified: 2026-06-16
 stale_after_days: 90
-owner: reviewer-finder
+owner: reviewers
 source_files:
-  - pages/reviewer-finder.js
+  - shared/components/reviewers/ReviewersTab.js
+  - shared/components/reviewers/ReviewerFindPanel.js
+  - shared/components/reviewers/ReviewerManagePanel.js
   - shared/components/reviewers/reviewer-search-logic.js
   - pages/api/reviewer-finder/my-candidates.js
   - pages/api/reviewer-finder/save-candidates.js
@@ -15,9 +17,9 @@ canonical_docs:
   - docs/atlas/dataverse-wmkf-potentialreviewers.md
   - docs/atlas/dataverse-wmkf-appreviewersuggestion.md
 watch_paths:
-  - pages/reviewer-finder.js
   - shared/components/reviewers/**
   - pages/api/reviewer-finder/**
+  - pages/api/review-manager/**
   - lib/services/reviewer-roster-store.js
 update_triggers:
   - reviewer workbench UX or lifecycle changes

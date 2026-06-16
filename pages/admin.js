@@ -885,8 +885,7 @@ const APP_MODEL_NAMES = {
   'batch-phase-ii': 'Batch Phase II',
   'phase-i-writeup': 'Phase I Writeup',
   'phase-ii-writeup': 'Phase II Writeup',
-  'reviewer-finder': 'Reviewer Finder',
-  'review-manager': 'Review Manager',
+  'reviewer-finder': 'Reviewer Finder Pipeline',
   'reviewers': 'Reviewers',
   'peer-review-summarizer': 'Peer Review Summarizer',
   'funding-analysis': 'Funding Analysis',
@@ -1423,6 +1422,9 @@ function AppAccessSection() {
 
   if (!isSuperuser) return null;
 
+  const visibleAppSet = new Set(allApps);
+  const visibleOnlySet = (keys) => new Set([...keys].filter(k => visibleAppSet.has(k)));
+
   // Toggle a single checkbox in local state
   const toggle = (userId, appKey) => {
     setLocalGrants(prev => {
@@ -1439,7 +1441,13 @@ function AppAccessSection() {
     setLocalGrants(prev => {
       const next = { ...prev };
       const current = next[userId] || new Set();
-      next[userId] = current.size === allApps.length ? new Set() : new Set(allApps);
+      const nextSet = new Set(current);
+      const hasAllVisibleApps = allApps.length > 0 && allApps.every(appKey => nextSet.has(appKey));
+      allApps.forEach(appKey => {
+        if (hasAllVisibleApps) nextSet.delete(appKey);
+        else nextSet.add(appKey);
+      });
+      next[userId] = nextSet;
       return next;
     });
   };
@@ -1450,8 +1458,8 @@ function AppAccessSection() {
     if (!serverGrants) return changes;
     for (const grant of serverGrants) {
       const uid = grant.user_profile_id;
-      const serverSet = new Set(grant.apps || []);
-      const localSet = localGrants[uid] || new Set();
+      const serverSet = visibleOnlySet(new Set(grant.apps || []));
+      const localSet = visibleOnlySet(localGrants[uid] || new Set());
       const toGrant = [...localSet].filter(k => !serverSet.has(k));
       const toRevoke = [...serverSet].filter(k => !localSet.has(k));
       if (toGrant.length > 0 || toRevoke.length > 0) {
@@ -1585,8 +1593,8 @@ function AppAccessSection() {
               {serverGrants.map(grant => {
                 const uid = grant.user_profile_id;
                 const localSet = localGrants[uid] || new Set();
-                const serverSet = new Set(grant.apps || []);
-                const allChecked = localSet.size === allApps.length;
+                const serverSet = visibleOnlySet(new Set(grant.apps || []));
+                const allChecked = allApps.length > 0 && allApps.every(appKey => localSet.has(appKey));
                 return (
                   <tr key={uid} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-2 px-2 text-gray-900 whitespace-nowrap sticky left-0 bg-white z-10">
