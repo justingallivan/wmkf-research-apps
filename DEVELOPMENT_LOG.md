@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Workbench triage field replaces the D26 allowlist (prod cutover) (Session 261)
+
+**Milestone:** Production cutover + deprecated-capability removal. The Workbench dashboard's "going-forward" subset was driven by a hand-maintained committed allowlist (`shared/config/d26Allowlist.js`, a D26-pilot throwaway). S261 replaced it with a real durable field — `wmkf_triagestatus` (Advancing / Set aside / null) on the **core `akoya_request`** entity — deployed to prod, backfilled, and wired through the dashboard read + a per-row write control. The allowlist is retired from live use.
+
+**Sessions:** 261. Built the no-prod-write pieces (constants, isolated schema wave, 3-way metadata preflight, dry-run backfill, hard-gated write route) → 2 Codex rounds → Justin's triggers deployed the field + ran the backfill (205 rows: 35 Advancing / 170 Set aside) → §3 dashboard switch → per-row flip UI → §5 allowlist retirement. Each prod-facing step verified with a read-only live probe.
+
+**Ship state:**
+- `wmkf_triagestatus` LIVE on `akoya_request` (isolated wave `--wave=2-triagestatus`); D26 backfilled, idempotent.
+- Dashboard reads it: default = `Phase II Pending OR Advancing`, Set aside hidden (toggle), untriaged/Concept rows never shown. A live probe caught that "show all non-set-aside" would have flooded it 35 → 285 (the meeting-date cycle filter also matches 250 Concept rows) — chose the faithful scope with Justin.
+- `POST /api/workbench/triage` is the authoritative lead-PD/superuser write gate; the dashboard per-row flip control writes it (server-computed `canManage`). `d26Allowlist.js` retired-in-place (historical/backfill source, not deleted).
+- Also cleared 3 stale jest suites from the S259 GUID guard (non-GUID fixtures), missed in S260 for lack of a full `npm test` → new `feedback-green-requires-full-test-suite`.
+
+**Why it matters:** Gives staff a durable, reversible, per-proposal triage signal that declutters the dashboard without an early status flip — and seeds the J27 triage lens. Removes a hand-maintained committed config from the live path.
+
+**Pointers:** `docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md` (plan + AS-BUILT notes); `docs/atlas/dataverse-akoya-request.md` (`wmkf_triagestatus`). Commits `ecdcaed2` → `832ed5c8` (8).
+
 ## June 2026 — Trust-boundary IDOR/injection class closed on the reviewer API + permanent blocking gate (Session 259)
 
 **Milestone:** Security hardening + new enforcement infrastructure. An adversarial Codex review (the queued S258 self-review-hook review) found the S258 fan-out was incomplete: across the reviewer-finder / review-manager surface, client-supplied ids (`req.query`/`req.body`) reached Dataverse selectors with only a presence check. `DynamicsService.getRecord`/`updateRecord` interpolate the id raw into the request URL (`${entitySet}(${id})`) and the adapter `findByRequest` into an OData `$filter` — an over-fetch / IDOR / filter-injection class (authenticated-staff scope). Closed it at the edge across 12 routes via a new shared validator `lib/utils/guid.js`, then converted the failure mode into a **blocking CI gate + commit guard** so it can't regress.
