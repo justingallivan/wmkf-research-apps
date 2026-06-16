@@ -2,12 +2,14 @@
 
 > **Status:** Pre-implementation. Drafted 2026-06-15 (S260) from the design thread with Justin.
 >
+> **v4 (2026-06-15): Codex review round 3 folded in.**
+>
 > **v2 (2026-06-15): Codex pre-impl review round 1 folded in.** Hard server-side manage gate (was the
 > BLOCKER); membership-keyed 3-bucket backfill; explicit numeric option values; cycle-picker replacement
 > before allowlist deletion; staged rollout; non-colliding labels (`Advancing`/`Set aside`).
 >
 > **v3 (2026-06-15): Codex review round 2 folded in.** Closed the six spec gaps: shared-constants module
-> named; **null-inclusive dashboard query (the correctness trap — `ne` excludes null in OData)**; null-PD
+> named; **null-inclusive dashboard query (the correctness trap — Dataverse-observed bare `ne` drops null rows)**; null-PD
 > auth behavior; concrete cycle-fallback source; numeric backfill abort thresholds; pre-deploy field-shape
 > metadata probe; exact scope-interaction + show-Set-aside query. Defaults chosen for the two judgment items
 > (abort bounds, "current open cycle" source) are marked `[DEFAULT — confirm at impl]`.
@@ -49,6 +51,10 @@ extensible (J27 adds values without a migration).
   `TRIAGE_STATUS = { ADVANCING: 100000000, SET_ASIDE: 100000001 }`, `TRIAGE_LABEL` (value→label),
   `isValidTriageValue(v)`. The route, backfill, dashboard query, and UI all import from here — **never
   compare on label, never inline the magic numbers.**
+- Import triage constants **directly** from `shared/config/triageStatus.js`, **NOT** from
+  `shared/config/index.js`: that barrel re-exports a server-only loader (`lib/services/model-override-loader`
+  via `shared/config/index.js` line ~12), which would pull server-side dependencies into a client bundle.
+  `shared/config/triageStatus.js` must remain dependency-free.
 
 ## 1. Dataverse field
 
@@ -56,9 +62,12 @@ extensible (J27 adds values without a migration).
   **explicit numeric values** (schema-apply requires them — `schema-apply.js:125`): `Advancing`=100000000,
   `Set aside`=100000001; `null` = untriaged (no option). Labels avoid the `akoya_requeststatus='Active'` collision.
 - **Pre-deploy metadata probe (Codex r2 RISK C):** schema-apply is **creation-only** — it will NOT reconcile
-  a divergent pre-existing field (`schema-apply.js:264-276`). So first probe (pattern: `scripts/probe-picklist.js`)
-  whether `wmkf_triagestatus` already exists on `akoya_request`; **abort if it exists with a different option
-  set** (require manual reconciliation), proceed only if absent or already exactly {100000000,100000001}.
+  a divergent pre-existing field (`schema-apply.js:264-276`). Use `scripts/probe-picklist.js` as the pattern,
+  but not directly as the preflight: it exits non-zero when the field is **ABSENT**, and absent is the allowed
+  creation path. The preflight needs a thin wrapper script with a 3-way exit contract: field **ABSENT** →
+  proceed (create); field **EXISTS** with exactly {100000000 Advancing, 100000001 Set aside} → proceed
+  (idempotent no-op); field **EXISTS** with a **DIVERGENT** option set → **ABORT** (manual reconciliation
+  required, because schema-apply is creation-only per `lib/dataverse/schema-apply.js:264`).
 - **Deploy:** isolated schema wave (mirror `lib/dataverse/schema/wave2-fieldprimer/…` + `scripts/apply-dataverse-schema.js`,
   string-wave loads only that dir). **NOT** `--wave=2 --execute` (duplicate-relationship drift hazard). Precedent:
   `wmkf_ai_fieldprimer` self-deployed to `akoya_request`; publisher prefix `wmkf`. **MUST carry NO PowerAutomate
@@ -86,10 +95,14 @@ must still be `Advancing` or the new query hides it.
 
 ## 3. Dashboard (`pages/api/workbench/dashboard.js` + `pages/workbench.js`)
 
-- **Visibility query (Codex r2 RISK E — the correctness trap):** OData `ne` **excludes null**, so an untriaged
-  row would be wrongly hidden by a bare `ne`. The clause MUST be
+- **Visibility query (Codex r2 RISK E — the correctness trap):** Dataverse-observed behavior (not an OData-spec
+  guarantee) is that a bare `ne` drops null rows, so an untriaged row would be wrongly hidden. The clause MUST be
   **`(wmkf_triagestatus eq null or wmkf_triagestatus ne 100000001)`** to show `Advancing` + `untriaged`, hide
-  `Set aside`. **Probe this live** before relying on it (confirm null rows are included) + a test fixture.
+  `Set aside`. This mirrors the repo's existing `notExcludedFilter()` pattern in
+  `lib/dataverse/adapters/reviewer-suggestion.js:135`, also used in
+  `lib/services/grant-cycles-dataverse.js:185` and pinned by
+  `tests/unit/reviewer-suggestion-disposition.test.js:65`; reuse that pattern rather than inventing a new
+  filter. **Probe this live** before relying on it (confirm null rows are included) + a test fixture.
 - **Scope interaction (Codex r2 RISK D):** the full default filter is
   `(<cycle>) and (wmkf_triagestatus eq null or wmkf_triagestatus ne 100000001)` plus, when `scope=my`,
   `and _wmkf_programdirector_value eq {pd}` — all parenthesized so the `or` can't leak. The **"show Set aside"
@@ -98,9 +111,12 @@ must still be `Advancing` or the new query hides it.
   `Advancing` via Bucket A). `Phase II Pending` becomes an informational row badge, not a filter.
 - **Cycle picker replacement (Codex r2 RISK A) `[DEFAULT — confirm at impl]`:** the picker default + "always
   include D26" is allowlist-driven (`dashboard.js:123-149`). Replace with cycle derivation from the existing
-  cycle source (`lib/services/grant-cycles-dataverse.js` / `wmkf_appgrantcycle`), **default = the open cycle
-  nearest today**; D26 lists naturally because it has Phase I Pending proposals. Confirm at impl that no cycle
-  with proposals can drop out, and that a zero-proposal cycle still lists (empty state). **Hard precondition of
+  cycle source (`lib/services/grant-cycles-dataverse.js` / `wmkf_appgrantcycle`), using the fields it already
+  exposes on `wmkf_appgrantcycle`: `id`, `name`, `shortCode`, `reviewDeadline`, `isActive`,
+  `fiscalYearCode`. **Default algorithm:** among cycles with `isActive === true`, pick the one with the
+  nearest upcoming `reviewDeadline` (fallback: nearest meeting date). D26 lists naturally because it has Phase I
+  Pending proposals. Confirm at impl that no cycle with proposals can drop out, and that a zero-proposal cycle
+  still lists (empty state). **Hard precondition of
   allowlist deletion.**
 - **Per-row triage flip** — lead PD sets `Advancing`/`Set aside`; UI gated via `computeCanManage`, WRITE
   hard-gated server-side (§4). The "going-forward" pill becomes the `Advancing` indicator.
@@ -110,8 +126,13 @@ must still be `Advancing` or the new query hides it.
 - **`POST /api/workbench/triage`** `{ requestId, triageStatus }` → writes `wmkf_triagestatus` on `akoya_request`.
 - `requireAppAccess('reviewers')` (app gate) **AND** a hard server-side manage check — this writes an
   **authoritative visibility field**, so the fail-open/UI-only `canManage` posture (S207, for org-open
-  reviewer-workflow APIs) is **NOT** acceptable. Resolve the request; **allow iff** `isSuperuser` **or**
-  (`_wmkf_programdirector_value` is non-null **and** equals `access.session.user.dynamicsSystemuserId`).
+  reviewer-workflow APIs) is **NOT** acceptable. `requireAppAccess` (`lib/utils/auth.js`) returns only
+  `{ profileId, session }`; it bypasses app checks for superusers but does **NOT** expose an `isSuperuser`
+  flag. The route must explicitly derive superuser status server-side using the canonical helper in
+  `lib/utils/auth.js`: import `getUserRole` and treat `(await getUserRole(access.profileId)) === 'superuser'`
+  as the superuser check (or use `requireSuperuser` only for superuser-only flows). Resolve the request;
+  **allow iff** derived superuser status **or** (`_wmkf_programdirector_value` is non-null **and** equals
+  `access.session.user.dynamicsSystemuserId`).
   **A null/absent `_wmkf_programdirector_value` → 403 for non-superusers (superuser only)** (Codex r2 F4).
 - `requestId` **GUID-validated** before it becomes a record-id selector (`check:trust-boundary-guid`).
 - Validate `triageStatus` via `isValidTriageValue` (numeric option set) → 400 otherwise.
