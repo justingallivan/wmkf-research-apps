@@ -46,8 +46,9 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
   A new `wmkf_triagestatus` picklist (Advancing/Set aside/null) on **core `akoya_request`** is LIVE in prod with the
   D26 backfill applied (35 Advancing + 170 Set aside, 205 rows). It is DESIGNED to retire the manual `d26Allowlist.js`,
   but the dashboard STILL reads the allowlist — the §3 dashboard switch (needs the cycle-default decision) + §5
-  allowlist retirement are NOT done, so the field has no visibility effect yet. (PA-trigger check on the bulk write
-  still to confirm.) J27 expands
+  allowlist retirement are NOT done, so the field has no visibility effect yet. (PA-trigger risk assessed low +
+  accepted S261: only the new field written, `akoya_requeststatus` untouched → status-filtered intake flow can't
+  fire; residual = any unfiltered modify-flow, run-history not spot-checked.) J27 expands
   it (more states + PD-recommendation/authoritative two-layer split) — that's the tier-2 **triage lens** seed.
 - **Standalone app retirement STARTED (verify before acting):** Justin **hid Reviewer Finder + Review Manager
   in the admin panel** (S260). The `/api/reviewer-finder/*` + `/api/review-manager/*` API routes are

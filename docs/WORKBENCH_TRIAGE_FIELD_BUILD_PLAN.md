@@ -2,8 +2,10 @@
 
 > **Status:** Stages 0–4 BUILT + DEPLOYED (S261, 2026-06-15) — field live in prod, D26 backfill applied
 > (35 Advancing + 170 Set aside, 205 rows, idempotent). Remaining: §3 dashboard switch (still needs the
-> `[DEFAULT]` cycle-default decision) + §5 allowlist retirement, plus a post-deploy PowerAutomate-trigger
-> confirmation on the bulk write. Drafted 2026-06-15 (S260) from the design thread with Justin.
+> `[DEFAULT]` cycle-default decision) + §5 allowlist retirement. PA-trigger risk assessed low + accepted
+> (only the new field written; `akoya_requeststatus` untouched, so the status-filtered intake flow can't
+> fire; residual = any unfiltered modify-flow, run-history not spot-checked). Drafted 2026-06-15 (S260)
+> from the design thread with Justin.
 >
 > **v4 (2026-06-15): Codex review round 3 folded in.**
 >
