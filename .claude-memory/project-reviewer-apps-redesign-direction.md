@@ -46,7 +46,8 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
   A new `wmkf_triagestatus` picklist (Advancing/Set aside/null) on **core `akoya_request`** is LIVE in prod with the
   D26 backfill applied (35 Advancing + 170 Set aside, 205 rows). It is DESIGNED to retire the manual `d26Allowlist.js`,
   The §3 dashboard switch is DONE (S261): the dashboard now reads the field (Advancing + Phase II Pending shown,
-  Set aside hidden, Concepts excluded). REMAINING: §5 allowlist retirement (delete `d26Allowlist.js` + cycle-picker
+  Set aside hidden, Concepts excluded). §5 allowlist retirement DONE (S261): cycle picker derives from the PD's
+  meeting-dated proposals (default = latest); `d26Allowlist.js` retired from live use (kept as historical/backfill
   replacement, needs the cycle-default decision). The per-row triage-flip UI is DONE (S261: canManage-gated
   per-row control POSTs to /api/workbench/triage). (PA-trigger risk assessed low +
   accepted S261: only the new field written, `akoya_requeststatus` untouched → status-filtered intake flow can't

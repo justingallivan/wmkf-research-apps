@@ -3,8 +3,11 @@
 > **Status:** Stages 0–4 BUILT + DEPLOYED (S261, 2026-06-15) — field live in prod, D26 backfill applied
 > (35 Advancing + 170 Set aside, 205 rows, idempotent). §3 dashboard switch DONE (S261) — the dashboard reads
 > the field (Advancing + Phase II Pending shown, Set aside hidden, Concepts excluded; live-probed 35/205).
-> Remaining: §5 allowlist retirement (delete d26Allowlist.js + cycle-picker replacement, which needs the
-> `[DEFAULT]` cycle-default decision). The per-row triage-flip UI is DONE (S261). PA-trigger risk assessed low + accepted
+> §5 allowlist retirement DONE (S261): the cycle picker now derives from the PD's meeting-dated proposals
+> (default = latest, no D26 anchor); `d26Allowlist.js` retired from live use (kept as historical/backfill
+> source, NOT deleted). The per-row triage-flip UI is DONE (S261). **Triage feature fully shipped.** (A more
+> principled cycle default — nearest upcoming reviewDeadline among isActive `wmkf_appgrantcycle` rows — remains
+> a future refinement.) PA-trigger risk assessed low + accepted
 > (only the new field written; `akoya_requeststatus` untouched, so the status-filtered intake flow can't
 > fire; residual = any unfiltered modify-flow, run-history not spot-checked). Drafted 2026-06-15 (S260)
 > from the design thread with Justin.
@@ -111,7 +114,8 @@ must still be `Advancing` or the new query hides it.
 > hidden via the null-inclusive guard unless `?includeSetAside=1`; **untriaged non-Phase-II rows
 > (incl. all Concepts) are never shown.** The Phase II Pending status branch is therefore KEPT (not
 > removed). The cycle picker was left as-is (still references `D26_ALLOWLIST_CYCLE_CODE`); its
-> replacement + the cycle-default decision moved to §5. The per-row triage-flip UI is built (S261): a
+> replacement done in §5 (S261): the picker derives from the PD's meeting-dated proposals, default = latest
+> (no D26 anchor) — NOT the isActive/reviewDeadline algorithm (deferred as a future refinement). The per-row triage-flip UI is built (S261): a
 > canManage-gated `<select>` on each dashboard row POSTs to `/api/workbench/triage`; the dashboard returns a
 > server-computed `canManage` boolean (no raw systemuserid on the wire).
 > Live-probed: D26 default = 35, includeSetAside = 205, Concepts excluded both ways.
@@ -161,6 +165,16 @@ must still be `Advancing` or the new query hides it.
 - Updates **decision #2**: lead PD + superuser, **hard-enforced**. Connor edits in Dataverse if needed.
 
 ## 5. Retire the allowlist — staged, LAST (Codex r1/r2 F5)
+
+> **AS BUILT (S261) — DONE.** The cycle picker (`dashboard.js listCycles`) no longer references the allowlist:
+> it derives cycles from the PD's meeting-dated proposals (already its mechanism) and defaults to the latest
+> (= D26 today), dropping the synthetic "always-add-D26" anchor. `d26Allowlist.js` was **retired from live use
+> but NOT hard-deleted** — it is kept as the historical record of the D26 going-forward set + the source the
+> one-time `backfill-d26-triage.mjs` read; the data of record now lives on `wmkf_triagestatus` in Dataverse. Its
+> header marks it RETIRED. The allowlist-union regression tests were already replaced with triage assertions in
+> §3. Deviation from the literal order below: the picker uses the existing meeting-date derivation, not the
+> `wmkf_appgrantcycle` isActive/reviewDeadline algorithm (deferred as a future refinement); and the file was
+> retired-in-place rather than deleted (deleting would break the one-time backfill/probe scripts for no gain).
 
 Order: **deploy field → dry-run + execute backfill → switch dashboard (keep `d26Allowlist.js` constants as
 verification fallback) → delete the allowlist + union branch ONLY after prod dashboard row counts match the

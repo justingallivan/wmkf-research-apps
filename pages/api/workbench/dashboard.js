@@ -24,9 +24,10 @@
  * cycle filter also matches — are never shown (not reviewer-finding targets). The going-
  * forward set used to be a committed allowlist of request numbers
  * (shared/config/d26Allowlist.js); the D26 backfill moved that set onto the
- * `wmkf_triagestatus` field (35 Advancing / 170 Set aside). The cycle picker
- * still references D26_ALLOWLIST_CYCLE_CODE; full allowlist retirement is §5 of
- * docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md. my-proposals.js is untouched.
+ * `wmkf_triagestatus` field (35 Advancing / 170 Set aside). The cycle picker now
+ * derives cycles from the PD's meeting-dated proposals (default = latest), with no
+ * allowlist anchor — d26Allowlist.js is retired from live use (§5, S261).
+ * my-proposals.js is untouched.
  */
 
 import { getUserRole, requireAppAccess } from '../../../lib/utils/auth';
@@ -34,7 +35,6 @@ import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { resolveByEmail } from '../../../lib/services/program-director-resolver';
 import { meetingDateToCycleCode, cycleCodeToOdataFilter, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
-import { D26_ALLOWLIST_CYCLE_CODE } from '../../../shared/config/d26Allowlist';
 import { TRIAGE_STATUS } from '../../../shared/config/triageStatus';
 // Reviewer rollup + work-remaining derivation are shared with the per-request
 // Overview tab (via /api/workbench/reviewer-rollup); single source of truth.
@@ -128,19 +128,6 @@ async function listCycles(res, pd) {
     }
   }
 
-  // Always offer the allowlist cycle even if the PD has no Phase-II-dated rows
-  // there yet (the going-forward set is Phase I Pending).
-  if (!seen.has(D26_ALLOWLIST_CYCLE_CODE)) {
-    const parsedYear = 2000 + Number(D26_ALLOWLIST_CYCLE_CODE.slice(1));
-    seen.set(D26_ALLOWLIST_CYCLE_CODE, {
-      code: D26_ALLOWLIST_CYCLE_CODE,
-      label: cycleCodeToLabel(D26_ALLOWLIST_CYCLE_CODE),
-      year: parsedYear,
-      month: 12,
-      count: 0,
-    });
-  }
-
   const cycles = Array.from(seen.values()).sort((a, b) => {
     if (a.year !== b.year) return b.year - a.year;
     return b.month - a.month;
@@ -150,10 +137,11 @@ async function listCycles(res, pd) {
     success: true,
     programDirector: { systemuserid: pd.systemuserid, fullName: pd.fullName },
     cycles,
-    // Default to the allowlist cycle — the pilot's open cycle — when present.
-    defaultCycleCode: cycles.some((c) => c.code === D26_ALLOWLIST_CYCLE_CODE)
-      ? D26_ALLOWLIST_CYCLE_CODE
-      : (cycles[0]?.code || null),
+    // Default to the PD's latest-meeting-date cycle (cycles are sorted desc) — the
+    // current/upcoming cycle in practice (D26 today). S261: replaced the hardcoded
+    // d26Allowlist anchor. A more principled default — nearest upcoming reviewDeadline
+    // among isActive `wmkf_appgrantcycle` rows — is a future refinement.
+    defaultCycleCode: cycles[0]?.code || null,
   });
 }
 

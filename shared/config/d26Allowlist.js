@@ -1,7 +1,16 @@
 /**
- * D26 going-forward allowlist — THROWAWAY pilot config (Request Workbench).
+ * D26 going-forward allowlist — RETIRED from live use (§5, S261, 2026-06-15).
  *
- * ⚠️ Edit this one file to change the set. It exists only to unblock the
+ * ⚠️ NO LONGER DRIVES THE LIVE DASHBOARD. The going-forward set now lives on the
+ * `wmkf_triagestatus` picklist (Advancing/Set aside) on `akoya_request`: the dashboard
+ * reads that field and a per-row control writes it (POST /api/workbench/triage). The
+ * data of record is in Dataverse. See docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md.
+ * This file is retained ONLY as (a) the historical record of the D26 going-forward set
+ * and (b) the source the one-time backfill (`scripts/backfill-d26-triage.mjs`) read to
+ * seed the field. Do NOT wire it back into live code.
+ *
+ * --- Historical context (pre-S261) ---
+ * THROWAWAY pilot config. It existed to unblock the
  * Workbench dashboard for the D26 (December 2026) peer-review cycle BEFORE the
  * formal Phase I→II status flip. The going-forward requests are still
  * `akoya_requeststatus = 'Phase I Pending'` (verified live 2026-05-31: all 35,

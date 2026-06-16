@@ -72,21 +72,34 @@ describe('/api/workbench/dashboard', () => {
     expect(res.status).toHaveBeenCalledWith(403);
   });
 
-  it('cycle-list mode: a reviewers grant gets cycles incl. the D26 default/open cycle', async () => {
+  it('cycle-list mode: cycles derive from the PD\'s meeting-dated proposals; default = latest', async () => {
     mockAuthenticatedUser(1, ['reviewers']);
-    // listCycles query: PD has a Dec-2026 proposal → J/D derivation yields D26 anyway,
-    // but force a different cycle so we prove D26 is *always* added.
+    // Derived purely from meeting dates (S261: no hardcoded D26 anchor). The PD has
+    // a Dec-2026 (D26) and a June-2026 (J26) proposal; latest (D26) is the default.
     DynamicsService.queryAllRecords.mockResolvedValueOnce({
-      records: [{ akoya_requestid: 'rc', wmkf_meetingdate: '2026-06-04' }],
+      records: [
+        { akoya_requestid: 'rd', wmkf_meetingdate: '2026-12-11' },
+        { akoya_requestid: 'rj', wmkf_meetingdate: '2026-06-04' },
+      ],
     });
     const res = createMockRes();
     await handler(createMockReq({ method: 'GET' }), res);
     expect(res.status).toHaveBeenCalledWith(200);
     const body = res.json.mock.calls[0][0];
-    const codes = body.cycles.map((c) => c.code);
-    expect(codes).toContain('D26');
-    expect(codes).toContain('J26');
+    expect(body.cycles.map((c) => c.code)).toEqual(['D26', 'J26']); // sorted latest-first
     expect(body.defaultCycleCode).toBe('D26');
+  });
+
+  it('cycle-list mode: a PD with no D26 proposals gets NO synthetic D26 anchor (allowlist retired)', async () => {
+    mockAuthenticatedUser(1, ['reviewers']);
+    DynamicsService.queryAllRecords.mockResolvedValueOnce({
+      records: [{ akoya_requestid: 'rj', wmkf_meetingdate: '2026-06-04' }], // only J26
+    });
+    const res = createMockRes();
+    await handler(createMockReq({ method: 'GET' }), res);
+    const body = res.json.mock.calls[0][0];
+    expect(body.cycles.map((c) => c.code)).toEqual(['J26']); // D26 not force-added
+    expect(body.defaultCycleCode).toBe('J26');
   });
 
   it('proposals mode: triage-driven filter (Advancing + Phase II Pending), hides Set aside, no allowlist query', async () => {
