@@ -711,6 +711,7 @@ export default function ReviewerSearchSection({
     const myGen = genRef.current;
     setRecPhase('running'); setRecError(null); setRecProgress([]); setRecCandidates([]);
     try {
+      if (genRef.current !== myGen) return; // abort if context changed before the request fires
       const res = await fetch('/api/workbench/enrich-recommended', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -926,6 +927,10 @@ export default function ReviewerSearchSection({
   // endpoint (it loads selectedOnly:true), so count only the enrichable ones —
   // otherwise the button promises N but enriches fewer (Codex post-impl).
   const recCount = recommended.filter((r) => r.selected !== false).length;
+  // Candidates with needsIdentification:true route to needs_identity_review, not
+  // applicant_suggested — split the done-message count accordingly.
+  const recVerifiedCount = recCandidates.filter((c) => provenanceGroupOf(withReviewerProvenance(c)) === 'applicant_suggested').length;
+  const recIdentityReviewCount = recCandidates.filter((c) => provenanceGroupOf(withReviewerProvenance(c)) === 'needs_identity_review').length;
 
   return (
     <>
@@ -1235,9 +1240,12 @@ export default function ReviewerSearchSection({
               {recommendedFailed.some((f) => f.name) && (
                 <> ({recommendedFailed.map((f) => f.name).filter(Boolean).join(', ')})</>
               )}
-              .{' '}
+              . They are <span className="font-medium">not</span> saved as candidates.{' '}
               <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
             </div>
+          )}
+          {recommended.length > 0 && recCount === 0 && (
+            <p className="text-sm text-gray-600">All applicant-suggested reviewers have been removed by staff.</p>
           )}
           {recPhase === 'idle' && !blobUrl && recCount > 0 && (
             <p className="text-sm text-gray-500">
@@ -1254,9 +1262,15 @@ export default function ReviewerSearchSection({
           )}
           {recPhase === 'done' && (
             <p className="text-sm text-gray-600">
-              {recCandidates.length > 0
-                ? `${recCandidates.length} applicant-suggested reviewer${recCandidates.length === 1 ? '' : 's'} verified — see the Applicant-suggested section above.`
-                : 'No applicant-suggested reviewers could be verified.'}
+              {recVerifiedCount === 0 && recIdentityReviewCount === 0
+                ? 'No applicant-suggested reviewers could be verified.'
+                : <>
+                    {recVerifiedCount > 0
+                      ? `${recVerifiedCount} applicant-suggested reviewer${recVerifiedCount === 1 ? '' : 's'} verified — see the Applicant-suggested section above`
+                      : 'No reviewers added to the Applicant-suggested section'}
+                    {recIdentityReviewCount > 0 && <>; {recIdentityReviewCount} could not be confirmed — see the Identity review section</>}.
+                  </>
+              }
             </p>
           )}
           {recPhase === 'error' && (
