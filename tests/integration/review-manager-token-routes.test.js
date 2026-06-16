@@ -29,6 +29,12 @@ jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
 }));
 
+// regenerate-token GUID-validates suggestionId before it becomes a Dataverse
+// record-id selector (S259 trust-boundary hardening). Fixtures must be GUID-shaped
+// or every test 400s before reaching the lifecycle logic it means to exercise.
+const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
+const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
+
 beforeEach(() => {
   clearAppAccessCache();
   jest.clearAllMocks();
@@ -44,7 +50,7 @@ describe('/api/review-manager/regenerate-token', () => {
 
   it('returns 401 when unauthenticated', async () => {
     mockUnauthenticated();
-    const req = createMockReq({ method: 'POST', body: { suggestionId: 'suggestion-1' } });
+    const req = createMockReq({ method: 'POST', body: { suggestionId: SUGGESTION_ID } });
     const res = createMockRes();
 
     await handler(req, res);
@@ -55,7 +61,7 @@ describe('/api/review-manager/regenerate-token', () => {
 
   it('returns 403 when caller lacks review-manager app access', async () => {
     mockAuthenticatedUser(1, ['reviewer-finder']);
-    const req = createMockReq({ method: 'POST', body: { suggestionId: 'suggestion-1' } });
+    const req = createMockReq({ method: 'POST', body: { suggestionId: SUGGESTION_ID } });
     const res = createMockRes();
 
     await handler(req, res);
@@ -67,8 +73,8 @@ describe('/api/review-manager/regenerate-token', () => {
   it('mints a replacement token for the requested suggestion and linked request', async () => {
     mockAuthenticatedUser(2, ['review-manager']);
     DynamicsService.getRecord.mockResolvedValue({
-      wmkf_appreviewersuggestionid: 'suggestion-1',
-      _wmkf_request_value: 'request-1',
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_request_value: REQUEST_ID,
     });
     const expiresAt = new Date(Date.now() + 60_000);
     mintAndStore.mockResolvedValue({
@@ -79,7 +85,7 @@ describe('/api/review-manager/regenerate-token', () => {
 
     const req = createMockReq({
       method: 'POST',
-      body: { suggestionId: 'suggestion-1', expiresAt: expiresAt.toISOString() },
+      body: { suggestionId: SUGGESTION_ID, expiresAt: expiresAt.toISOString() },
     });
     const res = createMockRes();
 
@@ -87,12 +93,12 @@ describe('/api/review-manager/regenerate-token', () => {
 
     expect(DynamicsService.getRecord).toHaveBeenCalledWith(
       'wmkf_appreviewersuggestions',
-      'suggestion-1',
+      SUGGESTION_ID,
       { select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_applicantdisposition' },
     );
     expect(mintAndStore).toHaveBeenCalledWith({
-      suggestionId: 'suggestion-1',
-      requestId: 'request-1',
+      suggestionId: SUGGESTION_ID,
+      requestId: REQUEST_ID,
       expiresAt,
       actingUserSystemId: null,
     });
@@ -109,7 +115,7 @@ describe('/api/review-manager/regenerate-token', () => {
     mockAuthenticatedUser(2, ['review-manager']);
     const req = createMockReq({
       method: 'POST',
-      body: { suggestionId: 'suggestion-1', expiresAt: new Date(Date.now() - 60_000).toISOString() },
+      body: { suggestionId: SUGGESTION_ID, expiresAt: new Date(Date.now() - 60_000).toISOString() },
     });
     const res = createMockRes();
 
@@ -122,14 +128,14 @@ describe('/api/review-manager/regenerate-token', () => {
   it('mints for a caller holding only the additive reviewers grant', async () => {
     mockAuthenticatedUser(4, ['reviewers']);
     DynamicsService.getRecord.mockResolvedValue({
-      wmkf_appreviewersuggestionid: 'suggestion-1',
-      _wmkf_request_value: 'request-1',
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_request_value: REQUEST_ID,
       wmkf_applicantdisposition: null,
     });
     const expiresAt = new Date(Date.now() + 60_000);
     mintAndStore.mockResolvedValue({ url: 'https://app.example/x', expiresAt, jti: 'jti-1' });
 
-    const req = createMockReq({ method: 'POST', body: { suggestionId: 'suggestion-1' } });
+    const req = createMockReq({ method: 'POST', body: { suggestionId: SUGGESTION_ID } });
     const res = createMockRes();
 
     await handler(req, res);
@@ -142,18 +148,30 @@ describe('/api/review-manager/regenerate-token', () => {
     mockAuthenticatedUser(2, ['review-manager']);
     // 100000001 = APPLICANT_DISPOSITION_EXCLUDED (lib/dataverse/adapters/reviewer-suggestion).
     DynamicsService.getRecord.mockResolvedValue({
-      wmkf_appreviewersuggestionid: 'suggestion-1',
-      _wmkf_request_value: 'request-1',
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_request_value: REQUEST_ID,
       wmkf_applicantdisposition: 100000001,
     });
 
-    const req = createMockReq({ method: 'POST', body: { suggestionId: 'suggestion-1' } });
+    const req = createMockReq({ method: 'POST', body: { suggestionId: SUGGESTION_ID } });
     const res = createMockRes();
 
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'excluded' });
+    expect(mintAndStore).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-GUID suggestionId with 400 before any Dataverse lookup', async () => {
+    mockAuthenticatedUser(2, ['review-manager']);
+    const req = createMockReq({ method: 'POST', body: { suggestionId: 'not-a-guid' } });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(DynamicsService.getRecord).not.toHaveBeenCalled();
     expect(mintAndStore).not.toHaveBeenCalled();
   });
 });
@@ -168,7 +186,7 @@ describe('/api/review-manager/revoke-token', () => {
 
   it('returns 401 when unauthenticated', async () => {
     mockUnauthenticated();
-    const req = createMockReq({ method: 'POST', body: { suggestionId: 'suggestion-1' } });
+    const req = createMockReq({ method: 'POST', body: { suggestionId: SUGGESTION_ID } });
     const res = createMockRes();
 
     await handler(req, res);
@@ -180,12 +198,12 @@ describe('/api/review-manager/revoke-token', () => {
   it('revokes a token for callers with review-manager access', async () => {
     mockAuthenticatedUser(3, ['review-manager']);
     revoke.mockResolvedValue(undefined);
-    const req = createMockReq({ method: 'POST', body: { suggestionId: 'suggestion-1' } });
+    const req = createMockReq({ method: 'POST', body: { suggestionId: SUGGESTION_ID } });
     const res = createMockRes();
 
     await handler(req, res);
 
-    expect(revoke).toHaveBeenCalledWith('suggestion-1', { actingUserSystemId: null });
+    expect(revoke).toHaveBeenCalledWith(SUGGESTION_ID, { actingUserSystemId: null });
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({ ok: true });
   });

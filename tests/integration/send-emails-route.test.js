@@ -63,6 +63,16 @@ jest.mock('../../lib/external/calendar-invite', () => ({ buildReviewHoldIcs: (..
 
 const { createMockReq, createMockRes } = require('../helpers/auth-mock');
 
+// send-emails GUID-validates each draft.suggestionId before it becomes a
+// findById record-id selector (S259 trust-boundary hardening), so suggestionId
+// fixtures must be GUID-shaped or the route 400s before the lane logic runs.
+// pr-1 / req-1 are server-derived (off the fetched suggestion), not client-supplied,
+// so they need no GUID shape. These four cover the single-row + batch cases.
+const SUG_1 = '11111111-1111-4111-8111-111111111111';
+const SUG_HELD = 'a1111111-1111-4111-8111-111111111111';
+const SUG_FRESH = 'b2222222-2222-4222-8222-222222222222';
+const SUG_MISSING = 'c3333333-3333-4333-8333-333333333333';
+
 // Mutable fixtures (reset per test). SUGGESTIONS is a map so batch tests can return
 // different rows / a missing row per suggestionId.
 let SUGGESTIONS;
@@ -73,7 +83,7 @@ let CYCLE_CONFIG;   // findByShortCode() → this (cycle materials live here)
 
 function baseSuggestion(over = {}) {
   return {
-    wmkf_appreviewersuggestionid: 'sug-1',
+    wmkf_appreviewersuggestionid: SUG_1,
     _wmkf_potentialreviewer_value: 'pr-1',
     _wmkf_request_value: 'req-1',
     wmkf_accepted: false,
@@ -112,7 +122,7 @@ beforeEach(() => {
   // the default so the degrade test's one-shot throw can't leak to a later test.
   buildReviewHoldIcs.mockReset();
   buildReviewHoldIcs.mockImplementation(() => ICS);
-  SUGGESTIONS = { 'sug-1': baseSuggestion() };
+  SUGGESTIONS = { [SUG_1]: baseSuggestion() };
   PERSON = basePerson();
   REQUEST = { akoya_requestid: 'req-1', akoya_requestnum: 'REQ-001', wmkf_meetingdate: '2026-07-01' };
   CYCLE_CODE = null;       // default: no cycle / no materials
@@ -140,7 +150,7 @@ async function run(body) {
   await handler(req, res);
   return res;
 }
-const draft = (id = 'sug-1') => ({ suggestionId: id, subject: 'S', body: 'B' });
+const draft = (id = SUG_1) => ({ suggestionId: id, subject: 'S', body: 'B' });
 
 describe('send-emails — hold calendar lane', () => {
   test('hold attaches ONLY the .ics — proposal materials are excluded even when the cycle HAS them', async () => {
@@ -167,14 +177,14 @@ describe('send-emails — hold calendar lane', () => {
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
     expect(attachmentsSent()).toEqual([]); // degraded: no .ics, no materials
     const r = resultOf(res);
-    expect(r.sent.map((s) => s.suggestionId)).toEqual(['sug-1']);
+    expect(r.sent.map((s) => s.suggestionId)).toEqual([SUG_1]);
     expect(r.failed).toEqual([]);
     expect(r.skipped).toEqual([]);
     expect(r.stats).toMatchObject({ sent: 1, failed: 0, skipped: 0, total: 1 });
   });
 
   test('hold to an ALREADY-INVITED row is skipped already_invited (no send)', async () => {
-    SUGGESTIONS = { 'sug-1': baseSuggestion({ wmkf_invited: true }) };
+    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_invited: true }) };
     const res = await run({ drafts: [draft()], templateType: 'hold' });
     expect(createAndSendEmail).not.toHaveBeenCalled();
     expect(updateLifecycle).not.toHaveBeenCalled();
@@ -192,7 +202,7 @@ describe('send-emails — hold calendar lane', () => {
 
   test('hold to a LOW-confidence address PROCEEDS when staff confirmed that recipient', async () => {
     PERSON = basePerson({ wmkf_emailsource: 'manual', wmkf_identitystatus: '' }); // LOW
-    const res = await run({ drafts: [draft()], templateType: 'hold', confirmedLowConfidenceIds: ['sug-1'] });
+    const res = await run({ drafts: [draft()], templateType: 'hold', confirmedLowConfidenceIds: [SUG_1] });
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
     expect(resultOf(res).stats.sent).toBe(1);
   });
@@ -202,13 +212,13 @@ describe('send-emails — materials strip gate (recipientMayReceiveAttachments, 
   beforeEach(() => { CYCLE_CODE = 'CYC'; CYCLE_CONFIG = MATERIALS_CYCLE; });
 
   test('materials send to an ACCEPTED reviewer carries the proposal material', async () => {
-    SUGGESTIONS = { 'sug-1': baseSuggestion({ wmkf_accepted: true }) };
+    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_accepted: true }) };
     await run({ drafts: [draft()], templateType: 'materials' });
     expect(filenamesSent()).toContain('proposal.pdf');
   });
 
   test('materials send to a NON-accepted reviewer is STRIPPED (no materials leak)', async () => {
-    SUGGESTIONS = { 'sug-1': baseSuggestion({ wmkf_accepted: false }) };
+    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_accepted: false }) };
     await run({ drafts: [draft()], templateType: 'materials' });
     expect(attachmentsSent()).toEqual([]); // materials existed but were stripped
   });
@@ -216,7 +226,7 @@ describe('send-emails — materials strip gate (recipientMayReceiveAttachments, 
 
 describe('send-emails — finalize held-eligibility gate', () => {
   test('finalize to a NON-held row is skipped not_held (no send, no lifecycle write)', async () => {
-    SUGGESTIONS = { 'sug-1': baseSuggestion({ wmkf_responsetype: null }) };
+    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_responsetype: null }) };
     const res = await run({ drafts: [draft()], templateType: 'finalize' });
     expect(createAndSendEmail).not.toHaveBeenCalled();
     expect(updateLifecycle).not.toHaveBeenCalled();
@@ -224,7 +234,7 @@ describe('send-emails — finalize held-eligibility gate', () => {
   });
 
   test('finalize to a HELD row sends, carries no .ics/materials, stamps emailSentAt only', async () => {
-    SUGGESTIONS = { 'sug-1': baseSuggestion({ wmkf_responsetype: 100000004 }) };
+    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_responsetype: 100000004 }) };
     const res = await run({ drafts: [draft()], templateType: 'finalize' });
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
     expect(attachmentsSent()).toEqual([]);
@@ -236,18 +246,18 @@ describe('send-emails — finalize held-eligibility gate', () => {
 describe('send-emails — partial-success batch', () => {
   test('mixed batch: held finalize sends, non-held skips not_held, missing row fails', async () => {
     SUGGESTIONS = {
-      'sug-held': baseSuggestion({ wmkf_appreviewersuggestionid: 'sug-held', wmkf_responsetype: 100000004 }),
-      'sug-fresh': baseSuggestion({ wmkf_appreviewersuggestionid: 'sug-fresh', wmkf_responsetype: null }),
-      // 'sug-missing' intentionally absent → findById returns null → failed
+      [SUG_HELD]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_HELD, wmkf_responsetype: 100000004 }),
+      [SUG_FRESH]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_FRESH, wmkf_responsetype: null }),
+      // SUG_MISSING intentionally absent → findById returns null → failed
     };
     const res = await run({
-      drafts: [draft('sug-held'), draft('sug-fresh'), draft('sug-missing')],
+      drafts: [draft(SUG_HELD), draft(SUG_FRESH), draft(SUG_MISSING)],
       templateType: 'finalize',
     });
     const r = resultOf(res);
-    expect(r.sent.map((s) => s.suggestionId)).toEqual(['sug-held']);
-    expect(r.skipped.map((s) => ({ id: s.suggestionId, reason: s.reason }))).toEqual([{ id: 'sug-fresh', reason: 'not_held' }]);
-    expect(r.failed.map((f) => f.suggestionId)).toEqual(['sug-missing']);
+    expect(r.sent.map((s) => s.suggestionId)).toEqual([SUG_HELD]);
+    expect(r.skipped.map((s) => ({ id: s.suggestionId, reason: s.reason }))).toEqual([{ id: SUG_FRESH, reason: 'not_held' }]);
+    expect(r.failed.map((f) => f.suggestionId)).toEqual([SUG_MISSING]);
     expect(r.stats).toMatchObject({ sent: 1, skipped: 1, failed: 1, total: 3 });
   });
 });
