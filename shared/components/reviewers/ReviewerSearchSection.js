@@ -997,6 +997,9 @@ export default function ReviewerSearchSection({
           hasCoauthorCOI: !!c.hasCoauthorCOI,
           coauthorCOIStrength: c.coauthorCOIStrength || null,
           coauthorships: Array.isArray(c.coauthorships) ? c.coauthorships : [],
+          hIndex: c.hIndex ?? enr.hIndex ?? null,
+          publicationCount5yr: c.publicationCount5yr ?? (Array.isArray(c.publications) ? c.publications.length : null),
+          seniorityEstimate: c.seniorityEstimate || null,
         };
       });
       const res = await fetch('/api/workbench/export-candidates', {
