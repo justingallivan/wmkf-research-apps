@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer email recovery (faculty-page fetch) + ORCID-name identity promotion (prod) (Session 265)
+
+**Milestone:** Two reviewer-finder capabilities shipped to prod, one of which **reverses the documented S235 zero-SSRF decision** as an opt-in. Reviewers were surfacing with no email (e.g. Argenti, Dudovich, Pfeifer) and prominent ORCID'd reviewers (e.g. Bucksbaum) were being dropped to `unresolved` when Claude omitted the institution.
+
+**Sessions:** 265. Each: design → Codex design review(s) → implement (Claude or Codex) → Codex/Claude review → deploy. 5 design docs, ~6 Codex passes.
+
+**Ship state:**
+- **Resolved-page email tier** (flag `REVIEWER_PAGE_EMAIL_TIER_ENABLED`, **set true in prod**): when a candidate has no email but a captured faculty/profile URL on their OpenAlex-verified institution domain, the server fetches + page-grounds the address (`safeFetchInstitutionPage` — host bound to `verifiedInstitutionDomain`, IPv6 private-IP block, **undici IP-pinning** for DNS-rebind, content-type/size/time caps; trust gate = page-grounding, not local-part name match; stamps HIGH-trust `emailSource='institution_page'`). **Reverses S235 "no server-side faculty-page fetch"** — now an opt-in; enforcement contract #7 + S235 design (superseded) + agent-wiki reconciled. Verified recovering correct emails in prod.
+- **ORCID-name-confirmed promotion** (not flag-gated): a spine-verified candidate goes `unresolved→probable` when the selected OpenAlex record's ORCID cross-source-agrees AND the ORCID profile's full given name confirms the forename — recovering the ORCID'd-but-vague-institution class without weakening the namesake gates (probable ceiling).
+- Confirmed (via temp instrumentation) that a missing known reviewer like Bucksbaum is **generation variance**, not verification — the real coverage lever is candidate count + multi-pass dedup, not the resolver.
+
+**Why it matters:** Recovers sendable emails that were previously blank (the email IS the product goal for outreach), and stops the verifier silently dropping world-class reviewers over institution-string noise. Discovery is the value — an un-surfaced qualified reviewer is a total loss.
+
+**Pointers:** `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`, `docs/REVIEWER_ORCID_NAME_PROMOTION_DESIGN.md`, `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` (#7), `docs/agent-wiki/topics/reviewer-identity.md`. Commits `6826aba1` → `c0561f6d` (email tier `ca5e54f1`/`c8078bc7`; ORCID `8e54a488`). Open: data-quality fixes designed not built (`docs/REVIEWER_GENERATION_DATA_QUALITY_DESIGN.md`); temp debug log live (revert).
+
 ## June 2026 — Applicant-suggested reviewers require explicit PD promotion (prod cutover + data migration) (Session 264)
 
 **Milestone:** Behavior cutover on live reviewer data. Applicant-named reviewers (the `wmkf_potentialreviewer1..5` slots) used to **auto-enter** the candidate pool on ingestion (`ensureApplicantRecommended` set `wmkf_selected=true`). They now require an explicit Program Director promotion, so "use applicant suggestions sparingly" is enforced by the tool, not by hand. Shipped alongside a cluster of Find-tab polish features.

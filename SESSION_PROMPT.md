@@ -1,108 +1,114 @@
-# Session 265 Prompt: Reviewer-email discovery investigation (first task)
+# Session 266 Prompt: Implement reviewer data-quality fixes; revert temp debug log
 
-> **GIT.** All S264 work is on `main` and pushed. Working tree clean. Everything below is
-> deployed to production EXCEPT it's all live as of session end (10 commits, all pushed).
-> **FIRST TASK S265:** diagnose why good Claude-discovered reviewers (e.g. Prof. Artem Rudenko,
-> request 1002794 / GUID `423eee92-1e35-f111-88b4-000d3a3065b8`) come back with no email.
+> **GIT.** All S265 work is on `main`. One commit (`c3e61b3d`, the data-quality design doc) is
+> **unpushed as of this writing** — push at the start of S266. Two features shipped to **prod** this
+> session (email tier + ORCID-promotion); a **temporary debug log is LIVE in prod and must be reverted**.
 
-## Session 264 — what happened
+## Session 265 — what happened
 
-A big reviewer-finder polish session: shipped the applicant-promotion model + 4 follow-on
-features, each Codex-reviewed and deployed. 10 commits, all live in prod.
+Started as the S265 "reviewer email-discovery investigation" and turned into a full design→Codex→ship
+loop for two features, plus diagnosis of why a known reviewer (Bucksbaum) wasn't surfacing.
 
-### Shipped + deployed (commit order)
+### Shipped + LIVE in production
+1. **Resolved-page email tier** — `ca5e54f1` (feat) + `c8078bc7` (Codex post-impl hardening).
+   When a candidate has no email but a captured faculty/profile URL on their OpenAlex-**verified**
+   institution domain, the server fetches + page-grounds the address. `safeFetchInstitutionPage`
+   (`lib/utils/safe-fetch.js`): HTTPS-only, host = exact-or-subdomain of `verifiedInstitutionDomain`,
+   DNS private/reserved-IP block (incl. IPv6), **undici IP-pinning** (closes DNS-rebind TOCTOU),
+   per-hop redirect re-validation, content-type+512KB+timeout caps. Trust gate = page-grounding
+   (`_selectGroundedEmail`: name-adjacency OR page-identity+URL-slug↔local-part, unique+forename-gated),
+   NOT `isNameConsistentEmail`. Stamps reserved HIGH-trust `emailSource='institution_page'`.
+   **Flag-gated `REVIEWER_PAGE_EMAIL_TIER_ENABLED` — set to `true` in prod (production env).** 3 Codex
+   passes (design ×2 + post-impl). **Verified working in prod**: recovered Argenti/Dudovich/Pfeifer
+   `institution_page` emails (2 spot-checked correct). Design: `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`.
+   **Reverses the S235 zero-SSRF decision as an opt-in** — reconciled enforcement contract #7 + the
+   S235 design (superseded) + agent-wiki + 2 plan docs.
+2. **ORCID-name-confirmed identity promotion** — `8e54a488`. Promotes a spine-verified candidate
+   `unresolved→probable` when the selected OpenAlex record's ORCID cross-source-agrees AND the ORCID
+   profile's full given name confirms the suggestion's forename. Recovers prominent ORCID'd reviewers
+   the verifier dropped when Claude omits/mismatches the institution. **NOT flag-gated — live on deploy.**
+   Codex design + Codex implementation; Claude-reviewed + verified (Bucksbaum null-inst→probable;
+   "Peter Bucksbaum" wrong-forename→abstain). Design: `docs/REVIEWER_ORCID_NAME_PROMOTION_DESIGN.md`.
 
-1. **`7aef1883`** — read-only probe `scripts/probe-applicant-selected-live-state.js` (pre-migration
-   safety check for the demotion).
-2. **`ad8e0299`** — **Applicant-suggested reviewers require explicit PD promotion.** Ingestion now
-   lands `wmkf_selected=false`; new `POST /api/workbench/promote-applicant-reviewer` (GUID-guarded,
-   ownership + disposition checks) flips it true. UI `applicant_suggested` section made selectable;
-   `saveSelected` partitions on provenance KIND and routes applicant rows to the promote endpoint.
-   New `findApplicantRecommendedByRequest`. Codex-reviewed (caught the `selected:true` return + the
-   shared-paper count bug, both fixed).
-3. **`99ca6e71`** — demotion migration script accepts explicit `--dry-run`.
-   **Migration RAN in prod:** all 54 applicant-recommended rows demoted to `selected=false`
-   (52 via `scripts/demote-applicant-suggested-reviewers.js --apply`; the 2 live-token rows on
-   request 423eee92 — Andreas Becker, Ahn-Thu Le — demoted **+ token-revoked** via a targeted op
-   after the user confirmed). Re-running the dry-run now shows 0 candidates (idempotent).
-4. **`dd5a5301`** — removed the confusing "Reviewer diversity" (temperature) slider; search runs at
-   the server default 0.3 (analyze.js + claude-reviewer-service both default to 0.3).
-5. **`024d0ff3` / `469e0989` / `f5131e24`** — **Excel export** of selected candidates:
-   `POST /api/workbench/export-candidates` → two-sheet `.xlsx` (Request Info + Candidates) via
-   `lib/services/reviewer-candidate-export.js` (ExcelJS). Columns: Name, Affiliation, Email, Source,
-   Why selected, Potential conflicts, ORCID iD, Google Scholar, h-index, 5-yr publications,
-   Seniority. Codex review fixed the conflict count (sum `paperCount`, not author count) + stale
-   exportError clear.
-6. **`ffec9186`** — **backfill 5-yr publication count** for applicant rows from the OpenAlex author
-   already resolved for h-index (`getWorksByAuthor`, same window as `DiscoveryService.YEARS_LOOKBACK`).
-   Fixes the false "0 publications" next to a real h-index (Paul Corkum → 69). Gated on
-   `blockScholar`. Codex-reviewed: clean GO.
-7. **`7ea7339f`** — when there's NO resolved bibliometric profile (null count + no pubs), the card
-   shows **"publication count unavailable"** instead of a misleading "0 publications". (A genuine
-   resolved-zero still shows "0".)
+### Diagnosis (no code, or design-only)
+3. **Email-discovery first task** — Rudenko "no email" = (a) no faculty page captured (only a Scholar
+   link, which the tier skips) + (b) multi-domain institution (`ksu.edu` page vs OpenAlex `k-state.edu`
+   → fetch correctly refused; documented v1 gap). Also fixed a **malformed `.env.local` CLAUDE_API_KEY**
+   (stray leading quote → local 401s; backup `.env.local.prefix-quote-bak`). Prod key was fine.
+4. **Bucksbaum not surfacing = GENERATION variance, not verification** — confirmed via a TEMP debug
+   log (`54cc5756`): the 15 generated names (incl. 3 Nobel laureates) simply didn't include him that
+   run. The ORCID-promotion fix is proven to surface him *when* generated. The real lever is generation
+   coverage (count + multi-pass dedup), not the resolver.
+5. **J27 filename-match framing corrected** — `c0561f6d`. The "filename-match WILL break in J27" claim
+   was unsubstantiated (Justin: no evidence; Connor pushed back). Reframed across the canonical memory
+   + 3 docs: filename-match is **fragile**; durable case for Dataverse legibility = structured storage,
+   strongest driver = auto-generated writeups need a structured home.
 
-### Also shipped (no separate item): applicant-enrichment caching — `e6dd4b2e`
+### Designed, Codex-reviewed, NOT implemented
+6. **Reviewer candidate data-quality fixes** — `c3e61b3d`, `docs/REVIEWER_GENERATION_DATA_QUALITY_DESIGN.md`.
+   Trigger: Kitzler-Zeiler shown as **"Prof."** (he's not) with a **co-author's paper PDF** as website.
+   Codex verdict **GO-WITH-CHANGES** (4 required changes — see next steps).
 
-**Applicant-suggested reviewers now persist + restore across reloads** instead of re-running the
-SSE enrichment every time. `enrich-recommended` persists each enriched row to `reviewer_find_roster`
-(via `recordSurfaced`) BEFORE emitting `complete`, stamped with `enrichedProposalKey`. On reload they
-restore via `rosterActive`. **Cache key = `doc.data.picked` (`library::folder::name`), NOT `blobUrl`**
-— `load-proposal` uploads with `addRandomSuffix:true`, so the blob URL changes every load. Same-file
-reload restores; a genuine re-pick changes the key → auto-re-enrich. Codex implemented to a
-Codex-reviewed plan; Claude reviewed the output (clean). `pruneCandidateForRoster` whitelist gained
-`enrichedProposalKey` + `suggestionId`; promote/exclude cleanup touch the roster.
+## Potential next steps for S266
 
-> **Note on first-load re-verify:** the user saw applicant rows re-verify on the first load after
-> deploy — EXPECTED (cold cache; that first run populates it). A second same-proposal reload should
-> restore instantly. If a plain same-proposal reload still re-verifies, that's a bug to investigate.
+### 1. Implement the data-quality fixes (design ready, Codex GO-WITH-CHANGES)
+Fold Codex's 4 changes into a rev-2 of `REVIEWER_GENERATION_DATA_QUALITY_DESIGN.md`, then implement:
+- **Fix 1:** `isUsefulWebsiteUrl` rejects document-file URLs via `new URL(url).pathname.toLowerCase()`
+  ending in `.pdf/.doc/.docx/.ppt(x)/.xls(x)/...` (try/catch malformed URLs).
+- **Fix 2:** sanitize the candidate website at `DiscoveryService.normalizeSuggestionSource` (the
+  confirmed single chokepoint) + defensively at BOTH merge points — `mergeEnrichment` (`e.website||c.website`)
+  AND `pruneCandidateForRoster` (`c.website||e.website`, opposite order). Note the suggestion `website`
+  key is **unverifiable from source** (prompt is in Dataverse) — defensive coverage.
+- **Fix 3:** `stripHonorifics` on the display name at `normalizeSuggestionSource` (safe — dedup +
+  verify already strip). Persisted Dataverse labels change (intentional).
+- **Fix 4 (Codex-found 4th leak):** `facultyPageUrl` goes through `isFacultyPageUrl`, which has NO
+  doc-extension gate — and the **new email tier fetches `facultyPageUrl`**, so a PDF there = a bad
+  fetch. Add the same reject. Cleanest as a shared `ContactParser.isDocumentUrl(url)` used by both.
+- Then Codex post-impl review.
 
-## Priority for S265
+### 2. Revert the temp debug log (`54cc5756`) — it's LIVE in prod
+The `[Discover API] S265 generated suggestion names: …` log in `pages/api/reviewer-finder/discover.js`.
+Justin asked to keep it during S265; remove + redeploy when done with generation experiments.
 
-### 1. FIRST TASK — diagnose reviewer-email discovery misses
-Good Claude-discovered reviewers come back with **no email** even when easy to find by hand.
-Concrete case: **Prof. Artem Rudenko**, request **1002794** (GUID `423eee92-1e35-f111-88b4-000d3a3065b8`).
-Roster blob: name `"Prof. Artem Rudenko"`, ORCID `0000-0002-9154-8463`, **email null**.
+### 3. Fix the "Run another search" slider bug
+The search-config panel (count slider, sources, notes, exclusions) only renders when
+`phase==='idle'||'error'` (`ReviewerSearchSection.js:1107`). "Run another search" (`:1325`) calls
+`runSearch` without returning to idle, so the **slider is hidden on re-runs**, and `reviewerCount`
+resets to `DEFAULT_REVIEWER_COUNT=15` on proposal reload (`:482`) — silently capping re-runs at 15
+(explains the 20→15 drift). Options: (a recommended) "Run another search" → reveal config panel
+(retain prior settings); (b) inline count control next to the button; (c) persist the count.
 
-Investigation already done (don't repeat): the **honorific is NOT the cause** — `stripHonorifics`
-is applied in `serp-contact-service` (Google/SerpAPI search), `orcid-service`, `openalex-service`,
-and inside `isNameConsistentEmail` itself (contact-parser.js:152). So "Prof." doesn't poison the
-search. The miss is the web-search email tiers not surfacing a usable address (ORCID doesn't expose
-emails; the wrong-person guard `isNameConsistentEmail` drops uncertain addresses for a tool that
-SENDS invitations).
+### 4. Generation coverage (the real Bucksbaum lever — bigger design)
+Per-run count is one lever (diminishing returns); multi-pass dedup already accumulates new names each
+"Run another search". A "comprehensive coverage" loop-until-dry mode would systematically exhaust the
+qualified pool instead of relying on lucky 15-name draws. Separate design.
 
-**Recommended approach (option 1 from the user discussion):** run a targeted enrichment for
-"Artem Rudenko / Kansas State" with tier-by-tier logging — did SerpAPI run / is it configured? did
-Claude web search return an email and was it dropped by the guard? — to find whether there's a real,
-fixable gap before changing enrichment logic. (Options 2/3 considered: strip honorifics at source =
-cosmetic, won't recover the email; manual-reviewer add = reliable per-case fallback.)
-Key files: `lib/services/contact-enrichment-service.js` (tier orchestration), `lib/services/serp-contact-service.js`,
-`lib/utils/contact-parser.js` (`isNameConsistentEmail`, `stripHonorifics`).
-
-### 2. Group B build — still blocked on Connor (unchanged)
-Connor's four inputs still needed (field names, Graph write, PA flow, prompt rows). See S262.
+### 5. Group B writeup-spine build — still blocked on Connor (unchanged from S264)
 
 ## Continuity guardrails
-- **Applicant promotion is LIVE** — applicant rows do NOT auto-enter the pool; PD promotion required.
-  Migration already run (all 54 demoted). Don't re-run it.
-- **`reviewer-finder` model namespace still live** — do NOT remove from `baseConfig.js`.
-- **Orphaned Codex process:** a `codex app-server` was left pointing at the deleted worktree
-  `.claude/worktrees/agent-a47a8626427139e8a` — harmless; quit/restart the Codex app to clear it.
+- **`REVIEWER_PAGE_EMAIL_TIER_ENABLED=true` is LIVE in prod** (production env var). Email tier active.
+- **ORCID-name promotion is LIVE and NOT flag-gated** — revert = code revert, no flag.
+- **Temp debug log is LIVE in prod** (`54cc5756`) — revert it (next step #2).
+- 1002794 roster: 5 `applicant_suggested` kept; Claude/proposal rows were cleared repeatedly for
+  testing (use `scripts/reset-request-reviewers.mjs` or the source_kind-scoped delete pattern; don't
+  hand-roll a full wipe). Applicant rows regenerate; don't drop them.
+- Push `c3e61b3d` first thing (unpushed).
 
 ## Key Files Reference
-
 | File | Role |
 |------|------|
-| `shared/components/reviewers/ReviewerSearchSection.js` | Find tab: candidate list, enrich, promote, export, cache gate |
-| `pages/api/workbench/enrich-recommended.js` | Applicant enrichment SSE + roster persist + 5-yr pub backfill |
-| `pages/api/workbench/promote-applicant-reviewer.js` | Explicit applicant→pool promotion |
-| `pages/api/workbench/export-candidates.js` + `lib/services/reviewer-candidate-export.js` | Excel export |
-| `lib/services/reviewer-roster-store.js` + `shared/components/reviewers/reviewer-search-logic.js` | Roster persist + `pruneCandidateForRoster` |
-| `lib/services/contact-enrichment-service.js` + `serp-contact-service.js` + `contact-parser.js` | **S265 first task — email discovery** |
-| `scripts/demote-applicant-suggested-reviewers.js` | One-time migration (already run; idempotent) |
+| `lib/utils/safe-fetch.js` | `safeFetchInstitutionPage` + host/IP guards (email tier) |
+| `lib/services/contact-enrichment-service.js` | `_attachEmailFromResolvedPage` / `_selectGroundedEmail` |
+| `lib/services/reviewer-identity-evidence.js` | spine anchors incl. new `orcid_name_confirmed` |
+| `lib/services/reviewer-identity-resolver.js` | `classifySpineEvidence` promotion paths |
+| `lib/utils/contact-parser.js` | `isUsefulWebsiteUrl`/`isFacultyPageUrl`/`stripHonorifics` (data-quality fixes) |
+| `lib/services/discovery-service.js` | `normalizeSuggestionSource` (data-quality ingestion chokepoint) |
+| `shared/components/reviewers/ReviewerSearchSection.js` | Find tab UI + the slider bug |
+| `pages/api/reviewer-finder/discover.js` | has the TEMP debug log to revert |
 
 ## Testing
 ```bash
 npm run build && npm run lint
-npm test                       # FULL suite (181 suites / 2539 tests as of S264)
-npm run check:api-routes && npm run check:trust-boundary-guid && npm run check:atlas && npm run check:agent-wiki && npm run check:fact-consistency
+npm test                       # FULL suite (~2584 tests as of S265)
+npm run check:api-routes && npm run check:atlas && npm run check:agent-wiki && npm run check:fact-consistency
 ```
