@@ -1,177 +1,108 @@
-# Session 264 Prompt: Applicant-suggested reviewer promotion spec ready for Codex review
+# Session 265 Prompt: Reviewer-email discovery investigation (first task)
 
-> **GIT.** All S263 work is on `main` (3 commits ahead of origin). Working tree clean.
-> Priority for S264: send the revised applicant-suggested promotion spec to Codex for review,
-> then discuss implementation. Group B build remains blocked on Connor's inputs.
+> **GIT.** All S264 work is on `main` and pushed. Working tree clean. Everything below is
+> deployed to production EXCEPT it's all live as of session end (10 commits, all pushed).
+> **FIRST TASK S265:** diagnose why good Claude-discovered reviewers (e.g. Prof. Artem Rudenko,
+> request 1002794 / GUID `423eee92-1e35-f111-88b4-000d3a3065b8`) come back with no email.
 
-## Session 263 — what happened
+## Session 264 — what happened
 
-Two feature streams plus a Codex review cycle.
+A big reviewer-finder polish session: shipped the applicant-promotion model + 4 follow-on
+features, each Codex-reviewed and deployed. 10 commits, all live in prod.
 
-### Stream 1 — S263: Applicant-suggested reviewers unified into main candidate list
+### Shipped + deployed (commit order)
 
-**Commits:** `c6a53045`, `c5d35163`, `1a8038e8`
+1. **`7aef1883`** — read-only probe `scripts/probe-applicant-selected-live-state.js` (pre-migration
+   safety check for the demotion).
+2. **`ad8e0299`** — **Applicant-suggested reviewers require explicit PD promotion.** Ingestion now
+   lands `wmkf_selected=false`; new `POST /api/workbench/promote-applicant-reviewer` (GUID-guarded,
+   ownership + disposition checks) flips it true. UI `applicant_suggested` section made selectable;
+   `saveSelected` partitions on provenance KIND and routes applicant rows to the promote endpoint.
+   New `findApplicantRecommendedByRequest`. Codex-reviewed (caught the `selected:true` return + the
+   shared-paper count bug, both fixed).
+3. **`99ca6e71`** — demotion migration script accepts explicit `--dry-run`.
+   **Migration RAN in prod:** all 54 applicant-recommended rows demoted to `selected=false`
+   (52 via `scripts/demote-applicant-suggested-reviewers.js --apply`; the 2 live-token rows on
+   request 423eee92 — Andreas Becker, Ahn-Thu Le — demoted **+ token-revoked** via a targeted op
+   after the user confirmed). Re-running the dry-run now shows 0 candidates (idempotent).
+4. **`dd5a5301`** — removed the confusing "Reviewer diversity" (temperature) slider; search runs at
+   the server default 0.3 (analyze.js + claude-reviewer-service both default to 0.3).
+5. **`024d0ff3` / `469e0989` / `f5131e24`** — **Excel export** of selected candidates:
+   `POST /api/workbench/export-candidates` → two-sheet `.xlsx` (Request Info + Candidates) via
+   `lib/services/reviewer-candidate-export.js` (ExcelJS). Columns: Name, Affiliation, Email, Source,
+   Why selected, Potential conflicts, ORCID iD, Google Scholar, h-index, 5-yr publications,
+   Seniority. Codex review fixed the conflict count (sum `paperCount`, not author count) + stale
+   exportError clear.
+6. **`ffec9186`** — **backfill 5-yr publication count** for applicant rows from the OpenAlex author
+   already resolved for h-index (`getWorksByAuthor`, same window as `DiscoveryService.YEARS_LOOKBACK`).
+   Fixes the false "0 publications" next to a real h-index (Paul Corkum → 69). Gated on
+   `blockScholar`. Codex-reviewed: clean GO.
+7. **`7ea7339f`** — when there's NO resolved bibliometric profile (null count + no pubs), the card
+   shows **"publication count unavailable"** instead of a misleading "0 publications". (A genuine
+   resolved-zero still shows "0".)
 
-- `enrich-recommended` now fires automatically (no manual button) once both `blobUrl` and
-  `recommended` slots are ready — gated on `recPhase === 'idle'` and `!recRunningRef.current`
-- Enriched applicant candidates (`recCandidates`) prepended into `displayCandidates` so they
-  surface in the `applicant_suggested` provenance section of the main unified candidate list
-- Applicant-suggested section is **read-only** (no checkbox) with note "Named by the applicant —
-  already in this request's candidate pool. Invite from the Invite tab."
-- Bottom card redesigned: status-only surface (no candidate list, no manual trigger, no Re-verify)
-- Removed Re-verify button intentionally (enrichment is static within a cycle; error recovery
-  via "Try again" only)
-- Bug: auto-trigger `useEffect` referenced `enrichRecommended` before its `useCallback`
-  declaration; fixed by moving the effect after the declaration (`1a8038e8`)
+### Also shipped (no separate item): applicant-enrichment caching — `e6dd4b2e`
 
-**Post-ship Codex review** found 4 bugs; all fixed in `c5d35163`:
-1. Done-message used `recCandidates.length` but `needsIdentification` candidates route to
-   `needs_identity_review`, not `applicant_suggested` — split into `recVerifiedCount` /
-   `recIdentityReviewCount`
-2. Blank status card when all recommendations are staff-removed — added "removed by staff" message
-3. Missing "not saved as candidates" pool-consequence in ingestion-failure banner — restored
-4. Pre-fetch `genRef` guard in `enrichRecommended` before the POST fires — added
+**Applicant-suggested reviewers now persist + restore across reloads** instead of re-running the
+SSE enrichment every time. `enrich-recommended` persists each enriched row to `reviewer_find_roster`
+(via `recordSurfaced`) BEFORE emitting `complete`, stamped with `enrichedProposalKey`. On reload they
+restore via `rosterActive`. **Cache key = `doc.data.picked` (`library::folder::name`), NOT `blobUrl`**
+— `load-proposal` uploads with `addRandomSuffix:true`, so the blob URL changes every load. Same-file
+reload restores; a genuine re-pick changes the key → auto-re-enrich. Codex implemented to a
+Codex-reviewed plan; Claude reviewed the output (clean). `pruneCandidateForRoster` whitelist gained
+`enrichedProposalKey` + `suggestionId`; promote/exclude cleanup touch the roster.
 
-**Wiki updated:** `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` — S263 section,
-auto-enrichment behavior, read-only hazard, recurring hazard note.
+> **Note on first-load re-verify:** the user saw applicant rows re-verify on the first load after
+> deploy — EXPECTED (cold cache; that first run populates it). A second same-proposal reload should
+> restore instantly. If a plain same-proposal reload still re-verifies, that's a bug to investigate.
 
-### Stream 2 — Applicant-suggested promotion redesign (spec, not yet built)
+## Priority for S265
 
-User identified pre-existing bug: applicant-suggested reviewers auto-promote into the candidate
-pool on ingestion (`ensureApplicantRecommended` CREATE sets `wmkf_selected = true`). They should
-require explicit PD promotion.
+### 1. FIRST TASK — diagnose reviewer-email discovery misses
+Good Claude-discovered reviewers come back with **no email** even when easy to find by hand.
+Concrete case: **Prof. Artem Rudenko**, request **1002794** (GUID `423eee92-1e35-f111-88b4-000d3a3065b8`).
+Roster blob: name `"Prof. Artem Rudenko"`, ORCID `0000-0002-9154-8463`, **email null**.
 
-**Codex spec review** surfaced two plan-breaking gaps (save path creates duplicate person records;
-`save-candidates` COI gate explicitly excludes applicant rows) and resolved all open decisions
-with user.
+Investigation already done (don't repeat): the **honorific is NOT the cause** — `stripHonorifics`
+is applied in `serp-contact-service` (Google/SerpAPI search), `orcid-service`, `openalex-service`,
+and inside `isNameConsistentEmail` itself (contact-parser.js:152). So "Prof." doesn't poison the
+search. The miss is the web-search email tiers not surfacing a usable address (ORCID doesn't expose
+emails; the wrong-person guard `isNameConsistentEmail` drops uncertain addresses for a tool that
+SENDS invitations).
 
-**Revised spec is written and ready for next Codex implementation review** — see below.
+**Recommended approach (option 1 from the user discussion):** run a targeted enrichment for
+"Artem Rudenko / Kansas State" with tier-by-tier logging — did SerpAPI run / is it configured? did
+Claude web search return an email and was it dropped by the guard? — to find whether there's a real,
+fixable gap before changing enrichment logic. (Options 2/3 considered: strip honorifics at source =
+cosmetic, won't recover the email; manual-reviewer add = reliable per-case fallback.)
+Key files: `lib/services/contact-enrichment-service.js` (tier orchestration), `lib/services/serp-contact-service.js`,
+`lib/utils/contact-parser.js` (`isNameConsistentEmail`, `stripHonorifics`).
 
----
-
-## Priority for S264
-
-### 1. Send revised spec to Codex for implementation review (FIRST TASK)
-
-Send the full revised spec (reproduced below) to Codex. Ask Codex to review for implementation
-correctness, flag any remaining gaps, and confirm it faithfully implements the user's intent
-before any code is written.
-
-### 2. Discuss implementation with user; then build
-
-After Codex review, present findings to user. Adjust spec if needed. Then build.
-
-### 3. Group B build — still blocked on Connor (unchanged)
-
-Connor's four inputs still needed before build can start (field names, Graph write, PA flow,
-prompt rows). See S262 section for details.
-
----
-
-## Revised Spec: Applicant-Suggested Reviewers — Explicit Promotion Required
-
-### User intent
-> "The applicant-suggested reviewers always get promoted to the candidates tab automatically.
-> This should not be the default behavior. That should only happen if a Program Director
-> requests it because we are supposed to use the applicant-suggest reviewers sparingly."
-
-Applicant-suggested reviewers must appear in the Find tab for PD review (enriched, with
-COI/bibliometrics) but must **not** enter the candidate pool or Invite tab until a PD explicitly
-selects them. Counts/rollups that depend on `wmkf_selected = true` will naturally exclude
-unpromoted rows — confirmed correct.
-
-### Layer 1 — Adapter: stop auto-selecting on create
-**File:** `lib/dataverse/adapters/reviewer-suggestion.js`
-- `ensureApplicantRecommended()` CREATE path (~line 395): `wmkf_selected = true` → `wmkf_selected = false`
-- UPDATE and race-condition paths already skip `wmkf_selected` — no change
-- "Never resurrect a staff-removed row" invariant preserved
-
-### Layer 2 — Adapter: new query for enrichment
-**File:** `lib/dataverse/adapters/reviewer-suggestion.js`
-- Add `findApplicantRecommendedByRequest(requestId)`:
-  filter `_wmkf_request_value eq {requestId} AND wmkf_applicantdisposition eq 100000000 AND {notExcludedFilter()}`
-  — no `wmkf_selected` constraint; same select fields as `findByRequest`
-
-**File:** `pages/api/workbench/enrich-recommended.js`
-- Replace `findByRequest(requestId, { selectedOnly: true })` → `findApplicantRecommendedByRequest(requestId)`
-- No other changes; enrichment writes (`researcherAdapter.upsertByPotentialReviewer`, `setMatchReason`) do not touch `wmkf_selected`
-
-### Layer 3 — applicant-reviewers.js + UI: drop `selected` field; fix recCount
-**File:** `pages/api/workbench/applicant-reviewers.js`
-- Remove `selected: result.selected !== false` from each row in `recommended` array
-  (field no longer has meaningful semantics; all new rows are `wmkf_selected = false`)
-
-**File:** `shared/components/reviewers/ReviewerSearchSection.js`
-- `recCount` (line 928): `recommended.filter((r) => r.selected !== false).length` → `recommended.length`
-- Auto-enrichment trigger: same filter expression → `recommended.length`
-- Remove "All applicant-suggested reviewers have been removed by staff." conditional
-- Remove "Removed by staff" pill from the applicant-reviewers card
-
-### Layer 4 — New promotion endpoint
-**File:** `pages/api/workbench/promote-applicant-reviewer.js` (new)
-- `POST { requestId, suggestionId }`
-- Auth: `requireAppAccess` (same guard as other workbench routes)
-- Validate `suggestionId` is a GUID
-- Fetch junction row by `suggestionId`; verify `_wmkf_request_value === requestId` (ownership)
-- Verify `wmkf_applicantdisposition === 100000000` (guard: only applicant rows)
-- PATCH `wmkf_selected = true` via `updateLifecycle(suggestionId, { selected: true })`
-- Return `{ success: true, suggestionId }`
-- Register in `docs/API_ROUTE_SECURITY_MATRIX.md`
-
-Rationale: sidesteps `save-candidates` COI gate (which has a comment explicitly excluding
-applicant rows) and avoids `upsertByEmail` → duplicate person record risk.
-
-### Layer 5 — UI: applicant_suggested section becomes selectable
-**File:** `shared/components/reviewers/ReviewerSearchSection.js`
-- Remove `applicant_suggested` from `readOnlySection`
-- Section note: → "Named by the applicant — select to add to this request's candidate pool."
-- Save handler: when saving selected candidates, detect `provenanceGroupOf(c) === 'applicant_suggested'`
-  and call `POST /api/workbench/promote-applicant-reviewer` with `{ requestId, suggestionId: c.suggestionId }`
-  instead of routing through `save-candidates`
-- On success: update local `recCandidates` to reflect promoted state
-
-### Layer 6 — One-time data migration script
-**File:** `scripts/demote-applicant-suggested-reviewers.js` (new)
-- Query all `wmkf_appreviewersuggestion` rows where `wmkf_applicantdisposition = 100000000`
-  AND `wmkf_selected = true`
-- PATCH each to `wmkf_selected = false` via `updateLifecycle`
-- Log count processed and failures; idempotent
-- Run **after** code deploy, **before** announcing to PDs
-- All-or-nothing confirmed safe: no PD has manually promoted any applicant-suggested reviewer
-
-### What does NOT change
-- `save-candidates.js` — untouched
-- `my-candidates.js` / Invite tab — untouched; unpromoted rows stay out naturally
-- `provenanceGroupOf` — untouched
-- Grant-cycle counts, proposal reviewer counts, rollups — unpromoted rows drop out (correct)
-- `needs_identity_review` routing — unchanged
-
----
+### 2. Group B build — still blocked on Connor (unchanged)
+Connor's four inputs still needed (field names, Graph write, PA flow, prompt rows). See S262.
 
 ## Continuity guardrails
-
-- **`reviewer-finder` model namespace still live** — do NOT remove from `baseConfig.js`
-- **API routes not touched** — dual-keyed routes stay until Connor confirms grant migration
-- **Triage is LIVE in prod** — `wmkf_triagestatus` is the signal
-- **S263 applicant_suggested section is currently read-only** — Layer 5 above will make it
-  selectable; do not add checkboxes before the promotion endpoint exists
+- **Applicant promotion is LIVE** — applicant rows do NOT auto-enter the pool; PD promotion required.
+  Migration already run (all 54 demoted). Don't re-run it.
+- **`reviewer-finder` model namespace still live** — do NOT remove from `baseConfig.js`.
+- **Orphaned Codex process:** a `codex app-server` was left pointing at the deleted worktree
+  `.claude/worktrees/agent-a47a8626427139e8a` — harmless; quit/restart the Codex app to clear it.
 
 ## Key Files Reference
 
 | File | Role |
 |------|------|
-| `shared/components/reviewers/ReviewerSearchSection.js` | S263 unified candidate list + status card |
-| `pages/api/workbench/enrich-recommended.js` | Applicant enrichment SSE endpoint |
-| `pages/api/workbench/applicant-reviewers.js` | Ingestion endpoint (materializes wmkf_potentialreviewer1..5 slots) |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | `ensureApplicantRecommended` + `findByRequest` + `updateLifecycle` |
-| `pages/api/reviewer-finder/save-candidates.js` | Normal save path — NOT to be used for applicant promotion |
-| `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` | S263 behavior documented here |
-| `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md` | Group B design doc (share with Connor) |
+| `shared/components/reviewers/ReviewerSearchSection.js` | Find tab: candidate list, enrich, promote, export, cache gate |
+| `pages/api/workbench/enrich-recommended.js` | Applicant enrichment SSE + roster persist + 5-yr pub backfill |
+| `pages/api/workbench/promote-applicant-reviewer.js` | Explicit applicant→pool promotion |
+| `pages/api/workbench/export-candidates.js` + `lib/services/reviewer-candidate-export.js` | Excel export |
+| `lib/services/reviewer-roster-store.js` + `shared/components/reviewers/reviewer-search-logic.js` | Roster persist + `pruneCandidateForRoster` |
+| `lib/services/contact-enrichment-service.js` + `serp-contact-service.js` + `contact-parser.js` | **S265 first task — email discovery** |
+| `scripts/demote-applicant-suggested-reviewers.js` | One-time migration (already run; idempotent) |
 
 ## Testing
 ```bash
 npm run build && npm run lint
-npm test                       # FULL suite
-npm run check:api-routes && npm run check:trust-boundary-guid
-npm run check:atlas && npm run check:agent-wiki
+npm test                       # FULL suite (181 suites / 2539 tests as of S264)
+npm run check:api-routes && npm run check:trust-boundary-guid && npm run check:atlas && npm run check:agent-wiki && npm run check:fact-consistency
 ```

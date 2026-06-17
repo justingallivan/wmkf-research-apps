@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Applicant-suggested reviewers require explicit PD promotion (prod cutover + data migration) (Session 264)
+
+**Milestone:** Behavior cutover on live reviewer data. Applicant-named reviewers (the `wmkf_potentialreviewer1..5` slots) used to **auto-enter** the candidate pool on ingestion (`ensureApplicantRecommended` set `wmkf_selected=true`). They now require an explicit Program Director promotion, so "use applicant suggestions sparingly" is enforced by the tool, not by hand. Shipped alongside a cluster of Find-tab polish features.
+
+**Sessions:** 264. Spec → 2 Codex review rounds → Codex build / Claude review → deploy → one-time data migration (Justin-triggered via local script).
+
+**Ship state:**
+- Ingestion lands `wmkf_selected=false`; new `POST /api/workbench/promote-applicant-reviewer` (GUID + ownership + disposition guarded) is the only path into the pool for applicant rows. UI `applicant_suggested` section is now selectable and routes to the promote endpoint by provenance KIND.
+- **Migration ran in prod:** all 54 applicant-recommended rows demoted to `selected=false` (52 inert via `scripts/demote-applicant-suggested-reviewers.js --apply`; 2 live-token rows demoted **+ token-revoked** after probe confirmed the spec's "all inert" assumption was false). Idempotent; re-run shows 0.
+- Four follow-on features, each Codex-reviewed + deployed: removed the temperature/"reviewer diversity" slider; **Excel export** of selected candidates (`/api/workbench/export-candidates`, two-sheet xlsx, 11 cols); **5-yr publication backfill** from OpenAlex (kills false "0 publications" next to a real h-index) + a "publication count unavailable" fallback; **applicant-enrichment caching** — enriched applicant rows persist to `reviewer_find_roster` keyed on the stable proposal file key (`doc.data.picked`, NOT the random-suffixed blob URL) so reloads restore instead of re-enriching.
+
+**Why it matters:** Stops a known over-promotion of applicant-named reviewers, and turns the Find tab from a re-search-every-reload surface into a persistent, shareable (Excel) candidate workbench.
+
+**Pointers:** `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` (S263/S264 flow + caching + export); `docs/atlas/dataverse-wmkf-appreviewersuggestion.md`, `docs/atlas/postgres-reviewer-find-roster.md`. Commits `7aef1883` → `7ea7339f` (10).
+
 ## June 2026 — Workbench triage field replaces the D26 allowlist (prod cutover) (Session 261)
 
 **Milestone:** Production cutover + deprecated-capability removal. The Workbench dashboard's "going-forward" subset was driven by a hand-maintained committed allowlist (`shared/config/d26Allowlist.js`, a D26-pilot throwaway). S261 replaced it with a real durable field — `wmkf_triagestatus` (Advancing / Set aside / null) on the **core `akoya_request`** entity — deployed to prod, backfilled, and wired through the dashboard read + a per-row write control. The allowlist is retired from live use.
