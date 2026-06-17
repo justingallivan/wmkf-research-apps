@@ -497,16 +497,6 @@ export default function ReviewerSearchSection({
     if (!excludeEditedRef.current) setExcludeText((excludedNames || []).join(', '));
   }, [excludedNames]);
 
-  // Auto-trigger applicant enrichment once both the proposal (blobUrl) and the
-  // ingested recommendations are ready. Runs independently of the Claude search —
-  // enrichment uses blobUrl directly for COI if no prior analysis result exists.
-  useEffect(() => {
-    const selectableCount = recommended.filter((r) => r.selected !== false).length;
-    if (blobUrl && selectableCount > 0 && recPhase === 'idle' && !recRunningRef.current) {
-      enrichRecommended();
-    }
-  }, [blobUrl, recommended, recPhase, enrichRecommended]);
-
   const pushProgress = useCallback((m) => {
     if (m) setProgress((p) => [...p.slice(-6), m]);
   }, []);
@@ -735,6 +725,17 @@ export default function ReviewerSearchSection({
       recRunningRef.current = false;
     }
   }, [blobUrl, requestId, analysis]);
+
+  // Auto-trigger applicant enrichment once both the proposal (blobUrl) and the
+  // ingested recommendations are ready. Runs independently of the Claude search —
+  // enrichment uses blobUrl directly for COI if no prior analysis result exists.
+  // Defined after enrichRecommended to avoid a temporal dead zone reference error.
+  useEffect(() => {
+    const selectableCount = recommended.filter((r) => r.selected !== false).length;
+    if (blobUrl && selectableCount > 0 && recPhase === 'idle' && !recRunningRef.current) {
+      enrichRecommended();
+    }
+  }, [blobUrl, recommended, recPhase, enrichRecommended]);
 
   // The selectable list = the durable active roster ∪ this run's results, deduped
   // by normalized name (run results win — freshest enrichment). Renders + ranks
