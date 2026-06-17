@@ -15,6 +15,8 @@ source_files:
   - pages/api/workbench/enrich-recommended.js
   - pages/api/workbench/applicant-reviewers.js
   - pages/api/workbench/promote-applicant-reviewer.js
+  - pages/api/workbench/export-candidates.js
+  - lib/services/reviewer-candidate-export.js
   - lib/services/reviewer-roster-store.js
 canonical_docs:
   - docs/APPLICATION_STATE_ATLAS.md
@@ -27,6 +29,8 @@ watch_paths:
   - pages/api/workbench/enrich-recommended.js
   - pages/api/workbench/applicant-reviewers.js
   - pages/api/workbench/promote-applicant-reviewer.js
+  - pages/api/workbench/export-candidates.js
+  - lib/services/reviewer-candidate-export.js
   - lib/services/reviewer-roster-store.js
 update_triggers:
   - reviewer workbench UX or lifecycle changes
@@ -62,6 +66,8 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 **Explicit promotion:** `/api/workbench/promote-applicant-reviewer` validates `requestId` and `suggestionId` as GUIDs, reads the existing suggestion, checks ownership (`_wmkf_request_value`) and `wmkf_applicantdisposition=Recommended`, then flips `wmkf_selected=true` via `updateLifecycle`. This avoids duplicate person upserts and bypasses the normal `save-candidates` COI path that intentionally excludes applicant-origin rows.
 
 **Status card:** The bottom card below the search is a status/progress/error surface only — no candidate list, no manual verify button. It shows ingestion state, enrichment progress while running, a done summary ("N verified — see Applicant-suggested section above"), or an error with a "Try again" button.
+
+**Export to Excel (S264):** A bottom-row "Export to Excel (N)" button (next to Save) exports the **selected** candidates via `POST /api/workbench/export-candidates`. The client sends a slim per-row DTO (same fields the card resolves — email/orcid/scholar fall back to `contactEnrichment`); the route fetches request metadata (number/institution/PI) authoritatively by `requestId` and streams back a two-sheet `.xlsx` (Request Info + Candidates). Column formatting (Source/Why/Conflicts/ORCID/Scholar) lives in `lib/services/reviewer-candidate-export.js` so the sheet and the cards agree. `needs_identity_review` rows aren't selectable, so they're naturally excluded. The "reviewer diversity"/temperature slider was removed the same cycle (search runs at the server default 0.3).
 
 **Re-verify removed intentionally:** The "Re-verify" button was dropped because enrichment output is static within a cycle (COI computed against a fixed proposal author list; PubMed/Scholar data stable over weeks). The only valid re-run use case is error recovery ("Try again"). Do not restore a general re-verify — if a re-resolve-after-edit pattern is ever needed, see the Future Work section in `reviewer-identity.md`.
 

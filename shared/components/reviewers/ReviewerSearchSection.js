@@ -432,6 +432,9 @@ export default function ReviewerSearchSection({
   const noSourcesSelected = !Object.values(searchSources).some(Boolean);
   const [reviewerCount, setReviewerCount] = useState(DEFAULT_REVIEWER_COUNT); // how many candidates Claude is asked to suggest (recall lever; see reviewerFinderPreferences)
   const [additionalNotes, setAdditionalNotes] = useState(''); // optional extra instructions for Claude
+  const [exporting, setExporting] = useState(false); // Excel export in flight
+  const [exportError, setExportError] = useState(null); // export-specific error (own surface; does not disturb search `error`/`phase`)
+  const exportingRef = useRef(false);
 
   // Applicant-recommended enrichment (separate flow from the search).
   const [recPhase, setRecPhase] = useState('idle'); // idle | running | done | error
@@ -459,7 +462,7 @@ export default function ReviewerSearchSection({
     genRef.current += 1; // invalidate any in-flight run
     const myGen = genRef.current;
     setPhase('idle'); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null);
-    setSelected(new Set()); setError(null); setErrorMeta(null); setSavedMsg(null); setEnrichNote(null);
+    setSelected(new Set()); setError(null); setErrorMeta(null); setSavedMsg(null); setEnrichNote(null); setExportError(null);
     setExcludedRemoved(0); setRosterNote(null);
     setRosterActive([]); setRosterExcluded([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false);
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
@@ -964,6 +967,67 @@ export default function ReviewerSearchSection({
     }
   }, [displayCandidates, selected, requestId, analysis, cycleCode, onSaved, pushProgress]);
 
+  // Export the SELECTED candidates to an Excel workbook (Request Info + Candidates
+  // sheets, built server-side). Slim DTO per row resolves the same fields the card
+  // shows (email/orcid/scholar fall back to contactEnrichment); the server fetches
+  // request metadata (number/institution/PI) authoritatively by requestId.
+  const exportSelected = useCallback(async () => {
+    if (exportingRef.current) return;
+    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isSelectable(c));
+    if (chosen.length === 0) return;
+    exportingRef.current = true;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const rows = chosen.map((c) => {
+        const enr = c.contactEnrichment || {};
+        const realScholar = c.googleScholarUrl || enr.googleScholarUrl || null;
+        return {
+          name: c.name,
+          affiliation: c.affiliation || null,
+          email: c.email || enr.email || null,
+          reasoning: c.reasoning || c.generatedReasoning || null,
+          isApplicantRecommended: !!c.isApplicantRecommended,
+          provenance: c.provenance || null,
+          orcidUrl: c.orcidUrl || enr.orcidUrl || null,
+          scholarUrl: realScholar || buildScholarSearchUrl(c.name, c.affiliation),
+          hasRealScholar: !!realScholar,
+          hasInstitutionCOI: !!c.hasInstitutionCOI,
+          institutionCOIDetails: c.institutionCOIDetails || null,
+          hasCoauthorCOI: !!c.hasCoauthorCOI,
+          coauthorCOIStrength: c.coauthorCOIStrength || null,
+          coauthorships: Array.isArray(c.coauthorships) ? c.coauthorships : [],
+        };
+      });
+      const res = await fetch('/api/workbench/export-candidates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, candidates: rows }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : 'reviewer-candidates.xlsx';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setExportError(e.message);
+    } finally {
+      exportingRef.current = false;
+      setExporting(false);
+    }
+  }, [displayCandidates, selected, requestId]);
+
   const busy = phase === 'running' || phase === 'saving';
   const onExcludeChange = (ev) => { excludeEditedRef.current = true; setExcludeText(ev.target.value); };
 
@@ -1209,8 +1273,20 @@ export default function ReviewerSearchSection({
                         >
                           Save {selected.size > 0 ? selected.size : ''} selected as candidates
                         </button>
+                        <button
+                          type="button"
+                          onClick={exportSelected}
+                          disabled={selected.size === 0 || exporting}
+                          title={selected.size === 0 ? 'Select candidates — or use Select all — to export' : undefined}
+                          className="px-4 py-2 bg-white text-gray-900 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {exporting ? 'Exporting…' : `Export ${selected.size > 0 ? selected.size : ''} to Excel`}
+                        </button>
                         <button type="button" onClick={runSearch} disabled={!blobUrl || busy || !rosterLoaded} className="text-sm text-gray-500 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Run another search</button>
                       </div>
+                      {exportError && (
+                        <p className="text-sm text-amber-700">Export failed: {exportError}</p>
+                      )}
                       <p className="text-xs text-gray-400">
                         Saved candidates join this request's pool and appear in the Invite tab once you invite and they accept. Excluded and already-surfaced candidates are skipped by the next search.
                       </p>

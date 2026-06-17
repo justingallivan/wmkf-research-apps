@@ -1,0 +1,102 @@
+/**
+ * @jest-environment node
+ *
+ * Reviewer-candidate Excel export — column formatting + workbook shape.
+ */
+
+import ExcelJS from 'exceljs';
+import {
+  buildReviewerCandidateWorkbook,
+  formatConflicts,
+  extractOrcidId,
+  whySelected,
+  sourceLabel,
+} from '../../lib/services/reviewer-candidate-export';
+
+describe('formatConflicts', () => {
+  it('reports none when there is no COI', () => {
+    expect(formatConflicts({})).toBe('None noted');
+  });
+  it('names the reviewer institution for an institution COI', () => {
+    expect(formatConflicts({ hasInstitutionCOI: true, institutionCOIDetails: { reviewerInstitution: 'MIT' } }))
+      .toBe('Institution COI: MIT');
+  });
+  it('grades coauthor overlap and counts shared papers', () => {
+    expect(formatConflicts({ hasCoauthorCOI: true, coauthorCOIStrength: 'possible', coauthorships: [1, 2] }))
+      .toBe('Co-author overlap (possible, 2 shared papers)');
+    expect(formatConflicts({ hasCoauthorCOI: true, coauthorships: [1] }))
+      .toBe('Co-author overlap (likely, 1 shared paper)');
+  });
+  it('joins multiple conflicts', () => {
+    const s = formatConflicts({ hasInstitutionCOI: true, hasCoauthorCOI: true, coauthorships: [] });
+    expect(s).toContain('Institution COI');
+    expect(s).toContain('Co-author overlap');
+  });
+});
+
+describe('extractOrcidId', () => {
+  it('pulls the bare iD from an orcid.org url', () => {
+    expect(extractOrcidId('https://orcid.org/0000-0002-1825-0097')).toBe('0000-0002-1825-0097');
+  });
+  it('handles the trailing-X checksum', () => {
+    expect(extractOrcidId('https://orcid.org/0000-0002-1825-009X')).toBe('0000-0002-1825-009X');
+  });
+  it('returns empty for nothing', () => {
+    expect(extractOrcidId(null)).toBe('');
+  });
+});
+
+describe('whySelected / sourceLabel', () => {
+  it('uses Claude reasoning when present', () => {
+    expect(whySelected({ reasoning: 'Leading expert in X.' })).toBe('Leading expert in X.');
+  });
+  it('falls back to applicant-named note', () => {
+    expect(whySelected({ isApplicantRecommended: true })).toBe('Named by the applicant');
+  });
+  it('labels applicant rows even without a provenance object', () => {
+    expect(sourceLabel({ isApplicantRecommended: true })).toBe('Applicant-suggested');
+  });
+});
+
+describe('buildReviewerCandidateWorkbook', () => {
+  it('produces a two-sheet workbook with metadata + candidate rows', async () => {
+    const buf = await buildReviewerCandidateWorkbook({
+      meta: {
+        requestNumber: '1002836',
+        institution: 'Stanford University',
+        pi: 'Jane Smith',
+        exportedDate: '2026-06-16',
+      },
+      candidates: [
+        {
+          name: 'Dr A',
+          affiliation: 'MIT',
+          email: 'a@mit.edu',
+          reasoning: 'Expert in catalysis.',
+          orcidUrl: 'https://orcid.org/0000-0002-1825-0097',
+          scholarUrl: 'https://scholar.google.com/citations?user=abc',
+          hasRealScholar: true,
+          hasInstitutionCOI: true,
+          institutionCOIDetails: { reviewerInstitution: 'Stanford University' },
+        },
+        { name: 'Dr B', isApplicantRecommended: true },
+      ],
+    });
+    expect(Buffer.isBuffer(buf)).toBe(true);
+
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+    expect(wb.getWorksheet('Request Info')).toBeTruthy();
+    const sheet = wb.getWorksheet('Candidates');
+    expect(sheet).toBeTruthy();
+    // header + 2 data rows
+    expect(sheet.rowCount).toBe(3);
+    expect(sheet.getRow(1).getCell(1).value).toBe('Reviewer name');
+    expect(sheet.getRow(2).getCell(1).value).toBe('Dr A');
+    // conflicts column composed
+    const conflictsCol = sheet.getRow(2).getCell(6).value;
+    expect(String(conflictsCol)).toContain('Institution COI: Stanford University');
+    // applicant row gets the named-by note
+    expect(sheet.getRow(3).getCell(5).value).toBe('Named by the applicant');
+  });
+});
