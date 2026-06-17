@@ -166,7 +166,13 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
   const reason = c.reasoning || c.generatedReasoning || null;
   const provenanceLabel = provenanceLabelForCandidate(c);
   const pubs = Array.isArray(c.publications) ? c.publications : [];
-  const pubCount = c.publicationCount5yr || pubs.length || 0;
+  // Distinguish "0 publications" (a resolved profile with genuinely no recent
+  // works) from "no bibliometric data" (the OpenAlex author never resolved —
+  // e.g. an applicant-named person whose typed name doesn't match their
+  // publishing name). For the latter, publicationCount5yr is null and there are
+  // no pubs, so show "publication count unavailable" rather than a misleading 0.
+  const hasPubCount = Number.isFinite(c.publicationCount5yr) || pubs.length > 0;
+  const pubCount = Number.isFinite(c.publicationCount5yr) ? c.publicationCount5yr : pubs.length;
   // Track-B candidate surfaced below the minimum-publication bar (S238) — a warning,
   // not a drop: the count can be undercounted when dedup collapses a preprint + its
   // published version of the same work.
@@ -297,7 +303,7 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
               <span className={hasAnyMismatch ? 'text-orange-500' : isLowConfidence ? 'text-amber-500' : isWeakMatch ? 'text-yellow-600' : 'text-green-500'}>
                 {hasAnyMismatch || isLowConfidence ? '⚠' : isWeakMatch ? '⚡' : '✓'}
               </span>
-              {pubCount} publications
+              {hasPubCount ? `${pubCount} publications` : 'publication count unavailable'}
               {confidence !== undefined && <span className="text-gray-400">({Math.round(confidence * 100)}% expertise match)</span>}
             </span>
             {!identityUnverified && hIndex != null && <span>· h-index {hIndex}</span>}
