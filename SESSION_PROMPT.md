@@ -1,108 +1,177 @@
-# Session 263 Prompt: Reviewer retirement done — Group B writeup spine designed, waiting on Connor
+# Session 264 Prompt: Applicant-suggested reviewer promotion spec ready for Codex review
 
-> **GIT.** All S262 work is on `main`. Working tree clean, all gates green (2520 tests passing).
-> Reviewer Finder / Review Manager retirement shipped. Group B design doc created; build blocked
-> pending Connor's Dataverse + Azure AD inputs. Graph API write-access probe script ready to run.
+> **GIT.** All S263 work is on `main` (3 commits ahead of origin). Working tree clean.
+> Priority for S264: send the revised applicant-suggested promotion spec to Codex for review,
+> then discuss implementation. Group B build remains blocked on Connor's inputs.
 
-## Session 262 — what happened
+## Session 263 — what happened
 
-Two streams completed:
+Two feature streams plus a Codex review cycle.
 
-### Stream 1 — Reviewer Finder / Review Manager retirement (`94bbbce4`)
+### Stream 1 — S263: Applicant-suggested reviewers unified into main candidate list
 
-- Live grant probe (`scripts/probe-reviewer-legacy-grants.js`) confirmed no legacy-only users
-- Deleted `pages/reviewer-finder.js` and `pages/review-manager.js`
-- Removed `reviewer-finder` and `review-manager` from `appRegistry.js` and `guideContent.js`
-- Removed `review-manager` model config from `baseConfig.js`; **kept `reviewer-finder`** (Workbench
-  reviewer-pipeline services still call `getModelForApp('reviewer-finder')`)
-- Removed `'review-manager': 'Review Manager'` display-name from `pages/admin.js`; preserved legacy
-  grant display so admin UI doesn't accidentally revoke them via "All" toggles
-- Reconciled `CANONICAL_COUNTS.md` (18→16 apps) and `reviewer-workbench-lifecycle.md` watch_paths
-- All gates green; `reviewer-finder`/`review-manager` keys remain in `requireAppAccess(...)` calls in
-  API routes (deferred until grant migration confirmed via Connor)
+**Commits:** `c6a53045`, `c5d35163`, `1a8038e8`
 
-### Stream 2 — Group B writeup spine design
+- `enrich-recommended` now fires automatically (no manual button) once both `blobUrl` and
+  `recommended` slots are ready — gated on `recPhase === 'idle'` and `!recRunningRef.current`
+- Enriched applicant candidates (`recCandidates`) prepended into `displayCandidates` so they
+  surface in the `applicant_suggested` provenance section of the main unified candidate list
+- Applicant-suggested section is **read-only** (no checkbox) with note "Named by the applicant —
+  already in this request's candidate pool. Invite from the Invite tab."
+- Bottom card redesigned: status-only surface (no candidate list, no manual trigger, no Re-verify)
+- Removed Re-verify button intentionally (enrichment is static within a cycle; error recovery
+  via "Try again" only)
+- Bug: auto-trigger `useEffect` referenced `enrichRecommended` before its `useCallback`
+  declaration; fixed by moving the effect after the declaration (`1a8038e8`)
 
-- Created `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md` — full design document for sharing with Connor
-- Created `scripts/probe-graph-write-access.mjs` — tests whether Azure AD app registration has
-  SharePoint write access via Graph API
+**Post-ship Codex review** found 4 bugs; all fixed in `c5d35163`:
+1. Done-message used `recCandidates.length` but `needsIdentification` candidates route to
+   `needs_identity_review`, not `applicant_suggested` — split into `recVerifiedCount` /
+   `recIdentityReviewCount`
+2. Blank status card when all recommendations are staff-removed — added "removed by staff" message
+3. Missing "not saved as candidates" pool-consequence in ingestion-failure banner — restored
+4. Pre-fetch `genRef` guard in `enrichRecommended` before the POST fires — added
 
-**Architecture agreed:**
-- SharePoint holds Word doc, Dataverse holds URL pointer (`wmkf_ai_initialwriteupurl`,
-  `wmkf_ai_presitevisitwriteupurl` on `akoya_request`)
-- D26 posture: Initial Writeups done manually (no backfill → Initial Writeup tab shows empty state
-  for D26); Pre-Site-Visit NOT started → **build and use new system for D26 as pilot**
-- Generation flows: D26 Pre-Site-Visit staff-triggered from Workbench tab; J27+ Initial Writeup
-  PA auto-triggered on triage=Advancing
-- Executive dashboard (`executive-review` app key) — separate editorial surface for leadership:
-  queries Advancing requests, shows writeup content via Graph API + Open in Word link
-- Prompts must migrate from `.js` files to `wmkf_ai_prompt` before building
-  (`phase-i-writeup.js` → `writeup.initial`; `proposal-summarizer.js` → `writeup.pre-site-visit`)
+**Wiki updated:** `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` — S263 section,
+auto-enrichment behavior, read-only hazard, recurring hazard note.
 
-**Connor's inputs needed before build can start:**
-1. Confirm field names (`wmkf_ai_initialwriteupurl`, `wmkf_ai_presitevisitwriteupurl`) and add to Dataverse
-2. Confirm Graph API write access (or grant `Files.ReadWrite` / `Sites.ReadWrite.All` in Azure AD)
-3. PA flow design for J27 auto-generation (write Word → SharePoint → URL writeback)
-4. Author `writeup.initial` and `writeup.pre-site-visit` prompt rows in `wmkf_ai_prompt`
+### Stream 2 — Applicant-suggested promotion redesign (spec, not yet built)
 
-## Potential Next Steps
+User identified pre-existing bug: applicant-suggested reviewers auto-promote into the candidate
+pool on ingestion (`ensureApplicantRecommended` CREATE sets `wmkf_selected = true`). They should
+require explicit PD promotion.
 
-### 1. ~~**Run the Graph API write-access probe.**~~ **CONFIRMED 2026-06-16.**
-`node scripts/probe-graph-write-access.mjs 1002788` — upload + delete sentinel succeeded.
-D26 Pre-Site-Visit tab can write Word docs to SharePoint directly. No fallback needed.
+**Codex spec review** surfaced two plan-breaking gaps (save path creates duplicate person records;
+`save-candidates` COI gate explicitly excludes applicant rows) and resolved all open decisions
+with user.
 
-### 2. **Share `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md` with Connor.**
-Send him the design doc (or paste into Teams/email). Open questions for him are in the final
-section of the doc. Block until he responds on the four inputs above.
+**Revised spec is written and ready for next Codex implementation review** — see below.
 
-### 3. **Group B build** (after Connor confirms prerequisites — in order):
-1. Connor adds `wmkf_ai_initialwriteupurl` and `wmkf_ai_presitevisitwriteupurl` to `akoya_request`
-2. Connor authors `writeup.initial` and `writeup.pre-site-visit` prompt rows in `wmkf_ai_prompt`
-3. Update `pages/api/workbench/resolve-request.js` to return both URL fields in `aiContent`
-4. Build `shared/components/workbench/InitialWriteupTab.js` — URL→fetch→preview + Open in Word
-   (empty state only for D26 since Initial Writeups done manually)
-5. Build `shared/components/workbench/PreSiteVisitWriteupTab.js` — same pattern + Generate draft
-   button calling Executor with `writeup.pre-site-visit` prompt row; writes output to SharePoint;
-   stores URL back in Dataverse; URL capture fallback if write access unavailable
-6. Wire both tabs into `pages/workbench/[requestId].js` (placeholder slots already exist)
-7. Build Executive Dashboard (`executive-review` app key, separate page)
-8. Update `pages/api/process-phase-i-writeup.js` (and related routes) to add `'reviewers'` to
-   `requireAppAccess(...)` so Workbench users can reach them
+---
 
-### 4. **Triage future refinements (low urgency — unchanged from S261).**
-- Principled cycle-default via `reviewDeadline` / `isActive` (currently defaults to latest PD cycle)
-- PA-trigger run-history spot-check on bulk backfill
-- J27 triage-lens expansion
+## Priority for S264
+
+### 1. Send revised spec to Codex for implementation review (FIRST TASK)
+
+Send the full revised spec (reproduced below) to Codex. Ask Codex to review for implementation
+correctness, flag any remaining gaps, and confirm it faithfully implements the user's intent
+before any code is written.
+
+### 2. Discuss implementation with user; then build
+
+After Codex review, present findings to user. Adjust spec if needed. Then build.
+
+### 3. Group B build — still blocked on Connor (unchanged)
+
+Connor's four inputs still needed before build can start (field names, Graph write, PA flow,
+prompt rows). See S262 section for details.
+
+---
+
+## Revised Spec: Applicant-Suggested Reviewers — Explicit Promotion Required
+
+### User intent
+> "The applicant-suggested reviewers always get promoted to the candidates tab automatically.
+> This should not be the default behavior. That should only happen if a Program Director
+> requests it because we are supposed to use the applicant-suggest reviewers sparingly."
+
+Applicant-suggested reviewers must appear in the Find tab for PD review (enriched, with
+COI/bibliometrics) but must **not** enter the candidate pool or Invite tab until a PD explicitly
+selects them. Counts/rollups that depend on `wmkf_selected = true` will naturally exclude
+unpromoted rows — confirmed correct.
+
+### Layer 1 — Adapter: stop auto-selecting on create
+**File:** `lib/dataverse/adapters/reviewer-suggestion.js`
+- `ensureApplicantRecommended()` CREATE path (~line 395): `wmkf_selected = true` → `wmkf_selected = false`
+- UPDATE and race-condition paths already skip `wmkf_selected` — no change
+- "Never resurrect a staff-removed row" invariant preserved
+
+### Layer 2 — Adapter: new query for enrichment
+**File:** `lib/dataverse/adapters/reviewer-suggestion.js`
+- Add `findApplicantRecommendedByRequest(requestId)`:
+  filter `_wmkf_request_value eq {requestId} AND wmkf_applicantdisposition eq 100000000 AND {notExcludedFilter()}`
+  — no `wmkf_selected` constraint; same select fields as `findByRequest`
+
+**File:** `pages/api/workbench/enrich-recommended.js`
+- Replace `findByRequest(requestId, { selectedOnly: true })` → `findApplicantRecommendedByRequest(requestId)`
+- No other changes; enrichment writes (`researcherAdapter.upsertByPotentialReviewer`, `setMatchReason`) do not touch `wmkf_selected`
+
+### Layer 3 — applicant-reviewers.js + UI: drop `selected` field; fix recCount
+**File:** `pages/api/workbench/applicant-reviewers.js`
+- Remove `selected: result.selected !== false` from each row in `recommended` array
+  (field no longer has meaningful semantics; all new rows are `wmkf_selected = false`)
+
+**File:** `shared/components/reviewers/ReviewerSearchSection.js`
+- `recCount` (line 928): `recommended.filter((r) => r.selected !== false).length` → `recommended.length`
+- Auto-enrichment trigger: same filter expression → `recommended.length`
+- Remove "All applicant-suggested reviewers have been removed by staff." conditional
+- Remove "Removed by staff" pill from the applicant-reviewers card
+
+### Layer 4 — New promotion endpoint
+**File:** `pages/api/workbench/promote-applicant-reviewer.js` (new)
+- `POST { requestId, suggestionId }`
+- Auth: `requireAppAccess` (same guard as other workbench routes)
+- Validate `suggestionId` is a GUID
+- Fetch junction row by `suggestionId`; verify `_wmkf_request_value === requestId` (ownership)
+- Verify `wmkf_applicantdisposition === 100000000` (guard: only applicant rows)
+- PATCH `wmkf_selected = true` via `updateLifecycle(suggestionId, { selected: true })`
+- Return `{ success: true, suggestionId }`
+- Register in `docs/API_ROUTE_SECURITY_MATRIX.md`
+
+Rationale: sidesteps `save-candidates` COI gate (which has a comment explicitly excluding
+applicant rows) and avoids `upsertByEmail` → duplicate person record risk.
+
+### Layer 5 — UI: applicant_suggested section becomes selectable
+**File:** `shared/components/reviewers/ReviewerSearchSection.js`
+- Remove `applicant_suggested` from `readOnlySection`
+- Section note: → "Named by the applicant — select to add to this request's candidate pool."
+- Save handler: when saving selected candidates, detect `provenanceGroupOf(c) === 'applicant_suggested'`
+  and call `POST /api/workbench/promote-applicant-reviewer` with `{ requestId, suggestionId: c.suggestionId }`
+  instead of routing through `save-candidates`
+- On success: update local `recCandidates` to reflect promoted state
+
+### Layer 6 — One-time data migration script
+**File:** `scripts/demote-applicant-suggested-reviewers.js` (new)
+- Query all `wmkf_appreviewersuggestion` rows where `wmkf_applicantdisposition = 100000000`
+  AND `wmkf_selected = true`
+- PATCH each to `wmkf_selected = false` via `updateLifecycle`
+- Log count processed and failures; idempotent
+- Run **after** code deploy, **before** announcing to PDs
+- All-or-nothing confirmed safe: no PD has manually promoted any applicant-suggested reviewer
+
+### What does NOT change
+- `save-candidates.js` — untouched
+- `my-candidates.js` / Invite tab — untouched; unpromoted rows stay out naturally
+- `provenanceGroupOf` — untouched
+- Grant-cycle counts, proposal reviewer counts, rollups — unpromoted rows drop out (correct)
+- `needs_identity_review` routing — unchanged
+
+---
 
 ## Continuity guardrails
 
-- **`reviewer-finder` model namespace is still live** — do NOT remove from `baseConfig.js`. The
-  Workbench reviewer pipeline services (`lib/services/claude-reviewer-service.js:94`,
-  `lib/services/reviewer-exclusion-parser.js:148`) call `getModelForApp('reviewer-finder')`.
-- **API routes not touched** — `pages/api/reviewer-finder/*` and `pages/api/review-manager/*` are
-  still dual-keyed. Do not remove legacy keys from `requireAppAccess(...)` until Connor confirms
-  all grant holders have `reviewers`.
-- **Triage is LIVE in prod** — `wmkf_triagestatus` is the signal; `d26Allowlist.js` retired-in-place.
-- `git gc.log` warning still printing on commits (unreachable loose objects) — `git prune` not yet run.
+- **`reviewer-finder` model namespace still live** — do NOT remove from `baseConfig.js`
+- **API routes not touched** — dual-keyed routes stay until Connor confirms grant migration
+- **Triage is LIVE in prod** — `wmkf_triagestatus` is the signal
+- **S263 applicant_suggested section is currently read-only** — Layer 5 above will make it
+  selectable; do not add checkboxes before the promotion endpoint exists
 
-## Key Files Reference (S262)
+## Key Files Reference
 
 | File | Role |
 |------|------|
-| `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md` | Full writeup spine design doc (share with Connor) |
-| `scripts/probe-graph-write-access.mjs` | Tests Graph API write access; requires requestId from Workbench URL |
-| `scripts/probe-reviewer-legacy-grants.js` | Read-only grant check (already ran; no legacy-only users) |
-| `shared/config/appRegistry.js` | reviewer-finder / review-manager entries removed |
-| `shared/config/baseConfig.js` | reviewer-finder model config KEPT (Workbench callers); review-manager removed |
-| `pages/workbench/[requestId].js` | Placeholder tab slots: `initial-writeup`, `pre-site-visit`, `final-writeup` |
-| `lib/services/graph-service.js` | `uploadFile()` / `deleteFile()` already implemented |
-| `lib/utils/sharepoint-buckets.js` | `getRequestSharePointBuckets()` resolves folder via sharepointdocumentlocations |
+| `shared/components/reviewers/ReviewerSearchSection.js` | S263 unified candidate list + status card |
+| `pages/api/workbench/enrich-recommended.js` | Applicant enrichment SSE endpoint |
+| `pages/api/workbench/applicant-reviewers.js` | Ingestion endpoint (materializes wmkf_potentialreviewer1..5 slots) |
+| `lib/dataverse/adapters/reviewer-suggestion.js` | `ensureApplicantRecommended` + `findByRequest` + `updateLifecycle` |
+| `pages/api/reviewer-finder/save-candidates.js` | Normal save path — NOT to be used for applicant promotion |
+| `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` | S263 behavior documented here |
+| `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md` | Group B design doc (share with Connor) |
 
 ## Testing
 ```bash
 npm run build && npm run lint
-npm test                       # FULL suite — not a subset (feedback-green-requires-full-test-suite)
-npm run check:trust-boundary-guid && npm run check:api-routes && npm run check:fact-consistency
-npm run check:status-enum-parity && npm run check:atlas
-node scripts/probe-graph-write-access.mjs 1002788        # CONFIRMED 2026-06-16 — write access verified
+npm test                       # FULL suite
+npm run check:api-routes && npm run check:trust-boundary-guid
+npm run check:atlas && npm run check:agent-wiki
 ```
