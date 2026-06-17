@@ -33,6 +33,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   __esModule: true,
   upsert: jest.fn(async () => ({ id: 'S1' })),
   findByRequest: jest.fn(async () => []),
+  findApplicantRecommendedByRequest: jest.fn(async () => []),
   setMatchReason: jest.fn(async () => undefined),
   APPLICANT_DISPOSITION_MAP: { recommended: 100000000 },
 }));
@@ -345,7 +346,7 @@ describe('enrich-recommended route — identity gate + clear-on-downgrade', () =
   beforeEach(() => {
     jest.clearAllMocks();
     // one applicant-recommended junction row pointing at PID-1
-    reviewerSuggestionAdapter.findByRequest.mockResolvedValue([{
+    reviewerSuggestionAdapter.findApplicantRecommendedByRequest.mockResolvedValue([{
       wmkf_applicantdisposition: 100000000,
       _wmkf_potentialreviewer_value: 'PID-1',
       _wmkf_potentialreviewer_value_formatted: 'Dr X',

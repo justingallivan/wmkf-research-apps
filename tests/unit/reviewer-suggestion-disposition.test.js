@@ -23,6 +23,7 @@ const {
   isExcluded,
   findById,
   findByRequest,
+  findApplicantRecommendedByRequest,
   upsert,
   updateLifecycle,
   ensureApplicantRecommended,
@@ -111,6 +112,23 @@ describe('list readers carry the disposition guard', () => {
     expect(filter).toContain('wmkf_selected eq true');
     expect(filter).toContain(notExcludedFilter());
   });
+
+  test('findApplicantRecommendedByRequest rejects non-GUID request ids', async () => {
+    await expect(findApplicantRecommendedByRequest('not-a-guid')).rejects.toThrow(/requestId must be a GUID/);
+    expect(DynamicsService.queryRecords).not.toHaveBeenCalled();
+  });
+
+  test('findApplicantRecommendedByRequest filters by recommended disposition without selected constraint', async () => {
+    await findApplicantRecommendedByRequest(REQUEST_ID);
+    const query = DynamicsService.queryRecords.mock.calls[0][1];
+    expect(query.filter).toContain(`_wmkf_request_value eq ${REQUEST_ID}`);
+    expect(query.filter).toContain('wmkf_applicantdisposition eq 100000000');
+    expect(query.filter).toContain(notExcludedFilter());
+    expect(query.filter).not.toContain('wmkf_selected');
+    expect(query.select).toContain('wmkf_appreviewersuggestionid');
+    expect(query.orderby).toBe('createdon desc');
+    expect(query.top).toBe(200);
+  });
 });
 
 describe('updateLifecycle stamps close-out timestamps on EVERY complete transition', () => {
@@ -182,7 +200,7 @@ describe('updateLifecycle fails closed on excluded rows for EVERY write', () => 
 });
 
 describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
-  test('creates a recommended, selected, applicant-sourced row when none exists', async () => {
+  test('creates a recommended, unselected, applicant-sourced row when none exists', async () => {
     DynamicsService.queryRecords.mockResolvedValue({ records: [] });
 
     const result = await ensureApplicantRecommended({
@@ -194,9 +212,9 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
       matchReason: 'Recommended by applicant (legacy reviewer slot).',
     });
 
-    expect(result).toEqual({ id: SUGGESTION_ID, created: true, selected: true });
+    expect(result).toEqual({ id: SUGGESTION_ID, created: true, selected: false });
     const payload = DynamicsService.createRecord.mock.calls[0][1];
-    expect(payload.wmkf_selected).toBe(true);
+    expect(payload.wmkf_selected).toBe(false);
     expect(payload.wmkf_applicantdisposition).toBe(APPLICANT_DISPOSITION_MAP.recommended);
     expect(payload.wmkf_sources).toBe('applicant');
     expect(payload['wmkf_PotentialReviewer@odata.bind']).toContain(PR_ID);

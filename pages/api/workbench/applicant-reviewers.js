@@ -9,9 +9,9 @@
  *
  *   - RECOMMENDED — the legacy `wmkf_potentialreviewer1..5` lookup slots
  *     (person GUIDs already exist) become `disposition=recommended`,
- *     `selected=true` `wmkf_appreviewersuggestion` junction rows, `applicant`
- *     unioned into their sources. On equal footing with Claude-discovered
- *     candidates for the PD's later enrichment run. Race-safe + idempotent
+ *     `selected=false` `wmkf_appreviewersuggestion` junction rows, `applicant`
+ *     unioned into their sources. They appear in Find for PD review and enter
+ *     the candidate pool only through explicit promotion. Race-safe + idempotent
  *     (`ensureApplicantRecommended`).
  *
  *   - EXCLUDED — the free-text `wmkf_excludedreviewers` is parsed into clean
@@ -128,9 +128,6 @@ export default async function handler(req, res) {
             name,
             suggestionId: result.id,
             created: result.created,
-            // false ⇒ staff soft-deleted this candidate; ingestion preserves that
-            // (does not resurrect). The panel badges it "removed by staff".
-            selected: result.selected !== false,
             skippedExcluded: result.skippedExcluded || false,
           });
           if (result.created) recommendedCreated += 1;

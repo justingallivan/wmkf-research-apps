@@ -13,6 +13,8 @@ source_files:
   - pages/api/reviewer-finder/my-candidates.js
   - pages/api/reviewer-finder/save-candidates.js
   - pages/api/workbench/enrich-recommended.js
+  - pages/api/workbench/applicant-reviewers.js
+  - pages/api/workbench/promote-applicant-reviewer.js
   - lib/services/reviewer-roster-store.js
 canonical_docs:
   - docs/APPLICATION_STATE_ATLAS.md
@@ -23,6 +25,8 @@ watch_paths:
   - pages/api/reviewer-finder/**
   - pages/api/review-manager/**
   - pages/api/workbench/enrich-recommended.js
+  - pages/api/workbench/applicant-reviewers.js
+  - pages/api/workbench/promote-applicant-reviewer.js
   - lib/services/reviewer-roster-store.js
 update_triggers:
   - reviewer workbench UX or lifecycle changes
@@ -47,13 +51,15 @@ and staff-facing reviewer management.
 - Data model/migration: `project-reviewer-postgres-to-dataverse-migration`, `project-reviewer-finder-dataverse-entry-path`, `project-appresearcher-collapse-post-pilot`.
 - Count/history/excluded invariants: `project-reviewer-count-invariant`, `project-reviewer-history-data-quality`, `project-excluded-reviewers-often-in-pool`.
 
-## Applicant-Suggested Reviewer Flow (S263)
+## Applicant-Suggested Reviewer Flow (S263/S264)
 
-Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmkf_potentialreviewer1..5`) are integrated into the main candidate list on the Find tab rather than shown in a separate bottom card.
+Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmkf_potentialreviewer1..5`) are integrated into the main candidate list on the Find tab rather than shown in a separate bottom card. As of S264, ingestion creates these rows with `wmkf_selected=false`; the candidate pool is the PD-selected set, and applicant-suggested rows enter it only when a Program Director explicitly promotes the existing junction row.
 
-**Auto-enrichment:** `ReviewerSearchSection` fires `POST /api/workbench/enrich-recommended` automatically via `useEffect` as soon as both `blobUrl` (proposal loaded) and `recommended` slots (ingestion done) are ready. No manual button click. The effect gates on `recPhase === 'idle'` and `recRunningRef.current === false`, firing once per request/proposal pair and re-firing if the PD navigates to a new request (main reset effect sets `recPhase` back to `'idle'`).
+**Auto-enrichment:** `ReviewerSearchSection` fires `POST /api/workbench/enrich-recommended` automatically via `useEffect` as soon as both `blobUrl` (proposal loaded) and `recommended` slots (ingestion done) are ready. No manual button click. The effect gates on `recPhase === 'idle'` and `recRunningRef.current === false`, firing once per request/proposal pair and re-firing if the PD navigates to a new request (main reset effect sets `recPhase` back to `'idle'`). The enrichment route reads by `wmkf_applicantdisposition=Recommended`, not by `wmkf_selected`, so unpromoted applicant rows are still verified and surfaced for review.
 
-**Unified candidate list:** Enriched applicant candidates (`recCandidates`) are prepended into `displayCandidates` so fresh enrichment wins over stale roster copies. Candidates with a resolved identity surface in the `applicant_suggested` provenance section — which appears after `cited_or_proposal_named` and `literature_retrieved` in that order — via `provenanceGroupOf` detecting `isApplicantRecommended: true` → `APPLICANT_SUGGESTED` kind. **Exception:** candidates where enrichment could not confirm identity (`needsIdentification: true`, typically when the applicant provided no affiliation) route to `needs_identity_review` instead — `provenanceGroupOf` checks `needsIdentification` before `APPLICANT_SUGGESTED` (reviewer-provenance.js:228 vs :231). The `applicant_suggested` section is **read-only** (no checkbox): applicant candidates are already persisted as `disposition=recommended` junction rows; PDs invite them from the Invite tab.
+**Unified candidate list:** Enriched applicant candidates (`recCandidates`) are prepended into `displayCandidates` so fresh enrichment wins over stale roster copies. Candidates with a resolved identity surface in the `applicant_suggested` provenance section — which appears after `cited_or_proposal_named` and `literature_retrieved` in that order — via `provenanceGroupOf` detecting `isApplicantRecommended: true` → `APPLICANT_SUGGESTED` kind. **Exception:** candidates where enrichment could not confirm identity (`needsIdentification: true`, typically when the applicant provided no affiliation) route to `needs_identity_review` instead — `provenanceGroupOf` checks `needsIdentification` before `APPLICANT_SUGGESTED` (reviewer-provenance.js:228 vs :231). The `applicant_suggested` section is selectable unless normal safety gates make a row read-only; selecting it calls `POST /api/workbench/promote-applicant-reviewer` with the existing `suggestionId` instead of `save-candidates`.
+
+**Explicit promotion:** `/api/workbench/promote-applicant-reviewer` validates `requestId` and `suggestionId` as GUIDs, reads the existing suggestion, checks ownership (`_wmkf_request_value`) and `wmkf_applicantdisposition=Recommended`, then flips `wmkf_selected=true` via `updateLifecycle`. This avoids duplicate person upserts and bypasses the normal `save-candidates` COI path that intentionally excludes applicant-origin rows.
 
 **Status card:** The bottom card below the search is a status/progress/error surface only — no candidate list, no manual verify button. It shows ingestion state, enrichment progress while running, a done summary ("N verified — see Applicant-suggested section above"), or an error with a "Try again" button.
 
@@ -64,7 +70,7 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 - Roster reload must preserve fields that keep deferred/unresolved/conflicted rows non-selectable.
 - Cross-run dedup is durable; do not casually drop carryover.
 - Reviewer removal/reset behavior often spans UI state, roster store, and Dataverse suggestion state.
-- Applicant-suggested section is **read-only by design** — do not add checkboxes without understanding that these rows are already persisted in Dataverse as `disposition=recommended`, not candidates awaiting save.
+- Applicant-suggested rows are persisted as `disposition=recommended` but are **not** in the candidate pool until `wmkf_selected=true`; keep the promotion route as the only UI save path for these rows.
 - The auto-enrichment effect re-fires whenever `blobUrl` or `recommended` changes while `recPhase === 'idle'`. A proposal re-pick resets `blobUrl`, which triggers the main reset effect (clearing `recPhase` to `'idle'`), which then re-triggers enrichment. This is intentional — but be careful if adding new blobUrl-dependent effects that they don't double-invoke enrichment.
 
 ## Standard Probe

@@ -45,7 +45,6 @@ import { ContactEnrichmentService } from '../../../lib/services/contact-enrichme
 import * as reviewerSuggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
 import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
-import { APPLICANT_DISPOSITION_MAP } from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import { mayPersistIdentity, RESOLVER_SOURCED_FIELDS } from '../../../lib/services/reviewer-identity-resolver';
 import { backPropReviewerOrcidToContact } from '../../../lib/services/backprop-reviewer-orcid';
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
@@ -124,10 +123,7 @@ export default async function handler(req, res) {
   try {
     await bypassDynamicsRestrictions('workbench-enrich-recommended', async () => {
       // 1. Load this request's applicant-RECOMMENDED junction rows.
-      const rows = await reviewerSuggestionAdapter.findByRequest(requestId, { selectedOnly: true });
-      const recommendedRows = rows.filter(
-        (r) => r.wmkf_applicantdisposition === APPLICANT_DISPOSITION_MAP.recommended
-      );
+      const recommendedRows = await reviewerSuggestionAdapter.findApplicantRecommendedByRequest(requestId);
       if (recommendedRows.length === 0) {
         sendEvent('complete', { recommended: [] });
         return;

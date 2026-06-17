@@ -7,8 +7,9 @@
  *   analyze (Claude) → discover (PubMed/preprint verify + rank)
  *     → enrich-contacts (ALL tiers — PubMed/ORCID/SerpAPI Google+Scholar/Claude
  *       web search; SerpAPI is ~free so there is no cost dialog) → save-candidates
- * — so saved candidates land in the SAME per-request pool the Invite tab reads,
- * on equal footing with the applicant-recommended rows.
+ * — so saved candidates land in the SAME per-request pool the Invite tab reads.
+ * Applicant-recommended rows use an explicit promotion route before joining that
+ * pool.
  *
  * S211 parity build (matches the proven standalone workflow): per-source toggles,
  * candidate-count + reviewer-diversity (temperature) + additional-context inputs;
@@ -49,7 +50,9 @@ import {
 import { rankByRelevance } from '../../../lib/utils/relevance-score';
 import { buildScholarSearchUrl } from '../../../lib/utils/scholar-url';
 import {
+  PROVENANCE_KINDS,
   provenanceGroupOf,
+  provenanceKindOf,
   provenanceLabelForCandidate,
   withReviewerProvenance,
 } from '../../../lib/utils/reviewer-provenance';
@@ -731,7 +734,7 @@ export default function ReviewerSearchSection({
   // enrichment uses blobUrl directly for COI if no prior analysis result exists.
   // Defined after enrichRecommended to avoid a temporal dead zone reference error.
   useEffect(() => {
-    const selectableCount = recommended.filter((r) => r.selected !== false).length;
+    const selectableCount = recommended.length;
     if (blobUrl && selectableCount > 0 && recPhase === 'idle' && !recRunningRef.current) {
       enrichRecommended();
     }
@@ -838,39 +841,102 @@ export default function ReviewerSearchSection({
     try {
       // Candidates were already enriched at results time (stage 4 of runSearch),
       // so the chosen rows carry contact info + bibliometrics — save them directly.
-      const toSave = chosen;
-      pushProgress(`Saving ${toSave.length} candidate(s)…`);
-      const sRes = await fetch('/api/reviewer-finder/save-candidates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requestId,
-          proposalTitle: analysis?.proposalInfo?.title || null,
-          programArea: analysis?.proposalInfo?.programArea || null,
-          grantCycleCode: cycleCode || null,
-          candidates: toSave,
-        }),
-      });
-      const sData = await sRes.json().catch(() => ({}));
-      if (!sRes.ok || !sData.success) {
-        const detail = formatSaveFailureDetails(sData.errors);
-        throw new Error(detail ? `${sData.error || `Save failed (${sRes.status})`} ${detail}` : (sData.error || `Save failed (${sRes.status})`));
+      const applicantChosen = [];
+      const toSave = [];
+      const failures = [];
+      for (const c of chosen) {
+        if (provenanceKindOf(c) === PROVENANCE_KINDS.APPLICANT_SUGGESTED) {
+          if (c.suggestionId) applicantChosen.push(c);
+          else failures.push({ name: c.name || 'Applicant-suggested reviewer', error: 'missing suggestionId' });
+        } else {
+          toSave.push(c);
+        }
       }
-      const saved = sData.savedCount || 0;
-      if (saved === 0) {
-        const detail = formatSaveFailureDetails(sData.errors);
+
+      let saved = 0;
+      let savedNames = [];
+      if (toSave.length > 0) {
+        pushProgress(`Saving ${toSave.length} candidate(s)…`);
+        try {
+          const sRes = await fetch('/api/reviewer-finder/save-candidates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              requestId,
+              proposalTitle: analysis?.proposalInfo?.title || null,
+              programArea: analysis?.proposalInfo?.programArea || null,
+              grantCycleCode: cycleCode || null,
+              candidates: toSave,
+            }),
+          });
+          const sData = await sRes.json().catch(() => ({}));
+          if (!sRes.ok || !sData.success) {
+            const detail = formatSaveFailureDetails(sData.errors);
+            throw new Error(detail ? `${sData.error || `Save failed (${sRes.status})`} ${detail}` : (sData.error || `Save failed (${sRes.status})`));
+          }
+          saved = sData.savedCount || 0;
+          if (saved === 0) {
+            const detail = formatSaveFailureDetails(sData.errors);
+            throw new Error(detail ? `No candidates were saved: ${detail}` : 'No candidates were saved.');
+          }
+          savedNames = Array.isArray(sData.savedNames) ? sData.savedNames : [];
+          const normalFailed = toSave.length - saved;
+          if (normalFailed > 0 && Array.isArray(sData.errors)) failures.push(...sData.errors);
+        } catch (e) {
+          failures.push(...toSave.map((c) => ({ name: c.name || 'Unknown candidate', error: e.message })));
+        }
+      }
+
+      let promoted = 0;
+      const promotedNames = [];
+      if (applicantChosen.length > 0) {
+        pushProgress(`Promoting ${applicantChosen.length} applicant-suggested reviewer(s)…`);
+        const results = await Promise.all(applicantChosen.map(async (c) => {
+          try {
+            const res = await fetch('/api/workbench/promote-applicant-reviewer', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ requestId, suggestionId: c.suggestionId }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+              throw new Error(data.error || `Promotion failed (${res.status})`);
+            }
+            return { ok: true, candidate: c };
+          } catch (e) {
+            return { ok: false, candidate: c, error: e.message };
+          }
+        }));
+        for (const result of results) {
+          if (result.ok) {
+            promoted += 1;
+            promotedNames.push(result.candidate.name);
+          } else {
+            failures.push({ name: result.candidate.name || 'Applicant-suggested reviewer', error: result.error });
+          }
+        }
+      }
+
+      const totalSucceeded = saved + promoted;
+      if (totalSucceeded === 0) {
+        const detail = formatSaveFailureDetails(failures);
         throw new Error(detail ? `No candidates were saved: ${detail}` : 'No candidates were saved.');
       }
-      const failed = toSave.length - saved;
-      const failureDetail = failed > 0 ? formatSaveFailureDetails(sData.errors) : '';
-      setSavedMsg(`Saved ${saved} of ${toSave.length} to this request's candidate pool.${failed > 0 ? ` ${failed} could not be saved${failureDetail ? ` (${failureDetail})` : ''}.` : ''}`);
+
+      const messageParts = [];
+      if (saved > 0) messageParts.push(`Saved ${saved} of ${toSave.length} to this request's candidate pool.`);
+      if (promoted > 0) messageParts.push(`Promoted ${promoted} of ${applicantChosen.length} applicant-suggested reviewer${applicantChosen.length === 1 ? '' : 's'}.`);
+      if (failures.length > 0) {
+        const detail = failures.map((f) => `${f.name || 'Unknown candidate'}: ${f.error || 'failed'}`).join('; ');
+        messageParts.push(`${failures.length} could not be saved (${detail}).`);
+      }
+      setSavedMsg(messageParts.join(' '));
       setPhase('done');
 
       // Graduate ONLY the successfully-saved names: flip them to status='saved'
       // in the roster (so they leave the active Find list → Candidates tab, but
       // stay deduped) and splice them out of the active view. Failed rows remain
       // active/selectable. Best-effort — a roster failure doesn't fail the save.
-      const savedNames = Array.isArray(sData.savedNames) ? sData.savedNames : [];
       if (savedNames.length > 0) {
         const savedKeys = new Set(savedNames.map((n) => normalizeReviewerName(n)));
         setCandidates((prev) => prev.filter((c) => !savedKeys.has(candKey(c))));
@@ -886,7 +952,12 @@ export default function ReviewerSearchSection({
           } catch { /* best-effort — savedPoolNames dedup covers re-surfacing */ }
         }
       }
-      if (onSaved) onSaved();
+      if (promotedNames.length > 0) {
+        const promotedKeys = new Set(promotedNames.map((n) => normalizeReviewerName(n)));
+        setRecCandidates((prev) => prev.filter((c) => !promotedKeys.has(candKey(c))));
+        setSelected((prev) => { const next = new Set(prev); promotedKeys.forEach((k) => next.delete(k)); return next; });
+      }
+      if (onSaved && totalSucceeded > 0) onSaved();
     } catch (e) {
       setError(e.message);
       setPhase('error');
@@ -924,10 +995,9 @@ export default function ReviewerSearchSection({
     },
   ].filter((section) => section.items.length > 0);
 
-  // Staff-removed recommendations (selected===false) are NOT enriched by the
-  // endpoint (it loads selectedOnly:true), so count only the enrichable ones —
-  // otherwise the button promises N but enriches fewer (Codex post-impl).
-  const recCount = recommended.filter((r) => r.selected !== false).length;
+  // Applicant rows now default to selected=false until explicit PD promotion;
+  // removed-by-staff vs not-yet-promoted is not a distinct displayed state.
+  const recCount = recommended.length;
   // Candidates with needsIdentification:true route to needs_identity_review, not
   // applicant_suggested — split the done-message count accordingly.
   const recVerifiedCount = recCandidates.filter((c) => provenanceGroupOf(withReviewerProvenance(c)) === 'applicant_suggested').length;
@@ -1125,9 +1195,7 @@ export default function ReviewerSearchSection({
                       <div className="max-h-[32rem] overflow-y-auto space-y-4 pr-1">
                         {provenanceSections.map((section) => {
                           // Slice E: the needs-identity-review section is read-only.
-                          // applicant_suggested is also read-only — those rows are already
-                          // in the pool (no save step needed); invite from the Invite tab.
-                          const readOnlySection = section.key === 'needs_identity_review' || section.key === 'applicant_suggested';
+                          const readOnlySection = section.key === 'needs_identity_review';
                           return (
                           <div key={section.key}>
                             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
@@ -1140,7 +1208,7 @@ export default function ReviewerSearchSection({
                             )}
                             {section.key === 'applicant_suggested' && (
                               <p className="text-xs text-gray-400 mb-1.5">
-                                Named by the applicant — already in this request's candidate pool. Invite from the Invite tab.
+                                Named by the applicant — select to add to this request's candidate pool.
                               </p>
                             )}
                             <div className="space-y-2">
@@ -1244,9 +1312,6 @@ export default function ReviewerSearchSection({
               . They are <span className="font-medium">not</span> saved as candidates.{' '}
               <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
             </div>
-          )}
-          {recommended.length > 0 && recCount === 0 && (
-            <p className="text-sm text-gray-600">All applicant-suggested reviewers have been removed by staff.</p>
           )}
           {recPhase === 'idle' && !blobUrl && recCount > 0 && (
             <p className="text-sm text-gray-500">
