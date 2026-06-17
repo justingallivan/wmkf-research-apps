@@ -25,6 +25,7 @@
  * Props:
  *   - requestId             : akoya_request GUID (save target)
  *   - blobUrl               : proposal blob URL from load-proposal (required to search)
+ *   - proposalKey           : stable SharePoint file key (`library::folder::name`) for applicant-enrichment cache
  *   - cycleCode             : grant cycle code (persisted with saved candidates)
  *   - excludedNames         : string[] of applicant-excluded names (prefills the editable box)
  *   - exclusionsUnavailable : true when ingestion failed to produce the exclude list
@@ -44,6 +45,7 @@ import {
   mergeEnrichment,
   parseExcludeList,
   filterExcluded,
+  hasValidApplicantEnrichmentCache,
   normalizeReviewerName,
   pruneCandidateForRoster,
 } from './reviewer-search-logic';
@@ -103,6 +105,10 @@ function dedupeByName(list) {
     out.push(c);
   }
   return out;
+}
+
+function isApplicantOriginCandidate(c) {
+  return !!c && (c.isApplicantRecommended || provenanceKindOf(c) === PROVENANCE_KINDS.APPLICANT_SUGGESTED);
 }
 
 function formatSaveFailureDetails(errors = []) {
@@ -388,6 +394,7 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
 export default function ReviewerSearchSection({
   requestId,
   blobUrl,
+  proposalKey = null,
   cycleCode,
   excludedNames = [],
   exclusionsUnavailable = false,
@@ -700,7 +707,7 @@ export default function ReviewerSearchSection({
   // Independent of the search; reuses the search's `analysis` when present so the
   // server can skip a second analyze call.
   const enrichRecommended = useCallback(async () => {
-    if (!blobUrl || recRunningRef.current) return;
+    if (!blobUrl || !proposalKey || recRunningRef.current) return;
     recRunningRef.current = true;
     const myGen = genRef.current;
     setRecPhase('running'); setRecError(null); setRecProgress([]); setRecCandidates([]);
@@ -709,7 +716,7 @@ export default function ReviewerSearchSection({
       const res = await fetch('/api/workbench/enrich-recommended', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, blobUrl, analysisResult: analysis || undefined }),
+        body: JSON.stringify({ requestId, blobUrl, proposalKey, analysisResult: analysis || undefined }),
       });
       let result = null;
       let streamError = null;
@@ -728,25 +735,34 @@ export default function ReviewerSearchSection({
     } finally {
       recRunningRef.current = false;
     }
-  }, [blobUrl, requestId, analysis]);
+  }, [blobUrl, proposalKey, requestId, analysis]);
 
   // Auto-trigger applicant enrichment once both the proposal (blobUrl) and the
   // ingested recommendations are ready. Runs independently of the Claude search —
   // enrichment uses blobUrl directly for COI if no prior analysis result exists.
   // Defined after enrichRecommended to avoid a temporal dead zone reference error.
+  const haveValidCache = hasValidApplicantEnrichmentCache(rosterActive, proposalKey);
   useEffect(() => {
     const selectableCount = recommended.length;
-    if (blobUrl && selectableCount > 0 && recPhase === 'idle' && !recRunningRef.current) {
+    if (recPhase !== 'idle' || recRunningRef.current) return;
+    if (rosterLoaded && haveValidCache) {
+      setRecPhase('done');
+      return;
+    }
+    if (blobUrl && proposalKey && selectableCount > 0 && rosterLoaded && !haveValidCache) {
       enrichRecommended();
     }
-  }, [blobUrl, recommended, recPhase, enrichRecommended]);
+  }, [blobUrl, proposalKey, recommended, recPhase, rosterLoaded, haveValidCache, enrichRecommended]);
 
   // The selectable list = the durable active roster ∪ this run's results, deduped
   // by normalized name (run results win — freshest enrichment). Renders + ranks
   // independent of `phase` so the roster shows on reload without a fresh search.
   // recCandidates (enriched applicant-suggested) prepend so fresh enrichment wins
   // over any stale roster copy of the same person.
-  const displayCandidates = dedupeByName([...recCandidates, ...candidates, ...rosterActive].map((c) => withReviewerProvenance(c)));
+  const displayRosterActive = rosterActive.filter((c) => (
+    !isApplicantOriginCandidate(c) || (!!proposalKey && c.enrichedProposalKey === proposalKey)
+  ));
+  const displayCandidates = dedupeByName([...recCandidates, ...candidates, ...displayRosterActive].map((c) => withReviewerProvenance(c)));
 
   // Slice E: a candidate the system could not identity-resolve (deferred Track-B or
   // an unresolved verdict) is visible but NOT selectable/savable as a vetted reviewer
@@ -789,6 +805,7 @@ export default function ReviewerSearchSection({
     if (!key || !requestId) return;
     const pruned = pruneCandidateForRoster(cand);
     setCandidates((prev) => prev.filter((c) => candKey(c) !== key));
+    setRecCandidates((prev) => prev.filter((c) => candKey(c) !== key));
     setRosterActive((prev) => prev.filter((c) => candKey(c) !== key));
     setRosterExcluded((prev) => dedupeByName([pruned, ...prev]));
     setRosterNames((prev) => Array.from(new Set([...prev, cand.name])));
@@ -955,8 +972,21 @@ export default function ReviewerSearchSection({
       }
       if (promotedNames.length > 0) {
         const promotedKeys = new Set(promotedNames.map((n) => normalizeReviewerName(n)));
+        setCandidates((prev) => prev.filter((c) => !promotedKeys.has(candKey(c))));
         setRecCandidates((prev) => prev.filter((c) => !promotedKeys.has(candKey(c))));
+        setRosterActive((prev) => prev.filter((c) => !promotedKeys.has(candKey(c))));
         setSelected((prev) => { const next = new Set(prev); promotedKeys.forEach((k) => next.delete(k)); return next; });
+        if (requestId) {
+          try {
+            await fetch('/api/workbench/reviewer-roster', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ requestId, action: 'saved', names: promotedNames }),
+            });
+          } catch {
+            setRosterNote("Couldn't mark promoted applicant-suggested reviewers as saved in the Find roster — they may reappear after reload.");
+          }
+        }
       }
       if (onSaved && totalSucceeded > 0) onSaved();
     } catch (e) {
@@ -1065,8 +1095,9 @@ export default function ReviewerSearchSection({
   const recCount = recommended.length;
   // Candidates with needsIdentification:true route to needs_identity_review, not
   // applicant_suggested — split the done-message count accordingly.
-  const recVerifiedCount = recCandidates.filter((c) => provenanceGroupOf(withReviewerProvenance(c)) === 'applicant_suggested').length;
-  const recIdentityReviewCount = recCandidates.filter((c) => provenanceGroupOf(withReviewerProvenance(c)) === 'needs_identity_review').length;
+  const applicantDisplayCandidates = displayCandidates.filter(isApplicantOriginCandidate);
+  const recVerifiedCount = applicantDisplayCandidates.filter((c) => provenanceGroupOf(withReviewerProvenance(c)) === 'applicant_suggested').length;
+  const recIdentityReviewCount = applicantDisplayCandidates.filter((c) => provenanceGroupOf(withReviewerProvenance(c)) === 'needs_identity_review').length;
 
   return (
     <>
@@ -1402,7 +1433,7 @@ export default function ReviewerSearchSection({
               <button
                 type="button"
                 onClick={enrichRecommended}
-                disabled={!blobUrl}
+                disabled={!blobUrl || !proposalKey}
                 className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Try again

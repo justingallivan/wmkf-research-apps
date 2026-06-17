@@ -618,6 +618,7 @@ export default function ReviewerFindPanel({ requestId, savedPoolNames = [], onSa
       <ReviewerSearchSection
         requestId={requestId}
         blobUrl={doc.data?.blobUrl || null}
+        proposalKey={doc.data?.picked || null}
         cycleCode={data?.cycleCode || null}
         excludedNames={data?.excludedNames || []}
         exclusionsUnavailable={!!ingest.error || excludedParseFailed}

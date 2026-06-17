@@ -7,10 +7,11 @@ import {
   normalizeReviewerName,
   parseExcludeList,
   filterExcluded,
+  hasValidApplicantEnrichmentCache,
   pruneCandidateForRoster,
   sanitizeInstitutionCOIDetails,
 } from '../../shared/components/reviewers/reviewer-search-logic.js';
-const { provenanceGroupOf } = require('../../lib/utils/reviewer-provenance');
+const { PROVENANCE_KINDS, provenanceGroupOf } = require('../../lib/utils/reviewer-provenance');
 
 describe('sanitizeInstitutionCOIDetails (S240)', () => {
   test('strips legacy .historical, keeps piInstitution + reviewerInstitution', () => {
@@ -309,6 +310,73 @@ describe('pruneCandidateForRoster — identity-review markers survive reload (Sl
     const pruned = pruneCandidateForRoster(resolved);
     expect(pruned.needsIdentification).toBe(false);
     expect(provenanceGroupOf(pruned)).not.toBe('needs_identity_review');
+  });
+});
+
+describe('pruneCandidateForRoster — applicant enrichment cache fields survive reload', () => {
+  test('carries applicant proposal key, suggestion id, COI, contact, provenance, metrics, and identity markers', () => {
+    const pruned = pruneCandidateForRoster({
+      name: 'Dr Applicant',
+      suggestionId: '22222222-2222-4222-8222-222222222222',
+      enrichedProposalKey: 'Library::Folder::Proposal.pdf',
+      isApplicantRecommended: true,
+      provenance: { kind: PROVENANCE_KINDS.APPLICANT_SUGGESTED, sources: ['applicant'] },
+      hasInstitutionCOI: true,
+      institutionCOIDetails: { piInstitution: 'MIT', reviewerInstitution: 'MIT', historical: true },
+      hasCoauthorCOI: true,
+      coauthorCOIStrength: 'possible',
+      coauthorships: [{ proposalAuthor: 'Dr PI', paperCount: 1 }],
+      email: 'applicant@example.edu',
+      hIndex: 31,
+      publicationCount5yr: 12,
+      orcidUrl: 'https://orcid.org/0000-0001',
+      googleScholarUrl: 'https://scholar.google.com/citations?user=ABC',
+      reasoning: 'Applicant listed this reviewer.',
+      seniorityEstimate: 'Senior',
+      identityStatus: 'confirmed',
+      needsIdentification: false,
+    });
+
+    expect(pruned.enrichedProposalKey).toBe('Library::Folder::Proposal.pdf');
+    expect(pruned.suggestionId).toBe('22222222-2222-4222-8222-222222222222');
+    expect(pruned.isApplicantRecommended).toBe(true);
+    expect(pruned.provenance.kind).toBe(PROVENANCE_KINDS.APPLICANT_SUGGESTED);
+    expect(pruned.hasInstitutionCOI).toBe(true);
+    expect(pruned.institutionCOIDetails).toEqual({ piInstitution: 'MIT', reviewerInstitution: 'MIT' });
+    expect(pruned.hasCoauthorCOI).toBe(true);
+    expect(pruned.coauthorCOIStrength).toBe('possible');
+    expect(pruned.coauthorships).toEqual([{ proposalAuthor: 'Dr PI', paperCount: 1 }]);
+    expect(pruned.email).toBe('applicant@example.edu');
+    expect(pruned.hIndex).toBe(31);
+    expect(pruned.publicationCount5yr).toBe(12);
+    expect(pruned.orcidUrl).toBe('https://orcid.org/0000-0001');
+    expect(pruned.googleScholarUrl).toBe('https://scholar.google.com/citations?user=ABC');
+    expect(pruned.reasoning).toBe('Applicant listed this reviewer.');
+    expect(pruned.seniorityEstimate).toBe('Senior');
+    expect(pruned.identityStatus).toBe('confirmed');
+    expect(pruned.needsIdentification).toBe(false);
+  });
+});
+
+describe('hasValidApplicantEnrichmentCache', () => {
+  const proposalKey = 'Library::Folder::Proposal.pdf';
+
+  test('requires a non-null proposal key and same-key applicant-origin roster row', () => {
+    expect(hasValidApplicantEnrichmentCache([
+      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey },
+    ], proposalKey)).toBe(true);
+
+    expect(hasValidApplicantEnrichmentCache([
+      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: 'Other::Proposal.pdf' },
+    ], proposalKey)).toBe(false);
+
+    expect(hasValidApplicantEnrichmentCache([
+      { name: 'Dr Applicant', isApplicantRecommended: true, enrichedProposalKey: proposalKey },
+    ], null)).toBe(false);
+
+    expect(hasValidApplicantEnrichmentCache([
+      { name: 'Dr Literature', enrichedProposalKey: proposalKey },
+    ], proposalKey)).toBe(false);
   });
 });
 

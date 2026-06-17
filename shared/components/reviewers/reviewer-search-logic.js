@@ -8,7 +8,7 @@
 // implementation. Re-exported below so existing client imports keep working.
 import { normalizeReviewerName as _normalizeReviewerName, partitionByExcluded } from '../../../lib/utils/reviewer-name-match';
 import { mayPersistIdentity } from '../../../lib/services/reviewer-identity-resolver';
-import { buildReviewerProvenance, sanitizeInstitutionCOIDetails as _sanitizeInstitutionCOIDetails } from '../../../lib/utils/reviewer-provenance';
+import { buildReviewerProvenance, PROVENANCE_KINDS, provenanceKindOf, sanitizeInstitutionCOIDetails as _sanitizeInstitutionCOIDetails } from '../../../lib/utils/reviewer-provenance';
 
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen
@@ -113,6 +113,14 @@ export function filterExcluded(candidates, excludedNames) {
   return partitionByExcluded(candidates, excludedNames, (c) => c && c.name);
 }
 
+export function hasValidApplicantEnrichmentCache(rosterActive, proposalKey) {
+  if (!proposalKey) return false;
+  return (Array.isArray(rosterActive) ? rosterActive : []).some((c) => (
+    c?.enrichedProposalKey === proposalKey
+      && (c.isApplicantRecommended || provenanceKindOf(c) === PROVENANCE_KINDS.APPLICANT_SUGGESTED)
+  ));
+}
+
 /**
  * Prune an enriched candidate down to the fields `CandidateCard` actually
  * renders, for durable storage in `reviewer_find_roster` (S224). Keeps the card
@@ -186,6 +194,8 @@ export function pruneCandidateForRoster(c) {
     sources: Array.isArray(c.sources) ? c.sources : [],
     provenance,
     isApplicantRecommended: !!c.isApplicantRecommended,
+    enrichedProposalKey: c.enrichedProposalKey || null,
+    suggestionId: c.suggestionId || null,
     // COI + mismatch detail.
     hasInstitutionCOI: !!c.hasInstitutionCOI,
     institutionCOIDetails: sanitizeInstitutionCOIDetails(c.institutionCOIDetails),

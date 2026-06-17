@@ -35,7 +35,6 @@ import { normalizeName } from '../../../lib/utils/name-normalization';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { deriveProposalAuthorNames } from '../../../lib/utils/proposal-authors';
 import { resolveProposalPI, appendPiName, piInstitutions } from '../../../lib/services/proposal-pi-identity';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { ClaudeReviewerService } from '../../../lib/services/claude-reviewer-service';
@@ -49,9 +48,12 @@ import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
 import { mayPersistIdentity, RESOLVER_SOURCED_FIELDS } from '../../../lib/services/reviewer-identity-resolver';
 import { backPropReviewerOrcidToContact } from '../../../lib/services/backprop-reviewer-orcid';
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
+import { pruneCandidateForRoster } from '../../../shared/components/reviewers/reviewer-search-logic';
+import { recordSurfaced } from '../../../lib/services/reviewer-roster-store';
 
 const limiter = nextRateLimiter({ max: 10 });
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PROPOSAL_KEY_MAX = 512;
 
 export const config = {
   api: { bodyParser: { sizeLimit: '2mb' } },
@@ -75,6 +77,20 @@ async function fetchProposalText(blobUrl) {
   return resp.text();
 }
 
+function sanitizeProposalKey(value) {
+  if (value == null) return null;
+  const cleaned = String(value)
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim()
+    .slice(0, PROPOSAL_KEY_MAX);
+  return cleaned || null;
+}
+
+function throwIfDeadlineAborted(signal) {
+  if (!signal?.aborted) return;
+  throw signal.reason || Object.assign(new Error('reviewer_time_budget_exceeded'), { code: 'reviewer_time_budget_exceeded' });
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -94,6 +110,7 @@ export default async function handler(req, res) {
   await loadModelOverrides();
 
   const { requestId, blobUrl, analysisResult } = req.body || {};
+  const proposalKey = sanitizeProposalKey(req.body?.proposalKey);
   if (!requestId || !GUID_RE.test(String(requestId))) {
     return res.status(400).json({ error: 'requestId must be a GUID' });
   }
@@ -464,6 +481,7 @@ export default async function handler(req, res) {
         out.push(unconfirmedMatch ? {
           potentialReviewerId: prId || null,
           suggestionId: c.suggestionId || null,
+          enrichedProposalKey: proposalKey,
           name: c.name,
           affiliation: null,
           seniorityEstimate: null,
@@ -493,6 +511,7 @@ export default async function handler(req, res) {
         } : {
           potentialReviewerId: prId || null,
           suggestionId: c.suggestionId || null,
+          enrichedProposalKey: proposalKey,
           name: c.name,
           affiliation: c.affiliation || null,
           seniorityEstimate: c.seniorityEstimate || null,
@@ -520,6 +539,23 @@ export default async function handler(req, res) {
           // Flag the UI uses to badge these rows distinctly.
           isApplicantRecommended: true,
         });
+      }
+
+      // Persist applicant-enriched rows into the durable Find roster so a reload
+      // can restore them without re-running the enrichment pipeline. Best-effort
+      // per row; never fail the SSE response for a roster write problem.
+      if (proposalKey && requestId && out.length > 0) {
+        throwIfDeadlineAborted(deadlineController.signal);
+        for (const candidate of out) {
+          throwIfDeadlineAborted(deadlineController.signal);
+          try {
+            const pruned = pruneCandidateForRoster({ ...candidate, enrichedProposalKey: proposalKey });
+            if (pruned?.name) await recordSurfaced(requestId, [pruned]);
+          } catch (err) {
+            if (deadlineController.signal.aborted) throw err;
+            console.error('[enrich-recommended] roster persist failed:', candidate?.name || 'unknown', err?.message || err);
+          }
+        }
       }
 
       sendEvent('complete', { recommended: out });

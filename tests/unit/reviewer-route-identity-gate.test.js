@@ -56,10 +56,14 @@ jest.mock('../../lib/services/deduplication-service', () => ({
 jest.mock('../../lib/services/contact-enrichment-service', () => ({
   ContactEnrichmentService: { enrichCandidates: jest.fn() },
 }));
+jest.mock('../../lib/services/reviewer-roster-store', () => ({
+  recordSurfaced: jest.fn(async () => 1),
+}));
 
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
+const rosterStore = require('../../lib/services/reviewer-roster-store');
 const { RESOLVER_SOURCED_FIELDS } = require('../../lib/services/reviewer-identity-resolver');
 
 function mockRes() {
@@ -354,11 +358,11 @@ describe('enrich-recommended route — identity gate + clear-on-downgrade', () =
     }]);
   });
 
-  const run = (identity) => {
+  const run = (identity, extraBody = {}) => {
     ContactEnrichmentService.enrichCandidates.mockResolvedValue({
       enriched: [{ potentialReviewerId: 'PID-1', suggestionId: 'SUG-1', name: 'Dr X', contactEnrichment: enrichmentFor(identity) }],
     });
-    const req = { method: 'POST', body: { requestId: GUID, analysisResult: { proposalInfo: { authorInstitution: 'Stanford', proposalAuthors: 'Dr PI' } } } };
+    const req = { method: 'POST', body: { requestId: GUID, analysisResult: { proposalInfo: { authorInstitution: 'Stanford', proposalAuthors: 'Dr PI' } }, ...extraBody } };
     const res = mockRes();
     return handler(req, res).then(() => res);
   };
@@ -381,6 +385,23 @@ describe('enrich-recommended route — identity gate + clear-on-downgrade', () =
     expect(payload.hIndex).toBe(40);
     expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'probable' }), expect.any(Object));
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
+  });
+
+  test('records enriched applicant candidates to roster before complete event', async () => {
+    const res = await run({ status: 'probable' }, { proposalKey: 'Library::Folder::Proposal.pdf' });
+
+    expect(rosterStore.recordSurfaced).toHaveBeenCalledWith(GUID, [
+      expect.objectContaining({
+        name: 'Dr X',
+        suggestionId: 'SUG-1',
+        enrichedProposalKey: 'Library::Folder::Proposal.pdf',
+        isApplicantRecommended: true,
+      }),
+    ]);
+    const completeCall = res.write.mock.calls.find((call) => call[0] === 'event: complete\n');
+    expect(completeCall).toBeTruthy();
+    expect(rosterStore.recordSurfaced.mock.invocationCallOrder[0])
+      .toBeLessThan(res.write.mock.invocationCallOrder[res.write.mock.calls.indexOf(completeCall)]);
   });
 
   // Codex S221 Bug 1: the unconfirmed-match guard previously excluded
