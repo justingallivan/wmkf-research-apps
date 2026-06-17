@@ -1,13 +1,24 @@
-# Resolved-Page Email Tier — Design Plan (rev 2)
+# Resolved-Page Email Tier — Design Plan (rev 3)
 
-**Status:** PROPOSED (pre-implementation; rev 2 after Codex review #1 + empirical verification)
+**Status:** APPROVED for implementation (rev 3 after Codex review #2 — GO-WITH-CHANGES items folded in)
 **Author:** Claude (S265)
 **Scope:** `lib/utils/safe-fetch.js` (extend), `lib/services/contact-enrichment-service.js`,
 `lib/utils/contact-parser.js`
 
-## 0. What changed in rev 2 (and why)
+## 0. Revision history
 
-Codex review #1 + live verification of two real cases changed the design materially:
+**Rev 3 (after Codex review #2 — folded in, design now APPROVED):**
+- **Fetch host predicate is exact-or-subdomain ONLY** — dropped the reverse relation
+  `d.endsWith('.'+host)` and the email-style hyphen-stripping normalization from *fetch
+  authorization* (those belong to email-domain *validation*, not URL gating). Use plain
+  lowercase/IDNA host comparison (§3).
+- **Private-IP block covers IPv6** (`::`, `0.0.0.0`, IPv4-mapped, `fe80::/10`, AAAA records) and the
+  spec acknowledges the residual `dns.lookup`→connect TOCTOU window (§3).
+- **Page-grounding requires candidate-email *association*, not just candidate-identity-on-page** — a
+  single email on a "Philip Bucksbaum Lab" page that belongs to a lab admin must NOT be trusted (§5).
+- New §9 negative fixture: PI-named lab/group page with one non-PI admin email → abstain.
+
+**Rev 2 (after Codex review #1 + live verification of two real cases) changed the design materially:**
 
 - **Reuse the existing `institution_page` email source** — it's already defined and **already HIGH
   trust** in `lib/utils/reviewer-invite.js` (`HIGH_TRUST_EMAIL_SOURCES`), and **nothing currently
@@ -74,13 +85,22 @@ export async function safeFetchInstitutionPage(url, {
 
 Enforced, on the initial request **and every redirect hop** (manual redirect loop, `MAX_REDIRECTS=3`):
 1. **HTTPS only.**
-2. **Host predicate:** `host === d || host.endsWith('.'+d) || d.endsWith('.'+host)` against the
-   normalized `allowedDomain` (reuse the exact hyphen-stripping label-boundary logic in
-   `_normalizeDomain`/`_validateEmailAgainstVerifiedDomain` — single source of truth).
+2. **Host predicate — exact-or-subdomain ONLY:** `host === d || host.endsWith('.'+d)` where both
+   `host` and `d` (`allowedDomain`) are lowercased + IDNA/punycode-normalized. **Do NOT** use the
+   reverse relation `d.endsWith('.'+host)` or the hyphen-stripping in
+   `_normalizeDomain`/`_validateEmailAgainstVerifiedDomain` — those are EMAIL-domain *validation*
+   semantics; authorizing a fetch to a *parent* of the verified domain (verified `cs.stanford.edu` →
+   fetch `stanford.edu`) is a privilege escalation, not a match. Fetch gating ≠ email validation.
 3. **Private/reserved-IP block:** `dns.lookup(host, { all: true })`; reject if ANY resolved address
-   is loopback / RFC1918 / link-local (169.254/16, incl. `169.254.169.254`) / unique-local (fc00::/7)
-   / CGNAT (100.64/10) / reserved. (safe-fetch's static allowlist doesn't do this; required here
-   because the host is not statically trusted.)
+   is loopback / RFC1918 / link-local (`169.254/16`, incl. `169.254.169.254`) / unique-local
+   (`fc00::/7`) / CGNAT (`100.64/10`) / reserved, plus the IPv6/edge cases: `0.0.0.0`, `::`
+   (unspecified), `fe80::/10` (v6 link-local), and IPv4-mapped-IPv6 private ranges (`::ffff:10.x`,
+   etc.) — normalize a mapped address to its v4 form before range-checking. Check AAAA records too,
+   not just A. (safe-fetch's static allowlist doesn't do this; required because the host is not
+   statically trusted.) **Residual risk (documented, accepted for v1):** a `dns.lookup`→`fetch`
+   TOCTOU/rebinding window remains since Node's `fetch` re-resolves on connect; mitigated by the
+   host predicate (the host must already be a real public university domain) + the text/html +
+   size + timeout caps. IP-pinning a custom agent is a post-v1 hardening, not a v1 blocker.
 4. **Caps:** `timeoutMs` composed with the caller `signal` AND the remaining deadline (min of the
    three), via the `openalex-service.js` signal-composition pattern; stream-read with a hard
    `maxBytes` cutoff; require `Content-Type` `text/html` or `text/plain`.
@@ -138,9 +158,16 @@ _finalize(candidate, result, { persist, onProgress, scholarCandidate, signal, de
 - Compute the page identity context: candidate **surname present** AND a **forename token or initial
   compatible** (align with the existing forename-gate principle — do not trust on surname alone) in
   `<title>`, an `<h1>/<h2>`, or the URL path.
+  In ALL cases the selected email must be **associated with the candidate**, not merely present on a
+  page that names them — "candidate named somewhere + one email" is NOT sufficient (Codex #2/#3: a
+  "Philip Bucksbaum Lab" page whose sole email is a lab admin's would otherwise be wrongly trusted).
+  Association evidence = the email's `mailto`/text is adjacent to a candidate-name match (within a
+  small token/DOM window), OR a `mailto` whose link text / preceding label is the candidate's name.
 - **Personal/profile page** (page identity context matches the candidate AND exactly one
-  domain-related email on the page) → **grounded**: trust that email regardless of local-part shape
-  (this is what recovers `phbuck`). Domain-related = passes the `verifiedInstitutionDomain` relation.
+  domain-related email on the page AND that email is candidate-*associated* per above) → **grounded**:
+  trust that email regardless of local-part shape (this is what recovers `phbuck`). Domain-related =
+  passes the `verifiedInstitutionDomain` relation. A lone email NOT adjacent to the candidate's name
+  (e.g. a footer `webmaster@`/lab-admin address) → **abstain**, even on a page titled with their name.
 - **Directory/multi-email page** → associate each email with the nearest preceding name block;
   select only an email whose adjacent name matches the candidate (surname + forename-compatible) AND
   is the unique such match. **Abstain** if zero or more-than-one candidate-matched emails (Codex
@@ -189,6 +216,9 @@ the unverifiable paid web_search email.
     title "Philip Bucksbaum" → grounded, `institution_page`, persist allowed (the case the rev-1 gate
     would have dropped).
   - `office@phys.ksu.edu` dept page → no candidate-name grounding → abstain (stays rejected).
+  - **Lab/group-page false positive**: page title/H1 names the candidate ("Philip Bucksbaum Lab"),
+    exactly one domain-valid email, but it's a lab-admin/`webmaster@` address NOT adjacent to the
+    candidate's name → **abstain** (the rev-3 association requirement; Codex #4).
   - Multi-person directory: two name-adjacent emails → abstain; exactly one candidate match → select.
   - Same-institution namesake (different forename, same surname) → forename gate abstains.
   - Search email present → tier runs and replaces with grounded `institution_page`; trusted email
@@ -209,4 +239,3 @@ the unverifiable paid web_search email.
   or a curated alias map) feeding the host predicate — explicitly out of scope for v1.
 - **Bot-blocked pages** (403/anti-scraping, e.g. `ultrafast.stanford.edu`): best-effort skip; a
   personal page (`web.stanford.edu/~phbuck`) often succeeds where the institute CMS blocks.
-```
