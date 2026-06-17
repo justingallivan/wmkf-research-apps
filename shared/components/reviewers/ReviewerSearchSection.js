@@ -12,7 +12,7 @@
  * pool.
  *
  * S211 parity build (matches the proven standalone workflow): per-source toggles,
- * candidate-count + reviewer-diversity (temperature) + additional-context inputs;
+ * candidate-count + additional-context inputs;
  * enrichment runs ON RESULTS (not at save) so cards show email + ORCID/Scholar +
  * REAL h-index/citations (fetched via the google_scholar_author engine) BEFORE the
  * user selects; rich candidate cards with COI / mismatch / confidence warnings;
@@ -431,7 +431,6 @@ export default function ReviewerSearchSection({
   const [searchSources, setSearchSources] = useState({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
   const noSourcesSelected = !Object.values(searchSources).some(Boolean);
   const [reviewerCount, setReviewerCount] = useState(DEFAULT_REVIEWER_COUNT); // how many candidates Claude is asked to suggest (recall lever; see reviewerFinderPreferences)
-  const [temperature, setTemperature] = useState(0.3); // "reviewer diversity": 0.3 conservative → 1.0 creative
   const [additionalNotes, setAdditionalNotes] = useState(''); // optional extra instructions for Claude
 
   // Applicant-recommended enrichment (separate flow from the search).
@@ -465,7 +464,6 @@ export default function ReviewerSearchSection({
     setRosterActive([]); setRosterExcluded([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false);
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
     setReviewerCount(DEFAULT_REVIEWER_COUNT);
-    setTemperature(0.3);
     setAdditionalNotes('');
     setRecPhase('idle'); setRecCandidates([]); setRecProgress([]); setRecError(null);
     excludeEditedRef.current = false;
@@ -526,7 +524,7 @@ export default function ReviewerSearchSection({
       const aRes = await fetch('/api/reviewer-finder/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ blobUrl, excludedNames: effectiveExcluded, temperature, reviewerCount, additionalNotes: additionalNotes.trim() || undefined }),
+        body: JSON.stringify({ blobUrl, excludedNames: effectiveExcluded, reviewerCount, additionalNotes: additionalNotes.trim() || undefined }),
       });
       let analysisResult = null;
       let streamError = null;
@@ -692,7 +690,7 @@ export default function ReviewerSearchSection({
     } finally {
       runningRef.current = false;
     }
-  }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, searchSources, noSourcesSelected, reviewerCount, temperature, additionalNotes, pushProgress]);
+  }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, searchSources, noSourcesSelected, reviewerCount, additionalNotes, pushProgress]);
 
   // Run the applicant-recommended reviewers through the full verify→COI→enrich
   // pipeline (server-side) and write the enrichment back to their existing rows.
@@ -1078,26 +1076,6 @@ export default function ReviewerSearchSection({
                     className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
                   <span className="text-xs text-gray-400 w-6 text-right">25</span>
-                </div>
-              </div>
-              <div>
-                <label htmlFor="reviewer-diversity" className="block text-xs text-gray-500 mb-1">
-                  Reviewer diversity: <span className="font-medium text-gray-700">{temperature.toFixed(1)}</span>
-                  <span className="text-gray-400"> — higher = more varied / exploratory suggestions</span>
-                </label>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-400 w-16">Conservative</span>
-                  <input
-                    id="reviewer-diversity"
-                    type="range"
-                    min="0.3"
-                    max="1.0"
-                    step="0.1"
-                    value={temperature}
-                    onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                  <span className="text-xs text-gray-400 w-12 text-right">Creative</span>
                 </div>
               </div>
               <div>
