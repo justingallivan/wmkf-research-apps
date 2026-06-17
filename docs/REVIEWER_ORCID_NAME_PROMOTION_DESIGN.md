@@ -1,9 +1,37 @@
-# Reviewer Identity: ORCID-Name-Confirmed Promotion — Design Plan
+# Reviewer Identity: ORCID-Name-Confirmed Promotion — Design Plan (rev 2)
 
-**Status:** PROPOSED (pre-implementation; awaiting Codex design review)
+**Status:** APPROVED for implementation (rev 2 — Codex design review #1 folded in)
 **Author:** Claude (S265)
 **Scope:** `lib/services/reviewer-identity-evidence.js` (anchor build), `lib/services/reviewer-identity-resolver.js` (spine classifier)
 **Safety surface:** fail-dangerous identity resolver (`project-reviewer-verify-fail-dangerous`). Promotion only; never weakens a contradiction gate.
+
+## 0. Rev 2 — Codex review #1 changes (authoritative deltas)
+
+- **(A) `directOrcid` availability — BLOCKER fixed.** Today `selectRecord` fetches `directOrcid` only
+  for TIED selections (evidence.js:149-155); a single-best match (Bucksbaum's null-institution case)
+  has `directOrcid === null`, so requiring `cross_source_orcid_agreement` would mean the new anchor
+  **never emits**. **Decision: fetch `directOrcid` post-selection** whenever the selected record has an
+  ORCID and the anchor could emit (one extra ORCID call per ORCID-bearing selected candidate). Keeps the
+  cross-source double-lock Codex wants. (Alternative — dropping the cross-source requirement — rejected:
+  weaker safety floor.)
+- **(B) ORCID-name helper.** Do NOT reconstruct `\`${givenNames} ${familyName}\`` naively. Add a helper
+  that requires a **full structured `givenNames` first token** (≥2 alpha chars; rejects `"P H"` /
+  initial-only / empty / non-Latin that normalizes away) and only then calls `forenameFullyAgrees`. Do
+  NOT fall through to `creditName` (can be initials).
+- **(C) Identity note.** Add `orcid_name_confirmed` to `buildIdentityNote()` corroboration list
+  (evidence.js:421-436), e.g. "ORCID profile name".
+- **(D) Honest "unchanged" wording.** This path INTENTIONALLY changes the `orcid_name_confirmed + topic`
+  **unresolved → probable**. Only the existing **confirmed/probable** paths are unchanged; the affected
+  class is today's topic-only-with-ORCID `unresolved`. Tests must regression-pin the unaffected matrices.
+- **(E) Tests (required):** Bucksbaum-shaped fixture (null institution, displayName `"P. H. Bucksbaum"`,
+  ORCID `0000-0003-1258-5571`, `topicMatched=true`, ORCID `givenNames:"Philip"`, directOrcid agreeing →
+  **probable**); negative: mis-attributed ORCID with **initial-only** OpenAlex displayName + ORCID name
+  agreeing (document this verifies the ORCID identity, NOT that OpenAlex's cluster is clean — stays
+  `probable`, human verifies); and assert `crossSourceOrcidDisagreement === true` stays **`ambiguous`**
+  even with `orcid_name_confirmed` (the earlier ambiguous return at resolver.js:240-251 must win).
+- **Residual risk (documented, accepted):** a mis-attributed OpenAlex inline ORCID whose profile name
+  matches the suggestion, on an initial-only displayname, can still promote — but only to `probable`
+  (verify-before-outreach). Cross-source agreement narrows, does not eliminate, this.
 
 ## 1. Problem (grounded, verified by probe)
 
@@ -58,7 +86,9 @@ Emit when ALL hold:
 1. the selected OpenAlex record carries an ORCID (`record.orcid`), and the ORCID profile resolved
    (`orcidProfile` — already fetched at evidence.js:505 via `fetchSelectedOrcidProfile`);
 2. **cross-source ORCID agreement** holds (the same `directId === orcid` condition that gates
-   `cross_source_orcid_agreement` today) — two independent sources concur on the ORCID; and
+   `cross_source_orcid_agreement` today) — two independent sources concur on the ORCID. **Per §0(A),
+   `directOrcid` is now fetched post-selection for ANY ORCID-bearing selected record** (not only ties),
+   so this condition is actually evaluable on the single-best-match path; and
 3. the **ORCID profile's full given+family name forename fully agrees** with the suggestion:
    `forenameFullyAgrees(suggestion.name, \`${orcidProfile.givenNames} ${orcidProfile.familyName}\`)`
    — using the AUTHORITATIVE ORCID full name, NOT the (initialized) OpenAlex displayName.
@@ -123,8 +153,9 @@ probable/confirmed via the existing paths — unchanged.)
   ORCID, or ORCID name forename is only an initial.
 - Unit (`reviewer-identity-resolver`): `classifySpineEvidence` → `probable` for
   orcid_name_confirmed + topic; stays `unresolved` without topic; stays blocked when
-  `forenameContradicts === true`; never `confirmed` on this path; existing verdicts unchanged
-  (regression: the affiliation/employment/authorship matrices).
+  `forenameContradicts === true`; never `confirmed` on this path. Existing **confirmed/probable**
+  verdicts unchanged (regression-pin the affiliation/employment/authorship matrices); the ONLY
+  intended change is today's topic-only-with-ORCID `unresolved` → `probable` (§0 D).
 - Fixture/integration: a Bucksbaum-shaped suggestion (null institution, selected record initials +
   ORCID, ORCID full name "Philip") → probable. A wrong-forename namesake ("Peter Bucksbaum", same
   ORCID record whose name is "Philip") → NOT promoted.
