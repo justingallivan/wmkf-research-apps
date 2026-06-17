@@ -42,6 +42,7 @@ import { ClaudeReviewerService } from '../../../lib/services/claude-reviewer-ser
 import { DiscoveryService } from '../../../lib/services/discovery-service';
 import { DeduplicationService } from '../../../lib/services/deduplication-service';
 import { ContactEnrichmentService } from '../../../lib/services/contact-enrichment-service';
+import { OpenAlexService } from '../../../lib/services/openalex-service';
 import * as reviewerSuggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
 import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
@@ -349,6 +350,30 @@ export default async function handler(req, res) {
           : rawEmail;
         const emailSource = email ? (ce.emailSource || null) : null;
 
+        // 5-year publication count. Applicant-recommended rows skip PubMed/preprint
+        // discovery, so they arrive with no publications list and would otherwise show
+        // a FALSE "0 publications" next to a real h-index (e.g. Paul Corkum, h-index 108).
+        // Backfill the count from the OpenAlex author we already resolved for the metrics:
+        // the same window as DiscoveryService.countRecentPublications (year >= currentYear-5)
+        // via getWorksByAuthor's from_publication_date filter, one count-only query
+        // (per-page 1, reads meta.count). Gated on `blockScholar` like the other metrics so
+        // an unconfirmed/wrong-person match never shows a stranger's count. Best-effort: a
+        // failure leaves it null and the card falls back to its prior behavior.
+        const openAlexAuthorId = blockScholar ? null : (ce.tierResults?.openalex_author?.openAlexId || null);
+        let publicationCount5yr = Number.isFinite(c.publicationCount5yr) ? c.publicationCount5yr : null;
+        if (publicationCount5yr == null && openAlexAuthorId) {
+          try {
+            const yearFrom = new Date().getFullYear() - DiscoveryService.YEARS_LOOKBACK;
+            const { totalCount } = await OpenAlexService.getWorksByAuthor(openAlexAuthorId, {
+              yearFrom, limit: 1, signal: deadlineController.signal,
+            });
+            if (Number.isFinite(totalCount)) publicationCount5yr = totalCount;
+          } catch (err) {
+            if (deadlineController.signal.aborted) throw err;
+            sendEvent('progress', { message: `Could not fetch publication count for ${c.name}: ${err.message}` });
+          }
+        }
+
         if (prId) {
           try {
             await researcherAdapter.upsertByPotentialReviewer(prId, {
@@ -475,7 +500,7 @@ export default async function handler(req, res) {
           unverified: c.verified === false,
           verificationConfidence: typeof c.verificationConfidence === 'number' ? c.verificationConfidence : null,
           publications: Array.isArray(c.publications) ? c.publications : [],
-          publicationCount5yr: c.publicationCount5yr ?? null,
+          publicationCount5yr,
           reasoning: c.reasoning || c.generatedReasoning || null,
           hasInstitutionCOI: !!c.hasInstitutionCOI,
           hasCoauthorCOI: !!c.hasCoauthorCOI,
