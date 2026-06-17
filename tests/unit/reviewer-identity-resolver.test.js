@@ -115,6 +115,7 @@ describe('resolveIdentity — OpenAlex/ORCID spine anchor rules', () => {
   const topic = () => ({ type: 'topic_match', weight: 'weak', value: 'https://openalex.org/A1' });
   const employment = () => ({ type: 'orcid_employment_corroborated', weight: 'strong', value: '0000-0002-1825-0097' });
   const orcid = (id = '0000-0002-1825-0097') => ({ type: 'orcid_present', weight: 'weak', value: id });
+  const orcidNameConfirmed = (id = '0000-0003-1258-5571') => ({ type: 'orcid_name_confirmed', weight: 'strong', value: id });
 
   test('confirmed requires strong affiliation/employment plus independent topic evidence', () => {
     const out = r({ name: 'Robert Sang' }, {
@@ -172,6 +173,44 @@ describe('resolveIdentity — OpenAlex/ORCID spine anchor rules', () => {
     const out = r({ name: 'Robert Sang' }, {
       identityAnchors: [aff('strong'), employment(), topic(), orcid('0000-0000-0000-0001')],
       spine: { crossSourceOrcidDisagreement: true, collision: true },
+    });
+
+    expect(out.status).toBe('ambiguous');
+    expect(out.competitors[0].conflictingEvidence[0]).toMatch(/disagreed/);
+  });
+
+  test('ORCID profile name plus topic promotes to probable, never confirmed', () => {
+    const out = r({ name: 'Philip Bucksbaum' }, {
+      identityAnchors: [topic(), orcid(), orcidNameConfirmed()],
+      spine: { forenameContradicts: false },
+    });
+
+    expect(out.status).toBe('probable');
+    expect(out.status).not.toBe('confirmed');
+  });
+
+  test('ORCID profile name without topic stays unresolved', () => {
+    const out = r({ name: 'Philip Bucksbaum' }, {
+      identityAnchors: [orcid(), orcidNameConfirmed()],
+      spine: { forenameContradicts: false },
+    });
+
+    expect(out.status).toBe('unresolved');
+  });
+
+  test('contradicting OpenAlex forename blocks ORCID profile name promotion', () => {
+    const out = r({ name: 'Philip Bucksbaum' }, {
+      identityAnchors: [topic(), orcid(), orcidNameConfirmed()],
+      spine: { forenameContradicts: true },
+    });
+
+    expect(out.status).toBe('unresolved');
+  });
+
+  test('cross-source ORCID disagreement stays ambiguous even with ORCID profile name confirmation', () => {
+    const out = r({ name: 'Philip Bucksbaum' }, {
+      identityAnchors: [topic(), orcid(), orcidNameConfirmed()],
+      spine: { crossSourceOrcidDisagreement: true, collision: true, forenameContradicts: false },
     });
 
     expect(out.status).toBe('ambiguous');

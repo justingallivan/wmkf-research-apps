@@ -32,6 +32,7 @@ describe('ReviewerIdentityEvidence.evaluateSuggestion', () => {
     // Default: the work-grounding rescue (S249) finds nothing, so it never changes a
     // normal-path verdict. Rescue tests override these per-case.
     OpenAlexService.getWorksByAuthor.mockReset().mockResolvedValue({ totalCount: 0, records: [] });
+    jest.spyOn(ORCIDService, 'findContact').mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -111,6 +112,115 @@ describe('ReviewerIdentityEvidence.evaluateSuggestion', () => {
 
     expect(out.status).toBe('unresolved');
     expect(out.anchors.map((a) => a.type)).toEqual(['topic_match']);
+  });
+
+  test('Bucksbaum-shaped ORCID profile name confirmation promotes topic-only identity to probable', async () => {
+    OpenAlexService.searchAuthors.mockResolvedValue({
+      totalCount: 1,
+      records: [record({
+        displayName: 'P. H. Bucksbaum',
+        orcid: '0000-0003-1258-5571',
+        lastKnownInstitution: null,
+        topics: ['Attosecond physics'],
+      })],
+    });
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue({
+      orcidId: '0000-0003-1258-5571',
+      givenNames: 'Philip',
+      familyName: 'Bucksbaum',
+      currentAffiliation: null,
+      affiliations: [],
+    });
+    ORCIDService.findContact.mockResolvedValue({
+      status: 'resolved',
+      orcidId: '0000-0003-1258-5571',
+    });
+
+    const out = await ReviewerIdentityEvidence.evaluateSuggestion(
+      { name: 'Philip Bucksbaum', expertiseAreas: ['attosecond science'] },
+      { proposalInfo: { primaryResearchArea: 'Physics' } },
+    );
+
+    expect(out.status).toBe('probable');
+    expect(out.anchors.map((a) => a.type)).toEqual(expect.arrayContaining([
+      'topic_match',
+      'orcid_present',
+      'cross_source_orcid_agreement',
+      'orcid_name_confirmed',
+    ]));
+    expect(out.anchors.find((a) => a.type === 'orcid_name_confirmed')).toMatchObject({
+      weight: 'strong',
+      value: '0000-0003-1258-5571',
+      parserOutput: { givenName: 'Philip' },
+    });
+    expect(out.identityNote).toMatch(/ORCID profile name/);
+  });
+
+  test('ORCID profile name confirmation rejects differing full forename', async () => {
+    OpenAlexService.searchAuthors.mockResolvedValue({
+      totalCount: 1,
+      records: [record({
+        displayName: 'P. H. Bucksbaum',
+        orcid: '0000-0003-1258-5571',
+        lastKnownInstitution: null,
+        topics: ['Attosecond physics'],
+      })],
+    });
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue({
+      orcidId: '0000-0003-1258-5571',
+      givenNames: 'Peter',
+      familyName: 'Bucksbaum',
+      currentAffiliation: null,
+      affiliations: [],
+    });
+    ORCIDService.findContact.mockResolvedValue({
+      status: 'resolved',
+      orcidId: '0000-0003-1258-5571',
+    });
+
+    const out = await ReviewerIdentityEvidence.evaluateSuggestion(
+      { name: 'Philip Bucksbaum', expertiseAreas: ['attosecond science'] },
+      { proposalInfo: { primaryResearchArea: 'Physics' } },
+    );
+
+    expect(out.status).toBe('unresolved');
+    expect(out.anchors.map((a) => a.type)).not.toContain('orcid_name_confirmed');
+    expect(out.anchors.map((a) => a.type)).toEqual(expect.arrayContaining([
+      'topic_match',
+      'orcid_present',
+      'cross_source_orcid_agreement',
+    ]));
+  });
+
+  test('ORCID profile name confirmation rejects initial-only givenNames', async () => {
+    OpenAlexService.searchAuthors.mockResolvedValue({
+      totalCount: 1,
+      records: [record({
+        displayName: 'P. H. Bucksbaum',
+        orcid: '0000-0003-1258-5571',
+        lastKnownInstitution: null,
+        topics: ['Attosecond physics'],
+      })],
+    });
+    jest.spyOn(ORCIDService, 'getProfile').mockResolvedValue({
+      orcidId: '0000-0003-1258-5571',
+      givenNames: 'P',
+      familyName: 'Bucksbaum',
+      currentAffiliation: null,
+      affiliations: [],
+    });
+    ORCIDService.findContact.mockResolvedValue({
+      status: 'resolved',
+      orcidId: '0000-0003-1258-5571',
+    });
+
+    const out = await ReviewerIdentityEvidence.evaluateSuggestion(
+      { name: 'Philip Bucksbaum', expertiseAreas: ['attosecond science'] },
+      { proposalInfo: { primaryResearchArea: 'Physics' } },
+    );
+
+    expect(out.status).toBe('unresolved');
+    expect(out.anchors.map((a) => a.type)).not.toContain('orcid_name_confirmed');
   });
 
   test('no constrained match abstains to unresolved', async () => {
