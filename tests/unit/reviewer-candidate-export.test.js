@@ -21,10 +21,17 @@ describe('formatConflicts', () => {
     expect(formatConflicts({ hasInstitutionCOI: true, institutionCOIDetails: { reviewerInstitution: 'MIT' } }))
       .toBe('Institution COI: MIT');
   });
-  it('grades coauthor overlap and counts shared papers', () => {
-    expect(formatConflicts({ hasCoauthorCOI: true, coauthorCOIStrength: 'possible', coauthorships: [1, 2] }))
-      .toBe('Co-author overlap (possible, 2 shared papers)');
-    expect(formatConflicts({ hasCoauthorCOI: true, coauthorships: [1] }))
+  it('grades coauthor overlap and SUMS paperCount across authors (not author count)', () => {
+    // Two authors, 2 + 3 shared papers → 5 shared papers (not "2").
+    expect(formatConflicts({
+      hasCoauthorCOI: true,
+      coauthorCOIStrength: 'possible',
+      coauthorships: [{ proposalAuthor: 'A', paperCount: 2 }, { proposalAuthor: 'B', paperCount: 3 }],
+    })).toBe('Co-author overlap (possible, 5 shared papers)');
+    // One author with 10 shared papers → "10", not "1".
+    expect(formatConflicts({ hasCoauthorCOI: true, coauthorships: [{ proposalAuthor: 'A', paperCount: 10 }] }))
+      .toBe('Co-author overlap (likely, 10 shared papers)');
+    expect(formatConflicts({ hasCoauthorCOI: true, coauthorships: [{ proposalAuthor: 'A', paperCount: 1 }] }))
       .toBe('Co-author overlap (likely, 1 shared paper)');
   });
   it('joins multiple conflicts', () => {

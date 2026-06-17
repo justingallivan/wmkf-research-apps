@@ -520,7 +520,7 @@ export default function ReviewerSearchSection({
     ]));
     setPhase('running');
     setError(null); setErrorMeta(null); setProgress([]); setCandidates([]); setUnverified([]); setSelected(new Set());
-    setSavedMsg(null); setEnrichNote(null); setAnalysis(null); setExcludedRemoved(0);
+    setSavedMsg(null); setEnrichNote(null); setAnalysis(null); setExcludedRemoved(0); setExportError(null);
     try {
       // 1. Analyze the proposal (Claude). excludedNames soft-blocks Claude's own
       //    suggestions; we still hard-filter discovery results below.
