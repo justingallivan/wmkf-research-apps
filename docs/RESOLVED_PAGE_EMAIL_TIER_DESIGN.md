@@ -1,178 +1,212 @@
-# Resolved-Page Email Tier — Design Plan
+# Resolved-Page Email Tier — Design Plan (rev 2)
 
-**Status:** PROPOSED (pre-implementation; awaiting Codex design review)
+**Status:** PROPOSED (pre-implementation; rev 2 after Codex review #1 + empirical verification)
 **Author:** Claude (S265)
-**Scope:** `lib/services/contact-enrichment-service.js`, a new guarded fetch helper, `lib/utils/contact-parser.js`
+**Scope:** `lib/utils/safe-fetch.js` (extend), `lib/services/contact-enrichment-service.js`,
+`lib/utils/contact-parser.js`
+
+## 0. What changed in rev 2 (and why)
+
+Codex review #1 + live verification of two real cases changed the design materially:
+
+- **Reuse the existing `institution_page` email source** — it's already defined and **already HIGH
+  trust** in `lib/utils/reviewer-invite.js` (`HIGH_TRUST_EMAIL_SOURCES`), and **nothing currently
+  sets it** (verified: zero writers). Do NOT invent a new `faculty_page` source. (Codex #7)
+- **Extend `safe-fetch.js` with a dynamic per-call host predicate** rather than building a parallel
+  outbound-fetch helper, so there is one outbound policy. (Codex #1)
+- **Trust gate is PAGE-GROUNDING, not the local-part `isNameConsistentEmail` heuristic.** Verified:
+  `isNameConsistentEmail('phbuck@stanford.edu', 'Philip Bucksbaum') === false` — the guard that
+  correctly rejects `office@phys.ksu.edu` *also* rejects Bucksbaum's real address (truncated
+  surname). The local-part heuristic is for *ungrounded* (snippet/search) emails; a *fetched* page
+  that is provably the person's is itself the grounding. (empirical; supersedes rev-1 §5 gate)
+- **Regression target is Bucksbaum, not Rudenko.** Verified domains:
+  - Bucksbaum → OpenAlex `stanford.edu`; email `phbuck@stanford.edu` on `web.stanford.edu/~phbuck`
+    (a `*.stanford.edu` host, label-related) → **recoverable**.
+  - Rudenko → OpenAlex `k-state.edu` (ROR lists no alias domains); email `rudenko@phys.ksu.edu` on
+    `ksu.edu` — NOT label-related to `k-state.edu` → **unreachable under strict domain binding**.
+    Multi-domain institutions are a **documented v1 limitation** (§10), not a target.
+- **Thread `deadlineAt` through `_finalize`** (it is currently destructured in `enrichCandidate` but
+  not accepted by `_finalize`); compose abort+timeout the way `openalex-service.js` does. (Codex #3)
+- **A low-trust search-sourced email must not silently block the tier** — it may be replaced by a
+  page-grounded `institution_page` email. (Codex #8)
 
 ## 1. Problem (grounded, verified)
 
 Good Claude-discovered reviewers come back with **no email** even when the address is trivially
-findable by hand. Verified concrete case — **Prof. Artem Rudenko** (request `423eee92-…`,
-ORCID `0000-0002-9154-8463`), prod roster row enriched 2026-06-09:
+findable by hand. The identity anchor + bibliometrics resolve fine; the miss is email-specific.
+The published address lives in the **body of a faculty/profile/lab page** that the paid tiers
+*captured as a URL* but **never fetched and parsed** (verified: no code fetches a faculty-page body
+— SerpAPI reads search *snippets* only; Claude web_search returns the email **unverifiably**,
+encrypted, and non-deterministically). This tier closes that gap deterministically.
 
-- `email=null`, `emailSource=null`, but `identityStatus=confirmed`, `hIndex`/`citations` populated
-  → the identity anchor + bibliometrics resolved; **the miss is email-specific**.
-- His published address `rudenko@phys.ksu.edu` lives in the **body of his faculty/lab page**
-  (`jrm.phys.ksu.edu/Faculty/rudenko.html`), which was *captured as a URL* by the paid tiers but
-  **never fetched and parsed**.
-
-Why each existing tier misses it:
-
-| Tier | Behavior on Rudenko | Why it misses |
+| Tier | Behavior | Why it misses |
 |---|---|---|
-| ORCID | resolves identity, no email | ORCID doesn't expose his email |
-| PubMed | no recent corresponding-author email | not the corresponding author recently |
-| SerpAPI (T4) | returns `office@phys.ksu.edu` | reads **search snippets only**, grabbed a dept role inbox; guard correctly rejected it |
-| Claude web_search (T3) | non-deterministic; returned nothing in prod, `rudenko@k-state.edu` locally | Anthropic returns page content **encrypted** → the returned email is **unverifiable** against the source, and can be a pattern-constructed/wrong-domain variant |
-
-**The gap:** when a faculty/profile page URL *is* resolved (it was, in both runs), nothing fetches
-that page and extracts a name-consistent, domain-validated email from its body — which is exactly
-what a human does by hand. This tier closes that gap **deterministically** (no LLM, verifiable).
+| ORCID | identity, no email | ORCID doesn't expose it |
+| PubMed | no recent corresponding-author email | not recent corresponding author |
+| SerpAPI (T4) | `office@…` (dept role inbox) | reads snippets only; guard correctly rejects |
+| Claude web_search (T3) | non-deterministic, unverifiable | page content encrypted; can be wrong-domain/constructed |
 
 ## 2. Goals / Non-goals
 
-**Goals**
-- Recover the published institutional email for candidates where a faculty/profile/lab page URL was
-  captured but no email surfaced.
-- Be **deterministic and verifiable** (we read the actual page bytes), unlike web_search.
-- Add **no new SSRF surface** beyond what is tightly bound to the candidate's verified institution.
-- Respect the reviewer-search time budget (abort signal / deadline) and add minimal latency.
+**Goals:** recover the published institutional email when a profile/lab page URL was captured;
+deterministic + verifiable (we read the page bytes); **no new SSRF surface** beyond a fetch tightly
+bound to the candidate's OpenAlex-verified institution domain; respect the reviewer-search deadline.
 
-**Non-goals**
-- Crawling/following links beyond the single captured URL(s) (no spidering in v1).
-- Weakening `isNameConsistentEmail` (it behaved correctly — `office@` is genuinely not Rudenko).
-- Replacing T3/T4. This is an additive tier that consumes the URLs they capture.
+**Non-goals:** crawling/spidering beyond the captured URL(s); weakening `isNameConsistentEmail` for
+the other tiers; recovering multi-domain-institution cases in v1 (§10); replacing T3/T4.
 
-## 3. The hard part: SSRF
+## 3. SSRF (the hard part) — extend `safe-fetch.js`
 
-Faculty pages live on arbitrary university hosts (`phys.ksu.edu`, `mit.edu`, `ox.ac.uk`, …). We
-**cannot** add them to `lib/utils/safe-fetch.js`'s static `ALLOWED_HOSTS`. Fetching a
-dynamically-discovered URL is the precise risk that allowlist exists to prevent.
+Faculty pages are on arbitrary university hosts; they cannot go in the static `ALLOWED_HOSTS`.
+Resolution: **bind the fetch to the candidate's already-verified institution domain**
+(`ce.verifiedInstitutionDomain`, sourced from the OpenAlex author's institution homepage eTLD+1 via
+PSL — set in `_attachOpenAlexMetrics`). This both shrinks SSRF surface to "a real public university
+domain OpenAlex returned for this person" and doubles as institution grounding.
 
-**Resolution — bind the fetch to the candidate's already-verified institution domain.** We already
-compute `verifiedInstitutionDomain` in `_attachOpenAlexMetrics` (re-sourced from the OpenAlex
-author's institution homepage, ORCID/spine-anchored — e.g. Rudenko → `k-state.edu`). The new fetch
-is permitted **only** when the captured URL's host is label-boundary-related to that verified domain
-(reusing the exact subdomain logic already in `_validateEmailAgainstVerifiedDomain`:
-`host === verified || host.endsWith('.'+verified) || verified.endsWith('.'+host)`). This:
+Add to `lib/utils/safe-fetch.js` a sibling export (one outbound policy module):
 
-1. Shrinks SSRF surface to "a real public university domain that OpenAlex returned for this person."
-2. Doubles as identity grounding — an email from `phys.ksu.edu` is provably on Rudenko's institution.
+```
+export async function safeFetchInstitutionPage(url, {
+  allowedDomain,     // required; verifiedInstitutionDomain — host must be exact-or-subdomain
+  signal, timeoutMs = 8000, maxBytes = 512 * 1024,
+})
+```
 
-**Defense in depth** in a new helper `lib/utils/fetch-institution-page.js` (does NOT live in
-safe-fetch.js, because it intentionally allows dynamic hosts under a per-call constraint):
+Enforced, on the initial request **and every redirect hop** (manual redirect loop, `MAX_REDIRECTS=3`):
+1. **HTTPS only.**
+2. **Host predicate:** `host === d || host.endsWith('.'+d) || d.endsWith('.'+host)` against the
+   normalized `allowedDomain` (reuse the exact hyphen-stripping label-boundary logic in
+   `_normalizeDomain`/`_validateEmailAgainstVerifiedDomain` — single source of truth).
+3. **Private/reserved-IP block:** `dns.lookup(host, { all: true })`; reject if ANY resolved address
+   is loopback / RFC1918 / link-local (169.254/16, incl. `169.254.169.254`) / unique-local (fc00::/7)
+   / CGNAT (100.64/10) / reserved. (safe-fetch's static allowlist doesn't do this; required here
+   because the host is not statically trusted.)
+4. **Caps:** `timeoutMs` composed with the caller `signal` AND the remaining deadline (min of the
+   three), via the `openalex-service.js` signal-composition pattern; stream-read with a hard
+   `maxBytes` cutoff; require `Content-Type` `text/html` or `text/plain`.
+5. No cookies/credentials; `redirect: 'manual'`; descriptive `User-Agent`.
 
-- HTTPS only.
-- Host must satisfy the verified-domain relation above (passed in per call) — this is the per-call
-  allowlist.
-- **Block private/reserved IPs:** resolve the hostname (`dns.lookup`, all addresses) and reject any
-  RFC1918 / loopback / link-local / unique-local / CGNAT / `169.254.169.254` metadata target.
-  (safeFetch does not do this; we add it here because the host is not statically trusted.)
-- **Validate every redirect hop** against BOTH the domain relation and the private-IP check (mirror
-  safeFetch's manual-redirect loop; `MAX_REDIRECTS=3`).
-- Caps: `timeoutMs` (≤8s, and ≤ remaining deadline budget), response size cap (≤512 KB, streamed/
-  truncated), `Content-Type` must be `text/html` or `text/plain`.
-- No credentials/cookies; `redirect: 'manual'`; a descriptive `User-Agent`.
-
-> **Open question for review:** is per-call-domain-bound dynamic fetch acceptable in this codebase's
-> threat model, or should it be gated behind a config flag / a curated academic-TLD allowlist
-> (`.edu`, `.ac.uk`, `.edu.au`, …) as an additional coarse filter? See §8.
+**Feature flag:** `REVIEWER_PAGE_EMAIL_TIER_ENABLED` (default off for first rollout). No coarse
+academic-TLD allowlist — the OpenAlex domain binding is strictly better and avoids `.org/.gov/.de`
+false negatives. (Codex Q5.1/Q5.2: domain-binding + caps acceptable for v1; IP-pinning documented
+as residual risk, not a v1 blocker.)
 
 ## 4. Where it runs (sequencing)
 
-It must run **inside `_finalize`**, AFTER `_attachOpenAlexMetrics` (so `verifiedInstitutionDomain`
-is known) and BEFORE `_validateEmailAgainstVerifiedDomain` (so a found email still passes the
-existing domain cross-check). New private method `_attachEmailFromResolvedPage(result, {signal, deadlineAt, onProgress})`:
+Inside `_finalize`, AFTER `_attachOpenAlexMetrics` (so `verifiedInstitutionDomain` is set) and BEFORE
+`_validateEmailAgainstVerifiedDomain` (so a found email still gets the domain cross-check). All
+`enrichCandidate` return paths route through `_finalize`; `persist:false` skips only
+`saveToDatabase`. The unanchored-abstain path (`_markUnanchoredAbstain`) clears the URLs + verified
+domain, so those candidates no-op here (correct).
 
 ```
-_finalize:
-  await _attachOpenAlexMetrics(...)               // sets verifiedInstitutionDomain (existing)
-  await _attachEmailFromResolvedPage(...)         // NEW — only if still no email
-  _validateEmailAgainstVerifiedDomain(...)        // existing; now also vets the page email
-  resolveIdentity / _applyAffiliationOverride / saveToDatabase  (existing)
+_finalize(candidate, result, { persist, onProgress, scholarCandidate, signal, deadlineAt }):  // + deadlineAt
+  await _attachOpenAlexMetrics(...)                 // sets verifiedInstitutionDomain
+  await _attachEmailFromResolvedPage(result, { signal, deadlineAt, onProgress })   // NEW
+  _validateEmailAgainstVerifiedDomain(result.contactEnrichment)
+  resolveIdentity / _applyAffiliationOverride / saveToDatabase
 ```
 
-`_attachEmailFromResolvedPage` logic:
-1. Return immediately if `ce.email` is already set (any prior tier won).
-2. Collect candidate URLs in priority order: `ce.facultyPageUrl`, then `ce.website` (skip the Google
-   Scholar search link / `buildGoogleScholarUrl` output — those aren't faculty pages).
-3. For each URL whose host is verified-domain-related (and `verifiedInstitutionDomain` is known):
-   - `fetchInstitutionPage(url, { allowedDomain: verifiedInstitutionDomain, signal, deadlineAt })`.
-   - Extract emails from the body (§5). Pick the first that is BOTH `isNameConsistentEmail(email, name)`
-     AND domain-related to `verifiedInstitutionDomain`.
-   - On a hit: set `ce.email`, `ce.emailSource='faculty_page'`, `ce.emailIsRecent=true`,
-     `ce.emailPersistAllowed=true`; record `ce.tierResults.faculty_page = { url, email }`; stop.
-4. Best-effort: any fetch/parse/DNS error is caught, recorded as
-   `ce.tierResults.faculty_page = { url, skipped|error }`, never throws (except a deadline abort,
-   which must propagate like the other tiers).
-5. Honor `signal.aborted` → rethrow `abortError(signal)`.
+`_attachEmailFromResolvedPage`:
+1. Run only when flag on AND `verifiedInstitutionDomain` is set AND
+   (`!ce.email` OR `ce.emailSource ∈ {serp_search, claude_search}`) — a low-trust search email does
+   not block the tier and may be replaced (Codex #8). An already-trusted email (orcid/pubmed/
+   affiliation/institution_page) is left untouched.
+2. Candidate URLs, **person-specificity ordered** (Codex Q5.4): prefer a URL whose path contains the
+   surname or a name token (`ce.website`/`ce.facultyPageUrl` that looks like a personal/lab page)
+   over a generic/event-looking one; skip the Google Scholar search link. De-dup.
+3. For each URL whose host passes the domain predicate: `safeFetchInstitutionPage(...)`, then
+   page-ground + select (§5). First grounded hit wins; stop.
+4. On a grounded hit: set `ce.email`, `ce.emailSource='institution_page'`, `ce.emailIsRecent=true`,
+   `ce.emailPersistAllowed=true`, `ce.facultyPageUrl ||= url`; record
+   `ce.tierResults.institution_page = { url, email, grounding }`. If replacing a search email, also
+   clear the stale `emailSource`/flags first.
+5. Best-effort: fetch/DNS/parse errors → `ce.tierResults.institution_page = { url, skipped|error }`,
+   never throw — EXCEPT a deadline/cancel abort, which rethrows `abortError(signal)` like the other
+   tiers. A 403/blocked page is a normal skip (verified: `ultrafast.stanford.edu` returns 403).
 
-> **Gating note:** because it only runs when `verifiedInstitutionDomain` is known and `ce.email` is
-> empty, it is a narrow subset of candidates → bounded latency. It needs NO new opt-in toggle: it
-> consumes URLs the existing paid tiers already captured. (Confirm with review — see §8.)
+## 5. Parsing + page-grounding (the trust gate)
 
-## 5. Parsing (`lib/utils/contact-parser.js`)
+**Extract** — add `ContactParser.extractEmailsFromHtml(html)`:
+- `mailto:` hrefs first (most reliable; recovers `phbuck@stanford.edu`).
+- Strip tags; decode `&#64;`/`&commat;`→`@`, `&period;`→`.`; conservatively de-obfuscate ` [at] `/
+  `(at)`→`@` and ` [dot] `/`(dot)`→`.` only inside email-looking tokens.
+- Run existing `extractEmails()`; return deduped, in document order, each with its source offset (to
+  support name-adjacency below).
 
-Add `static extractEmailsFromHtml(html)`:
-- Pull `mailto:` hrefs (`/mailto:([^"'?>\s]+)/gi`) first — most reliable.
-- Strip tags (`replace(/<[^>]+>/g, ' ')`) and decode common entities (`&#64;`→`@`, `&commat;`,
-  `&period;`).
-- De-obfuscate the most common patterns conservatively: ` [at] `/`(at)`→`@`, ` [dot] `/`(dot)`→`.`
-  **only** within a token that otherwise looks like an email — avoid rewriting prose.
-- Run the existing `extractEmails()` on the result; return the deduped list (order preserved).
+**Ground + select** (in the service; the trust decision, NOT a local-part match):
+- Compute the page identity context: candidate **surname present** AND a **forename token or initial
+  compatible** (align with the existing forename-gate principle — do not trust on surname alone) in
+  `<title>`, an `<h1>/<h2>`, or the URL path.
+- **Personal/profile page** (page identity context matches the candidate AND exactly one
+  domain-related email on the page) → **grounded**: trust that email regardless of local-part shape
+  (this is what recovers `phbuck`). Domain-related = passes the `verifiedInstitutionDomain` relation.
+- **Directory/multi-email page** → associate each email with the nearest preceding name block;
+  select only an email whose adjacent name matches the candidate (surname + forename-compatible) AND
+  is the unique such match. **Abstain** if zero or more-than-one candidate-matched emails (Codex
+  Q5.5 — never guess for an invitation tool).
+- `isNameConsistentEmail` is kept ONLY as a soft tiebreaker among already-grounded candidates; it is
+  **never a hard reject** here.
+- Every selected email must still be domain-related to `verifiedInstitutionDomain` (kept by
+  `_validateEmailAgainstVerifiedDomain` downstream too).
 
-Selection stays in the service: `isNameConsistentEmail` + verified-domain relation. Reuse, don't
-duplicate, the guard.
+## 6. Provenance / persistence
 
-## 6. Persistence / provenance
-
-- New `emailSource` value: `'faculty_page'`. Treated as a **trusted** source (page bytes on the
-  verified institution domain) — it is NOT added to the `['claude_search','serp_search']`
-  search-sourced set in `_fieldPersistAllowed`/`_validateEmailAgainstVerifiedDomain`, so a verified-
-  domain match keeps it and it persists like ORCID/PubMed. (It still passed the domain check by
-  construction.)
-- Stats: add `faculty_page` to `enrichCandidates` `stats.bySource`.
-- Roster: `emailSource` already persists via `pruneCandidateForRoster`; no schema change.
+- `emailSource = 'institution_page'` (existing reserved HIGH-trust source; no new string, no consumer
+  fan-out needed — `reviewer-invite.js` already treats it HIGH). (Codex #7)
+- **Because `institution_page` is already HIGH trust, the page-grounding in §5 is mandatory** before
+  it is stamped — otherwise a same-institution namesake gets HIGH invite confidence (Codex #3). The
+  grounding (page-identity + uniqueness + forename gate) is the identity proof the domain check
+  alone can't provide.
+- It is NOT added to the `claude_search/serp_search` search-sourced drop set; it is grounded by
+  construction. Stats: add `institution_page` to `enrichCandidates` `stats.bySource`.
+- Roster: `emailSource` already persists via `pruneCandidateForRoster`; no schema change. DB
+  `wmkf_emailsource` already accepts the string (reviewer-invite reads it).
 
 ## 7. Latency / cost
 
-- **No LLM, no paid API** — one HTTPS GET per still-missing-email candidate that has a captured URL.
-- Bounded by `min(8s, remaining deadline)`; runs for a subset only.
-- Net effect can REDUCE cost: a faculty-page hit can let us drop reliance on the unverifiable
-  web_search email (future: could even run before paying for T3/T4 if a URL is otherwise known —
-  out of scope for v1).
+No LLM, no paid API — one HTTPS GET per still-missing (or search-email) candidate that has a captured
+URL, bounded by `min(8s, remaining deadline)`, subset only. Can REDUCE cost by replacing reliance on
+the unverifiable paid web_search email.
 
-## 8. Open questions for Codex review
+## 8. Open questions from rev 1 — resolved
 
-1. **SSRF model:** Is per-call domain-bound dynamic fetch + private-IP blocking acceptable here, or
-   do we additionally want a coarse academic-TLD allowlist and/or a feature flag for first rollout?
-2. **DNS rebinding:** `dns.lookup` then `fetch` is TOCTOU-racy (resolve→connect may differ). Is
-   pinning the resolved IP (custom `lookup`/agent) warranted in v1, or is the domain-relation + the
-   text/html content-type cap sufficient given the host must already be a real university domain?
-3. **No-verified-domain candidates:** when OpenAlex yields no `verifiedInstitutionDomain` (the
-   abstain/unanchored path), the tier does nothing. Acceptable, or should it fall back to the
-   candidate's discovery-affiliation domain (weaker grounding)?
-4. **URL quality:** the captured `facultyPageUrl` can be a non-profile page (Rudenko's was a
-   colloquium event page); his email was on the `website` (JRM lab) URL. Is "try facultyPageUrl then
-   website" the right order, and should a generic/event-looking URL be deprioritized?
-5. **Selection ambiguity:** if a page yields multiple name-consistent, domain-valid emails, take the
-   first, or abstain? (Abstain is safer for an invitation tool.)
-6. **`faculty_page` as trusted source:** is it right to exempt it from the search-sourced drop set,
-   given it is domain-validated by construction — or should it still be subject to the same
-   contradiction drop for symmetry?
+1. SSRF model — **accepted**: shared `safe-fetch` dynamic predicate, exact/subdomain binding,
+   redirect+IP+type+size+time caps, feature flag; no academic-TLD allowlist.
+2. DNS rebinding / IP pin — **not a v1 blocker**; document residual risk; test private-IP rejection
+   on initial + redirect hops.
+3. No-verified-domain fallback to discovery affiliation — **no** (don't weaken the existing abstain).
+4. URL quality — **person-specificity ordering** + skip Scholar search link (§4.2).
+5. Multiple plausible emails — **abstain** (§5).
+6. Source string — **reuse `institution_page`** (§6), no new consumers.
 
 ## 9. Testing
 
-- Unit (`contact-parser`): `extractEmailsFromHtml` — mailto hrefs, entity/obfuscation decode, tag
-  strip, false-positive rejection.
-- Unit (service, mocked `fetchInstitutionPage`): hit on verified-domain page → email set, source
-  `faculty_page`, persist allowed; off-domain host → skipped; multiple emails → name-consistent one
-  chosen; deadline abort → propagates; fetch error → best-effort skip.
-- Unit (`fetch-institution-page`): rejects non-HTTPS, off-domain host, private-IP target, redirect to
-  private host, oversized/non-HTML body.
-- Regression: the `office@phys.ksu.edu` case stays rejected; the `rudenko@phys.ksu.edu` page case is
-  recovered (fixture HTML).
-- No live network in tests (fixture HTML + mocked fetch/DNS).
-- Gates: `npm test`, `npm run lint`, `npm run build`, and (new util/route surface) re-run
-  `check:api-routes`/`check:atlas` as applicable.
+- `contact-parser.extractEmailsFromHtml`: mailto hrefs, entity/obfuscation decode, tag strip, FP
+  rejection, document-order + offsets.
+- Page-grounding/selection (mocked fetch, fixture HTML):
+  - **Bucksbaum regression**: `web.stanford.edu/~phbuck`-style fixture, single mailto `phbuck@…`,
+    title "Philip Bucksbaum" → grounded, `institution_page`, persist allowed (the case the rev-1 gate
+    would have dropped).
+  - `office@phys.ksu.edu` dept page → no candidate-name grounding → abstain (stays rejected).
+  - Multi-person directory: two name-adjacent emails → abstain; exactly one candidate match → select.
+  - Same-institution namesake (different forename, same surname) → forename gate abstains.
+  - Search email present → tier runs and replaces with grounded `institution_page`; trusted email
+    present → tier no-ops.
+  - Deadline abort mid-fetch → propagates; fetch/DNS error / 403 → best-effort skip.
+- `safe-fetch.safeFetchInstitutionPage`: rejects non-HTTPS, off-domain host, private-IP target,
+  redirect to off-domain/private host, oversized body, non-HTML content-type.
+- **Rudenko documented-skip test**: `k-state.edu` verified domain + `ksu.edu` page host → domain
+  predicate rejects the fetch (asserts the known v1 limitation, no email set).
+- No live network (fixtures + mocked fetch/DNS). Gates: `npm test`, `lint`, `build`; re-run
+  `check:api-routes`/`check:atlas` if a route/data surface is touched (this tier touches neither).
+
+## 10. Known v1 limitations (documented, not bugs)
+
+- **Multi-domain institutions** (e.g. Kansas State `ksu.edu` vs OpenAlex/ROR `k-state.edu`): the
+  page host isn't label-related to the verified domain, so the fetch is correctly refused. Rudenko
+  falls here. Future enhancement: an institution domain-alias source (ROR `domains` when populated,
+  or a curated alias map) feeding the host predicate — explicitly out of scope for v1.
+- **Bot-blocked pages** (403/anti-scraping, e.g. `ultrafast.stanford.edu`): best-effort skip; a
+  personal page (`web.stanford.edu/~phbuck`) often succeeds where the institute CMS blocks.
 ```
