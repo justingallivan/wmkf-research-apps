@@ -133,6 +133,12 @@ export default async function handler(req, res) {
       proposalAuthors: analysisResult.proposalInfo?.proposalAuthors || '(NOT SET)'
     });
 
+    // [S265 TEMP DEBUG — REMOVE after the Bucksbaum generation check] names only (no
+    // proposal content) of the raw Claude-generated suggestions, BEFORE any verification/
+    // COI/relevance filtering — to distinguish "not generated" from "generated then dropped".
+    console.log('[Discover API] S265 generated suggestion names:',
+      (analysisResult.reviewerSuggestions || []).map(s => s.name).join(' | ') || '(none)');
+
     // Start the search budget clock (covers DB searches + reasoning).
     budgetSeconds = await getReviewerTimeBudgetSeconds();
     const deadlineAt = Date.now() + budgetSeconds * 1000;
