@@ -15,8 +15,7 @@ SharePoint folder and matching on a known filename — `ProjectDescription.pdf`,
 `Biosketches.pdf`, etc. Dataverse holds the folder location on the request record, but
 has no awareness of what specific files are inside it or what role each file plays.
 
-This works today because filenames are consistent within a cycle. It will break for J27,
-which will use different file-naming conventions and a different collection mechanism. Any
+This works today because filenames are consistent within a cycle. Any
 logic built on filename matching is an explicitly interim bridge, not a durable pattern.
 
 ### 2. Staff-produced writeups have the same problem
@@ -95,7 +94,7 @@ Tab behaviour (same pattern for both tabs):
 
 1. Staff opens the Pre-Site-Visit tab for a request and clicks "Generate draft"
 2. The tab calls the Executor with the `writeup.pre-site-visit` prompt row from `wmkf_ai_prompt`
-3. The Executor fetches the proposal document from SharePoint (D26: `ProjectDescription.pdf` — filename convention will change for J27), extracts text, runs the prompt
+3. The Executor fetches the proposal document from SharePoint (D26: `ProjectDescription.pdf` — filename matching is fragile and depends on PDs naming files consistently), extracts text, runs the prompt
 4. The output Word doc is written to the request's SharePoint folder via Graph API
 5. The direct file URL is stored back in `akoya_request.wmkf_ai_presitevisitwriteupurl`
 6. The tab renders a preview + "Open in Word" link; staff edits and co-authors in Word

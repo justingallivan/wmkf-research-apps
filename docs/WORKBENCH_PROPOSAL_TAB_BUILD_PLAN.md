@@ -55,7 +55,7 @@ Page.docx`** (redundant — it's the Top section):
 
 - **Surface-don't-drop:** render the 4 labeled slots (grey if missing) + an "Other
   documents" group for any unmatched Phase I file.
-- **Name map lives in one per-cycle config** — filenames change in J27; never hard-code as permanent.
+- **Name map lives in one per-cycle config** — filename-match is fragile (names *may* change between cycles; no evidence J27 specifically breaks it); never hard-code as permanent.
 - `ProjectDescription.pdf` is the SAME file the primer + reviewer-finder ingest (not a
   separate doc); the existing `classifyFile()` already tags it `proposal`.
 
