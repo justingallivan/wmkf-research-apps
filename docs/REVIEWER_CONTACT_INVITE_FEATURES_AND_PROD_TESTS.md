@@ -247,8 +247,11 @@ a LOW recipient, and **omit** `confirmedLowConfidenceIds` (or send an empty arra
 
 When a confirmed/anchored reviewer has **no** accepted email, staff get a one-click path to the
 institution's own page to find and enter the address — with **no** server-side page fetch.
-**Commits:** `f6b5bd4`, merged `c5a4a0a`. Design + the (un-built, Codex-reviewed) automated
-alternative: `docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md`.
+**Commits:** `f6b5bd4`, merged `c5a4a0a`.
+**S265 update:** the automated fetch was subsequently built behind `REVIEWER_PAGE_EMAIL_TIER_ENABLED`
+(**default OFF — this manual path is still the live default**); live design
+`docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`, contract #7 in `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`
+(supersedes `docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md`).
 
 ### 4.1 Features
 

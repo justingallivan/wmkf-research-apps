@@ -193,28 +193,41 @@ toggle. It writes the `tierResults.openalex_author` DTO that the resolver re-pro
 
 ---
 
-## 7. Faculty-page email recovery — zero-SSRF boundary `[VERIFIED 2026-06-13]`
+## 7. Faculty-page email recovery — default zero-SSRF; opt-in guarded fetch (S265) `[VERIFIED 2026-06-17]`
 
-**Contract.** Faculty-page email recovery (Slice F, S235) is the **ZERO-SSRF path — there is NO
-server-side fetch of an external faculty page.** `my-candidates` GET returns `facultyPageUrl`
-(selects `wmkf_facultypageurl`); `CandidatesPanel` shows a "find on faculty page →" link on
-no-email candidates; staff read the address there and enter it via `CandidateEditModal` → manual
-stamp (`emailSource='manual'`, reads LOW per Contract 3) → Slice-G confirm.
+**Contract.** By DEFAULT the faculty-page path is still the **ZERO-SSRF path — no server-side fetch.**
+`my-candidates` GET returns `facultyPageUrl` (selects `wmkf_facultypageurl`); `CandidatesPanel` shows
+a "find on faculty page →" link on no-email candidates; staff read the address there and enter it via
+`CandidateEditModal` → manual stamp (`emailSource='manual'`, reads LOW per Contract 3) → Slice-G confirm.
 
-The automated server-side fetch was Codex-reviewed (READY WITH NAMED CHANGES — undici IP-pinning
-dispatcher, `verifiedInstitutionDomain`-only allowlist, IPv6 private-IP blocklist) but
-**deliberately NOT built**. Do NOT add a server-side external-page fetch without that mechanism.
+**S265 reversal (opt-in only).** The automated server-side fetch the S235 decision declined was BUILT,
+behind the `REVIEWER_PAGE_EMAIL_TIER_ENABLED` flag (**default OFF — production behavior unchanged**).
+When enabled, `_attachEmailFromResolvedPage` (`contact-enrichment-service.js:934`) runs inside
+`_finalize` (after `_attachOpenAlexMetrics`, before the verified-domain guard) and recovers a
+page-grounded email via `safeFetchInstitutionPage` (`lib/utils/safe-fetch.js`) with the named SSRF
+mechanism Codex required: HTTPS-only, host = exact-or-subdomain of `verifiedInstitutionDomain` ONLY,
+DNS private/reserved-IP block incl. IPv6, **undici IP-pinning dispatcher** (closes the DNS-rebind
+TOCTOU), per-hop redirect re-validation, content-type + 512 KB + timeout caps. The email is stamped
+`emailSource='institution_page'` ONLY when page-grounded (candidate-associated, unique, forename-gated;
+`_selectGroundedEmail`) — `institution_page` is HIGH-trust per Contract 3. Rationale + full design:
+`docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md` (supersedes `REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md` §D).
+Do NOT enable without that mechanism intact; multi-domain institutions (e.g. Kansas State `ksu.edu` vs
+OpenAlex `k-state.edu`) are an intentional v1 gap (the fetch is refused, not relaxed).
 
 **Related verified-domain guard.** Where a verified domain IS known (from OpenAlex institution
-lookup), `_validateEmailAgainstVerifiedDomain` (`contact-enrichment-service.js:214-244`, sourced at
-`:761`) drops a SEARCH-sourced email to null when its domain contradicts `verifiedInstitutionDomain`
+lookup), `_validateEmailAgainstVerifiedDomain` (`contact-enrichment-service.js:223`, sourced at
+`:770`) drops a SEARCH-sourced email to null when its domain contradicts `verifiedInstitutionDomain`
 — preventing namesake-collapse. ORCID/PubMed/affiliation emails outrank the heuristic.
 
-**Enforcement points.** The no-fetch/manual-link boundary: `pages/api/reviewer-finder/my-candidates.js:189`
+**Enforcement points.** Default no-fetch/manual-link boundary: `pages/api/reviewer-finder/my-candidates.js:189`
 (returns `facultyPageUrl`, no fetch) · `shared/components/reviewers/CandidatesPanel.js:185` (staff-facing
-"find on faculty page →" link). The related verified-domain guard:
-`lib/services/contact-enrichment-service.js:214-244, 761`. Design owner for the un-built auto-fetch
-SSRF mechanism: `docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md` §D.
+"find on faculty page →" link). Opt-in guarded fetch (flag-gated): `lib/utils/safe-fetch.js`
+(`safeFetchInstitutionPage`, `hostWithinDomain`, `isPrivateAddress`) ·
+`lib/services/contact-enrichment-service.js:934` (`_attachEmailFromResolvedPage`) +
+`_selectGroundedEmail`. The related verified-domain guard:
+`lib/services/contact-enrichment-service.js:223, 770`. Audit:
+`tests/unit/resolved-page-email-grounding.test.js`, `tests/unit/resolved-page-email-tier-service.test.js`.
+Design: `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`.
 
 ---
 
@@ -253,5 +266,5 @@ exported `:568`). **Audit:** `tests/unit/reviewer-identity-evidence.test.js`
 | 4 | Structured-PI fail-open/augment-only | `proposal-pi-identity.js:125+` + `reviewer-identity-evidence.js:316-321` |
 | 5 | S240 institution COI hard drop | `save-candidates.js:116,150-160` + `discover.js`/`DiscoveryService` `filterConflicts` |
 | 6 | OpenAlex bibliometrics/verified-domain | `contact-enrichment-service.js:676-790` |
-| 7 | Faculty-page zero-SSRF boundary | `contact-enrichment-service.js:214-244,761` |
+| 7 | Faculty-page: default zero-SSRF; opt-in guarded fetch (flag) | `my-candidates.js:189` + `CandidatesPanel.js:185` (default) · `safe-fetch.js` `safeFetchInstitutionPage` + `contact-enrichment-service.js:934` (opt-in) |
 | 8 | Work-grounding rescue | `reviewer-identity-evidence.js:212-271` |

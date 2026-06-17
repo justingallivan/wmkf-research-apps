@@ -1,11 +1,14 @@
 # Reviewer Faculty-Page Email Recovery (Slice F) — Design
 
-Date: 2026-06-08 (S235)
-Status: **DECISION (2026-06-08, S235): the automated server-side fetch (§2–§5 below) was
-DESIGNED + Codex-reviewed (READY WITH NAMED CHANGES) but NOT BUILT.** Per Codex Q6 and a
-user decision, we shipped the **zero-SSRF alternative** instead (see "## D. Decision +
-shipped" immediately below). The auto-fetch design is retained as a record of what was
-considered + Codex's verified SSRF mechanism, in case it's revisited. Implements Slice F of
+Date: 2026-06-08 (S235); **SUPERSEDED 2026-06-17 (S265)**
+Status: **SUPERSEDED by `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md` (S265).** The S235 decision
+recorded here was to ship the zero-SSRF manual alternative (§D) and NOT build the automated
+fetch (§2–§5). S265 revisited that and BUILT the automated fetch — with the exact SSRF
+mechanism §4/§Q1 called for (undici IP-pinning, `verifiedInstitutionDomain`-only allowlist,
+IPv6 private-IP block) — but **behind `REVIEWER_PAGE_EMAIL_TIER_ENABLED` (default OFF), so the
+live default is still the zero-SSRF manual path in §D.** Retained as the S235 record + the
+SSRF-mechanism rationale; the live design is `RESOLVED_PAGE_EMAIL_TIER_DESIGN.md` and the
+contract is #7 in `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`. Implements Slice F of
 `docs/REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md` §3.
 
 State labels: [VERIFIED] = read in source this session; [ASSUMED] = inference.
