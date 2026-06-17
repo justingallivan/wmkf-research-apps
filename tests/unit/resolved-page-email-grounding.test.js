@@ -81,6 +81,16 @@ describe('ContactEnrichmentService._selectGroundedEmail', () => {
       .toBe('phbuck@stanford.edu');
   });
 
+  it('abstains when an unrelated same-institution slug page merely names the candidate', () => {
+    const html =
+      '<title>Lab page</title>' +
+      '<p>Philip Bucksbaum visited the lab for a seminar.</p>' +
+      ' '.repeat(300) +
+      '<p>Contact me: <a href="mailto:evil@stanford.edu">e</a></p>';
+    expect(select('Philip Bucksbaum', html, 'stanford.edu', { pageUrl: 'https://web.stanford.edu/~evil/' }))
+      .toBeNull();
+  });
+
   it('recovers via name-adjacency when the name sits next to the email', () => {
     const html = '<p>Philip Bucksbaum <a href="mailto:phbuck@stanford.edu">e</a></p>';
     expect(select('Philip Bucksbaum', html, 'stanford.edu', { pageUrl: 'https://x.stanford.edu/people/p' }))
@@ -117,6 +127,15 @@ describe('ContactEnrichmentService._selectGroundedEmail', () => {
       '<p>Philip Bucksbaum <a href="mailto:bucksbaum@stanford.edu">e</a></p>';
     expect(select('Philip Bucksbaum', html, 'stanford.edu', { pageUrl: 'https://x.stanford.edu/p' })).toBeNull();
   });
+
+  it('does not associate an email when forename and surname are distant colleague mentions', () => {
+    const html =
+      '<p>Philip leads a separate project in optics.</p>' +
+      ' '.repeat(150) +
+      '<p>Contact Sarah Bucksbaum <a href="mailto:sbuck@stanford.edu">e</a></p>';
+    expect(select('Philip Bucksbaum', html, 'stanford.edu', { pageUrl: 'https://web.stanford.edu/people/sarah' }))
+      .toBeNull();
+  });
 });
 
 describe('safe-fetch host + IP guards (pure)', () => {
@@ -126,6 +145,9 @@ describe('safe-fetch host + IP guards (pure)', () => {
     expect(hostWithinDomain('stanford.edu', 'cs.stanford.edu')).toBe(false); // parent escalation
     expect(hostWithinDomain('phys.ksu.edu', 'k-state.edu')).toBe(false); // multi-domain inst
     expect(hostWithinDomain('evil-stanford.edu', 'stanford.edu')).toBe(false); // label boundary
+    expect(hostWithinDomain('.stanford.edu', 'stanford.edu')).toBe(false);
+    expect(hostWithinDomain('web..stanford.edu', 'stanford.edu')).toBe(false);
+    expect(hostWithinDomain('web.stanford.edu.', 'stanford.edu')).toBe(false);
   });
 
   it('isPrivateAddress flags loopback/RFC1918/link-local/CGNAT/IPv6/mapped', () => {
@@ -141,9 +163,12 @@ describe('safe-fetch host + IP guards (pure)', () => {
     expect(isPrivateAddress('fe80::1', 6)).toBe(true);
     expect(isPrivateAddress('fd00::1', 6)).toBe(true);
     expect(isPrivateAddress('::ffff:10.0.0.1', 6)).toBe(true);
+    expect(isPrivateAddress('::ffff:0a00:0001', 6)).toBe(true);
+    expect(isPrivateAddress('::ffff:c0a8:0001', 6)).toBe(true);
     // public
     expect(isPrivateAddress('171.67.215.200', 4)).toBe(false); // stanford-ish public v4
     expect(isPrivateAddress('2606:4700::1111', 6)).toBe(false);
+    expect(isPrivateAddress('::ffff:0808:0808', 6)).toBe(false);
   });
 });
 
@@ -155,11 +180,27 @@ describe('safeFetchInstitutionPage (dns + fetch mocked)', () => {
     undiciFetch.mockReset();
   });
 
+  const streamBody = (body, events = []) => {
+    const chunks = [new TextEncoder().encode(body)];
+    return {
+      getReader: () => ({
+        read: async () => {
+          events.push('read');
+          const value = chunks.shift();
+          return value ? { done: false, value } : { done: true };
+        },
+        cancel: async () => {
+          events.push('cancel');
+        },
+      }),
+    };
+  };
+
   const htmlResponse = (body, { status = 200, contentType = 'text/html' } = {}) => ({
     ok: status >= 200 && status < 300,
     status,
     headers: { get: (k) => (k.toLowerCase() === 'content-type' ? contentType : null) },
-    text: async () => body,
+    body: streamBody(body),
   });
 
   it('fetches an allowed host and returns the body text', async () => {
@@ -188,10 +229,24 @@ describe('safeFetchInstitutionPage (dns + fetch mocked)', () => {
     undiciFetch.mockResolvedValue({
       status: 302,
       headers: { get: (k) => (k.toLowerCase() === 'location' ? 'https://evil.com/x' : null) },
-      text: async () => '',
+      body: streamBody(''),
     });
     await expect(safeFetchInstitutionPage('https://web.stanford.edu/', { allowedDomain: 'stanford.edu' }))
       .rejects.toThrow(/not within/);
+  });
+
+  it('re-validates redirect DNS and rejects a same-domain second hop resolving private', async () => {
+    dnsPromises.lookup
+      .mockResolvedValueOnce(publicV4)
+      .mockResolvedValueOnce([{ address: '10.0.0.5', family: 4 }]);
+    undiciFetch.mockResolvedValue({
+      status: 302,
+      headers: { get: (k) => (k.toLowerCase() === 'location' ? 'https://web.stanford.edu/private' : null) },
+      body: streamBody(''),
+    });
+    await expect(safeFetchInstitutionPage('https://web.stanford.edu/', { allowedDomain: 'stanford.edu' }))
+      .rejects.toThrow(/private\/reserved/);
+    expect(undiciFetch).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a non-HTML content-type', async () => {
@@ -203,5 +258,39 @@ describe('safeFetchInstitutionPage (dns + fetch mocked)', () => {
   it('requires allowedDomain', async () => {
     await expect(safeFetchInstitutionPage('https://web.stanford.edu/', {}))
       .rejects.toThrow(/allowedDomain is required/);
+  });
+
+  it('caps the body before appending an over-limit chunk', async () => {
+    const events = [];
+    undiciFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: (k) => (k.toLowerCase() === 'content-type' ? 'text/html' : null) },
+      body: streamBody('abcdef', events),
+    });
+    const r = await safeFetchInstitutionPage('https://web.stanford.edu/~p/', {
+      allowedDomain: 'stanford.edu',
+      maxBytes: 5,
+    });
+    expect(r.text).toBe('abcde');
+    expect(events).toContain('cancel');
+  });
+
+  it('aborts a stalled body read under the page deadline', async () => {
+    undiciFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: (k) => (k.toLowerCase() === 'content-type' ? 'text/html' : null) },
+      body: {
+        getReader: () => ({
+          read: () => new Promise(() => {}),
+          cancel: async () => {},
+        }),
+      },
+    });
+    await expect(safeFetchInstitutionPage('https://web.stanford.edu/~p/', {
+      allowedDomain: 'stanford.edu',
+      timeoutMs: 10,
+    })).rejects.toThrow(/institution_page_timeout/);
   });
 });

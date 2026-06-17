@@ -102,4 +102,19 @@ describe('_attachEmailFromResolvedPage', () => {
       .rejects.toThrow();
     expect(safeFetchInstitutionPage).not.toHaveBeenCalled();
   });
+
+  it('propagates an in-flight abort from the page fetch', async () => {
+    const result = makeResult();
+    const ac = new AbortController();
+    safeFetchInstitutionPage.mockImplementation((_url, { signal }) => new Promise((_, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    }));
+
+    const pending = ContactEnrichmentService._attachEmailFromResolvedPage(candidate, result, { signal: ac.signal });
+    expect(safeFetchInstitutionPage).toHaveBeenCalledTimes(1);
+    ac.abort(new Error('reviewer_time_budget_exceeded'));
+
+    await expect(pending).rejects.toThrow(/reviewer_time_budget_exceeded/);
+    expect(result.contactEnrichment.email).toBeNull();
+  });
 });

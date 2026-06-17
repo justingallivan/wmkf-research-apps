@@ -12,8 +12,8 @@
   `d.endsWith('.'+host)` and the email-style hyphen-stripping normalization from *fetch
   authorization* (those belong to email-domain *validation*, not URL gating). Use plain
   lowercase/IDNA host comparison (§3).
-- **Private-IP block covers IPv6** (`::`, `0.0.0.0`, IPv4-mapped, `fe80::/10`, AAAA records) and the
-  spec acknowledges the residual `dns.lookup`→connect TOCTOU window (§3).
+- **Private-IP block covers IPv6** (`::`, `0.0.0.0`, IPv4-mapped incl. hex-form, `fe80::/10`, AAAA
+  records); the `dns.lookup`→connect TOCTOU window is CLOSED via undici IP-pinning (S265 post-impl, §3).
 - **Page-grounding requires candidate-email *association*, not just candidate-identity-on-page** — a
   single email on a "Philip Bucksbaum Lab" page that belongs to a lab admin must NOT be trusted (§5).
 - New §9 negative fixture: PI-named lab/group page with one non-PI admin email → abstain.
@@ -97,10 +97,10 @@ Enforced, on the initial request **and every redirect hop** (manual redirect loo
    (unspecified), `fe80::/10` (v6 link-local), and IPv4-mapped-IPv6 private ranges (`::ffff:10.x`,
    etc.) — normalize a mapped address to its v4 form before range-checking. Check AAAA records too,
    not just A. (safe-fetch's static allowlist doesn't do this; required because the host is not
-   statically trusted.) **Residual risk (documented, accepted for v1):** a `dns.lookup`→`fetch`
-   TOCTOU/rebinding window remains since Node's `fetch` re-resolves on connect; mitigated by the
-   host predicate (the host must already be a real public university domain) + the text/html +
-   size + timeout caps. IP-pinning a custom agent is a post-v1 hardening, not a v1 blocker.
+   statically trusted.) **DNS-rebind TOCTOU — CLOSED in implementation (S265 post-impl):** the
+   fetch uses an undici `Agent` whose `connect.lookup` returns ONLY the pre-validated public IP, so
+   the socket connects to the address we checked (no re-resolution window). TLS SNI/cert validation
+   still uses the hostname. Also handles hex-form IPv4-mapped IPv6 (`::ffff:0a00:0001`).
 4. **Caps:** `timeoutMs` composed with the caller `signal` AND the remaining deadline (min of the
    three), via the `openalex-service.js` signal-composition pattern; stream-read with a hard
    `maxBytes` cutoff; require `Content-Type` `text/html` or `text/plain`.
@@ -108,8 +108,8 @@ Enforced, on the initial request **and every redirect hop** (manual redirect loo
 
 **Feature flag:** `REVIEWER_PAGE_EMAIL_TIER_ENABLED` (default off for first rollout). No coarse
 academic-TLD allowlist — the OpenAlex domain binding is strictly better and avoids `.org/.gov/.de`
-false negatives. (Codex Q5.1/Q5.2: domain-binding + caps acceptable for v1; IP-pinning documented
-as residual risk, not a v1 blocker.)
+false negatives. (Codex Q5.1/Q5.2: domain-binding + caps acceptable; IP-pinning IMPLEMENTED in the
+post-impl pass — the TOCTOU residual is closed, not merely documented.)
 
 ## 4. Where it runs (sequencing)
 
@@ -200,8 +200,8 @@ the unverifiable paid web_search email.
 
 1. SSRF model — **accepted**: shared `safe-fetch` dynamic predicate, exact/subdomain binding,
    redirect+IP+type+size+time caps, feature flag; no academic-TLD allowlist.
-2. DNS rebinding / IP pin — **not a v1 blocker**; document residual risk; test private-IP rejection
-   on initial + redirect hops.
+2. DNS rebinding / IP pin — **IP-pinning IMPLEMENTED** (undici `connect.lookup` → pre-validated IP);
+   private-IP rejection tested on initial + redirect hops.
 3. No-verified-domain fallback to discovery affiliation — **no** (don't weaken the existing abstain).
 4. URL quality — **person-specificity ordering** + skip Scholar search link (§4.2).
 5. Multiple plausible emails — **abstain** (§5).
