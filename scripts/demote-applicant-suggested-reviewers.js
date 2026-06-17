@@ -47,9 +47,10 @@ function fail(message) {
 }
 
 function usage() {
-  console.log(`Usage: node scripts/demote-applicant-suggested-reviewers.js [--apply]
+  console.log(`Usage: node scripts/demote-applicant-suggested-reviewers.js [--dry-run | --apply]
 
-Default is dry-run. --apply writes wmkf_selected=false for inert rows only.`);
+Default is dry-run (also selectable explicitly with --dry-run). --apply writes
+wmkf_selected=false for inert rows only.`);
 }
 
 async function queryAll(client, entitySet, params) {
@@ -91,7 +92,9 @@ async function main() {
   }
   const apply = args.has('--apply');
   for (const arg of args) {
-    if (arg !== '--apply') fail(`Unknown argument: ${arg}`);
+    // --dry-run is the default and accepted explicitly as a no-op so an operator
+    // who types it (the natural thing to do) isn't rejected as "unknown argument".
+    if (arg !== '--apply' && arg !== '--dry-run') fail(`Unknown argument: ${arg}`);
   }
 
   loadEnvLocal();
