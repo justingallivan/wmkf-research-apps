@@ -28,9 +28,11 @@
 - "idempotent"/"no re-stamp"/"reuse existing guard"/"backward compatible" claim: feedback-idempotency-name-the-mechanism.md
 - Adding a branch/type/gate, or EXEMPTING a path from a gate (check the complement/fall-through): feedback-scrutinize-exemptions-and-fallthrough.md
 - rtk reference: project-rtk-grep-output-corruption.md
+- Checking a Vercel deploy after push (use `vercel inspect`, don't poll-grep `vercel ls` for the hash): feedback-deployment-monitoring-use-inspect.md
 
 ## Working Norms
 - Reviewer-finder utility vs precision (before another identity/namesake/affiliation fix): feedback-prioritize-contact-recall-over-identity-precision.md
+- Manual affiliation edit on reviewer card → do NOT add COI re-check (owner decision): feedback-manual-affiliation-edit-no-coi-recheck.md
 - Thoroughness / completion posture: feedback-thoroughness-default.md; feedback-drive-to-completion.md; feedback-truncation-is-breakage-not-completion.md
 - Bug found in review: feedback-real-fix-not-design-note.md
 - Before declaring a slice done / committing code / delegating a review (verify+fan-out+boundary+concurrency self-pass): feedback-self-review-before-delegating-review.md
