@@ -54,6 +54,15 @@ describe('classifyContactOutcome — per-bucket', () => {
     expect(out.detail).toContain('claude:name_mismatch');
   });
 
+  test('lead_found_not_persisted for a Serp name-mismatch discard', () => {
+    const out = classifyContactOutcome({
+      email: null,
+      tierResults: { serp_search: { emailRejectedReason: 'name_mismatch' } },
+    });
+    expect(out.bucket).toBe('lead_found_not_persisted');
+    expect(out.detail).toContain('serp:name_mismatch');
+  });
+
   test('namesake_ambiguous from the resolver verdict', () => {
     const out = classifyContactOutcome({ email: null, identity: { status: 'ambiguous' } });
     expect(out.bucket).toBe('namesake_ambiguous');
