@@ -71,6 +71,11 @@ describe('_attachOpenAlexMetrics — identity gate before persisting metrics (Sl
     jest.spyOn(ContactEnrichmentService, 'saveToDatabase').mockResolvedValue(undefined);
     jest.spyOn(ContactParser, 'extractPrimaryEmail').mockReturnValue('x@mit.edu');
     jest.spyOn(OpenAlexService, 'getInstitution').mockResolvedValue(null);
+    // S266: the ORCID metrics path now resolves via getRichestAuthorByOrcid; delegate it
+    // to the per-test getAuthorByOrcid mock so existing author fixtures apply unchanged
+    // (richest-among-split selection is unit-tested in openalex-service.test.js).
+    jest.spyOn(OpenAlexService, 'getRichestAuthorByOrcid')
+      .mockImplementation((o, opts) => OpenAlexService.getAuthorByOrcid(o, opts));
   });
   afterEach(() => jest.restoreAllMocks());
 

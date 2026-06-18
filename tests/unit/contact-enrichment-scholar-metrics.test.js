@@ -39,6 +39,10 @@ describe('enrichCandidate — OpenAlex metrics fetched even for early-email cand
   beforeEach(() => {
     jest.spyOn(ContactEnrichmentService, 'saveToDatabase').mockResolvedValue(undefined);
     byOrcidSpy = jest.spyOn(OpenAlexService, 'getAuthorByOrcid').mockResolvedValue(AUTHOR);
+    // S266: ORCID metrics path resolves via getRichestAuthorByOrcid; delegate to the
+    // getAuthorByOrcid mock (richest-selection is unit-tested in openalex-service.test.js).
+    jest.spyOn(OpenAlexService, 'getRichestAuthorByOrcid')
+      .mockImplementation((o, opts) => OpenAlexService.getAuthorByOrcid(o, opts));
     byIdSpy = jest.spyOn(OpenAlexService, 'getAuthorById').mockResolvedValue(AUTHOR);
     institutionSpy = jest.spyOn(OpenAlexService, 'getInstitution').mockResolvedValue({
       openAlexId: AUTHOR.lastKnownInstitutionId,

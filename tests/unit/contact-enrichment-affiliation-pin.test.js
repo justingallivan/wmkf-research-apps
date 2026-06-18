@@ -119,6 +119,11 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
     // OpenAlex now. Default the lookups to "no author" / "no institution"; each test
     // overrides getAuthorByOrcid when it wants an accepted (strong-anchor) author.
     jest.spyOn(OpenAlexService, 'getAuthorByOrcid').mockResolvedValue(null);
+    // S266: ORCID metrics path resolves via getRichestAuthorByOrcid; delegate to the
+    // getAuthorByOrcid mock so each test's override applies (richest-selection is
+    // unit-tested in openalex-service.test.js).
+    jest.spyOn(OpenAlexService, 'getRichestAuthorByOrcid')
+      .mockImplementation((o, opts) => OpenAlexService.getAuthorByOrcid(o, opts));
     jest.spyOn(OpenAlexService, 'getAuthorById').mockResolvedValue(null);
     jest.spyOn(OpenAlexService, 'getInstitution').mockResolvedValue(null);
   });

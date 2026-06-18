@@ -279,6 +279,25 @@ describe('OpenAlexService.getRichestAuthorByOrcid (S266 — ORCID author-split)'
     await OpenAlexService.getRichestAuthorByOrcid(VALID_ORCID, { signal: controller.signal });
     expect(safeFetch.mock.calls[0][1].signal).toBeTruthy();
   });
+
+  test('PROPAGATES a non-404 error (timeout) instead of degrading to the canonical lookup', async () => {
+    // Codex post-impl MEDIUM: a list-layer timeout must NOT silently fall back to the
+    // stub-prone canonical path — it rethrows like getAuthorByOrcid.
+    safeFetch.mockRejectedValue(Object.assign(new Error('boom'), { code: 'openalex_timeout' }));
+    // Rejecting (rather than resolving) proves it did NOT fall back to the canonical lookup.
+    await expect(OpenAlexService.getRichestAuthorByOrcid(VALID_ORCID)).rejects.toThrow('boom');
+  });
+
+  test('a 404 on the list form falls back to the canonical single-entity lookup', async () => {
+    safeFetch
+      .mockResolvedValueOnce(jsonResponse({}, 404)) // list form 404
+      .mockResolvedValueOnce(jsonResponse({
+        id: 'https://openalex.org/A_CANON', orcid: `https://orcid.org/${VALID_ORCID}`, works_count: 7,
+      }));
+    const out = await OpenAlexService.getRichestAuthorByOrcid(VALID_ORCID);
+    expect(out.openAlexId).toBe('https://openalex.org/A_CANON');
+    expect(safeFetch.mock.calls[1][0]).toContain(`/authors/https://orcid.org/${VALID_ORCID}`);
+  });
 });
 
 describe('mapAuthorRecord — Slice 1b bibliometrics + institution refs', () => {
