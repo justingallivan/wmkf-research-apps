@@ -41,6 +41,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '../Layout';
 import { readSseStream } from './sse';
 import ReviewerPromptOverridePanel from './ReviewerPromptOverridePanel';
+import ContactLeads from './ContactLeads';
 import {
   mergeEnrichment,
   parseExcludeList,
@@ -344,6 +345,16 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
                 </a>
               )}
             </div>
+          )}
+
+          {/* Slice 3: quarantined contact leads — only when there's no usable
+              email (the recovery case) and identity is verified enough to show
+              contact. Read-only display; "Use this email" promotion is Slice 4.
+              Deduped against the website chip already shown above. NOTE: leads
+              live on the live-enriched contactEnrichment; roster-reloaded rows
+              drop them until Slice 5 persists a compact form. */}
+          {!identityUnverified && !email && (
+            <ContactLeads leads={enr.contactLeads} hideValues={[website]} />
           )}
 
           <div className="mt-2 flex items-center gap-3">

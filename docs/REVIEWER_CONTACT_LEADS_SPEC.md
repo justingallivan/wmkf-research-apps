@@ -269,6 +269,16 @@ Acceptance:
 
 ### Slice 3: Candidate Card Display
 
+**Status: IMPLEMENTED (S267).** `shared/components/reviewers/ContactLeads.js` (read-only)
+renders `contactEnrichment.contactLeads` in the workbench/find card
+(`ReviewerSearchSection` `CandidateCard`), gated on `!identityUnverified && !email` and
+deduped against the website chip already shown. High/medium leads show prominently;
+low/rejected collapse behind a "Show N weak / rejected leads" toggle, each with the reason
+it was not auto-used. No promotion action yet — "Use this email" is Slice 4. With only
+Slice 2a confidences assigned today (low for pages, rejected for discards), the prominent
+slot is usually empty and leads live behind the toggle. Leads ride the live-enriched
+`contactEnrichment`; roster-reloaded rows drop them until Slice 5 persists a compact form.
+
 Render contact leads separately from verified contact fields.
 
 UI shape:

@@ -78,6 +78,8 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 
 **Re-verify removed intentionally:** The "Re-verify" button was dropped because enrichment output is static within a cycle (COI computed against a fixed proposal author list; PubMed/Scholar data stable over weeks). The only valid re-run use case is error recovery ("Try again"). Do not restore a general re-verify — if a re-resolve-after-edit pattern is ever needed, see the Future Work section in `reviewer-identity.md`.
 
+**Contact leads display (S267, Slice 3):** `shared/components/reviewers/ContactLeads.js` renders the quarantined `contactEnrichment.contactLeads` (Slice 2a) in `ReviewerSearchSection`'s `CandidateCard`, gated on `!identityUnverified && !email` and deduped against the website chip. Read-only — high/medium leads prominent, low/rejected behind a "Show N weak / rejected leads" toggle with the not-auto-used reason; the "Use this email" promotion is Slice 4 (not built). `mergeEnrichment` preserves `contactLeads` on live-enriched rows (it spreads the full enrichment object), but `pruneCandidateForRoster` strips it, so roster-reloaded rows show no leads until Slice 5 persists a compact form. Spec/status: `docs/REVIEWER_CONTACT_LEADS_SPEC.md`; produced in `contact-enrichment-service.js` (see reviewer-identity topic).
+
 ## Recurring Hazards
 
 - Roster reload must preserve fields that keep deferred/unresolved/conflicted rows non-selectable.
