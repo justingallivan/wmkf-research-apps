@@ -899,9 +899,15 @@ export default function ReviewerSearchSection({
       if (candKey(c) !== key) return c;
       const enr = { ...(c.contactEnrichment || {}) };
       const next = { ...c, contactEnrichment: enr };
+      // A manual email OR website is a staff override of the contact-quality
+      // abstain (e.g. verified_domain_contradiction) — clear it for both so save
+      // can persist the typed value (Codex review LOW: website edits were missing
+      // this clear, so a withheld-by-domain row's manual website was blocked).
+      if ('email' in updates || 'website' in updates) {
+        enr.contactStatus = null; enr.contactStatusReason = null;
+      }
       if ('email' in updates) {
         const email = updates.email || null;
-        enr.contactStatus = null; enr.contactStatusReason = null;
         enr.email = email; enr.emailSource = email ? 'manual' : null; enr.emailPersistAllowed = !!email;
         next.email = email; next.emailSource = email ? 'manual' : null; next.emailPersistAllowed = !!email;
       }
@@ -918,7 +924,8 @@ export default function ReviewerSearchSection({
       if ('hIndex' in updates) {
         const h = updates.hIndex;
         const parsed = (h === '' || h == null) ? null : Number(h);
-        enr.hIndex = parsed; next.hIndex = parsed;
+        const safe = Number.isFinite(parsed) ? parsed : null; // guard NaN (Codex review LOW)
+        enr.hIndex = safe; next.hIndex = safe;
       }
       return next;
     };
