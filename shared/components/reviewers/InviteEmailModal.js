@@ -144,6 +144,7 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
     setEdits((prev) => ({ ...prev, [suggestionId]: { ...prev[suggestionId], [field]: value } }));
 
   const sendable = drafts.filter((d) => !d.skipped && d.candidateEmail);
+  const capturedSent = results.sent.filter((r) => r.capturedEmail);
   // Slice G — recipients whose email isn't anchored to the resolved identity (manual entry,
   // affiliation-derived, unknown source, or a search email on an unconfirmed identity). They
   // are still sendable, but staff must consciously confirm before inviting (guards the S234
@@ -309,7 +310,38 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
 
           {(step === 'sent' || step === 'error') && (
             <div className="space-y-2 text-sm">
-              <p className="text-green-700">Sent {results.sent.length} invitation(s).</p>
+              {capturedSent.length > 0 ? (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-900">
+                  <p className="font-medium">Captured {capturedSent.length} invitation email{capturedSent.length === 1 ? '' : 's'} for rehearsal.</p>
+                  <p className="mt-1 text-xs text-blue-800">
+                    No Dynamics email was sent. Review the generated artifact below, then use its Start Review link for the reviewer-side test.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-green-700">Sent {results.sent.length} invitation(s).</p>
+              )}
+              {capturedSent.length > 0 && (
+                <div className="space-y-2">
+                  {capturedSent.map((r) => (
+                    <details key={r.suggestionId || r.emailId} className="rounded-lg border border-gray-200 bg-white p-3">
+                      <summary className="cursor-pointer text-sm font-medium text-gray-900">
+                        {r.candidateName || r.capturedEmail.candidateName || 'Captured invitation'} &lt;{r.capturedEmail.to || 'unknown recipient'}&gt;
+                      </summary>
+                      <div className="mt-2 space-y-2">
+                        <p className="text-xs text-gray-600">
+                          <span className="font-medium">Subject:</span> {r.capturedEmail.subject || r.subject || '(no subject)'}
+                        </p>
+                        <textarea
+                          readOnly
+                          rows={8}
+                          className="w-full rounded border border-gray-300 bg-gray-50 px-2 py-1 font-mono text-xs text-gray-700"
+                          value={r.capturedEmail.htmlBody || ''}
+                        />
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              )}
               {results.skipped.length > 0 && (
                 <p className="text-amber-700">
                   Skipped {results.skipped.length}: {results.skipped.map((s) => `${s.candidateName || '?'} (${s.reason})`).join(', ')}
