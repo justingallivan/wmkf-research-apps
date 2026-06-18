@@ -213,6 +213,74 @@ describe('OpenAlexService.getAuthorByOrcid (S240)', () => {
   });
 });
 
+describe('OpenAlexService.getRichestAuthorByOrcid (S266 — ORCID author-split)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const VALID_ORCID = '0000-0002-1825-0097';
+
+  test('picks the richest entity when an ORCID is split across multiple authors', async () => {
+    // The Landsman case: one ORCID → a 139-work record AND a 1-work stub.
+    safeFetch.mockResolvedValue(jsonResponse({
+      meta: { count: 2 },
+      results: [
+        { id: 'https://openalex.org/A_STUB', display_name: 'Alexandra Landsman',
+          orcid: `https://orcid.org/${VALID_ORCID}`, works_count: 1,
+          summary_stats: { h_index: 0 }, cited_by_count: 0 },
+        { id: 'https://openalex.org/A_FULL', display_name: 'Alexandra S. Landsman',
+          orcid: `https://orcid.org/${VALID_ORCID}`, works_count: 139,
+          summary_stats: { h_index: 25 }, cited_by_count: 4200 },
+      ],
+    }));
+
+    const out = await OpenAlexService.getRichestAuthorByOrcid(VALID_ORCID);
+    expect(out.openAlexId).toBe('https://openalex.org/A_FULL');
+    expect(out.worksCount).toBe(139);
+    expect(out.hIndex).toBe(25);
+    expect(out.orcid).toBe(VALID_ORCID);
+    // Uses the LIST/filter form, not the single-object path form.
+    const url = safeFetch.mock.calls[0][0];
+    expect(url).toContain(`filter=orcid%3A${VALID_ORCID}`);
+    expect(url).not.toContain('/authors/https://orcid.org/');
+  });
+
+  test('tiebreaks on h-index then citations when works_count ties', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({
+      results: [
+        { id: 'https://openalex.org/A1', orcid: `https://orcid.org/${VALID_ORCID}`, works_count: 10, summary_stats: { h_index: 5 }, cited_by_count: 100 },
+        { id: 'https://openalex.org/A2', orcid: `https://orcid.org/${VALID_ORCID}`, works_count: 10, summary_stats: { h_index: 9 }, cited_by_count: 50 },
+      ],
+    }));
+    const out = await OpenAlexService.getRichestAuthorByOrcid(VALID_ORCID);
+    expect(out.openAlexId).toBe('https://openalex.org/A2'); // higher h-index wins the tie
+  });
+
+  test('falls back to the canonical single-entity lookup when the list form is empty', async () => {
+    safeFetch
+      .mockResolvedValueOnce(jsonResponse({ meta: { count: 0 }, results: [] })) // list form: empty
+      .mockResolvedValueOnce(jsonResponse({ // path-form fallback
+        id: 'https://openalex.org/A_ONLY', display_name: 'Solo', orcid: `https://orcid.org/${VALID_ORCID}`, works_count: 42,
+      }));
+    const out = await OpenAlexService.getRichestAuthorByOrcid(VALID_ORCID);
+    expect(out.openAlexId).toBe('https://openalex.org/A_ONLY');
+    expect(safeFetch.mock.calls[1][0]).toContain(`/authors/https://orcid.org/${VALID_ORCID}`);
+  });
+
+  test('returns null for an invalid ORCID WITHOUT calling the API', async () => {
+    const out = await OpenAlexService.getRichestAuthorByOrcid('1234567');
+    expect(out).toBeNull();
+    expect(safeFetch).not.toHaveBeenCalled();
+  });
+
+  test('threads the abort signal through to safeFetch', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({ results: [{ id: 'A1', orcid: `https://orcid.org/${VALID_ORCID}`, works_count: 1 }] }));
+    const controller = new AbortController();
+    await OpenAlexService.getRichestAuthorByOrcid(VALID_ORCID, { signal: controller.signal });
+    expect(safeFetch.mock.calls[0][1].signal).toBeTruthy();
+  });
+});
+
 describe('mapAuthorRecord — Slice 1b bibliometrics + institution refs', () => {
   beforeEach(() => jest.clearAllMocks());
 
