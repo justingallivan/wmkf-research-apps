@@ -183,4 +183,21 @@ describe('researcher.upsertByPotentialReviewer — writes bibliometrics onto the
     expect(payload.wmkf_primaryaffiliation).toBeUndefined(); // already set → not overwritten
     expect(payload.wmkf_hindex).toBe(9);                     // metric always overwrites
   });
+
+  // Contact-leads Slice 4 (Codex MED): a manual email source is authoritative and
+  // must overwrite a stale value, so a promoted lead reads as `manual` (low) at
+  // invite time — unlike other descriptive fields, which stay fill-only.
+  test("emailSource:'manual' OVERWRITES an existing source; a non-manual source stays fill-only", async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_potentialreviewersid: 'pr-3', wmkf_emailsource: 'orcid',
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    await upsertByPotentialReviewer('pr-3', { email: 'x@y.edu', emailSource: 'manual' });
+    expect(update.mock.calls[0][2].wmkf_emailsource).toBe('manual'); // staff assertion wins
+
+    update.mockClear();
+    await upsertByPotentialReviewer('pr-3', { email: 'x@y.edu', emailSource: 'serp_search' });
+    expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined(); // non-manual: fill-only, not overwritten
+  });
 });
