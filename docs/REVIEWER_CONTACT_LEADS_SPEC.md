@@ -216,6 +216,18 @@ Acceptance:
 
 ### Slice 2a: Surface Existing Discards As Leads
 
+**Status: IMPLEMENTED (S267).** `ContactEnrichmentService` now collects
+`contactEnrichment.contactLeads[]` from contacts the tiers already fetched but discarded —
+with no new network calls. Capture points: `_validateEmailAgainstVerifiedDomain` (the
+verified-domain-contradiction class, the largest missing-email bucket per Slice 1) captures
+before nulling; `_collectContactLeads` (in `_finalize`) reads the anchor-contradiction +
+name-mismatch markers on `tierResults` and promotes a faculty/profile page found without an
+email. Name-mismatch email values are preserved on `rejectedEmail` by a pre-null hook in
+both the Claude tier (`claudeWebSearch`) and the Serp tier. `_addContactLead` is the single
+push point and force-sets `persistable:false` (the quarantine guarantee). Default-on for
+both enrichment routes (no toggle). Display (Slice 3) and roster persistence (Slice 5) still
+TODO — leads currently ride the in-memory enrichment result / SSE complete event only.
+
 Extend `ContactEnrichmentService.enrichCandidate` to collect `contactEnrichment.contactLeads = []`.
 
 Collection rules:
