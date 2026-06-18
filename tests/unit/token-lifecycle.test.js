@@ -6,7 +6,7 @@
 
 import { jest } from '@jest/globals';
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
-import { mintAndStore, revoke, buildExternalUrl, ensureToken, extendForPostSubmissionWindow } from '../../lib/external/token-lifecycle.js';
+import { mintAndStore, revoke, buildExternalUrl, getReviewerPortalBaseUrl, ensureToken, extendForPostSubmissionWindow } from '../../lib/external/token-lifecycle.js';
 import { hashToken } from '../../lib/services/external-token.js';
 
 const SECRET = 'test-secret-32-chars-min-aaaaaaaaaaaa';
@@ -17,13 +17,16 @@ let originalUpdate;
 let originalGetRecord;
 let originalSecret;
 let originalNextauth;
+let originalReviewerPortalBaseUrl;
 
 describe('token-lifecycle', () => {
   beforeEach(() => {
     originalSecret = process.env.EXTERNAL_LINK_SECRET;
     originalNextauth = process.env.NEXTAUTH_URL;
+    originalReviewerPortalBaseUrl = process.env.REVIEWER_PORTAL_BASE_URL;
     process.env.EXTERNAL_LINK_SECRET = SECRET;
     process.env.NEXTAUTH_URL = 'https://reviewer.example.com';
+    delete process.env.REVIEWER_PORTAL_BASE_URL;
     originalUpdate = DynamicsService.updateRecord;
     originalGetRecord = DynamicsService.getRecord;
     DynamicsService.updateRecord = jest.fn().mockResolvedValue({});
@@ -34,6 +37,8 @@ describe('token-lifecycle', () => {
     else process.env.EXTERNAL_LINK_SECRET = originalSecret;
     if (originalNextauth === undefined) delete process.env.NEXTAUTH_URL;
     else process.env.NEXTAUTH_URL = originalNextauth;
+    if (originalReviewerPortalBaseUrl === undefined) delete process.env.REVIEWER_PORTAL_BASE_URL;
+    else process.env.REVIEWER_PORTAL_BASE_URL = originalReviewerPortalBaseUrl;
     DynamicsService.updateRecord = originalUpdate;
     DynamicsService.getRecord = originalGetRecord;
   });
@@ -219,15 +224,27 @@ describe('token-lifecycle', () => {
   });
 
   describe('buildExternalUrl', () => {
-    test('joins NEXTAUTH_URL and the JWT', () => {
+    test('joins REVIEWER_PORTAL_BASE_URL and the JWT when configured', () => {
+      process.env.REVIEWER_PORTAL_BASE_URL = 'https://reviews.wmkeck.org';
+      expect(buildExternalUrl('abc.def.ghi')).toBe(
+        'https://reviews.wmkeck.org/external/review/abc.def.ghi',
+      );
+    });
+
+    test('falls back to NEXTAUTH_URL and the JWT', () => {
       expect(buildExternalUrl('abc.def.ghi')).toBe(
         'https://reviewer.example.com/external/review/abc.def.ghi',
       );
     });
 
     test('strips trailing slash on the base', () => {
-      process.env.NEXTAUTH_URL = 'https://reviewer.example.com/';
-      expect(buildExternalUrl('xyz')).toBe('https://reviewer.example.com/external/review/xyz');
+      process.env.REVIEWER_PORTAL_BASE_URL = 'https://reviews.wmkeck.org/';
+      expect(buildExternalUrl('xyz')).toBe('https://reviews.wmkeck.org/external/review/xyz');
+    });
+
+    test('reports the configured reviewer portal base URL', () => {
+      process.env.REVIEWER_PORTAL_BASE_URL = 'https://reviews.wmkeck.org/';
+      expect(getReviewerPortalBaseUrl()).toBe('https://reviews.wmkeck.org');
     });
   });
 });

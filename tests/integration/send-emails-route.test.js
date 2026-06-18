@@ -14,7 +14,7 @@
 
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(async () => ({
-    session: { user: { azureEmail: 'staff@wmkf.org', dynamicsSystemuserId: 'u-1' } },
+    session: { user: { azureEmail: 'staff@wmkeck.org', dynamicsSystemuserId: 'u-1' } },
   })),
 }));
 jest.mock('../../shared/api/middleware/rateLimiter', () => ({
@@ -143,6 +143,7 @@ function events(res) {
 const resultOf = (res) => events(res).find((e) => e.event === 'result')?.data;
 const attachmentsSent = () => createAndSendEmail.mock.calls[0][0].attachments;
 const filenamesSent = () => attachmentsSent().map((a) => a.filename);
+const htmlBodySent = () => createAndSendEmail.mock.calls[0][0].body;
 
 async function run(body) {
   const req = createMockReq({ method: 'POST', query: {}, body });
@@ -205,6 +206,39 @@ describe('send-emails — hold calendar lane', () => {
     const res = await run({ drafts: [draft()], templateType: 'hold', confirmedLowConfidenceIds: [SUG_1] });
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
     expect(resultOf(res).stats.sent).toBe(1);
+  });
+});
+
+describe('send-emails — reviewer portal HTML links', () => {
+  test('external reviewer URLs render as a button with a fallback link', async () => {
+    await run({
+      drafts: [{
+        suggestionId: SUG_1,
+        subject: 'S',
+        body: 'Please use your secure personal link:\nhttps://reviews.wmkeck.org/external/review/token.value\n\nThank you',
+      }],
+      templateType: 'invitation',
+    });
+
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(htmlBodySent()).toContain('Start Review');
+    expect(htmlBodySent()).toContain('This secure link is unique to you');
+    expect(htmlBodySent()).toContain('https://reviews.wmkeck.org/external/review/token.value');
+    expect(htmlBodySent()).toContain('<table role="presentation"');
+  });
+
+  test('ordinary URLs still render as plain links', async () => {
+    await run({
+      drafts: [{
+        suggestionId: SUG_1,
+        subject: 'S',
+        body: 'Read more: https://example.org/info',
+      }],
+      templateType: 'invitation',
+    });
+
+    expect(htmlBodySent()).toContain('<a href="https://example.org/info">https://example.org/info</a>');
+    expect(htmlBodySent()).not.toContain('Start Review');
   });
 });
 

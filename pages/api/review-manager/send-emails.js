@@ -589,17 +589,47 @@ async function loadCycleConfigs(cycleCodes) {
   return out;
 }
 
-function plainTextToHtml(text) {
+export function plainTextToHtml(text) {
   if (!text) return '';
-  const escaped = String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  const escaped = escapeHtml(String(text));
   const linked = escaped.replace(
     /(https?:\/\/[^\s<]+)/g,
-    (m) => `<a href="${m}">${m}</a>`,
+    (m) => isExternalReviewUrl(m)
+      ? reviewPortalButtonHtml(m)
+      : `<a href="${escapeAttribute(m)}">${m}</a>`,
   );
   return linked.replace(/\r\n|\r|\n/g, '<br>');
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function escapeAttribute(value) {
+  return String(value)
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function isExternalReviewUrl(url) {
+  return /\/external\/review\/[A-Za-z0-9._~-]+/.test(url);
+}
+
+function reviewPortalButtonHtml(url) {
+  const href = escapeAttribute(url);
+  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0;">
+<tr>
+<td bgcolor="#234c8c" style="border-radius:4px;">
+<a href="${href}" style="display:inline-block;padding:12px 18px;font-family:Arial,sans-serif;font-size:15px;line-height:20px;color:#ffffff;text-decoration:none;font-weight:600;">Start Review</a>
+</td>
+</tr>
+</table>
+<p style="margin:0 0 12px 0;">This secure link is unique to you and was sent by your Foundation program director.</p>
+<p style="margin:0;">If the button does not work, copy and paste this secure link into your browser:<br><a href="${href}">${url}</a></p>`;
 }
 
 // `ref` is either a legacy public blob URL or a private cycle-material pathname
