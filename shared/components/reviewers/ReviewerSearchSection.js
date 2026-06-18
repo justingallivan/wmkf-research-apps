@@ -354,10 +354,16 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
               Deduped against the website chip already shown above. NOTE: leads
               live on the live-enriched contactEnrichment; roster-reloaded rows
               drop them until Slice 5 persists a compact form. */}
-          {!identityUnverified && !email && (
+          {/* Show leads whenever identity is OK and the candidate carries any —
+              NOT gated on !email, so promoting one field (e.g. "Use this email")
+              doesn't hide the still-unfixed website/faculty-page leads. The
+              component self-hides when nothing is left to show, and cleanly
+              resolved candidates carry no leads, so this doesn't clutter cards.
+              hideValues dedups the email/website already shown as primary chips. */}
+          {!identityUnverified && (
             <ContactLeads
               leads={enr.contactLeads}
-              hideValues={[website]}
+              hideValues={[email, website]}
               onUse={!readOnly && canManage && onUseLead ? (lead) => onUseLead(candidate, lead) : undefined}
             />
           )}

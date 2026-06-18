@@ -47,12 +47,15 @@ const CONFIDENCE_RANK = { high: 0, medium: 1, low: 2, rejected: 3 };
 
 /**
  * Leads worth showing: de-duplicate by (type, value), and drop a lead only when
- * it is genuinely REDUNDANT with a contact already shown on the card — i.e. a
- * NON-rejected page/website lead whose URL equals a shown chip (`hideValues`).
- * A `rejected` lead (e.g. a withheld email that happens to share a URL) or any
- * other type is NEVER suppressed by hideValues: the whole point is to surface
- * what the card's primary chips do not (Codex Slice-3 MED — value-only dedup was
- * too blunt and could hide a valid quarantined lead).
+ * its value is ALREADY displayed as the card's primary contact of the same kind:
+ *   - an EMAIL lead equal to the shown email chip (e.g. the one just promoted via
+ *     "Use this email" — it's now the contact above, regardless of its stored
+ *     confidence), or
+ *   - a NON-rejected website/page lead equal to the shown website chip.
+ * A `rejected` website/page lead that merely shares a URL with the chip still
+ * surfaces — its rejection context isn't conveyed by the chip (Codex Slice-3 MED).
+ * Everything else (other-value leads, the website/page leads that remain after an
+ * email is promoted) stays visible so staff can keep fixing the other fields.
  */
 export function visibleLeads(leads, hideValues = []) {
   const hidden = new Set((Array.isArray(hideValues) ? hideValues : []).filter(Boolean));
@@ -60,10 +63,9 @@ export function visibleLeads(leads, hideValues = []) {
   const out = [];
   for (const l of Array.isArray(leads) ? leads : []) {
     if (!l || !l.value) continue;
-    const redundantWithChip =
-      l.confidence !== 'rejected' &&
-      (l.type === 'website' || l.type === 'faculty_page' || l.type === 'profile') &&
-      hidden.has(l.value);
+    const isPage = l.type === 'website' || l.type === 'faculty_page' || l.type === 'profile';
+    const redundantWithChip = hidden.has(l.value)
+      && (l.type === 'email' || (isPage && l.confidence !== 'rejected'));
     if (redundantWithChip) continue;
     const key = `${l.type}:${l.value}`;
     if (seen.has(key)) continue;

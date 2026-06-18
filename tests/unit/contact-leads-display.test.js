@@ -44,13 +44,28 @@ describe('pure helpers', () => {
     expect(visibleLeads([page], ['https://shown.edu'])).toEqual([]);
   });
 
-  test('visibleLeads never suppresses a rejected lead or an email lead via hideValues', () => {
-    // a withheld email that happens to equal a shown chip must still surface
-    const rejectedEmail = lead({ value: 'https://shown.edu' }); // rejected, type email
-    expect(visibleLeads([rejectedEmail], ['https://shown.edu'])).toHaveLength(1);
-    // a rejected page sharing the chip URL also surfaces (different context)
+  test('visibleLeads hides an email lead that equals the shown email chip (e.g. just promoted)', () => {
+    const promoted = lead({ value: 'real@mit.edu' }); // rejected-origin, now the shown email
+    expect(visibleLeads([promoted], ['real@mit.edu'])).toEqual([]);
+  });
+
+  test('visibleLeads keeps a rejected page sharing the chip URL, and an email with a different value', () => {
+    // rejected page sharing the website-chip URL still surfaces (rejection context not on the chip)
     const rejectedPage = { type: 'faculty_page', value: 'https://shown.edu', source: 'serp_search', confidence: 'rejected', rejectedReason: 'identity_anchor_contradiction', persistable: false };
     expect(visibleLeads([rejectedPage], ['https://shown.edu'])).toHaveLength(1);
+    // a withheld email NOT matching any shown chip still surfaces
+    const otherEmail = lead({ value: 'withheld@ifmo.ru' });
+    expect(visibleLeads([otherEmail], ['real@mit.edu', 'https://shown.edu'])).toHaveLength(1);
+  });
+
+  test('after promoting the email, the remaining website/page leads stay visible (the bug fix)', () => {
+    const leads = [
+      lead({ value: 'real@mit.edu' }), // promoted → now the email chip
+      { type: 'website', value: 'https://lab.mit.edu', source: 'serp_search', confidence: 'rejected', persistable: false },
+      { type: 'faculty_page', value: 'https://mit.edu/~x', source: 'serp_search', confidence: 'rejected', persistable: false },
+    ];
+    const out = visibleLeads(leads, ['real@mit.edu']); // email now shown, website not yet
+    expect(out.map((l) => l.type).sort()).toEqual(['faculty_page', 'website']);
   });
 
   test('partitionLeads splits prominent vs collapsed and orders best-first', () => {
