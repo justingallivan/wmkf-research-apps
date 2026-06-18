@@ -307,6 +307,13 @@ export default async function handler(req, res) {
       });
       const enriched = enrichResult.enriched || [];
 
+      // Slice 1 contact-leads audit (REVIEWER_CONTACT_LEADS_SPEC §6): structured
+      // log of the missing-email reason buckets so the dominant-bucket split is
+      // observable in logs before any UI lands. Names only — no proposal content.
+      if (enrichResult?.stats?.contactAudit) {
+        console.log('[enrich-recommended] contact-leads audit:', JSON.stringify(enrichResult.stats.contactAudit));
+      }
+
       // 7 + 8. Writeback per person: sidecar metrics/contact (id-keyed, race-safe)
       //         + deterministic COI match-reason on the junction row.
       const out = [];

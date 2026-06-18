@@ -183,6 +183,14 @@ Bound the search budget:
 
 ### Slice 1: Measurement / Audit
 
+**Status: IMPLEMENTED (S267).** Pure classifier `lib/services/reviewer-contact-audit.js`
+(`classifyContactOutcome` + `summarizeContactOutcomes`); aggregated into
+`results.stats.contactAudit` by `ContactEnrichmentService.enrichCandidates`; logged
+server-side by `enrich-contacts.js` and `workbench/enrich-recommended.js` (and carried
+on the SSE complete-event stats). No behavior/persistence change; UI summary still TODO.
+The classifier reads the post-enrichment `contactStatusReason` / `identity.status` /
+`tierResults`, so the dominant-bucket split is measured, not assumed.
+
 Add a diagnostic report for the last enrichment run or a supplied candidate batch:
 
 Classify missing contact by reason:

@@ -177,6 +177,14 @@ export default async function handler(req, res) {
       });
     }
 
+    // Slice 1 contact-leads audit (REVIEWER_CONTACT_LEADS_SPEC §6): structured
+    // log of the missing-email reason buckets so the dominant-bucket split is
+    // observable in logs before any UI lands. Names only — no proposal content.
+    // The full audit also rides on stats below for the client.
+    if (results?.stats?.contactAudit) {
+      console.log('[enrich-contacts] contact-leads audit:', JSON.stringify(results.stats.contactAudit));
+    }
+
     // Send final results
     sendEvent({
       type: 'complete',
