@@ -96,9 +96,25 @@ describe('<ContactLeads> render', () => {
     expect(screen.queryByText(/Possible contact leads/i)).not.toBeInTheDocument();
   });
 
-  test('never offers a "Use this email" promotion (Slice 4 not implemented)', () => {
+  test('offers no "Use this email" promotion when onUse is absent (read-only / non-manage)', () => {
     render(<ContactLeads leads={[lead()]} />);
     fireEvent.click(screen.getByRole('button', { name: /Show 1 weak/i }));
     expect(screen.queryByRole('button', { name: /use this email/i })).not.toBeInTheDocument();
+  });
+
+  test('Slice 4: when onUse is provided, "Use this email" appears and fires with the lead', () => {
+    const onUse = jest.fn();
+    render(<ContactLeads leads={[lead({ value: 'withheld@ifmo.ru' })]} onUse={onUse} />);
+    fireEvent.click(screen.getByRole('button', { name: /Show 1 weak/i }));
+    const useBtn = screen.getByRole('button', { name: /use this email/i });
+    fireEvent.click(useBtn);
+    expect(onUse).toHaveBeenCalledWith(expect.objectContaining({ value: 'withheld@ifmo.ru' }));
+  });
+
+  test('Slice 4: a page lead offers "Use this page"', () => {
+    const onUse = jest.fn();
+    render(<ContactLeads leads={[{ type: 'faculty_page', value: 'https://u.edu/~p', source: 'serp_search', confidence: 'low', persistable: false }]} onUse={onUse} />);
+    fireEvent.click(screen.getByRole('button', { name: /Show 1 weak/i }));
+    expect(screen.getByRole('button', { name: /use this page/i })).toBeInTheDocument();
   });
 });

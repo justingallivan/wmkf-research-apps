@@ -129,6 +129,30 @@ export function hasValidApplicantEnrichmentCache(rosterActive, proposalKey) {
 }
 
 /**
+ * Slice 5: compact, bounded `contactLeads` for durable roster storage. Keeps only
+ * the fields the card renders (ContactLeads); drops `warnings` (re-derived in the
+ * UI) and `evidence` (unused in display today), and caps count + string lengths so
+ * a roster row stays small and never carries raw provider payloads (spec §7).
+ * `persistable:false` is re-asserted so a roster round-trip can never flip it.
+ */
+export const MAX_ROSTER_CONTACT_LEADS = 8;
+export function pruneContactLeads(leads) {
+  if (!Array.isArray(leads)) return [];
+  return leads
+    .slice(0, MAX_ROSTER_CONTACT_LEADS)
+    .map((l) => ({
+      type: l && l.type ? String(l.type) : null,
+      value: l && typeof l.value === 'string' ? l.value.slice(0, 320) : null,
+      sourceUrl: l && typeof l.sourceUrl === 'string' ? l.sourceUrl.slice(0, 500) : null,
+      source: l && l.source ? String(l.source) : null,
+      confidence: l && l.confidence ? String(l.confidence) : null,
+      rejectedReason: l && l.rejectedReason ? String(l.rejectedReason) : null,
+      persistable: false,
+    }))
+    .filter((l) => l.value);
+}
+
+/**
  * Prune an enriched candidate down to the fields `CandidateCard` actually
  * renders, for durable storage in `reviewer_find_roster` (S224). Keeps the card
  * fully renderable after reload while dropping the heavy raw enrichment internals
@@ -181,6 +205,9 @@ export function pruneCandidateForRoster(c) {
       emailPersistAllowed: persistFlag('emailPersistAllowed'),
       websitePersistAllowed: persistFlag('websitePersistAllowed'),
       affiliationPersistAllowed: persistFlag('affiliationPersistAllowed'),
+      // Slice 5: compact quarantined leads so the ContactLeads section survives a
+      // roster reload. Bounded + stripped of raw payloads; persistable stays false.
+      contactLeads: pruneContactLeads(e.contactLeads),
     },
     name: c.name,
     affiliation: c.affiliation || null,

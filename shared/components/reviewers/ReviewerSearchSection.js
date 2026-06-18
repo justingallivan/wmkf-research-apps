@@ -145,7 +145,7 @@ function affiliationSourceLabel(source) {
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclude, onPromote }) {
+function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclude, onPromote, onUseLead, canManage = true }) {
   const [expanded, setExpanded] = useState(false);
   const c = candidate;
   const confidence = typeof c.verificationConfidence === 'number' ? c.verificationConfidence : undefined;
@@ -354,7 +354,11 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
               live on the live-enriched contactEnrichment; roster-reloaded rows
               drop them until Slice 5 persists a compact form. */}
           {!identityUnverified && !email && (
-            <ContactLeads leads={enr.contactLeads} hideValues={[website]} />
+            <ContactLeads
+              leads={enr.contactLeads}
+              hideValues={[website]}
+              onUse={!readOnly && canManage && onUseLead ? (lead) => onUseLead(candidate, lead) : undefined}
+            />
           )}
 
           <div className="mt-2 flex items-center gap-3">
@@ -427,6 +431,7 @@ export default function ReviewerSearchSection({
   savedPoolNames = [],
   onSaved,
   manualAddSlot = null,
+  canManage = true,
 }) {
   const [phase, setPhase] = useState('idle'); // idle | running | results | saving | done | error
   const [progress, setProgress] = useState([]);
@@ -863,6 +868,35 @@ export default function ReviewerSearchSection({
       setRosterNote("Couldn't promote that reviewer — please try again.");
     }
   }, [requestId]);
+
+  // Slice 4: staff promotes a quarantined lead to the candidate's MANUAL contact.
+  // Stamps emailSource/websiteSource='manual' (so emailConfidence → low → the
+  // invite flow requires explicit confirm-before-send) and clears the contact-layer
+  // abstain that withheld the value (e.g. verified_domain_contradiction) so save can
+  // persist it. Identity gating is untouched — only offered for identity-OK rows
+  // (the card gates leads on !identityUnverified). Auto-selects so it's saved.
+  const useLead = useCallback((cand, lead) => {
+    if (!cand || !lead || !lead.value) return;
+    const key = candKey(cand);
+    if (!key) return;
+    const isEmail = lead.type === 'email';
+    const apply = (c) => {
+      if (candKey(c) !== key) return c;
+      const enr = { ...(c.contactEnrichment || {}) };
+      enr.contactStatus = null;
+      enr.contactStatusReason = null;
+      if (isEmail) {
+        enr.email = lead.value; enr.emailSource = 'manual'; enr.emailPersistAllowed = true;
+        return { ...c, email: lead.value, emailSource: 'manual', emailPersistAllowed: true, contactEnrichment: enr };
+      }
+      enr.website = lead.value; enr.websiteSource = 'manual'; enr.websitePersistAllowed = true;
+      return { ...c, website: lead.value, websiteSource: 'manual', websitePersistAllowed: true, contactEnrichment: enr };
+    };
+    setCandidates((prev) => prev.map(apply));
+    setRecCandidates((prev) => prev.map(apply));
+    setRosterActive((prev) => prev.map(apply));
+    setSelected((prev) => { const next = new Set(prev); next.add(key); return next; });
+  }, []);
 
   const saveSelected = useCallback(async () => {
     if (savingRef.current) return;
@@ -1310,7 +1344,7 @@ export default function ReviewerSearchSection({
                               {section.items.map((c) => (
                                 (readOnlySection || !isSelectable(c))
                                   ? <CandidateCard key={candKey(c)} candidate={c} readOnly onExclude={excludeCandidate} />
-                                  : <CandidateCard key={candKey(c)} candidate={c} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} />
+                                  : <CandidateCard key={candKey(c)} candidate={c} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} canManage={canManage} />
                               ))}
                             </div>
                           </div>

@@ -225,8 +225,8 @@ name-mismatch markers on `tierResults` and promotes a faculty/profile page found
 email. Name-mismatch email values are preserved on `rejectedEmail` by a pre-null hook in
 both the Claude tier (`claudeWebSearch`) and the Serp tier. `_addContactLead` is the single
 push point and force-sets `persistable:false` (the quarantine guarantee). Default-on for
-both enrichment routes (no toggle). Display (Slice 3) and roster persistence (Slice 5) still
-TODO — leads currently ride the in-memory enrichment result / SSE complete event only.
+both enrichment routes (no toggle). Display (Slice 3), staff promotion (Slice 4), and roster
+persistence (Slice 5) are implemented — see their sections below.
 
 Extend `ContactEnrichmentService.enrichCandidate` to collect `contactEnrichment.contactLeads = []`.
 
@@ -303,6 +303,17 @@ Acceptance:
 
 ### Slice 4: Staff Promotion
 
+**Status: IMPLEMENTED (S267).** A manage-only "Use this email" / "Use this page" action on
+each lead (`ContactLeads` `onUse`, threaded `CandidateCard` → `ReviewerSearchSection.useLead`,
+gated on `canManage`). It promotes in place rather than via a separate edit modal (the find
+card has none): it stamps `emailSource:'manual'` (`websiteSource:'manual'` for a page), clears
+the contact-layer abstain that withheld the value (e.g. `verified_domain_contradiction`) so
+save can persist it, and auto-selects the row. Provenance persists via `save-candidates`, and
+the live invite gate `emailConfidence` (`lib/utils/reviewer-invite.js`) classifies `manual` as
+**low** — so a promoted lead still hits the confirm-before-send flow (`send-emails` refuses a
+low address without `confirmedLowConfidenceIds`). No auto-send. Only offered for identity-OK
+rows (leads are gated on `!identityUnverified`). Locked by tests.
+
 Add a manual promotion path:
 
 - Staff clicks "Use this email" on a lead.
@@ -319,6 +330,13 @@ Acceptance:
 - A low-confidence manually promoted email still requires explicit send confirmation.
 
 ### Slice 5: Durable Lead Storage
+
+**Status: IMPLEMENTED (S267).** `pruneContactLeads` (in `reviewer-search-logic.js`) produces a
+compact, bounded (max 8), payload-free leads array (drops `warnings`/`evidence`, caps string
+lengths, re-asserts `persistable:false`); `pruneCandidateForRoster` includes it in the
+`contactEnrichment` subset, so both server write paths (`workbench/reviewer-roster`,
+`workbench/enrich-recommended`) persist it and a roster reload re-renders the section. Live
+rows already keep leads via `mergeEnrichment` (full spread). No Dataverse change.
 
 For v1, persist bounded `contactLeads[]` in the durable Find roster cache, not Dataverse.
 

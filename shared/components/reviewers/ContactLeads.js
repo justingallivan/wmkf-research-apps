@@ -84,7 +84,7 @@ export function partitionLeads(leads) {
   };
 }
 
-function LeadRow({ lead }) {
+function LeadRow({ lead, onUse }) {
   const isEmail = lead.type === 'email';
   const rejected = lead.confidence === 'rejected';
   return (
@@ -103,12 +103,25 @@ function LeadRow({ lead }) {
           Open source →
         </a>
       )}
+      {/* Slice 4: manage-only promotion. Sets the value as a MANUAL contact —
+          stamped manual provenance, so the invite flow still treats it as
+          low-confidence and requires explicit confirm-before-send. */}
+      {onUse && (
+        <button
+          type="button"
+          onClick={() => onUse(lead)}
+          className="ml-2 text-blue-700 hover:text-blue-900 underline"
+          title="Set this as the reviewer's contact (manual — you'll confirm before any invite is sent)"
+        >
+          {isEmail ? 'Use this email' : 'Use this page'}
+        </button>
+      )}
       <span className="block text-[11px] text-amber-700 mt-0.5">{leadWarningText(lead)}</span>
     </li>
   );
 }
 
-export default function ContactLeads({ leads, hideValues = [] }) {
+export default function ContactLeads({ leads, hideValues = [], onUse }) {
   const [showWeak, setShowWeak] = useState(false);
   const visible = visibleLeads(leads, hideValues);
   if (!visible.length) return null;
@@ -119,7 +132,7 @@ export default function ContactLeads({ leads, hideValues = [] }) {
       <p className="text-xs font-medium text-gray-700">Possible contact leads — not verified, review before use</p>
       {primary.length > 0 && (
         <ul className="mt-1 space-y-1">
-          {primary.map((l) => <LeadRow key={`${l.type}:${l.value}`} lead={l} />)}
+          {primary.map((l) => <LeadRow key={`${l.type}:${l.value}`} lead={l} onUse={onUse} />)}
         </ul>
       )}
       {weak.length > 0 && (
@@ -134,7 +147,7 @@ export default function ContactLeads({ leads, hideValues = [] }) {
           </button>
           {showWeak && (
             <ul className="mt-1 space-y-1">
-              {weak.map((l) => <LeadRow key={`${l.type}:${l.value}`} lead={l} />)}
+              {weak.map((l) => <LeadRow key={`${l.type}:${l.value}`} lead={l} onUse={onUse} />)}
             </ul>
           )}
         </>
