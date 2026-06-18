@@ -30,6 +30,7 @@
 - rtk reference: project-rtk-grep-output-corruption.md
 
 ## Working Norms
+- Reviewer-finder utility vs precision (before another identity/namesake/affiliation fix): feedback-prioritize-contact-recall-over-identity-precision.md
 - Thoroughness / completion posture: feedback-thoroughness-default.md; feedback-drive-to-completion.md; feedback-truncation-is-breakage-not-completion.md
 - Bug found in review: feedback-real-fix-not-design-note.md
 - Before declaring a slice done / committing code / delegating a review (verify+fan-out+boundary+concurrency self-pass): feedback-self-review-before-delegating-review.md
