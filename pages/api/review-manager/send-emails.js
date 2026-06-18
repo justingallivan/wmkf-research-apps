@@ -58,6 +58,7 @@ import { shouldSkipDuplicateInvitation, sendAllowsAttachments, templateCarriesCa
 import { buildReviewHoldIcs } from '../../../lib/external/calendar-invite';
 
 const limiter = nextRateLimiter({ max: 10 });
+const EMAIL_DELIVERY_MODES = new Set(['send', 'capture']);
 
 export const config = {
   api: { bodyParser: { sizeLimit: '10mb' } },
@@ -134,6 +135,13 @@ export default async function handler(req, res) {
     // (Codex chunk-6 #4). Fail closed.
     if (!isKnownTemplateType(templateType)) {
       sendEvent('error', { message: `Unknown templateType: ${templateType}` });
+      return res.end();
+    }
+    let deliveryMode;
+    try {
+      deliveryMode = getReviewerEmailDeliveryMode();
+    } catch (modeErr) {
+      sendEvent('error', { message: modeErr.message });
       return res.end();
     }
     for (const d of drafts) {
@@ -250,7 +258,9 @@ export default async function handler(req, res) {
 
     sendEvent('progress', {
       stage: 'sending',
-      message: `Sending ${drafts.length} email(s) from ${fromEmail}...`,
+      message: deliveryMode === 'capture'
+        ? `Capturing ${drafts.length} email(s) from ${fromEmail}...`
+        : `Sending ${drafts.length} email(s) from ${fromEmail}...`,
       total: drafts.length,
     });
 
@@ -386,7 +396,7 @@ export default async function handler(req, res) {
       const recipientAttachments = [...materialAttachments, ...calendarAttachments];
 
       try {
-        const { emailId } = await DynamicsService.createAndSendEmail({
+        const emailPayload = {
           subject: draft.subject,
           body: plainTextToHtml(draft.body),
           from: fromEmail,
@@ -395,7 +405,10 @@ export default async function handler(req, res) {
           regardingType: regardingId ? 'akoya_request' : undefined,
           attachments: recipientAttachments,
           actingUserSystemId,
-        });
+        };
+        const { emailId, capturedEmail } = deliveryMode === 'capture'
+          ? captureReviewerEmail(emailPayload, { suggestionId: draft.suggestionId, candidateName: name })
+          : await DynamicsService.createAndSendEmail(emailPayload);
 
         // Contact promotion: only if the potentialreviewer doesn't already
         // have a wmkf_contact link. Failures are non-fatal — the email
@@ -404,16 +417,20 @@ export default async function handler(req, res) {
         let promotedContactId = null;
         try {
           if (person && !person._wmkf_contact_value) {
-            const fn = person.wmkf_firstname || splitName(name).firstName;
-            const ln = person.wmkf_lastname || splitName(name).lastName || name || 'Unknown';
-            const { id: contactId, created } = await contactAdapter.findOrCreateByEmail({
-              firstName: fn || null,
-              lastName: ln || null,
-              email,
-            }, { actingUserSystemId });
-            await potentialReviewerAdapter.setContactLink(person.wmkf_potentialreviewersid, contactId, { actingUserSystemId });
-            promotedContactId = contactId;
-            contactPromoted = created ? 'created' : 'linked';
+            if (deliveryMode === 'capture') {
+              contactPromoted = 'skipped_capture';
+            } else {
+              const fn = person.wmkf_firstname || splitName(name).firstName;
+              const ln = person.wmkf_lastname || splitName(name).lastName || name || 'Unknown';
+              const { id: contactId, created } = await contactAdapter.findOrCreateByEmail({
+                firstName: fn || null,
+                lastName: ln || null,
+                email,
+              }, { actingUserSystemId });
+              await potentialReviewerAdapter.setContactLink(person.wmkf_potentialreviewersid, contactId, { actingUserSystemId });
+              promotedContactId = contactId;
+              contactPromoted = created ? 'created' : 'linked';
+            }
           }
         } catch (promoteErr) {
           console.warn(`Contact promotion failed for ${name} <${email}>:`, promoteErr.message);
@@ -427,7 +444,9 @@ export default async function handler(req, res) {
         let orcidBackprop = null;
         try {
           const cid = promotedContactId || person?._wmkf_contact_value || null;
-          if (person && cid) {
+          if (deliveryMode === 'capture') {
+            orcidBackprop = 'skipped_capture';
+          } else if (person && cid) {
             const r = await backPropReviewerOrcidToContact({ reviewer: person, contactId: cid, actingUserSystemId });
             orcidBackprop = r.action || r.skipped || null;
             if (r.action === 'write') orcidStats.written++;
@@ -451,6 +470,8 @@ export default async function handler(req, res) {
           regardingLinked: Boolean(regardingId),
           contactPromoted,
           orcidBackprop,
+          deliveryMode,
+          ...(capturedEmail ? { capturedEmail } : {}),
           // Slice G — record the confidence the send went out under (HIGH, or LOW that
           // staff explicitly confirmed) so a low-confidence invite is auditable.
           emailConfidence: confidence,
@@ -630,6 +651,37 @@ function reviewPortalButtonHtml(url) {
 </table>
 <p style="margin:0 0 12px 0;">This secure link is unique to you and was sent by your Foundation program director.</p>
 <p style="margin:0;">If the button does not work, copy and paste this secure link into your browser:<br><a href="${href}">${url}</a></p>`;
+}
+
+function getReviewerEmailDeliveryMode() {
+  const mode = String(process.env.REVIEWER_EMAIL_DELIVERY_MODE || 'send').toLowerCase();
+  if (!EMAIL_DELIVERY_MODES.has(mode)) {
+    throw new Error(`Unknown REVIEWER_EMAIL_DELIVERY_MODE: ${mode}`);
+  }
+  if (mode === 'capture' && process.env.VERCEL_ENV === 'production') {
+    throw new Error('REVIEWER_EMAIL_DELIVERY_MODE=capture is not allowed in Vercel production');
+  }
+  return mode;
+}
+
+function captureReviewerEmail(payload, { suggestionId, candidateName } = {}) {
+  const capturedEmail = {
+    suggestionId,
+    candidateName,
+    subject: payload.subject,
+    htmlBody: payload.body,
+    from: payload.from,
+    to: payload.to,
+    cc: payload.cc || null,
+    regardingId: payload.regardingId || null,
+    regardingType: payload.regardingType || null,
+    attachmentNames: (payload.attachments || []).map((a) => a.filename).filter(Boolean),
+    capturedAt: new Date().toISOString(),
+  };
+  return {
+    emailId: `captured-${suggestionId || Date.now()}`,
+    capturedEmail,
+  };
 }
 
 // `ref` is either a legacy public blob URL or a private cycle-material pathname

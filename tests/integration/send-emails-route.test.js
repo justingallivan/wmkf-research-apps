@@ -43,8 +43,10 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findById: (...a) => findById(...a),
   updateLifecycle: (...a) => updateLifecycle(...a),
 }));
-jest.mock('../../lib/dataverse/adapters/contact', () => ({ findOrCreateByEmail: jest.fn(async () => ({ id: 'c-1', created: false })) }));
-jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({ setContactLink: jest.fn(async () => {}) }));
+const mockFindOrCreateByEmail = jest.fn(async () => ({ id: 'c-1', created: false }));
+const mockSetContactLink = jest.fn(async () => {});
+jest.mock('../../lib/dataverse/adapters/contact', () => ({ findOrCreateByEmail: (...a) => mockFindOrCreateByEmail(...a) }));
+jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({ setContactLink: (...a) => mockSetContactLink(...a) }));
 jest.mock('../../lib/services/backprop-reviewer-orcid', () => ({ backPropReviewerOrcidToContact: jest.fn(async () => ({ action: 'noop' })) }));
 jest.mock('../../lib/services/grant-cycles-dataverse', () => ({ findByShortCode: jest.fn(async () => CYCLE_CONFIG) }));
 jest.mock('../../lib/utils/cycle-code', () => ({ meetingDateToCycleCode: jest.fn(() => CYCLE_CODE) }));
@@ -80,6 +82,8 @@ let PERSON;
 let REQUEST;
 let CYCLE_CODE;     // meetingDateToCycleCode() → this
 let CYCLE_CONFIG;   // findByShortCode() → this (cycle materials live here)
+let ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE;
+let ORIGINAL_VERCEL_ENV;
 
 function baseSuggestion(over = {}) {
   return {
@@ -114,6 +118,8 @@ const MATERIALS_CYCLE = {
 
 let handler;
 beforeAll(async () => {
+  ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE = process.env.REVIEWER_EMAIL_DELIVERY_MODE;
+  ORIGINAL_VERCEL_ENV = process.env.VERCEL_ENV;
   handler = (await import('../../pages/api/review-manager/send-emails')).default;
 });
 beforeEach(() => {
@@ -127,6 +133,10 @@ beforeEach(() => {
   REQUEST = { akoya_requestid: 'req-1', akoya_requestnum: 'REQ-001', wmkf_meetingdate: '2026-07-01' };
   CYCLE_CODE = null;       // default: no cycle / no materials
   CYCLE_CONFIG = null;
+  if (ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE === undefined) delete process.env.REVIEWER_EMAIL_DELIVERY_MODE;
+  else process.env.REVIEWER_EMAIL_DELIVERY_MODE = ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE;
+  if (ORIGINAL_VERCEL_ENV === undefined) delete process.env.VERCEL_ENV;
+  else process.env.VERCEL_ENV = ORIGINAL_VERCEL_ENV;
 });
 
 // Parse the SSE writes into {event, data} pairs.
@@ -239,6 +249,60 @@ describe('send-emails — reviewer portal HTML links', () => {
 
     expect(htmlBodySent()).toContain('<a href="https://example.org/info">https://example.org/info</a>');
     expect(htmlBodySent()).not.toContain('Start Review');
+  });
+});
+
+describe('send-emails — capture delivery mode', () => {
+  test('capture mode returns the rendered email artifact without calling Dynamics send', async () => {
+    process.env.REVIEWER_EMAIL_DELIVERY_MODE = 'capture';
+    delete process.env.VERCEL_ENV;
+    PERSON = basePerson({ _wmkf_contact_value: null });
+
+    const res = await run({
+      drafts: [{
+        suggestionId: SUG_1,
+        subject: 'Invitation',
+        body: 'Please use your secure personal link:\nhttps://reviews.wmkeck.org/external/review/token.value',
+      }],
+      templateType: 'invitation',
+    });
+
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(mockFindOrCreateByEmail).not.toHaveBeenCalled();
+    expect(mockSetContactLink).not.toHaveBeenCalled();
+    expect(updateLifecycle).toHaveBeenCalledWith(
+      SUG_1,
+      { invited: true, emailSentAt: expect.any(String) },
+      { actingUserSystemId: 'u-1' },
+    );
+
+    const r = resultOf(res);
+    expect(r.stats.sent).toBe(1);
+    expect(r.sent[0]).toMatchObject({
+      suggestionId: SUG_1,
+      deliveryMode: 'capture',
+      emailId: `captured-${SUG_1}`,
+      contactPromoted: 'skipped_capture',
+      orcidBackprop: 'skipped_capture',
+    });
+    expect(r.sent[0].capturedEmail).toMatchObject({
+      subject: 'Invitation',
+      from: 'staff@wmkeck.org',
+      to: 'rev@example.org',
+      htmlBody: expect.stringContaining('Start Review'),
+    });
+    expect(r.sent[0].capturedEmail.htmlBody).toContain('https://reviews.wmkeck.org/external/review/token.value');
+  });
+
+  test('capture mode is refused in Vercel production before send or lifecycle writes', async () => {
+    process.env.REVIEWER_EMAIL_DELIVERY_MODE = 'capture';
+    process.env.VERCEL_ENV = 'production';
+
+    const res = await run({ drafts: [draft()], templateType: 'invitation' });
+
+    expect(events(res).some((e) => e.event === 'error' && /not allowed in Vercel production/.test(e.data.message))).toBe(true);
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
   });
 });
 
