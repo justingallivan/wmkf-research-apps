@@ -463,6 +463,31 @@ export default async function handler(req, res) {
     enhancedDiscovered = withProvenanceList(enhancedDiscovered);
     const rankedWithProvenance = withProvenanceList(rankedCandidates);
 
+    // [S266 TEMP DEBUG — REMOVE after the generation-exclusion review] Names only
+    // (no proposal content). Audits which Claude-GENERATED Track-A suggestions
+    // survived to the UI (verified / needs-review) vs were dropped by the
+    // verification + COI + proposal-author + relevance/dedup filters. The dropped
+    // set is generated-minus-surfaced (honorifics stripped for the comparison,
+    // since normalizeSuggestionSource strips them before verification).
+    try {
+      const { normalizeReviewerName } = require('../../../lib/utils/reviewer-name-match');
+      const norm = (n) => normalizeReviewerName(String(n || ''));
+      const generated = (analysisResult.reviewerSuggestions || []).map((s) => s.name).filter(Boolean);
+      const verifiedNames = verifiedWithCOI.map((c) => c.name).filter(Boolean);
+      const needsReviewNames = unverifiedWithProvenance.map((c) => c.name).filter(Boolean);
+      const surfaced = new Set([...verifiedNames, ...needsReviewNames].map(norm));
+      const droppedNames = generated.filter((n) => !surfaced.has(norm(n)));
+      console.log('[Discover API] S266 generation audit:', JSON.stringify({
+        generatedCount: generated.length,
+        generated,
+        verified: verifiedNames,
+        needsReview: needsReviewNames,
+        droppedByFilters: droppedNames,
+      }));
+    } catch (auditErr) {
+      console.error('[Discover API] S266 generation audit failed (non-fatal):', auditErr.message);
+    }
+
     sendEvent('result', {
       verified: verifiedWithCOI,
       unverified: unverifiedWithProvenance,
