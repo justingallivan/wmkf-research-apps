@@ -314,6 +314,16 @@ the live invite gate `emailConfidence` (`lib/utils/reviewer-invite.js`) classifi
 low address without `confirmedLowConfidenceIds`). No auto-send. Only offered for identity-OK
 rows (leads are gated on `!identityUnverified`). Locked by tests.
 
+**On-card manual edit (S267 follow-up).** Beyond promoting a surfaced lead, a manage-only
+"✏️ Edit contact" on the Find/Workbench card opens `CandidateEditModal` in a new local mode
+(`onApply` prop — applies to client state instead of PATCHing the saved-row `my-candidates`).
+Staff can correct email/website (and affiliation/h-index) by hand — e.g. an address found on
+the reviewer's own page that differs from the Google-suggested one — overriding a wrong
+existing value. Email/website go through the SAME `setManualContact` mutation as promotion
+(`emailSource:'manual'` → low-confidence invite). The Name field is locked in this mode (the
+Find card is keyed by normalized name; renaming there would desync selection/dedup). The
+saved-candidates editor (CandidatesPanel) keeps full PATCH-mode editing including name.
+
 Add a manual promotion path:
 
 - Staff clicks "Use this email" on a lead.

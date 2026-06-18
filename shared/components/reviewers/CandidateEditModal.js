@@ -17,11 +17,19 @@
  *   - candidate : { suggestionId, name, affiliation, email, website, hIndex }
  *   - onClose()
  *   - onSaved()  — called after a successful PATCH so the parent can refresh
+ *   - onApply(updates)  — LOCAL mode (the Find/Workbench card, which isn't saved
+ *       yet): when provided, Save hands the changed fields to the parent to apply
+ *       to client state instead of PATCHing my-candidates. The parent stamps
+ *       manual provenance (email/website → emailSource/websiteSource 'manual',
+ *       which the invite gate reads as low-confidence). No suggestionId needed.
+ *   - nameEditable (default true) — set false in local mode: the Find card keys
+ *       candidates by normalized name, so renaming there would desync selection/
+ *       dedup. Name is shown read-only and never included in the emitted updates.
  */
 
 import { useState, useEffect } from 'react';
 
-export default function CandidateEditModal({ candidate, onClose, onSaved }) {
+export default function CandidateEditModal({ candidate, onClose, onSaved, onApply, nameEditable = true }) {
   const [formData, setFormData] = useState({ name: '', affiliation: '', email: '', website: '', hIndex: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -47,9 +55,11 @@ export default function CandidateEditModal({ candidate, onClose, onSaved }) {
     setError(null);
 
     try {
-      // Send only changed fields.
+      // Send only changed fields. Name is omitted entirely when not editable
+      // (local mode): the Find card is keyed by normalized name, so a rename
+      // there would desync selection/dedup.
       const updates = {};
-      if (formData.name !== (candidate.name || '')) updates.name = formData.name;
+      if (nameEditable && formData.name !== (candidate.name || '')) updates.name = formData.name;
       if (formData.affiliation !== (candidate.affiliation || '')) updates.affiliation = formData.affiliation;
       if (formData.email !== (candidate.email || '')) updates.email = formData.email;
       if (formData.website !== (candidate.website || '')) updates.website = formData.website;
@@ -58,6 +68,14 @@ export default function CandidateEditModal({ candidate, onClose, onSaved }) {
       }
 
       if (Object.keys(updates).length === 0) {
+        onClose();
+        return;
+      }
+
+      // LOCAL mode: apply to client state via the parent (no PATCH — the Find-card
+      // candidate isn't a saved row yet). The parent stamps manual provenance.
+      if (onApply) {
+        onApply(updates);
         onClose();
         return;
       }
@@ -99,8 +117,10 @@ export default function CandidateEditModal({ candidate, onClose, onSaved }) {
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 ${nameEditable ? '' : 'bg-gray-100 text-gray-500 cursor-not-allowed'}`}
               required
+              readOnly={!nameEditable}
+              title={nameEditable ? undefined : 'Name is locked here — rename from the saved Candidates tab if needed'}
             />
           </div>
 
@@ -149,7 +169,11 @@ export default function CandidateEditModal({ candidate, onClose, onSaved }) {
             />
           </div>
 
-          <p className="text-xs text-gray-500">Changes apply to this researcher across all proposals that reference them.</p>
+          <p className="text-xs text-gray-500">
+            {onApply
+              ? 'A manually entered email/website is marked unverified — you’ll confirm before any invitation is sent. Saved with this request when you save the candidate.'
+              : 'Changes apply to this researcher across all proposals that reference them.'}
+          </p>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 

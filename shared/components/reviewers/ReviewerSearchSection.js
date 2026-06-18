@@ -42,6 +42,7 @@ import { Card } from '../Layout';
 import { readSseStream } from './sse';
 import ReviewerPromptOverridePanel from './ReviewerPromptOverridePanel';
 import ContactLeads from './ContactLeads';
+import CandidateEditModal from './CandidateEditModal';
 import {
   mergeEnrichment,
   parseExcludeList,
@@ -145,7 +146,7 @@ function affiliationSourceLabel(source) {
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclude, onPromote, onUseLead, canManage = true }) {
+function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclude, onPromote, onUseLead, onEdit, canManage = true }) {
   const [expanded, setExpanded] = useState(false);
   const c = candidate;
   const confidence = typeof c.verificationConfidence === 'number' ? c.verificationConfidence : undefined;
@@ -373,6 +374,19 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
               <a href={scholarUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1" title={hasRealScholar ? "Open this researcher's Google Scholar profile" : 'Search Google Scholar for this researcher'}>
                 🎓 {hasRealScholar ? 'Scholar Profile' : 'Scholar Search'}
               </a>
+            )}
+            {/* Manual contact edit (manage-only): correct a wrong email/website
+                (or affiliation/h-index) by hand. A typed email is stamped manual
+                → low-confidence at invite (confirm-before-send). */}
+            {!readOnly && canManage && onEdit && !identityUnverified && (
+              <button
+                type="button"
+                onClick={() => onEdit(c)}
+                className="text-xs text-gray-500 hover:text-blue-700 flex items-center gap-1"
+                title="Edit contact details (email/website/affiliation) for this candidate"
+              >
+                ✏️ Edit contact
+              </button>
             )}
             {onExclude && (
               <button
@@ -869,34 +883,59 @@ export default function ReviewerSearchSection({
     }
   }, [requestId]);
 
-  // Slice 4: staff promotes a quarantined lead to the candidate's MANUAL contact.
-  // Stamps emailSource/websiteSource='manual' (so emailConfidence → low → the
-  // invite flow requires explicit confirm-before-send) and clears the contact-layer
-  // abstain that withheld the value (e.g. verified_domain_contradiction) so save can
-  // persist it. Identity gating is untouched — only offered for identity-OK rows
-  // (the card gates leads on !identityUnverified). Auto-selects so it's saved.
-  const useLead = useCallback((cand, lead) => {
-    if (!cand || !lead || !lead.value) return;
+  // Apply a staff-entered MANUAL contact to a candidate's client state (the row
+  // isn't a saved Dataverse record yet). Used by the lead "Use this email"
+  // promotion (Slice 4) AND the on-card Edit-contact modal. For email/website it
+  // stamps `manual` provenance (so emailConfidence → low → the invite flow requires
+  // explicit confirm-before-send) and clears the contact-layer abstain that
+  // withheld a value (e.g. verified_domain_contradiction) so save can persist it.
+  // NEVER touches name (the find-card key) or any identity field. Auto-selects so
+  // the edit is included on save.
+  const setManualContact = useCallback((cand, updates) => {
+    if (!cand || !updates) return;
     const key = candKey(cand);
     if (!key) return;
-    const isEmail = lead.type === 'email';
     const apply = (c) => {
       if (candKey(c) !== key) return c;
       const enr = { ...(c.contactEnrichment || {}) };
-      enr.contactStatus = null;
-      enr.contactStatusReason = null;
-      if (isEmail) {
-        enr.email = lead.value; enr.emailSource = 'manual'; enr.emailPersistAllowed = true;
-        return { ...c, email: lead.value, emailSource: 'manual', emailPersistAllowed: true, contactEnrichment: enr };
+      const next = { ...c, contactEnrichment: enr };
+      if ('email' in updates) {
+        const email = updates.email || null;
+        enr.contactStatus = null; enr.contactStatusReason = null;
+        enr.email = email; enr.emailSource = email ? 'manual' : null; enr.emailPersistAllowed = !!email;
+        next.email = email; next.emailSource = email ? 'manual' : null; next.emailPersistAllowed = !!email;
       }
-      enr.website = lead.value; enr.websiteSource = 'manual'; enr.websitePersistAllowed = true;
-      return { ...c, website: lead.value, websiteSource: 'manual', websitePersistAllowed: true, contactEnrichment: enr };
+      if ('website' in updates) {
+        const website = updates.website || null;
+        enr.website = website; enr.websiteSource = website ? 'manual' : null; enr.websitePersistAllowed = !!website;
+        next.website = website; next.websiteSource = website ? 'manual' : null; next.websitePersistAllowed = !!website;
+      }
+      if ('affiliation' in updates) {
+        const affiliation = updates.affiliation || null;
+        enr.affiliationPersistAllowed = true;
+        next.affiliation = affiliation;
+      }
+      if ('hIndex' in updates) {
+        const h = updates.hIndex;
+        const parsed = (h === '' || h == null) ? null : Number(h);
+        enr.hIndex = parsed; next.hIndex = parsed;
+      }
+      return next;
     };
     setCandidates((prev) => prev.map(apply));
     setRecCandidates((prev) => prev.map(apply));
     setRosterActive((prev) => prev.map(apply));
     setSelected((prev) => { const next = new Set(prev); next.add(key); return next; });
   }, []);
+
+  // Slice 4: one-click promotion of a quarantined lead → manual contact.
+  const useLead = useCallback((cand, lead) => {
+    if (!cand || !lead || !lead.value) return;
+    setManualContact(cand, lead.type === 'email' ? { email: lead.value } : { website: lead.value });
+  }, [setManualContact]);
+
+  // The candidate currently open in the on-card Edit-contact modal (local mode).
+  const [editingContact, setEditingContact] = useState(null);
 
   const saveSelected = useCallback(async () => {
     if (savingRef.current) return;
@@ -1344,7 +1383,7 @@ export default function ReviewerSearchSection({
                               {section.items.map((c) => (
                                 (readOnlySection || !isSelectable(c))
                                   ? <CandidateCard key={candKey(c)} candidate={c} readOnly onExclude={excludeCandidate} />
-                                  : <CandidateCard key={candKey(c)} candidate={c} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} canManage={canManage} />
+                                  : <CandidateCard key={candKey(c)} candidate={c} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} onEdit={setEditingContact} canManage={canManage} />
                               ))}
                             </div>
                           </div>
@@ -1410,6 +1449,16 @@ export default function ReviewerSearchSection({
               )}
             </div>
           )}
+      {/* On-card manual contact editor (local mode — applies to client state with
+          manual provenance; not a saved-row PATCH). Name is locked here. */}
+      {editingContact && (
+        <CandidateEditModal
+          candidate={editingContact}
+          nameEditable={false}
+          onApply={(updates) => setManualContact(editingContact, updates)}
+          onClose={() => setEditingContact(null)}
+        />
+      )}
     </Card>
 
     {/* Manual reviewer add — slot rendered BELOW the search and ABOVE the optional
