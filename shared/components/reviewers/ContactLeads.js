@@ -46,16 +46,25 @@ const PAGE_LABEL = { faculty_page: 'Faculty page', profile: 'Profile', website: 
 const CONFIDENCE_RANK = { high: 0, medium: 1, low: 2, rejected: 3 };
 
 /**
- * Leads worth showing: drop anything already surfaced elsewhere on the card
- * (the primary email/website chips) and de-duplicate by (type, value). Keeps
- * the leads section from echoing the contact the card already displays.
+ * Leads worth showing: de-duplicate by (type, value), and drop a lead only when
+ * it is genuinely REDUNDANT with a contact already shown on the card — i.e. a
+ * NON-rejected page/website lead whose URL equals a shown chip (`hideValues`).
+ * A `rejected` lead (e.g. a withheld email that happens to share a URL) or any
+ * other type is NEVER suppressed by hideValues: the whole point is to surface
+ * what the card's primary chips do not (Codex Slice-3 MED — value-only dedup was
+ * too blunt and could hide a valid quarantined lead).
  */
 export function visibleLeads(leads, hideValues = []) {
   const hidden = new Set((Array.isArray(hideValues) ? hideValues : []).filter(Boolean));
   const seen = new Set();
   const out = [];
   for (const l of Array.isArray(leads) ? leads : []) {
-    if (!l || !l.value || hidden.has(l.value)) continue;
+    if (!l || !l.value) continue;
+    const redundantWithChip =
+      l.confidence !== 'rejected' &&
+      (l.type === 'website' || l.type === 'faculty_page' || l.type === 'profile') &&
+      hidden.has(l.value);
+    if (redundantWithChip) continue;
     const key = `${l.type}:${l.value}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -110,7 +119,7 @@ export default function ContactLeads({ leads, hideValues = [] }) {
       <p className="text-xs font-medium text-gray-700">Possible contact leads — not verified, review before use</p>
       {primary.length > 0 && (
         <ul className="mt-1 space-y-1">
-          {primary.map((l, i) => <LeadRow key={`p${i}`} lead={l} />)}
+          {primary.map((l) => <LeadRow key={`${l.type}:${l.value}`} lead={l} />)}
         </ul>
       )}
       {weak.length > 0 && (
@@ -125,7 +134,7 @@ export default function ContactLeads({ leads, hideValues = [] }) {
           </button>
           {showWeak && (
             <ul className="mt-1 space-y-1">
-              {weak.map((l, i) => <LeadRow key={`w${i}`} lead={l} />)}
+              {weak.map((l) => <LeadRow key={`${l.type}:${l.value}`} lead={l} />)}
             </ul>
           )}
         </>

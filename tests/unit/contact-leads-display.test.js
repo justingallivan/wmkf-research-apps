@@ -34,9 +34,23 @@ describe('pure helpers', () => {
     expect(leadWarningText(lead({ confidence: 'low', rejectedReason: null }))).toMatch(/Unverified lead/);
   });
 
-  test('visibleLeads drops hidden values and dedups by type+value', () => {
-    const leads = [lead({ value: 'dup@x.edu' }), lead({ value: 'dup@x.edu' }), lead({ value: 'shown@x.edu' })];
-    expect(visibleLeads(leads, ['shown@x.edu'])).toEqual([expect.objectContaining({ value: 'dup@x.edu' })]);
+  test('visibleLeads dedups by (type, value)', () => {
+    const leads = [lead({ value: 'dup@x.edu' }), lead({ value: 'dup@x.edu' })];
+    expect(visibleLeads(leads)).toEqual([expect.objectContaining({ value: 'dup@x.edu' })]);
+  });
+
+  test('visibleLeads suppresses ONLY a non-rejected page/website lead that matches a shown chip', () => {
+    const page = { type: 'website', value: 'https://shown.edu', source: 'orcid', confidence: 'low', persistable: false };
+    expect(visibleLeads([page], ['https://shown.edu'])).toEqual([]);
+  });
+
+  test('visibleLeads never suppresses a rejected lead or an email lead via hideValues', () => {
+    // a withheld email that happens to equal a shown chip must still surface
+    const rejectedEmail = lead({ value: 'https://shown.edu' }); // rejected, type email
+    expect(visibleLeads([rejectedEmail], ['https://shown.edu'])).toHaveLength(1);
+    // a rejected page sharing the chip URL also surfaces (different context)
+    const rejectedPage = { type: 'faculty_page', value: 'https://shown.edu', source: 'serp_search', confidence: 'rejected', rejectedReason: 'identity_anchor_contradiction', persistable: false };
+    expect(visibleLeads([rejectedPage], ['https://shown.edu'])).toHaveLength(1);
   });
 
   test('partitionLeads splits prominent vs collapsed and orders best-first', () => {
