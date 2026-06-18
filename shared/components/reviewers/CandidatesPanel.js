@@ -29,7 +29,7 @@ import { useState } from 'react';
 import { Card } from '../Layout';
 import InviteEmailModal from './InviteEmailModal';
 import CandidateEditModal from './CandidateEditModal';
-import { buildScholarSearchUrl } from '../../../lib/utils/scholar-url';
+import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 
 function StatusChip({ c }) {
@@ -233,9 +233,9 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-purple-600 hover:text-purple-800"
-                      title={c.googleScholarUrl ? 'Open Google Scholar profile to view papers' : 'Search Google Scholar to view papers'}
+                      title={isRealScholarProfileUrl(c.googleScholarUrl) ? 'Open Google Scholar profile to view papers' : 'Search Google Scholar to view papers'}
                     >
-                      🎓 {c.googleScholarUrl ? 'Scholar profile' : 'Scholar search'} →
+                      🎓 {isRealScholarProfileUrl(c.googleScholarUrl) ? 'Scholar profile' : 'Scholar search'} →
                     </a>
                     {c.website && (
                       <a href={c.website} target="_blank" rel="noopener noreferrer" className="text-green-700 hover:text-green-900" title="Faculty / personal website">

@@ -50,7 +50,7 @@ import {
   pruneCandidateForRoster,
 } from './reviewer-search-logic';
 import { rankByRelevance } from '../../../lib/utils/relevance-score';
-import { buildScholarSearchUrl } from '../../../lib/utils/scholar-url';
+import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
 import {
   PROVENANCE_KINDS,
   provenanceGroupOf,
@@ -186,7 +186,9 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
   const website = c.website || enr.website || null;
   const orcidUrl = c.orcidUrl || enr.orcidUrl || null;
   const scholarUrl = c.googleScholarUrl || enr.googleScholarUrl || buildScholarSearchUrl(c.name, c.affiliation);
-  const hasRealScholar = !!(c.googleScholarUrl || enr.googleScholarUrl);
+  // "Profile" only when the URL is a real Scholar author page, not a search URL
+  // (enrichment stores a search URL in googleScholarUrl by default).
+  const hasRealScholar = isRealScholarProfileUrl(c.googleScholarUrl || enr.googleScholarUrl);
   const hIndex = c.hIndex ?? enr.hIndex ?? null;
   const citations = c.totalCitations ?? enr.totalCitations ?? null;
   const coauthorships = Array.isArray(c.coauthorships) ? c.coauthorships : [];
@@ -1027,7 +1029,7 @@ export default function ReviewerSearchSection({
           provenance: c.provenance || null,
           orcidUrl: c.orcidUrl || enr.orcidUrl || null,
           scholarUrl: realScholar || buildScholarSearchUrl(c.name, c.affiliation),
-          hasRealScholar: !!realScholar,
+          hasRealScholar: isRealScholarProfileUrl(realScholar),
           hasInstitutionCOI: !!c.hasInstitutionCOI,
           institutionCOIDetails: c.institutionCOIDetails || null,
           hasCoauthorCOI: !!c.hasCoauthorCOI,
