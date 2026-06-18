@@ -53,6 +53,15 @@ describe('mergeEnrichment', () => {
     expect(out[1]).toEqual(candidates[1]);
   });
 
+  test('defensively nulls a document-file website at the merge (S266)', () => {
+    const pdf = 'https://repositum.tuwien.at/bitstream/1/Treiber-2022.pdf';
+    const out = mergeEnrichment(
+      [{ name: 'Dr. A', website: null }],
+      [{ name: 'Dr. A', contactEnrichment: { website: pdf } }],
+    );
+    expect(out[0].website).toBeNull();
+  });
+
   test('keeps the existing email when enrichment has none', () => {
     const out = mergeEnrichment(candidates, [
       { name: 'Dr. B', contactEnrichment: { website: 'https://b' } },
@@ -232,6 +241,28 @@ describe('pruneCandidateForRoster — flags survive reload', () => {
     expect(pruned.potentialConcerns).toBeUndefined();
     // Fitness justification still rides in its own field, untouched.
     expect(pruned.reasoning).toMatch(/single-molecule/);
+  });
+
+  test('defensively nulls a document-file website in the pruned DTO (S266)', () => {
+    const pdf = 'https://repositum.tuwien.at/bitstream/1/Treiber-2022.pdf';
+    const pruned = pruneCandidateForRoster({
+      name: 'Markus Kitzler-Zeiler',
+      website: pdf,
+      contactEnrichment: { website: pdf },
+    });
+    expect(pruned.website).toBeNull();
+    expect(pruned.contactEnrichment.website).toBeNull();
+  });
+
+  test('keeps a real profile-page website through the prune', () => {
+    const profile = 'https://chem.x.edu/faculty/markus-kitzler-zeiler';
+    const pruned = pruneCandidateForRoster({
+      name: 'Markus Kitzler-Zeiler',
+      website: profile,
+      contactEnrichment: { website: profile },
+    });
+    expect(pruned.website).toBe(profile);
+    expect(pruned.contactEnrichment.website).toBe(profile);
   });
 
   test('verification-incoherence flag survives reload so the ranking down-weight reapplies', () => {

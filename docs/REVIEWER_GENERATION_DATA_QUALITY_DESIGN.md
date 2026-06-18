@@ -1,8 +1,13 @@
 # Reviewer Candidate Data-Quality Fixes — Design Plan
 
-**Status:** PROPOSED (pre-implementation; awaiting Codex design review)
-**Author:** Claude (S265)
-**Scope:** `lib/utils/contact-parser.js`, the suggestion-ingestion path (`DiscoveryService.normalizeSuggestionSource` / reviewer-finder mapping), and the candidate→roster merge (`shared/components/reviewers/reviewer-search-logic.js`)
+**Status:** IMPLEMENTED (S266). Codex design review verdict was **GO-WITH-CHANGES**; all
+required changes (incl. a Codex-found 4th leak) are folded in below and shipped.
+**Author:** Claude (S265 design; S266 implementation)
+**Scope:** `lib/utils/contact-parser.js` (shared `isDocumentUrl` + `isUsefulWebsiteUrl`),
+`lib/services/serp-contact-service.js` (`isFacultyPageUrl`), the email tier's fetch chokepoint
+(`lib/services/contact-enrichment-service.js` `_orderCandidateUrls`), the suggestion-ingestion path
+(`DiscoveryService.normalizeSuggestionSource`), and the candidate→roster merge
+(`shared/components/reviewers/reviewer-search-logic.js` `mergeEnrichment` / `pruneCandidateForRoster`).
 **Trigger:** Markus Kitzler-Zeiler surfaced as **"Prof."** (he is not — `seniorityEstimate: Mid-career`) with a **website pointing at a co-author's paper PDF** (`repositum.tuwien.at/bitstream/…/Treiber-2022-…-vor.pdf`).
 
 ## 1. Problem (grounded, verified)
@@ -28,25 +33,33 @@ Origin `[ASSUMED]`: most likely the Claude/SerpAPI website tier (`contact-enrich
 ## 3. The fixes
 
 ### Fix 1 — reject document-file URLs in `isUsefulWebsiteUrl` (`contact-parser.js`)
-Add, early in `isUsefulWebsiteUrl`, a rejection of URLs whose **path** (ignoring query/fragment) ends in a document/media extension: `.pdf .doc .docx .ppt .pptx .xls .xlsx .ps .rtf .txt .csv .zip` (+ images if cheap). A file is never a profile page. This is the **canonical catch** — it covers all 5 callers (`serp-contact-service.js:89/155`, `contact-enrichment-service.js:437/539/629`) at once, killing the PDF regardless of which tier produced it.
+Reject, early in `isUsefulWebsiteUrl`, URLs whose **path** (ignoring query/fragment) ends in a document/media extension via the shared `isDocumentUrl` (list in §4.4). A file is never a profile page. This is the **canonical website catch** — it covers every `isUsefulWebsiteUrl` caller (`contact-enrichment-service.js:437/539/629`, `serp-contact-service.js` website tier) at once, killing the PDF regardless of which website tier produced it. (The faculty-page callers use `isFacultyPageUrl`, not `isUsefulWebsiteUrl` — covered separately by Fix 4.)
 
 ### Fix 2 — validate the candidate website at ingestion, not just in enrichment
-The Claude-*suggested* `website` (top-level `candidate.website`) currently reaches the card/merge without ever passing `isUsefulWebsiteUrl`. Route it through `ContactParser.sanitizeWebsiteForCandidate(url, name)` (already exists, `contact-parser.js:427`) at the suggestion-ingestion point (`DiscoveryService.normalizeSuggestionSource` — confirm exact field; Open Q1), so an unvalidated generated URL is nulled before storage. Defense-in-depth: also sanitize in the roster prune (`reviewer-search-logic.js:232`/`:54`) so a bad URL can't ride through the merge. With Fix 1 in place, this also rejects the PDF.
+The Claude-*suggested* `website` (top-level `candidate.website`) currently reaches the card/merge without ever passing `isUsefulWebsiteUrl`. Route it through `ContactParser.sanitizeWebsiteForCandidate(url, name)` (`contact-parser.js`) at the suggestion-ingestion chokepoint (`DiscoveryService.normalizeSuggestionSource` — the `website` key; see §4.1), so an unvalidated generated URL is nulled before storage. Defense-in-depth: also sanitize at **both** merge points — `mergeEnrichment` (`e.website||c.website`) and `pruneCandidateForRoster` (top-level `c.website||e.website` **and** the render-safe `contactEnrichment.website` subset) — so a bad URL can't ride through the merge. With Fix 1 in place, this also rejects the PDF.
 
 ### Fix 3 — strip the honorific from the display name at ingestion
-Apply `ContactParser.stripHonorifics(name)` to the candidate's **stored display name** at the same suggestion-ingestion point, so the card shows "Markus Kitzler-Zeiler" and seniority is conveyed only by the verified-ish `seniorityEstimate`. Safe for dedup (`normalizeReviewerName` already strips honorifics). **Tradeoff (accepted):** this also drops *correct* "Dr./Prof." titles — but since we never verify them, not asserting a title is the safer default than asserting a possibly-wrong one. (Strip once at the source so the clean name propagates to search/verify/display/dedup; downstream honorific-strippers are then no-ops.)
+Apply `ContactParser.stripHonorifics(name)` to the candidate's **stored display name** at the same suggestion-ingestion point, so the card shows "Markus Kitzler-Zeiler" and seniority is conveyed only by the verified-ish `seniorityEstimate`. Safe for dedup (`normalizeReviewerName` already strips honorifics). **Tradeoff (accepted):** this also drops *correct* "Dr./Prof." titles — but since we never verify them, not asserting a title is the safer default than asserting a possibly-wrong one. (Strip once at the source so the clean name propagates to search/verify/display/dedup; downstream honorific-strippers are then no-ops.) **Persisted Dataverse labels change (intentional)** — `discovery-verification-status.test.js` updated to expect the stripped name.
 
-## 4. Open questions for Codex
+### Fix 4 — reject document URLs on the faculty-page path too (Codex-found 4th leak)
+`facultyPageUrl` is captured via `SerpContactService.isFacultyPageUrl`, which had **no** document-extension gate, and the **resolved-page email tier fetches `facultyPageUrl`** (`contact-enrichment-service.js` `_orderCandidateUrls` → `safeFetchInstitutionPage`). So a PDF in `facultyPageUrl` would be fetched. Implemented as one shared catch — `ContactParser.isDocumentUrl(url)` (path-only, query/fragment ignored, malformed → non-document) — applied at:
+- `isUsefulWebsiteUrl` (Fix 1's canonical website catch),
+- `SerpContactService.isFacultyPageUrl` (capture-time faculty-page catch),
+- `_orderCandidateUrls` (defensive: the Claude tier captures `facultyPageUrl` *without* `isFacultyPageUrl`, so the email tier re-guards right before the fetch).
 
-1. **Exact ingestion point.** The reviewer prompts live in **Dataverse** (not files), so the suggestion schema isn't greppable. Is `DiscoveryService.normalizeSuggestionSource` the right single chokepoint to (a) sanitize the website and (b) strip the name, such that BOTH the verify path and the display/roster path see the cleaned values? Or is there an earlier map (analyze.js → `reviewerSuggestions`) that's safer? Confirm the field name the generated website lands under (`website`? `url`? `profileUrl`?).
-2. **Name-strip blast radius.** Does stripping the honorific from `candidate.name` at ingestion perturb anything that *keys on the raw name* — OpenAlex/ORCID verification (`forenameFullyAgrees` re-strips, so fine?), COI/coauthor matching, `suggestionId`, or the roster `normalized_name` (already strips, so stable)? Any place that displays the raw name expecting a title?
-3. **`isNameConsistentWebsiteUrl` leniency (line 419).** Should we ALSO tighten the "return `true` when no slug extractable" branch, or is Fix 1's document-extension rejection the right, minimal catch (avoid over-rejecting legit personal sites with odd paths)? Recommendation: Fix 1 only; leave leniency.
-4. **Document-extension list.** Right set? Any false-positive risk (e.g. a legit profile page that ends in `.html`/no extension is unaffected; a personal site at `…/cv.pdf` *should* be rejected as a website even though useful — acceptable?).
-5. Should a rejected website fall back to anything (ORCID URL, Scholar link) or just null? Proposal: null (the card already renders ORCID/Scholar links separately).
+## 4. Codex review resolutions (GO-WITH-CHANGES → implemented)
 
-## 5. Testing
+1. **Exact ingestion point — confirmed.** `DiscoveryService.normalizeSuggestionSource` is the single chokepoint: it runs before `verifyClaudeSuggestions` and feeds both the verify path and the display/roster path, so cleaning the `name` + `website` there propagates everywhere. The generated website lands under the `website` key. Cleaning is applied across **all three** source branches (applicant-recommended / proposal-named / claude-suggestion), not just the default one.
+2. **Name-strip blast radius — safe.** Dedup `normalizeReviewerName` already strips honorifics; OpenAlex/ORCID verification re-strips via its own forename logic; the roster `normalized_name` already strips. No surface keys on the titled raw name. The one test that asserted the titled name (`discovery-verification-status.test.js`) is updated — the intentional persisted-label change.
+3. **`isNameConsistentWebsiteUrl` leniency — left as is.** Fix 1's document-extension rejection is the minimal catch; the "return `true` when no slug extractable" branch is unchanged to avoid over-rejecting legit personal sites with odd paths.
+4. **Document-extension list.** `.pdf .doc .docx .ppt .pptx .xls .xlsx .ps .rtf .txt .csv .zip` (path-only; query/fragment ignored). A page at `…/profile.html` or no extension is unaffected; a personal site at `…/cv.pdf` is rejected as a *website* — accepted.
+5. **Rejected website → null** (no fallback). The card renders ORCID/Scholar links separately.
+6. **4th leak (Codex-found):** the faculty-page path. Resolved via the shared `ContactParser.isDocumentUrl` — see Fix 4.
 
-- `contact-parser`: `isUsefulWebsiteUrl` rejects `.pdf/.docx/.pptx/.xlsx` (incl. with query strings + uppercase), accepts a normal faculty/profile URL; the Kitzler-Zeiler `Treiber-2022….pdf` fixture → rejected. `sanitizeWebsiteForCandidate` nulls a doc URL, keeps a good one.
-- Ingestion: a suggestion with `name:"Prof. X Y"` + `website:<pdf>` → stored `name:"X Y"`, `website:null`; a suggestion with a real profile site keeps it.
-- Regression: existing enrichment website-capture tests (orcid/serp/claude) still accept legit profile URLs; dedup/`normalized_name` unaffected by the name strip.
-- Gates: `npm test`, `lint`, `build`. No schema/route surface; no atlas/api-routes gate.
+## 5. Testing (implemented)
+
+- `tests/unit/contact-parser-website-gate.test.js`: `isDocumentUrl` flags all listed extensions (uppercase + query string), spares navigable pages / malformed / empty input; `isUsefulWebsiteUrl` rejects the Kitzler-Zeiler `Treiber-2022….pdf` and a candidate-named `…/cv.pdf`; `sanitizeWebsiteForCandidate` nulls a doc URL, keeps a real profile page.
+- `tests/unit/reviewer-suggestion-data-quality.test.js`: `normalizeSuggestionSource` strips single + stacked honorifics, leaves a title-less / absent name intact, nulls a doc website, keeps a real one, and cleans across all three source branches; `SerpContactService.isFacultyPageUrl` rejects a name-matching faculty-pattern PDF, keeps a real faculty page.
+- `tests/unit/reviewer-search-logic.test.js`: `mergeEnrichment` + `pruneCandidateForRoster` defensively null a doc-file website (top-level and the render-safe `contactEnrichment` subset) and keep a real one.
+- `tests/unit/discovery-verification-status.test.js`: updated to expect the stripped name.
+- Gates: full `npm test` (2601 green), `lint` (0 errors), `build` OK. No schema/route surface; `check:api-routes`/`check:atlas`/`check:agent-wiki`/`check:fact-consistency` all green.

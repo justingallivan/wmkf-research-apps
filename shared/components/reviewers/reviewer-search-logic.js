@@ -9,6 +9,7 @@
 import { normalizeReviewerName as _normalizeReviewerName, partitionByExcluded } from '../../../lib/utils/reviewer-name-match';
 import { mayPersistIdentity } from '../../../lib/services/reviewer-identity-resolver';
 import { buildReviewerProvenance, PROVENANCE_KINDS, provenanceKindOf, sanitizeInstitutionCOIDetails as _sanitizeInstitutionCOIDetails } from '../../../lib/utils/reviewer-provenance';
+import { ContactParser } from '../../../lib/utils/contact-parser';
 
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen
@@ -51,7 +52,9 @@ export function mergeEnrichment(candidates, enrichmentResults) {
       hasInstitutionCOI: e.coiRecomputed ? !!e.hasInstitutionCOI : c.hasInstitutionCOI,
       institutionCOIDetails: sanitizeInstitutionCOIDetails(e.coiRecomputed ? e.institutionCOIDetails : c.institutionCOIDetails),
       email: e.email || c.email,
-      website: e.website || c.website,
+      // Defensive: a document-file URL (e.g. a paper PDF) must never ride through
+      // the merge as a website. Sanitized at ingestion already; re-guarded here.
+      website: ContactParser.sanitizeWebsiteForCandidate(e.website || c.website, c.name),
       facultyPageUrl: e.facultyPageUrl || c.facultyPageUrl,
       department: e.department || c.department,
       orcid: e.orcid || e.orcidId || c.orcid,
@@ -161,7 +164,7 @@ export function pruneCandidateForRoster(c) {
       email: e.email || null,
       emailSource: e.emailSource || null,
       emailYear: e.emailYear || null,
-      website: e.website || null,
+      website: ContactParser.sanitizeWebsiteForCandidate(e.website, c.name) || null,
       orcid: e.orcid || e.orcidId || null,
       orcidId: e.orcidId || null,
       orcidUrl: e.orcidUrl || null,
@@ -229,7 +232,9 @@ export function pruneCandidateForRoster(c) {
     email: c.email || e.email || null,
     emailSource: e.emailSource || null,
     emailYear: e.emailYear || null,
-    website: c.website || e.website || null,
+    // Defensive: re-guard the persisted website so a document-file URL can't ride
+    // through the prune (mirrors mergeEnrichment; sanitized at ingestion too).
+    website: ContactParser.sanitizeWebsiteForCandidate(c.website || e.website, c.name) || null,
     orcid: c.orcid || e.orcid || e.orcidId || null,
     orcidUrl: c.orcidUrl || e.orcidUrl || null,
     googleScholarUrl: c.googleScholarUrl || e.googleScholarUrl || null,

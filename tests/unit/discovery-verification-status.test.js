@@ -88,7 +88,10 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
     expect(result.verified).toHaveLength(0);
     expect(result.unverified).toHaveLength(1);
     expect(result.unverified[0]).toMatchObject({
-      name: 'Dr. Alfred Laederach',
+      // S266: the unverified honorific is stripped at ingestion
+      // (normalizeSuggestionSource); the forename "Alfred" is untouched, so the
+      // Alain-vs-Alfred non-match still holds.
+      name: 'Alfred Laederach',
       verified: false,
       verificationStatus: 'unresolved',
       identityStatus: 'unresolved',

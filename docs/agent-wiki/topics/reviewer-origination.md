@@ -176,6 +176,16 @@ bare keyword→author lane is what underperformed.
 - **Applicant exclusion breadth is an open policy decision** — one vague
   overlapping-program line can over-prune the peer set. Memory
   `project-applicant-exclusion-policy-pending`.
+- **Suggestion data is cleaned at ONE chokepoint — `DiscoveryService.normalizeSuggestionSource` (S266).**
+  An unverified honorific is stripped from the display name (`stripHonorifics`) and a
+  non-page website (e.g. a co-author's paper PDF) is nulled (`sanitizeWebsiteForCandidate`),
+  across all three source branches, before verify/display. We never verify titles, so a
+  persisted "Prof./Dr." is a fabricated-credential risk — **persisted Dataverse labels lose
+  the title (intentional).** Document-file URLs are rejected by the shared
+  `ContactParser.isDocumentUrl` on the website gate (`isUsefulWebsiteUrl`), the faculty-page gate
+  (`SerpContactService.isFacultyPageUrl`), and the email tier's fetch chokepoint
+  (`_orderCandidateUrls`) — the email tier fetches `facultyPageUrl`, so a PDF there would be a bad
+  fetch. Design: `docs/REVIEWER_GENERATION_DATA_QUALITY_DESIGN.md`.
 
 ## Durable Memory
 
