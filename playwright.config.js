@@ -53,7 +53,7 @@ module.exports = defineConfig({
     // symlink — hence the explicit `--webpack`.) For fast local iteration, start
     // the server once manually (`next build --webpack && next start -p 3100`) and
     // Playwright reuses it.
-    command: `npx next build --webpack && npx next start -p ${PORT}`,
+    command: `NEXTAUTH_SECRET=e2e-throwaway-nextauth-secret-32-chars NEXTAUTH_URL=${BASE_URL} npx next build --webpack && NEXTAUTH_SECRET=e2e-throwaway-nextauth-secret-32-chars NEXTAUTH_URL=${BASE_URL} npx next start -p ${PORT}`,
     // Readiness check hits a PUBLIC route — `/` redirects to the auth-gated
     // signin page; the external review portal is token-public (allowlisted in
     // proxy), so it returns 200.
