@@ -30,6 +30,7 @@ import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-sug
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
 import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
 import { ensureToken } from '../../../lib/external/token-lifecycle';
+import { ContactParser } from '../../../lib/utils/contact-parser';
 
 const REQUEST_FIELDS = [
   'akoya_requestid',
@@ -176,6 +177,9 @@ async function handleGet(req, res, access) {
       }
       const person = personById[s._wmkf_potentialreviewer_value] || {};
       const researcher = researcherByPerson[s._wmkf_potentialreviewer_value] || null;
+      const facultyPageUrl = researcher?.wmkf_facultypageurl && !ContactParser.isDocumentUrl(researcher.wmkf_facultypageurl)
+        ? researcher.wmkf_facultypageurl
+        : null;
       const sources = typeof s.wmkf_sources === 'string'
         ? s.wmkf_sources.split(',').map((x) => x.trim()).filter(Boolean)
         : (s.wmkf_sources || []);
@@ -198,7 +202,7 @@ async function handleGet(req, res, access) {
         // can open it, read the reviewer's real address, and enter it via the manual edit
         // (which stamps emailSource='manual' → Slice-G confirm-before-invite). The more
         // specific faculty-page link; `website` is the fallback.
-        facultyPageUrl: researcher?.wmkf_facultypageurl || null,
+        facultyPageUrl,
         // Scholar / ORCID profile URLs persisted on the bibliometric sidecar.
         // Publications themselves are NOT persisted (live-only during a search),
         // so the Candidates tab links out to Scholar to view papers instead.

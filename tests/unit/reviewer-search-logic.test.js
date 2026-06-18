@@ -60,6 +60,8 @@ describe('mergeEnrichment', () => {
       [{ name: 'Dr. A', contactEnrichment: { website: pdf } }],
     );
     expect(out[0].website).toBeNull();
+    expect(out[0].contactEnrichment.website).toBeNull();
+    expect(out[0].website || out[0].contactEnrichment.website || null).toBeNull();
   });
 
   test('keeps the existing email when enrichment has none', () => {

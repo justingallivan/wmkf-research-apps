@@ -206,6 +206,27 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(payload.orcid).toBe('0000-0001');
   });
 
+  test('document facultyPageUrl is nulled before save-candidates persistence', async () => {
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [{
+          name: 'Dr X',
+          contactEnrichment: {
+            ...enrichmentFor({ status: 'confirmed' }),
+            facultyPageUrl: 'https://mit.edu/faculty/example-cv.pdf',
+            websitePersistAllowed: true,
+          },
+        }],
+      },
+    };
+    const res = mockRes();
+    await handler(req, res);
+    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
+    expect(payload.facultyPageUrl).toBeNull();
+  });
+
   // S235 — a PI-named / cited candidate is SAVED even when identity is unresolved (the proposal
   // author vouched for this specific person), but ALL contact + identity-derived fields are
   // force-nulled at the boundary (Codex HIGH) — a selectable-but-unverified row can't carry a

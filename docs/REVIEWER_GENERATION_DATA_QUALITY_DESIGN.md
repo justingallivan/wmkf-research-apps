@@ -1,13 +1,17 @@
 # Reviewer Candidate Data-Quality Fixes — Design Plan
 
-**Status:** IMPLEMENTED (S266). Codex design review verdict was **GO-WITH-CHANGES**; all
-required changes (incl. a Codex-found 4th leak) are folded in below and shipped.
-**Author:** Claude (S265 design; S266 implementation)
+**Status:** IMPLEMENTED (S266). Codex design review verdict was **GO-WITH-CHANGES** (4 changes,
+folded in as Fix 1–4); Codex post-implementation review then returned **NEEDS-FIX** on display/
+persistence fan-out, closed as Fix 5. Shipped.
+**Author:** Claude (S265 design; S266 implementation; Codex implemented Fix 5)
 **Scope:** `lib/utils/contact-parser.js` (shared `isDocumentUrl` + `isUsefulWebsiteUrl`),
 `lib/services/serp-contact-service.js` (`isFacultyPageUrl`), the email tier's fetch chokepoint
-(`lib/services/contact-enrichment-service.js` `_orderCandidateUrls`), the suggestion-ingestion path
-(`DiscoveryService.normalizeSuggestionSource`), and the candidate→roster merge
-(`shared/components/reviewers/reviewer-search-logic.js` `mergeEnrichment` / `pruneCandidateForRoster`).
+(`lib/services/contact-enrichment-service.js` `_orderCandidateUrls`; + Claude-tier `facultyPageUrl`
+capture and the side-save), the suggestion-ingestion path (`DiscoveryService.normalizeSuggestionSource`),
+the candidate→roster merge (`shared/components/reviewers/reviewer-search-logic.js` `mergeEnrichment` /
+`pruneCandidateForRoster`), and the `facultyPageUrl` persist/read/render surfaces
+(`pages/api/reviewer-finder/save-candidates.js`, `pages/api/reviewer-finder/my-candidates.js`,
+`shared/components/reviewers/CandidatesPanel.js`).
 **Trigger:** Markus Kitzler-Zeiler surfaced as **"Prof."** (he is not — `seniorityEstimate: Mid-career`) with a **website pointing at a co-author's paper PDF** (`repositum.tuwien.at/bitstream/…/Treiber-2022-…-vor.pdf`).
 
 ## 1. Problem (grounded, verified)
@@ -47,6 +51,16 @@ Apply `ContactParser.stripHonorifics(name)` to the candidate's **stored display 
 - `SerpContactService.isFacultyPageUrl` (capture-time faculty-page catch),
 - `_orderCandidateUrls` (defensive: the Claude tier captures `facultyPageUrl` *without* `isFacultyPageUrl`, so the email tier re-guards right before the fetch).
 
+### Fix 5 — close the `facultyPageUrl` display/persistence fan-out (Codex post-impl review, HIGH)
+Codex's post-implementation review (verdict NEEDS-FIX) refuted "fan-out completeness": the email-tier *fetch* was gated, but a document `facultyPageUrl` could still be **persisted and rendered as a clickable link** (the Candidates panel shows `wmkf_facultypageurl` as an href), and the Workbench render fallback `c.website || enr.website` read the **raw** `contactEnrichment.website` that `mergeEnrichment` attached (only the promoted top-level `website` had been sanitized). Closed by applying `isDocumentUrl` / `sanitizeWebsiteForCandidate` at the capture/persist/read/render surfaces:
+- **Capture:** Claude-tier `facultyPageUrl` gated in `contact-enrichment-service.js` (`!isDocumentUrl`), so persisted rows are clean.
+- **Persist:** `save-candidates.js` (Dataverse write) and the `contact-enrichment-service.js` side-save both null a document `facultyPageUrl`.
+- **Read:** `my-candidates.js` nulls a document `facultyPageUrl` on hydration from Dataverse.
+- **Render:** `CandidatesPanel.js` `candidateContactPageUrl()` keeps a document `facultyPageUrl` from becoming the clickable fallback href.
+- **Workbench website fallback:** `mergeEnrichment` now sanitizes the website on the **attached `contactEnrichment` object** too (not just the promoted top-level), so the `enr.website` render fallback can't surface a document URL.
+
+(Codex's review also rated `isDocumentUrl`'s query-only / malformed-URL false-negatives as acceptable-LOW and confirmed the honorific strip has no name-keying consumer break — only an invite salutation that now defaults to "Dr." instead of inferring "Professor".)
+
 ## 4. Codex review resolutions (GO-WITH-CHANGES → implemented)
 
 1. **Exact ingestion point — confirmed.** `DiscoveryService.normalizeSuggestionSource` is the single chokepoint: it runs before `verifyClaudeSuggestions` and feeds both the verify path and the display/roster path, so cleaning the `name` + `website` there propagates everywhere. The generated website lands under the `website` key. Cleaning is applied across **all three** source branches (applicant-recommended / proposal-named / claude-suggestion), not just the default one.
@@ -60,6 +74,7 @@ Apply `ContactParser.stripHonorifics(name)` to the candidate's **stored display 
 
 - `tests/unit/contact-parser-website-gate.test.js`: `isDocumentUrl` flags all listed extensions (uppercase + query string), spares navigable pages / malformed / empty input; `isUsefulWebsiteUrl` rejects the Kitzler-Zeiler `Treiber-2022….pdf` and a candidate-named `…/cv.pdf`; `sanitizeWebsiteForCandidate` nulls a doc URL, keeps a real profile page.
 - `tests/unit/reviewer-suggestion-data-quality.test.js`: `normalizeSuggestionSource` strips single + stacked honorifics, leaves a title-less / absent name intact, nulls a doc website, keeps a real one, and cleans across all three source branches; `SerpContactService.isFacultyPageUrl` rejects a name-matching faculty-pattern PDF, keeps a real faculty page.
-- `tests/unit/reviewer-search-logic.test.js`: `mergeEnrichment` + `pruneCandidateForRoster` defensively null a doc-file website (top-level and the render-safe `contactEnrichment` subset) and keep a real one.
+- `tests/unit/reviewer-search-logic.test.js`: `mergeEnrichment` + `pruneCandidateForRoster` defensively null a doc-file website (top-level and the render-safe `contactEnrichment` subset) and keep a real one; the `enr.website` fallback (attached `contactEnrichment.website`) is sanitized.
 - `tests/unit/discovery-verification-status.test.js`: updated to expect the stripped name.
-- Gates: full `npm test` (2601 green), `lint` (0 errors), `build` OK. No schema/route surface; `check:api-routes`/`check:atlas`/`check:agent-wiki`/`check:fact-consistency` all green.
+- Fix 5 fan-out (`facultyPageUrl`): `tests/unit/contact-enrichment-affiliation-pin.test.js` (nulled at capture), `tests/unit/reviewer-route-identity-gate.test.js` + `tests/unit/save-to-database-identity-gate.test.js` (not persisted through the two save paths), `tests/unit/my-candidates-faculty-page-url-gate.test.js` (nulled on read hydration), `tests/unit/candidates-panel-faculty-page-url-gate.test.js` (not rendered as a clickable link).
+- Gates: full `npm test` (2606 green), `lint` (0 errors), `build` OK. No schema/route surface; `check:api-routes`/`check:atlas`/`check:agent-wiki`/`check:fact-consistency` all green.

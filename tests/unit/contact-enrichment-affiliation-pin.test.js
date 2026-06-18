@@ -403,6 +403,28 @@ describe('ContactEnrichmentService — identity-gated affiliation override (#15)
     expect(out.identityNote).toBe('Identity needs review');
     expect(out.publications).toHaveLength(1);
   });
+
+  test('Claude document facultyPageUrl is nulled at capture', async () => {
+    jest.spyOn(ContactEnrichmentService, 'claudeWebSearch').mockResolvedValue({
+      email: null,
+      facultyPageUrl: 'https://mit.edu/faculty/example-cv.pdf',
+      website: null,
+    });
+
+    const out = await ContactEnrichmentService.enrichCandidate(
+      { name: 'Jane Roe', affiliation: 'MIT', publications: [] },
+      {
+        credentials: { claudeApiKey: 'ck' },
+        usePubmed: false,
+        useOrcid: false,
+        useClaudeSearch: true,
+        useSerpSearch: false,
+        persist: false,
+      },
+    );
+
+    expect(out.contactEnrichment.facultyPageUrl).toBeNull();
+  });
 });
 
 describe('ContactEnrichmentService._validateEmailAgainstVerifiedDomain — verified-domain contact validation', () => {

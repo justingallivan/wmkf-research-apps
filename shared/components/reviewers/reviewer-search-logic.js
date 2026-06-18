@@ -42,9 +42,13 @@ export function mergeEnrichment(candidates, enrichmentResults) {
   return candidates.map((c) => {
     const e = byName.get(c.name);
     if (!e) return c;
+    const contactEnrichment = {
+      ...e,
+      website: ContactParser.sanitizeWebsiteForCandidate(e.website, c.name) || null,
+    };
     return {
       ...c,
-      contactEnrichment: e,
+      contactEnrichment,
       // Institution COI re-evaluated server-side against the post-enrichment
       // affiliation (enrich-contacts). `coiRecomputed` distinguishes "ran and
       // found none" (override the discover value) from "didn't run" (keep it).

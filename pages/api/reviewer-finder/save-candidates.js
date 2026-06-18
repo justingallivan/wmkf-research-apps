@@ -183,7 +183,8 @@ export default async function handler(req, res) {
         const candidateGoogleScholarId = contactBlocked ? null : (candidate.googleScholarId || enrichment.googleScholarId || null);
         const rawCandidateWebsite = websiteAllowed ? (candidate.website || enrichment.website || null) : null;
         const candidateWebsite = ContactParser.sanitizeWebsiteForCandidate(rawCandidateWebsite, candidate.name);
-        const candidateFacultyPageUrl = websiteAllowed ? (candidate.facultyPageUrl || enrichment.facultyPageUrl || null) : null;
+        const rawCandidateFacultyPageUrl = websiteAllowed ? (candidate.facultyPageUrl || enrichment.facultyPageUrl || null) : null;
+        const candidateFacultyPageUrl = rawCandidateFacultyPageUrl && !ContactParser.isDocumentUrl(rawCandidateFacultyPageUrl) ? rawCandidateFacultyPageUrl : null;
 
         const expertiseForDv = Array.isArray(candidate.expertiseAreas)
           ? candidate.expertiseAreas.filter(Boolean).join('; ')

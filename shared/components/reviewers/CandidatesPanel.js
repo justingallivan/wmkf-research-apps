@@ -30,6 +30,7 @@ import { Card } from '../Layout';
 import InviteEmailModal from './InviteEmailModal';
 import CandidateEditModal from './CandidateEditModal';
 import { buildScholarSearchUrl } from '../../../lib/utils/scholar-url';
+import { ContactParser } from '../../../lib/utils/contact-parser';
 
 function StatusChip({ c }) {
   const tones = {
@@ -45,6 +46,11 @@ function StatusChip({ c }) {
 
 function isManualAdded(c) {
   return c.manualAdded === true || (Array.isArray(c.sources) && c.sources.includes('staff_manual'));
+}
+
+function candidateContactPageUrl(c) {
+  const facultyPageUrl = c.facultyPageUrl && !ContactParser.isDocumentUrl(c.facultyPageUrl) ? c.facultyPageUrl : null;
+  return facultyPageUrl || c.website;
 }
 
 export default function CandidatesPanel({ requestId, candidates = [], loading = false, onRefresh, settings = {}, canManage = true }) {
@@ -185,11 +191,11 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
                     {c.email ? <span>{c.email}</span> : (
                       <span className="text-amber-700">
                         no email — can’t invite
-                        {(c.facultyPageUrl || c.website) && (
+                        {candidateContactPageUrl(c) && (
                           <>
                             {' · '}
                             <a
-                              href={c.facultyPageUrl || c.website}
+                              href={candidateContactPageUrl(c)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-amber-800 underline hover:text-amber-900"

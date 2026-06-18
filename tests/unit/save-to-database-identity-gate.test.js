@@ -88,4 +88,18 @@ describe('saveToDatabase — identity gate on the email-keyed side path', () => 
     expect(payload.website).toBeNull();
     expect(payload.facultyPageUrl).toBeNull();
   });
+
+  test('document facultyPageUrl is nulled before side-path persistence', async () => {
+    await ContactEnrichmentService.saveToDatabase(
+      { name: 'Dr X', affiliation: 'MIT' },
+      {
+        ...enrichment({ status: 'confirmed' }),
+        facultyPageUrl: 'https://mit.edu/faculty/example-cv.pdf',
+        emailPersistAllowed: true,
+        websitePersistAllowed: true,
+      },
+    );
+    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
+    expect(payload.facultyPageUrl).toBeNull();
+  });
 });

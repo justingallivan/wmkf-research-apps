@@ -182,10 +182,15 @@ bare keyword→author lane is what underperformed.
   across all three source branches, before verify/display. We never verify titles, so a
   persisted "Prof./Dr." is a fabricated-credential risk — **persisted Dataverse labels lose
   the title (intentional).** Document-file URLs are rejected by the shared
-  `ContactParser.isDocumentUrl` on the website gate (`isUsefulWebsiteUrl`), the faculty-page gate
-  (`SerpContactService.isFacultyPageUrl`), and the email tier's fetch chokepoint
-  (`_orderCandidateUrls`) — the email tier fetches `facultyPageUrl`, so a PDF there would be a bad
-  fetch. Design: `docs/REVIEWER_GENERATION_DATA_QUALITY_DESIGN.md`.
+  `ContactParser.isDocumentUrl` at EVERY website/faculty-page surface: the website gate
+  (`isUsefulWebsiteUrl`), the faculty-page gate (`SerpContactService.isFacultyPageUrl`), the email
+  tier's fetch chokepoint (`_orderCandidateUrls`), and — after a Codex post-impl review caught the
+  display/persist fan-out — the `facultyPageUrl` capture/persist/read/render path
+  (`contact-enrichment-service.js` Claude-tier capture + side-save, `save-candidates.js`,
+  `my-candidates.js`, `CandidatesPanel.js`) plus the `enr.website` render fallback in `mergeEnrichment`.
+  **Lesson: a chokepoint/merge guard is NOT enough — `facultyPageUrl` is also persisted to Dataverse
+  and rendered as a clickable link, so the guard must reach the persist + read + render surfaces too.**
+  Design: `docs/REVIEWER_GENERATION_DATA_QUALITY_DESIGN.md`.
 
 ## Durable Memory
 
