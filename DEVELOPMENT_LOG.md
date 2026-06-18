@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer contact-leads recall layer + on-card manual contact edit (prod) (Session 267)
+
+**Milestone:** Delivers the S266 strategic pivot (contact **recall** over identity precision). A reviewer's email was often *found by the search but withheld by a safety gate* (domain/name/anchor contradiction); staff couldn't see or use it. Now they can — without weakening the wrong-person gates.
+
+**Sessions:** 267. Pattern per slice: spec → measure → build → Codex review → deploy. Slice 1 audit ran in prod first to confirm the dominant bucket before building (it did: ~68% verified, 100% of misses were found-then-discarded — so the broad paid scout (2b) was measured **unjustified** and skipped).
+
+**Ship state:**
+- **Quarantined `contactEnrichment.contactLeads[]`** surfaces discarded contacts (verified-domain / name-mismatch / anchor-contradiction) + faculty pages found without an email. `_addContactLead` force-sets `persistable:false` — leads NEVER feed `email`/`website`/persist flags or an invite.
+- **Card display** (`ContactLeads.js`): high/medium prominent, low/rejected behind a toggle with the not-auto-used reason; gated on `!identityUnverified` (not `!email`).
+- **Staff promotion + on-card manual edit:** "Use this email" / "✏️ Edit contact" stamp `emailSource:'manual'` → `emailConfidence` LOW → still requires confirm-before-send. Roster-persisted (compact, bounded) so leads survive reload.
+- Co-shipped (Codex): reviewer E2E rehearsal harness + email-capture mode (`tests/e2e/reviewer-*`, `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md`).
+
+**Why it matters:** The email IS the product goal — a found-but-withheld address that staff can't recover is a total loss. This restores recall while keeping the safety spine (Codex re-confirmed across 5 reviews: leads quarantined, manual = low-confidence invite).
+
+**Pointers:** `docs/REVIEWER_CONTACT_LEADS_SPEC.md` (Slices 1–5 IMPLEMENTED), `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` + `reviewer-identity.md`. Commits `915265c2` → `33ca40c5` (+ Codex E2E `e6fdff4d` → `399310b7`). Open: branded subdomains added, awaiting IT DNS (`REVIEWER_PORTAL_BASE_URL` flip pending); grantee portal spec stub `835e3a29`.
+
 ## June 2026 — Reviewer email recovery (faculty-page fetch) + ORCID-name identity promotion (prod) (Session 265)
 
 **Milestone:** Two reviewer-finder capabilities shipped to prod, one of which **reverses the documented S235 zero-SSRF decision** as an opt-in. Reviewers were surfacing with no email (e.g. Argenti, Dudovich, Pfeifer) and prominent ORCID'd reviewers (e.g. Bucksbaum) were being dropped to `unresolved` when Claude omitted the institution.

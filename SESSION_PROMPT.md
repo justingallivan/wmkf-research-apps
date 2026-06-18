@@ -1,92 +1,100 @@
-# Session 267 Prompt: Build the reviewer contact-leads layer (Slice 1 = measure first)
+# Session 268 Prompt: Finish branded domains + (future) grantee portal spec
 
-> **STRATEGIC PIVOT (S266).** Stop hardening reviewer *identity precision*; the headline pain is contact
-> *recall* — candidates surface without emails that are web-discoverable by hand. Build the contact-leads
-> layer. See `feedback-prioritize-contact-recall-over-identity-precision.md`.
-> **TEMP audit log LIVE in prod** (`d0fb1ef5`, `[Discover API] S266 generation audit`) — kept intentionally;
-> revert when done reviewing generation/exclusion behavior.
+> **S267 delivered the contact-recall pivot.** The full reviewer contact-leads layer (Slices 1–5)
+> + on-card manual contact edit shipped to prod, Codex-reviewed across 5 passes. The broad paid
+> scout (Slice 2b) was MEASURED unjustified (Slice 1 audit: ~68% verified, 100% of misses are
+> found-then-discarded) — do NOT build it.
+> **Open carryover: branded subdomains await IT DNS** — finish the verify + env flip when IT confirms.
 
-## Session 266 — what happened
+## Session 267 — what happened
 
-Started as "implement reviewer data-quality fixes," shipped those, then chased reviewer enrichment
-quality through several Codex loops, and ended on a deliberate **pivot to contact recall** with an
-aligned design.
+Built the entire reviewer **contact-leads recall layer** end-to-end (the S266 design), measuring
+first, then shipping each slice with a Codex review and a prod deploy. Then added an on-card
+manual contact editor, helped set up two Vercel custom domains (awaiting IT), and seeded a
+future grantee-portal spec. Codex (separate window) shipped a reviewer E2E rehearsal harness.
 
 ### Shipped to prod (all pushed)
-1. **Reverted S265 temp debug log** — `e7ba970f`.
-2. **Candidate data-quality fixes (Fix 1-5)** — `a07e3f0f` + `56e5368e`. Shared `ContactParser.isDocumentUrl`
-   rejects document-file URLs as websites/faculty pages at every surface (website gate, faculty gate, email-tier
-   fetch, capture/persist/read/render); honorifics stripped from display name at `normalizeSuggestionSource`.
-   Fix 5 closed a Codex-found HIGH fan-out leak (facultyPageUrl rendered/persisted raw). Codex post-impl reviewed.
-3. **Scholar label fix** — `145e0add`. "Scholar profile" only for a real `citations?user=` URL via
-   `isRealScholarProfileUrl`; the search-style URLs enrichment stores now correctly read "Scholar search."
-4. **ORCID author-split metrics fix** — `6dccd743` + `8c386173` (Codex MEDIUM hardening). `getRichestAuthorByOrcid`
-   queries `?filter=orcid:` and picks the richest entity, so a split ORCID (Landsman: a 1-work stub + the real
-   139-work record) no longer lands the stub. Codex-reviewed identity-safe.
-5. **TEMP generation audit log** — `d0fb1ef5` (still live). Logs generated vs verified vs needsReview vs
-   droppedByFilters per search.
+1. **Slice 1 — missing-email audit** (`lib/services/reviewer-contact-audit.js`). Classifies each
+   candidate's missing-email reason into buckets; logged by both enrichment routes + on SSE stats.
+   Ran in prod on 2 proposals: **~68% verified; every miss was `withheld_by_gate` /
+   `lead_found_not_persisted` / `has_page_no_email`** — 0 `searched_no_result` / `search_skipped`.
+   → Slice 2b (paid scout) is unjustified.
+2. **Slice 2a — quarantined `contactLeads[]`** (`contact-enrichment-service.js`). Surfaces
+   discarded/withheld contacts + faculty-pages-without-email. `_addContactLead` forces
+   `persistable:false`. No new network calls.
+3. **Slice 3 — card display** (`shared/components/reviewers/ContactLeads.js`). Read-only; gated on
+   `!identityUnverified` (NOT `!email` — fixed mid-session so promoting one field doesn't hide the
+   others); high/medium prominent, low/rejected behind a toggle.
+4. **Slices 4+5 — staff promotion + roster persistence.** "Use this email"/"Use this page" stamps
+   `emailSource:'manual'` → `emailConfidence` LOW → confirm-before-send. Compact leads persisted in
+   the Find roster (`pruneContactLeads`, ≤8) so they survive reload.
+5. **On-card manual contact edit** (`CandidateEditModal` local `onApply` mode +
+   `ReviewerSearchSection.setManualContact`). "✏️ Edit contact" lets staff type email/website/
+   affiliation/h-index by hand (the Javier Martinez case). Name locked on the Find card (name is
+   the dedup key). Affiliation edits intentionally NOT COI-rechecked (owner decision — see memory).
+6. **Codex E2E rehearsal harness** (separate window): reviewer email-capture mode + captured-invite
+   + return-upload Playwright specs + runbook (`docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md`).
 
-### Design aligned, NOT implemented
-6. **Contact-leads / scout layer** — `2e4b43b3`. `docs/REVIEWER_CONTACT_LEADS_SPEC.md` (Codex-updated) +
-   `docs/REVIEWER_CONTACT_LEADS_REVIEW.md` (Claude review + Codex **GO-WITH-CHANGES**). A quarantined
-   `contactLeads[]` layer: search aggressively for staff breadcrumbs, never feed safe email/website/persist/invite
-   fields. **This is the S267 work.**
+### Codex reviews (all clean / fixed)
+5 Codex passes — every safety/identity invariant CONFIRMED. Fixes applied: Serp name-mismatch
+marker (`c196d574`), dedup sharpen (`d4e62a33`), manual source authoritative on promotion
+(`93b7e2ce`, MED), website-clears-abstain + h-index NaN guard (`d3682068`).
 
-### Parked (deliberately deprioritized — do NOT pick up before the leads layer)
-7. **OpenAlex affiliation-history widening** — Codex design review GO-WITH-CHANGES (match all of
-   `last_known_institutions`, not just `[0]`). Diagnosed root cause of Olga Smirnova → needs-review: OpenAlex
-   flipped her last-known institution to Technion (proposal places her at Max Born Institute), breaking the
-   affiliation anchor; the ORCID-name promotion can't rescue a name that common. Required changes (matched-institution
-   metadata carried through anchors, a secondary-match gate requiring forename/ORCID corroboration, tests) are in the
-   S266 transcript + the agent-wiki reviewer-identity hazard note. **Parked behind recall work per the pivot.**
+### Infra / data ops (not feature commits)
+- **Branded Vercel domains** `applications.wmkeck.org` + `reviews.wmkeck.org` added to project
+  `wmkf_research_apps` (both Invalid Configuration until DNS). DNS host is **Cloudflare** (IT). The
+  records to give IT (from dashboard Manual setup): **CNAME → `c2b4d46311200992.vercel-dns-017.com`**
+  for each, **DNS-only / proxy OFF**. IT emailed; Justin replied with records. Email is M365/Dynamics
+  (PD mailbox) — subdomains are web-only, no mail records, no SMTP2GO needed.
+- Roster cleanups (non-applicant) for **1002794** and **1002874** via `reset-request-reviewers.mjs`.
+- Refreshed 3 stale applicant suggestion labels on 1002794 (Alexandra/Thomas/Anh-Thu).
 
-### Prod data operations (not commits)
-- 1002794 reviewer corrections: fixed 3 misspelled applicant names in `wmkf_potentialreviewer` (Ahn-Thu→Anh-Thu Le,
-  Tom→Thomas Weinacht, Alexandria→Alexandra Landsman); cleared the find roster to its 5 applicant rows; re-enriched
-  them against the deployed ORCID-split fix → **Landsman now h-index 25 / 139 works** (was the 1-work stub). Le still
-  abstains (no ORCID anchor + common name — expected).
-- **Deleted 15 orphaned encrypted `api_key_*` prefs** from `wmkf_appuserpreferences` (3 owners × 5 keys). These were
-  dead legacy data (keys are env-var-centralized; `getDecryptedApiKey` has no live callers) that produced the
-  "Decryption failed" log noise. Fixed at the source.
+## Potential next steps for S268
 
-## Potential next steps for S267
+### 1. Finish the branded domains (carryover — needs IT DNS first)
+When IT confirms the CNAMEs are in Cloudflare (DNS-only):
+- Verify both: `vercel inspect <url>` / dashboard Refresh → Valid + HTTPS active (use `vercel inspect`,
+  NOT a `vercel ls` hash-poll — see `feedback-deployment-monitoring-use-inspect`).
+- Set env **`REVIEWER_PORTAL_BASE_URL=https://reviews.wmkeck.org`** (Production) — it falls back to
+  `NEXTAUTH_URL` until set (commit `19bd446e`).
+- Redeploy so future reviewer invitation emails use the branded link.
+- Decide what `applications.wmkeck.org` routes to (just live → app for now, unless a path is wanted).
 
-### 1. Contact-leads layer — Slice 1 FIRST (the agreed build)
-Per `REVIEWER_CONTACT_LEADS_REVIEW.md` build order: **Slice 1 = measurement/audit** (classify missing-email by
-reason: verified_present / withheld_by_gate / search_skipped_no_anchor / searched_no_result / has_page_no_email /
-lead_found_not_persisted / namesake_ambiguous / identity_unresolved / provider_error). The dominant-bucket split is
-a **measurement question, not an assumption** (Codex correction: the search gate reads `_effectiveInstitution` =
-`orcidAffiliation`/`affiliation`/`institution`/`primaryAffiliation`, NOT `suggestedInstitution`). Then Slice 2a
-(surface already-discarded Claude/Serp results + page URLs as `contactLeads`, no new network calls — note the
-SerpAPI name-mismatch email is destroyed in place at `contact-enrichment-service.js:612`, so add a pre-null capture
-hook) + faculty-page-as-lead. Then display, promotion, then (only if Slice 1 justifies) the broad paid scout.
+### 2. (Future) Grantee Deliverables Portal — spec it out
+`docs/GRANTEE_PORTAL_SPEC.md` stub (commit `835e3a29`). Workbench-triggered at cycle close: Claude
+drafts 2 docs → email grantees for edit/approval → they return 2 edited docs + graphical-abstract
+image + caption + consent checkbox → Dataverse (+ SharePoint). Reuses the reviewer-portal primitives
+(magic-link, token-lifecycle, M365 send, SharePoint upload, Executor). Biggest open question: what
+the two documents ARE. Run a Codex design pass off the stub.
 
-### 2. Revert the temp generation audit log (`d0fb1ef5`) when done
-`[Discover API] S266 generation audit` in `pages/api/reviewer-finder/discover.js`. Kept for now to watch generation
-coverage; remove + redeploy when finished.
-
-### 3. (Parked) affiliation-history identity fix — only after the leads layer
+### 3. (Parked) S266 TEMP generation audit log still live
+`d0fb1ef5` `[Discover API] S266 generation audit` in `discover.js` — never reverted. Low priority;
+revert when the generation/exclusion review is truly done. (Distinct from the Slice-1 audit, which
+is permanent.)
 
 ## Continuity guardrails
-- **Pivot is set:** recall over identity-precision. Don't open another namesake/affiliation fix before the leads layer.
-- TEMP audit log is LIVE in prod (`d0fb1ef5`); revert it eventually.
-- 1002794: 5 applicant rows, re-enriched; non-applicant cleared. A new search re-surfaces literature candidates.
-- Contact-leads safety invariant: leads stay quarantined; a wrong-person email must never reach an auto-invite.
+- **Do NOT build Slice 2b** (broad paid scout) — measured unjustified.
+- Contact-leads safety: leads stay `persistable:false`; a manually entered/promoted email is `manual`
+  → low-confidence → confirm-before-send. Never weaken this.
+- Reviewer-finder posture: recall over identity-precision (`feedback-prioritize-contact-recall-over-identity-precision`).
+- Multi-agent: Codex also works on `main` (separate window/worktree, shares origin). At session
+  boundaries: clean tree, scoped commits, `git pull --rebase` before push.
 
 ## Key Files Reference
 | File | Role |
 |------|------|
-| `docs/REVIEWER_CONTACT_LEADS_SPEC.md` | The scout-layer spec (Codex-updated, the S267 build) |
-| `docs/REVIEWER_CONTACT_LEADS_REVIEW.md` | Claude review + Codex GO-WITH-CHANGES + verified premise |
-| `lib/services/contact-enrichment-service.js` | enrich tiers; `_effectiveInstitution`/`hasIdentityAnchor` gate (:487), discard sites (:511/:593/:612) |
-| `lib/services/openalex-service.js` | `getRichestAuthorByOrcid` (ORCID-split fix); `mapAuthorRecord` (only `last_known_institutions[0]`) |
-| `lib/services/reviewer-identity-evidence.js` | spine `scoreRecord`/`selectRecord`/`buildAnchors` (affiliation match) |
-| `pages/api/reviewer-finder/discover.js` | has the TEMP generation audit log to revert |
-| `shared/components/reviewers/reviewer-search-logic.js` | `mergeEnrichment`/`pruneCandidateForRoster` (lead persistence plumbing) |
+| `docs/REVIEWER_CONTACT_LEADS_SPEC.md` | Slices 1–5 spec, all IMPLEMENTED |
+| `lib/services/reviewer-contact-audit.js` | Slice 1 missing-email classifier |
+| `lib/services/contact-enrichment-service.js` | `contactLeads` collection (`_addContactLead`/`_collectContactLeads`) |
+| `shared/components/reviewers/ContactLeads.js` | Slice 3 read-only lead display |
+| `shared/components/reviewers/ReviewerSearchSection.js` | `setManualContact`/`useLead` + Edit-contact wiring |
+| `shared/components/reviewers/CandidateEditModal.js` | local `onApply` mode (Find-card manual edit) |
+| `docs/GRANTEE_PORTAL_SPEC.md` | future grantee-portal stub |
+| `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md` | Codex E2E rehearsal harness |
 
 ## Testing
 ```bash
 npm run build && npm run lint
-npm test                       # FULL suite (~2616 tests as of S266)
+npm test                       # FULL suite (~2690 tests as of S267)
 npm run check:agent-wiki && npm run check:fact-consistency && npm run check:doc-currency
 ```
