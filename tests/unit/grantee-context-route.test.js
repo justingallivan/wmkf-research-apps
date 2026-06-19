@@ -117,6 +117,24 @@ test('FAIL-CLOSED: unknown status value → not editable, view:closed', async ()
   expect(res.body.view).toBe('closed');
 });
 
+test('SECURITY: a populated image ref never leaks to the client (only hasImage:true)', async () => {
+  const SECRET_URL = 'https://wmkf.sharepoint.com/Grantee_Uploads/secret-folder/img.png';
+  const v = okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED);
+  v.request.wmkf_granteeimagefileref = SECRET_URL;
+  verifyGranteeToken.mockResolvedValue(v);
+  const res = mockRes();
+  await handler({ method: 'GET', query: { token: 't' }, headers: {} }, res);
+
+  expect(res.body.deliverable.hasImage).toBe(true);
+  // The raw SharePoint URL must appear nowhere in the serialized response, and
+  // no raw wmkf_* field name may leak through the deliverable shape.
+  const serialized = JSON.stringify(res.body);
+  expect(serialized).not.toContain(SECRET_URL);
+  expect(serialized).not.toContain('wmkf_');
+  expect(res.body.deliverable.imageFileRef).toBeUndefined();
+  expect(res.body.deliverable.wmkf_granteeimagefileref).toBeUndefined();
+});
+
 test('numeric-string status from the API is coerced (Revision Requested → editable)', async () => {
   verifyGranteeToken.mockResolvedValue(okVerify(String(GRANTEE_DELIVERABLE_STATUS.REVISION_REQUESTED)));
   const res = mockRes();

@@ -90,8 +90,12 @@ state lives — or whether we keep tokens stateless.
 - `pages/external/grantee/[token].js` — page scaffold: reads token from URL, fetches
   `/api/external/grantee/[token]/context`, fail-closed render on invalid/expired.
 - `pages/api/external/grantee/[token]/context.js` — rate-limited (reuse `checkRateLimit`),
-  token-verified, returns `{ ok, request:{title,requestNumber}, abstractFormatted, status, ... }`.
-- Tests: token mint/verify (incl. audience-claim rejection of a reviewer token), context fail-closed.
+  token-verified, returns `{ ok, request:{title,requestNumber,meetingDate}, deliverable:{abstractFormatted,
+  abstractApproved,caption,hasImage,status,statusLabel}, editable, view }`. `meetingDate` is included so
+  the edit UI can frame the cycle ("for the {meetingDate} cycle"); the raw SharePoint image ref is NEVER
+  returned — only `hasImage`.
+- Tests: token mint/verify (incl. audience-claim rejection of a reviewer token + array-form aud +
+  missing-sub + past-expiry), context fail-closed (status allowlist) + no image-ref leak.
 
 ## Open (later chunks)
 - Chunk 2: the exact abstract-generation prompt/template + Executor wiring + style guide source.

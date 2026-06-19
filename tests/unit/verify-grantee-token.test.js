@@ -71,9 +71,16 @@ test('SECURITY: a reviewer token (no aud) is rejected with invalid_claim', async
 });
 
 test('expired token → expired (no Dataverse lookup)', async () => {
-  // mintScopedToken refuses past expiry, so mint with a tiny future window and wait.
-  const { jwt } = await mintForRequest({ requestId: REQUEST_ID, expiresAt: new Date(Date.now() + 1000) });
-  await new Promise((r) => setTimeout(r, 1100));
+  // Deterministic: sign a grantee token whose exp is already in the past
+  // (mintScopedToken refuses past expiry, so go direct via jose). At/after the
+  // exp boundary jose throws JWTExpired → reason 'expired'.
+  const { SignJWT } = await import('jose');
+  const jwt = await new SignJWT({ sub: REQUEST_ID, ops: ['edit_abstract'] })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuedAt(Math.floor((Date.now() - 120_000) / 1000))
+    .setAudience('grantee')
+    .setExpirationTime(Math.floor((Date.now() - 1000) / 1000)) // 1s in the past
+    .sign(new TextEncoder().encode(SECRET));
   const result = await verifyGranteeToken(jwt);
   expect(result.ok).toBe(false);
   expect(result.reason).toBe('expired');
@@ -84,6 +91,36 @@ test('garbage token → malformed', async () => {
   const r = await verifyGranteeToken('not-a-jwt');
   expect(r.ok).toBe(false);
   expect(['malformed', 'invalid_signature']).toContain(r.reason);
+});
+
+test('SECURITY: array-form aud (["grantee"]) is rejected with invalid_claim', async () => {
+  // A token whose aud is the array ['grantee'] must NOT satisfy the strict
+  // `=== 'grantee'` string guard. Mint one directly via jose to force array aud.
+  const { SignJWT } = await import('jose');
+  const jwt = await new SignJWT({ sub: REQUEST_ID, ops: ['edit_abstract'] })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuedAt()
+    .setAudience(['grantee']) // array form
+    .setExpirationTime(Math.floor((Date.now() + 60_000) / 1000))
+    .sign(new TextEncoder().encode(SECRET));
+  const r = await verifyGranteeToken(jwt);
+  expect(r.ok).toBe(false);
+  expect(r.reason).toBe('invalid_claim');
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+});
+
+test('SECURITY: valid signature + aud:grantee but missing sub → malformed', async () => {
+  const { SignJWT } = await import('jose');
+  const jwt = await new SignJWT({ ops: ['edit_abstract'] }) // no sub
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuedAt()
+    .setAudience('grantee')
+    .setExpirationTime(Math.floor((Date.now() + 60_000) / 1000))
+    .sign(new TextEncoder().encode(SECRET));
+  const r = await verifyGranteeToken(jwt);
+  expect(r.ok).toBe(false);
+  expect(r.reason).toBe('malformed');
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
 });
 
 test('request not found (404) → not_found', async () => {
