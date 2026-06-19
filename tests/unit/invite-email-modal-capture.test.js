@@ -70,7 +70,11 @@ describe('InviteEmailModal capture-mode result display', () => {
     );
 
     await screen.findByDisplayValue('Invitation');
-    fireEvent.click(screen.getByRole('button', { name: /send 1 invitation/i }));
+    // The "Send 1 invitation" label carries the recipient COUNT, which settles in a
+    // later render tick than the subject field — so wait for that exact label rather
+    // than querying synchronously (the count lags the subject under CPU load → the
+    // button still reads "Send invitations", which was the parallel-worker flake).
+    fireEvent.click(await screen.findByRole('button', { name: /send 1 invitation/i }));
 
     await waitFor(() => expect(screen.getByText(/captured 1 invitation email for rehearsal/i)).toBeInTheDocument());
     expect(screen.getByText(/no dynamics email was sent/i)).toBeInTheDocument();
