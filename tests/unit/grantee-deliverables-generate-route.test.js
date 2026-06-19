@@ -1,0 +1,181 @@
+/**
+ * POST /api/workbench/grantee-deliverables/generate — chunk 3.
+ * Covers: method/GUID/auth guards, reuse-existing, missing source, no-etag
+ * fail-closed, happy persist + status stamp, status non-downgrade, 412 handling
+ * (re-read → 200 reused / 409), and strict-boolean regenerate.
+ *
+ * @jest-environment node
+ */
+jest.mock('../../lib/utils/auth', () => ({
+  requireAppAccess: jest.fn(),
+}));
+jest.mock('../../lib/services/dynamics-service', () => ({
+  DynamicsService: { getRecord: jest.fn(), updateRecord: jest.fn() },
+}));
+jest.mock('../../lib/services/dynamics-context', () => ({
+  bypassDynamicsRestrictions: (labelOrFn, maybeFn) => {
+    const fn = typeof labelOrFn === 'function' ? labelOrFn : maybeFn;
+    return Promise.resolve().then(() => fn());
+  },
+}));
+jest.mock('../../lib/services/model-override-loader', () => ({
+  loadModelOverrides: jest.fn(async () => {}),
+}));
+jest.mock('../../lib/services/grantee-abstract-service', () => ({
+  generateGranteeAbstract: jest.fn(),
+}));
+
+import { requireAppAccess } from '../../lib/utils/auth';
+import { DynamicsService } from '../../lib/services/dynamics-service';
+import { loadModelOverrides } from '../../lib/services/model-override-loader';
+import { generateGranteeAbstract } from '../../lib/services/grantee-abstract-service';
+import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
+import handler from '../../pages/api/workbench/grantee-deliverables/generate';
+
+const GUID = '22222222-2222-2222-2222-222222222222';
+const SOURCE = 'We will measure the thing. Our team has prior data and we believe it generalizes to humans over the next three years.';
+const FORMATTED = 'The team will measure the thing; prior data showed it works and the work will test generalization to humans.';
+
+function mockRes() {
+  const res = { statusCode: 200, headers: {}, body: null };
+  res.status = (c) => { res.statusCode = c; return res; };
+  res.json = (b) => { res.body = b; return res; };
+  res.setHeader = (k, v) => { res.headers[k] = v; };
+  return res;
+}
+const reqOf = (body) => ({ method: 'POST', body, headers: {} });
+
+function row(over = {}) {
+  return {
+    akoya_requestid: GUID,
+    wmkf_abstract: SOURCE,
+    wmkf_abstractformatted: null,
+    wmkf_granteedeliverablestatus: null,
+    _etag: 'W/"1"',
+    ...over,
+  };
+}
+
+beforeEach(() => {
+  requireAppAccess.mockReset().mockResolvedValue({ profileId: 'p1', session: { user: { dynamicsSystemuserId: 'sys-1' } } });
+  DynamicsService.getRecord.mockReset();
+  DynamicsService.updateRecord.mockReset().mockResolvedValue({});
+  loadModelOverrides.mockReset().mockResolvedValue();
+  generateGranteeAbstract.mockReset().mockResolvedValue({ abstractFormatted: FORMATTED, runId: 'r1', model: 'm1' });
+});
+
+test('non-POST → 405', async () => {
+  const res = mockRes();
+  await handler({ method: 'GET', body: {}, headers: {} }, res);
+  expect(res.statusCode).toBe(405);
+});
+
+test('invalid requestId → 400 (no Dataverse read)', async () => {
+  const res = mockRes();
+  await handler(reqOf({ requestId: 'not-a-guid' }), res);
+  expect(res.statusCode).toBe(400);
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+});
+
+test('auth gate short-circuits (requireAppAccess returns falsy)', async () => {
+  requireAppAccess.mockResolvedValue(null);
+  const res = mockRes();
+  await handler(reqOf({ requestId: GUID }), res);
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+});
+
+test('happy path: generate, persist, stamp Drafted from null status', async () => {
+  DynamicsService.getRecord.mockResolvedValue(row());
+  const res = mockRes();
+  await handler(reqOf({ requestId: GUID }), res);
+  expect(loadModelOverrides).toHaveBeenCalled();
+  expect(res.statusCode).toBe(200);
+  expect(res.body.abstractFormatted).toBe(FORMATTED);
+  expect(res.body.persisted).toBe(true);
+  const [, , patch, opts] = DynamicsService.updateRecord.mock.calls[0];
+  expect(patch.wmkf_abstractformatted).toBe(FORMATTED);
+  expect(patch.wmkf_granteedeliverablestatus).toBe(GRANTEE_DELIVERABLE_STATUS.DRAFTED);
+  expect(opts).toMatchObject({ ifMatch: 'W/"1"', actingUserSystemId: 'sys-1' });
+});
+
+test('reuse-existing: populated abstract + no regenerate → no paid call', async () => {
+  DynamicsService.getRecord.mockResolvedValue(row({ wmkf_abstractformatted: 'already here', wmkf_granteedeliverablestatus: GRANTEE_DELIVERABLE_STATUS.INVITED }));
+  const res = mockRes();
+  await handler(reqOf({ requestId: GUID }), res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body.reused).toBe(true);
+  expect(generateGranteeAbstract).not.toHaveBeenCalled();
+  expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+});
+
+test('regenerate is honored only for strict boolean true (string "true" still reuses)', async () => {
+  DynamicsService.getRecord.mockResolvedValue(row({ wmkf_abstractformatted: 'already here' }));
+  const res = mockRes();
+  await handler(reqOf({ requestId: GUID, regenerate: 'true' }), res);
+  expect(res.body.reused).toBe(true);
+  expect(generateGranteeAbstract).not.toHaveBeenCalled();
+});
+
+test('regenerate=true overwrites an existing abstract', async () => {
+  DynamicsService.getRecord.mockResolvedValue(row({ wmkf_abstractformatted: 'old', wmkf_granteedeliverablestatus: GRANTEE_DELIVERABLE_STATUS.DRAFTED }));
+  const res = mockRes();
+  await handler(reqOf({ requestId: GUID, regenerate: true }), res);
+  expect(generateGranteeAbstract).toHaveBeenCalled();
+  expect(res.body.regenerated).toBe(true);
+});
+
+test('STATUS NON-DOWNGRADE: regenerate at Invited keeps Invited (patch omits status)', async () => {
+  DynamicsService.getRecord.mockResolvedValue(row({ wmkf_abstractformatted: 'old', wmkf_granteedeliverablestatus: GRANTEE_DELIVERABLE_STATUS.INVITED }));
+  const res = mockRes();
+  await handler(reqOf({ requestId: GUID, regenerate: true }), res);
+  const [, , patch] = DynamicsService.updateRecord.mock.calls[0];
+  expect(patch.wmkf_abstractformatted).toBe(FORMATTED);
+  expect(patch).not.toHaveProperty('wmkf_granteedeliverablestatus');
+  expect(res.body.status).toBe(GRANTEE_DELIVERABLE_STATUS.INVITED);
+});
+
+test('missing source abstract → 400 (before generation)', async () => {
+  DynamicsService.getRecord.mockResolvedValue(row({ wmkf_abstract: 'too short' }));
+  const res = mockRes();
+  await handler(reqOf({ requestId: GUID }), res);
+  expect(res.statusCode).toBe(400);
+  expect(generateGranteeAbstract).not.toHaveBeenCalled();
+});
+
+test('no _etag → 503 fail-closed (no bare PATCH)', async () => {
+  DynamicsService.getRecord.mockResolvedValue(row({ _etag: undefined }));
+  const res = mockRes();
+  await handler(reqOf({ requestId: GUID }), res);
+  expect(res.statusCode).toBe(503);
+  expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+});
+
+test('request not found → 404', async () => {
+  DynamicsService.getRecord.mockRejectedValue(new Error('boom'));
+  const res = mockRes();
+  await handler(reqOf({ requestId: GUID }), res);
+  expect(res.statusCode).toBe(404);
+});
+
+test('412 + now-populated → 200 reused/concurrent (no raw 412)', async () => {
+  DynamicsService.getRecord
+    .mockResolvedValueOnce(row())  // first read
+    .mockResolvedValueOnce({ wmkf_abstractformatted: 'peer wrote this', wmkf_granteedeliverablestatus: GRANTEE_DELIVERABLE_STATUS.DRAFTED }); // re-read after 412
+  DynamicsService.updateRecord.mockRejectedValue(Object.assign(new Error('precondition failed'), { status: 412 }));
+  const res = mockRes();
+  await handler(reqOf({ requestId: GUID }), res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body.reused).toBe(true);
+  expect(res.body.concurrent).toBe(true);
+  expect(res.body.abstractFormatted).toBe('peer wrote this');
+});
+
+test('412 + still empty → 409', async () => {
+  DynamicsService.getRecord
+    .mockResolvedValueOnce(row())
+    .mockResolvedValueOnce({ wmkf_abstractformatted: null });
+  DynamicsService.updateRecord.mockRejectedValue(Object.assign(new Error('precondition failed'), { status: 412 }));
+  const res = mockRes();
+  await handler(reqOf({ requestId: GUID }), res);
+  expect(res.statusCode).toBe(409);
+});

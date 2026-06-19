@@ -20,7 +20,10 @@ build a **parallel grantee variant** of the lifecycle, pages, submit route, uplo
 |---|---|---|---|
 | 1 | **Token + auth foundation** | grantee token lifecycle, `verify-grantee-token`, `/external/grantee/[token]` page scaffold, `context` route (fail-closed) | schema (token state — see Q1) |
 | 2 | **Abstract generation** | Executor prompt/template: `wmkf_abstract` → `wmkf_abstractformatted` | Executor contract |
-| 3 | **Awardee-tab trigger UI** | workbench Awardee tab: list/select grant, program-aware recipient resolve + staff confirm, generate + send invite | 1, 2 |
+| 3 | **Generate + persist abstract** (split from the original combined chunk 3) | `POST /api/workbench/grantee-deliverables/generate` — generate via chunk-2 service, persist `wmkf_abstractformatted` + status→Drafted (ETag-conditional) | 2 |
+| 3b | **Recipient resolution** | program-aware grantee-contact resolve + staff confirm | 3 |
+| 3c | **Send invite** | grantee token mint (chunk 1) + M365 email (action-button + fallback), status→Invited | 1, 3, 3b |
+| 3d | **Awardee-tab UI** | wire the empty workbench Awardee tab (`pages/workbench/[requestId].js:41`) | 3, 3b, 3c |
 | 4 | **Grantee portal UI** | edit abstract (in-portal text), upload image, caption, publish-image waiver submit-gate | 1 |
 | 5 | **Submit route** | atomic SharePoint image upload + Dataverse PATCH (`wmkf_abstractapproved`, caption, image ref, status) + rollback; image magic-byte validation; virus scan | 1, 4 |
 | 6 | **Status/lifecycle + reminders** | status transitions on the Awardee tab, optional reminder send | 3, 5 |
@@ -148,7 +151,56 @@ directly to `wmkf_abstractformatted` (Memo). Mirrors the field-primer Executor p
 > reuse an existing value → acquire an ETag/lease → verify ownership → conditional persist
 > (`pages/api/field-primer/generate.js:92-126,172-215`). Do NOT ship chunk 3 with a bare last-write PATCH.
 
+## Chunk 3 — Generate + persist abstract (design)
+
+The original chunk 3 (resolve recipient + generate + persist + send invite + Awardee-tab UI) is too
+big for one reviewable slice, so it is split. **Chunk 3 = the generate-and-persist-abstract backend
+route only** — it discharges the carried idempotency requirement and is self-contained/testable.
+Recipient-resolution, send-invite (token mint + M365 email), and the Awardee-tab UI become chunks 3b+.
+
+- **Route:** `POST /api/workbench/grantee-deliverables/generate` — `requireAppAccess(req, res, 'reviewers')`
+  (matches the triage workbench-write precedent), `requestId` GUID-validated straight off `req.body`
+  (trust-boundary gate), optional `regenerate`. Register in the security matrix.
+- **Flow:** reuse-existing → (idempotency guard) → read `wmkf_abstract` source → `generateGranteeAbstract`
+  (chunk-2 service) → persist `wmkf_abstractformatted` + `wmkf_granteedeliverablestatus` → `Drafted`,
+  conditionally on a fresh ETag → return the abstract. `bypassDynamicsRestrictions` (external/trusted read).
+
+### Q1 — Idempotency: full lease/nonce vs reuse + ETag-conditional write?
+Field-primer stores its lease sentinel IN its result field because that field is a JSON envelope.
+`wmkf_abstractformatted` is human-readable PROSE, so a transient lease sentinel there is awkward (and
+the chunk-1 context route surfaces that field).
+- **Option A — Full field-primer lease/nonce:** store a JSON lease sentinel in `wmkf_abstractformatted`
+  during generation (parse helper distinguishes sentinel vs prose); strongest single-flight. Cost:
+  overloads a prose field; the context route must learn to ignore a sentinel.
+- **Option B (recommended) — reuse-existing + ETag-conditional write (no sentinel):** if
+  `wmkf_abstractformatted` already populated and `!regenerate` → return it (no paid call); else read the
+  row's `_etag`, generate, then `updateRecord` with `ifMatch` — a concurrent write 412s. Prevents
+  corruption/last-write-win; the only downside is a rare double cold generation on a rapid double-click
+  (one wasted paid call, no data harm). Fits a low-volume, single-staff-initiated action and keeps the
+  prose field clean. The status flip to `Drafted` rides the same conditional update.
+- **Recommendation:** Option B. Frame for Codex pre-impl to confirm it satisfies the carried
+  "no bare last-write PATCH" requirement (it does: the write is ETag-conditional).
+
+### RESOLVED (S268, Codex pre-impl — Option B approved, READY WITH NAMED CHANGES)
+Six required behaviors baked into the route:
+1. **No write without `_etag`** — `getRecord` surfaces `_etag`; if absent, fail closed (503), never a bare PATCH.
+2. **412 handling** — on `err.status === 412`, re-read `wmkf_abstractformatted`; if now populated → 200
+   `{reused:true, concurrent:true}`; if still empty → 409 (retryable). Never surface raw 412.
+3. **Status non-downgrade** — read current `wmkf_granteedeliverablestatus`; include `Drafted` in the
+   patch ONLY when current is null/empty or already Drafted; for Invited/Reminder/Submitted/Staff
+   Review/Revision/Complete/Closed, preserve status and update only the abstract field.
+4. **Missing source** — validate `wmkf_abstract` after the read; missing/too-short → 400 (not a 500).
+5. **`actingUserSystemId`** passed on the write (caller attribution, like triage).
+6. **GUID-validate off `req.body.requestId`** (trust-boundary gate) + **register in the security matrix**.
+`regenerate` is honored only when strictly `=== true` (a string `"false"` must not force overwrite).
+No restore-on-failure needed (Option B writes nothing before the final PATCH).
+- **Tests:** reuse-existing skips generation; first write succeeds + sets Drafted; a stale-ETag write
+  412s and does NOT clobber; GUID/method/auth guards; missing-source 400; regenerate overwrites.
+
 ## Open (later chunks)
+- Chunk 3b: program-aware recipient resolution + staff confirm.
+- Chunk 3c: send invite (grantee token mint + M365 email, action-button + fallback link), status→Invited.
+- Chunk 3d: Awardee-tab UI wiring (the empty tab at `pages/workbench/[requestId].js:41`).
 - Chunk 5: image accepted formats/size; `file-magic.js` needs image magic-byte support (PNG/JPEG/…).
 - Chunk 6: reminder cadence/deadline.
 
