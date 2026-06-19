@@ -64,9 +64,10 @@ WMKF AI writeback fields (canonical: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` —
 
 **Grantee Deliverables Portal fields (S268) — [LIVE in prod (S268, 2026-06-18, `apply-dataverse-schema --wave=2-grantee-deliverables --execute`); 5/5 created, re-probe shows 5/5 EXACT via `scripts/preflight-grantee-deliverables-fields.mjs`].** Five
 new fields for the cycle-close grantee deliverables package (one AI-formatted abstract the grantee
-edits/approves + one graphical image + a caption). **Fields exist but are UNPOPULATED** — no record
-carries values yet; the portal write-path is not built. The portal feature itself (Awardee-tab
-trigger, abstract generation, external grantee portal, SharePoint upload) is still TO BUILD:
+edits/approves + one graphical image + a caption). The **portal write-path SHIPPED S268** — the full
+feature (Awardee-tab trigger, abstract generation, external grantee portal, SharePoint upload/return,
+status write-path) is built end-to-end (`docs/GRANTEE_PORTAL_BUILD_PLAN.md` chunks 1–5, 3b–3d).
+Population in prod not re-probed this session — likely sparse/unpopulated until grantees submit:
 - `wmkf_abstractformatted` (Memo, 32000) — AI style-guide abstract drafted FROM the applicant's `wmkf_abstract` (the source above); shown to the grantee to edit/approve. Not overwritten by the edit.
 - `wmkf_abstractapproved` (Memo, 32000) — grantee-edited/approved abstract (stored separately to preserve the AI-draft provenance).
 - `wmkf_granteeimagefileref` (String, Url, 1000) — SharePoint reference for the graphical image (binary lives in SharePoint).

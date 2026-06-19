@@ -1,6 +1,6 @@
 # Grantee Deliverables Portal — Build Plan
 
-Status: **IN PROGRESS (S268).** Implementation plan for the portal whose design is resolved in
+Status: **IN PROGRESS (S268; chunks 7–8 designed S269, pending Codex pre-impl review).** Implementation plan for the portal whose design is resolved in
 `docs/GRANTEE_PORTAL_SPEC.md` and whose Dataverse field wave is LIVE in prod (5 fields on
 `akoya_request`). This plan decomposes the build into reviewable chunks (the proven
 design→Codex-pre-impl→implement→Codex-post-impl loop) and frames the open decisions per chunk.
@@ -27,6 +27,8 @@ build a **parallel grantee variant** of the lifecycle, pages, submit route, uplo
 | 4 | **Grantee portal UI** ✅ | edit abstract (in-portal text), upload image, caption, publish-image waiver submit-gate (`GranteeDeliverableForm`) | 1 |
 | 5 | **Submit route** ✅ | `POST .../submit`: atomic SharePoint image upload + ETag-conditional Dataverse PATCH (`wmkf_abstractapproved`, caption, image ref, status→Submitted) + rollback; image magic-byte (`validateGranteeImage`) + virus scan; `grantee-upload` service | 1, 4 |
 | 6 | **Status/lifecycle + reminders** | status transitions on the Awardee tab, optional reminder send | 3, 5 |
+| 7 | **Edited-title generator (S269)** | new schema wave (1 field) + Haiku prompt (`grantee-title.generate`) + cron-poll on `wmkf_phaseistatus=Invited` (research-only, idempotent) | Executor contract, schema wave |
+| 8 | **Document assembly + export (S269)** | server-side template (structured header + edited title + body/caption) → portal preview · website HTML · cycle-level export | 7, 5 |
 
 ## Chunk 1 — Token + auth foundation (design)
 
@@ -361,10 +363,102 @@ the J26 query is **685 rows** (a `$top=500` truncates it).
 **PD access:** a superuser grants each PD the **`reviewers`** app in `/admin` (Users; `api/admin/users.js`
 is `requireSuperuser`-gated). That's all a PD needs for the Awardee tab + this list.
 
+## Chunk 7 — Edited-title generator (S269, design)
+
+Generates the house-style **edited title** (the italic one-line objective on the PD's award document)
+**once, at the Phase I→II `Invited` flip**, and stores it for reuse by the Board Book (external) and
+the later abstract assembly (chunk 8). Independent of the abstract flow — a different trigger, model,
+and field. Grounding: `docs/GRANTEE_PORTAL_SPEC.md` D7 + the `project-phaseistatus-decision-lifecycle`
+memory. `[VERIFIED S269 via live probe: request 1002852 + `wmkf_phaseistatus` option-set metadata]`
+
+**Trigger (verified):** `wmkf_phaseistatus = 100000003 (Invited)`. The staff recommendation that
+precedes the board is `Recommended Invite` (707510005) on the same field; the official promotion is
+`Invited`. NOT `akoya_requeststatus`, NOT `wmkf_phaseiistatus` (Phase **II**, a separate field).
+
+**New schema wave (1 field).** A new isolated wave `wave2-grantee-title` (creation-only, with a
+preflight mirroring `scripts/preflight-grantee-deliverables-fields.mjs`). Field carries the AI-edited
+title; follows the `wmkf_ai_<concept>` naming rule (no mid-concept underscore, per the Atlas v3 rule).
+Proposed schemaName `wmkf_AIEditedTitle` → logical `wmkf_aieditedtitle` (Q3 below resolves the exact
+literal at preflight). Memo (~500). Mirror any status/constants in app config if needed.
+
+**Prompt (`grantee-title.generate`).** `shared/config/prompts/grantee-title.js` + a seed script
+(mirror `seed-grantee-abstract-prompt.js`); the prod row is REQUIRED (no bundled fallback). Source =
+`wmkf_abstract` as an **untrusted** override variable (`source_abstract`, `untrusted:true` +
+`dataClass` + `maxChars`, A7-wrapped) — same boundary as the abstract prompt. Output `parseMode:'raw'`,
+single output, `target.kind:'none'` (returned, caller persists). **Model: Haiku** (cheap one-liner;
+note the Executor `temperature` constraint the abstract prompt hit on the Opus tier — confirm Haiku
+accepts it). Register in `scripts/check-prompt-injection-tagging.js` (A7) with
+`callSiteFiles:['lib/services/execute-prompt.js']`.
+
+**Service.** `lib/services/grantee-title-service.js` — `generateGranteeTitle({ sourceAbstract })`,
+thin Executor wrapper returning the stripped one-line string. Min-length input guard; single-line
+output guard (strip stray fences/newlines).
+
+**Trigger surface — cron-poll (owner: preferred).** `pages/api/cron/generate-grantee-titles.js`,
+`verifyCronSecret`-guarded, scheduled in `vercel.json`. Each run: query research-program awardees-in-
+waiting with `wmkf_phaseistatus eq 100000003` **AND** the edited-title field empty → for each, read
+`wmkf_abstract` → generate → **ETag-conditional persist** (no bare last-write PATCH; same idempotency
+discipline as chunk 3). Idempotent + re-runnable (the slate reshuffles; already-filled rows are
+skipped by the empty-field predicate). Research-only via `GRANTEE_RESEARCH_PROGRAM_IDS`
+(`shared/config/granteeResearchPrograms.js`).
+
+### Open questions for Codex pre-impl
+- **Q1 — Cron predicate vs. backfill volume.** Is filtering on `wmkf_phaseistatus eq 100000003` + empty
+  title + research program enough, or do we also need a cycle/meeting-date bound so a cron run doesn't
+  reprocess historical `Invited` rows from prior cycles? (Pagination: the awardee query needed
+  `$top`>500 — confirm the title query handles >500.)
+- **Q2 — Re-generation on slate reshuffle.** If a proposal flips `Invited → Not Invited → Invited`,
+  do we regenerate, keep the first title, or leave staff a manual regenerate? (Empty-field predicate
+  means once filled it's never auto-redone — confirm that's the intended semantics.)
+- **Q3 — Exact schemaName literal** (mid-name underscore caveat, D1) — resolve at preflight.
+- **Q4 — Is a one-shot backfill** of already-`Invited` current-cycle rows wanted on first deploy, or
+  only go-forward?
+- **Q5 — Idempotency mechanism** — ETag-conditional write (chunk-3 precedent) vs. a heavier lease;
+  confirm ETag-conditional is sufficient for a cron (no concurrent writer but re-entrancy across runs).
+
+## Chunk 8 — Document assembly + export (S269, design)
+
+Server-side template assembling the award document from structured Dataverse fields + the generated
+content, replacing the PD's manual DOCX build and the staff member's manual website-HTML coding.
+Grounding: `docs/GRANTEE_PORTAL_SPEC.md` D8/D9.
+
+**Assembly inputs (per request):** institution name (`akoya_applicantid` → account; **bold**),
+institution city/state (account address; *italic*), PI + co-PIs (`wmkf_projectleader` +
+`wmkf_apprequestperson` junction; *italic*), award amount (`akoya_grant` /
+`akoya_originalgrantamount`, currency-formatted; **never** `akoya_request`), edited title (chunk 7;
+*italic*), body (`wmkf_abstractapproved || wmkf_abstractformatted`, markdown→HTML), and for the
+website, caption + image. All **structural formatting lives in the template** (keyed on field
+identity); only body/caption carry inline markdown (D8).
+
+**Outputs (owner: "output will vary"):**
+- **(a) Portal review preview** — the assembled, styled document shown in the grantee portal above the
+  editable body; header fields display-only.
+- **(b) Website HTML** — clean controlled HTML (only `<em>/<strong>` from the body markdown) for the
+  staff member to drop into the site, replacing manual coding.
+- **(c) Cycle-level export** — all of a cycle's awarded abstracts assembled together (replaces today's
+  "compile all into one PDF and post it"). Format TBD (HTML page / combined HTML / DOCX).
+
+### Open questions for Codex pre-impl
+- **Q1 — Title PI-editability.** Is the edited title editable by the PI in the portal (auto-generated,
+  then tweakable) or staff-owned/fixed? (Owner leaned undecided — drives whether it's a portal field.)
+- **Q2 — Markdown renderer + sanitization.** Which renderer, with which allowed subset, and where does
+  rendering happen (assembly-time only)? Confirm no untrusted-HTML sink given D8's plain-markdown
+  storage.
+- **Q3 — Where does assembly live** — a shared service producing a structured model consumed by all
+  three outputs, vs. per-output templates? (Avoid copy-paste drift across preview/HTML/export.)
+- **Q4 — Cycle-export scope + access** — which cycle key, which status set (awarded only?), and the
+  staff auth gate; cron-prebuilt vs. on-demand.
+- **Q5 — Co-PI assembly** — the DOCX showed two PIs; confirm the `wmkf_apprequestperson` junction read
+  (UNION with `wmkf_projectleader`) and the name-join formatting ("A and B").
+- **Q6 — Image/caption on the website output** — format/placement, and whether the website export
+  pulls the SharePoint image ref (the portal context route deliberately never returns the raw ref).
+
 ## Open (later chunks)
 - Chunk 6: reminder cadence/deadline + exact waiver/T&C and email-body wording.
-- Optional **auto-on-award cron** (PA-free) — a `pages/api/cron/*` route on the same eligibility filter
-  (config above) that pre-generates abstracts for newly-Active research awardees; idempotent.
+- Optional **auto-on-award cron** (PA-free) — a `pages/api/cron/*` route on the awardee eligibility
+  filter (`granteeResearchPrograms.js`) that pre-generates **abstracts** for newly-`Active` research
+  awardees; idempotent. (Distinct from the chunk-7 title cron, which fires earlier on the `Invited`
+  flip — abstracts are post-award, titles are at board-invite.)
 
 ## Pointers
 - Design: `docs/GRANTEE_PORTAL_SPEC.md`. Reviewer portal map: `docs/agent-wiki/topics/external-reviewer-portal.md`.

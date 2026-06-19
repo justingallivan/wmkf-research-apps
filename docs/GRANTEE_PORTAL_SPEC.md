@@ -1,11 +1,13 @@
 # Grantee Deliverables Portal — Spec
 
-Status: **DESIGN RESOLVED + SCHEMA DEPLOYED (S268).** Owner-confirmed decisions folded in from the
-S268 Codex design review + owner clarifications. The **Dataverse field wave is LIVE in prod** (5/5
-fields created 2026-06-18, re-probe shows 5/5 EXACT). The **portal application is NOT built** —
-Awardee-tab trigger, abstract generation, external grantee portal, SharePoint upload/return, and the
-status write-path all remain to build. Label new state claims `[VERIFIED]`/`[ASSUMED]` as
-implementation lands.
+Status: **PORTAL BUILT + SHIPPED (S268); EDITED-TITLE + ASSEMBLY DESIGNED (S269).** Owner-confirmed
+decisions folded in from the S268 Codex design review + owner clarifications. The **S268 Dataverse
+field wave is LIVE in prod** (5/5 fields created 2026-06-18, re-probe shows 5/5 EXACT) and the **portal
+application is built end-to-end** — Awardee-tab trigger, abstract generation, external grantee portal,
+SharePoint upload/return, and the status write-path all shipped S268 (see build-plan chunks 1–5, 3b–3d).
+**S269 added the edited-title generator + server-side document-assembly design** (below + build-plan
+chunks 7–8, pending Codex pre-impl review); the edited-title field is a **new wave, NOT yet deployed**.
+Label new state claims `[VERIFIED]`/`[ASSUMED]` as implementation lands.
 
 ## Purpose
 
@@ -143,6 +145,77 @@ Status picklist option set (mirror in `shared/config/granteeDeliverableStatus.js
 - **Waiver is a UI gate, not server-validated state** — the submit button is disabled until the box
   is checked. Since nothing is persisted, the gate lives in the portal form; the submit route does
   not (and need not) record or re-check consent.
+
+## Edited title + server-side document assembly (S269 — design)
+
+S269 extended the portal's scope after reviewing a real PD-built artifact (`Oregon State University
+Abstract Draft.docx`). The deliverable isn't just "an abstract field" — it's the PD's **hand-built
+award document** (institution + PI + award amount + a one-line edited title + the house-style body),
+which today is assembled manually in DOCX and then re-coded by hand into website HTML by a staff
+member. The goal is to move that assembly **server-side**. Two new design decisions plus a generation
+lifecycle.
+
+### Grant decision lifecycle (the generation timing) — `[VERIFIED S269 via live probe]`
+
+Full detail + the verified `wmkf_phaseistatus` option set live in the
+`project-phaseistatus-decision-lifecycle` memory and `docs/atlas/dataverse-akoya-request.md`. Summary:
+
+Phase I in → staff winnow → slate to **committee chairs (de facto decision; their packet keeps the
+ORIGINAL `akoya_title`)** → **`wmkf_phaseistatus` flips to `Invited` (100000003)** → **Board Book**
+prepared for the board meeting (uses the EDITED title) → board votes → **award (`akoya_requeststatus
+= 'Active'`)** → staff generate the **abstract materials** (the existing S268 grantee flow).
+
+⚠️ `wmkf_phaseistatus = Invited` (100000003) means **invited into the competition, NOT awarded** —
+consistent with the Awardee-discovery section (award = `Active` + research + PI). The staff
+recommendation that precedes the board is `Recommended Invite` (707510005) on the same field.
+
+### D7 — Edited title: generated once at the `Invited` flip, reused twice. `[RESOLVED, owner S269]`
+
+- The italic one-line title/objective (DOCX line 5, e.g. *"To determine whether marine viruses store
+  iron in the surface ocean"*) is **not** `akoya_title` (that's the original, kept by the committee
+  packet). It is a **new, AI-edited** house-style title.
+- **Generate once at `wmkf_phaseistatus → Invited`** (cron-poll predicate `wmkf_phaseistatus eq
+  100000003` AND the title field empty; idempotent — the slate can reshuffle, so it must be
+  re-runnable). **Cheap model (Haiku)**, source = `wmkf_abstract`. **Research grants only.**
+- Stored in a **new field** (a new schema wave, NOT part of the deployed S268 wave — defined in
+  build-plan chunk 7). **Reused twice**: the Board Book
+  first (an external/manual consumer — we only need the field populated and legible), then the
+  award-stage abstract assembly. It is *not* needed for the committee packet.
+- This is generated **independently of, and earlier than, the abstract materials** — they are two
+  separate moments (Invited flip vs. post-award), not one step.
+
+### D8 — Formatting is structural (template), not inline; storage = plain memo + light markdown. `[RESOLVED, owner S269]`
+
+The artifact showed the formatting load is **structural**, determined by *which field* a value is —
+institution → bold, location/PI/title → italic, amount → plain currency, body → plain prose — and
+applied by the **assembly template**, not authored as rich text. The **body itself carried no inline
+formatting** in the example.
+
+- **Structured header fields** (institution, location, PI + co-PIs, award amount, edited title) are
+  pulled from existing Dataverse data and **styled by the server-side template** — no rich-text
+  storage. (Award amount = `akoya_grant` / `akoya_originalgrantamount`; **never** `akoya_request`,
+  which is the migration-backfilled requested amount — Atlas: "never export as a real amount.")
+- **Body + caption** are the only fields needing *inline* formatting (the occasional italic
+  species/gene name, the occasional bold caption). Keep them **plain memo with a light markdown
+  convention**; no `FormatName=RichText` flip on the live prod columns, stays legible in Dataverse,
+  and renders to clean controlled HTML on export. The S268 abstract prompt can **pre-italicize
+  binomial species names / gene symbols** so the grantee rarely touches markup ("they won't know to
+  proofread for missing italics"). A light WYSIWYG (bold/italic/super-sub buttons serializing to the
+  convention) keeps friction near zero for the grantee.
+- **Security:** this is a high-trust, magic-link, post-award population (owner S269), so untrusted-HTML
+  risk is small — but if any inline HTML is ever accepted, sanitize server-side with a tight allowlist
+  (`em/strong/sub/sup/p/br`) as cheap defense-in-depth. Markdown-convention storage avoids the HTML
+  sink entirely.
+
+### D9 — Server-side assembly replaces the manual DOCX + manual web HTML. `[RESOLVED direction, owner S269]`
+
+A server-side template assembles the structured header + edited title + body (+ caption/image for the
+website) into multiple outputs: **(a) the grantee portal review preview, (b) website-ready HTML**
+(replaces the staff member's manual HTML coding), and **(c) a cycle-level export** so staff can pull
+all of a cycle's awarded abstracts at once (replaces today's manual "compile all abstracts into one
+PDF and post it"). Header fields are **display-only** in the portal (Foundation-owned; the grantee
+complains case-by-case rather than editing institution/PI/amount). Build detail + open questions:
+`docs/GRANTEE_PORTAL_BUILD_PLAN.md` chunks 7–8.
 
 ## Open items (resolve during implementation)
 

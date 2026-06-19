@@ -63,6 +63,7 @@
 - Dev environment / secrets / Vercel deploy / local build: ../docs/agent-wiki/topics/dev-environment.md
 - Strategy / system model / roadmap / phasing: ../docs/agent-wiki/topics/strategy-roadmap.md
 - Proposal-tab docs / request document capture / J27 doc-storage evolution: project-j27-doc-capture-evolution.md; project-grant-phasing-evolution.md
+- Phase I→II decision flip / wmkf_phaseistatus lifecycle / when to generate edited titles vs abstracts: project-phaseistatus-decision-lifecycle.md
 - Virtual Review Panel: ../docs/agent-wiki/topics/strategy-roadmap.md
 - Deferred cleanup / dead-code session: project-deferred-code-cleanup.md
 
