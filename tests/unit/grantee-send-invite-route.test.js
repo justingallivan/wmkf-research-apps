@@ -135,10 +135,44 @@ test('send failure → 502, status not flipped', async () => {
   expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
 });
 
-test('a failed status write after a successful send still returns 200 (non-fatal)', async () => {
+test('a failed status write after a successful send returns 200 but reports the ACTUAL status (not Invited)', async () => {
   DynamicsService.updateRecord.mockRejectedValue(new Error('etag race'));
   const res = mockRes();
   await handler(reqOf(body()), res);
   expect(res.statusCode).toBe(200);
   expect(res.body.ok).toBe(true);
+  // The email sent, but the durable status stayed Drafted — must NOT claim Invited.
+  expect(res.body.status).toBe(GRANTEE_DELIVERABLE_STATUS.DRAFTED);
+  expect(res.body.statusPersisted).toBe(false);
+});
+
+test('happy path reports statusPersisted true', async () => {
+  const res = mockRes();
+  await handler(reqOf(body()), res);
+  expect(res.body.statusPersisted).toBe(true);
+});
+
+test('SECURITY: a corrupt non-numeric status → 500, nothing minted or sent', async () => {
+  DynamicsService.getRecord.mockResolvedValue({ akoya_requestid: GUID, wmkf_granteedeliverablestatus: 'abc' });
+  const res = mockRes();
+  await handler(reqOf(body()), res);
+  expect(res.statusCode).toBe(500);
+  expect(mintForRequest).not.toHaveBeenCalled();
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+});
+
+test('a numeric-STRING Drafted status from the API still sends + flips to Invited', async () => {
+  DynamicsService.getRecord.mockResolvedValue({ akoya_requestid: GUID, wmkf_granteedeliverablestatus: String(GRANTEE_DELIVERABLE_STATUS.DRAFTED) });
+  const res = mockRes();
+  await handler(reqOf(body()), res);
+  expect(res.statusCode).toBe(200);
+  expect(DynamicsService.createAndSendEmail).toHaveBeenCalled();
+  expect(res.body.status).toBe(GRANTEE_DELIVERABLE_STATUS.INVITED);
+});
+
+test('omitting ccEmail passes cc: undefined to the send (no CC party)', async () => {
+  const res = mockRes();
+  await handler(reqOf(body({ ccEmail: '' })), res);
+  expect(res.statusCode).toBe(200);
+  expect(DynamicsService.createAndSendEmail.mock.calls[0][0].cc).toBeUndefined();
 });

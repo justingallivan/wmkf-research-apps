@@ -260,6 +260,19 @@ the request, then load the contacts — or `$expand`). Return both with a missin
 - Wire the empty workbench Awardee tab (`pages/workbench/[requestId].js:41`): Generate (chunk 3) →
   show recipients (3b) → confirm + preview → Send (3c); reflect status.
 
+### Codex post-impl folded (3b/3c, S268)
+CLEAN on security (server-minted link injection, body HTML-escaped, GUID validation, no log/header
+injection, render escaping). Three REAL issues fixed: (1) **NaN bypass** — a non-numeric
+`wmkf_granteedeliverablestatus` made every guard comparison false and would mint/send; now a
+non-null `NaN` status → 500 (fail loud). (2) **False status report** — a failed status write after a
+successful send used to return `status: Invited`; now returns the ACTUAL durable status (stays
+Drafted) + a `statusPersisted:false` flag. (3) added tests for NaN-bypass, numeric-string coercion,
+the write-failure body, and `cc:undefined`. Two CONCERNs **documented as deliberate, not changed**:
+(a) To/Cc are staff-confirmed and trusted (the owner asked for confirm/**override** — hard-restricting
+to the request's PI/liaison would break override; the route is staff-authed outbound); (b) no
+server-side Research-only gate (staff only run this from research Awardee tabs; a program gate reopens
+the deferred polymorphic-program-field question — revisit if the surface widens).
+
 ## Open (later chunks)
 - Chunk 5: image accepted formats/size; `file-magic.js` needs image magic-byte support (PNG/JPEG/…).
 - Chunk 6: reminder cadence/deadline + exact waiver/T&C and email-body wording.

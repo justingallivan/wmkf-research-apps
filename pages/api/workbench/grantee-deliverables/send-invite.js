@@ -86,6 +86,12 @@ export default async function handler(req, res) {
       }
 
       const status = normStatus(row.wmkf_granteedeliverablestatus);
+      // Corrupt/non-numeric status must NOT slip past the guards — NaN comparisons
+      // are all false, which would otherwise let a bad value reach mint/send. Fail loud.
+      if (status !== null && Number.isNaN(status)) {
+        console.error('[grantee-deliverables/send-invite] non-numeric status on', requestId);
+        return res.status(500).json({ error: 'This request has an invalid deliverable status; cannot send.' });
+      }
       // Must generate the abstract first.
       if (status === null || status < GRANTEE_DELIVERABLE_STATUS.DRAFTED) {
         return res.status(400).json({ error: 'Generate the abstract before sending the invite.' });
@@ -118,6 +124,10 @@ export default async function handler(req, res) {
 
       // Flip Drafted -> Invited. Non-downgrade: a re-send while already Invited /
       // Reminder Sent leaves status unchanged. Non-fatal — the email is already out.
+      // Report the ACTUAL persisted status: a failed write must NOT be reported as
+      // Invited (the email sent, but status stays Drafted durably).
+      let finalStatus = status;
+      let statusPersisted = true;
       if (status === GRANTEE_DELIVERABLE_STATUS.DRAFTED) {
         try {
           await DynamicsService.updateRecord(
@@ -125,15 +135,14 @@ export default async function handler(req, res) {
             { wmkf_granteedeliverablestatus: GRANTEE_DELIVERABLE_STATUS.INVITED },
             { actingUserSystemId },
           );
+          finalStatus = GRANTEE_DELIVERABLE_STATUS.INVITED;
         } catch (e) {
           console.error('[grantee-deliverables/send-invite] status update failed (email already sent):', e.message);
+          statusPersisted = false;
         }
       }
 
-      const newStatus = status === GRANTEE_DELIVERABLE_STATUS.DRAFTED
-        ? GRANTEE_DELIVERABLE_STATUS.INVITED
-        : status;
-      return res.status(200).json({ ok: true, emailId: sent?.emailId || null, status: newStatus });
+      return res.status(200).json({ ok: true, emailId: sent?.emailId || null, status: finalStatus, statusPersisted });
     } catch (error) {
       console.error('[grantee-deliverables/send-invite] error:', error);
       return res.status(500).json({ error: 'Failed to send the invitation.' });
