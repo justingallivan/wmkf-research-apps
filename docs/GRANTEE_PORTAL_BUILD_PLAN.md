@@ -194,6 +194,16 @@ Six required behaviors baked into the route:
 6. **GUID-validate off `req.body.requestId`** (trust-boundary gate) + **register in the security matrix**.
 `regenerate` is honored only when strictly `=== true` (a string `"false"` must not force overwrite).
 No restore-on-failure needed (Option B writes nothing before the final PATCH).
+
+### Codex post-impl folded (S268)
+CLEAN on all six required behaviors (etag fail-closed before the paid call, 412→re-read, status
+non-downgrade incl. numeric-string coercion, missing-source 400, actingUserSystemId, GUID off body).
+Two ISSUEs: (#5) `loadModelOverrides()` ran before the reuse check → moved onto the generation path
+only (reuse/early-return paths skip it; test asserts it). (#6) no row-level auth gate — this is the
+*deliberate, pre-impl-approved* decision (draft generation is non-authoritative, unlike triage's
+visibility write; app-level `reviewers` matches the workbench norm); the `bypassDynamicsRestrictions`
+scope spanning generation is safe because `executePrompt` re-enters bypass internally. Added tests:
+numeric-string status non-downgrade, non-412 update→500, 503-skips-generation, null `_etag`.
 - **Tests:** reuse-existing skips generation; first write succeeds + sets Drafted; a stale-ETag write
   412s and does NOT clobber; GUID/method/auth guards; missing-source 400; regenerate overwrites.
 

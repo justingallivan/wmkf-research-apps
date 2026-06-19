@@ -106,6 +106,8 @@ test('reuse-existing: populated abstract + no regenerate → no paid call', asyn
   expect(res.body.reused).toBe(true);
   expect(generateGranteeAbstract).not.toHaveBeenCalled();
   expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  // Reuse path must not do pre-generation work either (Codex post-impl #5).
+  expect(loadModelOverrides).not.toHaveBeenCalled();
 });
 
 test('regenerate is honored only for strict boolean true (string "true" still reuses)', async () => {
@@ -142,12 +144,44 @@ test('missing source abstract → 400 (before generation)', async () => {
   expect(generateGranteeAbstract).not.toHaveBeenCalled();
 });
 
-test('no _etag → 503 fail-closed (no bare PATCH)', async () => {
+test('no _etag (undefined) → 503 fail-closed, before the paid generation', async () => {
   DynamicsService.getRecord.mockResolvedValue(row({ _etag: undefined }));
   const res = mockRes();
   await handler(reqOf({ requestId: GUID }), res);
   expect(res.statusCode).toBe(503);
   expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  // 503 must fire BEFORE the paid LLM call (Codex post-impl).
+  expect(generateGranteeAbstract).not.toHaveBeenCalled();
+});
+
+test('null _etag also → 503 (guard treats null as missing)', async () => {
+  DynamicsService.getRecord.mockResolvedValue(row({ _etag: null }));
+  const res = mockRes();
+  await handler(reqOf({ requestId: GUID }), res);
+  expect(res.statusCode).toBe(503);
+  expect(generateGranteeAbstract).not.toHaveBeenCalled();
+});
+
+test('STATUS NON-DOWNGRADE handles a numeric-STRING status from the API', async () => {
+  // Dataverse may return the option value as a string; normStatus must coerce it
+  // so an Invited row (as "100000001") still omits the status from the patch.
+  DynamicsService.getRecord.mockResolvedValue(row({
+    wmkf_abstractformatted: 'old',
+    wmkf_granteedeliverablestatus: String(GRANTEE_DELIVERABLE_STATUS.INVITED),
+  }));
+  const res = mockRes();
+  await handler(reqOf({ requestId: GUID, regenerate: true }), res);
+  const [, , patch] = DynamicsService.updateRecord.mock.calls[0];
+  expect(patch).not.toHaveProperty('wmkf_granteedeliverablestatus');
+  expect(res.body.status).toBe(GRANTEE_DELIVERABLE_STATUS.INVITED);
+});
+
+test('a non-412 update failure → 500 (not swallowed as success)', async () => {
+  DynamicsService.getRecord.mockResolvedValue(row());
+  DynamicsService.updateRecord.mockRejectedValue(Object.assign(new Error('server error'), { status: 500 }));
+  const res = mockRes();
+  await handler(reqOf({ requestId: GUID }), res);
+  expect(res.statusCode).toBe(500);
 });
 
 test('request not found → 404', async () => {

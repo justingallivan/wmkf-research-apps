@@ -60,10 +60,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'requestId must be a GUID' });
   }
 
-  // Warm the model-override cache BEFORE any model resolution (the service -> Executor
-  // resolves a model synchronously from this cache). check:model-override-warming.
-  await loadModelOverrides();
-
   return bypassDynamicsRestrictions('grantee-abstract-generate', async () => {
     try {
       let row;
@@ -100,6 +96,11 @@ export default async function handler(req, res) {
       if (!row._etag) {
         return res.status(503).json({ error: 'Could not acquire a write lock; please try again.' });
       }
+
+      // Warm the model-override cache only on the generation path (skip the
+      // reuse / early-return paths). Awaited before the service -> Executor
+      // resolves a model. check:model-override-warming.
+      await loadModelOverrides();
 
       let gen;
       try {
