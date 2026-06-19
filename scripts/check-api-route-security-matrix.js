@@ -16,6 +16,7 @@ const KNOWN_GUARDS = [
   'requireSuperuser',
   'verifyCronSecret',
   'verifySuggestionToken',
+  'verifyGranteeToken',
   'getServerSession',
   'NextAuth',
 ];
