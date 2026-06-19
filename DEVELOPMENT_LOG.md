@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Grantee Deliverables Portal, built end-to-end (prod) (Session 268)
+
+**Milestone:** A new external-facing capability — at cycle close, staff invite research awardees to review a Foundation-style abstract of their proposal and return a graphical image + caption via a magic-link portal, captured to Dataverse + SharePoint. A parallel grantee variant of the reviewer external portal (shared primitives, forked surfaces), not a mutation of it.
+
+**Sessions:** 268. Built chunk by chunk with the design→Codex-pre-impl→implement→Codex-post-impl loop (each post-impl caught real issues, all folded). Schema + prompt deployed/seeded to prod mid-session.
+
+**Ship state:**
+- **Schema wave LIVE in prod** — 5 fields on `akoya_request` (`wmkf_abstractformatted`/`abstractapproved`/`granteeimagecaption`/`granteeimagefileref`/`granteedeliverablestatus`); no consent field (waiver is a client-side submit gate). Abstract prompt **seeded** in `wmkf_ai_prompts`.
+- **Flow:** Awardee tab → generate (Executor, ETag-conditional persist) → resolve recipients (PI `To` / liaison `Cc`) → M365 invite (server-injected stateless `aud:'grantee'` magic-link) → grantee portal (edit abstract + upload image/caption + publish-waiver) → submit (magic-byte + virus-scan + SharePoint + atomic ETag write, refuses once Complete).
+- **Awardee discovery:** the reviewer-finding dashboard doesn't surface awardees; new `/workbench/awardees` + editable GUID-keyed eligibility config (`akoya_requeststatus=Active` + research program + PI; owner-validated J26 = 12). Fixed the long-running `invite-email-modal-capture` parallel-test flake.
+
+**Why it matters:** First grantee-facing workflow; closes the cycle-end loop the Foundation does manually today. Eligibility/recipient definitions were reverse-engineered from live J26 data and owner-validated (status=Active + research GUID + PI; `wmkf_phaseistatus=Invited` ≠ awarded).
+
+**Pointers:** `docs/GRANTEE_PORTAL_SPEC.md` + `docs/GRANTEE_PORTAL_BUILD_PLAN.md`. Commits `180200ec` → `494a1b22`. Open (S269): rich-text-in-abstract decision (native `FormatName=RichText` vs markdown), chunk 6 (reminders + waiver/email copy), optional PA-free auto-on-award cron.
+
 ## June 2026 — Reviewer contact-leads recall layer + on-card manual contact edit (prod) (Session 267)
 
 **Milestone:** Delivers the S266 strategic pivot (contact **recall** over identity precision). A reviewer's email was often *found by the search but withheld by a safety gate* (domain/name/anchor contradiction); staff couldn't see or use it. Now they can — without weakening the wrong-person gates.

@@ -4,6 +4,7 @@ description: "Do not editorialize about the user's available time (\"you're out 
 metadata: 
   node_type: memory
   type: feedback
+  status: active
   originSessionId: b7556be6-1734-49d3-a0e8-1a8029fd0df3
 ---
 

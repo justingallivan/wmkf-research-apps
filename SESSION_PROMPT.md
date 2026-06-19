@@ -1,101 +1,111 @@
-# Session 268 Prompt: Finish branded domains + (future) grantee portal spec
+# Session 269 Prompt: Grantee portal — rich-text decision, chunk 6 copy, (opt) auto-cron
 
-> **S267 delivered the contact-recall pivot.** The full reviewer contact-leads layer (Slices 1–5)
-> + on-card manual contact edit shipped to prod, Codex-reviewed across 5 passes. The broad paid
-> scout (Slice 2b) was MEASURED unjustified (Slice 1 audit: ~68% verified, 100% of misses are
-> found-then-discarded) — do NOT build it.
-> **Open carryover: branded subdomains await IT DNS** — finish the verify + env flip when IT confirms.
+> **S268 built the entire Grantee Deliverables Portal end-to-end and shipped it.** Schema wave LIVE in
+> prod (5 fields on `akoya_request`), abstract prompt seeded in prod (`wmkf_ai_prompts`), and the full
+> flow works: staff generate → confirm recipients → send invite → grantee magic-link portal → edit
+> abstract + upload image/caption + publish-waiver → submit. The real J26 need is unblocked via a new
+> **Awardees list** (`/workbench/awardees`). One decision parked for S269: **rich text in the abstract
+> memos** (native Dataverse `FormatName=RichText` vs a markdown convention).
 
-## Session 267 — what happened
+## Session 268 — what happened
 
-Built the entire reviewer **contact-leads recall layer** end-to-end (the S266 design), measuring
-first, then shipping each slice with a Codex review and a prod deploy. Then added an on-card
-manual contact editor, helped set up two Vercel custom domains (awaiting IT), and seeded a
-future grantee-portal spec. Codex (separate window) shipped a reviewer E2E rehearsal harness.
+Designed (Codex pre-impl) and built (Codex post-impl on each) the whole portal, chunk by chunk, with a
+prod deploy/seed where needed. Then solved the live J26 operational problem (awardee discovery +
+eligibility + access). Fixed the long-running parallel-test flake.
 
 ### Shipped to prod (all pushed)
-1. **Slice 1 — missing-email audit** (`lib/services/reviewer-contact-audit.js`). Classifies each
-   candidate's missing-email reason into buckets; logged by both enrichment routes + on SSE stats.
-   Ran in prod on 2 proposals: **~68% verified; every miss was `withheld_by_gate` /
-   `lead_found_not_persisted` / `has_page_no_email`** — 0 `searched_no_result` / `search_skipped`.
-   → Slice 2b (paid scout) is unjustified.
-2. **Slice 2a — quarantined `contactLeads[]`** (`contact-enrichment-service.js`). Surfaces
-   discarded/withheld contacts + faculty-pages-without-email. `_addContactLead` forces
-   `persistable:false`. No new network calls.
-3. **Slice 3 — card display** (`shared/components/reviewers/ContactLeads.js`). Read-only; gated on
-   `!identityUnverified` (NOT `!email` — fixed mid-session so promoting one field doesn't hide the
-   others); high/medium prominent, low/rejected behind a toggle.
-4. **Slices 4+5 — staff promotion + roster persistence.** "Use this email"/"Use this page" stamps
-   `emailSource:'manual'` → `emailConfidence` LOW → confirm-before-send. Compact leads persisted in
-   the Find roster (`pruneContactLeads`, ≤8) so they survive reload.
-5. **On-card manual contact edit** (`CandidateEditModal` local `onApply` mode +
-   `ReviewerSearchSection.setManualContact`). "✏️ Edit contact" lets staff type email/website/
-   affiliation/h-index by hand (the Javier Martinez case). Name locked on the Find card (name is
-   the dedup key). Affiliation edits intentionally NOT COI-rechecked (owner decision — see memory).
-6. **Codex E2E rehearsal harness** (separate window): reviewer email-capture mode + captured-invite
-   + return-upload Playwright specs + runbook (`docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md`).
+1. **Schema wave** — 5 fields on `akoya_request` (`wmkf_abstractformatted`, `wmkf_abstractapproved`,
+   `wmkf_granteeimagefileref`, `wmkf_granteeimagecaption`, `wmkf_granteedeliverablestatus`).
+   `lib/dataverse/schema/wave2-grantee-deliverables/` + `scripts/preflight-grantee-deliverables-fields.mjs`
+   (creation-only, 3-way preflight). **Applied to prod 2026-06-18; 5/5 EXACT.** No consent field — the
+   publish-image waiver is a client-side submit gate (a submitted package IS the consent record).
+2. **Chunk 1 — token + auth** — stateless `aud:'grantee'` magic-link (`mintScopedToken` added to the
+   shared `external-token.js`; `grantee-token-lifecycle.js`, `verify-grantee-token.js`); fail-closed
+   `context` route + `/external/grantee/[token]` page.
+3. **Chunk 2 — abstract generation** — `shared/config/prompts/grantee-abstract.js` (owner's editor
+   prompt) + `grantee-abstract-service.js` (Executor, parseMode raw). **Prompt SEEDED in prod**
+   (`grantee-abstract.generate` in `wmkf_ai_prompts`, row `462c08ae-…`).
+4. **Chunk 3 — generate+persist route** (`/api/workbench/grantee-deliverables/generate`) — reuse +
+   ETag-conditional write + status non-downgrade.
+5. **Chunks 3b/3c — recipients + send-invite** — PI (`wmkf_projectleader`) in `To`, liaison
+   (`akoya_primarycontactid`) in `Cc`; M365 send; server-injected magic-link.
+6. **Chunk 4 — portal edit UI** (`GranteeDeliverableForm`) — abstract/image/caption + waiver submit-gate.
+7. **Chunk 5 — submit route** (`/api/external/grantee/[token]/submit`) — image magic-byte
+   (`validateGranteeImage`, incl. WEBP offset) + virus scan + SharePoint + atomic ETag PATCH + rollback;
+   refuses once `Complete`. Extracted `lib/services/sharepoint-cleanup.js` (shared with review-upload).
+8. **Chunk 3d — Awardee tab** (`AwardeeTab`) wired into the workbench tab dispatch.
+9. **Awardees list** (`/workbench/awardees` + `/api/workbench/grantee-deliverables/awardees`) +
+   **editable eligibility config** (`shared/config/granteeResearchPrograms.js`, GUID-keyed).
+10. **Test-infra fix** — the recurring `invite-email-modal-capture` parallel flake (sync `getByRole` on
+    a count-bearing label that settles a tick late → `findByRole`).
 
-### Codex reviews (all clean / fixed)
-5 Codex passes — every safety/identity invariant CONFIRMED. Fixes applied: Serp name-mismatch
-marker (`c196d574`), dedup sharpen (`d4e62a33`), manual source authoritative on promotion
-(`93b7e2ce`, MED), website-clears-abstain + h-index NaN guard (`d3682068`).
+### The J26 operational findings (probed live, owner-validated)
+- The reviewer-finding **dashboard does NOT surface awardees** (filters `Phase II Pending` / triage
+  `Advancing`). Awardees are post-decision → use the new `/workbench/awardees`.
+- **Awardee definition = `akoya_requeststatus='Active'` + `akoya_programid` ∈ research set + PI present**
+  → 12 for J26. `wmkf_phaseistatus='Invited'` is NOT "awarded" (it's "invited to compete", 205 rows
+  mostly Phase I Declined). PI-required excludes the endowment #985674; program-set excludes civic
+  #1002650. Full J26 = 685 rows (`$top=500` truncates).
+- **PD access:** a superuser grants each PD the **`reviewers`** app in **`/admin` → Users**.
+- Test-ready awardee: **#1002238** (Espinosa-Ortiz / liaison Elzinga; GUID `9ca06ca2-93b6-f011-bbd3-6045bd02b4cc`).
 
-### Infra / data ops (not feature commits)
-- **Branded Vercel domains** `applications.wmkeck.org` + `reviews.wmkeck.org` added to project
-  `wmkf_research_apps` (both Invalid Configuration until DNS). DNS host is **Cloudflare** (IT). The
-  records to give IT (from dashboard Manual setup): **CNAME → `c2b4d46311200992.vercel-dns-017.com`**
-  for each, **DNS-only / proxy OFF**. IT emailed; Justin replied with records. Email is M365/Dynamics
-  (PD mailbox) — subdomains are web-only, no mail records, no SMTP2GO needed.
-- Roster cleanups (non-applicant) for **1002794** and **1002874** via `reset-request-reviewers.mjs`.
-- Refreshed 3 stale applicant suggestion labels on 1002794 (Alexandra/Thomas/Anh-Thu).
+### Commits (S268: 180200ec … 494a1b22)
+`180200ec` schema wave · `85c26eae` deploy+reconcile · `09614e96` dv gotcha#7 · `4bd86411`/`e8a61734`
+chunk1 · `c2a488e0`/`54367aa1` chunk2 · `0bed5266`/`28e3230f` chunk3 · `b13e1d96`/`78f9f339` 3b/3c design ·
+`ea13dd95`/`315f7c1b` 3b/3c · `05815067` chunk4 · `5cc2927d` flake fix · `1478bbc1`/`fb99829f` chunk5 ·
+`7c7d2ede` chunk3d · `494a1b22` Awardees list.
 
-## Potential next steps for S268
+## Potential next steps for S269
 
-### 1. Finish the branded domains (carryover — needs IT DNS first)
-When IT confirms the CNAMEs are in Cloudflare (DNS-only):
-- Verify both: `vercel inspect <url>` / dashboard Refresh → Valid + HTTPS active (use `vercel inspect`,
-  NOT a `vercel ls` hash-poll — see `feedback-deployment-monitoring-use-inspect`).
-- Set env **`REVIEWER_PORTAL_BASE_URL=https://reviews.wmkeck.org`** (Production) — it falls back to
-  `NEXTAUTH_URL` until set (commit `19bd446e`).
-- Redeploy so future reviewer invitation emails use the branded link.
-- Decide what `applications.wmkeck.org` routes to (just live → app for now, unless a path is wanted).
+### 1. Rich-text-in-abstract decision (PARKED for "tomorrow")
+Verified: Dataverse memo supports **`FormatName=RichText`** (stores HTML; bold/italic; settable on
+create AND update, so the empty cols can be flipped in place). Two paths — **(A) native RichText**
+(flip the 2 cols + a minimal portal editor + sanitize grantee-submitted HTML + downstream HTML), or
+**(B) markdown convention** in the plain memo (no schema change, no untrusted-HTML risk, render in
+portal+output). **Deciding question:** must it render *inside Dynamics*, or only portal + published
+output? Lean **markdown** unless Dynamics-native rendering matters. (Sources: MS Learn format-and-formatname.)
 
-### 2. (Future) Grantee Deliverables Portal — spec it out
-`docs/GRANTEE_PORTAL_SPEC.md` stub (commit `835e3a29`; corrected + framed for design in S268).
-Workbench-triggered at cycle close: Claude drafts **one abstract of the grantee's proposal** →
-email grantees for edit/approval → they return the edited abstract + graphical image + caption +
-T&C acknowledgement → Dataverse (+ SharePoint). Reuses the reviewer-portal primitives (magic-link,
-token-lifecycle, M365 send, SharePoint upload, Executor). Owner-confirmed S268: it is ONE abstract,
-not two documents. Run a Codex design pass off the spec (Q1–Q6 framed).
+### 2. Chunk 6 — reminders + copy for approval
+Reminder cadence/deadline; **draft the Foundation-voice email default + waiver/T&C copy for owner
+approval** (current `DEFAULT_BODY` in `AwardeeTab` + the waiver label in `GranteeDeliverableForm` are
+interim placeholders).
 
-### 3. (Parked) S266 TEMP generation audit log still live
-`d0fb1ef5` `[Discover API] S266 generation audit` in `discover.js` — never reverted. Low priority;
-revert when the generation/exclusion review is truly done. (Distinct from the Slice-1 audit, which
-is permanent.)
+### 3. (Optional) Auto-on-award cron (PA-free)
+A `pages/api/cron/*` route (guarded by `verifyCronSecret`, scheduled in `vercel.json`) on the
+eligibility config (`granteeResearchPrograms.js`) that pre-generates abstracts for newly-`Active`
+research awardees. Idempotent (the generate logic reuses/skips). No PA needed.
+
+### 4. Carryover from S267 (unverified-until-checked)
+- **Branded domains** await IT DNS (Cloudflare CNAME → `c2b4d46311200992.vercel-dns-017.com`,
+  DNS-only). When live: `vercel inspect`, set `REVIEWER_PORTAL_BASE_URL=https://reviews.wmkeck.org`
+  (Prod), redeploy. (Grantee links use `GRANTEE_PORTAL_BASE_URL` || `NEXTAUTH_URL`.)
+- S266 TEMP generation audit log in `discover.js` (`d0fb1ef5`) still live — revert when done.
 
 ## Continuity guardrails
-- **Do NOT build Slice 2b** (broad paid scout) — measured unjustified.
-- Contact-leads safety: leads stay `persistable:false`; a manually entered/promoted email is `manual`
-  → low-confidence → confirm-before-send. Never weaken this.
-- Reviewer-finder posture: recall over identity-precision (`feedback-prioritize-contact-recall-over-identity-precision`).
-- Multi-agent: Codex also works on `main` (separate window/worktree, shares origin). At session
-  boundaries: clean tree, scoped commits, `git pull --rebase` before push.
+- **Grantee portal safety (never weaken):** stateless `aud:'grantee'` token rejects reviewer tokens;
+  submit refuses once status `Complete`; image magic-byte + virus-scan before upload; ETag-conditional
+  writes with rollback; status non-downgrade; the waiver is a client gate, never persisted.
+- **Eligibility is NOT hard-wired** — `shared/config/granteeResearchPrograms.js` (GUID-keyed; program
+  names may change → edit there). `wmkf_phaseistatus='Invited'` ≠ awarded.
+- **Don't tell the user when they're out of time** (`feedback-no-time-pressure-commentary`).
+- Multi-agent: Codex also works on `main`; clean tree, scoped commits, `git pull --rebase` before push.
 
 ## Key Files Reference
 | File | Role |
 |------|------|
-| `docs/REVIEWER_CONTACT_LEADS_SPEC.md` | Slices 1–5 spec, all IMPLEMENTED |
-| `lib/services/reviewer-contact-audit.js` | Slice 1 missing-email classifier |
-| `lib/services/contact-enrichment-service.js` | `contactLeads` collection (`_addContactLead`/`_collectContactLeads`) |
-| `shared/components/reviewers/ContactLeads.js` | Slice 3 read-only lead display |
-| `shared/components/reviewers/ReviewerSearchSection.js` | `setManualContact`/`useLead` + Edit-contact wiring |
-| `shared/components/reviewers/CandidateEditModal.js` | local `onApply` mode (Find-card manual edit) |
-| `docs/GRANTEE_PORTAL_SPEC.md` | future grantee-portal stub |
-| `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md` | Codex E2E rehearsal harness |
+| `docs/GRANTEE_PORTAL_SPEC.md` / `docs/GRANTEE_PORTAL_BUILD_PLAN.md` | Resolved design + chunk-by-chunk plan (all decisions/folds) |
+| `shared/config/granteeResearchPrograms.js` | **Editable** awardee eligibility (research program GUIDs + Active status) |
+| `shared/config/granteeDeliverableStatus.js` | Status picklist + `isGranteeEditableStatus` |
+| `lib/external/grantee-token-lifecycle.js` / `verify-grantee-token.js` | Stateless `aud:'grantee'` magic-link |
+| `lib/services/grantee-abstract-service.js` / `shared/config/prompts/grantee-abstract.js` | Abstract gen (prompt seeded in prod) |
+| `lib/services/grantee-upload.js` / `lib/utils/file-magic.js` (`validateGranteeImage`) | Submit: scan/upload/atomic write |
+| `pages/api/workbench/grantee-deliverables/{generate,recipients,send-invite,awardees}.js` | Staff endpoints |
+| `pages/api/external/grantee/[token]/{context,submit}.js` + `pages/external/grantee/[token].js` | Grantee portal |
+| `shared/components/workbench/AwardeeTab.js` · `pages/workbench/awardees.js` | Staff UI (tab + list) |
 
 ## Testing
 ```bash
 npm run build && npm run lint
-npm test                       # FULL suite (~2690 tests as of S267)
-npm run check:agent-wiki && npm run check:fact-consistency && npm run check:doc-currency
+npm test                       # FULL suite — 2812 tests (serial green; rare residual parallel flake)
+npm run check:api-routes && npm run check:fact-consistency && npm run check:prompt-injection-tagging
 ```
