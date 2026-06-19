@@ -377,9 +377,13 @@ precedes the board is `Recommended Invite` (707510005) on the same field; the of
 
 **New schema wave (1 field).** A new isolated wave `wave2-grantee-title` (creation-only, with a
 preflight mirroring `scripts/preflight-grantee-deliverables-fields.mjs`). Field carries the AI-edited
-title; follows the `wmkf_ai_<concept>` naming rule (no mid-concept underscore, per the Atlas v3 rule).
-Proposed schemaName `wmkf_AIEditedTitle` → logical `wmkf_aieditedtitle` (Q3 below resolves the exact
-literal at preflight). Memo (~500). Mirror any status/constants in app config if needed.
+title; schemaName **`wmkf_ai_EditedTitle` → logical `wmkf_ai_editedtitle`** — conforms to the
+`wmkf_ai_<concept>` rule (the `ai_` namespace separator is REQUIRED and proven-safe by the existing
+`wmkf_ai_FieldPrimer` / `wmkf_ai_RiskFlags` fields; `wmkf_aieditedtitle` would DROP the namespace and is
+wrong — Codex pre-impl catch). `[VERIFIED naming precedent: lib/dataverse/schema/wave2-fieldprimer/,
+wave2-existing/akoya_request-ai-extensions.json]` Memo (~500). **Atlas coverage** for the new field +
+**post-deploy PA run-history verification** (writing a NEW field only — like the triage field, low
+risk, but confirm no unfiltered "any-modify" flow fires) are chunk-7 acceptance criteria.
 
 **Prompt (`grantee-title.generate`).** `shared/config/prompts/grantee-title.js` + a seed script
 (mirror `seed-grantee-abstract-prompt.js`); the prod row is REQUIRED (no bundled fallback). Source =
@@ -395,26 +399,51 @@ thin Executor wrapper returning the stripped one-line string. Min-length input g
 output guard (strip stray fences/newlines).
 
 **Trigger surface — cron-poll (owner: preferred).** `pages/api/cron/generate-grantee-titles.js`,
-`verifyCronSecret`-guarded, scheduled in `vercel.json`. Each run: query research-program awardees-in-
-waiting with `wmkf_phaseistatus eq 100000003` **AND** the edited-title field empty → for each, read
-`wmkf_abstract` → generate → **ETag-conditional persist** (no bare last-write PATCH; same idempotency
-discipline as chunk 3). Idempotent + re-runnable (the slate reshuffles; already-filled rows are
-skipped by the empty-field predicate). Research-only via `GRANTEE_RESEARCH_PROGRAM_IDS`
-(`shared/config/granteeResearchPrograms.js`).
+`verifyCronSecret`-guarded, scheduled in `vercel.json`. Each run, **scoped to the current open board
+cycle** (Codex pre-impl BLOCKER — without this, first deploy reprocesses years of historical `Invited`
+rows): build the filter from `cycleCodeToOdataFilter(currentCycle, 'wmkf_meetingdate')` (the exact
+pattern the awardees endpoint uses, `pages/api/workbench/grantee-deliverables/awardees.js:43`) **AND**
+`wmkf_phaseistatus eq 100000003` **AND** the edited-title field empty **AND** research program
+(`GRANTEE_RESEARCH_PROGRAM_IDS`, `shared/config/granteeResearchPrograms.js`). For each row: read
+`wmkf_abstract` → generate (Haiku) → **ETag-conditional persist** (no bare last-write PATCH; chunk-3
+idempotency discipline). Idempotent + re-runnable (the slate reshuffles; already-filled rows fall out
+of the empty-field predicate).
 
-### Open questions for Codex pre-impl
-- **Q1 — Cron predicate vs. backfill volume.** Is filtering on `wmkf_phaseistatus eq 100000003` + empty
-  title + research program enough, or do we also need a cycle/meeting-date bound so a cron run doesn't
-  reprocess historical `Invited` rows from prior cycles? (Pagination: the awardee query needed
-  `$top`>500 — confirm the title query handles >500.)
-- **Q2 — Re-generation on slate reshuffle.** If a proposal flips `Invited → Not Invited → Invited`,
-  do we regenerate, keep the first title, or leave staff a manual regenerate? (Empty-field predicate
-  means once filled it's never auto-redone — confirm that's the intended semantics.)
-- **Q3 — Exact schemaName literal** (mid-name underscore caveat, D1) — resolve at preflight.
-- **Q4 — Is a one-shot backfill** of already-`Invited` current-cycle rows wanted on first deploy, or
-  only go-forward?
-- **Q5 — Idempotency mechanism** — ETag-conditional write (chunk-3 precedent) vs. a heavier lease;
-  confirm ETag-conditional is sufficient for a cron (no concurrent writer but re-entrancy across runs).
+**Paginated query — REQUIRED (Codex pre-impl BLOCKER, verified).** `DynamicsService.queryRecords`
+hard-caps `$top` at 100 (`Math.min(top||25,100)`, `lib/services/dynamics-service.js:435`) — the
+awardees endpoint is safe only because J26 had 12 awardees. Research `Invited` rows for a cycle can
+exceed 100, so the cron MUST use the paginated `DynamicsService.queryAllRecords` (returns
+`{ records, totalCount, capped }`) and **act on `capped`** (log + alert rather than silently drop the
+tail). `[VERIFIED: dynamics-service.js queryRecords cap vs. queryAllRecords nextLink pagination]`
+
+**Per-row failure contract (Codex pre-impl CONCERN).** A row whose `wmkf_abstract` is missing/too-short,
+or whose generation repeatedly fails, must NOT be retried every run forever. Mirror the abstract
+service's fail-closed input guard (`lib/services/grantee-abstract-service.js:45-48`): on an
+unprocessable row, **skip + report** (structured log line per skipped requestId; the cron summary
+returns counts: generated / skipped-no-source / failed). A model failure leaves the field empty (so it
+retries next run) but is surfaced; a missing-source row is reported so staff can fix `wmkf_abstract`.
+(A persistent-failure cap can be added later if needed — out of v1 unless Codex pushes.)
+
+**The just-finished cycle = a one-off backfill (owner S269).** The current/just-completed cycle's
+research proposals already flipped to `Invited` BEFORE this feature existed, so their titles were never
+generated at flip-time. Handle that cycle with a **one-off run** — the same code path invoked with that
+cycle's `cycleCode` explicitly (a `?cycleCode=` override on the cron route, or a `scripts/` one-shot
+using the same service), NOT a permanent widening of the go-forward predicate. Go-forward, the cron
+stays bounded to the current open cycle; the backfill is an explicit, named, one-time invocation for
+the prior cycle.
+
+### RESOLVED (Codex pre-impl review, S269)
+- **Cycle bound** — go-forward cron scoped to the current open cycle via `cycleCodeToOdataFilter` on
+  `wmkf_meetingdate`; the just-finished cycle is a **separate one-off** invocation (above). Closes the
+  unbounded-historical-rows BLOCKER + the backfill question.
+- **Pagination** — `queryAllRecords` (paginated), honor `capped`. Closes the >100-cap BLOCKER.
+- **Field literal** — `wmkf_ai_EditedTitle` / `wmkf_ai_editedtitle` (conforms to `wmkf_ai_<concept>`).
+- **Atlas + PA verification** — added as acceptance criteria (above).
+- **Per-row failures** — skip + report contract (above).
+- **Re-generation on reshuffle** — empty-field predicate means **once filled, never auto-redone**;
+  a deliberate re-edit is a manual staff regenerate (out of the cron). This is the intended semantics.
+- **Idempotency mechanism** — ETag-conditional write is sufficient (no concurrent writer; the
+  empty-field predicate + ETag guard re-entrancy across runs). No heavier lease needed.
 
 ## Chunk 8 — Document assembly + export (S269, design)
 
@@ -423,12 +452,15 @@ content, replacing the PD's manual DOCX build and the staff member's manual webs
 Grounding: `docs/GRANTEE_PORTAL_SPEC.md` D8/D9.
 
 **Assembly inputs (per request):** institution name (`akoya_applicantid` → account; **bold**),
-institution city/state (account address; *italic*), PI + co-PIs (`wmkf_projectleader` +
-`wmkf_apprequestperson` junction; *italic*), award amount (`akoya_grant` /
+institution city/state (account address; *italic*), **PI = `wmkf_projectleader`; Co-PIs = the existing
+`fetchCoPIs(requestId)` helper** (`lib/services/proposal-participants.js`, `wmkf_apprequestperson`
+junction role=Co-PI **only** — NOT a UNION with `wmkf_projectleader`; the UNION is the PI-history
+pattern, a different thing — Codex pre-impl catch) (*italic*), award amount (`akoya_grant` /
 `akoya_originalgrantamount`, currency-formatted; **never** `akoya_request`), edited title (chunk 7;
 *italic*), body (`wmkf_abstractapproved || wmkf_abstractformatted`, markdown→HTML), and for the
 website, caption + image. All **structural formatting lives in the template** (keyed on field
-identity); only body/caption carry inline markdown (D8).
+identity); only body/caption carry inline markdown (D8). `[VERIFIED co-PI read: proposal-participants.js
+fetchCoPIs, role=Co-PI 100000001]`
 
 **Outputs (owner: "output will vary"):**
 - **(a) Portal review preview** — the assembled, styled document shown in the grantee portal above the
@@ -438,20 +470,33 @@ identity); only body/caption carry inline markdown (D8).
 - **(c) Cycle-level export** — all of a cycle's awarded abstracts assembled together (replaces today's
   "compile all into one PDF and post it"). Format TBD (HTML page / combined HTML / DOCX).
 
-### Open questions for Codex pre-impl
-- **Q1 — Title PI-editability.** Is the edited title editable by the PI in the portal (auto-generated,
-  then tweakable) or staff-owned/fixed? (Owner leaned undecided — drives whether it's a portal field.)
-- **Q2 — Markdown renderer + sanitization.** Which renderer, with which allowed subset, and where does
-  rendering happen (assembly-time only)? Confirm no untrusted-HTML sink given D8's plain-markdown
-  storage.
-- **Q3 — Where does assembly live** — a shared service producing a structured model consumed by all
-  three outputs, vs. per-output templates? (Avoid copy-paste drift across preview/HTML/export.)
-- **Q4 — Cycle-export scope + access** — which cycle key, which status set (awarded only?), and the
-  staff auth gate; cron-prebuilt vs. on-demand.
-- **Q5 — Co-PI assembly** — the DOCX showed two PIs; confirm the `wmkf_apprequestperson` junction read
-  (UNION with `wmkf_projectleader`) and the name-join formatting ("A and B").
-- **Q6 — Image/caption on the website output** — format/placement, and whether the website export
-  pulls the SharePoint image ref (the portal context route deliberately never returns the raw ref).
+### RESOLVED (Codex pre-impl review, S269)
+- **One canonical assembly model (Codex ISSUE).** A single shared service
+  (`lib/services/grantee-document-assembly.js`) reads every field ONCE and returns a structured model
+  `{ institution, location, pi, coPIs[], amount, editedTitle, bodyHtml, caption, image }`; all three
+  outputs (portal preview, website HTML, cycle export) consume that model — no per-output field
+  re-reads. Closes the copy-paste-drift risk across PI/co-PI/amount/title/markdown.
+- **One markdown subset + render policy (Codex ISSUE).** Canonical inline subset = **bold, italic,
+  super/subscript** (D8); rendered by ONE shared renderer to a tight allowlist (`em/strong/sub/sup`)
+  at assembly time. The **edited title is plain text** (a single line, italicized structurally by each
+  consumer) so **no raw markdown reaches the Board Book** (the title is the only field the Board Book
+  consumes from us). Body/caption render identically across portal preview, website HTML, and export —
+  no surface ever shows unrendered `*…*`.
+- **Co-PI read (Codex ISSUE).** PI = `wmkf_projectleader`; Co-PIs = `fetchCoPIs(requestId)` (junction
+  role=Co-PI only). Name-join "A and B" / "A, B, and C". (See Assembly inputs above.)
+- **Website/cycle image + auth boundary (Codex ISSUE).** The website + cycle export are **staff-authed,
+  server-side** (`requireAppAccess('reviewers')`), so they read `wmkf_granteeimagefileref` directly —
+  the portal context route's `hasImage`-only rule is a constraint on the **external grantee-token**
+  surface, not on staff exports. State this boundary explicitly in the route headers.
+- **Cycle export scope + access** — keyed by `cycleCode` (`cycleCodeToOdataFilter` on `wmkf_meetingdate`,
+  awardees-endpoint pattern), **awarded research only** (`Active` + `GRANTEE_RESEARCH_PROGRAM_IDS` + PI
+  present), `requireAppAccess('reviewers')`. On-demand v1 (cron-prebuilt only if volume warrants).
+
+### Still open (does NOT block — chunk-8 portal wiring detail)
+- **Title PI-editability.** Is the edited title editable by the PI in the award-stage portal
+  (auto-generated, then tweakable) or staff-owned/fixed? Owner undecided. It does not block chunk 7
+  (the title is generated at the `Invited` flip, long before the award-stage portal) — settle when
+  wiring the chunk-8 portal preview.
 
 ## Open (later chunks)
 - Chunk 6: reminder cadence/deadline + exact waiver/T&C and email-body wording.
