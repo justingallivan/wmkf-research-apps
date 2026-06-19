@@ -25,7 +25,7 @@ build a **parallel grantee variant** of the lifecycle, pages, submit route, uplo
 | 3c | **Send invite** ✅ | grantee token mint (chunk 1) + M365 email (PI `To`, liaison `Cc`, action-button + fallback), status→Invited. `POST .../send-invite` | 1, 3, 3b |
 | 3d | **Awardee-tab UI** | wire the empty workbench Awardee tab (`pages/workbench/[requestId].js:41`) | 3, 3b, 3c |
 | 4 | **Grantee portal UI** ✅ | edit abstract (in-portal text), upload image, caption, publish-image waiver submit-gate (`GranteeDeliverableForm`) | 1 |
-| 5 | **Submit route** | atomic SharePoint image upload + Dataverse PATCH (`wmkf_abstractapproved`, caption, image ref, status) + rollback; image magic-byte validation; virus scan | 1, 4 |
+| 5 | **Submit route** ✅ | `POST .../submit`: atomic SharePoint image upload + ETag-conditional Dataverse PATCH (`wmkf_abstractapproved`, caption, image ref, status→Submitted) + rollback; image magic-byte (`validateGranteeImage`) + virus scan; `grantee-upload` service | 1, 4 |
 | 6 | **Status/lifecycle + reminders** | status transitions on the Awardee tab, optional reminder send | 3, 5 |
 
 ## Chunk 1 — Token + auth foundation (design)
@@ -273,8 +273,59 @@ to the request's PI/liaison would break override; the route is staff-authed outb
 server-side Research-only gate (staff only run this from research Awardee tabs; a program gate reopens
 the deferred polymorphic-program-field question — revisit if the surface widens).
 
+## Chunk 5 — Submit route (design)
+
+Closes the round-trip: `POST /api/external/grantee/[token]/submit` (the contract the chunk-4 UI
+already posts to). Mirrors `lib/services/review-upload.js` (atomic upload→PATCH→rollback) but is a
+PARALLEL grantee variant — not a mutation of the reviewer path.
+
+- **Auth/order:** token-authed (NOT app-authed). method → `checkRateLimit` → `verifyGranteeToken`
+  (chunk 1, `aud` guard) → `recordTokenOutcome` → fail-fast → parse → validate → scan → upload → PATCH.
+  `config.api.bodyParser = false` (busboy needs the raw stream).
+- **Status guard (fail-closed):** refuse unless the request's `wmkf_granteedeliverablestatus` is in the
+  EDITABLE allowlist (Drafted / Invited / Reminder Sent / Revision Requested) — same set the context
+  route renders editable. This subsumes the chunk-1 carried **Complete guard** (Submitted / Staff
+  Review / Complete / Closed / null / unknown all refuse → 409). On success → status `Submitted`.
+- **Multipart (busboy):** fields `editedAbstract` (text, required, min length), `caption` (text,
+  required); ONE `image` file (≤ a sane cap, e.g. 15 MB; `limits.files: 1`). Image is required UNLESS
+  one is already on file (`wmkf_granteeimagefileref` present) — then a new upload replaces it.
+- **Image validation:** add image magic-byte support to `lib/utils/file-magic.js`
+  (`validateGranteeImage` — PNG/JPEG/GIF/WEBP signatures + extension match) — the gap Codex flagged in
+  chunk 1. Then virus-scan via `scanBytes` (Cloudmersive, gated on `VIRUS_SCAN_ENABLED`), same
+  fail-closed posture as review-upload.
+- **SharePoint:** upload to the `akoya_request` library under
+  `{requestNumber}_{guidNoHyphensUpper}/Grantee_Uploads/` (parallel to `Reviewer_Uploads/`). Track the
+  uploaded item for rollback.
+- **Atomic PATCH + rollback:** `updateRecord('akoya_requests', requestId, { wmkf_abstractapproved,
+  wmkf_granteeimagecaption, wmkf_granteeimagefileref, wmkf_granteedeliverablestatus: Submitted })`. On
+  PATCH failure, `cleanupSharePointItems` (delete the just-uploaded image) so no orphan file. No
+  `actingUserSystemId` (external/grantee, no staff identity) — runs in `bypassDynamicsRestrictions`.
+- **Service:** `lib/services/grantee-upload.js` (`writeGranteeDeliverables`) holds validate→scan→
+  upload→PATCH→rollback; the route does token+status+multipart. Keeps the service text/buffer-testable.
+- **Tests:** image magic accept/reject; status allowlist (Complete/Submitted → 409, Drafted → ok);
+  edited-abstract/caption required; image required when none on file / optional when one exists;
+  SharePoint-fail → no PATCH; PATCH-fail → rollback (image deleted); token aud-reject; happy path
+  writes all four fields + Submitted.
+
+### RESOLVED (S268, Codex pre-impl — READY WITH NAMED CHANGES)
+1. **ETag/If-Match on the submit PATCH** (TOCTOU: staff could change status between the guard read and
+   the write). Re-read `_etag`; PATCH with `ifMatch`; on 412 → roll back the newly uploaded image →
+   409. Fail closed (503) if no `_etag`.
+2. **Old-image cleanup on replace:** upload new → conditional PATCH → ON SUCCESS best-effort delete the
+   PRIOR image (log on failure; orphan, not data loss). NEVER delete the old image before the PATCH
+   succeeds (an upload/PATCH failure must leave a usable image).
+3. **Deterministic server filename:** ignore the attacker-supplied filename; store as
+   `{requestNum}_grantee_image.{ext}` where `ext` comes from the VALIDATED magic type. Upload
+   Content-Type also derives from the validated type, not the browser MIME.
+4. **WEBP needs an offset check** (`RIFF`@0 + `WEBP`@8) — `validateGranteeImage` checks bytes at
+   arbitrary offsets, not just `startsWith`.
+5. **Extract `cleanupSharePointItems`** to a shared `lib/services/sharepoint-cleanup.js` (review-upload
+   imports it from there — behavior identical; no duplication) and the grantee service reuses it.
+6. Busboy: `files:1`, image cap a named constant (15 MB), `fieldSize` ~64 KB (4 KB would truncate the
+   abstract), `fields` ~5. Order: magic-byte → scan (soft-pass when `VIRUS_SCAN_ENABLED=false`) →
+   upload. No raw Graph/Dataverse error / SharePoint path / item-id / file-ref leaked to the client.
+
 ## Open (later chunks)
-- Chunk 5: image accepted formats/size; `file-magic.js` needs image magic-byte support (PNG/JPEG/…).
 - Chunk 6: reminder cadence/deadline + exact waiver/T&C and email-body wording.
 
 ## Pointers

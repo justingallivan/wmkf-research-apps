@@ -23,16 +23,11 @@ import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/
 import {
   GRANTEE_DELIVERABLE_STATUS,
   GRANTEE_DELIVERABLE_LABEL,
+  isGranteeEditableStatus,
 } from '../../../../../shared/config/granteeDeliverableStatus';
 
-// Statuses where the grantee may still edit/submit. A null/unknown status is
-// intentionally NOT here — fail closed (read-only) rather than editable.
-const EDITABLE_STATUSES = new Set([
-  GRANTEE_DELIVERABLE_STATUS.DRAFTED,
-  GRANTEE_DELIVERABLE_STATUS.INVITED,
-  GRANTEE_DELIVERABLE_STATUS.REMINDER_SENT,
-  GRANTEE_DELIVERABLE_STATUS.REVISION_REQUESTED,
-]);
+// Editable = the shared allowlist (single source of truth, also used by the
+// submit route). A null/unknown status is NOT editable — fail closed.
 
 // Statuses that render a read-only "received / under review" confirmation.
 const SUBMITTED_VIEW_STATUSES = new Set([
@@ -72,7 +67,7 @@ export default async function handler(req, res) {
       ? null
       : Number(rawStatus);
 
-    const editable = status !== null && EDITABLE_STATUSES.has(status);
+    const editable = isGranteeEditableStatus(status);
     let view;
     if (editable) view = 'edit';
     else if (status !== null && SUBMITTED_VIEW_STATUSES.has(status)) view = 'submitted';

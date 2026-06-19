@@ -64,3 +64,28 @@ export function isValidGranteeDeliverableValue(v) {
   const n = Number(v);
   return Number.isInteger(n) && Object.values(GRANTEE_DELIVERABLE_STATUS).includes(n);
 }
+
+/**
+ * Statuses in which the grantee may still edit/submit through the portal. The
+ * single source of truth shared by the external context route (what to render
+ * editable) and the submit route (what to accept) — null/unknown is NOT here, so
+ * both fail closed. Submitted / Staff Review / Complete / Closed are read-only.
+ */
+export const GRANTEE_EDITABLE_STATUSES = [
+  GRANTEE_DELIVERABLE_STATUS.DRAFTED,
+  GRANTEE_DELIVERABLE_STATUS.INVITED,
+  GRANTEE_DELIVERABLE_STATUS.REMINDER_SENT,
+  GRANTEE_DELIVERABLE_STATUS.REVISION_REQUESTED,
+];
+
+/**
+ * True iff `v` (number or numeric string) is an editable status. Fail-closed on
+ * null/unknown/non-numeric.
+ * @param {*} v
+ * @returns {boolean}
+ */
+export function isGranteeEditableStatus(v) {
+  if (v === null || v === undefined || v === '') return false;
+  const n = Number(v);
+  return Number.isInteger(n) && GRANTEE_EDITABLE_STATUSES.includes(n);
+}
