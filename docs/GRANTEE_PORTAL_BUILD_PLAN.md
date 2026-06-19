@@ -325,6 +325,13 @@ PARALLEL grantee variant — not a mutation of the reviewer path.
    abstract), `fields` ~5. Order: magic-byte → scan (soft-pass when `VIRUS_SCAN_ENABLED=false`) →
    upload. No raw Graph/Dataverse error / SharePoint path / item-id / file-ref leaked to the client.
 
+### Codex post-impl folded (S268)
+CLEAN on all seven substantive items (extraction safety, rollback, stale-prune, guard/order + TOCTOU
+via ETag, image validation incl. WEBP offset, security, context refactor). One self-found fix during
+test: prune now excludes the just-uploaded file by **item id** (not the random nonce name), so a
+replace can never delete the new image. Two test gaps closed: SharePoint-upload-failure → no PATCH;
+route busboy `FILE_TOO_LARGE`/`TOO_MANY_FILES` → 400. Full parallel suite 2802/2802.
+
 ## Open (later chunks)
 - Chunk 6: reminder cadence/deadline + exact waiver/T&C and email-body wording.
 

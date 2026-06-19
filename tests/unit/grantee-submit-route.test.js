@@ -17,7 +17,8 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 }));
 jest.mock('../../lib/services/grantee-upload', () => ({
   writeGranteeDeliverables: jest.fn(),
-  MAX_IMAGE_BYTES: 15 * 1024 * 1024,
+  // Small cap so a tiny over-cap file exercises the busboy fileSize limit branch.
+  MAX_IMAGE_BYTES: 16,
 }));
 
 import { checkRateLimit, recordTokenOutcome } from '../../lib/external/rate-limit';
@@ -38,15 +39,16 @@ function plainReq(method = 'POST') {
   return { method, query: { token: 't' }, headers: {} };
 }
 
-function multipartReq({ fields = {}, file } = {}) {
+function multipartReq({ fields = {}, file, files } = {}) {
   const boundary = '----tb';
   const parts = [];
   for (const [k, v] of Object.entries(fields)) {
     parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`));
   }
-  if (file) {
-    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="${file.filename}"\r\nContent-Type: image/png\r\n\r\n`));
-    parts.push(file.buffer);
+  const fileList = files || (file ? [file] : []);
+  for (const f of fileList) {
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="${f.filename}"\r\nContent-Type: image/png\r\n\r\n`));
+    parts.push(f.buffer);
     parts.push(Buffer.from('\r\n'));
   }
   parts.push(Buffer.from(`--${boundary}--\r\n`));
@@ -122,6 +124,32 @@ test('happy path: parses multipart, calls service, returns 200', async () => {
   expect(arg.imageFile.filename).toBe('fig.png');
   expect(Buffer.isBuffer(arg.imageFile.buffer)).toBe(true);
   expect(arg.request.akoya_requestid).toBe('r1');
+});
+
+test('busboy FILE_TOO_LARGE → 400 image_too_large, service not called', async () => {
+  verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+  const res = mockRes();
+  await handler(multipartReq({
+    fields: { editedAbstract: 'x', caption: 'c' },
+    file: { filename: 'fig.png', buffer: Buffer.alloc(64, 1) }, // > 16-byte mock cap
+  }), res);
+  expect(res.statusCode).toBe(400);
+  expect(res.body.reason).toBe('image_too_large');
+  expect(writeGranteeDeliverables).not.toHaveBeenCalled();
+});
+
+test('busboy TOO_MANY_FILES → 400 too_many_files', async () => {
+  verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+  const res = mockRes();
+  await handler(multipartReq({
+    fields: { editedAbstract: 'x', caption: 'c' },
+    files: [
+      { filename: 'a.png', buffer: Buffer.from([1, 2]) },
+      { filename: 'b.png', buffer: Buffer.from([3, 4]) },
+    ],
+  }), res);
+  expect(res.statusCode).toBe(400);
+  expect(res.body.reason).toBe('too_many_files');
 });
 
 test('maps a service failure status/reason through (e.g. image_invalid 400)', async () => {

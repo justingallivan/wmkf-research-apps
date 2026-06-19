@@ -104,6 +104,13 @@ test('PATCH failure rolls back the uploaded image', async () => {
   expect(GraphService.deleteFile).toHaveBeenCalledWith('drive-1', 'item-new');
 });
 
+test('SharePoint upload failure → sharepoint_failed, no PATCH', async () => {
+  GraphService.uploadFile.mockRejectedValue(new Error('graph 500'));
+  const r = await writeGranteeDeliverables({ request: REQ, editedAbstract: ABSTRACT, caption: 'c', imageFile: imageFile() });
+  expect(r).toMatchObject({ ok: false, reason: 'sharepoint_failed', status: 502 });
+  expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+});
+
 test('412 conflict → rollback + reason conflict (409)', async () => {
   DynamicsService.updateRecord.mockRejectedValue(Object.assign(new Error('precondition'), { status: 412 }));
   const r = await writeGranteeDeliverables({ request: REQ, editedAbstract: ABSTRACT, caption: 'c', imageFile: imageFile() });
