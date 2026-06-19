@@ -21,7 +21,7 @@ build a **parallel grantee variant** of the lifecycle, pages, submit route, uplo
 | 1 | **Token + auth foundation** | grantee token lifecycle, `verify-grantee-token`, `/external/grantee/[token]` page scaffold, `context` route (fail-closed) | schema (token state — see Q1) |
 | 2 | **Abstract generation** | Executor prompt/template: `wmkf_abstract` → `wmkf_abstractformatted` | Executor contract |
 | 3 | **Generate + persist abstract** (split from the original combined chunk 3) | `POST /api/workbench/grantee-deliverables/generate` — generate via chunk-2 service, persist `wmkf_abstractformatted` + status→Drafted (ETag-conditional) | 2 |
-| 3b | **Recipient resolution** | program-aware grantee-contact resolve + staff confirm | 3 |
+| 3b | **Recipient resolution** | resolve TWO contacts — PI (`wmkf_projectleader`) + liaison (`akoya_primarycontactid`); staff confirm. Research-only (no program branching) | 3 |
 | 3c | **Send invite** | grantee token mint (chunk 1) + M365 email (action-button + fallback), status→Invited | 1, 3, 3b |
 | 3d | **Awardee-tab UI** | wire the empty workbench Awardee tab (`pages/workbench/[requestId].js:41`) | 3, 3b, 3c |
 | 4 | **Grantee portal UI** ✅ | edit abstract (in-portal text), upload image, caption, publish-image waiver submit-gate (`GranteeDeliverableForm`) | 1 |
@@ -226,12 +226,42 @@ needs image support added) + virus-scan; upload the image to SharePoint and PATC
 (`wmkf_abstractapproved`, `wmkf_granteeimagecaption`, `wmkf_granteeimagefileref`, status→`Submitted`)
 **atomically with rollback** (mirror `lib/services/review-upload.js`).
 
+## Chunk 3b/3c — Recipient resolution + send invite (design RESOLVED, owner S268)
+
+**Scope: RESEARCH grants only.** The deliverable (publication abstract + graphical abstract) is a
+research-output thing; staff simply don't run the workflow on non-research grants. This removes all
+program-family branching — no SoCal/Discretionary logic needed.
+
+**Recipients: TWO, both legible on `akoya_request` as contact lookups (owner-confirmed):**
+- **PI** = `wmkf_projectleader` → `contact` (the principal investigator; Research native fill ~90–98%).
+- **Liaison** = `akoya_primarycontactid` → `contact` — the institution's WMKF **foundation liaison /
+  grant steward** (NOT the PI; documented in `lib/services/dataverse-export/constants.js:362` + the
+  dynamics-explorer prompt). 
+Resolve each contact's `emailaddress1` + `firstname`/`lastname` (read the two `_*_value` lookups off
+the request, then load the contacts — or `$expand`). Return both with a missing-email flag.
+
+### Chunk 3b — recipient resolution
+- `GET /api/workbench/grantee-deliverables/recipients?requestId=<guid>` — `requireAppAccess('reviewers')`,
+  GUID-validated. Returns `{ pi: {contactId,name,email,hasEmail}, liaison: {…} }`. Read-only.
+- Staff confirm/override both addresses on the Awardee tab before send (no auto-send).
+
+### Chunk 3c — send invite
+- **One stateless magic-link** per request (chunk-1 `mintForRequest`); BOTH recipients get the SAME
+  link (one package per request — the token's `sub` is the requestId). 
+- Email **both** (PI + liaison) from the PD mailbox via the Dynamics email-activity send (reuse the
+  reviewer `send-emails` M365 pattern); action-button + copy-paste fallback link (the email-button URL
+  matcher must include `/external/grantee/`, not just `/external/review/`).
+- **Send UX: staff confirm recipients + preview/edit the email body, then send** (owner choice).
+- Requires the abstract generated first (status ≥ Drafted). On send → status → `Invited`
+  (non-downgrade). Optional reminder is chunk 6.
+
+### Chunk 3d — Awardee-tab UI
+- Wire the empty workbench Awardee tab (`pages/workbench/[requestId].js:41`): Generate (chunk 3) →
+  show recipients (3b) → confirm + preview → Send (3c); reflect status.
+
 ## Open (later chunks)
-- Chunk 3b: program-aware recipient resolution + staff confirm.
-- Chunk 3c: send invite (grantee token mint + M365 email, action-button + fallback link), status→Invited.
-- Chunk 3d: Awardee-tab UI wiring (the empty tab at `pages/workbench/[requestId].js:41`).
 - Chunk 5: image accepted formats/size; `file-magic.js` needs image magic-byte support (PNG/JPEG/…).
-- Chunk 6: reminder cadence/deadline.
+- Chunk 6: reminder cadence/deadline + exact waiver/T&C and email-body wording.
 
 ## Pointers
 - Design: `docs/GRANTEE_PORTAL_SPEC.md`. Reviewer portal map: `docs/agent-wiki/topics/external-reviewer-portal.md`.

@@ -54,10 +54,13 @@ Per grantee, exactly:
 - **D4 — Trigger surface = the Awardee tab.** Launched from the currently-empty **Awardee tab** in
   the workbench (`pages/workbench/[requestId].js:41` — `{ key: 'awardee', label: 'Awardee' }`,
   defined with no render branch today). This tab gets populated as part of the build.
-- **D5 — Recipient resolution: auto-resolve, staff confirms.** Pre-fill a program-aware default
-  contact (Research → `akoya_request.wmkf_projectleader`; SoCal → primary contact / possibly
-  `wmkf_ceo`; Discretionary → no reliable lead — flag for manual), and let staff confirm/override
-  before send. (`docs/atlas/dataverse-akoya-request.md:135-142`.)
+- **D5 — Scope = RESEARCH only; recipients = TWO contacts (owner-confirmed S268).** The portal runs
+  on research grants only (the deliverable is a research output), so there is NO program-family
+  branching. The invite goes to BOTH the **PI** (`akoya_request.wmkf_projectleader` → `contact`) and the
+  **liaison** (`akoya_request.akoya_primarycontactid` → `contact` — the institution's WMKF foundation
+  liaison / grant steward, NOT the PI). Both are auto-resolved (`emailaddress1` + name); staff
+  confirm/override and preview the email before send. The earlier program-aware SoCal/Discretionary
+  mapping is superseded. (`docs/atlas/dataverse-akoya-request.md:135-160`.)
 - **D6 — Schema home: extend `akoya_request` inline.** One staff-run package per grant, no
   resubmission rounds planned, so add fields directly to `akoya_request` (matches Atlas "lifecycle
   additions stay merged into the vendor entity" — `docs/atlas/dataverse-akoya-request.md:11-15,144-147`).
@@ -68,10 +71,11 @@ Per grantee, exactly:
 1. **Trigger:** staff opens a grant's **Awardee tab** and starts the grantee-deliverables workflow.
 2. **Draft:** Claude generates a style-guide abstract from `wmkf_abstract` via the Executor/prompt
    pipeline into `wmkf_abstract_formatted`. *(Concrete prompt/template TBD — see Open items.)*
-3. **Invite:** staff confirms the auto-resolved recipient, then emails the grantee (PD mailbox via
-   Dynamics 365 / M365) a magic-link to `/external/grantee/...`, asking them to edit & approve the
-   abstract and upload image + caption, and check the publish-image box (which enables submit). Reuse
-   the "Start …" button + copy-paste fallback link (`19bd446e`).
+3. **Invite:** staff confirm the two auto-resolved recipients (PI + liaison) and preview/edit the email,
+   then email BOTH (PD mailbox via Dynamics 365 / M365) a magic-link to `/external/grantee/...` (one link
+   per request — both recipients share it), asking them to edit & approve the abstract and upload image +
+   caption, and check the publish-image box (which enables submit). Reuse the "Start …" button +
+   copy-paste fallback link (`19bd446e`).
 4. **Collect:** in the portal the grantee returns the **edited abstract (in-portal text)**, one
    **graphical image** (upload), and an **image caption** (free text), with the **publish-image box
    checked** (the box gates the submit button; nothing about consent is persisted).
