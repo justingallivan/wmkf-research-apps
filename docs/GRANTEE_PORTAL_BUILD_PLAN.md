@@ -381,8 +381,13 @@ curate it manually into `wmkf_wmkfprojectdescription` today (Memo, maxLen 2000, 
 Description"). The cron **writes this existing field when empty**; staff can edit afterward. This
 supersedes the earlier "new `wmkf_ai_editedtitle` wave" plan — no wave, no preflight, no Atlas-add
 (the field already exists; update the Atlas field DESCRIPTION to note it is now AI-written-when-empty).
-- ⚠️ **`wmkf_projecttitle1` is a DIFFERENT field** (String 500, "Project Title 1") with a separate
-  hypothesis-style phrasing — owner does not know its purpose; **do NOT read or write it.**
+- ⚠️ **`wmkf_projecttitle1` is a DIFFERENT field** — slot 1 of a numbered `wmkf_projecttitle1..3`
+  family (String 500, "Project Title N"; slots 2/3 empty on the sampled record), a vendor-style
+  multi-slot pattern like `wmkf_copi1..5`. It carries a **hypothesis/question** phrasing (e.g. 1002238:
+  *"To determine if electrical signals … represent organized communication or incidental activity"*),
+  distinct from the **aim/method** phrasing in `wmkf_wmkfprojectdescription` (*"To visualize … using
+  genetically-encoded voltage indicators"*). **No repo code reads or writes `wmkf_projecttitle*`**
+  (verified via grep) — **do NOT read or write it.** `[VERIFIED S269 via live probe + repo grep]`
 - ⚠️ **PA verification is MORE important here, not less:** we are now writing an EXISTING, board-facing,
   human-curated field — a Power Automate flow could be watching it. Post-deploy, confirm no AkoyaGO/PA
   flow fires on a `wmkf_wmkfprojectdescription` write (this is a chunk-7 acceptance criterion).
