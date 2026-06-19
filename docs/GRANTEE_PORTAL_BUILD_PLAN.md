@@ -23,7 +23,7 @@ build a **parallel grantee variant** of the lifecycle, pages, submit route, uplo
 | 3 | **Generate + persist abstract** (split from the original combined chunk 3) | `POST /api/workbench/grantee-deliverables/generate` — generate via chunk-2 service, persist `wmkf_abstractformatted` + status→Drafted (ETag-conditional) | 2 |
 | 3b | **Recipient resolution** ✅ | resolve TWO contacts — PI (`wmkf_projectleader`) + liaison (`akoya_primarycontactid`); staff confirm. Research-only (no program branching). `GET .../recipients` | 3 |
 | 3c | **Send invite** ✅ | grantee token mint (chunk 1) + M365 email (PI `To`, liaison `Cc`, action-button + fallback), status→Invited. `POST .../send-invite` | 1, 3, 3b |
-| 3d | **Awardee-tab UI** | wire the empty workbench Awardee tab (`pages/workbench/[requestId].js:41`) | 3, 3b, 3c |
+| 3d | **Awardee-tab UI** ✅ | `AwardeeTab` wired into the workbench tab dispatch — generate → confirm recipients → preview → send | 3, 3b, 3c |
 | 4 | **Grantee portal UI** ✅ | edit abstract (in-portal text), upload image, caption, publish-image waiver submit-gate (`GranteeDeliverableForm`) | 1 |
 | 5 | **Submit route** ✅ | `POST .../submit`: atomic SharePoint image upload + ETag-conditional Dataverse PATCH (`wmkf_abstractapproved`, caption, image ref, status→Submitted) + rollback; image magic-byte (`validateGranteeImage`) + virus scan; `grantee-upload` service | 1, 4 |
 | 6 | **Status/lifecycle + reminders** | status transitions on the Awardee tab, optional reminder send | 3, 5 |
@@ -256,9 +256,12 @@ the request, then load the contacts — or `$expand`). Return both with a missin
 - Requires the abstract generated first (status ≥ Drafted). On send → status → `Invited`
   (non-downgrade). Optional reminder is chunk 6.
 
-### Chunk 3d — Awardee-tab UI
-- Wire the empty workbench Awardee tab (`pages/workbench/[requestId].js:41`): Generate (chunk 3) →
-  show recipients (3b) → confirm + preview → Send (3c); reflect status.
+### Chunk 3d — Awardee-tab UI ✅ (S268)
+`shared/components/workbench/AwardeeTab.js`, wired into the workbench tab dispatch
+(`pages/workbench/[requestId].js`). Staff orchestration over the existing endpoints: Generate/Regenerate
+abstract (chunk 3, reuse-path doubles as load) → recipients auto-resolved on mount (3b, PI in To +
+liaison in Cc, editable) → subject/body preview/edit → Send (3c) → status reflected. Action-driven (no
+new endpoints). 4 RTL tests. (Self-reviewed + tested like chunk 4; a Codex pass can run later.)
 
 ### Codex post-impl folded (3b/3c, S268)
 CLEAN on security (server-minted link injection, body HTML-escaped, GUID validation, no log/header

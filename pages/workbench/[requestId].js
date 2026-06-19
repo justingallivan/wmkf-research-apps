@@ -24,6 +24,7 @@ import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 import ProposalTab from '../../shared/components/workbench/ProposalTab';
 import OverviewTab from '../../shared/components/workbench/OverviewTab';
 import StatusTab from '../../shared/components/workbench/StatusTab';
+import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
 import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
 
 // Live tabs: Overview, Proposal, Reviewers (Phases 2–3), Status; the other 6 are
@@ -161,6 +162,8 @@ function WorkbenchRequest() {
         <ProposalTab context={ctx} />
       ) : activeTab === 'status' ? (
         <StatusTab context={ctx} />
+      ) : activeTab === 'awardee' ? (
+        <AwardeeTab requestId={typeof requestId === 'string' ? requestId : ''} context={ctx} />
       ) : (
         <Card hover={false}>
           <p className="text-sm text-gray-500">This panel is coming in a later update.</p>
