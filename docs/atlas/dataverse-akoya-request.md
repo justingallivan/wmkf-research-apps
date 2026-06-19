@@ -62,6 +62,24 @@ WMKF AI writeback fields (canonical: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` —
 
 **Workbench triage field (S261).** `wmkf_triagestatus` (Picklist, local option set: `Advancing`=100000000 · `Set aside`=100000001; null/unset = untriaged). **[LIVE in prod (S261, 2026-06-15, `apply-dataverse-schema --wave=2-triagestatus --execute`); D26 backfill applied — 35 Advancing + 170 Set aside (205 rows, `scripts/backfill-d26-triage.mjs --execute`, idempotent). CONSUMED by the dashboard (§3 switch, S261): `/api/workbench/dashboard` now reads this field for visibility — Advancing + Phase II Pending shown, Set aside hidden, untriaged/Concept rows excluded (live-probed: D26 default 35, includeSetAside 205). The dashboard's per-row triage-flip control (S261) WRITES it via `POST /api/workbench/triage` (lead PD / superuser; cosmetic UI gate, hard server gate). §5 allowlist retirement DONE (S261): the cycle picker now derives from the PD's meeting-dated proposals (default = latest); `d26Allowlist.js` is retired from live use (kept as historical record + one-time-backfill source). Triage feature fully shipped.]** Staff winnowing signal that drives the Workbench dashboard going-forward filter (VISIBILITY ONLY, reversible) — replaces the throwaway `shared/config/d26Allowlist.js`. NOT the official Phase I→II status flip, NOT the board "Invited" signal (`wmkf_phaseistatus`), NOT the doc-arrival signal (`akoya_requeststatus='Phase II Pending'`). Schema spec: `lib/dataverse/schema/wave2-triagestatus/akoya_request-triagestatus.json` (isolated wave `--wave=2-triagestatus`, same drift-avoidance reason as wave2-fieldprimer). App-side constants: `shared/config/triageStatus.js`. Written by `POST /api/workbench/triage` (hard manage gate). The 205-row backfill reported 205 written / 0 failed. **PA-trigger risk assessed low + accepted (Justin, S261):** only the new `wmkf_triagestatus` was written — no existing field changed and `akoya_requeststatus` was untouched — so a column-filtered flow (incl. the status-driven intake-recompute flow) cannot fire; the only residual would be an *unfiltered* "any modify" flow on `akoya_request` (run-history not spot-checked). Plan: `docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md`.
 
+**Grantee Deliverables Portal fields (S268) — [PLANNED, schema authored, NOT YET DEPLOYED].** Five
+new fields for the cycle-close grantee deliverables package (one AI-formatted abstract the grantee
+edits/approves + one graphical image + a caption). Schema spec authored but NOT applied — these do
+**not** exist in Dataverse yet; do not assume them on a live record until deployed:
+- `wmkf_abstractformatted` (Memo, 32000) — AI style-guide abstract drafted FROM the applicant's `wmkf_abstract` (the source above); shown to the grantee to edit/approve. Not overwritten by the edit.
+- `wmkf_abstractapproved` (Memo, 32000) — grantee-edited/approved abstract (stored separately to preserve the AI-draft provenance).
+- `wmkf_granteeimagefileref` (String, Url, 1000) — SharePoint reference for the graphical image (binary lives in SharePoint).
+- `wmkf_granteeimagecaption` (Memo, 4000) — free-text image caption.
+- `wmkf_granteedeliverablestatus` (Picklist, local option set: Drafted=100000000 · Invited=100000001 · Reminder Sent=100000002 · Submitted=100000003 · Staff Review=100000004 · Revision Requested=100000005 · Complete=100000006 · Closed No Response=100000007; null/unset = not started).
+
+No consent field exists by design — the image-publication waiver is a client-side submit gate (the
+checkbox enables submit), not stored; a submitted package IS the consent record. Schema spec:
+`lib/dataverse/schema/wave2-grantee-deliverables/akoya_request-grantee-deliverables.json` (isolated
+wave `--wave=2-grantee-deliverables`, same drift-avoidance reason as wave2-fieldprimer/triagestatus).
+App-side picklist constants: `shared/config/granteeDeliverableStatus.js`. Pre-deploy probe:
+`scripts/preflight-grantee-deliverables-fields.mjs` (3-way exit contract; schema-apply is
+creation-only). MUST carry NO Power Automate trigger — verify post-deploy. Design: `docs/GRANTEE_PORTAL_SPEC.md`.
+
 **Cruft / do-not-write fields** [VERIFIED via `project_dynamics_ai_writeback.md`]:
 - `wmkf__ai_summary` (double underscore) — exists alongside the real `wmkf_ai_summary`; Connor will delete. Do not target.
 - `wmkf_ai_rundatetime` on `wmkf_ai_run` — vestigial; use built-in `createdon` instead.

@@ -61,11 +61,12 @@ When IT confirms the CNAMEs are in Cloudflare (DNS-only):
 - Decide what `applications.wmkeck.org` routes to (just live → app for now, unless a path is wanted).
 
 ### 2. (Future) Grantee Deliverables Portal — spec it out
-`docs/GRANTEE_PORTAL_SPEC.md` stub (commit `835e3a29`). Workbench-triggered at cycle close: Claude
-drafts 2 docs → email grantees for edit/approval → they return 2 edited docs + graphical-abstract
-image + caption + consent checkbox → Dataverse (+ SharePoint). Reuses the reviewer-portal primitives
-(magic-link, token-lifecycle, M365 send, SharePoint upload, Executor). Biggest open question: what
-the two documents ARE. Run a Codex design pass off the stub.
+`docs/GRANTEE_PORTAL_SPEC.md` stub (commit `835e3a29`; corrected + framed for design in S268).
+Workbench-triggered at cycle close: Claude drafts **one abstract of the grantee's proposal** →
+email grantees for edit/approval → they return the edited abstract + graphical image + caption +
+T&C acknowledgement → Dataverse (+ SharePoint). Reuses the reviewer-portal primitives (magic-link,
+token-lifecycle, M365 send, SharePoint upload, Executor). Owner-confirmed S268: it is ONE abstract,
+not two documents. Run a Codex design pass off the spec (Q1–Q6 framed).
 
 ### 3. (Parked) S266 TEMP generation audit log still live
 `d0fb1ef5` `[Discover API] S266 generation audit` in `discover.js` — never reverted. Low priority;

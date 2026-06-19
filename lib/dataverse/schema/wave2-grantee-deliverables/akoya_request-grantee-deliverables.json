@@ -1,0 +1,53 @@
+{
+  "name": "akoya_request-grantee-deliverables",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "_comment": "Grantee Deliverables Portal field wave (S268). Extends akoya_request because the portal collects exactly ONE deliverable package per grant/request cycle (one AI-formatted abstract the grantee edits/approves + one graphical image + a caption); see docs/GRANTEE_PORTAL_SPEC.md (DESIGN RESOLVED). Lives in its own wave so `apply-dataverse-schema --wave=2-grantee-deliverables` creates ONLY these fields and does NOT re-attempt drifted relationships from the full wave2 (same isolation reason as wave2-triagestatus / wave2-fieldprimer). schema-apply is CREATION-ONLY (lib/dataverse/schema-apply.js header + ensureAttribute) — it will NOT reconcile a divergent pre-existing field; run scripts/preflight-grantee-deliverables-fields.mjs FIRST. Picklist values mirror shared/config/granteeDeliverableStatus.js (the app-side source of truth); this JSON is the Dataverse source of truth and the two MUST stay in sync. MUST carry NO Power Automate trigger; verify post-deploy that writes limited to these new fields fire no AkoyaGO/PA flow. Publisher prefix wmkf. NOTE on naming: the AI-formatted + grantee-approved abstracts join the existing wmkf_abstract (applicant-drafted SOURCE, NOT created here) abstract family; schemaNames use repo PascalCase convention (no mid-name underscore), so logical names are wmkf_abstractformatted / wmkf_abstractapproved. The image-publication waiver is a client-side submit gate (checkbox enables submit), NOT a stored field — a submitted package IS the consent record — so NO consent fields exist in this wave.",
+  "attributes": [
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_AbstractFormatted",
+      "displayName": "Abstract (Formatted)",
+      "description": "AI-generated, style-guide-conforming abstract drafted from the applicant-authored wmkf_abstract. This is what the grantee is shown to edit/approve. NOT overwritten by the grantee edit (provenance: what we generated). Text by design; no binary.",
+      "maxLength": 32000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_AbstractApproved",
+      "displayName": "Abstract (Grantee Approved)",
+      "description": "The grantee-edited/approved abstract captured through the portal text editor. Stored separately from wmkf_AbstractFormatted so the original AI draft is preserved.",
+      "maxLength": 32000
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_GranteeImageFileRef",
+      "displayName": "Grantee Image File Reference",
+      "description": "SharePoint URL/path/item reference for the grantee-submitted graphical image. The binary lives in SharePoint; only the reference is stored in Dataverse.",
+      "format": "Url",
+      "maxLength": 1000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_GranteeImageCaption",
+      "displayName": "Grantee Image Caption",
+      "description": "Free-text caption supplied by the grantee for the graphical image.",
+      "maxLength": 4000
+    },
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_GranteeDeliverableStatus",
+      "displayName": "Grantee Deliverable Status",
+      "description": "Lifecycle for the grantee deliverables package. Null/unset = not started. Mirrors shared/config/granteeDeliverableStatus.js; additively extensible without a migration.",
+      "options": [
+        { "value": 100000000, "label": "Drafted", "description": "AI abstract prepared; invite not yet sent." },
+        { "value": 100000001, "label": "Invited", "description": "Magic-link invite sent to the grantee." },
+        { "value": 100000002, "label": "Reminder Sent", "description": "At least one reminder sent to a non-responder." },
+        { "value": 100000003, "label": "Submitted", "description": "Grantee submitted edited abstract + image + caption (waiver box was checked)." },
+        { "value": 100000004, "label": "Staff Review", "description": "Submitted materials are under staff review." },
+        { "value": 100000005, "label": "Revision Requested", "description": "Staff requested a correction or replacement." },
+        { "value": 100000006, "label": "Complete", "description": "Staff accepted the returned materials." },
+        { "value": 100000007, "label": "Closed No Response", "description": "Cycle deadline passed without a usable submission." }
+      ]
+    }
+  ]
+}
