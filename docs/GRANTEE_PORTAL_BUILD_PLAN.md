@@ -335,8 +335,36 @@ test: prune now excludes the just-uploaded file by **item id** (not the random n
 replace can never delete the new image. Two test gaps closed: SharePoint-upload-failure → no PATCH;
 route busboy `FILE_TOO_LARGE`/`TOO_MANY_FILES` → 400. Full parallel suite 2802/2802.
 
+## Awardee discovery + eligibility (S268) ✅
+
+The reviewer-finding **dashboard does not surface awardees** (it filters
+`akoya_requeststatus='Phase II Pending'` OR `wmkf_triagestatus=Advancing` — the pre-decision pipeline).
+Awardees are post-decision, so a separate surface was needed.
+
+**Eligibility (owner-validated against live J26 = 12 awardees):** a research awardee is
+`akoya_requeststatus = 'Active'` AND `akoya_programid` ∈ a research-program set AND `wmkf_projectleader`
+present (the PI requirement excludes the standing endowment #985674; the program set excludes
+Active-with-a-PI civic grants like #1002650). NOTE: `wmkf_phaseistatus = Invited` is NOT "awarded" — it
+means "invited into the competition" (205 J26 rows, mostly Phase I Declined). Probe pagination matters:
+the J26 query is **685 rows** (a `$top=500` truncates it).
+
+- **Config (NOT hard-wired — owner: program names may change):**
+  `shared/config/granteeResearchPrograms.js` — `GRANTEE_RESEARCH_PROGRAM_IDS` (GUID-keyed per the Atlas
+  duplicate-name caution; seeded with Science & Engineering Research + Medical Research) +
+  `GRANTEE_AWARDED_STATUS='Active'`. Single edit point when programs change.
+- **Endpoint:** `GET /api/workbench/grantee-deliverables/awardees?cycleCode=J26` — returns the cycle's
+  awardees with formatted PI/liaison/program names + deliverable status. App-authed; no client GUID
+  reaches a selector.
+- **UI:** `pages/workbench/awardees.js` — cycle picker (defaults to the current board cycle) → table →
+  each row links to `/workbench/{requestId}?tab=awardee`. 6 tests (endpoint filter + mapping; page render + links).
+
+**PD access:** a superuser grants each PD the **`reviewers`** app in `/admin` (Users; `api/admin/users.js`
+is `requireSuperuser`-gated). That's all a PD needs for the Awardee tab + this list.
+
 ## Open (later chunks)
 - Chunk 6: reminder cadence/deadline + exact waiver/T&C and email-body wording.
+- Optional **auto-on-award cron** (PA-free) — a `pages/api/cron/*` route on the same eligibility filter
+  (config above) that pre-generates abstracts for newly-Active research awardees; idempotent.
 
 ## Pointers
 - Design: `docs/GRANTEE_PORTAL_SPEC.md`. Reviewer portal map: `docs/agent-wiki/topics/external-reviewer-portal.md`.

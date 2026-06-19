@@ -38,6 +38,7 @@
 - Before declaring a slice done / committing code / delegating a review (verify+fan-out+boundary+concurrency self-pass): feedback-self-review-before-delegating-review.md
 - Declaring tests "green" / safe to commit (run FULL npm test, not a subset/gates): feedback-green-requires-full-test-suite.md
 - No performative contrition: feedback-no-performative-contrition.md
+- No time-pressure commentary (don't tell the user they're out of time): feedback-no-time-pressure-commentary.md
 - React async/effect edits: feedback-profile-context-runtime-bugs.md
 - Prior-context lookup: feedback-check-memory-before-asking-user.md
 - Startup / next-step summary (omit parked items): feedback-dont-resurface-parked-items.md
