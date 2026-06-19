@@ -371,6 +371,20 @@ const SURFACES = [
     promptFiles: ['shared/config/prompts/field-primer.js'],
     callSiteFiles: ['lib/services/execute-prompt.js'],
   },
+  {
+    // Executor-driven (grantee-abstract.generate, via lib/services/grantee-abstract-service.js).
+    // Hardening lives in execute-prompt.js (#20): wrapUntrustedContent +
+    // buildUntrustedContentPreamble injected for the untrusted source_abstract
+    // variable (the applicant-authored abstract). The prompt code file carries no
+    // markers of its own; registered here so the unregistered-prompt-file check
+    // tracks it. callSiteFiles MUST include execute-prompt.js or the marker checks
+    // fail (Codex chunk-2 review 5b).
+    id: 'grantee-abstract-generate',
+    inv: 26,
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/grantee-abstract.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the

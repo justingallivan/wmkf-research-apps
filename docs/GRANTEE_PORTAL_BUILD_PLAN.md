@@ -97,8 +97,51 @@ state lives — or whether we keep tokens stateless.
 - Tests: token mint/verify (incl. audience-claim rejection of a reviewer token + array-form aud +
   missing-sub + past-expiry), context fail-closed (status allowlist) + no image-ref leak.
 
+## Chunk 2 — Abstract generation (design)
+
+Owner supplied the editor prompt (third-person, tense-zoned house-style rewrite of the applicant's
+abstract). It returns **plain prose** ("return only the rewritten abstract text"), which maps
+directly to `wmkf_abstractformatted` (Memo). Mirrors the field-primer Executor precedent exactly.
+
+- **Source input:** the existing `wmkf_abstract` (applicant-authored) — passed to the Executor as an
+  **override variable** `source_abstract` (the caller reads the field; the service stays text-only and
+  unit-testable, exactly like field-primer's `proposal_text`). It is **untrusted** (applicant text):
+  declared `untrusted:true` + `dataClass:'abstract'` + `maxChars` so the Executor wraps it in nonce
+  sentinels and injects the A7 preamble. NOT concatenated raw.
+- **Prompt config:** `shared/config/prompts/grantee-abstract.js` — `SYSTEM_PROMPT` = owner's editor
+  prompt verbatim; `USER_PROMPT_TEMPLATE` references the `{{source_abstract}}` slot. No A7 markers in
+  the file itself (Executor-driven; injected by execute-prompt.js).
+- **Output:** `parseMode:'raw'`, exactly one output `abstract_formatted`, `target.kind:'none'` → the
+  text is RETURNED (`result.parsed.abstract_formatted`), not written by the Executor. The caller does
+  the `wmkf_abstractformatted` write + status→Drafted (chunk 3, idempotent + lease — like field-primer's
+  route). Raw mode does NOT strip markdown fences, so the service defensively strips any stray fence.
+- **Seed:** `scripts/seed-grantee-abstract-prompt.js` (mirror `seed-field-primer-prompt.js`) writes the
+  `grantee-abstract.generate` row into `wmkf_ai_prompts`. **executePrompt has NO bundled fallback** —
+  the prod row is REQUIRED. Run `--dry-run` then `--execute` (prod write, gated on owner go-ahead, like
+  the schema deploy).
+- **Model:** `sonnet` (the Opus tier rejects the `temperature` param the Executor always sends — same
+  constraint field-primer hit); `temperature` 0.3; `maxtokens` ~4096 (an abstract is ~1 page).
+- **A7 registration:** add a `SURFACES` entry in `scripts/check-prompt-injection-tagging.js`
+  (id `grantee-abstract-generate`, `promptFiles:['shared/config/prompts/grantee-abstract.js']`,
+  Executor-driven) so the unregistered-prompt-file check passes.
+- **Service:** `lib/services/grantee-abstract-service.js` — `generateGranteeAbstract({ sourceAbstract })`
+  → `executePrompt({ promptName:'grantee-abstract.generate', overrideVariables:{ source_abstract },
+  forceOverwrite:true })` → return the stripped text. Min-length guard on input + output.
+- **Tests:** service happy path (mock executePrompt), defensive fence strip, empty/short input + output
+  throw, untrusted var passed through. (The seed is a script; the prompt-injection gate covers registration.)
+- **Codex pre-impl folded (S268):** seed uses NO `jsonSchema.required` (raw mode ignores it — raw/none
+  precedent `scripts/seed-phase-ii-prompts.js`); SURFACES entry MUST carry
+  `callSiteFiles:['lib/services/execute-prompt.js']` (`inv:26`) or the A7 marker check fails; service
+  guards input (`< ~50` chars) and surfaces the Executor's `<20`-char short-output throw clearly.
+
+> **Chunk-3 REQUIREMENT carried from chunk-2 review (Codex 6a/6c):** chunk 2 returns text only
+> (`target.kind:'none'`), so a generation that succeeds in chunk 2 but is never persisted is silently
+> lost, and two concurrent generations would last-write-win. Chunk 3 (the Awardee-tab trigger that
+> writes `wmkf_abstractformatted`) MUST own idempotency the way field-primer's Workbench mode does:
+> reuse an existing value → acquire an ETag/lease → verify ownership → conditional persist
+> (`pages/api/field-primer/generate.js:92-126,172-215`). Do NOT ship chunk 3 with a bare last-write PATCH.
+
 ## Open (later chunks)
-- Chunk 2: the exact abstract-generation prompt/template + Executor wiring + style guide source.
 - Chunk 5: image accepted formats/size; `file-magic.js` needs image magic-byte support (PNG/JPEG/…).
 - Chunk 6: reminder cadence/deadline.
 
