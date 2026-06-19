@@ -1,9 +1,11 @@
 # Grantee Deliverables Portal — Spec
 
-Status: **DESIGN RESOLVED (S268) — ready for an implementation pass.** Owner-confirmed decisions
-folded in from the S268 Codex design review + owner clarifications. Nothing is built yet; this is
-the approved design, not an implementation record. Label new state claims `[VERIFIED]`/`[ASSUMED]`
-as implementation lands.
+Status: **DESIGN RESOLVED + SCHEMA DEPLOYED (S268).** Owner-confirmed decisions folded in from the
+S268 Codex design review + owner clarifications. The **Dataverse field wave is LIVE in prod** (5/5
+fields created 2026-06-18, re-probe shows 5/5 EXACT). The **portal application is NOT built** —
+Awardee-tab trigger, abstract generation, external grantee portal, SharePoint upload/return, and the
+status write-path all remain to build. Label new state claims `[VERIFIED]`/`[ASSUMED]` as
+implementation lands.
 
 ## Purpose
 
@@ -94,11 +96,12 @@ writes `wmkf_review*` fields, uses the `Reviewer_Uploads` folder, validates revi
 tightens reviewer-token expiry (`lib/services/review-upload.js:106-120,172-175,203-238`). Copying
 either as-is is the copy-paste-drift trap.
 
-## Proposed Dataverse field schema (wave JSON)
+## Dataverse field schema (wave JSON) — DEPLOYED S268
 
-Proposed file: `lib/dataverse/schema/wave2-grantee-deliverables/akoya_request-grantee-deliverables.json`,
+File: `lib/dataverse/schema/wave2-grantee-deliverables/akoya_request-grantee-deliverables.json`,
 `kind: "extensions-on-existing"` on `akoya_request`, publisher prefix `wmkf`. Isolated wave so
-`apply-dataverse-schema --wave=2-grantee-deliverables` creates ONLY these fields.
+`apply-dataverse-schema --wave=2-grantee-deliverables` creates ONLY these fields. **Applied to prod
+2026-06-18** (`--execute`); preflight re-probe confirms 5/5 EXACT.
 
 New fields (the existing `wmkf_abstract` is the source and is NOT created):
 
