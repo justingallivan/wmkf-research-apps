@@ -56,9 +56,9 @@ Per grantee, exactly:
   defined with no render branch today). This tab gets populated as part of the build.
 - **D5 — Scope = RESEARCH only; recipients = TWO contacts (owner-confirmed S268).** The portal runs
   on research grants only (the deliverable is a research output), so there is NO program-family
-  branching. The invite goes to BOTH the **PI** (`akoya_request.wmkf_projectleader` → `contact`) and the
-  **liaison** (`akoya_request.akoya_primarycontactid` → `contact` — the institution's WMKF foundation
-  liaison / grant steward, NOT the PI). Both are auto-resolved (`emailaddress1` + name); staff
+  branching. The invite addresses the **PI** (`akoya_request.wmkf_projectleader` → `contact`) in **`To`**
+  and **Cc's the liaison** (`akoya_request.akoya_primarycontactid` → `contact` — the institution's WMKF
+  foundation liaison / grant steward, NOT the PI). Both are auto-resolved (`emailaddress1` + name); staff
   confirm/override and preview the email before send. The earlier program-aware SoCal/Discretionary
   mapping is superseded. (`docs/atlas/dataverse-akoya-request.md:135-160`.)
 - **D6 — Schema home: extend `akoya_request` inline.** One staff-run package per grant, no
@@ -72,8 +72,8 @@ Per grantee, exactly:
 2. **Draft:** Claude generates a style-guide abstract from `wmkf_abstract` via the Executor/prompt
    pipeline into `wmkf_abstract_formatted`. *(Concrete prompt/template TBD — see Open items.)*
 3. **Invite:** staff confirm the two auto-resolved recipients (PI + liaison) and preview/edit the email,
-   then email BOTH (PD mailbox via Dynamics 365 / M365) a magic-link to `/external/grantee/...` (one link
-   per request — both recipients share it), asking them to edit & approve the abstract and upload image +
+   then email the PI (`To`) and Cc the liaison (PD mailbox via Dynamics 365 / M365) a magic-link to
+   `/external/grantee/...` (one link per request — both share it), asking them to edit & approve the abstract and upload image +
    caption, and check the publish-image box (which enables submit). Reuse the "Start …" button +
    copy-paste fallback link (`19bd446e`).
 4. **Collect:** in the portal the grantee returns the **edited abstract (in-portal text)**, one

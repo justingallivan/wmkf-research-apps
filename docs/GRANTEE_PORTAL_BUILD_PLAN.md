@@ -248,9 +248,10 @@ the request, then load the contacts — or `$expand`). Return both with a missin
 ### Chunk 3c — send invite
 - **One stateless magic-link** per request (chunk-1 `mintForRequest`); BOTH recipients get the SAME
   link (one package per request — the token's `sub` is the requestId). 
-- Email **both** (PI + liaison) from the PD mailbox via the Dynamics email-activity send (reuse the
-  reviewer `send-emails` M365 pattern); action-button + copy-paste fallback link (the email-button URL
-  matcher must include `/external/grantee/`, not just `/external/review/`).
+- Email the **PI in `To`** and the **liaison in `Cc`** (owner S268) from the PD mailbox via the Dynamics
+  email-activity send (reuse the reviewer `send-emails` M365 pattern); action-button + copy-paste
+  fallback link (the email-button URL matcher must include `/external/grantee/`, not just
+  `/external/review/`). Both addressees share the one magic-link.
 - **Send UX: staff confirm recipients + preview/edit the email body, then send** (owner choice).
 - Requires the abstract generated first (status ≥ Drafted). On send → status → `Invited`
   (non-downgrade). Optional reminder is chunk 6.
