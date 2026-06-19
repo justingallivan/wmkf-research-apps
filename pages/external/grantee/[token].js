@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import GranteeDeliverableForm from '../../../shared/components/external/GranteeDeliverableForm';
 
 const REASON_MESSAGE = {
   no_token: 'This link is missing its access token.',
@@ -72,14 +73,7 @@ export default function GranteePortalPage() {
       {request.requestNumber && <p>Grant #{request.requestNumber}</p>}
 
       {view === 'edit' && (
-        <section>
-          {/* Chunk 4: abstract editor + image upload + caption + publish-image
-              waiver submit gate. Placeholder render until then. */}
-          <p>Please review and submit your grant deliverables.</p>
-          {deliverable.abstractFormatted && (
-            <article aria-label="abstract-preview">{deliverable.abstractFormatted}</article>
-          )}
-        </section>
+        <GranteeDeliverableForm token={token} deliverable={deliverable} />
       )}
 
       {view === 'submitted' && (

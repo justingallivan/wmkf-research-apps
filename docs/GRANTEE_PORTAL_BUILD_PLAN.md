@@ -24,7 +24,7 @@ build a **parallel grantee variant** of the lifecycle, pages, submit route, uplo
 | 3b | **Recipient resolution** | program-aware grantee-contact resolve + staff confirm | 3 |
 | 3c | **Send invite** | grantee token mint (chunk 1) + M365 email (action-button + fallback), status→Invited | 1, 3, 3b |
 | 3d | **Awardee-tab UI** | wire the empty workbench Awardee tab (`pages/workbench/[requestId].js:41`) | 3, 3b, 3c |
-| 4 | **Grantee portal UI** | edit abstract (in-portal text), upload image, caption, publish-image waiver submit-gate | 1 |
+| 4 | **Grantee portal UI** ✅ | edit abstract (in-portal text), upload image, caption, publish-image waiver submit-gate (`GranteeDeliverableForm`) | 1 |
 | 5 | **Submit route** | atomic SharePoint image upload + Dataverse PATCH (`wmkf_abstractapproved`, caption, image ref, status) + rollback; image magic-byte validation; virus scan | 1, 4 |
 | 6 | **Status/lifecycle + reminders** | status transitions on the Awardee tab, optional reminder send | 3, 5 |
 
@@ -206,6 +206,25 @@ scope spanning generation is safe because `executePrompt` re-enters bypass inter
 numeric-string status non-downgrade, non-412 update→500, 503-skips-generation, null `_etag`.
 - **Tests:** reuse-existing skips generation; first write succeeds + sets Drafted; a stale-ETag write
   412s and does NOT clobber; GUID/method/auth guards; missing-source 400; regenerate overwrites.
+
+## Chunk 4 — Grantee portal edit UI (DONE, S268)
+
+`shared/components/external/GranteeDeliverableForm.js`, rendered in the `view==='edit'` branch of
+`pages/external/grantee/[token].js`. Abstract editor (prefilled from `abstractApproved || abstractFormatted`),
+image upload, caption, and the **publish-image waiver checkbox as a client-side submit gate**: the
+submit button is disabled until the waiver is checked AND abstract + caption + an image (new upload or
+one already on file) are present. The waiver is NEVER sent — a submitted package is the consent record.
+On success the form renders a thank-you state. 5 RTL tests (waiver gate, image-required, multipart
+contract, thank-you, error re-enable). The waiver wording is interim (exact legal text = open item).
+
+**Submit contract (defined here; chunk 5 implements it):**
+`POST /api/external/grantee/{token}/submit` — `multipart/form-data` with `editedAbstract` (text),
+`caption` (text), `image` (File; optional only if one is already on file). Returns `{ ok: true }` on
+success, else `{ error }`. The route MUST: verify the grantee token (chunk 1, `aud` guard);
+**refuse once status is `Complete`** (the chunk-1 carried guard); image magic-byte validate (file-magic.js
+needs image support added) + virus-scan; upload the image to SharePoint and PATCH Dataverse
+(`wmkf_abstractapproved`, `wmkf_granteeimagecaption`, `wmkf_granteeimagefileref`, status→`Submitted`)
+**atomically with rollback** (mirror `lib/services/review-upload.js`).
 
 ## Open (later chunks)
 - Chunk 3b: program-aware recipient resolution + staff confirm.
