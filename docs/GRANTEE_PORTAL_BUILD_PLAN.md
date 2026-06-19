@@ -27,7 +27,7 @@ build a **parallel grantee variant** of the lifecycle, pages, submit route, uplo
 | 4 | **Grantee portal UI** ✅ | edit abstract (in-portal text), upload image, caption, publish-image waiver submit-gate (`GranteeDeliverableForm`) | 1 |
 | 5 | **Submit route** ✅ | `POST .../submit`: atomic SharePoint image upload + ETag-conditional Dataverse PATCH (`wmkf_abstractapproved`, caption, image ref, status→Submitted) + rollback; image magic-byte (`validateGranteeImage`) + virus scan; `grantee-upload` service | 1, 4 |
 | 6 | **Status/lifecycle + reminders** | status transitions on the Awardee tab, optional reminder send | 3, 5 |
-| 7 | **Edited-title generator (S269)** | new schema wave (1 field) + Haiku prompt (`grantee-title.generate`) + cron-poll on `wmkf_phaseistatus=Invited` (research-only, idempotent) | Executor contract, schema wave |
+| 7 | **Edited-title generator (S269)** | Haiku prompt (`grantee-title.generate`) + cron-poll on `wmkf_phaseistatus=Invited` → writes the EXISTING `wmkf_wmkfprojectdescription` when empty (research-only, idempotent; no new schema) | Executor contract |
 | 8 | **Document assembly + export (S269)** | server-side template (structured header + edited title + body/caption) → portal preview · website HTML · cycle-level export | 7, 5 |
 
 ## Chunk 1 — Token + auth foundation (design)
@@ -375,15 +375,19 @@ memory. `[VERIFIED S269 via live probe: request 1002852 + `wmkf_phaseistatus` op
 precedes the board is `Recommended Invite` (707510005) on the same field; the official promotion is
 `Invited`. NOT `akoya_requeststatus`, NOT `wmkf_phaseiistatus` (Phase **II**, a separate field).
 
-**New schema wave (1 field).** A new isolated wave `wave2-grantee-title` (creation-only, with a
-preflight mirroring `scripts/preflight-grantee-deliverables-fields.mjs`). Field carries the AI-edited
-title; schemaName **`wmkf_ai_EditedTitle` → logical `wmkf_ai_editedtitle`** — conforms to the
-`wmkf_ai_<concept>` rule (the `ai_` namespace separator is REQUIRED and proven-safe by the existing
-`wmkf_ai_FieldPrimer` / `wmkf_ai_RiskFlags` fields; `wmkf_aieditedtitle` would DROP the namespace and is
-wrong — Codex pre-impl catch). `[VERIFIED naming precedent: lib/dataverse/schema/wave2-fieldprimer/,
-wave2-existing/akoya_request-ai-extensions.json]` Memo (~500). **Atlas coverage** for the new field +
-**post-deploy PA run-history verification** (writing a NEW field only — like the triage field, low
-risk, but confirm no unfiltered "any-modify" flow fires) are chunk-7 acceptance criteria.
+**Target field — EXISTING `wmkf_wmkfprojectdescription` (NO new schema wave).** `[VERIFIED S269 via
+live probe: field metadata + all 12 J26 awardees]` The edited title already has a home: the staff
+curate it manually into `wmkf_wmkfprojectdescription` today (Memo, maxLen 2000, display "WMKF Project
+Description"). The cron **writes this existing field when empty**; staff can edit afterward. This
+supersedes the earlier "new `wmkf_ai_editedtitle` wave" plan — no wave, no preflight, no Atlas-add
+(the field already exists; update the Atlas field DESCRIPTION to note it is now AI-written-when-empty).
+- ⚠️ **`wmkf_projecttitle1` is a DIFFERENT field** (String 500, "Project Title 1") with a separate
+  hypothesis-style phrasing — owner does not know its purpose; **do NOT read or write it.**
+- ⚠️ **PA verification is MORE important here, not less:** we are now writing an EXISTING, board-facing,
+  human-curated field — a Power Automate flow could be watching it. Post-deploy, confirm no AkoyaGO/PA
+  flow fires on a `wmkf_wmkfprojectdescription` write (this is a chunk-7 acceptance criterion).
+- **Write-when-empty only** protects the manual curation: the cron never overwrites a populated value
+  (the empty-field predicate), so staff edits and pre-existing manual titles are safe.
 
 **Prompt (`grantee-title.generate`).** `shared/config/prompts/grantee-title.js` + a seed script
 (mirror `seed-grantee-abstract-prompt.js`); the prod row is REQUIRED (no bundled fallback). Source =
@@ -403,11 +407,11 @@ output guard (strip stray fences/newlines).
 cycle** (Codex pre-impl BLOCKER — without this, first deploy reprocesses years of historical `Invited`
 rows): build the filter from `cycleCodeToOdataFilter(currentCycle, 'wmkf_meetingdate')` (the exact
 pattern the awardees endpoint uses, `pages/api/workbench/grantee-deliverables/awardees.js:43`) **AND**
-`wmkf_phaseistatus eq 100000003` **AND** the edited-title field empty **AND** research program
+`wmkf_phaseistatus eq 100000003` **AND** `wmkf_wmkfprojectdescription` empty **AND** research program
 (`GRANTEE_RESEARCH_PROGRAM_IDS`, `shared/config/granteeResearchPrograms.js`). For each row: read
-`wmkf_abstract` → generate (Haiku) → **ETag-conditional persist** (no bare last-write PATCH; chunk-3
-idempotency discipline). Idempotent + re-runnable (the slate reshuffles; already-filled rows fall out
-of the empty-field predicate).
+`wmkf_abstract` → generate (Haiku) → **ETag-conditional persist** to `wmkf_wmkfprojectdescription`
+(no bare last-write PATCH; chunk-3 idempotency discipline). Idempotent + re-runnable (the slate
+reshuffles; already-filled rows fall out of the empty-field predicate, protecting manual curation).
 
 **Paginated query — REQUIRED (Codex pre-impl BLOCKER, verified).** `DynamicsService.queryRecords`
 hard-caps `$top` at 100 (`Math.min(top||25,100)`, `lib/services/dynamics-service.js:435`) — the
@@ -424,21 +428,24 @@ returns counts: generated / skipped-no-source / failed). A model failure leaves 
 retries next run) but is surfaced; a missing-source row is reported so staff can fix `wmkf_abstract`.
 (A persistent-failure cap can be added later if needed — out of v1 unless Codex pushes.)
 
-**The just-finished cycle = a one-off backfill (owner S269).** The current/just-completed cycle's
-research proposals already flipped to `Invited` BEFORE this feature existed, so their titles were never
-generated at flip-time. Handle that cycle with a **one-off run** — the same code path invoked with that
-cycle's `cycleCode` explicitly (a `?cycleCode=` override on the cron route, or a `scripts/` one-shot
-using the same service), NOT a permanent widening of the go-forward predicate. Go-forward, the cron
-stays bounded to the current open cycle; the backfill is an explicit, named, one-time invocation for
-the prior cycle.
+**The just-finished cycle (J26) needs NO title backfill.** `[VERIFIED S269: all 12 J26 research
+awardees already have `wmkf_wmkfprojectdescription` populated]` Staff hand-curated every J26 edited
+title for the June board books, so there is nothing to generate or backfill this cycle — the empty-field
+predicate skips all 12 automatically, which is exactly the owner's "don't regenerate" instruction. The
+**4 S&E awardees** (#1002132/1002238/1002305/1002365) keep their existing manual titles and serve as
+the Track-B abstract-portal trial (run the S268 flow on them). A cycle-scoped one-off invocation remains
+available as a general safeguard for any FUTURE cycle whose titles weren't pre-filled, but J26 does not
+exercise it.
 
 ### RESOLVED (Codex pre-impl review, S269)
 - **Cycle bound** — go-forward cron scoped to the current open cycle via `cycleCodeToOdataFilter` on
-  `wmkf_meetingdate`; the just-finished cycle is a **separate one-off** invocation (above). Closes the
-  unbounded-historical-rows BLOCKER + the backfill question.
+  `wmkf_meetingdate`. Closes the unbounded-historical-rows BLOCKER. (J26 needs no backfill — already
+  fully populated; see above.)
 - **Pagination** — `queryAllRecords` (paginated), honor `capped`. Closes the >100-cap BLOCKER.
-- **Field literal** — `wmkf_ai_EditedTitle` / `wmkf_ai_editedtitle` (conforms to `wmkf_ai_<concept>`).
-- **Atlas + PA verification** — added as acceptance criteria (above).
+- **Target field** — the EXISTING `wmkf_wmkfprojectdescription` (Memo 2000), written when empty; NO new
+  wave (supersedes the earlier `wmkf_ai_editedtitle` plan). `wmkf_projecttitle1` is unrelated — leave it.
+- **Atlas + PA verification** — update the existing field's Atlas description (now AI-written-when-empty);
+  PA run-history verification on a `wmkf_wmkfprojectdescription` write is an acceptance criterion.
 - **Per-row failures** — skip + report contract (above).
 - **Re-generation on reshuffle** — empty-field predicate means **once filled, never auto-redone**;
   a deliberate re-edit is a manual staff regenerate (out of the cron). This is the intended semantics.
@@ -456,8 +463,9 @@ institution city/state (account address; *italic*), **PI = `wmkf_projectleader`;
 `fetchCoPIs(requestId)` helper** (`lib/services/proposal-participants.js`, `wmkf_apprequestperson`
 junction role=Co-PI **only** — NOT a UNION with `wmkf_projectleader`; the UNION is the PI-history
 pattern, a different thing — Codex pre-impl catch) (*italic*), award amount (`akoya_grant` /
-`akoya_originalgrantamount`, currency-formatted; **never** `akoya_request`), edited title (chunk 7;
-*italic*), body (`wmkf_abstractapproved || wmkf_abstractformatted`, markdown→HTML), and for the
+`akoya_originalgrantamount`, currency-formatted; **never** `akoya_request`), edited title
+(`wmkf_wmkfprojectdescription`, chunk 7; *italic*), body (`wmkf_abstractapproved ||
+wmkf_abstractformatted`, markdown→HTML), and for the
 website, caption + image. All **structural formatting lives in the template** (keyed on field
 identity); only body/caption carry inline markdown (D8). `[VERIFIED co-PI read: proposal-participants.js
 fetchCoPIs, role=Co-PI 100000001]`

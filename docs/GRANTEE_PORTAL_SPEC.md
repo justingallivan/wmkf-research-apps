@@ -184,12 +184,14 @@ recommendation that precedes the board is `Recommended Invite` (707510005) on th
   iron in the surface ocean"*) is **not** `akoya_title` (that's the original, kept by the committee
   packet). It is a **new, AI-edited** house-style title.
 - **Generate once at `wmkf_phaseistatus → Invited`** (cron-poll predicate `wmkf_phaseistatus eq
-  100000003` AND the title field empty; idempotent — the slate can reshuffle, so it must be
-  re-runnable). **Cheap model (Haiku)**, source = `wmkf_abstract`. **Research grants only.**
-- Stored in a **new field** (a new schema wave, NOT part of the deployed S268 wave — defined in
-  build-plan chunk 7). **Reused twice**: the Board Book
-  first (an external/manual consumer — we only need the field populated and legible), then the
-  award-stage abstract assembly. It is *not* needed for the committee packet.
+  100000003` AND `wmkf_wmkfprojectdescription` empty; idempotent — the slate can reshuffle, so it must
+  be re-runnable). **Cheap model (Haiku)**, source = `wmkf_abstract`. **Research grants only.**
+- Stored in the **EXISTING `wmkf_wmkfprojectdescription` field** (Memo 2000, "WMKF Project Description")
+  — staff curate it manually today; the cron writes it **only when empty**, staff edit afterward. **No
+  new schema wave** (supersedes an earlier new-field plan; `[VERIFIED S269 via live probe]`). The
+  sibling `wmkf_projecttitle1` (String 500) is a different, unrelated field — leave it. **Reused twice**:
+  the Board Book first (an external/manual consumer — we only need the field populated and legible),
+  then the award-stage abstract assembly. It is *not* needed for the committee packet.
 - This is generated **independently of, and earlier than, the abstract materials** — they are two
   separate moments (Invited flip vs. post-award), not one step.
 
