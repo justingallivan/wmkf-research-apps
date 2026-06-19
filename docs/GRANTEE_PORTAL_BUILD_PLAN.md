@@ -117,8 +117,10 @@ directly to `wmkf_abstractformatted` (Memo). Mirrors the field-primer Executor p
   route). Raw mode does NOT strip markdown fences, so the service defensively strips any stray fence.
 - **Seed:** `scripts/seed-grantee-abstract-prompt.js` (mirror `seed-field-primer-prompt.js`) writes the
   `grantee-abstract.generate` row into `wmkf_ai_prompts`. **executePrompt has NO bundled fallback** —
-  the prod row is REQUIRED. Run `--dry-run` then `--execute` (prod write, gated on owner go-ahead, like
-  the schema deploy).
+  the prod row is REQUIRED. **[SEEDED to prod 2026-06-18 — row `462c08ae-896b-f111-a826-000d3a3065b8`,
+  verification checks passed.]** The seed imports its variable/output declarations from the prompt
+  config (`PROMPT_VARIABLES`/`PROMPT_OUTPUT_SCHEMA`), so the live row cannot drift from the file the
+  config-pin test guards; re-running `--execute` is idempotent (updates the current row).
 - **Model:** `sonnet` (the Opus tier rejects the `temperature` param the Executor always sends — same
   constraint field-primer hit); `temperature` 0.3; `maxtokens` ~4096 (an abstract is ~1 page).
 - **A7 registration:** add a `SURFACES` entry in `scripts/check-prompt-injection-tagging.js`
@@ -133,6 +135,11 @@ directly to `wmkf_abstractformatted` (Memo). Mirrors the field-primer Executor p
   precedent `scripts/seed-phase-ii-prompts.js`); SURFACES entry MUST carry
   `callSiteFiles:['lib/services/execute-prompt.js']` (`inv:26`) or the A7 marker check fails; service
   guards input (`< ~50` chars) and surfaces the Executor's `<20`-char short-output throw clearly.
+- **Codex post-impl folded (S268):** CLEAN on items 1–4, four LOW. Addressed: (#5) lifted the variable/
+  output schema into the config as the single source of truth + a `grantee-abstract-prompt-config` test
+  that fails closed if `source_abstract` ever loses `untrusted:true`/`dataClass`/`maxChars` (the A7 gate
+  alone can't catch that drift); (#6) added tests for `runSource` passthrough, language-tagged fences,
+  and a defensive non-string-output guard in the service.
 
 > **Chunk-3 REQUIREMENT carried from chunk-2 review (Codex 6a/6c):** chunk 2 returns text only
 > (`target.kind:'none'`), so a generation that succeeds in chunk 2 but is never persisted is silently

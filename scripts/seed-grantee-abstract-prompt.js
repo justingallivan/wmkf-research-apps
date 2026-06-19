@@ -43,7 +43,7 @@ for (const envFile of ['.env', '.env.local']) {
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
 const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
-const { SYSTEM_PROMPT, USER_PROMPT_TEMPLATE } = await import(
+const { SYSTEM_PROMPT, USER_PROMPT_TEMPLATE, PROMPT_VARIABLES, PROMPT_OUTPUT_SCHEMA } = await import(
   '../shared/config/prompts/grantee-abstract.js'
 );
 enterDynamicsBypassForScript('seed-grantee-abstract-prompt');
@@ -62,36 +62,13 @@ if (!DRY && !EXECUTE) {
 // seed-field-primer-prompt.js / seed-phase-i-summary-prompt.js).
 const PROMPTSTATUS_PUBLISHED = 682090001;
 
-const promptVariables = {
-  variables: [
-    {
-      name: 'source_abstract',
-      source: { kind: 'override' },
-      required: true,
-      cacheable: true,
-      placement: 'user',
-      // The applicant-authored abstract is UNTRUSTED: the Executor wraps it in
-      // nonce sentinels (wrapUntrustedContent) and injects the hardening preamble
-      // so embedded instructions cannot hijack the rewrite. `untrusted:true`
-      // REQUIRES dataClass + maxChars (the wrapper needs a cap) — see
-      // lib/services/execute-prompt.js applyVariableBoundaries.
-      dataClass: 'abstract',
-      maxChars: 20000,
-      untrusted: true,
-    },
-  ],
-};
-
-const promptOutputSchema = {
-  // Single raw pass-through: the rewritten abstract is RETURNED to the caller
-  // (result.parsed.abstract_formatted) and never persisted by the Executor.
-  // kind:'none' is skipped by the persistence path, so no requestId is required.
-  // Raw mode ignores jsonSchema — do NOT declare one (Codex chunk-2 review).
-  outputs: [{ name: 'abstract_formatted', type: 'string', target: { kind: 'none' } }],
-  parseMode: 'raw',
-  // No akoya_request writeback, so keep the full output in the run log for audit/replay.
-  rawOutputRetention: 'full',
-};
+// Variable + output declarations are the prompt config's single source of truth
+// (shared/config/prompts/grantee-abstract.js), imported above so the live
+// wmkf_ai_prompts row cannot drift from the file a unit test pins. source_abstract
+// is untrusted (Executor wraps it + injects the A7 preamble); output is raw, one
+// pass-through `abstract_formatted` (kind:'none' → returned), no jsonSchema.
+const promptVariables = PROMPT_VARIABLES;
+const promptOutputSchema = PROMPT_OUTPUT_SCHEMA;
 
 const recordData = {
   wmkf_ai_promptname: PROMPT_NAME,

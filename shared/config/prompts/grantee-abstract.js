@@ -62,3 +62,37 @@ Applicant abstract:
 {{source_abstract}}
 
 Return only the rewritten abstract text now.`;
+
+/**
+ * Executor variable declarations — the single source of truth, imported by the
+ * seed script (so the live wmkf_ai_prompts row and this file cannot drift) and
+ * pinned by a unit test. `source_abstract` is the applicant-authored abstract:
+ * it MUST stay `untrusted:true` with a `dataClass` + integer `maxChars` so the
+ * Executor wraps it (wrapUntrustedContent) and injects the A7 preamble. Dropping
+ * `untrusted:true` would silently remove that injection boundary — the
+ * grantee-abstract-prompt-config test fails closed on any such regression.
+ */
+export const PROMPT_VARIABLES = {
+  variables: [
+    {
+      name: 'source_abstract',
+      source: { kind: 'override' },
+      required: true,
+      cacheable: true,
+      placement: 'user',
+      dataClass: 'abstract',
+      maxChars: 20000,
+      untrusted: true,
+    },
+  ],
+};
+
+/**
+ * Output schema. Plain prose → parseMode 'raw', a single output returned to the
+ * caller (target kind:'none'); raw mode ignores jsonSchema, so none is declared.
+ */
+export const PROMPT_OUTPUT_SCHEMA = {
+  outputs: [{ name: 'abstract_formatted', type: 'string', target: { kind: 'none' } }],
+  parseMode: 'raw',
+  rawOutputRetention: 'full',
+};

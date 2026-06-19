@@ -51,6 +51,25 @@ test('passes source_abstract as an override variable + forceOverwrite', async ()
   }));
 });
 
+test('passes a custom runSource through to the Executor', async () => {
+  executePrompt.mockResolvedValue(execResult('a'.repeat(40)));
+  await generateGranteeAbstract({ sourceAbstract: SOURCE, runSource: 'Cron' });
+  expect(executePrompt).toHaveBeenCalledWith(expect.objectContaining({ runSource: 'Cron' }));
+});
+
+test('strips a language-tagged code fence (```text)', async () => {
+  const fenced = '```text\n' + 'The team will measure the thing in a long enough sentence.' + '\n```';
+  executePrompt.mockResolvedValue(execResult(fenced));
+  const out = await generateGranteeAbstract({ sourceAbstract: SOURCE });
+  expect(out.abstractFormatted).toBe('The team will measure the thing in a long enough sentence.');
+});
+
+test('throws (does not stringify) when the model output is not a string', async () => {
+  executePrompt.mockResolvedValue(execResult({ unexpected: 'object' }));
+  await expect(generateGranteeAbstract({ sourceAbstract: SOURCE }))
+    .rejects.toThrow(/was not text/);
+});
+
 test('defensively strips a stray code fence', async () => {
   const fenced = '```\n' + 'The team will measure the thing in a long enough sentence.' + '\n```';
   executePrompt.mockResolvedValue(execResult(fenced));
