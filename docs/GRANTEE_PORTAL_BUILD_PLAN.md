@@ -388,6 +388,16 @@ supersedes the earlier "new `wmkf_ai_editedtitle` wave" plan — no wave, no pre
   distinct from the **aim/method** phrasing in `wmkf_wmkfprojectdescription` (*"To visualize … using
   genetically-encoded voltage indicators"*). **No repo code reads or writes `wmkf_projecttitle*`**
   (verified via grep) — **do NOT read or write it.** `[VERIFIED S269 via live probe + repo grep]`
+- **Provenance — empirical findings `[VERIFIED S269 via live probe]`:** the field is
+  **program-polymorphic**. In **SoCal** `wmkf_projecttitle1` is populated at the concept stage (100% of
+  Concept Done). In **Research** BOTH title fields are **empty pre-Invited** (0/179 Pending Committee
+  Review; 0/202 Phase I Pending) and only populate at **Invited/decided** (`wmkf_wmkfprojectdescription`
+  15/15 Invited, `wmkf_projecttitle1` 11/15). So in Research both are **late, staff/board-era** fields,
+  not intake fields (e.g. D26 #1002952, pre-Invited → both empty; intake = "# BCO akoyaGO Integration").
+- **Provenance — working hypothesis `[UNVERIFIED — owner emailed Connor + Sarah S269; confirm + document]`:**
+  `wmkf_wmkfprojectdescription` is **authored by the PD at the END of the process** (our target field);
+  `wmkf_projecttitle1` may be the **staff's earlier best-guess title**, used upstream (e.g. building a
+  Phase I board book). Treat as ASSUMED until Connor/Sarah confirm — see the Open-items entry.
 - ⚠️ **PA verification is MORE important here, not less:** we are now writing an EXISTING, board-facing,
   human-curated field — a Power Automate flow could be watching it. Post-deploy, confirm no AkoyaGO/PA
   flow fires on a `wmkf_wmkfprojectdescription` write (this is a chunk-7 acceptance criterion).
@@ -510,6 +520,16 @@ fetchCoPIs, role=Co-PI 100000001]`
   (auto-generated, then tweakable) or staff-owned/fixed? Owner undecided. It does not block chunk 7
   (the title is generated at the `Invited` flip, long before the award-stage portal) — settle when
   wiring the chunk-8 portal preview.
+
+## Open items (circle back)
+- **[PENDING Connor + Sarah] Confirm title-field provenance, then document.** Owner emailed Connor +
+  Sarah (S269) to verify the working hypothesis: `wmkf_wmkfprojectdescription` is PD-authored at the
+  END of the process (our target), and `wmkf_projecttitle1` is a staff earlier best-guess title used
+  upstream (e.g. Phase I board book). Empirically verified so far (S269 probe): in Research both are
+  empty pre-Invited and populate only at Invited/decided; the field is program-polymorphic (SoCal fills
+  `projecttitle1` at concept). Once Connor/Sarah confirm, fold the authoritative provenance into the
+  chunk-7 caveat + the `project-phaseistatus-decision-lifecycle` memory and drop the `[UNVERIFIED]`
+  label. Does NOT block chunk-7 build (the write-when-empty target is settled either way).
 
 ## Open (later chunks)
 - Chunk 6: reminder cadence/deadline + exact waiver/T&C and email-body wording.
