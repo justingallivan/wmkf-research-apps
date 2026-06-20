@@ -71,6 +71,15 @@ test('profile resolver always ends with the Foundation line', () => {
   });
 });
 
+test('a saved block that already names the Foundation is used verbatim (no duplicate line)', () => {
+  const sig = 'Sincerely,\nJustin Gallivan\n--\nJustin Gallivan\nSenior Program Director\nW.M. Keck Foundation\nLos Angeles';
+  const out = resolveSignatureForProfile({
+    [PREFERENCE_KEYS.EMAIL_SIGNATURE]: JSON.stringify({ name: 'Justin Gallivan', signature: sig }),
+  });
+  expect(out.signature).toBe(sig);
+  expect((out.signature.match(/Keck Foundation/g) || []).length).toBe(1);
+});
+
 test('request resolver reads the assigned PD profile preference', async () => {
   DynamicsService.getRecord.mockImplementation((entitySet) => {
     if (entitySet === 'akoya_requests') {
@@ -119,7 +128,18 @@ test('request resolver falls back to systemuser fullname when no profile matches
   expect(DatabaseService.getUserPreferences).not.toHaveBeenCalled();
 });
 
-test('appendSignatureBlock appends the server-owned block to staff text', () => {
-  expect(appendSignatureBlock('Thank you,', { signature: 'Assigned PD' }))
+test('appendSignatureBlock appends the (already-finalized) block verbatim', () => {
+  // The block is finalized by resolveSignatureForRequest before this; append does
+  // NOT re-add the Foundation line (that double-appended it).
+  expect(appendSignatureBlock('Thank you,', { signature: 'Assigned PD\nW. M. Keck Foundation' }))
     .toBe('Thank you,\n\nAssigned PD\nW. M. Keck Foundation');
+});
+
+test('appendSignatureBlock does not duplicate a Foundation line already in the saved block', () => {
+  // Regression: a real saved block ending in a city, with its own org line above,
+  // must not get a second "W. M. Keck Foundation" tacked on.
+  const block = { signature: 'Sincerely,\nJustin Gallivan\n--\nJustin Gallivan\nSenior Program Director\nW.M. Keck Foundation\nLos Angeles' };
+  const out = appendSignatureBlock('Thank you,', block);
+  expect((out.match(/Keck Foundation/g) || []).length).toBe(1);
+  expect(out.endsWith('Los Angeles')).toBe(true);
 });
