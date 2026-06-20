@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Grantee deliverables: package-table migration + chunk-8 outputs + unified signatures (prod) (Session 271)
+
+**Milestone:** The grantee deliverables portal went from "built" to operationally usable, plus a production schema cutover moving the deliverable package off `akoya_request` into its own related entity.
+
+**Sessions:** 271. Design → Codex pre-impl review → implement → Claude post-impl review loop throughout (the package migration and the unified signature were each Codex-reviewed before build and Claude-reviewed after).
+
+**Ship state:**
+- **New Dataverse entity `wmkf_granteedeliverable` LIVE in prod** (1:1 with `akoya_request` via a `wmkf_request` lookup + alternate key): status/image/caption + invited/reminded dates moved off `akoya_request` (0 live rows → clean cutover; SP write smoke-verified). The 3 now-orphaned `akoya_request` fields await a manual Dataverse deletion.
+- **Chunk 8 outputs:** (a) portal preview, (b) website HTML, (c) cycle export; **Awardees page now reachable** (dashboard nav link + your-PD default + "Show all" toggle); **automatic reminder cron** (14-day deadline, day-12, PI+liaison, sent as the assigned PD via impersonation, `noFallback`).
+- **Unified per-user email signature:** one Dataverse pref edited in Profile Settings, server-resolved from the assigned PD, tolerant migration off the reviewer `SENDER_INFO`. Reviewer-flow unification (Phase 2) documented, not built.
+- **Prod env:** `DYNAMICS_IMPERSONATION_ENABLED=true`; `GRANTEE_PORTAL_BASE_URL` set (fixed hostless grantee magic-links). New `design-doc-assertion-guard` hook (grounds storage claims in plan docs).
+
+**Why it matters:** closes the cycle-end grantee loop end-to-end and establishes the per-PD-preference + branded-domain patterns; the package now has its own lifecycle entity instead of bloating the central request.
+
+**Pointers:** `docs/GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md`, `docs/UNIFIED_EMAIL_SIGNATURE_PLAN.md`, `docs/GRANTEE_PORTAL_BUILD_PLAN.md` chunk 8. Commits `0986c8fc` → `ed474d41`. Open (S272 first task): per-PD custom email body + edit affordance.
+
 ## June 2026 — Grantee Deliverables Portal, built end-to-end (prod) (Session 268)
 
 **Milestone:** A new external-facing capability — at cycle close, staff invite research awardees to review a Foundation-style abstract of their proposal and return a graphical image + caption via a magic-link portal, captured to Dataverse + SharePoint. A parallel grantee variant of the reviewer external portal (shared primitives, forked surfaces), not a mutation of it.

@@ -1,114 +1,110 @@
-# Session 271 Prompt: Grantee portal — chunk 8 output (a) portal preview + Awardee-tab UI wiring; chunk 6
+# Session 272 Prompt: Per-PD custom email body + edit affordance (grantee invite); then S271 follow-ups
 
-> **S270 deployed & verified the chunk-7 title cron, closed its PA-flow open item, and built chunk 8's
-> assembly foundation + outputs (b) website HTML and (c) cycle export — Codex-reviewed and folded.**
-> Remaining for chunk 8: **(a) portal preview** (blocked only on the title-editability owner decision)
-> and the **Awardee-tab UI wiring** for (b)/(c) (the routes exist but have no buttons yet).
+> **FIRST ORDER OF BUSINESS (owner-set S271):** give PDs a **saved custom grantee-invitation email body**
+> + a clearer **edit affordance**. Today the body is a single shared `DEFAULT_BODY` constant in
+> `shared/components/workbench/AwardeeTab.js`, editable per-send in the "Message" textarea but not saved.
 
-## Session 270 — what happened
+## Session 271 — what happened (18 commits, `0986c8fc` → `ed474d41`, all pushed)
 
-### 1. Title cron (chunk 7) — DEPLOYED + VERIFIED (`b6d002d4`)
-The cron shipped with the S269-stop push: the Vercel cron registry lists
-`/api/cron/generate-grantee-titles` (`0 6 * 4-6,10-12 *`), built from HEAD. Verified: 32 unit tests
-pass; a read-only probe confirmed the current **J26 cycle is a no-op** (0 rows match the empty-field
-selection; all 24 J26 research-Invited rows already filled). Reconciled the stale "cron pending / prompt
-not yet seeded" claims in the Atlas + build plan.
+S271 took the grantee deliverables portal from "built" to operationally usable, applied a **production
+schema cutover**, and unified per-user email signatures. See `DEVELOPMENT_LOG.md` (S271 entry).
 
-### 2. PA-flow open item — RESOLVED (`42f6de8f`)
-Field-level Dataverse **audit-trail analysis** (J26/D25/J25/D24) proved `wmkf_wmkfprojectdescription` is
-**exclusively human-curated** — every dated set-event is a named staff member (Sarah Hibler, Kevin Moses,
-Jean Kim, Thomas Rieker, Melissa Gage, Connor Noda), **no service-principal / flow writer**, human-paced
-gaps (seconds→months), no service-account audit following the human edits. **Owner confirmed: no
-trigger-flow watches the field.** So the cron's write-when-empty fires no AkoyaGO/PA flow. Marked RESOLVED
-in Atlas + build plan. (Audit query needs `objecttypecode eq 'akoya_request'` in the top-level filter;
-column number for the field = **461**.)
+### Shipped
+1. **Chunk 8 outputs** — (a) portal review preview (title display-only, owner decision), (b) website HTML,
+   (c) cycle export; all reachable. (`0986c8fc`, `6a919294`)
+2. **PD-voice invitation email default** landed in `AwardeeTab` (`466b2f9e`); **render-only Preview email**
+   button (`e7fc1eaf`).
+3. **Grantee deliverable package migration (Option 1) — LIVE IN PROD.** New Dataverse entity
+   `wmkf_granteedeliverable` (1:1 with `akoya_request` via `wmkf_request` lookup + alternate key); the
+   package (status/image/caption + `wmkf_inviteddate`/`wmkf_remindeddate`) moved off `akoya_request`.
+   Plan (`bb0ef083`,`eb471d41`) → Codex impl (`1f3ba1cb`) → schema applied to prod + SP-write smoke
+   verified (`f79d7f2b`). Codex-reviewed pre-impl, Claude-reviewed post-impl.
+4. **Automatic reminder cron** `/api/cron/grantee-deliverable-reminders` (`0 8 * * *`): 14-day deadline,
+   day-12 reminder if still Invited, PI(To)+liaison(Cc), sent **as the assigned PD** via impersonation
+   (`noFallback` — skip+report, never service-principal fallback), durable pre-send claim (no double-send).
+5. **Unified per-user email signature** (`f3f46a01`, plan `826b41dd`→`2b5fc6fc`): one `email_signature`
+   Dataverse pref edited in **Profile Settings**, **server-resolved from the assigned PD**, tolerant
+   migration off the reviewer `SENDER_INFO`. Foundation-line dedup fix (`ed474d41`).
+6. **Awardees page reachable** — dashboard nav link + **your-PD default + "Show all programs" toggle**
+   (`93afeafd`, `c5cfbea1`).
+7. **Domains** (`13d067d0`): set `GRANTEE_PORTAL_BASE_URL` (fixed hostless magic-links); documented the
+   branded-domain plan. New **design-doc assertion-guard hook** (`dc88ca81`).
 
-### 3. Chunk 8 — document assembly + export (foundation + outputs b/c)
-- **Foundation (`221da226`):** three output-agnostic modules.
-  - `shared/utils/grantee-markdown.js` — the ONE inline renderer. Subset = bold/italic (CommonMark) +
-    super/subscript (**pandoc `^x^` / `~x~`**), private `Marked` instance + DOMPurify allowlist; raw HTML
-    escapes to text (Codex fix). No attrs/links.
-  - `lib/services/grantee-document-assembly.js` — `assembleGranteeDocument(requestId,{includeImageRef})`
-    reads every field once → canonical model. amount = `akoya_grant ?? akoya_originalgrantamount` (never
-    `akoya_request`), full-number USD no cents; `includeImageRef` gates the private SharePoint ref to staff.
-  - `lib/services/grantee-document-html.js` — `renderAwardBlock` (structural formatting per field) +
-    `renderCyclePage` (standalone printable page; capped-truncation notice).
-- **Outputs b + c (`ac72f96b`):** `GET …/website-html?requestId=<guid>` (single award, JSON `{html}`) and
-  `GET …/cycle-export?cycleCode=J26` (combined HTML page, owner's format choice). Both
-  `requireAppAccess('reviewers')`; matrix rows added; counts refreshed (123→125, 72→74).
-- **Codex post-impl review folded (`606d2239`):** 2 findings fixed — cycle-export now uses paginated
-  `queryAllRecords` + visible capped notice (was silently capped at 25); raw-HTML escape (above). Other 5
-  concerns refuted. Doc status reconciled (`fa3cbcf2`).
-- Verified: full suite **2908 pass**, lint clean, `npm run build` green. Run chunk-8 tests via
-  `npm run test:grantee-deliverables`.
+### Prod state / env (VERIFIED S271)
+- `DYNAMICS_IMPERSONATION_ENABLED=true`, `GRANTEE_PORTAL_BASE_URL=https://wmkfresearch.vercel.app`
+  (both non-sensitive). `NEXTAUTH_URL` empty (auth uses VERCEL_URL fallback).
+- `wmkf_granteedeliverable` table LIVE (9/9 EXACT); SP can CRUD it (smoke verified) — no role grant needed.
+- App is served at **`https://wmkfresearch.vercel.app`**. `reviews.`/`applications.wmkeck.org` are aliased
+  but DNS not pointed (don't resolve); `grantees.wmkeck.org` is planned, not provisioned. See
+  `project-branded-domains` memory.
 
-### Commits (S270)
-- `b6d002d4` title-cron deployed/verified · `42f6de8f` PA-flow resolved · `221da226` chunk-8 foundation
-- `ac72f96b` chunk-8 outputs b/c · `fa3cbcf2` chunk-8 doc reconcile · `606d2239` Codex fixes
-- (+ this session's stop commit, which also folds the `test:grantee-deliverables` script in `package.json`)
+## Potential next steps for S272
 
-## Potential next steps for S271
+### 1. ⭐ Per-PD custom email body + edit affordance (FIRST)
+- **Custom body:** mirror the signature pattern — a per-PD `grantee_invite_body` Dataverse pref edited in
+  Profile Settings; the Awardee tab loads the PD's saved body if present, else the shared `DEFAULT_BODY`.
+  **Body-only** (no signature — server still appends the signature; don't reintroduce the double sign-off).
+  Keep the `[Name]`/`[title]`/`COB [date]` placeholders (auto-filled). Recommended scope: **sender's**
+  (logged-in user's) pref, read client-side from ProfileContext — simplest; confirm with owner.
+- **Edit affordance:** the "Message" textarea already IS the editable body; make it obvious (label
+  "Email body — edit before sending" + a "Reset to default" link). No separate Edit button needed.
+- Consider writing it up + a Codex pre-impl review first (consistent with S271), or implement directly.
 
-### 1. Chunk 8 output (a) — portal review preview  ⚠️ needs ONE decision first
-**Decision required (owner): is the edited title PI-editable in the award-stage portal, or
-staff-owned/display-only?** Everything else for (a) is ready — reuse `renderAwardBlock` to show the
-assembled, styled award above the editable body; header fields display-only (D9). If PI-editable, add an
-ETag-conditional write-back path for `wmkf_wmkfprojectdescription`. Wire into `pages/external/grantee/[token].js`.
+### 2. Resolve the invite double-closing (open)
+The owner's saved signature is a full Outlook block (`Sincerely, / -- / Los Angeles`) that collides with
+the body's `Thank you,`. Either: (A) owner cleans Profile Settings → Email signature to identity-only
+(`Justin Gallivan / Senior Program Director / W. M. Keck Foundation`), or (B) drop `Thank you,` from the
+body template (affects all PDs). Dedup of the Foundation line is already fixed (`ed474d41`).
 
-### 2. Awardee-tab UI wiring for (b)/(c)
-The two routes work but have no buttons. Add to the Awardee tab: a "Copy website HTML" action (calls
-`website-html`, shows/copies the fragment) and a "Cycle export" link (opens `cycle-export?cycleCode=…`).
+### 3. Manual deploy chore (owner/Connor): delete 3 orphaned `akoya_request` fields
+`wmkf_granteedeliverablestatus` / `wmkf_granteeimagefileref` / `wmkf_granteeimagecaption` — now unused
+(moved to `wmkf_granteedeliverable`). Manual Dataverse admin step (schema-apply is creation-only); safe
+(0 rows ever held data). Do after confirming the cutover behaves against a real awardee.
 
-### 3. Public image serving (chunk-8 follow-up)
-The website/cycle HTML emits the image as a `<figure>` placeholder with the SharePoint ref in a comment —
-NOT a public `<img src>`. Decide how a private SharePoint image becomes a postable web image (proxy route
-vs. CMS upload) before (b)/(c) are truly "drop-in".
+### 4. Unified signature Phase 2
+Move reviewer `render-emails` to server-side assigned-PD resolution; retire the bespoke reviewer sender UI
+(`EmailSettingsPanel`/`SettingsModal`); retire the legacy `SENDER_INFO` key after telemetry. Documented in
+`docs/UNIFIED_EMAIL_SIGNATURE_PLAN.md` (Phase 2).
 
-### 4. Chunk 6 — reminders + approval copy (carryover)
-Reminder cadence/deadline; draft Foundation-voice email default + waiver/T&C copy for owner approval.
+### 5. Consent/waiver wording (pending owner ↔ counsel)
+Owner reviewing a toned-down redline with their boss (handout: `~/Downloads/WMKF_Consent_Redline_Handout.pdf`).
+Once settled, drop the agreed text into the portal as the publish-image consent + align the email line.
 
-### 5. Open items / follow-ups
-- **[PENDING Connor + Sarah]** title-field provenance (hypothesis: `wmkf_wmkfprojectdescription` =
-  PD-authored at end; `wmkf_projecttitle1` = staff early best-guess). Owner emailed S269. Drop the
-  `[UNVERIFIED]` label once confirmed.
-- Legacy-seed conversion sweep (other seeds still upsert; grantee seeds are create-only) — separate task.
-- Admin-can-edit-`variables` A7 hardening — tracked in `project-prompt-governance.md`.
-
-### 6. Carryover from S267 (unverified-until-checked)
-- **Branded domain `reviews.wmkeck.org` — CONFIRMED LIVE S270** (it's a prod deployment alias). Optional
-  next step: set `REVIEWER_PORTAL_BASE_URL` + redeploy so the reviewer portal emits that URL.
-- S266 TEMP generation audit log in `discover.js` (`d0fb1ef5`) still live — **revert when done** (grep
-  callers first per the destructive-carryover rule).
+### 6. Branded-domain cutover (when DNS/grantees.wmkeck.org ready)
+Point DNS → swap the `*_PORTAL_BASE_URL` env var (non-sensitive) → redeploy. No code change (nothing
+hardcodes a domain). `GRANTEE_PORTAL_BASE_URL` → `https://grantees.wmkeck.org` when it exists.
 
 ## Continuity guardrails
-- **Chunk-8 boundaries (never regress):** `includeImageRef` is STAFF-only (the private SharePoint ref must
-  never reach the external grantee-token surface — that surface stays `hasImage`-only); cycle-export uses
-  paginated `queryAllRecords` + surfaces `capped`; the markdown renderer escapes raw HTML and honors only
-  bold/italic + pandoc `^`/`~` sub/sup; the edited title is PLAIN text (never markdown-rendered → Board Book stays clean).
-- **Prompt governance (never regress):** `wmkf_ai_prompts` is source of truth; seeds are create-only; a
-  plain `--execute` on an existing prompt REFUSES — edit via `/admin` or `--execute --force`. See
-  `project-prompt-governance.md`.
-- **Title cron safety:** write-when-empty + ETag; research-only; `wmkf_phaseistatus=Invited`. PA-flow
-  question is now closed (human-curated field). `wmkf_projecttitle1..3` is unrelated — do not touch.
-- **Grantee portal safety (S268):** stateless `aud:'grantee'` token; submit refuses once Complete; image
-  magic-byte + virus scan; ETag-conditional writes; waiver is a client gate, never persisted.
-- **Don't tell the user when they're out of time.** Multi-agent: Codex also works on `main`; clean tree,
-  scoped commits, `git pull --rebase` before push.
-
-## Key Files Reference (S270 additions)
-| File | Role |
-|------|------|
-| `shared/utils/grantee-markdown.js` | The ONE inline renderer (bold/italic + pandoc sub/sup; raw HTML escaped) |
-| `lib/services/grantee-document-assembly.js` | `assembleGranteeDocument` — canonical model (reads every field once) |
-| `lib/services/grantee-document-html.js` | `renderAwardBlock` + `renderCyclePage` (structural formatting; capped notice) |
-| `pages/api/workbench/grantee-deliverables/website-html.js` | Output (b) — single-award website HTML |
-| `pages/api/workbench/grantee-deliverables/cycle-export.js` | Output (c) — combined-cycle HTML export |
-| `docs/GRANTEE_PORTAL_BUILD_PLAN.md` chunk 8 · `docs/GRANTEE_PORTAL_SPEC.md` D8/D9 | Design + the canonical owner template |
+- **Caution:** grantee invite links currently carry `wmkfresearch.vercel.app` (the "looks like phishing"
+  domain the branded-domain plan avoids). Fine for testing; **hold real grantee sends** until
+  `grantees.wmkeck.org` is live. The 2 awarded J26 research proposals for testing: **#1002238** (Utah State)
+  and **#1002365** (UC Berkeley).
+- **Signature/body invariant:** the body must NOT contain a signature — the server appends the assigned
+  PD's signature at send/preview (`resolveSignatureForRequest` + `appendSignatureBlock`). Foundation line
+  is added once (fuzzy dedup).
+- **Vercel env:** set non-secret flags **non-sensitive** (sensitive vars read back empty via pull — see
+  `reference-vercel-sensitive-env-unreadable`).
+- **Package boundaries (never regress):** `includeImageRef` STAFF-only; external grantee surface stays
+  `hasImage`-only and uses the read-only `getDeliverableForRequest` (fail-closed: missing row = not
+  editable); staff write paths use `ensureDeliverableForRequest`.
+- Multi-agent: Codex also works on `main`; clean tree, scoped commits, `git pull --rebase` before push.
 
 ## Testing
 ```bash
 npm run build && npm run lint
-npm test                          # FULL suite — 2908 tests
-npm run test:grantee-deliverables # the 5 chunk-8 suites (53 tests)
+npm test                          # FULL suite — 2959 pass (S271)
+npm run test:grantee-deliverables
 npm run check:api-routes && npm run check:fact-consistency && npm run check:trust-boundary-guid
 ```
+
+## Key Files Reference (S271 additions)
+| File | Role |
+|------|------|
+| `lib/services/email-signature.js` | Unified signature resolver (profile + assigned-PD-from-request), fuzzy Foundation dedup |
+| `lib/services/grantee-deliverable-record.js` | Package helper (read-only `get` vs staff `ensure`/`patch`) |
+| `lib/dataverse/schema/wave3-grantee-deliverable-table/` | `wmkf_granteedeliverable` schema (entity + alt key) |
+| `pages/api/cron/grantee-deliverable-reminders.js` | Day-12 reminder cron (pre-send claim, PD impersonation) |
+| `pages/workbench/awardees.js` + `.../grantee-deliverables/awardees.js` | Awardees page (PD-scoped + Show all) |
+| `pages/profile-settings.js` | Email-signature editor (next: + custom body) |
+| `.claude/hooks/design-doc-assertion-guard.js` | Grounds storage claims in durable plan docs |
+| `docs/GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md` · `docs/UNIFIED_EMAIL_SIGNATURE_PLAN.md` | The two S271 plans (impl + Phase 2) |
