@@ -7,7 +7,7 @@
  * @jest-environment node
  */
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
-jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: { queryRecords: jest.fn() } }));
+jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: { queryAllRecords: jest.fn() } }));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (l, fn) => Promise.resolve().then(() => (typeof l === 'function' ? l() : fn())),
 }));
@@ -31,7 +31,7 @@ const model = (institution) => ({ institution, bodyHtml: `<p>${institution} abst
 
 beforeEach(() => {
   requireAppAccess.mockReset().mockResolvedValue({ profileId: 'p', session: { user: {} } });
-  DynamicsService.queryRecords.mockReset();
+  DynamicsService.queryAllRecords.mockReset();
   assembleGranteeDocument.mockReset();
 });
 
@@ -45,11 +45,11 @@ test('invalid cycleCode → 400 (no query)', async () => {
   const res = mockRes();
   await handler({ method: 'GET', query: { cycleCode: 'nope' }, headers: {} }, res);
   expect(res.statusCode).toBe(400);
-  expect(DynamicsService.queryRecords).not.toHaveBeenCalled();
+  expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
 });
 
 test('happy path → 200 text/html combined page', async () => {
-  DynamicsService.queryRecords.mockResolvedValue({ records: [{ akoya_requestid: 'a' }, { akoya_requestid: 'b' }] });
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [{ akoya_requestid: 'a' }, { akoya_requestid: 'b' }], totalCount: 2, capped: false });
   assembleGranteeDocument.mockImplementation((id) => Promise.resolve(model(id === 'a' ? 'Caltech' : 'MIT')));
   const res = mockRes();
   await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
@@ -64,7 +64,7 @@ test('happy path → 200 text/html combined page', async () => {
 });
 
 test('empty cycle → 200 page with 0 awards', async () => {
-  DynamicsService.queryRecords.mockResolvedValue({ records: [] });
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [], totalCount: 0, capped: false });
   const res = mockRes();
   await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
   expect(res.statusCode).toBe(200);
@@ -73,7 +73,7 @@ test('empty cycle → 200 page with 0 awards', async () => {
 });
 
 test('fail-soft: an award that fails to assemble is skipped', async () => {
-  DynamicsService.queryRecords.mockResolvedValue({ records: [{ akoya_requestid: 'a' }, { akoya_requestid: 'b' }] });
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [{ akoya_requestid: 'a' }, { akoya_requestid: 'b' }], totalCount: 2, capped: false });
   assembleGranteeDocument.mockImplementation((id) => (id === 'a' ? Promise.resolve(model('Caltech')) : Promise.reject(new Error('boom'))));
   const res = mockRes();
   await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
@@ -82,8 +82,18 @@ test('fail-soft: an award that fails to assemble is skipped', async () => {
   expect(res.body).toContain('1 award<');
 });
 
+test('capped query renders a visible truncation notice', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [{ akoya_requestid: 'a' }], totalCount: 30, capped: true });
+  assembleGranteeDocument.mockResolvedValue(model('Caltech'));
+  const res = mockRes();
+  await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toContain('Export truncated: Dataverse returned 1 of 30 award records');
+  expect(res.body).toContain('class="export-notice"');
+});
+
 test('awardee query failure → 503', async () => {
-  DynamicsService.queryRecords.mockRejectedValue(new Error('dataverse down'));
+  DynamicsService.queryAllRecords.mockRejectedValue(new Error('dataverse down'));
   const res = mockRes();
   await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
   expect(res.statusCode).toBe(503);

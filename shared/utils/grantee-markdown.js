@@ -32,6 +32,11 @@ const createDOMPurify = require('dompurify');
 const BODY_TAGS = ['p', 'br', 'strong', 'em', 'sub', 'sup'];
 const CAPTION_TAGS = ['strong', 'em', 'sub', 'sup', 'br'];
 const NO_ATTR = [];
+const ESCAPE_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (ch) => ESCAPE_MAP[ch]);
+}
 
 // Pandoc-style superscript: ^text^ (no spaces, single line, starts non-space).
 const supExtension = {
@@ -64,7 +69,16 @@ const subExtension = {
 let _marked = null;
 function getMarked() {
   if (!_marked) {
-    _marked = new Marked({ gfm: false, breaks: false, pedantic: false });
+    _marked = new Marked({
+      gfm: false,
+      breaks: false,
+      pedantic: false,
+      renderer: {
+        html(src) {
+          return escapeHtml(src);
+        },
+      },
+    });
     _marked.use({ extensions: [supExtension, subExtension] });
   }
   return _marked;

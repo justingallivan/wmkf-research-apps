@@ -25,6 +25,17 @@ describe('renderGranteeBody', () => {
     expect(html).toContain('<em>italic</em>');
   });
 
+  test('literal raw HTML is escaped to text, not rendered as allowed tags', () => {
+    const html = renderGranteeBody('Typed <strong>raw</strong> HTML.');
+    expect(html).toContain('&lt;strong&gt;raw&lt;/strong&gt;');
+    expect(html).not.toContain('<strong>raw</strong>');
+  });
+
+  test('markdown bold still renders to strong', () => {
+    const html = renderGranteeBody('Typed **md** markup.');
+    expect(html).toContain('<strong>md</strong>');
+  });
+
   test('pandoc superscript ^x^ and subscript ~x~', () => {
     expect(renderGranteeBody('x^2^')).toContain('<sup>2</sup>');
     expect(renderGranteeBody('H~2~O')).toContain('<sub>2</sub>');
@@ -51,17 +62,17 @@ describe('renderGranteeBody', () => {
     expect(html).toContain('Big Heading');
   });
 
-  test('raw HTML / script is sanitized away', () => {
+  test('raw HTML / script is escaped to inert text', () => {
     const html = renderGranteeBody('safe <script>alert(1)</script> text');
     expect(html).not.toContain('<script');
-    expect(html).not.toContain('alert(1)');
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).toContain('safe');
   });
 
-  test('img with onerror is stripped', () => {
+  test('img with onerror is escaped to inert text', () => {
     const html = renderGranteeBody('x <img src=x onerror=alert(1)> y');
     expect(html).not.toContain('<img');
-    expect(html).not.toContain('onerror');
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
   });
 
   test('empty / non-string → empty string', () => {

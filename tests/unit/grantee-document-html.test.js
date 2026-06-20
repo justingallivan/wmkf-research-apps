@@ -100,4 +100,10 @@ describe('renderCyclePage', () => {
     const page = renderCyclePage([]);
     expect(page).toContain('0 awards');
   });
+
+  test('capped export renders a visible truncation notice', () => {
+    const page = renderCyclePage([MODEL], { cycleLabel: 'June 2026', capped: true, totalCount: 30 });
+    expect(page).toContain('class="export-notice"');
+    expect(page).toContain('Export truncated: Dataverse returned 1 of 30 award records');
+  });
 });

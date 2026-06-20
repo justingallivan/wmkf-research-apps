@@ -75,13 +75,17 @@ export default async function handler(req, res) {
 
   return bypassDynamicsRestrictions('grantee-cycle-export', async () => {
     let requestIds;
+    let capped = false;
+    let totalCount = 0;
     try {
-      const { records } = await DynamicsService.queryRecords('akoya_requests', {
+      const { records, totalCount: queriedTotalCount, capped: queryCapped } = await DynamicsService.queryAllRecords('akoya_requests', {
         select: 'akoya_requestid',
         filter,
         orderby: 'akoya_requestnum asc',
       });
       requestIds = (records || []).map((r) => r.akoya_requestid).filter(Boolean);
+      totalCount = queriedTotalCount || requestIds.length;
+      capped = Boolean(queryCapped);
     } catch (error) {
       console.error('[grantee-deliverables/cycle-export] query failed:', error);
       return res.status(503).json({ error: 'Awardee query failed.', cycleCode });
@@ -95,7 +99,13 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Failed to assemble cycle export.', cycleCode });
     }
 
-    const html = renderCyclePage(models, { cycleLabel: cycleCodeToLabel(cycleCode), includeImage: true });
+    const html = renderCyclePage(models, {
+      cycleLabel: cycleCodeToLabel(cycleCode),
+      includeImage: true,
+      capped,
+      totalCount,
+      returnedCount: requestIds.length,
+    });
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.status(200).send(html);
   });
