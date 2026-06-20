@@ -87,9 +87,10 @@ Description") holding the house-style one-line board-summary objective ("To [ver
 manually today; it populates **late** — empty pre-Invited (probed 0/179 `Pending Committee Review`,
 0/202 `Phase I Pending`), filled at/after the `wmkf_phaseistatus=Invited` board flip. The S269
 grantee-title generator (`grantee-title.generate`, Sonnet, from `akoya_title` + `wmkf_abstract`) and
-its planned cron write it **only when empty** (write-when-empty, ETag-conditional) for research
-awardees — never overwriting manual curation. ⚠️ Post-deploy, verify a write to this EXISTING
-board-facing field fires no Power Automate flow. ⚠️ `wmkf_projecttitle1..3` (String 500, "Project Title
+its cron (`pages/api/cron/generate-grantee-titles.js`, **BUILT S269**; prompt not yet seeded to prod)
+write it **only when empty** (write-when-empty, ETag-conditional) for research awardees — never
+overwriting manual curation. ⚠️ **OPEN (post-deploy verification, owner):** confirm a write to this
+EXISTING board-facing field fires no AkoyaGO/Power Automate flow. ⚠️ `wmkf_projecttitle1..3` (String 500, "Project Title
 N") is a SEPARATE numbered-slot family with a different hypothesis phrasing (SoCal fills it at concept;
 Research late) — **no repo code reads/writes it; do not target.** [VERIFIED S269 via live probe + grep.]
 

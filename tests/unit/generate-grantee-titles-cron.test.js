@@ -134,9 +134,30 @@ test('top-level query failure → 503 (whole run retried next)', async () => {
   expect(res.statusCode).toBe(503);
 });
 
-test('honors capped from the paginated query', async () => {
-  DynamicsService.queryAllRecords.mockResolvedValue({ records: [row(1)], capped: true });
+test('honors capped + folds the unreturned remainder (totalCount - scanned) into deferred', async () => {
+  // capped query returned 1 of 5 matching rows → 4 unreturned remainder is deferred.
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [row(1)], totalCount: 5, capped: true });
   const res = makeRes();
   await handler(req(), res);
-  expect(res.body.capped).toBe(true);
+  expect(res.body).toMatchObject({ capped: true, totalCount: 5, scanned: 1, generated: 1, deferred: 4 });
+});
+
+test('rejects a disallowed method with 405 + Allow header', async () => {
+  const res = makeRes();
+  await handler(req(undefined, 'PUT'), res);
+  expect(res.statusCode).toBe(405);
+  expect(res._headers.Allow).toBe('GET, POST');
+  expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
+});
+
+test('time-budget exhausted → unprocessed rows are deferred (not generated)', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [row(1), row(2)], totalCount: 2, capped: false });
+  // Deadline computed from the first Date.now(); every subsequent check is past it,
+  // so workers return before claiming any row.
+  const nowSpy = jest.spyOn(Date, 'now').mockReturnValueOnce(1000).mockReturnValue(1_000_000);
+  const res = makeRes();
+  await handler(req(), res);
+  nowSpy.mockRestore();
+  expect(generateGranteeTitle).not.toHaveBeenCalled();
+  expect(res.body).toMatchObject({ scanned: 2, generated: 0, deferred: 2 });
 });

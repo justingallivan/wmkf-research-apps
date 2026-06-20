@@ -38,11 +38,18 @@ const ENTITY_SET = 'akoya_requests';
 const SELECT = 'akoya_requestid,akoya_requestnum,akoya_title,wmkf_abstract,wmkf_wmkfprojectdescription';
 const MIN_ABSTRACT_CHARS = 50;
 
-// Resilience knobs. Concurrency keeps a ~30-row batch well inside the 120s function
-// cap (pages/api/cron/*.js maxDuration). The time budget leaves headroom so the
-// function never hard-kills mid-write — the remainder defers to the next run.
+// Resilience knobs. Concurrency keeps a ~30–60-row cycle batch well inside the 120s
+// function cap (pages/api/cron/*.js maxDuration). Two bounds keep us under the hard
+// cap even if generation stalls (Codex post-impl ISSUE — the soft budget only gates
+// LAUNCHING; the per-row timeout bounds an IN-FLIGHT call, since the shared LLMClient
+// timeout is 120s PER ATTEMPT and stacks with 429/529 retries):
+//   - TIME_BUDGET_MS stops launching new rows (remainder → deferred to next run).
+//   - ROW_TIMEOUT_MS hard-bounds each generation via Promise.race (a stalled call is
+//     abandoned + counted failed → retried next run).
+// Worst case wall ≈ TIME_BUDGET_MS + ROW_TIMEOUT_MS = 110s < 120s cap.
 const CONCURRENCY = 4;
-const TIME_BUDGET_MS = 100_000; // 20s headroom under the 120s cron maxDuration
+const TIME_BUDGET_MS = 70_000;
+const ROW_TIMEOUT_MS = 40_000;
 
 // Valid wmkf_ai_runsource picklist value (executePrompt rejects unknown values).
 // 'PowerAutomate Auto' = the closest "automated background" value today; revisit if a
@@ -90,12 +97,14 @@ export default async function handler(req, res) {
 
     let records = [];
     let capped = false;
+    let totalCount = 0;
     try {
       // queryAllRecords (paginated) — NOT queryRecords (caps $top at 100); the research
       // Invited set for a cycle can exceed 100. Honor `capped` rather than drop the tail.
       const result = await DynamicsService.queryAllRecords(ENTITY_SET, { select: SELECT, filter });
       records = result.records || [];
       capped = Boolean(result.capped);
+      totalCount = result.totalCount || records.length;
     } catch (err) {
       console.error('[generate-grantee-titles] query failed:', err.message);
       return res.status(503).json({ error: 'Awardee query failed.', cycleCode });
@@ -103,12 +112,17 @@ export default async function handler(req, res) {
 
     const summary = {
       cycleCode,
+      totalCount,
       scanned: records.length,
       generated: 0,
       skippedNoSource: 0,
       skippedConcurrent: 0,
       failed: 0,
       deferred: 0,
+      // `capped` = the query hit MAX_EXPORT_RECORDS and dropped the tail (won't happen
+      // for a ~30–60-row research-Invited cycle, but reported honestly). Any capped or
+      // budget-deferred remainder is still Invited + empty next run, so the next
+      // scheduled run picks it up — the empty-field predicate is the retry.
       capped,
       failures: [],
     };
@@ -125,11 +139,13 @@ export default async function handler(req, res) {
     }
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, records.length || 1) }, () => worker()));
 
-    // Anything never processed (time-budget stop) is deferred to the next run.
+    // Anything never processed (time-budget stop) is deferred to the next run. If the
+    // query was `capped`, the unreturned remainder (totalCount - scanned) is also
+    // effectively deferred — still Invited + empty next run.
     const processed = summary.generated + summary.skippedNoSource + summary.skippedConcurrent + summary.failed;
-    summary.deferred = summary.scanned - processed;
+    summary.deferred = (summary.scanned - processed) + (capped ? Math.max(totalCount - summary.scanned, 0) : 0);
 
-    const log = summary.failed > 0 || summary.deferred > 0 ? console.error : console.log;
+    const log = summary.failed > 0 || summary.deferred > 0 || summary.capped ? console.error : console.log;
     log('[generate-grantee-titles] summary', JSON.stringify(summary));
     return res.status(200).json(summary);
   });
@@ -152,15 +168,24 @@ async function processRow(row, summary) {
   }
 
   let editedTitle;
+  let timer;
   try {
-    const out = await generateGranteeTitle({ sourceTitle: title, sourceAbstract: abstract, runSource: RUN_SOURCE });
+    // Hard-bound each generation so a stalled/retry-heavy call can't run the function
+    // into the 120s cap (the shared LLMClient timeout is per-attempt). A timeout
+    // abandons the in-flight call and is counted failed → retried next run.
+    const out = await Promise.race([
+      generateGranteeTitle({ sourceTitle: title, sourceAbstract: abstract, runSource: RUN_SOURCE }),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`row timeout after ${ROW_TIMEOUT_MS}ms`)), ROW_TIMEOUT_MS); }),
+    ]);
     editedTitle = out.editedTitle;
   } catch (err) {
-    // Refusal / short output / persistent service-unavailable after client retries.
-    // Field stays empty → retried next run.
+    // Timeout / refusal / short output / persistent service-unavailable after client
+    // retries. Field stays empty → retried next run.
     summary.failed++;
     summary.failures.push({ requestNum, reason: `generation: ${err.message}` });
     return;
+  } finally {
+    clearTimeout(timer); // release the race timer whichever side won (no leaked handle)
   }
 
   try {
@@ -169,7 +194,11 @@ async function processRow(row, summary) {
     const fresh = await DynamicsService.getRecord(ENTITY_SET, row.akoya_requestid, {
       select: 'wmkf_wmkfprojectdescription',
     });
-    if (fresh.wmkf_wmkfprojectdescription) {
+    // Empty Memo is stored as null (verified S269: `eq null` matches the empty field),
+    // but recheck with a trimmed test so a stray whitespace-only value also counts as
+    // "curated, do not overwrite".
+    const current = fresh.wmkf_wmkfprojectdescription;
+    if (current && String(current).trim()) {
       summary.skippedConcurrent++; // staff (or a prior run) filled it — never overwrite
       return;
     }
