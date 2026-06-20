@@ -83,6 +83,8 @@ describe('PUT /api/admin/prompts/[name]', () => {
     const created = DynamicsService.createRecord.mock.calls[0][1];
     expect(created.wmkf_ai_iscurrent).toBe(true);
     expect(created.wmkf_promptversion).toBe(4);
+    // S269: every admin-published version carries a domain publish time (parity w/ seed).
+    expect(typeof created.wmkf_ai_publisheddatetime).toBe('string');
     expect(DynamicsService.updateRecord).toHaveBeenCalledWith(
       'wmkf_ai_prompts', 'prior', { wmkf_ai_iscurrent: false }, expect.objectContaining({ ifMatch: 'W/"1"' }));
   });

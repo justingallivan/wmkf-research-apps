@@ -36,6 +36,7 @@ const ROW_SELECT = [
   'wmkf_ai_promptstatus', 'wmkf_ai_systemprompt', 'wmkf_ai_promptbody',
   'wmkf_ai_promptvariables', 'wmkf_ai_promptoutputschema', 'wmkf_ai_model',
   'wmkf_ai_temperature', 'wmkf_ai_maxtokens',
+  'createdon', 'modifiedon', '_modifiedby_value', 'wmkf_ai_publisheddatetime', // provenance (S269)
 ].join(',');
 const MAX_BODY_LEN = 64 * 1024;
 
@@ -174,6 +175,9 @@ async function handlePut(req, res, name, profileId) {
       wmkf_ai_promptstatus: priorRow.wmkf_ai_promptstatus ?? null,
       wmkf_ai_iscurrent: true,
       wmkf_promptversion: targetVersion,
+      // Domain publish time on every admin-published version (parity with the seed,
+      // which stamps it too) — so publishedAt is meaningful across both write paths (S269).
+      wmkf_ai_publisheddatetime: new Date().toISOString(),
       // NOTE: `wmkf_ai_rollbackfrom` (prior-row lineage) is intentionally NOT
       // written here — its field type (Lookup vs text) is unverified and a wrong
       // write shape would fail the whole create. Lineage is already captured by
@@ -294,6 +298,14 @@ function mapRow(r) {
     model: r.wmkf_ai_model || null,
     temperature: r.wmkf_ai_temperature ?? null,
     maxTokens: r.wmkf_ai_maxtokens ?? null,
+    // Provenance (S269). For HISTORY rows, createdOn/publishedAt mark when the
+    // version was published; modifiedOn is "last touched" — a version-flip rewrites
+    // it, so it can read as the retire time, not authorship.
+    createdOn: r.createdon ?? null,
+    publishedAt: r.wmkf_ai_publisheddatetime ?? null,
+    modifiedOn: r.modifiedon ?? null,
+    modifiedById: r._modifiedby_value ?? null,
+    modifiedByName: r._modifiedby_value_formatted ?? null,
   };
 }
 

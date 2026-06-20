@@ -17,7 +17,7 @@ const STATUS_COPY = {
   already_published:     { tone: 'gray',  text: 'No change — that request was already published.' },
   partial:               { tone: 'amber', text: 'Published with warnings — see details below.' },
   concurrency_conflict:  { tone: 'amber', text: 'Another admin published while you were editing. Reload and re-apply.' },
-  no_current_row:        { tone: 'red',   text: 'No current row for this prompt — seed it first.' },
+  no_current_row:        { tone: 'red',   text: 'Prompt rows exist but none is current — use the seed --force recovery path, or resolve in Dynamics.' },
   duplicate_current_rows:{ tone: 'red',   text: 'Multiple current rows (store corruption). Resolve in Dynamics.' },
   invalid_body:          { tone: 'red',   text: 'Prompt body failed validation.' },
   audit_unavailable:     { tone: 'red',   text: 'Audit table unavailable; refused to publish.' },
@@ -33,6 +33,13 @@ const TONE = {
 function newRequestId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return `req-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+}
+
+// Short timestamp; '—' when absent. Guards an unparseable value.
+function fmtTs(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
 }
 
 export default function PromptTemplatesSection() {
@@ -90,6 +97,10 @@ function PromptPanel({ prompt, onPublished }) {
           </div>
           <div className="text-xs text-gray-500">
             {prompt.hasCurrent ? 'current version' : 'latest version'} <strong>v{prompt.version ?? '?'}</strong> · {(prompt.body || '').length} chars
+          </div>
+          <div className="text-[11px] text-gray-400 mt-0.5">
+            published {fmtTs(prompt.publishedAt || prompt.createdOn)} · last touched {fmtTs(prompt.modifiedOn)}
+            {prompt.modifiedByName ? <> by {prompt.modifiedByName}</> : null}
           </div>
         </div>
         {prompt.hasCurrent ? (
@@ -172,7 +183,7 @@ function PublishForm({ prompt, onSuccess, onOutcome }) {
 
       {!prompt.hasCurrent && (
         <div className="text-xs px-3 py-2 rounded border bg-amber-50 text-amber-800 border-amber-200">
-          This prompt has no published current version, so it can&apos;t be versioned from here. Seed/publish a current version first (e.g. via the seed script).
+          This prompt has rows but no published current version, so it can&apos;t be versioned from here. Recover a current version with the seed&apos;s <code>--force</code> path (publishes max+1), or resolve in Dynamics.
         </div>
       )}
 

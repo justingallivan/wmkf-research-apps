@@ -22,6 +22,10 @@ const SELECT = [
   'wmkf_ai_promptstatus', 'wmkf_ai_systemprompt', 'wmkf_ai_promptbody',
   'wmkf_ai_promptvariables', 'wmkf_ai_promptoutputschema', 'wmkf_ai_model',
   'wmkf_ai_temperature', 'wmkf_ai_maxtokens',
+  // Provenance (S269): createdon = version created, publisheddatetime = domain
+  // publish time, modifiedon = last Dataverse touch, _modifiedby_value(_formatted)
+  // = who/what (seed runs as the app identity; admin publish as the superuser).
+  'createdon', 'modifiedon', '_modifiedby_value', 'wmkf_ai_publisheddatetime',
 ].join(',');
 
 function mapRow(r, { hasCurrent }) {
@@ -39,6 +43,13 @@ function mapRow(r, { hasCurrent }) {
     model: r.wmkf_ai_model || null,
     temperature: r.wmkf_ai_temperature ?? null,
     maxTokens: r.wmkf_ai_maxtokens ?? null,
+    // Timestamps. createdOn/publishedAt mark when THIS version came to be;
+    // modifiedOn is "last touched" (a version-flip rewrites it — label accordingly).
+    createdOn: r.createdon ?? null,
+    publishedAt: r.wmkf_ai_publisheddatetime ?? null,
+    modifiedOn: r.modifiedon ?? null,
+    modifiedById: r._modifiedby_value ?? null,
+    modifiedByName: r._modifiedby_value_formatted ?? null,
   };
 }
 
