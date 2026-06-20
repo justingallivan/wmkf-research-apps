@@ -584,6 +584,12 @@ fetchCoPIs, role=Co-PI 100000001]`
   label. Does NOT block chunk-7 build (the write-when-empty target is settled either way).
 
 ## Open (later chunks)
+- **Public image serving — DEFERRED to Connor (owner decision S271).** The website/cycle HTML emits the
+  grantee image as a `<figure>` placeholder with the SharePoint ref in a comment, never a public
+  `<img src>` (the upload lands in private SharePoint via `grantee-upload.js` → `wmkf_granteeimagefileref`).
+  Closing the gap (signed proxy route that streams the private image vs. manual CMS upload) is **Connor's
+  call as the website builder** — he owns how images get published. Left open pending his approach; no
+  build this session.
 - Chunk 6: reminder cadence/deadline + exact waiver/T&C and email-body wording.
 - Optional **auto-on-award cron** (PA-free) — a `pages/api/cron/*` route on the awardee eligibility
   filter (`granteeResearchPrograms.js`) that pre-generates **abstracts** for newly-`Active` research
