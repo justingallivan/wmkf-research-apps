@@ -185,7 +185,8 @@ recommendation that precedes the board is `Recommended Invite` (707510005) on th
   packet). It is a **new, AI-edited** house-style title.
 - **Generate once at `wmkf_phaseistatus → Invited`** (cron-poll predicate `wmkf_phaseistatus eq
   100000003` AND `wmkf_wmkfprojectdescription` empty; idempotent — the slate can reshuffle, so it must
-  be re-runnable). **Cheap model (Haiku)**, source = `wmkf_abstract`. **Research grants only.**
+  be re-runnable). **Model: Sonnet (temp 0.1)**, source = applicant **title + abstract**
+  (`akoya_title` + `wmkf_abstract`). **Research grants only.** (Sonnet over Haiku: validated S269.)
 - Stored in the **EXISTING `wmkf_wmkfprojectdescription` field** (Memo 2000, "WMKF Project Description")
   — staff curate it manually today; the cron writes it **only when empty**, staff edit afterward. **No
   new schema wave** (supersedes an earlier new-field plan; `[VERIFIED S269 via live probe]`). The

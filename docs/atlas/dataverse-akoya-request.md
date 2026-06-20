@@ -82,6 +82,17 @@ App-side picklist constants: `shared/config/granteeDeliverableStatus.js`. Pre-de
 `scripts/preflight-grantee-deliverables-fields.mjs` (3-way exit contract; schema-apply is
 creation-only). MUST carry NO Power Automate trigger — verify post-deploy. Design: `docs/GRANTEE_PORTAL_SPEC.md`.
 
+**Edited title — `wmkf_wmkfprojectdescription` (S269).** EXISTING field (Memo 2000, "WMKF Project
+Description") holding the house-style one-line board-summary objective ("To [verb] …"). Staff curate it
+manually today; it populates **late** — empty pre-Invited (probed 0/179 `Pending Committee Review`,
+0/202 `Phase I Pending`), filled at/after the `wmkf_phaseistatus=Invited` board flip. The S269
+grantee-title generator (`grantee-title.generate`, Sonnet, from `akoya_title` + `wmkf_abstract`) and
+its planned cron write it **only when empty** (write-when-empty, ETag-conditional) for research
+awardees — never overwriting manual curation. ⚠️ Post-deploy, verify a write to this EXISTING
+board-facing field fires no Power Automate flow. ⚠️ `wmkf_projecttitle1..3` (String 500, "Project Title
+N") is a SEPARATE numbered-slot family with a different hypothesis phrasing (SoCal fills it at concept;
+Research late) — **no repo code reads/writes it; do not target.** [VERIFIED S269 via live probe + grep.]
+
 **Cruft / do-not-write fields** [VERIFIED via `project_dynamics_ai_writeback.md`]:
 - `wmkf__ai_summary` (double underscore) — exists alongside the real `wmkf_ai_summary`; Connor will delete. Do not target.
 - `wmkf_ai_rundatetime` on `wmkf_ai_run` — vestigial; use built-in `createdon` instead.

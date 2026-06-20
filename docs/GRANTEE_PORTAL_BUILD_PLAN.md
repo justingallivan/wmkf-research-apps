@@ -27,7 +27,7 @@ build a **parallel grantee variant** of the lifecycle, pages, submit route, uplo
 | 4 | **Grantee portal UI** ✅ | edit abstract (in-portal text), upload image, caption, publish-image waiver submit-gate (`GranteeDeliverableForm`) | 1 |
 | 5 | **Submit route** ✅ | `POST .../submit`: atomic SharePoint image upload + ETag-conditional Dataverse PATCH (`wmkf_abstractapproved`, caption, image ref, status→Submitted) + rollback; image magic-byte (`validateGranteeImage`) + virus scan; `grantee-upload` service | 1, 4 |
 | 6 | **Status/lifecycle + reminders** | status transitions on the Awardee tab, optional reminder send | 3, 5 |
-| 7 | **Edited-title generator (S269)** | Haiku prompt (`grantee-title.generate`) + cron-poll on `wmkf_phaseistatus=Invited` → writes the EXISTING `wmkf_wmkfprojectdescription` when empty (research-only, idempotent; no new schema) | Executor contract |
+| 7 | **Edited-title generator (S269)** | Sonnet prompt (`grantee-title.generate`, title+abstract) + cron-poll on `wmkf_phaseistatus=Invited` → writes the EXISTING `wmkf_wmkfprojectdescription` when empty (research-only, idempotent; no new schema). Prompt/service/seed/A7 BUILT; cron pending | Executor contract |
 | 8 | **Document assembly + export (S269)** | server-side template (structured header + edited title + body/caption) → portal preview · website HTML · cycle-level export | 7, 5 |
 
 ## Chunk 1 — Token + auth foundation (design)
@@ -404,18 +404,22 @@ supersedes the earlier "new `wmkf_ai_editedtitle` wave" plan — no wave, no pre
 - **Write-when-empty only** protects the manual curation: the cron never overwrites a populated value
   (the empty-field predicate), so staff edits and pre-existing manual titles are safe.
 
-**Prompt (`grantee-title.generate`).** `shared/config/prompts/grantee-title.js` + a seed script
-(mirror `seed-grantee-abstract-prompt.js`); the prod row is REQUIRED (no bundled fallback). Source =
-`wmkf_abstract` as an **untrusted** override variable (`source_abstract`, `untrusted:true` +
-`dataClass` + `maxChars`, A7-wrapped) — same boundary as the abstract prompt. Output `parseMode:'raw'`,
-single output, `target.kind:'none'` (returned, caller persists). **Model: Haiku** (cheap one-liner;
-note the Executor `temperature` constraint the abstract prompt hit on the Opus tier — confirm Haiku
-accepts it). Register in `scripts/check-prompt-injection-tagging.js` (A7) with
-`callSiteFiles:['lib/services/execute-prompt.js']`.
+**Prompt (`grantee-title.generate`) — BUILT (S269, `d36e0459`).** `shared/config/prompts/grantee-title.js`
++ `scripts/seed-grantee-title-prompt.js` (mirror the abstract seed; the prod row is REQUIRED — no
+bundled fallback). Source = **applicant TITLE (`akoya_title`) + ABSTRACT (`wmkf_abstract`)** as **two
+untrusted** override variables (`source_title` + `source_abstract`, both `untrusted:true` + `dataClass`
++ `maxChars`, A7-wrapped). Output `parseMode:'raw'`, single output `edited_title`, `target.kind:'none'`
+(returned, caller persists). **Model: Sonnet, temp 0.1** (validated S269 against 12 J26 answer keys +
+held-out exemplars — Sonnet materially beat Haiku on this distillation, and the Opus tier rejects the
+`temperature` param the Executor sends). Registered in `check:prompt-injection-tagging` (A7, inv:27).
+**NOT yet seeded to prod** (`--execute` pending).
 
-**Service.** `lib/services/grantee-title-service.js` — `generateGranteeTitle({ sourceAbstract })`,
-thin Executor wrapper returning the stripped one-line string. Min-length input guard; single-line
-output guard (strip stray fences/newlines).
+**Service — BUILT (S269).** `lib/services/grantee-title-service.js` — `generateGranteeTitle({ sourceTitle,
+sourceAbstract, runSource })`, thin Executor wrapper returning the cleaned one-liner. Input guards
+(no paid call on short/empty); `cleanTitle` (fence strip → first `To …` line → quote strip →
+abbreviation-safe trailing-period strip); fail-closed output guard requiring a non-empty `To …` line
+(rejects refusals). ⚠️ The cron MUST pass a **valid `runSource`** picklist value (e.g. `Vercel User` /
+`PowerAutomate Auto`) — `executePrompt` throws on unknown values.
 
 **Trigger surface — cron-poll (owner: preferred).** `pages/api/cron/generate-grantee-titles.js`,
 `verifyCronSecret`-guarded, scheduled in `vercel.json`. Each run, **scoped to the current open board
@@ -424,7 +428,7 @@ rows): build the filter from `cycleCodeToOdataFilter(currentCycle, 'wmkf_meeting
 pattern the awardees endpoint uses, `pages/api/workbench/grantee-deliverables/awardees.js:43`) **AND**
 `wmkf_phaseistatus eq 100000003` **AND** `wmkf_wmkfprojectdescription` empty **AND** research program
 (`GRANTEE_RESEARCH_PROGRAM_IDS`, `shared/config/granteeResearchPrograms.js`). For each row: read
-`wmkf_abstract` → generate (Haiku) → **ETag-conditional persist** to `wmkf_wmkfprojectdescription`
+`akoya_title` + `wmkf_abstract` → `generateGranteeTitle` (Sonnet) → **ETag-conditional persist** to `wmkf_wmkfprojectdescription`
 (no bare last-write PATCH; chunk-3 idempotency discipline). Idempotent + re-runnable (the slate
 reshuffles; already-filled rows fall out of the empty-field predicate, protecting manual curation).
 

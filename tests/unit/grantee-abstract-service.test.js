@@ -51,10 +51,12 @@ test('passes source_abstract as an override variable + forceOverwrite', async ()
   }));
 });
 
-test('passes a custom runSource through to the Executor', async () => {
+test('passes a custom (valid) runSource through to the Executor', async () => {
+  // 'Vercel Test' is a real RUN_SOURCE picklist value; executePrompt throws on
+  // unknown values, so a caller must pass a valid one (not e.g. "Cron").
   executePrompt.mockResolvedValue(execResult('a'.repeat(40)));
-  await generateGranteeAbstract({ sourceAbstract: SOURCE, runSource: 'Cron' });
-  expect(executePrompt).toHaveBeenCalledWith(expect.objectContaining({ runSource: 'Cron' }));
+  await generateGranteeAbstract({ sourceAbstract: SOURCE, runSource: 'Vercel Test' });
+  expect(executePrompt).toHaveBeenCalledWith(expect.objectContaining({ runSource: 'Vercel Test' }));
 });
 
 test('strips a language-tagged code fence (```text)', async () => {

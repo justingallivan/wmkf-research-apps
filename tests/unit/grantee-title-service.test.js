@@ -55,10 +55,12 @@ test('passes BOTH untrusted override variables + forceOverwrite', async () => {
   }));
 });
 
-test('passes a custom runSource through to the Executor', async () => {
+test('passes a custom (valid) runSource through to the Executor', async () => {
+  // 'Vercel Test' is a real RUN_SOURCE picklist value; the Executor throws on
+  // unknown values, so the cron must pass a valid one (not e.g. "Cron").
   executePrompt.mockResolvedValue(execResult('To investigate non-reciprocal matter'));
-  await generateGranteeTitle({ sourceTitle: TITLE, sourceAbstract: ABSTRACT, runSource: 'Cron' });
-  expect(executePrompt).toHaveBeenCalledWith(expect.objectContaining({ runSource: 'Cron' }));
+  await generateGranteeTitle({ sourceTitle: TITLE, sourceAbstract: ABSTRACT, runSource: 'Vercel Test' });
+  expect(executePrompt).toHaveBeenCalledWith(expect.objectContaining({ runSource: 'Vercel Test' }));
 });
 
 test('strips a language-tagged code fence (```text)', async () => {
@@ -94,10 +96,40 @@ test('re-surfaces an Executor short-output throw with context', async () => {
     .rejects.toThrow(/generation failed — Claude returned empty\/short text/);
 });
 
-test('throws if the model returns an empty/too-short title', async () => {
+test('throws if the model returns a too-short title', async () => {
   executePrompt.mockResolvedValue(execResult('To x'));
   await expect(generateGranteeTitle({ sourceTitle: TITLE, sourceAbstract: ABSTRACT }))
-    .rejects.toThrow(/empty\/too-short/);
+    .rejects.toThrow(/valid "To …" objective/);
+});
+
+test('keeps an abbreviation period (does not strip "U.S.")', async () => {
+  executePrompt.mockResolvedValue(execResult('To study cancer disparities across the U.S.'));
+  const out = await generateGranteeTitle({ sourceTitle: TITLE, sourceAbstract: ABSTRACT });
+  expect(out.editedTitle).toBe('To study cancer disparities across the U.S.');
+});
+
+test('strips smart (curly) quotes', async () => {
+  executePrompt.mockResolvedValue(execResult('“To map the human RNA structurome”'));
+  const out = await generateGranteeTitle({ sourceTitle: TITLE, sourceAbstract: ABSTRACT });
+  expect(out.editedTitle).toBe('To map the human RNA structurome');
+});
+
+test('skips a preamble line and returns the "To …" objective line', async () => {
+  executePrompt.mockResolvedValue(execResult('Here is the objective:\nTo decode the spinal cord-immune axis'));
+  const out = await generateGranteeTitle({ sourceTitle: TITLE, sourceAbstract: ABSTRACT });
+  expect(out.editedTitle).toBe('To decode the spinal cord-immune axis');
+});
+
+test('throws on a refusal / non-"To" output that clears the length floor', async () => {
+  executePrompt.mockResolvedValue(execResult('I cannot determine an objective from this abstract.'));
+  await expect(generateGranteeTitle({ sourceTitle: TITLE, sourceAbstract: ABSTRACT }))
+    .rejects.toThrow(/valid "To …" objective/);
+});
+
+test('throws when cleanup collapses to empty (fence-only output)', async () => {
+  executePrompt.mockResolvedValue(execResult('```\n\n```'));
+  await expect(generateGranteeTitle({ sourceTitle: TITLE, sourceAbstract: ABSTRACT }))
+    .rejects.toThrow(/valid "To …" objective/);
 });
 
 test('throws if the run is unexpectedly blocked', async () => {

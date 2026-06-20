@@ -24,13 +24,14 @@ keeps the **ORIGINAL** `akoya_title`; they usually agree with staff) → the **P
 **abstract materials**.
 
 Generation timing (decided S269, owner):
-- **Edited title** — generated **ONCE at `wmkf_phaseistatus = 100000003 (Invited)`**, with a cheap model
-  (**Haiku**), from `wmkf_abstract`, stored in the **EXISTING `wmkf_wmkfprojectdescription`** field
+- **Edited title** — generated **ONCE at `wmkf_phaseistatus = 100000003 (Invited)`**, with **Sonnet**
+  (temp 0.1; validated S269 to beat Haiku), from the applicant **title + abstract** (`akoya_title` +
+  `wmkf_abstract`), stored in the **EXISTING `wmkf_wmkfprojectdescription`** field
   (Memo 2000; staff curate it manually today — the cron writes it only when EMPTY, never overwriting
   manual curation; NO new schema wave. `wmkf_projecttitle1` is a different, unrelated field). **Reused
   twice**: the Board Book first,
-  then the abstract assembly later. Cron-poll predicate: `wmkf_phaseistatus eq 100000003` **AND** the new
-  title field is empty (idempotent — the slate can reshuffle, so it must be re-runnable). **Research
+  then the abstract assembly later. Cron-poll predicate: `wmkf_phaseistatus eq 100000003` **AND**
+  `wmkf_wmkfprojectdescription` is empty (idempotent — the slate can reshuffle, so it must be re-runnable). **Research
   grants only.** It is NOT needed for the committee-chair packet (that keeps the original title).
 - **Abstract materials** (house-style body + image + caption) — generated **LATE**, post-board-vote /
   award, via the existing grantee-deliverables Awardee-tab flow (S268). The award amount only exists at
