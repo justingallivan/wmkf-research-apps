@@ -29,6 +29,7 @@
 - Adding a branch/type/gate, or EXEMPTING a path from a gate (check the complement/fall-through): feedback-scrutinize-exemptions-and-fallthrough.md
 - rtk reference: project-rtk-grep-output-corruption.md
 - Checking a Vercel deploy after push (use `vercel inspect`, don't poll-grep `vercel ls` for the hash): feedback-deployment-monitoring-use-inspect.md
+- Verifying a Vercel env var VALUE via pull (Sensitive vars read back EMPTY — can't be verified; recreate non-sensitive): reference-vercel-sensitive-env-unreadable.md
 
 ## Working Norms
 - Reviewer-finder utility vs precision (before another identity/namesake/affiliation fix): feedback-prioritize-contact-recall-over-identity-precision.md
