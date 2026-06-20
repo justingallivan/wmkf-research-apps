@@ -1,111 +1,98 @@
-# Session 269 Prompt: Grantee portal — rich-text decision, chunk 6 copy, (opt) auto-cron
+# Session 270 Prompt: Grantee portal — deploy the title cron, chunk 8 (assembly/export), chunk 6
 
-> **S268 built the entire Grantee Deliverables Portal end-to-end and shipped it.** Schema wave LIVE in
-> prod (5 fields on `akoya_request`), abstract prompt seeded in prod (`wmkf_ai_prompts`), and the full
-> flow works: staff generate → confirm recipients → send invite → grantee magic-link portal → edit
-> abstract + upload image/caption + publish-waiver → submit. The real J26 need is unblocked via a new
-> **Awardees list** (`/workbench/awardees`). One decision parked for S269: **rich text in the abstract
-> memos** (native Dataverse `FormatName=RichText` vs a markdown convention).
+> **S269 built the Grantee Deliverables edited-title generator (chunk 7) end-to-end and shipped the
+> prompt to prod.** The "rich-text" decision parked for S269 is RESOLVED (markdown convention; structural
+> formatting lives in the assembly template — spec D8). Along the way S269 also shipped a **prompt-seed
+> governance** layer (create-only + version-preserving `--force`) and admin version-timestamps. The
+> `grantee-title.generate` prompt is SEEDED in prod (v1); the cron is built but **not yet deployed**.
 
-## Session 268 — what happened
+## Session 269 — what happened
 
-Designed (Codex pre-impl) and built (Codex post-impl on each) the whole portal, chunk by chunk, with a
-prod deploy/seed where needed. Then solved the live J26 operational problem (awardee discovery +
-eligibility + access). Fixed the long-running parallel-test flake.
+Started as "rich-text decision + chunk 6"; became the full **edited-title** feature + prompt governance.
+Every piece went design → Codex pre-impl → build → Codex post-impl, all folded and committed.
 
-### Shipped to prod (all pushed)
-1. **Schema wave** — 5 fields on `akoya_request` (`wmkf_abstractformatted`, `wmkf_abstractapproved`,
-   `wmkf_granteeimagefileref`, `wmkf_granteeimagecaption`, `wmkf_granteedeliverablestatus`).
-   `lib/dataverse/schema/wave2-grantee-deliverables/` + `scripts/preflight-grantee-deliverables-fields.mjs`
-   (creation-only, 3-way preflight). **Applied to prod 2026-06-18; 5/5 EXACT.** No consent field — the
-   publish-image waiver is a client-side submit gate (a submitted package IS the consent record).
-2. **Chunk 1 — token + auth** — stateless `aud:'grantee'` magic-link (`mintScopedToken` added to the
-   shared `external-token.js`; `grantee-token-lifecycle.js`, `verify-grantee-token.js`); fail-closed
-   `context` route + `/external/grantee/[token]` page.
-3. **Chunk 2 — abstract generation** — `shared/config/prompts/grantee-abstract.js` (owner's editor
-   prompt) + `grantee-abstract-service.js` (Executor, parseMode raw). **Prompt SEEDED in prod**
-   (`grantee-abstract.generate` in `wmkf_ai_prompts`, row `462c08ae-…`).
-4. **Chunk 3 — generate+persist route** (`/api/workbench/grantee-deliverables/generate`) — reuse +
-   ETag-conditional write + status non-downgrade.
-5. **Chunks 3b/3c — recipients + send-invite** — PI (`wmkf_projectleader`) in `To`, liaison
-   (`akoya_primarycontactid`) in `Cc`; M365 send; server-injected magic-link.
-6. **Chunk 4 — portal edit UI** (`GranteeDeliverableForm`) — abstract/image/caption + waiver submit-gate.
-7. **Chunk 5 — submit route** (`/api/external/grantee/[token]/submit`) — image magic-byte
-   (`validateGranteeImage`, incl. WEBP offset) + virus scan + SharePoint + atomic ETag PATCH + rollback;
-   refuses once `Complete`. Extracted `lib/services/sharepoint-cleanup.js` (shared with review-upload).
-8. **Chunk 3d — Awardee tab** (`AwardeeTab`) wired into the workbench tab dispatch.
-9. **Awardees list** (`/workbench/awardees` + `/api/workbench/grantee-deliverables/awardees`) +
-   **editable eligibility config** (`shared/config/granteeResearchPrograms.js`, GUID-keyed).
-10. **Test-infra fix** — the recurring `invite-email-modal-capture` parallel flake (sync `getByRole` on
-    a count-bearing label that settles a tick late → `findByRole`).
+### Shipped (all committed; prompt seeded to prod)
+1. **Design (chunks 7–8)** — edited-title generator + server-side document assembly. Codex pre-impl
+   reviewed + folded. Spec D7–D9 (`docs/GRANTEE_PORTAL_SPEC.md`), build plan chunks 7–8.
+   - **Key discovery:** the edited title lives in the **EXISTING `wmkf_wmkfprojectdescription`** field
+     (Memo 2000) — NOT a new field. No schema wave. `wmkf_projecttitle1..3` is a separate, unused
+     numbered-slot family (do NOT touch).
+   - **Lifecycle [VERIFIED via probe]:** title generates at `wmkf_phaseistatus=Invited` (100000003);
+     research-only; J26's 12 titles already exist (manual) → cron is go-forward (D26+).
+     Memory: `project-phaseistatus-decision-lifecycle.md`.
+2. **Chunk 7 — title generator** (`d36e0459`, post-impl `0853a542`): `shared/config/prompts/grantee-title.js`
+   (validated "v5" prompt — **Sonnet**, title+abstract input, few-shot exemplars, the named-concept rule;
+   temp 0.1) + `lib/services/grantee-title-service.js` + `scripts/seed-grantee-title-prompt.js` + A7.
+   Prompt validated against the 12 J26 manual titles as an answer key (5 iterations).
+3. **Chunk 7 — cron** (`ac5ebe9a`, post-impl `c446a8c1`): `pages/api/cron/generate-grantee-titles.js` —
+   seasonal (`0 6 * 4-6,10-12 *`), `verifyCronSecret`, current-cycle + Invited + research + empty-field,
+   `queryAllRecords`, **ETag write-when-empty**, bounded concurrency + per-row hard timeout + soft
+   budget (under the 120s cap), `?cycleCode=` override. Registered in the security matrix.
+4. **Prompt governance** (`85ee312b` / `f6bb692c` / `9a6a468d`): `lib/services/prompt-seed.js` —
+   **create-only** seed by default (refuses if any row exists), **version-preserving `--force`**
+   (publishes max+1, never resets v1 in place). Both grantee seeds refactored. Admin panel now shows
+   version timestamps (created / published / last-touched / by-whom); admin publish stamps
+   `publisheddatetime`. Two-tier model captured: `project-prompt-governance.md` + Atlas.
+5. **Seeded to prod:** `grantee-title.generate` v1 (`node scripts/seed-grantee-title-prompt.js --execute`).
+   Re-run now correctly REFUSES (create-only verified live).
 
-### The J26 operational findings (probed live, owner-validated)
-- The reviewer-finding **dashboard does NOT surface awardees** (filters `Phase II Pending` / triage
-  `Advancing`). Awardees are post-decision → use the new `/workbench/awardees`.
-- **Awardee definition = `akoya_requeststatus='Active'` + `akoya_programid` ∈ research set + PI present**
-  → 12 for J26. `wmkf_phaseistatus='Invited'` is NOT "awarded" (it's "invited to compete", 205 rows
-  mostly Phase I Declined). PI-required excludes the endowment #985674; program-set excludes civic
-  #1002650. Full J26 = 685 rows (`$top=500` truncates).
-- **PD access:** a superuser grants each PD the **`reviewers`** app in **`/admin` → Users**.
-- Test-ready awardee: **#1002238** (Espinosa-Ortiz / liaison Elzinga; GUID `9ca06ca2-93b6-f011-bbd3-6045bd02b4cc`).
+## Potential next steps for S270
 
-### Commits (S268: 180200ec … 494a1b22)
-`180200ec` schema wave · `85c26eae` deploy+reconcile · `09614e96` dv gotcha#7 · `4bd86411`/`e8a61734`
-chunk1 · `c2a488e0`/`54367aa1` chunk2 · `0bed5266`/`28e3230f` chunk3 · `b13e1d96`/`78f9f339` 3b/3c design ·
-`ea13dd95`/`315f7c1b` 3b/3c · `05815067` chunk4 · `5cc2927d` flake fix · `1478bbc1`/`fb99829f` chunk5 ·
-`7c7d2ede` chunk3d · `494a1b22` Awardees list.
+### 1. Deploy + verify the title cron
+Deploy to register the cron schedule (`vercel.json`). Then **post-deploy PA-flow check**: confirm a
+write to the EXISTING board-facing `wmkf_wmkfprojectdescription` fires no AkoyaGO/Power Automate flow
+(recorded open item — Atlas). Smoke-test with `?cycleCode=` on a research-Invited row with an empty
+field (J26 all-filled, so a no-op there). Use `vercel inspect`, not poll-grep, to check the deploy.
 
-## Potential next steps for S269
+### 2. Chunk 8 — document assembly + export (the bigger downstream piece)
+Server-side template: structured header (institution→bold, location/PI+coPI→italic, amount→currency,
+edited title→italic) + body/caption (markdown) → portal preview · website HTML · cycle export (replaces
+Connor's manual PDF). Design is in build-plan chunk 8 (one canonical assembly model; PI = `wmkf_projectleader`,
+Co-PIs = `fetchCoPIs()`; staff-authed export reads the SharePoint image ref directly). **One open question:**
+is the edited title PI-editable in the portal, or staff-owned?
 
-### 1. Rich-text-in-abstract decision (PARKED for "tomorrow")
-Verified: Dataverse memo supports **`FormatName=RichText`** (stores HTML; bold/italic; settable on
-create AND update, so the empty cols can be flipped in place). Two paths — **(A) native RichText**
-(flip the 2 cols + a minimal portal editor + sanitize grantee-submitted HTML + downstream HTML), or
-**(B) markdown convention** in the plain memo (no schema change, no untrusted-HTML risk, render in
-portal+output). **Deciding question:** must it render *inside Dynamics*, or only portal + published
-output? Lean **markdown** unless Dynamics-native rendering matters. (Sources: MS Learn format-and-formatname.)
+### 3. Chunk 6 — reminders + approval copy (carryover)
+Reminder cadence/deadline; draft Foundation-voice email default + waiver/T&C copy for owner approval.
 
-### 2. Chunk 6 — reminders + copy for approval
-Reminder cadence/deadline; **draft the Foundation-voice email default + waiver/T&C copy for owner
-approval** (current `DEFAULT_BODY` in `AwardeeTab` + the waiver label in `GranteeDeliverableForm` are
-interim placeholders).
+### 4. Open items / follow-ups
+- **[Task #1] Connor + Sarah** — confirm title-field provenance (hypothesis: `wmkf_wmkfprojectdescription`
+  = PD-authored at end; `wmkf_projecttitle1` = staff early best-guess). Owner emailed them S269. Once
+  confirmed, drop the `[UNVERIFIED]` label in the build plan + memory.
+- Legacy-seed conversion sweep (other seeds still upsert; grantee seeds are create-only) — separate task.
+- Admin-can-edit-`variables` A7 hardening (a superuser admin edit can weaken the untrusted boundary on the
+  live row, ungated) — tracked in `project-prompt-governance.md`.
 
-### 3. (Optional) Auto-on-award cron (PA-free)
-A `pages/api/cron/*` route (guarded by `verifyCronSecret`, scheduled in `vercel.json`) on the
-eligibility config (`granteeResearchPrograms.js`) that pre-generates abstracts for newly-`Active`
-research awardees. Idempotent (the generate logic reuses/skips). No PA needed.
-
-### 4. Carryover from S267 (unverified-until-checked)
-- **Branded domains** await IT DNS (Cloudflare CNAME → `c2b4d46311200992.vercel-dns-017.com`,
-  DNS-only). When live: `vercel inspect`, set `REVIEWER_PORTAL_BASE_URL=https://reviews.wmkeck.org`
-  (Prod), redeploy. (Grantee links use `GRANTEE_PORTAL_BASE_URL` || `NEXTAUTH_URL`.)
+### 5. Carryover from S267 (unverified-until-checked)
+- **Branded domains:** `reviews.wmkeck.org` now appears in the project's Vercel domains (observed S269) —
+  may already be live; verify before assuming. When confirmed: set `REVIEWER_PORTAL_BASE_URL`, redeploy.
 - S266 TEMP generation audit log in `discover.js` (`d0fb1ef5`) still live — revert when done.
 
 ## Continuity guardrails
-- **Grantee portal safety (never weaken):** stateless `aud:'grantee'` token rejects reviewer tokens;
-  submit refuses once status `Complete`; image magic-byte + virus-scan before upload; ETag-conditional
-  writes with rollback; status non-downgrade; the waiver is a client gate, never persisted.
-- **Eligibility is NOT hard-wired** — `shared/config/granteeResearchPrograms.js` (GUID-keyed; program
-  names may change → edit there). `wmkf_phaseistatus='Invited'` ≠ awarded.
-- **Don't tell the user when they're out of time** (`feedback-no-time-pressure-commentary`).
-- Multi-agent: Codex also works on `main`; clean tree, scoped commits, `git pull --rebase` before push.
+- **Prompt governance (never regress):** Dataverse `wmkf_ai_prompts` is the source of truth for Tier-1
+  system prompts. Seeds are **create-only**; a plain `--execute` on an existing prompt REFUSES — edit via
+  `/admin` (versioned) or `--execute --force` (version-preserving recovery). Don't reintroduce in-place
+  overwrite. See `project-prompt-governance.md`.
+- **Title cron safety:** write-when-empty + ETag (never overwrites staff curation); research-only;
+  `wmkf_phaseistatus=Invited` ≠ awarded. `wmkf_projecttitle1..3` is unrelated — do not read/write.
+- **Grantee portal safety (S268, unchanged):** stateless `aud:'grantee'` token; submit refuses once
+  `Complete`; image magic-byte + virus scan; ETag-conditional writes; waiver is a client gate, never persisted.
+- **Don't tell the user when they're out of time.** Multi-agent: Codex also works on `main`; clean tree,
+  scoped commits, `git pull --rebase` before push.
 
-## Key Files Reference
+## Key Files Reference (S269 additions)
 | File | Role |
 |------|------|
-| `docs/GRANTEE_PORTAL_SPEC.md` / `docs/GRANTEE_PORTAL_BUILD_PLAN.md` | Resolved design + chunk-by-chunk plan (all decisions/folds) |
-| `shared/config/granteeResearchPrograms.js` | **Editable** awardee eligibility (research program GUIDs + Active status) |
-| `shared/config/granteeDeliverableStatus.js` | Status picklist + `isGranteeEditableStatus` |
-| `lib/external/grantee-token-lifecycle.js` / `verify-grantee-token.js` | Stateless `aud:'grantee'` magic-link |
-| `lib/services/grantee-abstract-service.js` / `shared/config/prompts/grantee-abstract.js` | Abstract gen (prompt seeded in prod) |
-| `lib/services/grantee-upload.js` / `lib/utils/file-magic.js` (`validateGranteeImage`) | Submit: scan/upload/atomic write |
-| `pages/api/workbench/grantee-deliverables/{generate,recipients,send-invite,awardees}.js` | Staff endpoints |
-| `pages/api/external/grantee/[token]/{context,submit}.js` + `pages/external/grantee/[token].js` | Grantee portal |
-| `shared/components/workbench/AwardeeTab.js` · `pages/workbench/awardees.js` | Staff UI (tab + list) |
+| `shared/config/prompts/grantee-title.js` · `lib/services/grantee-title-service.js` | Edited-title prompt (Sonnet, seeded) + service |
+| `scripts/seed-grantee-title-prompt.js` · `lib/services/prompt-seed.js` | Title seed + the create-only/`--force` governance helper |
+| `pages/api/cron/generate-grantee-titles.js` | The go-forward cron (seasonal; not yet deployed) |
+| `pages/api/admin/prompts/{index,[name]}.js` · `shared/components/admin/PromptTemplatesSection.js` | Admin version-timestamps + publish stamp |
+| `.claude-memory/project-prompt-governance.md` · `project-phaseistatus-decision-lifecycle.md` | Governance + lifecycle decisions |
+| `docs/GRANTEE_PORTAL_BUILD_PLAN.md` chunks 7–8 · `docs/GRANTEE_PORTAL_SPEC.md` D7–D9 | Design + remaining chunk 8 |
 
 ## Testing
 ```bash
 npm run build && npm run lint
-npm test                       # FULL suite — 2812 tests (serial green; rare residual parallel flake)
+npm test                       # FULL suite — 2855 tests (serial green; rare residual parallel flake)
+node scripts/seed-grantee-title-prompt.js --dry-run    # plan only (read-only)
 npm run check:api-routes && npm run check:fact-consistency && npm run check:prompt-injection-tagging
 ```
