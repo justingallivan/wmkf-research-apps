@@ -1,9 +1,9 @@
 # Plan: Unified per-user email signature (profile-settings) (S271)
 
-> **Status: PLAN v2 — Codex review #1 folded; pending Codex review #2 (owner-requested).** Owner wants
-> ONE editable signature block per user, edited in the central **Profile Settings** page, consumed by BOTH
-> reviewer-invitation and grantee (invite + reminder) emails — unifying today's reviewer-only bespoke
-> sender-info UI. Also fixes a live reminder-cron bug. Implementer decided after review #2.
+> **Status: PLAN v3 — Codex reviews #1 + #2 folded; READY FOR IMPLEMENTATION (Codex implements, Claude
+> reviews — owner decision S271).** Owner wants ONE editable signature block per user, edited in the
+> central **Profile Settings** page, consumed by BOTH reviewer-invitation and grantee (invite + reminder)
+> emails — unifying today's reviewer-only bespoke sender-info UI. Also fixes a live reminder-cron bug.
 >
 > **Revision note:** v1 wrongly said preferences live in Postgres and proposed an `azureactivedirectoryobjectid`
 > join; both corrected below per Codex review #1 (storage = Dataverse; join = email via the existing
@@ -105,6 +105,25 @@
    later option is assigned-PD impersonation for the manual grantee invite.
 8. **#8 No encrypted-key/allowlist change** — add `EMAIL_SIGNATURE` to `PREFERENCE_KEYS`/defaults only.
 
+## Codex review #2 — folded (binding for implementation)
+
+Review #2 confirmed all 8 of review #1's findings RESOLVED and raised three contract tighteners:
+
+- **F-01 [HIGH] Grantee signature is appended SERVER-SIDE.** The canonical *sent* signature must be
+  resolved + appended in `send-invite` AND `preview-invite` from the request's assigned PD (keyed by
+  `requestId`) — NOT relied upon from the client `AwardeeTab` body (which the staffer can edit/clear and
+  which `send-invite` currently sends verbatim, `send-invite.js:59,112`). The `AwardeeTab` auto-fill of
+  `[Name]/[title]/COB [date]` stays as a DISPLAY convenience, but the server owns the signature actually
+  sent. This also makes the invite consistent with the reminder (both server-resolved from the assigned PD).
+- **F-02 [MEDIUM] Active-profile-first match.** `dataverse-identity-map` builds from ALL `user_profiles`
+  ordered by id with no `is_active` filter (`dataverse-identity-map.js:34`; archive sets `is_active=false`,
+  `database-service.js:407`). The resolver's email multi-match tie-break = **active profiles first, then
+  lowest id**; only fall back to inactive if explicitly intended.
+- **F-03 [MEDIUM] Explicit serialization contract.** `EMAIL_SIGNATURE` is stored as a **JSON string** in
+  the pref value (existing object prefs `JSON.stringify` on write / `JSON.parse` on read —
+  `EmailSettingsPanel.js:193`, `user-preferences.js:89`). The shared tolerant reader must accept
+  string / object / malformed legacy values and normalize to `{ signature, name, email }`.
+
 ## Phased rollout (Codex #4 scope)
 
 - **Phase 1 (fixes the owner's immediate need + the cron bug):** add `EMAIL_SIGNATURE` + tolerant
@@ -118,11 +137,15 @@
 ## Work breakdown (Phase 1 unless noted)
 
 1. `EMAIL_SIGNATURE` key + `DEFAULT_VALUES` + tolerant read + explicit `SENDER_INFO→EMAIL_SIGNATURE` copy.
+   Stored as a JSON string; reader normalizes string/object/malformed → `{signature,name,email}` (F-03).
 2. `lib/services/email-signature.js` — `resolveSignatureForProfile` + `resolveSignatureForRequest` (server,
-   assigned-PD via identity map; deterministic no-match/multi-match) + fallback chain.
+   assigned-PD via identity map). Email multi-match tie-break = **active profiles first, then lowest id**;
+   no-match → `fullname` + default; never throws (F-02). Fallback chain as above.
 3. Profile-settings "Email signature" card (signature textarea + name/email; save/load via `EMAIL_SIGNATURE`).
-4. Grantee invite auto-fill (`AwardeeTab`): `[Name]` (PI), `[title]` (award), `COB [date]` (send+14d), and
-   the assigned-PD signature — on load, guarded against clobbering staff edits.
+4. Grantee invite signature is **server-resolved + appended** in `send-invite` AND `preview-invite` from the
+   assigned PD keyed by `requestId` (F-01) — the server owns the sent signature. `AwardeeTab` may still
+   DISPLAY an auto-filled `[Name]`/`[title]`/`COB [date]` body (convenience), but must not be the source of
+   the canonical signature.
 5. Reminder cron + renderer: change `renderGranteeReminderHtml`/text to accept a resolved signature block;
    drop the cron `!pdTitle` skip; invite + reminder use the same resolver → identical signature.
 6. **(Phase 2)** render-emails server-side assigned-PD resolution; retire bespoke reviewer sender UI;
