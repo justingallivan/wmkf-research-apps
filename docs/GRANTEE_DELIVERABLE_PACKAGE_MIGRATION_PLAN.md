@@ -1,9 +1,11 @@
 # Plan: Grantee Deliverable Package table + automatic reminders (S271)
 
-> **Status: PLAN — Codex pre-impl review folded (S271); ready for implementation.** Sender-mailbox
-> decision RESOLVED (Path A, PD impersonation; prod flag verified). Remaining prerequisite is the
-> Dataverse write-privilege grant for the new table (Codex #7) — a deploy-time admin step, not a code
-> blocker. Owner chose **Option 1** (move the deliverable package off `akoya_request` into its own
+> **Status: IMPLEMENTED (Codex `1f3ba1cb`) + schema applied to PROD (S271).** Codex pre-impl review
+> folded; sender-mailbox RESOLVED (Path A, PD impersonation; prod flag verified). The new table is live
+> (9/9 EXACT) and the SP write privilege is verified by smoke test — **no role grant needed** (Codex #7
+> closed). Remaining before go-live: deploy the code + the manual deletion of the 3 orphaned
+> `akoya_request` fields (see "Deploy progress" below). Owner chose **Option 1** (move the deliverable
+> package off `akoya_request` into its own
 > related table) over adding more one-off date columns to the top-level request. This plan covers that
 > migration plus the 14-day / day-12 automatic reminder it unblocks.
 
@@ -105,6 +107,26 @@ Future lifecycle dates (submitted / reviewed / completed) land here too — not 
    parity (status now on the new entity). Run `check:atlas`, `check:api-routes`, `check:status-enum-parity`,
    `check:trust-boundary-guid`, `check:fact-consistency` + self-tests.
 
+## Deploy progress (S271)
+
+- ✅ **Schema applied to PROD** (`apply-dataverse-schema.js --target=prod --wave=3-grantee-deliverable-table --execute`).
+  Preflight (after a fix — its relationship probe needed the `OneToManyRelationshipMetadata` type cast)
+  reports **9/9 EXACT**: entity + 5 attributes + the 1:N relationship + the `wmkf_request` alternate key.
+  ⚠️ The alt-key create hit a transient SQL deadlock (error 1205) on the first run; a re-run (idempotent,
+  creation-only) created it. Re-run on transient 500s.
+- ✅ **App write privilege verified — NO grant needed** (`scripts/smoke-grantee-deliverable-write.mjs`):
+  the service principal can fully CRUD `wmkf_granteedeliverable` (create/read/update/delete, test row
+  cleaned up). The SP has System Administrator/Customizer (it created the entity), and those roles
+  auto-receive full privileges on a newly created custom table. So the app's SP-attributed writes
+  (external submit, cron claim/finalize) work without touching any role JSON. `wave1-staff.json` did NOT
+  need a change (it never covered `akoya_request` either — staff writes have always gone via the SP).
+- ✅ Prod `DYNAMICS_IMPERSONATION_ENABLED=true` (verified). The cron's `noFallback` email send impersonates
+  the PD; that needs the PD able to send an email activity (the same capability the manual invite uses) —
+  otherwise the cron skip+reports the row. Not a custom-table privilege.
+- ⏳ **Remaining manual step:** after the deployed code runs clean, delete the 3 now-orphaned fields from
+  `akoya_request` (`wmkf_granteedeliverablestatus`, `wmkf_granteeimagefileref`, `wmkf_granteeimagecaption`)
+  in Dataverse (schema-apply is creation-only; manual; safe — 0 rows ever held data).
+
 ## Cutover order
 
 1. Apply the new table/fields (preflight → `schema-apply`).  2. Deploy the helper + cut-over code +
@@ -134,10 +156,12 @@ The implementer MUST apply these (from the Codex review, all confirmed):
 5. **No silent impersonation fallback (HIGH, #6).** Reminder sends pass `noFallback` so an impersonation
    403 / disabled flag → skip+report, never a service-principal-attributed send. (Mirror the intake-admin
    `noFallback: true` precedent.)
-6. **Cutover needs a Dataverse write-privilege grant + smoke probe (HIGH, #7).** The service principal's
-   write scope is `akoya_request` / `wmkf_ai_run` / email; writing `wmkf_granteedeliverable` will 403
-   until granted. Add that grant + a create/update smoke probe as a cutover gate BEFORE code stops writing
-   `akoya_request`.
+6. **Cutover write-privilege check (HIGH, #7) — RESOLVED S271: no grant needed.** Concern was that the SP
+   couldn't write `wmkf_granteedeliverable`. The smoke probe (`scripts/smoke-grantee-deliverable-write.mjs`)
+   proved the SP can fully CRUD the new table — it has System Administrator/Customizer (it created the
+   entity), which auto-receives privileges on new custom tables. No role JSON change required. See "Deploy
+   progress". (Impersonated staff writes that lack the privilege fall back to the SP; only the cron's
+   `noFallback` PD email-send is exempt from fallback, and that's an email-activity capability, not this table.)
 7. **Gate retarget (MEDIUM, #8).** Grantee status parity is a Jest test hardwired to the old wave2
    request-field JSON (`tests/unit/grantee-deliverable-status-constants.test.js`) — retarget it to the new
    entity schema. Add the cron route to `docs/API_ROUTE_SECURITY_MATRIX.md` (`check:api-routes`) and the

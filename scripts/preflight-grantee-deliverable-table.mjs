@@ -158,7 +158,9 @@ async function probeField(token, field) {
 }
 
 async function probeRelationship(token) {
-  const r = await getJson(token, `/RelationshipDefinitions(SchemaName='${RELATIONSHIP}')?$select=SchemaName,ReferencedEntity,ReferencingEntity`);
+  // ReferencedEntity/ReferencingEntity live on OneToManyRelationshipMetadata, not the
+  // RelationshipMetadataBase — must cast the type, else Dataverse 400s on the $select.
+  const r = await getJson(token, `/RelationshipDefinitions(SchemaName='${RELATIONSHIP}')/Microsoft.Dynamics.CRM.OneToManyRelationshipMetadata?$select=SchemaName,ReferencedEntity,ReferencingEntity`);
   if (r.status === 404) return { state: 'absent', notes: [] };
   const notes = [];
   if (r.body?.ReferencedEntity !== 'akoya_request') notes.push(`ReferencedEntity '${r.body?.ReferencedEntity}' != expected 'akoya_request'`);
