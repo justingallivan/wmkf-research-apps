@@ -19,7 +19,7 @@ import Layout, { Card } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import { useAppAccess } from '../../shared/context/AppAccessContext';
 import { useProfile } from '../../shared/context/ProfileContext';
-import { PREFERENCE_KEYS } from '../../shared/config/reviewerFinderPreferences';
+import { readEmailSignaturePreference } from '../../shared/config/reviewerFinderPreferences';
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 import ProposalTab from '../../shared/components/workbench/ProposalTab';
 import OverviewTab from '../../shared/components/workbench/OverviewTab';
@@ -88,22 +88,13 @@ function WorkbenchRequest() {
   const pdId = ctx?.programDirectorId || null;
   const canManage = computeCanManage({ isSuperuser, pdId, myUserId });
 
-  // Per-user invite signature — the same SENDER_INFO preference the standalone
-  // Reviewer Finder uses (sender identity is always the signed-in MS account;
-  // this only resolves the {{signature}} placeholder in the email templates).
+  // Per-user invite signature — the unified email_signature preference, with
+  // legacy SENDER_INFO fallback (sender identity is always the signed-in MS
+  // account; this only resolves the {{signature}} placeholder in templates).
   // Falls back to the freeform signature → sender name → profile display name.
   const reviewerSettings = useMemo(() => {
-    let signature = session?.user?.profileName || '';
-    const raw = preferences?.[PREFERENCE_KEYS.SENDER_INFO];
-    if (raw) {
-      try {
-        const sender = JSON.parse(raw);
-        signature = sender.signature || sender.name || signature;
-      } catch {
-        /* malformed preference — keep the profile-name fallback */
-      }
-    }
-    return { signature };
+    const sender = readEmailSignaturePreference(preferences);
+    return { signature: sender.signature || sender.name || session?.user?.profileName || '' };
   }, [preferences, session?.user?.profileName]);
 
   return (

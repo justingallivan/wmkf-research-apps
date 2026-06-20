@@ -8,7 +8,12 @@
 
 import { createContext, useContext, useReducer, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
-import { PREFERENCE_KEYS, STORAGE_KEYS } from '../config/reviewerFinderPreferences';
+import {
+  PREFERENCE_KEYS,
+  STORAGE_KEYS,
+  normalizeEmailSignatureValue,
+  serializeEmailSignaturePreference,
+} from '../config/reviewerFinderPreferences';
 
 const ProfileContext = createContext(null);
 
@@ -188,6 +193,38 @@ export function ProfileProvider({ children }) {
     return currentPrefs;
   }, []);
 
+  const copyLegacySenderInfoToEmailSignature = useCallback(async (profileId, currentPrefs) => {
+    if (
+      Object.prototype.hasOwnProperty.call(currentPrefs, PREFERENCE_KEYS.EMAIL_SIGNATURE)
+      || !currentPrefs[PREFERENCE_KEYS.SENDER_INFO]
+    ) {
+      return currentPrefs;
+    }
+
+    const sender = normalizeEmailSignatureValue(currentPrefs[PREFERENCE_KEYS.SENDER_INFO]);
+    if (!sender.name && !sender.email && !sender.signature) {
+      return currentPrefs;
+    }
+
+    const value = serializeEmailSignaturePreference(sender);
+    try {
+      const response = await fetch('/api/user-preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId,
+          key: PREFERENCE_KEYS.EMAIL_SIGNATURE,
+          value,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to persist email signature preference');
+      return { ...currentPrefs, [PREFERENCE_KEYS.EMAIL_SIGNATURE]: value };
+    } catch (err) {
+      console.error('Failed to copy legacy sender info to email signature:', err);
+      return currentPrefs;
+    }
+  }, []);
+
   /**
    * Core session loader: fetches profile and its preferences atomically
    */
@@ -214,13 +251,14 @@ export function ProfileProvider({ children }) {
 
       // Check for and perform legacy migration
       prefs = await migrateLegacySettings(profileId, prefs);
+      prefs = await copyLegacySenderInfoToEmailSignature(profileId, prefs);
 
       dispatch({ type: 'LOAD_SUCCESS', requestId, profile, preferences: prefs });
     } catch (err) {
       console.error('Session load error:', err);
       dispatch({ type: 'LOAD_ERROR', requestId, error: err.message });
     }
-  }, [fetchProfiles, migrateLegacySettings]);
+  }, [fetchProfiles, migrateLegacySettings, copyLegacySenderInfoToEmailSignature]);
 
   /**
    * Select a profile by ID

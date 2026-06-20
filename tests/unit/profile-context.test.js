@@ -184,6 +184,24 @@ describe('ProfileContext — destructive migration data-loss regression (bug 2)'
     expect(localStorage.getItem(STORAGE_KEYS.SENDER_INFO)).toBeNull();
     // Migrated prefs surfaced to consumers.
     expect(screen.getByTestId('prefKeys').textContent).toContain(PREFERENCE_KEYS.SENDER_INFO);
+    expect(screen.getByTestId('prefKeys').textContent).toContain(PREFERENCE_KEYS.EMAIL_SIGNATURE);
+  });
+
+  it('copies legacy SENDER_INFO to EMAIL_SIGNATURE even when the old migration flag is already set', async () => {
+    authenticate(1);
+    const legacySender = JSON.stringify({ name: 'Alice', email: 'alice@wmkeck.org', signature: 'Cheers' });
+    fetchHandlers['GET /api/user-preferences'] = () =>
+      makeJsonResponse({
+        preferences: {
+          [MIGRATION_FLAG]: 'true',
+          [PREFERENCE_KEYS.SENDER_INFO]: legacySender,
+        },
+      });
+
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+
+    expect(screen.getByTestId('prefKeys').textContent).toContain(PREFERENCE_KEYS.EMAIL_SIGNATURE);
   });
 });
 

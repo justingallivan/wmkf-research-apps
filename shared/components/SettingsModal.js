@@ -18,9 +18,10 @@ import { STORAGE_KEYS } from './EmailSettingsPanel';
 import { useProfile } from '../context/ProfileContext';
 import {
   PREFERENCE_KEYS,
-  STORAGE_KEYS as RF_STORAGE_KEYS,
   resolveStoredCycle,
   formatCycleForStorage,
+  readEmailSignaturePreference,
+  serializeEmailSignaturePreference,
 } from '../config/reviewerFinderPreferences';
 
 // Phase 1 private-blob migration of grant-cycle materials (review template +
@@ -92,7 +93,7 @@ export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
     loadSettings();
     loadCycles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, status, currentProfile?.id, preferences[PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS], preferences[PREFERENCE_KEYS.SENDER_INFO], preferences[PREFERENCE_KEYS.CURRENT_CYCLE_ID]]);
+  }, [isOpen, status, currentProfile?.id, preferences[PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS], preferences[PREFERENCE_KEYS.EMAIL_SIGNATURE], preferences[PREFERENCE_KEYS.SENDER_INFO], preferences[PREFERENCE_KEYS.CURRENT_CYCLE_ID]]);
 
   // Normalize the stored cycle preference once cycles are loaded.
   useEffect(() => {
@@ -142,13 +143,8 @@ export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
           }
         }
 
-        if (preferences[PREFERENCE_KEYS.SENDER_INFO]) {
-          try {
-            const decoded = JSON.parse(preferences[PREFERENCE_KEYS.SENDER_INFO]);
-            loadedSender = { ...DEFAULT_SENDER, ...decoded };
-          } catch (e) {
-            console.warn('Failed to parse sender info from profile:', e);
-          }
+        if (preferences[PREFERENCE_KEYS.EMAIL_SIGNATURE] || preferences[PREFERENCE_KEYS.SENDER_INFO]) {
+          loadedSender = { ...DEFAULT_SENDER, ...readEmailSignaturePreference(preferences) };
         }
 
         if (preferences[PREFERENCE_KEYS.CURRENT_CYCLE_ID]) {
@@ -329,7 +325,7 @@ export default function SettingsModal({ isOpen, onClose, onCycleChange }) {
       if (currentProfile) {
         // Save to profile preferences
         await setPreference(PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS, JSON.stringify(grantCycle));
-        await setPreference(PREFERENCE_KEYS.SENDER_INFO, JSON.stringify(sender));
+        await setPreference(PREFERENCE_KEYS.EMAIL_SIGNATURE, serializeEmailSignaturePreference(sender));
       } else {
         // Fallback to localStorage
         localStorage.setItem(STORAGE_KEYS.GRANT_CYCLE, btoa(JSON.stringify(grantCycle)));

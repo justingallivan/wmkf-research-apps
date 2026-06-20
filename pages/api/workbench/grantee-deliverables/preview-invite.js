@@ -6,18 +6,20 @@
  * renderGranteeInviteHtml), so staff can see the formatting + the magic-link
  * button before committing.
  *
- * CRITICAL — this is a PURE RENDER. It NEVER sends an email, mints a real
- * magic-link token, reads/writes Dataverse, or changes any deliverable status.
- * The staff-edited body is rendered with a clearly-marked PLACEHOLDER link; the
- * real per-request magic-link is minted only by send-invite at actual send time.
+ * CRITICAL — this is a READ-ONLY RENDER. It NEVER sends an email, mints a real
+ * magic-link token, writes Dataverse, or changes any deliverable status. It
+ * reads the request's assigned PD so the preview includes the same server-owned
+ * signature that send-invite will append.
  *
- * AUTH: requireAppAccess('reviewers') (same as send-invite). No client id
- * reaches a selector (no requestId, no Dataverse access) — nothing to validate
- * beyond the body length, and no trust-boundary surface.
+ * AUTH: requireAppAccess('reviewers') (same as send-invite). requestId is
+ * GUID-validated before assigned-PD lookup.
  */
 
 import { requireAppAccess } from '../../../../lib/utils/auth';
 import { renderGranteeInviteHtml } from '../../../../lib/external/grantee-invite-email';
+import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
+import { appendSignatureBlock, resolveSignatureForRequest } from '../../../../lib/services/email-signature';
+import { isGuid } from '../../../../lib/utils/guid';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '64kb' } },
@@ -37,11 +39,22 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'reviewers');
   if (!access) return;
 
+  const requestId = typeof req.body?.requestId === 'string' ? req.body.requestId.trim() : '';
+  if (!isGuid(requestId)) {
+    return res.status(400).json({ error: 'requestId must be a GUID' });
+  }
+
   const bodyText = String(req.body?.bodyText || '');
   if (bodyText.trim().length < 10) {
     return res.status(400).json({ error: 'The email body is required.' });
   }
 
-  const html = renderGranteeInviteHtml({ bodyText, url: PLACEHOLDER_LINK });
-  return res.status(200).json({ html });
+  return bypassDynamicsRestrictions('grantee-preview-invite', async () => {
+    const signatureBlock = await resolveSignatureForRequest(requestId);
+    const html = renderGranteeInviteHtml({
+      bodyText: appendSignatureBlock(bodyText, signatureBlock),
+      url: PLACEHOLDER_LINK,
+    });
+    return res.status(200).json({ html });
+  });
 }

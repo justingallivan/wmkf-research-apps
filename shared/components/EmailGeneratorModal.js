@@ -15,7 +15,7 @@ import EmailTemplateEditor from './EmailTemplateEditor';
 import { STORAGE_KEYS, DEFAULT_SETTINGS } from './EmailSettingsPanel';
 import { DEFAULT_TEMPLATE } from '../../lib/utils/email-generator';
 import { useProfile } from '../context/ProfileContext';
-import { PREFERENCE_KEYS } from '../config/reviewerFinderPreferences';
+import { PREFERENCE_KEYS, readEmailSignaturePreference } from '../config/reviewerFinderPreferences';
 
 // Modal steps
 const STEPS = {
@@ -121,15 +121,11 @@ export default function EmailGeneratorModal({
         }
 
         // Load sender info from profile
-        if (preferences[PREFERENCE_KEYS.SENDER_INFO]) {
-          try {
-            const sender = JSON.parse(preferences[PREFERENCE_KEYS.SENDER_INFO]);
-            loadedSettings.senderName = sender.name || loadedSettings.senderName;
-            loadedSettings.senderEmail = sender.email || loadedSettings.senderEmail;
-            loadedSettings.signature = sender.signature || loadedSettings.signature;
-          } catch (e) {
-            console.warn('Failed to parse sender info from profile:', e);
-          }
+        if (preferences[PREFERENCE_KEYS.EMAIL_SIGNATURE] || preferences[PREFERENCE_KEYS.SENDER_INFO]) {
+          const sender = readEmailSignaturePreference(preferences);
+          loadedSettings.senderName = sender.name || loadedSettings.senderName;
+          loadedSettings.senderEmail = sender.email || loadedSettings.senderEmail;
+          loadedSettings.signature = sender.signature || loadedSettings.signature;
         }
 
         // Load template from profile

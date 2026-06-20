@@ -92,7 +92,9 @@ describe('CandidatesPanel invitation capture rehearsal', () => {
     fireEvent.click(screen.getByRole('button', { name: /send invitation \(1\)/i }));
 
     await screen.findByDisplayValue('Invitation');
-    fireEvent.click(screen.getByRole('button', { name: /send 1 invitation/i }));
+    const sendButton = await screen.findByRole('button', { name: /send 1 invitation/i });
+    await waitFor(() => expect(sendButton).toBeEnabled());
+    fireEvent.click(sendButton);
 
     await waitFor(() => expect(screen.getByText(/captured 1 invitation email for rehearsal/i)).toBeInTheDocument());
     expect(screen.getByText(/no dynamics email was sent/i)).toBeInTheDocument();

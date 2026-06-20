@@ -12,7 +12,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useProfile } from '../context/ProfileContext';
-import { PREFERENCE_KEYS } from '../config/reviewerFinderPreferences';
+import {
+  PREFERENCE_KEYS,
+  readEmailSignaturePreference,
+  serializeEmailSignaturePreference,
+} from '../config/reviewerFinderPreferences';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -50,7 +54,7 @@ export default function EmailSettingsPanel({ onSettingsChange, initialExpanded =
     if (status !== 'ready') return;
     loadSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, currentProfile?.id, preferences[PREFERENCE_KEYS.SENDER_INFO], preferences[PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS]]);
+  }, [status, currentProfile?.id, preferences[PREFERENCE_KEYS.EMAIL_SIGNATURE], preferences[PREFERENCE_KEYS.SENDER_INFO], preferences[PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS]]);
 
   const loadSettings = () => {
     try {
@@ -60,17 +64,13 @@ export default function EmailSettingsPanel({ onSettingsChange, initialExpanded =
       if (currentProfile) {
         let hasAnyProfileSettings = false;
 
-        if (preferences[PREFERENCE_KEYS.SENDER_INFO]) {
-          try {
-            const sender = JSON.parse(preferences[PREFERENCE_KEYS.SENDER_INFO]);
-            loadedSettings = loadedSettings || { ...DEFAULT_SETTINGS };
-            loadedSettings.senderName = sender.name || '';
-            loadedSettings.senderEmail = sender.email || '';
-            loadedSettings.signature = sender.signature || '';
-            hasAnyProfileSettings = true;
-          } catch (e) {
-            console.warn('Failed to parse sender info from profile:', e);
-          }
+        if (preferences[PREFERENCE_KEYS.EMAIL_SIGNATURE] || preferences[PREFERENCE_KEYS.SENDER_INFO]) {
+          const sender = readEmailSignaturePreference(preferences);
+          loadedSettings = loadedSettings || { ...DEFAULT_SETTINGS };
+          loadedSettings.senderName = sender.name || '';
+          loadedSettings.senderEmail = sender.email || '';
+          loadedSettings.signature = sender.signature || '';
+          hasAnyProfileSettings = true;
         }
 
         if (preferences[PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS]) {
@@ -190,7 +190,7 @@ export default function EmailSettingsPanel({ onSettingsChange, initialExpanded =
     try {
       if (currentProfile) {
         // Save to profile preferences as separate keys
-        await setPreference(PREFERENCE_KEYS.SENDER_INFO, JSON.stringify({
+        await setPreference(PREFERENCE_KEYS.EMAIL_SIGNATURE, serializeEmailSignaturePreference({
           name: settings.senderName || '',
           email: settings.senderEmail || '',
           signature: settings.signature || ''
@@ -226,7 +226,7 @@ export default function EmailSettingsPanel({ onSettingsChange, initialExpanded =
 
     if (currentProfile) {
       // Clear from profile preferences
-      await setPreference(PREFERENCE_KEYS.SENDER_INFO, '');
+      await setPreference(PREFERENCE_KEYS.EMAIL_SIGNATURE, '');
       await setPreference(PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS, '');
     }
     // Always purge legacy localStorage so reopen cannot resurrect the cleared value.

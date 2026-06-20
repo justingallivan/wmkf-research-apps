@@ -20,17 +20,14 @@
  * is hidden when the request has no June/December cycle.
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { GRANTEE_DELIVERABLE_LABEL } from '../../config/granteeDeliverableStatus';
 
 const DEFAULT_SUBJECT = 'Your W. M. Keck Foundation award — abstract for our website';
-// Program-Director-voice default (owner-approved S271). Bracketed fields are
-// staff-filled before sending: [Name], [title], COB [date], and the signature
-// ([Program Director name]/[title]). Auto-fill of those (PI name, award title,
-// computed deadline, PD signature) is a pending enhancement gated on the open
-// cadence/signature decisions. The send route appends the magic-link button +
-// fallback link BELOW this body — so "the secure link below" stays accurate and
-// no literal link belongs in the body (the link is always server-minted).
+// Program-Director-voice default (owner-approved S271). The client may fill PI
+// name, award title, and the 14-day COB date for display; send/preview append
+// the assigned-PD signature server-side so staff-edited body text is never the
+// canonical signature source.
 const DEFAULT_BODY =
   'Dear Professor [Name]:\n\n' +
   'Congratulations on your recent grant from the W. M. Keck Foundation. We plan to ' +
@@ -48,10 +45,27 @@ const DEFAULT_BODY =
   'publications and other scientific work related to this award, such as presentations ' +
   'and posters.\n\n' +
   'Please do not hesitate to contact me if you need additional information.\n\n' +
-  'Thank you,\n\n' +
-  '[Program Director name]\n[Program Director title]\nW. M. Keck Foundation';
+  'Thank you,';
 
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || '').trim());
+
+function formatCobDate(base = new Date()) {
+  const d = new Date(base);
+  d.setDate(d.getDate() + 14);
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function surnameFromName(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : '';
+}
+
+function buildDefaultBody({ piName, title, baseDate } = {}) {
+  return DEFAULT_BODY
+    .replace('[Name]', surnameFromName(piName) || '[Name]')
+    .replace('[title]', title || '[title]')
+    .replace('COB [date]', `COB ${formatCobDate(baseDate)}`);
+}
 
 export default function AwardeeTab({ requestId, context }) {
   const [status, setStatus] = useState(null);
@@ -68,9 +82,11 @@ export default function AwardeeTab({ requestId, context }) {
   const [websiteHtml, setWebsiteHtml] = useState(null);
   const [fetchingHtml, setFetchingHtml] = useState(false);
   const [copyMsg, setCopyMsg] = useState(null);
+  const autoBodyRef = useRef(DEFAULT_BODY);
 
   const cycleCode = context?.cycleCode || null;
   const cycleLabel = context?.cycleLabel || null;
+  const awardTitle = context?.title || null;
 
   const loadRecipients = useCallback(async () => {
     if (!requestId) return;
@@ -86,6 +102,15 @@ export default function AwardeeTab({ requestId, context }) {
   }, [requestId]);
 
   useEffect(() => { loadRecipients(); }, [loadRecipients]);
+
+  useEffect(() => {
+    const nextBody = buildDefaultBody({ piName: recipients?.pi?.name, title: awardTitle });
+    setBody((current) => {
+      if (current !== DEFAULT_BODY && current !== autoBodyRef.current) return current;
+      autoBodyRef.current = nextBody;
+      return nextBody;
+    });
+  }, [recipients?.pi?.name, awardTitle]);
 
   async function generate(regenerate = false) {
     setGenerating(true); setError(null); setSentMsg(null);
@@ -123,7 +148,7 @@ export default function AwardeeTab({ requestId, context }) {
     try {
       const res = await fetch('/api/workbench/grantee-deliverables/preview-invite', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bodyText: body }),
+        body: JSON.stringify({ requestId, bodyText: body }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error || 'Could not render the preview.'); return; }

@@ -4,7 +4,10 @@
  * renderGranteeInviteHtml — escapes the staff body, renders paragraphs, and
  * appends the server-injected action button + fallback link for the grantee URL.
  */
-import { renderGranteeInviteHtml } from '../../lib/external/grantee-invite-email';
+import {
+  buildGranteeReminderBodyText,
+  renderGranteeInviteHtml,
+} from '../../lib/external/grantee-invite-email';
 
 const URL = 'https://app.example.org/external/grantee/JWT.123_abc';
 
@@ -29,4 +32,15 @@ test('escapes HTML in the staff-authored body (no injection)', () => {
   expect(html).toContain('&lt;script&gt;');
   expect(html).not.toContain('<script>alert(1)</script>');
   expect(html).toContain('&amp; co');
+});
+
+test('reminder body uses the resolved signature block instead of pdName/pdTitle', () => {
+  const body = buildGranteeReminderBodyText({
+    piName: 'Raj',
+    title: 'Neural signaling',
+    signatureBlock: { signature: 'Connor Noda\nW. M. Keck Foundation' },
+    invitedDate: '2026-06-08T00:00:00.000Z',
+  });
+  expect(body).toContain('Connor Noda\nW. M. Keck Foundation');
+  expect(body).not.toContain('Program Director');
 });

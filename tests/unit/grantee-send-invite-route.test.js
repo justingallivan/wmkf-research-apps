@@ -19,6 +19,14 @@ jest.mock('../../lib/services/grantee-deliverable-record', () => ({
   ensureDeliverableForRequest: jest.fn(),
   patchDeliverable: jest.fn(),
 }));
+jest.mock('../../lib/services/email-signature', () => ({
+  resolveSignatureForRequest: jest.fn(async () => ({
+    signature: 'Assigned PD\nW. M. Keck Foundation',
+    name: 'Assigned PD',
+    email: 'assigned.pd@wmkeck.org',
+  })),
+  appendSignatureBlock: (bodyText, signatureBlock) => `${String(bodyText).trimEnd()}\n\n${signatureBlock.signature}`,
+}));
 
 import { requireAppAccess } from '../../lib/utils/auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
@@ -88,6 +96,10 @@ test('happy path: PI To, liaison Cc, server-injected link, status Drafted→Invi
   });
   // the magic-link was injected server-side into the HTML body
   expect(sent.body).toContain('https://app.example.org/external/grantee/JWT123');
+  // and the assigned-PD signature was appended server-side, not supplied by the staff body.
+  expect(body().bodyText).not.toContain('Assigned PD');
+  expect(sent.body).toContain('Assigned PD');
+  expect(sent.body).toContain('W. M. Keck Foundation');
 
   // status flip Drafted -> Invited, stamped once with the first invite date
   const [, patch, opts] = patchDeliverable.mock.calls[0];

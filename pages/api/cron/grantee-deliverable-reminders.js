@@ -11,6 +11,7 @@ import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { mintForRequest } from '../../../lib/external/grantee-token-lifecycle';
 import { renderGranteeReminderHtml } from '../../../lib/external/grantee-invite-email';
+import { resolveSignatureForRequest } from '../../../lib/services/email-signature';
 import {
   GRANTEE_DELIVERABLE_ENTITY_SET,
 } from '../../../lib/services/grantee-deliverable-record';
@@ -166,11 +167,10 @@ async function processRow(row, summary) {
   }
 
   const pdName = pd?.fullname || null;
-  const pdTitle = pd?.title || null;
   const from = pd?.internalemailaddress || null;
-  if (!pd?.systemuserid || !from || !pdName || !pdTitle) {
+  if (!pd?.systemuserid || !from || !pdName) {
     summary.skippedNoPd++;
-    addFailure(summary, requestNum, 'missing PD systemuser/email/name/title');
+    addFailure(summary, requestNum, 'missing PD systemuser/email/name');
     return;
   }
 
@@ -190,11 +190,11 @@ async function processRow(row, summary) {
   let url;
   try {
     ({ url } = await mintForRequest({ requestId }));
+    const signatureBlock = await resolveSignatureForRequest(requestId);
     const html = renderGranteeReminderHtml({
       piName,
       title: request.akoya_title || 'your W. M. Keck Foundation award',
-      pdName,
-      pdTitle,
+      signatureBlock,
       invitedDate: row.wmkf_inviteddate,
       url,
     });

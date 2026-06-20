@@ -23,6 +23,7 @@ import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-co
 import { isGuid } from '../../../../lib/utils/guid';
 import { mintForRequest } from '../../../../lib/external/grantee-token-lifecycle';
 import { renderGranteeInviteHtml } from '../../../../lib/external/grantee-invite-email';
+import { appendSignatureBlock, resolveSignatureForRequest } from '../../../../lib/services/email-signature';
 import {
   ensureDeliverableForRequest,
   patchDeliverable,
@@ -111,7 +112,11 @@ export default async function handler(req, res) {
 
       // Mint the magic-link SERVER-SIDE and inject it — never trust a link in the body.
       const { url } = await mintForRequest({ requestId });
-      const html = renderGranteeInviteHtml({ bodyText, url });
+      const signatureBlock = await resolveSignatureForRequest(requestId);
+      const html = renderGranteeInviteHtml({
+        bodyText: appendSignatureBlock(bodyText, signatureBlock),
+        url,
+      });
 
       let sent;
       try {

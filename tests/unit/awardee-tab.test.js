@@ -101,14 +101,15 @@ test('default invitation copy is the PD-voice template (subject + body)', async 
   await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
 
   expect(screen.getByLabelText('Subject')).toHaveValue('Your W. M. Keck Foundation award — abstract for our website');
+  await waitFor(() => expect(screen.getByLabelText('Message body').value).toMatch(/^Dear Professor Raj:/));
   const body = screen.getByLabelText('Message body').value;
-  expect(body).toMatch(/^Dear Professor \[Name\]:/);
+  expect(body).toMatch(/^Dear Professor Raj:/);
   expect(body).toContain('post an abstract on the Foundation’s website describing your award entitled “[title]”');
   expect(body).toContain('lightly edited to conform to the style that the Foundation uses in its publications');
-  expect(body).toContain('no later than COB [date]');
+  expect(body).toMatch(/no later than COB [A-Z][a-z]+ \d{1,2}, \d{4}/);
   expect(body).toContain('we will assume that we have your concurrence to post the draft as written');
   expect(body).toContain('agreed to acknowledge'); // acknowledgment-of-support paragraph
-  expect(body).toContain('[Program Director name]'); // PD signature placeholder, not a generic Foundation sign-off
+  expect(body).not.toContain('[Program Director name]'); // server appends the canonical assigned-PD signature
 });
 
 test('Preview email renders into a new tab without sending (no send-invite call)', async () => {
@@ -126,6 +127,8 @@ test('Preview email renders into a new tab without sending (no send-invite call)
   const calls = global.fetch.mock.calls.map(([u]) => String(u));
   expect(calls.some((u) => u.includes('/preview-invite'))).toBe(true);
   expect(calls.some((u) => u.includes('/send-invite'))).toBe(false);
+  const previewCall = global.fetch.mock.calls.find(([u]) => String(u).includes('/preview-invite'));
+  expect(JSON.parse(previewCall[1].body)).toMatchObject({ requestId: REQ });
 
   // the new tab got the rendered email behind a PREVIEW banner
   const written = doc.write.mock.calls[0][0];

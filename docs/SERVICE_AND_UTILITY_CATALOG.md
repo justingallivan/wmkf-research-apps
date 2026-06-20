@@ -31,6 +31,7 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`settings-service.js`** / **`dataverse-settings-service.js`** — Dataverse `wmkf_appsystemsettings`. Legacy Postgres `system_settings` was dropped 2026-05-12 (Migrates / Replaced); dispatch retained as fail-loud opt-out.
 - **`app-access-service.js`** / **`dataverse-app-access-service.js`** — Dataverse `wmkf_appuserappaccesses`. Legacy Postgres `user_app_access` was dropped 2026-05-12 (Migrates / Replaced).
 - **`dataverse-prefs-service.js`** — Dataverse `wmkf_appuserpreferences` adapter. Postgres `user_preferences` was dropped 2026-05-12 (Migrates / Replaced). See header KNOWN HAZARD re: dead Postgres branches in `database-service.js`.
+- **`email-signature.js`** — Unified per-user email-signature resolver. Reads the `email_signature` preference from Dataverse user preferences, falls back to legacy reviewer sender info, resolves request-scoped grantee signatures from the assigned Dataverse PD via `dataverse-identity-map`, and appends a Foundation-ending signature block for grantee invite/reminder mail.
 
 ### Storage / persistence
 

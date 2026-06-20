@@ -7,9 +7,14 @@
  * that profile. Profile creation is intentionally not exposed here.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import { useProfile } from '../shared/context/ProfileContext';
+import {
+  PREFERENCE_KEYS,
+  readEmailSignaturePreference,
+  serializeEmailSignaturePreference,
+} from '../shared/config/reviewerFinderPreferences';
 
 // Preset colors for avatar selection
 const AVATAR_COLORS = [
@@ -32,14 +37,49 @@ export default function ProfileSettings() {
     isLoading,
     updateProfile,
     archiveProfile,
-    selectProfile
+    selectProfile,
+    preferences,
+    setPreference,
+    status,
   } = useProfile();
 
   const [editingProfile, setEditingProfile] = useState(null);
   const [newProfileName, setNewProfileName] = useState('');
   const [newProfileColor, setNewProfileColor] = useState(AVATAR_COLORS[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [signatureForm, setSignatureForm] = useState({ name: '', email: '', signature: '' });
+  const [isSavingSignature, setIsSavingSignature] = useState(false);
+  const [signatureStatus, setSignatureStatus] = useState(null);
   const [error, setError] = useState(null);
+  const loadedSignatureSourceRef = useRef('');
+  const emailSignaturePreference = preferences?.[PREFERENCE_KEYS.EMAIL_SIGNATURE] || '';
+  const senderInfoPreference = preferences?.[PREFERENCE_KEYS.SENDER_INFO] || '';
+
+  useEffect(() => {
+    if (status !== 'ready') return;
+    const sourceKey = [
+      currentProfile?.id || '',
+      emailSignaturePreference,
+      senderInfoPreference,
+    ].join('::');
+    if (sourceKey === loadedSignatureSourceRef.current) return;
+    const next = readEmailSignaturePreference({
+      [PREFERENCE_KEYS.EMAIL_SIGNATURE]: emailSignaturePreference,
+      [PREFERENCE_KEYS.SENDER_INFO]: senderInfoPreference,
+    });
+    setSignatureForm(prev => (
+      prev.name === next.name && prev.email === next.email && prev.signature === next.signature
+        ? prev
+        : next
+    ));
+    setSignatureStatus(null);
+    loadedSignatureSourceRef.current = sourceKey;
+  }, [
+    status,
+    currentProfile?.id,
+    emailSignaturePreference,
+    senderInfoPreference,
+  ]);
 
   // Reset form when closing
   const resetForm = () => {
@@ -101,6 +141,27 @@ export default function ProfileSettings() {
     setError(null);
   };
 
+  const updateSignatureField = (field, value) => {
+    setSignatureForm(prev => ({ ...prev, [field]: value }));
+    setSignatureStatus(null);
+  };
+
+  const handleSaveSignature = async (e) => {
+    e.preventDefault();
+    if (!currentProfile) return;
+
+    setIsSavingSignature(true);
+    setError(null);
+    setSignatureStatus(null);
+    const ok = await setPreference(
+      PREFERENCE_KEYS.EMAIL_SIGNATURE,
+      serializeEmailSignaturePreference(signatureForm),
+    );
+    setIsSavingSignature(false);
+    setSignatureStatus(ok ? 'saved' : 'error');
+    if (!ok) setError('Failed to save email signature.');
+  };
+
   if (isLoading) {
     return (
       <Layout title="Profile Settings" maxWidth="4xl">
@@ -154,6 +215,62 @@ export default function ProfileSettings() {
                 </div>
               </div>
             </div>
+          </Card>
+        )}
+
+        {currentProfile && (
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Email Signature</h2>
+              {signatureStatus === 'saved' && (
+                <span className="text-sm text-green-700">Saved</span>
+              )}
+            </div>
+            <form onSubmit={handleSaveSignature} className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Name
+                  <input
+                    type="text"
+                    value={signatureForm.name}
+                    onChange={(e) => updateSignatureField('name', e.target.value)}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-gray-700">
+                  Email
+                  <input
+                    type="email"
+                    value={signatureForm.email}
+                    onChange={(e) => updateSignatureField('email', e.target.value)}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </label>
+              </div>
+              <label className="block text-sm font-medium text-gray-700">
+                Signature
+                <textarea
+                  value={signatureForm.signature}
+                  onChange={(e) => updateSignatureField('signature', e.target.value)}
+                  rows={6}
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
+                />
+              </label>
+              {signatureStatus === 'error' && (
+                <p className="text-sm text-red-700">Could not save the email signature.</p>
+              )}
+              <div className="flex justify-end">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  type="submit"
+                  disabled={isSavingSignature}
+                  loading={isSavingSignature}
+                >
+                  Save Email Signature
+                </Button>
+              </div>
+            </form>
           </Card>
         )}
 

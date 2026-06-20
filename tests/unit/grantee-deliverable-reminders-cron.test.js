@@ -18,9 +18,17 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 jest.mock('../../lib/external/grantee-token-lifecycle', () => ({
   mintForRequest: jest.fn(async ({ requestId }) => ({ url: `https://app.example.org/external/grantee/${requestId}` })),
 }));
+jest.mock('../../lib/services/email-signature', () => ({
+  resolveSignatureForRequest: jest.fn(async () => ({
+    signature: 'Assigned PD\nW. M. Keck Foundation',
+    name: 'Assigned PD',
+    email: 'assigned.pd@wmkeck.org',
+  })),
+}));
 
 import { verifyCronSecret } from '../../lib/utils/cron-auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
+import { resolveSignatureForRequest } from '../../lib/services/email-signature';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import handler from '../../pages/api/cron/grantee-deliverable-reminders';
 
@@ -66,6 +74,7 @@ beforeEach(() => {
   DynamicsService.queryAllRecords.mockReset().mockResolvedValue({ records: [], totalCount: 0, capped: false });
   DynamicsService.updateRecord.mockReset().mockResolvedValue({});
   DynamicsService.createAndSendEmail.mockReset().mockResolvedValue({ emailId: 'email-1' });
+  resolveSignatureForRequest.mockClear();
   DynamicsService.getRecord.mockReset().mockImplementation((entitySet, id) => {
     if (entitySet === 'akoya_requests') return Promise.resolve(requestRow(id.slice(1)));
     if (entitySet === 'contacts') return Promise.resolve(contactRow(id));
@@ -115,6 +124,8 @@ test('claims before sending and sends with noFallback as the PD', async () => {
     actingUserSystemId: 'pd1',
     noFallback: true,
   });
+  expect(resolveSignatureForRequest).toHaveBeenCalledWith('r1');
+  expect(DynamicsService.createAndSendEmail.mock.calls[0][0].body).toContain('Assigned PD');
 });
 
 test('send failure after claim is reported and not finalized, preventing next-run double-send', async () => {
@@ -140,6 +151,21 @@ test('missing PD skips before claim or send', async () => {
   expect(res.body.skippedNoPd).toBe(1);
   expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+});
+
+test('missing PD title no longer skips the reminder', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1)], totalCount: 1, capped: false });
+  DynamicsService.getRecord.mockImplementation((entitySet, id) => {
+    if (entitySet === 'akoya_requests') return Promise.resolve(requestRow(1));
+    if (entitySet === 'contacts') return Promise.resolve(contactRow(id));
+    if (entitySet === 'systemusers') return Promise.resolve({ ...pdRow(id), title: null });
+    return Promise.reject(new Error('unexpected'));
+  });
+  const res = mockRes();
+  await handler(req(), res);
+  expect(res.body.reminded).toBe(1);
+  expect(res.body.skippedNoPd).toBe(0);
+  expect(DynamicsService.createAndSendEmail).toHaveBeenCalled();
 });
 
 test('missing recipient skips before claim or send', async () => {

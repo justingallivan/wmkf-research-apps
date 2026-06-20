@@ -20,6 +20,7 @@
 export const DEFAULT_REVIEWER_COUNT = 15;
 
 export const PREFERENCE_KEYS = {
+  EMAIL_SIGNATURE: 'email_signature',
   SENDER_INFO: 'reviewer_finder_sender_info',
   GRANT_CYCLE_SETTINGS: 'reviewer_finder_grant_cycle_settings',
   EMAIL_TEMPLATE: 'reviewer_finder_email_template',
@@ -109,6 +110,11 @@ export function formatCycleForStorage(cycle) {
  * Default values for settings
  */
 export const DEFAULT_VALUES = {
+  EMAIL_SIGNATURE: {
+    name: '',
+    email: '',
+    signature: '',
+  },
   SENDER_INFO: {
     name: '',
     email: '',
@@ -143,3 +149,40 @@ Thank you for considering this invitation.
 {{signature}}`,
   },
 };
+
+export function normalizeEmailSignatureValue(value) {
+  if (value === null || value === undefined || value === '') {
+    return { ...DEFAULT_VALUES.EMAIL_SIGNATURE };
+  }
+
+  let decoded = value;
+  if (typeof value === 'string') {
+    try {
+      decoded = JSON.parse(value);
+    } catch {
+      decoded = { signature: value };
+    }
+  }
+
+  if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) {
+    return { ...DEFAULT_VALUES.EMAIL_SIGNATURE };
+  }
+
+  return {
+    signature: typeof decoded.signature === 'string' ? decoded.signature : '',
+    name: typeof decoded.name === 'string' ? decoded.name : '',
+    email: typeof decoded.email === 'string' ? decoded.email : '',
+  };
+}
+
+export function readEmailSignaturePreference(preferences = {}) {
+  const hasUnified = Object.prototype.hasOwnProperty.call(preferences, PREFERENCE_KEYS.EMAIL_SIGNATURE);
+  const raw = hasUnified
+    ? preferences[PREFERENCE_KEYS.EMAIL_SIGNATURE]
+    : preferences[PREFERENCE_KEYS.SENDER_INFO];
+  return normalizeEmailSignatureValue(raw);
+}
+
+export function serializeEmailSignaturePreference(value) {
+  return JSON.stringify(normalizeEmailSignatureValue(value));
+}
