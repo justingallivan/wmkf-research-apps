@@ -508,12 +508,16 @@ fetchCoPIs, role=Co-PI 100000001]`
   image figure (`includeImage:false`), keeping that surface `hasImage`-only; the preview is fail-soft
   (assembly/render failure → `preview:null`, never breaks the form-bearing core response) and computed
   only for the `edit`/`submitted` views. Rendered on the page via `AwardPreview` (server-sanitized HTML).
-- **(b) Website HTML** ✅ *BUILT S270* — clean controlled HTML for the staff member to drop into the
-  site, replacing manual coding. `GET /api/workbench/grantee-deliverables/website-html?requestId=<guid>`.
-- **(c) Cycle-level export** ✅ *BUILT S270* — all of a cycle's awarded abstracts assembled together
-  (replaces today's "compile all into one PDF and post it"). **Format = combined HTML** (owner decision
-  S270; reuses the same renderer as (b), print-to-PDF in the browser).
-  `GET /api/workbench/grantee-deliverables/cycle-export?cycleCode=J26`.
+- **(b) Website HTML** ✅ *BUILT S270 · staff-wired S271* — clean controlled HTML for the staff member to
+  drop into the site, replacing manual coding. `GET /api/workbench/grantee-deliverables/website-html?requestId=<guid>`.
+  Awardee-tab "Copy website HTML" button (S271): fetches the fragment, shows it in a textarea, and copies
+  it to the clipboard (manual-select fallback when the clipboard API is blocked).
+- **(c) Cycle-level export** ✅ *BUILT S270 · staff-wired S271* — all of a cycle's awarded abstracts
+  assembled together (replaces today's "compile all into one PDF and post it"). **Format = combined HTML**
+  (owner decision S270; reuses the same renderer as (b), print-to-PDF in the browser).
+  `GET /api/workbench/grantee-deliverables/cycle-export?cycleCode=J26`. Awardee-tab "Cycle export" link
+  (S271): opens the printable page for the request's board cycle; the cycle code comes from the
+  resolve-request context (meeting date → J{YY}/D{YY}); the link is hidden for non-June/December cycles.
 
 ### RESOLVED (Codex pre-impl review, S269)
 - **One canonical assembly model (Codex ISSUE).** A single shared service

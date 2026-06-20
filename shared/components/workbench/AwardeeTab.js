@@ -4,12 +4,20 @@
  *   - generate abstract:  POST /api/workbench/grantee-deliverables/generate
  *   - resolve recipients: GET  /api/workbench/grantee-deliverables/recipients
  *   - send invite:        POST /api/workbench/grantee-deliverables/send-invite
+ *   - website HTML (b):   GET  /api/workbench/grantee-deliverables/website-html?requestId=
+ *   - cycle export (c):   GET  /api/workbench/grantee-deliverables/cycle-export?cycleCode=
  *
  * Flow: Generate (or load) the style-guide abstract → confirm the two recipients
  * (PI in To, liaison in Cc; both pre-filled, editable) → preview/edit the email →
  * Send. Research-only scope (the workflow is only run on research grants).
  * Action-driven: no dedicated state-read endpoint — "Generate abstract" reuses an
  * existing one without a paid call, so it doubles as a load.
+ *
+ * Deliverable outputs (chunk 8 b/c, wired S271): "Copy website HTML" fetches the
+ * single-award fragment and copies it to the clipboard; "Cycle export" opens the
+ * combined printable HTML page for this request's board cycle. The cycle code
+ * comes from the resolve-request `context` (meeting date → J{YY}/D{YY}); the link
+ * is hidden when the request has no June/December cycle.
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -25,7 +33,7 @@ const DEFAULT_BODY =
 
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || '').trim());
 
-export default function AwardeeTab({ requestId }) {
+export default function AwardeeTab({ requestId, context }) {
   const [status, setStatus] = useState(null);
   const [abstract, setAbstract] = useState(null);
   const [recipients, setRecipients] = useState(null);
@@ -37,6 +45,12 @@ export default function AwardeeTab({ requestId }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const [sentMsg, setSentMsg] = useState(null);
+  const [websiteHtml, setWebsiteHtml] = useState(null);
+  const [fetchingHtml, setFetchingHtml] = useState(false);
+  const [copyMsg, setCopyMsg] = useState(null);
+
+  const cycleCode = context?.cycleCode || null;
+  const cycleLabel = context?.cycleLabel || null;
 
   const loadRecipients = useCallback(async () => {
     if (!requestId) return;
@@ -79,6 +93,30 @@ export default function AwardeeTab({ requestId }) {
       else { setStatus(data.status); setSentMsg('Invitation sent to the grantee.'); }
     } catch { setError('Could not send the invitation.'); }
     setSending(false);
+  }
+
+  // Output (b): fetch the single-award website HTML and copy it to the clipboard.
+  // The fragment is always shown in a textarea so staff can copy manually when
+  // the clipboard API is unavailable (e.g. a non-secure context).
+  async function copyWebsiteHtml() {
+    if (!requestId) return;
+    setFetchingHtml(true); setError(null); setCopyMsg(null);
+    try {
+      const res = await fetch(`/api/workbench/grantee-deliverables/website-html?requestId=${encodeURIComponent(requestId)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Could not build the website HTML.');
+      } else {
+        setWebsiteHtml(data.html || '');
+        try {
+          await navigator.clipboard.writeText(data.html || '');
+          setCopyMsg('Website HTML copied to the clipboard.');
+        } catch {
+          setCopyMsg('Website HTML ready — select the text below to copy.');
+        }
+      }
+    } catch { setError('Could not build the website HTML.'); }
+    setFetchingHtml(false);
   }
 
   const statusLabel = status != null ? (GRANTEE_DELIVERABLE_LABEL[status] || String(status)) : 'Not started';
@@ -134,6 +172,48 @@ export default function AwardeeTab({ requestId }) {
           {sending ? 'Sending…' : 'Send invitation'}
         </button>
         {!abstract && <p className="text-xs text-gray-500">Generate the abstract before sending.</p>}
+      </section>
+
+      <section className="space-y-2">
+        <h4 className="text-sm font-medium text-gray-800">Deliverable outputs</h4>
+        <p className="text-xs text-gray-500">
+          Website-ready HTML for this award, and the combined printable page for the whole board cycle.
+        </p>
+        {copyMsg && <p className="text-sm text-green-700">{copyMsg}</p>}
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={copyWebsiteHtml}
+            disabled={fetchingHtml || !requestId}
+            className="px-3 py-2 text-sm rounded bg-gray-700 text-white disabled:opacity-50"
+          >
+            {fetchingHtml ? 'Working…' : 'Copy website HTML'}
+          </button>
+          {cycleCode ? (
+            <a
+              href={`/api/workbench/grantee-deliverables/cycle-export?cycleCode=${encodeURIComponent(cycleCode)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-2 text-sm rounded bg-gray-700 text-white no-underline"
+            >
+              Cycle export{cycleLabel ? ` (${cycleLabel})` : ''}
+            </a>
+          ) : (
+            <span className="px-3 py-2 text-sm text-gray-500">
+              Cycle export unavailable — no June/December board cycle on this request.
+            </span>
+          )}
+        </div>
+        {websiteHtml != null && (
+          <textarea
+            aria-label="Website HTML"
+            readOnly
+            value={websiteHtml}
+            rows={10}
+            onFocus={(e) => e.target.select()}
+            className="w-full text-xs font-mono border rounded p-2"
+          />
+        )}
       </section>
     </div>
   );
