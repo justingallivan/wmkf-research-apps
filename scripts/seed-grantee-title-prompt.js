@@ -15,12 +15,18 @@
  * Plain one-line output → parseMode:'raw', a single output `edited_title`. Raw
  * mode ignores jsonSchema, so none is declared.
  *
+ * Governance (lib/services/prompt-seed.js): CREATE-ONLY by default — refuses if the
+ * prompt already exists in Dataverse (admin is the governed, versioned edit path; this
+ * file is a bootstrap artifact, not the live state). `--force` publishes a recovery
+ * VERSION (max+1), never an in-place overwrite.
+ *
  * Usage:
- *   node scripts/seed-grantee-title-prompt.js --dry-run
- *   node scripts/seed-grantee-title-prompt.js --execute
+ *   node scripts/seed-grantee-title-prompt.js --dry-run            # plan only
+ *   node scripts/seed-grantee-title-prompt.js --execute            # bootstrap (refuses if exists)
+ *   node scripts/seed-grantee-title-prompt.js --execute --force    # publish a recovery version
  *
  * Target (prod Dynamics — via .env.local): entity wmkf_ai_prompts,
- *   key wmkf_ai_promptname = 'grantee-title.generate' AND wmkf_ai_iscurrent = true.
+ *   wmkf_ai_promptname = 'grantee-title.generate'.
  * Prompt text source of truth: shared/config/prompts/grantee-title.js.
  */
 
@@ -42,18 +48,20 @@ for (const envFile of ['.env', '.env.local']) {
   } catch {}
 }
 
-const { DynamicsService } = await import('../lib/services/dynamics-service.js');
 const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
+const { seedPromptRow, planSeed, SeedRefused } = await import('../lib/services/prompt-seed.js');
 const { SYSTEM_PROMPT, USER_PROMPT_TEMPLATE, PROMPT_VARIABLES, PROMPT_OUTPUT_SCHEMA } = await import(
   '../shared/config/prompts/grantee-title.js'
 );
 enterDynamicsBypassForScript('seed-grantee-title-prompt');
 
 const PROMPT_NAME = 'grantee-title.generate';
-const ENTITY_SET = 'wmkf_ai_prompts';
 
 const DRY = process.argv.includes('--dry-run');
 const EXECUTE = process.argv.includes('--execute');
+// Create-only by default; --force publishes a recovery version (max+1) instead of
+// overwriting. See lib/services/prompt-seed.js for the governance contract.
+const FORCE = process.argv.includes('--force');
 if (!DRY && !EXECUTE) {
   console.error('Pass --dry-run or --execute. Refusing to run without an explicit mode.');
   process.exit(2);
@@ -87,9 +95,8 @@ const recordData = {
   wmkf_ai_temperature: 0.1,
   wmkf_ai_maxtokens: 100,
   wmkf_ai_promptstatus: PROMPTSTATUS_PUBLISHED,
-  wmkf_ai_iscurrent: true,
-  wmkf_promptversion: 1,
-  wmkf_ai_publisheddatetime: new Date().toISOString(),
+  // wmkf_ai_iscurrent / wmkf_promptversion / wmkf_ai_publisheddatetime are set by
+  // seedPromptRow (create-only + version-preserving force) — not here.
   wmkf_ai_notes:
     'Grantee edited-title (board-summary objective) generation (S269). All-override (no requestId), ' +
     'source_title + source_abstract untrusted, parseMode raw, output target kind:none (returned, not ' +
@@ -105,70 +112,40 @@ console.log(`  outputs:      ${promptOutputSchema.outputs.length} (parseMode=${p
 console.log(`  model:        ${recordData.wmkf_ai_model} (temp ${recordData.wmkf_ai_temperature})`);
 console.log('');
 
-const existing = await DynamicsService.queryRecords(ENTITY_SET, {
-  select: 'wmkf_ai_promptid,wmkf_ai_promptname,wmkf_promptversion,wmkf_ai_iscurrent',
-  filter: `wmkf_ai_promptname eq '${PROMPT_NAME}' and wmkf_ai_iscurrent eq true`,
-  top: 2,
-});
-const matches = existing?.records || [];
-if (matches.length > 1) {
-  console.error(`✗ Multiple current rows found for ${PROMPT_NAME} — aborting. Resolve manually.`);
-  process.exit(1);
-}
-const existingId = matches[0]?.wmkf_ai_promptid || null;
-
 if (DRY) {
   console.log('--- DRY RUN ---');
-  console.log(existingId ? `Would UPDATE wmkf_ai_prompts(${existingId})` : 'Would CREATE new wmkf_ai_prompts row');
-  console.log('\n--- wmkf_ai_promptvariables ---');
-  console.log(recordData.wmkf_ai_promptvariables);
-  console.log('\n--- wmkf_ai_promptoutputschema ---');
-  console.log(recordData.wmkf_ai_promptoutputschema);
-  process.exit(0);
-}
-
-let recordId;
-try {
-  if (existingId) {
-    console.log(`Updating existing row: wmkf_ai_prompts(${existingId})`);
-    await DynamicsService.updateRecord(ENTITY_SET, existingId, recordData);
-    recordId = existingId;
-  } else {
-    console.log('Creating new row in wmkf_ai_prompts');
-    const created = await DynamicsService.createRecord(ENTITY_SET, recordData);
-    recordId = created?.wmkf_ai_promptid || created?.id || null;
-    if (!recordId) {
-      const rb = await DynamicsService.queryRecords(ENTITY_SET, {
-        select: 'wmkf_ai_promptid',
-        filter: `wmkf_ai_promptname eq '${PROMPT_NAME}' and wmkf_ai_iscurrent eq true`,
-        top: 1,
-      });
-      recordId = (rb?.records || [])[0]?.wmkf_ai_promptid;
-    }
-  }
-  console.log(`✓ Wrote row: ${recordId}`);
-} catch (err) {
-  console.error('✗ Write failed:', err.message);
-  if (err.response) console.error('  response:', err.response);
-  process.exit(1);
-}
-
-try {
-  const verified = await DynamicsService.getRecord(ENTITY_SET, recordId, {
-    select: ['wmkf_ai_promptname', 'wmkf_ai_promptvariables', 'wmkf_ai_promptoutputschema', 'wmkf_ai_model', 'wmkf_ai_iscurrent'].join(','),
-  });
-  let ok = verified.wmkf_ai_promptname === PROMPT_NAME && verified.wmkf_ai_iscurrent === true;
   try {
-    const vars = JSON.parse(verified.wmkf_ai_promptvariables);
-    const out = JSON.parse(verified.wmkf_ai_promptoutputschema);
-    console.log(`  ✓ round-trip: ${vars.variables.length} variable(s), ${out.outputs.length} output(s) (parseMode=${out.parseMode})`);
-  } catch (e) {
-    console.error(`  ✗ JSON round-trip failed: ${e.message}`);
-    ok = false;
+    const plan = await planSeed({ promptName: PROMPT_NAME, force: FORCE });
+    const verb = {
+      create: 'Would CREATE v1 (bootstrap — no rows exist)',
+      republish: `Would PUBLISH v${plan.targetVersion} (force; flips the current v${plan.current[0]?.wmkf_promptversion} down)`,
+      recover: `Would RECOVER as v${plan.targetVersion} (force; rows exist but none current)`,
+      refuse: `Would REFUSE — ${plan.rows.length} row(s) exist (create-only). Edit via /admin, or pass --force to publish a recovery version.`,
+      'refuse-duplicate': `Would REFUSE — ${plan.current.length} current rows (duplicate-current). Resolve in Dynamics.`,
+    }[plan.action];
+    console.log(verb);
+    console.log('\n--- wmkf_ai_promptvariables ---');
+    console.log(recordData.wmkf_ai_promptvariables);
+    console.log('\n--- wmkf_ai_promptoutputschema ---');
+    console.log(recordData.wmkf_ai_promptoutputschema);
+    process.exit(0);
+  } catch (err) {
+    console.error('✗ Dry-run plan failed:', err.message);
+    process.exit(1);
   }
-  console.log(ok ? '\n✓ All verification checks passed.' : '\n✗ Verification mismatch.');
-  process.exit(ok ? 0 : 2);
+}
+
+try {
+  const result = await seedPromptRow({ promptName: PROMPT_NAME, recordData, force: FORCE });
+  console.log(`✓ ${result.action} → v${result.version} (current row ${result.id})`);
+  console.log('\n✓ Seed complete (exactly one current row verified).');
+  process.exit(0);
 } catch (err) {
-  console.error('✗ Verification read failed:', err.message);
+  if (err instanceof SeedRefused) {
+    console.error(`✗ ${err.message}`);
+    process.exit(2);
+  }
+  console.error('✗ Seed failed:', err.message);
+  if (err.response) console.error('  response:', err.response);
   process.exit(1);
 }
