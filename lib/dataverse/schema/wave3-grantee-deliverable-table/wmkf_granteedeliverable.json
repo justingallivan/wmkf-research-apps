@@ -1,0 +1,83 @@
+{
+  "name": "wmkf_granteedeliverable",
+  "kind": "new-entity",
+  "schemaName": "wmkf_GranteeDeliverable",
+  "displayName": "Grantee Deliverable",
+  "displayCollectionName": "Grantee Deliverables",
+  "description": "One grantee deliverable package lifecycle row per akoya_request. Abstract text remains on akoya_request; this table owns package status, image metadata, invite date, and reminder date. At-most-one row per request is enforced by the wmkf_request alternate key.",
+  "ownershipType": "OrganizationOwned",
+  "primaryNameAttribute": {
+    "schemaName": "wmkf_Name",
+    "displayName": "Name",
+    "description": "Synthetic display name for the request's grantee deliverable package.",
+    "maxLength": 200,
+    "requiredLevel": "ApplicationRequired"
+  },
+  "attributes": [
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_DeliverableStatus",
+      "displayName": "Deliverable Status",
+      "description": "Lifecycle for the grantee deliverable package. Null/unset = not started. Mirrors shared/config/granteeDeliverableStatus.js.",
+      "options": [
+        { "value": 100000000, "label": "Drafted", "description": "AI abstract prepared; invite not yet sent." },
+        { "value": 100000001, "label": "Invited", "description": "Magic-link invite sent to the grantee." },
+        { "value": 100000002, "label": "Reminder Sent", "description": "At least one reminder sent to a non-responder." },
+        { "value": 100000003, "label": "Submitted", "description": "Grantee submitted edited abstract + image + caption." },
+        { "value": 100000004, "label": "Staff Review", "description": "Submitted materials are under staff review." },
+        { "value": 100000005, "label": "Revision Requested", "description": "Staff requested a correction or replacement." },
+        { "value": 100000006, "label": "Complete", "description": "Staff accepted the returned materials." },
+        { "value": 100000007, "label": "Closed No Response", "description": "Cycle deadline passed without a usable submission." }
+      ]
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ImageFileRef",
+      "displayName": "Image File Reference",
+      "description": "SharePoint URL/path/item reference for the grantee-submitted graphical image. Binary content lives in SharePoint.",
+      "format": "Url",
+      "maxLength": 1000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ImageCaption",
+      "displayName": "Image Caption",
+      "description": "Free-text image caption supplied by the grantee.",
+      "maxLength": 4000
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_InvitedDate",
+      "displayName": "Invited Date",
+      "description": "UTC date/time when the package first moved from Drafted to Invited.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_RemindedDate",
+      "displayName": "Reminded Date",
+      "description": "UTC date/time when the automatic day-12 reminder was sent.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    }
+  ],
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_granteedeliverable_request",
+      "referencedEntity": "akoya_request",
+      "lookupSchemaName": "wmkf_Request",
+      "lookupDisplayName": "Request",
+      "lookupDescription": "The awarded request this grantee deliverable package belongs to.",
+      "required": "ApplicationRequired"
+    }
+  ],
+  "alternateKeys": [
+    {
+      "schemaName": "wmkf_granteedeliverable_request_key",
+      "displayName": "Request",
+      "keyAttributes": ["wmkf_request"]
+    }
+  ]
+}

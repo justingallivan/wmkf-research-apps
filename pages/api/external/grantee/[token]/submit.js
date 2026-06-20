@@ -44,10 +44,10 @@ export default async function handler(req, res) {
       return res.status(verified.reason === 'not_found' ? 404 : 401).json({ ok: false, reason: verified.reason });
     }
 
-    const { request } = verified;
+    const { request, deliverable } = verified;
     // Fail-closed editable-status guard. The ETag-conditional PATCH in the service
     // closes the TOCTOU window (a staff status change after this read → 412 → 409).
-    if (!isGranteeEditableStatus(request.wmkf_granteedeliverablestatus)) {
+    if (!isGranteeEditableStatus(deliverable?.wmkf_deliverablestatus)) {
       return res.status(409).json({ ok: false, reason: 'not_editable' });
     }
 
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
     const imageFile = parsed.files[0] || null;
 
     const result = await bypassDynamicsRestrictions('grantee-submit', () =>
-      writeGranteeDeliverables({ request, editedAbstract, caption, imageFile }));
+      writeGranteeDeliverables({ request, deliverable, editedAbstract, caption, imageFile }));
 
     if (!result.ok) {
       // Generic, non-leaky reasons (service already logged specifics server-side).

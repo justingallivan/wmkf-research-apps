@@ -29,13 +29,17 @@ import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-co
 import { loadModelOverrides } from '../../../../lib/services/model-override-loader';
 import { isGuid } from '../../../../lib/utils/guid';
 import { generateGranteeAbstract } from '../../../../lib/services/grantee-abstract-service';
+import {
+  ensureDeliverableForRequest,
+  patchDeliverable,
+} from '../../../../lib/services/grantee-deliverable-record';
 import { GRANTEE_DELIVERABLE_STATUS, GRANTEE_DELIVERABLE_LABEL } from '../../../../shared/config/granteeDeliverableStatus';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '8kb' } },
 };
 
-const REQUEST_SELECT = 'akoya_requestid,wmkf_abstract,wmkf_abstractformatted,wmkf_granteedeliverablestatus';
+const REQUEST_SELECT = 'akoya_requestid,akoya_requestnum,wmkf_abstract,wmkf_abstractformatted';
 const MIN_SOURCE_CHARS = 50;
 
 const normStatus = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
@@ -72,17 +76,30 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: `No request found for ${requestId}` });
       }
 
-      const currentStatus = normStatus(row.wmkf_granteedeliverablestatus);
+      const deliverable = await ensureDeliverableForRequest(requestId, {
+        requestNumber: row.akoya_requestnum,
+        actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
+      });
+      const currentStatus = normStatus(deliverable?.wmkf_deliverablestatus);
       const existingFormatted = (row.wmkf_abstractformatted || '').trim();
 
       // Reuse-existing — no paid call unless the caller explicitly regenerates.
       if (existingFormatted && !regenerate) {
+        if (currentStatus === null && deliverable?.wmkf_granteedeliverableid) {
+          await patchDeliverable(requestId, {
+            wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.DRAFTED,
+          }, {
+            ifMatch: deliverable._etag,
+            actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
+          });
+        }
+        const status = currentStatus === null ? GRANTEE_DELIVERABLE_STATUS.DRAFTED : currentStatus;
         return res.status(200).json({
           abstractFormatted: existingFormatted,
           persisted: true,
           reused: true,
-          status: currentStatus,
-          statusLabel: currentStatus !== null ? (GRANTEE_DELIVERABLE_LABEL[currentStatus] || null) : null,
+          status,
+          statusLabel: status !== null ? (GRANTEE_DELIVERABLE_LABEL[status] || null) : null,
         });
       }
 
@@ -112,9 +129,6 @@ export default async function handler(req, res) {
 
       // Status non-downgrade: only stamp Drafted from null/empty or already-Drafted.
       const patch = { wmkf_abstractformatted: gen.abstractFormatted };
-      if (currentStatus === null || currentStatus === GRANTEE_DELIVERABLE_STATUS.DRAFTED) {
-        patch.wmkf_granteedeliverablestatus = GRANTEE_DELIVERABLE_STATUS.DRAFTED;
-      }
 
       try {
         await DynamicsService.updateRecord('akoya_requests', row.akoya_requestid, patch, {
@@ -126,11 +140,15 @@ export default async function handler(req, res) {
           // Concurrent write won the race. Prefer the now-stored value; if still
           // empty, ask the caller to retry rather than leaking the raw 412.
           const re = await DynamicsService.getRecord('akoya_requests', requestId, {
-            select: 'wmkf_abstractformatted,wmkf_granteedeliverablestatus',
+            select: 'wmkf_abstractformatted',
           });
           const reFormatted = (re.wmkf_abstractformatted || '').trim();
           if (reFormatted) {
-            const reStatus = normStatus(re.wmkf_granteedeliverablestatus);
+            const reDeliverable = await ensureDeliverableForRequest(requestId, {
+              requestNumber: row.akoya_requestnum,
+              actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
+            });
+            const reStatus = normStatus(reDeliverable?.wmkf_deliverablestatus);
             return res.status(200).json({
               abstractFormatted: reFormatted, persisted: true, reused: true, concurrent: true,
               status: reStatus,
@@ -143,7 +161,16 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Failed to save the generated abstract.' });
       }
 
-      const newStatus = patch.wmkf_granteedeliverablestatus ?? currentStatus;
+      let newStatus = currentStatus;
+      if (currentStatus === null || currentStatus === GRANTEE_DELIVERABLE_STATUS.DRAFTED) {
+        await patchDeliverable(requestId, {
+          wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.DRAFTED,
+        }, {
+          ifMatch: deliverable._etag,
+          actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
+        });
+        newStatus = GRANTEE_DELIVERABLE_STATUS.DRAFTED;
+      }
       return res.status(200).json({
         abstractFormatted: gen.abstractFormatted,
         persisted: true,

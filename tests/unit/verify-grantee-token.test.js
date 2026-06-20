@@ -15,6 +15,7 @@ const REQUEST_ID = '22222222-2222-2222-2222-222222222222';
 
 let originalSecret;
 let originalGetRecord;
+let originalQueryRecords;
 
 function requestRow(override = {}) {
   return {
@@ -25,9 +26,16 @@ function requestRow(override = {}) {
     wmkf_abstract: 'applicant source abstract',
     wmkf_abstractformatted: 'formatted abstract',
     wmkf_abstractapproved: null,
-    wmkf_granteeimagefileref: null,
-    wmkf_granteeimagecaption: null,
-    wmkf_granteedeliverablestatus: 100000001,
+    ...override,
+  };
+}
+
+function deliverableRow(override = {}) {
+  return {
+    wmkf_granteedeliverableid: 'deliv-1',
+    wmkf_deliverablestatus: 100000001,
+    wmkf_imagefileref: null,
+    wmkf_imagecaption: null,
     ...override,
   };
 }
@@ -36,15 +44,18 @@ beforeEach(() => {
   originalSecret = process.env.EXTERNAL_LINK_SECRET;
   process.env.EXTERNAL_LINK_SECRET = SECRET;
   originalGetRecord = DynamicsService.getRecord;
+  originalQueryRecords = DynamicsService.queryRecords;
   DynamicsService.getRecord = jest.fn();
+  DynamicsService.queryRecords = jest.fn().mockResolvedValue({ records: [deliverableRow()] });
 });
 afterEach(() => {
   if (originalSecret === undefined) delete process.env.EXTERNAL_LINK_SECRET;
   else process.env.EXTERNAL_LINK_SECRET = originalSecret;
   DynamicsService.getRecord = originalGetRecord;
+  DynamicsService.queryRecords = originalQueryRecords;
 });
 
-test('happy path: valid grantee token loads the akoya_request inline', async () => {
+test('happy path: valid grantee token loads the akoya_request and deliverable row', async () => {
   DynamicsService.getRecord.mockResolvedValue(requestRow());
   const { jwt } = await mintForRequest({ requestId: REQUEST_ID });
 
@@ -52,8 +63,12 @@ test('happy path: valid grantee token loads the akoya_request inline', async () 
   expect(r.ok).toBe(true);
   expect(r.requestId).toBe(REQUEST_ID);
   expect(r.request.akoya_requestnum).toBe('1002794');
+  expect(r.deliverable.wmkf_deliverablestatus).toBe(100000001);
   // loaded against the request entity set
   expect(DynamicsService.getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, expect.any(Object));
+  expect(DynamicsService.queryRecords).toHaveBeenCalledWith('wmkf_granteedeliverables', expect.objectContaining({
+    filter: `_wmkf_request_value eq ${REQUEST_ID}`,
+  }));
 });
 
 test('SECURITY: a reviewer token (no aud) is rejected with invalid_claim', async () => {

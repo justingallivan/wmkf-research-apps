@@ -5,12 +5,14 @@
  */
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: { queryRecords: jest.fn() } }));
+jest.mock('../../lib/services/grantee-deliverable-record', () => ({ getDeliverableForRequest: jest.fn() }));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (l, fn) => Promise.resolve().then(() => (typeof l === 'function' ? l() : fn())),
 }));
 
 import { requireAppAccess } from '../../lib/utils/auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
+import { getDeliverableForRequest } from '../../lib/services/grantee-deliverable-record';
 import { GRANTEE_RESEARCH_PROGRAM_IDS } from '../../shared/config/granteeResearchPrograms';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import handler from '../../pages/api/workbench/grantee-deliverables/awardees';
@@ -26,6 +28,7 @@ function mockRes() {
 beforeEach(() => {
   requireAppAccess.mockReset().mockResolvedValue({ profileId: 'p', session: { user: {} } });
   DynamicsService.queryRecords.mockReset().mockResolvedValue({ records: [] });
+  getDeliverableForRequest.mockReset().mockResolvedValue(null);
 });
 
 test('non-GET → 405', async () => {
@@ -62,16 +65,18 @@ test('maps records to awardees with formatted PI/liaison names + deliverable sta
       _wmkf_projectleader_value: 'pi1', _wmkf_projectleader_value_formatted: 'Erika Espinosa-Ortiz',
       _akoya_primarycontactid_value: 'li1', _akoya_primarycontactid_value_formatted: 'Dawnie Elzinga',
       _akoya_programid_value: 'prog1', _akoya_programid_value_formatted: 'Science and Engineering Research',
-      wmkf_granteedeliverablestatus: GRANTEE_DELIVERABLE_STATUS.DRAFTED,
       wmkf_abstractformatted: 'already drafted',
     },
     {
       akoya_requestid: 'r2', akoya_requestnum: '1002324', akoya_title: 'Circadian clock',
       _wmkf_projectleader_value: 'pi2', _wmkf_projectleader_value_formatted: 'Margaret Stratton',
       _akoya_primarycontactid_value: null, _akoya_programid_value_formatted: 'Medical Research',
-      wmkf_granteedeliverablestatus: null, wmkf_abstractformatted: null,
+      wmkf_abstractformatted: null,
     },
   ] });
+  getDeliverableForRequest
+    .mockResolvedValueOnce({ wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.DRAFTED })
+    .mockResolvedValueOnce(null);
   const res = mockRes();
   await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
   expect(res.body.count).toBe(2);

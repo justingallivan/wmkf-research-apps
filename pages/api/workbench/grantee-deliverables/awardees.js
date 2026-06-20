@@ -18,6 +18,7 @@
 import { requireAppAccess } from '../../../../lib/utils/auth';
 import { DynamicsService } from '../../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
+import { getDeliverableForRequest } from '../../../../lib/services/grantee-deliverable-record';
 import { cycleCodeToOdataFilter, cycleCodeToLabel } from '../../../../lib/utils/cycle-code';
 import { GRANTEE_RESEARCH_PROGRAM_IDS, GRANTEE_AWARDED_STATUS } from '../../../../shared/config/granteeResearchPrograms';
 import { GRANTEE_DELIVERABLE_LABEL } from '../../../../shared/config/granteeDeliverableStatus';
@@ -25,7 +26,7 @@ import { GRANTEE_DELIVERABLE_LABEL } from '../../../../shared/config/granteeDeli
 const SELECT = [
   'akoya_requestid', 'akoya_requestnum', 'akoya_title',
   '_wmkf_projectleader_value', '_akoya_primarycontactid_value', '_akoya_programid_value',
-  'wmkf_granteedeliverablestatus', 'wmkf_abstractformatted',
+  'wmkf_abstractformatted',
 ].join(',');
 
 const normStatus = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
@@ -61,8 +62,12 @@ export default async function handler(req, res) {
         orderby: 'akoya_requestnum asc',
       });
 
-      const awardees = (records || []).map((r) => {
-        const status = normStatus(r.wmkf_granteedeliverablestatus);
+      const deliverables = await Promise.all(
+        (records || []).map((r) => getDeliverableForRequest(r.akoya_requestid).catch(() => null)),
+      );
+
+      const awardees = (records || []).map((r, i) => {
+        const status = normStatus(deliverables[i]?.wmkf_deliverablestatus);
         return {
           requestId: r.akoya_requestid,
           requestNumber: r.akoya_requestnum,

@@ -23,6 +23,10 @@ import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-co
 import { isGuid } from '../../../../lib/utils/guid';
 import { mintForRequest } from '../../../../lib/external/grantee-token-lifecycle';
 import { renderGranteeInviteHtml } from '../../../../lib/external/grantee-invite-email';
+import {
+  ensureDeliverableForRequest,
+  patchDeliverable,
+} from '../../../../lib/services/grantee-deliverable-record';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../../../shared/config/granteeDeliverableStatus';
 
 export const config = {
@@ -76,7 +80,7 @@ export default async function handler(req, res) {
       let row;
       try {
         row = await DynamicsService.getRecord('akoya_requests', requestId, {
-          select: 'akoya_requestid,wmkf_granteedeliverablestatus',
+          select: 'akoya_requestid,akoya_requestnum',
         });
       } catch {
         row = null;
@@ -85,7 +89,11 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: `No request found for ${requestId}` });
       }
 
-      const status = normStatus(row.wmkf_granteedeliverablestatus);
+      const deliverable = await ensureDeliverableForRequest(requestId, {
+        requestNumber: row.akoya_requestnum,
+        actingUserSystemId,
+      });
+      const status = normStatus(deliverable?.wmkf_deliverablestatus);
       // Corrupt/non-numeric status must NOT slip past the guards — NaN comparisons
       // are all false, which would otherwise let a bad value reach mint/send. Fail loud.
       if (status !== null && Number.isNaN(status)) {
@@ -130,11 +138,13 @@ export default async function handler(req, res) {
       let statusPersisted = true;
       if (status === GRANTEE_DELIVERABLE_STATUS.DRAFTED) {
         try {
-          await DynamicsService.updateRecord(
-            'akoya_requests', requestId,
-            { wmkf_granteedeliverablestatus: GRANTEE_DELIVERABLE_STATUS.INVITED },
-            { actingUserSystemId },
-          );
+          await patchDeliverable(requestId, {
+            wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.INVITED,
+            wmkf_inviteddate: new Date().toISOString(),
+          }, {
+            ifMatch: deliverable._etag,
+            actingUserSystemId,
+          });
           finalStatus = GRANTEE_DELIVERABLE_STATUS.INVITED;
         } catch (e) {
           console.error('[grantee-deliverables/send-invite] status update failed (email already sent):', e.message);

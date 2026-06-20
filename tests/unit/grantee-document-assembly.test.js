@@ -18,9 +18,13 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 jest.mock('../../lib/services/proposal-participants', () => ({
   fetchCoPIs: jest.fn(),
 }));
+jest.mock('../../lib/services/grantee-deliverable-record', () => ({
+  getDeliverableForRequest: jest.fn(),
+}));
 
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import { fetchCoPIs } from '../../lib/services/proposal-participants';
+import { getDeliverableForRequest } from '../../lib/services/grantee-deliverable-record';
 import {
   assembleGranteeDocument,
   joinNames,
@@ -70,8 +74,6 @@ describe('assembleGranteeDocument', () => {
     wmkf_wmkfprojectdescription: 'To determine whether marine viruses store iron',
     wmkf_abstractapproved: 'Approved abstract body.',
     wmkf_abstractformatted: 'AI formatted abstract body.',
-    wmkf_granteeimagecaption: 'A marine virus',
-    wmkf_granteeimagefileref: 'sites/x/img.jpg',
     _wmkf_projectleader_value: 'pi-guid',
     _wmkf_projectleader_value_formatted: 'Kristen Buck',
     akoya_grant: 1200000,
@@ -79,12 +81,18 @@ describe('assembleGranteeDocument', () => {
     _akoya_applicantid_value: 'acct-guid',
     _akoya_applicantid_value_formatted: 'Oregon State University (annotation)',
   };
+  const DELIVERABLE = {
+    wmkf_granteedeliverableid: 'deliv-1',
+    wmkf_imagecaption: 'A marine virus',
+    wmkf_imagefileref: 'sites/x/img.jpg',
+  };
   const ACCOUNT = { name: 'Oregon State University', address1_city: 'Corvallis', address1_stateorprovince: 'OR' };
 
   beforeEach(() => {
     DynamicsService.getRecord.mockReset();
     fetchCoPIs.mockReset();
     fetchCoPIs.mockResolvedValue(['Mya Breitbart']);
+    getDeliverableForRequest.mockReset().mockResolvedValue(DELIVERABLE);
   });
 
   function wireReads({ request = REQUEST, account = ACCOUNT } = {}) {

@@ -57,9 +57,12 @@ function okVerify(status) {
       wmkf_meetingdate: '2026-06-01',
       wmkf_abstractformatted: 'formatted',
       wmkf_abstractapproved: null,
-      wmkf_granteeimagecaption: null,
-      wmkf_granteeimagefileref: null,
-      wmkf_granteedeliverablestatus: status,
+    },
+    deliverable: status === undefined ? null : {
+      wmkf_granteedeliverableid: 'deliv-1',
+      wmkf_imagecaption: null,
+      wmkf_imagefileref: null,
+      wmkf_deliverablestatus: status,
     },
   };
 }
@@ -132,6 +135,14 @@ test('FAIL-CLOSED: null status → not editable, view:closed', async () => {
   expect(res.body.view).toBe('closed');
 });
 
+test('FAIL-CLOSED: missing deliverable row → not editable, view:closed', async () => {
+  verifyGranteeToken.mockResolvedValue(okVerify(undefined));
+  const res = mockRes();
+  await handler({ method: 'GET', query: { token: 't' }, headers: {} }, res);
+  expect(res.body.editable).toBe(false);
+  expect(res.body.view).toBe('closed');
+});
+
 test('FAIL-CLOSED: unknown status value → not editable, view:closed', async () => {
   verifyGranteeToken.mockResolvedValue(okVerify(999999));
   const res = mockRes();
@@ -143,7 +154,7 @@ test('FAIL-CLOSED: unknown status value → not editable, view:closed', async ()
 test('SECURITY: a populated image ref never leaks to the client (only hasImage:true)', async () => {
   const SECRET_URL = 'https://wmkf.sharepoint.com/Grantee_Uploads/secret-folder/img.png';
   const v = okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED);
-  v.request.wmkf_granteeimagefileref = SECRET_URL;
+  v.deliverable.wmkf_imagefileref = SECRET_URL;
   verifyGranteeToken.mockResolvedValue(v);
   const res = mockRes();
   await handler({ method: 'GET', query: { token: 't' }, headers: {} }, res);

@@ -24,11 +24,16 @@ jest.mock('../../lib/services/model-override-loader', () => ({
 jest.mock('../../lib/services/grantee-abstract-service', () => ({
   generateGranteeAbstract: jest.fn(),
 }));
+jest.mock('../../lib/services/grantee-deliverable-record', () => ({
+  ensureDeliverableForRequest: jest.fn(),
+  patchDeliverable: jest.fn(),
+}));
 
 import { requireAppAccess } from '../../lib/utils/auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import { loadModelOverrides } from '../../lib/services/model-override-loader';
 import { generateGranteeAbstract } from '../../lib/services/grantee-abstract-service';
+import { ensureDeliverableForRequest, patchDeliverable } from '../../lib/services/grantee-deliverable-record';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import handler from '../../pages/api/workbench/grantee-deliverables/generate';
 
@@ -48,11 +53,18 @@ const reqOf = (body) => ({ method: 'POST', body, headers: {} });
 function row(over = {}) {
   return {
     akoya_requestid: GUID,
+    akoya_requestnum: '1002794',
     wmkf_abstract: SOURCE,
     wmkf_abstractformatted: null,
-    wmkf_granteedeliverablestatus: null,
     _etag: 'W/"1"',
     ...over,
+  };
+}
+function deliverable(status = null) {
+  return {
+    wmkf_granteedeliverableid: 'deliv-1',
+    wmkf_deliverablestatus: status,
+    _etag: 'W/"2"',
   };
 }
 
@@ -62,6 +74,8 @@ beforeEach(() => {
   DynamicsService.updateRecord.mockReset().mockResolvedValue({});
   loadModelOverrides.mockReset().mockResolvedValue();
   generateGranteeAbstract.mockReset().mockResolvedValue({ abstractFormatted: FORMATTED, runId: 'r1', model: 'm1' });
+  ensureDeliverableForRequest.mockReset().mockResolvedValue(deliverable(null));
+  patchDeliverable.mockReset().mockResolvedValue({});
 });
 
 test('non-POST → 405', async () => {
@@ -93,13 +107,16 @@ test('happy path: generate, persist, stamp Drafted from null status', async () =
   expect(res.body.abstractFormatted).toBe(FORMATTED);
   expect(res.body.persisted).toBe(true);
   const [, , patch, opts] = DynamicsService.updateRecord.mock.calls[0];
-  expect(patch.wmkf_abstractformatted).toBe(FORMATTED);
-  expect(patch.wmkf_granteedeliverablestatus).toBe(GRANTEE_DELIVERABLE_STATUS.DRAFTED);
+  expect(patch).toEqual({ wmkf_abstractformatted: FORMATTED });
   expect(opts).toMatchObject({ ifMatch: 'W/"1"', actingUserSystemId: 'sys-1' });
+  expect(patchDeliverable).toHaveBeenCalledWith(GUID, {
+    wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.DRAFTED,
+  }, { ifMatch: 'W/"2"', actingUserSystemId: 'sys-1' });
 });
 
 test('reuse-existing: populated abstract + no regenerate → no paid call', async () => {
-  DynamicsService.getRecord.mockResolvedValue(row({ wmkf_abstractformatted: 'already here', wmkf_granteedeliverablestatus: GRANTEE_DELIVERABLE_STATUS.INVITED }));
+  DynamicsService.getRecord.mockResolvedValue(row({ wmkf_abstractformatted: 'already here' }));
+  ensureDeliverableForRequest.mockResolvedValue(deliverable(GRANTEE_DELIVERABLE_STATUS.INVITED));
   const res = mockRes();
   await handler(reqOf({ requestId: GUID }), res);
   expect(res.statusCode).toBe(200);
@@ -119,7 +136,8 @@ test('regenerate is honored only for strict boolean true (string "true" still re
 });
 
 test('regenerate=true overwrites an existing abstract', async () => {
-  DynamicsService.getRecord.mockResolvedValue(row({ wmkf_abstractformatted: 'old', wmkf_granteedeliverablestatus: GRANTEE_DELIVERABLE_STATUS.DRAFTED }));
+  DynamicsService.getRecord.mockResolvedValue(row({ wmkf_abstractformatted: 'old' }));
+  ensureDeliverableForRequest.mockResolvedValue(deliverable(GRANTEE_DELIVERABLE_STATUS.DRAFTED));
   const res = mockRes();
   await handler(reqOf({ requestId: GUID, regenerate: true }), res);
   expect(generateGranteeAbstract).toHaveBeenCalled();
@@ -127,12 +145,13 @@ test('regenerate=true overwrites an existing abstract', async () => {
 });
 
 test('STATUS NON-DOWNGRADE: regenerate at Invited keeps Invited (patch omits status)', async () => {
-  DynamicsService.getRecord.mockResolvedValue(row({ wmkf_abstractformatted: 'old', wmkf_granteedeliverablestatus: GRANTEE_DELIVERABLE_STATUS.INVITED }));
+  DynamicsService.getRecord.mockResolvedValue(row({ wmkf_abstractformatted: 'old' }));
+  ensureDeliverableForRequest.mockResolvedValue(deliverable(GRANTEE_DELIVERABLE_STATUS.INVITED));
   const res = mockRes();
   await handler(reqOf({ requestId: GUID, regenerate: true }), res);
   const [, , patch] = DynamicsService.updateRecord.mock.calls[0];
   expect(patch.wmkf_abstractformatted).toBe(FORMATTED);
-  expect(patch).not.toHaveProperty('wmkf_granteedeliverablestatus');
+  expect(patchDeliverable).not.toHaveBeenCalled();
   expect(res.body.status).toBe(GRANTEE_DELIVERABLE_STATUS.INVITED);
 });
 
@@ -167,12 +186,12 @@ test('STATUS NON-DOWNGRADE handles a numeric-STRING status from the API', async 
   // so an Invited row (as "100000001") still omits the status from the patch.
   DynamicsService.getRecord.mockResolvedValue(row({
     wmkf_abstractformatted: 'old',
-    wmkf_granteedeliverablestatus: String(GRANTEE_DELIVERABLE_STATUS.INVITED),
   }));
+  ensureDeliverableForRequest.mockResolvedValue(deliverable(String(GRANTEE_DELIVERABLE_STATUS.INVITED)));
   const res = mockRes();
   await handler(reqOf({ requestId: GUID, regenerate: true }), res);
   const [, , patch] = DynamicsService.updateRecord.mock.calls[0];
-  expect(patch).not.toHaveProperty('wmkf_granteedeliverablestatus');
+  expect(patchDeliverable).not.toHaveBeenCalled();
   expect(res.body.status).toBe(GRANTEE_DELIVERABLE_STATUS.INVITED);
 });
 
@@ -194,7 +213,8 @@ test('request not found → 404', async () => {
 test('412 + now-populated → 200 reused/concurrent (no raw 412)', async () => {
   DynamicsService.getRecord
     .mockResolvedValueOnce(row())  // first read
-    .mockResolvedValueOnce({ wmkf_abstractformatted: 'peer wrote this', wmkf_granteedeliverablestatus: GRANTEE_DELIVERABLE_STATUS.DRAFTED }); // re-read after 412
+    .mockResolvedValueOnce({ wmkf_abstractformatted: 'peer wrote this' }); // re-read after 412
+  ensureDeliverableForRequest.mockResolvedValue(deliverable(GRANTEE_DELIVERABLE_STATUS.DRAFTED));
   DynamicsService.updateRecord.mockRejectedValue(Object.assign(new Error('precondition failed'), { status: 412 }));
   const res = mockRes();
   await handler(reqOf({ requestId: GUID }), res);

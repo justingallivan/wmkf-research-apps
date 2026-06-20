@@ -26,6 +26,10 @@
       "schedule": "0 6 * 4-6,10-12 *"
     },
     {
+      "path": "/api/cron/grantee-deliverable-reminders",
+      "schedule": "0 8 * * *"
+    },
+    {
       "path": "/api/cron/health-check",
       "schedule": "*/15 * * * *"
     },

@@ -56,6 +56,7 @@ The canonical reference for the live state of the application's data layer.
 | `systemuser` | 222 | internal staff | (used for impersonation; see `dataverse-identity-map.js`) |
 | `wmkf_ai_run` | 325 | append-only AI invocation audit ledger | [dataverse-wmkf-ai-run-and-prompt.md](atlas/dataverse-wmkf-ai-run-and-prompt.md) |
 | `wmkf_ai_prompt` | 11 | staff-editable prompt rows for Executor | same page |
+| `wmkf_granteedeliverable` | 0 expected at cutover | **[PLANNED S271]** grantee deliverable package lifecycle/image/date side table; schema-as-code added, live Dataverse apply/admin privilege grant not performed by this task | [dataverse-wmkf-granteedeliverable.md](atlas/dataverse-wmkf-granteedeliverable.md) |
 
 ### Vendor entities — Dynamics Explorer read-only
 
@@ -123,6 +124,7 @@ The high-leverage services for data-layer work — full source remains authorita
 | `graph-service.js` | none | none (Microsoft Graph, separate token cache) | SharePoint files |
 | `external-token.js` | none (read/write live on `wmkf_appreviewersuggestion` extension fields) | `wmkf_appreviewersuggestion` | HMAC JWT primitive |
 | `review-upload.js` | none | `wmkf_appreviewersuggestion` (PATCH) + SharePoint | shared writer for staff + reviewer paths |
+| `grantee-deliverable-record.js` | none | `wmkf_granteedeliverable` | canonical package helper; read-only `getDeliverableForRequest()` never creates, staff write paths use `ensureDeliverableForRequest()` and `patchDeliverable()` |
 | `claude-reviewer-service.js` | none | none | legacy; new code uses `llm-client.js` |
 | `discovery-service.js` external clients (`pubmed-service.js`, `openalex-service.js`, `arxiv-service.js`, `biorxiv-service.js`, `chemrxiv-service.js`, `orcid-service.js`, `serp-contact-service.js`) | none | none | external research-DB clients |
 | `literature-search-service.js` | none | none | shared search shim |

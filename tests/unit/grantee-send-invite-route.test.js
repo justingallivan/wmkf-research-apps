@@ -7,7 +7,7 @@
  */
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/services/dynamics-service', () => ({
-  DynamicsService: { getRecord: jest.fn(), updateRecord: jest.fn(), createAndSendEmail: jest.fn() },
+  DynamicsService: { getRecord: jest.fn(), createAndSendEmail: jest.fn() },
 }));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (l, fn) => Promise.resolve().then(() => (typeof l === 'function' ? l() : fn())),
@@ -15,10 +15,15 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 jest.mock('../../lib/external/grantee-token-lifecycle', () => ({
   mintForRequest: jest.fn(async () => ({ url: 'https://app.example.org/external/grantee/JWT123' })),
 }));
+jest.mock('../../lib/services/grantee-deliverable-record', () => ({
+  ensureDeliverableForRequest: jest.fn(),
+  patchDeliverable: jest.fn(),
+}));
 
 import { requireAppAccess } from '../../lib/utils/auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import { mintForRequest } from '../../lib/external/grantee-token-lifecycle';
+import { ensureDeliverableForRequest, patchDeliverable } from '../../lib/services/grantee-deliverable-record';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import handler from '../../pages/api/workbench/grantee-deliverables/send-invite';
 
@@ -37,14 +42,22 @@ const body = (over = {}) => ({
   ...over,
 });
 const reqOf = (b) => ({ method: 'POST', body: b, headers: {} });
+function deliverable(status) {
+  return {
+    wmkf_granteedeliverableid: 'deliv-1',
+    wmkf_deliverablestatus: status,
+    _etag: 'W/"2"',
+  };
+}
 
 beforeEach(() => {
   requireAppAccess.mockReset().mockResolvedValue({
     profileId: 'p', session: { user: { azureEmail: 'pd@wmkeck.org', dynamicsSystemuserId: 'sys-1' } },
   });
-  DynamicsService.getRecord.mockReset().mockResolvedValue({ akoya_requestid: GUID, wmkf_granteedeliverablestatus: GRANTEE_DELIVERABLE_STATUS.DRAFTED });
-  DynamicsService.updateRecord.mockReset().mockResolvedValue({});
+  DynamicsService.getRecord.mockReset().mockResolvedValue({ akoya_requestid: GUID, akoya_requestnum: '1002794' });
   DynamicsService.createAndSendEmail.mockReset().mockResolvedValue({ emailId: 'email-1' });
+  ensureDeliverableForRequest.mockReset().mockResolvedValue(deliverable(GRANTEE_DELIVERABLE_STATUS.DRAFTED));
+  patchDeliverable.mockReset().mockResolvedValue({});
   mintForRequest.mockClear();
 });
 
@@ -76,13 +89,15 @@ test('happy path: PI To, liaison Cc, server-injected link, status Drafted→Invi
   // the magic-link was injected server-side into the HTML body
   expect(sent.body).toContain('https://app.example.org/external/grantee/JWT123');
 
-  // status flip Drafted -> Invited
-  const [, , patch] = DynamicsService.updateRecord.mock.calls[0];
-  expect(patch).toEqual({ wmkf_granteedeliverablestatus: GRANTEE_DELIVERABLE_STATUS.INVITED });
+  // status flip Drafted -> Invited, stamped once with the first invite date
+  const [, patch, opts] = patchDeliverable.mock.calls[0];
+  expect(patch).toMatchObject({ wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.INVITED });
+  expect(typeof patch.wmkf_inviteddate).toBe('string');
+  expect(opts).toEqual({ ifMatch: 'W/"2"', actingUserSystemId: 'sys-1' });
 });
 
 test('generate-first guard: null status → 400, nothing sent', async () => {
-  DynamicsService.getRecord.mockResolvedValue({ akoya_requestid: GUID, wmkf_granteedeliverablestatus: null });
+  ensureDeliverableForRequest.mockResolvedValue(deliverable(null));
   const res = mockRes();
   await handler(reqOf(body()), res);
   expect(res.statusCode).toBe(400);
@@ -90,7 +105,7 @@ test('generate-first guard: null status → 400, nothing sent', async () => {
 });
 
 test('already submitted → 409, nothing sent', async () => {
-  DynamicsService.getRecord.mockResolvedValue({ akoya_requestid: GUID, wmkf_granteedeliverablestatus: GRANTEE_DELIVERABLE_STATUS.SUBMITTED });
+  ensureDeliverableForRequest.mockResolvedValue(deliverable(GRANTEE_DELIVERABLE_STATUS.SUBMITTED));
   const res = mockRes();
   await handler(reqOf(body()), res);
   expect(res.statusCode).toBe(409);
@@ -98,12 +113,12 @@ test('already submitted → 409, nothing sent', async () => {
 });
 
 test('NON-DOWNGRADE: re-send while Invited keeps Invited (no status write)', async () => {
-  DynamicsService.getRecord.mockResolvedValue({ akoya_requestid: GUID, wmkf_granteedeliverablestatus: GRANTEE_DELIVERABLE_STATUS.INVITED });
+  ensureDeliverableForRequest.mockResolvedValue(deliverable(GRANTEE_DELIVERABLE_STATUS.INVITED));
   const res = mockRes();
   await handler(reqOf(body()), res);
   expect(res.statusCode).toBe(200);
   expect(DynamicsService.createAndSendEmail).toHaveBeenCalled();
-  expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  expect(patchDeliverable).not.toHaveBeenCalled();
   expect(res.body.status).toBe(GRANTEE_DELIVERABLE_STATUS.INVITED);
 });
 
@@ -132,11 +147,11 @@ test('send failure → 502, status not flipped', async () => {
   const res = mockRes();
   await handler(reqOf(body()), res);
   expect(res.statusCode).toBe(502);
-  expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  expect(patchDeliverable).not.toHaveBeenCalled();
 });
 
 test('a failed status write after a successful send returns 200 but reports the ACTUAL status (not Invited)', async () => {
-  DynamicsService.updateRecord.mockRejectedValue(new Error('etag race'));
+  patchDeliverable.mockRejectedValue(new Error('etag race'));
   const res = mockRes();
   await handler(reqOf(body()), res);
   expect(res.statusCode).toBe(200);
@@ -153,7 +168,7 @@ test('happy path reports statusPersisted true', async () => {
 });
 
 test('SECURITY: a corrupt non-numeric status → 500, nothing minted or sent', async () => {
-  DynamicsService.getRecord.mockResolvedValue({ akoya_requestid: GUID, wmkf_granteedeliverablestatus: 'abc' });
+  ensureDeliverableForRequest.mockResolvedValue(deliverable('abc'));
   const res = mockRes();
   await handler(reqOf(body()), res);
   expect(res.statusCode).toBe(500);
@@ -162,7 +177,7 @@ test('SECURITY: a corrupt non-numeric status → 500, nothing minted or sent', a
 });
 
 test('a numeric-STRING Drafted status from the API still sends + flips to Invited', async () => {
-  DynamicsService.getRecord.mockResolvedValue({ akoya_requestid: GUID, wmkf_granteedeliverablestatus: String(GRANTEE_DELIVERABLE_STATUS.DRAFTED) });
+  ensureDeliverableForRequest.mockResolvedValue(deliverable(String(GRANTEE_DELIVERABLE_STATUS.DRAFTED)));
   const res = mockRes();
   await handler(reqOf(body()), res);
   expect(res.statusCode).toBe(200);

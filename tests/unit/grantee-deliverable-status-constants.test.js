@@ -55,10 +55,10 @@ test('isValidGranteeDeliverableValue rejects out-of-set and non-integer values',
 
 test('config option set matches the Dataverse wave JSON exactly (source-of-truth parity)', () => {
   const waveJson = JSON.parse(fs.readFileSync(
-    path.join(__dirname, '..', '..', 'lib', 'dataverse', 'schema', 'wave2-grantee-deliverables', 'akoya_request-grantee-deliverables.json'),
+    path.join(__dirname, '..', '..', 'lib', 'dataverse', 'schema', 'wave3-grantee-deliverable-table', 'wmkf_granteedeliverable.json'),
     'utf8',
   ));
-  const statusAttr = waveJson.attributes.find((a) => a.schemaName === 'wmkf_GranteeDeliverableStatus');
+  const statusAttr = waveJson.attributes.find((a) => a.schemaName === 'wmkf_DeliverableStatus');
   expect(statusAttr).toBeDefined();
 
   const jsonOptions = new Map(statusAttr.options.map((o) => [o.value, o.label]));

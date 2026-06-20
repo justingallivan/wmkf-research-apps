@@ -60,7 +60,14 @@ function multipartReq({ fields = {}, file, files } = {}) {
 }
 
 const okVerify = (status = GRANTEE_DELIVERABLE_STATUS.INVITED) => ({
-  ok: true, requestId: 'r1', request: { akoya_requestid: 'r1', akoya_requestnum: '1002794', wmkf_granteedeliverablestatus: status, _etag: 'W/"1"' },
+  ok: true,
+  requestId: 'r1',
+  request: { akoya_requestid: 'r1', akoya_requestnum: '1002794', _etag: 'W/"1"' },
+  deliverable: status === undefined ? null : {
+    wmkf_granteedeliverableid: 'd1',
+    wmkf_deliverablestatus: status,
+    _etag: 'W/"2"',
+  },
 });
 
 beforeEach(() => {
@@ -108,6 +115,16 @@ test('FAIL-CLOSED: null status → 409', async () => {
   expect(res.statusCode).toBe(409);
 });
 
+test('FAIL-CLOSED: missing deliverable row → 409', async () => {
+  const v = okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED);
+  v.deliverable = null;
+  verifyGranteeToken.mockResolvedValue(v);
+  const res = mockRes();
+  await handler(plainReq(), res);
+  expect(res.statusCode).toBe(409);
+  expect(writeGranteeDeliverables).not.toHaveBeenCalled();
+});
+
 test('happy path: parses multipart, calls service, returns 200', async () => {
   verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
   const res = mockRes();
@@ -124,6 +141,7 @@ test('happy path: parses multipart, calls service, returns 200', async () => {
   expect(arg.imageFile.filename).toBe('fig.png');
   expect(Buffer.isBuffer(arg.imageFile.buffer)).toBe(true);
   expect(arg.request.akoya_requestid).toBe('r1');
+  expect(arg.deliverable.wmkf_granteedeliverableid).toBe('d1');
 });
 
 test('busboy FILE_TOO_LARGE → 400 image_too_large, service not called', async () => {

@@ -8,10 +8,9 @@
  * formatted/approved abstract, caption, whether an image is already on file,
  * and the package status — plus a fail-closed `editable` flag and `view`.
  *
- * Fail-closed (Codex chunk-1 review): an unknown/missing
- * wmkf_granteedeliverablestatus does NOT default to editable. Only the explicit
- * EDITABLE_STATUSES allowlist renders the edit view; everything else is
- * read-only. Ordering: method → rate-limit → verify → record outcome →
+ * Fail-closed: a missing deliverable row or unknown/missing deliverable status
+ * does NOT default to editable. Only the explicit EDITABLE_STATUSES allowlist
+ * renders the edit view; everything else is read-only. Ordering: method → rate-limit → verify → record outcome →
  * fail-fast → only then shape the response.
  *
  * Errors return `{ ok: false, reason }` (the verifier's discriminated reasons)
@@ -95,10 +94,10 @@ export default async function handler(req, res) {
       });
     }
 
-    const { request } = verified;
+    const { request, deliverable } = verified;
 
     // Status may be a number, a numeric string from the API, or null/undefined.
-    const rawStatus = request.wmkf_granteedeliverablestatus;
+    const rawStatus = deliverable?.wmkf_deliverablestatus;
     const status = rawStatus === null || rawStatus === undefined || rawStatus === ''
       ? null
       : Number(rawStatus);
@@ -129,8 +128,8 @@ export default async function handler(req, res) {
         // only whether an image is already on file.
         abstractFormatted: request.wmkf_abstractformatted || null,
         abstractApproved: request.wmkf_abstractapproved || null,
-        caption: request.wmkf_granteeimagecaption || null,
-        hasImage: Boolean(request.wmkf_granteeimagefileref),
+        caption: deliverable?.wmkf_imagecaption || null,
+        hasImage: Boolean(deliverable?.wmkf_imagefileref),
         status,
         statusLabel: status !== null ? (GRANTEE_DELIVERABLE_LABEL[status] || null) : null,
       },

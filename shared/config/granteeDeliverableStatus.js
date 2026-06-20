@@ -1,8 +1,8 @@
 /**
  * Grantee deliverable status — shared constants for the Grantee Deliverables Portal.
  *
- * Single source of truth for the `wmkf_granteedeliverablestatus` picklist on the
- * core `akoya_request` entity. The Awardee-tab workflow, the external grantee
+ * Single source of truth for the `wmkf_deliverablestatus` picklist on the
+ * `wmkf_granteedeliverable` entity. The Awardee-tab workflow, the external grantee
  * portal submit route, the metadata-probe preflight, the dashboard query, and the
  * UI ALL import from here — never compare on label, never inline the magic numbers.
  *
@@ -20,7 +20,7 @@
  * shared/config/triageStatus.js.)
  *
  * The numeric option values are mirrored in the Dataverse schema
- * (lib/dataverse/schema/wave2-grantee-deliverables/akoya_request-grantee-deliverables.json,
+ * (lib/dataverse/schema/wave3-grantee-deliverable-table/wmkf_granteedeliverable.json,
  * the source of truth for Dataverse) and MUST stay in sync with it. New values
  * may be appended additively without a migration.
  */
