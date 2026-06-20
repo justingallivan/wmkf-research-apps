@@ -1,112 +1,144 @@
 # Plan: Unified per-user email signature (profile-settings) (S271)
 
-> **⚠️ CORRECTION (S271, post-Codex-review):** an earlier draft of this plan asserted preferences live
-> in **Postgres** — that is WRONG. [VERIFIED via `lib/services/dataverse-prefs-service.js` header +
-> `lib/services/database-service.js:14-19` + `scripts/setup-database.js:254`] user **preferences live in
-> Dataverse `wmkf_appuserpreferences`** (Postgres `user_preferences` was dropped 2026-05-12); Postgres
-> `user_profiles` holds only the identity record. The body below is being revised to match (Dataverse-pref
-> keyed by systemuser; `dataverse-identity-map.js` bridges profile↔systemuser). See Codex finding #1.
+> **Status: PLAN v2 — Codex review #1 folded; pending Codex review #2 (owner-requested).** Owner wants
+> ONE editable signature block per user, edited in the central **Profile Settings** page, consumed by BOTH
+> reviewer-invitation and grantee (invite + reminder) emails — unifying today's reviewer-only bespoke
+> sender-info UI. Also fixes a live reminder-cron bug. Implementer decided after review #2.
 >
-> **Status: PLAN — pending Codex pre-impl review (owner-requested).** Owner wants ONE editable
-> signature block per user, stored in Postgres, edited in the central **Profile Settings** page, and
-> consumed by BOTH reviewer-invitation and grantee (invite + reminder) emails — replacing today's
-> reviewer-only, bespoke sender-info UI. Also fixes a live cron bug.
+> **Revision note:** v1 wrongly said preferences live in Postgres and proposed an `azureactivedirectoryobjectid`
+> join; both corrected below per Codex review #1 (storage = Dataverse; join = email via the existing
+> identity map). v2 also splits the rollout into two phases (grantee first, reviewer-UI retirement later).
 
 ## Why (owner intent, S271)
 
-- The grantee invite/reminder need a signature; titles are NOT in Dataverse (verified null for all PDs),
-  so the signature must come from a per-user store with a sensible fallback.
-- A PD is leaving mid-cycle; the plan is to **reassign the Dataverse PD** (`_wmkf_programdirector_value`)
+- The grantee invite/reminder need a signature; titles are NOT in Dataverse, so the signature must come
+  from a per-user store with a sensible fallback.
+- A PD is leaving mid-cycle; the owner will **reassign the Dataverse PD** (`_wmkf_programdirector_value`)
   on his applications. That already drives dashboards/`canManage`; the signature should resolve from the
   **assigned PD** so the same reassignment cascades to emails too.
 - Owner wants the signature **collapsed to one freeform block**, edited in **Profile Settings** (today a
-  placeholder-only page), and the reviewer flow's bespoke sender UI **unified** into it ("clean solution").
+  placeholder-only page), with the reviewer flow's bespoke sender UI **unified** into it.
 
 ## Verified current state (S271)
 
-- **The signature already exists as a Postgres preference.** `PREFERENCE_KEYS.SENDER_INFO =
-  'reviewer_finder_sender_info'` (`shared/config/reviewerFinderPreferences.js`), JSON `{ name, email,
-  signature }` where **`signature` is a freeform multi-line block** (default all-empty). Stored per
-  profile via `/api/user-preferences` → `DatabaseService` (Postgres `@vercel/postgres`).
-- **Edited via reviewer-only UIs:** `shared/components/EmailSettingsPanel.js` + `SettingsModal.js`
-  (Sender Name / Sender Email / Signature textarea). `ProfileContext` migrates a legacy localStorage
-  `email_sender_info` into the preference on first profile select.
-- **Consumed by reviewer invites only:** standalone Reviewer Finder (`EmailGeneratorModal.js`) and the
-  workbench reviewer invite (`pages/workbench/[requestId].js:88-110`), resolving `{{signature}}` with the
-  fallback chain `signature → name → profile display name`.
-- **`profile-settings.js`** manages profiles only (display name, avatar, default/archive) + an "About
-  Profiles" info card — NO signature section. Uses `useProfile()` (has `preferences` + `setPreference`).
-- **`/api/user-preferences`** accepts any key except the reserved `PROMPT_OVERRIDES`; supports an
-  encrypted-keys list. So a new general key needs no allowlist change.
-- **Grantee flows do NOT read any signature today.** The invite default (`AwardeeTab` `DEFAULT_BODY`) has
-  a literal `[Program Director name]/[title]` placeholder; the reminder cron reads the assigned PD's
-  `systemuser` and **requires `title`**.
-- **[VERIFIED via probe] `systemuser.title` is null for all 6 assigned PDs** (Connor, Justin, Kevin,
-  Jean, Beth, Anneli); `fullname` + `internalemailaddress` are populated. ⇒ **the shipped reminder cron
-  would skip every row** (`!pdTitle → skippedNoPd`, `grantee-deliverable-reminders.js:171`). Bug to fix.
-- **`user_profiles` (Postgres)** has `azure_id` (Azure AD object id, UNIQUE) + `azure_email`.
+- **Preferences live in Dataverse, NOT Postgres.** [VERIFIED via `lib/services/dataverse-prefs-service.js`
+  header + `lib/services/database-service.js:14-19` + `scripts/setup-database.js:254`] `DatabaseService`
+  delegates all six pref methods unconditionally to `dataverse-prefs-service.js` → Dataverse
+  `wmkf_appuserpreferences`; the Postgres `user_preferences` table was dropped 2026-05-12 (W3–W6 cutover);
+  `WAVE1_BACKEND_PREFS=postgres` throws at load. Postgres `user_profiles` holds only the IDENTITY record.
+- **The signature block already exists as a pref.** [VERIFIED via `shared/config/reviewerFinderPreferences.js:23,112`]
+  `PREFERENCE_KEYS.SENDER_INFO = 'reviewer_finder_sender_info'`, JSON `{ name, email, signature }` where
+  `signature` is a freeform multi-line block (default all-empty). Stored per profile via
+  `/api/user-preferences` → DataverseService.
+- **Identity bridge is EMAIL-based.** [VERIFIED via `lib/services/dataverse-identity-map.js:2,4,49,70,77`]
+  `dataverse-identity-map.js` bridges Postgres `user_profile_id` ↔ Dataverse `systemuserid` by matching
+  `user_profiles.azure_email eq systemuser.internalemailaddress` (NOT `azureactivedirectoryobjectid` — no
+  source reads that field). Exposes `resolveProfileToSystemUser(profileId)` and
+  `resolveSystemUserToProfile(systemuserid)`. `dataverse-prefs-service.js` already uses
+  `resolveProfileToSystemUser` — so prefs are effectively keyed per systemuser.
+- **Edited via reviewer-only UIs:** `shared/components/EmailSettingsPanel.js` + `SettingsModal.js` (Sender
+  Name / Email / Signature textarea). [VERIFIED via `shared/context/ProfileContext.js:115,123,142`]
+  `ProfileContext` migrates a legacy localStorage `email_sender_info` into `SENDER_INFO` once, sets
+  `_legacy_migration_complete`, and returns early on later loads.
+- **Reviewer consumption is CLIENT-SUPPLIED today.** [VERIFIED via `pages/workbench/[requestId].js:91`,
+  `pages/api/review-manager/render-emails.js:74-75,191`] the workbench reads the logged-in user's
+  `SENDER_INFO` in the page and passes `{ signature }` into the render API, which trusts
+  `req.body.settings.signature`. render-emails already fetches the request (`akoya_requests`, line 100)
+  and has `_wmkf_request_value` per suggestion — so server-side assigned-PD resolution is feasible there.
+- **Standalone Reviewer Finder hard-requires sender name/email.** [VERIFIED via
+  `pages/api/reviewer-finder/generate-emails.js:240-241,480-481`] it rejects a missing `settings.senderEmail`
+  and the `.eml` From header uses `senderName`/`senderEmail`. So name/email CANNOT be dropped for that flow.
+- **Grantee flows read no signature today.** The invite default (`AwardeeTab` `DEFAULT_BODY`) has a literal
+  `[Program Director name]/[title]` placeholder; the reminder cron reads the assigned PD's `systemuser`.
+- **[VERIFIED via probe] `systemuser.title` is null for all 6 assigned PDs** (Connor, Justin, Kevin, Jean,
+  Beth, Anneli); `fullname` + `internalemailaddress` are populated. ⇒ the shipped reminder cron skips
+  every row (`!pdTitle → skippedNoPd`, `grantee-deliverable-reminders.js:171`). Bug to fix.
+- **Reminder renderer takes pdName/pdTitle.** [VERIFIED via `lib/external/grantee-invite-email.js`]
+  `renderGranteeReminderHtml` appends name + title lines — so the fix is a renderer CONTRACT change (accept
+  a resolved signature block), not just dropping the cron's title check.
+- **`/api/user-preferences`** accepts any key except reserved `PROMPT_OVERRIDES`; `EMAIL_SIGNATURE` is not
+  in `ENCRYPTED_PREFERENCE_KEYS`. No allowlist/encryption change needed.
 
-## Proposed model
+## Proposed model (v2)
 
 1. **One canonical block** — new general key `PREFERENCE_KEYS.EMAIL_SIGNATURE = 'email_signature'`, shape
-   `{ signature, name, email }` (`signature` = the freeform block, e.g. "Justin Gallivan\nSenior Program
-   Director\nW. M. Keck Foundation"; `name`/`email` retained for the reviewer flow's sender identity).
-   **Tolerant reader** falls back to the legacy `reviewer_finder_sender_info`; a one-time migration copies
-   legacy → new on read/save. No `/api/user-preferences` allowlist change needed.
-2. **One editor** — add an "Email signature" card to `profile-settings.js` (textarea for the block; saved
-   via `setPreference(EMAIL_SIGNATURE)`). Remove the sender-info section from `EmailSettingsPanel`/
-   `SettingsModal` (or replace with a "manage in Profile Settings" link). Central location, single editor.
+   `{ signature, name, email }` (`signature` = the freeform block; `name`/`email` retained — the standalone
+   reviewer flow still needs them). Stored in Dataverse `wmkf_appuserpreferences` via the existing
+   `/api/user-preferences` path (no allowlist/encryption change). **Tolerant reader** prefers
+   `EMAIL_SIGNATURE`, falls back to legacy `SENDER_INFO`; an explicit `SENDER_INFO → EMAIL_SIGNATURE`
+   copy runs **independent of** `_legacy_migration_complete` (that flag won't populate the new key).
+2. **One editor** — add an "Email signature" card to `profile-settings.js` editing the full
+   `{ signature, name, email }` shape (textarea + name/email), saved via `setPreference(EMAIL_SIGNATURE)`.
+   The bespoke reviewer sender UI stays for now (see phased rollout) but reads/writes the new key.
 3. **One shared resolver** `lib/services/email-signature.js`:
-   - `resolveSignatureForProfile(preferences | profileId)` → block (logged-in user; standalone Reviewer Finder).
-   - `resolveSignatureForRequest(requestId)` → resolves the **assigned PD** (`_wmkf_programdirector_value`
-     → `systemuser` → `azureactivedirectoryobjectid`) → that PD's `user_profiles` row (by `azure_id`, else
-     `azure_email` ↔ `internalemailaddress`) → their `email_signature` block.
-   - **Fallback chain** (both): saved `signature` block → PD/user `fullname` (or profile `display_name`)
-     → `display_name`; always end with "W. M. Keck Foundation". **No title line** unless the block sets
-     one (titles aren't in Dataverse).
-   All email surfaces build the signature through this — so reviewer/grantee/reminder all match.
-4. **Resolution decision (CONFIRMED owner S271):** request-scoped emails (grantee invite, grantee
-   reminder, workbench reviewer invite) resolve from the **assigned PD's profile** → reassigning the
-   Dataverse PD cascades to the signature + (for the cron) the sender. Standalone Reviewer Finder uses the
-   **logged-in user's** profile.
+   - `resolveSignatureForProfile(preferences)` → block for the logged-in user (standalone Reviewer Finder).
+   - `resolveSignatureForRequest(requestId)` (SERVER-SIDE) → assigned PD `_wmkf_programdirector_value` →
+     read that **systemuser's** `email_signature` pref directly (prefs are systemuser-keyed; use
+     `resolveSystemUserToProfile`/the prefs service), → block.
+   - **Fallback chain:** saved `signature` block → PD/user `fullname` (or profile `display_name`); always
+     end "W. M. Keck Foundation". **No title line** unless the block sets one.
+   - **No-match / multi-match:** `azure_email` is indexed but NOT unique — define deterministic handling
+     (first by lowest profile id; if no profile/pref, fall back to `fullname` + default; never throw).
+4. **Resolution placement (Codex #3):** request-scoped signature resolution happens **server-side**:
+   - grantee invite (`send-invite`) + reminder cron + the reviewer **render-emails** route resolve from the
+     request's **assigned PD** (keyed by request id), NOT from client-supplied `settings.signature`.
+   - standalone Reviewer Finder stays on the **logged-in user's** profile block.
 
-## Work breakdown
+## Codex review #1 — folded (binding for implementation)
 
-1. Add `EMAIL_SIGNATURE` key + `DEFAULT_VALUES` + tolerant read/migration off `reviewer_finder_sender_info`.
-2. `lib/services/email-signature.js` — the two resolvers + fallback chain (the assigned-PD→profile join
-   is the one new bit; share the PD-systemuser read with the cron).
-3. Profile-settings "Email signature" card (textarea + save + load).
+1. **#1 Storage = Dataverse, not Postgres.** All "preference" reads/writes go through the Dataverse path;
+   Postgres is identity-only. (Corrected throughout.)
+2. **#2 Join via the existing identity map (email), not `azureactivedirectoryobjectid`.** Use
+   `resolveSystemUserToProfile(systemuserid)` / read prefs by the PD's systemuserid; email join is
+   non-unique → deterministic multi-match rule + no-match fallback.
+3. **#3 Move request-scoped resolution server-side.** render-emails (and grantee send-invite/cron) resolve
+   the assigned-PD signature on the server keyed by request id; do not trust client `settings.signature`
+   for request-scoped sends.
+4. **#4 Keep name/email; phase the reviewer-UI retirement.** Standalone reviewer flow hard-requires
+   `senderEmail`; Profile Settings edits the full `{name,email,signature}` and the bespoke UI is retired
+   only in Phase 2, after the standalone send-identity path is confirmed.
+5. **#5 Explicit `SENDER_INFO → EMAIL_SIGNATURE` migration/tolerant reader** independent of
+   `_legacy_migration_complete`.
+6. **#6 Reminder renderer contract change:** `renderGranteeReminderHtml`/`buildGranteeReminderBodyText`
+   accept a resolved signature block; remove `pdTitle` from the reminder contract.
+7. **#7 From-vs-signature divergence:** decide per phase (below) — Phase 1 documents the divergence; a
+   later option is assigned-PD impersonation for the manual grantee invite.
+8. **#8 No encrypted-key/allowlist change** — add `EMAIL_SIGNATURE` to `PREFERENCE_KEYS`/defaults only.
+
+## Phased rollout (Codex #4 scope)
+
+- **Phase 1 (fixes the owner's immediate need + the cron bug):** add `EMAIL_SIGNATURE` + tolerant
+  reader/migration; Profile Settings editor (full shape); shared resolver; grantee invite auto-fill
+  (`[Name]`/`[title]`/`COB [date]` + assigned-PD signature) and reminder-cron fix (renderer contract +
+  drop title requirement). Reviewer flow keeps reading the (now-unified) key via its existing UI.
+- **Phase 2 (reviewer unification):** move render-emails to server-side assigned-PD resolution; retire the
+  bespoke sender UI in favor of Profile Settings; redesign the standalone send-identity if needed; then
+  retire the legacy `SENDER_INFO` key after telemetry shows no remaining reads.
+
+## Work breakdown (Phase 1 unless noted)
+
+1. `EMAIL_SIGNATURE` key + `DEFAULT_VALUES` + tolerant read + explicit `SENDER_INFO→EMAIL_SIGNATURE` copy.
+2. `lib/services/email-signature.js` — `resolveSignatureForProfile` + `resolveSignatureForRequest` (server,
+   assigned-PD via identity map; deterministic no-match/multi-match) + fallback chain.
+3. Profile-settings "Email signature" card (signature textarea + name/email; save/load via `EMAIL_SIGNATURE`).
 4. Grantee invite auto-fill (`AwardeeTab`): `[Name]` (PI), `[title]` (award), `COB [date]` (send+14d), and
-   the signature block from the assigned PD's profile — when the tab loads, guarded against clobbering
-   staff edits.
-5. **Fix the reminder cron**: drop the `!pdTitle` requirement; build the signature via the resolver
-   (assigned PD's profile → fallback); invite + reminder use the same signature construction.
-6. Point reviewer surfaces (`EmailGeneratorModal`, workbench reviewer invite) at the resolver/new key
-   (tolerant); retire the bespoke sender UI section.
-7. Tests (resolver fallback + assigned-PD join + tolerant legacy read; profile-settings save; cron
-   no-title; invite auto-fill), docs, gates.
+   the assigned-PD signature — on load, guarded against clobbering staff edits.
+5. Reminder cron + renderer: change `renderGranteeReminderHtml`/text to accept a resolved signature block;
+   drop the cron `!pdTitle` skip; invite + reminder use the same resolver → identical signature.
+6. **(Phase 2)** render-emails server-side assigned-PD resolution; retire bespoke reviewer sender UI;
+   standalone send-identity; retire legacy key.
+7. Tests (resolver fallback + email-join no-match/multi-match + tolerant legacy read; profile-settings
+   save; cron no-title + renderer contract; invite auto-fill), docs, gates.
 
-## Migration / cutover
+## Risks / for Codex review #2 to scrutinize
 
-- New key + tolerant read means a straight cutover: readers prefer `email_signature`, fall back to
-  `reviewer_finder_sender_info`; writers (profile-settings save) write the new key (and may clear/copy the
-  legacy one). Retire the legacy key after telemetry shows no remaining reads. No DB schema change
-  (key/value preference store).
-
-## Risks / for Codex to scrutinize
-
-- **Assigned-PD → Postgres-profile join reliability.** Is `systemuser.azureactivedirectoryobjectid`
-  populated, and does it equal `user_profiles.azure_id`? What if a PD has no linked profile, or two
-  profiles match? Define the deterministic fallback (fullname + default) and the multi-match rule.
-- **Cron sender vs. signature consistency.** The cron sends *as* the assigned PD (impersonation) and must
-  now also *sign* as the assigned PD — confirm both derive from the same resolved PD; no silent mismatch.
-- **Invite From vs. signature.** The manual invite sends from the logged-in sender's mailbox but would
-  sign as the assigned PD. Usually identical; flag the divergence case (admin sends on a PD's behalf).
-- **Don't break the reviewer flow.** `{{signature}}` resolution + the legacy fallback must keep working
-  through the cutover; the localStorage→preference migration in `ProfileContext` must not regress.
-- **Tolerant-reader removal.** Name the telemetry/condition for retiring the legacy key (don't leave a
-  permanent dual-read).
-- **Encrypted-keys list / write path.** Confirm the new key is NOT in `ENCRYPTED_PREFERENCE_KEYS` (it's
-  not a secret) and that `/api/user-preferences` accepts it without an allowlist change.
-- **Scope check:** is unifying the reviewer flow in the same pass worth the blast radius, or should grantee
-  consume the new key first and the reviewer-UI retirement follow as a second step?
+- **Pref read by systemuserid for the assigned PD** — confirm `dataverse-prefs-service` can read another
+  user's prefs by systemuserid (not just the caller's), and the auth/restriction context that requires.
+- **Email-join determinism** — multi-match (non-unique `azure_email`) + no-linked-profile fallback; ensure
+  it never throws and degrades to `fullname` + default.
+- **render-emails migration (Phase 2)** — moving off client `settings.signature` without breaking the
+  existing reviewer-invite contract / InviteEmailModal.
+- **Tolerant-reader + the `_legacy_migration_complete` interaction** — the new copy must run even when the
+  old migration already marked complete; name the retirement condition for the legacy key.
+- **From-vs-signature** — Phase 1 divergence acceptance vs. assigned-PD impersonation for manual invites.
+- **Scope** — is Phase 1 the right cut, or should anything from Phase 2 move earlier/later?
