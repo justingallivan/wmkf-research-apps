@@ -27,7 +27,7 @@ build a **parallel grantee variant** of the lifecycle, pages, submit route, uplo
 | 4 | **Grantee portal UI** ✅ | edit abstract (in-portal text), upload image, caption, publish-image waiver submit-gate (`GranteeDeliverableForm`) | 1 |
 | 5 | **Submit route** ✅ | `POST .../submit`: atomic SharePoint image upload + ETag-conditional Dataverse PATCH (`wmkf_abstractapproved`, caption, image ref, status→Submitted) + rollback; image magic-byte (`validateGranteeImage`) + virus scan; `grantee-upload` service | 1, 4 |
 | 6 | **Status/lifecycle + reminders** | status transitions on the Awardee tab, optional reminder send | 3, 5 |
-| 7 | **Edited-title generator (S269)** | Sonnet prompt (`grantee-title.generate`, title+abstract) + cron-poll on `wmkf_phaseistatus=Invited` → writes the EXISTING `wmkf_wmkfprojectdescription` when empty (research-only, idempotent; no new schema). Prompt/service/seed/A7 BUILT; cron pending | Executor contract |
+| 7 | **Edited-title generator (S269)** ✅ | Sonnet prompt (`grantee-title.generate`, title+abstract) + cron-poll on `wmkf_phaseistatus=Invited` → writes the EXISTING `wmkf_wmkfprojectdescription` when empty (research-only, idempotent; no new schema). Prompt/service/seed/A7 BUILT; prompt seeded to prod v1 (S269); cron **deployed + registered in the Vercel cron registry (S270)** | Executor contract |
 | 8 | **Document assembly + export (S269)** | server-side template (structured header + edited title + body/caption) → portal preview · website HTML · cycle-level export | 7, 5 |
 
 ## Chunk 1 — Token + auth foundation (design)
@@ -404,6 +404,10 @@ supersedes the earlier "new `wmkf_ai_editedtitle` wave" plan — no wave, no pre
 - ⚠️ **PA verification is MORE important here, not less:** we are now writing an EXISTING, board-facing,
   human-curated field — a Power Automate flow could be watching it. Post-deploy, confirm no AkoyaGO/PA
   flow fires on a `wmkf_wmkfprojectdescription` write (this is a chunk-7 acceptance criterion).
+  **STATUS (S270): still open (owner / Power Automate access). Not yet exercised in prod — a read-only
+  probe confirmed the current J26 cycle is a no-op (0 rows match the empty-field selection; all 24 J26
+  research-Invited rows already filled), so the cron has written nothing and the PA-flow question stays
+  untested until the first genuinely-empty research-Invited row is written.**
 - **Write-when-empty only** protects the manual curation: the cron never overwrites a populated value
   (the empty-field predicate), so staff edits and pre-existing manual titles are safe.
 
@@ -415,7 +419,8 @@ untrusted** override variables (`source_title` + `source_abstract`, both `untrus
 (returned, caller persists). **Model: Sonnet, temp 0.1** (validated S269 against 12 J26 answer keys +
 held-out exemplars — Sonnet materially beat Haiku on this distillation, and the Opus tier rejects the
 `temperature` param the Executor sends). Registered in `check:prompt-injection-tagging` (A7, inv:27).
-**NOT yet seeded to prod** (`--execute` pending).
+**SEEDED to prod (v1, S269)** — re-running `--execute` now correctly REFUSES (create-only governance,
+`lib/services/prompt-seed.js`); edit via `/admin` (versioned) or `--execute --force` (version-preserving).
 
 **Service — BUILT (S269).** `lib/services/grantee-title-service.js` — `generateGranteeTitle({ sourceTitle,
 sourceAbstract, runSource })`, thin Executor wrapper returning the cleaned one-liner. Input guards
