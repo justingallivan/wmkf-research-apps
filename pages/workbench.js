@@ -10,6 +10,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import Layout, { PageHeader, Card } from '../shared/components/Layout';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import { TRIAGE_STATUS } from '../shared/config/triageStatus';
@@ -161,6 +162,19 @@ function WorkbenchDashboard() {
         subtitle="Find and manage peer reviewers for your grant requests, one cycle at a time."
         icon="🗂️"
       />
+
+      {/* Awardees shortcut — the reviewer-finding list below only shows
+          Phase-II-Pending/Advancing rows, so decided/awarded grants don't appear
+          here. The Awardees page lists this cycle's research awardees (status
+          Active) and links each to its Awardee tab for the grantee deliverables flow. */}
+      <div className="mb-4">
+        <Link
+          href={`/workbench/awardees${cycleCode ? `?cycleCode=${encodeURIComponent(cycleCode)}` : ''}`}
+          className="text-sm text-blue-700 hover:underline"
+        >
+          🏆 View awardees &amp; grantee deliverables{cycleCode ? ` (${cycleCode})` : ''} →
+        </Link>
+      </div>
 
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-4 mb-6">

@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Layout, { Card } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
@@ -21,11 +22,20 @@ function currentCycleCode() {
 }
 
 function AwardeesList() {
+  const router = useRouter();
   const [cycleCode, setCycleCode] = useState(currentCycleCode());
   const [input, setInput] = useState(currentCycleCode());
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Honor a ?cycleCode= deep link (e.g. the workbench "View awardees" link) once
+  // the router is ready; falls back to the current-cycle default otherwise.
+  useEffect(() => {
+    if (!router.isReady) return;
+    const q = typeof router.query.cycleCode === 'string' ? router.query.cycleCode.trim().toUpperCase() : '';
+    if (q && /^[JD]\d{2}$/.test(q)) { setCycleCode(q); setInput(q); }
+  }, [router.isReady, router.query.cycleCode]);
 
   const load = useCallback(async (code) => {
     setLoading(true); setError(null);

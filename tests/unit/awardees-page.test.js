@@ -18,8 +18,12 @@ jest.mock('../../shared/components/RequireAppAccess', () => ({
 }));
 jest.mock('next/link', () => ({ __esModule: true, default: ({ href, children }) => <a href={href}>{children}</a> }));
 
+let mockRouter = { isReady: true, query: {} };
+jest.mock('next/router', () => ({ useRouter: () => mockRouter }));
+
 import AwardeesPage from '../../pages/workbench/awardees';
 
+beforeEach(() => { mockRouter = { isReady: true, query: {} }; });
 afterEach(() => { if (global.fetch?.mockRestore) global.fetch.mockRestore(); });
 
 test('renders the awardee rows with PI/liaison and an Open link to each Awardee tab', async () => {
@@ -51,4 +55,16 @@ test('shows an empty-state message when the cycle has no awardees', async () => 
   global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ cycleCode: 'D25', cycleLabel: 'December 2025', count: 0, awardees: [] }) }));
   render(<AwardeesPage />);
   await waitFor(() => expect(screen.getByText(/no research awardees found/i)).toBeInTheDocument());
+});
+
+test('honors a ?cycleCode= deep link (workbench "View awardees" link)', async () => {
+  mockRouter = { isReady: true, query: { cycleCode: 'D26' } };
+  global.fetch = jest.fn(async () => ({
+    ok: true, json: async () => ({ cycleCode: 'D26', cycleLabel: 'December 2026', count: 0, awardees: [] }),
+  }));
+  render(<AwardeesPage />);
+  await waitFor(() => {
+    const calls = global.fetch.mock.calls.map(([u]) => String(u));
+    expect(calls.some((u) => u.includes('cycleCode=D26'))).toBe(true);
+  });
 });
