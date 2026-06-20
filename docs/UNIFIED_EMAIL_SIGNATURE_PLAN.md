@@ -1,5 +1,12 @@
 # Plan: Unified per-user email signature (profile-settings) (S271)
 
+> **⚠️ CORRECTION (S271, post-Codex-review):** an earlier draft of this plan asserted preferences live
+> in **Postgres** — that is WRONG. [VERIFIED via `lib/services/dataverse-prefs-service.js` header +
+> `lib/services/database-service.js:14-19` + `scripts/setup-database.js:254`] user **preferences live in
+> Dataverse `wmkf_appuserpreferences`** (Postgres `user_preferences` was dropped 2026-05-12); Postgres
+> `user_profiles` holds only the identity record. The body below is being revised to match (Dataverse-pref
+> keyed by systemuser; `dataverse-identity-map.js` bridges profile↔systemuser). See Codex finding #1.
+>
 > **Status: PLAN — pending Codex pre-impl review (owner-requested).** Owner wants ONE editable
 > signature block per user, stored in Postgres, edited in the central **Profile Settings** page, and
 > consumed by BOTH reviewer-invitation and grantee (invite + reminder) emails — replacing today's
