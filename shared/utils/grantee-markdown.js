@@ -1,0 +1,120 @@
+/**
+ * Grantee document markdown — the ONE shared inline renderer for chunk-8
+ * document assembly (spec D8; build-plan chunk 8 "one markdown subset + render
+ * policy"). Every assembled output (portal preview, website HTML, cycle export)
+ * renders the abstract body + image caption through THIS module, so no surface
+ * can drift on which markup it honors or how it sanitizes.
+ *
+ * Canonical inline subset (D8): **bold**, *italic*, super/subscript. Bold and
+ * italic use the CommonMark markers (`**` / `*`); super/subscript use the
+ * pandoc convention — `^text^` (superscript) and `~text~` (subscript), e.g.
+ * `H~2~O`, `x^2^`. Nothing else is honored.
+ *
+ * Safety contract (mirrors shared/utils/policy-markdown.js):
+ *   - Storage is plain UTF-8 markdown in the Dataverse memo (NO RichText flip).
+ *   - Rendered HTML is produced by `marked` (a private Marked instance so the
+ *     sub/sup extensions never leak into the global `marked` that policy-markdown
+ *     uses), then sanitized by DOMPurify to a tight allowlist.
+ *   - Body allowlist:    p, br, strong, em, sub, sup
+ *   - Caption allowlist:    strong, em, sub, sup, br   (inline; no <p>)
+ *   - No attributes, no links, no raw HTML pass-through. Anything else is
+ *     dropped (KEEP_CONTENT keeps the text).
+ *
+ * The edited title (`wmkf_wmkfprojectdescription`) is deliberately NOT rendered
+ * here — it is plain text, italicized *structurally* by each consumer, so no raw
+ * markdown can reach the Board Book (its only external consumer). See the
+ * assembly service (lib/services/grantee-document-assembly.js).
+ */
+
+const { Marked } = require('marked');
+const createDOMPurify = require('dompurify');
+
+const BODY_TAGS = ['p', 'br', 'strong', 'em', 'sub', 'sup'];
+const CAPTION_TAGS = ['strong', 'em', 'sub', 'sup', 'br'];
+const NO_ATTR = [];
+
+// Pandoc-style superscript: ^text^ (no spaces, single line, starts non-space).
+const supExtension = {
+  name: 'gsup',
+  level: 'inline',
+  start(src) { const i = src.indexOf('^'); return i < 0 ? undefined : i; },
+  tokenizer(src) {
+    const m = /^\^(?=\S)([^\^\n]+?)\^/.exec(src);
+    if (!m) return undefined;
+    return { type: 'gsup', raw: m[0], text: m[1], tokens: this.lexer.inlineTokens(m[1]) };
+  },
+  renderer(token) { return `<sup>${this.parser.parseInline(token.tokens)}</sup>`; },
+};
+
+// Pandoc-style subscript: ~text~ (no spaces, single line, starts non-space).
+const subExtension = {
+  name: 'gsub',
+  level: 'inline',
+  start(src) { const i = src.indexOf('~'); return i < 0 ? undefined : i; },
+  tokenizer(src) {
+    const m = /^~(?=\S)([^~\n]+?)~/.exec(src);
+    if (!m) return undefined;
+    return { type: 'gsub', raw: m[0], text: m[1], tokens: this.lexer.inlineTokens(m[1]) };
+  },
+  renderer(token) { return `<sub>${this.parser.parseInline(token.tokens)}</sub>`; },
+};
+
+// Private instance: gfm:false so `~`/`~~` is NOT strikethrough (we own `~` for
+// subscript); no HTML pass-through; no smart autolinks.
+let _marked = null;
+function getMarked() {
+  if (!_marked) {
+    _marked = new Marked({ gfm: false, breaks: false, pedantic: false });
+    _marked.use({ extensions: [supExtension, subExtension] });
+  }
+  return _marked;
+}
+
+// DOMPurify works in the browser (window) and on Node (jsdom). The eval('require')
+// keeps jsdom out of the client bundle even though this module is importable from
+// React. Same trick as policy-markdown.js.
+let _purifier = null;
+function purifier() {
+  if (_purifier) return _purifier;
+  if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
+    _purifier = createDOMPurify(window);
+  } else {
+    const nodeRequire = eval('require');
+    const { JSDOM } = nodeRequire('jsdom');
+    _purifier = createDOMPurify(new JSDOM('<!DOCTYPE html><html><body></body></html>').window);
+  }
+  return _purifier;
+}
+
+function sanitize(rawHtml, tags) {
+  return purifier().sanitize(rawHtml, {
+    ALLOWED_TAGS: tags,
+    ALLOWED_ATTR: NO_ATTR,
+    KEEP_CONTENT: true,
+    RETURN_TRUSTED_TYPE: false,
+  });
+}
+
+/**
+ * Render an abstract body (block markdown → paragraphs) to sanitized HTML safe
+ * for dangerouslySetInnerHTML / direct emission. Plain prose becomes <p> blocks.
+ */
+function renderGranteeBody(body) {
+  if (typeof body !== 'string' || body.length === 0) return '';
+  return sanitize(getMarked().parse(body), BODY_TAGS);
+}
+
+/**
+ * Render a caption (inline markdown, no paragraph wrapping) to sanitized HTML.
+ */
+function renderGranteeCaption(caption) {
+  if (typeof caption !== 'string' || caption.length === 0) return '';
+  return sanitize(getMarked().parseInline(caption), CAPTION_TAGS);
+}
+
+module.exports = {
+  BODY_TAGS,
+  CAPTION_TAGS,
+  renderGranteeBody,
+  renderGranteeCaption,
+};
