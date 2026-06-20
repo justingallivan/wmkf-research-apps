@@ -115,6 +115,35 @@ export default function AwardeeTab({ requestId, context }) {
     setSending(false);
   }
 
+  // Render-only preview of the invitation email — NEVER sends or changes status.
+  // Opens the exact send HTML (with a placeholder link) in a new tab, behind a
+  // PREVIEW banner so it can't be confused with a real send.
+  async function previewEmail() {
+    setError(null);
+    try {
+      const res = await fetch('/api/workbench/grantee-deliverables/preview-invite', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bodyText: body }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error || 'Could not render the preview.'); return; }
+      const w = window.open('', '_blank');
+      if (!w) { setError('Allow pop-ups to preview the email in a new tab.'); return; }
+      const safeSubject = String(subject).replace(/[&<>"']/g, (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      w.document.write(
+        '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invitation preview</title></head>' +
+        '<body style="margin:0;font-family:Arial,sans-serif;color:#111">' +
+        '<div style="background:#fef3c7;border-bottom:1px solid #f59e0b;padding:10px 16px;font-size:13px;color:#92400e">' +
+        'PREVIEW — this email has NOT been sent. The secure portal link is generated only when you click “Send invitation”.' +
+        '</div>' +
+        `<div style="padding:14px 20px;border-bottom:1px solid #eee;font-size:14px"><strong>Subject:</strong> ${safeSubject}</div>` +
+        `<div style="padding:20px;max-width:680px">${data.html}</div>` +
+        '</body></html>');
+      w.document.close();
+    } catch { setError('Could not render the preview.'); }
+  }
+
   // Output (b): fetch the single-award website HTML and copy it to the clipboard.
   // The fragment is always shown in a textarea so staff can copy manually when
   // the clipboard API is unavailable (e.g. a non-secure context).
@@ -183,15 +212,28 @@ export default function AwardeeTab({ requestId, context }) {
           <textarea aria-label="Message body" value={body} onChange={(e) => setBody(e.target.value)} rows={8} className="w-full border rounded p-2" />
         </label>
         <p className="text-xs text-gray-500">A secure magic-link is added to the email automatically.</p>
-        <button
-          type="button"
-          onClick={send}
-          disabled={!canSend}
-          className="px-3 py-2 text-sm rounded bg-blue-700 text-white disabled:opacity-50"
-        >
-          {sending ? 'Sending…' : 'Send invitation'}
-        </button>
-        {!abstract && <p className="text-xs text-gray-500">Generate the abstract before sending.</p>}
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={previewEmail}
+            className="px-3 py-2 text-sm rounded border border-gray-400 text-gray-800"
+          >
+            Preview email
+          </button>
+          <button
+            type="button"
+            onClick={send}
+            disabled={!canSend}
+            className="px-3 py-2 text-sm rounded bg-blue-700 text-white disabled:opacity-50"
+          >
+            {sending ? 'Sending…' : 'Send invitation'}
+          </button>
+        </div>
+        <p className="text-xs text-gray-500">
+          {abstract
+            ? 'Preview opens the email in a new tab without sending. Send emails the grantee and starts the 14-day clock.'
+            : 'Generate the abstract before sending. (Preview works any time.)'}
+        </p>
       </section>
 
       <section className="space-y-2">

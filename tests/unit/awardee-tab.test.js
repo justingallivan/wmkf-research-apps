@@ -30,6 +30,9 @@ function wireFetch({ generateOk = true, sendOk = true, websiteOk = true } = {}) 
         ? { ok: true, json: async () => ({ ok: true, status: 100000001 }) }
         : { ok: false, json: async () => ({ error: 'send failed' }) };
     }
+    if (u.includes('/grantee-deliverables/preview-invite')) {
+      return { ok: true, json: async () => ({ html: '<p>Dear Professor [Name]:</p><a>Open the Grantee Portal</a>' }) };
+    }
     if (u.includes('/grantee-deliverables/website-html')) {
       return websiteOk
         ? { ok: true, json: async () => ({ requestId: REQ, html: '<article class="grantee-award"><strong>Emory University</strong></article>' }) }
@@ -106,6 +109,29 @@ test('default invitation copy is the PD-voice template (subject + body)', async 
   expect(body).toContain('we will assume that we have your concurrence to post the draft as written');
   expect(body).toContain('agreed to acknowledge'); // acknowledgment-of-support paragraph
   expect(body).toContain('[Program Director name]'); // PD signature placeholder, not a generic Foundation sign-off
+});
+
+test('Preview email renders into a new tab without sending (no send-invite call)', async () => {
+  wireFetch();
+  const doc = { write: jest.fn(), close: jest.fn() };
+  const openSpy = jest.spyOn(window, 'open').mockReturnValue({ document: doc });
+
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
+
+  fireEvent.click(screen.getByRole('button', { name: /preview email/i }));
+  await waitFor(() => expect(openSpy).toHaveBeenCalledWith('', '_blank'));
+
+  // it called the render-only preview endpoint, NOT send-invite
+  const calls = global.fetch.mock.calls.map(([u]) => String(u));
+  expect(calls.some((u) => u.includes('/preview-invite'))).toBe(true);
+  expect(calls.some((u) => u.includes('/send-invite'))).toBe(false);
+
+  // the new tab got the rendered email behind a PREVIEW banner
+  const written = doc.write.mock.calls[0][0];
+  expect(written).toContain('PREVIEW');
+  expect(written).toContain('Open the Grantee Portal');
+  openSpy.mockRestore();
 });
 
 // --- Deliverable outputs (chunk 8 b/c) ---
