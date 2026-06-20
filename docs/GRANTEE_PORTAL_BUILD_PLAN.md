@@ -88,7 +88,8 @@ state lives — or whether we keep tokens stateless.
 
 ### Chunk 1 deliverables
 - `lib/external/grantee-token-lifecycle.js` — `mintForRequest({ requestId, expiresAt })` →
-  `{ jwt, url }`; `buildGranteeUrl(jwt)` → `${REVIEWER_PORTAL_BASE_URL or NEXTAUTH_URL}/external/grantee/${jwt}`.
+  `{ jwt, url }`; `buildGranteeUrl(jwt)` → `${GRANTEE_PORTAL_BASE_URL or NEXTAUTH_URL}/external/grantee/${jwt}`
+  (its OWN base var — set to `https://wmkfresearch.vercel.app` S271, → `grantees.wmkeck.org` later; NOT the reviewer var).
   (Option B would add store/verify-hash/revoke.)
 - `lib/external/verify-grantee-token.js` — wraps shared `verifyToken`, enforces `aud:'grantee'`,
   loads the `akoya_request` + the 5 deliverable fields, fail-closed.

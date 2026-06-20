@@ -30,6 +30,7 @@
 - rtk reference: project-rtk-grep-output-corruption.md
 - Checking a Vercel deploy after push (use `vercel inspect`, don't poll-grep `vercel ls` for the hash): feedback-deployment-monitoring-use-inspect.md
 - Verifying a Vercel env var VALUE via pull (Sensitive vars read back EMPTY — can't be verified; recreate non-sensitive): reference-vercel-sensitive-env-unreadable.md
+- Branded domains / portal base URLs / wmkeck.org vs vercel.app / grantees.wmkeck.org plan / *_PORTAL_BASE_URL: project-branded-domains.md
 
 ## Working Norms
 - Reviewer-finder utility vs precision (before another identity/namesake/affiliation fix): feedback-prioritize-contact-recall-over-identity-precision.md
