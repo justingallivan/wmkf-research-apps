@@ -20,6 +20,9 @@
 
 import { verifyGranteeToken } from '../../../../../lib/external/verify-grantee-token';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
+import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
+import { assembleGranteeDocument } from '../../../../../lib/services/grantee-document-assembly';
+import { renderAwardBlock } from '../../../../../lib/services/grantee-document-html';
 import {
   GRANTEE_DELIVERABLE_STATUS,
   GRANTEE_DELIVERABLE_LABEL,
@@ -35,6 +38,39 @@ const SUBMITTED_VIEW_STATUSES = new Set([
   GRANTEE_DELIVERABLE_STATUS.STAFF_REVIEW,
   GRANTEE_DELIVERABLE_STATUS.COMPLETE,
 ]);
+
+/**
+ * Chunk-8 output (a): the assembled, styled award document shown above the
+ * editable body so the grantee sees exactly how their award will appear. This
+ * is a DISPLAY-ONLY preview — institution / location / PI+co-PIs / amount /
+ * edited title are all Foundation-owned (D9) and the edited title is
+ * staff-owned/fixed (owner decision S271), so nothing here is editable. The
+ * grantee still edits the body / caption / image in the form below.
+ *
+ * Auth boundary: this is the external grantee-token surface, so the model is
+ * assembled WITHOUT the private SharePoint ref (`includeImageRef: false`) and
+ * rendered WITHOUT the image figure (`includeImage: false`) — the surface stays
+ * `hasImage`-only. The renderer escapes every plain-text field and inlines only
+ * the already-sanitized body HTML, so the returned string is safe to inject.
+ *
+ * Fail-soft: the preview is additive. Any assembly/render failure returns null
+ * rather than breaking the core context response (which the form depends on).
+ *
+ * @returns {Promise<string|null>} the award-block HTML fragment, or null.
+ */
+async function buildPreviewHtml(requestId) {
+  try {
+    const model = await bypassDynamicsRestrictions('grantee-portal-preview', () =>
+      assembleGranteeDocument(requestId, { includeImageRef: false }),
+    );
+    if (!model) return null;
+    const html = renderAwardBlock(model, { includeImage: false });
+    return html || null;
+  } catch (e) {
+    console.error('[grantee/context] preview assembly failed:', e?.message || e);
+    return null;
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -73,6 +109,13 @@ export default async function handler(req, res) {
     else if (status !== null && SUBMITTED_VIEW_STATUSES.has(status)) view = 'submitted';
     else view = 'closed';
 
+    // Output (a): assemble the styled award preview for the views that render it
+    // (edit + submitted). Skip on `closed` — the grantee only sees a contact
+    // message there, so the extra Dataverse reads are wasted.
+    const preview = (view === 'edit' || view === 'submitted')
+      ? await buildPreviewHtml(verified.requestId)
+      : null;
+
     return res.status(200).json({
       ok: true,
       request: {
@@ -93,6 +136,9 @@ export default async function handler(req, res) {
       },
       editable,
       view,
+      // Display-only assembled award (output a). null when unavailable or on a
+      // closed view; the page renders it above the form when present.
+      preview,
     });
   } catch (e) {
     console.error('[grantee/context] unexpected error:', e?.message || e);

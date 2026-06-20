@@ -28,7 +28,7 @@ build a **parallel grantee variant** of the lifecycle, pages, submit route, uplo
 | 5 | **Submit route** ✅ | `POST .../submit`: atomic SharePoint image upload + ETag-conditional Dataverse PATCH (`wmkf_abstractapproved`, caption, image ref, status→Submitted) + rollback; image magic-byte (`validateGranteeImage`) + virus scan; `grantee-upload` service | 1, 4 |
 | 6 | **Status/lifecycle + reminders** | status transitions on the Awardee tab, optional reminder send | 3, 5 |
 | 7 | **Edited-title generator (S269)** ✅ | Sonnet prompt (`grantee-title.generate`, title+abstract) + cron-poll on `wmkf_phaseistatus=Invited` → writes the EXISTING `wmkf_wmkfprojectdescription` when empty (research-only, idempotent; no new schema). Prompt/service/seed/A7 BUILT; prompt seeded to prod v1 (S269); cron **deployed + registered in the Vercel cron registry (S270)** | Executor contract |
-| 8 | **Document assembly + export (S269 design; S270 build)** | server-side template (structured header + edited title + body/caption) → portal preview · website HTML · cycle-level export. **Foundation + outputs (b) website HTML & (c) cycle export BUILT (S270); (a) portal preview deferred on title-editability** | 7, 5 |
+| 8 | **Document assembly + export (S269 design; S270–271 build)** | server-side template (structured header + edited title + body/caption) → portal preview · website HTML · cycle-level export. **Foundation + outputs (b) website HTML & (c) cycle export BUILT (S270); (a) portal preview BUILT (S271, title display-only)** | 7, 5 |
 
 ## Chunk 1 — Token + auth foundation (design)
 
@@ -500,8 +500,14 @@ identity); only body/caption carry inline markdown (D8). `[VERIFIED co-PI read: 
 fetchCoPIs, role=Co-PI 100000001]`
 
 **Outputs (owner: "output will vary"):**
-- **(a) Portal review preview** ⏸ *deferred (title-editability)* — the assembled, styled document shown
-  in the grantee portal above the editable body; header fields display-only.
+- **(a) Portal review preview** ✅ *BUILT S271* — the assembled, styled document (`renderAwardBlock`)
+  shown in the grantee portal above the editable body; ALL header fields display-only, including the
+  edited title (owner decision S271: title is staff-owned/fixed, NOT PI-editable → no title write-back
+  path). The external grantee-token context route (`pages/api/external/grantee/[token]/context.js`)
+  assembles the model WITHOUT the private image ref (`includeImageRef:false`) and renders WITHOUT the
+  image figure (`includeImage:false`), keeping that surface `hasImage`-only; the preview is fail-soft
+  (assembly/render failure → `preview:null`, never breaks the form-bearing core response) and computed
+  only for the `edit`/`submitted` views. Rendered on the page via `AwardPreview` (server-sanitized HTML).
 - **(b) Website HTML** ✅ *BUILT S270* — clean controlled HTML for the staff member to drop into the
   site, replacing manual coding. `GET /api/workbench/grantee-deliverables/website-html?requestId=<guid>`.
 - **(c) Cycle-level export** ✅ *BUILT S270* — all of a cycle's awarded abstracts assembled together
@@ -557,11 +563,11 @@ fetchCoPIs, role=Co-PI 100000001]`
   | To determine whether… | edited title | `wmkf_wmkfprojectdescription` | *italic*, runs into the body |
   | In nearly half… | body | `wmkf_abstractapproved` ‖ `wmkf_abstractformatted` | prose; inline subset when present |
 
-### Still open (does NOT block — chunk-8 portal wiring detail)
-- **Title PI-editability.** Is the edited title editable by the PI in the award-stage portal
-  (auto-generated, then tweakable) or staff-owned/fixed? Owner undecided. It does not block chunk 7
-  (the title is generated at the `Invited` flip, long before the award-stage portal) — settle when
-  wiring the chunk-8 portal preview.
+### RESOLVED (S271)
+- **Title PI-editability — RESOLVED: staff-owned/fixed, NOT PI-editable (owner decision S271).** The
+  edited title (`wmkf_wmkfprojectdescription`) renders display-only in the award-stage portal preview;
+  there is **no** PI write-back path for it (no ETag-conditional title PATCH on the external surface).
+  This unblocked and shipped output (a) above. The grantee still edits the body / caption / image.
 
 ## Open items (circle back)
 - **[PENDING Connor + Sarah] Confirm title-field provenance, then document.** Owner emailed Connor +

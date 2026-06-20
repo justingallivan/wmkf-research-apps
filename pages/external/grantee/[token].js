@@ -64,13 +64,15 @@ export default function GranteePortalPage() {
     );
   }
 
-  const { request, deliverable, view } = state.data;
+  const { request, deliverable, view, preview } = state.data;
 
   return (
     <Shell>
       <h1>Grant Deliverables</h1>
       {request.title && <h2>{request.title}</h2>}
       {request.requestNumber && <p>Grant #{request.requestNumber}</p>}
+
+      {preview && <AwardPreview html={preview} />}
 
       {view === 'edit' && (
         <GranteeDeliverableForm token={token} deliverable={deliverable} />
@@ -84,6 +86,36 @@ export default function GranteePortalPage() {
         <p>This submission is closed. Please contact the Foundation if you have questions.</p>
       )}
     </Shell>
+  );
+}
+
+/**
+ * Display-only preview of the assembled, styled award (chunk-8 output a). The
+ * `html` is the server-rendered award block from the context route: every
+ * plain-text field is HTML-escaped server-side and the body is DOMPurify-
+ * sanitized to a tight allowlist, so it is safe to inject here. Header fields
+ * (institution / location / PI+co-PIs / amount / edited title) are Foundation-
+ * owned and not editable; the grantee edits the body in the form below.
+ */
+function AwardPreview({ html }) {
+  return (
+    <section
+      aria-label="award-preview"
+      style={{
+        border: '1px solid #ddd',
+        borderRadius: 6,
+        background: '#fafafa',
+        padding: '1rem 1.25rem',
+        margin: '1.5rem 0',
+        fontFamily: "Georgia, 'Times New Roman', serif",
+        lineHeight: 1.5,
+      }}
+    >
+      <p style={{ margin: '0 0 .75rem', fontFamily: 'Arial, sans-serif', fontSize: '.8rem', textTransform: 'uppercase', letterSpacing: '.04em', color: '#666' }}>
+        How your award will appear
+      </p>
+      <div dangerouslySetInnerHTML={{ __html: html }} />
+    </section>
   );
 }
 

@@ -233,11 +233,13 @@ PDF and post it"). Header fields are **display-only** in the portal (Foundation-
 complains case-by-case rather than editing institution/PI/amount). Build detail + open questions:
 `docs/GRANTEE_PORTAL_BUILD_PLAN.md` chunks 7–8.
 
-**Build status (S270):** the shared assembly model + renderer and outputs **(b) website HTML** and
-**(c) cycle export** (format = combined HTML, owner decision) are BUILT; **(a) portal preview** is
-deferred on the title-editability decision. Decided this session: inline markdown subset = bold/italic
-(CommonMark) + super/subscript (pandoc `^x^`/`~x~`); award amount = full-number USD, no cents. See the
-build-plan chunk-8 "BUILT (S270)" block for modules, the canonical owner template, and route paths.
+**Build status (S270–271):** the shared assembly model + renderer and all three outputs are BUILT —
+**(b) website HTML** and **(c) cycle export** (format = combined HTML, owner decision) at S270; **(a)
+portal preview** at S271. The S270 decisions: inline markdown subset = bold/italic (CommonMark) +
+super/subscript (pandoc `^x^`/`~x~`); award amount = full-number USD, no cents. The S271 decision: the
+edited title is **staff-owned/display-only, NOT PI-editable** — so output (a) renders ALL header fields
+(including the title) display-only above the editable body, with no title write-back path. See the
+build-plan chunk-8 "BUILT" blocks for modules, the canonical owner template, and route paths.
 
 ## Open items (resolve during implementation)
 
