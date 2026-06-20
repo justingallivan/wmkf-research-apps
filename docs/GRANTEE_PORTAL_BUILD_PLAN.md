@@ -125,7 +125,10 @@ directly to `wmkf_abstractformatted` (Memo). Mirrors the field-primer Executor p
   the prod row is REQUIRED. **[SEEDED to prod 2026-06-18 — row `462c08ae-896b-f111-a826-000d3a3065b8`,
   verification checks passed.]** The seed imports its variable/output declarations from the prompt
   config (`PROMPT_VARIABLES`/`PROMPT_OUTPUT_SCHEMA`), so the live row cannot drift from the file the
-  config-pin test guards; re-running `--execute` is idempotent (updates the current row).
+  config-pin test guards. **Seed governance (S269): create-only via `lib/services/prompt-seed.js`** —
+  a plain re-run of `--execute` now REFUSES (the row exists); edits go through `/admin` (versioned), and
+  `--execute --force` publishes a version-preserving recovery. (Was: "re-run is an idempotent in-place
+  update" — superseded.)
 - **Model:** `sonnet` (the Opus tier rejects the `temperature` param the Executor always sends — same
   constraint field-primer hit); `temperature` 0.3; `maxtokens` ~4096 (an abstract is ~1 page).
 - **A7 registration:** add a `SURFACES` entry in `scripts/check-prompt-injection-tagging.js`

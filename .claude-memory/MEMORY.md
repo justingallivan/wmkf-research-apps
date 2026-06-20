@@ -56,6 +56,7 @@
 - Dataverse / Dynamics / Explorer / Power Tools: ../docs/agent-wiki/topics/dataverse-dynamics.md
 - Dynamics CRM facts / grant lifecycle fields: ../docs/agent-wiki/topics/dataverse-dynamics.md
 - Prompt / Executor / document processing: ../docs/agent-wiki/topics/prompt-executor.md
+- Adding a prompt / editing a seed / prompt-store governance (two-tier, create-only seed, version-preserving --force, timestamps): project-prompt-governance.md
 - BILL / honoraria / payment semantics: ../docs/agent-wiki/topics/finance-honoraria.md
 - Auth / admin / access / security: ../docs/agent-wiki/topics/security-auth.md
 - Private Blob / file download patterns: ../docs/agent-wiki/topics/security-auth.md
