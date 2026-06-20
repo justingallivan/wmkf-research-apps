@@ -385,6 +385,20 @@ const SURFACES = [
     promptFiles: ['shared/config/prompts/grantee-abstract.js'],
     callSiteFiles: ['lib/services/execute-prompt.js'],
   },
+  {
+    // Executor-driven (grantee-title.generate, via lib/services/grantee-title-service.js).
+    // Hardening lives in execute-prompt.js: wrapUntrustedContent +
+    // buildUntrustedContentPreamble injected for BOTH untrusted variables —
+    // source_title (applicant project title) and source_abstract (applicant
+    // abstract). The prompt code file carries no markers of its own; registered
+    // here so the unregistered-prompt-file check tracks it. callSiteFiles MUST
+    // include execute-prompt.js or the marker checks fail.
+    id: 'grantee-title-generate',
+    inv: 27,
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/grantee-title.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the
