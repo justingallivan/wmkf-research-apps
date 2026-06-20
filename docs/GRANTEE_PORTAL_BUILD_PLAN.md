@@ -590,7 +590,16 @@ fetchCoPIs, role=Co-PI 100000001]`
   Closing the gap (signed proxy route that streams the private image vs. manual CMS upload) is **Connor's
   call as the website builder** — he owns how images get published. Left open pending his approach; no
   build this session.
-- Chunk 6: reminder cadence/deadline + exact waiver/T&C and email-body wording.
+- Chunk 6: reminder cadence/deadline + exact waiver/T&C wording.
+  - **Invitation email default — LANDED (S271).** `AwardeeTab` `DEFAULT_SUBJECT`/`DEFAULT_BODY` now carry
+    the owner-approved Program-Director-voice template (congrats → "post an abstract … entitled '[title]'"
+    → review-by-COB-[date] with implied concurrence → encourage image via the link → acknowledge-support
+    reminder → PD signature). Bracketed fields ([Name], [title], COB [date], PD name/title) are staff-filled;
+    auto-filling them (PI name, award title, computed deadline, PD signature) is the pending enhancement,
+    gated on the open cadence/signature decisions. Voice + structure: `project-grantee-deliverable-email-voice`.
+  - **Still open:** reminder cadence (count/timing/recipients, auto-cron vs. manual "Send reminder" button)
+    and the publish-image **waiver/T&C wording** (owner reviewing a toned-down redline with counsel —
+    `~/Downloads/WMKF_Consent_Redline_Handout.pdf`, S271). The reminder send is NOT built pending cadence.
 - Optional **auto-on-award cron** (PA-free) — a `pages/api/cron/*` route on the awardee eligibility
   filter (`granteeResearchPrograms.js`) that pre-generates **abstracts** for newly-`Active` research
   awardees; idempotent. (Distinct from the chunk-7 title cron, which fires earlier on the `Invited`

@@ -92,6 +92,22 @@ test('a generation error surfaces and leaves Send disabled', async () => {
   expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
 });
 
+test('default invitation copy is the PD-voice template (subject + body)', async () => {
+  wireFetch();
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
+
+  expect(screen.getByLabelText('Subject')).toHaveValue('Your W. M. Keck Foundation award — abstract for our website');
+  const body = screen.getByLabelText('Message body').value;
+  expect(body).toMatch(/^Dear Professor \[Name\]:/);
+  expect(body).toContain('post an abstract on the Foundation’s website describing your award entitled “[title]”');
+  expect(body).toContain('lightly edited to conform to the style that the Foundation uses in its publications');
+  expect(body).toContain('no later than COB [date]');
+  expect(body).toContain('we will assume that we have your concurrence to post the draft as written');
+  expect(body).toContain('agreed to acknowledge'); // acknowledgment-of-support paragraph
+  expect(body).toContain('[Program Director name]'); // PD signature placeholder, not a generic Foundation sign-off
+});
+
 // --- Deliverable outputs (chunk 8 b/c) ---
 
 test('Copy website HTML fetches the fragment, shows it, and copies to clipboard', async () => {

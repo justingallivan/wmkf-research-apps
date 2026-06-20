@@ -23,13 +23,33 @@
 import { useEffect, useState, useCallback } from 'react';
 import { GRANTEE_DELIVERABLE_LABEL } from '../../config/granteeDeliverableStatus';
 
-const DEFAULT_SUBJECT = 'Your W. M. Keck Foundation grant deliverables';
+const DEFAULT_SUBJECT = 'Your W. M. Keck Foundation award — abstract for our website';
+// Program-Director-voice default (owner-approved S271). Bracketed fields are
+// staff-filled before sending: [Name], [title], COB [date], and the signature
+// ([Program Director name]/[title]). Auto-fill of those (PI name, award title,
+// computed deadline, PD signature) is a pending enhancement gated on the open
+// cadence/signature decisions. The send route appends the magic-link button +
+// fallback link BELOW this body — so "the secure link below" stays accurate and
+// no literal link belongs in the body (the link is always server-minted).
 const DEFAULT_BODY =
-  'Congratulations on your W. M. Keck Foundation grant.\n\n' +
-  'Please use the secure link below to review and approve a short abstract of your project, ' +
-  'upload a graphical image with a caption, and confirm permission to publish the image. ' +
-  'The link is unique to your grant.\n\n' +
-  'Thank you.';
+  'Dear Professor [Name]:\n\n' +
+  'Congratulations on your recent grant from the W. M. Keck Foundation. We plan to ' +
+  'post an abstract on the Foundation’s website describing your award entitled “[title]”.\n\n' +
+  'The draft abstract is based on information you provided in your proposal, lightly ' +
+  'edited to conform to the style that the Foundation uses in its publications. Please ' +
+  'use the secure link below to review it and make any changes no later than COB [date]. ' +
+  'If we have not heard from you by this date, we will assume that we have your ' +
+  'concurrence to post the draft as written.\n\n' +
+  'To better highlight your work, we also encourage you to upload a high-resolution ' +
+  'image related to your project, with a caption and credit. The link will walk you ' +
+  'through the image and the permission to publish it.\n\n' +
+  'As a reminder, in your application you and your institution agreed to acknowledge ' +
+  'the Foundation’s support. Please recognize the “W. M. Keck Foundation” in ' +
+  'publications and other scientific work related to this award, such as presentations ' +
+  'and posters.\n\n' +
+  'Please do not hesitate to contact me if you need additional information.\n\n' +
+  'Thank you,\n\n' +
+  '[Program Director name]\n[Program Director title]\nW. M. Keck Foundation';
 
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || '').trim());
 
