@@ -6,6 +6,7 @@
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: { queryRecords: jest.fn() } }));
 jest.mock('../../lib/services/grantee-deliverable-record', () => ({ getDeliverableForRequest: jest.fn() }));
+jest.mock('../../lib/services/program-director-resolver', () => ({ resolveByEmail: jest.fn() }));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (l, fn) => Promise.resolve().then(() => (typeof l === 'function' ? l() : fn())),
 }));
@@ -13,6 +14,7 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 import { requireAppAccess } from '../../lib/utils/auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import { getDeliverableForRequest } from '../../lib/services/grantee-deliverable-record';
+import { resolveByEmail } from '../../lib/services/program-director-resolver';
 import { GRANTEE_RESEARCH_PROGRAM_IDS } from '../../shared/config/granteeResearchPrograms';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import handler from '../../pages/api/workbench/grantee-deliverables/awardees';
@@ -26,9 +28,10 @@ function mockRes() {
 }
 
 beforeEach(() => {
-  requireAppAccess.mockReset().mockResolvedValue({ profileId: 'p', session: { user: {} } });
+  requireAppAccess.mockReset().mockResolvedValue({ profileId: 'p', session: { user: { azureEmail: 'jgallivan@wmkeck.org' } } });
   DynamicsService.queryRecords.mockReset().mockResolvedValue({ records: [] });
   getDeliverableForRequest.mockReset().mockResolvedValue(null);
+  resolveByEmail.mockReset().mockResolvedValue({ systemuserid: 'pd-me', fullName: 'Justin Gallivan' });
 });
 
 test('non-GET → 405', async () => {
@@ -56,6 +59,28 @@ test('builds the eligibility filter: Active + research program GUIDs + PI presen
     expect(filter).toContain(`_akoya_programid_value eq ${id}`);
   }
   expect(orderby).toMatch(/akoya_requestnum/);
+  // default scope = mine → PD clause present, using the server-resolved systemuserid
+  expect(filter).toContain('_wmkf_programdirector_value eq pd-me');
+  expect(res.body.scope).toBe('mine');
+});
+
+test('scope=all omits the PD clause and lists everyone', async () => {
+  const res = mockRes();
+  await handler({ method: 'GET', query: { cycleCode: 'J26', scope: 'all' }, headers: {} }, res);
+  expect(res.statusCode).toBe(200);
+  const { filter } = DynamicsService.queryRecords.mock.calls[0][1];
+  expect(filter).not.toContain('_wmkf_programdirector_value');
+  expect(res.body.scope).toBe('all');
+});
+
+test('mine-scope with no resolvable PD → empty list, pdResolved:false, no query', async () => {
+  resolveByEmail.mockResolvedValue(null);
+  const res = mockRes();
+  await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body.count).toBe(0);
+  expect(res.body.pdResolved).toBe(false);
+  expect(DynamicsService.queryRecords).not.toHaveBeenCalled();
 });
 
 test('maps records to awardees with formatted PI/liaison names + deliverable status', async () => {

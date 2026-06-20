@@ -28,6 +28,7 @@ function AwardeesList() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showAll, setShowAll] = useState(false);
 
   // Honor a ?cycleCode= deep link (e.g. the workbench "View awardees" link) once
   // the router is ready; falls back to the current-cycle default otherwise.
@@ -37,10 +38,11 @@ function AwardeesList() {
     if (q && /^[JD]\d{2}$/.test(q)) { setCycleCode(q); setInput(q); }
   }, [router.isReady, router.query.cycleCode]);
 
-  const load = useCallback(async (code) => {
+  const load = useCallback(async (code, all) => {
     setLoading(true); setError(null);
     try {
-      const res = await fetch(`/api/workbench/grantee-deliverables/awardees?cycleCode=${encodeURIComponent(code)}`);
+      const scopeParam = all ? '&scope=all' : '';
+      const res = await fetch(`/api/workbench/grantee-deliverables/awardees?cycleCode=${encodeURIComponent(code)}${scopeParam}`);
       const d = await res.json();
       if (!res.ok) { setError(d.error || 'Failed to load awardees.'); setData(null); }
       else setData(d);
@@ -48,7 +50,7 @@ function AwardeesList() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(cycleCode); }, [cycleCode, load]);
+  useEffect(() => { load(cycleCode, showAll); }, [cycleCode, showAll, load]);
 
   return (
     <Layout>
@@ -69,14 +71,28 @@ function AwardeesList() {
             />
           </label>
           <button type="submit" className="px-3 py-1 text-sm rounded bg-blue-700 text-white">Load</button>
-          {data?.cycleLabel && <span className="text-sm text-gray-500">{data.cycleLabel} · {data.count} awardee(s)</span>}
+          <label className="flex items-center gap-1 text-sm text-gray-700 ml-2">
+            <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
+            Show all programs
+          </label>
+          {data?.cycleLabel && (
+            <span className="text-sm text-gray-500">
+              {data.cycleLabel} · {data.count} awardee(s){showAll ? ' (all PDs)' : ' (yours)'}
+            </span>
+          )}
         </form>
 
         {loading && <p className="text-sm text-gray-500">Loading…</p>}
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
 
         {data && !loading && data.awardees.length === 0 && (
-          <p className="text-sm text-gray-500">No research awardees found for {data.cycleLabel || cycleCode}.</p>
+          <p className="text-sm text-gray-500">
+            {data.pdResolved === false
+              ? 'Could not match your account to a Program Director — tick “Show all programs” to see the full list.'
+              : showAll
+                ? `No research awardees found for ${data.cycleLabel || cycleCode}.`
+                : `No awardees assigned to you for ${data.cycleLabel || cycleCode}. Tick “Show all programs” to see everyone’s.`}
+          </p>
         )}
 
         {data && data.awardees.length > 0 && (

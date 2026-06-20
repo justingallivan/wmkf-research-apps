@@ -5,7 +5,7 @@
  * its Awardee tab. (RequireAppAccess guard is exercised elsewhere; this renders
  * the inner list against a mocked fetch.)
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 jest.mock('../../shared/components/Layout', () => ({
   __esModule: true,
@@ -51,10 +51,26 @@ test('renders the awardee rows with PI/liaison and an Open link to each Awardee 
   ]);
 });
 
-test('shows an empty-state message when the cycle has no awardees', async () => {
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ cycleCode: 'D25', cycleLabel: 'December 2025', count: 0, awardees: [] }) }));
+test('empty state (mine scope, default) prompts to show all', async () => {
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ cycleCode: 'D25', cycleLabel: 'December 2025', count: 0, awardees: [], scope: 'mine', pdResolved: true }) }));
   render(<AwardeesPage />);
-  await waitFor(() => expect(screen.getByText(/no research awardees found/i)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/no awardees assigned to you/i)).toBeInTheDocument());
+  // default fetch is mine-scoped (no scope=all param)
+  expect(global.fetch.mock.calls.every(([u]) => !String(u).includes('scope=all'))).toBe(true);
+});
+
+test('PD-unresolved empty state prompts to show all', async () => {
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ cycleCode: 'D25', cycleLabel: 'December 2025', count: 0, awardees: [], scope: 'mine', pdResolved: false, programDirector: null }) }));
+  render(<AwardeesPage />);
+  await waitFor(() => expect(screen.getByText(/could not match your account/i)).toBeInTheDocument());
+});
+
+test('toggling "Show all programs" refetches with scope=all', async () => {
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ cycleCode: 'J26', cycleLabel: 'June 2026', count: 0, awardees: [], scope: 'mine', pdResolved: true }) }));
+  render(<AwardeesPage />);
+  await waitFor(() => expect(screen.getByText(/show all programs/i)).toBeInTheDocument());
+  fireEvent.click(screen.getByLabelText(/show all programs/i));
+  await waitFor(() => expect(global.fetch.mock.calls.some(([u]) => String(u).includes('scope=all'))).toBe(true));
 });
 
 test('honors a ?cycleCode= deep link (workbench "View awardees" link)', async () => {
