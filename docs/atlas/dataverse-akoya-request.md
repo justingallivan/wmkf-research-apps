@@ -90,11 +90,15 @@ grantee-title generator (`grantee-title.generate`, Sonnet, from `akoya_title` + 
 its cron (`pages/api/cron/generate-grantee-titles.js`, seasonal `0 6 * 4-6,10-12 *`, **DEPLOYED +
 registered in the Vercel cron registry S270**; `grantee-title.generate` prompt **seeded to prod v1 S269**)
 write it **only when empty** (write-when-empty, ETag-conditional) for research awardees — never
-overwriting manual curation. ⚠️ **OPEN (post-deploy verification, owner):** confirm a write to this
-EXISTING board-facing field fires no AkoyaGO/Power Automate flow. **[Not yet exercised in prod —
-S270 read-only probe: the current J26 cycle is a confirmed no-op (0 rows match the cron's empty-field
-selection; all 24 J26 research-Invited rows already filled), so no cron write has occurred and the
-PA-flow question stays untested until the first genuinely-empty research-Invited row is written.]** ⚠️ `wmkf_projecttitle1..3` (String 500, "Project Title
+overwriting manual curation. ✅ **RESOLVED (S270): no AkoyaGO/Power Automate flow fires on a
+`wmkf_wmkfprojectdescription` write — safe for the cron to write.** Evidence: field-level audit-trail
+analysis across J26/D25/J25/D24 shows the field is **exclusively human-curated** — every dated set-event
+is a named staff member (Sarah Hibler, Kevin Moses, Jean Kim, Thomas Rieker, Melissa Gage, Connor Noda),
+**no service-principal / application-user / flow writer anywhere**, with human-paced gaps (seconds within
+a sitting → days/months across the cycle, multiple editors per cycle, multi-edit revisions) — the
+opposite of a flow's single-identity tight burst. No service-account audit follows the human edits
+(no read/react trigger-flow). Owner confirmed S270: no trigger-flow watches the field. The cron's
+write-when-empty simply does, automatically, what staff do by hand. ⚠️ `wmkf_projecttitle1..3` (String 500, "Project Title
 N") is a SEPARATE numbered-slot family with a different hypothesis phrasing (SoCal fills it at concept;
 Research late) — **no repo code reads/writes it; do not target.** [VERIFIED S269 via live probe + grep.]
 

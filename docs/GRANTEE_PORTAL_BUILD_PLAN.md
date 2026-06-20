@@ -401,13 +401,15 @@ supersedes the earlier "new `wmkf_ai_editedtitle` wave" plan — no wave, no pre
   `wmkf_wmkfprojectdescription` is **authored by the PD at the END of the process** (our target field);
   `wmkf_projecttitle1` may be the **staff's earlier best-guess title**, used upstream (e.g. building a
   Phase I board book). Treat as ASSUMED until Connor/Sarah confirm — see the Open-items entry.
-- ⚠️ **PA verification is MORE important here, not less:** we are now writing an EXISTING, board-facing,
-  human-curated field — a Power Automate flow could be watching it. Post-deploy, confirm no AkoyaGO/PA
-  flow fires on a `wmkf_wmkfprojectdescription` write (this is a chunk-7 acceptance criterion).
-  **STATUS (S270): still open (owner / Power Automate access). Not yet exercised in prod — a read-only
-  probe confirmed the current J26 cycle is a no-op (0 rows match the empty-field selection; all 24 J26
-  research-Invited rows already filled), so the cron has written nothing and the PA-flow question stays
-  untested until the first genuinely-empty research-Invited row is written.**
+- ✅ **PA verification — RESOLVED (S270): no AkoyaGO/PA flow fires on a `wmkf_wmkfprojectdescription`
+  write; safe for the cron.** This is/was a chunk-7 acceptance criterion (we write an EXISTING,
+  board-facing, human-curated field — a flow could have been watching it). Closed via field-level
+  audit-trail analysis across J26/D25/J25/D24: the field is **exclusively human-curated** — every dated
+  set-event is a named staff member (Sarah Hibler / Kevin Moses / Jean Kim / Thomas Rieker / Melissa Gage
+  / Connor Noda), **no service-principal / flow writer**, with human-paced gaps (seconds within a sitting
+  → days/months across a cycle; multiple editors; multi-edit revisions) — the opposite of a flow's
+  single-identity burst; and **no service-account audit follows the human edits** (no read/react
+  trigger-flow). **Owner confirmed S270: no trigger-flow watches the field.**
 - **Write-when-empty only** protects the manual curation: the cron never overwrites a populated value
   (the empty-field predicate), so staff edits and pre-existing manual titles are safe.
 

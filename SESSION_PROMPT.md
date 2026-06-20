@@ -38,11 +38,14 @@ Every piece went design → Codex pre-impl → build → Codex post-impl, all fo
 
 ## Potential next steps for S270
 
-### 1. Deploy + verify the title cron
-Deploy to register the cron schedule (`vercel.json`). Then **post-deploy PA-flow check**: confirm a
-write to the EXISTING board-facing `wmkf_wmkfprojectdescription` fires no AkoyaGO/Power Automate flow
-(recorded open item — Atlas). Smoke-test with `?cycleCode=` on a research-Invited row with an empty
-field (J26 all-filled, so a no-op there). Use `vercel inspect`, not poll-grep, to check the deploy.
+### 1. Deploy + verify the title cron ✅ DONE (S270)
+Cron is **deployed + registered** in the Vercel cron registry (`/api/cron/generate-grantee-titles`,
+`0 6 * 4-6,10-12 *`, built from HEAD); it shipped with the S269-stop push. Verified: 32 cron/service
+unit tests pass; read-only probe confirms current J26 cycle is a no-op (0 empty research-Invited rows;
+all 24 already filled). **PA-flow check RESOLVED:** field-level audit-trail analysis (J26/D25/J25/D24)
+shows `wmkf_wmkfprojectdescription` is exclusively human-curated (named staff, no service-principal/flow
+writer, human-paced gaps); **owner confirmed no trigger-flow watches the field.** See Atlas
+(`docs/atlas/dataverse-akoya-request.md`) + build plan chunk 7.
 
 ### 2. Chunk 8 — document assembly + export (the bigger downstream piece)
 Server-side template: structured header (institution→bold, location/PI+coPI→italic, amount→currency,
