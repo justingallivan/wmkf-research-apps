@@ -55,6 +55,7 @@
 - Intake portal / attachments / institution match / virus scan: ../docs/agent-wiki/topics/intake-portal.md
 - Dataverse / Dynamics / Explorer / Power Tools: ../docs/agent-wiki/topics/dataverse-dynamics.md
 - Dynamics CRM facts / grant lifecycle fields: ../docs/agent-wiki/topics/dataverse-dynamics.md
+- Is a Dataverse field human- or flow-populated? (audit-trail actor detection): reference-dataverse-audit-trail-actor-detection.md
 - Prompt / Executor / document processing: ../docs/agent-wiki/topics/prompt-executor.md
 - Adding a prompt / editing a seed / prompt-store governance (two-tier, create-only seed, version-preserving --force, timestamps): project-prompt-governance.md
 - BILL / honoraria / payment semantics: ../docs/agent-wiki/topics/finance-honoraria.md

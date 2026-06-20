@@ -24,6 +24,7 @@
     "test:integration": "jest tests/integration",
     "test:prompts": "jest tests/unit/prompts",
     "test:utils": "jest tests/unit/utils",
+    "test:grantee-deliverables": "jest tests/unit/grantee-markdown.test.js tests/unit/grantee-document-html.test.js tests/unit/grantee-document-assembly.test.js tests/unit/grantee-cycle-export-route.test.js tests/unit/grantee-website-html-route.test.js",
     "e2e:pr4": "node scripts/pr4-e2e.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
