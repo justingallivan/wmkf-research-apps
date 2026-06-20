@@ -233,6 +233,12 @@ PDF and post it"). Header fields are **display-only** in the portal (Foundation-
 complains case-by-case rather than editing institution/PI/amount). Build detail + open questions:
 `docs/GRANTEE_PORTAL_BUILD_PLAN.md` chunks 7–8.
 
+**Build status (S270):** the shared assembly model + renderer and outputs **(b) website HTML** and
+**(c) cycle export** (format = combined HTML, owner decision) are BUILT; **(a) portal preview** is
+deferred on the title-editability decision. Decided this session: inline markdown subset = bold/italic
+(CommonMark) + super/subscript (pandoc `^x^`/`~x~`); award amount = full-number USD, no cents. See the
+build-plan chunk-8 "BUILT (S270)" block for modules, the canonical owner template, and route paths.
+
 ## Open items (resolve during implementation)
 
 - Exact abstract-generation **prompt/template** and Executor wiring (Q1 partially open).

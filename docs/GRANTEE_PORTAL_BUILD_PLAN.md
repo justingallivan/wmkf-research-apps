@@ -28,7 +28,7 @@ build a **parallel grantee variant** of the lifecycle, pages, submit route, uplo
 | 5 | **Submit route** ✅ | `POST .../submit`: atomic SharePoint image upload + ETag-conditional Dataverse PATCH (`wmkf_abstractapproved`, caption, image ref, status→Submitted) + rollback; image magic-byte (`validateGranteeImage`) + virus scan; `grantee-upload` service | 1, 4 |
 | 6 | **Status/lifecycle + reminders** | status transitions on the Awardee tab, optional reminder send | 3, 5 |
 | 7 | **Edited-title generator (S269)** ✅ | Sonnet prompt (`grantee-title.generate`, title+abstract) + cron-poll on `wmkf_phaseistatus=Invited` → writes the EXISTING `wmkf_wmkfprojectdescription` when empty (research-only, idempotent; no new schema). Prompt/service/seed/A7 BUILT; prompt seeded to prod v1 (S269); cron **deployed + registered in the Vercel cron registry (S270)** | Executor contract |
-| 8 | **Document assembly + export (S269)** | server-side template (structured header + edited title + body/caption) → portal preview · website HTML · cycle-level export | 7, 5 |
+| 8 | **Document assembly + export (S269 design; S270 build)** | server-side template (structured header + edited title + body/caption) → portal preview · website HTML · cycle-level export. **Foundation + outputs (b) website HTML & (c) cycle export BUILT (S270); (a) portal preview deferred on title-editability** | 7, 5 |
 
 ## Chunk 1 — Token + auth foundation (design)
 
@@ -500,12 +500,14 @@ identity); only body/caption carry inline markdown (D8). `[VERIFIED co-PI read: 
 fetchCoPIs, role=Co-PI 100000001]`
 
 **Outputs (owner: "output will vary"):**
-- **(a) Portal review preview** — the assembled, styled document shown in the grantee portal above the
-  editable body; header fields display-only.
-- **(b) Website HTML** — clean controlled HTML (only `<em>/<strong>` from the body markdown) for the
-  staff member to drop into the site, replacing manual coding.
-- **(c) Cycle-level export** — all of a cycle's awarded abstracts assembled together (replaces today's
-  "compile all into one PDF and post it"). Format TBD (HTML page / combined HTML / DOCX).
+- **(a) Portal review preview** ⏸ *deferred (title-editability)* — the assembled, styled document shown
+  in the grantee portal above the editable body; header fields display-only.
+- **(b) Website HTML** ✅ *BUILT S270* — clean controlled HTML for the staff member to drop into the
+  site, replacing manual coding. `GET /api/workbench/grantee-deliverables/website-html?requestId=<guid>`.
+- **(c) Cycle-level export** ✅ *BUILT S270* — all of a cycle's awarded abstracts assembled together
+  (replaces today's "compile all into one PDF and post it"). **Format = combined HTML** (owner decision
+  S270; reuses the same renderer as (b), print-to-PDF in the browser).
+  `GET /api/workbench/grantee-deliverables/cycle-export?cycleCode=J26`.
 
 ### RESOLVED (Codex pre-impl review, S269)
 - **One canonical assembly model (Codex ISSUE).** A single shared service
@@ -528,6 +530,32 @@ fetchCoPIs, role=Co-PI 100000001]`
 - **Cycle export scope + access** — keyed by `cycleCode` (`cycleCodeToOdataFilter` on `wmkf_meetingdate`,
   awardees-endpoint pattern), **awarded research only** (`Active` + `GRANTEE_RESEARCH_PROGRAM_IDS` + PI
   present), `requireAppAccess('reviewers')`. On-demand v1 (cron-prebuilt only if volume warrants).
+
+### BUILT (S270)
+- **Foundation (commit `221da226`).** Three output-agnostic modules:
+  - `shared/utils/grantee-markdown.js` — the ONE inline renderer. Subset = **bold/italic** (CommonMark
+    `**`/`*`) + **super/subscript** via the **pandoc convention** (`^x^` superscript, `~x~` subscript —
+    decided S270; the WYSIWYG buttons in D8 serialize to this). Private `Marked` instance so the sub/sup
+    extensions never leak into the global `marked` that `policy-markdown` uses; DOMPurify allowlist (body:
+    `p/br/strong/em/sub/sup`; caption inline: `strong/em/sub/sup/br`); no attrs, no links, no raw HTML.
+  - `lib/services/grantee-document-assembly.js` — `assembleGranteeDocument(requestId, { includeImageRef })`
+    reads every field once → the canonical model. **Amount = full-number USD, no cents** (`$1,200,000`,
+    decided S270). `includeImageRef` gates the private SharePoint ref to staff surfaces.
+  - `lib/services/grantee-document-html.js` — `renderAwardBlock` (structural formatting per field) +
+    `renderCyclePage` (standalone printable page). Image → `<figure>` placeholder (ref in a comment),
+    NEVER a fabricated public `<img src>` (public image serving is a separate follow-up).
+- **Outputs (b) + (c) (commit `ac72f96b`).** Both staff-authed routes above; matrix rows + counts added;
+  49 unit tests; `npm run build` green (the renderer's server-side jsdom path compiles).
+- **Canonical owner template (S270)** — the assembled award structure, per field → format:
+
+  | Line | Field | Source | Format |
+  |---|---|---|---|
+  | Oregon State University | institution | `akoya_applicantid` → account `name` | **bold** |
+  | Corvallis, OR | location | account `address1_city`, `address1_stateorprovince` | *italic* |
+  | Kristen Buck and Mya Breitbart | PI + Co-PIs | `wmkf_projectleader` + `fetchCoPIs()` join "A and B" | *italic* |
+  | $1,200,000 | award amount | `akoya_grant` ‖ `akoya_originalgrantamount` | plain, full number, no cents |
+  | To determine whether… | edited title | `wmkf_wmkfprojectdescription` | *italic*, runs into the body |
+  | In nearly half… | body | `wmkf_abstractapproved` ‖ `wmkf_abstractformatted` | prose; inline subset when present |
 
 ### Still open (does NOT block — chunk-8 portal wiring detail)
 - **Title PI-editability.** Is the edited title editable by the PI in the award-stage portal
