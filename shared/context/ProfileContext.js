@@ -108,7 +108,7 @@ export function ProfileProvider({ children }) {
   // Mirror of state.preferences so setPreference can capture the pre-save value for
   // a precise per-key rollback on failure WITHOUT taking state.preferences as a
   // dependency (which would change setPreference's identity every time a preference
-  // changes and retrigger effects that depend on it, e.g. SettingsModal's cycle sync).
+  // changes and retrigger effects that depend on it, e.g. the Profile Settings sync effects).
   const preferencesRef = useRef({});
   useEffect(() => { preferencesRef.current = state.preferences; }, [state.preferences]);
 
@@ -140,7 +140,8 @@ export function ProfileProvider({ children }) {
     let hasMigrationData = false;
 
     // Mapping of localStorage keys to preference keys
-    // email_reviewer_settings is a composite key used by EmailSettingsPanel
+    // email_reviewer_settings is a legacy composite localStorage key (from the
+    // retired Reviewer Finder settings panel); still migrated for old browser data.
     const legacyKeys = {
       [STORAGE_KEYS.SENDER_INFO]: PREFERENCE_KEYS.SENDER_INFO,
       [STORAGE_KEYS.GRANT_CYCLE]: PREFERENCE_KEYS.GRANT_CYCLE_SETTINGS,

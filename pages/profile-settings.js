@@ -16,6 +16,8 @@ import {
   serializeEmailSignaturePreference,
 } from '../shared/config/reviewerFinderPreferences';
 import { GRANTEE_INVITE_DEFAULT_BODY } from '../shared/config/granteeInviteEmail';
+import EmailTemplatesModal from '../shared/components/reviewers/EmailTemplatesModal';
+import { TEMPLATE_TYPE_LABELS, TEMPLATE_TYPES } from '../shared/components/reviewers/email-template-store';
 
 // Preset colors for avatar selection
 const AVATAR_COLORS = [
@@ -64,6 +66,12 @@ export default function ProfileSettings() {
   const [inviteBodyStatus, setInviteBodyStatus] = useState(null);
   const loadedInviteBodySourceRef = useRef('');
   const inviteBodyPreference = preferences?.[PREFERENCE_KEYS.GRANTEE_INVITE_BODY] || '';
+
+  // Reviewer email templates (the 6-type set sent from Workbench → Reviewers).
+  // Edited in the shared EmailTemplatesModal, which loads/saves via the same
+  // preference key the Workbench tab uses — so this is a second entry point to the
+  // ONE editor, not a separate copy. Defaults are seeded by the modal itself.
+  const [showReviewerTemplates, setShowReviewerTemplates] = useState(false);
 
   useEffect(() => {
     if (status !== 'ready') return;
@@ -191,7 +199,7 @@ export default function ProfileSettings() {
     const ok = await setPreference(PREFERENCE_KEYS.GRANTEE_INVITE_BODY, inviteBody);
     setIsSavingInviteBody(false);
     setInviteBodyStatus(ok ? 'saved' : 'error');
-    if (!ok) setError('Failed to save grantee invitation body.');
+    if (!ok) setError('Failed to save the Request Abstract email body.');
   };
 
   // Reset = DELETE the key so the body falls back to the canonical Foundation
@@ -208,7 +216,7 @@ export default function ProfileSettings() {
       setInviteBodyStatus('reset');
     } else {
       setInviteBodyStatus('error');
-      setError('Failed to reset grantee invitation body.');
+      setError('Failed to reset the Request Abstract email body.');
     }
   };
 
@@ -327,12 +335,12 @@ export default function ProfileSettings() {
         {currentProfile && (
           <Card>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Grantee Invitation Email</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Request Abstract Email</h2>
               {inviteBodyStatus === 'saved' && <span className="text-sm text-green-700">Saved</span>}
               {inviteBodyStatus === 'reset' && <span className="text-sm text-green-700">Reset to default</span>}
             </div>
             <p className="text-sm text-gray-600 mb-4">
-              Your default body for the grantee abstract-review invitation (the Workbench
+              Your default body for the grantee abstract-review email (the Workbench
               Awardee tab). Do not include your name or signature — your saved Email
               Signature is appended automatically when you send. Keep the{' '}
               <code className="text-xs">[Name]</code>, <code className="text-xs">[title]</code>, and{' '}
@@ -349,7 +357,7 @@ export default function ProfileSettings() {
                 />
               </label>
               {inviteBodyStatus === 'error' && (
-                <p className="text-sm text-red-700">Could not save the grantee invitation body.</p>
+                <p className="text-sm text-red-700">Could not save the Request Abstract email body.</p>
               )}
               <div className="flex justify-end gap-2">
                 <Button
@@ -368,10 +376,35 @@ export default function ProfileSettings() {
                   disabled={isSavingInviteBody}
                   loading={isSavingInviteBody}
                 >
-                  Save Invitation Body
+                  Save Email Body
                 </Button>
               </div>
             </form>
+          </Card>
+        )}
+
+        {currentProfile && (
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Reviewer Emails</h2>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Your templates for the emails sent to peer reviewers from the Workbench
+              Reviewers tab — invitation, hold, finalize, materials, follow-up, and
+              thank-you. Everyone starts from a default; edits here are saved to your
+              profile and used wherever you send. Your saved Email Signature fills the{' '}
+              <code className="text-xs">{'{{signature}}'}</code> placeholder.
+            </p>
+            <ul className="text-sm text-gray-600 mb-4 flex flex-wrap gap-x-4 gap-y-1">
+              {TEMPLATE_TYPES.map((t) => (
+                <li key={t} className="text-gray-700">• {TEMPLATE_TYPE_LABELS[t] || t}</li>
+              ))}
+            </ul>
+            <div className="flex justify-end">
+              <Button variant="primary" size="sm" type="button" onClick={() => setShowReviewerTemplates(true)}>
+                Edit reviewer email templates
+              </Button>
+            </div>
           </Card>
         )}
 
@@ -552,6 +585,9 @@ export default function ProfileSettings() {
           </div>
         </Card>
       </div>
+      {showReviewerTemplates && (
+        <EmailTemplatesModal onClose={() => setShowReviewerTemplates(false)} />
+      )}
     </Layout>
   );
 }
