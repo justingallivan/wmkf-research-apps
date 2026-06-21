@@ -39,6 +39,7 @@ import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-conte
 import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
 import { getHonorariumAmount } from '../../../lib/services/honorarium-config';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
+import { fetchCoPIs } from '../../../lib/services/proposal-participants';
 import { mintAndStore } from '../../../lib/external/token-lifecycle';
 import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 
@@ -107,6 +108,17 @@ export default async function handler(req, res) {
     if (rows.length === 0) {
       return res.status(404).json({ error: 'No reviewers found for the provided IDs' });
     }
+
+    // Co-PIs come from the wmkf_apprequestperson junction (role=Co-PI), the same
+    // source the external-reviewer Proposal card uses. Fetch once per distinct
+    // request (a batch usually shares one). Best-effort: a failed lookup yields no
+    // co-PI line rather than blocking the render. Inside the handler-wide
+    // restriction bypass, which fetchCoPIs requires.
+    const coPIsByRequest = new Map();
+    const distinctRequestIds = [...new Set(rows.map((r) => r.request?.akoya_requestid).filter(Boolean))];
+    await Promise.all(distinctRequestIds.map(async (rid) => {
+      coPIsByRequest.set(rid, await fetchCoPIs(rid).catch(() => []));
+    }));
 
     // Cycle-level config from Dataverse `wmkf_appgrantcycle` (W3 cutover).
     const distinctCycleCodes = [...new Set(
@@ -177,15 +189,18 @@ export default async function handler(req, res) {
         affiliation: person?.wmkf_primaryaffiliation || person?.wmkf_organizationname || null,
         email: candidateEmail,
       };
+      const coPINames = coPIsByRequest.get(request?.akoya_requestid) || [];
       const proposal = {
         title: request?.akoya_title || null,
         abstract: request?.wmkf_abstract || null,
-        authors: request?._wmkf_projectleader_value_formatted
-          || request?._akoya_applicantid_value_formatted
-          || null,
+        // PI ONLY — do NOT fall back to the applicant account, which is an
+        // ORGANIZATION and would wrongly be labeled the Principal Investigator
+        // (Codex S274). A missing PI drops the line via the composed details block.
+        authors: request?._wmkf_projectleader_value_formatted || null,
         institution: (request?.wmkf_organizationname || request?._akoya_applicantid_value_formatted || '').trim() || null,
-        coInvestigators: null, // historical Postgres-only field; not migrated
-        coInvestigatorCount: null,
+        // Co-PI display names from the apprequestperson junction (names only).
+        coInvestigators: coPINames.join(', ') || null,
+        coInvestigatorCount: coPINames.length,
       };
       const templateSettings = {
         signature: settings.signature || '',
