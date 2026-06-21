@@ -7,14 +7,16 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
 
-// AwardeeTab reads the logged-in PD's saved custom invite body via useProfile.
-// Mock the context so the component can render in isolation; mockPreferences is
-// mutable per-test (the "mock" prefix lets the jest.mock factory reference it).
+// AwardeeTab reads the logged-in PD's saved custom invite body + profile identity
+// via useProfile. Mock the context so the component renders in isolation;
+// mockPreferences/mockProfileId are mutable per-test (the "mock" prefix lets the
+// jest.mock factory reference them) so profile-switch behavior is testable.
 let mockPreferences = {};
+let mockProfileId = 'p1';
 jest.mock('../../shared/context/ProfileContext', () => ({
-  useProfile: () => ({ preferences: mockPreferences }),
+  useProfile: () => ({ preferences: mockPreferences, currentProfile: { id: mockProfileId } }),
 }));
-beforeEach(() => { mockPreferences = {}; });
+beforeEach(() => { mockPreferences = {}; mockProfileId = 'p1'; });
 
 const REQ = '11111111-1111-1111-1111-111111111111';
 
@@ -238,4 +240,65 @@ test('"Reset to default" restores the Foundation default over a saved custom bod
   // Stays reset — does not bounce back to the custom body on a later effect run.
   await new Promise((r) => setTimeout(r, 0));
   expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj:/);
+});
+
+// --- Lifecycle (compose-state) regression tests: bugs #1 and #2 (S272) ---
+
+test('switching profile reseeds the body to the new PD saved body (not stale)', async () => {
+  mockProfileId = 'pA';
+  mockPreferences = { grantee_invite_body: 'Body A for [Name].' };
+  wireFetch();
+  const { rerender } = render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Body A for Raj\./));
+
+  mockProfileId = 'pB';
+  mockPreferences = { grantee_invite_body: 'Body B for [Name].' };
+  rerender(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Body B for Raj\./));
+});
+
+test('switching profile AFTER editing discards the edit and loads the new PD body (#1)', async () => {
+  mockProfileId = 'pA';
+  mockPreferences = { grantee_invite_body: 'Body A for [Name].' };
+  wireFetch();
+  const { rerender } = render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Body A for Raj\./));
+
+  fireEvent.change(screen.getByLabelText('Email body'), { target: { value: 'half-typed draft for pA' } });
+  expect(screen.getByLabelText('Email body').value).toBe('half-typed draft for pA');
+
+  mockProfileId = 'pB';
+  mockPreferences = { grantee_invite_body: 'Body B for [Name].' };
+  rerender(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  // Identity changed → the edit (provenance: pA) is discarded; pB's body derives.
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Body B for Raj\./));
+});
+
+test('reset BEFORE recipients load still fills [Name] when they arrive (#2)', async () => {
+  let resolveRecipients;
+  global.fetch = jest.fn(async (url) => {
+    const u = String(url);
+    if (u.includes('/grantee-deliverables/recipients')) {
+      await new Promise((res) => { resolveRecipients = res; });
+      return { ok: true, json: async () => ({ pi: { name: 'Monika Raj', email: 'monika.raj@emory.edu' }, liaison: {} }) };
+    }
+    throw new Error(`unexpected fetch ${u}`);
+  });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  // Recipients not resolved yet → [Name] placeholder still present.
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/Dear Professor \[Name\]:/));
+
+  fireEvent.click(screen.getByRole('button', { name: /reset to default/i }));
+  expect(screen.getByLabelText('Email body').value).toMatch(/Dear Professor \[Name\]:/);
+
+  resolveRecipients();
+  // After recipients land, the reset (foundation, not "edited") refills [Name].
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj:/));
+});
+
+test('preserves a custom body verbatim incl. leading/trailing whitespace (no trim)', async () => {
+  mockPreferences = { grantee_invite_body: '  Hello [Name], spaced body.  ' };
+  wireFetch();
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^ {2}Hello Raj, spaced body\. {2}$/));
 });

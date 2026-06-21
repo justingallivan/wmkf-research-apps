@@ -20,7 +20,7 @@
  * is hidden when the request has no June/December cycle.
  */
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { GRANTEE_DELIVERABLE_LABEL } from '../../config/granteeDeliverableStatus';
 import { useProfile } from '../../context/ProfileContext';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
@@ -47,37 +47,40 @@ export default function AwardeeTab({ requestId, context }) {
   const [websiteHtml, setWebsiteHtml] = useState(null);
   const [fetchingHtml, setFetchingHtml] = useState(false);
   const [copyMsg, setCopyMsg] = useState(null);
-  // autoBodyRef holds the last auto-generated body; userEditedBodyRef flips true the
-  // moment staff types in the textarea so a late-arriving saved body or recipient
-  // name never clobbers their edit (S272).
-  const autoBodyRef = useRef(GRANTEE_INVITE_DEFAULT_BODY);
-  const userEditedBodyRef = useRef(false);
+  // Compose-state model (S272): the body is DERIVED from (identity, template choice,
+  // recipients) unless the PD has taken ownership by typing. `dirty` = real manual
+  // edit; `templateMode` = which template feeds the derive ('auto' = saved-or-default,
+  // 'foundation' = the shared default forced by "Reset to default"). This replaces a
+  // one-way userEditedBodyRef latch that went stale across identity changes and froze
+  // placeholder refills after a reset — both fixed by tracking these explicitly plus
+  // an identity-reset effect below.
+  const [dirty, setDirty] = useState(false);
+  const [templateMode, setTemplateMode] = useState('auto');
 
-  const { preferences } = useProfile();
+  const { preferences, currentProfile } = useProfile();
   // The logged-in PD's saved custom body (Option A: sender's pref, client-side).
-  // Whitespace-only is treated as absent. Absent ⇒ the shared Foundation default.
-  const savedBody = (preferences?.[PREFERENCE_KEYS.GRANTEE_INVITE_BODY] || '').trim();
-  const baseTemplate = savedBody || GRANTEE_INVITE_DEFAULT_BODY;
+  // Trim only to decide ABSENCE; use the raw value as the template so intentional
+  // leading/trailing whitespace in a custom body survives.
+  const savedBodyRaw = preferences?.[PREFERENCE_KEYS.GRANTEE_INVITE_BODY] || '';
+  const hasSavedBody = savedBodyRaw.trim().length > 0;
+  const baseTemplate = hasSavedBody ? savedBodyRaw : GRANTEE_INVITE_DEFAULT_BODY;
 
   const cycleCode = context?.cycleCode || null;
   const cycleLabel = context?.cycleLabel || null;
   const awardTitle = context?.title || null;
 
   const handleBodyChange = (e) => {
-    userEditedBodyRef.current = true;
+    setDirty(true);
     setBody(e.target.value);
   };
 
   // Restore the Foundation default for THIS send (local only — does not change the
-  // PD's saved body). Marks user-edited=true so the effect below does not bounce it
-  // back to the saved custom body when prefs/recipients re-trigger it (S272 v2).
+  // PD's saved body). Marks the compose as foundation-template, NOT manually edited,
+  // so a later recipient load still fills [Name] (it does not bounce back to the
+  // saved custom body because templateMode pins the default).
   const resetToFoundationDefault = () => {
-    const nextBody = fillInviteBody(GRANTEE_INVITE_DEFAULT_BODY, {
-      piName: recipients?.pi?.name,
-      title: awardTitle,
-    });
-    userEditedBodyRef.current = true;
-    setBody(nextBody);
+    setTemplateMode('foundation');
+    setDirty(false);
   };
 
   const loadRecipients = useCallback(async () => {
@@ -95,19 +98,24 @@ export default function AwardeeTab({ requestId, context }) {
 
   useEffect(() => { loadRecipients(); }, [loadRecipients]);
 
+  // Identity reset (the un-latch): when the producing identity changes — the request
+  // being composed, or the logged-in PD whose saved body feeds it — discard prior
+  // compose state so the body re-derives for the new identity. Without this, a typed
+  // or reset body from one identity would persist (stale) into the next.
   useEffect(() => {
-    const nextBody = fillInviteBody(baseTemplate, {
-      piName: recipients?.pi?.name,
-      title: awardTitle,
-    });
-    setBody((current) => {
-      // Keep staff edits; only reseed an untouched, still-auto body. Depending on
-      // baseTemplate means a saved custom body that loads AFTER mount reseeds here.
-      if (userEditedBodyRef.current || current !== autoBodyRef.current) return current;
-      autoBodyRef.current = nextBody;
-      return nextBody;
-    });
-  }, [baseTemplate, recipients?.pi?.name, awardTitle]);
+    setDirty(false);
+    setTemplateMode('auto');
+  }, [currentProfile?.id, requestId]);
+
+  // Derive the body from the chosen template + recipients UNLESS the PD has taken
+  // ownership by typing. `dirty` is in the deps so the render after an identity reset
+  // (which clears dirty) re-fires this and reseeds; baseTemplate is in the deps so a
+  // saved body loading after mount reseeds too.
+  useEffect(() => {
+    if (dirty) return;
+    const base = templateMode === 'foundation' ? GRANTEE_INVITE_DEFAULT_BODY : baseTemplate;
+    setBody(fillInviteBody(base, { piName: recipients?.pi?.name, title: awardTitle }));
+  }, [dirty, templateMode, baseTemplate, recipients?.pi?.name, awardTitle]);
 
   async function generate(regenerate = false) {
     setGenerating(true); setError(null); setSentMsg(null);
@@ -245,7 +253,7 @@ export default function AwardeeTab({ requestId, context }) {
         </div>
         <p className="text-xs text-gray-500">
           A secure magic-link and your saved email signature are added automatically — don’t include a signature here.
-          {savedBody ? ' Starting from your saved custom body (edit it in Profile Settings).' : ''}
+          {hasSavedBody && templateMode === 'auto' && !dirty ? ' Starting from your saved custom body (edit it in Profile Settings).' : ''}
         </p>
         <div className="flex flex-wrap gap-2">
           <button

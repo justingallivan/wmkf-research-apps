@@ -1,6 +1,6 @@
 # Per-PD Custom Grantee-Invitation Email Body + Edit Affordance (S272)
 
-**Status:** PLANNED — Codex pre-impl reviews v1 + v2 folded; ready to implement.
+**Status:** IMPLEMENTED (commit 56da01e3) + post-impl lifecycle fixes shipped (compose-state model — see §11). Open: #5 (ProfileContext optimistic save) and #6 (`replaceAll`) not yet done.
 **Owner ask (S272):** Give Program Directors a *saved* custom grantee-invitation
 email body, plus a clearer edit affordance on the Awardee tab. Today the body is a
 single shared `DEFAULT_BODY` constant in `shared/components/workbench/AwardeeTab.js`,
@@ -146,6 +146,10 @@ No normalize/serialize helpers needed (plain string, unlike the JSON signature).
 
 ### 4.3 AwardeeTab: seed from the saved body + reset affordance
 
+> **[SUPERSEDED by §11.]** The `userEditedBodyRef` latch design below shipped first
+> but had two lifecycle bugs (#1, #2); the live code uses the compose-state model in
+> §11. Kept here as the pre-impl planning record.
+
 - `import { useProfile } from '../../context/ProfileContext'` and read
   `const savedBody = preferences?.[PREFERENCE_KEYS.GRANTEE_INVITE_BODY] || '';`
 - **Base template** = `savedBody || GRANTEE_INVITE_DEFAULT_BODY`, where `savedBody`
@@ -247,8 +251,9 @@ to be appended server-side from the assigned PD.
 
 ## 5. Hazards & invariants (for the reviewer to scrutinize)
 
-1. **Auto-fill vs manual-edit ref logic (highest risk — RESOLVED in §4.3).** The
-   original effect (AwardeeTab 106–113) decided "did the user hand-edit?" by comparing
+1. **Auto-fill vs manual-edit ref logic (highest risk — SUPERSEDED by §11; the
+   `userEditedBodyRef` fix below was itself buggy and was replaced by the compose-state
+   model).** The original effect (AwardeeTab 106–113) decided "did the user hand-edit?" by comparing
    `body` against `DEFAULT_BODY` and `autoBodyRef.current`. Because `preferences` load
    **asynchronously after** first render, two failure modes existed: (a) a saved
    custom body silently never appears (it arrives after mount; the guard treats the
@@ -281,11 +286,12 @@ to be appended server-side from the assigned PD.
    - **Optimistic save / failure.** `setPreference` resolves to a boolean; the
      Profile Settings card already surfaces a save error (mirror the signature
      pattern). The Awardee-tab reset is local-only (no network), so it cannot fail.
-   - **Profile switch with an Awardee tab open.** `preferences` changes when the PD
-     switches profiles. Because §4.3's effect depends on `baseTemplate` and gates on
-     `userEditedBodyRef`, a *typed* body is preserved across a switch and an *unedited*
-     body reseeds from the new profile. **Decision: preserve typed text** (don't
-     surprise the PD mid-compose); reseed only when untouched. Confirm acceptable.
+   - **Profile switch with an Awardee tab open.** **[SUPERSEDED by §11 — decision
+     reversed.]** This bullet planned to *preserve typed text* across a profile switch;
+     the shipped compose-state model instead **discards** the in-progress edit on an
+     identity change and re-derives from the new PD (the edit's provenance is stale).
+     The "preserve only when untouched" reasoning here also rested on the
+     `userEditedBodyRef` latch, which no longer exists.
 
 ---
 
@@ -295,7 +301,7 @@ to be appended server-side from the assigned PD.
 |---|---|
 | `shared/config/granteeInviteEmail.js` | **NEW** — shared default subject/body + `fillInviteBody` |
 | `shared/config/reviewerFinderPreferences.js` | Add `GRANTEE_INVITE_BODY` key |
-| `shared/components/workbench/AwardeeTab.js` | Seed body from saved pref; `userEditedBodyRef`; reset link; relabel; import shared module; `useProfile()` |
+| `shared/components/workbench/AwardeeTab.js` | Seed body from saved pref; compose-state model (`dirty`/`templateMode` + identity-reset effect, §11); reset link; relabel; import shared module; `useProfile()` |
 | `shared/context/ProfileContext.js` | Add `REMOVE_PREFERENCE` reducer action + `deletePreference(key)` (DELETE `/api/user-preferences`, gate on parsed `data.success`) |
 | `pages/profile-settings.js` | New "Grantee invitation email" card (save + reset-to-default via delete) |
 
@@ -328,8 +334,10 @@ and a fresh profile (no saved body) still sees the default.
 3. ✅ **Drop `Thank you,` from the default body now** — confirmed (owner). Resolves
    S272 item #2 (double-closing). See §1 invariant #4 and §4.1.
 
-Remaining confirm-on-review (not blockers): profile-switch behavior preserves typed
-text (§5 hazard 7) — surface to owner if they expect a reseed instead.
+Remaining confirm-on-review (not blockers): profile-switch behavior — **resolved in
+§11**: a switch discards the in-progress edit and reseeds from the new PD (the
+opposite of §5 hazard 7's original "preserve typed text" plan). Surface to owner if
+they'd prefer preserve-on-switch.
 
 ---
 
@@ -376,3 +384,48 @@ v2 reviewed the v1 folds and hunted for issues the folds introduced:
   on parsed `data.success === true`, not `response.ok`. §4.4.
 - **Finding 5 (unverifiable-as-built labels) — folded.** The two §3 lines that are
   plan intent (won't-encrypt; no matrix edit) are now tagged `[PLANNED]`.
+
+---
+
+## 11. Post-impl lifecycle fixes — SHIPPED (compose-state model, S272)
+
+A post-impl Codex review caught two temporal bugs the pre-impl `userEditedBodyRef`
+design (§4.3) introduced. **§4.3, §5 hazard 1, §5 hazard 7, and §10 Finding 2 are
+SUPERSEDED by this section** — the shipped AwardeeTab does not use a `userEditedBodyRef`
+latch at all.
+
+**Root cause:** `userEditedBodyRef` was a one-way latch (set `true` on type AND on
+reset, never reset to `false`), and AwardeeTab is not keyed by profile, so the ref
+outlived a profile switch. That produced #1 (after an edit/reset, switching profiles
+kept the stale body — the new PD's saved body never appeared) and #2 (reset set the
+latch `true`, so a recipient arriving after a reset never filled `[Name]`). The deeper
+defect: the component tracked the body's *text* but not its *source identity*.
+
+**Fix — compose-state model (replaces the latch):**
+- Two explicit states: `dirty` (true only on real typing) and `templateMode`
+  (`'auto'` = saved-or-default `baseTemplate` | `'foundation'` = the shared default
+  forced by "Reset to default").
+- **Identity-reset effect** keyed on `[currentProfile?.id, requestId]` sets
+  `dirty=false`, `templateMode='auto'` — the missing un-latch edge. This **reverses
+  §5 hazard 7's "preserve typed text across a profile switch"**: a switch now
+  **discards** the in-progress edit and re-derives from the new identity, because the
+  edit's provenance (the old PD) is no longer current.
+- **Derive effect** `[dirty, templateMode, baseTemplate, recipients?.pi?.name, awardTitle]`:
+  `if (dirty) return; setBody(fillInviteBody(templateMode==='foundation' ? DEFAULT : baseTemplate, …))`.
+  `dirty` in the deps is what makes the render after an identity-reset reseed; a saved
+  body loading after mount reseeds via `baseTemplate`. `autoBodyRef`/`userEditedBodyRef`
+  removed.
+- **Whitespace fix:** trim only for the *absent?* check (`hasSavedBody`); use the raw
+  `savedBodyRaw` as the template so intentional leading/trailing whitespace survives.
+
+**Tests added (awardee-tab.test.js, 18 total):** profile-switch reseed (incl. the
+dirty case = #1), reset-before-recipients fills `[Name]` (#2), whitespace-preserving
+custom body. Full suite green (2937 pass; the 2 unrelated pre-existing suites still red).
+
+**Still open (out of the AwardeeTab lifecycle scope):**
+- **#5** — `ProfileContext.setPreference` is optimistic and doesn't revert on a failed
+  save, so a failed save can leave AwardeeTab reading an unsaved body as saved. Belongs
+  in ProfileContext (non-optimistic, or per-key rollback).
+- **#6** — `fillInviteBody` uses first-occurrence `.replace`; a custom body with a
+  repeated `[Name]`/`[title]` leaves the 2nd unfilled. Use `replaceAll` (and consider
+  replacing the `[date]` token itself, preserving the default's `COB [date]`).
