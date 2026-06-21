@@ -100,12 +100,14 @@ fail open on any other error; then wire it into the `PreToolUse`→`Bash` block 
 
 - **`pre-review-delegation-trace-guard.js`** — `PreToolUse(Task|Agent)`, ADVISORY (injects
   context, never blocks). Fires before a review/verify delegation (any Codex subagent, or any
-  agent with a review-worded prompt) and demands a TEMPORAL (next-render/re-entry) +
-  BOUNDARY (both sides agree on value semantics) self-trace WITH file:line evidence before
-  delegating — so the reviewer confirms a trace, not a bare assertion. The forcing function
-  behind modes 5–6 of `feedback-self-review-before-delegating-review` (added S272 after a
-  Codex pre-impl review caught a reset-bounce and a 200-on-failure/merge-reducer mismatch I
-  had outsourced). Complements the PostToolUse `codex-verbatim-reminder.js`. Fail-open.
+  agent with a review-worded prompt) and demands a LIFECYCLE (trace from the landed state /
+  the edge the code omits) + PROVENANCE (what produced a value; a contract's failure path,
+  not just its shape) self-trace WITH file:line evidence before delegating — so the reviewer
+  confirms a trace, not a bare assertion, and so a named check isn't deflected to the reviewer
+  or into a future project tool. The forcing function behind modes 5–6 of
+  `feedback-self-review-before-delegating-review` (added S272 after Codex reviews repeatedly
+  caught lifecycle/provenance misses — a one-way latch gone stale, a 200-on-failure DELETE).
+  Complements the PostToolUse `codex-verbatim-reminder.js`. Fail-open.
 
 ## Standard Probe
 

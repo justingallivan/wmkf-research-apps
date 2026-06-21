@@ -37,7 +37,7 @@
 - Manual affiliation edit on reviewer card → do NOT add COI re-check (owner decision): feedback-manual-affiliation-edit-no-coi-recheck.md
 - Thoroughness / completion posture: feedback-thoroughness-default.md; feedback-drive-to-completion.md; feedback-truncation-is-breakage-not-completion.md
 - Bug found in review: feedback-real-fix-not-design-note.md
-- Before declaring a slice done / committing code / delegating a review (verify+fan-out+boundary+concurrency, plus temporal next-render + boundary-value-semantics self-pass): feedback-self-review-before-delegating-review.md
+- Before declaring done / committing / delegating a review (verify+fan-out+trust-boundary+concurrency + lifecycle + provenance self-pass; don't deflect a behavioral fix into project code): feedback-self-review-before-delegating-review.md
 - Declaring tests "green" / safe to commit (run FULL npm test, not a subset/gates): feedback-green-requires-full-test-suite.md
 - No performative contrition: feedback-no-performative-contrition.md
 - No time-pressure commentary (don't tell the user they're out of time): feedback-no-time-pressure-commentary.md

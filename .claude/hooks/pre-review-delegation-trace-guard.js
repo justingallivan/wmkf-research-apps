@@ -4,20 +4,22 @@
  * PreToolUse hook (Task|Agent): self-trace gate BEFORE delegating a review to Codex.
  *
  * Fires the instant a Codex review / pre-impl-review subagent is about to be
- * spawned. Injects a mandatory two-axis self-review gate that I must work through
+ * spawned. Injects a mandatory lifecycle+provenance self-review gate I must work through
  * FIRST, so the reviewer confirms my trace instead of doing it for me.
  *
- * This guard exists because in S272 a Codex pre-impl review caught three issues I
- * had missed in my own design doc, and all three were of two specific kinds:
- *   - TEMPORAL: a "reset" that bounces back on the NEXT effect run (I reasoned
- *     about the snapshot, not the next render).
- *   - BOUNDARY: a DELETE route that returns 200 + {success:false} on failure while
- *     the client keys on response.ok; and a merge-only reducer that physically
- *     cannot express a key delete (I verified the contract SHAPE, not its
- *     value SEMANTICS on each side).
- * On two of those I had literally pointed Codex at the exact spot in my prompt —
- * i.e. I sensed the soft spot and outsourced the trace instead of doing it. A
- * promise to "run a self-pass next time" is not enforceable; this hook is.
+ * This guard exists because in S272 Codex reviews repeatedly caught issues I had
+ * missed, all of one general defect: I verify what's present and the happy path
+ * forward, but skip a thing's LIFECYCLE and PROVENANCE. The two axes:
+ *   - LIFECYCLE: I trace forward from creation along edges the code CONTAINS and
+ *     miss the edge it OMITS — a one-way latch with no reset that goes stale across
+ *     an identity change; a "reset" that bounces back on the next run. (Trace from
+ *     the landed state, not the snapshot.)
+ *   - PROVENANCE & VALUE-SEMANTICS: I track a value but not what produced it, and
+ *     check a contract's SHAPE but not its failure path / what both sides mean
+ *     (DELETE returns 200 + {success:false}; a merge-only reducer cannot delete).
+ * And when I could NAME the check, I outsourced it to the reviewer (or proposed a
+ * project tool to catch it later) instead of doing it — the defect dodging the fix.
+ * A promise to "run a self-pass next time" is not enforceable; this hook is.
  *
  * Trigger (exact rule): a Task/Agent call that is EITHER
  *   (a) any Codex subagent — subagent_type contains 'codex', or 'codex' appears
@@ -61,20 +63,24 @@ process.stdin.on('end', () => {
       'SELF-TRACE GATE — before this review delegation, run your OWN trace on the two ' +
       'axes a reviewer keeps catching for you (S272). Do not outsource a trace you can ' +
       'do yourself; the reviewer should CONFIRM your work, not replace it.\n' +
-      '  (1) TEMPORAL — for every state change in scope, simulate the NEXT render / ' +
-      're-entry / re-run, not just the snapshot. Does a reset bounce back when an async ' +
-      'value lands? Does an effect re-fire and clobber? Does a flag get re-read stale?\n' +
-      '  (2) BOUNDARY — for every cross-layer contract, check both sides agree on VALUE ' +
-      'SEMANTICS, not just shape. Return codes vs. how the caller detects success ' +
-      '(200 + {success:false} vs. response.ok); success flags; whether the data ' +
-      'structure can even EXPRESS the operation (e.g. a merge-only reducer cannot delete).\n' +
+      '  (1) LIFECYCLE (not snapshot) — for every stateful thing (flag, ref, resource, ' +
+      'cache, subscription), trace FROM its landed state, not just the happy-path entry. ' +
+      'Enumerate what arrives there and every transition OUT. A value set in one direction ' +
+      'with no reset is a bug until proven a deliberate one-shot. What un-does this and ' +
+      'when? What re-fires after an async value lands? What goes stale on an identity ' +
+      'change / remount? (The edge the code OMITS is the one you miss.)\n' +
+      '  (2) PROVENANCE & VALUE-SEMANTICS — track what PRODUCED a value (does state survive ' +
+      'an identity change it should not?), and for every cross-layer contract check the ' +
+      'FAILURE path and what both sides MEAN, not just field shape (200 + {success:false} ' +
+      'vs. response.ok; can the structure even EXPRESS the op — a merge-only reducer cannot delete).\n' +
       'State your findings on BOTH axes in your delegation prompt WITH EVIDENCE, so the ' +
       'reviewer confirms a trace and not a bare assertion. For each axis give either a ' +
       'concrete artifact — file:line of the state change / both contract sides, the ' +
       'caller→consumer path, and "checked X, found Y" — or an explicit "traced <the ' +
       'specific thing> at <file:line>, none found". A finding with no file:line is an ' +
       'assertion, not a trace. If you caught yourself about to ask the reviewer to ' +
-      '"trace whether X" — that is the signal to trace X yourself first.';
+      '"trace whether X" — or to propose a project tool/gate to catch it later — that ' +
+      'is the signal to trace X yourself NOW.';
 
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: msg },
