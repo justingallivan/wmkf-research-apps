@@ -162,6 +162,16 @@ address.
 
 4. Check the inbox and exercise the reviewer link.
 
+   2026-06-21 live-smoke finding: accepting while taking the honorarium reached
+   the post-accept honorarium path and sent a `honorarium_onboard_failed` alert
+   because the deployed environment did not have `HONORARIUM_PROGRAM_ID`,
+   `HONORARIUM_GRANTPROGRAM_ID`, or `HONORARIUM_TYPE_ID` configured. This is not
+   a reviewer-link failure; the accept committed. Follow-up before broad live
+   reviewer testing: run `scripts/probe-honorarium-discriminators.js` against the
+   target Dataverse environment and set those Vercel env vars, or make smoke
+   reviewers opt out of the honorarium until the vars are configured so staff do
+   not receive expected-failure alert email on every accept.
+
 5. Clean up the smoke candidate:
 
 ```bash
@@ -171,6 +181,13 @@ npm run smoke:reviewer-invite:live -- cleanup
 Cleanup removes the test person and suggestion rows recorded by the helper.
 If a promoted CRM contact cannot be deleted due app-user permissions, the helper
 reports the contact ID for manual cleanup.
+
+2026-06-21 live-smoke cleanup note: the helper deleted suggestion
+`91197773-aa6d-f111-ab0d-000d3a3064b7` and person
+`8e197773-aa6d-f111-ab0d-000d3a3064b7`, but the app user lacked delete access
+for promoted contact `c98806cf-aa6d-f111-ab0d-000d3a3065b8`
+(`ZZZ Smoke Test (DELETE)` / `berets.eyeful-0f@icloud.com`). A Dataverse admin
+should delete that contact manually before reusing the same smoke email.
 
 ---
 
@@ -224,6 +241,7 @@ Do not run capture mode in Vercel Production. For production, the smoke check sh
 | Captured artifact uses the Vercel URL | `REVIEWER_PORTAL_BASE_URL` is unset or still points at Vercel | Set `REVIEWER_PORTAL_BASE_URL` to the intended reviewer domain and redeploy |
 | Capture mode errors in production | `REVIEWER_EMAIL_DELIVERY_MODE=capture` with `VERCEL_ENV=production` | Use capture only in local/preview; production should be `send` |
 | Auth bypass warning email appears | `EMERGENCY_AUTH_BYPASS=true` was used in a production-mode process | Stop the process, verify the variable is absent from Vercel env, and use normal auth or the local development-mode mock harness |
+| `WARNING — honorarium onboard failed` after reviewer accept | Reviewer accepted without opting out, but honorarium discriminator env vars are missing | Configure `HONORARIUM_PROGRAM_ID`, `HONORARIUM_GRANTPROGRAM_ID`, and `HONORARIUM_TYPE_ID` using `scripts/probe-honorarium-discriminators.js`; until then, opt out in live smoke tests to avoid expected alert email |
 | Playwright cannot launch Chromium | Browser binary is missing | Run `npx playwright install chromium` |
 | Playwright cannot bind the test server port | Another server is using `3100` or sandbox blocked the bind | Stop the existing server or set `E2E_PORT=<free port>` |
 | Reviewer link says invalid signature | `EXTERNAL_LINK_SECRET` differs between minting and verification | Use the same secret for the rehearsal environment |

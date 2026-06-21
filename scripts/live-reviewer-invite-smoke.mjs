@@ -139,6 +139,22 @@ async function openWorkbench() {
   });
   const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
+  page.on('dialog', async (dialog) => {
+    const message = dialog.message();
+    const isExpectedInviteConfirm = dialog.type() === 'confirm'
+      && /Send \d+ invitation/i.test(message)
+      && message.includes('via Dynamics')
+      && message.includes('real email');
+
+    if (isExpectedInviteConfirm) {
+      console.log(`[browser-dialog] accepting invitation send confirmation: ${message}`);
+      await dialog.accept();
+      return;
+    }
+
+    console.warn(`[browser-dialog] dismissing unexpected ${dialog.type()} dialog: ${message}`);
+    await dialog.dismiss();
+  });
   const url = `${baseUrl}/workbench/${row.requestId}?tab=reviewers&sub=candidates&n=${encodeURIComponent(row.requestNum)}`;
   await page.goto(url, { waitUntil: 'domcontentloaded' });
 
