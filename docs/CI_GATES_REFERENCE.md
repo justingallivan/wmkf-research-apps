@@ -15,6 +15,14 @@ A red gate in this set on `main` blocks new commits to the affected surface. Est
 
 The fix is always to make the gate green. Adding to `ALLOWED_UNDOCUMENTED_*` requires a written justification and is a last resort, not a default. The rule applies regardless of which session caused the red state: "not my regression" is not a valid reason to proceed past it.
 
+## Local build gate execution in Codex sandbox
+
+When a Codex session is running with filesystem sandboxing, scoped checks such as `npx jest ...` and `npx eslint ...` should run normally in the sandbox first. The full Next.js build is different: `npm run build` uses Next 16/Turbopack and may fail inside the Codex sandbox with a Turbopack panic that includes `Operation not permitted` while creating a process or binding a local worker port. Treat that as an execution-environment failure, not as an app build failure.
+
+If `npm run build` fails with that sandbox/port-binding signature, immediately retry the same command through Codex's escalation/approval mechanism so it runs outside the sandbox. If escalation is unavailable, run `npx next build --webpack` and report it explicitly as a fallback build signal, not as the canonical Turbopack build.
+
+If a retry reports "Another next build process is already running" after an interrupted attempt, check for a live `next build` / `npm run build` process first. Do not delete `.next`, kill broad process patterns, or clean build artifacts unless the live process check proves the warning is stale and the operator approves the cleanup.
+
 ## Drift gates (also fail-loud, not in the P0 set above)
 
 ### `check:fact-consistency` — registered scalar drift
