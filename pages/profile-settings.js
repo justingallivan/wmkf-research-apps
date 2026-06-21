@@ -15,6 +15,7 @@ import {
   readEmailSignaturePreference,
   serializeEmailSignaturePreference,
 } from '../shared/config/reviewerFinderPreferences';
+import { GRANTEE_INVITE_DEFAULT_BODY } from '../shared/config/granteeInviteEmail';
 
 // Preset colors for avatar selection
 const AVATAR_COLORS = [
@@ -40,6 +41,7 @@ export default function ProfileSettings() {
     selectProfile,
     preferences,
     setPreference,
+    deletePreference,
     status,
   } = useProfile();
 
@@ -54,6 +56,14 @@ export default function ProfileSettings() {
   const loadedSignatureSourceRef = useRef('');
   const emailSignaturePreference = preferences?.[PREFERENCE_KEYS.EMAIL_SIGNATURE] || '';
   const senderInfoPreference = preferences?.[PREFERENCE_KEYS.SENDER_INFO] || '';
+
+  // Grantee-invitation custom email body (S272). Body-only — the server appends the
+  // signature; the textarea must not contain one. Absent pref ⇒ the shared default.
+  const [inviteBody, setInviteBody] = useState(GRANTEE_INVITE_DEFAULT_BODY);
+  const [isSavingInviteBody, setIsSavingInviteBody] = useState(false);
+  const [inviteBodyStatus, setInviteBodyStatus] = useState(null);
+  const loadedInviteBodySourceRef = useRef('');
+  const inviteBodyPreference = preferences?.[PREFERENCE_KEYS.GRANTEE_INVITE_BODY] || '';
 
   useEffect(() => {
     if (status !== 'ready') return;
@@ -80,6 +90,16 @@ export default function ProfileSettings() {
     emailSignaturePreference,
     senderInfoPreference,
   ]);
+
+  useEffect(() => {
+    if (status !== 'ready') return;
+    const sourceKey = [currentProfile?.id || '', inviteBodyPreference].join('::');
+    if (sourceKey === loadedInviteBodySourceRef.current) return;
+    const next = inviteBodyPreference.trim() ? inviteBodyPreference : GRANTEE_INVITE_DEFAULT_BODY;
+    setInviteBody((prev) => (prev === next ? prev : next));
+    setInviteBodyStatus(null);
+    loadedInviteBodySourceRef.current = sourceKey;
+  }, [status, currentProfile?.id, inviteBodyPreference]);
 
   // Reset form when closing
   const resetForm = () => {
@@ -160,6 +180,36 @@ export default function ProfileSettings() {
     setIsSavingSignature(false);
     setSignatureStatus(ok ? 'saved' : 'error');
     if (!ok) setError('Failed to save email signature.');
+  };
+
+  const handleSaveInviteBody = async (e) => {
+    e.preventDefault();
+    if (!currentProfile) return;
+    setIsSavingInviteBody(true);
+    setError(null);
+    setInviteBodyStatus(null);
+    const ok = await setPreference(PREFERENCE_KEYS.GRANTEE_INVITE_BODY, inviteBody);
+    setIsSavingInviteBody(false);
+    setInviteBodyStatus(ok ? 'saved' : 'error');
+    if (!ok) setError('Failed to save grantee invitation body.');
+  };
+
+  // Reset = DELETE the key so the body falls back to the canonical Foundation
+  // default (and tracks future default changes), not a frozen literal.
+  const handleResetInviteBody = async () => {
+    if (!currentProfile) return;
+    setIsSavingInviteBody(true);
+    setError(null);
+    setInviteBodyStatus(null);
+    const ok = await deletePreference(PREFERENCE_KEYS.GRANTEE_INVITE_BODY);
+    setIsSavingInviteBody(false);
+    if (ok) {
+      setInviteBody(GRANTEE_INVITE_DEFAULT_BODY);
+      setInviteBodyStatus('reset');
+    } else {
+      setInviteBodyStatus('error');
+      setError('Failed to reset grantee invitation body.');
+    }
   };
 
   if (isLoading) {
@@ -268,6 +318,57 @@ export default function ProfileSettings() {
                   loading={isSavingSignature}
                 >
                   Save Email Signature
+                </Button>
+              </div>
+            </form>
+          </Card>
+        )}
+
+        {currentProfile && (
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Grantee Invitation Email</h2>
+              {inviteBodyStatus === 'saved' && <span className="text-sm text-green-700">Saved</span>}
+              {inviteBodyStatus === 'reset' && <span className="text-sm text-green-700">Reset to default</span>}
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Your default body for the grantee abstract-review invitation (the Workbench
+              Awardee tab). Do not include your name or signature — your saved Email
+              Signature is appended automatically when you send. Keep the{' '}
+              <code className="text-xs">[Name]</code>, <code className="text-xs">[title]</code>, and{' '}
+              <code className="text-xs">COB [date]</code> placeholders; they’re filled in per-grantee.
+            </p>
+            <form onSubmit={handleSaveInviteBody} className="space-y-4">
+              <label className="block text-sm font-medium text-gray-700">
+                Email body
+                <textarea
+                  value={inviteBody}
+                  onChange={(e) => { setInviteBody(e.target.value); setInviteBodyStatus(null); }}
+                  rows={14}
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
+                />
+              </label>
+              {inviteBodyStatus === 'error' && (
+                <p className="text-sm text-red-700">Could not save the grantee invitation body.</p>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  onClick={handleResetInviteBody}
+                  disabled={isSavingInviteBody}
+                >
+                  Reset to default
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  type="submit"
+                  disabled={isSavingInviteBody}
+                  loading={isSavingInviteBody}
+                >
+                  Save Invitation Body
                 </Button>
               </div>
             </form>

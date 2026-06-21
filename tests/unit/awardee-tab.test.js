@@ -7,6 +7,15 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
 
+// AwardeeTab reads the logged-in PD's saved custom invite body via useProfile.
+// Mock the context so the component can render in isolation; mockPreferences is
+// mutable per-test (the "mock" prefix lets the jest.mock factory reference it).
+let mockPreferences = {};
+jest.mock('../../shared/context/ProfileContext', () => ({
+  useProfile: () => ({ preferences: mockPreferences }),
+}));
+beforeEach(() => { mockPreferences = {}; });
+
 const REQ = '11111111-1111-1111-1111-111111111111';
 
 const CYCLE_CTX = { cycleCode: 'J26', cycleLabel: 'June 2026' };
@@ -101,8 +110,8 @@ test('default invitation copy is the PD-voice template (subject + body)', async 
   await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
 
   expect(screen.getByLabelText('Subject')).toHaveValue('Your W. M. Keck Foundation award — abstract for our website');
-  await waitFor(() => expect(screen.getByLabelText('Message body').value).toMatch(/^Dear Professor Raj:/));
-  const body = screen.getByLabelText('Message body').value;
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj:/));
+  const body = screen.getByLabelText('Email body').value;
   expect(body).toMatch(/^Dear Professor Raj:/);
   expect(body).toContain('post an abstract on the Foundation’s website describing your award entitled “[title]”');
   expect(body).toContain('lightly edited to conform to the style that the Foundation uses in its publications');
@@ -110,6 +119,9 @@ test('default invitation copy is the PD-voice template (subject + body)', async 
   expect(body).toContain('we will assume that we have your concurrence to post the draft as written');
   expect(body).toContain('agreed to acknowledge'); // acknowledgment-of-support paragraph
   expect(body).not.toContain('[Program Director name]'); // server appends the canonical assigned-PD signature
+  // Body-only invariant: no closing — the server appends the signature (S272).
+  expect(body).not.toMatch(/Thank you,/);
+  expect(body.trimEnd()).toMatch(/additional information\.$/);
 });
 
 test('Preview email renders into a new tab without sending (no send-invite call)', async () => {
@@ -195,4 +207,35 @@ test('Cycle export is unavailable (no link) when the request has no June/Decembe
   await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
   expect(screen.queryByRole('link', { name: /cycle export/i })).not.toBeInTheDocument();
   expect(screen.getByText(/cycle export unavailable/i)).toBeInTheDocument();
+});
+
+test('seeds the body from the PD saved custom body (placeholders still filled)', async () => {
+  mockPreferences = { grantee_invite_body: 'Hi [Name], your award “[title]” — reply by COB [date]. Custom sign-off.' };
+  wireFetch();
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Hi Raj,/));
+  const body = screen.getByLabelText('Email body').value;
+  expect(body).toContain('your award “[title]”'); // no awardTitle in CYCLE_CTX → [title] left as-is
+  expect(body).toMatch(/COB [A-Z][a-z]+ \d{1,2}, \d{4}/); // COB [date] filled
+  expect(body).not.toMatch(/^Dear Professor/); // default NOT used
+  expect(screen.getByText(/saved custom body/i)).toBeInTheDocument();
+});
+
+test('whitespace-only saved body falls back to the Foundation default', async () => {
+  mockPreferences = { grantee_invite_body: '   \n  ' };
+  wireFetch();
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj:/));
+});
+
+test('"Reset to default" restores the Foundation default over a saved custom body', async () => {
+  mockPreferences = { grantee_invite_body: 'Custom body for [Name].' };
+  wireFetch();
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Custom body for Raj\./));
+  fireEvent.click(screen.getByRole('button', { name: /reset to default/i }));
+  expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj:/);
+  // Stays reset — does not bounce back to the custom body on a later effect run.
+  await new Promise((r) => setTimeout(r, 0));
+  expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj:/);
 });

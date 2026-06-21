@@ -43,6 +43,13 @@ export const PREFERENCE_KEYS = {
   // /api/reviewer-finder/prompt-override may write this key (the generic
   // /api/user-preferences endpoint blocks it). See the migration plan.
   PROMPT_OVERRIDES: 'reviewer_finder_prompt_overrides',
+  // Per-user custom grantee-invitation email BODY (S272). Body-only — never a
+  // signature (the server appends the assigned-PD signature at send/preview).
+  // Plain string; absent (or whitespace-only) ⇒ fall back to
+  // GRANTEE_INVITE_DEFAULT_BODY. Written via the generic /api/user-preferences
+  // endpoint (not reserved); "Reset to default" DELETEs the key. See
+  // shared/config/granteeInviteEmail.js and docs/GRANTEE_INVITE_BODY_CUSTOM_PLAN.md.
+  GRANTEE_INVITE_BODY: 'grantee_invite_body',
 };
 
 /**

@@ -22,50 +22,15 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { GRANTEE_DELIVERABLE_LABEL } from '../../config/granteeDeliverableStatus';
-
-const DEFAULT_SUBJECT = 'Your W. M. Keck Foundation award — abstract for our website';
-// Program-Director-voice default (owner-approved S271). The client may fill PI
-// name, award title, and the 14-day COB date for display; send/preview append
-// the assigned-PD signature server-side so staff-edited body text is never the
-// canonical signature source.
-const DEFAULT_BODY =
-  'Dear Professor [Name]:\n\n' +
-  'Congratulations on your recent grant from the W. M. Keck Foundation. We plan to ' +
-  'post an abstract on the Foundation’s website describing your award entitled “[title]”.\n\n' +
-  'The draft abstract is based on information you provided in your proposal, lightly ' +
-  'edited to conform to the style that the Foundation uses in its publications. Please ' +
-  'use the secure link below to review it and make any changes no later than COB [date]. ' +
-  'If we have not heard from you by this date, we will assume that we have your ' +
-  'concurrence to post the draft as written.\n\n' +
-  'To better highlight your work, we also encourage you to upload a high-resolution ' +
-  'image related to your project, with a caption and credit. The link will walk you ' +
-  'through the image and the permission to publish it.\n\n' +
-  'As a reminder, in your application you and your institution agreed to acknowledge ' +
-  'the Foundation’s support. Please recognize the “W. M. Keck Foundation” in ' +
-  'publications and other scientific work related to this award, such as presentations ' +
-  'and posters.\n\n' +
-  'Please do not hesitate to contact me if you need additional information.\n\n' +
-  'Thank you,';
+import { useProfile } from '../../context/ProfileContext';
+import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
+import {
+  GRANTEE_INVITE_DEFAULT_SUBJECT,
+  GRANTEE_INVITE_DEFAULT_BODY,
+  fillInviteBody,
+} from '../../config/granteeInviteEmail';
 
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || '').trim());
-
-function formatCobDate(base = new Date()) {
-  const d = new Date(base);
-  d.setDate(d.getDate() + 14);
-  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-}
-
-function surnameFromName(name) {
-  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : '';
-}
-
-function buildDefaultBody({ piName, title, baseDate } = {}) {
-  return DEFAULT_BODY
-    .replace('[Name]', surnameFromName(piName) || '[Name]')
-    .replace('[title]', title || '[title]')
-    .replace('COB [date]', `COB ${formatCobDate(baseDate)}`);
-}
 
 export default function AwardeeTab({ requestId, context }) {
   const [status, setStatus] = useState(null);
@@ -73,8 +38,8 @@ export default function AwardeeTab({ requestId, context }) {
   const [recipients, setRecipients] = useState(null);
   const [toEmail, setToEmail] = useState('');
   const [ccEmail, setCcEmail] = useState('');
-  const [subject, setSubject] = useState(DEFAULT_SUBJECT);
-  const [body, setBody] = useState(DEFAULT_BODY);
+  const [subject, setSubject] = useState(GRANTEE_INVITE_DEFAULT_SUBJECT);
+  const [body, setBody] = useState(GRANTEE_INVITE_DEFAULT_BODY);
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
@@ -82,11 +47,38 @@ export default function AwardeeTab({ requestId, context }) {
   const [websiteHtml, setWebsiteHtml] = useState(null);
   const [fetchingHtml, setFetchingHtml] = useState(false);
   const [copyMsg, setCopyMsg] = useState(null);
-  const autoBodyRef = useRef(DEFAULT_BODY);
+  // autoBodyRef holds the last auto-generated body; userEditedBodyRef flips true the
+  // moment staff types in the textarea so a late-arriving saved body or recipient
+  // name never clobbers their edit (S272).
+  const autoBodyRef = useRef(GRANTEE_INVITE_DEFAULT_BODY);
+  const userEditedBodyRef = useRef(false);
+
+  const { preferences } = useProfile();
+  // The logged-in PD's saved custom body (Option A: sender's pref, client-side).
+  // Whitespace-only is treated as absent. Absent ⇒ the shared Foundation default.
+  const savedBody = (preferences?.[PREFERENCE_KEYS.GRANTEE_INVITE_BODY] || '').trim();
+  const baseTemplate = savedBody || GRANTEE_INVITE_DEFAULT_BODY;
 
   const cycleCode = context?.cycleCode || null;
   const cycleLabel = context?.cycleLabel || null;
   const awardTitle = context?.title || null;
+
+  const handleBodyChange = (e) => {
+    userEditedBodyRef.current = true;
+    setBody(e.target.value);
+  };
+
+  // Restore the Foundation default for THIS send (local only — does not change the
+  // PD's saved body). Marks user-edited=true so the effect below does not bounce it
+  // back to the saved custom body when prefs/recipients re-trigger it (S272 v2).
+  const resetToFoundationDefault = () => {
+    const nextBody = fillInviteBody(GRANTEE_INVITE_DEFAULT_BODY, {
+      piName: recipients?.pi?.name,
+      title: awardTitle,
+    });
+    userEditedBodyRef.current = true;
+    setBody(nextBody);
+  };
 
   const loadRecipients = useCallback(async () => {
     if (!requestId) return;
@@ -104,13 +96,18 @@ export default function AwardeeTab({ requestId, context }) {
   useEffect(() => { loadRecipients(); }, [loadRecipients]);
 
   useEffect(() => {
-    const nextBody = buildDefaultBody({ piName: recipients?.pi?.name, title: awardTitle });
+    const nextBody = fillInviteBody(baseTemplate, {
+      piName: recipients?.pi?.name,
+      title: awardTitle,
+    });
     setBody((current) => {
-      if (current !== DEFAULT_BODY && current !== autoBodyRef.current) return current;
+      // Keep staff edits; only reseed an untouched, still-auto body. Depending on
+      // baseTemplate means a saved custom body that loads AFTER mount reseeds here.
+      if (userEditedBodyRef.current || current !== autoBodyRef.current) return current;
       autoBodyRef.current = nextBody;
       return nextBody;
     });
-  }, [recipients?.pi?.name, awardTitle]);
+  }, [baseTemplate, recipients?.pi?.name, awardTitle]);
 
   async function generate(regenerate = false) {
     setGenerating(true); setError(null); setSentMsg(null);
@@ -233,10 +230,23 @@ export default function AwardeeTab({ requestId, context }) {
         <label className="block text-sm">Subject
           <input aria-label="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full border rounded p-1" />
         </label>
-        <label className="block text-sm">Message
-          <textarea aria-label="Message body" value={body} onChange={(e) => setBody(e.target.value)} rows={8} className="w-full border rounded p-2" />
-        </label>
-        <p className="text-xs text-gray-500">A secure magic-link is added to the email automatically.</p>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-gray-800">Email body — edit before sending</span>
+            <button
+              type="button"
+              onClick={resetToFoundationDefault}
+              className="text-xs text-blue-700 underline"
+            >
+              Reset to default
+            </button>
+          </div>
+          <textarea aria-label="Email body" value={body} onChange={handleBodyChange} rows={8} className="w-full border rounded p-2" />
+        </div>
+        <p className="text-xs text-gray-500">
+          A secure magic-link and your saved email signature are added automatically — don’t include a signature here.
+          {savedBody ? ' Starting from your saved custom body (edit it in Profile Settings).' : ''}
+        </p>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"

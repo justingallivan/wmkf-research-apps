@@ -80,6 +80,16 @@ function profileReducer(state, action) {
         preferences: { ...state.preferences, ...action.updates }
       };
 
+    case 'REMOVE_PREFERENCE': {
+      // A merge (UPDATE_PREFERENCES with {[key]: undefined}) cannot remove a key —
+      // it leaves it present with value undefined. Deleting needs its own action so
+      // an absent pref truly reads as absent (e.g. "reset to default" via key delete).
+      if (action.profileId !== state.currentProfile?.id) return state;
+      if (!Object.prototype.hasOwnProperty.call(state.preferences, action.key)) return state;
+      const { [action.key]: _removed, ...rest } = state.preferences;
+      return { ...state, preferences: rest };
+    }
+
     default:
       return state;
   }
@@ -369,6 +379,35 @@ export function ProfileProvider({ children }) {
   }, [state.currentProfile?.id]);
 
   /**
+   * Delete a single preference (so an absent pref reads as absent — e.g. "reset to
+   * default"). NOT optimistic: the DELETE route returns HTTP 200 with a JSON
+   * { success } even when the underlying delete failed, so we confirm
+   * data.success === true before mutating local state. Mirrors the gate the generic
+   * route expects rather than keying on response.ok.
+   */
+  const deletePreference = useCallback(async (key) => {
+    const profileId = state.currentProfile?.id;
+    if (!profileId) return false;
+
+    try {
+      const response = await fetch('/api/user-preferences', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key })
+      });
+      if (!response.ok) throw new Error('Failed to delete preference');
+      const data = await response.json().catch(() => ({}));
+      if (data.success !== true) throw new Error('Delete reported failure');
+
+      dispatch({ type: 'REMOVE_PREFERENCE', profileId, key });
+      return true;
+    } catch (err) {
+      console.error('Failed to delete preference:', err);
+      return false;
+    }
+  }, [state.currentProfile?.id]);
+
+  /**
    * Save multiple preferences
    */
   const savePreferences = useCallback(async (prefsToSave) => {
@@ -452,6 +491,7 @@ export function ProfileProvider({ children }) {
     archiveProfile,
     refreshProfiles: fetchProfiles,
     setPreference,
+    deletePreference,
     savePreferences,
     setPreferences: savePreferences, // Alias
     refreshPreferences: (id) => loadSession(id || state.currentProfile?.id),
