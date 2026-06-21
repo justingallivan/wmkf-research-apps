@@ -49,6 +49,17 @@ test.describe('Reviewer Stage 2a accept flow', () => {
     expect(respondCalls[0].action).toBe('accept');
   });
 
+  test('response actions stay visible in the viewport on long forms', async ({ page }) => {
+    await mockPortal(page, { context: buildContext({ longBody: true }) });
+    await page.goto(portalUrl());
+
+    const inViewport = await page.getByRole('button', { name: 'Accept and continue' }).evaluate((button) => {
+      const rect = button.getBoundingClientRect();
+      return rect.top >= 0 && rect.bottom <= window.innerHeight;
+    });
+    expect(inViewport).toBe(true);
+  });
+
   test('address + phone are required client-side when taking the honorarium', async ({ page }) => {
     // Empty address → the client must block submit and never POST.
     const emptyAddress = { line1: '', line2: '', city: '', state: '', postalCode: '', country: '', phone: '' };

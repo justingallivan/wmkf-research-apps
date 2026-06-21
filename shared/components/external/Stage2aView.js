@@ -242,7 +242,7 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-28">
       <h2
         ref={headingRef}
         tabIndex={-1}
@@ -298,23 +298,25 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3 pt-2">
-        <button
-          type="button"
-          onClick={onRequestDecline}
-          disabled={submitting}
-          className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900 disabled:text-gray-400"
-        >
-          Decline
-        </button>
-        <button
-          type="button"
-          onClick={handleAccept}
-          disabled={!allAcked || submitting}
-          className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed"
-        >
-          {submitting ? 'Submitting…' : 'Accept and continue'}
-        </button>
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-gray-50/95 px-4 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={onRequestDecline}
+            disabled={submitting}
+            className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900 disabled:text-gray-400"
+          >
+            Decline
+          </button>
+          <button
+            type="button"
+            onClick={handleAccept}
+            disabled={!allAcked || submitting}
+            className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            {submitting ? 'Submitting…' : 'Accept and continue'}
+          </button>
+        </div>
       </div>
 
       {openModalSlot && policies[openModalSlot] && (
