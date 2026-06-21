@@ -50,12 +50,13 @@ export function surnameFromName(name) {
 
 /**
  * Fill the per-grantee placeholders into ANY base template (the shared default OR
- * a PD's saved custom body). Each token is replaced once (the default carries each
- * exactly once); a deleted token simply leaves a gap rather than throwing.
+ * a PD's saved custom body). EVERY occurrence of each token is replaced (replaceAll),
+ * so a custom body that repeats a placeholder fills all of them; a deleted token
+ * simply leaves a gap rather than throwing.
  */
 export function fillInviteBody(baseTemplate, { piName, title, baseDate } = {}) {
   return String(baseTemplate || '')
-    .replace('[Name]', surnameFromName(piName) || '[Name]')
-    .replace('[title]', title || '[title]')
-    .replace('COB [date]', `COB ${formatCobDate(baseDate)}`);
+    .replaceAll('[Name]', surnameFromName(piName) || '[Name]')
+    .replaceAll('[title]', title || '[title]')
+    .replaceAll('COB [date]', `COB ${formatCobDate(baseDate)}`);
 }

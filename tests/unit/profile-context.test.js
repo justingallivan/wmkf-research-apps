@@ -23,7 +23,7 @@
  */
 
 import { useEffect } from 'react';
-import { render, screen, act, waitFor } from '@testing-library/react';
+import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
 import { ProfileProvider, useProfile } from '../../shared/context/ProfileContext';
 import { PREFERENCE_KEYS, STORAGE_KEYS } from '../../shared/config/reviewerFinderPreferences';
 
@@ -300,5 +300,60 @@ describe('ProfileContext — state-machine structural guards', () => {
 
     expect(screen.getByTestId('profileId').textContent).toBe('2');
     expect(screen.getByTestId('profileName').textContent).toBe('Bob');
+  });
+});
+
+describe('ProfileContext — setPreference per-key rollback on failed save (#5)', () => {
+  const KEY = PREFERENCE_KEYS.GRANTEE_INVITE_BODY;
+
+  function SaveProbe() {
+    const { status, preferences, setPreference } = useProfile();
+    return (
+      <div>
+        <span data-testid="status">{status}</span>
+        <span data-testid="val">{String(preferences[KEY] ?? '<<absent>>')}</span>
+        <button onClick={() => setPreference(KEY, 'unsaved value')}>save</button>
+      </div>
+    );
+  }
+
+  function renderSaveProbe() {
+    return render(
+      <ProfileProvider>
+        <SaveProbe />
+      </ProfileProvider>,
+    );
+  }
+
+  it('restores the prior value when the save fails (key existed before)', async () => {
+    mockSession = { data: { user: { profileId: 1 } }, status: 'authenticated' };
+    fetchHandlers['GET /api/user-preferences'] = () =>
+      makeJsonResponse({ preferences: { [MIGRATION_FLAG]: 'true', [KEY]: 'original' } });
+    fetchHandlers['POST /api/user-preferences'] = () =>
+      makeJsonResponse({ error: 'boom' }, { ok: false, status: 500 });
+
+    renderSaveProbe();
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+    expect(screen.getByTestId('val').textContent).toBe('original');
+
+    await act(async () => { fireEvent.click(screen.getByText('save')); });
+    // After the failed POST, the optimistic 'unsaved value' must be rolled back.
+    await waitFor(() => expect(screen.getByTestId('val').textContent).toBe('original'));
+  });
+
+  it('removes the key when the save fails and the key was absent before', async () => {
+    mockSession = { data: { user: { profileId: 1 } }, status: 'authenticated' };
+    fetchHandlers['GET /api/user-preferences'] = () =>
+      makeJsonResponse({ preferences: { [MIGRATION_FLAG]: 'true' } }); // KEY absent
+    fetchHandlers['POST /api/user-preferences'] = () =>
+      makeJsonResponse({ error: 'boom' }, { ok: false, status: 500 });
+
+    renderSaveProbe();
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+    expect(screen.getByTestId('val').textContent).toBe('<<absent>>');
+
+    await act(async () => { fireEvent.click(screen.getByText('save')); });
+    // Rollback must REMOVE the optimistically-added key, not leave it as 'unsaved value'.
+    await waitFor(() => expect(screen.getByTestId('val').textContent).toBe('<<absent>>'));
   });
 });

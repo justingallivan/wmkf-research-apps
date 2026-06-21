@@ -1,6 +1,6 @@
 # Per-PD Custom Grantee-Invitation Email Body + Edit Affordance (S272)
 
-**Status:** IMPLEMENTED (commit 56da01e3) + post-impl fixes shipped: compose-state model (#1/#2) and review-round-2 boundary fixes (NI-4 initial-profile-resolution, NI-5 cross-request leak) — see §11. Open: #5 (ProfileContext optimistic save) and #6 (`replaceAll`) not yet done.
+**Status:** IMPLEMENTED (commit 56da01e3) + post-impl fixes shipped: compose-state model (#1/#2), review-round-2 boundary fixes (NI-4 initial-profile-resolution, NI-5 cross-request leak), and #5 (per-key save rollback) + #6 (`replaceAll`) — see §11. No grantee-invite open items remain; the only red suites are pre-existing and unrelated (`bill`, `discovery-verification-status`).
 **Owner ask (S272):** Give Program Directors a *saved* custom grantee-invitation
 email body, plus a clearer edit affordance on the Awardee tab. Today the body is a
 single shared `DEFAULT_BODY` constant in `shared/components/workbench/AwardeeTab.js`,
@@ -434,10 +434,21 @@ custom body. Full suite green (2937 pass; the 2 unrelated pre-existing suites st
   (bail post-await if the live requestId changed). +2 tests (NI-4 preserve-edit,
   NI-5 stale-response-ignored). Implemented by Codex, reviewed by Claude.
 
-**Still open (separate concerns, out of the AwardeeTab lifecycle scope):**
-- **#5** — `ProfileContext.setPreference` is optimistic and doesn't revert on a failed
-  save, so a failed save can leave AwardeeTab reading an unsaved body as saved. Belongs
-  in ProfileContext (non-optimistic, or per-key rollback).
-- **#6** — `fillInviteBody` uses first-occurrence `.replace`; a custom body with a
-  repeated `[Name]`/`[title]` leaves the 2nd unfilled. Use `replaceAll` (and consider
-  replacing the `[date]` token itself, preserving the default's `COB [date]`).
+**#5 / #6 — FIXED (S272):**
+- **#5** — `ProfileContext.setPreference` now does a **per-key rollback** on a failed
+  save: it captures the pre-save value via a `preferencesRef` mirror (so its identity
+  stays stable — no effect-retrigger fan-out across its call sites, ~13 invocations
+  in 4 components: profile-settings, EmailSettingsPanel, SettingsModal, EmailTemplateEditor) and, on
+  `!response.ok`, restores just that key (or `REMOVE_PREFERENCE` if it was absent),
+  rather than leaving the optimistic value. Chose per-key rollback over fully
+  non-optimistic to avoid changing timing for the fire-and-forget callers
+  (`SettingsModal` cycle sync). +2 ProfileContext tests (restore-prior, remove-when-absent).
+- **#6** — `fillInviteBody` switched from first-occurrence `.replace` to `replaceAll`
+  on the three tokens, so a custom body that repeats `[Name]`/`[title]`/`COB [date]`
+  fills every occurrence. Kept the exact documented token strings (no `[date]`-bare
+  change — minimal, no doc churn). New `tests/unit/grantee-invite-body-fill.test.js`
+  (distinct from the pre-existing `grantee-invite-email.test.js`, which covers the
+  separate `lib/external` HTML renderer).
+
+**Still open (unrelated, pre-existing):** `bill.test.js` + `discovery-verification-status.test.js`
+(`ReferenceError`-class, not from this work).

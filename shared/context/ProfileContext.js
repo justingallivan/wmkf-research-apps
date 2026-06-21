@@ -105,6 +105,12 @@ export function ProfileProvider({ children }) {
   // loadSession) — an unbounded fetch loop on mount.
   const profilesRef = useRef([]);
   useEffect(() => { profilesRef.current = state.profiles; }, [state.profiles]);
+  // Mirror of state.preferences so setPreference can capture the pre-save value for
+  // a precise per-key rollback on failure WITHOUT taking state.preferences as a
+  // dependency (which would change setPreference's identity every time a preference
+  // changes and retrigger effects that depend on it, e.g. SettingsModal's cycle sync).
+  const preferencesRef = useRef({});
+  useEffect(() => { preferencesRef.current = state.preferences; }, [state.preferences]);
 
   /**
    * Fetch all profiles from the API
@@ -359,6 +365,12 @@ export function ProfileProvider({ children }) {
     const profileId = state.currentProfile?.id;
     if (!profileId) return false;
 
+    // Capture the pre-save value so a failed save can be rolled back precisely —
+    // otherwise the optimistic value sticks and a consumer (e.g. AwardeeTab) reads
+    // an unsaved body as if it persisted.
+    const hadKey = Object.prototype.hasOwnProperty.call(preferencesRef.current, key);
+    const prevValue = preferencesRef.current[key];
+
     try {
       // Optimistic update
       dispatch({ type: 'UPDATE_PREFERENCES', profileId, updates: { [key]: value } });
@@ -373,7 +385,14 @@ export function ProfileProvider({ children }) {
       return true;
     } catch (err) {
       console.error('Failed to save preference:', err);
-      // Revert could be implemented here if needed by re-fetching
+      // Roll back ONLY this key (don't restore a whole snapshot — that would clobber
+      // a concurrent save of a different key). Restore the prior value, or remove the
+      // key entirely if it was absent before this save.
+      if (hadKey) {
+        dispatch({ type: 'UPDATE_PREFERENCES', profileId, updates: { [key]: prevValue } });
+      } else {
+        dispatch({ type: 'REMOVE_PREFERENCE', profileId, key });
+      }
       return false;
     }
   }, [state.currentProfile?.id]);
