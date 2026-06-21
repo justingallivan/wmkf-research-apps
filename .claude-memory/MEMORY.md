@@ -18,6 +18,7 @@
 ## Always-Read Guardrails
 - Destructive carryover / bulk delete: feedback-verify-before-destructive-carryover.md; feedback-list-and-confirm-before-bulk-deletes.md
 - Red CI gate or failing startup gate: feedback-red-gates-are-p0.md
+- Full `npm test` shows red (confirm it's ONLY the known bill.com expected-red set before chasing): project-bill-com-integration-tests-known-red.md
 - Scope/count/quantity claim: feedback-falsify-not-confirm.md
 - Durable docs/memory/fact edit: feedback-reconcile-dont-append-docs.md; feedback-apply-reconcile-to-fix-work.md
 - Cleanup/audit/verification loop: feedback-timebox-metawork.md
