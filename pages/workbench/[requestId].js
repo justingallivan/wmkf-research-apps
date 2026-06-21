@@ -154,7 +154,11 @@ function WorkbenchRequest() {
       ) : activeTab === 'status' ? (
         <StatusTab context={ctx} />
       ) : activeTab === 'awardee' ? (
-        <AwardeeTab requestId={typeof requestId === 'string' ? requestId : ''} context={ctx} />
+        <AwardeeTab
+          key={typeof requestId === 'string' ? requestId : ''}
+          requestId={typeof requestId === 'string' ? requestId : ''}
+          context={ctx}
+        />
       ) : (
         <Card hover={false}>
           <p className="text-sm text-gray-500">This panel is coming in a later update.</p>

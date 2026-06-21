@@ -1,6 +1,6 @@
 # Per-PD Custom Grantee-Invitation Email Body + Edit Affordance (S272)
 
-**Status:** IMPLEMENTED (commit 56da01e3) + post-impl lifecycle fixes shipped (compose-state model — see §11). Open: #5 (ProfileContext optimistic save) and #6 (`replaceAll`) not yet done.
+**Status:** IMPLEMENTED (commit 56da01e3) + post-impl fixes shipped: compose-state model (#1/#2) and review-round-2 boundary fixes (NI-4 initial-profile-resolution, NI-5 cross-request leak) — see §11. Open: #5 (ProfileContext optimistic save) and #6 (`replaceAll`) not yet done.
 **Owner ask (S272):** Give Program Directors a *saved* custom grantee-invitation
 email body, plus a clearer edit affordance on the Awardee tab. Today the body is a
 single shared `DEFAULT_BODY` constant in `shared/components/workbench/AwardeeTab.js`,
@@ -422,7 +422,19 @@ defect: the component tracked the body's *text* but not its *source identity*.
 dirty case = #1), reset-before-recipients fills `[Name]` (#2), whitespace-preserving
 custom body. Full suite green (2937 pass; the 2 unrelated pre-existing suites still red).
 
-**Still open (out of the AwardeeTab lifecycle scope):**
+**Post-impl review round 2 (Codex) — FIXED in a follow-up:**
+- **NI-4** — the identity-reset effect fired on the initial `currentProfile?.id`
+  `undefined→id` resolution and wiped an edit/reset made while the profile was still
+  loading. Fixed: a `prevProfileIdRef` guard resets only on a transition between two
+  *known, different* profile ids (first resolution is not a switch). Residual minor
+  edge: a transient `id→null→id` profile flap resets once.
+- **NI-5** — cross-request stale state (request A's in-flight recipients bleeding into
+  B). Fixed: `key={requestId}` at the call site (`pages/workbench/[requestId].js`) so
+  request navigation remounts, plus a request-generation guard in `loadRecipients`
+  (bail post-await if the live requestId changed). +2 tests (NI-4 preserve-edit,
+  NI-5 stale-response-ignored). Implemented by Codex, reviewed by Claude.
+
+**Still open (separate concerns, out of the AwardeeTab lifecycle scope):**
 - **#5** — `ProfileContext.setPreference` is optimistic and doesn't revert on a failed
   save, so a failed save can leave AwardeeTab reading an unsaved body as saved. Belongs
   in ProfileContext (non-optimistic, or per-key rollback).

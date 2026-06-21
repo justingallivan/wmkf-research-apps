@@ -20,7 +20,7 @@
  * is hidden when the request has no June/December cycle.
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { GRANTEE_DELIVERABLE_LABEL } from '../../config/granteeDeliverableStatus';
 import { useProfile } from '../../context/ProfileContext';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
@@ -56,6 +56,8 @@ export default function AwardeeTab({ requestId, context }) {
   // an identity-reset effect below.
   const [dirty, setDirty] = useState(false);
   const [templateMode, setTemplateMode] = useState('auto');
+  const currentRequestIdRef = useRef(requestId);
+  const prevProfileIdRef = useRef(undefined);
 
   const { preferences, currentProfile } = useProfile();
   // The logged-in PD's saved custom body (Option A: sender's pref, client-side).
@@ -85,15 +87,21 @@ export default function AwardeeTab({ requestId, context }) {
 
   const loadRecipients = useCallback(async () => {
     if (!requestId) return;
+    const loadRequestId = requestId;
     try {
-      const res = await fetch(`/api/workbench/grantee-deliverables/recipients?requestId=${encodeURIComponent(requestId)}`);
+      const res = await fetch(`/api/workbench/grantee-deliverables/recipients?requestId=${encodeURIComponent(loadRequestId)}`);
       const data = await res.json();
+      if (currentRequestIdRef.current !== loadRequestId) return;
       if (res.ok) {
         setRecipients(data);
         setToEmail(data.pi?.email || '');
         setCcEmail(data.liaison?.email || '');
       }
     } catch { /* recipients are optional context; staff can still type them */ }
+  }, [requestId]);
+
+  useEffect(() => {
+    currentRequestIdRef.current = requestId;
   }, [requestId]);
 
   useEffect(() => { loadRecipients(); }, [loadRecipients]);
@@ -103,9 +111,14 @@ export default function AwardeeTab({ requestId, context }) {
   // compose state so the body re-derives for the new identity. Without this, a typed
   // or reset body from one identity would persist (stale) into the next.
   useEffect(() => {
+    const id = currentProfile?.id;
+    const prev = prevProfileIdRef.current;
+    prevProfileIdRef.current = id;
+    if (prev === undefined || prev === null) return;
+    if (prev === id) return;
     setDirty(false);
     setTemplateMode('auto');
-  }, [currentProfile?.id, requestId]);
+  }, [currentProfile?.id]);
 
   // Derive the body from the chosen template + recipients UNLESS the PD has taken
   // ownership by typing. `dirty` is in the deps so the render after an identity reset

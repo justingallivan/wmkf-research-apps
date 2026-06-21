@@ -274,6 +274,63 @@ test('switching profile AFTER editing discards the edit and loads the new PD bod
   await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Body B for Raj\./));
 });
 
+test('initial profile id resolution preserves an in-progress body edit (NI-4)', async () => {
+  mockProfileId = null;
+  wireFetch();
+  const { rerender } = render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toHaveValue('monika.raj@emory.edu'));
+
+  fireEvent.change(screen.getByLabelText('Email body'), { target: { value: 'early draft while profile loads' } });
+  expect(screen.getByLabelText('Email body')).toHaveValue('early draft while profile loads');
+
+  mockProfileId = 'user-1';
+  rerender(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await new Promise((r) => setTimeout(r, 0));
+  expect(screen.getByLabelText('Email body')).toHaveValue('early draft while profile loads');
+});
+
+test('late recipients response from a previous request cannot overwrite the current request (NI-5)', async () => {
+  const requestA = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const requestB = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  let resolveA;
+  let resolveB;
+
+  global.fetch = jest.fn(async (url) => {
+    const u = String(url);
+    if (!u.includes('/grantee-deliverables/recipients')) {
+      throw new Error(`unexpected fetch ${u}`);
+    }
+    if (u.includes(encodeURIComponent(requestA))) {
+      await new Promise((res) => { resolveA = res; });
+      return { ok: true, json: async () => ({
+        pi: { name: 'Request A', email: 'request-a@example.org' },
+        liaison: { email: 'liaison-a@example.org' },
+      }) };
+    }
+    if (u.includes(encodeURIComponent(requestB))) {
+      await new Promise((res) => { resolveB = res; });
+      return { ok: true, json: async () => ({
+        pi: { name: 'Request B', email: 'request-b@example.org' },
+        liaison: { email: 'liaison-b@example.org' },
+      }) };
+    }
+    throw new Error(`unexpected requestId ${u}`);
+  });
+
+  const { rerender } = render(<AwardeeTab requestId={requestA} context={CYCLE_CTX} />);
+  await waitFor(() => expect(resolveA).toBeDefined());
+
+  rerender(<AwardeeTab requestId={requestB} context={CYCLE_CTX} />);
+  await waitFor(() => expect(resolveB).toBeDefined());
+  resolveB();
+  await waitFor(() => expect(screen.getByLabelText('To email')).toHaveValue('request-b@example.org'));
+
+  resolveA();
+  await new Promise((r) => setTimeout(r, 0));
+  expect(screen.getByLabelText('To email')).toHaveValue('request-b@example.org');
+  expect(screen.getByLabelText('Cc email')).toHaveValue('liaison-b@example.org');
+});
+
 test('reset BEFORE recipients load still fills [Name] when they arrive (#2)', async () => {
   let resolveRecipients;
   global.fetch = jest.fn(async (url) => {
