@@ -96,6 +96,17 @@ shared trigger, run the `check:*` script via `execFileSync`, `process.exit(2)` o
 fail open on any other error; then wire it into the `PreToolUse`→`Bash` block of
 `.claude/settings.json` and add it to the `/start` gate list.
 
+## Other Discipline Hooks (non-commit)
+
+- **`pre-review-delegation-trace-guard.js`** — `PreToolUse(Task|Agent)`, ADVISORY (injects
+  context, never blocks). Fires before a review/verify delegation (any Codex subagent, or any
+  agent with a review-worded prompt) and demands a TEMPORAL (next-render/re-entry) +
+  BOUNDARY (both sides agree on value semantics) self-trace WITH file:line evidence before
+  delegating — so the reviewer confirms a trace, not a bare assertion. The forcing function
+  behind modes 5–6 of `feedback-self-review-before-delegating-review` (added S272 after a
+  Codex pre-impl review caught a reset-bounce and a 200-on-failure/merge-reducer mismatch I
+  had outsourced). Complements the PostToolUse `codex-verbatim-reminder.js`. Fail-open.
+
 ## Standard Probe
 
 ```bash
