@@ -1,6 +1,6 @@
 # Per-PD Custom Grantee-Invitation Email Body + Edit Affordance (S272)
 
-**Status:** PLANNED — Codex pre-impl review v1 folded; v2 review pending.
+**Status:** PLANNED — Codex pre-impl reviews v1 + v2 folded; ready to implement.
 **Owner ask (S272):** Give Program Directors a *saved* custom grantee-invitation
 email body, plus a clearer edit affordance on the Awardee tab. Today the body is a
 single shared `DEFAULT_BODY` constant in `shared/components/workbench/AwardeeTab.js`,
@@ -84,11 +84,11 @@ because the sender is almost always the assigned PD.
   the 5 API-key entries (`api_key_claude`, ORCID id/secret, `api_key_ncbi`,
   `api_key_serp`) — `lib/services/database-service.js:444-450`. Neither
   `email_signature` nor the new `grantee_invite_body` is encrypted; both are stored
-  as plain serialized preferences. `grantee_invite_body` will NOT be added to that list.
+  as plain serialized preferences. [PLANNED] `grantee_invite_body` will NOT be added to that list.
 - **Security matrix unaffected (VERIFIED).** `/api/user-preferences` already has a
   matrix entry (`docs/API_ROUTE_SECURITY_MATRIX.md:150` — "Intended user-owned
   settings", `requireAuthWithProfile`, `profileId`). A new non-reserved key does not
-  change the route's contract, so no matrix edit is required.
+  change the route's contract, so [PLANNED] no matrix edit is required.
 - **Storage location (VERIFIED).** Preferences are stored in Dataverse
   `wmkf_appuserpreferences` via the `DatabaseService` dispatcher (the Postgres
   `user_preferences` table was retired 2026-05-12) —
@@ -183,8 +183,8 @@ No normalize/serialize helpers needed (plain string, unlike the JSON signature).
   "A secure magic-link is added automatically" helper line; add a hint: "Your saved
   signature is added automatically — don't include it here."
 - Add a **"Reset to default"** link button that restores the **Foundation default**
-  (ignores the saved custom body — that is the most useful reset), clears the
-  manual-edit flag, and re-points `autoBodyRef`:
+  (ignores the saved custom body — that is the most useful reset). It marks the state
+  as **user-edited (`= true`)**, not unedited — see the temporal note below:
 
   ```js
   const resetToFoundationDefault = () => {
@@ -192,8 +192,12 @@ No normalize/serialize helpers needed (plain string, unlike the JSON signature).
       piName: recipients?.pi?.name,
       title: awardTitle,
     });
-    userEditedBodyRef.current = false;
-    autoBodyRef.current = nextBody;
+    // Mark as a deliberate user choice. baseTemplate still resolves to the saved
+    // CUSTOM body (the tab's reset is local; it does not clear the pref), so if we
+    // left userEditedBodyRef false the NEXT effect run — e.g. when recipients load
+    // — would re-fill from baseTemplate and bounce the body back to the custom text.
+    // (Codex v2 Finding 2.) Setting it true freezes the reset for this compose.
+    userEditedBodyRef.current = true;
     setBody(nextBody);
   };
   ```
@@ -212,11 +216,21 @@ Add a card below "Email Signature" in `pages/profile-settings.js`:
   "absent ⇒ canonical default" cleanly. `/api/user-preferences` already supports
   `DELETE` (`pages/api/user-preferences.js:122-140`), but **`ProfileContext`
   currently exposes only `setPreference`** (verified `shared/context/ProfileContext.js:348`)
-  — so this needs a small `deletePreference(key)` added to the context (mirrors
-  `setPreference`, calls `DELETE /api/user-preferences`, updates local state), or a
-  direct fetch from the page. **Add `deletePreference` to the context** (cleaner; the
-  Awardee-tab reset uses local state only, so the context method is the single
-  network path).
+  — so add a small `deletePreference(key)` to the context. **Do NOT just "mirror
+  setPreference"** — two Codex-v2 boundary catches:
+  - **Finding 3 (reducer can't express a delete).** The reducer only merges
+    (`UPDATE_PREFERENCES → {...state.preferences, ...updates}`,
+    `shared/context/ProfileContext.js:76-81`); dispatching `{[key]: undefined}` leaves
+    the key PRESENT with value `undefined`, not removed. Add a new reducer action
+    `REMOVE_PREFERENCE` that deletes the key from `state.preferences` (e.g. destructure-omit
+    or a shallow copy + `delete`), and have `deletePreference` dispatch it.
+  - **Finding 4 (DELETE returns 200 on failure).** The single-key DELETE path always
+    returns HTTP 200 with a JSON `{success: boolean}` even when the underlying delete
+    failed (`pages/api/user-preferences.js:133-140`), and `setPreference` keys only on
+    `response.ok` (`shared/context/ProfileContext.js:356-363`). So `deletePreference`
+    MUST parse the body and gate on `data.success === true` (not just `response.ok`)
+    before mutating local state — otherwise it falsely reports success and drops the
+    key locally while Dataverse still holds it.
 - After a successful save/delete, **refresh local state** so an open Awardee tab in
   the same session reseeds (the tab reads `preferences` from the same context).
 - Helper copy stating the body-only invariant: "Do not include your name or
@@ -282,7 +296,7 @@ to be appended server-side from the assigned PD.
 | `shared/config/granteeInviteEmail.js` | **NEW** — shared default subject/body + `fillInviteBody` |
 | `shared/config/reviewerFinderPreferences.js` | Add `GRANTEE_INVITE_BODY` key |
 | `shared/components/workbench/AwardeeTab.js` | Seed body from saved pref; `userEditedBodyRef`; reset link; relabel; import shared module; `useProfile()` |
-| `shared/context/ProfileContext.js` | Add `deletePreference(key)` (mirrors `setPreference`, calls `DELETE /api/user-preferences`) |
+| `shared/context/ProfileContext.js` | Add `REMOVE_PREFERENCE` reducer action + `deletePreference(key)` (DELETE `/api/user-preferences`, gate on parsed `data.success`) |
 | `pages/profile-settings.js` | New "Grantee invitation email" card (save + reset-to-default via delete) |
 
 No migration, no new API route, no Atlas/security-matrix/manifest change.
@@ -344,3 +358,21 @@ Each catch and the response folded into this doc:
   does not strip; UI copy is the guard.
 - **4d (only `[Name]`/`[title]`/`COB [date]`, first-occurrence) — acknowledged.**
   No curly-token support; placeholders unchanged (§5 hazard 3).
+
+---
+
+## 10. Codex pre-impl review v2 — folded (S272)
+
+v2 reviewed the v1 folds and hunted for issues the folds introduced:
+
+- **Finding 1 (effect stability) — CONFIRMED OK.** `baseTemplate` is a string
+  primitive, not a new object each render, so the effect doesn't loop. No change.
+- **Finding 2 (reset bounce) — NEW ISSUE → folded.** Reset now sets
+  `userEditedBodyRef.current = true` (not false), else the next effect run re-applies
+  the saved custom body over the reset. §4.3.
+- **Finding 3 (reducer can't delete) — NEW ISSUE → folded.** Added a `REMOVE_PREFERENCE`
+  reducer action; merge-only `{[k]:undefined}` would leave the key present. §4.4.
+- **Finding 4 (DELETE 200-on-failure) — NEW ISSUE → folded.** `deletePreference` gates
+  on parsed `data.success === true`, not `response.ok`. §4.4.
+- **Finding 5 (unverifiable-as-built labels) — folded.** The two §3 lines that are
+  plan intent (won't-encrypt; no matrix edit) are now tagged `[PLANNED]`.
