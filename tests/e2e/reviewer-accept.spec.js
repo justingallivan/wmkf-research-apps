@@ -83,6 +83,47 @@ test.describe('Reviewer Stage 2a accept flow', () => {
     await expect(page.getByLabel('Phone number')).toBeHidden();
   });
 
+  test('accept with honorarium opt-out sends no payment address', async ({ page }) => {
+    const { respondCalls } = await mockPortal(page, { context: buildContext() });
+    await page.goto(portalUrl());
+
+    await acknowledgeBothPolicies(page);
+    await page.getByRole('checkbox').check(); // "I'd prefer to decline the honorarium."
+    await page.getByRole('button', { name: 'Accept and continue' }).click();
+
+    await expect.poll(() => respondCalls.length).toBe(1);
+    expect(respondCalls[0]).toMatchObject({
+      action: 'accept',
+      honorariumOptOut: true,
+      policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true },
+    });
+    expect(respondCalls[0]).not.toHaveProperty('address');
+  });
+
+  test('decline path captures reason/referral and renders declined confirmation', async ({ page }) => {
+    const { respondCalls } = await mockPortal(page, { context: buildContext() });
+    await page.goto(portalUrl());
+
+    await page.getByRole('button', { name: 'Decline' }).click();
+    await expect(page.getByText("Sorry to hear you can't take this on")).toBeVisible();
+
+    await page.getByLabel("Anyone you'd suggest instead?").fill('Dr. Suggested Reviewer, suggested@example.edu');
+    await page.getByLabel('Reason for declining').selectOption('too-busy');
+    await page.getByLabel(/anything else/i).fill('I am unavailable during the review window.');
+    await page.getByRole('button', { name: 'Submit decline' }).click();
+
+    await expect.poll(() => respondCalls.length).toBe(1);
+    expect(respondCalls[0]).toMatchObject({
+      action: 'decline',
+      decline: {
+        referral: 'Dr. Suggested Reviewer, suggested@example.edu',
+        reasonPicklist: 'too-busy',
+        reasonText: 'I am unavailable during the review window.',
+      },
+    });
+    await expect(page.getByText("Thank you. We've recorded your decline.")).toBeVisible();
+  });
+
   test('policy modal enforces the scroll-to-acknowledge gate', async ({ page }) => {
     await mockPortal(page, { context: buildContext({ longBody: true }) });
     await page.goto(portalUrl());

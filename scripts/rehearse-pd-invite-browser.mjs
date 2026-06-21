@@ -24,6 +24,7 @@ const REQUEST_NUM = '1002788';
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const REVIEW_TOKEN = 'pd-rehearsal-reviewer-token';
 const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET || 'pd-rehearsal-nextauth-secret-32-chars';
+const TEST_REVIEWER_EMAIL = process.env.PD_INVITE_REHEARSAL_EMAIL || 'berets.eyeful-0f@icloud.com';
 
 function arg(name, def = null) {
   const i = process.argv.indexOf(`--${name}`);
@@ -55,7 +56,7 @@ const candidate = {
   suggestionId: SUGGESTION_ID,
   name: 'Dr. Capture Candidate',
   affiliation: 'Example University',
-  email: 'capture.candidate@example.edu',
+  email: TEST_REVIEWER_EMAIL,
   invited: false,
   accepted: false,
   declined: false,
