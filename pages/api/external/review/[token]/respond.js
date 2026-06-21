@@ -428,6 +428,88 @@ export default async function handler(req, res) {
           ensureHonorariumOnboarding({ suggestion, request, reviewer, body }),
         );
         honContactId = honResult?.contactId || null;
+
+        // Capture-only mode: the orchestrator captured contact + mailing address
+        // but the honorarium payment record / BILL onboarding is deferred (not
+        // built this cycle). Posture depends on the outcome, in priority order:
+        //   1. address PATCH failed → the one thing capture-only exists to capture
+        //      was LOST and there is no downstream copy → emailing WARNING, deduped
+        //      per suggestion (Codex S274 P1). Fires on re-accepts too: a persistent
+        //      capture failure must keep surfacing until resolved.
+        //   2. partial discriminator config (some-but-not-all GUIDs, no explicit
+        //      defer flag) → likely a botched go-live → emailing WARNING, deduped to
+        //      ONE recurring alert (Codex S274 P2).
+        //   3. clean capture → ONE non-emailing info worklist record, fresh accept
+        //      only (a re-accept is an idempotent retry; don't duplicate the notice).
+        if (honResult?.status === 'deferred') {
+          const suggestionId = suggestion.wmkf_appreviewersuggestionid;
+          let notifyArgs = null;
+          if (honResult.addressCaptureError) {
+            notifyArgs = {
+              type: 'honorarium_capture_failed',
+              severity: 'warning',
+              emailAdmins: true,
+              autoResolveKey: `honorarium_capture_failed:${suggestionId}`,
+              title: 'Reviewer honorarium: mailing address NOT captured',
+              message:
+                'Reviewer accepted with the honorarium pipeline deferred, but writing the ' +
+                'mailing address to the contact failed — staff must capture the payment ' +
+                `address manually. Error: ${honResult.addressCaptureError}`,
+              metadata: {
+                suggestionId,
+                requestNumber: request?.akoya_requestnum || null,
+                contactId: honResult?.contactId || null,
+              },
+              source: 'external/review/respond',
+              category: 'spend',
+            };
+          } else if (honResult.partialDiscriminatorConfig) {
+            notifyArgs = {
+              type: 'honorarium_discriminator_partial_config',
+              severity: 'warning',
+              emailAdmins: true,
+              autoResolveKey: 'honorarium_discriminator_partial_config',
+              title: 'Honorarium discriminators only partially configured',
+              message:
+                'Some but not all of HONORARIUM_PROGRAM_ID / HONORARIUM_GRANTPROGRAM_ID / ' +
+                'HONORARIUM_TYPE_ID are set, and HONORARIUM_ONBOARDING_DEFERRED is not set. ' +
+                'Reviewers are being captured in capture-only mode instead of having ' +
+                'honorarium records created. Set all three GUIDs to go live, or set ' +
+                'HONORARIUM_ONBOARDING_DEFERRED=true to defer intentionally.',
+              metadata: {
+                suggestionId,
+                requestNumber: request?.akoya_requestnum || null,
+              },
+              source: 'external/review/respond',
+              category: 'spend',
+            };
+          } else if (!isAcceptRepeat) {
+            notifyArgs = {
+              type: 'honorarium_capture_only',
+              severity: 'info',
+              emailAdmins: false,
+              title: 'Reviewer honorarium captured (onboarding deferred)',
+              message:
+                'Reviewer accepted and provided payment-contact info; the honorarium ' +
+                'payment record and BILL onboarding are deferred and must be completed ' +
+                'manually once the pipeline is enabled.',
+              metadata: {
+                suggestionId,
+                requestNumber: request?.akoya_requestnum || null,
+                contactId: honResult?.contactId || null,
+              },
+              source: 'external/review/respond',
+              category: 'spend',
+            };
+          }
+          if (notifyArgs) {
+            try {
+              await NotificationService.notify(notifyArgs);
+            } catch (notifyErr) {
+              console.warn('[external respond] honorarium deferred notice failed (non-fatal):', notifyErr?.message || notifyErr);
+            }
+          }
+        }
       } catch (honErr) {
         console.error('[external respond] honorarium onboarding failed (non-fatal):', honErr?.message || honErr);
         try {

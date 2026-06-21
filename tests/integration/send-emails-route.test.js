@@ -235,6 +235,36 @@ describe('send-emails — reviewer portal HTML links', () => {
     expect(htmlBodySent()).toContain('This secure link is unique to you');
     expect(htmlBodySent()).toContain('https://reviews.wmkeck.org/external/review/token.value');
     expect(htmlBodySent()).toContain('<table role="presentation"');
+    expect(htmlBodySent()).toContain('<td align="center" valign="middle"');
+    expect(htmlBodySent()).toContain('line-height:20px');
+    expect(htmlBodySent()).toContain('text-align:center');
+    expect(htmlBodySent()).not.toContain('<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0;"><br>');
+  });
+
+  test('excess blank lines before the reviewer portal call-to-action are collapsed', async () => {
+    await run({
+      drafts: [{
+        suggestionId: SUG_1,
+        subject: 'S',
+        body: [
+          '--',
+          'Justin Gallivan',
+          'Senior Program Director',
+          'W.M. Keck Foundation',
+          'Los Angeles',
+          '',
+          '',
+          '',
+          'Please use your secure personal link to accept or decline this invitation:',
+          'https://reviews.wmkeck.org/external/review/token.value',
+        ].join('\n'),
+      }],
+      templateType: 'invitation',
+    });
+
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(htmlBodySent()).toContain('Los Angeles<br><br>Please use your secure personal link');
+    expect(htmlBodySent()).not.toContain('Los Angeles<br><br><br>Please use your secure personal link');
   });
 
   test('ordinary URLs still render as plain links', async () => {

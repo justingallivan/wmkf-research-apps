@@ -1,6 +1,6 @@
 # Reviewer End-to-End Rehearsal Runbook
 
-Date: 2026-06-18
+Date: 2026-06-21
 
 Purpose: rehearse the reviewer invitation and return flow without sending real Dynamics email, without writing test review files to SharePoint, and without polluting production Dataverse data.
 
@@ -15,6 +15,7 @@ This runbook covers the current no-send local rehearsal loop. It complements `do
 - Capture mode skips Dynamics email send, skips contact promotion/back-propagation, and returns the rendered email artifact in the send result.
 - The browser E2E tests mock external-reviewer portal data routes at the browser boundary. They render the real reviewer pages, but they do not reach Dataverse, SharePoint, Dynamics, or Blob storage.
 - Do not use a real reviewer or a live production request for manual experiments unless you intend to create real lifecycle records.
+- Do not set `EMERGENCY_AUTH_BYPASS=true` for testing. Use normal staff sign-in for live browser smoke tests, or run the local mocked rehearsal in development mode.
 
 ---
 
@@ -80,6 +81,23 @@ Expected:
 
 ## Manual Director-Side Rehearsal
 
+For the safest browser-first rehearsal, use the headed local mock harness:
+
+```bash
+npm run rehearse:reviewer-invite:browser
+```
+
+Expected:
+
+- A headed browser opens the real Workbench `Reviewers -> Candidates` UI.
+- The test candidate is route-mocked in the browser.
+- `render-emails`, `send-emails`, and external reviewer portal API routes are route-mocked in the browser.
+- Selecting the candidate, sending the invitation, and opening the local reviewer link creates no Dataverse records and sends no Dynamics email.
+
+Stop the rehearsal with `Ctrl-C` in the terminal that launched it.
+
+For a capture-mode rehearsal against local/live APIs instead of browser route mocks:
+
 1. Start the app locally with `REVIEWER_EMAIL_DELIVERY_MODE=capture`.
 2. Open the Workbench request.
 3. Go to `Reviewers` -> `Candidates`.
@@ -96,6 +114,85 @@ Expected:
    - fallback full URL
 
 Expected: no real Dynamics email is sent. The captured artifact is the testable email output.
+
+---
+
+## Live Email Smoke
+
+Use this only with test addresses you control. The smoke wrapper reuses
+`scripts/smoke-test-candidate.mjs`, which creates a throwaway reviewer candidate
+and records the GUIDs needed for cleanup.
+
+1. Save a normal browser auth state for the deployed app:
+
+```bash
+npm run smoke:reviewer-invite:auth -- --base-url https://wmkfresearch.vercel.app
+```
+
+Sign in in the opened browser, return to the terminal, and press Enter. The
+state file is written under `.auth/`, which is gitignored.
+
+2. Prepare a throwaway candidate on the dedicated test request:
+
+```bash
+TEST_REVIEWER_EMAIL_ALLOWLIST=your.test.address@example.org \
+LIVE_REVIEWER_EMAIL_SMOKE=true \
+npm run smoke:reviewer-invite:live -- prepare \
+  --email your.test.address@example.org \
+  --confirm-live-email
+```
+
+The wrapper refuses to run unless the target email is in
+`TEST_REVIEWER_EMAIL_ALLOWLIST`.
+
+3. Open the real Workbench in a headed browser:
+
+```bash
+TEST_REVIEWER_EMAIL_ALLOWLIST=your.test.address@example.org \
+LIVE_REVIEWER_EMAIL_SMOKE=true \
+npm run smoke:reviewer-invite:live -- open \
+  --base-url https://wmkfresearch.vercel.app \
+  --auth-state .auth/reviewer-invite-smoke.json \
+  --confirm-live-email
+```
+
+Review the candidate, preview the email, then manually click the real send
+button. The final click sends a real Dynamics email to the allowlisted test
+address.
+
+4. Check the inbox and exercise the reviewer link.
+
+   2026-06-21 live-smoke finding (now mitigated): accepting while taking the
+   honorarium reached the post-accept honorarium path and sent a
+   `honorarium_onboard_failed` alert because the deployed environment did not have
+   `HONORARIUM_PROGRAM_ID`, `HONORARIUM_GRANTPROGRAM_ID`, or `HONORARIUM_TYPE_ID`
+   configured. As of the **capture-only** change (same day), an unconfigured
+   environment — or `HONORARIUM_ONBOARDING_DEFERRED=true` — now AUTO-DEFERS: the
+   reviewer's contact + mailing address are still captured, but no `akoya_request`
+   is minted and **no per-reviewer `honorarium_onboard_failed` email fires** (a
+   single non-emailing `honorarium_capture_only` notice is recorded instead). So
+   smoke reviewers no longer need to opt out to avoid alert spam. To finish the
+   pipeline before broad live reviewer testing: run
+   `scripts/probe-honorarium-discriminators.js` against the target Dataverse
+   environment, set those Vercel env vars (and clear any
+   `HONORARIUM_ONBOARDING_DEFERRED`), which re-enables honorarium-record creation.
+
+5. Clean up the smoke candidate:
+
+```bash
+npm run smoke:reviewer-invite:live -- cleanup
+```
+
+Cleanup removes the test person and suggestion rows recorded by the helper.
+If a promoted CRM contact cannot be deleted due app-user permissions, the helper
+reports the contact ID for manual cleanup.
+
+2026-06-21 live-smoke cleanup note: the helper deleted suggestion
+`91197773-aa6d-f111-ab0d-000d3a3064b7` and person
+`8e197773-aa6d-f111-ab0d-000d3a3064b7`, but the app user lacked delete access
+for promoted contact `c98806cf-aa6d-f111-ab0d-000d3a3065b8`
+(`ZZZ Smoke Test (DELETE)` / `berets.eyeful-0f@icloud.com`). A Dataverse admin
+should delete that contact manually before reusing the same smoke email.
 
 ---
 
@@ -148,6 +245,8 @@ Do not run capture mode in Vercel Production. For production, the smoke check sh
 |---|---|---|
 | Captured artifact uses the Vercel URL | `REVIEWER_PORTAL_BASE_URL` is unset or still points at Vercel | Set `REVIEWER_PORTAL_BASE_URL` to the intended reviewer domain and redeploy |
 | Capture mode errors in production | `REVIEWER_EMAIL_DELIVERY_MODE=capture` with `VERCEL_ENV=production` | Use capture only in local/preview; production should be `send` |
+| Auth bypass warning email appears | `EMERGENCY_AUTH_BYPASS=true` was used in a production-mode process | Stop the process, verify the variable is absent from Vercel env, and use normal auth or the local development-mode mock harness |
+| `WARNING — honorarium onboard failed` after reviewer accept | Reviewer accepted without opting out AND honorarium-create reached the discriminator assert — only possible when the GUIDs ARE configured but a later step failed (an UNconfigured env now auto-defers to capture-only, no alert) | Investigate the specific failure in the alert metadata. To intentionally suppress honorarium creation entirely, set `HONORARIUM_ONBOARDING_DEFERRED=true` (capture-only, no alert email; one non-emailing `honorarium_capture_only` notice per accept) |
 | Playwright cannot launch Chromium | Browser binary is missing | Run `npx playwright install chromium` |
 | Playwright cannot bind the test server port | Another server is using `3100` or sandbox blocked the bind | Stop the existing server or set `E2E_PORT=<free port>` |
 | Reviewer link says invalid signature | `EXTERNAL_LINK_SECRET` differs between minting and verification | Use the same secret for the rehearsal environment |

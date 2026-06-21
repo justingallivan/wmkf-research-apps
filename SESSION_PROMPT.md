@@ -1,108 +1,135 @@
-# Session 273 Prompt: S272 grantee-invite-body shipped + agent-hygiene tooling; remaining S272 backlog
+# Session 274 Prompt: Reviewer invitation demo readiness + branded-domain follow-up
 
-## Session 272 — what happened (12 commits, `87536f12` → `50965194`, all pushed)
+## Session 273 Summary
 
-Delivered the owner's S272 first task — a **per-PD saved custom grantee-invitation email
-body + edit affordance** — end to end, including every post-impl-review fix. Also built
-durable **agent-hygiene tooling** after a long review loop exposed a recurring reasoning
-defect, and recorded two known-state facts.
+Session 273 moved the reviewer invitation/reviewer-portal work from plan into a reusable browser testing and demo workflow. The session added local mocked Playwright rehearsals, a guarded live-email smoke path, runbook documentation, and one formatting fix found during a real test email.
 
-### Shipped — the feature
-1. **Per-PD custom invite body (Option A: sender's pref, client-side).** New
-   `shared/config/granteeInviteEmail.js` (shared default subject/body + `fillInviteBody`);
-   `grantee_invite_body` preference key; AwardeeTab seeds from it; Profile Settings editor
-   card (save via `setPreference`, reset via new `deletePreference`). `Thank you,` dropped
-   from the default body (resolves the S272 #2 double-closing — server appends the
-   signature, the sole closing). (`56da01e3`)
-2. **AwardeeTab compose-state model** — replaced a one-way `userEditedBodyRef` latch with
-   explicit `dirty` + `templateMode` + an identity-reset effect. Fixes #1 (profile-switch
-   staleness) and #2 (reset froze `[Name]`). (`138bc2b8`)
-3. **Boundary fixes** — NI-4 (initial `undefined→id` profile resolution no longer wipes an
-   in-progress edit; `prevProfileIdRef` guard) and NI-5 (cross-request recipient leak:
-   `key={requestId}` at the call site + a request-generation guard in `loadRecipients`).
-   Codex-implemented, Claude-reviewed. (`aa7e139f`)
-4. **#5 `setPreference` per-key rollback** (failed save no longer leaves the optimistic
-   value; `preferencesRef` mirror keeps identity stable) + **#6 `fillInviteBody`
-   `replaceAll`** (repeated placeholders all fill). (`0ce305e1`)
-   - Tests: AwardeeTab 18→20, +2 ProfileContext rollback tests, new
-     `tests/unit/grantee-invite-body-fill.test.js` (4).
+Current branch: `codex/reviewer-invite-browser-testing`. The branch is pushed; as of session stop the working tree was clean.
 
-### Shipped — agent hygiene / process
-5. **Self-trace gate hook** `.claude/hooks/pre-review-delegation-trace-guard.js`
-   (PreToolUse Task|Agent, advisory) — forces a LIFECYCLE + PROVENANCE self-trace with
-   file:line evidence before delegating a review to Codex. Codex-reviewed twice.
-   (`87536f12`)
-6. **Generalized the self-review lesson** off the React-specific instance to the lifecycle
-   /provenance defect + an anti-deflection rule (don't outsource a named check, don't turn
-   a behavioral fix into project code). (`b5b46936`)
-7. **Recorded two known states:** the **Codex Turbopack-sandbox build-gate** (panic =
-   env failure, escalate outside sandbox, never delete `.next` on a stale lock —
-   memory + `docs/CI_GATES_REFERENCE.md`) and the **bill.com expected-red** unit suites.
-   (`4bdb6780`, `266e3f30`, `50965194`)
+### What Was Completed
 
-### Verified ship state (S272)
-- All 16 `check:*` gates green. `npm run build` compiles. Full `npm test`: **2945 pass**,
-  29 fail — **exactly** the known bill.com expected-red set (`bill.test.js` +
-  `discovery-verification-status.test.js`); any failure outside those two is real.
-- Working tree clean, everything on `main`.
+1. **Safe browser rehearsal for Program Director invitation flow**
+   - Added `npm run rehearse:reviewer-invite:browser`, which launches a headed browser and exercises the real Workbench `Reviewers -> Candidates` UI with route-mocked reviewer/invitation APIs.
+   - This is the best demo path for colleagues: browser-visible, realistic UI, no Dataverse writes, no Dynamics email.
 
-## Potential next steps for S273
+2. **Reviewer-side Playwright coverage**
+   - Expanded E2E coverage for reviewer accept and return/upload surfaces.
+   - Added `tests/e2e/program-director-invite.spec.js` for Program Director send-flow coverage.
+   - Kept reviewer portal API calls browser-mocked in E2E so SharePoint/Dataverse/Blob are not touched.
 
-### Remaining S272 backlog (carried from the S271 handoff; all UNVERIFIED-until-checked)
-1. **Manual deploy chore (owner/Connor):** delete 3 orphaned `akoya_request` fields
-   `wmkf_granteedeliverablestatus` / `wmkf_granteeimagefileref` / `wmkf_granteeimagecaption`
-   (moved to `wmkf_granteedeliverable`; 0 rows ever held data). Manual Dataverse admin
-   step — schema-apply is creation-only. Do after confirming the cutover behaves.
-2. **Unified signature Phase 2** — move reviewer `render-emails` to server-side
-   assigned-PD resolution; retire the bespoke reviewer sender UI
-   (`EmailSettingsPanel`/`SettingsModal`); retire legacy `SENDER_INFO` after telemetry.
-   Plan: `docs/UNIFIED_EMAIL_SIGNATURE_PLAN.md` (Phase 2).
-3. **Consent/waiver wording** (pending owner ↔ counsel) — drop agreed text into the portal
-   as the publish-image consent + align the email line.
-4. **Branded-domain cutover** (when `grantees.wmkeck.org` DNS ready) — point DNS → swap
-   `GRANTEE_PORTAL_BASE_URL` (non-sensitive) → redeploy. No code change.
+3. **Guarded live-email smoke tooling**
+   - Added auth capture via `npm run smoke:reviewer-invite:auth`.
+   - Added `npm run smoke:reviewer-invite:live -- prepare/open/cleanup`.
+   - Live smoke refuses to run without `LIVE_REVIEWER_EMAIL_SMOKE=true`, `--confirm-live-email`, and `TEST_REVIEWER_EMAIL_ALLOWLIST=<target email>`.
 
-### Minor / optional
-- **NI-4 residual edge:** a transient `profileId p1→null→p1` flap mid-compose resets the
-  compose state once on the `→null` leg. Documented & accepted; revisit only if it bites.
+4. **Live test follow-up captured**
+   - Live test email to `berets.eyeful-0f@icloud.com` worked through invite send and reviewer accept.
+   - Accepting with honorarium triggered the known alert: `WARNING — honorarium onboard failed` because `HONORARIUM_PROGRAM_ID`, `HONORARIUM_GRANTPROGRAM_ID`, and `HONORARIUM_TYPE_ID` are not configured.
+   - Cleanup deleted the smoke suggestion/person but could not delete promoted contact `c98806cf-aa6d-f111-ab0d-000d3a3065b8` (`ZZZ Smoke Test (DELETE)` / `berets.eyeful-0f@icloud.com`) because the app user lacks contact-delete permission.
 
-## Continuity guardrails
-- **Hold real grantee sends** until `grantees.wmkeck.org` is live — invite links still
-  carry `wmkfresearch.vercel.app` (the "looks like phishing" domain). Test awardees:
-  J26 research **#1002238** (Utah State) and **#1002365** (UC Berkeley). See
-  `project-branded-domains`.
-- **Signature/body invariant:** the body must NOT contain a signature or closing — the
-  server appends the assigned-PD signature at send/preview (`resolveSignatureForRequest` +
-  `appendSignatureBlock`; Foundation line deduped once). The default ends at "additional
-  information."
-- **Full-suite red triage:** expected-red = `bill.test.js` + `discovery-verification-status.test.js`
-  only (unfinished bill.com integration, fires nightly on Vercel). Anything else is real.
-  See `project-bill-com-integration-tests-known-red`.
-- **Delegating a build-gated task to Codex:** include the Turbopack-sandbox build-gate
-  block; a `check:*` red is a P0, but a Turbopack `Operation not permitted` panic is the
-  sandbox, not the app. See `feedback-codex-build-gate-turbopack-sandbox` +
-  `docs/CI_GATES_REFERENCE.md`.
-- **Before delegating a review / declaring done:** the self-trace gate fires; run your own
-  lifecycle + provenance trace first (`feedback-self-review-before-delegating-review`).
-- Multi-agent: Codex also works on `main`; clean tree, scoped commits, `git pull --rebase`
-  before push.
+5. **Reviewer invite email formatting fix**
+   - Fixed excessive blank-line spacing before the CTA and centered the `Start Review` button label.
+   - The send route now normalizes repeated blank lines and keeps generated CTA HTML out of the plain-text `<br>` conversion.
 
-## Testing
+### Commits
+
+- `8bd92edc` - Add reviewer invite browser smoke tooling
+- `7291542e` - Expand reviewer invitation browser coverage
+- `43ac7297` - Record live reviewer smoke follow-ups
+- `08d1dd9c` - Fix reviewer invite email CTA formatting
+
+## Potential Next Steps
+
+### 1. Demo the safe browser rehearsal
+
+Use this first for colleagues:
+
 ```bash
-npm run build && npm run lint
-npm test                          # 2945 pass; only bill+discovery red (expected, bill.com)
-npm run test:grantee-deliverables
-npx jest tests/unit/awardee-tab.test.js tests/unit/profile-context.test.js tests/unit/grantee-invite-body-fill.test.js
+npm run rehearse:reviewer-invite:browser
 ```
 
-## Key Files Reference (S272 additions)
-| File | Role |
-|------|------|
-| `shared/config/granteeInviteEmail.js` | Shared default subject/body (no closing) + `fillInviteBody` (replaceAll) |
-| `shared/components/workbench/AwardeeTab.js` | Compose-state model (`dirty`/`templateMode` + identity reset); request-generation guard |
-| `shared/context/ProfileContext.js` | `deletePreference` + `REMOVE_PREFERENCE`; `setPreference` per-key rollback (`preferencesRef`) |
-| `pages/profile-settings.js` | "Grantee Invitation Email" editor card (save / reset-via-delete) |
-| `pages/workbench/[requestId].js` | `key={requestId}` on `<AwardeeTab>` (NI-5 remount) |
-| `.claude/hooks/pre-review-delegation-trace-guard.js` | Lifecycle+provenance self-trace gate before a Codex review delegation |
-| `docs/GRANTEE_INVITE_BODY_CUSTOM_PLAN.md` | The feature plan + folded pre/post-impl reviews (§11 is authoritative) |
+Expected: headed browser opens the Program Director invitation workflow, sends through mocked routes, and opens a local reviewer portal link without real external side effects.
+
+### 2. Re-run automated reviewer E2E coverage
+
+```bash
+npx playwright test \
+  tests/e2e/reviewer-accept.spec.js \
+  tests/e2e/reviewer-captured-invite.spec.js \
+  tests/e2e/reviewer-return-upload.spec.js \
+  --project=chromium
 ```
+
+Optional Program Director-focused E2E:
+
+```bash
+npx playwright test tests/e2e/program-director-invite.spec.js --project=chromium
+```
+
+### 3. Prepare for another live-email smoke only when intended
+
+Use only with a test address the owner controls:
+
+```bash
+npm run smoke:reviewer-invite:auth -- --base-url https://wmkfresearch.vercel.app
+
+TEST_REVIEWER_EMAIL_ALLOWLIST=berets.eyeful-0f@icloud.com \
+LIVE_REVIEWER_EMAIL_SMOKE=true \
+npm run smoke:reviewer-invite:live -- prepare \
+  --email berets.eyeful-0f@icloud.com \
+  --confirm-live-email
+
+TEST_REVIEWER_EMAIL_ALLOWLIST=berets.eyeful-0f@icloud.com \
+LIVE_REVIEWER_EMAIL_SMOKE=true \
+npm run smoke:reviewer-invite:live -- open \
+  --base-url https://wmkfresearch.vercel.app \
+  --auth-state .auth/reviewer-invite-smoke.json \
+  --confirm-live-email
+```
+
+Afterward:
+
+```bash
+npm run smoke:reviewer-invite:live -- cleanup
+```
+
+### 4. Fix operational follow-ups before broader live testing
+
+- Ask a Dataverse admin to delete promoted contact `c98806cf-aa6d-f111-ab0d-000d3a3065b8` if it still exists.
+- Configure honorarium discriminator env vars by running `scripts/probe-honorarium-discriminators.js` against the target Dataverse environment, then set `HONORARIUM_PROGRAM_ID`, `HONORARIUM_GRANTPROGRAM_ID`, and `HONORARIUM_TYPE_ID`.
+- As of S274, an unconfigured environment (or `HONORARIUM_ONBOARDING_DEFERRED=true`) auto-defers to **capture-only**: the reviewer's contact + mailing address are captured, no `akoya_request` is minted, and NO per-reviewer `honorarium_onboard_failed` email fires (one non-emailing `honorarium_capture_only` notice is recorded instead). So live-smoke reviewers no longer need to opt out to avoid alert spam. To re-enable honorarium-record creation, set all three GUID vars **and** ensure `HONORARIUM_ONBOARDING_DEFERRED` is not `true` (the explicit flag is checked first, so it overrides configured GUIDs). Setting only some of the GUIDs (without the flag) fires a deduped `honorarium_discriminator_partial_config` warning, and a failed address write in capture-only mode fires a `honorarium_capture_failed` warning rather than silently losing the address.
+- When IT finishes Cloudflare DNS, set `REVIEWER_PORTAL_BASE_URL=https://reviews.wmkeck.org` in the relevant Vercel environment and redeploy.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md` | Canonical reviewer testing/demo runbook, including no-send local rehearsal and live-email smoke steps |
+| `scripts/rehearse-pd-invite-browser.mjs` | Headed browser mock harness for Program Director invite demo |
+| `scripts/save-playwright-auth-state.mjs` | Saves authenticated Playwright browser state for deployed-app smoke tests |
+| `scripts/live-reviewer-invite-smoke.mjs` | Guarded prepare/open/cleanup wrapper for real email smoke testing |
+| `tests/e2e/program-director-invite.spec.js` | Program Director invitation browser coverage |
+| `tests/e2e/reviewer-accept.spec.js` | Reviewer accept flow coverage |
+| `tests/e2e/reviewer-captured-invite.spec.js` | Captured email button -> reviewer portal coverage |
+| `tests/e2e/reviewer-return-upload.spec.js` | Reviewer return/upload flow coverage |
+| `pages/api/review-manager/send-emails.js` | Reviewer invite email HTML formatting and CTA rendering |
+| `tests/integration/send-emails-route.test.js` | Send-route capture, production-refusal, CTA formatting regression coverage |
+
+## Testing Performed In Session 273
+
+```bash
+npx jest tests/integration/send-emails-route.test.js --runInBand
+npx eslint pages/api/review-manager/send-emails.js tests/integration/send-emails-route.test.js
+```
+
+Observed: focused send-route suite passed (`16 passed`), and ESLint passed for touched email-formatting files.
+
+Additional browser/live validation was performed interactively during the session and recorded in `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md`.
+
+## Continuity Guardrails
+
+- Do not set `EMERGENCY_AUTH_BYPASS=true` for these tests. Use normal staff sign-in or the local mocked harness.
+- `REVIEWER_EMAIL_DELIVERY_MODE=capture` is non-production only; production should remain `send`.
+- Live smoke sends real mail on the final manual send click.
+- The current reviewer custom domain is pending Cloudflare/IT. Until DNS/env are cut over, real links may still use the Vercel host.
+- The `applications.wmkeck.org`, `submissions.wmkeck.org`, and `grantees.wmkeck.org` naming discussion is still a planning item; this session only built/tested reviewer invitation workflows.

@@ -612,14 +612,34 @@ async function loadCycleConfigs(cycleCodes) {
 
 export function plainTextToHtml(text) {
   if (!text) return '';
-  const escaped = escapeHtml(String(text));
-  const linked = escaped.replace(
-    /(https?:\/\/[^\s<]+)/g,
-    (m) => isExternalReviewUrl(m)
-      ? reviewPortalButtonHtml(m)
-      : `<a href="${escapeAttribute(m)}">${m}</a>`,
-  );
-  return linked.replace(/\r\n|\r|\n/g, '<br>');
+  const normalized = normalizeEmailPlainText(String(text));
+  const urlPattern = /(https?:\/\/[^\s<]+)/g;
+  let html = '';
+  let cursor = 0;
+  let match;
+
+  while ((match = urlPattern.exec(normalized)) !== null) {
+    const url = match[0];
+    html += plainTextFragmentToHtml(normalized.slice(cursor, match.index));
+    html += isExternalReviewUrl(url)
+      ? reviewPortalButtonHtml(url)
+      : `<a href="${escapeAttribute(url)}">${escapeHtml(url)}</a>`;
+    cursor = match.index + url.length;
+  }
+
+  html += plainTextFragmentToHtml(normalized.slice(cursor));
+  return html;
+}
+
+function normalizeEmailPlainText(text) {
+  return String(text)
+    .replace(/\r\n|\r/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n');
+}
+
+function plainTextFragmentToHtml(value) {
+  return escapeHtml(value).replace(/\n/g, '<br>');
 }
 
 function escapeHtml(value) {
@@ -642,15 +662,21 @@ function isExternalReviewUrl(url) {
 
 function reviewPortalButtonHtml(url) {
   const href = escapeAttribute(url);
-  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0;">
-<tr>
-<td bgcolor="#234c8c" style="border-radius:4px;">
-<a href="${href}" style="display:inline-block;padding:12px 18px;font-family:Arial,sans-serif;font-size:15px;line-height:20px;color:#ffffff;text-decoration:none;font-weight:600;">Start Review</a>
-</td>
-</tr>
-</table>
-<p style="margin:0 0 12px 0;">This secure link is unique to you and was sent by your Foundation program director.</p>
-<p style="margin:0;">If the button does not work, copy and paste this secure link into your browser:<br><a href="${href}">${url}</a></p>`;
+  const label = 'Start Review';
+  const displayUrl = escapeHtml(url);
+  return [
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:14px 0 16px 0;border-collapse:separate;">',
+    '<tr>',
+    '<td align="center" valign="middle" bgcolor="#234c8c" style="border-radius:4px;text-align:center;mso-padding-alt:12px 18px;">',
+    `<a href="${href}" style="display:inline-block;min-width:132px;padding:12px 18px;font-family:Arial,sans-serif;font-size:15px;line-height:20px;color:#ffffff;text-decoration:none;font-weight:600;text-align:center;">`,
+    `<span style="color:#ffffff;text-decoration:none;">${label}</span>`,
+    '</a>',
+    '</td>',
+    '</tr>',
+    '</table>',
+    '<p style="margin:0 0 12px 0;">This secure link is unique to you and was sent by your Foundation program director.</p>',
+    `<p style="margin:0;">If the button does not work, copy and paste this secure link into your browser:<br><a href="${href}">${displayUrl}</a></p>`,
+  ].join('');
 }
 
 function getReviewerEmailDeliveryMode() {

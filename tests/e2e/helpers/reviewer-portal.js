@@ -45,9 +45,11 @@ function buildContext({ address, honorariumOptOut = false, longBody = false, vie
     line1: '123 Main St', line2: '', city: 'Townsville', state: 'CA',
     postalCode: '94000', country: 'US', phone: '+1 555 123 4567',
   };
+  const accepted = ['accepted-pre-materials', 'stage2b', 'submitted'].includes(view);
+  const declined = view === 'declined';
   return {
     ok: true,
-    engagementState: { view, accepted: view !== 'stage2a', declined: false },
+    engagementState: { view, accepted, declined },
     etag: 'W/"etag-1"',
     proposal: {
       title: 'A Study of Test-Driven Reviewer Onboarding',
@@ -99,11 +101,16 @@ async function mockPortal(page, { context, respond } = {}) {
     if (respond) return respond(route, body, state);
     if (body.action === 'accept') {
       state.context = buildContext({ view: 'accepted-pre-materials' });
+    } else if (body.action === 'decline') {
+      state.context = buildContext({ view: 'declined' });
     }
+    const engagementState = body.action === 'decline'
+      ? { view: 'declined', accepted: false, declined: true }
+      : { view: 'accepted-pre-materials', accepted: true, declined: false };
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ ok: true, idempotent: false, engagementState: { view: 'accepted-pre-materials', accepted: true, declined: false } }),
+      body: JSON.stringify({ ok: true, idempotent: false, engagementState }),
     });
   });
 
