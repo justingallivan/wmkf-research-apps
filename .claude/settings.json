@@ -111,6 +111,17 @@
             "statusMessage": "pre-commit self-review"
           }
         ]
+      },
+      {
+        "matcher": "Task|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/pre-review-delegation-trace-guard.js\" 2>/dev/null || true",
+            "timeout": 10,
+            "statusMessage": "self-trace gate (pre-review)"
+          }
+        ]
       }
     ],
     "PostToolUse": [
