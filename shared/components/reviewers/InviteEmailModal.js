@@ -23,7 +23,7 @@
  *   - onClose, onSent
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { readSseStream } from './sse';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
 import { loadEmailTemplates, DEFAULT_TEMPLATES } from './email-template-store';
@@ -103,7 +103,13 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
     return () => { cancelled = true; };
   }, []);
 
+  // Generation guard: the effect below re-runs renderPreviews when `template`
+  // lands from loadEmailTemplates, so two fetches can be in flight at once. Only
+  // the latest invocation may apply its result — a slower older response must not
+  // overwrite a newer one's drafts.
+  const renderGenRef = useRef(0);
   const renderPreviews = useCallback(async () => {
+    const gen = ++renderGenRef.current;
     setError(null); setRawDrafts([]);
     setProgress({ current: 0, total: suggestionIds.length, message: 'Rendering previews…' });
     try {
@@ -118,9 +124,11 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
         }),
       });
       const data = await res.json().catch(() => ({}));
+      if (gen !== renderGenRef.current) return; // superseded by a newer render
       if (!res.ok) throw new Error(data.error || 'Failed to render previews');
       setRawDrafts(data.drafts || []);
     } catch (e) {
+      if (gen !== renderGenRef.current) return;
       setError(e.message);
     }
   }, [suggestionIds, settings.signature, template]);

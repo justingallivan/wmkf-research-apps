@@ -75,3 +75,19 @@ it. Related: [[project-reviewer-accept-prod-automation]].
 - **ICS calendar invite scope** — true `.ics` (VEVENT) attachment is net-new (no calendar mechanism
   exists anywhere in the repo); decide build-now vs ship hold + "save-the-date" email body as a
   fast-follow. The invite belongs at hold-confirmation time (review window / `wmkf_meetingdate`).
+
+## Update (S274) — hold EMAIL send path is NOT built; use the invitation
+
+[VERIFIED] The portal side of the hold step is built (`HoldView`, `respond.js` hold action,
+readiness-gated view in `context.js`), and `send-emails.js` understands `templateType:'hold'`. BUT
+no client UI sends the `hold` template: first-contact invites go through `CandidatesPanel →
+InviteEmailModal`, hardcoded to `templateType:'invitation'`; `ReviewerManagePanel` only offers
+materials/followup/thankyou. `finalize` likewise has no send UI. So **this cycle the first-contact
+email is the `invitation` template**, and the reviewer still sees the agree/pass hold view because the
+view is readiness-gated, not email-driven. Owner decision (S274): adapt the invitation copy
+(agree-in-principle framing) rather than build a hold-send path now. The invitation default now also
+surfaces title / PI / co-PIs / institution / full abstract (`{{proposalDetails}}` + `{{proposalAbstract}}`)
+so reviewers can flag a COI before accepting (owner-approved early exposure). Reviewer email templates
+are edited in Profile Settings (hub) or the Workbench Reviewers tab — same `EmailTemplatesModal` / pref
+key. See ../docs/agent-wiki/topics/reviewer-workbench-lifecycle.md. A real hold/finalize send path is a
+future build if the distinct wording is wanted before next cycle.

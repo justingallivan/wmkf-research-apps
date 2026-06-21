@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-17
+last_verified: 2026-06-21
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -79,6 +79,28 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 **Re-verify removed intentionally:** The "Re-verify" button was dropped because enrichment output is static within a cycle (COI computed against a fixed proposal author list; PubMed/Scholar data stable over weeks). The only valid re-run use case is error recovery ("Try again"). Do not restore a general re-verify — if a re-resolve-after-edit pattern is ever needed, see the Future Work section in `reviewer-identity.md`.
 
 **Contact leads (S267, Slices 3–5):** `shared/components/reviewers/ContactLeads.js` renders the quarantined `contactEnrichment.contactLeads` (Slice 2a) in `ReviewerSearchSection`'s `CandidateCard`, gated on `!identityUnverified` (NOT `!email` — promoting one field must not hide the other still-unfixed leads; the component self-hides when empty and resolved candidates carry no leads) and deduped against the email + website chips — high/medium prominent, low/rejected behind a "Show N weak / rejected leads" toggle with the not-auto-used reason. **Slice 4 promotion:** a manage-only `onUse` ("Use this email"/"Use this page", gated on `canManage`) calls `ReviewerSearchSection.useLead`, which stamps `emailSource:'manual'`, clears the contact-layer abstain (e.g. `verified_domain_contradiction`) so save persists it, and auto-selects the row; `emailConfidence` (`reviewer-invite.js`) classifies `manual` as LOW so the invite still requires confirm-before-send. **Slice 5 persistence:** `pruneContactLeads` + `pruneCandidateForRoster` persist a compact bounded (≤8) payload-free leads array, so the section survives a roster reload (`mergeEnrichment` already keeps it on live rows via full spread). No Dataverse change. **On-card manual edit (follow-up):** a manage-only "✏️ Edit contact" opens `CandidateEditModal` in local mode (`onApply` prop instead of the saved-row PATCH); `ReviewerSearchSection.setManualContact` applies the edit to client state — email/website stamped `manual` (low-confidence invite), Name locked (the card is name-keyed), auto-selects. The same `setManualContact` backs the lead promotion (`useLead` wraps it). The saved-candidates `CandidatesPanel` editor keeps full PATCH-mode editing (incl. name). Spec/status: `docs/REVIEWER_CONTACT_LEADS_SPEC.md`; produced in `contact-enrichment-service.js` (see reviewer-identity topic).
+
+## Email templates (per-PD)
+
+- The six reviewer email templates (`invitation`, `hold`, `finalize`, `materials`,
+  `followup`, `thankyou`) live in `shared/components/reviewers/email-template-store.js`
+  (`DEFAULT_TEMPLATES` + `loadEmailTemplates`/`saveEmailTemplates`, persisted per-PD
+  under `PREFERENCE_KEYS.EMAIL_TEMPLATES`). Edit them in **Profile Settings** (the
+  canonical hub) OR the Workbench Reviewers tab's "✎ Email templates" — both open
+  the SAME `EmailTemplatesModal` against the same preference key.
+- **Sendable templates ≠ all templates.** Only `invitation` (via CandidatesPanel →
+  `InviteEmailModal`, hardcoded) and `materials`/`followup`/`thankyou` (via
+  `ReviewerManagePanel`) have a client SEND path. `hold` and `finalize` are
+  defined + portal-supported but have **no send UI** — so this cycle's first-contact
+  email is the **invitation** template; the portal then shows the agree/pass hold
+  view via readiness gating (see the `project-reviewer-hold-step-decouple` memory).
+- The invitation default now surfaces proposal context for **early COI flagging**:
+  `{{proposalDetails}}` (Title / Principal investigator / Co-investigators /
+  Institution — empty lines dropped, composed in `lib/utils/email-generator.js`) and
+  the full `{{proposalAbstract}}`. Co-PI names come from the `wmkf_apprequestperson`
+  junction (`fetchCoPIs`); PI is `_wmkf_projectleader_value_formatted` ONLY (never the
+  applicant org). Timeline tokens are client-substituted and line-dropped by
+  `applyTiming` (which keys on the literal "Review timeline:" header).
 
 ## Recurring Hazards
 
