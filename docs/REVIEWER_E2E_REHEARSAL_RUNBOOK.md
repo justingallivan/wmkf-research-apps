@@ -162,15 +162,20 @@ address.
 
 4. Check the inbox and exercise the reviewer link.
 
-   2026-06-21 live-smoke finding: accepting while taking the honorarium reached
-   the post-accept honorarium path and sent a `honorarium_onboard_failed` alert
-   because the deployed environment did not have `HONORARIUM_PROGRAM_ID`,
-   `HONORARIUM_GRANTPROGRAM_ID`, or `HONORARIUM_TYPE_ID` configured. This is not
-   a reviewer-link failure; the accept committed. Follow-up before broad live
-   reviewer testing: run `scripts/probe-honorarium-discriminators.js` against the
-   target Dataverse environment and set those Vercel env vars, or make smoke
-   reviewers opt out of the honorarium until the vars are configured so staff do
-   not receive expected-failure alert email on every accept.
+   2026-06-21 live-smoke finding (now mitigated): accepting while taking the
+   honorarium reached the post-accept honorarium path and sent a
+   `honorarium_onboard_failed` alert because the deployed environment did not have
+   `HONORARIUM_PROGRAM_ID`, `HONORARIUM_GRANTPROGRAM_ID`, or `HONORARIUM_TYPE_ID`
+   configured. As of the **capture-only** change (same day), an unconfigured
+   environment — or `HONORARIUM_ONBOARDING_DEFERRED=true` — now AUTO-DEFERS: the
+   reviewer's contact + mailing address are still captured, but no `akoya_request`
+   is minted and **no per-reviewer `honorarium_onboard_failed` email fires** (a
+   single non-emailing `honorarium_capture_only` notice is recorded instead). So
+   smoke reviewers no longer need to opt out to avoid alert spam. To finish the
+   pipeline before broad live reviewer testing: run
+   `scripts/probe-honorarium-discriminators.js` against the target Dataverse
+   environment, set those Vercel env vars (and clear any
+   `HONORARIUM_ONBOARDING_DEFERRED`), which re-enables honorarium-record creation.
 
 5. Clean up the smoke candidate:
 
@@ -241,7 +246,7 @@ Do not run capture mode in Vercel Production. For production, the smoke check sh
 | Captured artifact uses the Vercel URL | `REVIEWER_PORTAL_BASE_URL` is unset or still points at Vercel | Set `REVIEWER_PORTAL_BASE_URL` to the intended reviewer domain and redeploy |
 | Capture mode errors in production | `REVIEWER_EMAIL_DELIVERY_MODE=capture` with `VERCEL_ENV=production` | Use capture only in local/preview; production should be `send` |
 | Auth bypass warning email appears | `EMERGENCY_AUTH_BYPASS=true` was used in a production-mode process | Stop the process, verify the variable is absent from Vercel env, and use normal auth or the local development-mode mock harness |
-| `WARNING — honorarium onboard failed` after reviewer accept | Reviewer accepted without opting out, but honorarium discriminator env vars are missing | Configure `HONORARIUM_PROGRAM_ID`, `HONORARIUM_GRANTPROGRAM_ID`, and `HONORARIUM_TYPE_ID` using `scripts/probe-honorarium-discriminators.js`; until then, opt out in live smoke tests to avoid expected alert email |
+| `WARNING — honorarium onboard failed` after reviewer accept | Reviewer accepted without opting out AND honorarium-create reached the discriminator assert — only possible when the GUIDs ARE configured but a later step failed (an UNconfigured env now auto-defers to capture-only, no alert) | Investigate the specific failure in the alert metadata. To intentionally suppress honorarium creation entirely, set `HONORARIUM_ONBOARDING_DEFERRED=true` (capture-only, no alert email; one non-emailing `honorarium_capture_only` notice per accept) |
 | Playwright cannot launch Chromium | Browser binary is missing | Run `npx playwright install chromium` |
 | Playwright cannot bind the test server port | Another server is using `3100` or sandbox blocked the bind | Stop the existing server or set `E2E_PORT=<free port>` |
 | Reviewer link says invalid signature | `EXTERNAL_LINK_SECRET` differs between minting and verification | Use the same secret for the rehearsal environment |

@@ -18,6 +18,11 @@ const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboar
 
 const SUGGESTION_ID = 'sug-1111';
 
+function restoreEnv(key, prev) {
+  if (prev === undefined) delete process.env[key];
+  else process.env[key] = prev;
+}
+
 function baseArgs(overrides = {}) {
   return {
     suggestion: { wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_honorariumrequest_value: null, ...overrides.suggestion },
@@ -42,6 +47,7 @@ function makeDeps(overrides = {}) {
     getAmount: overrides.getAmount || jest.fn().mockResolvedValue(250),
     backProp: overrides.backProp || jest.fn().mockResolvedValue({ action: 'noop' }),
     deriveGuid: overrides.deriveGuid || jest.fn((name) => `det-${name}`),
+    ...(overrides.isDeferred ? { isDeferred: overrides.isDeferred } : {}),
   };
 }
 
@@ -174,6 +180,108 @@ describe('ensureHonorariumOnboarding', () => {
     expect(deps.dynamics.createRecord).toHaveBeenCalled();
     expect(deps.onboard).toHaveBeenCalled();
     expect(res.honorariumRequestId).toBe(`det-${SUGGESTION_ID}`);
+  });
+
+  describe('capture-only (deferred) mode', () => {
+    it('isDeferred → captures contact + address, but skips create/getAmount/onboard and does NOT throw', async () => {
+      const deps = makeDeps({ isDeferred: () => true });
+      const res = await ensureHonorariumOnboarding(baseArgs(), deps);
+
+      // Address still PATCHed onto the contact (the data we want to capture).
+      const addrCall = deps.dynamics.updateRecord.mock.calls.find(c => c[0] === 'contacts');
+      expect(addrCall[2]).toMatchObject({ address1_line1: '1 Lab Rd', address1_telephone1: '+1 555 0100' });
+
+      // No payment record minted, no amount read, no BILL onboarding.
+      expect(deps.dynamics.createRecord).not.toHaveBeenCalled();
+      expect(deps.getAmount).not.toHaveBeenCalled();
+      expect(deps.onboard).not.toHaveBeenCalled();
+      expect(deps.suggestions.setHonorariumRequest).not.toHaveBeenCalled();
+
+      expect(res).toMatchObject({ status: 'deferred', contactId: 'contact-1', created: false, honorariumRequestId: null });
+      expect(res.addressCaptureError).toBeNull();
+    });
+
+    it('deferred surfaces an address-capture failure instead of silently succeeding (P1)', async () => {
+      const deps = makeDeps({
+        isDeferred: () => true,
+        dynamics: {
+          createRecord: jest.fn(),
+          getRecord: jest.fn(),
+          updateRecord: jest.fn().mockRejectedValue(new Error('address PATCH 500')),
+        },
+      });
+      const res = await ensureHonorariumOnboarding(baseArgs(), deps);
+      expect(res.status).toBe('deferred');
+      expect(res.addressCaptureError).toMatch(/address PATCH 500/);
+      // Still no payment record minted on the failure path.
+      expect(deps.dynamics.createRecord).not.toHaveBeenCalled();
+    });
+
+    it('deferred flags partial discriminator config (some-but-not-all GUIDs, no explicit flag) (P2)', async () => {
+      const prevDefer = process.env.HONORARIUM_ONBOARDING_DEFERRED;
+      const prevProg = process.env.HONORARIUM_PROGRAM_ID;
+      const prevGrant = process.env.HONORARIUM_GRANTPROGRAM_ID;
+      const prevType = process.env.HONORARIUM_TYPE_ID;
+      delete process.env.HONORARIUM_ONBOARDING_DEFERRED;
+      process.env.HONORARIUM_PROGRAM_ID = '00000000-0000-0000-0000-0000000000aa';
+      process.env.HONORARIUM_GRANTPROGRAM_ID = ''; // only 1 of 3 set
+      delete process.env.HONORARIUM_TYPE_ID;
+      try {
+        const deps = makeDeps({ isDeferred: () => true });
+        const res = await ensureHonorariumOnboarding(baseArgs(), deps);
+        expect(res.partialDiscriminatorConfig).toBe(true);
+      } finally {
+        restoreEnv('HONORARIUM_ONBOARDING_DEFERRED', prevDefer);
+        restoreEnv('HONORARIUM_PROGRAM_ID', prevProg);
+        restoreEnv('HONORARIUM_GRANTPROGRAM_ID', prevGrant);
+        restoreEnv('HONORARIUM_TYPE_ID', prevType);
+      }
+    });
+
+    it('deferred does NOT flag partial config when ALL GUIDs are set (intentional flag defer)', async () => {
+      const prevDefer = process.env.HONORARIUM_ONBOARDING_DEFERRED;
+      process.env.HONORARIUM_ONBOARDING_DEFERRED = 'true';
+      try {
+        // baseline test env already has all three GUIDs set (lines 13-15).
+        const deps = makeDeps({ isDeferred: () => true });
+        const res = await ensureHonorariumOnboarding(baseArgs(), deps);
+        expect(res.partialDiscriminatorConfig).toBe(false);
+      } finally {
+        restoreEnv('HONORARIUM_ONBOARDING_DEFERRED', prevDefer);
+      }
+    });
+
+    it('deferred promote-on-accept still creates the contact so the address has a home', async () => {
+      const deps = makeDeps({ isDeferred: () => true });
+      const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_potentialreviewersid: 'pr-1', wmkf_emailaddress: 'jane@uni.edu', wmkf_name: 'Jane' } });
+      const res = await ensureHonorariumOnboarding(args, deps);
+      expect(deps.contacts.findOrCreateByEmail).toHaveBeenCalled();
+      expect(res.contactId).toBe('contact-new');
+      expect(res.status).toBe('deferred');
+    });
+
+    it('deferred carries an already-linked honorarium id through (no re-create, no onboard)', async () => {
+      const deps = makeDeps({ isDeferred: () => true });
+      const args = baseArgs({ suggestion: { _wmkf_honorariumrequest_value: 'existing-hon' } });
+      const res = await ensureHonorariumOnboarding(args, deps);
+      expect(deps.onboard).not.toHaveBeenCalled();
+      expect(res).toMatchObject({ status: 'deferred', honorariumRequestId: 'existing-hon', created: false });
+    });
+
+    it('default gate defers when HONORARIUM_ONBOARDING_DEFERRED=true even with discriminators configured', async () => {
+      const prev = process.env.HONORARIUM_ONBOARDING_DEFERRED;
+      process.env.HONORARIUM_ONBOARDING_DEFERRED = 'true';
+      try {
+        // No isDeferred injected → exercises defaultHonorariumOnboardingDeferred().
+        const deps = makeDeps();
+        const res = await ensureHonorariumOnboarding(baseArgs(), deps);
+        expect(deps.dynamics.createRecord).not.toHaveBeenCalled();
+        expect(res.status).toBe('deferred');
+      } finally {
+        if (prev === undefined) delete process.env.HONORARIUM_ONBOARDING_DEFERRED;
+        else process.env.HONORARIUM_ONBOARDING_DEFERRED = prev;
+      }
+    });
   });
 
   it('threads actingUserSystemId into the promote-on-accept contact helpers (Codex #13)', async () => {

@@ -97,7 +97,7 @@ npm run smoke:reviewer-invite:live -- cleanup
 
 - Ask a Dataverse admin to delete promoted contact `c98806cf-aa6d-f111-ab0d-000d3a3065b8` if it still exists.
 - Configure honorarium discriminator env vars by running `scripts/probe-honorarium-discriminators.js` against the target Dataverse environment, then set `HONORARIUM_PROGRAM_ID`, `HONORARIUM_GRANTPROGRAM_ID`, and `HONORARIUM_TYPE_ID`.
-- Until those vars are configured, live-smoke reviewers should opt out of honorarium to avoid expected alert emails.
+- As of S274, an unconfigured environment (or `HONORARIUM_ONBOARDING_DEFERRED=true`) auto-defers to **capture-only**: the reviewer's contact + mailing address are captured, no `akoya_request` is minted, and NO per-reviewer `honorarium_onboard_failed` email fires (one non-emailing `honorarium_capture_only` notice is recorded instead). So live-smoke reviewers no longer need to opt out to avoid alert spam. To re-enable honorarium-record creation, set all three GUID vars **and** ensure `HONORARIUM_ONBOARDING_DEFERRED` is not `true` (the explicit flag is checked first, so it overrides configured GUIDs). Setting only some of the GUIDs (without the flag) fires a deduped `honorarium_discriminator_partial_config` warning, and a failed address write in capture-only mode fires a `honorarium_capture_failed` warning rather than silently losing the address.
 - When IT finishes Cloudflare DNS, set `REVIEWER_PORTAL_BASE_URL=https://reviews.wmkeck.org` in the relevant Vercel environment and redeploy.
 
 ## Key Files Reference
