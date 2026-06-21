@@ -61,6 +61,13 @@ flag). Source: `lib/bill/honorarium-onboard-orchestrator.js`,
 `lib/bill/onboard-reviewer-service.js`; design banners in
 `docs/BILL_CHUNK_4_DESIGN.md` + `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`.
 
+Reviewers who accepted while capture-only was on won't re-accept, so once the
+pipeline is live, mint their missing records with
+`scripts/backfill-honorarium-capture-only.mjs --cycle <CODE>` (dry-run by default;
+cycle-scoped so it can't sweep older cohorts; drives the same idempotent
+`ensureHonorariumOnboarding`; skips rows with no captured address; refuses to run
+while still deferred).
+
 ## Standard Probe
 
 ```bash
