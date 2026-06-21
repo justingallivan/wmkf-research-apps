@@ -28,6 +28,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import ReviewerManagePanel from './ReviewerManagePanel';
 import ReviewerFindPanel from './ReviewerFindPanel';
 import CandidatesPanel from './CandidatesPanel';
@@ -179,6 +180,13 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
         >
           ✎ Email templates
         </button>
+        <Link
+          href="/profile-settings"
+          className="text-xs text-gray-400 hover:text-gray-700 px-1 py-1 whitespace-nowrap"
+          title="Manage all your email templates in Profile Settings"
+        >
+          Manage in Profile →
+        </Link>
       </div>
 
       {templatesOpen && <EmailTemplatesModal onClose={() => setTemplatesOpen(false)} />}

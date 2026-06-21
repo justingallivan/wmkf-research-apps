@@ -31,20 +31,24 @@ export const TEMPLATE_TYPE_LABELS = {
 
 export const DEFAULT_TEMPLATES = {
   invitation: {
-    subject: 'Invitation to review a grant proposal: {{proposalTitle}}',
+    subject: 'Invitation to review for the W. M. Keck Foundation — {{proposalTitle}}',
     body: `{{greeting}},
 
-The W. M. Keck Foundation invites you to serve as a peer reviewer for the proposal "{{proposalTitle}}" from {{piInstitution}}.
+The W. M. Keck Foundation is assembling a review panel and would value your expertise. We're writing to ask whether you'd be willing to review the proposal below — the full materials will follow shortly. For now we simply need to know whether you can take it on, or whether we should look elsewhere.
 
-Please use your secure personal link to accept or decline this invitation:
+{{proposalDetails}}
+
+{{proposalAbstract}}
+
+Please use your secure personal link to let us know you can review it — or to pass:
 {{externalLink}}
 
 Review timeline:
-- Please respond to this invitation by {{respondBy}}.
-- If you accept, we will send the full proposal and review form on {{proposalDelivery}}.
-- Completed reviews are due by {{reviewDue}}.
+- Please respond by {{respondBy}}.
+- We expect to send the full proposal and review form on {{proposalDelivery}}.
+- Completed reviews would be due by {{reviewDue}}.
 
-If you accept, the same link gives you access to the proposal materials and the review form. We would be grateful for your expertise.
+The details above should let you flag any conflict of interest now, before the materials go out. There's no further commitment today — the conflict-of-interest and AI-use acknowledgements and any honorarium details all come later, once the proposal is released. We would be grateful for your help.
 
 {{signature}}`,
   },
