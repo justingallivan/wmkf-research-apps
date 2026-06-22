@@ -104,10 +104,12 @@ Expected:
 
 Suggested click paths while the browser stays open:
 
-1. `Candidates`: select `Dr. Capture Candidate` -> `Send invitation` -> fill dates -> send.
+1. `Candidates`: select `Dr. New Candidate (not invited)` -> `Send invitation` -> fill dates -> send.
 2. `Campaign settings`: edit `Days to respond` / `Review due date` -> save.
 3. `Invite`: `Release to reviewers` -> preview -> send.
-4. `Candidates`: select `Dr. Pending Invitee` -> `Release as no longer needed`.
+4. `Candidates`: select `Dr. Pending Invitee (already invited)` -> `Release as no longer needed`.
+
+`Re-invite` is still visible for the pending invitee because that is the existing resend path for already-invited reviewers. For the reviewer-engagement release UX, use `Release as no longer needed`.
 
 Stop the rehearsal with `Ctrl-C` in the terminal that launched it.
 

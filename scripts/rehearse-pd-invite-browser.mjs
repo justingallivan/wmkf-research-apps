@@ -56,7 +56,7 @@ const KEEP_SERVER = hasFlag('keep-server');
 
 const candidate = {
   suggestionId: SUGGESTION_ID,
-  name: 'Dr. Capture Candidate',
+  name: 'Dr. New Candidate (not invited)',
   affiliation: 'Example University',
   email: TEST_REVIEWER_EMAIL,
   invited: false,
@@ -72,7 +72,7 @@ const candidate = {
 
 const pendingCandidate = {
   suggestionId: PENDING_SUGGESTION_ID,
-  name: 'Dr. Pending Invitee',
+  name: 'Dr. Pending Invitee (already invited)',
   affiliation: 'Example Institute',
   email: 'pending.reviewer@example.edu',
   invited: true,
@@ -89,7 +89,7 @@ const pendingCandidate = {
 
 const acceptedReviewer = {
   suggestionId: ACCEPTED_SUGGESTION_ID,
-  name: 'Dr. Accepted Reviewer',
+  name: 'Dr. Accepted Reviewer (awaiting materials)',
   affiliation: 'Example University',
   email: 'accepted.reviewer@example.edu',
   reviewStatus: 'accepted',
@@ -451,8 +451,8 @@ try {
   await installMocks(context);
   const page = await context.newPage();
   page.on('dialog', async (dialog) => {
-    console.log(`[browser-dialog] accepting ${dialog.type()}: ${dialog.message()}`);
-    await dialog.accept();
+    console.log(`[browser-dialog] ${dialog.type()}: ${dialog.message()}`);
+    console.log('Respond to this dialog in the browser window to continue.');
   });
   const workbenchUrl = `${BASE_URL}/workbench/${REQUEST_ID}?tab=reviewers&sub=candidates&n=${REQUEST_NUM}`;
   await page.goto(workbenchUrl, { waitUntil: 'domcontentloaded' });
@@ -460,10 +460,11 @@ try {
   console.log(`  ${workbenchUrl}`);
   console.log('\nSafe mocks are active for Workbench invite APIs and the reviewer portal APIs.');
   console.log('Try these sandboxed UI paths:');
-  console.log('  1. Candidates: select Dr. Capture Candidate -> Send invitation -> fill dates -> Send.');
+  console.log('  1. Candidates: select Dr. New Candidate (not invited) -> Send invitation -> fill dates -> Send.');
   console.log('  2. Campaign settings: edit Days to respond / Review due date -> Save.');
   console.log('  3. Invite tab: Release to reviewers -> Preview -> Send.');
-  console.log('  4. Candidates: select Dr. Pending Invitee -> Release as no longer needed.');
+  console.log('  4. Candidates: select Dr. Pending Invitee (already invited) -> Release as no longer needed.');
+  console.log('     The Re-invite button is the existing resend path; the new flow is Release as no longer needed.');
   console.log('  5. Open the captured local reviewer link to inspect the reviewer-facing accept page.');
   console.log('\nPress Ctrl-C in this terminal when finished.');
   await new Promise(() => {});
