@@ -100,7 +100,11 @@ describe('CandidatesPanel invitation capture rehearsal', () => {
     fireEvent.click(screen.getByRole('button', { name: /send invitation \(1\)/i }));
 
     await screen.findByDisplayValue('Invitation');
-    fireEvent.change(screen.getByLabelText('Respond to invitation by'), { target: { value: '2026-07-01' } });
+    // Reviewer-engagement Phase 1: respond-by is now a "days to respond" offset, not a
+    // fixed date. The respond-by date in the email is computed as today + offset, so it
+    // can't be asserted as a fixed string here — the campaignConfig payload below is the
+    // durable contract. Proposal-delivery and review-due stay fixed dates.
+    fireEvent.change(screen.getByLabelText('Days to respond'), { target: { value: '10' } });
     fireEvent.change(screen.getByLabelText('Proposal delivered on'), { target: { value: '2026-07-08' } });
     fireEvent.change(screen.getByLabelText('Review due by'), { target: { value: '2026-07-22' } });
     const sendButton = await screen.findByRole('button', { name: /send 1 invitation/i });
@@ -127,8 +131,9 @@ describe('CandidatesPanel invitation capture rehearsal', () => {
       markAsSent: true,
       allowResend: false,
       drafts: [{ suggestionId: 'S1', subject: 'Invitation' }],
+      // Phase 1: the panel sends the per-request campaign config alongside the drafts.
+      campaignConfig: { respondOffsetDays: 10, reviewDueDate: '2026-07-22' },
     });
-    expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('July 1, 2026');
     expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('July 8, 2026');
     expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('July 22, 2026');
     expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('https://reviews.wmkeck.org/external/review/token.value');

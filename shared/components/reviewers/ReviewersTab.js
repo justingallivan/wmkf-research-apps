@@ -33,6 +33,7 @@ import ReviewerManagePanel from './ReviewerManagePanel';
 import ReviewerFindPanel from './ReviewerFindPanel';
 import CandidatesPanel from './CandidatesPanel';
 import EmailTemplatesModal from './EmailTemplatesModal';
+import CampaignConfigModal from './CampaignConfigModal';
 import { SubTabBadge } from './SubTabBadges';
 import { countForMode, workRemainingForMode, computeDefaultSub } from './reviewer-modes';
 
@@ -53,6 +54,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const [candidates, setCandidates] = useState([]);
   const [candidatesLoading, setCandidatesLoading] = useState(true);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [campaignOpen, setCampaignOpen] = useState(false);
 
   const reviewers = proposal?.reviewers || [];
   // Candidates badge: saved candidates not yet invited (and not accepted/declined).
@@ -174,6 +176,14 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
         </nav>
         <button
           type="button"
+          onClick={() => setCampaignOpen(true)}
+          className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap"
+          title="Edit this request's reviewer campaign settings (days to respond, review due date)"
+        >
+          ⚙ Campaign settings
+        </button>
+        <button
+          type="button"
           onClick={() => setTemplatesOpen(true)}
           className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap"
           title="Edit your default reviewer email templates"
@@ -190,6 +200,9 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
       </div>
 
       {templatesOpen && <EmailTemplatesModal onClose={() => setTemplatesOpen(false)} />}
+      {campaignOpen && requestId && (
+        <CampaignConfigModal requestId={requestId} onClose={() => setCampaignOpen(false)} />
+      )}
 
       {error && (
         <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">

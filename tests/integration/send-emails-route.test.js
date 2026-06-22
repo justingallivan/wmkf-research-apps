@@ -30,10 +30,12 @@ const getRecord = jest.fn(async (entity) => {
   if (entity === 'akoya_requests') return REQUEST;
   return null;
 });
+const updateRecord = jest.fn(async () => {});
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
     createAndSendEmail: (...a) => createAndSendEmail(...a),
     getRecord: (...a) => getRecord(...a),
+    updateRecord: (...a) => updateRecord(...a),
   },
 }));
 
@@ -387,6 +389,58 @@ describe('send-emails — partial-success batch', () => {
     expect(r.skipped.map((s) => ({ id: s.suggestionId, reason: s.reason }))).toEqual([{ id: SUG_FRESH, reason: 'not_held' }]);
     expect(r.failed.map((f) => f.suggestionId)).toEqual([SUG_MISSING]);
     expect(r.stats).toMatchObject({ sent: 1, skipped: 1, failed: 1, total: 3 });
+  });
+});
+
+describe('send-emails — Phase 1 campaign-config persistence (first invite)', () => {
+  const CONFIG = { respondOffsetDays: 7, reviewDueDate: '2026-08-01' };
+  const invite = (over = {}) => ({ drafts: [draft()], templateType: 'invitation', campaignConfig: CONFIG, ...over });
+
+  test('first invite with no existing config writes BOTH columns once', async () => {
+    const res = await run(invite());
+    expect(resultOf(res).stats).toMatchObject({ sent: 1 });
+    expect(updateRecord).toHaveBeenCalledTimes(1);
+    expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
+      { wmkf_respondoffsetdays: 7, wmkf_reviewduedate: '2026-08-01' }, expect.any(Object));
+  });
+
+  test('pre-set offset is NOT clobbered; only the unset due date is written', async () => {
+    REQUEST = { ...REQUEST, wmkf_respondoffsetdays: 5 }; // due date still unset
+    await run(invite());
+    expect(updateRecord).toHaveBeenCalledTimes(1);
+    expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
+      { wmkf_reviewduedate: '2026-08-01' }, expect.any(Object));
+  });
+
+  test('pre-set due date is NOT clobbered; only the unset offset is written (Codex finding #1a)', async () => {
+    REQUEST = { ...REQUEST, wmkf_reviewduedate: '2026-09-09' };
+    await run(invite());
+    expect(updateRecord).toHaveBeenCalledTimes(1);
+    expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
+      { wmkf_respondoffsetdays: 7 }, expect.any(Object));
+  });
+
+  test('fully configured request → no write at all', async () => {
+    REQUEST = { ...REQUEST, wmkf_respondoffsetdays: 5, wmkf_reviewduedate: '2026-09-09' };
+    await run(invite());
+    expect(updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('Re-invite (allowResend) sends but never writes request config (Codex finding #2)', async () => {
+    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_invited: true }) };
+    const res = await run(invite({ allowResend: true }));
+    expect(resultOf(res).stats).toMatchObject({ sent: 1 });
+    expect(updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('no campaignConfig → no write (backwards-compatible)', async () => {
+    await run({ drafts: [draft()], templateType: 'invitation' });
+    expect(updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('non-invitation templateType never writes config', async () => {
+    await run({ drafts: [draft()], templateType: 'followup', campaignConfig: CONFIG });
+    expect(updateRecord).not.toHaveBeenCalled();
   });
 });
 
