@@ -12,7 +12,7 @@
 
 A vertical slice of the Stage 2a landing page that covers the proposal summary card, contact-info confirmation, honorarium opt-out, **policy acknowledgment for COI and AI use** (Dynamics-native), and accept/decline events. Production-honest from day one — accept requires both policy acks, matching the design doc contract.
 
-The slice **extends the existing `/external/review/[token]` route family** (rather than building a parallel `/external/landing/*`) and writes engagement-scope state to **`wmkf_appreviewersuggestions`** (the entity the existing magic-link primitive already resolves and writes to). This matches the design doc's "URL does not change across the journey" rule and avoids duplicating state already on the suggestion row.
+The slice **extends the existing `/external/review/[token]` route family** (rather than building a parallel `/external/landing/*`) and writes engagement-scope state to **`wmkf_appreviewersuggestions`** (the entity the existing magic-link primitive already resolves and writes to). This matches the design doc's "same ROUTE/page across the journey, state-driven" rule (the `/external/review/[token]` route and the engagement it resolves are stable) and avoids duplicating state already on the suggestion row. NOTE (corrected 2026-06-21): the TOKEN inside that URL is NOT stable — the send path re-mints it on every email, so the full link changes between the invitation, materials, and any reminder; only the route + resolved engagement persist. See `REVIEWER_INTERACTION_DESIGN.md` Stage 4.
 
 Rationale:
 - Contact-confirmation + accept/decline + policy acks are the highest-leverage mechanics — they unlock the data downstream consumers want (decline reasons, referrals, accept timestamps, contact corrections, compliance-grade COI capture).
@@ -304,7 +304,7 @@ All writes to `wmkf_appreviewersuggestions` use `If-Match` with the row's `_etag
 
 ## 6. Page composition
 
-**Same URL across the journey** (per design doc Stage 4: *"the URL does not change across the journey; the backend flips the page from Stage 2a to Stage 2b state"*). We extend the existing `pages/external/review/[token].js` rather than creating a parallel `pages/external/landing/[token].js` — page state, driven by the response from `/context`, picks which view renders.
+**Same ROUTE/page across the journey** — `pages/external/review/[token].js`, with page state driven by `/context` picking which view renders — rather than a parallel `pages/external/landing/[token].js`. NOTE (corrected 2026-06-21): the design doc's older "the URL does not change" wording was wrong about the LINK — the send path re-mints the token per email, so the full URL (its token) changes between invitation/materials/reminders; the stable thing is the route + the engagement it resolves, not the link. See `REVIEWER_INTERACTION_DESIGN.md` Stage 4.
 
 ### View dispatch (driven by `/context` response)
 

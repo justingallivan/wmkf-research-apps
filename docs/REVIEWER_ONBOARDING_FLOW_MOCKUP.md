@@ -209,9 +209,10 @@ A short confirmation that the decline was recorded, with the option to switch ba
 
 ### Screen 4 — Materials available (later stage, `stage2b`)
 
-When staff release the proposal materials, the reviewer is emailed again; the same link now opens
-the **Materials** view to read the proposal and submit their review. (Out of scope for onboarding,
-shown here for continuity.)
+When staff release the proposal materials, the reviewer is emailed again; the link in that NEW
+email opens the **Materials** view (the send path re-mints the token, so it differs from the
+invitation link — see `REVIEWER_INTERACTION_DESIGN.md` Stage 4; reviewers use the most recent
+email). (Out of scope for onboarding, shown here for continuity.)
 
 ---
 
