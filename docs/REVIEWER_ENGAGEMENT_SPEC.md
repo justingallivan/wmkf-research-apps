@@ -49,7 +49,8 @@ Each reminder is **off by default** with a configurable "days before."
 - Per-reviewer deadline = **that reviewer's `emailSentAt` + `respondOffsetDays`** (computed in code; OData can't do the arithmetic — same pattern as the sweep). `[verified §2.5 emailSentAt is per-suggestion]`
 - Fire **once**, when `today ≥ (deadline − leadDays)`, reviewer still unresponded, token not expired, `wmkf_respondremindersentat` empty. If already past the soft date at first eligibility, send once anyway (a late nudge is fine — respond-by is soft). Never repeat. `[DECISION #3]`
 - Marker: new per-suggestion `wmkf_respondremindersentat` `[SCHEMA]`, **separate** from the review-due/follow-up marker. `[DECISION #4]`
-- The reminder email contains `{{externalLink}}` → it **re-mints** a fresh token with the SAME invite cap (review-due + grace). Reviewers use the most recent link. `[DECISION #13, verified §2.6]`
+- The reminder email contains `{{externalLink}}` → it **re-mints** a fresh token with the SAME invite cap (review-due + grace), invalidating the prior invite link. Reviewers use the most recent link. `[DECISION #13, verified §2.6]` **Required copy fix (Codex P2):** the portal's expired-link error says "most recent **invitation** email" (`pages/external/review/[token].js`) — change to "most recent email," since a reminder (not the invitation) may now carry the live link.
+- **Required side-effect (Codex P2):** Re-invite (`allowResend`) MUST clear `wmkf_respondremindersentat` in the **same write** as the `emailSentAt` re-stamp (`send-emails.js` invitation branch), or the fire-once marker from the prior wave blocks the new window's reminder. Build the marker with this in mind from the start.
 
 **Review-due reminder** — nudge accepted reviewers who haven't submitted.
 - Target: `accepted && materials-sent && not-submitted` — never an accepted-pre-materials reviewer who hasn't received the proposal. `[DECISION #11]`
@@ -58,8 +59,8 @@ Each reminder is **off by default** with a configurable "days before."
 
 ### 3.C  Quota → notify PD → selective decline `[BUILD]`
 **Not automatic.** Reaching the desired count notifies the PD, who decides who (if anyone) to decline — so a wanted-but-slow senior reviewer is never auto-shut-out.
-- Count = `wmkf_accepted = true` rows for the request (any downstream stage). `[DECISION #1]`
-- On each accept (`respond.js` accept path), compare count to `desiredCount`; on the false→set transition of `wmkf_quotanotifiedat` `[SCHEMA]`, notify the PD once (first-writer-wins; a rare double-notify is harmless). `[DECISION #2]`
+- Count = `wmkf_accepted = true` rows for the request (any downstream stage), queried **AFTER** the accept PATCH commits (`applyStage2aResponse` runs first in `respond.js`; a pre-write count is off by one) `[DECISION #1, Codex P2]`. Reuse the existing accepted-reader filter shape (`lib/dataverse/adapters/reviewer-suggestion.js::findAcceptedByPD` uses `wmkf_accepted eq true`).
+- **Concurrency mechanism (named, Codex P1):** the notify must be a **conditional null→set** of `wmkf_quotanotifiedat` `[SCHEMA]` via an `If-Match`/ETag update (`DynamicsService.updateRecord` supports `ifMatch`), so only the first writer past the threshold succeeds and notifies; concurrent accepts that lose the race do not double-notify. Notify the PD on that single false→set transition. (Without the conditional write, concurrent accepts can both notify, and a stale count read can miss the threshold until a later accept — so the conditional set is required, not optional.)
 - PD action (Workbench): select pending invitees and send the polite "no longer needed" decline → sets `withdrawn_sufficient` + `wmkf_withdrawnsufficientat` (the missing writer from §2.9) + sends the decline email + clears those reviewers' `wmkf_respondremindersentat` so no reminder fires.
 - `withdrawn_sufficient` is settable **only on still-pending rows** (`invited && !accepted && !declined`), server-guarded; it never touches an accepted/honorarium row. `[DECISION #8]`
 
@@ -68,7 +69,9 @@ No JWT "extension" (a signed JWT can't be extended in place; the raw token isn't
 - **Invite send** (and respond-by reminder re-mint): mint with **expiry = review-due + grace** (default grace 1–2 days). This is the non-responder cap — their link dies at review-due. `[DECISION #5]`
 - **Release/materials send**: mints a fresh, **long-lived** token (expiry ≈ review-due + ~90 days) for the review window + late returns. Only ACCEPTED reviewers ever receive this, so non-responders never get the long token. `[DECISION #1 late-returns-OK]`
 - Requires `render-emails` to pick the expiry by template/config (it currently hardcodes `now + 90`); the review-due date must be available at mint (→ §4 persistence). `[verified §2.6 render-emails mints]`
-- `sweep-stale-invites` (meeting-date) and the token cap (review-due) are **different gates** and both stay: the token cap is the **access** gate (link stops working at review-due); the sweep is **status** bookkeeping (`no_response` at meeting date). No conflict. `[DECISION #9]`
+- `sweep-stale-invites` (meeting-date) and the token cap (review-due) are **different gates** and both stay: the token cap is the **access** gate (link stops working at review-due); the sweep is **status** bookkeeping (`no_response` at meeting date). No conflict — but note a **staff-UI gap (Codex P2):** between review-due and meeting-date a row reads "pending/invited" in the UI while its link can no longer respond. Surface "link expired" state in the staff view, or tighten the sweep toward review-due. `[DECISION #9]`
+- **"Accepted but never released" window (Codex P1):** an accepted-pre-materials reviewer holds only the **invite** token (review-due cap). If the PD never sends materials, that link dies at review-due with no self-serve path. Mitigation: (a) the Release action MUST ship with the cap (see §5 reordering) so the long-lived materials link normally exists before the cap bites; (b) the existing **regenerate-token** staff endpoint (`lib/external/token-lifecycle.js`) is the recovery path for any stranded reviewer.
+- **Cap is "going forward" only (Codex P2):** `mintToken` fixes `exp` at mint time; changing `reviewDueDate` in the config later does NOT re-cap already-minted tokens. Acceptable — recovery is a re-invite / materials send / regenerate-token, all of which re-mint.
 
 ### 3.E  Per-request campaign config + panel change `[BUILD]` `[SCHEMA]`
 Persist, on the request, what the cron and quota logic need (today these are throwaway `[verified §2.11]`):
@@ -81,21 +84,24 @@ Persist, on the request, what the cron and quota logic need (today these are thr
 
 ## 4. Schema additions `[SCHEMA]` — DEPENDENCY (Dataverse fields must be created)
 
-On `akoya_request` (or a single JSON config field `wmkf_reviewcampaignconfig` — decide at build):
-`respond_offset_days`, `review_due_date`, `respond_reminder_enabled`, `respond_reminder_lead_days`, `reviewdue_reminder_enabled`, `reviewdue_reminder_lead_days`, `desired_count`, `quota_notified_at`.
+On `akoya_request` — **discrete Dataverse columns** for everything the cron or sweep must `$filter` on (Codex P2: a JSON blob is NOT server-queryable via OData `$filter`):
+`respond_offset_days`, `review_due_date`, `respond_reminder_enabled`, `respond_reminder_lead_days`, `reviewdue_reminder_enabled`, `reviewdue_reminder_lead_days`, `desired_count`, `quota_notified_at`. (A JSON blob is acceptable ONLY for values never used in a server-side filter — but for simplicity, make them all discrete.)
 
 On `wmkf_appreviewersuggestion`:
 `wmkf_respondremindersentat` (datetime).
 
-> These are new fields — a real dependency (Dataverse admin / migration), not just code. The cron filters need them queryable, which favors discrete fields over a JSON blob for the ones the cron filters on (`reminder_enabled`, dates); the rest can be JSON.
+> These are new fields — a real dependency (Dataverse admin / migration), not just code.
 
 ---
 
 ## 5. Sequencing
 
-- **Phase 1 — Persistence + panel + token cap:** campaign config on the request; panel "days to respond" change; `render-emails` picks token expiry from config (invite = review-due + grace, materials = long). Foundation for everything else.
-- **Phase 2 — Reminders:** the two-reminder daily cron + the `wmkf_respondremindersentat` marker.
-- **Phase 3 — Release + Quota:** the accepted-only Release action; quota count/notify in the accept path; the PD selective-decline Workbench action (writes `withdrawn_sufficient`).
+> **Reordered (Codex P1):** the token cap must NOT ship before the Release action, or an accepted reviewer's invite link can die at review-due before any built mechanism exists to send them the long-lived materials link.
+
+- **Phase 1 — Persistence + panel:** campaign config (discrete columns, §4) on the request; panel "days to respond" (offset) change. **No token-behavior change yet** — invite keeps minting `now + 90`. Pure foundation.
+- **Phase 2 — Release + token TTL (ship together):** the accepted-only Release action (mints the long-lived materials token) **and** the invite/reminder token cap (review-due + grace), landed in the same release so the long-lived materials link always exists before the cap can bite. **Also here:** add the missing `materials_sent` server-side guard on the upload endpoint (Codex P2 — `pages/api/external/review/[token]/upload.js` → `lib/services/review-upload.js` accept any valid token today without checking `wmkf_reviewstatus`, so an accepted-pre-materials reviewer could upload).
+- **Phase 3 — Reminders:** the two-reminder daily cron + the `wmkf_respondremindersentat` marker (with Re-invite clearing it, §3.B).
+- **Phase 4 — Quota:** count-after-write + conditional null→set notify + the PD selective-decline Workbench action (writes `withdrawn_sufficient`).
 
 Independent of all of the above: the invitation copy still needs the **Model-B fix** (the shipped copy says "no commitment today, COI/AI + honorarium come later" — wrong; should say "you confirm COI/AI + honorarium details when you accept; the proposal follows later"). Small, do anytime.
 
@@ -106,4 +112,6 @@ Independent of all of the above: the invitation copy still needs the **Model-B f
 - **Honorarium stays capture-only** this cycle `[verified §2.3]`; none of this changes that.
 - **Token cap depends on a sane review-due date** in the config; if absent, fall back to the current `now + 90` (don't silently mint a past-dated/expired token).
 - **Latest-link-wins is now explicit** `[verified §2.6]`: every reminder/materials email supersedes prior links; reviewer-facing copy already corrected (S275) to "use the link in this email."
-- **Quota count runs in the external accept path** (`respond.js`) — a Dataverse count query per accept; acceptable (low volume), guard the notify with the first-writer flag.
+- **Quota count runs in the external accept path** (`respond.js`) — a Dataverse count query per accept, **after** the accept write; acceptable (low volume); the notify is a conditional null→set on `wmkf_quotanotifiedat` (§3.C).
+- **Pre-existing upload soundness gap (Codex P2):** `/upload` accepts any valid token without a `materials_sent` check — an accepted-pre-materials reviewer could upload before release. Closed in Phase 2 (§5).
+- **Expired-but-still-pending window (Codex P2):** between review-due (token dies) and meeting-date (sweep closes), a non-responder reads "pending" in staff UI but can't respond. Surface "link expired" in the staff view, or tighten the sweep (§3.D).
