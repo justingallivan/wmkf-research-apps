@@ -1,135 +1,65 @@
-# Session 274 Prompt: Reviewer invitation demo readiness + branded-domain follow-up
+# Session 275 Prompt: Reviewer engagement build (Phase 1) + land the bundle
 
-## Session 273 Summary
+## Session 274 Summary
 
-Session 273 moved the reviewer invitation/reviewer-portal work from plan into a reusable browser testing and demo workflow. The session added local mocked Playwright rehearsals, a guarded live-email smoke path, runbook documentation, and one formatting fix found during a real test email.
+Three threads this session: (1) honorarium **capture-only** deferral + backfill (merged), (2) **email-template hub** in Profile Settings + invitation rework (merged), (3) a full **reviewer-engagement redesign → spec** plus a reliability-guardrail memory and a link-permanence doc correction (on a held, pushed, **unmerged** branch).
 
-Current branch: `codex/reviewer-invite-browser-testing`. The branch is pushed; as of session stop the working tree was clean.
+> **WHERE THE WORK IS:** the reviewer-engagement design + this handoff live on branch **`chore/reviewer-flow-docs-and-citation-memory`** (pushed, not merged). `main`'s SESSION_PROMPT stays at S274 until the bundle merges — **to resume, check out that branch.**
 
 ### What Was Completed
 
-1. **Safe browser rehearsal for Program Director invitation flow**
-   - Added `npm run rehearse:reviewer-invite:browser`, which launches a headed browser and exercises the real Workbench `Reviewers -> Candidates` UI with route-mocked reviewer/invitation APIs.
-   - This is the best demo path for colleagues: browser-visible, realistic UI, no Dataverse writes, no Dynamics email.
+1. **Honorarium capture-only deferral + backfill** — merged (PR #34)
+   - `ensureHonorariumOnboarding` returns `status:'deferred'` AFTER capturing contact+address but BEFORE minting the `akoya_request`/calling BILL, when `HONORARIUM_ONBOARDING_DEFERRED=true` OR the discriminator GUIDs are unset. No throw → no per-reviewer warning email; one non-emailing `honorarium_capture_only` notice. Address-PATCH-failure and partial-GUID-config get emailing warnings.
+   - `scripts/backfill-honorarium-capture-only.mjs` — cycle-scoped (`--cycle`), dry-run default, reuses the idempotent orchestrator.
 
-2. **Reviewer-side Playwright coverage**
-   - Expanded E2E coverage for reviewer accept and return/upload surfaces.
-   - Added `tests/e2e/program-director-invite.spec.js` for Program Director send-flow coverage.
-   - Kept reviewer portal API calls browser-mocked in E2E so SharePoint/Dataverse/Blob are not touched.
+2. **Email-template hub in Profile Settings** — merged (PR #35)
+   - "Request Abstract Email" (renamed from "Grantee Invitation Email"); new **Reviewer Emails** card (the 6-type `EmailTemplatesModal`, same pref key as Workbench); retired the dead legacy cluster (deleted `SettingsModal`, `EmailGeneratorModal`, `EmailTemplateEditor`, `EmailSettingsPanel`).
+   - Invitation reworked to surface proposal details (title/PI/co-PIs/institution/abstract) for early COI; PI = projectleader-only; co-PIs from the `wmkf_apprequestperson` junction.
 
-3. **Guarded live-email smoke tooling**
-   - Added auth capture via `npm run smoke:reviewer-invite:auth`.
-   - Added `npm run smoke:reviewer-invite:live -- prepare/open/cleanup`.
-   - Live smoke refuses to run without `LIVE_REVIEWER_EMAIL_SMOKE=true`, `--confirm-live-email`, and `TEST_REVIEWER_EMAIL_ALLOWLIST=<target email>`.
+3. **Reviewer engagement redesign → spec** — held branch (unmerged)
+   - Settled on **MODEL B (accept-now):** reviewer **accepts + onboards at the offer stage** (COI/AI acks + mailing address; honorarium capture-only), sits tight, then the PD **releases the proposal** later. The "hold / agree-in-principle" flow is **dormant** (`isProposalReadyForReviewers()` hardcoded `true`) and NOT used in this design.
+   - `docs/REVIEWER_ENGAGEMENT_SPEC.md` — Model B spine (verified vs live code) + four additions: **Release-to-reviewers**, **two reminders** (respond-by per-reviewer offset; review-due), **PD-confirmed quota** notify + selective decline (writes `withdrawn_sufficient`), **state-split token TTL** (invite=review-due cap, materials=long; no JWT extension). 4-phase sequencing; new Dataverse fields as a dependency. **Codex-vetted** (all 7 verified-citations confirmed; Part-2 findings folded in — esp. token-cap must ship WITH Release).
+   - **Link-permanence correction:** docs claimed "the URL doesn't change across the journey" — wrong; `render-emails` re-mints per email (latest-link-wins). Corrected 3 design docs + 2 email-template strings.
+   - **New always-read memory** `feedback-behavior-claims-cite-the-producer` — tag behavior claims `[verified file:line]`/`[unverified]` even in chat; read the PRODUCER not the consumer; plan ≠ built state. (Born from this session's repeated assert-without-verify failures.)
 
-4. **Live test follow-up captured**
-   - Live test email to `berets.eyeful-0f@icloud.com` worked through invite send and reviewer accept.
-   - Accepting with honorarium triggered the known alert: `WARNING — honorarium onboard failed` because `HONORARIUM_PROGRAM_ID`, `HONORARIUM_GRANTPROGRAM_ID`, and `HONORARIUM_TYPE_ID` are not configured.
-   - Cleanup deleted the smoke suggestion/person but could not delete promoted contact `c98806cf-aa6d-f111-ab0d-000d3a3065b8` (`ZZZ Smoke Test (DELETE)` / `berets.eyeful-0f@icloud.com`) because the app user lacks contact-delete permission.
-
-5. **Reviewer invite email formatting fix**
-   - Fixed excessive blank-line spacing before the CTA and centered the `Start Review` button label.
-   - The send route now normalizes repeated blank lines and keeps generated CTA HTML out of the plain-text `<br>` conversion.
-
-### Commits
-
-- `8bd92edc` - Add reviewer invite browser smoke tooling
-- `7291542e` - Expand reviewer invitation browser coverage
-- `43ac7297` - Record live reviewer smoke follow-ups
-- `08d1dd9c` - Fix reviewer invite email CTA formatting
+### Commits — branch `chore/reviewer-flow-docs-and-citation-memory` (pushed, UNMERGED)
+- `586d5be8` citation/producer-trace memory
+- `ff3c5a1a` link-permanence doc/copy corrections
+- `c04bc647` Codex Model-B interpretation snapshot
+- `ca0b92ac` reviewer engagement spec
+- `18933df3` spec revised per Codex sanity pass
+- (+ this SESSION_PROMPT commit)
+- Merged to `main` earlier this session: **PR #34** (honorarium), **PR #35** (email hub).
 
 ## Potential Next Steps
 
-### 1. Demo the safe browser rehearsal
+### 1. Land the bundle
+Open a PR for `chore/reviewer-flow-docs-and-citation-memory` → `main` and merge. It's design/docs + the reliability memory + link-permanence fixes — all low-risk, no behavior change.
 
-Use this first for colleagues:
+### 2. Reviewer-engagement build (GATED on Dataverse schema)
+Per `docs/REVIEWER_ENGAGEMENT_SPEC.md` §4, the new Dataverse fields (campaign config on `akoya_request` + `wmkf_respondremindersentat` on the suggestion) must be created first — **line this up with Connor.** Then build in order:
+- **Phase 1:** per-request campaign config (discrete columns) + panel "days to respond" (offset) change. No token behavior change yet.
+- **Phase 2:** Release-to-reviewers action + token TTL (ship together) + the upload `materials_sent` guard.
+- **Phase 3:** two reminders (daily cron) + `wmkf_respondremindersentat`.
+- **Phase 4:** quota count-after-write + conditional notify + PD selective decline.
 
-```bash
-npm run rehearse:reviewer-invite:browser
-```
-
-Expected: headed browser opens the Program Director invitation workflow, sends through mocked routes, and opens a local reviewer portal link without real external side effects.
-
-### 2. Re-run automated reviewer E2E coverage
-
-```bash
-npx playwright test \
-  tests/e2e/reviewer-accept.spec.js \
-  tests/e2e/reviewer-captured-invite.spec.js \
-  tests/e2e/reviewer-return-upload.spec.js \
-  --project=chromium
-```
-
-Optional Program Director-focused E2E:
-
-```bash
-npx playwright test tests/e2e/program-director-invite.spec.js --project=chromium
-```
-
-### 3. Prepare for another live-email smoke only when intended
-
-Use only with a test address the owner controls:
-
-```bash
-npm run smoke:reviewer-invite:auth -- --base-url https://wmkfresearch.vercel.app
-
-TEST_REVIEWER_EMAIL_ALLOWLIST=berets.eyeful-0f@icloud.com \
-LIVE_REVIEWER_EMAIL_SMOKE=true \
-npm run smoke:reviewer-invite:live -- prepare \
-  --email berets.eyeful-0f@icloud.com \
-  --confirm-live-email
-
-TEST_REVIEWER_EMAIL_ALLOWLIST=berets.eyeful-0f@icloud.com \
-LIVE_REVIEWER_EMAIL_SMOKE=true \
-npm run smoke:reviewer-invite:live -- open \
-  --base-url https://wmkfresearch.vercel.app \
-  --auth-state .auth/reviewer-invite-smoke.json \
-  --confirm-live-email
-```
-
-Afterward:
-
-```bash
-npm run smoke:reviewer-invite:live -- cleanup
-```
-
-### 4. Fix operational follow-ups before broader live testing
-
-- Ask a Dataverse admin to delete promoted contact `c98806cf-aa6d-f111-ab0d-000d3a3065b8` if it still exists.
-- Configure honorarium discriminator env vars by running `scripts/probe-honorarium-discriminators.js` against the target Dataverse environment, then set `HONORARIUM_PROGRAM_ID`, `HONORARIUM_GRANTPROGRAM_ID`, and `HONORARIUM_TYPE_ID`.
-- As of S274, an unconfigured environment (or `HONORARIUM_ONBOARDING_DEFERRED=true`) auto-defers to **capture-only**: the reviewer's contact + mailing address are captured, no `akoya_request` is minted, and NO per-reviewer `honorarium_onboard_failed` email fires (one non-emailing `honorarium_capture_only` notice is recorded instead). So live-smoke reviewers no longer need to opt out to avoid alert spam. To re-enable honorarium-record creation, set all three GUID vars **and** ensure `HONORARIUM_ONBOARDING_DEFERRED` is not `true` (the explicit flag is checked first, so it overrides configured GUIDs). Setting only some of the GUIDs (without the flag) fires a deduped `honorarium_discriminator_partial_config` warning, and a failed address write in capture-only mode fires a `honorarium_capture_failed` warning rather than silently losing the address.
-- When IT finishes Cloudflare DNS, set `REVIEWER_PORTAL_BASE_URL=https://reviews.wmkeck.org` in the relevant Vercel environment and redeploy.
+### 3. Model-B invitation copy fix (small, anytime)
+The shipped invitation copy still says "no commitment today, COI/AI + honorarium come later" (Model A). Change to "you confirm COI/AI + honorarium details when you accept; the proposal follows later." See SPEC §5.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md` | Canonical reviewer testing/demo runbook, including no-send local rehearsal and live-email smoke steps |
-| `scripts/rehearse-pd-invite-browser.mjs` | Headed browser mock harness for Program Director invite demo |
-| `scripts/save-playwright-auth-state.mjs` | Saves authenticated Playwright browser state for deployed-app smoke tests |
-| `scripts/live-reviewer-invite-smoke.mjs` | Guarded prepare/open/cleanup wrapper for real email smoke testing |
-| `tests/e2e/program-director-invite.spec.js` | Program Director invitation browser coverage |
-| `tests/e2e/reviewer-accept.spec.js` | Reviewer accept flow coverage |
-| `tests/e2e/reviewer-captured-invite.spec.js` | Captured email button -> reviewer portal coverage |
-| `tests/e2e/reviewer-return-upload.spec.js` | Reviewer return/upload flow coverage |
-| `pages/api/review-manager/send-emails.js` | Reviewer invite email HTML formatting and CTA rendering |
-| `tests/integration/send-emails-route.test.js` | Send-route capture, production-refusal, CTA formatting regression coverage |
+| `docs/REVIEWER_ENGAGEMENT_SPEC.md` | The build spec — Model B + 4 additions, phases, schema, edge cases |
+| `docs/REVIEWER_ENGAGEMENT_PLAN_INTERPRETATION.md` | Codex's Model-B flow interpretation (mermaid + open questions) |
+| `lib/bill/honorarium-onboard-orchestrator.js` | Honorarium capture-only deferral tier |
+| `scripts/backfill-honorarium-capture-only.mjs` | Go-live backfill for capture-only reviewers |
+| `pages/profile-settings.js` | Email-template hub (signature, Request Abstract, Reviewer Emails) |
+| `.claude-memory/feedback-behavior-claims-cite-the-producer.md` | Reliability guardrail (cite the producer) |
 
-## Testing Performed In Session 273
+## Gotchas / Continuity
 
-```bash
-npx jest tests/integration/send-emails-route.test.js --runInBand
-npx eslint pages/api/review-manager/send-emails.js tests/integration/send-emails-route.test.js
-```
-
-Observed: focused send-route suite passed (`16 passed`), and ESLint passed for touched email-formatting files.
-
-Additional browser/live validation was performed interactively during the session and recorded in `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md`.
-
-## Continuity Guardrails
-
-- Do not set `EMERGENCY_AUTH_BYPASS=true` for these tests. Use normal staff sign-in or the local mocked harness.
-- `REVIEWER_EMAIL_DELIVERY_MODE=capture` is non-production only; production should remain `send`.
-- Live smoke sends real mail on the final manual send click.
-- The current reviewer custom domain is pending Cloudflare/IT. Until DNS/env are cut over, real links may still use the Vercel host.
-- The `applications.wmkeck.org`, `submissions.wmkeck.org`, and `grantees.wmkeck.org` naming discussion is still a planning item; this session only built/tested reviewer invitation workflows.
+- **Reviewer flow is Model B (accept-now) LIVE today** because `lib/external/proposal-readiness.js::isProposalReadyForReviewers()` returns hardcoded `true`; the HoldView path is dormant. Don't reintroduce the hold/finalize two-step.
+- **Reviewer secure links are NOT stable across emails** — `render-emails` re-mints per email; "latest link wins." Use the link in the most recent email.
+- **Honorarium is capture-only this cycle** (discriminator GUIDs unset) — address captured, no `akoya_request` minted, no per-reviewer alert.
+- The held branch is the source of truth for the reviewer-engagement work; the two interpretation/spec `.md` files supersede each other in that order.
