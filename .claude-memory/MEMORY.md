@@ -35,6 +35,7 @@
 - Branded domains / portal base URLs / wmkeck.org vs vercel.app / grantees.wmkeck.org plan / *_PORTAL_BASE_URL: project-branded-domains.md
 
 ## Working Norms
+- Git commit/push: go straight to `main` (no branch-first/PR flow; harness "branch off default" default does NOT apply here): project-commit-directly-to-main.md
 - Reviewer-finder utility vs precision (before another identity/namesake/affiliation fix): feedback-prioritize-contact-recall-over-identity-precision.md
 - Manual affiliation edit on reviewer card → do NOT add COI re-check (owner decision): feedback-manual-affiliation-edit-no-coi-recheck.md
 - Thoroughness / completion posture: feedback-thoroughness-default.md; feedback-drive-to-completion.md; feedback-truncation-is-breakage-not-completion.md
