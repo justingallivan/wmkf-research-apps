@@ -12,6 +12,10 @@ This is a Next.js multi-application system for grant and document workflows, dep
 4. **Relevant red gates block completion.** Run gates for surfaces you changed. A gate and its self-test run sequentially, never in parallel. Gate mechanics and scopes live in `docs/CI_GATES_REFERENCE.md`.
 5. **Reconcile durable facts completely.** For docs, memory, instruction files, and `SESSION_PROMPT.md`, follow `.claude/rules/durable-docs.md`; use `/sweep` for fact-level reconciliation.
 6. **Commit working changes regularly.** Commit completed, working features/fixes with descriptive messages; preserve unrelated user changes.
+7. **Ask, don't assume.** If something is unclear, ask before writing a single line. Never make silent assumptions about intent, architecture, or requirements.
+8. **Simplest solution first.** Always implement the simplest thing that could work. Do not add abstractions or flexibility that weren't explicitly requested.
+9. **Don't touch unrelated code.** If a file or function is not directly part of the current task, do not modify it, even if you think it could be improved.
+10. **Flag uncertainty explicitly.** If you are not confident about an approach or technical detail, say so before proceeding. Confidence without certainty causes more damage than admitting a gap.
 
 ## Universal Safety Invariants
 
