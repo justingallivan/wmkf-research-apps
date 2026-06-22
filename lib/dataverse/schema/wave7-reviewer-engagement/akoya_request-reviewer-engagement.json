@@ -1,0 +1,70 @@
+{
+  "name": "akoya_request-reviewer-engagement",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "_comment": "Reviewer-engagement per-request campaign config (docs/REVIEWER_ENGAGEMENT_SPEC.md §4). DISCRETE columns, NOT a JSON blob, because the Phase-3 reminder cron and Phase-4 quota sweep must OData $filter on them server-side (Codex P2: a JSON blob is not $filter-queryable). schema-apply is creation-only + idempotent (schema-apply.js:264) — re-running no-ops existing fields and will NOT reconcile a divergent pre-existing one; these are all brand-new. Publisher prefix wmkf; precedent wmkf_TriageStatus / wmkf_ai_FieldPrimer self-deployed to akoya_request. New fields MUST carry NO PowerAutomate trigger — verify post-deploy. Logical name = lowercased SchemaName, so these resolve to wmkf_respondoffsetdays / wmkf_quotanotifiedat etc. as the spec references them. Catalogued in docs/atlas/dataverse-akoya-request.md.",
+  "attributes": [
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_RespondOffsetDays",
+      "displayName": "Respond Offset Days",
+      "minValue": 0,
+      "description": "Campaign config: days a panelist is given to respond to an offer. Drives the per-reviewer soft respond-by (Phase 1 panel 'days to respond')."
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ReviewDueDate",
+      "displayName": "Review Due Date",
+      "format": "DateOnly",
+      "behavior": "DateOnly",
+      "description": "Campaign config: the review deadline for this request's cycle. DateOnly to avoid timezone drift in the reminder cron's date math. Anchors the review-due reminder and the invite/materials token TTL cap."
+    },
+    {
+      "type": "Boolean",
+      "schemaName": "wmkf_RespondReminderEnabled",
+      "displayName": "Respond Reminder Enabled",
+      "default": true,
+      "trueLabel": "Enabled",
+      "falseLabel": "Disabled",
+      "description": "Campaign config: whether the respond-by reminder fires for this request (Phase 3). Default Enabled."
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_RespondReminderLeadDays",
+      "displayName": "Respond Reminder Lead Days",
+      "minValue": 0,
+      "description": "Campaign config: how many days before the soft respond-by date the single respond reminder fires (Phase 3)."
+    },
+    {
+      "type": "Boolean",
+      "schemaName": "wmkf_ReviewDueReminderEnabled",
+      "displayName": "Review Due Reminder Enabled",
+      "default": true,
+      "trueLabel": "Enabled",
+      "falseLabel": "Disabled",
+      "description": "Campaign config: whether the review-due reminder fires for this request (Phase 3). Default Enabled."
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_ReviewDueReminderLeadDays",
+      "displayName": "Review Due Reminder Lead Days",
+      "minValue": 0,
+      "description": "Campaign config: how many days before the review-due date the review-due reminder fires (Phase 3)."
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_DesiredCount",
+      "displayName": "Desired Reviewer Count",
+      "minValue": 0,
+      "description": "Campaign config: PD-confirmed quota — target number of accepted reviewers for this request. Drives the Phase-4 count-after-write quota notify."
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_QuotaNotifiedAt",
+      "displayName": "Quota Notified At",
+      "format": "DateAndTime",
+      "behavior": "UserLocal",
+      "description": "Phase-4 concurrency marker. Conditional null->set via If-Match/ETag so only the first accept past wmkf_DesiredCount notifies the PD; concurrent accepts that lose the race do not double-notify."
+    }
+  ]
+}

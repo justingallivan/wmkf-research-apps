@@ -2,7 +2,7 @@
 
 **Status:** design, ready for Codex sanity pass (S275). Supersedes the interpretation snapshot in `REVIEWER_ENGAGEMENT_PLAN_INTERPRETATION.md`.
 
-**Citation convention:** current-behavior claims carry `[verified <file>::<symbol>]` (read this session). Planned work is `[BUILD]`. New Dataverse fields are `[SCHEMA]`. Settled design calls are `[DECISION]`.
+**Citation convention:** current-behavior claims carry `[verified <file>::<symbol>]` (read this session). Planned work is `[BUILD]`. `[SCHEMA]` marks a field backed by a custom Dataverse column — **all of which are now provisioned in prod (see §4, 2026-06-21)**; the tag is a type-marker, not a "still to create" flag. Settled design calls are `[DECISION]`.
 
 ---
 
@@ -82,15 +82,22 @@ Persist, on the request, what the cron and quota logic need (today these are thr
 
 ---
 
-## 4. Schema additions `[SCHEMA]` — DEPENDENCY (Dataverse fields must be created)
+## 4. Schema additions — PROVISIONED ✓ (2026-06-21, prod)
 
-On `akoya_request` — **discrete Dataverse columns** for everything the cron or sweep must `$filter` on (Codex P2: a JSON blob is NOT server-queryable via OData `$filter`):
-`respond_offset_days`, `review_due_date`, `respond_reminder_enabled`, `respond_reminder_lead_days`, `reviewdue_reminder_enabled`, `reviewdue_reminder_lead_days`, `desired_count`, `quota_notified_at`. (A JSON blob is acceptable ONLY for values never used in a server-side filter — but for simplicity, make them all discrete.)
+> **Status: DONE.** All 9 fields were created in **production** (`wmkf.crm.dynamics.com`) on 2026-06-21 via `scripts/apply-dataverse-schema.js --target=prod --wave=7-reviewer-engagement --execute` (schema-as-code in `lib/dataverse/schema/wave7-reviewer-engagement/`), published, and verified in live metadata. No longer a build blocker. Discrete columns (NOT a JSON blob) so the Phase-3 cron / Phase-4 sweep can OData `$filter` server-side (Codex P2). New columns carry no Power Automate trigger.
+
+On `akoya_request` — schema name (→ logical name) · type:
+- `wmkf_RespondOffsetDays` → `wmkf_respondoffsetdays` · Integer (≥0)
+- `wmkf_ReviewDueDate` → `wmkf_reviewduedate` · DateTime (**DateOnly** — calendar deadline, no tz drift in cron date math)
+- `wmkf_RespondReminderEnabled` → `wmkf_respondreminderenabled` · Boolean (default **true**)
+- `wmkf_RespondReminderLeadDays` → `wmkf_respondreminderleaddays` · Integer (≥0)
+- `wmkf_ReviewDueReminderEnabled` → `wmkf_reviewduereminderenabled` · Boolean (default **true**)
+- `wmkf_ReviewDueReminderLeadDays` → `wmkf_reviewduereminderleaddays` · Integer (≥0)
+- `wmkf_DesiredCount` → `wmkf_desiredcount` · Integer (≥0)
+- `wmkf_QuotaNotifiedAt` → `wmkf_quotanotifiedat` · DateTime (DateAndTime/UserLocal) — Phase-4 concurrency marker, conditional null→set via If-Match/ETag
 
 On `wmkf_appreviewersuggestion`:
-`wmkf_respondremindersentat` (datetime).
-
-> These are new fields — a real dependency (Dataverse admin / migration), not just code.
+- `wmkf_RespondReminderSentAt` → `wmkf_respondremindersentat` · DateTime (DateAndTime/UserLocal) — Phase-3 fire-once marker; Re-invite MUST clear it in the same write as the `emailSentAt` re-stamp (§3.B).
 
 ---
 

@@ -33,11 +33,11 @@ Three threads this session: (1) honorarium **capture-only** deferral + backfill 
 
 ## Potential Next Steps
 
-### 1. Land the bundle
-Open a PR for `chore/reviewer-flow-docs-and-citation-memory` → `main` and merge. It's design/docs + the reliability memory + link-permanence fixes — all low-risk, no behavior change.
+### 1. Land the bundle — DONE
+Merged via PR #36 (squash, 2026-06-21). Branch deleted.
 
-### 2. Reviewer-engagement build (GATED on Dataverse schema)
-Per `docs/REVIEWER_ENGAGEMENT_SPEC.md` §4, the new Dataverse fields (campaign config on `akoya_request` + `wmkf_respondremindersentat` on the suggestion) must be created first — **line this up with Connor.** Then build in order:
+### 2. Reviewer-engagement build (schema dependency CLEARED ✓)
+Per `docs/REVIEWER_ENGAGEMENT_SPEC.md` §4, the 9 new Dataverse fields (8 campaign-config columns on `akoya_request` + `wmkf_respondremindersentat` on the suggestion) were **provisioned in prod 2026-06-21** (`lib/dataverse/schema/wave7-reviewer-engagement/`, applied + published + verified). The schema is no longer a blocker — build can proceed. Order:
 - **Phase 1:** per-request campaign config (discrete columns) + panel "days to respond" (offset) change. No token behavior change yet.
 - **Phase 2:** Release-to-reviewers action + token TTL (ship together) + the upload `materials_sent` guard.
 - **Phase 3:** two reminders (daily cron) + `wmkf_respondremindersentat`.
