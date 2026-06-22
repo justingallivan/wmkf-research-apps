@@ -10,6 +10,24 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer-engagement build: Model B accept-now, shipped end-to-end (prod) (Session 275)
+
+**Milestone:** The reviewer-engagement flow (Model B — accept + onboard at the offer stage, PD releases the proposal later) went from spec to fully built across four phases, each Codex-reviewed before merge. Provisions new per-request campaign config and changes LIVE external-reviewer link expiry.
+
+**Sessions:** 275. Per phase: design → build → self-trace → Codex adversarial review → fix → Codex re-confirm → merge.
+
+**Ship state:**
+- **9 Dataverse columns provisioned in prod** (wave `7-reviewer-engagement`): per-request campaign config on `akoya_request` (offset, review-due date, two reminder enabled/lead pairs, desired count, quota-notified marker) + `wmkf_respondremindersentat` on the suggestion.
+- **Phase 1 — campaign config + panel:** invite "respond-by" is now a *days-to-respond offset*; config written on first invite (`send-emails`) + edited via `/api/review-manager/campaign-config` ("Campaign settings").
+- **Phase 2 — token TTL + Release (ship together):** per-recipient link expiry keyed on accepted status (`lib/external/reviewer-token-ttl.js` via `render-emails`) — invitee/non-responder caps at review-due+2d, accepted gets review-due+90d, `now+90` fallback; accepted-only "Release to reviewers" materials send (server-gated); `materials_sent` upload guard (403).
+- **Phase 3 — reminders:** daily `/api/cron/reviewer-reminders` (respond-by + review-due), per-request opt-in, fire-once + claim-before-send (at-most-once).
+- **Phase 4 — quota + selective decline:** PD notified once when accepted count first hits desired (conditional `wmkf_quotanotifiedat` If-Match + bounded retry); `/api/review-manager/withdraw-sufficient` writes `withdrawn_sufficient` on still-pending rows (the §2.9 missing writer), If-Match-guarded against a mid-action accept.
+- **Off by default:** reminders + quota are per-request opt-in; nothing fires until a PD enables a request. ~55 new tests; ~5 real concurrency/logic bugs caught by Codex and fixed.
+
+**Why it matters:** completes the reviewer side of the panel-assembly loop and establishes the per-request-config + If-Match-concurrency + cron-claim-before-send patterns; the first feature where link expiry is data-driven rather than a flat 90 days.
+
+**Pointers:** `docs/REVIEWER_ENGAGEMENT_SPEC.md` (§3.A–§3.E), `docs/atlas/dataverse-akoya-request.md` + `dataverse-wmkf-appreviewersuggestion.md`, `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`. Schema `lib/dataverse/schema/wave7-reviewer-engagement/`. PRs #37, #40, #42, #43, #44, #45 (commits `18f3bd81` → `dcfcd3a6`). Known deferred residual: cron/manual-followup share `wmkf_remindersentat` (Codex P3, documented).
+
 ## June 2026 — Grantee deliverables: package-table migration + chunk-8 outputs + unified signatures (prod) (Session 271)
 
 **Milestone:** The grantee deliverables portal went from "built" to operationally usable, plus a production schema cutover moving the deliverable package off `akoya_request` into its own related entity.
