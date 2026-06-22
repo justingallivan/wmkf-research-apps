@@ -1,69 +1,76 @@
-# Session 276 Prompt: Reviewer-engagement go-live + verification
+# Session 277 Prompt: Reviewer-engagement rehearsal follow-through
 
-## Session 275 Summary
+## Session 276 Summary
 
-Landed the held S274 bundle, then **built the entire reviewer-engagement flow (Model B — accept-now) across four phases**, each Codex-reviewed before merge. Also provisioned the 9 backing Dataverse columns in prod. The build is **complete** — spec §3.A–§3.E fully implemented.
+Built and verified a sandboxed Playwright/browser rehearsal for the reviewer-engagement Program Director flow, then used the in-browser rehearsal to catch and fix two UX mismatches before stop. The rehearsal now supports both automated CI-style E2E checks and a kept-open browser mode for manual UI review.
 
 ### What Was Completed
 
-1. **Landed the held bundle** — PR #36 (reviewer-engagement spec, citation memory, link-permanence fixes); plus PR #38 (CLAUDE.md operating rules 7–10) and PR #39 (corrected stale Codex-status in the spec).
+1. **Playwright-assisted reviewer-engagement rehearsal**
+   - Added `npm run test:e2e:reviewer-engagement` for the mocked Program Director reviewer flow.
+   - Covered captured invite, campaign settings, accepted-reviewer release, and "release as no longer needed" interactions in `tests/e2e/program-director-invite.spec.js`.
+   - Documented setup and troubleshooting in `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md`.
 
-2. **Schema provisioned in prod** — PR #37, wave `7-reviewer-engagement`: 8 campaign-config columns on `akoya_request` (`wmkf_respondoffsetdays`, `wmkf_reviewduedate`, `wmkf_respondreminderenabled`/`…leaddays`, `wmkf_reviewduereminderenabled`/`…leaddays`, `wmkf_desiredcount`, `wmkf_quotanotifiedat`) + `wmkf_respondremindersentat` on the suggestion. Applied + published + verified in live metadata; no Power Automate trigger.
+2. **Manual kept-open browser rehearsal**
+   - Expanded `scripts/rehearse-pd-invite-browser.mjs` so `npm run rehearse:reviewer-invite:browser` opens the Workbench Reviewers tab against mocked safe data.
+   - Added realistic candidate states: not invited, already invited, and accepted-awaiting-materials.
+   - Left send confirmations visible for manual inspection instead of auto-accepting dialogs.
 
-3. **Phase 1 — campaign config + panel** (PR #40, Codex ✅): invite "respond-by" → days-to-respond **offset**; config written on first invite (`send-emails.js`, per-column set-if-unset, never on Re-invite) + a "Campaign settings" editor (`/api/review-manager/campaign-config`).
+3. **Reviewer-engagement UX cleanup from browser review**
+   - Clarified the already-invited candidate path so the new release/withdraw action is distinguishable from the legacy Re-invite resend path.
+   - Fixed the due-date mismatch: Send invitation now hydrates request-level `Days to respond` and `Review due date` from Campaign settings, while `Proposal delivered on (email only)` remains invitation-only copy.
+   - Updated the reviewer engagement spec to reflect the split between request-level campaign timing and email-only proposal-delivery copy.
 
-4. **Phase 2 — token TTL + Release** (PR #42, Codex ✅): per-recipient link expiry keyed on **accepted status** (`lib/external/reviewer-token-ttl.js`); accepted-only "Release to reviewers" (server-gated in `send-emails`); `materials_sent` upload guard (403). **Changes live link expiry.**
+### Commits
 
-5. **Phase 3 — reminder crons** (PR #43, Codex ✅): daily `/api/cron/reviewer-reminders` (respond-by + review-due), per-request opt-in, fire-once + claim-before-send.
-
-6. **Phase 4 — quota + selective decline** (PR #44, Codex ✅): quota→PD notify (conditional `wmkf_quotanotifiedat` If-Match + bounded retry, count-after-write in `respond.js`); `/api/review-manager/withdraw-sufficient` (the §2.9 missing writer), If-Match-guarded.
-
-7. **Model-B invitation copy** (PR #45): default invitation now says COI/AI + honorarium are confirmed at accept, proposal follows on release.
-
-### Commits (all merged to `main`)
-`18f3bd81` schema · `7f58f37c` P1 · `f3928352` P2 · `d07d684a` P3 · `9ad2195d` P4 · `dcfcd3a6` copy (+ `b01773cb` bundle, `3be883aa` rules, `a94e657b` spec-status). ~55 new tests; full suite green except the pre-existing bill.com + discovery red sets.
+- `1aeeefb9` - Add reviewer engagement Playwright rehearsal
+- `dd82d437` - Expand reviewer engagement browser rehearsal
+- `5f72dfd2` - Clarify reviewer engagement rehearsal states
+- `f7723c2b` - Unify reviewer campaign timing UI
 
 ## Potential Next Steps
 
-### 1. Go-live verification (recommended first)
-The build is shipped but **off by default** (reminders + quota are per-request opt-in; nothing fires until a PD enables a request). Before relying on it:
-- Walk one real request through the "Campaign settings" editor (set offset + review-due + enable a reminder + desired count), then exercise invite → accept → release → reminder → quota end-to-end (consider `REVIEWER_EMAIL_DELIVERY_MODE=capture` for a dry run; `/api/cron/reviewer-reminders?dryRun=1` to preview eligibility).
-- Confirm the daily cron is firing in Vercel (`vercel.json` entry `0 10 * * *`).
+### 1. Final manual pass before broader use
 
-### 2. Token-cap rollout awareness
-Once a request has a `wmkf_reviewduedate`, invite/reminder links cap at **review-due + 2 days** (was flat `now+90`). Requests without one keep `now+90`. Already-minted tokens are unaffected (cap is going-forward). The recovery path for a stranded accepted-pre-materials reviewer is the existing regenerate-token endpoint.
+Run the kept-open rehearsal and do one more visual pass through:
+- Campaign settings -> save `Days to respond` and `Review due date`
+- Candidates -> `Dr. New Candidate (not invited)` -> Send invitation
+- Confirm the invitation modal shows the same response/review due values as Campaign settings
+- Confirm only `Proposal delivered on (email only)` behaves as per-invitation copy
 
-### 3. Known deferred residual (Codex P3, low-risk)
-The review-due cron and the manual followup share `wmkf_remindersentat` (cron claims before send; manual stamps after), so a same-window manual followup can yield one extra nudge. Documented in `reviewer-reminder-sweep.js`, spec §3.B, and the suggestion Atlas. Tighten only if it bites (reorder the manual followup to claim-first).
+### 2. Decide whether the legacy Re-invite affordance needs additional copy
 
-### 4. Honorarium is still capture-only this cycle
-Unchanged by this build — accept captures contact+address, mints no `akoya_request`, no per-reviewer alert (discriminator GUIDs unset).
+The pending invitee still shows `Re-invite` because that is the existing resend path for already-invited reviewers. If this remains confusing in user testing, consider a small label/help-text change around pending invitee actions rather than altering the release flow.
+
+### 3. Promote the rehearsal into routine verification
+
+If this flow is still under active iteration, consider running `npm run test:e2e:reviewer-engagement` as the standard gate after reviewer-engagement UI edits. The script is mocked and safe; it does not send real email or write Dataverse data.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_ENGAGEMENT_SPEC.md` | The build spec (§3.A–§3.E), now all DONE |
-| `lib/services/reviewer-reminder-sweep.js` | Phase-3 reminder sweeps (claim-before-send) |
-| `lib/services/reviewer-quota.js` | Phase-4 quota→notify (If-Match + retry) |
-| `lib/external/reviewer-token-ttl.js` | Phase-2 per-recipient link expiry policy |
-| `pages/api/review-manager/campaign-config.js` | Campaign-config editor API |
-| `pages/api/review-manager/withdraw-sufficient.js` | PD selective-decline (withdrawn_sufficient writer) |
-| `pages/api/cron/reviewer-reminders.js` | Daily reminder cron |
-| `lib/dataverse/schema/wave7-reviewer-engagement/` | Schema-as-code for the 9 columns |
+| `tests/e2e/program-director-invite.spec.js` | Mocked Playwright E2E coverage for Program Director reviewer-engagement flows |
+| `scripts/rehearse-pd-invite-browser.mjs` | Manual kept-open browser rehearsal with safe mocked routes |
+| `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md` | Rehearsal instructions, manual browser mode, and troubleshooting |
+| `shared/components/reviewers/InviteEmailModal.js` | Invitation modal timing UI and campaign-config hydration |
+| `shared/components/reviewers/CandidatesPanel.js` | Candidate invitation entry point and modal wiring |
+| `docs/REVIEWER_ENGAGEMENT_SPEC.md` | Durable reviewer-engagement contract, including timing-field semantics |
+| `shared/config/reviewerFinderPreferences.js` | Sticky invite timing preference contract |
 
 ## Testing
 
 ```bash
-npm test          # green except pre-existing bill.com + discovery (setTimeout-spy env) red sets
-npm run lint
-# Cron dry-run (needs CRON_SECRET locally, or run in dev where it bypasses):
-#   GET /api/cron/reviewer-reminders?dryRun=1
+npm run test:e2e:reviewer-engagement
+npx jest tests/unit/candidates-panel-invite-capture.test.js tests/unit/invite-email-modal-capture.test.js --runInBand
+npx eslint shared/components/reviewers/InviteEmailModal.js shared/components/reviewers/CandidatesPanel.js tests/unit/candidates-panel-invite-capture.test.js tests/e2e/program-director-invite.spec.js scripts/rehearse-pd-invite-browser.mjs
+npm run check:doc-currency
+npm run check:fact-consistency
 ```
 
 ## Gotchas / Continuity
 
-- **Reviewer flow is Model B (accept-now)** — `isProposalReadyForReviewers()` returns hardcoded `true`; the hold/finalize two-step is dormant. Don't reintroduce it.
-- **Everything new is OFF until a PD opts a request in** via "Campaign settings." The token cap is the one exception — it applies automatically to any request that has a `wmkf_reviewduedate` (set on first invite from the panel, or via the editor).
-- **Per-PD saved templates keep their wording** — the Model-B copy fix only changed the default invitation template; a PD with a customized one is unchanged.
-- **The two red test suites (bill.com, discovery) fail on clean `main`** independent of this work — confirm any "red" is only those before chasing.
+- The rehearsal is intentionally mocked and sandboxed. It captures browser/API behavior without sending real Dynamics email or mutating Dataverse.
+- `npm run rehearse:reviewer-invite:browser` keeps a server and browser open until interrupted. Stop it with `Ctrl-C` when done.
+- ESLint currently passes for the touched files but reports existing hook warnings in `InviteEmailModal.js` around preview-rendering effects.
+- `DEVELOPMENT_LOG.md` was not updated for Session 276 because this was a verification/rehearsal and UX cleanup session, not a production cutover or architecture milestone.
