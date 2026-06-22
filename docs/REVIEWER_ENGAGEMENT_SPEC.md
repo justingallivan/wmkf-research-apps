@@ -1,6 +1,6 @@
 # Reviewer Engagement Spec — Model B (accept-now) + reminders, quota, token TTL
 
-**Status:** design, ready for Codex sanity pass (S275). Supersedes the interpretation snapshot in `REVIEWER_ENGAGEMENT_PLAN_INTERPRETATION.md`.
+**Status:** design — **Codex sanity pass complete (S275, commit `18933df3`):** all 7 verified-citations confirmed; P1/P2 findings folded in (phase reorder so token cap ships with Release; quota count-after-write + If-Match concurrency; `materials_sent` guard; reminder-marker clear on Re-invite; expired-link copy/UI). Schema dependency provisioned (§4). Design-level vet only — no implementation code yet; each phase still gets a Codex review when built. Supersedes the interpretation snapshot in `REVIEWER_ENGAGEMENT_PLAN_INTERPRETATION.md`.
 
 **Citation convention:** current-behavior claims carry `[verified <file>::<symbol>]` (read this session). Planned work is `[BUILD]`. `[SCHEMA]` marks a field backed by a custom Dataverse column — **all of which are now provisioned in prod (see §4, 2026-06-21)**; the tag is a type-marker, not a "still to create" flag. Settled design calls are `[DECISION]`.
 
