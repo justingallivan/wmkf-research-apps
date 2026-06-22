@@ -54,6 +54,7 @@ import { ensureHonorariumOnboarding } from '../../../../../lib/bill/honorarium-o
 import { captureSelfReportedReviewerOrcid } from '../../../../../lib/services/capture-self-reported-orcid';
 import { normalizeOrcid } from '../../../../../lib/utils/orcid-normalize';
 import NotificationService from '../../../../../lib/services/notification-service';
+import { maybeNotifyQuotaReached } from '../../../../../lib/services/reviewer-quota';
 
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
 
@@ -538,6 +539,24 @@ export default async function handler(req, res) {
     // and repeat accepts (idempotent); independent of honorarium opt-out. Sourced
     // from the typed delta OR the persisted engagement value (confirm-without-edit).
     await captureReviewerSelfReportedOrcid({ reviewer, contactId: honContactId, rawOrcid: acceptOrcidRaw });
+
+    // ── Quota → notify PD (NON-FATAL; reviewer-engagement Phase 4 §3.C) ──────
+    // Only a FRESH accept changes the accepted count, so a repeat accept can't cross the
+    // threshold. Runs AFTER the accept PATCH committed above (count-after-write, off-by-one
+    // safe). The notify-once gate is a conditional null→set of wmkf_quotanotifiedat inside
+    // the service. Never converts a committed accept into a 500.
+    if (!isAcceptRepeat) {
+      try {
+        await bypassDynamicsRestrictions('external-quota-notify', () =>
+          maybeNotifyQuotaReached({
+            requestId: request?.akoya_requestid,
+            actingUserSystemId: null,
+          }),
+        );
+      } catch (quotaErr) {
+        console.warn('[external respond] quota notify failed (non-fatal):', quotaErr?.message || quotaErr);
+      }
+    }
 
     return res.status(200).json({
       ok: true,

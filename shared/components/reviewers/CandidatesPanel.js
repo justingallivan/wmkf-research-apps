@@ -37,10 +37,24 @@ function StatusChip({ c }) {
     declined: 'bg-red-100 text-red-700',
     accepted: 'bg-green-100 text-green-700',
     invited: 'bg-amber-100 text-amber-800',
+    closed: 'bg-gray-100 text-gray-500',
     none: 'bg-gray-100 text-gray-600',
   };
-  const label = c.declined ? 'Declined' : c.accepted ? 'Accepted' : c.invited ? 'Invited — awaiting response' : 'Not invited';
-  const tone = c.declined ? tones.declined : c.accepted ? tones.accepted : c.invited ? tones.invited : tones.none;
+  // Reviewer-engagement Phase 4: a set responseType (withdrawn_sufficient / no_response /
+  // held) is a resolved state — don't keep showing the row as "awaiting response".
+  const withdrawn = c.responseType === 'withdrawn_sufficient';
+  const noResponse = c.responseType === 'no_response';
+  const label = c.declined ? 'Declined'
+    : c.accepted ? 'Accepted'
+    : withdrawn ? 'Released — no longer needed'
+    : noResponse ? 'No response'
+    : c.invited ? 'Invited — awaiting response'
+    : 'Not invited';
+  const tone = c.declined ? tones.declined
+    : c.accepted ? tones.accepted
+    : (withdrawn || noResponse) ? tones.closed
+    : c.invited ? tones.invited
+    : tones.none;
   return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tone}`}>{label}</span>;
 }
 
@@ -58,6 +72,7 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
   const [modal, setModal] = useState(null); // { candidates, allowResend } | null
   const [editing, setEditing] = useState(null); // candidate row being edited | null
   const [removingId, setRemovingId] = useState(null);
+  const [withdrawing, setWithdrawing] = useState(false);
 
   // Remove a candidate from THIS request. Same server-authoritative DELETE the
   // Invite/Track rows use (my-candidates → soft-delete wmkf_selected=false + revoke
@@ -100,6 +115,36 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
   const selectedRows = candidates.filter((c) => selected.has(c.suggestionId));
   const selectedNotInvited = selectedRows.filter((c) => !c.invited && !c.accepted);
   const selectedInvited = selectedRows.filter((c) => c.invited && !c.accepted);
+  // Still-pending = invited, no response yet (not accepted/declined, and no resolved
+  // responseType — excludes already-withdrawn/no_response). The only rows the PD may
+  // "no longer needed"-release (reviewer-engagement Phase 4 §3.C). Server re-guards this.
+  const selectedPending = selectedRows.filter((c) => c.invited && !c.accepted && !c.declined && !c.responseType);
+
+  const handleWithdraw = async () => {
+    if (selectedPending.length === 0 || withdrawing) return;
+    const n = selectedPending.length;
+    const ok = window.confirm(
+      `Release ${n} pending reviewer${n === 1 ? '' : 's'} as "no longer needed"? `
+      + 'Each receives a polite thank-you and their invitation is closed — they can no longer respond.',
+    );
+    if (!ok) return;
+    setWithdrawing(true);
+    try {
+      const res = await fetch('/api/review-manager/withdraw-sufficient', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, suggestionIds: selectedPending.map((c) => c.suggestionId) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
+      setSelected(new Set());
+      if (onRefresh) onRefresh();
+    } catch (e) {
+      window.alert(`Could not release reviewers: ${e.message}`);
+    } finally {
+      setWithdrawing(false);
+    }
+  };
 
   const openInvite = (rows, allowResend) => {
     setModal({
@@ -269,6 +314,17 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
                 className="text-sm text-gray-600 underline"
               >
                 Re-invite {selectedInvited.length} already-invited
+              </button>
+            )}
+            {selectedPending.length > 0 && (
+              <button
+                type="button"
+                onClick={handleWithdraw}
+                disabled={withdrawing}
+                className="text-sm text-gray-600 underline disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Send a polite 'no longer needed' note and close these pending invitations"
+              >
+                {withdrawing ? 'Releasing…' : `Release ${selectedPending.length} as no longer needed`}
               </button>
             )}
             <span className="text-xs text-gray-400">{selectable.length} invitable · {candidates.length - selectable.length} accepted</span>
