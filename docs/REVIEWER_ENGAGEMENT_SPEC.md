@@ -56,6 +56,7 @@ Each reminder is **off by default** with a configurable "days before."
 - Target: `accepted && materials-sent && not-submitted` — never an accepted-pre-materials reviewer who hasn't received the proposal. `[DECISION #11]`
 - Deadline = the fixed review-due date − leadDays.
 - This automates today's manual `followup` template `[verified §2.4]`; do not also keep a manual review-due reminder.
+- **Implemented (Phase 3):** fire-once via the existing `wmkf_remindersentat`. **Known residual (Codex P3, deferred):** the cron claims that marker BEFORE send (If-Match) but the manual followup stamps it AFTER send, so a manual followup in the same daily window (or one whose post-send stamp fails) can leave a row cron-eligible → one extra nudge. Accepted low-risk; a future tightening would reorder the manual followup to claim-first.
 
 ### 3.C  Quota → notify PD → selective decline `[BUILD]`
 **Not automatic.** Reaching the desired count notifies the PD, who decides who (if anyone) to decline — so a wanted-but-slow senior reviewer is never auto-shut-out.

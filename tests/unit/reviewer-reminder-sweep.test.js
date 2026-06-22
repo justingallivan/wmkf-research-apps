@@ -92,11 +92,48 @@ describe('sweepRespondReminders', () => {
     );
     expect(mintAndStore).toHaveBeenCalledTimes(1);
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    // Claim-before-send ordering: the marker write must precede mint + send, so a crash
+    // mid-op can never send without first claiming (Codex finding #4).
+    expect(updateRecord.mock.invocationCallOrder[0]).toBeLessThan(mintAndStore.mock.invocationCallOrder[0]);
+    expect(mintAndStore.mock.invocationCallOrder[0]).toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
     // Sent from the PD; respond reminder is the "accept or decline" subject.
     const email = createAndSendEmail.mock.calls[0][0];
     expect(email.from).toBe('pd@keck.org');
     expect(email.to).toBe('rev@example.org');
     expect(email.subject).toMatch(/invitation/i);
+  });
+
+  test('missing _etag → fail closed (claimFailed, no claim write, no send)', async () => {
+    const { _etag, ...noEtag } = respondCandidate();
+    queryAllRecords.mockResolvedValue({ records: [noEtag] });
+    installReads();
+    const r = await sweepRespondReminders();
+    expect(r.claimFailed).toBe(1);
+    expect(r.sent).toBe(0);
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('maxBatch bounds CLAIMS even when sends fail (no mass suppression)', async () => {
+    const rows = Array.from({ length: 5 }, (_, i) => respondCandidate({ wmkf_appreviewersuggestionid: `id-${i}`, _etag: `W/"${i}"` }));
+    queryAllRecords.mockResolvedValue({ records: rows });
+    installReads();
+    createAndSendEmail.mockRejectedValue(new Error('SMTP down')); // every send fails
+    const r = await sweepRespondReminders({ maxBatch: 2 });
+    // Only 2 rows may be claimed despite all sends failing — the rest are deferred.
+    expect(updateRecord).toHaveBeenCalledTimes(2);
+    expect(r.sendFailed).toBe(2);
+    expect(r.sent).toBe(0);
+    expect(r.skipped).toBe(3);
+  });
+
+  test('missing reviewer email → skipped, no claim or send', async () => {
+    queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
+    installReads({ reviewerEmail: null });
+    const r = await sweepRespondReminders();
+    expect(r.sent).toBe(0);
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
   test('disabled per request → skipped, no claim or send', async () => {
