@@ -111,7 +111,7 @@ On `wmkf_appreviewersuggestion`:
 - **Phase 3 — Reminders:** the two-reminder daily cron + the `wmkf_respondremindersentat` marker (with Re-invite clearing it, §3.B).
 - **Phase 4 — Quota:** count-after-write + conditional null→set notify + the PD selective-decline Workbench action (writes `withdrawn_sufficient`).
 
-Independent of all of the above: the invitation copy still needs the **Model-B fix** (the shipped copy says "no commitment today, COI/AI + honorarium come later" — wrong; should say "you confirm COI/AI + honorarium details when you accept; the proposal follows later"). Small, do anytime.
+**Model-B invitation copy — DONE (S275).** The default invitation template (`shared/components/reviewers/email-template-store.js` `DEFAULT_TEMPLATES.invitation`) now says the COI/AI acknowledgements + honorarium are confirmed *when you accept*, with the full proposal following on release — no longer the Model-A "no commitment today, all comes later." (The dormant `hold` template keeps its own copy by design; it's the agree-in-principle flow and is not used in Model B. A PD who saved a customized invitation template keeps their own wording — only the default changed.)
 
 ---
 

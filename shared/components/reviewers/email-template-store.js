@@ -34,13 +34,13 @@ export const DEFAULT_TEMPLATES = {
     subject: 'Invitation to review for the W. M. Keck Foundation — {{proposalTitle}}',
     body: `{{greeting}},
 
-The W. M. Keck Foundation is assembling a review panel and would value your expertise. We're writing to ask whether you'd be willing to review the proposal below — the full materials will follow shortly. For now we simply need to know whether you can take it on, or whether we should look elsewhere.
+The W. M. Keck Foundation is assembling a review panel and would value your expertise. We're writing to ask whether you'd be willing to review the proposal below. The summary here is enough to decide — and to flag any conflict of interest — before the full materials go out.
 
 {{proposalDetails}}
 
 {{proposalAbstract}}
 
-Please use your secure personal link to let us know you can review it — or to pass:
+Please use your secure personal link to accept or decline:
 {{externalLink}}
 
 Review timeline:
@@ -48,7 +48,7 @@ Review timeline:
 - We expect to send the full proposal and review form on {{proposalDelivery}}.
 - Completed reviews would be due by {{reviewDue}}.
 
-The details above should let you flag any conflict of interest now, before the materials go out. There's no further commitment today — the conflict-of-interest and AI-use acknowledgements and any honorarium details all come later, once the proposal is released. We would be grateful for your help.
+When you accept, you'll confirm a few details — the conflict-of-interest and AI-use acknowledgements, and how you'd like any honorarium handled. The full proposal and review form then follow once it's released for review. If the summary already surfaces a conflict, a quick decline is just as helpful. We would be grateful for your help.
 
 {{signature}}`,
   },
