@@ -347,10 +347,15 @@ describe('send-emails — materials strip gate (recipientMayReceiveAttachments, 
     expect(filenamesSent()).toContain('proposal.pdf');
   });
 
-  test('materials send to a NON-accepted reviewer is STRIPPED (no materials leak)', async () => {
+  test('materials send to a NON-accepted reviewer is SKIPPED not_accepted (Release accepted-only gate, §3.A)', async () => {
+    // Reviewer-engagement Phase 2: the materials EMAIL itself is now refused for a
+    // non-accepted reviewer (not merely stripped of attachments) — so they can never
+    // receive materials nor get upgraded to the long-lived materials token.
     SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_accepted: false }) };
-    await run({ drafts: [draft()], templateType: 'materials' });
-    expect(attachmentsSent()).toEqual([]); // materials existed but were stripped
+    const res = await run({ drafts: [draft()], templateType: 'materials' });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(resultOf(res).skipped[0].reason).toBe('not_accepted');
   });
 });
 

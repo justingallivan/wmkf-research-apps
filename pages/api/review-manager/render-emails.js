@@ -42,10 +42,10 @@ import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-sug
 import { fetchCoPIs } from '../../../lib/services/proposal-participants';
 import { mintAndStore } from '../../../lib/external/token-lifecycle';
 import { emailConfidence } from '../../../lib/utils/reviewer-invite';
+import { computeReviewerTokenExpiry } from '../../../lib/external/reviewer-token-ttl';
 
 const limiter = nextRateLimiter({ max: 30 });
 
-const EXTERNAL_LINK_TTL_DAYS = 90;
 const EXTERNAL_LINK_PLACEHOLDER = '{{externalLink}}';
 
 export const config = {
@@ -99,7 +99,7 @@ export default async function handler(req, res) {
           select: 'wmkf_name,wmkf_emailaddress,wmkf_organizationname,wmkf_primaryaffiliation,wmkf_emailsource,wmkf_identitystatus',
         }).catch(() => null) : null,
         requestId ? DynamicsService.getRecord('akoya_requests', requestId, {
-          select: 'akoya_requestid,akoya_requestnum,akoya_title,wmkf_abstract,wmkf_organizationname,_akoya_applicantid_value,_wmkf_projectleader_value,wmkf_meetingdate',
+          select: 'akoya_requestid,akoya_requestnum,akoya_title,wmkf_abstract,wmkf_organizationname,_akoya_applicantid_value,_wmkf_projectleader_value,wmkf_meetingdate,wmkf_reviewduedate',
         }).catch(() => null) : null,
       ]);
       rows.push({ suggestionId, sug, person, request });
@@ -148,12 +148,17 @@ export default async function handler(req, res) {
       (template.subject || '').includes(EXTERNAL_LINK_PLACEHOLDER);
     const externalLinkBySuggestion = {};
     if (needsExternalLink) {
-      const expires = new Date(Date.now() + EXTERNAL_LINK_TTL_DAYS * 24 * 60 * 60 * 1000);
-      for (const { suggestionId, sug } of rows) {
+      for (const { suggestionId, sug, request } of rows) {
         const requestId = sug?._wmkf_request_value;
         if (!requestId) continue;
+        // §3.D: expiry is per-recipient — an accepted reviewer gets the long review
+        // window; an invitee/non-responder gets the early cap at review-due + grace.
+        const expiresAt = computeReviewerTokenExpiry({
+          accepted: sug?.wmkf_accepted === true,
+          reviewDueDate: request?.wmkf_reviewduedate || null,
+        });
         try {
-          const { url } = await mintAndStore({ suggestionId, requestId, expiresAt: expires, actingUserSystemId });
+          const { url } = await mintAndStore({ suggestionId, requestId, expiresAt, actingUserSystemId });
           externalLinkBySuggestion[suggestionId] = url;
         } catch (e) {
           console.error(`[render-emails] mint failed for ${suggestionId}: ${e.message}`);

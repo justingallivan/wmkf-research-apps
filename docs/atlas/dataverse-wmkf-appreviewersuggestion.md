@@ -153,8 +153,8 @@ Postgres `reviewer_suggestions` (337 rows) is parity at ~97.6% per S136 probe (`
 
 ## Token lifecycle (live, per `project_external_reviewer_file_access.md`)
 
-- 90-day mint ceiling; 7-day post-submission modify window (`extendForPostSubmissionWindow` in `lib/external/token-lifecycle.js`).
-- Token expiry is **event-driven**, not absolute — extension on submission, revocation on regenerate.
+- **Mint expiry is per-recipient (reviewer-engagement Phase 2, S275):** `render-emails` sets it via `computeReviewerTokenExpiry` (`lib/external/reviewer-token-ttl.js`), keyed on ACCEPTED status — an accepted reviewer gets review-due + 90d (long review window); an invitee/non-responder gets the early cap at review-due + 2d; with no sane future `wmkf_reviewduedate` it falls back to now + 90d (prior flat behavior). `regenerate-token` / `ensureToken` still use a flat 90-day default. 7-day post-submission modify window via `extendForPostSubmissionWindow`.
+- Token expiry is **event-driven**, not absolute — capped vs long at mint by accepted status, extension on submission, revocation on regenerate.
 - `wmkf_reviewbloburl` retains historical Vercel Blob URLs for legacy rows but the active write target is `wmkf_reviewsharepointfolder` (Vercel Blob retired 2026-05-03 via commit `2277d23`).
 
 ## Migration disposition (post-W3-W6 cutover 2026-05-12)
