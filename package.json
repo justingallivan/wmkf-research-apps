@@ -27,6 +27,7 @@
     "test:grantee-deliverables": "jest tests/unit/grantee-markdown.test.js tests/unit/grantee-document-html.test.js tests/unit/grantee-document-assembly.test.js tests/unit/grantee-cycle-export-route.test.js tests/unit/grantee-website-html-route.test.js",
     "e2e:pr4": "node scripts/pr4-e2e.js",
     "test:e2e": "playwright test",
+    "test:e2e:reviewer-engagement": "playwright test tests/e2e/program-director-invite.spec.js --project=chromium",
     "test:e2e:ui": "playwright test --ui",
     "test:ci": "jest --ci --coverage --watchAll=false",
     "rehearse:reviewer-invite:browser": "node scripts/rehearse-pd-invite-browser.mjs",
