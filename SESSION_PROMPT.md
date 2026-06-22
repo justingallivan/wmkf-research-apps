@@ -38,9 +38,9 @@ Run the kept-open rehearsal and do one more visual pass through:
 - Confirm the invitation modal shows the same response/review due values as Campaign settings
 - Confirm only `Proposal delivered on (email only)` behaves as per-invitation copy
 
-### 2. Decide whether the legacy Re-invite affordance needs additional copy
+### 2. ~~Decide whether the legacy Re-invite affordance needs additional copy~~ — RESOLVED (S277)
 
-The pending invitee still shows `Re-invite` because that is the existing resend path for already-invited reviewers. If this remains confusing in user testing, consider a small label/help-text change around pending invitee actions rather than altering the release flow.
+Decision (Justin, S277): **remove the manual `Re-invite already-invited` button** from `CandidatesPanel.js`. The automated respond-by reminder (`/api/cron/reviewer-reminders`, Phase 3 LIVE) is the nudge for invited non-responders, so the overlapping manual control is gone. The server-side `allowResend` re-mint + `wmkf_respondremindersentat` marker-clear contract is retained for programmatic re-mint paths. Reconciled in `REVIEWER_ENGAGEMENT_SPEC.md` §3.E, the rehearsal runbook, and the workbench-lifecycle wiki topic.
 
 ### 3. Promote the rehearsal into routine verification
 

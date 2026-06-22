@@ -1,5 +1,8 @@
 # Reviewer Engagement Plan Interpretation
 
+> **⚠️ SUPERSEDED (S277) — historical pre-implementation snapshot. Do not treat node labels as current state.**
+> The authoritative contract is `docs/REVIEWER_ENGAGEMENT_SPEC.md` (which explicitly supersedes this file). All four phases are now LIVE (S275), so the flowchart's `[TO-BUILD]` labels are stale. In particular, there is **no manual "Re-invite" PD action** — the `Re-invite [LIVE TODAY]` node was removed S277; invited non-responders are nudged by the automated respond-by reminder cron. Kept only as a record of the original interpretation.
+
 ## Mermaid Flowchart
 
 ```mermaid

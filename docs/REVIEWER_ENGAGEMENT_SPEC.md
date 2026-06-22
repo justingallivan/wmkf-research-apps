@@ -1,8 +1,8 @@
 # Reviewer Engagement Spec — Model B (accept-now) + reminders, quota, token TTL
 
-**Status:** design — **Codex sanity pass complete (S275, commit `18933df3`):** all 7 verified-citations confirmed; P1/P2 findings folded in (phase reorder so token cap ships with Release; quota count-after-write + If-Match concurrency; `materials_sent` guard; reminder-marker clear on Re-invite; expired-link copy/UI). Schema dependency provisioned (§4). Design-level vet only — no implementation code yet; each phase still gets a Codex review when built. Supersedes the interpretation snapshot in `REVIEWER_ENGAGEMENT_PLAN_INTERPRETATION.md`.
+**Status:** IMPLEMENTED — **all four phases LIVE (S275).** [VERIFIED via source] Phase 1 `pages/api/review-manager/campaign-config.js`; Phase 2 `lib/external/reviewer-token-ttl.js` (via `render-emails.js`) + `materials_not_sent` guard in `lib/services/review-upload.js`; Phase 3 `pages/api/cron/reviewer-reminders.js` + `lib/services/reviewer-reminder-sweep.js`; Phase 4 `lib/services/reviewer-quota.js` (`maybeNotifyQuotaReached` in `respond.js`) + `pages/api/review-manager/withdraw-sufficient.js`. Schema provisioned in prod (§4, 2026-06-21). The original Codex sanity pass (S275, commit `18933df3`) folded its P1/P2 findings in before build (phase reorder so token cap ships with Release; quota count-after-write + If-Match concurrency; `materials_sent` guard; reminder-marker clear on Re-invite; expired-link copy/UI). S277: the manual "Re-invite already-invited" UI affordance was removed (§3.E). Supersedes the interpretation snapshot in `REVIEWER_ENGAGEMENT_PLAN_INTERPRETATION.md`.
 
-**Citation convention:** current-behavior claims carry `[verified <file>::<symbol>]` (read this session). Planned work is `[BUILD]`. `[SCHEMA]` marks a field backed by a custom Dataverse column — **all of which are now provisioned in prod (see §4, 2026-06-21)**; the tag is a type-marker, not a "still to create" flag. Settled design calls are `[DECISION]`.
+**Citation convention:** current-behavior claims carry `[verified <file>::<symbol>]` (read this session). `[LIVE S275]` marks the four additions that were originally tagged `[BUILD]` (planned) and **shipped in the S275 build** — historical "this was the new work" markers, not pending. `[SCHEMA]` marks a field backed by a custom Dataverse column — **all of which are now provisioned in prod (see §4, 2026-06-21)**; the tag is a type-marker, not a "still to create" flag. Settled design calls are `[DECISION]`.
 
 ---
 
@@ -34,14 +34,14 @@ A reviewer is invited, **accepts (or declines) the offer with full onboarding at
 
 ## 3. The build — four additions on top of the spine
 
-All four ride on existing mechanisms; none requires a parallel route or a new token primitive.
+**All four shipped (S275) — `[LIVE S275]` below; the prose under each still reads as the build-time plan and remains accurate to what was built.** All four ride on existing mechanisms; none requires a parallel route or a new token primitive.
 
-### 3.A  Release to reviewers `[BUILD]`
+### 3.A  Release to reviewers `[LIVE S275]`
 A PD action that **emails the proposal/materials to the ACCEPTED reviewers**. It is a clean wrapper over the existing manual Materials send — NOT a readiness/hold mechanism.
 - **Target:** `wmkf_accepted = true` rows only, enforced **server-side** `[DECISION #10]` (reuse the materials-send recipient gate).
 - **Token effect:** the materials email re-mints a fresh, **long-lived** token (§3.D). This is the link accepted reviewers use to review; it supersedes their invite link `[verified §2.6 latest-link-wins]`.
 
-### 3.B  Two reminders (daily cron in `pages/api/cron/`) `[BUILD]` `[DECISION #14]`
+### 3.B  Two reminders (daily cron in `pages/api/cron/`) `[LIVE S275]` `[DECISION #14]`
 Each reminder is **off by default** with a configurable "days before."
 
 **Respond-by reminder** — nudge invited non-responders.
@@ -58,14 +58,14 @@ Each reminder is **off by default** with a configurable "days before."
 - This automates today's manual `followup` template `[verified §2.4]`; do not also keep a manual review-due reminder.
 - **Implemented (Phase 3):** fire-once via the existing `wmkf_remindersentat`. **Known residual (Codex P3, deferred):** the cron claims that marker BEFORE send (If-Match) but the manual followup stamps it AFTER send, so a manual followup in the same daily window (or one whose post-send stamp fails) can leave a row cron-eligible → one extra nudge. Accepted low-risk; a future tightening would reorder the manual followup to claim-first.
 
-### 3.C  Quota → notify PD → selective decline `[BUILD]`
+### 3.C  Quota → notify PD → selective decline `[LIVE S275]`
 **Not automatic.** Reaching the desired count notifies the PD, who decides who (if anyone) to decline — so a wanted-but-slow senior reviewer is never auto-shut-out.
 - Count = `wmkf_accepted = true` rows for the request (any downstream stage), queried **AFTER** the accept PATCH commits (`applyStage2aResponse` runs first in `respond.js`; a pre-write count is off by one) `[DECISION #1, Codex P2]`. Reuse the existing accepted-reader filter shape (`lib/dataverse/adapters/reviewer-suggestion.js::findAcceptedByPD` uses `wmkf_accepted eq true`).
 - **Concurrency mechanism (named, Codex P1):** the notify must be a **conditional null→set** of `wmkf_quotanotifiedat` `[SCHEMA]` via an `If-Match`/ETag update (`DynamicsService.updateRecord` supports `ifMatch`), so only the first writer past the threshold succeeds and notifies; concurrent accepts that lose the race do not double-notify. Notify the PD on that single false→set transition. (Without the conditional write, concurrent accepts can both notify, and a stale count read can miss the threshold until a later accept — so the conditional set is required, not optional.)
 - PD action (Workbench): select pending invitees and send the polite "no longer needed" decline → sets `withdrawn_sufficient` + `wmkf_withdrawnsufficientat` (the missing writer from §2.9) + sends the decline email + clears those reviewers' `wmkf_respondremindersentat` so no reminder fires.
 - `withdrawn_sufficient` is settable **only on still-pending rows** (`invited && !accepted && !declined`), server-guarded; it never touches an accepted/honorarium row. `[DECISION #8]`
 
-### 3.D  Token TTL — non-responders expire early, accepted keep ~90 days `[BUILD]`
+### 3.D  Token TTL — non-responders expire early, accepted keep ~90 days `[LIVE S275]`
 No JWT "extension" (a signed JWT can't be extended in place; the raw token isn't stored). We use the existing latest-link-wins re-mint:
 - **Invite send** (and respond-by reminder re-mint): mint with **expiry = review-due + grace** (default grace 1–2 days). This is the non-responder cap — their link dies at review-due. `[DECISION #5]`
 - **Release/materials send**: mints a fresh, **long-lived** token (expiry ≈ review-due + ~90 days) for the review window + late returns. Only ACCEPTED reviewers ever receive this, so non-responders never get the long token. `[DECISION #1 late-returns-OK]`
@@ -74,12 +74,13 @@ No JWT "extension" (a signed JWT can't be extended in place; the raw token isn't
 - **"Accepted but never released" window (Codex P1):** an accepted-pre-materials reviewer holds only the **invite** token (review-due cap). If the PD never sends materials, that link dies at review-due with no self-serve path. Mitigation: (a) the Release action MUST ship with the cap (see §5 reordering) so the long-lived materials link normally exists before the cap bites; (b) the existing **regenerate-token** staff endpoint (`lib/external/token-lifecycle.js`) is the recovery path for any stranded reviewer.
 - **Cap is "going forward" only (Codex P2):** `mintToken` fixes `exp` at mint time; changing `reviewDueDate` in the config later does NOT re-cap already-minted tokens. Acceptable — recovery is a re-invite / materials send / regenerate-token, all of which re-mint.
 
-### 3.E  Per-request campaign config + panel change `[BUILD]` `[SCHEMA]`
+### 3.E  Per-request campaign config + panel change `[LIVE S275]` `[SCHEMA]`
 Persist, on the request, what the cron and quota logic need (today these are throwaway `[verified §2.11]`):
 - `respondOffsetDays` (default 7), `reviewDueDate` (fixed), `respondReminderEnabled` + `respondReminderLeadDays`, `reviewDueReminderEnabled` + `reviewDueReminderLeadDays`, `desiredCount`, `quotaNotifiedAt`.
 - Written on first invite-batch send; **editable later** from the Reviewers tab; read live by the cron. Edits apply going forward, not retroactively. `[DECISION #7]`
 - **Panel change:** the respond-by input becomes **"days to respond" (offset)**, not a fixed date `[DECISION — fixes the multi-wave bug where a fixed day-0 date shortchanges later waves]`; review-due stays a fixed date; proposal-delivery stays informational email text only (no reminder — `[DECISION]` dropped).
 - Multi-wave / Re-invite: a new wave is a normal first-time invite (its own `emailSentAt`); a Re-invite re-mints (review-due cap), re-stamps `emailSentAt`, and **clears `wmkf_respondremindersentat`**; request-level config is untouched. `[DECISION #6]`
+- **No manual "Re-invite already-invited" UI affordance (`[DECISION]` Justin, S277).** The automated respond-by reminder (§3.B, Phase 3 LIVE) is the nudge for invited non-responders, so the Candidates-panel button was removed (`shared/components/reviewers/CandidatesPanel.js`). The server-side `allowResend` re-mint + marker-clear contract (lines above, §2.5, §4) is **retained** for programmatic re-mint paths (e.g. `regenerate-token`); a new wave still goes out as a normal first-time invite via "Send invitation" on not-invited rows.
 
 ---
 
@@ -103,6 +104,8 @@ On `wmkf_appreviewersuggestion`:
 ---
 
 ## 5. Sequencing
+
+> **All four phases shipped (S275)** — this section is the historical build order, now complete. [VERIFIED via source — see the §Status header citations.]
 
 > **Reordered (Codex P1):** the token cap must NOT ship before the Release action, or an accepted reviewer's invite link can die at review-due before any built mechanism exists to send them the long-lived materials link.
 

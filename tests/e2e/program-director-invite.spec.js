@@ -419,24 +419,10 @@ test.describe('Program Director reviewer invitation flow', () => {
     });
   });
 
-  test('re-invite path sends with allowResend', async ({ page, context }, testInfo) => {
-    const baseURL = testInfo.project.use.baseURL || 'http://localhost:3100';
-    await installStaffSession(context, baseURL);
-    const invited = makeCandidate({ invited: true });
-    const { sentBodies } = await installInviteMocks(context, baseURL, { candidates: [invited] });
-
-    await page.goto(workbenchUrl(baseURL));
-    await page.getByLabel('Select Dr. Capture Candidate').check();
-    await page.getByRole('button', { name: 'Re-invite 1 already-invited' }).click();
-
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
-    await page.getByRole('button', { name: 'Send 1 invitation' }).click();
-
-    await expect(page.getByText(/captured 1 invitation email for rehearsal/i)).toBeVisible();
-    expect(sentBodies[0]).toMatchObject({ allowResend: true });
-  });
+  // Note: there is no manual "Re-invite already-invited" UI affordance — the
+  // automated respond-by reminder (cron reviewer-reminders) nudges pending
+  // invitees. The server-side `allowResend` re-mint contract is still covered by
+  // tests/unit/reviewer-invite.test.js and tests/integration/send-emails-route.test.js.
 
   test('edits reviewer-engagement campaign settings without Dataverse', async ({ page, context }, testInfo) => {
     const baseURL = testInfo.project.use.baseURL || 'http://localhost:3100';

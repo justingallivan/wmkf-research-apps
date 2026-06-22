@@ -109,7 +109,7 @@ Suggested click paths while the browser stays open:
 3. `Invite`: `Release to reviewers` -> preview -> send.
 4. `Candidates`: select `Dr. Pending Invitee (already invited)` -> `Release as no longer needed`.
 
-`Re-invite` is still visible for the pending invitee because that is the existing resend path for already-invited reviewers. For the reviewer-engagement release UX, use `Release as no longer needed`.
+There is no manual `Re-invite already-invited` button: invited non-responders are nudged automatically by the respond-by reminder cron (`/api/cron/reviewer-reminders`, Phase 3). For a pending invitee you want to drop, use `Release as no longer needed`.
 
 Stop the rehearsal with `Ctrl-C` in the terminal that launched it.
 

@@ -114,7 +114,6 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
 
   const selectedRows = candidates.filter((c) => selected.has(c.suggestionId));
   const selectedNotInvited = selectedRows.filter((c) => !c.invited && !c.accepted);
-  const selectedInvited = selectedRows.filter((c) => c.invited && !c.accepted);
   // Still-pending = invited, no response yet (not accepted/declined, and no resolved
   // responseType — excludes already-withdrawn/no_response). The only rows the PD may
   // "no longer needed"-release (reviewer-engagement Phase 4 §3.C). Server re-guards this.
@@ -307,15 +306,6 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
             >
               Send invitation{selectedNotInvited.length > 0 ? ` (${selectedNotInvited.length})` : ''}
             </button>
-            {selectedInvited.length > 0 && (
-              <button
-                type="button"
-                onClick={() => openInvite(selectedInvited, true)}
-                className="text-sm text-gray-600 underline"
-              >
-                Re-invite {selectedInvited.length} already-invited
-              </button>
-            )}
             {selectedPending.length > 0 && (
               <button
                 type="button"

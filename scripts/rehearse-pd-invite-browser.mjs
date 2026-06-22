@@ -464,7 +464,7 @@ try {
   console.log('  2. Campaign settings: edit Days to respond / Review due date -> Save.');
   console.log('  3. Invite tab: Release to reviewers -> Preview -> Send.');
   console.log('  4. Candidates: select Dr. Pending Invitee (already invited) -> Release as no longer needed.');
-  console.log('     The Re-invite button is the existing resend path; the new flow is Release as no longer needed.');
+  console.log('     Pending invitees are nudged automatically by the respond-by reminder cron; there is no manual re-invite button.');
   console.log('  5. Open the captured local reviewer link to inspect the reviewer-facing accept page.');
   console.log('\nPress Ctrl-C in this terminal when finished.');
   await new Promise(() => {});
