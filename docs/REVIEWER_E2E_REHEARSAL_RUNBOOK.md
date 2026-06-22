@@ -98,9 +98,16 @@ npm run rehearse:reviewer-invite:browser
 Expected:
 
 - A headed browser opens the real Workbench `Reviewers -> Candidates` UI.
-- The test candidate is route-mocked in the browser.
-- `render-emails`, `send-emails`, and external reviewer portal API routes are route-mocked in the browser.
-- Selecting the candidate, sending the invitation, and opening the local reviewer link creates no Dataverse records and sends no Dynamics email.
+- The test candidate, a pending invitee, and an accepted reviewer are route-mocked in the browser.
+- `campaign-config`, `withdraw-sufficient`, `render-emails`, `send-emails`, and external reviewer portal API routes are route-mocked in the browser.
+- Selecting the candidate, sending the invitation, editing campaign settings, releasing accepted reviewers, releasing a pending invitee as "no longer needed", and opening the local reviewer link create no Dataverse records and send no Dynamics email.
+
+Suggested click paths while the browser stays open:
+
+1. `Candidates`: select `Dr. Capture Candidate` -> `Send invitation` -> fill dates -> send.
+2. `Campaign settings`: edit `Days to respond` / `Review due date` -> save.
+3. `Invite`: `Release to reviewers` -> preview -> send.
+4. `Candidates`: select `Dr. Pending Invitee` -> `Release as no longer needed`.
 
 Stop the rehearsal with `Ctrl-C` in the terminal that launched it.
 

@@ -22,6 +22,8 @@ const { buildContext } = require('../tests/e2e/helpers/reviewer-portal');
 const REQUEST_ID = '00000000-0000-4000-8000-000000000001';
 const REQUEST_NUM = '1002788';
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
+const PENDING_SUGGESTION_ID = '22222222-2222-4222-8222-222222222222';
+const ACCEPTED_SUGGESTION_ID = '33333333-3333-4333-8333-333333333333';
 const REVIEW_TOKEN = 'pd-rehearsal-reviewer-token';
 const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET || 'pd-rehearsal-nextauth-secret-32-chars';
 const TEST_REVIEWER_EMAIL = process.env.PD_INVITE_REHEARSAL_EMAIL || 'berets.eyeful-0f@icloud.com';
@@ -68,13 +70,50 @@ const candidate = {
   website: 'https://example.edu/faculty/capture-candidate',
 };
 
+const pendingCandidate = {
+  suggestionId: PENDING_SUGGESTION_ID,
+  name: 'Dr. Pending Invitee',
+  affiliation: 'Example Institute',
+  email: 'pending.reviewer@example.edu',
+  invited: true,
+  accepted: false,
+  declined: false,
+  emailSentAt: '2026-07-01T00:00:00Z',
+  reasoning: 'Already invited, still awaiting a response. Useful for testing the no-longer-needed release.',
+  keywords: 'bioengineering; imaging',
+  applicantRecommended: false,
+  manualAdded: false,
+  googleScholarUrl: 'https://scholar.google.com/',
+  website: 'https://example.edu/faculty/pending-invitee',
+};
+
+const acceptedReviewer = {
+  suggestionId: ACCEPTED_SUGGESTION_ID,
+  name: 'Dr. Accepted Reviewer',
+  affiliation: 'Example University',
+  email: 'accepted.reviewer@example.edu',
+  reviewStatus: 'accepted',
+  tokenState: 'active',
+  tokenExpiresAt: '2026-08-01T00:00:00Z',
+  reminderCount: 0,
+  notes: '',
+};
+
 function sseResult(result) {
   return [
     'event: progress',
-    'data: {"current":1,"total":1,"message":"Captured invitation"}',
+    `data: ${JSON.stringify({ current: result.stats.sent, total: result.stats.total, message: 'Captured email' })}`,
     '',
     'event: result',
     `data: ${JSON.stringify(result)}`,
+    '',
+    'event: complete',
+    `data: ${JSON.stringify({
+      message: `Sent ${result.stats.sent} of ${result.stats.total} email(s)`,
+      sent: result.stats.sent,
+      failed: result.stats.failed,
+      skipped: result.stats.skipped,
+    })}`,
     '',
     '',
   ].join('\n');
@@ -108,7 +147,23 @@ async function waitForServer(url, child) {
 
 async function installMocks(context) {
   let reviewerContext = buildContext({ longBody: true });
+  let candidates = [candidate, pendingCandidate];
+  let reviewers = [acceptedReviewer];
+  let campaignConfig = {
+    respondOffsetDays: 7,
+    reviewDueDate: '2026-07-22',
+    respondReminderEnabled: true,
+    respondReminderLeadDays: 1,
+    reviewDueReminderEnabled: true,
+    reviewDueReminderLeadDays: 3,
+    desiredCount: 1,
+    quotaNotifiedAt: null,
+  };
   const reviewerUrl = `${BASE_URL}/external/review/${REVIEW_TOKEN}`;
+  const recipientFor = (suggestionId) => (
+    candidates.find((c) => c.suggestionId === suggestionId)
+    || reviewers.find((r) => r.suggestionId === suggestionId)
+  );
 
   await context.route('**/api/auth/status', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: false }) }));
@@ -164,26 +219,82 @@ async function installMocks(context) {
       contentType: 'application/json',
       body: JSON.stringify({
         success: true,
-        proposals: [{ proposalId: REQUEST_ID, proposalTitle: 'A Study of Test-Driven Reviewer Onboarding', reviewers: [] }],
+        proposals: [{
+          proposalId: REQUEST_ID,
+          proposalTitle: 'A Study of Test-Driven Reviewer Onboarding',
+          reviewDeadline: campaignConfig.reviewDueDate,
+          reviewers,
+        }],
       }),
     }));
   await context.route('**/api/reviewer-finder/my-candidates**', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ proposals: [{ proposalId: REQUEST_ID, candidates: [candidate] }] }),
+      body: JSON.stringify({ proposals: [{ proposalId: REQUEST_ID, candidates }] }),
     }));
-  await context.route('**/api/review-manager/render-emails', (route) =>
-    route.fulfill({
+  await context.route('**/api/review-manager/campaign-config**', async (route) => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ requestId: REQUEST_ID, config: campaignConfig }),
+      });
+    }
+    const body = route.request().postDataJSON();
+    campaignConfig = { ...campaignConfig, ...body.config };
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, requestId: REQUEST_ID, config: campaignConfig }),
+    });
+  });
+  await context.route('**/api/review-manager/withdraw-sufficient', (route) => {
+    const body = route.request().postDataJSON();
+    const ids = new Set(body.suggestionIds || []);
+    candidates = candidates.map((c) => (
+      ids.has(c.suggestionId) ? { ...c, responseType: 'withdrawn_sufficient' } : c
+    ));
+    return route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        drafts: [{
-          suggestionId: SUGGESTION_ID,
-          candidateName: candidate.name,
-          candidateEmail: candidate.email,
-          subject: 'Reviewer invitation for Request 1002788',
-          body: [
+        ok: true,
+        withdrawn: ids.size,
+        results: [...ids].map((suggestionId) => ({ suggestionId, status: 'withdrawn_no_pd' })),
+      }),
+    });
+  });
+  await context.route('**/api/review-manager/render-emails', (route) => {
+    const body = route.request().postDataJSON();
+    const drafts = (body.suggestionIds || []).map((suggestionId) => {
+      const recipient = recipientFor(suggestionId);
+      if (!recipient?.email) {
+        return {
+          suggestionId,
+          candidateName: recipient?.name || '(unnamed)',
+          candidateEmail: '',
+          skipped: 'no_email',
+          body: 'No email address is available.',
+        };
+      }
+      return {
+        suggestionId,
+        candidateName: recipient.name,
+        candidateEmail: recipient.email,
+        subject: body.templateType === 'materials'
+          ? 'Reviewer materials for Request 1002788'
+          : 'Reviewer invitation for Request 1002788',
+        body: body.templateType === 'materials'
+          ? [
+            'Dear Reviewer,',
+            '',
+            'The proposal materials are ready.',
+            reviewerUrl,
+            '',
+            'Review due: {{reviewDueDate}}',
+          ].join('\n')
+          : [
             'Dear Dr. Candidate,',
             '',
             'Please use your secure personal link:',
@@ -196,22 +307,42 @@ async function installMocks(context) {
             '',
             '{{signature}}',
           ].join('\n'),
-          emailConfidence: { level: 'high', reason: 'confirmed_identity' },
-        }],
-      }),
-    }));
+        emailConfidence: { level: 'high', reason: 'confirmed_identity' },
+      };
+    });
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ drafts }),
+    });
+  });
   await context.route('**/api/review-manager/send-emails', (route) => {
-    const result = {
-      sent: [{
-        suggestionId: SUGGESTION_ID,
-        candidateName: candidate.name,
-        candidateEmail: candidate.email,
+    const body = route.request().postDataJSON();
+    const sent = (body.drafts || []).map((draft) => {
+      const recipient = recipientFor(draft.suggestionId);
+      if (body.templateType === 'materials') {
+        reviewers = reviewers.map((r) => (
+          r.suggestionId === draft.suggestionId
+            ? { ...r, reviewStatus: 'materials_sent', materialsSentAt: '2026-07-08T00:00:00Z' }
+            : r
+        ));
+      } else if (body.templateType === 'invitation') {
+        candidates = candidates.map((c) => (
+          c.suggestionId === draft.suggestionId
+            ? { ...c, invited: true, emailSentAt: '2026-07-08T00:00:00Z' }
+            : c
+        ));
+      }
+      return {
+        suggestionId: draft.suggestionId,
+        candidateName: recipient?.name,
+        candidateEmail: recipient?.email,
         deliveryMode: 'capture',
-        emailId: `captured-${SUGGESTION_ID}`,
+        emailId: `captured-${draft.suggestionId}`,
         capturedEmail: {
-          subject: 'Reviewer invitation for Request 1002788',
+          subject: draft.subject,
           from: 'pd@wmkeck.org',
-          to: candidate.email,
+          to: recipient?.email,
           htmlBody: [
             '<main>',
             '<p>The W. M. Keck Foundation invites you to serve as a peer reviewer.</p>',
@@ -220,10 +351,13 @@ async function installMocks(context) {
             '</main>',
           ].join(''),
         },
-      }],
+      };
+    });
+    const result = {
+      sent,
       failed: [],
       skipped: [],
-      stats: { sent: 1, failed: 0, skipped: 0, total: 1 },
+      stats: { sent: sent.length, failed: 0, skipped: 0, total: sent.length },
     };
     return route.fulfill({ status: 200, contentType: 'text/event-stream', body: sseResult(result) });
   });
@@ -325,7 +459,12 @@ try {
   console.log('\nProgram Director invite rehearsal is open:');
   console.log(`  ${workbenchUrl}`);
   console.log('\nSafe mocks are active for Workbench invite APIs and the reviewer portal APIs.');
-  console.log('Try: select Dr. Capture Candidate -> Send invitation -> fill dates -> Send -> copy/open the local reviewer link.');
+  console.log('Try these sandboxed UI paths:');
+  console.log('  1. Candidates: select Dr. Capture Candidate -> Send invitation -> fill dates -> Send.');
+  console.log('  2. Campaign settings: edit Days to respond / Review due date -> Save.');
+  console.log('  3. Invite tab: Release to reviewers -> Preview -> Send.');
+  console.log('  4. Candidates: select Dr. Pending Invitee -> Release as no longer needed.');
+  console.log('  5. Open the captured local reviewer link to inspect the reviewer-facing accept page.');
   console.log('\nPress Ctrl-C in this terminal when finished.');
   await new Promise(() => {});
 } catch (error) {
