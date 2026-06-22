@@ -58,6 +58,7 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
   const [modal, setModal] = useState(null); // { candidates, allowResend } | null
   const [editing, setEditing] = useState(null); // candidate row being edited | null
   const [removingId, setRemovingId] = useState(null);
+  const [withdrawing, setWithdrawing] = useState(false);
 
   // Remove a candidate from THIS request. Same server-authoritative DELETE the
   // Invite/Track rows use (my-candidates → soft-delete wmkf_selected=false + revoke
@@ -100,6 +101,35 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
   const selectedRows = candidates.filter((c) => selected.has(c.suggestionId));
   const selectedNotInvited = selectedRows.filter((c) => !c.invited && !c.accepted);
   const selectedInvited = selectedRows.filter((c) => c.invited && !c.accepted);
+  // Still-pending = invited, not accepted, not declined — the only rows the PD may
+  // "no longer needed"-release (reviewer-engagement Phase 4 §3.C). Server re-guards this.
+  const selectedPending = selectedRows.filter((c) => c.invited && !c.accepted && !c.declined);
+
+  const handleWithdraw = async () => {
+    if (selectedPending.length === 0 || withdrawing) return;
+    const n = selectedPending.length;
+    const ok = window.confirm(
+      `Release ${n} pending reviewer${n === 1 ? '' : 's'} as "no longer needed"? `
+      + 'Each receives a polite thank-you and their invitation is closed — they can no longer respond.',
+    );
+    if (!ok) return;
+    setWithdrawing(true);
+    try {
+      const res = await fetch('/api/review-manager/withdraw-sufficient', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, suggestionIds: selectedPending.map((c) => c.suggestionId) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
+      setSelected(new Set());
+      if (onRefresh) onRefresh();
+    } catch (e) {
+      window.alert(`Could not release reviewers: ${e.message}`);
+    } finally {
+      setWithdrawing(false);
+    }
+  };
 
   const openInvite = (rows, allowResend) => {
     setModal({
@@ -269,6 +299,17 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
                 className="text-sm text-gray-600 underline"
               >
                 Re-invite {selectedInvited.length} already-invited
+              </button>
+            )}
+            {selectedPending.length > 0 && (
+              <button
+                type="button"
+                onClick={handleWithdraw}
+                disabled={withdrawing}
+                className="text-sm text-gray-600 underline disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Send a polite 'no longer needed' note and close these pending invitations"
+              >
+                {withdrawing ? 'Releasing…' : `Release ${selectedPending.length} as no longer needed`}
               </button>
             )}
             <span className="text-xs text-gray-400">{selectable.length} invitable · {candidates.length - selectable.length} accepted</span>

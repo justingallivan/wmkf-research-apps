@@ -18,12 +18,12 @@ are machine-verified — `N` against the derive, the anchor against this registr
 
 ## requireappaccess-endpoint-count
 
-- **Live value:** 76
+- **Live value:** 77
 - **Description:** pages/api files with requireAppAccess() call sites
 - **Derive:** `pages/api/**/*.{js,mjs,cjs,jsx,ts,tsx}` → count of files containing at least one `requireAppAccess(...)` call
 
 ## api-route-file-count
 
-- **Live value:** 129
+- **Live value:** 130
 - **Description:** pages/api route files (matches check:api-routes walker)
 - **Derive:** `pages/api/**/*.js` → count of route files (same predicate `scripts/check-api-route-security-matrix.js` uses)
