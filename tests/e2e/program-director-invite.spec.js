@@ -241,7 +241,7 @@ test.describe('Program Director reviewer invitation flow', () => {
     await page.getByRole('button', { name: /send invitation \(1\)/i }).click();
 
     await expect(page.getByText('Invite reviewers (1)')).toBeVisible();
-    await page.getByLabel('Respond to invitation by').fill('2026-07-01');
+    await page.getByLabel('Days to respond').fill('10');
     await page.getByLabel('Proposal delivered on').fill('2026-07-08');
     await page.getByLabel('Review due by').fill('2026-07-22');
 
@@ -260,8 +260,13 @@ test.describe('Program Director reviewer invitation flow', () => {
       markAsSent: true,
       allowResend: false,
       drafts: [{ suggestionId: '11111111-1111-4111-8111-111111111111' }],
+      // Phase 1: respond-by is now a "days to respond" offset; the panel sends the
+      // per-request campaign config alongside the drafts.
+      campaignConfig: { respondOffsetDays: 10, reviewDueDate: '2026-07-22' },
     });
-    expect(sentBodies[0].drafts[0].body).toContain('July 1, 2026');
+    // respond-by date is today + offset (relative), so it's not asserted as a fixed
+    // string; the review-due fixed date and the secure link are.
+    expect(sentBodies[0].drafts[0].body).toContain('July 22, 2026');
     expect(sentBodies[0].drafts[0].body).toContain(reviewerUrl);
 
     const reviewerPage = await context.newPage();

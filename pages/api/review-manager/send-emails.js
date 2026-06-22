@@ -65,6 +65,17 @@ export const config = {
   maxDuration: 300,
 };
 
+// Strict YYYY-MM-DD calendar-date validator for the campaign-config reviewDueDate
+// (a Dataverse DateOnly column). Rejects malformed strings and impossible dates
+// (e.g. 2026-02-31) so a bad value never lands on the request.
+function isYmd(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
 function splitName(fullName) {
   const trimmed = (fullName || '').trim();
   if (!trimmed) return { firstName: '', lastName: '' };
@@ -121,6 +132,11 @@ export default async function handler(req, res) {
       // that became LOW after the staff previewed (and was never shown/confirmed) is still
       // refused, instead of being authorized by another row's confirmation.
       confirmedLowConfidenceIds = [],
+      // Reviewer-engagement Phase 1: per-request campaign config from the invite panel
+      // ({ respondOffsetDays, reviewDueDate }). Persisted to the request on the FIRST
+      // invitation send only (never clobbers a later editor change). Ignored for any
+      // non-invitation templateType. See the persistence block after the lifecycle loop.
+      campaignConfig = null,
     } = req.body;
     const confirmedLowConfidenceIdSet = new Set(
       Array.isArray(confirmedLowConfidenceIds) ? confirmedLowConfidenceIds : []
@@ -181,7 +197,7 @@ export default async function handler(req, res) {
           select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_emailaddress,wmkf_firstname,wmkf_lastname,_wmkf_contact_value,wmkf_orcid,wmkf_identitystatus,wmkf_emailsource',
         }).catch(() => null) : null,
         requestId ? DynamicsService.getRecord('akoya_requests', requestId, {
-          select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate',
+          select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate,wmkf_respondoffsetdays,wmkf_reviewduedate',
         }).catch(() => null) : null,
       ]);
       recipientBySuggestion.set(d.suggestionId, { suggestion: sug, person, request });
@@ -555,6 +571,39 @@ export default async function handler(req, res) {
             stage: 'updating_lifecycle',
             message: `Warning: lifecycle update failed for ${s.candidateName}: ${err.message}`,
           });
+        }
+      }
+    }
+
+    // Reviewer-engagement Phase 1: persist the per-request campaign config on the FIRST
+    // invitation send. Discrete columns (NOT a JSON blob) so the Phase-3 reminder cron and
+    // Phase-4 quota sweep can OData $filter server-side. Guards:
+    //   - invitation sends only (never materials/followup/etc.);
+    //   - only requests with at least one successfully-sent invitation this batch;
+    //   - only requests with NO config yet (wmkf_respondoffsetdays null) — a later edit via
+    //     the campaign-config editor must never be clobbered by a subsequent invite wave.
+    // Non-fatal: the invitations already shipped; a config-write failure is logged, not raised.
+    if (templateType === 'invitation' && campaignConfig && sent.length > 0) {
+      const offsetRaw = campaignConfig.respondOffsetDays;
+      const offset = Number.isInteger(offsetRaw) && offsetRaw >= 0 ? offsetRaw : null;
+      const dueDate = isYmd(campaignConfig.reviewDueDate) ? campaignConfig.reviewDueDate : null;
+      if (offset != null || dueDate != null) {
+        const configuredRequests = new Set();
+        for (const s of sent) {
+          const reqRec = recipientBySuggestion.get(s.suggestionId)?.request;
+          const reqId = reqRec?.akoya_requestid;
+          if (!reqId || configuredRequests.has(reqId)) continue;
+          configuredRequests.add(reqId);
+          // Already configured (offset present) — leave staff edits / a prior wave intact.
+          if (reqRec.wmkf_respondoffsetdays != null) continue;
+          try {
+            await DynamicsService.updateRecord('akoya_requests', reqId, {
+              ...(offset != null ? { wmkf_respondoffsetdays: offset } : {}),
+              ...(dueDate != null ? { wmkf_reviewduedate: dueDate } : {}),
+            }, { actingUserSystemId });
+          } catch (cfgErr) {
+            console.warn(`Campaign-config write failed for request ${reqId} (invites already sent):`, cfgErr.message);
+          }
         }
       }
     }

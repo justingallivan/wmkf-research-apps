@@ -28,15 +28,6 @@ import { readSseStream } from './sse';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
 import { loadEmailTemplates, DEFAULT_TEMPLATES } from './email-template-store';
 
-// Local (client-side) timing tokens → the timing-state field that fills them.
-// These are NOT server placeholders; render-emails leaves them untouched and we
-// substitute them here.
-const TIMING_TOKENS = {
-  '{{respondBy}}': 'respondByDate',
-  '{{proposalDelivery}}': 'proposalSendDate',
-  '{{reviewDue}}': 'reviewDueDate',
-};
-
 // Parse a YYYY-MM-DD as LOCAL time (not UTC) and format as "January 15, 2026".
 function formatDate(ymd) {
   if (!ymd) return '';
@@ -45,21 +36,49 @@ function formatDate(ymd) {
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+// Reviewer-engagement Phase 1: respond-by is now a "days to respond" OFFSET, not a
+// fixed date (a fixed day-0 date shortchanges later invite waves). The email still
+// shows a concrete respond-by DATE — computed here as today + offset, which closely
+// tracks the per-reviewer deadline the Phase-3 cron derives server-side from each
+// suggestion's real emailSentAt + respondOffsetDays. Returns YYYY-MM-DD (local).
+function addDaysToTodayYmd(days) {
+  const n = Number(days);
+  if (days === '' || days == null || !Number.isFinite(n) || n < 0) return '';
+  const dt = new Date();
+  dt.setDate(dt.getDate() + Math.round(n));
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+// Resolve each client-side timing token to its display string. respond-by comes
+// from the offset (today + N days); the other two are fixed dates. These are NOT
+// server placeholders — render-emails leaves them literal and we substitute here.
+function timingTokenValues(timing) {
+  return {
+    '{{respondBy}}': formatDate(addDaysToTodayYmd(timing.respondOffsetDays)),
+    '{{proposalDelivery}}': formatDate(timing.proposalSendDate),
+    '{{reviewDue}}': formatDate(timing.reviewDueDate),
+  };
+}
+
 // Substitute the timing tokens with formatted dates. A line whose token has no
-// date is dropped entirely (so the bullet doesn't appear with a blank/leftover
-// token). The "Review timeline:" header is dropped when no dates are set at all.
+// value is dropped entirely (so the bullet doesn't appear with a blank/leftover
+// token). The "Review timeline:" header is dropped when nothing is set at all.
 function applyTiming(body, timing) {
-  const anySet = Object.values(TIMING_TOKENS).some((k) => timing[k]);
+  const values = timingTokenValues(timing);
+  const anySet = Object.values(values).some(Boolean);
   const lines = body.split('\n');
   const out = [];
   for (const line of lines) {
     if (!anySet && /^\s*Review timeline:\s*$/.test(line)) continue;
     let drop = false;
     let next = line;
-    for (const [token, key] of Object.entries(TIMING_TOKENS)) {
+    for (const [token, value] of Object.entries(values)) {
       if (line.includes(token)) {
-        if (!timing[key]) { drop = true; break; }
-        next = next.split(token).join(formatDate(timing[key]));
+        if (!value) { drop = true; break; }
+        next = next.split(token).join(value);
       }
     }
     if (!drop) out.push(next);
@@ -71,7 +90,7 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
   const [step, setStep] = useState('preview'); // preview | sending | sent | error
   const [rawDrafts, setRawDrafts] = useState([]); // from render-emails, timing tokens still literal
   const [edits, setEdits] = useState({}); // suggestionId -> { subject?, body? } user overrides
-  const [timing, setTiming] = useState({ respondByDate: '', proposalSendDate: '', reviewDueDate: '' });
+  const [timing, setTiming] = useState({ respondOffsetDays: 7, proposalSendDate: '', reviewDueDate: '' });
   const [template, setTemplate] = useState(DEFAULT_TEMPLATES.invitation); // user's invitation template
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState({ current: 0, total: 0, message: 'Rendering previews…' });
@@ -92,7 +111,13 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
         const data = await res.json().catch(() => ({}));
         if (!cancelled && data?.value) {
           const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-          setTiming((t) => ({ ...t, ...parsed }));
+          // Pick only the known keys (a pre-Phase-1 sticky value carries the retired
+          // `respondByDate` date — ignore it; respondOffsetDays falls back to default 7).
+          const next = {};
+          if (parsed.respondOffsetDays != null && parsed.respondOffsetDays !== '') next.respondOffsetDays = parsed.respondOffsetDays;
+          if (typeof parsed.proposalSendDate === 'string') next.proposalSendDate = parsed.proposalSendDate;
+          if (typeof parsed.reviewDueDate === 'string') next.reviewDueDate = parsed.reviewDueDate;
+          setTiming((t) => ({ ...t, ...next }));
         }
       } catch { /* sticky defaults are best-effort */ }
       try {
@@ -198,6 +223,14 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
           attachmentUrls: [],
           markAsSent: true,
           allowResend,
+          // Reviewer-engagement Phase 1: persist the per-request campaign config on the
+          // FIRST invite-batch send. Discrete values the Phase-3 cron / Phase-4 sweep
+          // need; the server writes them to the request only if it has none yet (never
+          // clobbers a later edit). reviewDueDate is YYYY-MM-DD or null.
+          campaignConfig: {
+            respondOffsetDays: timing.respondOffsetDays === '' ? null : Number(timing.respondOffsetDays),
+            reviewDueDate: timing.reviewDueDate || null,
+          },
           // Staff acknowledged THESE specific low-confidence addresses via the confirm dialog
           // above (which named them). Recipient-specific, not a batch boolean: the server only
           // honors the override for these exact suggestionIds, so a row that became LOW after
@@ -241,9 +274,9 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
                 <p className="text-xs font-medium text-gray-700 mb-2">Review timeline (appears in the invitation)</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <label className="text-xs text-gray-600">
-                    Respond to invitation by
-                    <input type="date" value={timing.respondByDate}
-                      onChange={(e) => setTiming((t) => ({ ...t, respondByDate: e.target.value }))}
+                    Days to respond
+                    <input type="number" min="0" step="1" value={timing.respondOffsetDays}
+                      onChange={(e) => setTiming((t) => ({ ...t, respondOffsetDays: e.target.value === '' ? '' : Math.max(0, Math.floor(Number(e.target.value))) }))}
                       className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
                   </label>
                   <label className="text-xs text-gray-600">
@@ -260,7 +293,7 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
                   </label>
                 </div>
                 <p className="text-[11px] text-gray-400 mt-2">
-                  A blank date omits its line. These dates are saved as your defaults for next time.
+                  “Days to respond” sets each reviewer’s respond-by date relative to when their invitation is sent (the email shows the resulting date). A blank field omits its line. These are saved as your defaults and persisted on the request when you send the first invitations.
                 </p>
               </div>
 
