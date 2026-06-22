@@ -58,6 +58,10 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/cron/reviewer-reminders",
+      "schedule": "0 10 * * *"
+    },
+    {
       "path": "/api/cron/auth-bypass-check",
       "schedule": "30 7 * * *"
     },

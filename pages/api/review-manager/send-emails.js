@@ -561,9 +561,16 @@ export default async function handler(req, res) {
             // went out, but do NOT touch wmkf_reviewstatus and do NOT set
             // wmkf_responsetype — the reviewer sets held/accepted/declined themselves
             // in the external portal. Both stamp the same first-contact fields.
+            //
+            // Reviewer-engagement Phase 3 (spec §3.B required side-effect): clear the
+            // respond-by reminder fire-once marker in the SAME write as the emailSentAt
+            // re-stamp. A Re-invite opens a NEW offer window (new emailSentAt → new
+            // deadline); without clearing it, the prior wave's marker would block the
+            // new window's reminder forever. (First-time invite: it's already null.)
             await suggestionAdapter.updateLifecycle(s.suggestionId, {
               invited: true,
               emailSentAt: now,
+              respondReminderSentAt: null,
             }, { actingUserSystemId });
           } else if (templateType === 'finalize') {
             // "Proposal ready — please finalize" nudge to a held reviewer. Records the
