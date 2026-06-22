@@ -53,6 +53,9 @@ beforeEach(() => {
   jest.spyOn(window, 'confirm').mockReturnValue(true);
   global.fetch.mockImplementation(async (url) => {
     if (String(url).startsWith('/api/user-preferences')) return mockJson({});
+    if (String(url).startsWith('/api/review-manager/campaign-config')) {
+      return mockJson({ config: { respondOffsetDays: 7, reviewDueDate: '2026-07-22' } });
+    }
     if (url === '/api/review-manager/render-emails') return mockJson({ drafts: [draft] });
     if (url === '/api/review-manager/send-emails') return { ok: true, body: { getReader: () => ({ read: jest.fn() }) } };
     throw new Error(`Unexpected fetch: ${url}`);
@@ -100,13 +103,15 @@ describe('CandidatesPanel invitation capture rehearsal', () => {
     fireEvent.click(screen.getByRole('button', { name: /send invitation \(1\)/i }));
 
     await screen.findByDisplayValue('Invitation');
+    await waitFor(() => expect(screen.getByLabelText('Review due date')).toHaveValue('2026-07-22'));
+    expect(screen.getByLabelText('Days to respond')).toHaveValue(7);
     // Reviewer-engagement Phase 1: respond-by is now a "days to respond" offset, not a
     // fixed date. The respond-by date in the email is computed as today + offset, so it
     // can't be asserted as a fixed string here — the campaignConfig payload below is the
     // durable contract. Proposal-delivery and review-due stay fixed dates.
     fireEvent.change(screen.getByLabelText('Days to respond'), { target: { value: '10' } });
-    fireEvent.change(screen.getByLabelText('Proposal delivered on'), { target: { value: '2026-07-08' } });
-    fireEvent.change(screen.getByLabelText('Review due by'), { target: { value: '2026-07-22' } });
+    fireEvent.change(screen.getByLabelText(/Proposal delivered on/i), { target: { value: '2026-07-08' } });
+    fireEvent.change(screen.getByLabelText('Review due date'), { target: { value: '2026-07-22' } });
     const sendButton = await screen.findByRole('button', { name: /send 1 invitation/i });
     await waitFor(() => expect(sendButton).toBeEnabled());
     fireEvent.click(sendButton);

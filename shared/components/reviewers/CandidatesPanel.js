@@ -334,6 +334,7 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
 
       {modal && (
         <InviteEmailModal
+          requestId={requestId}
           candidates={modal.candidates}
           settings={settings}
           allowResend={modal.allowResend}

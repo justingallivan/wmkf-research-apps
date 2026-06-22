@@ -17,6 +17,7 @@
  * pre-fill next time.
  *
  * Props:
+ *   - requestId   : current akoya_request GUID; used to load request campaign settings
  *   - candidates : [{ suggestionId, name, email }] to invite (already filtered)
  *   - settings   : { signature }
  *   - allowResend: when true, the server re-sends to already-invited candidates
@@ -86,7 +87,7 @@ function applyTiming(body, timing) {
   return out.join('\n');
 }
 
-export default function InviteEmailModal({ candidates = [], settings = {}, allowResend = false, onClose, onSent }) {
+export default function InviteEmailModal({ requestId = null, candidates = [], settings = {}, allowResend = false, onClose, onSent }) {
   const [step, setStep] = useState('preview'); // preview | sending | sent | error
   const [rawDrafts, setRawDrafts] = useState([]); // from render-emails, timing tokens still literal
   const [edits, setEdits] = useState({}); // suggestionId -> { subject?, body? } user overrides
@@ -102,31 +103,47 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
   const idsKey = candidates.map((c) => c.suggestionId).filter(Boolean).join(',');
   const suggestionIds = useMemo(() => (idsKey ? idsKey.split(',') : []), [idsKey]);
 
-  // On open: load the user's invitation template + sticky timing defaults.
+  // On open: load the user's invitation template + sticky timing defaults, then
+  // overlay request-level campaign config for the fields that are shared with
+  // Campaign settings. This keeps stale per-user defaults from showing a
+  // different review due date than the request's campaign config.
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const nextTiming = {};
       try {
         const res = await fetch(`/api/user-preferences?key=${encodeURIComponent(PREFERENCE_KEYS.INVITE_TIMING)}`);
         const data = await res.json().catch(() => ({}));
-        if (!cancelled && data?.value) {
+        if (data?.value) {
           const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
           // Pick only the known keys (a pre-Phase-1 sticky value carries the retired
           // `respondByDate` date — ignore it; respondOffsetDays falls back to default 7).
-          const next = {};
-          if (parsed.respondOffsetDays != null && parsed.respondOffsetDays !== '') next.respondOffsetDays = parsed.respondOffsetDays;
-          if (typeof parsed.proposalSendDate === 'string') next.proposalSendDate = parsed.proposalSendDate;
-          if (typeof parsed.reviewDueDate === 'string') next.reviewDueDate = parsed.reviewDueDate;
-          setTiming((t) => ({ ...t, ...next }));
+          if (parsed.respondOffsetDays != null && parsed.respondOffsetDays !== '') nextTiming.respondOffsetDays = parsed.respondOffsetDays;
+          if (typeof parsed.proposalSendDate === 'string') nextTiming.proposalSendDate = parsed.proposalSendDate;
+          if (typeof parsed.reviewDueDate === 'string') nextTiming.reviewDueDate = parsed.reviewDueDate;
         }
       } catch { /* sticky defaults are best-effort */ }
+      if (requestId) {
+        try {
+          const res = await fetch(`/api/review-manager/campaign-config?requestId=${encodeURIComponent(requestId)}`);
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data?.config) {
+            const c = data.config;
+            if (c.respondOffsetDays != null) nextTiming.respondOffsetDays = c.respondOffsetDays;
+            if (c.reviewDueDate) nextTiming.reviewDueDate = c.reviewDueDate;
+          }
+        } catch { /* request campaign config is best-effort for preview hydration */ }
+      }
+      if (!cancelled && Object.keys(nextTiming).length > 0) {
+        setTiming((t) => ({ ...t, ...nextTiming }));
+      }
       try {
         const tpl = await loadEmailTemplates();
         if (!cancelled && tpl?.invitation) setTemplate(tpl.invitation);
       } catch { /* falls back to the default invitation template */ }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [requestId]);
 
   // Generation guard: the effect below re-runs renderPreviews when `template`
   // lands from loadEmailTemplates, so two fetches can be in flight at once. Only
@@ -275,7 +292,7 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
           {step === 'preview' && (
             <>
               <div className="mb-4 border border-gray-200 rounded-lg p-3 bg-gray-50">
-                <p className="text-xs font-medium text-gray-700 mb-2">Review timeline (appears in the invitation)</p>
+                <p className="text-xs font-medium text-gray-700 mb-2">Reviewer campaign timeline</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <label className="text-xs text-gray-600">
                     Days to respond
@@ -284,20 +301,20 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
                       className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
                   </label>
                   <label className="text-xs text-gray-600">
-                    Proposal delivered on
+                    Proposal delivered on (email only)
                     <input type="date" value={timing.proposalSendDate}
                       onChange={(e) => setTiming((t) => ({ ...t, proposalSendDate: e.target.value }))}
                       className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
                   </label>
                   <label className="text-xs text-gray-600">
-                    Review due by
+                    Review due date
                     <input type="date" value={timing.reviewDueDate}
                       onChange={(e) => setTiming((t) => ({ ...t, reviewDueDate: e.target.value }))}
                       className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
                   </label>
                 </div>
                 <p className="text-[11px] text-gray-400 mt-2">
-                  “Days to respond” sets each reviewer’s respond-by date relative to when their invitation is sent (the email shows the resulting date). A blank field omits its line. These are saved as your defaults and persisted on the request when you send the first invitations.
+                  Days to respond and review due date are the same request-level campaign settings shown in Campaign settings. Proposal delivered on is email-only copy for this invitation. A blank field omits its line.
                 </p>
               </div>
 

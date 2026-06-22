@@ -345,9 +345,11 @@ test.describe('Program Director reviewer invitation flow', () => {
     await page.getByRole('button', { name: /send invitation \(1\)/i }).click();
 
     await expect(page.getByText('Invite reviewers (1)')).toBeVisible();
+    await expect(page.getByLabel('Days to respond')).toHaveValue('10');
+    await expect(page.getByLabel('Review due date')).toHaveValue('2026-07-22');
     await page.getByLabel('Days to respond').fill('10');
-    await page.getByLabel('Proposal delivered on').fill('2026-07-08');
-    await page.getByLabel('Review due by').fill('2026-07-22');
+    await page.getByLabel(/Proposal delivered on/i).fill('2026-07-08');
+    await page.getByLabel('Review due date').fill('2026-07-22');
 
     page.once('dialog', async (dialog) => {
       expect(dialog.message()).toContain('Send 1 invitation now via Dynamics?');
