@@ -1,0 +1,109 @@
+# Reviewer Engagement Spec — Model B (accept-now) + reminders, quota, token TTL
+
+**Status:** design, ready for Codex sanity pass (S275). Supersedes the interpretation snapshot in `REVIEWER_ENGAGEMENT_PLAN_INTERPRETATION.md`.
+
+**Citation convention:** current-behavior claims carry `[verified <file>::<symbol>]` (read this session). Planned work is `[BUILD]`. New Dataverse fields are `[SCHEMA]`. Settled design calls are `[DECISION]`.
+
+---
+
+## 1. Model — "accept now, proposal later"
+
+A reviewer is invited, **accepts (or declines) the offer with full onboarding at the offer stage** (COI/AI acks + mailing address; honorarium captured), then sits tight until the PD **releases the proposal**, then reviews. There is **one** reviewer decision (accept/decline) — no "agree in principle / finalize" two-step.
+
+> The dormant "hold / agree-in-principle" path (`HoldView`, `respond.js` hold action) is **NOT** part of this design. It exists but never fires because the readiness gate is stubbed (below). We leave it dormant.
+
+---
+
+## 2. Verified current state (the spine — already live)
+
+| # | Behavior | Evidence |
+|---|---|---|
+| 2.1 | Readiness gate is stubbed to always-ready, so every reviewer is dispatched to the full Stage-2a accept form (the hold view never shows). | `[verified lib/external/proposal-readiness.js::isProposalReadyForReviewers]` returns hardcoded `true`; `[verified pages/api/external/review/[token]/context.js::computeEngagementState]` `view = isReady ? 'stage2a' : 'hold-invite'` |
+| 2.2 | A fresh non-opted-out accept requires COI + AI policy acks (400 if missing) and a mailing address + phone (422 if missing); writes `accepted` + acks; lands in `accepted-pre-materials`. | `[verified pages/api/external/review/[token]/respond.js handler]` (policy_ack_required, payment_contact_required, applyStage2aResponse accept) |
+| 2.3 | Honorarium onboarding at accept is **capture-only this cycle** (captures contact + address, mints no `akoya_request`, no per-reviewer alert). | `[verified lib/bill/honorarium-onboard-orchestrator.js::ensureHonorariumOnboarding]` (deferred tier, shipped earlier S274) |
+| 2.4 | The invitation is the only sendable first-contact email. | `[verified shared/components/reviewers/InviteEmailModal.js]` hardcoded `templateType:'invitation'`; manage modal exposes only materials/followup/thankyou `[verified shared/components/reviewers/ReviewerManagePanel.js]` |
+| 2.5 | `emailSentAt` is stamped per-suggestion at invite send, re-stamped on Re-invite. | `[verified pages/api/review-manager/send-emails.js]` (invitation/hold branch: `invited:true, emailSentAt:now`); Re-invite via `allowResend` `[verified lib/utils/reviewer-invite.js::shouldSkipDuplicateInvitation]` |
+| 2.6 | The secure token is a signed JWT; **only its hash is stored**; the send path **re-mints on every email containing `{{externalLink}}` and overwrites the hash** ("latest link wins" — prior links stop verifying). | `[verified pages/api/review-manager/render-emails.js]` (`needsExternalLink` → `mintAndStore`, comment "the email body becomes the canonical link"); `[verified lib/external/token-lifecycle.js::mintAndStore]`, `[verified lib/services/external-token.js::mintToken]` (JWT `exp` = `expiresAt`) |
+| 2.7 | `verify-suggestion-token` enforces JWT signature/expiry + stored hash + revoked flag + stored `wmkf_externaltokenexpires`. | `[verified lib/external/verify-suggestion-token.js]` |
+| 2.8 | Proposal/materials are sent **manually** today (no auto-send, no release action, no cron). | `[verified]` no cron in `pages/api/cron/` sends materials; materials send is the manual ReviewerManagePanel "Materials" path |
+| 2.9 | `withdrawn_sufficient` (responseType `100000003`) has a portal "no longer needed" view + a respond guard, but **nothing writes it**. | view `[verified context.js]` `view='withdrawn-sufficient'`; guard `[verified respond.js]` 409 `withdrawn_sufficient`; **no writer** `[verified grep — no set of `wmkf_withdrawnsufficientat`]` |
+| 2.10 | `sweep-stale-invites` closes non-responders to `no_response` **after the meeting date** (not respond-by). | `[verified pages/api/cron/sweep-stale-invites.js]`, `[verified lib/services/reviewer-suggestion-sweep.js]` |
+| 2.11 | The 3 invite dates (respond-by / proposal-delivery / review-due) are a **sticky USER preference + email body text only** — NOT persisted per reviewer or request. Respond-by tokens are client-substituted and line-dropped when blank. | `[verified InviteEmailModal.js]` `PREFERENCE_KEYS.INVITE_TIMING`, `applyTiming` |
+
+---
+
+## 3. The build — four additions on top of the spine
+
+All four ride on existing mechanisms; none requires a parallel route or a new token primitive.
+
+### 3.A  Release to reviewers `[BUILD]`
+A PD action that **emails the proposal/materials to the ACCEPTED reviewers**. It is a clean wrapper over the existing manual Materials send — NOT a readiness/hold mechanism.
+- **Target:** `wmkf_accepted = true` rows only, enforced **server-side** `[DECISION #10]` (reuse the materials-send recipient gate).
+- **Token effect:** the materials email re-mints a fresh, **long-lived** token (§3.D). This is the link accepted reviewers use to review; it supersedes their invite link `[verified §2.6 latest-link-wins]`.
+
+### 3.B  Two reminders (daily cron in `pages/api/cron/`) `[BUILD]` `[DECISION #14]`
+Each reminder is **off by default** with a configurable "days before."
+
+**Respond-by reminder** — nudge invited non-responders.
+- Target: `invited && no response` (not accepted/declined/withdrawn).
+- Per-reviewer deadline = **that reviewer's `emailSentAt` + `respondOffsetDays`** (computed in code; OData can't do the arithmetic — same pattern as the sweep). `[verified §2.5 emailSentAt is per-suggestion]`
+- Fire **once**, when `today ≥ (deadline − leadDays)`, reviewer still unresponded, token not expired, `wmkf_respondremindersentat` empty. If already past the soft date at first eligibility, send once anyway (a late nudge is fine — respond-by is soft). Never repeat. `[DECISION #3]`
+- Marker: new per-suggestion `wmkf_respondremindersentat` `[SCHEMA]`, **separate** from the review-due/follow-up marker. `[DECISION #4]`
+- The reminder email contains `{{externalLink}}` → it **re-mints** a fresh token with the SAME invite cap (review-due + grace). Reviewers use the most recent link. `[DECISION #13, verified §2.6]`
+
+**Review-due reminder** — nudge accepted reviewers who haven't submitted.
+- Target: `accepted && materials-sent && not-submitted` — never an accepted-pre-materials reviewer who hasn't received the proposal. `[DECISION #11]`
+- Deadline = the fixed review-due date − leadDays.
+- This automates today's manual `followup` template `[verified §2.4]`; do not also keep a manual review-due reminder.
+
+### 3.C  Quota → notify PD → selective decline `[BUILD]`
+**Not automatic.** Reaching the desired count notifies the PD, who decides who (if anyone) to decline — so a wanted-but-slow senior reviewer is never auto-shut-out.
+- Count = `wmkf_accepted = true` rows for the request (any downstream stage). `[DECISION #1]`
+- On each accept (`respond.js` accept path), compare count to `desiredCount`; on the false→set transition of `wmkf_quotanotifiedat` `[SCHEMA]`, notify the PD once (first-writer-wins; a rare double-notify is harmless). `[DECISION #2]`
+- PD action (Workbench): select pending invitees and send the polite "no longer needed" decline → sets `withdrawn_sufficient` + `wmkf_withdrawnsufficientat` (the missing writer from §2.9) + sends the decline email + clears those reviewers' `wmkf_respondremindersentat` so no reminder fires.
+- `withdrawn_sufficient` is settable **only on still-pending rows** (`invited && !accepted && !declined`), server-guarded; it never touches an accepted/honorarium row. `[DECISION #8]`
+
+### 3.D  Token TTL — non-responders expire early, accepted keep ~90 days `[BUILD]`
+No JWT "extension" (a signed JWT can't be extended in place; the raw token isn't stored). We use the existing latest-link-wins re-mint:
+- **Invite send** (and respond-by reminder re-mint): mint with **expiry = review-due + grace** (default grace 1–2 days). This is the non-responder cap — their link dies at review-due. `[DECISION #5]`
+- **Release/materials send**: mints a fresh, **long-lived** token (expiry ≈ review-due + ~90 days) for the review window + late returns. Only ACCEPTED reviewers ever receive this, so non-responders never get the long token. `[DECISION #1 late-returns-OK]`
+- Requires `render-emails` to pick the expiry by template/config (it currently hardcodes `now + 90`); the review-due date must be available at mint (→ §4 persistence). `[verified §2.6 render-emails mints]`
+- `sweep-stale-invites` (meeting-date) and the token cap (review-due) are **different gates** and both stay: the token cap is the **access** gate (link stops working at review-due); the sweep is **status** bookkeeping (`no_response` at meeting date). No conflict. `[DECISION #9]`
+
+### 3.E  Per-request campaign config + panel change `[BUILD]` `[SCHEMA]`
+Persist, on the request, what the cron and quota logic need (today these are throwaway `[verified §2.11]`):
+- `respondOffsetDays` (default 7), `reviewDueDate` (fixed), `respondReminderEnabled` + `respondReminderLeadDays`, `reviewDueReminderEnabled` + `reviewDueReminderLeadDays`, `desiredCount`, `quotaNotifiedAt`.
+- Written on first invite-batch send; **editable later** from the Reviewers tab; read live by the cron. Edits apply going forward, not retroactively. `[DECISION #7]`
+- **Panel change:** the respond-by input becomes **"days to respond" (offset)**, not a fixed date `[DECISION — fixes the multi-wave bug where a fixed day-0 date shortchanges later waves]`; review-due stays a fixed date; proposal-delivery stays informational email text only (no reminder — `[DECISION]` dropped).
+- Multi-wave / Re-invite: a new wave is a normal first-time invite (its own `emailSentAt`); a Re-invite re-mints (review-due cap), re-stamps `emailSentAt`, and **clears `wmkf_respondremindersentat`**; request-level config is untouched. `[DECISION #6]`
+
+---
+
+## 4. Schema additions `[SCHEMA]` — DEPENDENCY (Dataverse fields must be created)
+
+On `akoya_request` (or a single JSON config field `wmkf_reviewcampaignconfig` — decide at build):
+`respond_offset_days`, `review_due_date`, `respond_reminder_enabled`, `respond_reminder_lead_days`, `reviewdue_reminder_enabled`, `reviewdue_reminder_lead_days`, `desired_count`, `quota_notified_at`.
+
+On `wmkf_appreviewersuggestion`:
+`wmkf_respondremindersentat` (datetime).
+
+> These are new fields — a real dependency (Dataverse admin / migration), not just code. The cron filters need them queryable, which favors discrete fields over a JSON blob for the ones the cron filters on (`reminder_enabled`, dates); the rest can be JSON.
+
+---
+
+## 5. Sequencing
+
+- **Phase 1 — Persistence + panel + token cap:** campaign config on the request; panel "days to respond" change; `render-emails` picks token expiry from config (invite = review-due + grace, materials = long). Foundation for everything else.
+- **Phase 2 — Reminders:** the two-reminder daily cron + the `wmkf_respondremindersentat` marker.
+- **Phase 3 — Release + Quota:** the accepted-only Release action; quota count/notify in the accept path; the PD selective-decline Workbench action (writes `withdrawn_sufficient`).
+
+Independent of all of the above: the invitation copy still needs the **Model-B fix** (the shipped copy says "no commitment today, COI/AI + honorarium come later" — wrong; should say "you confirm COI/AI + honorarium details when you accept; the proposal follows later"). Small, do anytime.
+
+---
+
+## 6. Risks / notes
+
+- **Honorarium stays capture-only** this cycle `[verified §2.3]`; none of this changes that.
+- **Token cap depends on a sane review-due date** in the config; if absent, fall back to the current `now + 90` (don't silently mint a past-dated/expired token).
+- **Latest-link-wins is now explicit** `[verified §2.6]`: every reminder/materials email supersedes prior links; reviewer-facing copy already corrected (S275) to "use the link in this email."
+- **Quota count runs in the external accept path** (`respond.js`) — a Dataverse count query per accept; acceptable (low volume), guard the notify with the first-writer flag.
