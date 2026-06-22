@@ -66,7 +66,7 @@ function respondCandidate(over = {}) {
     _wmkf_request_value: REQ,
     wmkf_emailsentat: isoDaysAgo(8),        // 8d ago, offset 7 → deadline 1d ago → eligible
     wmkf_externaltokenexpires: new Date(Date.now() + 5 * DAY).toISOString(), // live
-    '@odata.etag': 'W/"100"',
+    _etag: 'W/"100"',
     ...over,
   };
 }
@@ -188,7 +188,7 @@ describe('sweepReviewDueReminders', () => {
       _wmkf_potentialreviewer_value: PERSON,
       _wmkf_request_value: REQ,
       wmkf_remindercount: 0,
-      '@odata.etag': 'W/"200"',
+      _etag: 'W/"200"',
       ...over,
     };
   }
