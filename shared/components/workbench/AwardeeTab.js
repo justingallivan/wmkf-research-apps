@@ -34,7 +34,19 @@ const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || '').trim())
 
 export default function AwardeeTab({ requestId, context }) {
   const [status, setStatus] = useState(null);
-  const [abstract, setAbstract] = useState(null);
+  // Editable abstract (S278). `abstractText` is the working copy; `savedAbstractText`
+  // is the last persisted value (drives the dirty/disabled state). `abstractField`
+  // is which stored field a save lands in ('approved' once the grantee has
+  // submitted, else 'formatted'); `abstractEtag` is the row etag loaded with the
+  // text (sent back as If-Match so a concurrent change 409s); `abstractEditable`
+  // reflects the server's status gate.
+  const [abstractText, setAbstractText] = useState('');
+  const [savedAbstractText, setSavedAbstractText] = useState('');
+  const [abstractField, setAbstractField] = useState(null);
+  const [abstractEtag, setAbstractEtag] = useState('');
+  const [abstractEditable, setAbstractEditable] = useState(false);
+  const [savingAbstract, setSavingAbstract] = useState(false);
+  const [abstractMsg, setAbstractMsg] = useState(null);
   const [recipients, setRecipients] = useState(null);
   const [toEmail, setToEmail] = useState('');
   const [ccEmail, setCcEmail] = useState('');
@@ -100,11 +112,35 @@ export default function AwardeeTab({ requestId, context }) {
     } catch { /* recipients are optional context; staff can still type them */ }
   }, [requestId]);
 
+  // Load the EFFECTIVE abstract (approved once the grantee has submitted, else the
+  // draft) so the PD can review/edit whatever will publish — including a
+  // grantee-returned version, which "Generate abstract" never surfaces. Guarded by
+  // currentRequestIdRef so a slow load for a previous request can't clobber state
+  // after the PD switches requests.
+  const loadAbstract = useCallback(async () => {
+    if (!requestId) return;
+    const loadRequestId = requestId;
+    try {
+      const res = await fetch(`/api/workbench/grantee-deliverables/abstract?requestId=${encodeURIComponent(loadRequestId)}`);
+      const data = await res.json();
+      if (currentRequestIdRef.current !== loadRequestId) return;
+      if (res.ok) {
+        setAbstractText(data.effective || '');
+        setSavedAbstractText(data.effective || '');
+        setAbstractField(data.effectiveField || null);
+        setAbstractEtag(data.etag || '');
+        setAbstractEditable(Boolean(data.editable));
+        if (data.status !== undefined) setStatus(data.status);
+      }
+    } catch { /* abstract load is best-effort; "Generate abstract" still works */ }
+  }, [requestId]);
+
   useEffect(() => {
     currentRequestIdRef.current = requestId;
   }, [requestId]);
 
   useEffect(() => { loadRecipients(); }, [loadRecipients]);
+  useEffect(() => { loadAbstract(); }, [loadAbstract]);
 
   // Identity reset (the un-latch): when the producing identity changes — the request
   // being composed, or the logged-in PD whose saved body feeds it — discard prior
@@ -131,7 +167,7 @@ export default function AwardeeTab({ requestId, context }) {
   }, [dirty, templateMode, baseTemplate, recipients?.pi?.name, awardTitle]);
 
   async function generate(regenerate = false) {
-    setGenerating(true); setError(null); setSentMsg(null);
+    setGenerating(true); setError(null); setSentMsg(null); setAbstractMsg(null);
     try {
       const res = await fetch('/api/workbench/grantee-deliverables/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -139,9 +175,35 @@ export default function AwardeeTab({ requestId, context }) {
       });
       const data = await res.json();
       if (!res.ok) setError(data.error || 'Abstract generation failed.');
-      else { setAbstract(data.abstractFormatted); setStatus(data.status); }
+      // Reload the effective abstract so the editor + etag reflect the persisted
+      // state (the write target may be the grantee-approved field, which generate
+      // does not return).
+      else { setStatus(data.status); await loadAbstract(); }
     } catch { setError('Abstract generation failed.'); }
     setGenerating(false);
+  }
+
+  async function saveAbstract() {
+    setSavingAbstract(true); setError(null); setAbstractMsg(null);
+    try {
+      const res = await fetch('/api/workbench/grantee-deliverables/abstract', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, text: abstractText, etag: abstractEtag, baseField: abstractField }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Could not save the abstract.');
+        // On a stale/changed conflict, reload so the PD sees the current version.
+        if (data.code === 'stale') await loadAbstract();
+      } else {
+        setSavedAbstractText(abstractText);
+        if (data.field) setAbstractField(data.field);
+        if (data.etag) setAbstractEtag(data.etag);
+        if (data.status !== undefined) setStatus(data.status);
+        setAbstractMsg('Abstract saved.');
+      }
+    } catch { setError('Could not save the abstract.'); }
+    setSavingAbstract(false);
   }
 
   async function send() {
@@ -212,7 +274,9 @@ export default function AwardeeTab({ requestId, context }) {
   }
 
   const statusLabel = status != null ? (GRANTEE_DELIVERABLE_LABEL[status] || String(status)) : 'Not started';
-  const canSend = Boolean(abstract) && isEmail(toEmail) && (!ccEmail || isEmail(ccEmail)) && !sending;
+  const hasAbstract = abstractText.trim().length > 0;
+  const abstractDirty = abstractText !== savedAbstractText;
+  const canSend = hasAbstract && isEmail(toEmail) && (!ccEmail || isEmail(ccEmail)) && !sending;
 
   return (
     <div className="space-y-6">
@@ -227,14 +291,43 @@ export default function AwardeeTab({ requestId, context }) {
       <section className="space-y-2">
         <button
           type="button"
-          onClick={() => generate(Boolean(abstract))}
+          onClick={() => generate(hasAbstract)}
           disabled={generating}
           className="px-3 py-2 text-sm rounded bg-blue-700 text-white disabled:opacity-50"
         >
-          {generating ? 'Working…' : abstract ? 'Regenerate abstract' : 'Generate abstract'}
+          {generating ? 'Working…' : hasAbstract ? 'Regenerate abstract' : 'Generate abstract'}
         </button>
-        {abstract && (
-          <textarea aria-label="Formatted abstract" readOnly value={abstract} rows={10} className="w-full text-sm border rounded p-2" />
+        {hasAbstract && (
+          <div className="space-y-1">
+            <p className="text-xs text-gray-600">
+              {abstractField === 'approved'
+                ? 'Editing the grantee-approved version — this is what publishes to the website.'
+                : 'Editing the draft — review and refine before sending it to the grantee.'}
+            </p>
+            <textarea
+              aria-label="Formatted abstract"
+              value={abstractText}
+              onChange={(e) => setAbstractText(e.target.value)}
+              readOnly={!abstractEditable}
+              rows={10}
+              className="w-full text-sm border rounded p-2"
+            />
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={saveAbstract}
+                disabled={savingAbstract || !abstractEditable || !hasAbstract || !abstractDirty}
+                className="px-3 py-2 text-sm rounded bg-green-700 text-white disabled:opacity-50"
+              >
+                {savingAbstract ? 'Saving…' : 'Save edits'}
+              </button>
+              {abstractDirty && <span className="text-xs text-amber-700">Unsaved changes</span>}
+              {abstractMsg && <span className="text-xs text-green-700">{abstractMsg}</span>}
+              {!abstractEditable && (
+                <span className="text-xs text-gray-500">Read-only in the current status.</span>
+              )}
+            </div>
+          </div>
         )}
       </section>
 
@@ -286,7 +379,7 @@ export default function AwardeeTab({ requestId, context }) {
           </button>
         </div>
         <p className="text-xs text-gray-500">
-          {abstract
+          {hasAbstract
             ? 'Preview opens the email in a new tab without sending. Send emails the grantee and starts the 14-day clock.'
             : 'Generate the abstract before sending. (Preview works any time.)'}
         </p>

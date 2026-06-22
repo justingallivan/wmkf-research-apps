@@ -22,7 +22,17 @@ const REQ = '11111111-1111-1111-1111-111111111111';
 
 const CYCLE_CTX = { cycleCode: 'J26', cycleLabel: 'June 2026' };
 
-function wireFetch({ generateOk = true, sendOk = true, websiteOk = true } = {}) {
+function wireFetch({ generateOk = true, sendOk = true, websiteOk = true, abstract = null, saveOk = true } = {}) {
+  // Stateful effective-abstract mock (S278): GET returns the current state, the
+  // generate POST seeds the draft, and PUT persists a PD edit so the editor flow
+  // round-trips like the real route.
+  const state = {
+    effective: abstract?.effective ?? '',
+    effectiveField: abstract?.effectiveField ?? null,
+    etag: abstract?.etag ?? 'W/"1"',
+    status: abstract?.status ?? null,
+    editable: abstract?.editable ?? true,
+  };
   global.fetch = jest.fn(async (url, opts = {}) => {
     const u = String(url);
     if (u.includes('/grantee-deliverables/recipients')) {
@@ -31,9 +41,27 @@ function wireFetch({ generateOk = true, sendOk = true, websiteOk = true } = {}) 
         liaison: { name: 'Lorena McLaren', email: 'lorena.mclaren@emory.edu', hasEmail: true },
       }) };
     }
+    if (u.includes('/grantee-deliverables/abstract')) {
+      if ((opts.method || 'GET') === 'PUT') {
+        if (!saveOk) return { ok: false, json: async () => ({ error: 'Could not save the abstract.' }) };
+        const b = JSON.parse(opts.body);
+        state.effective = b.text;
+        state.etag = 'W/"saved"';
+        return { ok: true, json: async () => ({ ok: true, field: state.effectiveField || 'formatted', etag: state.etag, status: state.status }) };
+      }
+      return { ok: true, json: async () => ({
+        effective: state.effective, effectiveField: state.effectiveField,
+        etag: state.etag, status: state.status, editable: state.editable,
+      }) };
+    }
     if (u.includes('/grantee-deliverables/generate')) {
+      if (generateOk) {
+        state.effective = 'The team will study the thing in a long enough abstract.';
+        state.effectiveField = 'formatted';
+        state.status = 100000000;
+      }
       return generateOk
-        ? { ok: true, json: async () => ({ abstractFormatted: 'The team will study the thing in a long enough abstract.', status: 100000000 }) }
+        ? { ok: true, json: async () => ({ abstractFormatted: state.effective, status: 100000000 }) }
         : { ok: false, json: async () => ({ error: 'no applicant abstract' }) };
     }
     if (u.includes('/grantee-deliverables/send-invite')) {
@@ -104,6 +132,50 @@ test('a generation error surfaces and leaves Send disabled', async () => {
   fireEvent.click(screen.getByRole('button', { name: /generate abstract/i }));
   await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/no applicant abstract/i));
   expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
+});
+
+// --- Editable abstract (S278) ---
+
+test('after generate the abstract is editable; editing then Save PUTs text + etag + baseField', async () => {
+  wireFetch();
+  render(<AwardeeTab requestId={REQ} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toHaveValue('monika.raj@emory.edu'));
+
+  fireEvent.click(screen.getByRole('button', { name: /generate abstract/i }));
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toBeInTheDocument());
+
+  const textarea = screen.getByLabelText('Formatted abstract');
+  expect(textarea).not.toHaveAttribute('readonly');
+  // Save is disabled until there's an actual edit.
+  expect(screen.getByRole('button', { name: /save edits/i })).toBeDisabled();
+
+  fireEvent.change(textarea, { target: { value: 'PD-refined abstract text for the website.' } });
+  const saveBtn = screen.getByRole('button', { name: /save edits/i });
+  expect(saveBtn).toBeEnabled();
+  fireEvent.click(saveBtn);
+
+  await waitFor(() => expect(screen.getByText(/abstract saved/i)).toBeInTheDocument());
+  const putCall = global.fetch.mock.calls.find(
+    ([u, o]) => String(u).includes('/grantee-deliverables/abstract') && o?.method === 'PUT',
+  );
+  expect(JSON.parse(putCall[1].body)).toMatchObject({
+    requestId: REQ, text: 'PD-refined abstract text for the website.', etag: 'W/"1"', baseField: 'formatted',
+  });
+});
+
+test('loads a grantee-approved abstract on mount, labeled as the published version', async () => {
+  wireFetch({ abstract: { effective: 'Grantee-approved abstract.', effectiveField: 'approved', etag: 'W/"9"', status: 100000003, editable: true } });
+  render(<AwardeeTab requestId={REQ} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Grantee-approved abstract.'));
+  expect(screen.getByText(/this is what publishes to the website/i)).toBeInTheDocument();
+});
+
+test('a read-only (status-gated) abstract cannot be saved', async () => {
+  wireFetch({ abstract: { effective: 'Locked approved abstract.', effectiveField: 'approved', etag: 'W/"9"', status: 100000006, editable: false } });
+  render(<AwardeeTab requestId={REQ} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Locked approved abstract.'));
+  expect(screen.getByLabelText('Formatted abstract')).toHaveAttribute('readonly');
+  expect(screen.getByText(/read-only in the current status/i)).toBeInTheDocument();
 });
 
 test('default invitation copy is the PD-voice template (subject + body)', async () => {

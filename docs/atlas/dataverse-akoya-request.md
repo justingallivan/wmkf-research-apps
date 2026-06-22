@@ -74,8 +74,8 @@ Schema spec: `lib/dataverse/schema/wave7-reviewer-engagement/akoya_request-revie
 
 **Grantee Deliverables Portal abstract fields (S268/S271).** The request keeps only the abstract text
 that is semantically part of the award/request record:
-- `wmkf_abstractformatted` (Memo, 32000) — AI style-guide abstract drafted FROM the applicant's `wmkf_abstract` (the source above); shown to the grantee to edit/approve. Not overwritten by the edit.
-- `wmkf_abstractapproved` (Memo, 32000) — grantee-edited/approved abstract (stored separately to preserve the AI-draft provenance).
+- `wmkf_abstractformatted` (Memo, 32000) — AI style-guide abstract drafted FROM the applicant's `wmkf_abstract` (the source above); shown to the grantee to edit/approve. Not overwritten by the grantee edit. **Writers:** `grantee-deliverables/generate` (AI draft) and, S278, `grantee-deliverables/abstract` PUT (PD refine before send — editable in null/Drafted/Invited/Reminder Sent).
+- `wmkf_abstractapproved` (Memo, 32000) — grantee-edited/approved abstract (stored separately to preserve the AI-draft provenance). **Writers:** the grantee submit (`grantee-upload`, primary author) and, S278, `grantee-deliverables/abstract` PUT — a PD correction to the *published* version, allowed only post-submission in Submitted/Staff Review (never written when empty, so staff text never precedes a grantee submission). Publish precedence: `wmkf_abstractapproved ?? wmkf_abstractformatted` (`lib/services/grantee-document-assembly.js`).
 
 **Retired from application shape (S271):** lifecycle status, image reference, image caption, invited date,
 and reminder date now live on the related `wmkf_granteedeliverable` table, not on `akoya_request`. The
