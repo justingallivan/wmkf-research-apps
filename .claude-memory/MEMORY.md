@@ -20,6 +20,7 @@
 - Red CI gate or failing startup gate: feedback-red-gates-are-p0.md
 - Full `npm test` shows red (confirm it's ONLY the known bill.com expected-red set before chasing): project-bill-com-integration-tests-known-red.md
 - Scope/count/quantity claim: feedback-falsify-not-confirm.md
+- Claim about how THIS system behaves (screen/return/feature-live/field/gate/token/link), incl. in chat — cite producer, not consumer: feedback-behavior-claims-cite-the-producer.md
 - Durable docs/memory/fact edit: feedback-reconcile-dont-append-docs.md; feedback-apply-reconcile-to-fix-work.md
 - Cleanup/audit/verification loop: feedback-timebox-metawork.md
 - External platform capability claim: feedback-verify-external-platform-claims.md; feedback-cite-ground-truth.md
