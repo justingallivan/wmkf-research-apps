@@ -16,7 +16,7 @@
  *   - onSaved   : optional () => void, fired after a successful save
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
   const [loading, setLoading] = useState(true);
@@ -24,6 +24,10 @@ export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
   const [error, setError] = useState(null);
   const [respondOffsetDays, setRespondOffsetDays] = useState('');
   const [reviewDueDate, setReviewDueDate] = useState('');
+
+  // Guards post-await setState on the save path if the modal unmounts mid-request.
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +71,7 @@ export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
       if (onSaved) onSaved();
       onClose();
     } catch (e) {
+      if (!mountedRef.current) return;
       setError(e.message);
       setSaving(false);
     }

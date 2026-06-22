@@ -583,7 +583,10 @@ export default async function handler(req, res) {
     //   - only requests with NO config yet (wmkf_respondoffsetdays null) — a later edit via
     //     the campaign-config editor must never be clobbered by a subsequent invite wave.
     // Non-fatal: the invitations already shipped; a config-write failure is logged, not raised.
-    if (templateType === 'invitation' && campaignConfig && sent.length > 0) {
+    // Re-invite (allowResend) is excluded: a re-invite re-mints/re-stamps but leaves
+    // request-level config untouched (spec §3.E); only a genuine first-time invite wave
+    // seeds the config.
+    if (templateType === 'invitation' && !allowResend && campaignConfig && sent.length > 0) {
       const offsetRaw = campaignConfig.respondOffsetDays;
       const offset = Number.isInteger(offsetRaw) && offsetRaw >= 0 ? offsetRaw : null;
       const dueDate = isYmd(campaignConfig.reviewDueDate) ? campaignConfig.reviewDueDate : null;
@@ -594,13 +597,15 @@ export default async function handler(req, res) {
           const reqId = reqRec?.akoya_requestid;
           if (!reqId || configuredRequests.has(reqId)) continue;
           configuredRequests.add(reqId);
-          // Already configured (offset present) — leave staff edits / a prior wave intact.
-          if (reqRec.wmkf_respondoffsetdays != null) continue;
+          // Per-column "set only if unset" — the two columns are independent, so never
+          // clobber a value the editor (or a prior wave) already set, and fill a column
+          // even if its sibling was pre-set. Codex Phase-1 finding #1.
+          const patch = {};
+          if (offset != null && reqRec.wmkf_respondoffsetdays == null) patch.wmkf_respondoffsetdays = offset;
+          if (dueDate != null && reqRec.wmkf_reviewduedate == null) patch.wmkf_reviewduedate = dueDate;
+          if (Object.keys(patch).length === 0) continue;
           try {
-            await DynamicsService.updateRecord('akoya_requests', reqId, {
-              ...(offset != null ? { wmkf_respondoffsetdays: offset } : {}),
-              ...(dueDate != null ? { wmkf_reviewduedate: dueDate } : {}),
-            }, { actingUserSystemId });
+            await DynamicsService.updateRecord('akoya_requests', reqId, patch, { actingUserSystemId });
           } catch (cfgErr) {
             console.warn(`Campaign-config write failed for request ${reqId} (invites already sent):`, cfgErr.message);
           }

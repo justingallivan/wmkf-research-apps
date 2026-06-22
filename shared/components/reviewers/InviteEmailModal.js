@@ -162,6 +162,10 @@ export default function InviteEmailModal({ candidates = [], settings = {}, allow
   // default (renderPreviews identity changes when `template` updates).
   useEffect(() => {
     renderPreviews();
+    // On unmount (or before a re-render) invalidate any in-flight render so its
+    // post-await setRawDrafts/setError can't fire on an unmounted component — reuses
+    // the existing generation guard (a bumped ref makes `gen !== current` true).
+    return () => { renderGenRef.current++; };
   }, [renderPreviews]);
 
   // Displayed draft = server-rendered draft with timing applied, unless the user
