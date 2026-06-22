@@ -179,7 +179,8 @@ describe('send-emails — hold calendar lane', () => {
     // Lifecycle: first contact → invited + emailSentAt, and NOT reviewstatus/responsetype.
     expect(updateLifecycle).toHaveBeenCalledTimes(1);
     const lc = updateLifecycle.mock.calls[0][1];
-    expect(lc).toEqual({ invited: true, emailSentAt: expect.any(String) });
+    // Phase 3: first contact also clears the respond-by reminder marker (new offer window).
+    expect(lc).toEqual({ invited: true, emailSentAt: expect.any(String), respondReminderSentAt: null });
     expect(lc).not.toHaveProperty('reviewStatus');
     expect(lc).not.toHaveProperty('responseType');
   });
@@ -304,7 +305,7 @@ describe('send-emails — capture delivery mode', () => {
     expect(mockSetContactLink).not.toHaveBeenCalled();
     expect(updateLifecycle).toHaveBeenCalledWith(
       SUG_1,
-      { invited: true, emailSentAt: expect.any(String) },
+      { invited: true, emailSentAt: expect.any(String), respondReminderSentAt: null },
       { actingUserSystemId: 'u-1' },
     );
 

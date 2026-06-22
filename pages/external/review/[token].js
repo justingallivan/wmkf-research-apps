@@ -225,7 +225,7 @@ function ErrorPanel({ reason }) {
     invalid_signature: 'This link is not valid. Please make sure you copied the entire URL from your invitation email.',
     invalid_claim: 'This link is not valid. Please make sure you copied the entire URL from your invitation email.',
     malformed: 'This link is not valid. Please make sure you copied the entire URL from your invitation email.',
-    hash_mismatch: 'This link has been replaced by a newer one. Please use the most recent invitation email.',
+    hash_mismatch: 'This link has been replaced by a newer one. Please use the most recent email from the Foundation.',
     revoked: 'This link has been revoked. Please contact The Foundation to receive a new one.',
     not_found: "We couldn't find a review for this link. Please contact The Foundation.",
     network: 'Network error. Please check your connection and try again.',
