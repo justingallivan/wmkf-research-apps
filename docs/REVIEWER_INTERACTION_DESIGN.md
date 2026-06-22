@@ -150,7 +150,7 @@ The reviewer clicks the magic link. They see one page with several stacked eleme
 
 **Materials notification:**
 
-When materials become available, the reviewer is notified via a fresh email that points back to the same magic link they already have. The URL does not change across the journey; the backend flips the page from Stage 2a to Stage 2b state. Existing calendar invites continue to point at the same link.
+When materials become available, the reviewer is notified via a fresh email containing a NEW secure link. **The link is NOT stable across the journey** (corrected 2026-06-21 to match the code): the send path (`pages/api/review-manager/render-emails.js`) re-mints the JWT and overwrites the stored hash on every email that contains `{{externalLink}}`, so any earlier link (the original invitation, a prior reminder) **stops verifying** once a newer email goes out — "the email body becomes the canonical link." The backend still resolves the same engagement (the `wmkf_appreviewersuggestion` row) regardless of which token is presented, and flips the page from Stage 2a to Stage 2b state — but reviewers must use the link in the **most recent** email. (Any future calendar-invite feature must therefore embed the link from whichever email is current, not a one-time URL.)
 
 **Stage 2b landing page** (same URL, materials-available state):
 

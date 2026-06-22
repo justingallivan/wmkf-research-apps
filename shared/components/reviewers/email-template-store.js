@@ -76,7 +76,7 @@ Thank you for holding your spot. The proposal "{{proposalTitle}}" from {{piInsti
 Please use your secure personal link to confirm the final details — the conflict-of-interest and AI-use acknowledgements, and how you'd like any honorarium handled — and to access the proposal materials:
 {{externalLink}}
 
-We ask that you complete this step by {{reviewDueDate}}. The same link will give you the materials and the review form once you've confirmed.
+We ask that you complete this step by {{reviewDueDate}}. Once you've confirmed, the secure link in this email gives you the materials and the review form.
 
 We're grateful for your time and expertise.
 
@@ -105,7 +105,7 @@ Thank you for your time and expertise.
 
 This is a friendly reminder that your review of "{{proposalTitle}}" is due by {{reviewDueDate}}.
 
-Your secure reviewer link (also in the original invitation):
+Your secure reviewer link (use the one in this email — it supersedes any earlier link):
 {{externalLink}}
 
 Please let us know if you need additional time or have any questions.
