@@ -221,7 +221,9 @@ image upload, caption, and the **publish-image waiver checkbox as a client-side 
 submit button is disabled until the waiver is checked AND abstract + caption + an image (new upload or
 one already on file) are present. The waiver is NEVER sent — a submitted package is the consent record.
 On success the form renders a thank-you state. 5 RTL tests (waiver gate, image-required, multipart
-contract, thank-you, error re-enable). The waiver wording is interim (exact legal text = open item).
+contract, thank-you, error re-enable). The waiver wording is the owner-provided publication-consent
+text (S278) — covers the abstract, project title, name + institution, and image + caption in
+award-announcement materials, and confirms image-sharing rights.
 
 **Submit contract (defined here; chunk 5 implements it):**
 `POST /api/external/grantee/{token}/submit` — `multipart/form-data` with `editedAbstract` (text),
@@ -296,10 +298,12 @@ PARALLEL grantee variant — not a mutation of the reviewer path.
   route renders editable. This subsumes the chunk-1 carried **Complete guard** (Submitted / Staff
   Review / Complete / Closed / null / unknown all refuse → 409). On success → status `Submitted`.
 - **Multipart (busboy):** fields `editedAbstract` (text, required, min length), `caption` (text,
-  required); ONE `image` file (≤ a sane cap, e.g. 15 MB; `limits.files: 1`). Image is required UNLESS
+  required); ONE `image` file (≤ a sane cap, 10 MB; `limits.files: 1`). Image is required UNLESS
   one is already on file (`wmkf_granteeimagefileref` present) — then a new upload replaces it.
 - **Image validation:** add image magic-byte support to `lib/utils/file-magic.js`
-  (`validateGranteeImage` — PNG/JPEG/GIF/WEBP signatures + extension match) — the gap Codex flagged in
+  (`validateGranteeImage` — PNG/JPEG/WEBP signatures + extension match; GIF dropped S278 for award
+  images, though `sniffImageType` still detects GIF so a GIF disguised with an allowed extension fails
+  the magic-byte check) — the gap Codex flagged in
   chunk 1. Then virus-scan via `scanBytes` (Cloudmersive, gated on `VIRUS_SCAN_ENABLED`), same
   fail-closed posture as review-upload.
 - **SharePoint:** upload to the `akoya_request` library under
@@ -330,7 +334,7 @@ PARALLEL grantee variant — not a mutation of the reviewer path.
    arbitrary offsets, not just `startsWith`.
 5. **Extract `cleanupSharePointItems`** to a shared `lib/services/sharepoint-cleanup.js` (review-upload
    imports it from there — behavior identical; no duplication) and the grantee service reuses it.
-6. Busboy: `files:1`, image cap a named constant (15 MB), `fieldSize` ~64 KB (4 KB would truncate the
+6. Busboy: `files:1`, image cap a named constant (10 MB), `fieldSize` ~64 KB (4 KB would truncate the
    abstract), `fields` ~5. Order: magic-byte → scan (soft-pass when `VIRUS_SCAN_ENABLED=false`) →
    upload. No raw Graph/Dataverse error / SharePoint path / item-id / file-ref leaked to the client.
 

@@ -83,7 +83,7 @@ old flat fields `wmkf_granteedeliverablestatus`, `wmkf_granteeimagefileref`, and
 `wmkf_granteeimagecaption` may still exist in live Dataverse until a manual admin cleanup, but app code no
 longer reads or writes them. Canonical package page: [`dataverse-wmkf-granteedeliverable.md`](dataverse-wmkf-granteedeliverable.md).
 
-No consent field exists by design — the image-publication waiver is a client-side submit gate (the checkbox
+No consent field exists by design — the publication-consent waiver is a client-side submit gate (the checkbox
 enables submit), not stored; a submitted package IS the consent record. App-side picklist constants:
 `shared/config/granteeDeliverableStatus.js`.
 

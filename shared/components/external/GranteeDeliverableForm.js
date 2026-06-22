@@ -3,7 +3,7 @@
  *
  * Rendered in the `view === 'edit'` branch of pages/external/grantee/[token].js.
  * The grantee reviews/edits the AI-formatted abstract, uploads a graphical image
- * + caption, and acknowledges the image-publication waiver. Per the design
+ * + caption, and acknowledges the publication-consent waiver. Per the design
  * (docs/GRANTEE_PORTAL_SPEC.md): the waiver is a CLIENT-SIDE SUBMIT GATE — the
  * checkbox enables the submit button and is NEVER sent/persisted; a submitted
  * package IS the consent record.
@@ -16,11 +16,31 @@
 
 import { useState } from 'react';
 
-// Interim waiver wording — exact legal text is an open item in the spec.
+// Publication-consent waiver wording (owner-provided, S278). Client-side submit
+// gate only — never sent/persisted; a submitted package IS the consent record.
 const WAIVER_LABEL =
-  'I grant the W. M. Keck Foundation permission to publish the image above.';
+  "By submitting, I give the W. M. Keck Foundation permission to publish the abstract, project title, my name and institution, and the image and caption I provide here in materials announcing this award, in print and online. I further confirm that I have the right to share the image I've uploaded.";
 
-const ACCEPTED_IMAGE_TYPES = 'image/png,image/jpeg,image/gif,image/webp';
+const ACCEPTED_IMAGE_TYPES = 'image/png,image/jpeg,image/webp';
+
+// Client-side size cap for a friendly pre-upload error. MUST match the server cap
+// (MAX_IMAGE_BYTES in lib/services/grantee-upload.js) — the server is the
+// enforcement of record; this is UX only.
+const MAX_IMAGE_MB = 10;
+const MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024;
+
+// Visible text-box styling so the fields read as inputs (the surrounding page
+// strips the default textarea border, leaving them white-on-white).
+const FIELD_STYLE = {
+  width: '100%',
+  marginTop: '.25rem',
+  padding: '.5rem',
+  border: '1px solid #b0b0b0',
+  borderRadius: 4,
+  fontFamily: 'inherit',
+  fontSize: '.95rem',
+  boxSizing: 'border-box',
+};
 
 export default function GranteeDeliverableForm({ token, deliverable, onSubmitted }) {
   const init = deliverable || {};
@@ -40,6 +60,18 @@ export default function GranteeDeliverableForm({ token, deliverable, onSubmitted
     caption.trim().length > 0 &&
     hasImage &&
     !submitting;
+
+  function handleImageChange(e) {
+    const file = e.target.files?.[0] || null;
+    if (file && file.size > MAX_IMAGE_BYTES) {
+      setError(`That image is ${(file.size / 1024 / 1024).toFixed(1)} MB — the limit is ${MAX_IMAGE_MB} MB. Please upload a smaller file.`);
+      setImageFile(null);
+      e.target.value = ''; // let the grantee re-select the same file after shrinking it
+      return;
+    }
+    setError(null);
+    setImageFile(file);
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -84,14 +116,18 @@ export default function GranteeDeliverableForm({ token, deliverable, onSubmitted
           value={abstract}
           onChange={(e) => setAbstract(e.target.value)}
           rows={12}
-          style={{ width: '100%' }}
+          placeholder="Review and edit your award abstract here."
+          style={FIELD_STYLE}
         />
       </label>
 
       <label style={{ display: 'block', marginTop: '1rem' }}>
         <strong>Graphical image</strong>
-        <input aria-label="Graphical image" type="file" accept={ACCEPTED_IMAGE_TYPES} onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
+        <input aria-label="Graphical image" type="file" accept={ACCEPTED_IMAGE_TYPES} onChange={handleImageChange} />
       </label>
+      <p style={{ margin: '.25rem 0 0', fontSize: '.85rem', color: '#555' }}>
+        JPEG, PNG, or WEBP (max {MAX_IMAGE_MB} MB) — not embedded in a Word or PowerPoint file. Use 16:9 for landscape photos.
+      </p>
       {init.hasImage && !imageFile && (
         <p><em>An image is already on file; upload a new one only if you want to replace it.</em></p>
       )}
@@ -103,7 +139,8 @@ export default function GranteeDeliverableForm({ token, deliverable, onSubmitted
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
           rows={3}
-          style={{ width: '100%' }}
+          placeholder="Type a caption describing the image (required)."
+          style={FIELD_STYLE}
         />
       </label>
 
@@ -115,7 +152,7 @@ export default function GranteeDeliverableForm({ token, deliverable, onSubmitted
       {error && <p role="alert" style={{ color: '#b00' }}>{error}</p>}
 
       <button type="submit" disabled={!canSubmit} style={{ marginTop: '1rem' }}>
-        {submitting ? 'Submitting…' : 'Submit deliverables'}
+        {submitting ? 'Submitting…' : 'Submit'}
       </button>
     </form>
   );

@@ -8,7 +8,7 @@
  *
  * This status tracks the lifecycle of a grantee's deliverables PACKAGE (one
  * AI-formatted abstract the grantee edits/approves + one graphical image + a
- * caption). The image-publication waiver is a client-side submit gate, NOT a
+ * caption). The publication-consent waiver is a client-side submit gate, NOT a
  * stored field — a submitted package IS the consent record. See
  * docs/GRANTEE_PORTAL_SPEC.md.
  *

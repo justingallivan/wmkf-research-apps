@@ -1,8 +1,10 @@
 /**
  * @jest-environment node
  *
- * validateGranteeImage — image magic-byte validation (PNG/JPEG/GIF/WEBP),
- * including the WEBP offset check (RIFF@0 + WEBP@8).
+ * validateGranteeImage — image magic-byte validation (PNG/JPEG/WEBP; GIF dropped
+ * for award images S278, though sniffImageType still detects GIF for the
+ * disguised-extension mismatch check), including the WEBP offset check
+ * (RIFF@0 + WEBP@8).
  */
 import { validateGranteeImage, sniffImageType } from '../../lib/utils/file-magic';
 
@@ -28,7 +30,6 @@ test('accepts matching extension + magic, returns canonical ext', () => {
   expect(validateGranteeImage('fig.png', png())).toEqual({ ok: true, type: 'png', ext: 'png' });
   expect(validateGranteeImage('fig.jpg', jpeg())).toEqual({ ok: true, type: 'jpeg', ext: 'jpg' });
   expect(validateGranteeImage('fig.jpeg', jpeg())).toEqual({ ok: true, type: 'jpeg', ext: 'jpg' });
-  expect(validateGranteeImage('fig.gif', gif())).toEqual({ ok: true, type: 'gif', ext: 'gif' });
   expect(validateGranteeImage('fig.webp', webp())).toEqual({ ok: true, type: 'webp', ext: 'webp' });
 });
 
@@ -37,10 +38,12 @@ test('rejects extension/content mismatch (renamed file)', () => {
   expect(validateGranteeImage('fig.webp', png()).ok).toBe(false);
 });
 
-test('rejects unsupported extension (e.g. .pdf / .exe)', () => {
+test('rejects unsupported extension (e.g. .pdf / .exe / .gif)', () => {
   expect(validateGranteeImage('doc.pdf', png()).ok).toBe(false);
   expect(validateGranteeImage('x.exe', png()).ok).toBe(false);
   expect(validateGranteeImage('', png()).ok).toBe(false);
+  // GIF dropped for grantee award images (S278) — even a real GIF is rejected.
+  expect(validateGranteeImage('fig.gif', gif()).ok).toBe(false);
 });
 
 test('WEBP with RIFF but wrong tag at offset 8 is rejected', () => {

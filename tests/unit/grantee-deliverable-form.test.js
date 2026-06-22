@@ -27,7 +27,7 @@ test('prefills the abstract and disables submit until waiver + fields are comple
   render(<GranteeDeliverableForm token="tok" deliverable={deliverable} />);
   // abstract prefilled from abstractFormatted
   expect(screen.getByLabelText('Abstract')).toHaveValue(deliverable.abstractFormatted);
-  const submit = screen.getByRole('button', { name: /submit deliverables/i });
+  const submit = screen.getByRole('button', { name: /^submit$/i });
   // caption empty + no image + waiver unchecked → disabled
   expect(submit).toBeDisabled();
 
@@ -45,13 +45,13 @@ test('checking the waiver alone does NOT enable submit without an image', () => 
   render(<GranteeDeliverableForm token="tok" deliverable={deliverable} />);
   fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
   fireEvent.click(screen.getByRole('checkbox'));
-  expect(screen.getByRole('button', { name: /submit deliverables/i })).toBeDisabled();
+  expect(screen.getByRole('button', { name: /^submit$/i })).toBeDisabled();
 });
 
 test('an already-on-file image satisfies the image requirement (no re-upload needed)', () => {
   render(<GranteeDeliverableForm token="tok" deliverable={{ ...deliverable, hasImage: true, caption: 'Existing caption.' }} />);
   fireEvent.click(screen.getByRole('checkbox'));
-  expect(screen.getByRole('button', { name: /submit deliverables/i })).toBeEnabled();
+  expect(screen.getByRole('button', { name: /^submit$/i })).toBeEnabled();
 });
 
 test('submit POSTs multipart to the submit route and shows the thank-you state', async () => {
@@ -61,7 +61,7 @@ test('submit POSTs multipart to the submit route and shows the thank-you state',
   fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
   fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
   fireEvent.click(screen.getByRole('checkbox'));
-  fireEvent.click(screen.getByRole('button', { name: /submit deliverables/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^submit$/i }));
 
   await waitFor(() => expect(screen.getByText(/your deliverables have been submitted/i)).toBeInTheDocument());
 
@@ -83,8 +83,8 @@ test('a failed submit surfaces an error and re-enables the button', async () => 
   fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
   fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
   fireEvent.click(screen.getByRole('checkbox'));
-  fireEvent.click(screen.getByRole('button', { name: /submit deliverables/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^submit$/i }));
 
   await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/scan failed/i));
-  expect(screen.getByRole('button', { name: /submit deliverables/i })).toBeEnabled();
+  expect(screen.getByRole('button', { name: /^submit$/i })).toBeEnabled();
 });

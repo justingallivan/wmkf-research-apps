@@ -26,10 +26,13 @@ Per grantee, exactly:
 1. **One edited/approved abstract** — we generate a style-guide version from the applicant's own
    submitted abstract; the grantee reviews, **edits in-portal (text, not a file upload)**, and
    **approves**. (NOT two documents.)
-2. **One image file** — a graphical/visual upload (graphical abstract). Format/size TBD.
+2. **One image file** — a graphical/visual upload (graphical abstract). JPEG/PNG/WEBP, ≤10 MB (S278;
+   client-side check + server magic-byte/size enforcement).
 3. **One image caption** — free text.
-4. **Image-publication waiver** — a single checkbox granting permission to publish their image.
-   Low-stakes / non-controversial (owner: never been refused). **Implemented as a UI submit-gate,
+4. **Publication-consent waiver** — a single checkbox granting permission to publish the abstract,
+   project title, grantee name + institution, and the image + caption in award-announcement materials
+   (print + online), and confirming the grantee has the right to share the image. Owner-provided
+   wording (S278). Low-stakes / non-controversial (owner: never been refused). **Implemented as a UI submit-gate,
    NOT a stored field:** the submit button stays disabled until the box is checked, so a submission
    existing *is* the consent record. **No consent fields are persisted to Dataverse** (no boolean,
    timestamp, IP/UA/version/hash, snapshot, or contact lookup).
@@ -119,7 +122,7 @@ New fields (the existing `wmkf_abstract` is the source and is NOT created):
 | `wmkf_GranteeImageCaption` | Memo (4000) | Free-text image caption. |
 | `wmkf_GranteeDeliverableStatus` | Picklist | Package lifecycle (below). Mirrors `shared/config/granteeDeliverableStatus.js`. |
 
-**No consent fields** — the image-publication waiver is a client-side submit gate (checkbox enables
+**No consent fields** — the publication-consent waiver is a client-side submit gate (checkbox enables
 submit), not stored. The existence of a submitted package is the consent record. So the new schema
 is just **4 content fields + 1 status picklist** (5 total): the two abstract fields, the image ref,
 the caption, and the status.
