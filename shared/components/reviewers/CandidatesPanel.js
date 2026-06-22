@@ -37,10 +37,24 @@ function StatusChip({ c }) {
     declined: 'bg-red-100 text-red-700',
     accepted: 'bg-green-100 text-green-700',
     invited: 'bg-amber-100 text-amber-800',
+    closed: 'bg-gray-100 text-gray-500',
     none: 'bg-gray-100 text-gray-600',
   };
-  const label = c.declined ? 'Declined' : c.accepted ? 'Accepted' : c.invited ? 'Invited — awaiting response' : 'Not invited';
-  const tone = c.declined ? tones.declined : c.accepted ? tones.accepted : c.invited ? tones.invited : tones.none;
+  // Reviewer-engagement Phase 4: a set responseType (withdrawn_sufficient / no_response /
+  // held) is a resolved state — don't keep showing the row as "awaiting response".
+  const withdrawn = c.responseType === 'withdrawn_sufficient';
+  const noResponse = c.responseType === 'no_response';
+  const label = c.declined ? 'Declined'
+    : c.accepted ? 'Accepted'
+    : withdrawn ? 'Released — no longer needed'
+    : noResponse ? 'No response'
+    : c.invited ? 'Invited — awaiting response'
+    : 'Not invited';
+  const tone = c.declined ? tones.declined
+    : c.accepted ? tones.accepted
+    : (withdrawn || noResponse) ? tones.closed
+    : c.invited ? tones.invited
+    : tones.none;
   return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tone}`}>{label}</span>;
 }
 
@@ -101,9 +115,10 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
   const selectedRows = candidates.filter((c) => selected.has(c.suggestionId));
   const selectedNotInvited = selectedRows.filter((c) => !c.invited && !c.accepted);
   const selectedInvited = selectedRows.filter((c) => c.invited && !c.accepted);
-  // Still-pending = invited, not accepted, not declined — the only rows the PD may
+  // Still-pending = invited, no response yet (not accepted/declined, and no resolved
+  // responseType — excludes already-withdrawn/no_response). The only rows the PD may
   // "no longer needed"-release (reviewer-engagement Phase 4 §3.C). Server re-guards this.
-  const selectedPending = selectedRows.filter((c) => c.invited && !c.accepted && !c.declined);
+  const selectedPending = selectedRows.filter((c) => c.invited && !c.accepted && !c.declined && !c.responseType);
 
   const handleWithdraw = async () => {
     if (selectedPending.length === 0 || withdrawing) return;

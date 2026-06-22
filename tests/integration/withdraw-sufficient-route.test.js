@@ -39,6 +39,7 @@ function pendingRow(over = {}) {
     _wmkf_request_value: REQ,
     _wmkf_potentialreviewer_value: PERSON,
     wmkf_invited: true, wmkf_accepted: false, wmkf_declined: false, wmkf_responsetype: null,
+    _etag: 'W/"1"',
     ...over,
   };
 }
@@ -67,7 +68,7 @@ test('still-pending row: writes withdrawn_sufficient (+ clears respond marker) B
   expect(updateLifecycle).toHaveBeenCalledWith(
     SUG,
     expect.objectContaining({ responseType: 'withdrawn_sufficient', withdrawnSufficientAt: expect.any(String), respondReminderSentAt: null }),
-    { actingUserSystemId: 'u-1' },
+    expect.objectContaining({ actingUserSystemId: 'u-1', ifMatch: 'W/"1"' }),
   );
   expect(createAndSendEmail).toHaveBeenCalledTimes(1);
   // State write precedes the courtesy email (a send failure can't leave them able to respond).
@@ -106,6 +107,17 @@ test('non-GUID suggestionId → 400 before any work', async () => {
 test('non-GUID requestId → 400', async () => {
   const res = await run({ requestId: 'nope', suggestionIds: [SUG] });
   expect(res.statusCode).toBe(400);
+});
+
+test('reviewer accepts between guard-read and write (412) → changed_skipped, no email (Codex finding #2)', async () => {
+  findById.mockResolvedValue(pendingRow());
+  updateLifecycle.mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }));
+  const res = await run({ requestId: REQ, suggestionIds: [SUG] });
+  expect(res._data.withdrawn).toBe(0);
+  expect(res._data.results[0].status).toBe('changed_skipped');
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+  // The write carried the row's _etag for the optimistic lock.
+  expect(updateLifecycle).toHaveBeenCalledWith(SUG, expect.any(Object), expect.objectContaining({ ifMatch: expect.anything() }));
 });
 
 test('email-send failure still reports the reviewer as withdrawn (state already committed)', async () => {

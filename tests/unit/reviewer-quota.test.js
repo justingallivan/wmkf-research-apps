@@ -73,13 +73,33 @@ test('no desired count configured → skip', async () => {
   expect(notify).not.toHaveBeenCalled();
 });
 
-test('lost the If-Match race (412) → no double-notify', async () => {
-  getRecord.mockResolvedValue(request());
+test('412 then re-read shows marker SET (another accept won) → no double-notify', async () => {
+  // Initial read: marker null. Re-read after the 412: marker now set by the winner.
+  getRecord
+    .mockResolvedValueOnce(request())
+    .mockResolvedValueOnce(request({ wmkf_quotanotifiedat: '2026-06-01T00:00:00Z' }));
   countAcceptedForRequest.mockResolvedValue(4);
   updateRecord.mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }));
   const r = await maybeNotifyQuotaReached({ requestId: REQ });
   expect(r).toMatchObject({ notified: false, reason: 'lost_notify_race' });
   expect(notify).not.toHaveBeenCalled();
+});
+
+test('412 from an UNRELATED akoya_request write (marker still null) → retries and notifies (Codex finding #1)', async () => {
+  // First write 412s (e.g. a concurrent campaign-config/triage write bumped the ETag); the
+  // re-read shows the marker is STILL null, so we must retry — not silently lose the notify.
+  getRecord
+    .mockResolvedValueOnce(request({ _etag: 'W/"5"' }))
+    .mockResolvedValueOnce(request({ _etag: 'W/"6"', wmkf_quotanotifiedat: null }));
+  countAcceptedForRequest.mockResolvedValue(3);
+  updateRecord
+    .mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }))
+    .mockResolvedValueOnce(undefined);
+  const r = await maybeNotifyQuotaReached({ requestId: REQ });
+  expect(r.notified).toBe(true);
+  // The retry used the FRESH etag from the re-read.
+  expect(updateRecord).toHaveBeenLastCalledWith('akoya_requests', REQ, expect.any(Object), { ifMatch: 'W/"6"' });
+  expect(notify).toHaveBeenCalledTimes(1);
 });
 
 test('marker write succeeds but notify throws → still reported notified (marker owns once-only)', async () => {

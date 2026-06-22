@@ -100,14 +100,20 @@ export default async function handler(req, res) {
 
         // Authoritative state change FIRST (prevents the reviewer from still responding),
         // then the courtesy email. A send failure leaves them correctly withdrawn.
+        //
+        // If-Match on the row's _etag closes the TOCTOU window (Codex finding #2): a
+        // reviewer who ACCEPTS between the pending read above and this write changes the
+        // row, so the conditional write 412s and we skip — never overwriting an accepted
+        // (or otherwise-changed) row to withdrawn_sufficient.
         try {
           await suggestionAdapter.updateLifecycle(id, {
             responseType: 'withdrawn_sufficient',
             withdrawnSufficientAt: nowIso,
             respondReminderSentAt: null,
-          }, { actingUserSystemId });
+          }, { actingUserSystemId, ifMatch: s._etag });
         } catch (e) {
-          results.push({ suggestionId: id, status: 'write_failed', error: String(e.message || e).slice(0, 200) });
+          const is412 = e.status === 412 || /\b412\b/.test(e.message || '');
+          results.push({ suggestionId: id, status: is412 ? 'changed_skipped' : 'write_failed', error: String(e.message || e).slice(0, 200) });
           continue;
         }
         withdrawn++;
