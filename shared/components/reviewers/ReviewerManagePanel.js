@@ -1187,6 +1187,20 @@ export default function ReviewerManagePanel({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* Release to reviewers (reviewer-engagement §3.A): a one-click materials send to
+              ALL accepted-awaiting-materials reviewers. The 'invite' mode already lists only
+              accepted reviewers; this selects them and opens the materials email (which the
+              modal defaults to). Accepted-only is also enforced server-side in send-emails. */}
+          {canManage && mode === 'invite' && reviewers.length > 0 && (
+            <Button
+              onClick={() => {
+                setSelectedReviewers(new Set(reviewers.map(r => r.suggestionId)));
+                setEmailModalOpen(true);
+              }}
+            >
+              Release to reviewers ({reviewers.length})
+            </Button>
+          )}
           {canManage && selectedList.length > 0 && (
             <Button onClick={() => setEmailModalOpen(true)}>
               Send Email ({selectedList.length})

@@ -43,6 +43,7 @@ import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { findByShortCode as findCycleByShortCode } from '../../../lib/services/grant-cycles-dataverse';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
+import { isYmd } from '../../../lib/utils/date-ymd';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { safeFetch, isAllowedUrl } from '../../../lib/utils/safe-fetch';
 import { readUploadedBlobBuffer } from '../../../lib/utils/uploaded-blob';
@@ -64,17 +65,6 @@ export const config = {
   api: { bodyParser: { sizeLimit: '10mb' } },
   maxDuration: 300,
 };
-
-// Strict YYYY-MM-DD calendar-date validator for the campaign-config reviewDueDate
-// (a Dataverse DateOnly column). Rejects malformed strings and impossible dates
-// (e.g. 2026-02-31) so a bad value never lands on the request.
-function isYmd(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const [y, m, d] = value.split('-').map(Number);
-  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
-}
 
 function splitName(fullName) {
   const trimmed = (fullName || '').trim();
@@ -343,6 +333,24 @@ export default async function handler(req, res) {
           current: processed,
           total: drafts.length,
           message: `Skipped ${name || '(unnamed)'} (not in held state)`,
+        });
+        continue;
+      }
+
+      // Release-to-reviewers accepted-only gate (reviewer-engagement §3.A / DECISION #10):
+      // proposal materials go ONLY to a reviewer who has ACCEPTED. SERVER-authoritative —
+      // independent of the caller/UI — so a non-accepted reviewer can never receive the
+      // materials email (and, via render-emails, never gets upgraded to the long-lived
+      // materials token). The existing attachment gate strips materials FILES from a
+      // mislabeled send; this refuses the materials EMAIL itself. Mirrors the
+      // recipientMayReceiveAttachments accepted check (wmkf_accepted === true).
+      if (templateType === 'materials' && suggestion?.wmkf_accepted !== true) {
+        skipped.push({ suggestionId: draft.suggestionId, candidateName: name, candidateEmail: email, reason: 'not_accepted' });
+        sendEvent('progress', {
+          stage: 'sending',
+          current: processed,
+          total: drafts.length,
+          message: `Skipped ${name || '(unnamed)'} (has not accepted — materials withheld)`,
         });
         continue;
       }

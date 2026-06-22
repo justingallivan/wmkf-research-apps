@@ -68,6 +68,9 @@ function mockSuggestionFound() {
   DynamicsService.getRecord.mockResolvedValue({
     wmkf_appreviewersuggestionid: SUGGESTION_ID,
     _wmkf_request_value: REQUEST_ID,
+    // materials_sent (100000001): a normal reviewer who has been released materials and
+    // may upload. The Phase-2 self-token guard rejects anything below this value.
+    wmkf_reviewstatus: 100000001,
     wmkf_Request: { akoya_requestid: REQUEST_ID, akoya_requestnum: REQUEST_NUMBER },
   });
 }
@@ -110,6 +113,40 @@ describe('writeReviewFiles — argument validation', () => {
   test('rejects unknown source', async () => {
     const r = await writeReviewFiles(validInput({ opts: { source: 'sneaky' } }));
     expect(r.ok).toBe(false);
+  });
+});
+
+describe('writeReviewFiles — materials-sent upload gate (Phase 2)', () => {
+  const withStatus = (wmkf_reviewstatus) => DynamicsService.getRecord.mockResolvedValue({
+    wmkf_appreviewersuggestionid: SUGGESTION_ID,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_reviewstatus,
+    wmkf_Request: { akoya_requestid: REQUEST_ID, akoya_requestnum: REQUEST_NUMBER },
+  });
+
+  test('self-token + status null (accepted-pre-materials) → materials_not_sent, no SharePoint write', async () => {
+    withStatus(null);
+    const r = await writeReviewFiles(validInput());
+    expect(r).toEqual({ ok: false, reason: 'materials_not_sent' });
+    expect(GraphService.uploadFile).not.toHaveBeenCalled();
+  });
+
+  test('self-token + status accepted (below materials_sent) → materials_not_sent', async () => {
+    withStatus(100000000);
+    const r = await writeReviewFiles(validInput());
+    expect(r).toEqual({ ok: false, reason: 'materials_not_sent' });
+  });
+
+  test('self-token + status materials_sent → proceeds', async () => {
+    withStatus(100000001);
+    const r = await writeReviewFiles(validInput());
+    expect(r.ok).toBe(true);
+  });
+
+  test('staff_upload is NOT gated even when materials not yet sent', async () => {
+    withStatus(null);
+    const r = await writeReviewFiles(validInput({ opts: { source: 'staff_upload', actingUserSystemId: 'sys-1' } }));
+    expect(r.ok).toBe(true);
   });
 });
 

@@ -32,6 +32,14 @@ describe('respondForFailedReviewUpload', () => {
     expect(res.body).toEqual({ ok: false, reason: 'not_found' });
   });
 
+  test('materials_not_sent → 403, reviewer-facing message (no internal leak)', () => {
+    const res = makeRes();
+    respondForFailedReviewUpload(res, { ok: false, reason: 'materials_not_sent' });
+    expect(res.statusCode).toBe(403);
+    expect(res.body.reason).toBe('materials_not_sent');
+    expect(res.body.message).toMatch(/have not been released/i);
+  });
+
   test('infected → 422, echoes the file-level errors (caller-actionable)', () => {
     const res = makeRes();
     respondForFailedReviewUpload(res, {
