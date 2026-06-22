@@ -147,6 +147,10 @@ Postgres `reviewer_suggestions` (337 rows) is parity at ~97.6% per S136 probe (`
 
 `wmkf_declinereason` (Memo, max 2000) — captures why a reviewer declined, replacing free-form `wmkf_notes` for that purpose. Deployed alongside the rest of the Stage 2a slice 1 additions (see the "Stage 2a slice 1 additions" section above for the full field list). The locked-S136 plan originally named two fields; `wmkf_responsereceivedat` turned out to already exist (R5 stress-test 2026-05-07), so only `wmkf_declinereason` was new.
 
+## Schema additions — DEPLOYED 2026-06-21 (S275 reviewer-engagement)
+
+`wmkf_respondremindersentat` (DateTime, DateAndTime/UserLocal) — Phase-3 fire-once marker for the per-reviewer respond-by reminder; SEPARATE from the review-due/follow-up marker. **No consumer yet** — schema is ahead of the build. Re-invite (`allowResend`) MUST clear it in the SAME write as the `emailSentAt` re-stamp (`docs/REVIEWER_ENGAGEMENT_SPEC.md` §3.B), else the prior wave's marker blocks the new window's reminder. Provisioned in prod via `apply-dataverse-schema --target=prod --wave=7-reviewer-engagement --execute`, published + verified in live metadata; no Power Automate trigger. Schema spec: `lib/dataverse/schema/wave7-reviewer-engagement/wmkf_appreviewersuggestion-reviewer-engagement.json`. The per-request campaign-config half of this wave lives on `akoya_request` (see that Atlas page).
+
 ## Token lifecycle (live, per `project_external_reviewer_file_access.md`)
 
 - 90-day mint ceiling; 7-day post-submission modify window (`extendForPostSubmissionWindow` in `lib/external/token-lifecycle.js`).

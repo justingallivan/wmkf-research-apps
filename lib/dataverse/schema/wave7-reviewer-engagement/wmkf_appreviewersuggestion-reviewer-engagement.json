@@ -1,0 +1,16 @@
+{
+  "name": "wmkf_appreviewersuggestion-reviewer-engagement",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_appreviewersuggestion",
+  "_comment": "Reviewer-engagement per-reviewer reminder marker (docs/REVIEWER_ENGAGEMENT_SPEC.md §4 / §3.B). Fire-once marker for the respond-by reminder, SEPARATE from the review-due/follow-up marker. CRITICAL (Codex P2): Re-invite (allowResend) MUST clear this in the SAME write as the emailSentAt re-stamp in send-emails.js, or the prior wave's marker blocks the new window's reminder. schema-apply is creation-only + idempotent. Same DateAndTime/UserLocal shape as the existing wmkf_heldat / wmkf_responsereceivedat lifecycle timestamps. New field MUST carry NO PowerAutomate trigger — verify post-deploy. Catalogued in docs/atlas/dataverse-reviewer-suggestion.md (or the reviewer-suggestion Atlas page).",
+  "attributes": [
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_RespondReminderSentAt",
+      "displayName": "Respond Reminder Sent At",
+      "format": "DateAndTime",
+      "behavior": "UserLocal",
+      "description": "When the single respond-by reminder was sent to this reviewer (Phase 3 fire-once marker). Empty = not yet sent. Cleared on Re-invite so a fresh offer window can remind again."
+    }
+  ]
+}

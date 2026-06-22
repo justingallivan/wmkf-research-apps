@@ -46,6 +46,8 @@ Use this page for reviewer UI/workbench flows, durable roster behavior,
 cross-run deduplication, referral capture, address collection, lifecycle state,
 and staff-facing reviewer management.
 
+**Reviewer-engagement build (Model B):** spec is `docs/REVIEWER_ENGAGEMENT_SPEC.md`. The 9 backing Dataverse fields are **provisioned in prod (2026-06-21, wave `7-reviewer-engagement`)** but have **no consumer yet** — Phases 1–4 are unbuilt. Per-request campaign config (offset/due-date/reminder toggles+leads/desired-count/quota-notified-at) lives on `akoya_request`; the per-reviewer fire-once respond-reminder marker `wmkf_respondremindersentat` lives on `wmkf_appreviewersuggestion`. See the two Atlas pages for the exact column list.
+
 ## Durable Memory
 
 - Workbench and invite workflow: `project-reviewer-apps-redesign-direction`, `project-reviewer-workbench-invite-workflow`.
