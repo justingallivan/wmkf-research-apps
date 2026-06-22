@@ -134,12 +134,13 @@ function PromptPanel({ prompt, onPublished }) {
 }
 
 function PublishForm({ prompt, onSuccess, onOutcome }) {
+  const [systemPrompt, setSystemPrompt] = useState(prompt.systemPrompt || '');
   const [body, setBody] = useState(prompt.body || '');
   const [submitting, setSubmitting] = useState(false);
   const [requestId] = useState(newRequestId); // stable across retries of this edit
 
   const validation = validatePromptForSave(prompt.name, body);
-  const unchanged = body === (prompt.body || '');
+  const unchanged = body === (prompt.body || '') && systemPrompt === (prompt.systemPrompt || '');
 
   const submit = async () => {
     setSubmitting(true);
@@ -147,7 +148,7 @@ function PublishForm({ prompt, onSuccess, onOutcome }) {
       const r = await fetch(`/api/admin/prompts/${encodeURIComponent(prompt.name)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body, requestId }),
+        body: JSON.stringify({ body, systemPrompt, requestId }),
       });
       const data = await r.json();
       if (data.status === 'completed' || data.status === 'already_published') onSuccess(data);
@@ -161,6 +162,17 @@ function PublishForm({ prompt, onSuccess, onOutcome }) {
 
   return (
     <div className="p-4 space-y-3">
+      <label className="block text-xs text-gray-700">
+        System prompt <span className="text-gray-400">(the rules / instructions; blank for none)</span>
+        <textarea
+          value={systemPrompt}
+          onChange={(e) => setSystemPrompt(e.target.value)}
+          rows={16}
+          className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-mono text-xs"
+        />
+        <div className="mt-1 text-[10px] text-gray-400">{systemPrompt.length} chars</div>
+      </label>
+
       <label className="block text-xs text-gray-700">
         Prompt body
         <textarea
@@ -190,7 +202,7 @@ function PublishForm({ prompt, onSuccess, onOutcome }) {
       <div className="flex items-center justify-end gap-3">
         <button
           type="button"
-          onClick={() => setBody(prompt.body || '')}
+          onClick={() => { setBody(prompt.body || ''); setSystemPrompt(prompt.systemPrompt || ''); }}
           disabled={unchanged}
           className="text-xs text-gray-600 hover:text-gray-900 disabled:opacity-40"
         >
