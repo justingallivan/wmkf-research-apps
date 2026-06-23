@@ -11,6 +11,7 @@ import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { mintForRequest } from '../../../lib/external/grantee-token-lifecycle';
 import { renderGranteeReminderHtml } from '../../../lib/external/grantee-invite-email';
+import { readRequiredEmailDefaults } from '../../../lib/services/email-defaults';
 import { resolveSignatureForRequest } from '../../../lib/services/email-signature';
 import {
   GRANTEE_DELIVERABLE_ENTITY_SET,
@@ -34,7 +35,8 @@ const REQUEST_SELECT = [
 const CONTACT_SELECT = 'contactid,fullname,firstname,lastname,emailaddress1';
 const PD_SELECT = 'systemuserid,fullname,internalemailaddress,title,isdisabled';
 const CONCURRENCY = 4;
-const SUBJECT = 'Reminder: your W. M. Keck Foundation abstract';
+const SUBJECT_KEY = 'email.grantee_reminder.subject';
+const BODY_KEY = 'email.grantee_reminder.body';
 
 function isoDaysAgo(days) {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
@@ -76,6 +78,9 @@ export default async function handler(req, res) {
   if (!verifyCronSecret(req, res)) return;
 
   return bypassDynamicsRestrictions('grantee-deliverable-reminders-cron', async () => {
+    const emailDefaults = await readRequiredEmailDefaults([SUBJECT_KEY, BODY_KEY], {
+      source: 'grantee-deliverable-reminders',
+    });
     const cutoff = isoDaysAgo(12);
     const filter =
       `wmkf_deliverablestatus eq ${GRANTEE_DELIVERABLE_STATUS.INVITED}` +
@@ -104,6 +109,7 @@ export default async function handler(req, res) {
       reminded: 0,
       skippedNoPd: 0,
       skippedNoRecipient: 0,
+      skippedMisconfigured: 0,
       claimFailed: 0,
       sendFailed: 0,
       capped,
@@ -111,12 +117,22 @@ export default async function handler(req, res) {
       failures: [],
     };
 
+    if (!emailDefaults.ok) {
+      summary.skippedMisconfigured = records.length;
+      summary.failures.push(...emailDefaults.failures.map((failure) => ({
+        requestNum: null,
+        reason: `email default ${failure.key} ${failure.reason}`,
+      })));
+      console.error('[grantee-deliverable-reminders] summary', JSON.stringify(summary));
+      return res.status(200).json(summary);
+    }
+
     let nextIndex = 0;
     async function worker() {
       while (true) {
         const i = nextIndex++;
         if (i >= records.length) return;
-        await processRow(records[i], summary);
+        await processRow(records[i], summary, emailDefaults.values);
       }
     }
 
@@ -130,7 +146,7 @@ export default async function handler(req, res) {
   });
 }
 
-async function processRow(row, summary) {
+async function processRow(row, summary, emailDefaultValues) {
   const deliverableId = row.wmkf_granteedeliverableid;
   const requestId = row._wmkf_request_value;
   let requestNum = null;
@@ -192,6 +208,7 @@ async function processRow(row, summary) {
     ({ url } = await mintForRequest({ requestId }));
     const signatureBlock = await resolveSignatureForRequest(requestId);
     const html = renderGranteeReminderHtml({
+      bodyTemplate: emailDefaultValues[BODY_KEY],
       piName,
       title: request.akoya_title || 'your W. M. Keck Foundation award',
       signatureBlock,
@@ -199,7 +216,7 @@ async function processRow(row, summary) {
       url,
     });
     await DynamicsService.createAndSendEmail({
-      subject: SUBJECT,
+      subject: emailDefaultValues[SUBJECT_KEY],
       body: html,
       from,
       to,

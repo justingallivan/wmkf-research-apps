@@ -44,7 +44,7 @@ describe('/api/admin/email-defaults', () => {
     getSettingStrict.mockImplementation(async (key) => {
       if (key === subjectKey) return { found: true, value: 'Stored subject' };
       if (key === bodyKey) return { found: false, value: null };
-      throw new Error(`unexpected key ${key}`);
+      return { found: false, value: null };
     });
 
     const r = res();
@@ -52,7 +52,8 @@ describe('/api/admin/email-defaults', () => {
 
     expect(r.statusCode).toBe(200);
     expect(r.body.defaults).toHaveLength(EDITABLE_TEXT_DEFAULTS.length);
-    expect(r.body.defaults[0]).toMatchObject({
+    const byKey = Object.fromEntries(r.body.defaults.map((entry) => [entry.key, entry]));
+    expect(byKey[subjectKey]).toMatchObject({
       key: subjectKey,
       label: expect.any(String),
       description: expect.any(String),
@@ -61,7 +62,7 @@ describe('/api/admin/email-defaults', () => {
       value: 'Stored subject',
       unavailable: false,
     });
-    expect(r.body.defaults[1]).toMatchObject({
+    expect(byKey[bodyKey]).toMatchObject({
       key: bodyKey,
       multiline: true,
       placeholders: ['[Name]', '[title]', 'COB [date]'],
@@ -118,7 +119,7 @@ describe('/api/email-defaults/grantee-invite', () => {
     getSettingStrict.mockImplementation(async (key) => {
       if (key === subjectKey) return { found: true, value: 'Stored subject' };
       if (key === bodyKey) return { found: true, value: 'Stored body' };
-      throw new Error(`unexpected key ${key}`);
+      return { found: false, value: null };
     });
 
     const r = res();

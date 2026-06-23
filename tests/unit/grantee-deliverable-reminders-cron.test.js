@@ -15,6 +15,13 @@ jest.mock('../../lib/services/dynamics-service', () => ({
     createAndSendEmail: jest.fn(),
   },
 }));
+jest.mock('../../lib/services/settings-service', () => ({
+  getSettingStrict: jest.fn(),
+}));
+jest.mock('../../lib/services/notification-service', () => ({
+  __esModule: true,
+  default: { notify: jest.fn(async () => ({ id: 1 })) },
+}));
 jest.mock('../../lib/external/grantee-token-lifecycle', () => ({
   mintForRequest: jest.fn(async ({ requestId }) => ({ url: `https://app.example.org/external/grantee/${requestId}` })),
 }));
@@ -28,6 +35,8 @@ jest.mock('../../lib/services/email-signature', () => ({
 
 import { verifyCronSecret } from '../../lib/utils/cron-auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
+import { getSettingStrict } from '../../lib/services/settings-service';
+import NotificationService from '../../lib/services/notification-service';
 import { resolveSignatureForRequest } from '../../lib/services/email-signature';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import handler from '../../pages/api/cron/grantee-deliverable-reminders';
@@ -41,6 +50,18 @@ function mockRes() {
 }
 
 const req = () => ({ method: 'GET', query: {}, headers: {} });
+const SUBJECT_KEY = 'email.grantee_reminder.subject';
+const BODY_KEY = 'email.grantee_reminder.body';
+const SUBJECT = 'Reminder: your W. M. Keck Foundation abstract';
+const BODY =
+  'Dear Professor [Name]:\n\n' +
+  'I\'m following up on the abstract for your recent W. M. Keck Foundation award entitled "[title]". ' +
+  "We'd welcome any changes to the draft, and an image to accompany it, before we post your award on the " +
+  "Foundation's website. Please use your secure link below by COB [date]. If we have not heard from you by " +
+  'then, we will post the draft abstract as written. If you have already submitted, thank you - no further ' +
+  'action is needed. Please do not hesitate to contact me if you need additional information.\n\n' +
+  'Thank you,\n\n' +
+  '[Program Director signature]';
 const deliv = (n, invitedDate = '2026-06-08T00:00:00.000Z') => ({
   wmkf_granteedeliverableid: `d${n}`,
   _wmkf_request_value: `r${n}`,
@@ -71,6 +92,12 @@ const pdRow = (id) => ({
 
 beforeEach(() => {
   verifyCronSecret.mockReset().mockReturnValue(true);
+  getSettingStrict.mockReset().mockImplementation(async (key) => {
+    if (key === SUBJECT_KEY) return { found: true, value: SUBJECT };
+    if (key === BODY_KEY) return { found: true, value: BODY };
+    throw new Error(`unexpected setting ${key}`);
+  });
+  NotificationService.notify.mockClear().mockResolvedValue({ id: 1 });
   DynamicsService.queryAllRecords.mockReset().mockResolvedValue({ records: [], totalCount: 0, capped: false });
   DynamicsService.updateRecord.mockReset().mockResolvedValue({});
   DynamicsService.createAndSendEmail.mockReset().mockResolvedValue({ emailId: 'email-1' });
@@ -115,7 +142,7 @@ test('claims before sending and sends with noFallback as the PD', async () => {
   expect(DynamicsService.updateRecord.mock.invocationCallOrder[0])
     .toBeLessThan(DynamicsService.createAndSendEmail.mock.invocationCallOrder[0]);
   expect(DynamicsService.createAndSendEmail.mock.calls[0][0]).toMatchObject({
-    subject: 'Reminder: your W. M. Keck Foundation abstract',
+    subject: SUBJECT,
     from: 'pd1@wmkeck.org',
     to: 'pi1@example.edu',
     cc: 'liaison1@example.edu',
@@ -126,6 +153,71 @@ test('claims before sending and sends with noFallback as the PD', async () => {
   });
   expect(resolveSignatureForRequest).toHaveBeenCalledWith('r1');
   expect(DynamicsService.createAndSendEmail.mock.calls[0][0].body).toContain('Assigned PD');
+});
+
+test('default read is applied to grantee reminder subject and body', async () => {
+  getSettingStrict.mockImplementation(async (key) => {
+    if (key === SUBJECT_KEY) return { found: true, value: 'Custom grantee reminder subject' };
+    if (key === BODY_KEY) return {
+      found: true,
+      value: 'Hello Professor [Name]\n\nAward [title] is due by COB [date].\n\n[Program Director signature]',
+    };
+    throw new Error(`unexpected setting ${key}`);
+  });
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1)], totalCount: 1, capped: false });
+  const res = mockRes();
+  await handler(req(), res);
+
+  expect(res.body.reminded).toBe(1);
+  const email = DynamicsService.createAndSendEmail.mock.calls[0][0];
+  expect(email.subject).toBe('Custom grantee reminder subject');
+  expect(email.body).toContain('Hello Professor Professor pi1');
+  expect(email.body).toContain('Award Award 1 is due by COB June 22, 2026.');
+  expect(email.body).toContain('Assigned PD');
+});
+
+test('blank grantee reminder default skips before claim and alerts admins', async () => {
+  getSettingStrict.mockImplementation(async (key) => {
+    if (key === SUBJECT_KEY) return { found: true, value: '   ' };
+    if (key === BODY_KEY) return { found: true, value: BODY };
+    throw new Error(`unexpected setting ${key}`);
+  });
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1)], totalCount: 1, capped: false });
+  const res = mockRes();
+  await handler(req(), res);
+
+  expect(res.body.skippedMisconfigured).toBe(1);
+  expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+  expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+    type: 'email_default_misconfigured',
+    emailAdmins: true,
+    autoResolveKey: `email-default-misconfigured:${SUBJECT_KEY}`,
+    metadata: expect.objectContaining({ reason: 'blank' }),
+  }));
+});
+
+test('unavailable grantee reminder default skips before claim and alerts admins', async () => {
+  getSettingStrict.mockImplementation(async (key) => {
+    if (key === SUBJECT_KEY) return { found: true, value: SUBJECT };
+    if (key === BODY_KEY) throw new Error('Dynamics 503');
+    throw new Error(`unexpected setting ${key}`);
+  });
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1)], totalCount: 1, capped: false });
+  const res = mockRes();
+  await handler(req(), res);
+
+  expect(res.body.skippedMisconfigured).toBe(1);
+  expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+  expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+    type: 'email_default_misconfigured',
+    emailAdmins: true,
+    autoResolveKey: `email-default-misconfigured:${BODY_KEY}`,
+    metadata: expect.objectContaining({ reason: 'unavailable' }),
+  }));
+  expect(NotificationService.notify.mock.invocationCallOrder[0])
+    .toBeLessThan(DynamicsService.queryAllRecords.mock.invocationCallOrder[0]);
 });
 
 test('send failure after claim is reported and not finalized, preventing next-run double-send', async () => {

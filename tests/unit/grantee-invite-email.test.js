@@ -8,6 +8,7 @@ import {
   buildGranteeReminderBodyText,
   renderGranteeInviteHtml,
 } from '../../lib/external/grantee-invite-email';
+import { GRANTEE_REMINDER_SEED_BODY } from '../../lib/seed/email-defaults/grantee-reminder';
 
 const URL = 'https://app.example.org/external/grantee/JWT.123_abc';
 
@@ -36,6 +37,7 @@ test('escapes HTML in the staff-authored body (no injection)', () => {
 
 test('reminder body uses the resolved signature block instead of pdName/pdTitle', () => {
   const body = buildGranteeReminderBodyText({
+    bodyTemplate: GRANTEE_REMINDER_SEED_BODY,
     piName: 'Raj',
     title: 'Neural signaling',
     signatureBlock: { signature: 'Connor Noda\nW. M. Keck Foundation' },

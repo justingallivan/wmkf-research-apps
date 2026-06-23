@@ -17,6 +17,15 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 }));
 const mintAndStore = jest.fn(async () => ({ url: 'https://reviews.example/external/review/jwt' }));
 jest.mock('../../lib/external/token-lifecycle', () => ({ mintAndStore: (...a) => mintAndStore(...a) }));
+const getSettingStrict = jest.fn();
+jest.mock('../../lib/services/settings-service', () => ({
+  getSettingStrict: (...a) => getSettingStrict(...a),
+}));
+const notify = jest.fn(async () => ({ id: 1 }));
+jest.mock('../../lib/services/notification-service', () => ({
+  __esModule: true,
+  default: { notify: (...a) => notify(...a) },
+}));
 jest.mock('../../lib/services/email-signature', () => ({
   resolveSignatureForRequest: jest.fn(async () => ({ signature: 'Dr. PD\nW. M. Keck Foundation' })),
 }));
@@ -31,6 +40,29 @@ const SUG = '11111111-1111-4111-8111-111111111111';
 const REQ = 'req-1';
 const PD = 'pd-1';
 const PERSON = 'person-1';
+const RESPOND_SUBJECT_KEY = 'email.reviewer_reminder_respond_by.subject';
+const RESPOND_BODY_KEY = 'email.reviewer_reminder_respond_by.body';
+const REVIEW_DUE_SUBJECT_KEY = 'email.reviewer_reminder_review_due.subject';
+const REVIEW_DUE_BODY_KEY = 'email.reviewer_reminder_review_due.body';
+const RESPOND_SUBJECT = 'Reminder: your W. M. Keck Foundation review invitation';
+const RESPOND_BODY =
+  'Dear [Reviewer Name]:\n\n' +
+  "I'm following up on my recent invitation to review [proposal title clause] for the W. M. Keck Foundation. " +
+  'We have not yet heard back from you and would be grateful to know whether you are able to serve.\n\n' +
+  'Please use your secure link below to accept or decline. If you accept, you can confirm a few details now ' +
+  'and the full proposal will follow once it is released. If your circumstances have changed, a quick decline ' +
+  'is just as helpful.\n\n' +
+  'Thank you,\n\n' +
+  '[Program Director signature]';
+const REVIEW_DUE_SUBJECT = 'Reminder: your W. M. Keck Foundation review';
+const REVIEW_DUE_BODY =
+  'Dear [Reviewer Name]:\n\n' +
+  'This is a friendly reminder about your review of [proposal title clause] for the W. M. Keck Foundation. ' +
+  'Your review is due by [review due date].\n\n' +
+  'Your secure link below opens the proposal materials and the review form. If you have already submitted, ' +
+  'thank you — no further action is needed.\n\n' +
+  'Thank you,\n\n' +
+  '[Program Director signature]';
 
 function isoDaysAgo(d) { return new Date(Date.now() - d * DAY).toISOString(); }
 function ymdDaysFromNow(d) {
@@ -73,6 +105,14 @@ function respondCandidate(over = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  getSettingStrict.mockImplementation(async (key) => {
+    if (key === RESPOND_SUBJECT_KEY) return { found: true, value: RESPOND_SUBJECT };
+    if (key === RESPOND_BODY_KEY) return { found: true, value: RESPOND_BODY };
+    if (key === REVIEW_DUE_SUBJECT_KEY) return { found: true, value: REVIEW_DUE_SUBJECT };
+    if (key === REVIEW_DUE_BODY_KEY) return { found: true, value: REVIEW_DUE_BODY };
+    throw new Error(`unexpected setting ${key}`);
+  });
+  notify.mockResolvedValue({ id: 1 });
   mintAndStore.mockResolvedValue({ url: 'https://reviews.example/external/review/jwt' });
   createAndSendEmail.mockResolvedValue({ emailId: 'e-1' });
   updateRecord.mockResolvedValue(undefined);
@@ -100,7 +140,71 @@ describe('sweepRespondReminders', () => {
     const email = createAndSendEmail.mock.calls[0][0];
     expect(email.from).toBe('pd@keck.org');
     expect(email.to).toBe('rev@example.org');
-    expect(email.subject).toMatch(/invitation/i);
+    expect(email.subject).toBe(RESPOND_SUBJECT);
+    expect(email.body).toContain('Dear Dr. Reviewer:');
+    expect(email.body).toContain('the proposal "A Proposal"');
+    expect(email.body).toContain('Dr. PD');
+  });
+
+  test('default read is applied to respond reminder subject and body', async () => {
+    getSettingStrict.mockImplementation(async (key) => {
+      if (key === RESPOND_SUBJECT_KEY) return { found: true, value: 'Custom respond subject' };
+      if (key === RESPOND_BODY_KEY) return {
+        found: true,
+        value: 'Hello [Reviewer Name]\n\nReview [proposal title clause].\n\nSigned,\n[Program Director signature]',
+      };
+      throw new Error(`unexpected setting ${key}`);
+    });
+    queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
+    installReads();
+    const r = await sweepRespondReminders();
+    expect(r.sent).toBe(1);
+    const email = createAndSendEmail.mock.calls[0][0];
+    expect(email.subject).toBe('Custom respond subject');
+    expect(email.body).toContain('Hello Dr. Reviewer');
+    expect(email.body).toContain('Review the proposal "A Proposal".');
+    expect(email.body).toContain('Dr. PD');
+  });
+
+  test('blank respond default skips before claim and alerts admins', async () => {
+    getSettingStrict.mockImplementation(async (key) => {
+      if (key === RESPOND_SUBJECT_KEY) return { found: true, value: '   ' };
+      if (key === RESPOND_BODY_KEY) return { found: true, value: RESPOND_BODY };
+      throw new Error(`unexpected setting ${key}`);
+    });
+    queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
+    installReads();
+    const r = await sweepRespondReminders();
+    expect(r.skippedMisconfigured).toBe(1);
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'email_default_misconfigured',
+      emailAdmins: true,
+      autoResolveKey: `email-default-misconfigured:${RESPOND_SUBJECT_KEY}`,
+    }));
+    expect(notify.mock.invocationCallOrder[0]).toBeLessThan(queryAllRecords.mock.invocationCallOrder[0]);
+  });
+
+  test('unavailable respond default skips before claim and alerts admins', async () => {
+    getSettingStrict.mockImplementation(async (key) => {
+      if (key === RESPOND_SUBJECT_KEY) throw new Error('Dynamics 503');
+      if (key === RESPOND_BODY_KEY) return { found: true, value: RESPOND_BODY };
+      throw new Error(`unexpected setting ${key}`);
+    });
+    queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
+    installReads();
+    const r = await sweepRespondReminders();
+    expect(r.skippedMisconfigured).toBe(1);
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'email_default_misconfigured',
+      emailAdmins: true,
+      autoResolveKey: `email-default-misconfigured:${RESPOND_SUBJECT_KEY}`,
+      metadata: expect.objectContaining({ reason: 'unavailable' }),
+    }));
   });
 
   test('missing _etag → fail closed (claimFailed, no claim write, no send)', async () => {
@@ -241,7 +345,69 @@ describe('sweepReviewDueReminders', () => {
       expect.objectContaining({ ifMatch: 'W/"200"' }),
     );
     const email = createAndSendEmail.mock.calls[0][0];
-    expect(email.subject).toMatch(/review/i);
+    expect(email.subject).toBe(REVIEW_DUE_SUBJECT);
+    expect(email.body).toContain('Dear Dr. Reviewer:');
+    expect(email.body).toContain('Your review is due by');
+  });
+
+  test('default read is applied to review-due reminder subject and body', async () => {
+    getSettingStrict.mockImplementation(async (key) => {
+      if (key === REVIEW_DUE_SUBJECT_KEY) return { found: true, value: 'Custom review due subject' };
+      if (key === REVIEW_DUE_BODY_KEY) return {
+        found: true,
+        value: 'Review due for [Reviewer Name]: [proposal title clause] by [review due date]\n\n[Program Director signature]',
+      };
+      throw new Error(`unexpected setting ${key}`);
+    });
+    queryAllRecords.mockResolvedValue({ records: [reviewDueCandidate()] });
+    installReads({ request: reviewDueRequest() });
+    const r = await sweepReviewDueReminders();
+    expect(r.sent).toBe(1);
+    const email = createAndSendEmail.mock.calls[0][0];
+    expect(email.subject).toBe('Custom review due subject');
+    expect(email.body).toContain('Review due for Dr. Reviewer: the proposal "A Proposal" by');
+    expect(email.body).toContain('Dr. PD');
+  });
+
+  test('blank review-due default skips before claim and alerts admins', async () => {
+    getSettingStrict.mockImplementation(async (key) => {
+      if (key === REVIEW_DUE_SUBJECT_KEY) return { found: true, value: REVIEW_DUE_SUBJECT };
+      if (key === REVIEW_DUE_BODY_KEY) return { found: true, value: '' };
+      throw new Error(`unexpected setting ${key}`);
+    });
+    queryAllRecords.mockResolvedValue({ records: [reviewDueCandidate()] });
+    installReads({ request: reviewDueRequest() });
+    const r = await sweepReviewDueReminders();
+    expect(r.skippedMisconfigured).toBe(1);
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'email_default_misconfigured',
+      emailAdmins: true,
+      autoResolveKey: `email-default-misconfigured:${REVIEW_DUE_BODY_KEY}`,
+      metadata: expect.objectContaining({ reason: 'blank' }),
+    }));
+  });
+
+  test('unavailable review-due default skips before claim and alerts admins', async () => {
+    getSettingStrict.mockImplementation(async (key) => {
+      if (key === REVIEW_DUE_SUBJECT_KEY) return { found: true, value: REVIEW_DUE_SUBJECT };
+      if (key === REVIEW_DUE_BODY_KEY) throw new Error('Dynamics 503');
+      throw new Error(`unexpected setting ${key}`);
+    });
+    queryAllRecords.mockResolvedValue({ records: [reviewDueCandidate()] });
+    installReads({ request: reviewDueRequest() });
+    const r = await sweepReviewDueReminders();
+    expect(r.skippedMisconfigured).toBe(1);
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'email_default_misconfigured',
+      emailAdmins: true,
+      autoResolveKey: `email-default-misconfigured:${REVIEW_DUE_BODY_KEY}`,
+      metadata: expect.objectContaining({ reason: 'unavailable' }),
+    }));
   });
 
   test('no review-due date set → skipped', async () => {

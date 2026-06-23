@@ -4,6 +4,7 @@
 
 describe('seed-email-defaults script core', () => {
   test('dry-run is the default and reports create actions without writing', async () => {
+    const { EDITABLE_TEXT_DEFAULTS } = await import('../../shared/config/editableTextDefaults.js');
     const { seedEmailDefaults } = await import('../../scripts/seed-email-defaults.mjs');
     const getSettingStrict = jest.fn(async () => ({ found: false, value: null }));
     const setSetting = jest.fn();
@@ -11,7 +12,7 @@ describe('seed-email-defaults script core', () => {
 
     const result = await seedEmailDefaults({ getSettingStrict, setSetting, logger });
 
-    expect(result.map((r) => r.action)).toEqual(['dry-create', 'dry-create']);
+    expect(result.map((r) => r.action)).toEqual(EDITABLE_TEXT_DEFAULTS.map(() => 'dry-create'));
     expect(setSetting).not.toHaveBeenCalled();
   });
 
@@ -31,7 +32,7 @@ describe('seed-email-defaults script core', () => {
       logger,
     });
 
-    expect(result.map((r) => r.action)).toEqual(['created', 'created']);
+    expect(result.every((r) => r.action === 'created')).toBe(true);
     expect(setSetting).toHaveBeenCalledWith(
       'email.grantee_invite.subject',
       EMAIL_DEFAULT_SEED_TEXT['email.grantee_invite.subject'],
@@ -45,6 +46,7 @@ describe('seed-email-defaults script core', () => {
   });
 
   test('does not overwrite existing non-empty settings', async () => {
+    const { EDITABLE_TEXT_DEFAULTS } = await import('../../shared/config/editableTextDefaults.js');
     const { seedEmailDefaults } = await import('../../scripts/seed-email-defaults.mjs');
     const getSettingStrict = jest.fn(async () => ({ found: true, value: 'Custom value' }));
     const setSetting = jest.fn();
@@ -57,7 +59,7 @@ describe('seed-email-defaults script core', () => {
       logger,
     });
 
-    expect(result.map((r) => r.action)).toEqual(['skip-existing', 'skip-existing']);
+    expect(result.map((r) => r.action)).toEqual(EDITABLE_TEXT_DEFAULTS.map(() => 'skip-existing'));
     expect(setSetting).not.toHaveBeenCalled();
   });
 
@@ -78,7 +80,8 @@ describe('seed-email-defaults script core', () => {
       logger,
     });
 
-    expect(result.map((r) => r.action)).toEqual(['created', 'skip-existing']);
+    expect(result[0].action).toBe('created');
+    expect(result.slice(1).every((r) => r.action === 'skip-existing')).toBe(true);
     expect(setSetting).toHaveBeenCalledTimes(1);
     expect(setSetting.mock.calls[0][0]).toBe('email.grantee_invite.subject');
   });
