@@ -85,14 +85,22 @@ describe('render-emails — co-PI list renders as a grammatical serial list', ()
     return payload.drafts[0].body;
   }
 
-  test('three co-PIs → "A, B, and C" (serial comma)', async () => {
-    const body = await renderBody(['Dr. Alice Adams', 'Dr. Bob Brown', 'Dr. Carol Clark']);
-    expect(body).toContain('Co-investigators: Dr. Alice Adams, Dr. Bob Brown, and Dr. Carol Clark');
+  test('three co-PIs → "A, B, and C" (serial comma), honorifics stripped', async () => {
+    const body = await renderBody(['Dr. Alice Adams', 'Prof. Bob Brown', 'Professor Carol Clark']);
+    expect(body).toContain('Co-investigators: Alice Adams, Bob Brown, and Carol Clark');
+    expect(body).not.toMatch(/Dr\.|Prof/);
   });
 
   test('two co-PIs → "A and B" (no serial comma)', async () => {
     const body = await renderBody(['Dr. Alice Adams', 'Dr. Bob Brown']);
-    expect(body).toContain('Co-investigators: Dr. Alice Adams and Dr. Bob Brown');
+    expect(body).toContain('Co-investigators: Alice Adams and Bob Brown');
+  });
+
+  test('the PI name is also shown without an honorific', async () => {
+    const body = await renderBody(['Dr. Alice Adams']);
+    // request mock supplies _wmkf_projectleader_value_formatted: 'Dr. Lead PI'
+    expect(body).toContain('Principal investigator: Lead PI');
+    expect(body).toContain('Co-investigators: Alice Adams');
   });
 
   test('no co-PIs → the Co-investigators line is dropped entirely', async () => {

@@ -1,4 +1,37 @@
-import { formatNameList } from '../../lib/utils/format-name-list';
+import { formatNameList, stripHonorific } from '../../lib/utils/format-name-list';
+
+describe('stripHonorific — plain full name, no leading honorific', () => {
+  test('strips common honorifics (with or without the period)', () => {
+    expect(stripHonorific('Dr. Jane Smith')).toBe('Jane Smith');
+    expect(stripHonorific('Dr Jane Smith')).toBe('Jane Smith');
+    expect(stripHonorific('Prof. Bob Brown')).toBe('Bob Brown');
+    expect(stripHonorific('Professor Bob Brown')).toBe('Bob Brown');
+    expect(stripHonorific('Mr. Alan Turing')).toBe('Alan Turing');
+    expect(stripHonorific('Ms. Ada Lovelace')).toBe('Ada Lovelace');
+    expect(stripHonorific('Mrs. Grace Hopper')).toBe('Grace Hopper');
+  });
+
+  test('strips a run of leading honorifics', () => {
+    expect(stripHonorific('Prof. Dr. Hans Mueller')).toBe('Hans Mueller');
+  });
+
+  test('leaves a name without an honorific unchanged, incl. suffixes', () => {
+    expect(stripHonorific('Jane Smith')).toBe('Jane Smith');
+    expect(stripHonorific('Martin Luther King Jr.')).toBe('Martin Luther King Jr.');
+    expect(stripHonorific('Jane Smith PhD')).toBe('Jane Smith PhD');
+  });
+
+  test('does NOT strip a name that merely starts with those letters', () => {
+    expect(stripHonorific('Drew Barrymore')).toBe('Drew Barrymore');
+    expect(stripHonorific('Professorial Jones')).toBe('Professorial Jones');
+  });
+
+  test('blank / nullish → empty string', () => {
+    expect(stripHonorific('')).toBe('');
+    expect(stripHonorific(null)).toBe('');
+    expect(stripHonorific(undefined)).toBe('');
+  });
+});
 
 describe('formatNameList — grammatical serial list', () => {
   test('empty / non-array → empty string', () => {
