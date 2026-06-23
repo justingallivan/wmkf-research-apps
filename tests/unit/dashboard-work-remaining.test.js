@@ -1,9 +1,11 @@
 /**
  * @jest-environment node
  *
- * Reviewer "hold step" chunk 8 — deriveWorkRemaining tier logic, incl. the held tier
- * and the mixed accepted+held case (Codex chunk-8 MED: a slate whose shortfall is made
- * up by holds must read 'held', not fall through to 'awaiting'). REVIEWERS_NEEDED = 3.
+ * deriveWorkRemaining tier logic. REVIEWERS_NEEDED = 3.
+ *
+ * The hold/finalize step was RETIRED (S279): `held` is no longer a work stage. A
+ * historical held row is counted in `invited`, so it folds into 'awaiting' rather
+ * than surfacing a "Slate secured — finalize them" cue. These tests guard that fold.
  */
 jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: {} }));
 
@@ -13,20 +15,17 @@ const { deriveWorkRemaining } = require('../../lib/services/reviewer-rollup');
 
 const c = (over) => ({ candidates: 0, invited: 0, accepted: 0, declined: 0, held: 0, completed: 0, ...over });
 
-describe('deriveWorkRemaining — held tier', () => {
+describe('deriveWorkRemaining — tier logic', () => {
   test('enough completed → done (outranks all)', () => {
     expect(deriveWorkRemaining(c({ completed: 3, accepted: 3, held: 3, invited: 5 }))).toBe('done');
   });
-  test('enough accepted → review (outranks held)', () => {
+  test('enough accepted → review', () => {
     expect(deriveWorkRemaining(c({ accepted: 3, held: 1, invited: 5 }))).toBe('review');
   });
-  test('enough held alone → held', () => {
-    expect(deriveWorkRemaining(c({ held: 3, invited: 4 }))).toBe('held');
-  });
-  test('MIXED accepted+held reaching the threshold → held (not awaiting)', () => {
-    expect(deriveWorkRemaining(c({ accepted: 2, held: 1, invited: 5 }))).toBe('held');
-  });
-  test('committed short of threshold (1 held) → awaiting', () => {
+  test('retired hold step: held rows fold into awaiting, not a "held" stage (S279)', () => {
+    // Was 'held' pre-S279; held rows count in `invited` and now read as 'awaiting'.
+    expect(deriveWorkRemaining(c({ held: 3, invited: 4 }))).toBe('awaiting');
+    expect(deriveWorkRemaining(c({ accepted: 2, held: 1, invited: 5 }))).toBe('awaiting');
     expect(deriveWorkRemaining(c({ held: 1, invited: 3 }))).toBe('awaiting');
   });
   test('invited but no commitments → awaiting', () => {
