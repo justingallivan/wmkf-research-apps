@@ -38,10 +38,12 @@
  *   412  optimistic-lock conflict (suggestion row changed underneath)
  *   500  active-child sanity violation (staff misconfiguration) or unexpected
  *
- * Reversibility: a flip among accepted / declined / held is permitted while the
+ * Reversibility: decline ↔ hold and decline/hold → accept are permitted while the
  * engagement is in pre-materials state (`wmkf_reviewstatus < materials_sent` and no
- * review received). On flip, response stamps refresh; wmkf_heldat is preserved across
- * a later finalize (owned by the hold path, never re-stamped on repeat hold).
+ * review received). Once accepted, exit is PD-only; a reviewer cannot self-decline
+ * through this portal. On permitted flips, response stamps refresh; wmkf_heldat is
+ * preserved across a later finalize (owned by the hold path, never re-stamped on
+ * repeat hold).
  */
 
 import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
@@ -55,6 +57,8 @@ import { captureSelfReportedReviewerOrcid } from '../../../../../lib/services/ca
 import { normalizeOrcid } from '../../../../../lib/utils/orcid-normalize';
 import NotificationService from '../../../../../lib/services/notification-service';
 import { maybeNotifyQuotaReached } from '../../../../../lib/services/reviewer-quota';
+import { DynamicsService } from '../../../../../lib/services/dynamics-service';
+import { buildReviewDueIcs } from '../../../../../lib/external/calendar-invite';
 
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
 
@@ -130,6 +134,102 @@ const RESPONSE_TYPE_ACCEPTED = 100000000;
 const RESPONSE_TYPE_DECLINED = 100000001;
 const RESPONSE_TYPE_WITHDRAWN_SUFFICIENT = 100000003;
 const RESPONSE_TYPE_HELD = 100000004;
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function formatReviewDueDate(reviewDueDate) {
+  if (!reviewDueDate || typeof reviewDueDate !== 'string') return null;
+  const match = reviewDueDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const [, y, mo, d] = match;
+  const dt = new Date(`${y}-${mo}-${d}T00:00:00Z`);
+  if (Number.isNaN(dt.getTime())) return null;
+  if (dt.getUTCFullYear() !== Number(y) || dt.getUTCMonth() + 1 !== Number(mo) || dt.getUTCDate() !== Number(d)) {
+    return null;
+  }
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(dt);
+}
+
+function renderAcceptanceConfirmationEmail({ reviewer, request }) {
+  const reviewerName = reviewer?.wmkf_name || 'Reviewer';
+  const title = request?.akoya_title || 'the proposal';
+  const requestNumber = request?.akoya_requestnum || null;
+  const due = formatReviewDueDate(request?.wmkf_reviewduedate);
+  const subject = `Review accepted${requestNumber ? ` — ${requestNumber}` : ''}`;
+  const dueSentence = due
+    ? `Your review is due on ${escapeHtml(due)}.`
+    : 'We will follow up with the review due date.';
+
+  const body = [
+    `<p>Dear ${escapeHtml(reviewerName)},</p>`,
+    `<p>Thank you for agreeing to review ${escapeHtml(title)}${requestNumber ? ` (${escapeHtml(requestNumber)})` : ''}.</p>`,
+    `<p>${dueSentence} A calendar reminder is attached when a review due date is available.</p>`,
+    '<p>Proposal materials will be sent separately when they are ready.</p>',
+    '<p>W. M. Keck Foundation</p>',
+  ].join('');
+
+  return { subject, body };
+}
+
+async function resolveAcceptanceConfirmationSender(request) {
+  const pdId = request?._wmkf_programdirector_value || null;
+  if (pdId) {
+    try {
+      const pd = await DynamicsService.getRecord('systemusers', pdId, {
+        select: 'systemuserid,internalemailaddress,isdisabled',
+      });
+      if (pd?.isdisabled === false && pd.internalemailaddress) {
+        return {
+          from: pd.internalemailaddress,
+          actingUserSystemId: pd.systemuserid || undefined,
+        };
+      }
+    } catch (e) {
+      console.warn('[external respond] acceptance confirmation PD sender lookup failed (using fallback):', e?.message || e);
+    }
+  }
+  return { from: process.env.NOTIFICATION_EMAIL_FROM || null, actingUserSystemId: undefined };
+}
+
+async function sendAcceptanceConfirmationEmail({ suggestion, request, reviewer }) {
+  const to = reviewer?.wmkf_emailaddress || suggestion?.wmkf_revieweremail || null;
+  const { from, actingUserSystemId } = await resolveAcceptanceConfirmationSender(request);
+  if (!to) {
+    throw new Error('acceptance confirmation recipient email missing');
+  }
+  if (!from) {
+    throw new Error('acceptance confirmation sender email missing');
+  }
+
+  const ics = buildReviewDueIcs({
+    reviewDueDate: request?.wmkf_reviewduedate,
+    suggestionId: suggestion?.wmkf_appreviewersuggestionid,
+    requestNumber: request?.akoya_requestnum,
+  });
+  const { subject, body } = renderAcceptanceConfirmationEmail({ reviewer, request });
+
+  await DynamicsService.createAndSendEmail({
+    subject,
+    body,
+    from,
+    to,
+    regardingId: request?.akoya_requestid || undefined,
+    regardingType: request?.akoya_requestid ? 'akoya_request' : undefined,
+    attachments: ics ? [ics] : [],
+    actingUserSystemId,
+  });
+}
 
 // The reviewer's self-reported ORCID for this response: the value they typed
 // this time (delta) OR the one already persisted on the engagement row (which
@@ -283,8 +383,15 @@ export default async function handler(req, res) {
 
     // ── Decline ────────────────────────────────────────────────────────────
     if (body.action === 'decline') {
+      if (accepted) {
+        return res.status(409).json({
+          ok: false,
+          reason: 'accepted_decline_locked',
+          message: 'You are already confirmed as a reviewer. To withdraw, please contact your Program Director.',
+        });
+      }
       // Idempotent repeat: already declined and not flipping → no re-stamp.
-      if (declined && !accepted) {
+      if (declined) {
         return res.status(200).json({
           ok: true,
           idempotent: true,
@@ -539,6 +646,38 @@ export default async function handler(req, res) {
     // and repeat accepts (idempotent); independent of honorarium opt-out. Sourced
     // from the typed delta OR the persisted engagement value (confirm-without-edit).
     await captureReviewerSelfReportedOrcid({ reviewer, contactId: honContactId, rawOrcid: acceptOrcidRaw });
+
+    // ── Acceptance confirmation email (NON-FATAL; fire-once on fresh accept) ─
+    // No new Dataverse marker: the existing isAcceptRepeat signal enforces first
+    // accept only. A send failure alerts/logs but never turns a committed accept
+    // into a 500 for the reviewer.
+    if (!isAcceptRepeat) {
+      try {
+        await bypassDynamicsRestrictions('external-acceptance-confirmation', () =>
+          sendAcceptanceConfirmationEmail({ suggestion, request, reviewer }),
+        );
+      } catch (emailErr) {
+        console.error('[external respond] acceptance confirmation failed (non-fatal):', emailErr?.message || emailErr);
+        try {
+          await NotificationService.notify({
+            type: 'reviewer_acceptance_confirmation_failed',
+            severity: 'warning',
+            emailAdmins: true,
+            title: 'Reviewer acceptance confirmation email failed',
+            message: emailErr?.message || String(emailErr),
+            metadata: {
+              suggestionId: suggestion.wmkf_appreviewersuggestionid,
+              requestNumber: request?.akoya_requestnum || null,
+              reviewerEmail: reviewer?.wmkf_emailaddress || suggestion?.wmkf_revieweremail || null,
+            },
+            source: 'external/review/respond',
+            category: 'ops',
+          });
+        } catch (notifyErr) {
+          console.error('[external respond] acceptance confirmation alert failed:', notifyErr?.message || notifyErr);
+        }
+      }
+    }
 
     // ── Quota → notify PD (NON-FATAL; reviewer-engagement Phase 4 §3.C) ──────
     // Only a FRESH accept changes the accepted count, so a repeat accept can't cross the

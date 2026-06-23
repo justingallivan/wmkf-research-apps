@@ -1,14 +1,12 @@
 /**
  * Post-accept confirmation view — terminal screen shown after a successful
  * accept (or when the reviewer returns to a previously-accepted engagement
- * before materials have been sent). Stage 3 polish (calendar invites etc.)
- * is deferred; this is the minimal slice-1 confirmation.
+ * before materials have been sent).
  */
 
 import { useEffect, useRef } from 'react';
 
-export default function AcceptedConfirmationView({ data, onRequestFlipToDecline }) {
-  const canFlipState = data.engagementState?.canFlipState;
+export default function AcceptedConfirmationView() {
   const headingRef = useRef(null);
 
   useEffect(() => {
@@ -40,18 +38,6 @@ export default function AcceptedConfirmationView({ data, onRequestFlipToDecline 
         </p>
       </div>
 
-      {canFlipState && (
-        <div className="pt-3 border-t border-gray-100">
-          <p className="text-xs text-gray-500">Changed your mind?</p>
-          <button
-            type="button"
-            onClick={onRequestFlipToDecline}
-            className="text-sm text-gray-700 underline-offset-2 hover:underline mt-1"
-          >
-            Switch to declining this invitation
-          </button>
-        </div>
-      )}
     </div>
   );
 }

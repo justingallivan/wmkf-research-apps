@@ -61,9 +61,9 @@ jest.mock('../../lib/utils/cycle-material-ref', () => ({
   isPrivateCycleMaterialPathname: (p) => typeof p === 'string' && p.startsWith('cycle-materials/'),
 }));
 
-const ICS = { filename: 'keck-review-hold.ics', contentType: 'text/calendar', content: Buffer.from('ICS') };
-const buildReviewHoldIcs = jest.fn(() => ICS);
-jest.mock('../../lib/external/calendar-invite', () => ({ buildReviewHoldIcs: (...a) => buildReviewHoldIcs(...a) }));
+const ICS = { filename: 'keck-review-due.ics', contentType: 'text/calendar', content: Buffer.from('ICS') };
+const buildReviewDueIcs = jest.fn(() => ICS);
+jest.mock('../../lib/external/calendar-invite', () => ({ buildReviewDueIcs: (...a) => buildReviewDueIcs(...a) }));
 
 const { createMockReq, createMockRes } = require('../helpers/auth-mock');
 
@@ -128,8 +128,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   // clearAllMocks does NOT drain a queued mockImplementationOnce — reset + reinstate
   // the default so the degrade test's one-shot throw can't leak to a later test.
-  buildReviewHoldIcs.mockReset();
-  buildReviewHoldIcs.mockImplementation(() => ICS);
+  buildReviewDueIcs.mockReset();
+  buildReviewDueIcs.mockImplementation(() => ICS);
   SUGGESTIONS = { [SUG_1]: baseSuggestion() };
   PERSON = basePerson();
   REQUEST = { akoya_requestid: 'req-1', akoya_requestnum: 'REQ-001', wmkf_meetingdate: '2026-07-01' };
@@ -171,9 +171,15 @@ describe('send-emails — hold calendar lane', () => {
     // excludes materials (allowAttachments('hold')=false), not just that none existed.
     CYCLE_CODE = 'CYC';
     CYCLE_CONFIG = MATERIALS_CYCLE;
+    REQUEST = { ...REQUEST, wmkf_reviewduedate: '2026-08-15' };
     const res = await run({ drafts: [draft()], templateType: 'hold' });
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-    expect(filenamesSent()).toEqual(['keck-review-hold.ics']); // .ics only, no proposal.pdf
+    expect(filenamesSent()).toEqual(['keck-review-due.ics']); // .ics only, no proposal.pdf
+    expect(buildReviewDueIcs).toHaveBeenCalledWith({
+      reviewDueDate: '2026-08-15',
+      suggestionId: SUG_1,
+      requestNumber: 'REQ-001',
+    });
     const r = resultOf(res);
     expect(r.stats.sent).toBe(1);
     // Lifecycle: first contact → invited + emailSentAt, and NOT reviewstatus/responsetype.
@@ -186,7 +192,7 @@ describe('send-emails — hold calendar lane', () => {
   });
 
   test('a thrown .ics build degrades — email still sends, recipient in sent[], attachments []', async () => {
-    buildReviewHoldIcs.mockImplementationOnce(() => { throw new Error('boom'); });
+    buildReviewDueIcs.mockImplementationOnce(() => { throw new Error('boom'); });
     const res = await run({ drafts: [draft()], templateType: 'hold' });
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
     expect(attachmentsSent()).toEqual([]); // degraded: no .ics, no materials

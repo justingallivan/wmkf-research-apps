@@ -56,7 +56,7 @@ import * as contactAdapter from '../../../lib/dataverse/adapters/contact';
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
 import { backPropReviewerOrcidToContact } from '../../../lib/services/backprop-reviewer-orcid';
 import { shouldSkipDuplicateInvitation, sendAllowsAttachments, templateCarriesCalendarInvite, isKnownTemplateType, mayReceiveFinalize, recipientMayReceiveAttachments, emailConfidence } from '../../../lib/utils/reviewer-invite';
-import { buildReviewHoldIcs } from '../../../lib/external/calendar-invite';
+import { buildReviewDueIcs } from '../../../lib/external/calendar-invite';
 
 const limiter = nextRateLimiter({ max: 10 });
 const EMAIL_DELIVERY_MODES = new Set(['send', 'capture']);
@@ -404,12 +404,13 @@ export default async function handler(req, res) {
       // material — concatenated AFTER the wmkf_accepted gate so a held (non-accepted)
       // reviewer still gets the save-the-date while materials stay gated. Built per
       // recipient from their request's meeting date; NON-FATAL — a calendar build error
-      // logs and the email still ships with the date in the body (chunk 5 "degrade, not fail").
+      // logs and the email still ships with the due date in the body (chunk 5 "degrade, not fail").
       let calendarAttachments = [];
       if (templateCarriesCalendarInvite(templateType)) {
         try {
-          const ics = buildReviewHoldIcs({
-            meetingDate: request?.wmkf_meetingdate,
+          const ics = buildReviewDueIcs({
+            reviewDueDate: request?.wmkf_reviewduedate,
+            suggestionId: suggestion?.wmkf_appreviewersuggestionid,
             requestNumber: request?.akoya_requestnum,
           });
           if (ics) calendarAttachments = [ics];

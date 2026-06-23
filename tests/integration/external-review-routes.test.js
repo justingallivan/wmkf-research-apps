@@ -29,6 +29,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({
     updateRecord: jest.fn(),
     queryRecords: jest.fn(async () => ({ records: [] })),
     getRecord: jest.fn(async () => null),
+    createAndSendEmail: jest.fn(async () => ({ emailId: 'email-1' })),
   },
 }));
 
@@ -94,6 +95,9 @@ jest.mock('../../lib/bill/honorarium-onboard-orchestrator', () => ({
 jest.mock('../../lib/services/notification-service', () => ({
   notify: jest.fn().mockResolvedValue({ id: 1 }),
 }));
+jest.mock('../../lib/external/calendar-invite', () => ({
+  buildReviewDueIcs: jest.fn(() => ({ filename: 'keck-review-due.ics', contentType: 'text/calendar', content: Buffer.from('ICS') })),
+}));
 
 const verifiedSuggestion = {
   ok: true,
@@ -120,6 +124,7 @@ const verifiedSuggestion = {
     akoya_requestnum: 'REQ-001',
     akoya_title: 'Token Scoped Proposal',
     wmkf_meetingdate: '2026-07-01',
+    wmkf_reviewduedate: '2026-08-15',
   },
   reviewer: {
     wmkf_name: 'Dr. External Reviewer',
@@ -130,6 +135,7 @@ const verifiedSuggestion = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  process.env.NOTIFICATION_EMAIL_FROM = 'notifications@wmkeck.org';
 });
 
 describe('/api/external/review/[token]/context', () => {
@@ -393,8 +399,8 @@ describe('/api/external/review/[token]/respond', () => {
       wmkf_accepted: false,
       wmkf_declined: false,
     },
-    request: { akoya_requestid: 'request-1', akoya_requestnum: 'REQ-001' },
-    reviewer: {},
+    request: { akoya_requestid: 'request-1', akoya_requestnum: 'REQ-001', akoya_title: 'Token Scoped Proposal', wmkf_reviewduedate: '2026-08-15' },
+    reviewer: { wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'reviewer@example.org' },
   };
 
   it('forwards the client If-Match header to the adapter as the optimistic lock (eval #2)', async () => {
@@ -453,6 +459,38 @@ describe('/api/external/review/[token]/respond', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
+  it('fresh accept sends acceptance confirmation email with review-due .ics', async () => {
+    const { buildReviewDueIcs } = require('../../lib/external/calendar-invite');
+    DynamicsService.createAndSendEmail.mockClear();
+    buildReviewDueIcs.mockClear();
+    verifySuggestionToken.mockResolvedValue({
+      ...fresh,
+      reviewer: { wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'reviewer@example.org' },
+    });
+    const req = createMockReq({
+      method: 'POST',
+      query: { token: 'good-token' },
+      headers: {},
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'Town', postalCode: '94000', country: 'US', phone: '+1 555 0100' } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(buildReviewDueIcs).toHaveBeenCalledWith({
+      reviewDueDate: '2026-08-15',
+      suggestionId: 'suggestion-1',
+      requestNumber: 'REQ-001',
+    });
+    expect(DynamicsService.createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(DynamicsService.createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      from: 'notifications@wmkeck.org',
+      to: 'reviewer@example.org',
+      regardingId: 'request-1',
+      regardingType: 'akoya_request',
+      attachments: [expect.objectContaining({ filename: 'keck-review-due.ics' })],
+    }));
+  });
+
   it('accept with honorariumOptOut:true does NOT run the orchestrator', async () => {
     const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
     ensureHonorariumOnboarding.mockClear();
@@ -483,6 +521,26 @@ describe('/api/external/review/[token]/respond', () => {
     await handler(req, res);
     expect(applyStage2aResponse).not.toHaveBeenCalled();
     expect(ensureHonorariumOnboarding).toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ idempotent: true }));
+  });
+
+  it('re-accept does NOT send acceptance confirmation email', async () => {
+    const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
+    ensureHonorariumOnboarding.mockClear();
+    DynamicsService.createAndSendEmail.mockClear();
+    verifySuggestionToken.mockResolvedValue({
+      ...fresh,
+      suggestion: { ...fresh.suggestion, wmkf_accepted: true, wmkf_declined: false },
+      reviewer: { wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'reviewer@example.org' },
+    });
+    const req = createMockReq({
+      method: 'POST', query: { token: 'good-token' }, headers: {},
+      body: { action: 'accept' },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(ensureHonorariumOnboarding).toHaveBeenCalled();
+    expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ idempotent: true }));
   });
 
@@ -517,6 +575,27 @@ describe('/api/external/review/[token]/respond', () => {
     expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({ type: 'honorarium_onboard_failed' }));
   });
 
+  it('acceptance-confirmation send failure is non-fatal: accept still 200 + alert fired', async () => {
+    const NotificationService = require('../../lib/services/notification-service');
+    NotificationService.notify.mockClear();
+    DynamicsService.createAndSendEmail.mockRejectedValueOnce(new Error('SMTP down'));
+    verifySuggestionToken.mockResolvedValue({
+      ...fresh,
+      reviewer: { wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'reviewer@example.org' },
+    });
+    const req = createMockReq({
+      method: 'POST', query: { token: 'good-token' }, headers: {},
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'reviewer_acceptance_confirmation_failed',
+      severity: 'warning',
+    }));
+  });
+
   it('decline does NOT run the honorarium orchestrator', async () => {
     const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
     ensureHonorariumOnboarding.mockClear();
@@ -527,6 +606,30 @@ describe('/api/external/review/[token]/respond', () => {
     const res = createMockRes();
     await handler(req, res);
     expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
+  });
+
+  it('rejects decline after acceptance with 409 and does not write (PD-only exit)', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ...fresh,
+      suggestion: { ...fresh.suggestion, wmkf_accepted: true, wmkf_declined: false },
+    });
+    const req = createMockReq({
+      method: 'POST',
+      query: { token: 'good-token' },
+      headers: {},
+      body: { action: 'decline', decline: {} },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      ok: false,
+      reason: 'accepted_decline_locked',
+      message: expect.stringMatching(/Program Director/i),
+    }));
   });
 
   it('rejects a malformed address with 400 before any write', async () => {
@@ -773,4 +876,3 @@ describe('/api/external/review/[token]/respond', () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'withdrawn_sufficient' }));
   });
 });
-

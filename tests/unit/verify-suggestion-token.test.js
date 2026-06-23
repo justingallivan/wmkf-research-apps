@@ -32,6 +32,7 @@ function suggestionRow({ hash, revoked = false, expires = null, override = {} })
       akoya_requestid: REQUEST_ID,
       akoya_requestnum: '1001289',
       akoya_title: 'Test proposal',
+      wmkf_reviewduedate: '2026-08-15',
     },
     wmkf_PotentialReviewer: {
       wmkf_potentialreviewersid: '33333333-3333-3333-3333-333333333333',
@@ -67,6 +68,7 @@ describe('verifySuggestionToken', () => {
     expect(result.ok).toBe(true);
     expect(result.suggestion.wmkf_appreviewersuggestionid).toBe(SUGGESTION_ID);
     expect(result.request.akoya_requestid).toBe(REQUEST_ID);
+    expect(DynamicsService.getRecord.mock.calls[0][2].expand).toContain('wmkf_reviewduedate');
     expect(result.reviewer.wmkf_name).toBe('Dr. Test Reviewer');
   });
 

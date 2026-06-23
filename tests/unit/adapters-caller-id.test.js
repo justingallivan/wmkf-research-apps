@@ -176,6 +176,26 @@ describe('reviewer-suggestion adapter', () => {
     expect(lastCallOpts(DynamicsService.updateRecord)).toEqual({ actingUserSystemId: ACTING });
   });
 
+  test('softDelete clears engagement flags and revokes token in one PATCH', async () => {
+    await suggestionAdapter.softDelete(SUGGESTION_ID, { actingUserSystemId: ACTING, alsoRevokeToken: true });
+
+    expect(DynamicsService.updateRecord).toHaveBeenCalledTimes(1);
+    expect(DynamicsService.updateRecord).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions',
+      SUGGESTION_ID,
+      {
+        wmkf_selected: false,
+        wmkf_accepted: false,
+        wmkf_declined: false,
+        wmkf_responsetype: null,
+        wmkf_reviewstatus: null,
+        wmkf_heldat: null,
+        wmkf_externaltokenrevoked: true,
+      },
+      { actingUserSystemId: ACTING },
+    );
+  });
+
   test('bulkUpdateByRequest forwards to every per-row update', async () => {
     DynamicsService.queryRecords.mockResolvedValue({
       records: [

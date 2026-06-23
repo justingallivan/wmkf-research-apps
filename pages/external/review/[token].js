@@ -180,12 +180,7 @@ function Dispatcher({ data, token, viewOverride, onRequestDecline, onRequestFlip
       );
 
     case 'accepted-pre-materials':
-      return (
-        <AcceptedConfirmationView
-          data={data}
-          onRequestFlipToDecline={onRequestDecline}
-        />
-      );
+      return <AcceptedConfirmationView />;
 
     case 'declined':
       return (
