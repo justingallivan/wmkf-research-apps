@@ -10,6 +10,23 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer onboarding-at-accept + admin-editable email defaults (prod) (Session 279)
+
+**Milestone:** Model B taken to its conclusion — the reviewer flow collapsed to ONE final Accept and the dormant hold/finalize scaffolding was retired — and email/text default copy became admin-editable (no hardcoded runtime copy). Both shipped to prod. Codex built each chunk; Claude reviewed every diff.
+
+**Sessions:** 279. Per chunk: design → Codex intent/pre-impl review → Codex build → Claude review (contract + gates + full `npm test`) → commit → deploy.
+
+**Ship state:**
+- **Single Accept:** reviewer onboards up front (COI/AI acks + capture-only honorarium/address, NO Bill.com), gets an acceptance email + review-due `.ics`. PD-only exit (server guard rejecting accepted→decline + atomic Remove that clears engagement flags).
+- **Hold/finalize path RETIRED** (templates, `HoldView`, `proposal-readiness`, the hold action) — `scripts/probe-held-reviewers.mjs` confirmed **0 held rows**; the `held` enum + `wmkf_heldat` column kept for read-safety.
+- **Capture-only honorarium lock:** `HONORARIUM_ONBOARDING_DEFERRED=true` in prod + discriminator GUIDs unset → no Bill.com payment can fire this cycle.
+- **Admin-editable email/text defaults:** catalog (`shared/config/editableTextDefaults.js`) → `wmkf_appsystemsettings` → `/admin → Email Defaults`; **no hidden hardcoded fallback** (blank = discoverable, outage = "unavailable"); seed/backup in `lib/seed/email-defaults/`. All six workbench emails migrated; cron blank-guards run **before** the fire-once claim so a misconfig never burns a reminder marker.
+- **Copy fixes:** request number removed from ALL external surfaces (emails, `.ics`, reviewer + grantee portals); `[proposal title clause]` → `[proposal]`; grantee-reminder surname. Preview tool `scripts/preview-emails.mjs`.
+
+**Why it matters:** one reviewer commitment instead of three, the dormant hold infrastructure gone, and a reusable admin-editable-copy pattern so non-coders own email/text defaults without a code change.
+
+**Pointers:** `SESSION_PROMPT.md` (S280), `docs/REVIEWER_ENGAGEMENT_SPEC.md`, `docs/REVIEWER_HOLD_STEP_BUILD_PLAN.md` (RETIRED banner), memory `project-reviewer-hold-step-decouple`, `docs/CREDENTIALS_RUNBOOK.md` (capture-only flag). Commits `30e54890` → `2c9d66dc` (all pushed + deployed this session).
+
 ## June 2026 — Reviewer-engagement build: Model B accept-now, shipped end-to-end (prod) (Session 275)
 
 **Milestone:** The reviewer-engagement flow (Model B — accept + onboard at the offer stage, PD releases the proposal later) went from spec to fully built across four phases, each Codex-reviewed before merge. Provisions new per-request campaign config and changes LIVE external-reviewer link expiry.
