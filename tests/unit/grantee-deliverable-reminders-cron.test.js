@@ -171,7 +171,9 @@ test('default read is applied to grantee reminder subject and body', async () =>
   expect(res.body.reminded).toBe(1);
   const email = DynamicsService.createAndSendEmail.mock.calls[0][0];
   expect(email.subject).toBe('Custom grantee reminder subject');
-  expect(email.body).toContain('Hello Professor Professor pi1');
+  // [Name] now renders the SURNAME only (consistent with the grantee invite),
+  // so "Professor pi1" → "pi1" — no doubled title.
+  expect(email.body).toContain('Hello Professor pi1');
   expect(email.body).toContain('Award Award 1 is due by COB June 22, 2026.');
   expect(email.body).toContain('Assigned PD');
 });
