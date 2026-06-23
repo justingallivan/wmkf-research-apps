@@ -1,6 +1,6 @@
 # API Route Security Matrix
 
-Last updated: 2026-05-23
+Last updated: 2026-06-23
 
 ## Purpose
 
@@ -49,6 +49,7 @@ There are no open findings from the initial matrix pass as of this update. New f
 | `/api/admin/alerts` | GET, PATCH | Superuser | `requireSuperuser` | Global admin | Reads/updates `system_alerts` (PG) | Low | Shared helper. |
 | `/api/admin/health-history` | GET | Superuser | `requireSuperuser` | Global admin | Reads `health_check_history` (PG) | Low | Shared helper. |
 | `/api/admin/alert-recipients` | GET, PUT | Superuser | `requireSuperuser` | Global admin | Reads/writes `alertRecipientsByCategory` setting in `wmkf_appsystemsettings` (DV); reads superuser roster from `dynamics_user_roles` (PG) for fallback display | Low | Per-category routing config for system-alert emails. |
+| `/api/admin/email-defaults` | GET, PUT | Superuser | `requireSuperuser` | Global admin | Reads/writes `email.grantee_invite.*` text defaults in `wmkf_appsystemsettings` (DV) via dispatcher | Low | Admin-editable email/text defaults catalog. GET uses strict reads and marks per-entry `unavailable` on settings fetch failure; PUT validates the catalog key and allows blank values. |
 | `/api/admin/honorarium-amount` | GET, PUT | Superuser | `requireSuperuser` | Global admin | Reads/writes `honorarium.default_amount` in `wmkf_appsystemsettings` (DV) via dispatcher | Low | Single ground-truth reviewer-honorarium amount (S199); replaces the per-user preference. PUT validates a positive number. |
 | `/api/admin/maintenance` | GET | Superuser | `requireSuperuser` | Global admin | Reads `maintenance_runs` (PG); reads `wmkf_appsystemsettings` (DV) for retention config | Low | Shared helper. |
 | `/api/admin/reviewer-time-budget` | GET, PUT | Superuser | `requireSuperuser` | Global admin | Reads/writes `reviewer.time_budget_seconds` in `wmkf_appsystemsettings` (DV) | Low | Admin-editable reviewer-search wall-clock budget (S223; default 600s, clamped [120,800]). PUT clamps into range. Enforced in-app via an AbortSignal deadline because Vercel `maxDuration` is build-time-static. See docs/REVIEWER_TIMEOUT_BUDGET_PLAN.md. |
@@ -92,6 +93,7 @@ There are no open findings from the initial matrix pass as of this update. New f
 | `/api/dynamics-explorer/feedback` | GET, POST, PATCH | App / Superuser | POST uses app access; GET/PATCH require superuser | Feedback records | Reads/writes `dynamics_feedback` (PG) | Low | Mixed route; current split is reasonable. |
 | `/api/dynamics-explorer/restrictions` | GET, POST, DELETE | App / Role | `requireAppAccess('dynamics-explorer')` + `getUserRole` | Restriction config | Reads/writes `dynamics_restrictions` (PG) | Low | Read/write role handling in route. |
 | `/api/dynamics-explorer/roles` | GET, POST, DELETE | App / Superuser | `requireAppAccess('dynamics-explorer')` + `getUserRole` | Own role or all roles | Reads/writes `dynamics_user_roles` (PG) | Low | Shared role helper. |
+| `/api/email-defaults/grantee-invite` | GET | Profile | `requireAuthWithProfile` | Shared grantee invite defaults | Reads `email.grantee_invite.subject` and `email.grantee_invite.body` from `wmkf_appsystemsettings` (DV) via dispatcher | Low | Profile-readable defaults for PD grantee-invite composition. Uses strict reads so outages return `unavailable:true` instead of silently looking blank. |
 | `/api/evaluate-multi-perspective` | POST | App | `requireAppAccess('multi-perspective-evaluator')` | Request payload | Writes `api_usage_log` (PG) via llm-client | Low | AI payload review. |
 | `/api/expertise-finder/batch-match` | POST | App | `requireAppAccess('expertise-finder')` | Writes `user_profile_id` | Writes `expertise_matches`, `api_usage_log` (PG); reads Dynamics + SharePoint | Low | User-scoped usage/history writes. |
 | `/api/expertise-finder/history` | GET | App | `requireAppAccess('expertise-finder')` | `user_profile_id` scoped | Read-only (`expertise_matches` SELECTs) | Low | Good scoping pattern. |
