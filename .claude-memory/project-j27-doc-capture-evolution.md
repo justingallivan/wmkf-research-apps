@@ -1,6 +1,6 @@
 ---
 name: J27 document capture & Proposal-tab evolution
-description: D26 resolves request docs by SharePoint filename-match — a FRAGILE interim bridge (no evidence it "breaks in J27"; only breaks if names change). Durable direction = Dataverse legibility (structured doc references the apps read back; strongest driver = auto-generated writeups need a structured home). Single-submission may un-scaffold the reviewer hold step. Large near-term planning effort.
+description: D26 resolves request docs by SharePoint filename-match — a FRAGILE interim bridge (no evidence it "breaks in J27"; only breaks if names change). Durable direction = Dataverse legibility (structured doc references the apps read back; strongest driver = auto-generated writeups need a structured home). (The reviewer hold step that single-submission might once have un-scaffolded was already RETIRED in S279.) Large near-term planning effort.
 type: project
 status: active
 scope: strategy
@@ -19,7 +19,7 @@ Read this when: building/maintaining the **Request Workbench → Proposal tab** 
 
 **Converging target (Justin + Connor discussing — NOT yet decided): associate documents with a Dataverse table on the request** so the app points at each doc **directly** instead of folder-walking + filename heuristics. Shape under consideration: a child table (e.g. `wmkf_requestdocument`) = `request lookup + doc-type picklist + direct reference (SharePoint URL / Graph driveItem id) + filename + content-type`. This **realizes the already-durable S157 intent**: "move doc-resident knowledge onto Dataverse **tables** (structured/legible/searchable); doc-link surfacing is an interim bridge" (Atlas `docs/atlas/dataverse-akoya-request.md` §era; [[project-dataverse-power-tools]]). Precedent for a doc-reference-on-a-row already exists: `wmkf_apprequestperson.wmkf_biosketchurl`. Natural **producer = the intake portal** (machine-legible capture, private Blob via `INTAKE_BLOB_RW_TOKEN`) — see [[project-machine-legible-form-capture]] and the intake-portal memories. Treat this as **strong, accumulating evidence for the table direction**, not a settled build.
 
-**Single-submission may un-scaffold the delayed reviewer-invite "hold step."** The hold step ([[project-reviewer-hold-step-decouple]]) exists largely to handle late-arriving Phase II materials; if J27 collects everything up front, that rationale weakens and the scaffolding may simplify or retire. ⚠️ **Contingent FUTURE un-scaffold, NOT a green-lit removal** — verify live callers before acting ([[feedback-verify-before-destructive-carryover]]).
+**Hold step already RETIRED (S279) — this contingency resolved early, for a different reason.** The reviewer "hold step" ([[project-reviewer-hold-step-decouple]]) was removed in S279 (commit `a8676af1`) when the direction shifted to onboarding at a single final Accept — independent of J27. So the earlier "single-submission may un-scaffold the hold step" note is now moot: there is no hold step left to un-scaffold. (Kept here only so the J27 doc-capture planning doesn't re-raise it.)
 
 ## Sequencing / urgency (user, S258)
 

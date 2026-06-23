@@ -1,6 +1,18 @@
 # Reviewer "Hold Step" Build Plan
 
-> **Status:** PLANNED — not yet built. Authored S257; reviewed S257 via `/contract-reconcile`
+> ## ⚠️ RETIRED (S279) — this plan describes a feature that has been REMOVED.
+> The hold/agree-in-principle step this plan designed never went live in practice
+> (the readiness gate shipped stubbed always-ready, so reviewers always got the
+> full accept form; prod had **0 `held` rows**). In S279 the direction changed to
+> **onboarding at a single final Accept**, and the hold path — `HoldView`,
+> `lib/external/proposal-readiness.js`, the `respond.js` hold action, and the
+> `hold`/`finalize` email templates — was **removed** (commit `a8676af1`). The
+> `held` responsetype value (100000004) is retained for read-safety only, and a
+> historical `held` row routes to the accept form. **Current design of record:**
+> `docs/REVIEWER_ENGAGEMENT_SPEC.md` + memory `project-reviewer-hold-step-decouple`.
+> Everything below is kept as historical build record only.
+
+> **Status (historical):** PLANNED — not yet built. Authored S257; reviewed S257 via `/contract-reconcile`
 > (Mode A) + **two** adversarial Codex passes — all findings folded in (pass-1 #1–#6 and
 > pass-2 #1–#3 tagged inline). Pass-2 confirmed all six pass-1 fixes RESOLVED and added three
 > MED findings (idempotency mechanism, allowlist, `held` round-trip), now addressed. Build-ready

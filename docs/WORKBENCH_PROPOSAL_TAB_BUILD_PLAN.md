@@ -23,7 +23,8 @@ generation + persistence + regenerate; the enabling route/app-access/helper work
 - `wmkf_requestdocument` Dataverse table for direct doc references — converging but
   undecided; D26 uses the SharePoint filename-match bridge. See
   `[[project-j27-doc-capture-evolution]]`.
-- Un-scaffolding the reviewer hold step (contingent on J27 single-submission).
+- ~~Un-scaffolding the reviewer hold step (contingent on J27 single-submission).~~
+  Done early — the hold step was RETIRED in S279 (onboarding-at-accept), independent of J27.
 - Rendering the structured budget (`wmkf_proposalbudgetline`) — show the two scalar
   amounts only.
 

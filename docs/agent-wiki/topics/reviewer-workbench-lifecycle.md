@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-21
+last_verified: 2026-06-22
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -84,18 +84,20 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 
 ## Email templates (per-PD)
 
-- The six reviewer email templates (`invitation`, `hold`, `finalize`, `materials`,
-  `followup`, `thankyou`) live in `shared/components/reviewers/email-template-store.js`
+- The four reviewer email templates (`invitation`, `materials`, `followup`,
+  `thankyou`) live in `shared/components/reviewers/email-template-store.js`
   (`DEFAULT_TEMPLATES` + `loadEmailTemplates`/`saveEmailTemplates`, persisted per-PD
   under `PREFERENCE_KEYS.EMAIL_TEMPLATES`). Edit them in **Profile Settings** (the
   canonical hub) OR the Workbench Reviewers tab's "✎ Email templates" — both open
   the SAME `EmailTemplatesModal` against the same preference key.
-- **Sendable templates ≠ all templates.** Only `invitation` (via CandidatesPanel →
-  `InviteEmailModal`, hardcoded) and `materials`/`followup`/`thankyou` (via
-  `ReviewerManagePanel`) have a client SEND path. `hold` and `finalize` are
-  defined + portal-supported but have **no send UI** — so this cycle's first-contact
-  email is the **invitation** template; the portal then shows the agree/pass hold
-  view via readiness gating (see the `project-reviewer-hold-step-decouple` memory).
+  (The `hold` + `finalize` templates were **REMOVED in S279** along with the rest of
+  the hold path — see `project-reviewer-hold-step-decouple`.)
+- All four templates are sendable: `invitation` (first contact, via CandidatesPanel →
+  `InviteEmailModal`, hardcoded `templateType:'invitation'`) and
+  `materials`/`followup`/`thankyou` (via `ReviewerManagePanel`). The reviewer onboards
+  (COI/AI acks + capture-only honorarium/address) at the single Accept on the portal;
+  an acceptance-confirmation email with a review-due `.ics` ships from `respond.js` on
+  first accept. There is no hold/agree-in-principle view.
 - The invitation default now surfaces proposal context for **early COI flagging**:
   `{{proposalDetails}}` (Title / Principal investigator / Co-investigators /
   Institution — empty lines dropped, composed in `lib/utils/email-generator.js`) and

@@ -10,7 +10,7 @@
 
 A reviewer is invited, **accepts (or declines) the offer with full onboarding at the offer stage** (COI/AI acks + mailing address; honorarium captured), then sits tight until the PD **releases the proposal**, then reviews. There is **one** reviewer decision (accept/decline) — no "agree in principle / finalize" two-step.
 
-> The dormant "hold / agree-in-principle" path (`HoldView`, `respond.js` hold action) is **NOT** part of this design. It exists but never fires because the readiness gate is stubbed (below). We leave it dormant.
+> The "hold / agree-in-principle" path (`HoldView`, the `respond.js` hold action, the `proposal-readiness` gate) was **REMOVED** in S279 (commit `a8676af1`). It never fired (the readiness gate was stubbed always-ready; prod had 0 `held` rows), and onboarding now happens at the single Accept. The `held` responsetype value is retained for read-safety; a historical `held` row routes to the accept form.
 
 ---
 
@@ -18,7 +18,7 @@ A reviewer is invited, **accepts (or declines) the offer with full onboarding at
 
 | # | Behavior | Evidence |
 |---|---|---|
-| 2.1 | Readiness gate is stubbed to always-ready, so every reviewer is dispatched to the full Stage-2a accept form (the hold view never shows). | `[verified lib/external/proposal-readiness.js::isProposalReadyForReviewers]` returns hardcoded `true`; `[verified pages/api/external/review/[token]/context.js::computeEngagementState]` `view = isReady ? 'stage2a' : 'hold-invite'` |
+| 2.1 | Every reviewer is dispatched to the full Stage-2a accept form. (S279: the readiness gate + hold view were REMOVED; `proposal-readiness.js` deleted.) | `[verified pages/api/external/review/[token]/context.js::computeEngagementState]` routes withdrawn/materials/accepted/declined and **falls through to `stage2a` for everything else** — including a historical `held` value (no `hold-invite` branch remains) |
 | 2.2 | A fresh non-opted-out accept requires COI + AI policy acks (400 if missing) and a mailing address + phone (422 if missing); writes `accepted` + acks; lands in `accepted-pre-materials`. | `[verified pages/api/external/review/[token]/respond.js handler]` (policy_ack_required, payment_contact_required, applyStage2aResponse accept) |
 | 2.3 | Honorarium onboarding at accept is **capture-only this cycle** (captures contact + address, mints no `akoya_request`, no per-reviewer alert). | `[verified lib/bill/honorarium-onboard-orchestrator.js::ensureHonorariumOnboarding]` (deferred tier, shipped earlier S274) |
 | 2.4 | The invitation is the only sendable first-contact email. | `[verified shared/components/reviewers/InviteEmailModal.js]` hardcoded `templateType:'invitation'`; manage modal exposes only materials/followup/thankyou `[verified shared/components/reviewers/ReviewerManagePanel.js]` |
@@ -114,7 +114,7 @@ On `wmkf_appreviewersuggestion`:
 - **Phase 3 — Reminders:** the two-reminder daily cron + the `wmkf_respondremindersentat` marker (with Re-invite clearing it, §3.B).
 - **Phase 4 — Quota:** count-after-write + conditional null→set notify + the PD selective-decline Workbench action (writes `withdrawn_sufficient`).
 
-**Model-B invitation copy — DONE (S275).** The default invitation template (`shared/components/reviewers/email-template-store.js` `DEFAULT_TEMPLATES.invitation`) now says the COI/AI acknowledgements + honorarium are confirmed *when you accept*, with the full proposal following on release — no longer the Model-A "no commitment today, all comes later." (The dormant `hold` template keeps its own copy by design; it's the agree-in-principle flow and is not used in Model B. A PD who saved a customized invitation template keeps their own wording — only the default changed.)
+**Model-B invitation copy — DONE (S275).** The default invitation template (`shared/components/reviewers/email-template-store.js` `DEFAULT_TEMPLATES.invitation`) now says the COI/AI acknowledgements + honorarium are confirmed *when you accept*, with the full proposal following on release — no longer the Model-A "no commitment today, all comes later." (The `hold`/`finalize` templates were REMOVED in S279 — the template set is now `invitation` + `materials` + `followup` + `thankyou`. A PD who saved a customized invitation template keeps their own wording — only the default changed.)
 
 ---
 

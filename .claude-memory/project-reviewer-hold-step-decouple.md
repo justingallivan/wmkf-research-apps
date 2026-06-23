@@ -55,19 +55,21 @@ clear `wmkf_accepted` / `wmkf_responsetype` / `wmkf_reviewstatus` — so it must
 those engagement flags (else a removed accepted reviewer still counts toward quota / doesn't free a
 slot). [VERIFIED S279 — `pages/api/reviewer-finder/my-candidates.js:553-585`]
 
-**Templates:** REMOVE the `hold` + `finalize` EMAIL templates + their send-path branches. Keep
-`invitation` + `materials` + `followup` + `thankyou`. The `HoldView` / `held` two-view portal is
-**bypassed now** (route straight to Accept) and **retired as a follow-up cleanup** — it is LIVE this
-cycle, so do not rip it out in the same change ([[feedback-verify-before-destructive-carryover]]).
+**Templates / hold path — RETIRED (S279, commit `a8676af1`).** The `hold` + `finalize` EMAIL
+templates + their send-path branches, `HoldView`, `lib/external/proposal-readiness.js`, the
+`respond.js` hold action, and the readiness-gated dispatch were all REMOVED. Template set is now
+`invitation` + `materials` + `followup` + `thankyou`. The `held` responsetype value (100000004) and
+the `wmkf_heldat` column are KEPT for read-safety; a historical `held` row routes to the accept form
+(`computeEngagementState` fall-through). Probe confirmed 0 held rows before removal.
 
 **Steady-state convergence:** next cycle (release-on-accept), the proposal is available at accept time,
 so the acceptance-confirmation email also carries the materials link and the separate `materials` send
 folds in. The `.ics` already lives on that email, so nothing moves.
 
-**Docs to reconcile AFTER the build** (they describe soon-to-be-superseded BUILT state — do NOT
-pre-rewrite them as built; that would present plan as built state):
-`docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`, `docs/REVIEWER_ENGAGEMENT_SPEC.md`,
-`docs/REVIEWER_HOLD_STEP_BUILD_PLAN.md`.
+**Docs reconciled (S279 /sweep):** `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`
+(four templates, no hold view), `docs/REVIEWER_ENGAGEMENT_SPEC.md` (hold path removed),
+`docs/REVIEWER_HOLD_STEP_BUILD_PLAN.md` (RETIRED banner). `docs/CREDENTIALS_RUNBOOK.md` +
+`docs/agent-wiki/topics/finance-honoraria.md` carry the capture-only lock (Chunk C).
 
 ## SUPERSEDED — original S256 plan (kept for context only)
 
