@@ -54,7 +54,7 @@ When you accept, you'll confirm a few details — the conflict-of-interest and A
     subject: 'Review Materials: {{proposalTitle}}',
     body: `{{greeting}},
 
-Thank you for agreeing to review the proposal "{{proposalTitle}}" from {{piInstitution}}.
+Thank you for agreeing to review the proposal “{{proposalTitle}}” from {{piInstitution}}.
 
 Please use your secure reviewer link to download the proposal materials and submit your completed review:
 {{externalLink}}
@@ -71,7 +71,7 @@ Thank you for your time and expertise.
     subject: 'Reminder: Review Due — {{proposalTitle}}',
     body: `{{greeting}},
 
-This is a friendly reminder that your review of "{{proposalTitle}}" is due by {{reviewDueDate}}.
+This is a friendly reminder that your review of “{{proposalTitle}}” is due by {{reviewDueDate}}.
 
 Your secure reviewer link (use the one in this email — it supersedes any earlier link):
 {{externalLink}}
@@ -86,7 +86,7 @@ Thank you,
     subject: 'Thank You for Your Review — {{proposalTitle}}',
     body: `{{greeting}},
 
-Thank you very much for completing your review of "{{proposalTitle}}". Your expertise and thoughtful evaluation are greatly appreciated and will be invaluable to the Foundation's decision-making process.
+Thank you very much for completing your review of “{{proposalTitle}}”. Your expertise and thoughtful evaluation are greatly appreciated and will be invaluable to the Foundation's decision-making process.
 
 We will be in touch regarding the processing of your honorarium.
 

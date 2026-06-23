@@ -37,6 +37,7 @@ import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
+import { formatNameList } from '../../../lib/utils/format-name-list';
 import { getHonorariumAmount } from '../../../lib/services/honorarium-config';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import { fetchCoPIs } from '../../../lib/services/proposal-participants';
@@ -206,8 +207,10 @@ export default async function handler(req, res) {
         // (Codex S274). A missing PI drops the line via the composed details block.
         authors: request?._wmkf_projectleader_value_formatted || null,
         institution: (request?.wmkf_organizationname || request?._akoya_applicantid_value_formatted || '').trim() || null,
-        // Co-PI display names from the apprequestperson junction (names only).
-        coInvestigators: coPINames.join(', ') || null,
+        // Co-PI display names from the apprequestperson junction (names only),
+        // joined into a grammatical serial list ("A", "A and B", "A, B, and C")
+        // so the email reads correctly for any number of co-PIs.
+        coInvestigators: formatNameList(coPINames) || null,
         coInvestigatorCount: coPINames.length,
       };
       const templateSettings = {

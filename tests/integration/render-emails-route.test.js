@@ -46,6 +46,61 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
+describe('render-emails — co-PI list renders as a grammatical serial list', () => {
+  const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
+
+  function wire(coPINames) {
+    findById.mockResolvedValue({
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_potentialreviewer_value: 'person-1',
+      _wmkf_request_value: REQUEST_ID,
+    });
+    const { DynamicsService } = require('../../lib/services/dynamics-service');
+    DynamicsService.getRecord.mockImplementation(async (set) => {
+      if (set === 'wmkf_potentialreviewerses') {
+        return { wmkf_name: 'Dr. Rev Iewer', wmkf_emailaddress: 'rev@example.org' };
+      }
+      if (set === 'akoya_requests') {
+        return { akoya_requestid: REQUEST_ID, akoya_title: 'A Proposal', _wmkf_projectleader_value_formatted: 'Dr. Lead PI' };
+      }
+      return null;
+    });
+    const { fetchCoPIs } = require('../../lib/services/proposal-participants');
+    fetchCoPIs.mockResolvedValue(coPINames);
+  }
+
+  async function renderBody(coPINames) {
+    wire(coPINames);
+    const req = createMockReq({
+      method: 'POST',
+      body: {
+        suggestionIds: [SUGGESTION_ID],
+        templateType: 'invitation',
+        template: { subject: 'Subject', body: '{{proposalDetails}}' },
+      },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    const payload = res.json.mock.calls[0][0];
+    return payload.drafts[0].body;
+  }
+
+  test('three co-PIs → "A, B, and C" (serial comma)', async () => {
+    const body = await renderBody(['Dr. Alice Adams', 'Dr. Bob Brown', 'Dr. Carol Clark']);
+    expect(body).toContain('Co-investigators: Dr. Alice Adams, Dr. Bob Brown, and Dr. Carol Clark');
+  });
+
+  test('two co-PIs → "A and B" (no serial comma)', async () => {
+    const body = await renderBody(['Dr. Alice Adams', 'Dr. Bob Brown']);
+    expect(body).toContain('Co-investigators: Dr. Alice Adams and Dr. Bob Brown');
+  });
+
+  test('no co-PIs → the Co-investigators line is dropped entirely', async () => {
+    const body = await renderBody([]);
+    expect(body).not.toContain('Co-investigators:');
+  });
+});
+
 describe('render-emails — retired template types fail closed', () => {
   for (const templateType of ['hold', 'finalize']) {
     test(`${templateType} is rejected before recipient hydration/token mint`, async () => {
