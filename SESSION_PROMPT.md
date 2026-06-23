@@ -80,10 +80,19 @@ roll-up/export is a deferred add-on.
 Staff-facing rollout polish around the grantee portal/workbench flow — remaining copy, PD preview, awardee
 workflow ergonomics.
 
-### 4. Keep `applications.wmkeck.org` staff auth on HOLD
-Do NOT set `NEXTAUTH_URL=https://applications.wmkeck.org` yet. The staff Azure/Entra app registration must
-first allow `…/api/auth/callback/azure-ad`, then staff sign-in + one cookie-bearing state-changing staff
-API action must be smoke-tested from that host.
+### 4. `applications.wmkeck.org` staff auth — Azure done; `NEXTAUTH_URL` held empty ON PURPOSE
+**Resolved 2026-06-23:** the staff Azure app registration (client `a652a292-2574-434c-ae6f-aa01f61d82ad`,
+"WMK: SSO Authentication") now includes the redirect URI
+`https://applications.wmkeck.org/api/auth/callback/azure-ad`, and **staff sign-in on the branded host is
+verified working**. `NEXTAUTH_URL` is **intentionally kept empty** (`NEXTAUTH_URL=""`) so BOTH
+`applications.wmkeck.org` and legacy `wmkfresearch.vercel.app` keep working during the staff rollout
+(host-derived callbacks). Owner is rolling out the branded host to non-tech-savvy colleagues and will
+deprecate the old host later. **Do NOT set `NEXTAUTH_URL` until that deprecation** — setting it pins the
+callback to the branded host AND turns on the `lib/utils/auth.js` Origin/Referer CSRF check (currently
+OFF), after which writes from `wmkfresearch.vercel.app` 403. At deprecation: set
+`NEXTAUTH_URL=https://applications.wmkeck.org`, redeploy, smoke a sign-in + one cookie-bearing write from
+the branded host, then optionally remove the old vercel.app redirect URI from Azure. See
+`project-branded-domains.md`.
 
 ### 5. Optional: migrate new reviewer invitations to `reviews.wmkeck.org`
 Low risk (no outstanding reviewer invitations). Remember reviewer links are **latest-link-wins**:
@@ -114,7 +123,9 @@ re-rendering/re-sending mints a new hash and invalidates older links.
   is what's sent; `lib/seed/email-defaults/*` is backup. Prod was re-baselined this session; future seed
   changes need `rebaseline-email-defaults.mjs --force-keys` to reach prod (and `--force-keys` CLOBBERS
   admin-panel edits).
-- **Do not set `NEXTAUTH_URL` yet** (staff-domain hold; see `project-branded-domains.md`).
+- **Do not set `NEXTAUTH_URL` yet** — held empty on purpose so both hosts work during the staff rollout
+  (Azure callback is registered + sign-in verified; the flip is the later deprecation switch). See item #4
+  and `project-branded-domains.md`.
 - **Vercel sensitive env pull:** sensitive values read back empty; the reviewer/grantee base-URL vars are
   non-sensitive and verifiable.
 - **External request numbers:** visible public copy/JSON must never expose the internal request number.
