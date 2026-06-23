@@ -22,6 +22,7 @@
 - Scope/count/quantity claim: feedback-falsify-not-confirm.md
 - Claim about how THIS system behaves (screen/return/feature-live/field/gate/token/link), incl. in chat — cite producer, not consumer: feedback-behavior-claims-cite-the-producer.md
 - Durable docs/memory/fact edit: feedback-reconcile-dont-append-docs.md; feedback-apply-reconcile-to-fix-work.md
+- Retiring/consolidating a renamed-or-merged capability, or a `/sweep` keeps re-finding the same stale claim (rename the CODE/ground truth, not just docs): feedback-rename-code-not-just-docs.md
 - Cleanup/audit/verification loop: feedback-timebox-metawork.md
 - External platform capability claim: feedback-verify-external-platform-claims.md; feedback-cite-ground-truth.md
 - External literal in code (email/URL/ID/contact): feedback-no-fabricated-placeholder-values.md
@@ -56,6 +57,7 @@
 - Reviewer origination / retrieval: ../docs/agent-wiki/topics/reviewer-origination.md
 - Reviewer identity / ORCID / contact / COI / PI identity: ../docs/agent-wiki/topics/reviewer-identity.md; project-reviewer-verify-fail-dangerous.md
 - Reviewer workbench / lifecycle / roster / referral: ../docs/agent-wiki/topics/reviewer-workbench-lifecycle.md
+- Workbench consolidation / non-techsavvy PD rollout / remove dead-end (now-automated) UI / reviewer-finder+review-manager sunset: project-workbench-consolidation-rollout.md
 - External reviewer portal / accept-decline / E2E / SharePoint: ../docs/agent-wiki/topics/external-reviewer-portal.md
 - Reviewer invite→accept collapse (S279: onboard up front at one final Accept; no hold/finalize step; capture-only honorarium; .ics on accept): project-reviewer-hold-step-decouple.md
 - Intake portal / attachments / institution match / virus scan: ../docs/agent-wiki/topics/intake-portal.md
