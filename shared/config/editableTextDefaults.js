@@ -1,3 +1,16 @@
+/**
+ * Catalog of admin-editable text defaults, rendered by
+ * `shared/components/admin/EmailDefaultsSection.js` (one entry → one panel card).
+ *
+ * FUTURE (readability): the panel currently shows ONE FLAT CARD per entry, so each
+ * subject and each body is its own card (12+ and growing). Group them for scanning:
+ *   - top-level GROUP by audience — "Reviewer emails" vs "Grantee emails"
+ *   - within a group, ONE card per email pairing its subject + body together
+ * The grouping is derivable from the key (`email.<audience>_<name>.<subject|body>`),
+ * or add explicit `group` + `emailLabel` fields here and have the section render
+ * grouped sections + paired subject/body inputs. Catalog-driven, so the change is
+ * localized to this file + EmailDefaultsSection.
+ */
 export const EDITABLE_TEXT_DEFAULTS = [
   {
     key: 'email.grantee_invite.subject',
