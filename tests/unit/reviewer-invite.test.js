@@ -5,7 +5,7 @@
  * to an already-invited candidate is skipped unless an explicit re-invite, while
  * materials/followup/thankyou stay re-sendable.
  */
-const { shouldSkipDuplicateInvitation, sendAllowsAttachments, templateCarriesCalendarInvite, recipientMayReceiveAttachments, emailConfidence } = require('../../lib/utils/reviewer-invite');
+const { shouldSkipDuplicateInvitation, sendAllowsAttachments, recipientMayReceiveAttachments, emailConfidence } = require('../../lib/utils/reviewer-invite');
 
 describe('shouldSkipDuplicateInvitation', () => {
   test('skips an already-invited invitation by default', () => {
@@ -17,15 +17,10 @@ describe('shouldSkipDuplicateInvitation', () => {
   test('allowResend overrides the guard (deliberate re-invite)', () => {
     expect(shouldSkipDuplicateInvitation({ templateType: 'invitation', allowResend: true, invited: true })).toBe(false);
   });
-  test('non-first-contact types are never skipped (materials/followup/thankyou/finalize are re-sendable)', () => {
-    for (const templateType of ['materials', 'followup', 'thankyou', 'finalize']) {
+  test('non-first-contact types are never skipped (materials/followup/thankyou are re-sendable)', () => {
+    for (const templateType of ['materials', 'followup', 'thankyou']) {
       expect(shouldSkipDuplicateInvitation({ templateType, allowResend: false, invited: true })).toBe(false);
     }
-  });
-  test('hold is first contact too — an already-invited hold ask is skipped (chunk 6)', () => {
-    expect(shouldSkipDuplicateInvitation({ templateType: 'hold', allowResend: false, invited: true })).toBe(true);
-    expect(shouldSkipDuplicateInvitation({ templateType: 'hold', allowResend: false, invited: false })).toBe(false);
-    expect(shouldSkipDuplicateInvitation({ templateType: 'hold', allowResend: true, invited: true })).toBe(false);
   });
 });
 
@@ -38,7 +33,7 @@ describe('sendAllowsAttachments — no materials on a pre-acceptance invitation'
       expect(sendAllowsAttachments(t)).toBe(true);
     }
   });
-  test('allowlist (not denylist): hold, finalize-trigger, and any UNKNOWN type carry NO materials', () => {
+  test('allowlist (not denylist): retired and UNKNOWN types carry NO materials', () => {
     for (const t of ['hold', 'finalize-ready', 'whatever-new-type', '', undefined]) {
       expect(sendAllowsAttachments(t)).toBe(false);
     }
@@ -47,39 +42,14 @@ describe('sendAllowsAttachments — no materials on a pre-acceptance invitation'
 
 describe('isKnownTemplateType — fail-closed on unknown types (chunk-6 #4)', () => {
   const { isKnownTemplateType } = require('../../lib/utils/reviewer-invite');
-  test('all six known types pass', () => {
-    for (const t of ['invitation', 'hold', 'finalize', 'materials', 'followup', 'thankyou']) {
+  test('active known types pass', () => {
+    for (const t of ['invitation', 'materials', 'followup', 'thankyou']) {
       expect(isKnownTemplateType(t)).toBe(true);
     }
   });
-  test('unknown / empty / undefined are rejected', () => {
-    for (const t of ['bogus', '', undefined, null, 'HOLD']) {
+  test('retired / unknown / empty / undefined are rejected', () => {
+    for (const t of ['hold', 'finalize', 'bogus', '', undefined, null, 'HOLD']) {
       expect(isKnownTemplateType(t)).toBe(false);
-    }
-  });
-});
-
-describe('mayReceiveFinalize — finalize is held-only (chunk-6 #3/#7)', () => {
-  const { mayReceiveFinalize } = require('../../lib/utils/reviewer-invite');
-  test('a held row (responsetype 100000004) is eligible', () => {
-    expect(mayReceiveFinalize({ wmkf_responsetype: 100000004 })).toBe(true);
-  });
-  test('fresh / accepted / declined / no-row are NOT eligible', () => {
-    expect(mayReceiveFinalize({ wmkf_responsetype: null })).toBe(false);
-    expect(mayReceiveFinalize({ wmkf_responsetype: 100000000 })).toBe(false); // accepted
-    expect(mayReceiveFinalize({ wmkf_responsetype: 100000001 })).toBe(false); // declined
-    expect(mayReceiveFinalize({})).toBe(false);
-    expect(mayReceiveFinalize(null)).toBe(false);
-  });
-});
-
-describe('templateCarriesCalendarInvite — the .ics save-the-date lane', () => {
-  test('hold carries the calendar invite', () => {
-    expect(templateCarriesCalendarInvite('hold')).toBe(true);
-  });
-  test('material-bearing + invitation types do NOT carry a calendar invite', () => {
-    for (const t of ['materials', 'followup', 'thankyou', 'invitation', undefined]) {
-      expect(templateCarriesCalendarInvite(t)).toBe(false);
     }
   });
 });

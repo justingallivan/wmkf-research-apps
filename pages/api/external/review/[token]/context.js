@@ -15,7 +15,6 @@
  */
 
 import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
-import { isProposalReadyForReviewers } from '../../../../../lib/external/proposal-readiness';
 import { DynamicsService } from '../../../../../lib/services/dynamics-service';
 import { GraphService } from '../../../../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../../../../lib/utils/sharepoint-buckets';
@@ -37,9 +36,7 @@ const REVIEW_STATUS_MATERIALS_SENT = 100000001;
 // wmkf_responsetype picklist values.
 const RESPONSE_TYPE_ACCEPTED = 100000000;
 const RESPONSE_TYPE_DECLINED = 100000001;
-const RESPONSE_TYPE_NO_RESPONSE = 100000002;
 const RESPONSE_TYPE_WITHDRAWN_SUFFICIENT = 100000003;
-const RESPONSE_TYPE_HELD = 100000004;
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -65,11 +62,8 @@ export default async function handler(req, res) {
 
     const { suggestion, request, reviewer } = verified;
 
-    // Engagement state — drives which view the page renders. Readiness (proposal
-    // released to reviewers after staff QA) gates the hold vs finalize views; it is
-    // computed once here and reused by the write boundary in /respond.
-    const ready = isProposalReadyForReviewers(request);
-    const engagementState = computeEngagementState(suggestion, ready);
+    // Engagement state — drives which view the page renders.
+    const engagementState = computeEngagementState(suggestion);
 
     // Optimistic-lock token returned to the client (round-tripped as If-Match
     // on /respond). Starts as the row's etag at verify time.
@@ -259,32 +253,22 @@ export default async function handler(req, res) {
  * page-level view dispatch and the reversibility lock.
  *
  * `view`:
- *   stage2a   — pre-materials, reviewer can still accept/decline/flip (the full finalize form)
- *   hold-invite — pre-materials, proposal NOT yet released: lightweight "hold your spot" ask
- *   held      — reviewer placed a hold; proposal not yet released (sit-tight + calendar)
+ *   stage2a   — pre-materials, reviewer can still accept/decline/flip
  *   accepted-pre-materials — accepted but materials not yet sent (post-accept screen)
  *   declined  — reviewer declined (post-decline screen)
  *   stage2b   — materials sent; existing review-form view
  *   submitted — review received; post-submission view
  *   withdrawn-sufficient — terminal, "no longer needed" copy
  *
- * `isReady` (default true): proposal released to reviewers after staff QA
- * (`isProposalReadyForReviewers`). When NOT ready, a fresh reviewer is asked to
- * hold (`hold-invite`) and a held reviewer sees the `held` confirmation; when
- * ready, both go to `stage2a` (the existing finalize/accept form). Defaults to
- * true so any unaware caller — and today's flow before the hold UI ships — keeps
- * the direct-to-accept behavior. Terminal/post-accept states ignore readiness.
- *
  * `canFlipState`: true if Stage 2a's accept/decline buttons should still
  * permit transitions. Locks once review status reaches materials_sent.
  */
-export function computeEngagementState(s, isReady = true) {
+export function computeEngagementState(s) {
   const responseType = s.wmkf_responsetype ?? null;
   const reviewStatus = s.wmkf_reviewstatus ?? null;
   const submitted = !!s.wmkf_reviewreceivedat;
   const accepted = s.wmkf_accepted === true;
   const declined = s.wmkf_declined === true;
-  const heldRow = responseType === RESPONSE_TYPE_HELD;
 
   // The lock: once staff have released materials, reviewer self-service flip ends.
   const canFlipState = (reviewStatus === null || reviewStatus < REVIEW_STATUS_MATERIALS_SENT)
@@ -301,32 +285,19 @@ export function computeEngagementState(s, isReady = true) {
     view = 'accepted-pre-materials';
   } else if (declined) {
     view = 'declined';
-  } else if (heldRow) {
-    // Agreed in principle. Once the proposal is released, finalize via the full
-    // accept form; until then, show the sit-tight/calendar confirmation.
-    view = isReady ? 'stage2a' : 'held';
   } else {
-    // No prior response. Released ⇒ the full accept form; not released ⇒ the
-    // lightweight hold ask.
-    view = isReady ? 'stage2a' : 'hold-invite';
+    // No active terminal/accepted/declined state. Historical `held` values fall
+    // through here so those reviewers can complete the single accept flow.
+    view = 'stage2a';
   }
-
-  // `held`/`heldAt` describe the ACTIVE held state only — i.e. the row's responsetype
-  // is held AND no terminal/accepted/declined state supersedes it (those win the view
-  // above). This avoids the contradictory `held:true` + `view:'submitted'` combo on an
-  // anomalous held+terminal row (the held branch is only reachable past all of them).
-  const held = heldRow && (view === 'held' || view === 'stage2a');
 
   return {
     view,
     canFlipState,
-    isReady,
     accepted,
     declined,
-    held,
     responseType,
     responseReceivedAt: s.wmkf_responsereceivedat || null,
-    heldAt: held ? (s.wmkf_heldat || null) : null,
     reviewStatus,
   };
 }

@@ -14,7 +14,7 @@
  *
  * Request body:
  *   - suggestionIds: string[]
- *   - templateType: 'invitation' | 'materials' | 'followup' | 'thankyou' (passthrough; the
+ *   - templateType: 'invitation' | 'materials' | 'followup' | 'thankyou' (validated; the
  *     caller supplies subject/body. 'invitation' carries {{externalLink}} → a magic accept/
  *     decline link is minted, same placeholder-driven path as materials.)
  *   - template: { subject, body }
@@ -41,7 +41,7 @@ import { getHonorariumAmount } from '../../../lib/services/honorarium-config';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import { fetchCoPIs } from '../../../lib/services/proposal-participants';
 import { mintAndStore } from '../../../lib/external/token-lifecycle';
-import { emailConfidence } from '../../../lib/utils/reviewer-invite';
+import { emailConfidence, isKnownTemplateType } from '../../../lib/utils/reviewer-invite';
 import { computeReviewerTokenExpiry } from '../../../lib/external/reviewer-token-ttl';
 
 const limiter = nextRateLimiter({ max: 30 });
@@ -85,6 +85,9 @@ export default async function handler(req, res) {
     }
     if (!template || !template.subject || !template.body) {
       return res.status(400).json({ error: 'template with subject and body is required' });
+    }
+    if (!isKnownTemplateType(templateType)) {
+      return res.status(400).json({ error: `Unknown templateType: ${templateType}` });
     }
 
     // Hydrate each suggestion: suggestion row + linked person + linked request.

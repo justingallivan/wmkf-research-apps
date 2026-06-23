@@ -1,15 +1,11 @@
 /**
  * @jest-environment node
  *
- * Route-level tests for /api/review-manager/send-emails — the reviewer "hold step"
- * calendar lane + send-path gates (chunks 5/6, carried from their Codex reviews).
+ * Route-level tests for /api/review-manager/send-emails send-path gates.
  *
  * Uses the REAL reviewer-invite gates (sendAllowsAttachments allowlist,
- * templateCarriesCalendarInvite, mayReceiveFinalize, isKnownTemplateType,
- * recipientMayReceiveAttachments, shouldSkipDuplicateInvitation, emailConfidence) —
- * those are the contract under test. calendar-invite is mocked so we can force the
- * .ics throw (its CONTENT is unit-tested in calendar-invite.test.js); here we test
- * the lane WIRING + the strip/skip/degrade gates end-to-end through the handler.
+ * isKnownTemplateType, recipientMayReceiveAttachments,
+ * shouldSkipDuplicateInvitation, emailConfidence) — those are the contract under test.
  */
 
 jest.mock('../../lib/utils/auth', () => ({
@@ -61,10 +57,6 @@ jest.mock('../../lib/utils/cycle-material-ref', () => ({
   isPrivateCycleMaterialPathname: (p) => typeof p === 'string' && p.startsWith('cycle-materials/'),
 }));
 
-const ICS = { filename: 'keck-review-due.ics', contentType: 'text/calendar', content: Buffer.from('ICS') };
-const buildReviewDueIcs = jest.fn(() => ICS);
-jest.mock('../../lib/external/calendar-invite', () => ({ buildReviewDueIcs: (...a) => buildReviewDueIcs(...a) }));
-
 const { createMockReq, createMockRes } = require('../helpers/auth-mock');
 
 // send-emails GUID-validates each draft.suggestionId before it becomes a
@@ -73,8 +65,6 @@ const { createMockReq, createMockRes } = require('../helpers/auth-mock');
 // pr-1 / req-1 are server-derived (off the fetched suggestion), not client-supplied,
 // so they need no GUID shape. These four cover the single-row + batch cases.
 const SUG_1 = '11111111-1111-4111-8111-111111111111';
-const SUG_HELD = 'a1111111-1111-4111-8111-111111111111';
-const SUG_FRESH = 'b2222222-2222-4222-8222-222222222222';
 const SUG_MISSING = 'c3333333-3333-4333-8333-333333333333';
 
 // Mutable fixtures (reset per test). SUGGESTIONS is a map so batch tests can return
@@ -126,10 +116,6 @@ beforeAll(async () => {
 });
 beforeEach(() => {
   jest.clearAllMocks();
-  // clearAllMocks does NOT drain a queued mockImplementationOnce — reset + reinstate
-  // the default so the degrade test's one-shot throw can't leak to a later test.
-  buildReviewDueIcs.mockReset();
-  buildReviewDueIcs.mockImplementation(() => ICS);
   SUGGESTIONS = { [SUG_1]: baseSuggestion() };
   PERSON = basePerson();
   REQUEST = { akoya_requestid: 'req-1', akoya_requestnum: 'REQ-001', wmkf_meetingdate: '2026-07-01' };
@@ -164,69 +150,6 @@ async function run(body) {
   return res;
 }
 const draft = (id = SUG_1) => ({ suggestionId: id, subject: 'S', body: 'B' });
-
-describe('send-emails — hold calendar lane', () => {
-  test('hold attaches ONLY the .ics — proposal materials are excluded even when the cycle HAS them', async () => {
-    // Materials-capable cycle + a non-accepted hold recipient: proves the hold path
-    // excludes materials (allowAttachments('hold')=false), not just that none existed.
-    CYCLE_CODE = 'CYC';
-    CYCLE_CONFIG = MATERIALS_CYCLE;
-    REQUEST = { ...REQUEST, wmkf_reviewduedate: '2026-08-15' };
-    const res = await run({ drafts: [draft()], templateType: 'hold' });
-    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-    expect(filenamesSent()).toEqual(['keck-review-due.ics']); // .ics only, no proposal.pdf
-    expect(buildReviewDueIcs).toHaveBeenCalledWith({
-      reviewDueDate: '2026-08-15',
-      suggestionId: SUG_1,
-      requestNumber: 'REQ-001',
-    });
-    const r = resultOf(res);
-    expect(r.stats.sent).toBe(1);
-    // Lifecycle: first contact → invited + emailSentAt, and NOT reviewstatus/responsetype.
-    expect(updateLifecycle).toHaveBeenCalledTimes(1);
-    const lc = updateLifecycle.mock.calls[0][1];
-    // Phase 3: first contact also clears the respond-by reminder marker (new offer window).
-    expect(lc).toEqual({ invited: true, emailSentAt: expect.any(String), respondReminderSentAt: null });
-    expect(lc).not.toHaveProperty('reviewStatus');
-    expect(lc).not.toHaveProperty('responseType');
-  });
-
-  test('a thrown .ics build degrades — email still sends, recipient in sent[], attachments []', async () => {
-    buildReviewDueIcs.mockImplementationOnce(() => { throw new Error('boom'); });
-    const res = await run({ drafts: [draft()], templateType: 'hold' });
-    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-    expect(attachmentsSent()).toEqual([]); // degraded: no .ics, no materials
-    const r = resultOf(res);
-    expect(r.sent.map((s) => s.suggestionId)).toEqual([SUG_1]);
-    expect(r.failed).toEqual([]);
-    expect(r.skipped).toEqual([]);
-    expect(r.stats).toMatchObject({ sent: 1, failed: 0, skipped: 0, total: 1 });
-  });
-
-  test('hold to an ALREADY-INVITED row is skipped already_invited (no send)', async () => {
-    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_invited: true }) };
-    const res = await run({ drafts: [draft()], templateType: 'hold' });
-    expect(createAndSendEmail).not.toHaveBeenCalled();
-    expect(updateLifecycle).not.toHaveBeenCalled();
-    const r = resultOf(res);
-    expect(r.skipped[0].reason).toBe('already_invited');
-    expect(r.sent).toEqual([]);
-  });
-
-  test('hold to a LOW-confidence address is refused email_unconfirmed (first-contact gate covers hold)', async () => {
-    PERSON = basePerson({ wmkf_emailsource: 'manual', wmkf_identitystatus: '' }); // LOW
-    const res = await run({ drafts: [draft()], templateType: 'hold' });
-    expect(createAndSendEmail).not.toHaveBeenCalled();
-    expect(resultOf(res).skipped[0].reason).toBe('email_unconfirmed');
-  });
-
-  test('hold to a LOW-confidence address PROCEEDS when staff confirmed that recipient', async () => {
-    PERSON = basePerson({ wmkf_emailsource: 'manual', wmkf_identitystatus: '' }); // LOW
-    const res = await run({ drafts: [draft()], templateType: 'hold', confirmedLowConfidenceIds: [SUG_1] });
-    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-    expect(resultOf(res).stats.sent).toBe(1);
-  });
-});
 
 describe('send-emails — reviewer portal HTML links', () => {
   test('external reviewer URLs render as a button with a fallback link', async () => {
@@ -366,39 +289,22 @@ describe('send-emails — materials strip gate (recipientMayReceiveAttachments, 
   });
 });
 
-describe('send-emails — finalize held-eligibility gate', () => {
-  test('finalize to a NON-held row is skipped not_held (no send, no lifecycle write)', async () => {
-    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_responsetype: null }) };
-    const res = await run({ drafts: [draft()], templateType: 'finalize' });
-    expect(createAndSendEmail).not.toHaveBeenCalled();
-    expect(updateLifecycle).not.toHaveBeenCalled();
-    expect(resultOf(res).skipped[0].reason).toBe('not_held');
-  });
-
-  test('finalize to a HELD row sends, carries no .ics/materials, stamps emailSentAt only', async () => {
-    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_responsetype: 100000004 }) };
-    const res = await run({ drafts: [draft()], templateType: 'finalize' });
-    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-    expect(attachmentsSent()).toEqual([]);
-    expect(resultOf(res).stats.sent).toBe(1);
-    expect(updateLifecycle.mock.calls[0][1]).toEqual({ emailSentAt: expect.any(String) });
-  });
-});
-
 describe('send-emails — partial-success batch', () => {
-  test('mixed batch: held finalize sends, non-held skips not_held, missing row fails', async () => {
+  test('mixed batch: accepted materials sends, non-accepted skips, missing row fails', async () => {
     SUGGESTIONS = {
-      [SUG_HELD]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_HELD, wmkf_responsetype: 100000004 }),
-      [SUG_FRESH]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_FRESH, wmkf_responsetype: null }),
+      [SUG_1]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_1, wmkf_accepted: true }),
+      [SUG_MISSING]: undefined,
       // SUG_MISSING intentionally absent → findById returns null → failed
     };
+    const freshId = 'b2222222-2222-4222-8222-222222222222';
+    SUGGESTIONS[freshId] = baseSuggestion({ wmkf_appreviewersuggestionid: freshId, wmkf_accepted: false });
     const res = await run({
-      drafts: [draft(SUG_HELD), draft(SUG_FRESH), draft(SUG_MISSING)],
-      templateType: 'finalize',
+      drafts: [draft(SUG_1), draft(freshId), draft(SUG_MISSING)],
+      templateType: 'materials',
     });
     const r = resultOf(res);
-    expect(r.sent.map((s) => s.suggestionId)).toEqual([SUG_HELD]);
-    expect(r.skipped.map((s) => ({ id: s.suggestionId, reason: s.reason }))).toEqual([{ id: SUG_FRESH, reason: 'not_held' }]);
+    expect(r.sent.map((s) => s.suggestionId)).toEqual([SUG_1]);
+    expect(r.skipped.map((s) => ({ id: s.suggestionId, reason: s.reason }))).toEqual([{ id: freshId, reason: 'not_accepted' }]);
     expect(r.failed.map((f) => f.suggestionId)).toEqual([SUG_MISSING]);
     expect(r.stats).toMatchObject({ sent: 1, skipped: 1, failed: 1, total: 3 });
   });
@@ -457,12 +363,14 @@ describe('send-emails — Phase 1 campaign-config persistence (first invite)', (
 });
 
 describe('send-emails — fail-closed on unknown templateType', () => {
-  test('unknown templateType errors before ANY work (no findById/getRecord/send/lifecycle)', async () => {
-    const res = await run({ drafts: [draft()], templateType: 'bogus' });
-    expect(events(res).some((e) => e.event === 'error' && /Unknown templateType/.test(e.data.message))).toBe(true);
-    expect(findById).toHaveBeenCalledTimes(0);
-    expect(getRecord).toHaveBeenCalledTimes(0);
-    expect(createAndSendEmail).toHaveBeenCalledTimes(0);
-    expect(updateLifecycle).toHaveBeenCalledTimes(0);
-  });
+  for (const templateType of ['bogus', 'hold', 'finalize']) {
+    test(`${templateType} errors before ANY work (no findById/getRecord/send/lifecycle)`, async () => {
+      const res = await run({ drafts: [draft()], templateType });
+      expect(events(res).some((e) => e.event === 'error' && /Unknown templateType/.test(e.data.message))).toBe(true);
+      expect(findById).toHaveBeenCalledTimes(0);
+      expect(getRecord).toHaveBeenCalledTimes(0);
+      expect(createAndSendEmail).toHaveBeenCalledTimes(0);
+      expect(updateLifecycle).toHaveBeenCalledTimes(0);
+    });
+  }
 });

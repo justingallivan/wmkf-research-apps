@@ -19,7 +19,7 @@
  *
  * Request body:
  *   - drafts: Array<{ suggestionId, subject, body }> — pre-rendered per recipient
- *   - templateType: 'materials' | 'followup' | 'thankyou'
+ *   - templateType: 'invitation' | 'materials' | 'followup' | 'thankyou'
  *   - attachmentUrls: string[] — additional attachment URLs (optional)
  *   - markAsSent: boolean — whether to update lifecycle (default true)
  *
@@ -55,8 +55,7 @@ import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-sug
 import * as contactAdapter from '../../../lib/dataverse/adapters/contact';
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
 import { backPropReviewerOrcidToContact } from '../../../lib/services/backprop-reviewer-orcid';
-import { shouldSkipDuplicateInvitation, sendAllowsAttachments, templateCarriesCalendarInvite, isKnownTemplateType, mayReceiveFinalize, recipientMayReceiveAttachments, emailConfidence } from '../../../lib/utils/reviewer-invite';
-import { buildReviewDueIcs } from '../../../lib/external/calendar-invite';
+import { shouldSkipDuplicateInvitation, sendAllowsAttachments, isKnownTemplateType, recipientMayReceiveAttachments, emailConfidence } from '../../../lib/utils/reviewer-invite';
 
 const limiter = nextRateLimiter({ max: 10 });
 const EMAIL_DELIVERY_MODES = new Set(['send', 'capture']);
@@ -316,26 +315,10 @@ export default async function handler(req, res) {
       // — the staff one-click "confirm & send". This is what stops an unknowing invite to a
       // wrong/namesake address (the S234 pianist-Chen failure).
       //
-      // Scoped to FIRST CONTACT (invitation OR hold): the hold ask goes to the same
-      // unproven address as the invitation, so it carries the same wrong/namesake risk
-      // and is gated identically. Once a reviewer engages via the magic link sent to this
-      // address, it's proven, so post-engagement sends (materials/followup/thankyou/finalize,
-      // the ReviewerManagePanel flow) are NOT re-gated — same scope as shouldSkipDuplicateInvitation.
-      // Finalize is the held→finalize nudge — valid ONLY for a reviewer who has HELD.
-      // A finalize to a non-held row (fresh/declined/already-accepted) is a wrong target:
-      // skip it server-side so a misdirected finalize can neither bypass the first-contact
-      // confidence gate on an unproven address nor overwrite a non-held row's emailSentAt
-      // (Codex chunk-6 #3/#7).
-      if (templateType === 'finalize' && !mayReceiveFinalize(suggestion)) {
-        skipped.push({ suggestionId: draft.suggestionId, candidateName: name, candidateEmail: email, reason: 'not_held' });
-        sendEvent('progress', {
-          stage: 'sending',
-          current: processed,
-          total: drafts.length,
-          message: `Skipped ${name || '(unnamed)'} (not in held state)`,
-        });
-        continue;
-      }
+      // Scoped to FIRST CONTACT (invitation): once a reviewer engages via the
+      // magic link sent to this address, it's proven, so post-engagement sends
+      // (materials/followup/thankyou, the ReviewerManagePanel flow) are NOT
+      // re-gated — same scope as shouldSkipDuplicateInvitation.
 
       // Release-to-reviewers accepted-only gate (reviewer-engagement §3.A / DECISION #10):
       // proposal materials go ONLY to a reviewer who has ACCEPTED. SERVER-authoritative —
@@ -357,7 +340,7 @@ export default async function handler(req, res) {
 
       const confidence = emailConfidence(person);
       const lowConfidenceConfirmed = confirmedLowConfidenceIdSet.has(draft.suggestionId);
-      const isFirstContact = templateType === 'invitation' || templateType === 'hold';
+      const isFirstContact = templateType === 'invitation';
       if (isFirstContact && confidence.level === 'low' && !lowConfidenceConfirmed) {
         skipped.push({
           suggestionId: draft.suggestionId,
@@ -400,25 +383,7 @@ export default async function handler(req, res) {
       // or any mislabeled send) gets NO attachments (Codex S211 stop-gate). The
       // `allowAttachments` (templateType) gate above just avoids fetching them.
       const materialAttachments = recipientMayReceiveAttachments(suggestion) ? sharedAttachments : [];
-      // Calendar invite (.ics) is a SERVER-generated, always-allowed lane — NOT proposal
-      // material — concatenated AFTER the wmkf_accepted gate so a held (non-accepted)
-      // reviewer still gets the save-the-date while materials stay gated. Built per
-      // recipient from their request's meeting date; NON-FATAL — a calendar build error
-      // logs and the email still ships with the due date in the body (chunk 5 "degrade, not fail").
-      let calendarAttachments = [];
-      if (templateCarriesCalendarInvite(templateType)) {
-        try {
-          const ics = buildReviewDueIcs({
-            reviewDueDate: request?.wmkf_reviewduedate,
-            suggestionId: suggestion?.wmkf_appreviewersuggestionid,
-            requestNumber: request?.akoya_requestnum,
-          });
-          if (ics) calendarAttachments = [ics];
-        } catch (icsErr) {
-          console.warn(`Failed to build calendar invite for ${name}:`, icsErr.message);
-        }
-      }
-      const recipientAttachments = [...materialAttachments, ...calendarAttachments];
+      const recipientAttachments = materialAttachments;
 
       try {
         const emailPayload = {
@@ -557,11 +522,11 @@ export default async function handler(req, res) {
               thankYouSentAt: now,
               reviewStatus: 'complete',
             }, { actingUserSystemId });
-          } else if (templateType === 'invitation' || templateType === 'hold') {
-            // First contact (invitation OR hold ask): mark invited + when the email
+          } else if (templateType === 'invitation') {
+            // First contact: mark invited + when the email
             // went out, but do NOT touch wmkf_reviewstatus and do NOT set
-            // wmkf_responsetype — the reviewer sets held/accepted/declined themselves
-            // in the external portal. Both stamp the same first-contact fields.
+            // wmkf_responsetype — the reviewer sets accepted/declined themselves
+            // in the external portal.
             //
             // Reviewer-engagement Phase 3 (spec §3.B required side-effect): clear the
             // respond-by reminder fire-once marker in the SAME write as the emailSentAt
@@ -572,13 +537,6 @@ export default async function handler(req, res) {
               invited: true,
               emailSentAt: now,
               respondReminderSentAt: null,
-            }, { actingUserSystemId });
-          } else if (templateType === 'finalize') {
-            // "Proposal ready — please finalize" nudge to a held reviewer. Records the
-            // send (emailSentAt) only; never touches wmkf_reviewstatus or wmkf_responsetype
-            // (the reviewer finalizes via the portal, which runs the full accept path).
-            await suggestionAdapter.updateLifecycle(s.suggestionId, {
-              emailSentAt: now,
             }, { actingUserSystemId });
           }
         } catch (err) {

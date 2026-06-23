@@ -390,8 +390,7 @@ export default function ProfileSettings() {
             </div>
             <p className="text-sm text-gray-600 mb-4">
               Your templates for the emails sent to peer reviewers from the Workbench
-              Reviewers tab — invitation, hold, finalize, materials, follow-up, and
-              thank-you. Everyone starts from a default; edits here are saved to your
+              Reviewers tab. Everyone starts from a default; edits here are saved to your
               profile and used wherever you send. Your saved Email Signature fills the{' '}
               <code className="text-xs">{'{{signature}}'}</code> placeholder.
             </p>

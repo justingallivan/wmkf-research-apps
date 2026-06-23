@@ -18,7 +18,6 @@ import { GraphService } from '../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../lib/utils/sharepoint-buckets';
 import { writeReviewFiles } from '../../lib/services/review-upload';
 import { applyStage2aResponse } from '../../lib/dataverse/adapters/reviewer-suggestion';
-import { isProposalReadyForReviewers } from '../../lib/external/proposal-readiness';
 
 jest.mock('../../lib/external/verify-suggestion-token', () => ({
   verifySuggestionToken: jest.fn(),
@@ -75,12 +74,6 @@ jest.mock('../../lib/services/review-upload', () => ({
 
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   applyStage2aResponse: jest.fn(async () => ({})),
-}));
-
-// Proposal readiness gates hold vs finalize at the write boundary. Default to the
-// production go-live state (ready ⇒ true, hold bypassed); hold tests override to false.
-jest.mock('../../lib/external/proposal-readiness', () => ({
-  isProposalReadyForReviewers: jest.fn(() => true),
 }));
 
 jest.mock('../../lib/services/dynamics-context', () => ({
@@ -695,67 +688,13 @@ describe('/api/external/review/[token]/respond', () => {
     expect(applyStage2aResponse).not.toHaveBeenCalled();
   });
 
-  // ── Chunk 3: hold action + readiness write-layer gate + transition matrix ──
-  const notReady = () => isProposalReadyForReviewers.mockReturnValue(false);
-  const ready = () => isProposalReadyForReviewers.mockReturnValue(true);
-  const holdReq = (suggestion, body = { action: 'hold' }) => {
+  // ── Retired hold path + direct accept transition matrix ──
+  const respondReq = (suggestion, body) => {
     verifySuggestionToken.mockResolvedValue({ ...fresh, suggestion: { ...fresh.suggestion, ...suggestion } });
     return createMockReq({ method: 'POST', query: { token: 'good-token' }, headers: {}, body });
   };
 
-  it('hold (fresh, not ready) → 200, calls adapter with action:hold, fires NO honorarium', async () => {
-    notReady();
-    const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
-    const res = createMockRes();
-    await handler(holdReq({}), res);
-    expect(applyStage2aResponse).toHaveBeenCalledWith(
-      'suggestion-1',
-      expect.objectContaining({ action: 'hold' }),
-      expect.anything(),
-    );
-    expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ idempotent: false }));
-  });
-
-  it('hold never sets wmkf_accepted (automation-safety): adapter call carries no accepted flag', async () => {
-    notReady();
-    const res = createMockRes();
-    await handler(holdReq({}), res);
-    const [, body] = applyStage2aResponse.mock.calls[0];
-    expect(body).not.toHaveProperty('acks');
-    expect(body.action).toBe('hold');
-  });
-
-  it('repeat hold (already held) → 200 idempotent WITHOUT calling the adapter (no heldAt re-stamp)', async () => {
-    notReady();
-    const res = createMockRes();
-    await handler(holdReq({ wmkf_responsetype: 100000004 }), res);
-    expect(applyStage2aResponse).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ idempotent: true }));
-  });
-
-  it('hold when ALREADY released → 409 already_released (reviewer should finalize)', async () => {
-    ready();
-    const res = createMockRes();
-    await handler(holdReq({}), res);
-    expect(applyStage2aResponse).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(409);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'already_released' }));
-  });
-
-  it('hold on an accepted row → 409 already_accepted (no downgrade)', async () => {
-    notReady();
-    const res = createMockRes();
-    await handler(holdReq({ wmkf_accepted: true }), res);
-    expect(applyStage2aResponse).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(409);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'already_accepted' }));
-  });
-
-  it('fresh accept when NOT ready → 409 not_ready (must hold first), no adapter call', async () => {
-    notReady();
+  it('fresh accept goes straight through the full accept path', async () => {
     const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
     verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
@@ -764,14 +703,12 @@ describe('/api/external/review/[token]/respond', () => {
     });
     const res = createMockRes();
     await handler(req, res);
-    expect(applyStage2aResponse).not.toHaveBeenCalled();
-    expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(409);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'not_ready' }));
+    expect(applyStage2aResponse).toHaveBeenCalledWith('suggestion-1', expect.objectContaining({ action: 'accept' }), expect.anything());
+    expect(ensureHonorariumOnboarding).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it('REPEAT accept (already accepted) is EXEMPT from the readiness gate — honorarium retry runs even when not ready', async () => {
-    notReady();
+  it('REPEAT accept (already accepted) still runs honorarium retry', async () => {
     const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
     verifySuggestionToken.mockResolvedValue({ ...fresh, suggestion: { ...fresh.suggestion, wmkf_accepted: true } });
     const req = createMockReq({ method: 'POST', query: { token: 'good-token' }, headers: {}, body: { action: 'accept' } });
@@ -782,9 +719,13 @@ describe('/api/external/review/[token]/respond', () => {
   });
 
   it('any action on a review-received row → 409 review_received_locked (side-channel receipt without materials_sent)', async () => {
-    notReady();
+    verifySuggestionToken.mockResolvedValue({
+      ...fresh,
+      suggestion: { ...fresh.suggestion, wmkf_reviewreceivedat: '2026-06-14T00:00:00Z' },
+    });
+    const req = createMockReq({ method: 'POST', query: { token: 'good-token' }, headers: {}, body: { action: 'decline', decline: {} } });
     const res = createMockRes();
-    await handler(holdReq({ wmkf_reviewreceivedat: '2026-06-14T00:00:00Z' }, { action: 'hold' }), res);
+    await handler(req, res);
     expect(applyStage2aResponse).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'review_received_locked' }));
@@ -800,27 +741,7 @@ describe('/api/external/review/[token]/respond', () => {
   });
 
   // ── Remaining transition-matrix cells (Codex chunk-3 #2) ──
-  it('accepted + READY + hold → 409 already_accepted (row state wins over readiness; Codex guard-order fix)', async () => {
-    ready();
-    const res = createMockRes();
-    await handler(holdReq({ wmkf_accepted: true }), res);
-    expect(applyStage2aResponse).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(409);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'already_accepted' }));
-  });
-
-  it('declined → hold (flip) when not ready → 200, adapter called with action:hold', async () => {
-    notReady();
-    const res = createMockRes();
-    await handler(holdReq({ wmkf_declined: true, wmkf_responsetype: 100000001 }), res);
-    expect(applyStage2aResponse).toHaveBeenCalledWith(
-      'suggestion-1', expect.objectContaining({ action: 'hold' }), expect.anything(),
-    );
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  it('held → accept (finalize) when READY → runs the full accept path (acks/honorarium)', async () => {
-    ready();
+  it('historical held → accept runs the full accept path (acks/honorarium)', async () => {
     const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
     verifySuggestionToken.mockResolvedValue({
       ...fresh,
@@ -837,25 +758,7 @@ describe('/api/external/review/[token]/respond', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it('held → accept (finalize) when NOT ready → 409 not_ready (held reviewer cannot finalize pre-release)', async () => {
-    notReady();
-    verifySuggestionToken.mockResolvedValue({
-      ...fresh,
-      suggestion: { ...fresh.suggestion, wmkf_responsetype: 100000004 },
-    });
-    const req = createMockReq({
-      method: 'POST', query: { token: 'good-token' }, headers: {},
-      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
-    });
-    const res = createMockRes();
-    await handler(req, res);
-    expect(applyStage2aResponse).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(409);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'not_ready' }));
-  });
-
   it('held → decline (flip) → 200, adapter called with action:decline', async () => {
-    notReady();
     verifySuggestionToken.mockResolvedValue({
       ...fresh,
       suggestion: { ...fresh.suggestion, wmkf_responsetype: 100000004 },
@@ -867,10 +770,9 @@ describe('/api/external/review/[token]/respond', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it('withdrawn_sufficient + hold → 409 withdrawn_sufficient (terminal lock applies to hold)', async () => {
-    notReady();
+  it('withdrawn_sufficient + decline → 409 withdrawn_sufficient', async () => {
     const res = createMockRes();
-    await handler(holdReq({ wmkf_responsetype: 100000003 }), res);
+    await handler(respondReq({ wmkf_responsetype: 100000003 }, { action: 'decline', decline: {} }), res);
     expect(applyStage2aResponse).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'withdrawn_sufficient' }));

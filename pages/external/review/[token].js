@@ -8,9 +8,7 @@
  * On mount, fetches /api/external/review/[token]/context, which returns
  * `engagementState.view` driving which view component renders:
  *
- *   stage2a               → Stage 2a invitation landing / finalize (full accept form)
- *   hold-invite           → lightweight "hold your spot" ask (proposal not yet released)
- *   held                  → post-hold "you're on the slate" confirmation
+ *   stage2a               → Stage 2a invitation landing / accept form
  *   accepted-pre-materials → post-accept confirmation
  *   declined              → post-decline confirmation
  *   stage2b               → materials list + review-form upload
@@ -27,7 +25,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Stage2aView from '../../../shared/components/external/Stage2aView';
-import HoldView from '../../../shared/components/external/HoldView';
 import DeclineFormView from '../../../shared/components/external/DeclineFormView';
 import AcceptedConfirmationView from '../../../shared/components/external/AcceptedConfirmationView';
 import DeclinedConfirmationView from '../../../shared/components/external/DeclinedConfirmationView';
@@ -154,28 +151,6 @@ function Dispatcher({ data, token, viewOverride, onRequestDecline, onRequestFlip
           token={token}
           onRequestDecline={onRequestDecline}
           onAccepted={onResponseSubmitted}
-        />
-      );
-
-    case 'hold-invite':
-      return (
-        <HoldView
-          data={data}
-          token={token}
-          confirmed={false}
-          onRequestDecline={onRequestDecline}
-          onHeld={onResponseSubmitted}
-        />
-      );
-
-    case 'held':
-      return (
-        <HoldView
-          data={data}
-          token={token}
-          confirmed
-          onRequestDecline={onRequestDecline}
-          onHeld={onResponseSubmitted}
         />
       );
 
