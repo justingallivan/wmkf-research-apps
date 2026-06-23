@@ -32,6 +32,19 @@ Origin/Referer checks.
   `https://applications.wmkeck.org/api/auth/callback/azure-ad` and a staff
   sign-in + state-changing staff API action are smoke-tested.
 
+## Verification trail (2026-06-23)
+
+- Codex branch: `codex/portal-domain-hardening-2026-06-23`.
+- Deployed commits: `6574f939` (external request-number hardening) and
+  `13757115` (grantee copy: "Graphical Abstract Request" / "materials").
+- Production deployments: `dpl_8tmRkKX9mhEpL7uU6o1NKKpMQuMb` and
+  `dpl_7Mvdv1juuDTRSJXeFQaatyqEyE7M`.
+- Smoke checks: fake reviewer/grantee token pages returned HTTP 200 on branded
+  hosts; reviewer invite smoke succeeded after using the latest email link;
+  grantee visual smoke reached the submitted confirmation state. Smoke rows,
+  SharePoint image upload, approved abstract test data, and reviewer test CRM
+  contact were cleaned up.
+
 ## Base-URL env vars (the switch is env-only — nothing hardcodes a domain)
 
 - `REVIEWER_PORTAL_BASE_URL` = `https://reviews.wmkeck.org`.

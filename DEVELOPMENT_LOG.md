@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Branded reviewer/grantee portal domains live (Session 280)
+
+**Milestone:** External reviewer and grantee magic-link traffic moved from Vercel-branded URLs to WMKF-branded domains, with the staff `applications.wmkeck.org` auth migration deliberately held until Azure callback validation.
+
+**Sessions:** 280. Codex split the portal-domain work off the accidental mixed branch, hardened public request-number exposure, smoke-tested reviewer/grantee links, and deployed to prod; Claude's unrelated workbench/email branch was parked separately.
+
+**Ship state:**
+- `REVIEWER_PORTAL_BASE_URL=https://reviews.wmkeck.org` and `GRANTEE_PORTAL_BASE_URL=https://grantees.wmkeck.org` active in Production; aliases also include `submissions.wmkeck.org` and `applications.wmkeck.org`.
+- External reviewer/grantee context JSON no longer returns `requestNumber`; reviewer and grantee send paths fail before send if hydrated subject/body copy exposes the internal request number.
+- Grantee portal copy now says "Graphical Abstract Request" and submitted copy says "your materials have..."; production grantee visual smoke reached submitted confirmation and test CRM/Dataverse/SharePoint residue was cleaned up.
+
+**Why it matters:** external reviewers and grantees now see WMKF-owned domains in email links, reducing phishing confusion while keeping staff OAuth and Origin/Referer behavior stable until the app-registration work is ready.
+
+**Pointers:** `SESSION_PROMPT.md` (S281), `.claude-memory/project-branded-domains.md`, `docs/CREDENTIALS_RUNBOOK.md`, `docs/agent-wiki/topics/security-auth.md`. Commits `6574f939`, `13757115`; deployments `dpl_8tmRkKX9mhEpL7uU6o1NKKpMQuMb`, `dpl_7Mvdv1juuDTRSJXeFQaatyqEyE7M`.
+
 ## June 2026 — Reviewer onboarding-at-accept + admin-editable email defaults (prod) (Session 279)
 
 **Milestone:** Model B taken to its conclusion — the reviewer flow collapsed to ONE final Accept and the dormant hold/finalize scaffolding was retired — and email/text default copy became admin-editable (no hardcoded runtime copy). Both shipped to prod. Codex built each chunk; Claude reviewed every diff.

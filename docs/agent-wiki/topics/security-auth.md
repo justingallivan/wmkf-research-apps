@@ -60,6 +60,10 @@ private Blob/file access, prompt-injection hardening, and download proxy pattern
   `GRANTEE_PORTAL_BASE_URL=https://grantees.wmkeck.org`. These are independent
   of staff NextAuth callbacks (`lib/external/token-lifecycle.js`,
   `lib/external/grantee-token-lifecycle.js`).
+- Public external surfaces must not show the internal request number. Reviewer
+  and grantee token context APIs intentionally omit `requestNumber`, and the
+  reviewer/grantee send paths guard against sending hydrated email subject/body
+  copy that contains the internal request number.
 - Held staff-auth migration: keep `NEXTAUTH_URL` unchanged/empty until the staff
   Azure app registration includes
   `https://applications.wmkeck.org/api/auth/callback/azure-ad`.
