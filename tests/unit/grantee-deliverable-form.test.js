@@ -63,7 +63,7 @@ test('submit POSTs multipart to the submit route and shows the thank-you state',
   fireEvent.click(screen.getByRole('checkbox'));
   fireEvent.click(screen.getByRole('button', { name: /^submit$/i }));
 
-  await waitFor(() => expect(screen.getByText(/your deliverables have been submitted/i)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/your materials have been submitted/i)).toBeInTheDocument());
 
   expect(fetchSpy).toHaveBeenCalledTimes(1);
   const [url, opts] = fetchSpy.mock.calls[0];
