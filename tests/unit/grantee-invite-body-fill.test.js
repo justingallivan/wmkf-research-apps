@@ -6,13 +6,11 @@
  * #6 (S272): every occurrence of a token must fill, not just the first — a PD's
  * custom body may repeat [Name]/[title]/COB [date].
  */
-import {
-  fillInviteBody,
-  GRANTEE_INVITE_DEFAULT_BODY,
-} from '../../shared/config/granteeInviteEmail';
+import { fillInviteBody } from '../../shared/config/granteeInviteEmail';
+import { GRANTEE_INVITE_SEED_BODY } from '../../lib/seed/email-defaults/grantee-invite';
 
 test('fills the default template placeholders', () => {
-  const out = fillInviteBody(GRANTEE_INVITE_DEFAULT_BODY, {
+  const out = fillInviteBody(GRANTEE_INVITE_SEED_BODY, {
     piName: 'Monika Raj',
     title: 'Quantum Widgets',
     baseDate: new Date('2026-06-20T12:00:00Z'),

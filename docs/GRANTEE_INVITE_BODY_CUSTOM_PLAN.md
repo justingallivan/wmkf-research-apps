@@ -109,18 +109,10 @@ import one source of truth.
 decision — see §1 invariant #4). The moved default ends at "Please do not hesitate
 to contact me if you need additional information." with no closing word.
 
-```js
-export const GRANTEE_INVITE_DEFAULT_SUBJECT = '...';   // moved verbatim
-export const GRANTEE_INVITE_DEFAULT_BODY = '...';      // moved, MINUS the 'Thank you,' line
-
-// Generalized: fill placeholders into ANY base template (default OR custom).
-export function fillInviteBody(baseTemplate, { piName, title, baseDate } = {}) {
-  return String(baseTemplate || '')
-    .replace('[Name]', surnameFromName(piName) || '[Name]')
-    .replace('[title]', title || '[title]')
-    .replace('COB [date]', `COB ${formatCobDate(baseDate)}`);
-}
-```
+> S279 update: the default text exports described here were later moved out of
+> runtime code. The canonical backup/seed copy now lives in
+> `lib/seed/email-defaults/grantee-invite.js`; `shared/config/granteeInviteEmail.js`
+> keeps only placeholder-fill logic.
 
 AwardeeTab keeps a thin `buildDefaultBody` shim or calls `fillInviteBody(base, …)`
 directly. **Verify** no other file imports `DEFAULT_BODY`/`DEFAULT_SUBJECT` from
@@ -134,9 +126,10 @@ In `shared/config/reviewerFinderPreferences.js`:
 export const PREFERENCE_KEYS = {
   // …
   // Per-user custom grantee-invitation email BODY (S272). Body-only — never a
-  // signature (server appends the assigned-PD signature). Plain string; absent ⇒
-  // fall back to GRANTEE_INVITE_DEFAULT_BODY. Written via the generic
-  // /api/user-preferences endpoint (not reserved).
+  // signature (server appends the assigned-PD signature). Plain string; absent =>
+  // fall back to the admin-editable default read from the profile-readable
+  // email-defaults route. Written via the generic /api/user-preferences endpoint
+  // (not reserved).
   GRANTEE_INVITE_BODY: 'grantee_invite_body',
 };
 ```
@@ -152,7 +145,7 @@ No normalize/serialize helpers needed (plain string, unlike the JSON signature).
 
 - `import { useProfile } from '../../context/ProfileContext'` and read
   `const savedBody = preferences?.[PREFERENCE_KEYS.GRANTEE_INVITE_BODY] || '';`
-- **Base template** = `savedBody || GRANTEE_INVITE_DEFAULT_BODY`, where `savedBody`
+- **Base template** = `savedBody || adminDefaultBody`, where `savedBody`
   is the trimmed pref (whitespace-only ⇒ treated as absent — see §5 hazard edge cases).
 - **Effect + manual-edit guard (Codex-corrected v1, hazard 1).** The auto-fill
   effect must (a) depend on the **resolved `baseTemplate`** so it reseeds when prefs
@@ -161,7 +154,7 @@ No normalize/serialize helpers needed (plain string, unlike the JSON signature).
   load late. Concrete shape:
 
   ```js
-  const autoBodyRef = useRef(GRANTEE_INVITE_DEFAULT_BODY);
+  const autoBodyRef = useRef(adminDefaultBody);
   const userEditedBodyRef = useRef(false);
 
   const handleBodyChange = (event) => {
@@ -192,7 +185,7 @@ No normalize/serialize helpers needed (plain string, unlike the JSON signature).
 
   ```js
   const resetToFoundationDefault = () => {
-    const nextBody = fillInviteBody(GRANTEE_INVITE_DEFAULT_BODY, {
+    const nextBody = fillInviteBody(adminDefaultBody, {
       piName: recipients?.pi?.name,
       title: awardTitle,
     });
@@ -211,7 +204,7 @@ No normalize/serialize helpers needed (plain string, unlike the JSON signature).
 Add a card below "Email Signature" in `pages/profile-settings.js`:
 
 - A textarea bound to `grantee_invite_body`, seeded from
-  `preferences[GRANTEE_INVITE_BODY] || GRANTEE_INVITE_DEFAULT_BODY` (same
+  `preferences[GRANTEE_INVITE_BODY] || adminDefaultBody` (same
   load-once-per-source ref pattern as the signature form, lines 58–82).
 - **Save** → `setPreference(PREFERENCE_KEYS.GRANTEE_INVITE_BODY, value)`.
 - **"Reset to Foundation default" → DELETE the key** (Codex v1, Q-1b). Writing the
@@ -299,7 +292,7 @@ to be appended server-side from the assigned PD.
 
 | File | Change |
 |---|---|
-| `shared/config/granteeInviteEmail.js` | **NEW** — shared default subject/body + `fillInviteBody` |
+| `shared/config/granteeInviteEmail.js` | Placeholder-fill helpers (`fillInviteBody`, date/name helpers); default text moved to admin settings/seed |
 | `shared/config/reviewerFinderPreferences.js` | Add `GRANTEE_INVITE_BODY` key |
 | `shared/components/workbench/AwardeeTab.js` | Seed body from saved pref; compose-state model (`dirty`/`templateMode` + identity-reset effect, §11); reset link; relabel; import shared module; `useProfile()` |
 | `shared/context/ProfileContext.js` | Add `REMOVE_PREFERENCE` reducer action + `deletePreference(key)` (DELETE `/api/user-preferences`, gate on parsed `data.success`) |

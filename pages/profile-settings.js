@@ -15,7 +15,6 @@ import {
   readEmailSignaturePreference,
   serializeEmailSignaturePreference,
 } from '../shared/config/reviewerFinderPreferences';
-import { GRANTEE_INVITE_DEFAULT_BODY } from '../shared/config/granteeInviteEmail';
 import EmailTemplatesModal from '../shared/components/reviewers/EmailTemplatesModal';
 import { TEMPLATE_TYPE_LABELS, TEMPLATE_TYPES } from '../shared/components/reviewers/email-template-store';
 
@@ -60,11 +59,17 @@ export default function ProfileSettings() {
   const senderInfoPreference = preferences?.[PREFERENCE_KEYS.SENDER_INFO] || '';
 
   // Grantee-invitation custom email body (S272). Body-only — the server appends the
-  // signature; the textarea must not contain one. Absent pref ⇒ the shared default.
-  const [inviteBody, setInviteBody] = useState(GRANTEE_INVITE_DEFAULT_BODY);
+  // signature; the textarea must not contain one. Absent pref => the admin default.
+  const [inviteBody, setInviteBody] = useState('');
+  const [inviteDefault, setInviteDefault] = useState({
+    body: '',
+    loaded: false,
+    unavailable: false,
+  });
   const [isSavingInviteBody, setIsSavingInviteBody] = useState(false);
   const [inviteBodyStatus, setInviteBodyStatus] = useState(null);
   const loadedInviteBodySourceRef = useRef('');
+  const inviteBodyDirtyRef = useRef(false);
   const inviteBodyPreference = preferences?.[PREFERENCE_KEYS.GRANTEE_INVITE_BODY] || '';
 
   // Reviewer email templates (the 6-type set sent from Workbench → Reviewers).
@@ -101,13 +106,53 @@ export default function ProfileSettings() {
 
   useEffect(() => {
     if (status !== 'ready') return;
-    const sourceKey = [currentProfile?.id || '', inviteBodyPreference].join('::');
+    if (!inviteDefault.loaded && !inviteBodyPreference.trim()) return;
+    const sourceKey = [
+      currentProfile?.id || '',
+      inviteBodyPreference,
+      inviteDefault.body,
+      inviteDefault.loaded ? 'loaded' : 'pending',
+      inviteDefault.unavailable ? 'unavailable' : 'available',
+    ].join('::');
     if (sourceKey === loadedInviteBodySourceRef.current) return;
-    const next = inviteBodyPreference.trim() ? inviteBodyPreference : GRANTEE_INVITE_DEFAULT_BODY;
-    setInviteBody((prev) => (prev === next ? prev : next));
-    setInviteBodyStatus(null);
+    const next = inviteBodyPreference.trim() ? inviteBodyPreference : inviteDefault.body;
+    if (!inviteBodyDirtyRef.current) {
+      setInviteBody((prev) => (prev === next ? prev : next));
+      setInviteBodyStatus(null);
+    }
     loadedInviteBodySourceRef.current = sourceKey;
-  }, [status, currentProfile?.id, inviteBodyPreference]);
+  }, [
+    status,
+    currentProfile?.id,
+    inviteBodyPreference,
+    inviteDefault.body,
+    inviteDefault.loaded,
+    inviteDefault.unavailable,
+  ]);
+
+  useEffect(() => {
+    if (status !== 'ready' || !currentProfile?.id) return;
+    let cancelled = false;
+    fetch('/api/email-defaults/grantee-invite')
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || 'Failed to load Request Abstract email default.');
+        return data;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setInviteDefault({
+          body: String(data.body || ''),
+          loaded: true,
+          unavailable: Boolean(data.unavailable),
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setInviteDefault({ body: '', loaded: true, unavailable: true });
+      });
+    return () => { cancelled = true; };
+  }, [status, currentProfile?.id]);
 
   // Reset form when closing
   const resetForm = () => {
@@ -199,6 +244,7 @@ export default function ProfileSettings() {
     const ok = await setPreference(PREFERENCE_KEYS.GRANTEE_INVITE_BODY, inviteBody);
     setIsSavingInviteBody(false);
     setInviteBodyStatus(ok ? 'saved' : 'error');
+    if (ok) inviteBodyDirtyRef.current = false;
     if (!ok) setError('Failed to save the Request Abstract email body.');
   };
 
@@ -212,7 +258,8 @@ export default function ProfileSettings() {
     const ok = await deletePreference(PREFERENCE_KEYS.GRANTEE_INVITE_BODY);
     setIsSavingInviteBody(false);
     if (ok) {
-      setInviteBody(GRANTEE_INVITE_DEFAULT_BODY);
+      inviteBodyDirtyRef.current = false;
+      setInviteBody(inviteDefault.body || '');
       setInviteBodyStatus('reset');
     } else {
       setInviteBodyStatus('error');
@@ -351,11 +398,25 @@ export default function ProfileSettings() {
                 Email body
                 <textarea
                   value={inviteBody}
-                  onChange={(e) => { setInviteBody(e.target.value); setInviteBodyStatus(null); }}
+                  onChange={(e) => {
+                    inviteBodyDirtyRef.current = true;
+                    setInviteBody(e.target.value);
+                    setInviteBodyStatus(null);
+                  }}
                   rows={14}
                   className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
                 />
               </label>
+              {inviteDefault.loaded && inviteDefault.unavailable && (
+                <p className="text-sm text-red-700">
+                  The shared default is unavailable because settings read failed. Saved custom text can still be edited, but reset is disabled until the default loads.
+                </p>
+              )}
+              {inviteDefault.loaded && !inviteDefault.unavailable && !inviteBodyPreference.trim() && inviteDefault.body.trim() === '' && (
+                <p className="text-sm text-amber-700">
+                  The shared default is blank - not configured.
+                </p>
+              )}
               {inviteBodyStatus === 'error' && (
                 <p className="text-sm text-red-700">Could not save the Request Abstract email body.</p>
               )}
@@ -365,7 +426,7 @@ export default function ProfileSettings() {
                   size="sm"
                   type="button"
                   onClick={handleResetInviteBody}
-                  disabled={isSavingInviteBody}
+                  disabled={isSavingInviteBody || !inviteDefault.loaded || inviteDefault.unavailable}
                 >
                   Reset to default
                 </Button>

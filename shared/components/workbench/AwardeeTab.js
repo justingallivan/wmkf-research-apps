@@ -24,11 +24,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { GRANTEE_DELIVERABLE_LABEL } from '../../config/granteeDeliverableStatus';
 import { useProfile } from '../../context/ProfileContext';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
-import {
-  GRANTEE_INVITE_DEFAULT_SUBJECT,
-  GRANTEE_INVITE_DEFAULT_BODY,
-  fillInviteBody,
-} from '../../config/granteeInviteEmail';
+import { fillInviteBody } from '../../config/granteeInviteEmail';
 
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || '').trim());
 
@@ -50,8 +46,15 @@ export default function AwardeeTab({ requestId, context }) {
   const [recipients, setRecipients] = useState(null);
   const [toEmail, setToEmail] = useState('');
   const [ccEmail, setCcEmail] = useState('');
-  const [subject, setSubject] = useState(GRANTEE_INVITE_DEFAULT_SUBJECT);
-  const [body, setBody] = useState(GRANTEE_INVITE_DEFAULT_BODY);
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [emailDefaults, setEmailDefaults] = useState({
+    subject: '',
+    body: '',
+    configured: false,
+    unavailable: false,
+    loaded: false,
+  });
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
@@ -70,6 +73,8 @@ export default function AwardeeTab({ requestId, context }) {
   const [templateMode, setTemplateMode] = useState('auto');
   const currentRequestIdRef = useRef(requestId);
   const prevProfileIdRef = useRef(undefined);
+  const subjectDirtyRef = useRef(false);
+  const defaultLoadSeqRef = useRef(0);
 
   const { preferences, currentProfile } = useProfile();
   // The logged-in PD's saved custom body (Option A: sender's pref, client-side).
@@ -77,7 +82,8 @@ export default function AwardeeTab({ requestId, context }) {
   // leading/trailing whitespace in a custom body survives.
   const savedBodyRaw = preferences?.[PREFERENCE_KEYS.GRANTEE_INVITE_BODY] || '';
   const hasSavedBody = savedBodyRaw.trim().length > 0;
-  const baseTemplate = hasSavedBody ? savedBodyRaw : GRANTEE_INVITE_DEFAULT_BODY;
+  const adminDefaultBody = emailDefaults.body || '';
+  const baseTemplate = hasSavedBody ? savedBodyRaw : adminDefaultBody;
 
   const cycleCode = context?.cycleCode || null;
   const cycleLabel = context?.cycleLabel || null;
@@ -88,6 +94,11 @@ export default function AwardeeTab({ requestId, context }) {
     setBody(e.target.value);
   };
 
+  const handleSubjectChange = (e) => {
+    subjectDirtyRef.current = true;
+    setSubject(e.target.value);
+  };
+
   // Restore the Foundation default for THIS send (local only — does not change the
   // PD's saved body). Marks the compose as foundation-template, NOT manually edited,
   // so a later recipient load still fills [Name] (it does not bounce back to the
@@ -96,6 +107,32 @@ export default function AwardeeTab({ requestId, context }) {
     setTemplateMode('foundation');
     setDirty(false);
   };
+
+  const loadEmailDefaults = useCallback(async () => {
+    const seq = defaultLoadSeqRef.current + 1;
+    defaultLoadSeqRef.current = seq;
+    try {
+      const res = await fetch('/api/email-defaults/grantee-invite');
+      const data = await res.json().catch(() => ({}));
+      if (defaultLoadSeqRef.current !== seq) return;
+      if (!res.ok) {
+        setEmailDefaults({ subject: '', body: '', configured: false, unavailable: true, loaded: true });
+        return;
+      }
+      const next = {
+        subject: String(data.subject || ''),
+        body: String(data.body || ''),
+        configured: Boolean(data.configured),
+        unavailable: Boolean(data.unavailable),
+        loaded: true,
+      };
+      setEmailDefaults(next);
+      if (!subjectDirtyRef.current) setSubject(next.subject);
+    } catch {
+      if (defaultLoadSeqRef.current !== seq) return;
+      setEmailDefaults({ subject: '', body: '', configured: false, unavailable: true, loaded: true });
+    }
+  }, []);
 
   const loadRecipients = useCallback(async () => {
     if (!requestId) return;
@@ -139,6 +176,10 @@ export default function AwardeeTab({ requestId, context }) {
     currentRequestIdRef.current = requestId;
   }, [requestId]);
 
+  useEffect(() => {
+    if (!currentProfile?.id) return;
+    loadEmailDefaults();
+  }, [loadEmailDefaults, currentProfile?.id]);
   useEffect(() => { loadRecipients(); }, [loadRecipients]);
   useEffect(() => { loadAbstract(); }, [loadAbstract]);
 
@@ -154,7 +195,9 @@ export default function AwardeeTab({ requestId, context }) {
     if (prev === id) return;
     setDirty(false);
     setTemplateMode('auto');
-  }, [currentProfile?.id]);
+    subjectDirtyRef.current = false;
+    setSubject(emailDefaults.subject || '');
+  }, [currentProfile?.id, emailDefaults.subject]);
 
   // Derive the body from the chosen template + recipients UNLESS the PD has taken
   // ownership by typing. `dirty` is in the deps so the render after an identity reset
@@ -162,9 +205,9 @@ export default function AwardeeTab({ requestId, context }) {
   // saved body loading after mount reseeds too.
   useEffect(() => {
     if (dirty) return;
-    const base = templateMode === 'foundation' ? GRANTEE_INVITE_DEFAULT_BODY : baseTemplate;
+    const base = templateMode === 'foundation' ? adminDefaultBody : baseTemplate;
     setBody(fillInviteBody(base, { piName: recipients?.pi?.name, title: awardTitle }));
-  }, [dirty, templateMode, baseTemplate, recipients?.pi?.name, awardTitle]);
+  }, [dirty, templateMode, adminDefaultBody, baseTemplate, recipients?.pi?.name, awardTitle]);
 
   async function generate(regenerate = false) {
     setGenerating(true); setError(null); setSentMsg(null); setAbstractMsg(null);
@@ -276,7 +319,20 @@ export default function AwardeeTab({ requestId, context }) {
   const statusLabel = status != null ? (GRANTEE_DELIVERABLE_LABEL[status] || String(status)) : 'Not started';
   const hasAbstract = abstractText.trim().length > 0;
   const abstractDirty = abstractText !== savedAbstractText;
-  const canSend = hasAbstract && isEmail(toEmail) && (!ccEmail || isEmail(ccEmail)) && !sending;
+  const effectiveBaseBody = hasSavedBody ? savedBodyRaw : adminDefaultBody;
+  const emailDefaultsUnavailable = emailDefaults.loaded && emailDefaults.unavailable;
+  const emailDefaultsNotConfigured = emailDefaults.loaded
+    && !emailDefaults.unavailable
+    && ((emailDefaults.subject || '').trim() === '' || effectiveBaseBody.trim() === '');
+  const emailTextReady = subject.trim() !== '' && body.trim() !== '';
+  const canSend = hasAbstract
+    && isEmail(toEmail)
+    && (!ccEmail || isEmail(ccEmail))
+    && !sending
+    && emailDefaults.loaded
+    && !emailDefaultsUnavailable
+    && !emailDefaultsNotConfigured
+    && emailTextReady;
 
   return (
     <div className="space-y-6">
@@ -342,7 +398,7 @@ export default function AwardeeTab({ requestId, context }) {
           {recipients?.liaison?.name && <span className="text-xs text-gray-500"> {recipients.liaison.name}</span>}
         </label>
         <label className="block text-sm">Subject
-          <input aria-label="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full border rounded p-1" />
+          <input aria-label="Subject" value={subject} onChange={handleSubjectChange} className="w-full border rounded p-1" />
         </label>
         <div className="space-y-1">
           <div className="flex items-center justify-between text-sm">
@@ -361,6 +417,21 @@ export default function AwardeeTab({ requestId, context }) {
           A secure magic-link and your saved email signature are added automatically — don’t include a signature here.
           {hasSavedBody && templateMode === 'auto' && !dirty ? ' Starting from your saved custom body (edit it in Profile Settings).' : ''}
         </p>
+        {emailDefaultsUnavailable && (
+          <p className="text-sm text-red-700">
+            Invitation email defaults are unavailable — settings read failed. Reload this page and try again before sending.
+          </p>
+        )}
+        {emailDefaultsNotConfigured && (
+          <p className="text-sm text-amber-700">
+            Invitation email default not configured. Ask an admin to set the grantee invite subject and body before sending.
+          </p>
+        )}
+        {emailDefaults.loaded && !emailDefaultsUnavailable && !emailDefaultsNotConfigured && !emailTextReady && (
+          <p className="text-sm text-amber-700">
+            Enter a subject and body before sending.
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           <button
             type="button"

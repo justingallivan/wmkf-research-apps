@@ -6,8 +6,10 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ProfileSettings from '../../pages/profile-settings';
 import { PREFERENCE_KEYS } from '../../shared/config/reviewerFinderPreferences';
+import { GRANTEE_INVITE_SEED_BODY } from '../../lib/seed/email-defaults/grantee-invite';
 
 const setPreference = jest.fn();
+const deletePreference = jest.fn();
 
 jest.mock('../../shared/components/Layout', () => {
   const Layout = ({ children }) => <div>{children}</div>;
@@ -30,6 +32,7 @@ jest.mock('../../shared/context/ProfileContext', () => ({
       reviewer_finder_sender_info: JSON.stringify({ name: 'Legacy Beth', email: 'legacy@wmkeck.org', signature: 'Legacy block' }),
     },
     setPreference,
+    deletePreference,
     updateProfile: jest.fn(),
     archiveProfile: jest.fn(),
     selectProfile: jest.fn(),
@@ -38,6 +41,25 @@ jest.mock('../../shared/context/ProfileContext', () => ({
 
 beforeEach(() => {
   setPreference.mockReset().mockResolvedValue(true);
+  deletePreference.mockReset().mockResolvedValue(true);
+  global.fetch = jest.fn(async (url) => {
+    if (String(url).includes('/api/email-defaults/grantee-invite')) {
+      return {
+        ok: true,
+        json: async () => ({
+          subject: 'Stored subject',
+          body: GRANTEE_INVITE_SEED_BODY,
+          configured: true,
+          unavailable: false,
+        }),
+      };
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+});
+
+afterEach(() => {
+  if (global.fetch?.mockRestore) global.fetch.mockRestore();
 });
 
 test('saves the unified email_signature key from the Profile Settings editor', async () => {
@@ -55,4 +77,15 @@ test('saves the unified email_signature key from the Profile Settings editor', a
     email: 'beth@wmkeck.org',
     signature: 'Beth Pruitt\nProgram Director',
   });
+});
+
+test('loads and resets the Request Abstract email body from the admin default endpoint', async () => {
+  render(<ProfileSettings />);
+
+  await waitFor(() => expect(screen.getByLabelText('Email body')).toHaveValue(GRANTEE_INVITE_SEED_BODY));
+  fireEvent.change(screen.getByLabelText('Email body'), { target: { value: 'Personal override' } });
+  fireEvent.click(screen.getByRole('button', { name: /reset to default/i }));
+
+  await waitFor(() => expect(deletePreference).toHaveBeenCalledWith(PREFERENCE_KEYS.GRANTEE_INVITE_BODY));
+  expect(screen.getByLabelText('Email body')).toHaveValue(GRANTEE_INVITE_SEED_BODY);
 });

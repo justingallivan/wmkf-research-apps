@@ -6,6 +6,10 @@
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
+import {
+  GRANTEE_INVITE_SEED_BODY,
+  GRANTEE_INVITE_SEED_SUBJECT,
+} from '../../lib/seed/email-defaults/grantee-invite';
 
 // AwardeeTab reads the logged-in PD's saved custom invite body + profile identity
 // via useProfile. Mock the context so the component renders in isolation;
@@ -22,7 +26,26 @@ const REQ = '11111111-1111-1111-1111-111111111111';
 
 const CYCLE_CTX = { cycleCode: 'J26', cycleLabel: 'June 2026' };
 
-function wireFetch({ generateOk = true, sendOk = true, websiteOk = true, abstract = null, saveOk = true } = {}) {
+function defaultEmailDefaults(overrides = {}) {
+  const subject = overrides.subject ?? GRANTEE_INVITE_SEED_SUBJECT;
+  const body = overrides.body ?? GRANTEE_INVITE_SEED_BODY;
+  return {
+    subject,
+    body,
+    configured: subject.trim() !== '' && body.trim() !== '',
+    unavailable: false,
+    ...overrides,
+  };
+}
+
+function wireFetch({
+  generateOk = true,
+  sendOk = true,
+  websiteOk = true,
+  abstract = null,
+  saveOk = true,
+  emailDefaults = defaultEmailDefaults(),
+} = {}) {
   // Stateful effective-abstract mock (S278): GET returns the current state, the
   // generate POST seeds the draft, and PUT persists a PD edit so the editor flow
   // round-trips like the real route.
@@ -35,6 +58,9 @@ function wireFetch({ generateOk = true, sendOk = true, websiteOk = true, abstrac
   };
   global.fetch = jest.fn(async (url, opts = {}) => {
     const u = String(url);
+    if (u.includes('/api/email-defaults/grantee-invite')) {
+      return { ok: true, json: async () => emailDefaults };
+    }
     if (u.includes('/grantee-deliverables/recipients')) {
       return { ok: true, json: async () => ({
         pi: { name: 'Monika Raj', email: 'monika.raj@emory.edu', hasEmail: true },
@@ -183,7 +209,7 @@ test('default invitation copy is the PD-voice template (subject + body)', async 
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
 
-  expect(screen.getByLabelText('Subject')).toHaveValue('Your W. M. Keck Foundation award — abstract for our website');
+  await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveValue(GRANTEE_INVITE_SEED_SUBJECT));
   await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj:/));
   const body = screen.getByLabelText('Email body').value;
   expect(body).toMatch(/^Dear Professor Raj:/);
@@ -302,6 +328,30 @@ test('whitespace-only saved body falls back to the Foundation default', async ()
   await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj:/));
 });
 
+test('blank admin defaults block sending with a not-configured message', async () => {
+  wireFetch({
+    abstract: { effective: 'Ready abstract.', effectiveField: 'formatted', etag: 'W/"2"', status: 100000000, editable: true },
+    emailDefaults: defaultEmailDefaults({ subject: '', body: '', configured: false }),
+  });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toBeInTheDocument());
+
+  expect(screen.getByText(/default not configured/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
+  expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/send-invite'))).toBe(false);
+});
+
+test('settings-read failure blocks sending with an unavailable message', async () => {
+  wireFetch({
+    abstract: { effective: 'Ready abstract.', effectiveField: 'formatted', etag: 'W/"2"', status: 100000000, editable: true },
+    emailDefaults: defaultEmailDefaults({ subject: '', body: '', configured: false, unavailable: true }),
+  });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText(/settings read failed/i)).toBeInTheDocument());
+
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
+});
+
 test('"Reset to default" restores the Foundation default over a saved custom body', async () => {
   mockPreferences = { grantee_invite_body: 'Custom body for [Name].' };
   wireFetch();
@@ -357,7 +407,7 @@ test('initial profile id resolution preserves an in-progress body edit (NI-4)', 
 
   mockProfileId = 'user-1';
   rerender(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
-  await new Promise((r) => setTimeout(r, 0));
+  await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveValue(GRANTEE_INVITE_SEED_SUBJECT));
   expect(screen.getByLabelText('Email body')).toHaveValue('early draft while profile loads');
 });
 
@@ -369,6 +419,14 @@ test('late recipients response from a previous request cannot overwrite the curr
 
   global.fetch = jest.fn(async (url) => {
     const u = String(url);
+    if (u.includes('/api/email-defaults/grantee-invite')) {
+      return { ok: true, json: async () => defaultEmailDefaults() };
+    }
+    if (u.includes('/grantee-deliverables/abstract')) {
+      return { ok: true, json: async () => ({
+        effective: '', effectiveField: null, etag: 'W/"1"', status: null, editable: true,
+      }) };
+    }
     if (!u.includes('/grantee-deliverables/recipients')) {
       throw new Error(`unexpected fetch ${u}`);
     }
@@ -407,6 +465,14 @@ test('reset BEFORE recipients load still fills [Name] when they arrive (#2)', as
   let resolveRecipients;
   global.fetch = jest.fn(async (url) => {
     const u = String(url);
+    if (u.includes('/api/email-defaults/grantee-invite')) {
+      return { ok: true, json: async () => defaultEmailDefaults() };
+    }
+    if (u.includes('/grantee-deliverables/abstract')) {
+      return { ok: true, json: async () => ({
+        effective: '', effectiveField: null, etag: 'W/"1"', status: null, editable: true,
+      }) };
+    }
     if (u.includes('/grantee-deliverables/recipients')) {
       await new Promise((res) => { resolveRecipients = res; });
       return { ok: true, json: async () => ({ pi: { name: 'Monika Raj', email: 'monika.raj@emory.edu' }, liaison: {} }) };

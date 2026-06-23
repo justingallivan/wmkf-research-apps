@@ -8,13 +8,13 @@ import {
   EDITABLE_TEXT_DEFAULTS,
 } from '../shared/config/editableTextDefaults.js';
 import {
-  GRANTEE_INVITE_DEFAULT_BODY,
-  GRANTEE_INVITE_DEFAULT_SUBJECT,
+  GRANTEE_INVITE_SEED_BODY,
+  GRANTEE_INVITE_SEED_SUBJECT,
 } from '../lib/seed/email-defaults/grantee-invite.js';
 
 export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
-  'email.grantee_invite.subject': GRANTEE_INVITE_DEFAULT_SUBJECT,
-  'email.grantee_invite.body': GRANTEE_INVITE_DEFAULT_BODY,
+  'email.grantee_invite.subject': GRANTEE_INVITE_SEED_SUBJECT,
+  'email.grantee_invite.body': GRANTEE_INVITE_SEED_BODY,
 });
 
 export function loadEnvLocal() {
