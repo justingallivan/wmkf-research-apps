@@ -262,6 +262,7 @@ function printEmail(name, subject, body) {
     '[reviewerName]':  reviewerName,
     '[title]':         proposalTitle,
     '[reviewDueDate]': dueSentence,
+    '[Program Director signature]': _normalizeSignatureText(signatureBlock),
     '[requestNumber]': '',           // always stripped — never surfaced to reviewers
   };
   const subject = applyTemplatePlaceholders(REVIEWER_ACCEPTANCE_SEED_SUBJECT, replacements);

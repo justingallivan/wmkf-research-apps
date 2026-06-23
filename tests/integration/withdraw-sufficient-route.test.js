@@ -94,7 +94,7 @@ test('still-pending row: writes withdrawn_sufficient (+ clears respond marker) B
   expect(updateLifecycle.mock.invocationCallOrder[0]).toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
   expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
     subject: 'Thank you — W. M. Keck Foundation review',
-    body: expect.stringContaining('Dear Dr. Reviewer:'),
+    body: expect.stringContaining('Dear Dr. Reviewer,'),
   }));
   const email = createAndSendEmail.mock.calls[0][0];
   expect(email.body).toContain('Thank you so much for your willingness to review the proposal "A Proposal" for the W. M. Keck Foundation.');

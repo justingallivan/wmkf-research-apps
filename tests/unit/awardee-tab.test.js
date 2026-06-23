@@ -96,7 +96,7 @@ function wireFetch({
         : { ok: false, json: async () => ({ error: 'send failed' }) };
     }
     if (u.includes('/grantee-deliverables/preview-invite')) {
-      return { ok: true, json: async () => ({ html: '<p>Dear Professor [Name]:</p><a>Open the Grantee Portal</a>' }) };
+      return { ok: true, json: async () => ({ html: '<p>Dear Professor [Name],</p><a>Open the Grantee Portal</a>' }) };
     }
     if (u.includes('/grantee-deliverables/website-html')) {
       return websiteOk
@@ -210,18 +210,19 @@ test('default invitation copy is the PD-voice template (subject + body)', async 
   await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
 
   await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveValue(GRANTEE_INVITE_SEED_SUBJECT));
-  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj:/));
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj,/));
   const body = screen.getByLabelText('Email body').value;
-  expect(body).toMatch(/^Dear Professor Raj:/);
+  expect(body).toMatch(/^Dear Professor Raj,/);
   expect(body).toContain('post an abstract on the Foundation’s website describing your award entitled “[title]”');
   expect(body).toContain('lightly edited to conform to the style that the Foundation uses in its publications');
   expect(body).toMatch(/no later than COB [A-Z][a-z]+ \d{1,2}, \d{4}/);
   expect(body).toContain('we will assume that we have your concurrence to post the draft as written');
   expect(body).toContain('agreed to acknowledge'); // acknowledgment-of-support paragraph
   expect(body).not.toContain('[Program Director name]'); // server appends the canonical assigned-PD signature
-  // Body-only invariant: no closing — the server appends the signature (S272).
-  expect(body).not.toMatch(/Thank you,/);
-  expect(body.trimEnd()).toMatch(/additional information\.$/);
+  // Body-only invariant: the body ends with the "Thank you," closing salutation; the
+  // server appends the SIGNATURE block after it (no signature lines in the body).
+  expect(body.trimEnd()).toMatch(/Thank you,$/);
+  expect(body).toContain('additional information.');
 });
 
 test('Preview email renders into a new tab without sending (no send-invite call)', async () => {
@@ -325,7 +326,7 @@ test('whitespace-only saved body falls back to the Foundation default', async ()
   mockPreferences = { grantee_invite_body: '   \n  ' };
   wireFetch();
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
-  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj:/));
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj,/));
 });
 
 test('blank admin defaults block sending with a not-configured message', async () => {
@@ -358,10 +359,10 @@ test('"Reset to default" restores the Foundation default over a saved custom bod
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Custom body for Raj\./));
   fireEvent.click(screen.getByRole('button', { name: /reset to default/i }));
-  expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj:/);
+  expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj,/);
   // Stays reset — does not bounce back to the custom body on a later effect run.
   await new Promise((r) => setTimeout(r, 0));
-  expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj:/);
+  expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj,/);
 });
 
 // --- Lifecycle (compose-state) regression tests: bugs #1 and #2 (S272) ---
@@ -481,14 +482,14 @@ test('reset BEFORE recipients load still fills [Name] when they arrive (#2)', as
   });
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   // Recipients not resolved yet → [Name] placeholder still present.
-  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/Dear Professor \[Name\]:/));
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/Dear Professor \[Name\],/));
 
   fireEvent.click(screen.getByRole('button', { name: /reset to default/i }));
-  expect(screen.getByLabelText('Email body').value).toMatch(/Dear Professor \[Name\]:/);
+  expect(screen.getByLabelText('Email body').value).toMatch(/Dear Professor \[Name\],/);
 
   resolveRecipients();
   // After recipients land, the reset (foundation, not "edited") refills [Name].
-  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj:/));
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj,/));
 });
 
 test('preserves a custom body verbatim incl. leading/trailing whitespace (no trim)', async () => {

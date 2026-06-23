@@ -49,6 +49,7 @@ import { DynamicsService } from '../../../../../lib/services/dynamics-service';
 import { buildReviewDueIcs } from '../../../../../lib/external/calendar-invite';
 import { readRequiredEmailDefaults } from '../../../../../lib/services/email-defaults';
 import { renderPlainTextEmailHtml } from '../../../../../lib/external/plain-text-email-html';
+import { resolveSignatureForRequest } from '../../../../../lib/services/email-signature';
 
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
 const ACCEPTANCE_SUBJECT_KEY = 'email.reviewer_acceptance.subject';
@@ -150,13 +151,17 @@ function applyTemplatePlaceholders(template, replacements) {
   return text;
 }
 
-function renderAcceptanceConfirmationEmail({ subjectTemplate, bodyTemplate, reviewer, request }) {
+function renderAcceptanceConfirmationEmail({ subjectTemplate, bodyTemplate, reviewer, request, signatureBlock }) {
   const reviewerName = reviewer?.wmkf_name || 'Reviewer';
   const title = request?.akoya_title || 'the proposal';
   const due = formatReviewDueDate(request?.wmkf_reviewduedate);
   const dueSentence = due
     ? `Your review is due on ${due}.`
     : 'We will follow up with the review due date.';
+  // The acceptance confirmation is PD-voiced like the reminder/withdraw emails: the
+  // [Program Director signature] token resolves to the assigned PD's signature block
+  // (falls back to the bare Foundation line when no PD/preference is available).
+  const signature = String(signatureBlock?.signature || signatureBlock?.name || 'W. M. Keck Foundation').trim();
   // The request number is internal — never surfaced to external reviewers.
   // Transitional strip: a legacy [requestNumber] token in a pre-fix seeded/edited
   // value renders EMPTY (never a literal token) until the prod default is re-baselined.
@@ -164,6 +169,7 @@ function renderAcceptanceConfirmationEmail({ subjectTemplate, bodyTemplate, revi
     '[reviewerName]': reviewerName,
     '[title]': title,
     '[reviewDueDate]': dueSentence,
+    '[Program Director signature]': signature,
     '[requestNumber]': '',
   };
   const subject = applyTemplatePlaceholders(subjectTemplate, replacements);
@@ -212,11 +218,15 @@ async function sendAcceptanceConfirmationEmail({ suggestion, request, reviewer }
   if (!emailDefaults.ok) {
     return;
   }
+  // Same assigned-PD signature the reminder/withdraw emails use (self-falls-back to
+  // the Foundation line when no PD or saved preference resolves).
+  const signatureBlock = await resolveSignatureForRequest(request?.akoya_requestid);
   const { subject, body } = renderAcceptanceConfirmationEmail({
     subjectTemplate: emailDefaults.values[ACCEPTANCE_SUBJECT_KEY],
     bodyTemplate: emailDefaults.values[ACCEPTANCE_BODY_KEY],
     reviewer,
     request,
+    signatureBlock,
   });
 
   await DynamicsService.createAndSendEmail({

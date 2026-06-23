@@ -4,10 +4,11 @@
  * store, seeded from lib/seed/email-defaults/grantee-invite.js; runtime code
  * imports only the logic in this file.
  *
- * BODY-ONLY invariant: the body must NOT contain a signature or a closing
- * sign-off. The send/preview routes append the assigned-PD signature server-side
- * (`resolveSignatureForRequest` + `appendSignatureBlock`). Default body copy
- * should end before any sign-off so the server-appended signature is the sole closing.
+ * BODY-ONLY invariant: the body must NOT contain the SIGNATURE block (PD name /
+ * title / Foundation line) — the send/preview routes append the assigned-PD
+ * signature server-side (`resolveSignatureForRequest` + `appendSignatureBlock`),
+ * so a signature in the body would duplicate it. The body MAY end with a closing
+ * salutation lead-in (e.g. "Thank you,"); the appended signature follows it.
  * See docs/GRANTEE_INVITE_BODY_CUSTOM_PLAN.md and the
  * project-grantee-deliverable-email-voice memory.
  */

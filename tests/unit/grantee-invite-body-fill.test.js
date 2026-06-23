@@ -15,7 +15,7 @@ test('fills the default template placeholders', () => {
     title: 'Quantum Widgets',
     baseDate: new Date('2026-06-20T12:00:00Z'),
   });
-  expect(out).toMatch(/^Dear Professor Raj:/);
+  expect(out).toMatch(/^Dear Professor Raj,/);
   expect(out).toContain('“Quantum Widgets”');
   expect(out).toContain('COB July 4, 2026'); // 2026-06-20 + 14 days
   expect(out).not.toContain('[Name]');

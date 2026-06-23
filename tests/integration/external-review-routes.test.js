@@ -93,6 +93,11 @@ jest.mock('../../lib/bill/honorarium-onboard-orchestrator', () => ({
 jest.mock('../../lib/services/notification-service', () => ({
   notify: jest.fn().mockResolvedValue({ id: 1 }),
 }));
+// Acceptance confirmation is PD-voiced — resolve a known signature block so the
+// rendered body carries the assigned-PD signature (matches reminder/withdraw flows).
+jest.mock('../../lib/services/email-signature', () => ({
+  resolveSignatureForRequest: jest.fn(async () => ({ signature: 'Dr. PD\nProgram Director\nW. M. Keck Foundation' })),
+}));
 jest.mock('../../lib/services/settings-service', () => ({
   getSettingStrict: jest.fn(),
 }));
@@ -501,6 +506,9 @@ describe('/api/external/review/[token]/respond', () => {
     expect(email.body).toContain('Thank you for agreeing to review Token Scoped Proposal.');
     expect(email.body).toContain('Your review is due on August 15, 2026. A calendar reminder is attached when a review due date is available.');
     expect(email.body).toContain('Proposal materials will be sent separately when they are ready.');
+    // PD-voiced closing: the assigned-PD signature is appended after a "Thank you," line.
+    expect(email.body).toContain('Thank you,');
+    expect(email.body).toContain('Dr. PD<br>Program Director<br>W. M. Keck Foundation');
     // Request number is internal — must never reach the external reviewer.
     expect(email.subject).not.toContain('REQ-001');
     expect(email.body).not.toContain('REQ-001');
