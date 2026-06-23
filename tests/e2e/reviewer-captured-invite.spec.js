@@ -34,7 +34,7 @@ test.describe('Reviewer captured invite rehearsal', () => {
             </td>
           </tr>
         </table>
-        <p>This secure link is unique to you and was sent by your Foundation program director.</p>
+        <p>This secure link is unique to you and was sent by W.M. Keck Foundation Program Director Dr. Program Director pd@wmkeck.org. Please contact them with any questions.</p>
         <p>If the button does not work, copy and paste this secure link into your browser:<br>
           <a href="${reviewUrl}">${reviewUrl}</a>
         </p>

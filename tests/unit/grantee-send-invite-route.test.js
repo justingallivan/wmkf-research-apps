@@ -108,6 +108,15 @@ test('happy path: PI To, liaison Cc, server-injected link, status Drafted→Invi
   expect(opts).toEqual({ ifMatch: 'W/"2"', actingUserSystemId: 'sys-1' });
 });
 
+test('rejects outgoing email text containing the internal request number', async () => {
+  const res = mockRes();
+  await handler(reqOf(body({ subject: 'Grant 1002794 deliverables' })), res);
+  expect(res.statusCode).toBe(400);
+  expect(res.body.error).toBe('Email subject/body cannot include the internal request number.');
+  expect(mintForRequest).not.toHaveBeenCalled();
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+});
+
 test('generate-first guard: null status → 400, nothing sent', async () => {
   ensureDeliverableForRequest.mockResolvedValue(deliverable(null));
   const res = mockRes();

@@ -85,6 +85,15 @@ reviewer / capture tooling). Pairs with `docs/agent-wiki/topics/reviewer-workben
 Panel renders one flat card per catalog entry (12+). Group by audience (Reviewer/Grantee) and pair each
 email's subject+body into one card. Catalog-driven; see the FUTURE note atop `editableTextDefaults.js`.
 
+### 0d. (future plumbing) Finish the `applications.wmkeck.org` staff-auth migration
+Branded external magic-link hosts are live: `REVIEWER_PORTAL_BASE_URL=https://reviews.wmkeck.org` and
+`GRANTEE_PORTAL_BASE_URL=https://grantees.wmkeck.org` were set in Vercel Production and redeployed on
+2026-06-23. **Do not set `NEXTAUTH_URL=https://applications.wmkeck.org` yet**. The staff Azure/Entra app
+registration must first allow `https://applications.wmkeck.org/api/auth/callback/azure-ad`, then a
+staff sign-in and at least one state-changing staff API action should be smoke-tested from
+`applications.wmkeck.org` because `lib/utils/auth.js` validates POST/PATCH/DELETE Origin/Referer against
+`NEXTAUTH_URL`.
+
 ### 1. Prod sanity-check the S279 deploys
 `/admin → Email Defaults` shows all 12 entries editable; a test-reviewer accept produces the
 confirmation email (+ `.ics`, no request number); the Awardee-tab compose base body is unchanged.
@@ -131,6 +140,9 @@ node scripts/rebaseline-email-defaults.mjs   # dry-run (shows what re-baseline w
   value carries it.
 - **Capture-only honorarium lock** = `HONORARIUM_ONBOARDING_DEFERRED=true` in prod + GUIDs unset. To
   ever enable Bill.com: configure the 3 discriminator GUIDs AND unset the flag.
+- **Branded-domain split:** reviewer/grantee external links now use `reviews.wmkeck.org` and
+  `grantees.wmkeck.org`; staff auth remains on the existing fallback path because `NEXTAUTH_URL` is still
+  empty in prod pending the `applications.wmkeck.org` Azure callback migration.
 - **Codex sandbox** now has write access to this repo's `.git` (`writable_roots` in `~/.codex/config.toml`,
   backup `config.toml.bak-pre-gitwritable`) — so Codex CAN commit; build prompts still instruct it NOT
   to (Claude reviews-then-commits stays the workflow by instruction, not sandbox).

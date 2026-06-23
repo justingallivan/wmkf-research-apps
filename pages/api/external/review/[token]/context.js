@@ -192,7 +192,6 @@ export default async function handler(req, res) {
       etag,
       proposal: {
         title: request.akoya_title || 'Untitled proposal',
-        requestNumber: request.akoya_requestnum,
         meetingDate: request.wmkf_meetingdate || null,
         abstract: request.wmkf_abstract || null,
         applicantInstitution: request['_akoya_applicantid_value@OData.Community.Display.V1.FormattedValue']

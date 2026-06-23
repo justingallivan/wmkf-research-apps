@@ -283,8 +283,8 @@ async function installMocks(context) {
         candidateName: recipient.name,
         candidateEmail: recipient.email,
         subject: body.templateType === 'materials'
-          ? 'Reviewer materials for Request 1002788'
-          : 'Reviewer invitation for Request 1002788',
+          ? 'Reviewer materials'
+          : 'Reviewer invitation',
         body: body.templateType === 'materials'
           ? [
             'Dear Reviewer,',

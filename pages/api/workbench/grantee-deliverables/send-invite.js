@@ -36,6 +36,10 @@ export const config = {
 
 const isEmail = (s) => typeof s === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
 const normStatus = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
+const containsRequestNumber = (text, requestNumber) => {
+  const n = String(requestNumber || '').trim();
+  return Boolean(n && String(text || '').includes(n));
+};
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -88,6 +92,9 @@ export default async function handler(req, res) {
       }
       if (!row?.akoya_requestid) {
         return res.status(404).json({ error: `No request found for ${requestId}` });
+      }
+      if (containsRequestNumber(subject, row.akoya_requestnum) || containsRequestNumber(bodyText, row.akoya_requestnum)) {
+        return res.status(400).json({ error: 'Email subject/body cannot include the internal request number.' });
       }
 
       const deliverable = await ensureDeliverableForRequest(requestId, {

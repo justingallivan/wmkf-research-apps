@@ -119,7 +119,6 @@ export default async function handler(req, res) {
       ok: true,
       request: {
         title: request.akoya_title || null,
-        requestNumber: request.akoya_requestnum || null,
         meetingDate: request.wmkf_meetingdate || null,
       },
       deliverable: {

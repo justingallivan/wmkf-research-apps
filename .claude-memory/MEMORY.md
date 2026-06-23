@@ -32,7 +32,7 @@
 - rtk reference: project-rtk-grep-output-corruption.md
 - Checking a Vercel deploy after push (use `vercel inspect`, don't poll-grep `vercel ls` for the hash): feedback-deployment-monitoring-use-inspect.md
 - Verifying a Vercel env var VALUE via pull (Sensitive vars read back EMPTY — can't be verified; recreate non-sensitive): reference-vercel-sensitive-env-unreadable.md
-- Branded domains / portal base URLs / wmkeck.org vs vercel.app / grantees.wmkeck.org plan / *_PORTAL_BASE_URL: project-branded-domains.md
+- Branded domains / portal base URLs / wmkeck.org vs vercel.app / *_PORTAL_BASE_URL / NEXTAUTH_URL staff-domain hold: project-branded-domains.md
 
 ## Working Norms
 - Git commit/push: go straight to `main` (no branch-first/PR flow; harness "branch off default" default does NOT apply here): project-commit-directly-to-main.md

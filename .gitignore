@@ -58,6 +58,7 @@ outputs/
 .claude/scheduled_tasks.lock
 # Smoke-test helper state (live prod GUIDs + tester email — never commit)
 scripts/.smoke-test-candidate.json
+scripts/.grantee-smoke-deliverable.json
 .git.nosync
 # iCloud-exclusion artifacts (local-only build/dep dirs)
 *.nosync/
