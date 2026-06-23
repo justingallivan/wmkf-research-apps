@@ -1,136 +1,124 @@
-# Session 281 Prompt: Branded Portal Domains + Grantee Rollout Continuity
+# Session 281 Prompt: Reviewers-tab UI smoke + Reviews tab + grantee rollout continuity
 
 ## Session 280 Summary
 
-This session focused on the wmkeck.org portal-domain plumbing and the first production smoke of the
-external reviewer/grantee links. The live reviewer and grantee magic-link flows now use branded
-domains, the public request-number exposure was hardened, and the grantee portal copy was adjusted to
-"Graphical Abstract Request." Work was split cleanly from Claude's accidentally-overlapping branch.
+Two parallel workstreams landed and were reconciled onto `main` (everything merged, pushed, nothing
+parked):
+
+- **Claude:** email-copy standardization across all six workbench emails (now fully live, incl. the prod
+  Dataverse re-baseline) + a Workbench **Reviewers-tab restructure** (5 tabs → 3) with a dead-end prune
+  and proposal auto-attach on Release.
+- **Codex:** branded portal domains + public request-number hardening (deployed to prod).
+
+A mid-session **branch drift** (shared working dir + a concurrent Codex app session checking out
+branches) put Claude's commits on Codex's branch. It was split into clean branches, then **everything
+was merged to `main` (`3b0899ae`), all session/safety branches + 4 stale Codex worktrees were deleted,
+and `main` was pushed** — the repo is now a single `main`. Pushing auto-deploys to prod; harmless because
+the reviewer/workbench apps are invisible to users.
 
 ### What Was Completed
 
-1. **Portal-domain branch split and deploy**
-   - Codex work lives on `codex/portal-domain-hardening-2026-06-23`.
-   - Claude's unrelated workbench/email commits live on `claude/workbench-email-reviewers-2026-06-23`.
-   - The old mixed branch was preserved, not rewritten: `codex-portal-work`, plus safety branches
-     `safety/mixed-codex-portal-work-2026-06-23` and
-     `safety/mixed-with-wip-codex-portal-work-2026-06-23`.
-   - Rule for shared repo work: run `git status --short --branch` before every commit, checkout, or
-     branch-assuming action.
+**Claude — email standardization (all six emails), now fully live:**
+- Consistent formatting: comma greetings everywhere; the **reviewer-acceptance email brought into PD
+  voice** ("Thank you," + assigned-PD signature, resolved in `respond.js` via `resolveSignatureForRequest`);
+  grantee-reminder paragraph-structured.
+- **Curly typographic quotes `“…”`** around proposal titles everywhere + **curly apostrophes**.
+- Invitation composer: **grammatical co-PI serial list** ("A, B, and C") + **honorific stripping** (plain
+  PI/co-PI names) — new helper `lib/utils/format-name-list.js`.
+- `--force-keys` mode added to `scripts/rebaseline-email-defaults.mjs` (+ pure helper
+  `scripts/lib/parse-force-keys.mjs`) so a formatting-only change can be pushed to prod.
+- **Prod copy propagated:** ran `rebaseline-email-defaults.mjs --force-keys=all --execute` → all 6 email
+  bodies in the Dataverse `wmkf_appsystemsettings` store updated (verified `already-current: 12` on re-run).
 
-2. **Reviewer/grantee branded external hosts are live**
-   - Vercel production aliases include `reviews.wmkeck.org`, `grantees.wmkeck.org`,
-     `submissions.wmkeck.org`, and `applications.wmkeck.org`.
-   - `REVIEWER_PORTAL_BASE_URL=https://reviews.wmkeck.org` and
-     `GRANTEE_PORTAL_BASE_URL=https://grantees.wmkeck.org` are active in Production.
-   - Production deploys:
-     - `dpl_8tmRkKX9mhEpL7uU6o1NKKpMQuMb` for domain hardening.
-     - `dpl_7Mvdv1juuDTRSJXeFQaatyqEyE7M` for the final grantee copy update.
-   - Verified `https://reviews.wmkeck.org/external/review/fake` and
-     `https://grantees.wmkeck.org/external/grantee/fake` return `200`.
+**Claude — Workbench Reviewers-tab restructure (deployed; apps still invisible to users):**
+- **5 sub-tabs → 3: `Find · Invite Reviewers · Track Reviewers`** (Candidates→"Invite Reviewers"; the old
+  Invite + Completed folded into Track). `reviewer-modes.js` collapsed to a single `track` status bucket
+  (no-fallthrough invariant kept; legacy `?sub=invite`/`?sub=completed` deep-links alias to `track`).
+- **Dead-end prune** in Track: `Correct status` correction dropdown (no manual `accepted` — that bypasses
+  portal COI/honorarium capture), "Staff upload (override)" relabel, removed "Commit By Date".
+- **Release proposal auto-attach (Part 4):** the materials send auto-loads the proposal from SharePoint
+  with a "which file?" confirm/override (`ReviewerManagePanel` EmailModal; transient state, never persisted).
+- Retired the stale **`held` work-stage cue** (S279 hold step) from `reviewer-rollup.js` + the "Slate held"
+  chip in `pages/workbench.js`; held now folds to `awaiting`.
 
-3. **Internal request number hardened away from public surfaces**
-   - Removed `requestNumber` from the external reviewer and grantee context JSON:
-     `pages/api/external/review/[token]/context.js` and
-     `pages/api/external/grantee/[token]/context.js`.
-   - Added final send-time guards that fail before sending if hydrated outbound reviewer/grantee
-     email subject/body contains the internal request number:
-     `pages/api/review-manager/send-emails.js` and
-     `pages/api/workbench/grantee-deliverables/send-invite.js`.
-   - Clarification from owner: request numbers hidden from view or buried inside non-interpretable
-     internal URLs are not the concern; public-facing visible email/page JSON is.
+**Codex — branded portal domains + request-number hardening** (deployed; full detail in commits):
+- Reviewer/grantee magic-links use branded hosts (`reviews.wmkeck.org`, `grantees.wmkeck.org`) via
+  `REVIEWER_PORTAL_BASE_URL` / `GRANTEE_PORTAL_BASE_URL` (active in Production).
+- Removed `requestNumber` from the external reviewer/grantee context JSON; added send-time guards that
+  fail before sending if a hydrated outbound subject/body contains the internal request number.
+- Grantee portal copy → "Graphical Abstract Request"; prod-smoked (reviewer + grantee), smoke data cleaned up.
+- Prod deploys: `dpl_8tmRkKX9mhEpL7uU6o1NKKpMQuMb` (hardening), `dpl_7Mvdv1juuDTRSJXeFQaatyqEyE7M` (copy).
 
-4. **Reviewer smoke and grantee visual smoke**
-   - Reviewer branded-domain invite smoke succeeded. The initial "hash_mismatch" was expected
-     latest-link-wins behavior after a second link was minted; the later email link worked.
-   - Grantee production visual smoke:
-     - Browser verified the edit page rendered and accepted typed edits.
-     - API submit completed the image-bearing production submit because the in-app browser file-upload
-       control was not usable.
-     - Browser reload verified the submitted confirmation state.
-   - Smoke cleanup completed:
-     - Deleted the temporary grantee deliverable row.
-     - Deleted the uploaded test PNG from SharePoint.
-     - Cleared the request's approved abstract back to `null`.
-     - Justin manually cleaned up the remaining promoted CRM reviewer contact.
-
-5. **Grantee portal copy update**
-   - Changed public page heading from "Grant Deliverables" to "Graphical Abstract Request."
-   - Changed submitted wording from "your deliverables have..." to "your materials have..."
-   - Deployed to Production in commit `13757115`.
-
-### Commits
-
-- `13757115` Grantee portal: update graphical abstract copy
-- `6574f939` Portal domains: harden external email request-number handling
-
-### Verification
-
-```bash
-npx jest tests/integration/send-emails-route.test.js tests/unit/grantee-send-invite-route.test.js tests/integration/external-review-routes.test.js tests/unit/grantee-context-route.test.js --runInBand
-npx jest tests/unit/grantee-deliverable-form.test.js --runInBand
-curl -I https://reviews.wmkeck.org/external/review/fake
-curl -I https://grantees.wmkeck.org/external/grantee/fake
-vercel inspect wmkfresearchapps-kybb9l1ab-justin-gallivans-projects.vercel.app
-vercel logs wmkfresearchapps-kybb9l1ab-justin-gallivans-projects.vercel.app --since 1h
-```
+### Commits (this session — all on `main`)
+- `3b0899ae` Merge portal branch into main
+- `f19193d4` / `13757115` / `6574f939` portal domains + grantee copy (Codex)
+- `540868a1` / `8a36517a` memory (verify-branch rule; rename-code + rollout notes)
+- `3af6c4dd` Track Reviewers: proposal auto-attach (Part 4)
+- `79ab2f3e` retire stale `held` work-stage cue
+- `4d45b4c8` Reviewers: 5→3 sub-tab restructure + dead-end prune
+- `bd2b1791` Email defaults: 4 review follow-ups
+- `5b2472d2` / `f2b0fd32` / `d3e15ff3` / `3f700f0b` email standardization (formatting, curly quotes, co-PI/honorifics)
 
 ## Potential Next Steps
 
-### 1. Merge/push strategy for Codex portal branch
+### 1. Reviewers-tab UI smoke (deployed but never clicked-through)
+The restructure is live but the dev-server smoke was interrupted by the branch drift, so it was never
+visually verified. Smoke the 3 tabs (`Find · Invite Reviewers · Track Reviewers`), legacy `?sub=` aliases,
+the Release → proposal-attach card + "which file?" picker, the `Correct status` dropdown (no Accepted),
+and the absence of any "Slate held" chip. Apps are invisible to users, so this is safe to do on prod or a
+local dev server (`npm run dev` → localhost:3000, hits live backend; don't click "Send"/"Preview" — those
+fire real emails / mint reviewer tokens).
 
-`codex/portal-domain-hardening-2026-06-23` has been deployed to Production but is separate from `main`.
-Before another machine takes over, make sure this branch is pushed. Later, merge it into the normal
-integration branch after deciding how it should relate to Claude's workbench branch.
+### 2. Minimal Reviews tab (still an empty placeholder)
+The top-level Workbench **Reviews** tab is a placeholder. A submitted review IS captured (structured
+ratings on the `wmkf_appreviewersuggestion` row + uploaded review file in SharePoint) but nothing reads it
+back — Track only offers a per-reviewer file download, and the ratings render nowhere. Build the read
+surface: per submitted reviewer, decoded ratings (impact/risk/overall) + download links. Panel-prep
+roll-up/export is a deferred add-on.
 
-### 2. Continue grantees portal rollout
-
-The branded grantee path works and has been visually smoked. Next useful work is staff-facing rollout
-polish around the grantee portal/workbench flow, especially any remaining copy, PD preview, and awardee
+### 3. Grantee portal rollout polish (Codex thread)
+Staff-facing rollout polish around the grantee portal/workbench flow — remaining copy, PD preview, awardee
 workflow ergonomics.
 
-### 3. Resume Claude's workbench/email-reviewers branch separately
+### 4. Keep `applications.wmkeck.org` staff auth on HOLD
+Do NOT set `NEXTAUTH_URL=https://applications.wmkeck.org` yet. The staff Azure/Entra app registration must
+first allow `…/api/auth/callback/azure-ad`, then staff sign-in + one cookie-bearing state-changing staff
+API action must be smoke-tested from that host.
 
-Claude parked its work on `claude/workbench-email-reviewers-2026-06-23`. Before merging/deploying it,
-run the full gate set, `npm run build` in a real environment, and a manual UI smoke of the Reviewers tab.
-Do not mix this with the Codex portal branch without an explicit merge plan.
-
-### 4. Keep `applications.wmkeck.org` staff auth on hold
-
-Do not set `NEXTAUTH_URL=https://applications.wmkeck.org` yet. The staff Azure/Entra app registration
-must first allow `https://applications.wmkeck.org/api/auth/callback/azure-ad`, then staff sign-in and
-one cookie-bearing state-changing staff API action must be smoke-tested from `applications.wmkeck.org`.
-
-### 5. Optional: final external-reviewer production migration
-
-There are no outstanding reviewer invitations, so moving new reviewer invitations to
-`reviews.wmkeck.org` is low risk. Still remember that reviewer links are latest-link-wins: re-rendering
-or re-sending can invalidate an older link hash.
+### 5. Optional: migrate new reviewer invitations to `reviews.wmkeck.org`
+Low risk (no outstanding reviewer invitations). Remember reviewer links are **latest-link-wins**:
+re-rendering/re-sending mints a new hash and invalidates older links.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/external/token-lifecycle.js` | Reviewer branded URL builder via `REVIEWER_PORTAL_BASE_URL` |
-| `lib/external/grantee-token-lifecycle.js` | Grantee branded URL builder via `GRANTEE_PORTAL_BASE_URL` |
-| `pages/api/review-manager/send-emails.js` | Reviewer invite send path + request-number send guard |
-| `pages/api/workbench/grantee-deliverables/send-invite.js` | Grantee invite send path + request-number send guard |
-| `pages/api/external/review/[token]/context.js` | Token-auth reviewer context, no public `requestNumber` |
-| `pages/api/external/grantee/[token]/context.js` | Token-auth grantee context, no public `requestNumber` |
-| `pages/external/grantee/[token].js` | External grantee page heading + submitted state |
-| `shared/components/external/GranteeDeliverableForm.js` | Grantee form immediate post-submit message |
-| `docs/CREDENTIALS_RUNBOOK.md` | Current env contract for `NEXTAUTH_URL`, reviewer, and grantee base URLs |
-| `docs/agent-wiki/topics/security-auth.md` | Agent wiki entry for the staff-domain hold |
-| `.claude-memory/project-branded-domains.md` | Repo-local memory for branded-domain state |
+| `lib/utils/format-name-list.js` | co-PI serial-list join + honorific stripping (composer) |
+| `shared/components/reviewers/reviewer-modes.js` | single `track` status bucket + no-fallthrough invariant |
+| `shared/components/reviewers/ReviewersTab.js` | 3 sub-tabs + legacy `?sub=` alias |
+| `shared/components/reviewers/ReviewerManagePanel.js` | Track panel: Release auto-attach, Correct-status, staff-upload |
+| `lib/services/reviewer-rollup.js` | work-remaining stages (`held` retired) |
+| `lib/seed/email-defaults/*` | seed/backup email copy (NOT runtime — live source is Dataverse) |
+| `scripts/rebaseline-email-defaults.mjs` | push seed copy to prod (`--force-keys=all --execute`) |
+| `lib/external/token-lifecycle.js` / `grantee-token-lifecycle.js` | branded reviewer/grantee URL builders |
+| `pages/api/review-manager/send-emails.js` / `…/grantee-deliverables/send-invite.js` | send paths + request-number guard |
+| `pages/api/external/review/[token]/context.js` / `…/grantee/[token]/context.js` | token-auth context, no public `requestNumber` |
+| `docs/CREDENTIALS_RUNBOOK.md` | env contract for `NEXTAUTH_URL`, reviewer/grantee base URLs |
 
 ## Gotchas / Continuity
 
-- **Do not set `NEXTAUTH_URL` yet.** Reviewer/grantee link bases are independent of staff auth; staff
-  Origin/Referer checks depend on `NEXTAUTH_URL`.
-- **Vercel sensitive env pull behavior:** sensitive values read back empty; the reviewer/grantee base
-  URL vars are non-sensitive so their values can be verified.
-- **External request numbers:** visible public copy/JSON must not expose the internal request number.
-- **Latest-link-wins:** reviewer email rendering that contains `{{externalLink}}` mints a new link hash
-  and invalidates prior links.
-- **Multi-agent branch discipline:** one repo git driver at a time; check `git status --short --branch`
-  before commits/checkouts.
+- **Branch discipline (shared working dir):** one git driver at a time; run `git status --short --branch`
+  before every commit/checkout/branch-assuming action — HEAD drifts when a concurrent Codex session checks
+  out branches. See `.claude-memory/feedback-verify-branch-before-git-action.md`.
+- **Email copy live source is Dataverse, not code.** `wmkf_appsystemsettings` / `/admin → Email Defaults`
+  is what's sent; `lib/seed/email-defaults/*` is backup. Prod was re-baselined this session; future seed
+  changes need `rebaseline-email-defaults.mjs --force-keys` to reach prod (and `--force-keys` CLOBBERS
+  admin-panel edits).
+- **Do not set `NEXTAUTH_URL` yet** (staff-domain hold; see `project-branded-domains.md`).
+- **Vercel sensitive env pull:** sensitive values read back empty; the reviewer/grantee base-URL vars are
+  non-sensitive and verifiable.
+- **External request numbers:** visible public copy/JSON must never expose the internal request number.
+- **Latest-link-wins:** reviewer email rendering containing `{{externalLink}}` mints a new link hash and
+  invalidates prior links.
+- **Known-red suites:** `bill.test.js` + `discovery-verification-status.test.js` only — confirm it's just
+  those before chasing a "red" run.
