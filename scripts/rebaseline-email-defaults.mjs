@@ -26,6 +26,7 @@
  *   node scripts/rebaseline-email-defaults.mjs --force-keys=all --execute  # write (force all)
  */
 
+import { parseForceKeys } from './lib/parse-force-keys.mjs';
 import { EMAIL_DEFAULT_SEED_TEXT, loadEnvLocal } from './seed-email-defaults.mjs';
 
 loadEnvLocal();
@@ -33,24 +34,20 @@ loadEnvLocal();
 const EXECUTE = process.argv.includes('--execute');
 const REMOVED_TOKENS = ['[requestNumber]', '[proposal title clause]'];
 
-// --force-keys=all | --force-keys=key1,key2 → deliberately overwrite those keys from
-// seed even when the live value has no removed token (i.e. it looks like an admin edit).
-const forceArg = process.argv.find((a) => a.startsWith('--force-keys='));
-const forceRaw = forceArg ? forceArg.slice('--force-keys='.length).trim() : '';
-const FORCE_ALL = forceRaw === 'all';
-const FORCE_KEYS = new Set(
-  forceRaw && !FORCE_ALL ? forceRaw.split(',').map((s) => s.trim()).filter(Boolean) : [],
-);
+const { forceAll: FORCE_ALL, forceKeys: FORCE_KEYS } = (() => {
+  try {
+    return parseForceKeys(process.argv, Object.keys(EMAIL_DEFAULT_SEED_TEXT));
+  } catch (e) {
+    if (e?.code === 'UNKNOWN_FORCE_KEY') {
+      console.error(`ERROR: --force-keys names an unknown catalog key: ${e.key}`);
+      console.error(`Valid keys:\n  ${Object.keys(EMAIL_DEFAULT_SEED_TEXT).join('\n  ')}`);
+      process.exit(1);
+    }
+    throw e;
+  }
+})();
 function isForced(key) {
   return FORCE_ALL || FORCE_KEYS.has(key);
-}
-// Fail fast on a typo'd key name (a forced key that isn't in the catalog).
-for (const k of FORCE_KEYS) {
-  if (!(k in EMAIL_DEFAULT_SEED_TEXT)) {
-    console.error(`ERROR: --force-keys names an unknown catalog key: ${k}`);
-    console.error(`Valid keys:\n  ${Object.keys(EMAIL_DEFAULT_SEED_TEXT).join('\n  ')}`);
-    process.exit(1);
-  }
 }
 
 const { getSettingStrict, setSetting } = await import('../lib/services/settings-service.js');

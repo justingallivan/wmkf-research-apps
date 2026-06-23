@@ -54,12 +54,13 @@ const SUBJECT_KEY = 'email.grantee_reminder.subject';
 const BODY_KEY = 'email.grantee_reminder.body';
 const SUBJECT = 'Reminder: your W. M. Keck Foundation abstract';
 const BODY =
-  'Dear Professor [Name]:\n\n' +
-  'I\'m following up on the abstract for your recent W. M. Keck Foundation award entitled “[title]”. ' +
-  "We'd welcome any changes to the draft, and an image to accompany it, before we post your award on the " +
-  "Foundation's website. Please use your secure link below by COB [date]. If we have not heard from you by " +
-  'then, we will post the draft abstract as written. If you have already submitted, thank you - no further ' +
-  'action is needed. Please do not hesitate to contact me if you need additional information.\n\n' +
+  'Dear Professor [Name],\n\n' +
+  'I’m following up on the abstract for your recent W. M. Keck Foundation award entitled “[title]”. ' +
+  'We’d welcome any changes to the draft, and an image to accompany it, before we post your award on the ' +
+  'Foundation’s website.\n\n' +
+  'Please use your secure link below by COB [date]. If we have not heard from you by then, we will post ' +
+  'the draft abstract as written. If you have already submitted, thank you — no further action is needed.\n\n' +
+  'Please do not hesitate to contact me if you need additional information.\n\n' +
   'Thank you,\n\n' +
   '[Program Director signature]';
 const deliv = (n, invitedDate = '2026-06-08T00:00:00.000Z') => ({

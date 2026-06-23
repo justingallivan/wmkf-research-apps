@@ -32,7 +32,7 @@ export const DEFAULT_TEMPLATES = {
     subject: 'Invitation to review for the W. M. Keck Foundation — {{proposalTitle}}',
     body: `{{greeting}},
 
-The W. M. Keck Foundation is assembling a review panel and would value your expertise. We're writing to ask whether you'd be willing to review the proposal below. The summary here is enough to decide — and to flag any conflict of interest — before the full materials go out.
+The W. M. Keck Foundation is assembling a review panel and would value your expertise. We’re writing to ask whether you’d be willing to review the proposal below. The summary here is enough to decide — and to flag any conflict of interest — before the full materials go out.
 
 {{proposalDetails}}
 
@@ -46,7 +46,7 @@ Review timeline:
 - We expect to send the full proposal and review form on {{proposalDelivery}}.
 - Completed reviews would be due by {{reviewDue}}.
 
-When you accept, you'll confirm a few details — the conflict-of-interest and AI-use acknowledgements, and how you'd like any honorarium handled. The full proposal and review form then follow once it's released for review. If the summary already surfaces a conflict, a quick decline is just as helpful. We would be grateful for your help.
+When you accept, you’ll confirm a few details — the conflict-of-interest and AI-use acknowledgements, and how you’d like any honorarium handled. The full proposal and review form then follow once it’s released for review. If the summary already surfaces a conflict, a quick decline is just as helpful. We would be grateful for your help.
 
 {{signature}}`,
   },
@@ -61,7 +61,7 @@ Please use your secure reviewer link to download the proposal materials and subm
 
 This link is unique to you. We ask that you submit your review by {{reviewDueDate}}.
 
-If you have any questions about the review process, please don't hesitate to reach out.
+If you have any questions about the review process, please don’t hesitate to reach out.
 
 Thank you for your time and expertise.
 
@@ -86,7 +86,7 @@ Thank you,
     subject: 'Thank You for Your Review — {{proposalTitle}}',
     body: `{{greeting}},
 
-Thank you very much for completing your review of “{{proposalTitle}}”. Your expertise and thoughtful evaluation are greatly appreciated and will be invaluable to the Foundation's decision-making process.
+Thank you very much for completing your review of “{{proposalTitle}}”. Your expertise and thoughtful evaluation are greatly appreciated and will be invaluable to the Foundation’s decision-making process.
 
 We will be in touch regarding the processing of your honorarium.
 

@@ -66,7 +66,7 @@ export const EDITABLE_TEXT_DEFAULTS = [
     label: 'Reviewer acceptance confirmation body',
     description: 'Default body copy for reviewer acceptance confirmation emails.',
     multiline: true,
-    placeholders: ['[reviewerName]', '[title]', '[reviewDueDate]'],
+    placeholders: ['[reviewerName]', '[title]', '[reviewDueDate]', '[Program Director signature]'],
   },
   {
     key: 'email.reviewer_withdraw.subject',
