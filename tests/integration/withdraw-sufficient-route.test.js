@@ -23,6 +23,18 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 jest.mock('../../lib/services/email-signature', () => ({
   resolveSignatureForRequest: jest.fn(async () => ({ signature: 'Dr. PD\nW. M. Keck Foundation' })),
 }));
+const getSettingStrict = jest.fn();
+jest.mock('../../lib/services/settings-service', () => ({
+  getSettingStrict: (...a) => getSettingStrict(...a),
+}));
+jest.mock('../../lib/services/notification-service', () => ({
+  notify: jest.fn().mockResolvedValue({ id: 1 }),
+}));
+
+const {
+  REVIEWER_WITHDRAW_SEED_BODY,
+  REVIEWER_WITHDRAW_SEED_SUBJECT,
+} = require('../../lib/seed/email-defaults/reviewer-actions');
 
 const { createMockReq, createMockRes } = require('../helpers/auth-mock');
 
@@ -46,6 +58,13 @@ function pendingRow(over = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  getSettingStrict.mockImplementation(async (key) => ({
+    found: true,
+    value: {
+      'email.reviewer_withdraw.subject': REVIEWER_WITHDRAW_SEED_SUBJECT,
+      'email.reviewer_withdraw.body': REVIEWER_WITHDRAW_SEED_BODY,
+    }[key],
+  }));
   getRecord.mockImplementation(async (set) => {
     if (set === 'akoya_requests') return { akoya_requestid: REQ, akoya_title: 'A Proposal', _wmkf_programdirector_value: 'pd-1' };
     if (set === 'systemusers') return { systemuserid: 'pd-1', internalemailaddress: 'pd@keck.org', isdisabled: false };
@@ -73,7 +92,58 @@ test('still-pending row: writes withdrawn_sufficient (+ clears respond marker) B
   expect(createAndSendEmail).toHaveBeenCalledTimes(1);
   // State write precedes the courtesy email (a send failure can't leave them able to respond).
   expect(updateLifecycle.mock.invocationCallOrder[0]).toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
+  expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+    subject: 'Thank you — W. M. Keck Foundation review',
+    body: expect.stringContaining('Dear Dr. Reviewer:'),
+  }));
+  const email = createAndSendEmail.mock.calls[0][0];
+  expect(email.body).toContain('Thank you so much for your willingness to review the proposal "A Proposal" for the W. M. Keck Foundation.');
+  expect(email.body).toContain('Dr. PD<br>W. M. Keck Foundation');
   expect(res._data).toMatchObject({ ok: true, withdrawn: 1 });
+});
+
+test('blank withdraw email default skips only the courtesy email after the withdrawal write', async () => {
+  const NotificationService = require('../../lib/services/notification-service');
+  NotificationService.notify.mockClear();
+  findById.mockResolvedValue(pendingRow());
+  getSettingStrict.mockImplementation(async (key) => ({
+    found: true,
+    value: key === 'email.reviewer_withdraw.body' ? '   ' : REVIEWER_WITHDRAW_SEED_SUBJECT,
+  }));
+
+  const res = await run({ requestId: REQ, suggestionIds: [SUG] });
+
+  expect(res.statusCode).toBe(200);
+  expect(updateLifecycle).toHaveBeenCalledTimes(1);
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+  expect(res._data).toMatchObject({ ok: true, withdrawn: 1, results: [{ suggestionId: SUG, status: 'withdrawn_email_skipped' }] });
+  expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+    type: 'email_default_misconfigured',
+    metadata: expect.objectContaining({ key: 'email.reviewer_withdraw.body', reason: 'blank' }),
+  }));
+  expect(updateLifecycle.mock.invocationCallOrder[0]).toBeLessThan(getSettingStrict.mock.invocationCallOrder[0]);
+});
+
+test('unavailable withdraw email default skips only the courtesy email after the withdrawal write', async () => {
+  const NotificationService = require('../../lib/services/notification-service');
+  NotificationService.notify.mockClear();
+  findById.mockResolvedValue(pendingRow());
+  getSettingStrict.mockImplementation(async (key) => {
+    if (key === 'email.reviewer_withdraw.subject') throw new Error('settings down');
+    return { found: true, value: REVIEWER_WITHDRAW_SEED_BODY };
+  });
+
+  const res = await run({ requestId: REQ, suggestionIds: [SUG] });
+
+  expect(res.statusCode).toBe(200);
+  expect(updateLifecycle).toHaveBeenCalledTimes(1);
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+  expect(res._data).toMatchObject({ ok: true, withdrawn: 1, results: [{ suggestionId: SUG, status: 'withdrawn_email_skipped' }] });
+  expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+    type: 'email_default_misconfigured',
+    metadata: expect.objectContaining({ key: 'email.reviewer_withdraw.subject', reason: 'unavailable' }),
+  }));
+  expect(updateLifecycle.mock.invocationCallOrder[0]).toBeLessThan(getSettingStrict.mock.invocationCallOrder[0]);
 });
 
 test('accepted row is refused (not_pending) — never touches an accepted/honorarium row', async () => {

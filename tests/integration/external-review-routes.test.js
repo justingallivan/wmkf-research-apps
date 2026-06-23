@@ -18,6 +18,11 @@ import { GraphService } from '../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../lib/utils/sharepoint-buckets';
 import { writeReviewFiles } from '../../lib/services/review-upload';
 import { applyStage2aResponse } from '../../lib/dataverse/adapters/reviewer-suggestion';
+import { getSettingStrict } from '../../lib/services/settings-service';
+import {
+  REVIEWER_ACCEPTANCE_SEED_BODY,
+  REVIEWER_ACCEPTANCE_SEED_SUBJECT,
+} from '../../lib/seed/email-defaults/reviewer-actions';
 
 jest.mock('../../lib/external/verify-suggestion-token', () => ({
   verifySuggestionToken: jest.fn(),
@@ -88,9 +93,17 @@ jest.mock('../../lib/bill/honorarium-onboard-orchestrator', () => ({
 jest.mock('../../lib/services/notification-service', () => ({
   notify: jest.fn().mockResolvedValue({ id: 1 }),
 }));
+jest.mock('../../lib/services/settings-service', () => ({
+  getSettingStrict: jest.fn(),
+}));
 jest.mock('../../lib/external/calendar-invite', () => ({
   buildReviewDueIcs: jest.fn(() => ({ filename: 'keck-review-due.ics', contentType: 'text/calendar', content: Buffer.from('ICS') })),
 }));
+
+const ACCEPTANCE_DEFAULTS = {
+  'email.reviewer_acceptance.subject': REVIEWER_ACCEPTANCE_SEED_SUBJECT,
+  'email.reviewer_acceptance.body': REVIEWER_ACCEPTANCE_SEED_BODY,
+};
 
 const verifiedSuggestion = {
   ok: true,
@@ -129,6 +142,7 @@ const verifiedSuggestion = {
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.NOTIFICATION_EMAIL_FROM = 'notifications@wmkeck.org';
+  getSettingStrict.mockImplementation(async (key) => ({ found: true, value: ACCEPTANCE_DEFAULTS[key] }));
 });
 
 describe('/api/external/review/[token]/context', () => {
@@ -476,12 +490,19 @@ describe('/api/external/review/[token]/respond', () => {
     });
     expect(DynamicsService.createAndSendEmail).toHaveBeenCalledTimes(1);
     expect(DynamicsService.createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      subject: 'Review accepted — REQ-001',
+      body: expect.stringContaining('Dear Dr. Reviewer,'),
       from: 'notifications@wmkeck.org',
       to: 'reviewer@example.org',
       regardingId: 'request-1',
       regardingType: 'akoya_request',
       attachments: [expect.objectContaining({ filename: 'keck-review-due.ics' })],
     }));
+    const email = DynamicsService.createAndSendEmail.mock.calls[0][0];
+    expect(email.body).toContain('Thank you for agreeing to review Token Scoped Proposal (REQ-001).');
+    expect(email.body).toContain('Your review is due on August 15, 2026. A calendar reminder is attached when a review due date is available.');
+    expect(email.body).toContain('Proposal materials will be sent separately when they are ready.');
+    expect(email.body).toContain('W. M. Keck Foundation');
   });
 
   it('accept with honorariumOptOut:true does NOT run the orchestrator', async () => {
@@ -586,6 +607,58 @@ describe('/api/external/review/[token]/respond', () => {
     expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
       type: 'reviewer_acceptance_confirmation_failed',
       severity: 'warning',
+    }));
+  });
+
+  it('blank acceptance email default skips the email but keeps accept 200 and alerts', async () => {
+    const NotificationService = require('../../lib/services/notification-service');
+    NotificationService.notify.mockClear();
+    DynamicsService.createAndSendEmail.mockClear();
+    getSettingStrict.mockImplementation(async (key) => ({
+      found: true,
+      value: key === 'email.reviewer_acceptance.body' ? '   ' : ACCEPTANCE_DEFAULTS[key],
+    }));
+    verifySuggestionToken.mockResolvedValue({
+      ...fresh,
+      reviewer: { wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'reviewer@example.org' },
+    });
+    const req = createMockReq({
+      method: 'POST', query: { token: 'good-token' }, headers: {},
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'email_default_misconfigured',
+      metadata: expect.objectContaining({ key: 'email.reviewer_acceptance.body', reason: 'blank' }),
+    }));
+  });
+
+  it('unavailable acceptance email default skips the email but keeps accept 200 and alerts', async () => {
+    const NotificationService = require('../../lib/services/notification-service');
+    NotificationService.notify.mockClear();
+    DynamicsService.createAndSendEmail.mockClear();
+    getSettingStrict.mockImplementation(async (key) => {
+      if (key === 'email.reviewer_acceptance.subject') throw new Error('settings down');
+      return { found: true, value: ACCEPTANCE_DEFAULTS[key] };
+    });
+    verifySuggestionToken.mockResolvedValue({
+      ...fresh,
+      reviewer: { wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'reviewer@example.org' },
+    });
+    const req = createMockReq({
+      method: 'POST', query: { token: 'good-token' }, headers: {},
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'email_default_misconfigured',
+      metadata: expect.objectContaining({ key: 'email.reviewer_acceptance.subject', reason: 'unavailable' }),
     }));
   });
 

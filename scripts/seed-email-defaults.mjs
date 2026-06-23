@@ -21,6 +21,12 @@ import {
   REVIEWER_REMINDER_REVIEW_DUE_SEED_BODY,
   REVIEWER_REMINDER_REVIEW_DUE_SEED_SUBJECT,
 } from '../lib/seed/email-defaults/reviewer-reminders.js';
+import {
+  REVIEWER_ACCEPTANCE_SEED_BODY,
+  REVIEWER_ACCEPTANCE_SEED_SUBJECT,
+  REVIEWER_WITHDRAW_SEED_BODY,
+  REVIEWER_WITHDRAW_SEED_SUBJECT,
+} from '../lib/seed/email-defaults/reviewer-actions.js';
 
 export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.grantee_invite.subject': GRANTEE_INVITE_SEED_SUBJECT,
@@ -29,6 +35,10 @@ export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.reviewer_reminder_respond_by.body': REVIEWER_REMINDER_RESPOND_BY_SEED_BODY,
   'email.reviewer_reminder_review_due.subject': REVIEWER_REMINDER_REVIEW_DUE_SEED_SUBJECT,
   'email.reviewer_reminder_review_due.body': REVIEWER_REMINDER_REVIEW_DUE_SEED_BODY,
+  'email.reviewer_acceptance.subject': REVIEWER_ACCEPTANCE_SEED_SUBJECT,
+  'email.reviewer_acceptance.body': REVIEWER_ACCEPTANCE_SEED_BODY,
+  'email.reviewer_withdraw.subject': REVIEWER_WITHDRAW_SEED_SUBJECT,
+  'email.reviewer_withdraw.body': REVIEWER_WITHDRAW_SEED_BODY,
   'email.grantee_reminder.subject': GRANTEE_REMINDER_SEED_SUBJECT,
   'email.grantee_reminder.body': GRANTEE_REMINDER_SEED_BODY,
 });

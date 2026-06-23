@@ -47,8 +47,12 @@ import NotificationService from '../../../../../lib/services/notification-servic
 import { maybeNotifyQuotaReached } from '../../../../../lib/services/reviewer-quota';
 import { DynamicsService } from '../../../../../lib/services/dynamics-service';
 import { buildReviewDueIcs } from '../../../../../lib/external/calendar-invite';
+import { readRequiredEmailDefaults } from '../../../../../lib/services/email-defaults';
+import { renderPlainTextEmailHtml } from '../../../../../lib/external/plain-text-email-html';
 
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
+const ACCEPTANCE_SUBJECT_KEY = 'email.reviewer_acceptance.subject';
+const ACCEPTANCE_BODY_KEY = 'email.reviewer_acceptance.body';
 
 // Per-field caps for reviewer-supplied contact corrections. Dataverse enforces
 // its own column limits (an oversized value would surface as a 500 from the
@@ -120,14 +124,6 @@ export function missingRequiredAddressFields(address) {
 const REVIEW_STATUS_MATERIALS_SENT = 100000001;
 const RESPONSE_TYPE_WITHDRAWN_SUFFICIENT = 100000003;
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 function formatReviewDueDate(reviewDueDate) {
   if (!reviewDueDate || typeof reviewDueDate !== 'string') return null;
   const match = reviewDueDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -146,25 +142,35 @@ function formatReviewDueDate(reviewDueDate) {
   }).format(dt);
 }
 
-function renderAcceptanceConfirmationEmail({ reviewer, request }) {
+function applyTemplatePlaceholders(template, replacements) {
+  let text = String(template || '');
+  for (const [placeholder, value] of Object.entries(replacements)) {
+    text = text.split(placeholder).join(String(value ?? ''));
+  }
+  return text;
+}
+
+function renderAcceptanceConfirmationEmail({ subjectTemplate, bodyTemplate, reviewer, request }) {
   const reviewerName = reviewer?.wmkf_name || 'Reviewer';
   const title = request?.akoya_title || 'the proposal';
   const requestNumber = request?.akoya_requestnum || null;
   const due = formatReviewDueDate(request?.wmkf_reviewduedate);
-  const subject = `Review accepted${requestNumber ? ` — ${requestNumber}` : ''}`;
   const dueSentence = due
-    ? `Your review is due on ${escapeHtml(due)}.`
+    ? `Your review is due on ${due}.`
     : 'We will follow up with the review due date.';
+  const replacements = {
+    '[reviewerName]': reviewerName,
+    '[title]': title,
+    '[requestNumber]': requestNumber ? ` (${requestNumber})` : '',
+    '[reviewDueDate]': dueSentence,
+  };
+  const subject = applyTemplatePlaceholders(subjectTemplate, {
+    ...replacements,
+    '[requestNumber]': requestNumber ? ` — ${requestNumber}` : '',
+  });
+  const bodyText = applyTemplatePlaceholders(bodyTemplate, replacements);
 
-  const body = [
-    `<p>Dear ${escapeHtml(reviewerName)},</p>`,
-    `<p>Thank you for agreeing to review ${escapeHtml(title)}${requestNumber ? ` (${escapeHtml(requestNumber)})` : ''}.</p>`,
-    `<p>${dueSentence} A calendar reminder is attached when a review due date is available.</p>`,
-    '<p>Proposal materials will be sent separately when they are ready.</p>',
-    '<p>W. M. Keck Foundation</p>',
-  ].join('');
-
-  return { subject, body };
+  return { subject, body: renderPlainTextEmailHtml(bodyText) };
 }
 
 async function resolveAcceptanceConfirmationSender(request) {
@@ -202,7 +208,18 @@ async function sendAcceptanceConfirmationEmail({ suggestion, request, reviewer }
     suggestionId: suggestion?.wmkf_appreviewersuggestionid,
     requestNumber: request?.akoya_requestnum,
   });
-  const { subject, body } = renderAcceptanceConfirmationEmail({ reviewer, request });
+  const emailDefaults = await readRequiredEmailDefaults([ACCEPTANCE_SUBJECT_KEY, ACCEPTANCE_BODY_KEY], {
+    source: 'external/review/respond:acceptance-confirmation',
+  });
+  if (!emailDefaults.ok) {
+    return;
+  }
+  const { subject, body } = renderAcceptanceConfirmationEmail({
+    subjectTemplate: emailDefaults.values[ACCEPTANCE_SUBJECT_KEY],
+    bodyTemplate: emailDefaults.values[ACCEPTANCE_BODY_KEY],
+    reviewer,
+    request,
+  });
 
   await DynamicsService.createAndSendEmail({
     subject,

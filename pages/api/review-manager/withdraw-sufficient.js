@@ -26,8 +26,11 @@ import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-conte
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import { resolveSignatureForRequest } from '../../../lib/services/email-signature';
 import { renderWithdrawSufficient } from '../../../lib/external/reviewer-withdraw-email';
+import { readRequiredEmailDefaults } from '../../../lib/services/email-defaults';
 
 const MAX_BATCH = 100;
+const WITHDRAW_SUBJECT_KEY = 'email.reviewer_withdraw.subject';
+const WITHDRAW_BODY_KEY = 'email.reviewer_withdraw.body';
 
 function isStillPending(s) {
   return s
@@ -124,7 +127,16 @@ export default async function handler(req, res) {
           }).catch(() => null);
           if (reviewer?.wmkf_emailaddress) {
             try {
+              const emailDefaults = await readRequiredEmailDefaults([WITHDRAW_SUBJECT_KEY, WITHDRAW_BODY_KEY], {
+                source: 'review-manager/withdraw-sufficient',
+              });
+              if (!emailDefaults.ok) {
+                results.push({ suggestionId: id, status: 'withdrawn_email_skipped' });
+                continue;
+              }
               const { subject, html } = renderWithdrawSufficient({
+                subjectTemplate: emailDefaults.values[WITHDRAW_SUBJECT_KEY],
+                bodyTemplate: emailDefaults.values[WITHDRAW_BODY_KEY],
                 reviewerName: reviewer.wmkf_name || null,
                 title: request.akoya_title || null,
                 signatureBlock,
