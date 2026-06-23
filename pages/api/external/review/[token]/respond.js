@@ -158,10 +158,13 @@ function renderAcceptanceConfirmationEmail({ subjectTemplate, bodyTemplate, revi
     ? `Your review is due on ${due}.`
     : 'We will follow up with the review due date.';
   // The request number is internal — never surfaced to external reviewers.
+  // Transitional strip: a legacy [requestNumber] token in a pre-fix seeded/edited
+  // value renders EMPTY (never a literal token) until the prod default is re-baselined.
   const replacements = {
     '[reviewerName]': reviewerName,
     '[title]': title,
     '[reviewDueDate]': dueSentence,
+    '[requestNumber]': '',
   };
   const subject = applyTemplatePlaceholders(subjectTemplate, replacements);
   const bodyText = applyTemplatePlaceholders(bodyTemplate, replacements);
