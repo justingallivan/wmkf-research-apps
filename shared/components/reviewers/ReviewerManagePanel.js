@@ -209,7 +209,20 @@ export function StatusSummary({ statusSummary }) {
 const EMAIL_FIELDS_STORAGE_KEY = 'review_manager_email_fields';
 const ATTACHMENTS_STORAGE_KEY = 'review_manager_attachments';
 
-function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEmailsSent }) {
+function fileKeyOf(file) {
+  return `${file.library}::${file.folder}::${file.name}`;
+}
+
+const emptyProposalDoc = () => ({
+  loading: false,
+  error: null,
+  blobUrl: null,
+  filename: null,
+  allFiles: [],
+  pickedKey: null,
+});
+
+function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, settings, onEmailsSent }) {
   const [templateType, setTemplateType] = useState('materials');
   const [templates, setTemplates] = useState(DEFAULT_TEMPLATES);
   const [step, setStep] = useState('compose'); // compose | preview | sending | sent
@@ -226,6 +239,8 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
   // → Thank-you) doesn't carry over the proposal PDF or other type-specific files.
   const [attachmentsByType, setAttachmentsByType] = useState({ materials: [], followup: [], thankyou: [] });
   const attachments = Array.isArray(attachmentsByType?.[templateType]) ? attachmentsByType[templateType] : [];
+  const [proposalDoc, setProposalDoc] = useState(emptyProposalDoc);
+  const proposalLoadSeq = useRef(0);
   const setAttachments = (updater) => {
     setAttachmentsByType((prev) => {
       const current = prev[templateType] || [];
@@ -237,7 +252,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
   };
   const [isUploading, setIsUploading] = useState(false);
 
-  // Reset transient state when modal opens
+  // Reset email compose state when modal opens.
   useEffect(() => {
     if (isOpen) {
       setStep('compose');
@@ -247,6 +262,82 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
       setError(null);
     }
   }, [isOpen]);
+
+  const resetProposalDoc = useCallback(() => {
+    proposalLoadSeq.current += 1;
+    setProposalDoc(emptyProposalDoc());
+  }, []);
+
+  const loadProposal = useCallback(async (fileKey) => {
+    if (!requestId) return;
+    const seq = proposalLoadSeq.current + 1;
+    proposalLoadSeq.current = seq;
+    setProposalDoc(prev => ({
+      ...emptyProposalDoc(),
+      allFiles: prev.allFiles || [],
+      pickedKey: fileKey || prev.pickedKey || null,
+      loading: true,
+    }));
+    try {
+      const response = await fetch('/api/reviewer-finder/load-proposal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fileKey ? { requestId, fileKey } : { requestId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      const allFiles = Array.isArray(data.allFiles) ? data.allFiles : [];
+
+      if (!response.ok || !data.success) {
+        if (proposalLoadSeq.current !== seq) return;
+        setProposalDoc({
+          loading: false,
+          error: response.status === 404 ? 'not_found' : (data.error || `Could not load the proposal document (${response.status})`),
+          blobUrl: null,
+          filename: null,
+          allFiles,
+          pickedKey: null,
+        });
+        return;
+      }
+
+      if (proposalLoadSeq.current !== seq) return;
+      setProposalDoc({
+        loading: false,
+        error: null,
+        blobUrl: data.blobUrl || null,
+        filename: data.filename || null,
+        allFiles,
+        pickedKey: data.picked || null,
+      });
+    } catch (err) {
+      if (proposalLoadSeq.current !== seq) return;
+      setProposalDoc({
+        loading: false,
+        error: err.message || 'Could not load the proposal document',
+        blobUrl: null,
+        filename: null,
+        allFiles: [],
+        pickedKey: null,
+      });
+    }
+  }, [requestId]);
+
+  useEffect(() => {
+    if (!isOpen) resetProposalDoc();
+  }, [isOpen, resetProposalDoc]);
+
+  useEffect(() => {
+    resetProposalDoc();
+  }, [requestId, resetProposalDoc]);
+
+  useEffect(() => {
+    if (templateType !== 'materials') resetProposalDoc();
+  }, [templateType, resetProposalDoc]);
+
+  useEffect(() => {
+    if (!isOpen || templateType !== 'materials' || !requestId) return;
+    loadProposal();
+  }, [isOpen, templateType, requestId, loadProposal]);
 
   // Templates load from the per-user Dataverse store; email-fields + attachments
   // remain per-browser (localStorage) — they're per-send scratch, not templates.
@@ -326,6 +417,11 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
   };
 
   const currentTemplate = templates[templateType];
+  const proposalFiles = [...(proposalDoc.allFiles || [])].sort((a, b) => {
+    const ap = a.classification === 'proposal' ? 0 : 1;
+    const bp = b.classification === 'proposal' ? 0 : 1;
+    return ap - bp || String(a.name).localeCompare(String(b.name));
+  });
 
   const handlePreview = async () => {
     setError(null);
@@ -389,6 +485,11 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
     setSentResults({ sent: [], failed: [], skipped: [] });
 
     try {
+      const manualAttachmentUrls = attachments.map(a => a.url).filter(Boolean);
+      const attachmentUrls = templateType === 'materials' && proposalDoc.blobUrl
+        ? Array.from(new Set([proposalDoc.blobUrl, ...manualAttachmentUrls]))
+        : manualAttachmentUrls;
+
       const response = await fetch('/api/review-manager/send-emails', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -399,7 +500,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
             body: d.body,
           })),
           templateType,
-          attachmentUrls: attachments.map(a => a.url),
+          attachmentUrls,
           markAsSent: true,
         }),
       });
@@ -523,6 +624,60 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
                       filled by the server, not this form. */}
                 </div>
               </div>
+
+              {templateType === 'materials' && (
+                <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-gray-900">Proposal document</p>
+                    {proposalDoc.loading && (
+                      <div className="w-5 h-5 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
+                    )}
+                  </div>
+                  {proposalDoc.error === 'not_found' ? (
+                    <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
+                      No proposal document found for this request yet — has it been submitted?
+                    </div>
+                  ) : proposalDoc.error ? (
+                    <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
+                      {proposalDoc.error}{' '}
+                      <button type="button" onClick={() => loadProposal()} className="underline font-medium">Retry</button>
+                    </div>
+                  ) : proposalDoc.loading ? (
+                    <p className="text-sm text-gray-500">Loading the request’s proposal from SharePoint…</p>
+                  ) : proposalDoc.blobUrl ? (
+                    <p className="text-sm text-gray-700">
+                      Will attach: <span className="font-medium">{proposalDoc.filename}</span>
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-600">No proposal document found for this request yet — has it been submitted?</p>
+                  )}
+
+                  {proposalFiles.length > 0 && (
+                    <div className="mt-3">
+                      <label className="block text-xs text-gray-500 mb-1" htmlFor="proposal-document-picker">
+                        Wrong document? choose another
+                      </label>
+                      <select
+                        id="proposal-document-picker"
+                        className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
+                        value={proposalDoc.pickedKey || ''}
+                        disabled={proposalDoc.loading}
+                        onChange={(ev) => { if (ev.target.value) loadProposal(ev.target.value); }}
+                      >
+                        {!proposalDoc.pickedKey && <option value="">Select a file…</option>}
+                        {proposalFiles.map((file) => {
+                          const key = fileKeyOf(file);
+                          return (
+                            <option key={key} value={key}>
+                              {file.name}{file.classification === 'proposal' ? '  ·  proposal' : ''}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Attachments */}
               <div className="bg-gray-50 rounded-lg p-3 space-y-2">
@@ -1366,6 +1521,7 @@ export default function ReviewerManagePanel({
             onClose={() => setEmailModalOpen(false)}
             reviewers={selectedList}
             proposalTitle={proposal.proposalTitle}
+            requestId={proposal?.proposalId}
             settings={{
               ...settings,
               reviewDueDate: proposal.reviewDeadline,
