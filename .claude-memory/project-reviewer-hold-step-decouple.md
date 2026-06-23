@@ -1,93 +1,79 @@
 ---
 name: project-reviewer-hold-step-decouple
-description: This cycle's reviewer goal — decouple invite/confirm from policy-acks + honorarium-payment by building a pre-accept "hold" step (find→validate→invite→hold→calendar invite→park), so a confirmed slate of reviewers is parked BEFORE Phase II proposals arrive; COI/AI acks + payment + proposal delivery deferred to a later finalize. Build it to merge cleanly into the steady-state flow (a short staff-QA window between receipt and release, not zero).
+description: Reviewer invite→accept direction (REVISED S279, supersedes the S256 deferral plan). Collapse invite→hold→finalize→accept into ONE final Accept that onboards up front — COI/AI acks + honorarium opt-in/address via the existing capture-only path (NO Bill.com) — and sends an acceptance-confirmation email carrying an .ics save-the-date (review due date). Proposal/materials are delivered separately when ready. Post-accept exit is out-of-band (personal email to PD → renegotiate due date → manual Remove that also resets engagement flags). No separate willing/held or finalize reviewer step.
 metadata:
   type: project
   status: active
   scope: reviewer-finder
-  last_verified: 2026-06-13 (S256) — direction confirmed by Justin; respond.js code state verified
+  last_verified: 2026-06-22 (S279) — direction revised + confirmed by Justin; honorarium capture-only path and Remove-button behavior re-verified in code
 ---
 
 ## Recall Rule
 
-Read when planning or building the external reviewer invite→accept flow this cycle, or any
-change to the Stage-2a accept (`pages/api/external/review/[token]/respond.js`), the reviewer
-engagement state machine, or reviewer scheduling/calendar invites.
+Read when planning or building the external reviewer invite→accept flow, the Stage-2a accept
+(`pages/api/external/review/[token]/respond.js`), honorarium onboarding at accept, the reviewer
+engagement state machine, reviewer scheduling / `.ics`, the reviewer email templates, or the PD
+remove-reviewer action.
 
-## The cycle plan (Justin, S256)
+## DIRECTION (REVISED S279 — supersedes the S256 plan at the bottom)
 
-This is the **last cycle with a delay** before Phase II proposals arrive — a buffer we exploit.
-Goal: get a **confirmed, parked slate of interested reviewers** into the pipeline NOW, before the
-proposals land. Staff gain confidence they hold a committed slate; reviewers "sit tight," are told
-when proposals will arrive, and get **calendar invites**. COI/AI policy commitment, honorarium
-payment info, and proposal delivery are **deferred a few weeks** to a later "finalize." Attrition
-when reviewers see the terms is not a worry; the point is to develop the pipeline infrastructure.
+Justin confirmed: onboarding moves UP FRONT, and the multi-step engagement collapses to ONE reviewer
+action. The earlier "park a lightweight slate now, collect acks/payment/proposal at a later finalize"
+model is dropped.
 
-## Why a new step is needed (code finding, verified S256)
+**The single Accept (the only reviewer decision):**
+- "Yes, I'll review" + COI/AI acknowledgements + honorarium opt-in.
+- If honorarium wanted → collect mailing address. Runs the EXISTING capture-only path
+  (`ensureHonorariumOnboarding` with `isDeferred()` true): ensures the contact + PATCHes the address,
+  then STOPS — does NOT create the honorarium `akoya_request` and does NOT call BILL. So accepting does
+  NOT fire the Connor-gated "Bill.com - Push Payments" automation. The contact-address PATCH DOES still
+  fire `AkoyaGo.Sync_BusinessCentral` (benign — the address landing in accounting, which is what makes
+  it usable for mailing a check, as last cycle). [VERIFIED S279 — `lib/bill/honorarium-onboard-orchestrator.js:53-134`]
+- "Partial now, full later": address captured now; if Bill.com gets the go-ahead THIS cycle, append it
+  by configuring the 3 discriminator GUIDs / unsetting `HONORARIUM_ONBOARDING_DEFERRED` — the full
+  create+onboard tail then runs on a later accept (reversible, by design).
+- Reviewer receives an acceptance-confirmation email carrying an `.ics` save-the-date keyed to
+  `wmkf_reviewduedate` (reuse `lib/external/calendar-invite.js`, rewired off the removed hold template;
+  rekey `meetingDate` → `reviewDueDate`). NOTE: today the `respond.js` accept branch sends the reviewer
+  NO email — only staff notifications — so this reviewer-facing confirmation send is **net-new**.
 
-The current Stage-2a accept (`respond.js`) **hard-requires at accept time exactly what we want to
-defer**: both policy acks (`reviewer-coi` + `reviewer-ai-use` — 400 `policy_ack_required`, enforced
-even on honorarium opt-out) AND a complete payment contact (mailing address + phone — 422
-`payment_contact_required` unless opt-out), and it runs `ensureHonorariumOnboarding`. Accept goes
-straight to the `accepted` pre-materials state; there is **no confirm-without-commitment path
-today.** So this cycle's build is a NEW pre-accept "hold/soft-confirm" state, not a run of the
-existing chain. Bonus: the hold step keeps the Connor-gated honorarium/Bill.com prod automation
-([[project-reviewer-accept-prod-automation]]) from firing this cycle at all.
+**Acceptance is FINAL at this step.** There is NO separate "willing/agree-in-principle" state and NO
+separate "finalize" reviewer step — those were artifacts of the S256 deferral plan and disappear once
+acks/payment are collected up front. The only thing that stays time-separated is WHEN the proposal
+becomes available, which is a **staff/readiness event** (this cycle: PD "Release to reviewers" after a
+QA pass; steady state: immediately on accept), NOT a second reviewer action.
 
-## Design constraint — merge-forward (Justin, S256)
+**Post-accept exit** (a reviewer who later can't review): OUT-OF-BAND, not a portal self-service
+decline. The reviewer emails the PD; the PD may renegotiate the due date; if no compromise, the PD
+manually removes them via the workbench Remove button. The existing Remove
+(`my-candidates` DELETE → `softDelete`) sets `wmkf_selected=false` + revokes the token but does NOT
+clear `wmkf_accepted` / `wmkf_responsetype` / `wmkf_reviewstatus` — so it must be ENHANCED to reset
+those engagement flags (else a removed accepted reviewer still counts toward quota / doesn't free a
+slot). [VERIFIED S279 — `pages/api/reviewer-finder/my-candidates.js:553-585`]
 
-Build "hold" as a proper engagement state that **"finalize" transitions out of** (hold → finalize),
-so that in steady state the gap between agreeing in principle, entering the info (acks + payment), and
-getting the proposal SHRINKS — but does NOT collapse to zero (corrected S256, see readiness trigger
-below: a staff-QA/release step persists every cycle). The merge-forward win is that ONE machinery
-handles both a long buffer (this cycle's Phase II delay) and a short steady-state QA window — not that
-hold ever vanishes. No throwaway scaffolding: the hold + readiness gate are permanent infrastructure.
-Mechanics are delegated to us — pick what's easiest this cycle that still lends itself to the merge.
+**Templates:** REMOVE the `hold` + `finalize` EMAIL templates + their send-path branches. Keep
+`invitation` + `materials` + `followup` + `thankyou`. The `HoldView` / `held` two-view portal is
+**bypassed now** (route straight to Accept) and **retired as a follow-up cleanup** — it is LIVE this
+cycle, so do not rip it out in the same change ([[feedback-verify-before-destructive-carryover]]).
 
-**Decision chosen:** option 1 (new pre-accept hold step) over splitting the existing accept or
-staff-side-only handling. Related: [[project-reviewer-workbench-invite-workflow]],
-[[project-reviewer-lifecycle]], [[project-reviewer-address-collection-provisional]].
+**Steady-state convergence:** next cycle (release-on-accept), the proposal is available at accept time,
+so the acceptance-confirmation email also carries the materials link and the separate `materials` send
+folds in. The `.ics` already lives on that email, so nothing moves.
 
-## Readiness trigger — what flips hold → finalize (decision, S256)
+**Docs to reconcile AFTER the build** (they describe soon-to-be-superseded BUILT state — do NOT
+pre-rewrite them as built; that would present plan as built state):
+`docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`, `docs/REVIEWER_ENGAGEMENT_SPEC.md`,
+`docs/REVIEWER_HOLD_STEP_BUILD_PLAN.md`.
 
-The portal shows the lightweight HoldView vs the full finalize (Stage2aView) based on **proposal
-readiness**, NOT a throwaway flag. **Crucial correction (Justin, S256): "Phase II submitted" ≠
-"ready to send to reviewers."** Staff run a QA pass between receipt and release (do the figures
-render, is it actually shareable — a holdover from resubmission days that Justin does NOT expect to
-ever fully disappear). So readiness-for-reviewers is the staff's affirmative **"release to
-reviewers" after QA**, not raw submission.
+## SUPERSEDED — original S256 plan (kept for context only)
 
-**Build accommodation:** gate finalize behind a single predicate `isProposalReadyForReviewers(request)`.
-The real signal is fundamentally a **staff-released flag** — so the manual staff "release to reviewers"
-action is most likely the **PERMANENT** trigger, not just an interim stand-in. Connor's Phase-II-
-becomes-visible housekeeping is an upstream **precondition** (start of the QA window — you can't
-release what hasn't landed), not the release event itself.
+The S256 plan built a NEW pre-accept "hold/soft-confirm" state to **defer** COI/AI acks + honorarium
+payment + proposal delivery to a later "finalize," so a lightweight confirmed slate could be parked
+before Phase II proposals arrived. The portal `HoldView` / `held` responsetype / readiness-gated
+`context.js` were built for it; no client UI ever sent the `hold`/`finalize` EMAIL templates. Reason
+superseded (S279): Justin chose to ONBOARD at the willing stage (acks + address up front), which
+collapses "willing" and "accept" into a single step and removes the reason the two states existed.
 
-**Candidate signals (verified S256):** our Phase II intake PATCHes `wmkf_phaseiisubmittedat` onto
-`akoya_request` on submit (`shared/forms/phase-ii-research-2026-06/map-to-dynamics.js`) — this marks
-RECEIPT / start of the QA window, a precondition, NOT readiness. **Justin's todo (with Connor):**
-identify the staff-release/visibility signal that fires AFTER QA (or confirm we add an explicit staff
-"release to reviewers" control). Not a stopper for the build — `isProposalReadyForReviewers` localizes
-it. Related: [[project-reviewer-accept-prod-automation]].
-
-## Still open (S256)
-
-- **ICS calendar invite scope** — true `.ics` (VEVENT) attachment is net-new (no calendar mechanism
-  exists anywhere in the repo); decide build-now vs ship hold + "save-the-date" email body as a
-  fast-follow. The invite belongs at hold-confirmation time (review window / `wmkf_meetingdate`).
-
-## Update (S274) — hold EMAIL send path is NOT built; use the invitation
-
-[VERIFIED] The portal side of the hold step is built (`HoldView`, `respond.js` hold action,
-readiness-gated view in `context.js`), and `send-emails.js` understands `templateType:'hold'`. BUT
-no client UI sends the `hold` template: first-contact invites go through `CandidatesPanel →
-InviteEmailModal`, hardcoded to `templateType:'invitation'`; `ReviewerManagePanel` only offers
-materials/followup/thankyou. `finalize` likewise has no send UI. So **this cycle the first-contact
-email is the `invitation` template**, and the reviewer still sees the agree/pass hold view because the
-view is readiness-gated, not email-driven. Owner decision (S274): adapt the invitation copy
-(agree-in-principle framing) rather than build a hold-send path now. The invitation default now also
-surfaces title / PI / co-PIs / institution / full abstract (`{{proposalDetails}}` + `{{proposalAbstract}}`)
-so reviewers can flag a COI before accepting (owner-approved early exposure). Reviewer email templates
-are edited in Profile Settings (hub) or the Workbench Reviewers tab — same `EmailTemplatesModal` / pref
-key. See ../docs/agent-wiki/topics/reviewer-workbench-lifecycle.md. A real hold/finalize send path is a
-future build if the distinct wording is wanted before next cycle.
+Related: [[project-reviewer-accept-prod-automation]], [[project-reviewer-address-collection-provisional]],
+[[project-reviewer-workbench-invite-workflow]], [[project-reviewer-lifecycle]],
+[[feedback-verify-before-destructive-carryover]].
