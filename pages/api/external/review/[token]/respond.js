@@ -153,21 +153,17 @@ function applyTemplatePlaceholders(template, replacements) {
 function renderAcceptanceConfirmationEmail({ subjectTemplate, bodyTemplate, reviewer, request }) {
   const reviewerName = reviewer?.wmkf_name || 'Reviewer';
   const title = request?.akoya_title || 'the proposal';
-  const requestNumber = request?.akoya_requestnum || null;
   const due = formatReviewDueDate(request?.wmkf_reviewduedate);
   const dueSentence = due
     ? `Your review is due on ${due}.`
     : 'We will follow up with the review due date.';
+  // The request number is internal — never surfaced to external reviewers.
   const replacements = {
     '[reviewerName]': reviewerName,
     '[title]': title,
-    '[requestNumber]': requestNumber ? ` (${requestNumber})` : '',
     '[reviewDueDate]': dueSentence,
   };
-  const subject = applyTemplatePlaceholders(subjectTemplate, {
-    ...replacements,
-    '[requestNumber]': requestNumber ? ` — ${requestNumber}` : '',
-  });
+  const subject = applyTemplatePlaceholders(subjectTemplate, replacements);
   const bodyText = applyTemplatePlaceholders(bodyTemplate, replacements);
 
   return { subject, body: renderPlainTextEmailHtml(bodyText) };
@@ -206,7 +202,6 @@ async function sendAcceptanceConfirmationEmail({ suggestion, request, reviewer }
   const ics = buildReviewDueIcs({
     reviewDueDate: request?.wmkf_reviewduedate,
     suggestionId: suggestion?.wmkf_appreviewersuggestionid,
-    requestNumber: request?.akoya_requestnum,
   });
   const emailDefaults = await readRequiredEmailDefaults([ACCEPTANCE_SUBJECT_KEY, ACCEPTANCE_BODY_KEY], {
     source: 'external/review/respond:acceptance-confirmation',

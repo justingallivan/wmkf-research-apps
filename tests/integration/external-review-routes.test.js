@@ -486,11 +486,10 @@ describe('/api/external/review/[token]/respond', () => {
     expect(buildReviewDueIcs).toHaveBeenCalledWith({
       reviewDueDate: '2026-08-15',
       suggestionId: 'suggestion-1',
-      requestNumber: 'REQ-001',
     });
     expect(DynamicsService.createAndSendEmail).toHaveBeenCalledTimes(1);
     expect(DynamicsService.createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      subject: 'Review accepted — REQ-001',
+      subject: 'Review accepted',
       body: expect.stringContaining('Dear Dr. Reviewer,'),
       from: 'notifications@wmkeck.org',
       to: 'reviewer@example.org',
@@ -499,9 +498,12 @@ describe('/api/external/review/[token]/respond', () => {
       attachments: [expect.objectContaining({ filename: 'keck-review-due.ics' })],
     }));
     const email = DynamicsService.createAndSendEmail.mock.calls[0][0];
-    expect(email.body).toContain('Thank you for agreeing to review Token Scoped Proposal (REQ-001).');
+    expect(email.body).toContain('Thank you for agreeing to review Token Scoped Proposal.');
     expect(email.body).toContain('Your review is due on August 15, 2026. A calendar reminder is attached when a review due date is available.');
     expect(email.body).toContain('Proposal materials will be sent separately when they are ready.');
+    // Request number is internal — must never reach the external reviewer.
+    expect(email.subject).not.toContain('REQ-001');
+    expect(email.body).not.toContain('REQ-001');
     expect(email.body).toContain('W. M. Keck Foundation');
   });
 

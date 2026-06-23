@@ -347,10 +347,9 @@ function ProposalSummaryCard({ proposal }) {
     <div className="bg-white rounded-2xl border border-gray-200 p-6">
       <p className="text-xs uppercase tracking-wide text-gray-500">Proposal</p>
       <h2 className="text-lg font-semibold text-gray-900 mt-1">{proposal.title}</h2>
-      <p className="text-sm text-gray-600 mt-1">
-        Request #{proposal.requestNumber}
-        {proposal.applicantInstitution ? ` · ${proposal.applicantInstitution}` : ''}
-      </p>
+      {proposal.applicantInstitution && (
+        <p className="text-sm text-gray-600 mt-1">{proposal.applicantInstitution}</p>
+      )}
       {proposal.projectLeader && (
         <p className="text-sm text-gray-700 mt-3">
           <span className="text-xs text-gray-500 uppercase tracking-wide mr-1">PI</span>

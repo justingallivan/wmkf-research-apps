@@ -70,7 +70,6 @@ export default function GranteePortalPage() {
     <Shell>
       <h1>Grant Deliverables</h1>
       {request.title && <h2>{request.title}</h2>}
-      {request.requestNumber && <p>Grant #{request.requestNumber}</p>}
 
       {preview && <AwardPreview html={preview} />}
 

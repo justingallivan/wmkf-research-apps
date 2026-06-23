@@ -37,9 +37,6 @@ function ProposalCard({ data }) {
     <div className="bg-white rounded-2xl border border-gray-200 p-6">
       <p className="text-xs uppercase tracking-wide text-gray-500">Proposal</p>
       <h2 className="text-lg font-semibold text-gray-900 mt-1">{data.proposal.title}</h2>
-      <p className="text-sm text-gray-600 mt-1">
-        Request #{data.proposal.requestNumber}
-      </p>
       <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
         <div>
           <p className="text-xs text-gray-500">Reviewer</p>
