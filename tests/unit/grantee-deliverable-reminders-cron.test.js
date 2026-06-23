@@ -55,7 +55,7 @@ const BODY_KEY = 'email.grantee_reminder.body';
 const SUBJECT = 'Reminder: your W. M. Keck Foundation abstract';
 const BODY =
   'Dear Professor [Name]:\n\n' +
-  'I\'m following up on the abstract for your recent W. M. Keck Foundation award entitled "[title]". ' +
+  'I\'m following up on the abstract for your recent W. M. Keck Foundation award entitled “[title]”. ' +
   "We'd welcome any changes to the draft, and an image to accompany it, before we post your award on the " +
   "Foundation's website. Please use your secure link below by COB [date]. If we have not heard from you by " +
   'then, we will post the draft abstract as written. If you have already submitted, thank you - no further ' +

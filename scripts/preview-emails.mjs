@@ -112,7 +112,7 @@ function _applyPlaceholders(template, replacements) {
   return text;
 }
 function _titleClause(title) {
-  return title ? `the proposal "${title}"` : 'a proposal we recently invited you to review';
+  return title ? `the proposal “${title}”` : 'a proposal we recently invited you to review';
 }
 function buildWithdrawSufficientBodyText({ bodyTemplate, reviewerName, title, signatureBlock }) {
   const greeting = reviewerName ? `Dear ${reviewerName}:` : 'Dear Reviewer:';
@@ -355,8 +355,8 @@ if (requestNum) {
   console.log('INFO: No --request flag given; request-number-strip check skipped (proxy run).');
 }
 
-// Check [proposal] token renders as 'the proposal "<title>"' in reminders + withdraw
-const expectedClause = `the proposal "${proposalTitle}"`;
+// Check [proposal] token renders as 'the proposal “<title>”' in reminders + withdraw
+const expectedClause = `the proposal “${proposalTitle}”`;
 const emailsWithProposalToken = [
   { name: 'Reviewer respond-by reminder',  rendered: allRendered[1] },
   { name: 'Reviewer review-due reminder',  rendered: allRendered[2] },

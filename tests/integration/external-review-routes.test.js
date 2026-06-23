@@ -503,7 +503,7 @@ describe('/api/external/review/[token]/respond', () => {
       attachments: [expect.objectContaining({ filename: 'keck-review-due.ics' })],
     }));
     const email = DynamicsService.createAndSendEmail.mock.calls[0][0];
-    expect(email.body).toContain('Thank you for agreeing to review Token Scoped Proposal.');
+    expect(email.body).toContain('Thank you for agreeing to review “Token Scoped Proposal”.');
     expect(email.body).toContain('Your review is due on August 15, 2026. A calendar reminder is attached when a review due date is available.');
     expect(email.body).toContain('Proposal materials will be sent separately when they are ready.');
     // PD-voiced closing: the assigned-PD signature is appended after a "Thank you," line.

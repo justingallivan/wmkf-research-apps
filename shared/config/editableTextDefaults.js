@@ -36,7 +36,7 @@ export const EDITABLE_TEXT_DEFAULTS = [
   {
     key: 'email.reviewer_reminder_respond_by.body',
     label: 'Reviewer respond-by reminder body',
-    description: 'Default body copy for reviewer respond-by reminder emails. [proposal] renders as the proposal title in context, e.g. the proposal "X" (or a neutral phrase if untitled).',
+    description: 'Default body copy for reviewer respond-by reminder emails. [proposal] renders as the proposal title in context, e.g. the proposal “X” (or a neutral phrase if untitled).',
     multiline: true,
     placeholders: ['[Reviewer Name]', '[proposal]', '[Program Director signature]'],
   },
@@ -50,7 +50,7 @@ export const EDITABLE_TEXT_DEFAULTS = [
   {
     key: 'email.reviewer_reminder_review_due.body',
     label: 'Reviewer review-due reminder body',
-    description: 'Default body copy for reviewer review-due reminder emails. [proposal] renders as the proposal title in context, e.g. the proposal "X" (or a neutral phrase if untitled).',
+    description: 'Default body copy for reviewer review-due reminder emails. [proposal] renders as the proposal title in context, e.g. the proposal “X” (or a neutral phrase if untitled).',
     multiline: true,
     placeholders: ['[Reviewer Name]', '[proposal]', '[review due date]', '[Program Director signature]'],
   },
@@ -78,7 +78,7 @@ export const EDITABLE_TEXT_DEFAULTS = [
   {
     key: 'email.reviewer_withdraw.body',
     label: 'Reviewer withdraw-sufficient body',
-    description: 'Default body copy for reviewer no-longer-needed withdrawal emails. [proposal] renders as the proposal title in context, e.g. the proposal "X" (or a neutral phrase if untitled).',
+    description: 'Default body copy for reviewer no-longer-needed withdrawal emails. [proposal] renders as the proposal title in context, e.g. the proposal “X” (or a neutral phrase if untitled).',
     multiline: true,
     placeholders: ['[Reviewer Name]', '[proposal]', '[Program Director signature]'],
   },

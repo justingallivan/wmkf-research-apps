@@ -142,7 +142,7 @@ describe('sweepRespondReminders', () => {
     expect(email.to).toBe('rev@example.org');
     expect(email.subject).toBe(RESPOND_SUBJECT);
     expect(email.body).toContain('Dear Dr. Reviewer:');
-    expect(email.body).toContain('the proposal "A Proposal"');
+    expect(email.body).toContain('the proposal “A Proposal”');
     expect(email.body).toContain('Dr. PD');
   });
 
@@ -162,7 +162,7 @@ describe('sweepRespondReminders', () => {
     const email = createAndSendEmail.mock.calls[0][0];
     expect(email.subject).toBe('Custom respond subject');
     expect(email.body).toContain('Hello Dr. Reviewer');
-    expect(email.body).toContain('Review the proposal "A Proposal".');
+    expect(email.body).toContain('Review the proposal “A Proposal”.');
     expect(email.body).toContain('Dr. PD');
   });
 
@@ -365,7 +365,7 @@ describe('sweepReviewDueReminders', () => {
     expect(r.sent).toBe(1);
     const email = createAndSendEmail.mock.calls[0][0];
     expect(email.subject).toBe('Custom review due subject');
-    expect(email.body).toContain('Review due for Dr. Reviewer: the proposal "A Proposal" by');
+    expect(email.body).toContain('Review due for Dr. Reviewer: the proposal “A Proposal” by');
     expect(email.body).toContain('Dr. PD');
   });
 
