@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-21
+last_verified: 2026-06-22
 stale_after_days: 90
 owner: finance-ops
 source_files:
@@ -34,6 +34,13 @@ source, Atlas, and the Power Automate owner before testing against production.
 - External accept automation hazard: `project-reviewer-accept-prod-automation`.
 
 ## Capture-only (deferred) honorarium onboarding
+
+**Prod state (2026-06-22):** `HONORARIUM_ONBOARDING_DEFERRED=true` is now SET in
+Production (the three discriminator GUIDs remain unset), so reviewer accept is
+capture-only by **explicit** lock this cycle — addresses captured for manual
+checks, no Bill.com payment can fire. See `docs/CREDENTIALS_RUNBOOK.md` →
+Operational Flags. This is the safety lock for the reviewer onboarding-at-accept
+cycle (`project-reviewer-hold-step-decouple`).
 
 Two independent deferral gates sit on the post-accept honorarium pipeline; both
 capture the reviewer's contact + mailing address upstream and pay manually:

@@ -29,9 +29,13 @@ model is dropped.
   NOT fire the Connor-gated "Bill.com - Push Payments" automation. The contact-address PATCH DOES still
   fire `AkoyaGo.Sync_BusinessCentral` (benign — the address landing in accounting, which is what makes
   it usable for mailing a check, as last cycle). [VERIFIED S279 — `lib/bill/honorarium-onboard-orchestrator.js:53-134`]
-- "Partial now, full later": address captured now; if Bill.com gets the go-ahead THIS cycle, append it
-  by configuring the 3 discriminator GUIDs / unsetting `HONORARIUM_ONBOARDING_DEFERRED` — the full
-  create+onboard tail then runs on a later accept (reversible, by design).
+- Explicit safety lock (2026-06-22): `HONORARIUM_ONBOARDING_DEFERRED=true` is now SET in prod Vercel,
+  AND the 3 discriminator GUIDs are unset — so capture-only is enforced by the flag, not just incidental.
+  No Bill.com payment can fire this cycle. Verified via `vercel env ls` (no `HONORARIUM_*` GUIDs set).
+  Documented in `docs/CREDENTIALS_RUNBOOK.md` (Operational Flags) + the finance-honoraria wiki topic.
+- "Partial now, full later": address captured now; to go live on Bill.com later, configure the 3
+  discriminator GUIDs AND unset `HONORARIUM_ONBOARDING_DEFERRED` — the full create+onboard tail then
+  runs on a later accept (reversible, by design).
 - Reviewer receives an acceptance-confirmation email carrying an `.ics` save-the-date keyed to
   `wmkf_reviewduedate` (reuse `lib/external/calendar-invite.js`, rewired off the removed hold template;
   rekey `meetingDate` → `reviewDueDate`). NOTE: today the `respond.js` accept branch sends the reviewer

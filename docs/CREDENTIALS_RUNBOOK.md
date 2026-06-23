@@ -129,6 +129,7 @@ Prefer the admin dashboard (`/admin` → Models tab) for non-static overrides �
 | `DEBUG_REVIEWER_FINDER` | Verbose logging for Reviewer Finder pipeline | unset |
 | `VIRUS_SCAN_ENABLED` | App-side Cloudmersive virus scanning on upload surfaces (today: reviewer uploads). Fail-closed when on — see [Virus scanning](#virus-scanning-virus_scan_enabled--cloudmersive_api_key) for the runbook. | unset (scanning skipped) |
 | `CLOUDMERSIVE_API_KEY` | Cloudmersive virus-scan API key. Required when `VIRUS_SCAN_ENABLED=true`. Free tier 800 scans/month. | unset |
+| `HONORARIUM_ONBOARDING_DEFERRED` | Forces reviewer honorarium onboarding to **capture-only**: `ensureHonorariumOnboarding()` captures contact + mailing address then STOPS before minting the honorarium `akoya_request` or calling BILL (`lib/bill/honorarium-onboard-orchestrator.js:54`). Capture-only is *also* implied whenever the discriminator GUIDs (`HONORARIUM_PROGRAM_ID` / `HONORARIUM_GRANTPROGRAM_ID` / `HONORARIUM_TYPE_ID`) are unset — but this flag is the **explicit** lock that still holds if those GUIDs are later configured. **SET to `true` in Production 2026-06-22** as the capture-only lock for the reviewer onboarding-at-accept cycle: addresses are captured for manual checks and **no Bill.com payment can fire this cycle**. The three discriminator GUIDs are intentionally **unset** in prod. To go live on Bill.com later: configure the GUIDs *and* unset this flag. | unset (this cycle: `true` in prod) |
 
 ### Optional — Notifications & Spend Alerts
 
