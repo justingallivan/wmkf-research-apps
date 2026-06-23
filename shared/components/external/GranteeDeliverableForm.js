@@ -100,7 +100,7 @@ export default function GranteeDeliverableForm({ token, deliverable, onSubmitted
 
   if (done) {
     return (
-      <p>Thank you — your deliverables have been submitted. Foundation staff will review them.</p>
+      <p>Thank you — your materials have been submitted. Foundation staff will review them.</p>
     );
   }
 

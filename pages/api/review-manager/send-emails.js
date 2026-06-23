@@ -60,6 +60,12 @@ import { shouldSkipDuplicateInvitation, sendAllowsAttachments, isKnownTemplateTy
 const limiter = nextRateLimiter({ max: 10 });
 const EMAIL_DELIVERY_MODES = new Set(['send', 'capture']);
 
+function outgoingTextContainsRequestNumber({ subject, body, requestNumber }) {
+  const n = String(requestNumber || '').trim();
+  if (!n) return false;
+  return String(subject || '').includes(n) || String(body || '').includes(n);
+}
+
 export const config = {
   api: { bodyParser: { sizeLimit: '10mb' } },
   maxDuration: 300,
@@ -186,11 +192,33 @@ export default async function handler(req, res) {
           select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_emailaddress,wmkf_firstname,wmkf_lastname,_wmkf_contact_value,wmkf_orcid,wmkf_identitystatus,wmkf_emailsource',
         }).catch(() => null) : null,
         requestId ? DynamicsService.getRecord('akoya_requests', requestId, {
-          select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate,wmkf_respondoffsetdays,wmkf_reviewduedate',
+          select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate,wmkf_respondoffsetdays,wmkf_reviewduedate,_wmkf_programdirector_value',
         }).catch(() => null) : null,
       ]);
       recipientBySuggestion.set(d.suggestionId, { suggestion: sug, person, request });
     }
+
+    const programDirectorById = new Map();
+    const distinctProgramDirectorIds = [...new Set(
+      [...recipientBySuggestion.values()]
+        .map((v) => v?.request?._wmkf_programdirector_value)
+        .filter(Boolean)
+    )];
+    await Promise.all(distinctProgramDirectorIds.map(async (pdId) => {
+      try {
+        const pd = await DynamicsService.getRecord('systemusers', pdId, {
+          select: 'fullname,internalemailaddress,isdisabled',
+        });
+        if (pd && pd.isdisabled !== true) {
+          programDirectorById.set(pdId, {
+            name: pd.fullname || null,
+            email: pd.internalemailaddress || null,
+          });
+        }
+      } catch {
+        // Non-fatal: the email still sends with a generic contact line.
+      }
+    }));
 
     // Cycle-level config (template URL + additional attachments) loaded
     // from Dataverse `wmkf_appgrantcycle` (W3 cutover). Look up once per
@@ -375,6 +403,30 @@ export default async function handler(req, res) {
       }
 
       const regardingId = request?.akoya_requestid || null;
+      const programDirectorContact = programDirectorById.get(request?._wmkf_programdirector_value) || {
+        name: null,
+        email: fromEmail,
+      };
+      if (outgoingTextContainsRequestNumber({
+        subject: draft.subject,
+        body: draft.body,
+        requestNumber: request?.akoya_requestnum,
+      })) {
+        failed.push({
+          suggestionId: draft.suggestionId,
+          candidateName: name,
+          candidateEmail: email,
+          error: 'Email subject/body contains the internal request number.',
+        });
+        sendEvent('email_failed', failed[failed.length - 1]);
+        sendEvent('progress', {
+          stage: 'sending',
+          current: processed,
+          total: drafts.length,
+          message: `Failed to send to ${name}`,
+        });
+        continue;
+      }
 
       // Attachment safety is SERVER-authoritative, not caller-controlled: proposal
       // materials only ride on an email to a recipient who has actually ACCEPTED
@@ -388,7 +440,7 @@ export default async function handler(req, res) {
       try {
         const emailPayload = {
           subject: draft.subject,
-          body: plainTextToHtml(draft.body),
+          body: plainTextToHtml(draft.body, { programDirectorContact }),
           from: fromEmail,
           to: email,
           regardingId: regardingId || undefined,
@@ -638,7 +690,7 @@ async function loadCycleConfigs(cycleCodes) {
   return out;
 }
 
-export function plainTextToHtml(text) {
+export function plainTextToHtml(text, { programDirectorContact } = {}) {
   if (!text) return '';
   const normalized = normalizeEmailPlainText(String(text));
   const urlPattern = /(https?:\/\/[^\s<]+)/g;
@@ -650,7 +702,7 @@ export function plainTextToHtml(text) {
     const url = match[0];
     html += plainTextFragmentToHtml(normalized.slice(cursor, match.index));
     html += isExternalReviewUrl(url)
-      ? reviewPortalButtonHtml(url)
+      ? reviewPortalButtonHtml(url, { programDirectorContact })
       : `<a href="${escapeAttribute(url)}">${escapeHtml(url)}</a>`;
     cursor = match.index + url.length;
   }
@@ -688,10 +740,11 @@ function isExternalReviewUrl(url) {
   return /\/external\/review\/[A-Za-z0-9._~-]+/.test(url);
 }
 
-function reviewPortalButtonHtml(url) {
+function reviewPortalButtonHtml(url, { programDirectorContact } = {}) {
   const href = escapeAttribute(url);
   const label = 'Start Review';
   const displayUrl = escapeHtml(url);
+  const contactLine = reviewerPortalContactLine(programDirectorContact);
   return [
     '<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:14px 0 16px 0;border-collapse:separate;">',
     '<tr>',
@@ -702,9 +755,19 @@ function reviewPortalButtonHtml(url) {
     '</td>',
     '</tr>',
     '</table>',
-    '<p style="margin:0 0 12px 0;">This secure link is unique to you and was sent by your Foundation program director.</p>',
+    `<p style="margin:0 0 12px 0;">${contactLine}</p>`,
     `<p style="margin:0;">If the button does not work, copy and paste this secure link into your browser:<br><a href="${href}">${displayUrl}</a></p>`,
   ].join('');
+}
+
+function reviewerPortalContactLine(programDirectorContact = {}) {
+  const name = String(programDirectorContact.name || '').trim();
+  const email = String(programDirectorContact.email || '').trim();
+  const contact = [name, email].filter(Boolean).join(' ');
+  if (!contact) {
+    return 'This secure link is unique to you and was sent by W.M. Keck Foundation Program Director. Please contact them with any questions.';
+  }
+  return `This secure link is unique to you and was sent by W.M. Keck Foundation Program Director ${escapeHtml(contact)}. Please contact them with any questions.`;
 }
 
 function getReviewerEmailDeliveryMode() {

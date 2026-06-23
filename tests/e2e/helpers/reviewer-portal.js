@@ -53,7 +53,6 @@ function buildContext({ address, honorariumOptOut = false, longBody = false, vie
     etag: 'W/"etag-1"',
     proposal: {
       title: 'A Study of Test-Driven Reviewer Onboarding',
-      requestNumber: '1002788',
       meetingDate: '2026-07-01T00:00:00Z',
       abstract: 'An abstract describing the proposed work in brief.',
       applicantInstitution: 'Example University',

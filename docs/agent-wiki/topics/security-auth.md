@@ -5,10 +5,12 @@ last_verified: 2026-06-15
 stale_after_days: 60
 owner: platform-security
 source_files:
+  - lib/utils/auth.js
   - lib/utils/tracked-secrets.js
   - lib/utils/intake-blob.js
   - lib/utils/guid.js
   - scripts/check-trust-boundary-guid.js
+  - pages/api/auth/[...nextauth].js
   - pages/api/
 canonical_docs:
   - docs/API_ROUTE_SECURITY_MATRIX.md
@@ -26,6 +28,7 @@ update_triggers:
   - API route auth/security changes
   - credential or tracked-secret changes
   - private blob/file access changes
+  - NEXTAUTH_URL or branded staff-domain changes
 ---
 
 # Security & Auth
@@ -39,6 +42,9 @@ private Blob/file access, prompt-injection hardening, and download proxy pattern
 - API keys and secrets stay server-side.
 - Private intake Blob operations use `INTAKE_BLOB_RW_TOKEN`.
 - API route security changes must reconcile the security matrix.
+- `NEXTAUTH_URL` is the canonical public origin for NextAuth callbacks and the
+  state-changing API Origin/Referer check. Do not point it at a new staff domain
+  until the matching Azure/Entra redirect URI is configured and smoke-tested.
 - A client-supplied id (`req.query`/`req.body`) that becomes a Dataverse selector
   must be GUID-validated at the route edge BEFORE the selector. `getRecord`/
   `updateRecord` interpolate the record id raw into the request URL
@@ -46,6 +52,28 @@ private Blob/file access, prompt-injection hardening, and download proxy pattern
   interpolates `requestId` raw into an OData `$filter` — an unvalidated id is an
   over-fetch / IDOR / filter-injection vector. Server-derived ids (read off a row
   already fetched, or a token-bound row) are trusted.
+
+## Branded Staff-Domain Migration Backlog
+
+- Current external magic-link state (2026-06-23): reviewer links use
+  `REVIEWER_PORTAL_BASE_URL=https://reviews.wmkeck.org`; grantee links use
+  `GRANTEE_PORTAL_BASE_URL=https://grantees.wmkeck.org`. These are independent
+  of staff NextAuth callbacks (`lib/external/token-lifecycle.js`,
+  `lib/external/grantee-token-lifecycle.js`).
+- Public external surfaces must not show the internal request number. Reviewer
+  and grantee token context APIs intentionally omit `requestNumber`, and the
+  reviewer/grantee send paths guard against sending hydrated email subject/body
+  copy that contains the internal request number.
+- Held staff-auth migration: keep `NEXTAUTH_URL` unchanged/empty until the staff
+  Azure app registration includes
+  `https://applications.wmkeck.org/api/auth/callback/azure-ad`.
+- After Azure is configured, set
+  `NEXTAUTH_URL=https://applications.wmkeck.org`, redeploy, then smoke-test a
+  staff sign-in and one cookie-bearing state-changing staff API action from
+  `applications.wmkeck.org`. `lib/utils/auth.js` rejects POST/PUT/PATCH/DELETE
+  requests whose Origin/Referer does not match `NEXTAUTH_URL`.
+- Do not redirect `wmkfresearch.vercel.app` until outstanding staff bookmarks and
+  old external magic links are accounted for.
 
 ## Trust-Boundary GUID Validation
 

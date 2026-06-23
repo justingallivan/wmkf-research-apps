@@ -217,6 +217,7 @@ describe('/api/external/review/[token]/context', () => {
       expect.objectContaining({ wmkf_proposalfirstaccessed: expect.any(String) }),
     );
     expect(res.status).toHaveBeenCalledWith(200);
+    expect(res._data.proposal.requestNumber).toBeUndefined();
     expect(res._data.files).toEqual([
       expect.objectContaining({
         id: 'allowed-file',

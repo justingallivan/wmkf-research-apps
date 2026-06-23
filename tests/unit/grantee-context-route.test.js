@@ -114,6 +114,7 @@ test('editable status (Invited) → editable:true, view:edit', async () => {
   expect(res.body.ok).toBe(true);
   expect(res.body.editable).toBe(true);
   expect(res.body.view).toBe('edit');
+  expect(res.body.request.requestNumber).toBeUndefined();
   expect(res.body.deliverable.hasImage).toBe(false);
   // raw SharePoint ref must NOT leak to the external client
   expect(res.body.deliverable.imageFileRef).toBeUndefined();

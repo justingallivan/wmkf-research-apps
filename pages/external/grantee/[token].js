@@ -58,7 +58,7 @@ export default function GranteePortalPage() {
   if (state.status === 'error') {
     return (
       <Shell>
-        <h1>Grant Deliverables</h1>
+        <h1>Graphical Abstract Request</h1>
         <p>{REASON_MESSAGE[state.reason] || 'This link cannot be opened.'}</p>
       </Shell>
     );
@@ -68,7 +68,7 @@ export default function GranteePortalPage() {
 
   return (
     <Shell>
-      <h1>Grant Deliverables</h1>
+      <h1>Graphical Abstract Request</h1>
       {request.title && <h2>{request.title}</h2>}
 
       {preview && <AwardPreview html={preview} />}
@@ -78,7 +78,7 @@ export default function GranteePortalPage() {
       )}
 
       {view === 'submitted' && (
-        <p>Thank you — your deliverables have been received and are being reviewed.</p>
+        <p>Thank you — your materials have been received and are being reviewed.</p>
       )}
 
       {view === 'closed' && (

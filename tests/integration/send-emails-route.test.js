@@ -24,6 +24,7 @@ const createAndSendEmail = jest.fn(async () => ({ emailId: 'email-1' }));
 const getRecord = jest.fn(async (entity) => {
   if (entity === 'wmkf_potentialreviewerses') return PERSON;
   if (entity === 'akoya_requests') return REQUEST;
+  if (entity === 'systemusers') return SYSTEMUSER;
   return null;
 });
 const updateRecord = jest.fn(async () => {});
@@ -72,6 +73,7 @@ const SUG_MISSING = 'c3333333-3333-4333-8333-333333333333';
 let SUGGESTIONS;
 let PERSON;
 let REQUEST;
+let SYSTEMUSER;
 let CYCLE_CODE;     // meetingDateToCycleCode() → this
 let CYCLE_CONFIG;   // findByShortCode() → this (cycle materials live here)
 let ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE;
@@ -118,7 +120,17 @@ beforeEach(() => {
   jest.clearAllMocks();
   SUGGESTIONS = { [SUG_1]: baseSuggestion() };
   PERSON = basePerson();
-  REQUEST = { akoya_requestid: 'req-1', akoya_requestnum: 'REQ-001', wmkf_meetingdate: '2026-07-01' };
+  REQUEST = {
+    akoya_requestid: 'req-1',
+    akoya_requestnum: 'REQ-001',
+    wmkf_meetingdate: '2026-07-01',
+    _wmkf_programdirector_value: 'pd-1',
+  };
+  SYSTEMUSER = {
+    fullname: 'Dr. Program Director',
+    internalemailaddress: 'pd@wmkeck.org',
+    isdisabled: false,
+  };
   CYCLE_CODE = null;       // default: no cycle / no materials
   CYCLE_CONFIG = null;
   if (ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE === undefined) delete process.env.REVIEWER_EMAIL_DELIVERY_MODE;
@@ -152,6 +164,23 @@ async function run(body) {
 const draft = (id = SUG_1) => ({ suggestionId: id, subject: 'S', body: 'B' });
 
 describe('send-emails — reviewer portal HTML links', () => {
+  test('refuses to send when the outgoing subject/body contains the internal request number', async () => {
+    const res = await run({
+      drafts: [{
+        suggestionId: SUG_1,
+        subject: 'Review request REQ-001',
+        body: 'Please review this proposal.',
+      }],
+      templateType: 'invitation',
+    });
+
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(res).sent).toHaveLength(0);
+    expect(resultOf(res).failed).toHaveLength(1);
+    expect(events(res).find((e) => e.event === 'email_failed')?.data.error)
+      .toBe('Email subject/body contains the internal request number.');
+  });
+
   test('external reviewer URLs render as a button with a fallback link', async () => {
     await run({
       drafts: [{
@@ -164,7 +193,9 @@ describe('send-emails — reviewer portal HTML links', () => {
 
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
     expect(htmlBodySent()).toContain('Start Review');
-    expect(htmlBodySent()).toContain('This secure link is unique to you');
+    expect(htmlBodySent()).toContain(
+      'This secure link is unique to you and was sent by W.M. Keck Foundation Program Director Dr. Program Director pd@wmkeck.org. Please contact them with any questions.'
+    );
     expect(htmlBodySent()).toContain('https://reviews.wmkeck.org/external/review/token.value');
     expect(htmlBodySent()).toContain('<table role="presentation"');
     expect(htmlBodySent()).toContain('<td align="center" valign="middle"');
