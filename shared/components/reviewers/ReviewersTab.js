@@ -6,17 +6,17 @@
  *                  (recommended → candidates, excluded → per-request soft-block),
  *                  auto-loaded proposal, and the in-panel reviewer search
  *                  (ReviewerSearchSection: inline analyze→discover→enrich→save).
- *   - Invite     : accepted reviewers awaiting materials.
- *   - Track      : reviewers in flight (materials sent → review received).
- *   - Completed  : reviewers whose review is complete.
+ *   - Invite Reviewers : saved candidates ready for invitation.
+ *   - Track Reviewers  : accepted reviewers across the full post-acceptance
+ *                        lifecycle (accepted → complete).
  *
  * Reviewer data comes from the existing Review Manager GET, scoped to one
  * request via `?proposalId=<guid>` (accepted reviewers only — the same set the
- * Review Manager manages). The Invite/Track/Completed panels reuse the shared
- * ReviewerManagePanel; `mode` selects which status slice each shows.
+ * Review Manager manages). Track Reviewers reuses the shared ReviewerManagePanel
+ * with `mode="track"`.
  *
- * Sub-tab selection is query-string driven (`?tab=reviewers&sub=invite`) for
- * deep-links; default landing is state-aware.
+ * Sub-tab selection is query-string driven (`?tab=reviewers&sub=track`) for
+ * deep-links; legacy `invite`/`completed` links normalize to Track Reviewers.
  *
  * Props:
  *   - requestId : the akoya_request GUID
@@ -39,10 +39,8 @@ import { countForMode, workRemainingForMode, computeDefaultSub } from './reviewe
 
 const SUB_TABS = [
   { key: 'find', label: 'Find' },
-  { key: 'candidates', label: 'Candidates' },
-  { key: 'invite', label: 'Invite' },
-  { key: 'track', label: 'Track' },
-  { key: 'completed', label: 'Completed' },
+  { key: 'candidates', label: 'Invite Reviewers' },
+  { key: 'track', label: 'Track Reviewers' },
 ];
 const SUB_TAB_KEYS = new Set(SUB_TABS.map((t) => t.key));
 
@@ -61,7 +59,8 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const candidatesToInvite = candidates.filter((c) => !c.invited && !c.accepted && !c.declined).length;
 
   const subParam = typeof router.query.sub === 'string' ? router.query.sub : null;
-  const activeSub = subParam && SUB_TAB_KEYS.has(subParam) ? subParam : null;
+  const normalizedSubParam = subParam === 'invite' || subParam === 'completed' ? 'track' : subParam;
+  const activeSub = normalizedSubParam && SUB_TAB_KEYS.has(normalizedSubParam) ? normalizedSubParam : null;
 
   const loadReviewers = useCallback(async () => {
     if (!requestId) return;

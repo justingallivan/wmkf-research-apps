@@ -17,7 +17,7 @@
  *   - settings   : { signature, ... } — feeds the email templates (sender is
  *                  always the signed-in MS account; signature is freeform text)
  *   - mode       : undefined|'all' → every reviewer (Review Manager behavior);
- *                  'invite'|'track'|'completed' → status-scoped (Workbench sub-tabs)
+ *                  'track' → Workbench post-acceptance lifecycle sub-tab
  *   - canManage  : soft UI gate (decided S207). When false, write controls are
  *                  hidden and the table is read-only. The reused server APIs stay
  *                  org-open regardless — this is cosmetic, not an auth boundary.
@@ -220,7 +220,6 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
   const [emailFields, setEmailFields] = useState({
     reviewDueDate: '',
     proposalSendDate: '',
-    commitDate: '',
     // honorarium removed S199 — now a Dataverse ground-truth read server-side.
   });
   // Attachments are per-template-type so switching templates (e.g. Materials
@@ -346,7 +345,6 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
             reviewDueDate: emailFields.reviewDueDate || settings.reviewDueDate || '',
             customFields: {
               proposalSendDate: emailFields.proposalSendDate || '',
-              commitDate: emailFields.commitDate || '',
               // honorarium intentionally omitted — render-emails injects the
               // Dataverse ground-truth amount server-side (S199).
             },
@@ -518,15 +516,6 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
                       className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-gray-400 focus:outline-none"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-0.5">Commit By Date</label>
-                    <input
-                      type="date"
-                      value={emailFields.commitDate}
-                      onChange={e => setEmailFields(prev => ({ ...prev, commitDate: e.target.value }))}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-gray-400 focus:outline-none"
-                    />
-                  </div>
                   {/* Honorarium amount removed from per-user input (S199): it is
                       now a single Dataverse ground-truth (honorarium.default_amount)
                       read server-side at email-render time. The
@@ -617,7 +606,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, settings, onEma
                     'proposalTitle', 'piName', 'piInstitution', 'externalLink',
                     'reviewDueDate', 'programName', 'signature',
                     'investigatorTeam', 'reviewerFormLink',
-                    'customField:proposalSendDate', 'customField:commitDate', 'customField:honorarium',
+                    'customField:proposalSendDate', 'customField:honorarium',
                     'customField:proposalDueDate'].map(p => (
                     <code key={p} className="text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200 text-gray-600">
                       {`{{${p}}}`}
@@ -963,16 +952,23 @@ function UploadReviewModal({ isOpen, onClose, reviewer, onUploaded }) {
 // ─── Status Dropdown ──────────────────────────────────────────────────────
 
 function StatusDropdown({ currentStatus, onChange }) {
+  const settableStatuses = STATUS_PIPELINE.filter(s => s.key !== 'accepted');
   return (
-    <select
-      value={currentStatus}
-      onChange={e => onChange(e.target.value)}
-      className="text-xs border border-gray-200 rounded px-1.5 py-1 text-gray-600 bg-white hover:border-gray-400 focus:ring-1 focus:ring-gray-400 focus:outline-none cursor-pointer"
-    >
-      {STATUS_PIPELINE.map(s => (
-        <option key={s.key} value={s.key}>{s.label}</option>
-      ))}
-    </select>
+    <label className="inline-flex flex-col items-start gap-0.5 text-left">
+      <span className="text-[10px] uppercase text-gray-400 leading-none">Correct status</span>
+      <select
+        value={currentStatus === 'accepted' ? '' : currentStatus}
+        onChange={e => onChange(e.target.value)}
+        className="text-xs border border-gray-200 rounded px-1.5 py-1 text-gray-600 bg-white hover:border-gray-400 focus:ring-1 focus:ring-gray-400 focus:outline-none cursor-pointer"
+      >
+        {currentStatus === 'accepted' && (
+          <option value="" disabled>Accepted</option>
+        )}
+        {settableStatuses.map(s => (
+          <option key={s.key} value={s.key}>{s.label}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -1005,6 +1001,7 @@ export default function ReviewerManagePanel({
 
   const selectedList = reviewers.filter(r => selectedReviewers.has(r.suggestionId));
   const allSelected = reviewers.length > 0 && reviewers.every(r => selectedReviewers.has(r.suggestionId));
+  const acceptedReviewers = reviewers.filter(r => r.reviewStatus === 'accepted');
 
   const toggleSelectAll = () => {
     if (allSelected) {
@@ -1187,18 +1184,18 @@ export default function ReviewerManagePanel({
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Release to reviewers (reviewer-engagement §3.A): a one-click materials send to
-              ALL accepted-awaiting-materials reviewers. The 'invite' mode already lists only
-              accepted reviewers; this selects them and opens the materials email (which the
-              modal defaults to). Accepted-only is also enforced server-side in send-emails. */}
-          {canManage && mode === 'invite' && reviewers.length > 0 && (
+          {/* Release proposal to reviewers (reviewer-engagement §3.A): a one-click
+              materials send to only accepted-awaiting-materials reviewers, even
+              though Track Reviewers also shows later lifecycle statuses.
+              Accepted-only is also enforced server-side in send-emails. */}
+          {canManage && acceptedReviewers.length > 0 && (
             <Button
               onClick={() => {
-                setSelectedReviewers(new Set(reviewers.map(r => r.suggestionId)));
+                setSelectedReviewers(new Set(acceptedReviewers.map(r => r.suggestionId)));
                 setEmailModalOpen(true);
               }}
             >
-              Release to reviewers ({reviewers.length})
+              Release proposal to reviewers ({acceptedReviewers.length})
             </Button>
           )}
           {canManage && selectedList.length > 0 && (
@@ -1321,12 +1318,13 @@ export default function ReviewerManagePanel({
                           {(r.reviewStatus === 'materials_sent' || r.reviewStatus === 'under_review') && (
                             <button
                               onClick={() => setUploadModalReviewer(r)}
-                              className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-                              title="Upload review"
+                              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100"
+                              title="Staff upload (override)"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                               </svg>
+                              <span>Staff upload (override)</span>
                             </button>
                           )}
                           {/* Download received review from SharePoint via Graph. */}

@@ -25,21 +25,18 @@ export function getStatusInfo(status) {
   return STATUS_PIPELINE.find(s => s.key === status) || STATUS_PIPELINE[0];
 }
 
-// Which reviewStatus values each Workbench sub-tab mode surfaces. The three
+// Which reviewStatus values the Workbench tracking sub-tab surfaces. The
 // buckets must partition every STATUS_PIPELINE key (complete coverage, no
 // overlap).
 export const MODE_STATUSES = {
-  invite: ['accepted'],
-  track: ['materials_sent', 'under_review', 'review_received'],
-  completed: ['complete'],
+  track: ['accepted', 'materials_sent', 'under_review', 'review_received', 'complete'],
 };
 
 // Reviewers a mode still has open work for (drives the work-remaining badge).
-// Completed has none; invite = needs materials; track = review not yet in.
+// Track open work: accepted reviewers still need materials, and sent reviewers
+// still need a review returned.
 export const MODE_WORK_REMAINING = {
-  invite: ['accepted'],
-  track: ['materials_sent', 'under_review'],
-  completed: [],
+  track: ['accepted', 'materials_sent', 'under_review'],
 };
 
 export function filterByMode(reviewers, mode) {
@@ -63,15 +60,12 @@ export function workRemainingForMode(reviewers, mode) {
   return (reviewers || []).filter(r => statuses.includes(r.reviewStatus)).length;
 }
 
-// State-aware default sub-tab: drop staff where the open work is. If reviewers
-// have accepted but aren't out yet → invite; if any are in flight → track; if
-// some are done and nothing is pending → completed; otherwise (no reviewers) the
-// Find tab, where reviewer-finding starts.
+// State-aware default sub-tab: drop staff into Track whenever any post-
+// acceptance reviewer exists; otherwise (no reviewers) the Find tab, where
+// reviewer-finding starts.
 export function computeDefaultSub(reviewers) {
-  if (workRemainingForMode(reviewers, 'invite') > 0) return 'invite';
+  if (workRemainingForMode(reviewers, 'track') > 0) return 'track';
   if (countForMode(reviewers, 'track') > 0) return 'track';
-  if (countForMode(reviewers, 'completed') > 0) return 'completed';
-  if (countForMode(reviewers, 'invite') > 0) return 'invite';
   return 'find';
 }
 

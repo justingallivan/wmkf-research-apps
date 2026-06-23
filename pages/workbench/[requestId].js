@@ -2,13 +2,13 @@
  * Request Workbench — per-request shell (tier-3).
  *
  * Renders the request context header + the tab strip. LIVE tabs: Reviewers
- * (Phase 2 Invite/Track/Completed via ReviewerManagePanel; Phase 3 Find —
+ * (Find, Invite Reviewers, Track Reviewers via ReviewerManagePanel; Phase 3
  * applicant-reviewer ingestion + in-panel search), Proposal (documents + AI
  * content + Field Primer, S258/S260), and — Group A, S260 — Overview (per-request
  * command center) + Status (read-only akoya_requeststatus reflection). The other
  * 6 tabs are placeholders for the rest of the request lifecycle. The default
  * landing is Overview. Tab + sub-tab selection is query-string driven
- * (?tab=reviewers&sub=invite) for deep-links.
+ * (?tab=reviewers&sub=track) for deep-links.
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';

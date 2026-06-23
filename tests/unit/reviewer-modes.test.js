@@ -5,7 +5,7 @@
  *
  * The headline guarantee is the "no fallthrough" invariant: every reviewStatus
  * the API can return is bucketed into exactly one sub-tab mode, so no reviewer
- * can silently disappear from Invite/Track/Completed (Codex S209 asked this).
+ * can silently disappear from Track Reviewers (Codex S209 asked this).
  */
 
 const {
@@ -43,7 +43,7 @@ describe('getStatusInfo', () => {
 });
 
 describe('MODE_STATUSES partitioning (no-fallthrough invariant)', () => {
-  const buckets = [MODE_STATUSES.invite, MODE_STATUSES.track, MODE_STATUSES.completed];
+  const buckets = [MODE_STATUSES.track];
 
   it('every API status lands in exactly one mode bucket', () => {
     for (const status of API_STATUSES) {
@@ -58,7 +58,7 @@ describe('MODE_STATUSES partitioning (no-fallthrough invariant)', () => {
   });
 
   it('MODE_WORK_REMAINING is a subset of MODE_STATUSES for each mode', () => {
-    for (const mode of ['invite', 'track', 'completed']) {
+    for (const mode of ['track']) {
       for (const s of MODE_WORK_REMAINING[mode]) {
         expect(MODE_STATUSES[mode]).toContain(s);
       }
@@ -76,24 +76,17 @@ describe('filterByMode', () => {
   });
 
   it('scopes to the mode bucket', () => {
-    expect(filterByMode(all, 'invite').map(r => r.reviewStatus)).toEqual(['accepted']);
     expect(filterByMode(all, 'track').map(r => r.reviewStatus))
-      .toEqual(['materials_sent', 'under_review', 'review_received']);
-    expect(filterByMode(all, 'completed').map(r => r.reviewStatus)).toEqual(['complete']);
+      .toEqual(['accepted', 'materials_sent', 'under_review', 'review_received', 'complete']);
   });
 
   it('tolerates null/empty input', () => {
-    expect(filterByMode(null, 'invite')).toEqual([]);
+    expect(filterByMode(null, 'track')).toEqual([]);
     expect(filterByMode(undefined, 'all')).toEqual([]);
   });
 
-  it('partitions the full set across the three modes with no loss', () => {
-    const recombined = [
-      ...filterByMode(all, 'invite'),
-      ...filterByMode(all, 'track'),
-      ...filterByMode(all, 'completed'),
-    ];
-    expect(recombined).toHaveLength(all.length);
+  it('tracks the full post-acceptance lifecycle with no loss', () => {
+    expect(filterByMode(all, 'track')).toHaveLength(all.length);
   });
 });
 
@@ -101,19 +94,15 @@ describe('countForMode / workRemainingForMode', () => {
   const reviewers = [rev('accepted'), rev('accepted'), rev('materials_sent'), rev('review_received'), rev('complete')];
 
   it('counts visible reviewers per mode', () => {
-    expect(countForMode(reviewers, 'invite')).toBe(2);
-    expect(countForMode(reviewers, 'track')).toBe(2);
-    expect(countForMode(reviewers, 'completed')).toBe(1);
+    expect(countForMode(reviewers, 'track')).toBe(5);
   });
 
   it('work-remaining excludes done-in-stage statuses', () => {
-    expect(workRemainingForMode(reviewers, 'invite')).toBe(2); // both accepted need materials
-    expect(workRemainingForMode(reviewers, 'track')).toBe(1);  // materials_sent open; review_received done
-    expect(workRemainingForMode(reviewers, 'completed')).toBe(0);
+    expect(workRemainingForMode(reviewers, 'track')).toBe(3);  // accepted + materials_sent open; review_received/complete done
   });
 
   it('handles empty/null', () => {
-    expect(countForMode([], 'invite')).toBe(0);
+    expect(countForMode([], 'track')).toBe(0);
     expect(workRemainingForMode(null, 'track')).toBe(0);
   });
 });
@@ -123,18 +112,18 @@ describe('computeDefaultSub (state-aware landing)', () => {
     expect(computeDefaultSub([])).toBe('find');
     expect(computeDefaultSub(null)).toBe('find');
   });
-  it('prefers Invite when reviewers await materials', () => {
-    expect(computeDefaultSub([rev('accepted'), rev('complete')])).toBe('invite');
+  it('lands on Track when accepted reviewers await materials', () => {
+    expect(computeDefaultSub([rev('accepted'), rev('complete')])).toBe('track');
   });
-  it('falls to Track when work is in flight and none await materials', () => {
+  it('lands on Track when work is in flight', () => {
     expect(computeDefaultSub([rev('under_review'), rev('complete')])).toBe('track');
   });
-  it('falls to Completed when everything is done', () => {
-    expect(computeDefaultSub([rev('complete'), rev('complete')])).toBe('completed');
+  it('lands on Track when everything is complete', () => {
+    expect(computeDefaultSub([rev('complete'), rev('complete')])).toBe('track');
   });
-  it('shows Invite (not Find) when only review_received remains (track has no open work but rows exist)', () => {
+  it('lands on Track when only review_received remains', () => {
     // review_received is in MODE_STATUSES.track but NOT MODE_WORK_REMAINING.track,
-    // so invite work-remaining is 0; track count > 0 → track.
+    // so track work-remaining is 0; track count > 0 → track.
     expect(computeDefaultSub([rev('review_received')])).toBe('track');
   });
 });
