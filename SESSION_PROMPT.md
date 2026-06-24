@@ -90,8 +90,9 @@ ON, pinned to the branded host. Legacy `wmkfresearch.vercel.app` now 403s writes
 branded host (deprecation tail; don't hard-retire until staff bookmarks + old magic links are accounted
 for). **Correction logged:** the prior "NEXTAUTH_URL is empty in prod" claim was a Sensitive-var `vercel
 env pull` artifact (read back `""`); runtime was always non-empty — trust `/api/health`, not the pull.
-**OPEN:** `NEXTAUTH_URL` was also set in **Preview** to the prod host — that likely breaks preview
-deployments; remove it from Preview (leave host-derived). See `project-branded-domains.md` [verify-removed].
+**Preview:** `NEXTAUTH_URL` had also been set in Preview to the prod host (would break preview
+deployments); REMOVED 2026-06-23 via `vercel env rm NEXTAUTH_URL preview` — now Production-only (verified
+via `vercel env ls`), Preview back to host-derived. See `project-branded-domains.md`.
 
 ### 5. Optional: migrate new reviewer invitations to `reviews.wmkeck.org`
 Low risk (no outstanding reviewer invitations). Remember reviewer links are **latest-link-wins**:

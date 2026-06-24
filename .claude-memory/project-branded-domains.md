@@ -75,8 +75,9 @@ Origin/Referer checks.
   deployments (preview sign-in callback would target the prod host, and preview-URL
   writes 403 on Origin mismatch). Preview previously had no `NEXTAUTH_URL`
   (host-derived, matching the registered `wmkfresearchapps-preview.vercel.app`
-  callback). Recommended fix: REMOVE `NEXTAUTH_URL` from Preview, keep it only in
-  Production. [status: verify-removed]
+  callback). RESOLVED 2026-06-23: `NEXTAUTH_URL` was removed from Preview via
+  `vercel env rm NEXTAUTH_URL preview`; it now scopes to Production only (verified
+  via `vercel env ls`), so Preview is back to host-derived.
 
 **How to apply future host changes:** point DNS at Vercel, attach/alias the host
 to the project, set any matching public base URL as **non-sensitive** so it can
