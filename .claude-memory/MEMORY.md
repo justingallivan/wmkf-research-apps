@@ -17,6 +17,7 @@
 
 ## Always-Read Guardrails
 - Destructive carryover / bulk delete: feedback-verify-before-destructive-carryover.md; feedback-list-and-confirm-before-bulk-deletes.md
+- Additive carryover ("build/migrate/add X" next-step or TODO) — verify it's not already done/blocked before surfacing or acting: feedback-verify-additive-carryover-not-just-destructive.md
 - Red CI gate or failing startup gate: feedback-red-gates-are-p0.md
 - Full `npm test` shows red (confirm it's ONLY the known bill.com expected-red set before chasing): project-bill-com-integration-tests-known-red.md
 - Scope/count/quantity claim: feedback-falsify-not-confirm.md
