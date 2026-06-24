@@ -129,18 +129,17 @@ function buildRenderer() {
 }
 
 function getDOMPurify() {
-  // Browser path uses window.document directly. Node path constructs a
-  // jsdom window using a webpack-static-analysis-defeating require so
-  // jsdom doesn't get pulled into the client bundle even though this
-  // module is reachable from a React component. Same pattern as
-  // shared/utils/policy-markdown.js.
-  if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
-    return installHooks(createDOMPurify(window));
+  // Browser-only. This module's sole consumer (Phase2QAModal) renders strictly
+  // client-side, so there is no server code path here. We deliberately do NOT
+  // ship a Node/jsdom fallback: jsdom can't load in the Vercel/Turbopack
+  // serverless runtime (ESM-only transitive deps — see
+  // shared/utils/policy-markdown-server.js), so a server caller must use a
+  // DOM-free sanitizer instead of silently waking a broken jsdom branch. Fail
+  // loud rather than mislead. Mirrors policy-markdown-client.js.
+  if (typeof window === 'undefined' || typeof window.document === 'undefined') {
+    throw new Error('renderAppMarkdown requires a browser window (client-only)');
   }
-  const nodeRequire = eval('require');
-  const { JSDOM } = nodeRequire('jsdom');
-  const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
-  return installHooks(createDOMPurify(dom.window));
+  return installHooks(createDOMPurify(window));
 }
 
 /**
