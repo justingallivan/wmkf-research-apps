@@ -36,6 +36,17 @@ If there are uncommitted changes:
    - Potential next steps for the next session
    - Any relevant context or gotchas for continuity
 
+   **Verify every "next step" against ground truth before writing it as actionable.**
+   Each next-step is a carryover *claim*, not a confirmed worklist — the same skepticism
+   `/start` Step 5 applies to destructive carryover (drop/remove/retire) extends to
+   additive "do X" items. Before listing an item as open, check it against memory
+   (`.claude-memory/`), source/Atlas, or a probe: if it's already shipped, owner-blocked,
+   or parked, mark it **DONE / blocked / parked** with the evidence — do NOT carry a stale
+   todo forward as if it's live. (S282: "#4 migrate reviewer invitations to reviews.wmkeck.org"
+   rode forward as an open task for a session though `project-branded-domains.md` already
+   recorded it live — a phantom todo that cost a verification round-trip.) Carrying a
+   verified-stale next-step forward is the additive twin of the destructive-carryover trap.
+
 3. **Update CLAUDE.md** if needed - Only update if:
    - New apps or features were added
    - API endpoints changed
