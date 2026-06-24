@@ -596,12 +596,17 @@ fetchCoPIs, role=Co-PI 100000001]`
   call as the website builder** — he owns how images get published. Left open pending his approach; no
   build this session.
 - Chunk 6: reminder cadence/deadline + exact waiver/T&C wording.
-  - **Invitation email default — LANDED (S271).** `AwardeeTab` `DEFAULT_SUBJECT`/`DEFAULT_BODY` now carry
+  - **Invitation email default — LANDED (S271).** the grantee-invite default copy (admin-editable settings
+    store, seeded from `lib/seed/email-defaults/grantee-invite.js`, fetched via
+    `/api/email-defaults/grantee-invite`; a PD may override with a saved custom body) carries
     the owner-approved Program-Director-voice template (congrats → "post an abstract … entitled '[title]'"
     → review-by-COB-[date] with implied concurrence → encourage image via the link → acknowledge-support
-    reminder → PD signature). Bracketed fields ([Name], [title], COB [date], PD name/title) are staff-filled;
-    auto-filling them (PI name, award title, computed deadline, PD signature) is the pending enhancement,
-    gated on the open cadence/signature decisions. Voice + structure: `project-grantee-deliverable-email-voice`.
+    reminder → PD signature). Auto-fill SHIPPED (not pending): `fillInviteBody`
+    (`shared/config/granteeInviteEmail.js`, wired at `AwardeeTab.js:209`) fills `[Name]` (PI surname),
+    `[title]` (award title), and `COB [date]` (computed today+14) into the body; the PD signature is
+    appended server-side (`resolveSignatureForRequest` + `appendSignatureBlock`), never a body
+    placeholder. Full design + hazards: `docs/GRANTEE_INVITE_BODY_CUSTOM_PLAN.md`. Only the
+    cadence/signature-policy decisions below remain open. Voice + structure: `project-grantee-deliverable-email-voice`.
   - **Still open:** reminder cadence (count/timing/recipients, auto-cron vs. manual "Send reminder" button)
     and the publish-image **waiver/T&C wording** (owner reviewing a toned-down redline with counsel —
     `~/Downloads/WMKF_Consent_Redline_Handout.pdf`, S271). The reminder send is NOT built pending cadence.
