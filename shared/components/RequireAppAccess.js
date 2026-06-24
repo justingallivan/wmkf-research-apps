@@ -9,7 +9,7 @@ import { useAppAccess } from '../context/AppAccessContext';
 import Link from 'next/link';
 
 export default function RequireAppAccess({ appKey, children }) {
-  const { hasAccess, isLoading } = useAppAccess();
+  const { hasAccess, isLoading, error, refreshAccess } = useAppAccess();
 
   if (isLoading) {
     return (
@@ -17,6 +17,41 @@ export default function RequireAppAccess({ appKey, children }) {
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-gray-200 border-t-gray-600 rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // The access check failed (timeout/network) rather than the user lacking the
+  // grant. Offer a Retry instead of a dead spinner or a misleading
+  // "Access Not Available". (Self-heal also re-attempts on tab focus.)
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full mx-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              Couldn’t verify access
+            </h1>
+            <p className="text-gray-600 mb-6">
+              We couldn’t reach the access service. Check your connection and try again.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => refreshAccess()}
+                className="inline-flex items-center justify-center px-6 py-3 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-lg transition-colors"
+              >
+                Retry
+              </button>
+              <Link
+                href="/"
+                className="inline-flex items-center justify-center px-6 py-3 bg-white hover:bg-gray-50 text-gray-900 font-semibold rounded-lg border border-gray-300 transition-colors"
+              >
+                Return Home
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     );
