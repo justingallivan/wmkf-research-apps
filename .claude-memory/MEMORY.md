@@ -41,6 +41,7 @@
 - Reviewer-finder utility vs precision (before another identity/namesake/affiliation fix): feedback-prioritize-contact-recall-over-identity-precision.md
 - Manual affiliation edit on reviewer card → do NOT add COI re-check (owner decision): feedback-manual-affiliation-edit-no-coi-recheck.md
 - Thoroughness / completion posture: feedback-thoroughness-default.md; feedback-drive-to-completion.md; feedback-truncation-is-breakage-not-completion.md
+- Cost tradeoff (prevention vs. fix-later; overhead on start/stop/commit is wanted if it prevents errors): feedback-first-time-correctness-over-rework.md
 - Bug found in review: feedback-real-fix-not-design-note.md
 - Before declaring done / committing / delegating a review (verify+fan-out+trust-boundary+concurrency + lifecycle + provenance self-pass; don't deflect a behavioral fix into project code): feedback-self-review-before-delegating-review.md
 - Declaring tests "green" / safe to commit (run FULL npm test, not a subset/gates): feedback-green-requires-full-test-suite.md
