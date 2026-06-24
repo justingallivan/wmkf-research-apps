@@ -41,12 +41,6 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  // jsdom is loaded server-side via eval('require') in shared/utils/policy-markdown.js
-  // (DOMPurify needs a DOM in Node). The eval keeps jsdom out of the CLIENT bundle,
-  // but it also hides jsdom from the build tracer, so it was never copied into the
-  // serverless function — POST /api/admin/policies threw MODULE_NOT_FOUND in prod.
-  // Listing it here forces jsdom (and its transitive deps) into the server runtime.
-  serverExternalPackages: ['jsdom'],
   async redirects() {
     return [
       {

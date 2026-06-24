@@ -30,17 +30,6 @@
  * head of docs/atlas/dataverse-wmkf-policy-and-policy-version.md.
  */
 
-// Force the build tracer (nft) to copy jsdom into THIS serverless function.
-// validatePolicyMarkdown() below acquires jsdom at runtime via eval('require')
-// in shared/utils/policy-markdown.js — that indirection keeps jsdom out of the
-// client bundle, but it also hides jsdom from the tracer, so the prod lambda
-// shipped without it and POST /api/admin/policies threw MODULE_NOT_FOUND.
-// This file is an API route (server-only, never client-bundled), so a literal
-// reference here is safe and gives nft a real edge to follow. Paired with
-// serverExternalPackages:['jsdom'] (next.config.js), which keeps jsdom an
-// external runtime require rather than attempting to bundle it.
-import 'jsdom';
-
 import { randomUUID } from 'crypto';
 import { sql } from '@vercel/postgres';
 import { requireSuperuser } from '../../../lib/utils/auth';
