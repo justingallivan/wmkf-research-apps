@@ -29,6 +29,8 @@ jobs:
       - run: npm run check:memory-router:self-test
       - run: npm run check:doc-symbol-refs
       - run: npm run check:doc-symbol-refs:self-test
+      - run: npm run check:build-claim-freshness
+      - run: npm run check:build-claim-freshness:self-test
       - run: npm run check:model-override-warming
       - run: npm run check:model-override-warming:self-test
       # Build re-runs prebuild (build-migrations-manifest); then assert the

@@ -49,8 +49,17 @@ Live `.claude-memory/**` + `docs/agent-wiki/**` docs must not reference repo fil
 
 - Detects repo-root paths shaped `<prefix>/<...>.<ext>` or `./<prefix>/<...>.<ext>`, where prefix is one of `lib`, `pages`, `shared`, `scripts`, `modules`, `tests`, or `docs`, and extension is one of `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`, `.sql`, `.json`, `.md`, or `.sh`. A trailing `:line` is ignored; globs/brace patterns (`*`, `{`) and `...`/`../` segments never match; Next.js `[token]` segments are literal and ARE checked; a `(?<![\w./-])` lookbehind excludes URLs and relative sub-paths.
 - Does not protect extensionless directory refs such as `pages/admin/`, `.github/**`, repo-root files such as `package.json`, `.yaml`/`.yml`/`.mdx` files, or paths split across lines. Add a detector and binding self-test before treating any of those shapes as covered.
-- Exemption: a removal/planned/historical keyword near the missing ref on the same line (removed · renamed · retired · superseded · abandoned · unused · historical · unbuilt · "name it" · "to live at" · planned · `~~strike~~`), a line-wide `<!-- doc-symbol-refs:ignore [reason=…] -->` marker, or a point-in-time / allowlisted file.
+- Exemption: a removal/planned/historical keyword near the missing ref on the same line (removed · renamed · retired · superseded · abandoned · unused · historical · unbuilt · "name it" · "to live at" · planned · `~~strike~~`), a line-wide `<!-- doc-symbol-refs:ignore [reason=…] -->` marker, a **`.gitignored` path** (a generated/output artifact is never committed, so it legitimately won't exist in a clean checkout — `git check-ignore` matches it even when absent; fails closed on git error), or a point-in-time / allowlisted file.
 - A new dangling path without one of those signals is a stale claim — fix the path to the current location; don't blanket-exempt.
+
+### `check:build-claim-freshness` — stale "planned/not-built" claims whose path now exists (S282)
+
+The exact COMPLEMENT of `check:doc-symbol-refs`: a live `.claude-memory/**` + `docs/agent-wiki/**` line that describes a repo path as **planned / not built yet**, where that path **now EXISTS**, is a stale build claim — the work shipped and the prose lagged. Like its sibling, the breaking change is usually a CODE commit (a planned file gets created), so the **primary trigger is CI-on-push**; `/start` is a backstop. Origin: the 2026-06-23 audit's second-largest stale class ("design-only / not built / future TODO" notes for work that had since shipped, e.g. `project-awardee-onboarding` vs. the live `AwardeeTab.js` + grantee-deliverables routes).
+
+- The two gates close the lifecycle of a planned-path reference: planned + absent = fine; planned + present = **this gate** (flip the claim); no-keyword + absent = `doc-symbol-refs` (dangling); no-keyword + present = a normal live reference.
+- PRECISION over recall (a noisy gate gets ignored). The pending keyword must be the **direct construction on the path**, not merely nearby: a verb phrase immediately before it (`to live at` · `will/would live` · `to be built/created/…` · `name it` · `recreate` · `scaffold` · `new file/helper/… at` · `planned:`) or a tag immediately after it (`` `PATH` (planned) `` · `(not built)` · `(unbuilt)` · `(design-only)` · `(stub)` · `(TODO)`). Anchoring kills the false-positive classes a proximity window hits: bare "planned" topic labels, design-doc references near a path, and multi-path lines where the keyword governs a DIFFERENT path. Bare "future"/"not yet"/standalone "planned" are intentionally NOT triggers.
+- Exemption: a completion marker anywhere on the line (`now built/exists/lives/…` · `is/are built` · `already exists` · `built/lives/shipped at` · `shipped` · `landed` · `implemented` · `in place` · `VERIFIED` · ✅), a `<!-- build-claim-freshness:ignore [reason=…] -->` marker, a `.gitignored` path (presence non-deterministic across checkouts), or a point-in-time / allowlisted file.
+- Recall is limited to claims that NAME a path (same as `doc-symbol-refs`); prose-only "not built" notes with no path are out of scope.
 
 ### `check:drain-table-mentions` — stale "data lives in PG" claims (S167)
 
@@ -139,7 +148,8 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:fact-consistency` | `check:fact-consistency:self-test` — exercises every `CANONICAL_FACTS` entry (known-miss positives + negation + structured-exemption fixtures + independent derive cross-check). |
 | `check:drain-table-mentions` | `check:drain-table-mentions-self-test` |
 | `check:prompt-storage-mentions` | `check:prompt-storage-mentions-self-test` |
-| `check:doc-symbol-refs` | `check:doc-symbol-refs:self-test` — positive (dangling), negative (existing/annotated/marker/glob/ellipsis/relative/URL), and live-baseline-clean fixtures. |
+| `check:doc-symbol-refs` | `check:doc-symbol-refs:self-test` — positive (dangling), negative (existing/annotated/marker/glob/ellipsis/relative/URL/gitignored), and live-baseline-clean fixtures. |
+| `check:build-claim-freshness` | `check:build-claim-freshness:self-test` — positive (pending construction on an existing path: before/after/colon/to-be-created), negative (pending on absent path, plain ref, done-marker, "now lives at", bare-planned label, multi-path, ignore-marker, gitignored), and live-baseline-clean fixtures. |
 | `check:canonical-pointers` | `check:canonical-pointers-self-test` |
 | `check:agent-wiki` | `check:agent-wiki:self-test` |
 | `check:status-enum-parity` | `check:status-enum-parity:self-test` |
@@ -165,4 +175,5 @@ Several self-tests write synthetic fixtures into paths that the main gate also s
 - `check:drain-table-mentions` then `check:drain-table-mentions-self-test` (same hazard)
 - `check:prompt-storage-mentions` then `check:prompt-storage-mentions-self-test` (same hazard)
 - `check:doc-symbol-refs` then `check:doc-symbol-refs:self-test` (self-test writes fixtures into `docs/agent-wiki/`, which the gate scans)
+- `check:build-claim-freshness` then `check:build-claim-freshness:self-test` (self-test writes fixtures into `docs/agent-wiki/`, which the gate scans)
 - `check:agent-wiki` then `check:agent-wiki:self-test`
