@@ -1,9 +1,10 @@
 ---
 name: project-jsdom-serverless-esm-incompat
-description: "jsdom can't load in the Vercel/Turbopack serverless runtime (ESM-require); split client/server + use a DOM-free sanitizer. Two sibling files still latent-broken."
+description: "jsdom can't load in the Vercel/Turbopack serverless runtime (ESM-require); for server-side HTML sanitization use a DOM-free sanitizer (sanitize-html), never DOMPurify+jsdom. All 3 markdown utils fixed S284."
 metadata: 
   node_type: memory
   type: project
+  status: active
   originSessionId: 51fa87ad-4c64-4fca-9f37-7ee9dd40ea02
 ---
 

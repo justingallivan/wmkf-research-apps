@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer acknowledgement policies live; jsdom purged from serverless (Session 284)
+
+**Milestone:** Reviewer Confidentiality + Responsible-Use-of-AI acknowledgements went live (Stage 2a accept now requires both), and a latent prod-breaking jsdom/serverless incompatibility was fixed across all three markdown renderers.
+
+**Sessions:** 284. Owner published the two policy versions; Claude fixed rendering + the jsdom bug (policy split delegated to Codex).
+
+**Ship state:**
+- Published versioned policies `reviewer-coi` ("Confidentiality Terms") + `reviewer-ai-use` ("Responsible Use of AI"), label `2026-06-24`. Rename is title-only; slot codes unchanged. Reviewer ack modal now renders markdown (`@tailwindcss/typography` enabled — `prose` had been a no-op everywhere).
+- **Incident:** `POST /api/admin/policies` 500'd in prod — server DOMPurify loads jsdom via `eval('require')`, but jsdom's ESM-only deps can't be `require()`'d in the Vercel/Turbopack function runtime. Fix: stop externalizing a DOM lib; use a DOM-free sanitizer.
+- `policy-markdown` split into `-client` (DOMPurify) / `-server` (`sanitize-html`); `grantee-markdown` (4 live routes) converted to `sanitize-html`; `app-markdown` made client-only. No `eval('require')('jsdom')` remains in `shared/utils`. Publish confirmed working in prod.
+
+**Why it matters:** reviewers now attest confidentiality + AI-use before accepting; and the whole class of "jsdom server-side" bugs (grantee deliverable routes were next to break) is closed — sanitize-html is the standing rule for server-side HTML sanitization.
+
+**Pointers:** `SESSION_PROMPT.md` (S285), `.claude-memory/project-jsdom-serverless-esm-incompat.md`. Commits `98bf2ce1`, `e597747e`, `77a003fb`, `d76af6ea`.
+
 ## June 2026 — Staff auth cut over to applications.wmkeck.org (Session 281)
 
 **Milestone:** The staff-auth migration held at S280 completed — staff OAuth + the `lib/utils/auth.js` Origin/Referer CSRF check now run on the WMKF-branded `applications.wmkeck.org`, verified end-to-end. Completes the branded-domain trio (reviews./grantees./applications.).
