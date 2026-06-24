@@ -35,6 +35,7 @@
 - Checking a Vercel deploy after push (use `vercel inspect`, don't poll-grep `vercel ls` for the hash): feedback-deployment-monitoring-use-inspect.md
 - Verifying a Vercel env var VALUE via pull (Sensitive vars read back EMPTY — can't be verified; recreate non-sensitive): reference-vercel-sensitive-env-unreadable.md
 - Branded domains / portal base URLs / wmkeck.org vs vercel.app / *_PORTAL_BASE_URL / NEXTAUTH_URL (staff auth cut over to applications.wmkeck.org 2026-06-23; verify via /api/health, NOT env pull): project-branded-domains.md
+- jsdom / DOMPurify / markdown sanitization on a server route (jsdom won't load in Vercel/Turbopack serverless — ESM-require; split client/server + DOM-free sanitizer; grantee/app-markdown still latent): project-jsdom-serverless-esm-incompat.md
 
 ## Working Norms
 - Before ANY commit / checkout / branch-assuming action (shared working dir drifts when the concurrent Codex-app session checks out branches; Justin chose self-policing over worktrees): feedback-verify-branch-before-git-action.md

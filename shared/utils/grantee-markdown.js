@@ -10,11 +10,14 @@
  * pandoc convention — `^text^` (superscript) and `~text~` (subscript), e.g.
  * `H~2~O`, `x^2^`. Nothing else is honored.
  *
- * Safety contract (mirrors shared/utils/policy-markdown.js):
+ * Safety contract (mirrors shared/utils/policy-markdown-server.js):
  *   - Storage is plain UTF-8 markdown in the Dataverse memo (NO RichText flip).
  *   - Rendered HTML is produced by `marked` (a private Marked instance so the
  *     sub/sup extensions never leak into the global `marked` that policy-markdown
- *     uses), then sanitized by DOMPurify to a tight allowlist.
+ *     uses), then sanitized by `sanitize-html` to a tight allowlist. This module
+ *     is server-only (all consumers are lib/services/*), so it deliberately uses
+ *     a DOM-free sanitizer rather than DOMPurify+jsdom — jsdom can't load in the
+ *     Vercel/Turbopack serverless runtime (ESM-require). See policy-markdown-server.js.
  *   - Body allowlist:    p, br, strong, em, sub, sup
  *   - Caption allowlist:    strong, em, sub, sup, br   (inline; no <p>)
  *   - No attributes, no links, no raw HTML pass-through. Anything else is
@@ -27,11 +30,10 @@
  */
 
 const { Marked } = require('marked');
-const createDOMPurify = require('dompurify');
+const sanitizeHtml = require('sanitize-html');
 
 const BODY_TAGS = ['p', 'br', 'strong', 'em', 'sub', 'sup'];
 const CAPTION_TAGS = ['strong', 'em', 'sub', 'sup', 'br'];
-const NO_ATTR = [];
 const ESCAPE_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
 function escapeHtml(value) {
@@ -84,28 +86,15 @@ function getMarked() {
   return _marked;
 }
 
-// DOMPurify works in the browser (window) and on Node (jsdom). The eval('require')
-// keeps jsdom out of the client bundle even though this module is importable from
-// React. Same trick as policy-markdown.js.
-let _purifier = null;
-function purifier() {
-  if (_purifier) return _purifier;
-  if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
-    _purifier = createDOMPurify(window);
-  } else {
-    const nodeRequire = eval('require');
-    const { JSDOM } = nodeRequire('jsdom');
-    _purifier = createDOMPurify(new JSDOM('<!DOCTYPE html><html><body></body></html>').window);
-  }
-  return _purifier;
-}
-
+// DOM-free sanitization via `sanitize-html`. disallowedTagsMode 'discard' drops
+// any tag outside the allowlist while keeping its text content (the old DOMPurify
+// KEEP_CONTENT behavior), and an empty allowedAttributes map strips every
+// attribute (the old NO_ATTR allowlist).
 function sanitize(rawHtml, tags) {
-  return purifier().sanitize(rawHtml, {
-    ALLOWED_TAGS: tags,
-    ALLOWED_ATTR: NO_ATTR,
-    KEEP_CONTENT: true,
-    RETURN_TRUSTED_TYPE: false,
+  return sanitizeHtml(rawHtml, {
+    allowedTags: tags,
+    allowedAttributes: {},
+    disallowedTagsMode: 'discard',
   });
 }
 
