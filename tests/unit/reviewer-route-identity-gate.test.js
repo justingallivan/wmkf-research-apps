@@ -195,6 +195,15 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(payload.emailSource).toBe('manual');
   });
 
+  test('PD override: emailSource is FORCED manual server-side (forged source ignored)', async () => {
+    const res = mockRes();
+    // A forged/stale payload claims a high-confidence source — must be overridden.
+    await handler(pdConfirmedReq({ emailSource: 'orcid' }), res);
+    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
+    expect(payload.email).toBe('correct@uni.edu');
+    expect(payload.emailSource).toBe('manual');
+  });
+
   test('PD override: auto-fetched ORCID / Scholar / metrics are NULLED (never blessed)', async () => {
     const res = mockRes();
     await handler(pdConfirmedReq(), res);

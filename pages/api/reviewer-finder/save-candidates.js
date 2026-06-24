@@ -181,8 +181,12 @@ export default async function handler(req, res) {
         // Codex HIGH: an unresolved cited/PI-named row saves as a name row only — force ALL
         // contact + identity-derived fields to null (it could be a namesake of the named person).
         const contactBlocked = !pdConfirmed && contactBlockedForUnresolvedExempt(candidate, enrichment);
-        const candidateEmailSource = candidate.emailSource || enrichment.emailSource || null;
-        const candidateWebsiteSource = candidate.websiteSource || enrichment.websiteSource || null;
+        // PD-confirmed contact is hand-entered by definition — FORCE source 'manual'
+        // server-side rather than trusting the client's `emailSource`. Otherwise a
+        // forged/stale payload could send emailSource:'orcid' (or another high-confidence
+        // source) and mark this email trusted, skipping confirm-before-invite at send.
+        const candidateEmailSource = pdConfirmed ? 'manual' : (candidate.emailSource || enrichment.emailSource || null);
+        const candidateWebsiteSource = pdConfirmed ? 'manual' : (candidate.websiteSource || enrichment.websiteSource || null);
         // PD-confirmed: persist the hand-typed contact directly (it's stamped 'manual'
         // client-side → confirm-before-invite still fires at send). Otherwise the normal
         // resolver-derived persist gates apply.

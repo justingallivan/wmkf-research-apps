@@ -27,6 +27,7 @@ const {
   upsert,
   updateLifecycle,
   ensureApplicantRecommended,
+  restore,
   APPLICANT_DISPOSITION_EXCLUDED,
   APPLICANT_DISPOSITION_MAP,
 } = suggestionAdapter;
@@ -77,6 +78,29 @@ describe('disposition optionset + helpers', () => {
     expect(isExcluded({ wmkf_applicantdisposition: null })).toBe(false);
     expect(isExcluded({})).toBe(false);
     expect(isExcluded(null)).toBe(false);
+  });
+});
+
+describe('restore scope guard (Codex S285 review High)', () => {
+  test('re-selects a genuinely removed row (selected=false, disposition=null)', async () => {
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_selected: false, wmkf_applicantdisposition: null });
+    await restore(SUGGESTION_ID, { actingUserSystemId: 'SYS-1' });
+    // updateLifecycle re-reads then PATCHes wmkf_selected:true.
+    const patched = DynamicsService.updateRecord.mock.calls.find((c) => c[2] && 'wmkf_selected' in c[2]);
+    expect(patched).toBeTruthy();
+    expect(patched[2].wmkf_selected).toBe(true);
+  });
+
+  test('refuses to restore an applicant-recommended row (must use promotion path)', async () => {
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_selected: false, wmkf_applicantdisposition: APPLICANT_DISPOSITION_MAP.recommended });
+    await expect(restore(SUGGESTION_ID, { actingUserSystemId: 'SYS-1' })).rejects.toThrow(/non-removed|promotion/i);
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('no-op (no PATCH) when the row is already selected', async () => {
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_selected: true, wmkf_applicantdisposition: null });
+    await restore(SUGGESTION_ID, { actingUserSystemId: 'SYS-1' });
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
 });
 
