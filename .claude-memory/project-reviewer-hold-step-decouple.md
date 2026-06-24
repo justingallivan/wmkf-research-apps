@@ -55,7 +55,7 @@ state and revokes the token; preserve that clear-accepted-state path if removal 
 [VERIFIED 2026-06-23 — `pages/api/reviewer-finder/my-candidates.js`, `lib/dataverse/adapters/reviewer-suggestion.js`]
 
 **Templates / hold path — RETIRED (S279, commit `a8676af1`).** The `hold` + `finalize` EMAIL
-templates + their send-path branches, `HoldView`, `lib/external/proposal-readiness.js`, the
+templates + their send-path branches, `HoldView`, `lib/external/proposal-readiness.js`, the <!-- doc-symbol-refs:ignore reason=retired-s279 -->
 `respond.js` hold action, and the readiness-gated dispatch were all REMOVED. Template set is now
 `invitation` + `materials` + `followup` + `thankyou`. The `held` responsetype value (100000004) and
 the `wmkf_heldat` column are KEPT for read-safety; a historical `held` row routes to the accept form

@@ -99,6 +99,8 @@ npm run check:fact-consistency && npm run check:fact-consistency:self-test     #
 npm run check:canonical-pointers && npm run check:canonical-pointers:self-test # anchor rot in CANONICAL_COUNTS pointers
 npm run check:drain-table-mentions && npm run check:drain-table-mentions:self-test       # stale "lives in PG" claims for drain tables
 npm run check:prompt-storage-mentions && npm run check:prompt-storage-mentions:self-test # stale wmkf_prompt_template refs (was red & unnoticed ~1 session)
+npm run check:doc-symbol-refs && npm run check:doc-symbol-refs:self-test           # dangling repo path refs in memory/wiki (renamed/removed code, docs lag); primary trigger is CI-on-push
+
 npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging:self-test # A7 prompt-injection surface markers
 npm run check:memory-router && npm run check:memory-router:self-test           # MEMORY.md router shape + valid statuses/links
 npm run check:model-override-warming && npm run check:model-override-warming:self-test # API routes that resolve an LLM model must call loadModelOverrides() first

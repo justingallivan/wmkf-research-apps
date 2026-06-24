@@ -49,6 +49,8 @@
     "check:drain-table-mentions:self-test": "node scripts/check-drain-table-mentions-self-test.js",
     "check:prompt-storage-mentions": "node scripts/check-prompt-storage-mentions.js",
     "check:prompt-storage-mentions:self-test": "node scripts/check-prompt-storage-mentions-self-test.js",
+    "check:doc-symbol-refs": "node scripts/check-doc-symbol-refs.js",
+    "check:doc-symbol-refs:self-test": "node scripts/check-doc-symbol-refs-self-test.js",
     "check:prompt-injection-tagging": "node scripts/check-prompt-injection-tagging.js",
     "check:prompt-injection-tagging:self-test": "node scripts/check-prompt-injection-tagging-self-test.js",
     "check:memory-router": "node scripts/check-memory-router.js",

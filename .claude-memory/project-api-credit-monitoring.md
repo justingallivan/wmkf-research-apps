@@ -48,7 +48,7 @@ User ran out of Anthropic API credits during a batch expertise matching run (Apr
 
 **Local code removed (S181):**
 - `checkLowBalance()` function and the anchor-based estimator.
-- `scripts/update-balance-anchor.sh`.
+- `scripts/update-balance-anchor.sh`. <!-- doc-symbol-refs:ignore reason=removed-s181 -->
 - Env vars `ANTHROPIC_BALANCE_ANCHOR_CENTS`, `ANTHROPIC_BALANCE_ANCHOR_DATE`, `LOW_BALANCE_ALERT_CENTS`. Also `SPEND_ALERT_EMAIL_TO/FROM` + `NOTIFICATION_EMAIL_TO` (removed earlier in S181 when alert recipients moved to the per-category routing config).
 
 ## Accuracy of our local estimate vs Anthropic

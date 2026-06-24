@@ -43,6 +43,14 @@ The live Dataverse prompt-storage entity is `wmkf_ai_prompt` (entity set `wmkf_a
 - Same 7-shape detection + tightened-keyword exemption + constrained file-purpose marker as the drain-table gate (see below).
 - New `wmkf_prompt_template` references without a historical/renamed/superseded annotation signal a ground-truth claim change — confirm with code before adding an exemption.
 
+### `check:doc-symbol-refs` — dangling repo path references in memory/wiki (S281)
+
+Live `.claude-memory/**` + `docs/agent-wiki/**` docs must not reference repo file paths that no longer exist. The failure mode is "rename the code, the doc lags" ([[feedback-rename-code-not-just-docs]]) — and because the breaking change is usually a CODE commit (not a doc edit), the **primary trigger is CI-on-push** (repo-wide); `/start` is a backstop. A doc-scoped pre-commit guard would miss it (the commit that breaks the reference never touches the doc). Origin: the 2026-06-23 memory/wiki audit, where renamed/removed-path drift was the single largest stale class.
+
+- Detects `<prefix>/<…>.<ext>` paths (prefix ∈ `lib`/`pages`/`shared`/`scripts`/`modules`/`tests`/`docs`). A trailing `:line` is ignored; globs/brace patterns (`*`, `{`) and `…`/`../` segments never match; Next.js `[token]` segments are literal and ARE checked; a `(?<![\w./-])` lookbehind excludes URLs and relative sub-paths.
+- Exemption: a same-line removal/planned/historical keyword (removed · renamed · retired · superseded · abandoned · unused · historical · unbuilt · "name it" · "to live at" · planned · `~~strike~~`), a `<!-- doc-symbol-refs:ignore [reason=…] -->` marker, or a point-in-time / allowlisted file.
+- A new dangling path without one of those signals is a stale claim — fix the path to the current location; don't blanket-exempt.
+
 ### `check:drain-table-mentions` — stale "data lives in PG" claims (S167)
 
 Reviewer-domain Postgres tables (`researchers`, `publications`, `researcher_keywords`, `reviewer_suggestions`, `grant_cycles`, `proposal_searches`) are drain-only post-W3-W6 cutover (2026-05-12); live source of truth is Dataverse (`wmkf_potentialreviewer` — which since the S213 collapse carries the bibliometric fields directly; the `wmkf_appresearcher` sidecar was dropped — `wmkf_appreviewersuggestion`, `wmkf_appgrantcycle`).
@@ -130,6 +138,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:fact-consistency` | `check:fact-consistency:self-test` — exercises every `CANONICAL_FACTS` entry (known-miss positives + negation + structured-exemption fixtures + independent derive cross-check). |
 | `check:drain-table-mentions` | `check:drain-table-mentions-self-test` |
 | `check:prompt-storage-mentions` | `check:prompt-storage-mentions-self-test` |
+| `check:doc-symbol-refs` | `check:doc-symbol-refs:self-test` — positive (dangling), negative (existing/annotated/marker/glob/ellipsis/relative/URL), and live-baseline-clean fixtures. |
 | `check:canonical-pointers` | `check:canonical-pointers-self-test` |
 | `check:agent-wiki` | `check:agent-wiki:self-test` |
 | `check:status-enum-parity` | `check:status-enum-parity:self-test` |
@@ -154,4 +163,5 @@ Several self-tests write synthetic fixtures into paths that the main gate also s
 - `check:canonical-pointers` then `check:canonical-pointers:self-test` (same hazard)
 - `check:drain-table-mentions` then `check:drain-table-mentions-self-test` (same hazard)
 - `check:prompt-storage-mentions` then `check:prompt-storage-mentions-self-test` (same hazard)
+- `check:doc-symbol-refs` then `check:doc-symbol-refs:self-test` (self-test writes fixtures into `docs/agent-wiki/`, which the gate scans)
 - `check:agent-wiki` then `check:agent-wiki:self-test`
