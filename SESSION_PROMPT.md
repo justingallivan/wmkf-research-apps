@@ -69,12 +69,15 @@ and the absence of any "Slate held" chip. Apps are invisible to users, so this i
 local dev server (`npm run dev` → localhost:3000, hits live backend; don't click "Send"/"Preview" — those
 fire real emails / mint reviewer tokens).
 
-### 2. Minimal Reviews tab (still an empty placeholder)
-The top-level Workbench **Reviews** tab is a placeholder. A submitted review IS captured (structured
-ratings on the `wmkf_appreviewersuggestion` row + uploaded review file in SharePoint) but nothing reads it
-back — Track only offers a per-reviewer file download, and the ratings render nowhere. Build the read
-surface: per submitted reviewer, decoded ratings (impact/risk/overall) + download links. Panel-prep
-roll-up/export is a deferred add-on.
+### 2. Minimal Reviews tab — BUILT (2026-06-23)
+The Workbench **Reviews** tab now reads back submitted reviews (`shared/components/workbench/ReviewsTab.js`,
+wired in `pages/workbench/[requestId].js`). Per reviewer with a submitted review (`reviewReceivedAt`): decoded
+Q1/Q3/Q10 ratings (via new `labelForReviewRating` in `lib/external/review-form-schema.js`), affiliation,
+received date, and a download link reusing `/api/review-manager/download-review`. Read-only — reuses the
+existing `/api/review-manager/reviewers` GET (which already projects the rating fields); no new API/data
+layer. Tests: `tests/unit/review-rating-decode.test.js`, `tests/unit/reviews-tab.test.js`. **Deferred add-on
+(not built):** panel-prep roll-up / cross-reviewer export. **Not yet visually smoked against live submitted-
+review data** — no cycle currently has accepted reviewers, so prod shows the empty state.
 
 ### 3. Grantee portal rollout polish (Codex thread)
 Staff-facing rollout polish around the grantee portal/workbench flow — remaining copy, PD preview, awardee
