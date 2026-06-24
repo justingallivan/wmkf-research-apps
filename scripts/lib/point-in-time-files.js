@@ -29,9 +29,10 @@
 const POINT_IN_TIME_BASENAMES = new Set([
   'DOC_TRIAGE_2026-05-07.md',
   'RECONCILIATION_REPORT.md',
-  // Memory/wiki staleness audit report (docs/audits/) — quotes current+stale
-  // scalars for comparison, so it must not be scalar-drift-scanned as a live doc.
-  'memory-wiki-audit.md',
+  // Memory/wiki staleness audit report (docs/audits/, dated) — quotes
+  // current+stale scalars for comparison, so it must not be scalar-drift-scanned
+  // as a live doc.
+  'memory-wiki-audit-2026-06-23.md',
 ]);
 
 const POINT_IN_TIME_PREFIXES = [
