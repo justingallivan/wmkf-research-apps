@@ -1,155 +1,131 @@
-# Session 281 Prompt: Reviewers-tab UI smoke + Reviews tab + grantee rollout continuity
+# Session 282 Prompt: Acknowledgement copy + grantee cron + memory-hygiene follow-ons
 
-## Session 280 Summary
+## Session 281 Summary
 
-Two parallel workstreams landed and were reconciled onto `main` (everything merged, pushed, nothing
-parked):
-
-- **Claude:** email-copy standardization across all six workbench emails (now fully live, incl. the prod
-  Dataverse re-baseline) + a Workbench **Reviewers-tab restructure** (5 tabs → 3) with a dead-end prune
-  and proposal auto-attach on Release.
-- **Codex:** branded portal domains + public request-number hardening (deployed to prod).
-
-A mid-session **branch drift** (shared working dir + a concurrent Codex app session checking out
-branches) put Claude's commits on Codex's branch. It was split into clean branches, then **everything
-was merged to `main` (`3b0899ae`), all session/safety branches + 4 stale Codex worktrees were deleted,
-and `main` was pushed** — the repo is now a single `main`. Pushing auto-deploys to prod; harmless because
-the reviewer/workbench apps are invisible to users.
+A long, single-`main` session (no branch drift this time). Five threads landed, all pushed:
 
 ### What Was Completed
 
-**Claude — email standardization (all six emails), now fully live:**
-- Consistent formatting: comma greetings everywhere; the **reviewer-acceptance email brought into PD
-  voice** ("Thank you," + assigned-PD signature, resolved in `respond.js` via `resolveSignatureForRequest`);
-  grantee-reminder paragraph-structured.
-- **Curly typographic quotes `“…”`** around proposal titles everywhere + **curly apostrophes**.
-- Invitation composer: **grammatical co-PI serial list** ("A, B, and C") + **honorific stripping** (plain
-  PI/co-PI names) — new helper `lib/utils/format-name-list.js`.
-- `--force-keys` mode added to `scripts/rebaseline-email-defaults.mjs` (+ pure helper
-  `scripts/lib/parse-force-keys.mjs`) so a formatting-only change can be pushed to prod.
-- **Prod copy propagated:** ran `rebaseline-email-defaults.mjs --force-keys=all --execute` → all 6 email
-  bodies in the Dataverse `wmkf_appsystemsettings` store updated (verified `already-current: 12` on re-run).
+**1. Staff auth CUT OVER to `applications.wmkeck.org` (verified).**
+Azure staff app registration ("WMK: SSO Authentication", client `a652a292-2574-434c-ae6f-aa01f61d82ad`)
+now includes the redirect URI `…/api/auth/callback/azure-ad`, and `NEXTAUTH_URL=https://applications.wmkeck.org`
+is set in Production. VERIFIED via live `/api/health` + an authenticated POST/DELETE write probe on the
+branded host (sign-in + reads + writes all work; Origin CSRF check ON, pinned there). Legacy
+`wmkfresearch.vercel.app` now 403s writes + funnels sign-in over. **Correction:** the prior "NEXTAUTH_URL
+empty in prod" belief was a Sensitive-var `vercel env pull` artifact — runtime was always non-empty; trust
+`/api/health`. Preview `NEXTAUTH_URL` removed (was wrongly set to the prod host). Commits `8776a32c`,
+`bd0f3764`, `3030ecfa`. See `project-branded-domains.md`.
 
-**Claude — Workbench Reviewers-tab restructure (deployed; apps still invisible to users):**
-- **5 sub-tabs → 3: `Find · Invite Reviewers · Track Reviewers`** (Candidates→"Invite Reviewers"; the old
-  Invite + Completed folded into Track). `reviewer-modes.js` collapsed to a single `track` status bucket
-  (no-fallthrough invariant kept; legacy `?sub=invite`/`?sub=completed` deep-links alias to `track`).
-- **Dead-end prune** in Track: `Correct status` correction dropdown (no manual `accepted` — that bypasses
-  portal COI/honorarium capture), "Staff upload (override)" relabel, removed "Commit By Date".
-- **Release proposal auto-attach (Part 4):** the materials send auto-loads the proposal from SharePoint
-  with a "which file?" confirm/override (`ReviewerManagePanel` EmailModal; transient state, never persisted).
-- Retired the stale **`held` work-stage cue** (S279 hold step) from `reviewer-rollup.js` + the "Slate held"
-  chip in `pages/workbench.js`; held now folds to `awaiting`.
+**2. Workbench Reviews tab BUILT** (`244073df`). `shared/components/workbench/ReviewsTab.js` reads back
+submitted reviews (decoded Q1/Q3/Q10 ratings via new `labelForReviewRating` in
+`lib/external/review-form-schema.js`, affiliation, received date, file download). Read-only; reuses the
+existing `/api/review-manager/reviewers` GET — no new API/data layer. Tests added. Live-smoked to the empty
+state (no cycle has accepted reviewers yet). Reviewers-tab 5→3 restructure also UI-smoked successfully.
 
-**Codex — branded portal domains + request-number hardening** (deployed; full detail in commits):
-- Reviewer/grantee magic-links use branded hosts (`reviews.wmkeck.org`, `grantees.wmkeck.org`) via
-  `REVIEWER_PORTAL_BASE_URL` / `GRANTEE_PORTAL_BASE_URL` (active in Production).
-- Removed `requestNumber` from the external reviewer/grantee context JSON; added send-time guards that
-  fail before sending if a hydrated outbound subject/body contains the internal request number.
-- Grantee portal copy → "Graphical Abstract Request"; prod-smoked (reviewer + grantee), smoke data cleaned up.
-- Prod deploys: `dpl_8tmRkKX9mhEpL7uU6o1NKKpMQuMb` (hardening), `dpl_7Mvdv1juuDTRSJXeFQaatyqEyE7M` (copy).
+**3. `AppAccessContext` bulletproofed** (`493cfb9a`). A stalled `/api/app-access` could strand every app
+page on a permanent "Loading…". Now: per-attempt timeout + bounded retry + `error` state with a Retry
+affordance + focus/visibility self-heal; fail-closed preserved. Regression test added.
+
+**4. Memory/wiki staleness audit + fixes.** Ran a Codex audit (hardened prompt, after a lite-model run
+produced 244 boilerplate false-positives — deleted). Real run: 26 STALE / 1243 verified / 82 NEEDS-PROBE.
+Codex fixed all 26 (`c1d7cba9`); I spot-verified + a sonnet agent confirmed completeness (0 missed). Audit
+report + prompts committed under `docs/audits/` (dated). Commits `04611a3f`, `d564a3fb`, `33237579`,
+`31e1f6a6`.
+
+**5. NEW gate `check:doc-symbol-refs`** (`d6c7d0a6`, hardened in `4c1314bf`). Hardens against the audit's
+largest stale class: docs referencing renamed/removed code paths. Scans `.claude-memory/**` +
+`docs/agent-wiki/**`, fails on any dangling `<prefix>/<…>.<ext>` path. **Primary trigger is CI-on-push**
+(the breaking change is a code rename, not a doc edit); `/start` is a backstop. Codex-reviewed (caught 2
+real P1s — line-wide exemption masking co-located typos + a self-test gap), Codex-fixed (per-ref windowed
+exemption), I verified. 924 path refs checked, all resolve.
+
+Plus: captured the **first-time-correctness-over-rework** working preference (`5b719c9f`); captured the
+acknowledgement-text TODO (`200ca848`).
 
 ### Commits (this session — all on `main`)
-- `3b0899ae` Merge portal branch into main
-- `f19193d4` / `13757115` / `6574f939` portal domains + grantee copy (Codex)
-- `540868a1` / `8a36517a` memory (verify-branch rule; rename-code + rollout notes)
-- `3af6c4dd` Track Reviewers: proposal auto-attach (Part 4)
-- `79ab2f3e` retire stale `held` work-stage cue
-- `4d45b4c8` Reviewers: 5→3 sub-tab restructure + dead-end prune
-- `bd2b1791` Email defaults: 4 review follow-ups
-- `5b2472d2` / `f2b0fd32` / `d3e15ff3` / `3f700f0b` email standardization (formatting, curly quotes, co-PI/honorifics)
+- `8af0c1cd` past-tense the web-suggestions abandoned build record
+- `4c1314bf` / `d6c7d0a6` check:doc-symbol-refs gate (+ Codex review-fix)
+- `5b719c9f` memory: first-time-correctness-over-rework preference
+- `31e1f6a6` dated memory/wiki audit artifacts
+- `200ca848` TODO: finalize AI + COI acknowledgement text
+- `c1d7cba9` Codex fix of 26 stale memory/wiki claims
+- `d564a3fb` / `04611a3f` Codex audit + fix prompts
+- `33237579` reconcile grantee auto-fill claim + classify audit report point-in-time
+- `244073df` Reviews tab (read-back of submitted reviews)
+- `493cfb9a` bulletproof AppAccessContext
+- `3030ecfa` / `bd0f3764` / `8776a32c` staff-auth cutover to applications.wmkeck.org
 
 ## Potential Next Steps
 
-### TODO — Finalize the AI + COI acknowledgement TEXT (infra already built)
-Owner item (2026-06-23): get the **AI-use** and **COI** reviewer-acknowledgement copy nailed down and
-published. **The plumbing is VERIFIED already built — this is a CONTENT task, not a build:**
-- **Stored in Dataverse:** `wmkf_policies` slots `reviewer-coi` + `reviewer-ai-use` → versioned bodies in
-  `wmkf_policyversions` (`wmkf_policytitle`/`wmkf_policybody`/`wmkf_effectivedate`, active-version pointer +
-  retired statecode). Publish audit trail is Postgres `policy_publish_audit`. Atlas:
-  `docs/atlas/dataverse-wmkf-policy-and-policy-version.md`.
-- **Editable in the admin panel:** `shared/components/admin/PoliciesSection.js` + `pages/api/admin/policies.js`
-  (superuser-gated; versioned publish with ETag optimistic-concurrency, markdown validation, idempotency).
-- **Shown to reviewers:** `lib/external/policy-fetcher.js` → `shared/components/external/PolicyAckModal.js` in
-  the Stage-2a accept view (`Stage2aView.js`); the acknowledgement is required/recorded via
-  `pages/api/external/review/[token]/respond.js`.
-- **Current state:** the active published version of each slot is **placeholder text** (owner-confirmed
-  2026-06-23) — so this is from-scratch authoring of the real COI + AI-use copy, then publish via the admin
-  Policies section. No code needed unless the copy needs a new field.
+### TODO — Finalize the AI + COI acknowledgement TEXT (owner content task)
+Infra is VERIFIED already built (Dataverse `wmkf_policies` slots `reviewer-coi` + `reviewer-ai-use` →
+`wmkf_policyversions`; admin `shared/components/admin/PoliciesSection.js` + `pages/api/admin/policies.js`,
+superuser, versioned publish; shown to reviewers via `lib/external/policy-fetcher.js` → `PolicyAckModal` in
+`Stage2aView.js`). **The published version of each slot is placeholder text** (owner-confirmed) — this is
+from-scratch authoring of the real COI + AI-use copy, then Publish via the admin Policies section (it
+versions, not edit-in-place; bump the version label; body ≥50 chars; markdown sanitized). No code needed.
 
-### 1. Reviewers-tab UI smoke (deployed but never clicked-through)
-The restructure is live but the dev-server smoke was interrupted by the branch drift, so it was never
-visually verified. Smoke the 3 tabs (`Find · Invite Reviewers · Track Reviewers`), legacy `?sub=` aliases,
-the Release → proposal-attach card + "which file?" picker, the `Correct status` dropdown (no Accepted),
-and the absence of any "Slate held" chip. Apps are invisible to users, so this is safe to do on prod or a
-local dev server (`npm run dev` → localhost:3000, hits live backend; don't click "Send"/"Preview" — those
-fire real emails / mint reviewer tokens).
+### 1. Auto-on-award abstract cron (the one unblocked grantee item)
+The grantee portal rollout polish (old #3) is mostly DONE-or-owner-blocked: the bracketed-field auto-fill I
+scoped turned out ALREADY shipped (`fillInviteBody` in `shared/config/granteeInviteEmail.js`), and reminder
+cadence / waiver wording / public image serving are all owner/Connor decisions. The one actionable
+engineering item left: an idempotent `pages/api/cron/*` route that pre-generates abstracts for newly-`Active`
+research awardees (eligibility filter `granteeResearchPrograms.js`). Optional. See `docs/GRANTEE_PORTAL_BUILD_PLAN.md` §"Open (later chunks)".
 
-### 2. Minimal Reviews tab — BUILT (2026-06-23)
-The Workbench **Reviews** tab now reads back submitted reviews (`shared/components/workbench/ReviewsTab.js`,
-wired in `pages/workbench/[requestId].js`). Per reviewer with a submitted review (`reviewReceivedAt`): decoded
-Q1/Q3/Q10 ratings (via new `labelForReviewRating` in `lib/external/review-form-schema.js`), affiliation,
-received date, and a download link reusing `/api/review-manager/download-review`. Read-only — reuses the
-existing `/api/review-manager/reviewers` GET (which already projects the rating fields); no new API/data
-layer. Tests: `tests/unit/review-rating-decode.test.js`, `tests/unit/reviews-tab.test.js`. **Deferred add-on
-(not built):** panel-prep roll-up / cross-reviewer export. **Not yet visually smoked against live submitted-
-review data** — no cycle currently has accepted reviewers, so prod shows the empty state.
+### 2. `check:build-claim-freshness` gate (memory-hygiene follow-on)
+The doc-symbol-refs gate covers the renamed/removed-PATH stale class. The audit's other big class was
+"not built yet / design-only / TODO" notes that shipped and were never flipped. A `build-claim-freshness`
+gate would flag a "not built" assertion in a memory whose cited producer path now EXISTS. Same gate pattern
+(CI-on-push primary). Scoped but unbuilt.
 
-### 3. Grantee portal rollout polish (Codex thread)
-Staff-facing rollout polish around the grantee portal/workbench flow — remaining copy, PD preview, awardee
-workflow ergonomics.
+### 3. Reviews tab — live smoke when real review data exists
+Built + tested, but only smoked to the empty state (no cycle has accepted reviewers). When a reviewer
+actually submits, eyeball the populated rendering (decoded ratings + download link).
 
-### 4. `applications.wmkeck.org` staff auth — CUT OVER + VERIFIED (2026-06-23)
-**Done:** staff auth is live on the branded host. Azure app registration (client
-`a652a292-2574-434c-ae6f-aa01f61d82ad`, "WMK: SSO Authentication") includes the redirect URI
-`https://applications.wmkeck.org/api/auth/callback/azure-ad`, and `NEXTAUTH_URL=https://applications.wmkeck.org`
-is set in Production. VERIFIED via live runtime `/api/health` + an authenticated write probe (POST/DELETE
-200) on the branded host — sign-in + reads + writes all work; the `lib/utils/auth.js` Origin CSRF check is
-ON, pinned to the branded host. Legacy `wmkfresearch.vercel.app` now 403s writes and funnels sign-in to the
-branded host (deprecation tail; don't hard-retire until staff bookmarks + old magic links are accounted
-for). **Correction logged:** the prior "NEXTAUTH_URL is empty in prod" claim was a Sensitive-var `vercel
-env pull` artifact (read back `""`); runtime was always non-empty — trust `/api/health`, not the pull.
-**Preview:** `NEXTAUTH_URL` had also been set in Preview to the prod host (would break preview
-deployments); REMOVED 2026-06-23 via `vercel env rm NEXTAUTH_URL preview` — now Production-only (verified
-via `vercel env ls`), Preview back to host-derived. See `project-branded-domains.md`.
-
-### 5. Optional: migrate new reviewer invitations to `reviews.wmkeck.org`
-Low risk (no outstanding reviewer invitations). Remember reviewer links are **latest-link-wins**:
-re-rendering/re-sending mints a new hash and invalidates older links.
+### 4. Optional: migrate new reviewer invitations to `reviews.wmkeck.org`
+Low risk (no outstanding invitations). Reviewer links are **latest-link-wins** (re-render mints a new hash,
+invalidates older links).
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/utils/format-name-list.js` | co-PI serial-list join + honorific stripping (composer) |
-| `shared/components/reviewers/reviewer-modes.js` | single `track` status bucket + no-fallthrough invariant |
-| `shared/components/reviewers/ReviewersTab.js` | 3 sub-tabs + legacy `?sub=` alias |
-| `shared/components/reviewers/ReviewerManagePanel.js` | Track panel: Release auto-attach, Correct-status, staff-upload |
-| `lib/services/reviewer-rollup.js` | work-remaining stages (`held` retired) |
-| `lib/seed/email-defaults/*` | seed/backup email copy (NOT runtime — live source is Dataverse) |
-| `scripts/rebaseline-email-defaults.mjs` | push seed copy to prod (`--force-keys=all --execute`) |
-| `lib/external/token-lifecycle.js` / `grantee-token-lifecycle.js` | branded reviewer/grantee URL builders |
-| `pages/api/review-manager/send-emails.js` / `…/grantee-deliverables/send-invite.js` | send paths + request-number guard |
-| `pages/api/external/review/[token]/context.js` / `…/grantee/[token]/context.js` | token-auth context, no public `requestNumber` |
-| `docs/CREDENTIALS_RUNBOOK.md` | env contract for `NEXTAUTH_URL`, reviewer/grantee base URLs |
+| `scripts/check-doc-symbol-refs.js` (+ `-self-test`) | NEW gate: dangling repo path refs in memory/wiki (CI-on-push) |
+| `scripts/lib/point-in-time-files.js` | shared point-in-time-doc classifier (audit report basename registered here) |
+| `shared/components/workbench/ReviewsTab.js` | Reviews tab read-back surface |
+| `lib/external/review-form-schema.js` | `labelForReviewRating` decode + the Q1/Q3/Q10 schema |
+| `shared/context/AppAccessContext.js` | hardened access fetch (timeout/retry/error/self-heal) |
+| `shared/components/admin/PoliciesSection.js` / `pages/api/admin/policies.js` | acknowledgement (COI/AI) admin editor |
+| `lib/external/policy-fetcher.js` / `shared/components/external/PolicyAckModal.js` | reviewer-facing acknowledgement display |
+| `docs/audits/memory-wiki-audit-2026-06-23.md` (+ `-PROMPT`, `-fix-PROMPT`) | the audit report + the two Codex prompts |
+| `docs/CREDENTIALS_RUNBOOK.md` | env contract (`NEXTAUTH_URL` now = applications.wmkeck.org) |
 
 ## Gotchas / Continuity
 
-- **Branch discipline (shared working dir):** one git driver at a time; run `git status --short --branch`
-  before every commit/checkout/branch-assuming action — HEAD drifts when a concurrent Codex session checks
-  out branches. See `.claude-memory/feedback-verify-branch-before-git-action.md`.
-- **Email copy live source is Dataverse, not code.** `wmkf_appsystemsettings` / `/admin → Email Defaults`
-  is what's sent; `lib/seed/email-defaults/*` is backup. Prod was re-baselined this session; future seed
-  changes need `rebaseline-email-defaults.mjs --force-keys` to reach prod (and `--force-keys` CLOBBERS
-  admin-panel edits).
-- **`NEXTAUTH_URL` is now `https://applications.wmkeck.org`** (Production; staff auth cut over + verified
-  2026-06-23). The Origin CSRF check is ON and pinned there; old-host writes 403. Don't trust `vercel env
-  pull` for it (Sensitive-var history read back `""` → false "empty" belief); use runtime `/api/health`.
-  See item #4 and `project-branded-domains.md`.
-- **Vercel sensitive env pull:** sensitive values read back empty; the reviewer/grantee base-URL vars are
-  non-sensitive and verifiable.
-- **External request numbers:** visible public copy/JSON must never expose the internal request number.
-- **Latest-link-wins:** reviewer email rendering containing `{{externalLink}}` mints a new link hash and
-  invalidates prior links.
+- **Branch discipline (shared working dir):** one git driver at a time; `git status --short --branch` before
+  any commit/checkout. This session a concurrent Codex run committed to `main` cleanly (different files,
+  explicit-path adds, pull-rebase). See `feedback-verify-branch-before-git-action.md`.
+- **`NEXTAUTH_URL` = `https://applications.wmkeck.org`** (Production, verified). Origin CSRF check ON;
+  old-host writes 403. Don't trust `vercel env pull` for it (Sensitive-var reads back `""`); use `/api/health`.
+- **Working-preference (NEW):** Justin optimizes for first-time correctness over fix-later; upfront overhead
+  on starts/stops/commits (gates, verification) is wanted. Bias toward prevention. `feedback-first-time-correctness-over-rework.md`.
+- **`check:doc-symbol-refs` exists now** — a dangling repo path in `.claude-memory/**` or `docs/agent-wiki/**`
+  fails CI. Fix the path, or annotate with a same-line removal/planned keyword or `<!-- doc-symbol-refs:ignore -->`.
+- **Email copy live source is Dataverse, not code** (`wmkf_appsystemsettings` / `/admin → Email Defaults`);
+  `lib/seed/email-defaults/*` is backup. `rebaseline-email-defaults.mjs --force-keys` CLOBBERS admin edits.
+- **Test data parked:** request **1002788** (D26, GUID `feabe26f-dc1b-f111-8341-000d3a306da2`) was flipped to
+  **Advancing** so Justin can exercise reviewer email flows in the UI (its applicant-recommended reviewers
+  have self-linked emails → invites go to Justin). The applicant-recommended PROMOTE path runs NO Claude
+  verification (only the AI search/discover path does) — so promoting won't be blocked. **Revert to Set-aside
+  when done testing.**
+- **Latest-link-wins:** reviewer email rendering with `{{externalLink}}` mints a new hash, invalidates prior links.
 - **Known-red suites:** `bill.test.js` + `discovery-verification-status.test.js` only — confirm it's just
   those before chasing a "red" run.
+
+## Testing
+
+```bash
+npm test                          # full suite (only the 2 known-red above should fail)
+npm run check:doc-symbol-refs && npm run check:doc-symbol-refs:self-test   # the new gate
+npm run lint
+```
