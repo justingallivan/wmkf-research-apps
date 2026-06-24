@@ -61,6 +61,22 @@ the reviewer/workbench apps are invisible to users.
 
 ## Potential Next Steps
 
+### TODO — Finalize the AI + COI acknowledgement TEXT (infra already built)
+Owner item (2026-06-23): get the **AI-use** and **COI** reviewer-acknowledgement copy nailed down and
+published. **The plumbing is VERIFIED already built — this is a CONTENT task, not a build:**
+- **Stored in Dataverse:** `wmkf_policies` slots `reviewer-coi` + `reviewer-ai-use` → versioned bodies in
+  `wmkf_policyversions` (`wmkf_policytitle`/`wmkf_policybody`/`wmkf_effectivedate`, active-version pointer +
+  retired statecode). Publish audit trail is Postgres `policy_publish_audit`. Atlas:
+  `docs/atlas/dataverse-wmkf-policy-and-policy-version.md`.
+- **Editable in the admin panel:** `shared/components/admin/PoliciesSection.js` + `pages/api/admin/policies.js`
+  (superuser-gated; versioned publish with ETag optimistic-concurrency, markdown validation, idempotency).
+- **Shown to reviewers:** `lib/external/policy-fetcher.js` → `shared/components/external/PolicyAckModal.js` in
+  the Stage-2a accept view (`Stage2aView.js`); the acknowledgement is required/recorded via
+  `pages/api/external/review/[token]/respond.js`.
+- **Current state:** the active published version of each slot is **placeholder text** (owner-confirmed
+  2026-06-23) — so this is from-scratch authoring of the real COI + AI-use copy, then publish via the admin
+  Policies section. No code needed unless the copy needs a new field.
+
 ### 1. Reviewers-tab UI smoke (deployed but never clicked-through)
 The restructure is live but the dev-server smoke was interrupted by the branch drift, so it was never
 visually verified. Smoke the 3 tabs (`Find · Invite Reviewers · Track Reviewers`), legacy `?sub=` aliases,
