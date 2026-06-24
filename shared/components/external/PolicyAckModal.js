@@ -19,6 +19,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { renderPolicyMarkdown } from '../../utils/policy-markdown';
 
 const BOTTOM_THRESHOLD_PX = 24;
 
@@ -131,11 +132,11 @@ export default function PolicyAckModal({
 
         <div
           ref={bodyRef}
-          className="px-6 py-4 overflow-y-auto flex-1 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed"
+          className="px-6 py-4 overflow-y-auto flex-1 text-sm text-gray-800 leading-relaxed prose prose-sm max-w-none"
           tabIndex={0}
-        >
-          {policy.body}
-        </div>
+          dangerouslySetInnerHTML={/* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- renderPolicyMarkdown sanitizes via DOMPurify strict allowlist; server validator rejects raw HTML */ { __html: renderPolicyMarkdown(policy.body || '') }}
+        />
+
 
         <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 px-6 py-4 border-t border-gray-200">
           <p className="text-xs text-gray-500 sm:flex-shrink-0">
