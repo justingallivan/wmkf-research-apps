@@ -10,7 +10,7 @@
  */
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { setMatchReason, ensureStaffManualCandidate, APPLICANT_DISPOSITION_EXCLUDED } from '../../lib/dataverse/adapters/reviewer-suggestion.js';
-import { upsertByPotentialReviewer } from '../../lib/dataverse/adapters/researcher.js';
+import { upsertByPotentialReviewer, updateById as updateResearcherById } from '../../lib/dataverse/adapters/researcher.js';
 import { create as createPotentialReviewer } from '../../lib/dataverse/adapters/potential-reviewer.js';
 
 function err412() { const e = new Error('Precondition Failed'); e.status = 412; return e; }
@@ -185,6 +185,28 @@ describe('researcher.upsertByPotentialReviewer — writes bibliometrics onto the
     const written = update.mock.calls[0][2].wmkf_primaryaffiliation;
     expect(written.length).toBeLessThanOrEqual(500);
     expect(written.endsWith('…')).toBe(true);
+  });
+
+  // wmkf_department has a known 255 cap (schema wave6) — the sibling free-text
+  // column; clamp it too (Codex S285 review Medium) so it can't 400 a later write.
+  test('clamps a >255-char department to its 255 cap', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ wmkf_potentialreviewersid: 'pr-dept' });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    await upsertByPotentialReviewer('pr-dept', { department: 'D'.repeat(400) });
+    const written = update.mock.calls[0][2].wmkf_department;
+    expect(written.length).toBeLessThanOrEqual(255);
+    expect(written.endsWith('…')).toBe(true);
+  });
+
+  // updateById is a distinct write path (the dynamic-map loop), not the fillIfEmpty
+  // path above — cover its clamp too (Codex S285 review Low: coverage breadth).
+  test('updateById clamps affiliation + department on the map-loop path', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ wmkf_potentialreviewersid: 'pr-upd' });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    await updateResearcherById('pr-upd', { affiliation: 'A'.repeat(700), department: 'B'.repeat(300) });
+    const diff = update.mock.calls[0][2];
+    expect(diff.wmkf_primaryaffiliation.length).toBeLessThanOrEqual(500);
+    expect(diff.wmkf_department.length).toBeLessThanOrEqual(255);
   });
 
   test('potential-reviewer.create also clamps wmkf_primaryaffiliation to 500', async () => {
