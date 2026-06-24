@@ -23,6 +23,12 @@ const tempDir = path.join(repoRoot, 'docs', 'agent-wiki', '_doc_symbol_refs_self
 const MISSING = 'lib/services/__doc_symbol_refs_selftest_missing__.js';
 const PRESENT = 'scripts/check-doc-symbol-refs.js';
 
+// A path that doesn't exist on disk but IS gitignored — via a nested .gitignore
+// written into the temp dir below. Has a scanned prefix + checkable ext so the
+// detector picks it up, then the git check-ignore exemption must skip it.
+const GITIGNORED_SUBDIR = 'ignored-artifacts';
+const GITIGNORED_REF = `docs/agent-wiki/_doc_symbol_refs_selftest_tmp/${GITIGNORED_SUBDIR}/out.json`;
+
 function cleanup() {
   if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
 }
@@ -76,12 +82,19 @@ function buildFixtures() {
       body: 'See `../docs/__nope_selftest__.md` for context.', expectFlagged: false },
     { name: 'URL containing a path-like segment is not flagged', file: 'neg_url.md',
       body: `Source: https://github.com/org/repo/blob/main/${MISSING}`, expectFlagged: false },
+    // gitignored generated artifact: absent on disk but matched by the nested
+    // .gitignore written in assertFixtures(). No same-line keyword, so ONLY the
+    // git check-ignore exemption can keep this from being flagged.
+    { name: 'gitignored artifact path is skipped (not flagged)', file: 'neg_gitignored.md',
+      body: `Output artifact: \`${GITIGNORED_REF}\`.`, expectFlagged: false },
   ];
 }
 
 function assertFixtures() {
   cleanup();
   fs.mkdirSync(tempDir, { recursive: true });
+  // Nested .gitignore so GITIGNORED_REF is git-ignored without the file existing.
+  fs.writeFileSync(path.join(tempDir, '.gitignore'), `${GITIGNORED_SUBDIR}/\n`);
   const fixtures = buildFixtures();
   for (const fx of fixtures) fs.writeFileSync(path.join(tempDir, fx.file), fx.body + '\n');
   const { status, output } = runGate();

@@ -38,10 +38,17 @@
  *     planned, "to be created", "to live at", "will live", future, ~~strike~~)
  *   - structured marker: <!-- doc-symbol-refs:ignore [reason=<id>] -->
  *   - point-in-time doc (shared classifier) / archive / allowlist file
+ *   - the path is .gitignored: a generated/output artifact (e.g. a tool's
+ *     `scripts/*.json` dump) is never committed, so it legitimately does NOT
+ *     exist in a clean checkout — locally it might (artifact present on disk),
+ *     in CI it never will. Existence-checking it is meaningless, so a doc that
+ *     correctly names a gitignored artifact must not fail the gate. `git
+ *     check-ignore` matches such paths even when the file is absent.
  */
 
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const { isPointInTimeBasename } = require('./lib/point-in-time-files');
 
 const repoRoot = path.resolve(__dirname, '..');
@@ -159,6 +166,31 @@ function refIsExempt(line, start, end) {
   return SAME_LINE_OK.test(line.slice(windowStart, windowEnd));
 }
 
+// Of the given repo-relative paths, return the subset git considers ignored.
+// `git check-ignore --stdin` matches paths against .gitignore rules WITHOUT
+// requiring the file to exist, so this works in a clean CI checkout where the
+// generated artifact is absent. Exit codes: 0 = some ignored (stdout lists
+// them), 1 = none ignored, 128 = error (not a repo, etc.). On error we return
+// the empty set — i.e. fail CLOSED: a real dangling ref is still reported rather
+// than silently suppressed.
+function gitIgnoredRefs(refs) {
+  const unique = [...new Set(refs)];
+  if (unique.length === 0) return new Set();
+  let out;
+  try {
+    out = execFileSync('git', ['check-ignore', '--stdin'], {
+      cwd: repoRoot,
+      input: unique.join('\n'),
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore'],
+    });
+  } catch (e) {
+    if (e.status === 1) return new Set(); // none ignored — normal, not an error
+    return new Set(); // 128 / other → fail closed (suppress nothing)
+  }
+  return new Set(out.split('\n').map((s) => s.trim()).filter(Boolean));
+}
+
 function assertAllowlistFilesExist() {
   for (const rel of ALLOWLIST_FILES) {
     const full = path.join(repoRoot, rel);
@@ -171,7 +203,7 @@ function assertAllowlistFilesExist() {
 function main() {
   assertAllowlistFilesExist();
   const files = collectFiles();
-  const violations = [];
+  const candidateViolations = [];
   let refsChecked = 0;
 
   for (const file of files) {
@@ -193,10 +225,17 @@ function main() {
         refsChecked += 1;
         if (fs.existsSync(path.join(repoRoot, ref))) continue;
         if (refIsExempt(line, match.start, match.end)) continue;
-        violations.push({ rel, lineNo: i + 1, ref, text: line.trim().slice(0, 180) });
+        candidateViolations.push({ rel, lineNo: i + 1, ref, text: line.trim().slice(0, 180) });
       }
     });
   }
+
+  // A path that doesn't exist on disk but IS gitignored is a generated/output
+  // artifact, not a dangling code reference — it's never in a clean checkout by
+  // design. Drop those before reporting (single batched git call).
+  const ignored = gitIgnoredRefs(candidateViolations.map((v) => v.ref));
+  const violations = candidateViolations.filter((v) => !ignored.has(v.ref));
+  const skippedGitignored = candidateViolations.length - violations.length;
 
   if (violations.length > 0) {
     console.error(
@@ -212,7 +251,8 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`doc-symbol-refs OK — ${files.length} live doc/memory file(s) scanned; ${refsChecked} path reference(s) checked, all resolve.`);
+  const skipNote = skippedGitignored > 0 ? `; ${skippedGitignored} gitignored artifact ref(s) skipped` : '';
+  console.log(`doc-symbol-refs OK — ${files.length} live doc/memory file(s) scanned; ${refsChecked} path reference(s) checked, all resolve${skipNote}.`);
 }
 
 try {

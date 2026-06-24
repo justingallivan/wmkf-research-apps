@@ -466,7 +466,7 @@ test.describe('Program Director reviewer invitation flow', () => {
 
     await page.goto(workbenchUrl(baseURL, 'invite'));
     await expect(page.getByText('Dr. Accepted Reviewer')).toBeVisible();
-    await page.getByRole('button', { name: /release to reviewers \(1\)/i }).click();
+    await page.getByRole('button', { name: /release proposal to reviewers \(1\)/i }).click();
     await expect(page.getByText('Generate Materials Emails')).toBeVisible();
 
     await page.getByRole('button', { name: /preview 1 email/i }).click();
