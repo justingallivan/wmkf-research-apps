@@ -82,9 +82,13 @@ gate would flag a "not built" assertion in a memory whose cited producer path no
 Built + tested, but only smoked to the empty state (no cycle has accepted reviewers). When a reviewer
 actually submits, eyeball the populated rendering (decoded ratings + download link).
 
-### 4. Optional: migrate new reviewer invitations to `reviews.wmkeck.org`
-Low risk (no outstanding invitations). Reviewer links are **latest-link-wins** (re-render mints a new hash,
-invalidates older links).
+### 4. ~~Migrate new reviewer invitations to `reviews.wmkeck.org`~~ — DONE (verified S282)
+Already live. The invitation link's domain has ONE producer: `buildExternalUrl` (`lib/external/token-lifecycle.js:181`)
+→ `getReviewerPortalBaseUrl()` → `REVIEWER_PORTAL_BASE_URL || NEXTAUTH_URL`. `render-emails.js:165` mints links via
+`mintAndStore` → `buildExternalUrl`, and `REVIEWER_PORTAL_BASE_URL` is set in Production (`vercel env ls`; value
+`https://reviews.wmkeck.org` smoke-verified 2026-06-23, see `project-branded-domains.md`). No hardcoded host in any
+reviewer email/link path. So new invitations already mint on `reviews.wmkeck.org`; latest-link-wins replaces any older
+link on re-render. (S282 did NOT re-read the exact prod value — a full env pull was blocked; confirmed var-set + code-uses-it.)
 
 ## Key Files Reference
 
