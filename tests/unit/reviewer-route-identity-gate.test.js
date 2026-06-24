@@ -166,6 +166,74 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
 
+  // ── PD identity override (pdIdentityConfirmed) ──────────────────────────────
+  const pdConfirmedReq = (extra = {}) => ({
+    method: 'POST',
+    body: {
+      requestId: 'REQ-1',
+      candidates: [{
+        name: 'Dr Real Person',
+        pdIdentityConfirmed: true,
+        needsIdentification: true,                 // would normally hard-reject
+        email: 'correct@uni.edu', emailSource: 'manual', emailPersistAllowed: true,
+        website: 'https://correct.uni.edu/faculty', websiteSource: 'manual', websitePersistAllowed: true,
+        affiliation: 'Right University',
+        contactEnrichment: enrichmentFor({ status: 'unresolved' }), // wrong ORCID/metrics present
+        ...extra,
+      }],
+    },
+  });
+
+  test('PD override: unresolved row is SAVED (not hard-rejected) with the manual email', async () => {
+    const res = mockRes();
+    await handler(pdConfirmedReq(), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.savedCount).toBe(1);
+    expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBe('correct@uni.edu');
+    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
+    expect(payload.email).toBe('correct@uni.edu');
+    expect(payload.emailSource).toBe('manual');
+  });
+
+  test('PD override: auto-fetched ORCID / Scholar / metrics are NULLED (never blessed)', async () => {
+    const res = mockRes();
+    await handler(pdConfirmedReq(), res);
+    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
+    expect(payload.orcid).toBeNull();
+    expect(payload.orcidUrl).toBeNull();
+    expect(payload.googleScholarId).toBeNull();
+    expect(payload.googleScholarUrl).toBeNull();
+    expect(payload.hIndex).toBeNull();
+    expect(payload.totalCitations).toBeNull();
+    // The resolver verdict is NOT written as a decision for a manual confirm.
+    expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
+    expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
+  });
+
+  test('PD override: a "[Identity confirmed by PD]" audit note is stamped on the suggestion', async () => {
+    const res = mockRes();
+    await handler(pdConfirmedReq(), res);
+    expect(reviewerSuggestionAdapter.upsert.mock.calls[0][0].matchReason).toMatch(/Identity confirmed by PD/);
+  });
+
+  test('PD override: blanked website does NOT fall back to the wrong enrichment website', async () => {
+    const res = mockRes();
+    // PD corrected the email but cleared the (wrong) website entirely.
+    await handler(pdConfirmedReq({ website: '', websiteSource: 'manual', websitePersistAllowed: false }), res);
+    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
+    expect(payload.website).toBeNull();           // NOT enrichment's https://...mit.edu
+    expect(payload.email).toBe('correct@uni.edu'); // the kept correction still persists
+  });
+
+  test('PD override does NOT waive institution-COI (still hard-rejected)', async () => {
+    const res = mockRes();
+    await handler(pdConfirmedReq({ hasInstitutionCOI: true }), res);
+    expect(res.statusCode).toBe(422);
+    expect(res.body.savedCount).toBe(0);
+    expect(res.body.rejectedInstitutionCOI).toBe(1);
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  });
+
   test('explicit contact persist flags false → confirmed identity still saves no sendable contact fields', async () => {
     const ce = {
       ...enrichmentFor({ status: 'confirmed' }),

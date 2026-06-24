@@ -29,10 +29,13 @@
 
 import { useState, useEffect } from 'react';
 
-export default function CandidateEditModal({ candidate, onClose, onSaved, onApply, nameEditable = true }) {
+export default function CandidateEditModal({ candidate, onClose, onSaved, onApply, onConfirm, confirmMode = false, nameEditable = true }) {
   const [formData, setFormData] = useState({ name: '', affiliation: '', email: '', website: '', hIndex: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
+  // confirmMode only: the PD must tick "I've verified this is the correct person"
+  // before the candidate can be added (the deliberate identity-gate override).
+  const [identityConfirmed, setIdentityConfirmed] = useState(false);
 
   useEffect(() => {
     if (candidate) {
@@ -44,6 +47,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
         hIndex: candidate.hIndex ?? '',
       });
       setError(null);
+      setIdentityConfirmed(false);
     }
   }, [candidate]);
 
@@ -55,6 +59,27 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
     setError(null);
 
     try {
+      // CONFIRM mode (PD identity override): always send email/website/affiliation
+      // as the PD-confirmed contact — even an unchanged field is an explicit "use
+      // this" — so the parent stamps the whole contact manual and promotes the row.
+      if (confirmMode) {
+        if (!identityConfirmed) {
+          setError('Tick the confirmation box to add this reviewer.');
+          return;
+        }
+        if (!formData.email.trim()) {
+          setError('An email is required to add and invite this reviewer.');
+          return;
+        }
+        onConfirm({
+          email: formData.email.trim(),
+          website: formData.website.trim(),
+          affiliation: formData.affiliation.trim(),
+        });
+        onClose();
+        return;
+      }
+
       // Send only changed fields. Name is omitted entirely when not editable
       // (local mode): the Find card is keyed by normalized name, so a rename
       // there would desync selection/dedup.
@@ -106,7 +131,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={onClose}>
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h3 className="font-semibold text-gray-900">Edit candidate</h3>
+          <h3 className="font-semibold text-gray-900">{confirmMode ? 'Confirm reviewer & correct contact' : 'Edit candidate'}</h3>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600" aria-label="Close">✕</button>
         </div>
 
@@ -157,23 +182,45 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">h-index</label>
-            <input
-              type="number"
-              value={formData.hIndex}
-              onChange={(e) => setFormData({ ...formData, hIndex: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              min="0"
-              placeholder="e.g., 25"
-            />
-          </div>
+          {/* h-index is hidden in confirm mode — a PD-confirmed row deliberately
+              carries NO auto-fetched bibliometrics (they may be a namesake's). */}
+          {!confirmMode && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">h-index</label>
+              <input
+                type="number"
+                value={formData.hIndex}
+                onChange={(e) => setFormData({ ...formData, hIndex: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                min="0"
+                placeholder="e.g., 25"
+              />
+            </div>
+          )}
 
-          <p className="text-xs text-gray-500">
-            {onApply
-              ? 'A manually entered email/website is marked unverified — you’ll confirm before any invitation is sent. Saved with this request when you save the candidate.'
-              : 'Changes apply to this researcher across all proposals that reference them.'}
-          </p>
+          {confirmMode && (
+            <label className="flex items-start gap-2 rounded-md bg-amber-50 border border-amber-200 p-3">
+              <input
+                type="checkbox"
+                checked={identityConfirmed}
+                onChange={(e) => setIdentityConfirmed(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600"
+              />
+              <span className="text-xs text-amber-800">
+                I’ve verified this is the correct person. Add them using the contact above — the
+                auto-suggested ORCID / metrics won’t be carried over, and the email is marked
+                unverified so you’ll confirm before any invitation is sent.
+              </span>
+            </label>
+          )}
+
+          {!confirmMode && (
+            <p className="text-xs text-gray-500">
+              {onApply
+                ? 'A manually entered email/website is marked unverified — you’ll confirm before any invitation is sent. Saved with this request when you save the candidate.'
+                : 'Changes apply to this researcher across all proposals that reference them.'}
+            </p>
+          )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -181,8 +228,12 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
               Cancel
             </button>
-            <button type="submit" disabled={isSaving} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
-              {isSaving ? 'Saving…' : 'Save changes'}
+            <button
+              type="submit"
+              disabled={isSaving || (confirmMode && !identityConfirmed)}
+              className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              {confirmMode ? 'Add to candidates' : (isSaving ? 'Saving…' : 'Save changes')}
             </button>
           </div>
         </form>

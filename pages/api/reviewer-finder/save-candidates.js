@@ -124,10 +124,21 @@ export default async function handler(req, res) {
       try {
         const candidate = withReviewerProvenance(rawCandidate);
 
+        // PD identity override (set ONLY by the "✓ This is the right person" confirm
+        // on a needs-identity-review card): an authenticated PD asserts the resolved
+        // person is correct and supplies hand-typed contact. This skips the identity
+        // hard-reject below AND the resolver-derived contact/bibliometric gates further
+        // down — but ONLY persists the PD's manual email/website/affiliation; ORCID /
+        // Scholar / metrics from the (unconfirmed) auto-resolver are force-nulled, never
+        // blessed. Institution-COI is still enforced (identity confirmation ≠ COI waiver).
+        // Read from rawCandidate so withReviewerProvenance can't drop the flag.
+        const pdConfirmed = rawCandidate?.pdIdentityConfirmed === true;
+
         // Slice E hard-reject: never persist a candidate whose identity is unresolved.
         // Skip BEFORE any adapter write (neither person nor suggestion) and record it
         // so a partial batch (mixed resolved/unresolved) still saves the resolved rows.
-        if (isUnresolvedIdentity(candidate)) {
+        // The PD override (above) is the one sanctioned bypass of this gate.
+        if (!pdConfirmed && isUnresolvedIdentity(candidate)) {
           rejectedUnresolved += 1;
           errors.push({
             name: candidate.name,
@@ -169,21 +180,28 @@ export default async function handler(req, res) {
         const enrichment = candidate.contactEnrichment || {};
         // Codex HIGH: an unresolved cited/PI-named row saves as a name row only — force ALL
         // contact + identity-derived fields to null (it could be a namesake of the named person).
-        const contactBlocked = contactBlockedForUnresolvedExempt(candidate, enrichment);
+        const contactBlocked = !pdConfirmed && contactBlockedForUnresolvedExempt(candidate, enrichment);
         const candidateEmailSource = candidate.emailSource || enrichment.emailSource || null;
         const candidateWebsiteSource = candidate.websiteSource || enrichment.websiteSource || null;
-        const emailAllowed = !contactBlocked && contactFieldAllowed(candidate, enrichment, 'emailPersistAllowed', candidateEmailSource);
-        const websiteAllowed = !contactBlocked && contactFieldAllowed(candidate, enrichment, 'websitePersistAllowed', candidateWebsiteSource);
-        const affiliationAllowed = !contactBlocked && contactFieldAllowed(candidate, enrichment, 'affiliationPersistAllowed', null);
-        const candidateEmail = emailAllowed ? (candidate.email || enrichment.email || null) : null;
-        const candidateAffiliation = affiliationAllowed ? (candidate.affiliation || enrichment.affiliation || null) : null;
+        // PD-confirmed: persist the hand-typed contact directly (it's stamped 'manual'
+        // client-side → confirm-before-invite still fires at send). Otherwise the normal
+        // resolver-derived persist gates apply.
+        const emailAllowed = pdConfirmed ? true : (!contactBlocked && contactFieldAllowed(candidate, enrichment, 'emailPersistAllowed', candidateEmailSource));
+        const websiteAllowed = pdConfirmed ? true : (!contactBlocked && contactFieldAllowed(candidate, enrichment, 'websitePersistAllowed', candidateWebsiteSource));
+        const affiliationAllowed = pdConfirmed ? true : (!contactBlocked && contactFieldAllowed(candidate, enrichment, 'affiliationPersistAllowed', null));
+        // PD-confirmed rows source contact ONLY from the PD-typed candidate.* values —
+        // NEVER the enrichment fallback. The enrichment email/website are the very values
+        // the PD is overriding; if the PD blanks one, it must persist as null, not silently
+        // fall back to the wrong auto-suggested value.
+        const candidateEmail = emailAllowed ? (pdConfirmed ? (candidate.email || null) : (candidate.email || enrichment.email || null)) : null;
+        const candidateAffiliation = affiliationAllowed ? (pdConfirmed ? (candidate.affiliation || null) : (candidate.affiliation || enrichment.affiliation || null)) : null;
         // Enrichment stores the ORCID iD as `orcidId` (not `orcid`); read that key
         // so a candidate carrying only contactEnrichment doesn't drop a real ORCID.
         const candidateOrcid = contactBlocked ? null : (candidate.orcid || enrichment.orcidId || null);
         const candidateGoogleScholarId = contactBlocked ? null : (candidate.googleScholarId || enrichment.googleScholarId || null);
-        const rawCandidateWebsite = websiteAllowed ? (candidate.website || enrichment.website || null) : null;
+        const rawCandidateWebsite = websiteAllowed ? (pdConfirmed ? (candidate.website || null) : (candidate.website || enrichment.website || null)) : null;
         const candidateWebsite = ContactParser.sanitizeWebsiteForCandidate(rawCandidateWebsite, candidate.name);
-        const rawCandidateFacultyPageUrl = websiteAllowed ? (candidate.facultyPageUrl || enrichment.facultyPageUrl || null) : null;
+        const rawCandidateFacultyPageUrl = (websiteAllowed && !pdConfirmed) ? (candidate.facultyPageUrl || enrichment.facultyPageUrl || null) : null;
         const candidateFacultyPageUrl = rawCandidateFacultyPageUrl && !ContactParser.isDocumentUrl(rawCandidateFacultyPageUrl) ? rawCandidateFacultyPageUrl : null;
 
         const expertiseForDv = Array.isArray(candidate.expertiseAreas)
@@ -209,6 +227,11 @@ export default async function handler(req, res) {
         // Note: a same-institution row (hasInstitutionCOI) never reaches here — it is
         // hard-rejected above (S240). So no institution-COI annotation is appended.
         let matchReason = candidate.reasoning || candidate.generatedReasoning || '';
+        if (pdConfirmed) {
+          // Audit trail: this row entered the pool on a PD's explicit identity
+          // confirmation, not the auto-resolver. Visible in the candidate's "Why".
+          matchReason += ' [Identity confirmed by PD; contact entered manually]';
+        }
         if (candidate.hasCoauthorCOI) {
           matchReason += candidate.coauthorCOIStrength === 'possible'
             ? ' [Possible coauthor overlap: shared paper(s) with proposal author(s) — may be incidental]'
@@ -231,10 +254,14 @@ export default async function handler(req, res) {
         // safe boolean persist flags so the gate still holds after a reload
         // (Codex post-impl HIGH). `=== false` so they only ever TIGHTEN the gate,
         // never loosen it for fresh (full-object) candidates that lack the flags.
-        const blockByIdentity = (!!identity && !mayPersistIdentity(identity.status))
+        // PD-confirmed rows force ALL resolver-sourced identity fields null: the PD
+        // vouched for WHO the person is + supplied contact, but the auto-fetched ORCID/
+        // Scholar/metrics were never identity-confirmed and may belong to a namesake.
+        const blockByIdentity = pdConfirmed
+          || (!!identity && !mayPersistIdentity(identity.status))
           || candidate.identityPersistAllowed === false
           || contactBlocked; // unresolved cited/PI-named exempt row → null ORCID/Scholar/metrics too
-        const blockScholar = scholarSkipped || blockByIdentity
+        const blockScholar = pdConfirmed || scholarSkipped || blockByIdentity
           || candidate.scholarPersistAllowed === false;
 
         const { id: potentialReviewerId } = await potentialReviewerAdapter.upsertByEmail({
@@ -272,7 +299,11 @@ export default async function handler(req, res) {
         // Persist the resolver decision on the person; on a downgrade, also CLEAR
         // any stale resolver-sourced identity fields (upsert's null is a no-op, so
         // an explicit null-PATCH is required to remove a previously-wrong value).
-        if (identity) {
+        // Skip for PD-confirmed rows: the resolver verdict was NOT 'confirmed', and a
+        // manual PD assertion shouldn't be written as a resolver decision. Leave
+        // wmkf_identitystatus untouched (mirrors the manual-add path) while the
+        // blockByIdentity gate above still keeps resolver-sourced fields out.
+        if (!pdConfirmed && identity) {
           await researcherAdapter.writeIdentityDecision(potentialReviewerId, identity, { actingUserSystemId });
           if (blockByIdentity) {
             await researcherAdapter.clearIdentityFields(potentialReviewerId, RESOLVER_SOURCED_FIELDS, { actingUserSystemId });

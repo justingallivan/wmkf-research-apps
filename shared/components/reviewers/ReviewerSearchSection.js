@@ -146,7 +146,7 @@ function affiliationSourceLabel(source) {
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclude, onPromote, onUseLead, onEdit, canManage = true }) {
+function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, canManage = true }) {
   const [expanded, setExpanded] = useState(false);
   const c = candidate;
   const confidence = typeof c.verificationConfidence === 'number' ? c.verificationConfidence : undefined;
@@ -392,6 +392,19 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
                 title="Edit contact details (email/website/affiliation) for this candidate"
               >
                 ✏️ Edit contact
+              </button>
+            )}
+            {/* Needs-identity-review escape hatch: a PD who recognizes the person can
+                confirm identity + correct the contact, which makes the row selectable
+                and lets it pass the save gate (bibliometrics still dropped server-side). */}
+            {onConfirmIdentity && canManage && (
+              <button
+                type="button"
+                onClick={() => onConfirmIdentity(c)}
+                className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                title="If you recognize this person, confirm their identity and correct the email/website, then add them to the candidate list"
+              >
+                ✓ This is the right person → edit &amp; add
               </button>
             )}
             {onExclude && (
@@ -817,7 +830,10 @@ export default function ReviewerSearchSection({
   // (S240 Chunk 2a hard drop): discovery already drops these, but enrichment can promote
   // a current affiliation that matches the PI's institution after the fact — those rows
   // become unselectable + unsavable (the save-candidates API also hard-rejects them).
-  const isSelectable = (c) => provenanceGroupOf(c) !== 'needs_identity_review' && !c.hasInstitutionCOI;
+  // A PD identity override (pdIdentityConfirmed) makes an otherwise unverifiable
+  // needs-identity-review row selectable — the PD vouched for who it is. Institution
+  // COI is NOT waived by it (a real policy conflict, independent of identity).
+  const isSelectable = (c) => (provenanceGroupOf(c) !== 'needs_identity_review' || c.pdIdentityConfirmed === true) && !c.hasInstitutionCOI;
   const selectableCandidates = displayCandidates.filter(isSelectable);
 
   // A Claude suggestion the server couldn't verify can ALSO surface — and verify —
@@ -949,6 +965,23 @@ export default function ReviewerSearchSection({
 
   // The candidate currently open in the on-card Edit-contact modal (local mode).
   const [editingContact, setEditingContact] = useState(null);
+  // The needs-identity-review candidate open in the "confirm this person" modal.
+  const [confirmingContact, setConfirmingContact] = useState(null);
+
+  // PD confirms a needs-identity-review row IS the right person + supplies corrected
+  // contact. Reuses setManualContact (stamps email/website/affiliation 'manual' and
+  // auto-selects) AND stamps pdIdentityConfirmed so isSelectable lets it through and
+  // save-candidates persists the manual contact while dropping unverified bibliometrics.
+  const confirmIdentityContact = useCallback((cand, updates) => {
+    if (!cand) return;
+    const key = candKey(cand);
+    if (!key) return;
+    setManualContact(cand, updates);
+    const stamp = (c) => (candKey(c) === key ? { ...c, pdIdentityConfirmed: true } : c);
+    setCandidates((prev) => prev.map(stamp));
+    setRecCandidates((prev) => prev.map(stamp));
+    setRosterActive((prev) => prev.map(stamp));
+  }, [setManualContact]);
 
   const saveSelected = useCallback(async () => {
     if (savingRef.current) return;
@@ -1384,7 +1417,8 @@ export default function ReviewerSearchSection({
                             </p>
                             {section.key === 'needs_identity_review' && (
                               <p className="text-xs text-gray-400 mb-1.5">
-                                Identity couldn't be confirmed for these — not selectable. Re-run a search or resolve the identity to consider them.
+                                Identity couldn't be confirmed for these. If you recognize one, use
+                                “This is the right person” to correct the contact and add them.
                               </p>
                             )}
                             {section.key === 'applicant_suggested' && (
@@ -1393,11 +1427,20 @@ export default function ReviewerSearchSection({
                               </p>
                             )}
                             <div className="space-y-2">
-                              {section.items.map((c) => (
-                                (readOnlySection || !isSelectable(c))
-                                  ? <CandidateCard key={candKey(c)} candidate={c} readOnly onExclude={excludeCandidate} />
-                                  : <CandidateCard key={candKey(c)} candidate={c} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} onEdit={setEditingContact} canManage={canManage} />
-                              ))}
+                              {section.items.map((c) => {
+                                // A PD-confirmed needs-review row flips to a normal selectable
+                                // card; unconfirmed ones stay read-only but get the "confirm
+                                // identity" affordance so a PD can rescue a real reviewer.
+                                const selectableNow = isSelectable(c);
+                                if (selectableNow && !readOnlySection) {
+                                  return <CandidateCard key={candKey(c)} candidate={c} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} onEdit={setEditingContact} canManage={canManage} />;
+                                }
+                                if (selectableNow && readOnlySection) {
+                                  // needs-review row the PD just confirmed → selectable + editable.
+                                  return <CandidateCard key={candKey(c)} candidate={c} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} onEdit={setEditingContact} canManage={canManage} />;
+                                }
+                                return <CandidateCard key={candKey(c)} candidate={c} readOnly onExclude={excludeCandidate} onConfirmIdentity={readOnlySection ? (cand) => setConfirmingContact(cand) : undefined} canManage={canManage} />;
+                              })}
                             </div>
                           </div>
                           );
@@ -1470,6 +1513,18 @@ export default function ReviewerSearchSection({
           nameEditable={false}
           onApply={(updates) => setManualContact(editingContact, updates)}
           onClose={() => setEditingContact(null)}
+        />
+      )}
+      {/* PD identity-override editor for a needs-identity-review row: correct the
+          contact + tick "I've verified this person" → row becomes selectable and
+          saves with the manual contact (bibliometrics dropped server-side). */}
+      {confirmingContact && (
+        <CandidateEditModal
+          candidate={confirmingContact}
+          nameEditable={false}
+          confirmMode
+          onConfirm={(updates) => confirmIdentityContact(confirmingContact, updates)}
+          onClose={() => setConfirmingContact(null)}
         />
       )}
     </Card>
