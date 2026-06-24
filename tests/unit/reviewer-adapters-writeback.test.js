@@ -11,6 +11,7 @@
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { setMatchReason, ensureStaffManualCandidate, APPLICANT_DISPOSITION_EXCLUDED } from '../../lib/dataverse/adapters/reviewer-suggestion.js';
 import { upsertByPotentialReviewer } from '../../lib/dataverse/adapters/researcher.js';
+import { create as createPotentialReviewer } from '../../lib/dataverse/adapters/potential-reviewer.js';
 
 function err412() { const e = new Error('Precondition Failed'); e.status = 412; return e; }
 
@@ -170,6 +171,28 @@ describe('researcher.upsertByPotentialReviewer — writes bibliometrics onto the
     expect(payload.wmkf_hindex).toBe(5);
     expect(payload.wmkf_primaryaffiliation).toBe('MIT');
     expect(out).toEqual({ id: 'pr-1', created: false });
+  });
+
+  // Prod 400 fix (req 1002833, "Hongjun Song"): wmkf_primaryaffiliation has a hard
+  // 500-char Dynamics cap; a longer (multi-institution OpenAlex) affiliation 400s the
+  // whole write. Clamp at the adapter so it never blocks a candidate save.
+  test('clamps a >500-char affiliation to the column cap', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ wmkf_potentialreviewersid: 'pr-long' });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    const longAff = 'A'.repeat(640);
+    await upsertByPotentialReviewer('pr-long', { affiliation: longAff });
+    const written = update.mock.calls[0][2].wmkf_primaryaffiliation;
+    expect(written.length).toBeLessThanOrEqual(500);
+    expect(written.endsWith('…')).toBe(true);
+  });
+
+  test('potential-reviewer.create also clamps wmkf_primaryaffiliation to 500', async () => {
+    const create = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({ wmkf_potentialreviewersid: 'pr-new' });
+    await createPotentialReviewer({ name: 'Hongjun Song', affiliation: 'B'.repeat(700) });
+    const payload = create.mock.calls[0][1];
+    expect(payload.wmkf_primaryaffiliation.length).toBeLessThanOrEqual(500);
+    expect(payload.wmkf_organizationname.length).toBeLessThanOrEqual(100); // shadow still capped
   });
 
   test('descriptive fields fill-if-empty; metrics always overwrite', async () => {
