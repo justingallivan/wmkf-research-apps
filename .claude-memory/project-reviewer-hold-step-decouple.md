@@ -37,9 +37,9 @@ model is dropped.
   discriminator GUIDs AND unset `HONORARIUM_ONBOARDING_DEFERRED` — the full create+onboard tail then
   runs on a later accept (reversible, by design).
 - Reviewer receives an acceptance-confirmation email carrying an `.ics` save-the-date keyed to
-  `wmkf_reviewduedate` (reuse `lib/external/calendar-invite.js`, rewired off the removed hold template;
-  rekey `meetingDate` → `reviewDueDate`). NOTE: today the `respond.js` accept branch sends the reviewer
-  NO email — only staff notifications — so this reviewer-facing confirmation send is **net-new**.
+  `wmkf_reviewduedate` (`lib/external/calendar-invite.js`, rewired off the removed hold template;
+  rekey `meetingDate` → `reviewDueDate`). This reviewer-facing confirmation now sends on fresh accept;
+  preserve the fire-once behavior if the acceptance flow changes.
 
 **Acceptance is FINAL at this step.** There is NO separate "willing/agree-in-principle" state and NO
 separate "finalize" reviewer step — those were artifacts of the S256 deferral plan and disappear once
@@ -50,10 +50,9 @@ QA pass; steady state: immediately on accept), NOT a second reviewer action.
 **Post-accept exit** (a reviewer who later can't review): OUT-OF-BAND, not a portal self-service
 decline. The reviewer emails the PD; the PD may renegotiate the due date; if no compromise, the PD
 manually removes them via the workbench Remove button. The existing Remove
-(`my-candidates` DELETE → `softDelete`) sets `wmkf_selected=false` + revokes the token but does NOT
-clear `wmkf_accepted` / `wmkf_responsetype` / `wmkf_reviewstatus` — so it must be ENHANCED to reset
-those engagement flags (else a removed accepted reviewer still counts toward quota / doesn't free a
-slot). [VERIFIED S279 — `pages/api/reviewer-finder/my-candidates.js:553-585`]
+(`my-candidates` DELETE → `softDelete`) clears selection plus accepted/declined/response/review/held
+state and revokes the token; preserve that clear-accepted-state path if removal behavior changes.
+[VERIFIED 2026-06-23 — `pages/api/reviewer-finder/my-candidates.js`, `lib/dataverse/adapters/reviewer-suggestion.js`]
 
 **Templates / hold path — RETIRED (S279, commit `a8676af1`).** The `hold` + `finalize` EMAIL
 templates + their send-path branches, `HoldView`, `lib/external/proposal-readiness.js`, the

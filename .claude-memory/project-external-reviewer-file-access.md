@@ -26,7 +26,7 @@ Two related problems that share the same underlying architectural question: how 
 
 **Problem A — Proposal URLs in emails throw "expired link" errors.** The links we send to reviewers point at SharePoint share URLs (or similar). Reviewers without authenticated access to the akoyaGO site can't open them — and even when authenticated paths exist, the links seem to expire. Justin's read: the deeper issue is that reviewer access must be non-authenticated for that fragment of the SharePoint drive, which the akoyaGO site policy may not currently support.
 
-**Problem B — Review uploads originally landed in Vercel Blob, not SharePoint.** Pre-2026-05-03, `/api/review-manager/upload-review` wrote to `reviews/{requestId}/{suggestionId}_{filename}` in Vercel Blob. The SharePoint write path was wired in alongside the external-reviewer landing rollout: uploads now land in the request-specific SharePoint folder (`Reviewer_Downloads/Reviews/`) and the Vercel Blob path was retired 2026-05-03 via commit `2277d23` (see Status block below).
+**Problem B — Review uploads originally landed in Vercel Blob, not SharePoint.** Pre-2026-05-03, `/api/review-manager/upload-review` wrote to `reviews/{requestId}/{suggestionId}_{filename}` in Vercel Blob. The SharePoint write path was wired in alongside the external-reviewer landing rollout: uploads now land under `akoya_request/{requestFolder}/Reviewer_Uploads/{reviewerSubfolder}` and the Vercel Blob path was retired 2026-05-03 via commit `2277d23` (see Status block below).
 
 **Why these are one problem:** both A and B are about the same boundary — foundation files exposed to external parties.
 

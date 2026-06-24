@@ -11,7 +11,7 @@ metadata:
 ## Recall Rule
 
 Read this when drafting/defaulting the grantee-deliverables invitation or reminder
-email copy (AwardeeTab `DEFAULT_SUBJECT`/`DEFAULT_BODY`, chunk-6 reminder body) or
+email copy (`email.grantee_invite.*`, AwardeeTab fill behavior, chunk-6 reminder body) or
 the publish-image waiver wording.
 
 ## The facts (owner, S271)
@@ -54,6 +54,7 @@ the publish-image waiver wording.
 
 **Why:** stakeholder/grantee emails in the Foundation's real voice are personal,
 PD-signed, and deadline-driven; a generic Foundation sign-off and portal mechanics
-in the body read wrong to a grantee. **How to apply:** default the AwardeeTab body
-to the PD-voice structure above; keep it staff-editable. Related:
+in the body read wrong to a grantee. **How to apply:** preserve the editable
+`email.grantee_invite.*` defaults and `fillInviteBody` placeholder behavior in the
+PD-voice structure above; keep the message staff-editable. Related:
 [[feedback-stakeholder-email-tone]], [[user-powerautomate]].

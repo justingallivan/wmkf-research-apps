@@ -1,6 +1,6 @@
 ---
 name: project-awardee-onboarding
-description: Post-award awardee onboarding feature (surfaced S206 2026-05-31) — after a fund decision + GAL, automate abstract approval + artwork upload + release form; reuses the external reviewer-flow primitive. Not built yet.
+description: Post-award Awardee/grantee-deliverables workflow is built in the workbench; remaining unknowns are GAL-trigger/status-field discovery and any separate external awardee portal or automation scope.
 metadata:
   type: project
   status: active
@@ -21,9 +21,9 @@ Do not:
 - Fork the external primitive; keep reviewer-specific bits separable.
 - Assume the abstract-writing automation is in scope — that's still to-confirm.
 
-Ground truth: not-yet-built (design only, surfaced S206). Reuses [[project-external-reviewer-file-access]] + [[project-reviewer-lifecycle]]; extends [[project-reviewer-apps-redesign-direction]]; status-trigger family [[project-backend-automation]].
+Ground truth: `pages/workbench/[requestId].js`, `shared/components/workbench/AwardeeTab.js`, `pages/api/workbench/grantee-deliverables/*`; verify GAL-trigger/status-field claims live before coding. Reuses [[project-external-reviewer-file-access]] + [[project-reviewer-lifecycle]]; extends [[project-reviewer-apps-redesign-direction]]; status-trigger family [[project-backend-automation]].
 
-**Surfaced by Justin 2026-05-31 (S206).** A new per-request, POST-AWARD workflow. Not built yet; captured because it shapes the Request Workbench lifecycle and reuses existing infrastructure.
+**Surfaced by Justin 2026-05-31 (S206).** A new per-request, POST-AWARD workflow. The PD-facing Awardee tab and grantee-deliverables routes are now built; remaining work should be scoped to GAL-trigger/status-field discovery and any separate external awardee portal or automation.
 
 ## The workflow
 1. Board makes a fund/decline decision.
@@ -34,15 +34,16 @@ Ground truth: not-yet-built (design only, surfaced S206). Reuses [[project-exter
    - **Release form** the awardee must agree to (accompanies the artwork request).
 
 ## Why it matters now (design impact, even though deferred)
-- **The request lifecycle extends PAST the board decision.** The Workbench `Status` tab is NOT terminal; this post-award stage comes after it (mockup now carries a placeholder `Awardee` tab after `Status`). The GAL-sent status change is the pivot into it.
+- **The request lifecycle extends PAST the board decision.** The Workbench `Status` tab is NOT terminal; this post-award stage comes after it (the Workbench now carries a live `Awardee` tab after `Status`). The GAL-sent status change is the pivot into any remaining automation.
 - **Reuses the external-interaction primitive — reviewer flow is instance #1, this is instance #2.** Same shape: automated email → magic-link approve/edit → document upload → form-agreement. Build it on `lib/external/` (HMAC token lifecycle, magic-link landing, SharePoint/Blob upload, form schema) the way the reviewer Stage-2a/accept/upload flow does ([[project-external-reviewer-file-access]], [[project-reviewer-lifecycle]]). Keep reviewer-specific bits separable so this doesn't fork the primitive. Justin: "doesn't require much to build — just needs field names in Dataverse to route the documents to."
 - **Another status-driven trigger** (GAL-sent), same family as the J27 phase trigger — reinforces the status-as-event model ([[project-backend-automation]]).
 - **The auto-written abstract is an automation-tier artifact** (auto-draft → **awardee** approves; note the approver is the awardee, not the PD).
 
-## What's needed to build (later)
+## Remaining unknowns before expanding it
 - Find the **GAL-sent status field/value** in Dataverse.
 - New **Dataverse routing fields** on the request (or a child entity): approved-abstract text, graphical-abstract/artwork blob/SharePoint URL, release-form agreement flag/timestamp. Parallels the reviewer fields (`wmkf_reviewbloburl`, `wmkf_reviewsharepointfolder`, etc.).
-- An awardee-facing external surface (`/external/award/[token]` or similar) + a PD-facing Workbench `Awardee` tab to trigger/track.
+- Verify whether the current PD-facing Workbench `Awardee` tab needs GAL/status-trigger integration, rather than assuming the whole workflow is absent.
+- Add an awardee-facing external surface (`/external/award/[token]` or similar) only if it is separate from the shipped grantee-deliverables flow.
 - The abstract-writing automation (LLM, house style) — confirm in/out of scope.
 
 ## Open / to confirm

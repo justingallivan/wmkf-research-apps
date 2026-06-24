@@ -21,7 +21,7 @@ Do:
 
 Do not:
 - Repeat the "there is NO isolated test store" claim — a sandbox exists.
-- Assume the sandbox can send email or has the reviewer schema (`wmkf_appreviewersuggestion`/`appgrantcycle` 404; `wmkf_policyversion` 0 rows).
+- Assume the sandbox can send email or has the reviewer schema (`wmkf_appreviewersuggestion`/`wmkf_appgrantcycle` 404; `wmkf_policyversion` 0 rows).
 
 Ground truth: `scripts/discover-dynamics-envs.js`, `scripts/apply-dataverse-schema.js`, [[project-contact-promotion-permission]].
 
@@ -36,5 +36,5 @@ A Dynamics **sandbox exists and is reachable** by our app registration — `WM K
 **Why:** sandbox was used for the Wave-1 Postgres→Dataverse migration testing (settings/identity-map/app-access/prefs), via `DYNAMICS_SANDBOX_URL`; the later reviewer-Workbench entities were only ever deployed to prod.
 
 **How to apply:**
-- The main app's `DynamicsService` reads `DYNAMICS_URL`, NOT `DYNAMICS_SANDBOX_URL`. Only 4 Wave-1 services (dataverse-{settings,identity-map,app-access,prefs}-service.js) + standalone scripts honor `DYNAMICS_SANDBOX_URL`. To route the whole local app at the sandbox you must set `DYNAMICS_URL=https://orgd9e66399.crm.dynamics.com` in `.env.local` (the discover script's "set DYNAMICS_SANDBOX_URL" hint is for schema scripts, not the app).
+- The main app's `DynamicsService` reads `DYNAMICS_URL`, NOT `DYNAMICS_SANDBOX_URL`. Only the Wave-1 Dataverse adapters (`dataverse-settings-service.js`, `dataverse-app-access-service.js`, `dataverse-prefs-service.js`) plus `dataverse-identity-map.js` and standalone scripts honor `DYNAMICS_SANDBOX_URL`. To route the whole local app at the sandbox you must set `DYNAMICS_URL=https://orgd9e66399.crm.dynamics.com` in `.env.local` (the discover script's "set DYNAMICS_SANDBOX_URL" hint is for schema scripts, not the app).
 - To make the sandbox usable for reviewer testing: deploy the reviewer schema there (`scripts/apply-dataverse-schema.js` already targets `DYNAMICS_SANDBOX_URL`), seed `wmkf_policyversion` rows, then verify **sandbox email actually sends** — Dynamics SendEmail from a sandbox is often disabled, which would defeat any "send a real invitation + click the magic link" smoke. Until that's done, reviewer smokes run on prod against a dedicated test request — **1002788** ("Dec 2026 Project Title TEST 2", Connor-created, applicant = WMKF) as of S213, in the D26 allowlist (see [[project-contact-promotion-permission]] for the undeletable-promoted-contact gotcha).

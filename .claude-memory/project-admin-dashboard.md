@@ -23,7 +23,7 @@ Do not:
 - Reintroduce per-user API key entry.
 - Assume usage metrics live anywhere other than the `api_usage_log` table.
 
-Ground truth: `pages/admin`, `api_usage_log` table (cited in body); historical for setup specifics.
+Ground truth: `pages/admin.js` (`/admin`), `pages/api/admin/*`, `api_usage_log` table (cited in body); historical for setup specifics.
 
 - API keys are **centralized server-side** — all routes use `process.env.CLAUDE_API_KEY`; users no longer provide their own
 - Usage logged to `api_usage_log` table (model, tokens, cost estimate, latency per request)

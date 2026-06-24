@@ -4,7 +4,7 @@
 
 > **Status:** Draft for discussion (Connor / Sarah). Drafted 2026-05-31 (Session 206) from the clickable mockup at `docs/mockups/lifecycle-ui-mockup.html` and a working session with Justin. Captures decisions that are **locked**, plans that are **proposed**, and dependencies that are **open**.
 >
-> **BUILD UPDATE (2026-06-11, verified against source):** the D26 reviewer dashboard has since SHIPPED — `/workbench` (tier-2) + `/workbench/[requestId]` (tier-3) with the **Reviewers tab live** (Workbench Phases 0–3). The shipped Reviewers tab has **5** sub-tabs (Find · Candidates · Invite · Track · Completed) — one more than the 4-tab design below; the **Candidates** saved-roster tab was added S211. The other 9 request-lifecycle tabs are still placeholders. *(Update 2026-06-15, S260: the **Proposal** tab has since shipped — S258, with Field Primer + expert-link enrichment S260 — so **8** remain; forward scope for those 8 is in `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` §"Remaining lifecycle tabs — scope (S260)". Note also that §3.2's "each tab is an existing capability re-homed" is a generalization — Overview, Site Visit, and the Reviewer Pool sibling are net-new exceptions; see that build-plan section.)* This scoping doc remains the *design rationale* (the what/why); for authoritative phase-by-phase build status see `docs/REQUEST_WORKBENCH_BUILD_PLAN.md`. Schema groundwork called out at drafting time is deployed: `wmkf_appreviewersuggestion.wmkf_completedat` (PD-closeout timestamp; wave5, prod 2026-05-28). See §3.4 / §6.
+> **BUILD UPDATE (2026-06-11, verified against source; refreshed 2026-06-23):** the D26 reviewer dashboard has since SHIPPED — `/workbench` (tier-2) + `/workbench/[requestId]` (tier-3) with the **Reviewers tab live** (Workbench Phases 0–3). The shipped Reviewers tab has **5** sub-tabs (Find · Candidates · Invite · Track · Completed) — one more than the 4-tab design below; the **Candidates** saved-roster tab was added S211. Proposal, Overview/Status, and Awardee/grantee-deliverables have also shipped, so **5** request-lifecycle tabs remain placeholders; forward scope is in `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` §"Remaining lifecycle tabs — scope (S260)". Note also that §3.2's "each tab is an existing capability re-homed" is a generalization — Overview, Site Visit, and the Reviewer Pool sibling are net-new exceptions; see that build-plan section. This scoping doc remains the *design rationale* (the what/why); for authoritative phase-by-phase build status see `docs/REQUEST_WORKBENCH_BUILD_PLAN.md`. Schema groundwork called out at drafting time is deployed: `wmkf_appreviewersuggestion.wmkf_completedat` (PD-closeout timestamp; wave5, prod 2026-05-28). See §3.4 / §6.
 >
 > **How to read this:** §1–§5 are for everyone. §6 (dependencies) is where Connor's items live. §7–§8 are scope fences and technical detail you can skim. Where a claim depends on live Dynamics/Dataverse state it is marked `[verified]` or `[open]`.
 
@@ -73,7 +73,7 @@ URL `/workbench/[requestId]/…`. Tab strip (current mockup state):
 
 The lifecycle does **not** end at the board decision: `Status` is the pivot into a **post-award** stage (`Awardee` — see §3.6).
 
-Each tab is an existing capability re-homed and pre-loaded with the proposal. Three writeup stages mirror the real lifecycle (Initial = Phase I form, early; Pre Site Visit = folds in returned reviews; Final = folds in site-visit findings). Initial + Pre-visit reuse the existing Phase I / Phase II writeup engines. **The Reviewers tab is the v1 build; the rest are placeholders that land as the automation tier matures.**
+Each tab is an existing capability re-homed and pre-loaded with the proposal. Three writeup stages mirror the real lifecycle (Initial = Phase I form, early; Pre Site Visit = folds in returned reviews; Final = folds in site-visit findings). Initial + Pre-visit reuse the existing Phase I / Phase II writeup engines. **The Reviewers tab was the v1 build; Proposal, Overview/Status, and Awardee/grantee-deliverables have since shipped, while the remaining placeholder tabs land as the automation tier matures.**
 
 **Writeups are collaboratively edited, not single-author.** Near cycle-end, **all PDs + the CSO + the President** jointly edit writeups (today in SharePoint). So the writeup tabs are collective-edit surfaces, and there's a **writeup-collaborator** access set that is *leadership-inclusive and broader than the reviewer team* — distinct from `reviewers` (use the dashboard) and from lead-PD (manage reviewers). Lean on the build: **embed / deep-link the SharePoint-backed writeup doc** (native Office co-authoring + SharePoint permissions) rather than rebuild collaborative editing in-app — the request view supplies context + entry, the editing rides on the existing capability. This refines "the Workbench obviates the parallel SharePoint folder": it removes the *folder-hunt and filename-as-join-key brittleness*, but the actual co-authoring can still be SharePoint. **Open:** (a) writeup-edit enforced by the SharePoint doc's own permissions vs a new app-level "writeup collaborator" capability; (b) do CSO/President get a light request-view/dossier entry or just doc access; (c) embed-SharePoint vs in-app editing (lean: embed).
 
@@ -104,12 +104,12 @@ These are unrelated fields at different scopes and must not be conflated.
 ### 3.5 What ships alongside
 - **Reviewer Pool** — a request-agnostic roster (browse reviewers, past invitation history, honorarium state, affiliations). Richer than the retired Database tab.
 
-### 3.6 Post-award: the Awardee stage (future, surfaced S206)
+### 3.6 Post-award: the Awardee stage (partly shipped, surfaced S206)
 After the board funds a request and ops sends the **Grant Award Letter (GAL)** — which fires a Dataverse status change (value TBD) — the PD runs a short post-award workflow with the awardee: approve a **foundation-written abstract** (auto-drafted from the submitted abstract in house style, saved to Dataverse; awardee approves or edits), upload a **graphical abstract / artwork** for the website, and agree to a **release form**.
 
 Two things make this cheap and worth noting now:
 - **It's the same shape as the reviewer flow** — automated email → magic-link approve/edit → document upload → form-agreement. So it **reuses the external-interaction primitive** (`lib/external`: HMAC token, magic-link landing, upload, form schema). The reviewer lifecycle is instance #1; this is instance #2. Keep the primitive's reviewer-specific bits separable so this doesn't fork it.
-- **It extends the Workbench spine past `Status`** — captured as the placeholder `Awardee` tab. Mainly needs new Dataverse document-routing fields. Full notes: `[[project-awardee-onboarding]]`. **Out of scope for the D26 build.**
+- **It extends the Workbench spine past `Status`** — the PD-facing Awardee tab and grantee-deliverables routes are now live. Remaining awardee work should be scoped to GAL-trigger/status-field discovery and any separate external awardee portal or automation need. Full notes: `[[project-awardee-onboarding]]`. **Out of scope for Reviewer Finder extraction unless explicitly scoped.**
 
 ### 3.7 Request dossier (team-open read view)
 Clicking a **request number** anywhere (dashboard, search, an email) opens the request's **read view** — proposal, returned reviews, docs, analyses. This is the team-open surface that supports collective Phase II evaluation: any `reviewers` grant-holder can open it, regardless of who the lead PD is.
@@ -194,7 +194,7 @@ The current and next cycles have different shapes, so the rollout differs.
 **Explicitly out of scope for the D26 build:**
 - The triage / cycle dashboard (J27).
 - The automation tier (event-driven artifact materialization).
-- The non-reviewer Workbench tabs (writeups, analyses, site visit) — placeholders only.
+- The remaining non-reviewer Workbench placeholder tabs (writeups, reviews/analyses, site visit).
 - A real, editable Status tab (read-only display at most, if at all).
 
 **Throwaway by design:** the D26 allowlist. It is fenced as D26-only and removed when the J27 phase trigger lands. The risk to manage is the usual "temporary becomes permanent" — hence the explicit removal note.

@@ -1,10 +1,10 @@
 ---
 name: A7 prompt-injection hardening (SHIPPED S173-S177)
-description: All 24 LLM-input surfaces in this repo are hardened against prompt injection via wrapUntrustedContent + buildUntrustedContentPreamble + CI gate. Do NOT build a parallel system.
+description: All LLM-input surfaces in the current gate inventory are hardened against prompt injection via wrapUntrustedContent + buildUntrustedContentPreamble + CI gate. Do NOT build a parallel system.
 type: project
 status: active
 scope: security
-last_verified: 2026-06-04 via gate (check:prompt-injection-tagging reports 24 surfaces)
+last_verified: 2026-06-23 via gate (check:prompt-injection-tagging reports 27 migrated surfaces, 0 pending)
 ---
 
 ## Recall Rule
@@ -17,7 +17,7 @@ Do:
 - For Dataverse-stored prompts, declare untrusted variables with `untrusted: true` in the variable schema.
 
 Do not:
-- Build a parallel/weaker injection-defense system — A7 already covers all 24 surfaces (the S182 burn).
+- Build a parallel/weaker injection-defense system — A7 already covers all surfaces in the current gate inventory (the S182 burn).
 - Propose multimodal as a "future Phase 2" — it's already shipped.
 - Grep with article-jargon (canary, OCR, white-on-white); use codebase-general terms (untrusted, sentinel).
 
@@ -26,13 +26,13 @@ Ground truth: `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md`; `lib/utils/ai-p
 The codebase has a comprehensive, CI-gated prompt-injection-defense system. It was shipped across Sessions 173-177 (May 2026) as the "A7" initiative — 7 parts, ~30 commits, three Codex review rounds. Before designing or building any prompt-injection / LLM-content / "untrusted document" defense, read the existing plan and check the gate.
 
 **Canonical entry points:**
-- `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md` — the plan, inventory of all 24 surfaces, part ordering, status. THIS IS THE CANONICAL DOC.
+- `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md` — the plan, surface inventory, part ordering, status. THIS IS THE CANONICAL DOC.
 - `lib/utils/ai-payload-boundary.js` — primitives: `wrapUntrustedContent` (nonce-on-both-sides sentinels, sentinel-shape stripping, forge-resistant), `buildUntrustedContentPreamble` (system-prompt clause), `buildBoundedTextPayload` (length cap + metadata).
 - `lib/utils/ai-output-schema.js` — `validateAiJson` schema validator for every `JSON.parse` sink (the *output* side of the defense).
 - `scripts/check-prompt-injection-tagging.js` — `npm run check:prompt-injection-tagging`. Positive-coverage registry: every prompt file MUST be registered as `migrated` or `multimodal` or the gate fails. Self-test at `:self-test`.
 - Tests: `tests/unit/*-a7.test.js` (6 files — email-reviewer, expertise-finder, multi-perspective, part6-prompts, reviewer-finder, virtual-review-panel) + `tests/unit/utils/ai-payload-boundary.test.js` (which also holds the forge-resistance tests; there is no separate `forged-close.test.js`). [verified S209]
 
-**Coverage (verified 2026-05-23, S182):** Gate reports `24 migrated surface(s) carry their markers, 0 pending`. Every LLM input surface in the inventory is hardened — Phase I/II writeups + batches, multi-perspective, virtual review panel, qa/refine, peer reviews, expense reporter (multimodal), literature analyzer (multimodal), funding gap, grant reporting, expertise/reviewer finder, integrity screener, contact enrichment, dynamics explorer (agentic + AI export), Executor (via `untrusted: true` variable declaration on Dataverse-stored prompts), cron/log-analysis. Includes a multimodal preamble for Anthropic vision content blocks (image/document inputs) where there's no string to wrap.
+**Coverage (verified 2026-06-23):** Gate reports `27 migrated surface(s) carry their markers, 0 pending`. Every LLM input surface in the gate inventory is hardened — Phase I/II writeups + batches, multi-perspective, virtual review panel, qa/refine, peer reviews, expense reporter (multimodal), literature analyzer (multimodal), funding gap, grant reporting, expertise/reviewer finder, integrity screener, contact enrichment, dynamics explorer (agentic + AI export), Executor (via `untrusted: true` variable declaration on Dataverse-stored prompts), cron/log-analysis. Includes a multimodal preamble for Anthropic vision content blocks (image/document inputs) where there's no string to wrap.
 
 **Why:** S182 spent half a day designing a parallel, weaker injection-defense plan (XML wrappers, canary regex, telemetry) because I did not find A7. The memory had zero entries pointing to A7; `docs/security-audit/` was a subdirectory my `ls docs/` didn't show; my grep used article-jargon terms (white-on-white, OCR, canary) rather than codebase-general terms (untrusted, sentinel). Two Codex rounds reviewed the parallel plan in isolation. The build shipped a double-wrap regression in two routes before live-test inspection caught it. The commit (04706f3) was reverted (abe861e); see [[feedback-grep-general-codebase-terms]] for the root-cause lesson.
 

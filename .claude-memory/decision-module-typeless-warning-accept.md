@@ -24,7 +24,7 @@ Do not:
 
 Ground truth: historical-only (decision, not live state). Atlas-scanner fix recorded as pattern E in `docs/CLAUDE_COVERAGE_LESSONS.md`. Related: [[reviewer-identity-fragmentation]].
 
-**Decision:** the `MODULE_TYPELESS_PACKAGE_JSON` reparse warning emitted by ESM `scripts/*.js` files is **ACCEPTED as-is (Option E)**. Root cause: root `package.json` has no `"type"`, so Node tries CJS first, fails, reparses as ESM (cosmetic, one-time per-process, zero runtime impact). 37 of 174 `scripts/*.js` are ESM and emit it; 136 are CJS (silent).
+**Decision:** the `MODULE_TYPELESS_PACKAGE_JSON` reparse warning emitted by ESM `scripts/*.js` files is **ACCEPTED as-is (Option E)**. Root cause: root `package.json` has no `"type"`, so Node tries CJS first, fails, reparses as ESM (cosmetic, one-time per-process, zero runtime impact). Exact inventory is drift-prone; current top-level `scripts/*.js` inventory is 61 ESM / 182 CJS out of 243, and recursive `scripts/**/*.js` is 61 ESM / 191 CJS out of 252.
 
 **Why D (rename the 37 `.js`→`.mjs`) was rejected** — Codex S164 review surfaced two concrete costs that outweigh a cosmetic warning:
 1. The Atlas P0 gate (`scripts/check-application-state-atlas.js`) scanned `.js` only — a `.mjs` rename would have silently dropped entity-coverage detection. **This blind spot was independently FIXED S164** (CLAUDE_COVERAGE_LESSONS.md pattern E + `check:atlas:self-test` `.mjs` fixture + gate widened to `.js|.mjs|.cjs`, committed together per the coverage-lessons protocol). The fix stands regardless of the warning decision.

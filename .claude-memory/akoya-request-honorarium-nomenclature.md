@@ -1,6 +1,6 @@
 ---
 name: Grant request vs honorarium request nomenclature
-description: Both grant proposals AND reviewer honoraria are stored as akoya_request rows in Dataverse — easy to confuse. Use precise terms; the two are not data-linked by default.
+description: Both grant proposals AND reviewer honoraria are stored as akoya_request rows in Dataverse — easy to confuse. Use precise terms; honorarium rows have a shipped reviewer-suggestion provenance link.
 metadata:
   type: project
   status: active
@@ -14,8 +14,8 @@ Read this when: writing or discussing anything involving `akoya_request` rows wh
 
 Do:
 - Say "grant request" or "honorarium request" — never "request" alone.
-- When filtering `akoya_request`, state which type and use the program-lookup discriminator (`akoya_program`/`wmkf_grantprogram`/`wmkf_type`), not heuristics like the $250 amount.
-- Reconstruct honorarium→grant linkage via the reviewer's contact (`_akoya_primarycontactid_value`) + matching grant cycle (`wmkf_meetingdate`).
+- When filtering `akoya_request`, state which type and use the program-lookup discriminator (`akoya_program`/`wmkf_grantprogram`/`wmkf_type`/`wmkf_request_type`), not heuristics like the $250 amount.
+- Prefer the shipped reviewer-suggestion provenance link for portal-created honoraria; for older/backfilled honoraria without that link, reconstruct via the reviewer's contact (`_akoya_primarycontactid_value`) + matching grant cycle (`wmkf_meetingdate`).
 
 Do not:
 - Assume an honorarium row has a parent-grant lookup — there is none by default.
@@ -29,11 +29,11 @@ Ground truth: live discriminators as of 2026-05-25 in body; [[project-bill-honor
 | Term | What it is | Discriminator |
 |---|---|---|
 | **Grant request** | A proposal from a university asking for funding | `akoya_program ≠ "Research Reviewer"` (e.g., "Medical Research", "Science and Engineering Research") |
-| **Honorarium request** | A payment record for an individual who reviewed a grant request | `akoya_program = "Research Reviewer"` AND `wmkf_grantprogram = "Honorarium"` AND `wmkf_type = "Individual"` |
+| **Honorarium request** | A payment record for an individual who reviewed a grant request | `akoya_program = "Research Reviewer"` AND `wmkf_grantprogram = "Honorarium"` AND `wmkf_type = "Individual"` AND `wmkf_request_type = "Individual"` |
 
 Concrete example: Utah State submitted **grant request** #1002238. Amy Gladfelter agreed to review it and was issued **honorarium request** #1002764 for $250.
 
-**Critical: no data link between them.** Honorarium request #1002764 has ZERO lookup fields pointing back to grant request #1002238. The only way to reconstruct "this honorarium was paid for reviewing which grant?":
+**Critical: old/backfilled rows may have no data link between them.** Honorarium request #1002764 had ZERO lookup fields pointing back to grant request #1002238. For those rows, reconstruct "this honorarium was paid for reviewing which grant?" via:
 - Honorarium row's `_akoya_primarycontactid_value` → the reviewer's contact (Amy)
 - Find grant requests where any of `wmkf_potentialreviewer1..5` slot-lookups point to that contact, in the same cycle (`wmkf_meetingdate`)
 - Probably one match per cycle
@@ -46,5 +46,5 @@ The grant↔reviewer assignment is denormalized on the grant request itself: 5 n
 - In design docs, tickets, emails, conversation: use "grant request" or "honorarium request" — never "request" alone.
 - When filtering/querying `akoya_request`, ALWAYS state which type the filter is for, and prefer the program-lookup discriminator over heuristics (e.g., $250 amount).
 - Don't assume an honorarium has a parent-grant pointer — there isn't one in the data. Reverse-lookup via contact + cycle is the reconstruction.
-- See [[project-bill-honorarium-integration]] for the integration that will optionally populate provenance going forward via a proposed `wmkf_honorariumforrequest` lookup.
+- See [[project-bill-honorarium-integration]] for the integration that now populates provenance via `wmkf_HonorariumRequest` on `wmkf_appreviewersuggestion` (bind `wmkf_HonorariumRequest@odata.bind`, read `_wmkf_honorariumrequest_value`), not the abandoned proposed `wmkf_honorariumforrequest` name.
 - See [[akoya-payment-field-semantics]] for related field-gating audit findings.

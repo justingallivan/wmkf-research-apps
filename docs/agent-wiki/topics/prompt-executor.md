@@ -18,7 +18,7 @@ watch_paths:
   - lib/services/llm-client.js
   - lib/services/execute-prompt.js
   - lib/services/*prompt*.js
-  - shared/prompts/**
+  - shared/config/prompts/**
   - docs/EXECUTOR_CONTRACT.md
 update_triggers:
   - prompt storage or composition changes

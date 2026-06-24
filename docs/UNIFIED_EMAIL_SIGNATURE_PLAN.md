@@ -48,8 +48,9 @@
 - **Standalone Reviewer Finder hard-requires sender name/email.** [VERIFIED via
   `pages/api/reviewer-finder/generate-emails.js:240-241,480-481`] it rejects a missing `settings.senderEmail`
   and the `.eml` From header uses `senderName`/`senderEmail`. So name/email CANNOT be dropped for that flow.
-- **Grantee flows read no signature today.** The invite default (`AwardeeTab` `DEFAULT_BODY`) has a literal
-  `[Program Director name]/[title]` placeholder; the reminder cron reads the assigned PD's `systemuser`.
+- **Grantee invite defaults now come from editable settings.** The invite default is seeded by
+  `lib/seed/email-defaults/grantee-invite.js`, read through `/api/email-defaults/grantee-invite`, and filled
+  by `shared/config/granteeInviteEmail.js` / `AwardeeTab`; the reminder cron reads the assigned PD's `systemuser`.
 - **[VERIFIED via probe] `systemuser.title` is null for all 6 assigned PDs** (Connor, Justin, Kevin, Jean,
   Beth, Anneli); `fullname` + `internalemailaddress` are populated. ⇒ the shipped reminder cron skips
   every row (`!pdTitle → skippedNoPd`, `grantee-deliverable-reminders.js:171`). Bug to fix.

@@ -24,7 +24,7 @@ Do not:
 
 Ground truth: historical-only (resolved S209; recovery runbook + do-not-relitigate guard). Root cause confirmed S175 via `ls -lO` showing `dataless` flag.
 
-> **RESOLVED (verified S209, 2026-06-01).** The recommended fix was executed: the repo now lives at **`/Users/gallivan/Code/WMKF_Apps`** (off any cloud-synced path), `gc.auto` is **unset**, there are **no dataless objects**, loose-object count is ~3K (not 31K), and full-walk traversal (`git rev-list --all --count`) completes in <30s without hanging. Kept as the **recovery runbook** for the `cannot lock ref 'HEAD'` lock-file case and as a do-not-relitigate guard (never put `.git` back under a cloud File Provider).
+> **RESOLVED (verified S209, 2026-06-01; refreshed 2026-06-23).** The recommended fix was executed: the repo now lives at **`/Users/gallivan/Code/WMKF_Apps`** (off any cloud-synced path), `gc.auto` is **unset**, there are **no dataless objects**, loose-object count is 6,327 (not 31K), and full-walk traversal (`git rev-list --all --count`) completes in <30s without hanging. Kept as the **recovery runbook** for the `cannot lock ref 'HEAD'` lock-file case and as a do-not-relitigate guard (never put `.git` back under a cloud File Provider).
 
 **Symptom (S174–S175):** every git command that walks ALL loose objects in
 `.git/objects/` — `gc`, `repack`, `prune`, `fsck` — hangs. Targeted commands
@@ -65,5 +65,6 @@ then if `.git/refs/heads/main` is missing but `main.lock` exists, the lock
 file content IS the correct ref value — `mv` it onto `main`. Verify with
 `git rev-parse HEAD`.
 
-**Config note:** `gc.auto 0` is set on this repo as an interim workaround. Once
-the repo is on a non-synced path, re-enable with `git config --unset gc.auto`.
+**Config note:** `gc.auto` is currently unset on this repo. If the lock-file failure
+recurs, `git config gc.auto 0` can be used as an interim workaround, but once
+the repo is on a non-synced path, leave auto-gc enabled.

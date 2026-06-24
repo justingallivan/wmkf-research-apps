@@ -19,7 +19,7 @@ Do:
 
 Do not:
 - Rebuild the removed low-balance estimator/anchor machinery — Anthropic-native auto-reload + spend limits replaced it (S181).
-- Assume there is a numbered migration `032` for `model_pricing_audit` — it's created in `scripts/setup-database.js`; latest numbered migration is `018` (the S219 reviewer-table drop).
+- Assume there is a numbered migration `032` for `model_pricing_audit` — it's created in `scripts/setup-database.js`; latest numbered migration is `020_reviewer_find_roster.sql`.
 
 Ground truth: `lib/utils/model-pricing.js`, `pages/api/admin/stats.js`, `pages/api/cron/{spend-check,pricing-canary,pricing-refresh}.js`, `api_usage_log` table; Anthropic console for reconciliation.
 
@@ -43,7 +43,7 @@ User ran out of Anthropic API credits during a batch expertise matching run (Apr
 **Pricing accuracy machinery (S181):**
 - **`lib/utils/model-pricing.js`** — extracted from `usage-logger.js`. Longest-prefix-first matcher (was `.includes()`, which silently misrouted `claude-opus-4-6` → `claude-opus-4` pricing for 3× overestimate). `LAST_REVIEWED_AT` field. Bug fixes: Haiku 4.5 = $1/$5 (was $0.80/$4); Opus 4.5/4.6/4.7 = $5/$25 (were inheriting Opus 4 $15/$75). 1h cache write multiplier (2×) added.
 - **`/api/cron/pricing-canary`** — weekly (Mon 10am UTC). Scans last 7d of `api_usage_log` for unknown model ids + flags if `LAST_REVIEWED_AT` >60 days old. Free signal, no Admin API needed.
-- **`/api/cron/pricing-refresh`** — monthly (1st of month, 11am UTC). Pulls Anthropic `/v1/organizations/cost_report` for last 30d, derives per-(model, token_type) price from `cost / tokens`, compares to local table, alerts on >5% drift OR unknown-in-cost-report. Skips when `ANTHROPIC_ADMIN_API_KEY` not set. Writes audit history to `model_pricing_audit` (created in `scripts/setup-database.js`, not a numbered migration — there is no `032`; latest migration is `018`). [verified S209; migration high-water mark refreshed S219]
+- **`/api/cron/pricing-refresh`** — monthly (1st of month, 11am UTC). Pulls Anthropic `/v1/organizations/cost_report` for last 30d, derives per-(model, token_type) price from `cost / tokens`, compares to local table, alerts on >5% drift OR unknown-in-cost-report. Skips when `ANTHROPIC_ADMIN_API_KEY` not set. Writes audit history to `model_pricing_audit` (created in `scripts/setup-database.js`, not a numbered migration — there is no `032`; latest migration is `020_reviewer_find_roster.sql`). [verified S209; migration high-water mark refreshed 2026-06-23]
 - **Storage decision:** pricing source of truth stays in code; cron alerts and humans edit. No auto-overwrite — protects against billing-system glitches corrupting prices.
 
 **Local code removed (S181):**

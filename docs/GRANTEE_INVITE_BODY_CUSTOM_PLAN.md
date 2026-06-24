@@ -2,9 +2,11 @@
 
 **Status:** IMPLEMENTED (commit 56da01e3) + post-impl fixes shipped: compose-state model (#1/#2), review-round-2 boundary fixes (NI-4 initial-profile-resolution, NI-5 cross-request leak), and #5 (per-key save rollback) + #6 (`replaceAll`) — see §11. No grantee-invite open items remain; the only red suites are pre-existing and unrelated (`bill`, `discovery-verification-status`).
 **Owner ask (S272):** Give Program Directors a *saved* custom grantee-invitation
-email body, plus a clearer edit affordance on the Awardee tab. Today the body is a
-single shared `DEFAULT_BODY` constant in `shared/components/workbench/AwardeeTab.js`,
-editable per-send in the "Message" textarea but **not saved** between sends.
+email body, plus a clearer edit affordance on the Awardee tab. Current source reads
+editable grantee invite defaults (`email.grantee_invite.subject` / `email.grantee_invite.body`)
+through `/api/email-defaults/grantee-invite`, fills placeholders via
+`shared/config/granteeInviteEmail.js`, and keeps the body editable per-send in the
+"Message" textarea.
 
 This mirrors the S271 unified-signature pattern (one per-user Dataverse preference,
 edited in Profile Settings) — see `docs/UNIFIED_EMAIL_SIGNATURE_PLAN.md`.
@@ -15,7 +17,7 @@ edited in Profile Settings) — see `docs/UNIFIED_EMAIL_SIGNATURE_PLAN.md`.
 
 1. **Saved custom body.** A per-user preference `grantee_invite_body` holding a
    *body-only* email template. When set, the Awardee tab seeds the Message textarea
-   from it; when absent, it falls back to the shared `DEFAULT_BODY`.
+   from it; when absent, it falls back to the shared editable grantee invite default.
 2. **Edit affordance.** Make it obvious the existing "Message" textarea *is* the
    editable body: relabel it ("Email body — edit before sending") and add a
    "Reset to default" link that restores the seeded template.
@@ -35,7 +37,7 @@ edited in Profile Settings) — see `docs/UNIFIED_EMAIL_SIGNATURE_PLAN.md`.
    signature) — `appendSignatureBlock` does no closing-dedup
    (`lib/services/email-signature.js:86-91`), so the body must not carry a closing.
 
-**Out of scope:** subject line (stays the shared `DEFAULT_SUBJECT`); the chunk-6
+**Out of scope:** subject line (stays shared/admin-editable through `email.grantee_invite.subject`); the chunk-6
 reminder body; the reviewer email templates (`reviewer_email_templates`).
 
 ---
@@ -60,14 +62,14 @@ because the sender is almost always the assigned PD.
 
 ## 3. Current state (VERIFIED via source)
 
-- **`DEFAULT_BODY`** + placeholder helpers (`formatCobDate`, `surnameFromName`,
-  `buildDefaultBody`) live **inside** `shared/components/workbench/AwardeeTab.js`
-  (lines 26–68). `buildDefaultBody({piName, title, baseDate})` substitutes
-  `[Name]` (surname), `[title]`, and `COB [date]` (today + 14d).
-- **Auto-fill / manual-edit guard** (AwardeeTab lines 106–113): an effect re-fills
-  placeholders when recipients/title load, but only if the user hasn't manually
-  edited the textarea. It compares the current body against `DEFAULT_BODY` and a
-  ref (`autoBodyRef`) holding the last auto-generated value.
+- **Editable default:** seed copy lives in `lib/seed/email-defaults/grantee-invite.js`,
+  is read through `/api/email-defaults/grantee-invite`, and is stored as
+  `email.grantee_invite.subject` / `email.grantee_invite.body`.
+- **Placeholder fill:** `shared/config/granteeInviteEmail.js::fillInviteBody`
+  substitutes `[Name]`, `[title]`, and `COB [date]`; AwardeeTab uses it for the selected
+  template.
+- **Auto-fill / manual-edit guard:** AwardeeTab now uses the compose-state model in §11,
+  not the old `DEFAULT_BODY` comparison.
 - **Send/preview** (lines 129–170) POST `bodyText: body` to
   `/api/workbench/grantee-deliverables/send-invite` and `.../preview-invite`; the
   server appends the signature. **No server change needed for Option A.**
@@ -75,7 +77,7 @@ because the sender is almost always the assigned PD.
   `shared/config/reviewerFinderPreferences.js`; read client-side via
   `useProfile().preferences[key]`; written via `useProfile().setPreference(key, value)`
   → `POST /api/user-preferences`. `ProfileProvider` wraps the whole app
-  (`pages/_app.js:29`), so AwardeeTab can call `useProfile()` (it does not today).
+  (`pages/_app.js:29`), and AwardeeTab uses `useProfile()`.
 - **Write gating:** `/api/user-preferences` blocks only `PROMPT_OVERRIDES`
   (`RESERVED_WRITE_KEYS`). A new `grantee_invite_body` key passes the generic
   endpoint with no route change and **no `API_ROUTE_SECURITY_MATRIX` entry**
@@ -100,23 +102,23 @@ because the sender is almost always the assigned PD.
 
 ### 4.1 Extract the shared template + placeholder helpers (new module)
 
-Move `DEFAULT_BODY`, `DEFAULT_SUBJECT`, `formatCobDate`, `surnameFromName`, and a
-generalized fill function out of `AwardeeTab.js` into a new shared module
-**`shared/config/granteeInviteEmail.js`** so both AwardeeTab and Profile Settings
-import one source of truth.
+Keep `email.grantee_invite.*`, `lib/seed/email-defaults/grantee-invite.js`,
+`/api/email-defaults/grantee-invite`, and `shared/config/granteeInviteEmail.js` as
+the shared defaults/helper layer so AwardeeTab and Profile Settings import one source
+of truth.
 
-**While moving `DEFAULT_BODY`, drop its trailing `'Thank you,'` line** (owner
-decision — see §1 invariant #4). The moved default ends at "Please do not hesitate
-to contact me if you need additional information." with no closing word.
+**Historical S272 decision:** while moving the then-local default body, drop its trailing
+`'Thank you,'` line (owner decision — see §1 invariant #4). The current seeded default
+ends at "Please do not hesitate to contact me if you need additional information." with
+no closing word.
 
 > S279 update: the default text exports described here were later moved out of
 > runtime code. The canonical backup/seed copy now lives in
 > `lib/seed/email-defaults/grantee-invite.js`; `shared/config/granteeInviteEmail.js`
 > keeps only placeholder-fill logic.
 
-AwardeeTab keeps a thin `buildDefaultBody` shim or calls `fillInviteBody(base, …)`
-directly. **Verify** no other file imports `DEFAULT_BODY`/`DEFAULT_SUBJECT` from
-AwardeeTab before moving (grep first).
+AwardeeTab calls `fillInviteBody(base, …)` directly; do not reintroduce local
+`DEFAULT_BODY`/`DEFAULT_SUBJECT` ownership in AwardeeTab.
 
 ### 4.2 Add the preference key
 
@@ -247,7 +249,7 @@ to be appended server-side from the assigned PD.
 1. **Auto-fill vs manual-edit ref logic (highest risk — SUPERSEDED by §11; the
    `userEditedBodyRef` fix below was itself buggy and was replaced by the compose-state
    model).** The original effect (AwardeeTab 106–113) decided "did the user hand-edit?" by comparing
-   `body` against `DEFAULT_BODY` and `autoBodyRef.current`. Because `preferences` load
+   `body` against the old local default and `autoBodyRef.current`. Because `preferences` load
    **asynchronously after** first render, two failure modes existed: (a) a saved
    custom body silently never appears (it arrives after mount; the guard treats the
    already-shown default as "manual" and refuses to replace), and (b) text the PD

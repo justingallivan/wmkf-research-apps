@@ -199,7 +199,7 @@ flowchart TD
 
     %% async BILL webhook
     S2hon -.->|"hours/days async"| WH["Webhook: vendor.updated"]
-    WH --> WHw["WRITES on honorarium akoya_request:<br/>• wmkf_exisitngbillcomaccount = Recently Confirmed"]
+    WH --> WHw["PENDING 7b write on honorarium akoya_request:<br/>• wmkf_exisitngbillcomaccount = Recently Confirmed"]
 ```
 
 ---

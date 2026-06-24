@@ -15,9 +15,9 @@ metadata:
 Read this when: setting up or troubleshooting the local dev server / `.env.local`, or assuming where local dev points its data.
 
 Do:
-- Run `npm run dev` on port 3000; expect auth disabled locally (`AUTH_REQUIRED=false`).
+- Run `npm run dev` on port 3000; verify the auth flag from live `.env.local` (currently `AUTH_REQUIRED=true`).
 - Strip quotes when parsing `.env.local` values in scripts.
-- Set the three `WAVE1_BACKEND_*` flags to `dataverse` (missing flags fail loudly, never silently route to dropped Postgres tables).
+- Do not assume `WAVE1_BACKEND_*` flags are present locally; current services default to Dataverse and fail loudly only when a flag is explicitly set to unsupported `postgres`.
 
 Do not:
 - Assume a separate local/test Dataverse store — local dev points at PROD Dataverse (`https://wmkf.crm.dynamics.com`); the sandbox is not drop-in usable (see [[project-dynamics-sandbox-state]]).
@@ -25,7 +25,7 @@ Do not:
 Ground truth: `.env.local`, `package.json` scripts; cross-refs [[project-dynamics-sandbox-state]]. Config values may drift — verify against the live `.env.local` rather than this memory.
 
 - Dev server: `npm run dev` on port 3000
-- Auth disabled in dev (`AUTH_REQUIRED=false` in `.env.local`)
+- Auth required in the current local `.env.local` (`AUTH_REQUIRED=true`)
 - `.env.local` values are quoted (e.g., `DYNAMICS_URL="https://..."`) — scripts that parse it must strip quotes
-- `.env.local` has `WAVE1_BACKEND_SETTINGS=dataverse`, `WAVE1_BACKEND_APP_ACCESS=dataverse`, `WAVE1_BACKEND_PREFS=dataverse` (mirroring prod since 2026-05-11). Dispatcher defaults to Dataverse as of 2026-05-12; missing flags now fail loudly instead of silently routing to the dropped Postgres tables.
+- `.env.local` currently has no `WAVE1_BACKEND_*` flags. Dispatcher defaults to Dataverse; an explicit `postgres` value fails loudly instead of silently routing to dropped Postgres tables.
 - Local dev points at **prod Dataverse** (`DYNAMICS_URL=https://wmkf.crm.dynamics.com`) — there is no separate test store wired in. A sandbox exists but isn't drop-in usable; see [[project-dynamics-sandbox-state]].
