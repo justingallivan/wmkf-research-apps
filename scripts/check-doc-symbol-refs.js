@@ -3,8 +3,8 @@
  * CI gate: repo file-path references in live memory + agent-wiki docs must point
  * at paths that EXIST. A reference to a renamed/removed code file (the "rename
  * the code, the doc lags" drift — see feedback-rename-code-not-just-docs) is
- * flagged unless the same line annotates it as removed/planned/historical, or it
- * carries a structured ignore marker.
+ * flagged unless that path is near a removed/planned/historical annotation, or
+ * the line carries a structured ignore marker.
  *
  * Why this gate: the fan-in doc gates (fact-consistency, prompt-storage-mentions,
  * drain-table-mentions) catch registered scalars and specific stale entity
@@ -32,7 +32,7 @@
  *   and ARE checked.
  *
  * Exemption (any one passes):
- *   - same-line removal/planned/historical keyword (removed, deleted, retired,
+ *   - same-line removal/planned/historical keyword near that ref (removed, deleted, retired,
  *     renamed, superseded, formerly, legacy, withdrawn, "no longer", "does not
  *     exist", "doesn't exist", absent, "never (created|existed|shipped)",
  *     planned, "to be created", "to live at", "will live", future, ~~strike~~)
@@ -48,7 +48,8 @@ const repoRoot = path.resolve(__dirname, '..');
 
 const ROOTS = ['.claude-memory', 'docs/agent-wiki'];
 const SINGLE_FILES = [];
-const EXCLUDE_DIR = /(^|\/)(archive|node_modules)(\/|$)/;
+const EXCLUDE_DIR = /(^|\/)(archive|node_modules|_doc_symbol_refs_selftest_tmp)(\/|$)/;
+const KEYWORD_PROXIMITY_CHARS = 120;
 
 // Whole-file allowlist (script-side). Empty for now; add only with a deliberate
 // justification (e.g. a doc whose purpose is recording removed paths).
@@ -61,7 +62,7 @@ const ALLOWLIST_FILES = new Set([]);
 const PATH_PREFIXES = ['lib', 'pages', 'shared', 'scripts', 'modules', 'tests', 'docs'];
 const EXT = '(?:jsx|tsx|json|mjs|cjs|sql|md|sh|ts|js)';
 const PATH_RE = new RegExp(
-  `(?<![\\w./-])((?:${PATH_PREFIXES.join('|')})\\/[A-Za-z0-9_.\\/\\[\\]-]*?\\.${EXT})\\b`,
+  `(?<![\\w./-])((?:\\.\\/)?(?:${PATH_PREFIXES.join('|')})\\/[A-Za-z0-9_.\\/\\[\\]-]*?\\.${EXT})\\b`,
   'g',
 );
 
@@ -94,7 +95,7 @@ function collectFiles() {
     const ent = fs.lstatSync(full);
     if (ent.isSymbolicLink()) return;
     if (!full.endsWith('.md')) return;
-    if (EXCLUDE_DIR.test(rel)) return;
+    if (shouldExcludeRelPath(rel)) return;
     if (isPointInTimeBasename(path.basename(full))) return;
     if (ALLOWLIST_FILES.has(rel)) return;
     const text = fs.readFileSync(full, 'utf8');
@@ -108,13 +109,15 @@ function collectFiles() {
   }
   for (const rootRel of ROOTS) {
     const root = path.join(repoRoot, rootRel);
-    if (!fs.existsSync(root)) continue;
+    if (!fs.existsSync(root)) {
+      throw new Error(`doc-symbol-refs configuration error: required scan root is missing: ${rootRel}. Restore it or update ROOTS deliberately.`);
+    }
     (function walkDir(dir) {
       for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, ent.name);
         const rel = path.relative(repoRoot, full);
         if (ent.isDirectory()) {
-          if (!EXCLUDE_DIR.test(rel)) walkDir(full);
+          if (!shouldExcludeRelPath(rel)) walkDir(full);
         } else {
           addIfLive(full);
         }
@@ -129,13 +132,31 @@ function findPathRefs(line) {
   const out = [];
   let m;
   while ((m = PATH_RE.exec(line)) !== null) {
-    out.push(m[1]);
+    out.push({
+      ref: normalizeRepoRef(m[1]),
+      start: m.index,
+      end: m.index + m[1].length,
+    });
   }
   return out;
 }
 
-function lineIsExempt(line) {
-  return MARKER_RE.test(line) || SAME_LINE_OK.test(line);
+function normalizeRepoRef(ref) {
+  return ref.startsWith('./') ? ref.slice(2) : ref;
+}
+
+function shouldExcludeRelPath(rel) {
+  if (process.env.DOC_SYMBOL_REFS_INCLUDE_SELFTEST_TMP === '1' && /(^|\/)_doc_symbol_refs_selftest_tmp(\/|$)/.test(rel)) {
+    return false;
+  }
+  return EXCLUDE_DIR.test(rel);
+}
+
+function refIsExempt(line, start, end) {
+  if (MARKER_RE.test(line)) return true;
+  const windowStart = Math.max(0, start - KEYWORD_PROXIMITY_CHARS);
+  const windowEnd = Math.min(line.length, end + KEYWORD_PROXIMITY_CHARS);
+  return SAME_LINE_OK.test(line.slice(windowStart, windowEnd));
 }
 
 function assertAllowlistFilesExist() {
@@ -157,11 +178,11 @@ function main() {
     const rel = path.relative(repoRoot, file);
     const lines = fs.readFileSync(file, 'utf8').split('\n');
     lines.forEach((line, i) => {
-      const refs = findPathRefs(line);
-      if (refs.length === 0) return;
-      const exempt = lineIsExempt(line);
+      const matches = findPathRefs(line);
+      if (matches.length === 0) return;
       const seen = new Set();
-      for (const ref of refs) {
+      for (const match of matches) {
+        const { ref } = match;
         if (seen.has(ref)) continue;
         seen.add(ref);
         // Skip abbreviation segments (`docs/.../DESIGN.md`) and parent-dir hops
@@ -171,7 +192,7 @@ function main() {
         if (/(^|\/)\.{2,3}(\/|$)/.test(ref)) continue;
         refsChecked += 1;
         if (fs.existsSync(path.join(repoRoot, ref))) continue;
-        if (exempt) continue;
+        if (refIsExempt(line, match.start, match.end)) continue;
         violations.push({ rel, lineNo: i + 1, ref, text: line.trim().slice(0, 180) });
       }
     });

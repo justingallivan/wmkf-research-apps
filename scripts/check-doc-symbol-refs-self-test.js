@@ -30,7 +30,10 @@ function cleanup() {
 function runGate() {
   try {
     return { status: 0, output: execSync(`node ${JSON.stringify(gate)}`, {
-      cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8',
+      cwd: repoRoot,
+      env: { ...process.env, DOC_SYMBOL_REFS_INCLUDE_SELFTEST_TMP: '1' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: 'utf8',
     }) };
   } catch (e) {
     return { status: e.status || 1, output: (e.stdout || '') + (e.stderr || '') };
@@ -46,6 +49,13 @@ function buildFixtures() {
       body: `See ${MISSING} for the implementation.`, expectFlagged: true },
     { name: 'dangling path with :line ref is flagged', file: 'pos_lineref.md',
       body: `Resolver at \`${MISSING}:42\` handles it.`, expectFlagged: true },
+    { name: './-prefixed repo path is normalized and flagged', file: 'pos_dot_slash.md',
+      body: `Resolver at \`./${MISSING}\` handles it.`, expectFlagged: true },
+    { name: 'keyword exemption is per-ref, not line-wide', file: 'pos_mixed_keyword_proximity.md',
+      body: `The \`lib/services/__doc_symbol_refs_selftest_removed__.js\` helper was removed in S281. ${'Filler '.repeat(30)}Also see \`lib/services/__doc_symbol_refs_selftest_far__.js\` for active behavior.`,
+      expectFlagged: true,
+      expectMissingRefs: ['lib/services/__doc_symbol_refs_selftest_far__.js'],
+      expectAbsentRefs: ['lib/services/__doc_symbol_refs_selftest_removed__.js'] },
 
     // ── Negatives — must NOT be flagged ───────────────────────────────────────
     { name: 'existing path passes', file: 'neg_exists.md',
@@ -85,6 +95,12 @@ function assertFixtures() {
   for (const fx of fixtures) {
     const flagged = new RegExp(`✗\\s+\\S*${fx.file.replace(/\./g, '\\.')}`).test(output);
     if (flagged !== fx.expectFlagged) failures.push(`${fx.expectFlagged ? 'MISSED' : 'FALSE-FLAG'}: ${fx.name}`);
+    for (const ref of fx.expectMissingRefs || []) {
+      if (!output.includes(`missing path ${ref}`)) failures.push(`MISSED-REF: ${fx.name} did not flag ${ref}`);
+    }
+    for (const ref of fx.expectAbsentRefs || []) {
+      if (output.includes(`missing path ${ref}`)) failures.push(`FALSE-FLAG-REF: ${fx.name} flagged ${ref}`);
+    }
   }
   cleanup();
   if (failures.length) {
