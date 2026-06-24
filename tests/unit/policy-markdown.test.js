@@ -11,8 +11,10 @@
 
 const {
   renderPolicyMarkdown,
+} = require('../../shared/utils/policy-markdown-client');
+const {
   validatePolicyMarkdown,
-} = require('../../shared/utils/policy-markdown');
+} = require('../../shared/utils/policy-markdown-server');
 
 describe('validatePolicyMarkdown', () => {
   test('accepts plain markdown', () => {

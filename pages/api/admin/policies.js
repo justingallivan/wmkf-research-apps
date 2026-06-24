@@ -35,7 +35,7 @@ import { sql } from '@vercel/postgres';
 import { requireSuperuser } from '../../../lib/utils/auth';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
-import { validatePolicyMarkdown } from '../../../shared/utils/policy-markdown';
+import { validatePolicyMarkdown } from '../../../shared/utils/policy-markdown-server';
 
 // Server-side allowlist. Other slots remain invisible until staff are ready;
 // expanding the allowlist is a deliberate code change, not a UI config.

@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { renderPolicyMarkdown } from '../../utils/policy-markdown';
+import { renderPolicyMarkdown } from '../../utils/policy-markdown-client';
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);

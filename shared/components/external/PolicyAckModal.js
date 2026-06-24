@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { renderPolicyMarkdown } from '../../utils/policy-markdown';
+import { renderPolicyMarkdown } from '../../utils/policy-markdown-client';
 
 const BOTTOM_THRESHOLD_PX = 24;
 
