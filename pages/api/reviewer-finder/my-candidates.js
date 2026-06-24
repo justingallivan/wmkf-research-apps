@@ -96,6 +96,9 @@ async function handleGet(req, res, access) {
 
     let suggestions = [];
     let requestById = {};
+    // Removed ("X'd") candidates — only fetched in the single-request path (the
+    // Candidates panel's scope). Attached to the proposal as `removedCandidates`.
+    let removedRows = [];
 
     if (requestId || requestNumber) {
       const request = await fetchRequestByIdOrNumber({ requestId, requestNumber });
@@ -105,6 +108,7 @@ async function handleGet(req, res, access) {
       requestById = { [request.requestId]: request };
       const rows = await suggestionAdapter.findByRequest(request.requestId, { selectedOnly: true });
       suggestions = rows;
+      removedRows = await suggestionAdapter.findRemovedByRequest(request.requestId);
     } else {
       const pd = await resolvePD(access.session?.user?.azureEmail);
       if (!pd?.systemuserid) {
@@ -115,7 +119,7 @@ async function handleGet(req, res, access) {
       requestById = result.requestById;
     }
 
-    if (suggestions.length === 0) {
+    if (suggestions.length === 0 && removedRows.length === 0) {
       return res.status(200).json({ success: true, proposals: [], totalCandidates: 0 });
     }
 
@@ -241,9 +245,32 @@ async function handleGet(req, res, access) {
       });
     }
 
+    const proposals = Object.values(byRequest);
+
+    // Single-request mode: attach the request's removed candidates so the
+    // Candidates panel can offer a "Removed → Restore" list. If every candidate
+    // was removed, byRequest is empty — build a proposal shell from requestById
+    // so the Removed list still renders.
+    if ((requestId || requestNumber) && removedRows.length > 0) {
+      const removedCandidates = await projectRemovedCandidates(removedRows);
+      const reqId = Object.keys(requestById)[0];
+      let target = proposals.find((p) => p.proposalId === reqId);
+      if (!target) {
+        const request = requestById[reqId];
+        target = {
+          proposalId: request.requestId,
+          proposalTitle: request.title || `Request ${request.requestNumber || ''}`.trim(),
+          requestNumber: request.requestNumber,
+          candidates: [],
+        };
+        proposals.push(target);
+      }
+      target.removedCandidates = removedCandidates;
+    }
+
     return res.status(200).json({
       success: true,
-      proposals: Object.values(byRequest),
+      proposals,
       totalCandidates: suggestions.length,
     });
   } catch (error) {
@@ -357,6 +384,34 @@ async function fetchResearchersByPerson(personIds) {
   return out;
 }
 
+// Lightweight projection for the "Removed" list — far fewer fields than an active
+// candidate (no invite/lifecycle state; these rows are off the request). Does its
+// own person/researcher hydration so it stays decoupled from the main grouping.
+async function projectRemovedCandidates(rows) {
+  if (!rows?.length) return [];
+  const personIds = [...new Set(rows.map((s) => s._wmkf_potentialreviewer_value).filter(Boolean))];
+  const [personById, researcherByPerson] = await Promise.all([
+    fetchPotentialReviewers(personIds),
+    fetchResearchersByPerson(personIds),
+  ]);
+  return rows.map((s) => {
+    const person = personById[s._wmkf_potentialreviewer_value] || {};
+    const researcher = researcherByPerson[s._wmkf_potentialreviewer_value] || null;
+    return {
+      suggestionId: s.wmkf_appreviewersuggestionid,
+      name: person.wmkf_name || null,
+      affiliation: researcher?.wmkf_primaryaffiliation || person.wmkf_organizationname || null,
+      email: person.wmkf_emailaddress || null,
+      reasoning: s.wmkf_matchreason || null,
+      // Whether the candidate was invited before removal — restoring keeps invite
+      // stamps (softDelete leaves them), but the magic link was revoked, so the UI
+      // can warn that a re-invite is needed.
+      wasInvited: !!s.wmkf_invited,
+      removedAt: s.modifiedon || null,
+    };
+  });
+}
+
 // ───────── PATCH ─────────
 
 async function handlePatch(req, res, access) {
@@ -426,6 +481,15 @@ async function handlePatch(req, res, access) {
     // selectors interpolated raw into the request URL).
     if (!isGuid(suggestionId)) {
       return res.status(400).json({ error: 'suggestionId is not a valid GUID' });
+    }
+
+    // ── Restore a removed candidate (reverse the X) ──
+    // Explicit flag rather than a generic `selected` field so the destructive
+    // direction stays single-pathed through DELETE (atomic unselect + token
+    // revoke); this only ever re-selects.
+    if (body.restore === true) {
+      await suggestionAdapter.restore(suggestionId, { actingUserSystemId });
+      return res.status(200).json({ success: true, message: 'Candidate restored' });
     }
 
     // ── Per-suggestion ──

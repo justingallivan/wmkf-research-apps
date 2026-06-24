@@ -50,6 +50,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [candidates, setCandidates] = useState([]);
+  const [removedCandidates, setRemovedCandidates] = useState([]);
   const [candidatesLoading, setCandidatesLoading] = useState(true);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
@@ -93,10 +94,14 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
     try {
       const res = await fetch(`/api/reviewer-finder/my-candidates?requestId=${encodeURIComponent(requestId)}`);
       const data = await res.json().catch(() => ({}));
-      const rows = (data.proposals && data.proposals[0] && data.proposals[0].candidates) || [];
+      const prop = (data.proposals && data.proposals[0]) || null;
+      const rows = (prop && prop.candidates) || [];
+      const removed = (prop && prop.removedCandidates) || [];
       setCandidates(Array.isArray(rows) ? rows : []);
+      setRemovedCandidates(Array.isArray(removed) ? removed : []);
     } catch {
       setCandidates([]);
+      setRemovedCandidates([]);
     } finally {
       setCandidatesLoading(false);
     }
@@ -225,6 +230,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
         <CandidatesPanel
           requestId={requestId}
           candidates={candidates}
+          removedCandidates={removedCandidates}
           loading={candidatesLoading}
           onRefresh={refreshAll}
           settings={settings}

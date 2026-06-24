@@ -67,12 +67,14 @@ function candidateContactPageUrl(c) {
   return facultyPageUrl || c.website;
 }
 
-export default function CandidatesPanel({ requestId, candidates = [], loading = false, onRefresh, settings = {}, canManage = true }) {
+export default function CandidatesPanel({ requestId, candidates = [], removedCandidates = [], loading = false, onRefresh, settings = {}, canManage = true }) {
   const [selected, setSelected] = useState(() => new Set());
   const [modal, setModal] = useState(null); // { candidates, allowResend } | null
   const [editing, setEditing] = useState(null); // candidate row being edited | null
   const [removingId, setRemovingId] = useState(null);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [restoringId, setRestoringId] = useState(null);
+  const [showRemoved, setShowRemoved] = useState(false);
 
   // Remove a candidate from THIS request. Same server-authoritative DELETE the
   // Invite/Track rows use (my-candidates → soft-delete wmkf_selected=false + revoke
@@ -82,7 +84,8 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
     const msg = `Remove ${c.name || 'this candidate'} from this request?\n\n`
       + 'This drops them from the candidate list for this proposal'
       + (c.invited && !c.accepted ? ' and revokes their invitation link' : '')
-      + '. Their reviewer record is preserved.';
+      + '. Their reviewer record is preserved, and you can restore them from the '
+      + 'Removed list at the bottom of this tab.';
     if (!confirm(msg)) return;
     setRemovingId(c.suggestionId);
     try {
@@ -101,6 +104,30 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
       alert(`Network error removing candidate: ${err.message}`);
     } finally {
       setRemovingId(null);
+    }
+  };
+
+  // Reverse the X: re-select a removed candidate so it returns to the list above.
+  // PATCH { restore:true } → server re-selects (never un-revokes a token). Same
+  // resp.ok guard as removeCandidate (fetch doesn't throw on 4xx/5xx).
+  const restoreCandidate = async (c) => {
+    setRestoringId(c.suggestionId);
+    try {
+      const resp = await fetch('/api/reviewer-finder/my-candidates', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ suggestionId: c.suggestionId, restore: true }),
+      });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        alert(`Could not restore candidate: ${data.error || data.message || data.details || resp.status}`);
+        return;
+      }
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert(`Network error restoring candidate: ${err.message}`);
+    } finally {
+      setRestoringId(null);
     }
   };
 
@@ -320,6 +347,54 @@ export default function CandidatesPanel({ requestId, candidates = [], loading = 
             <span className="text-xs text-gray-400">{selectable.length} invitable · {candidates.length - selectable.length} accepted</span>
           </div>
         </>
+      )}
+
+      {removedCandidates.length > 0 && (
+        <div className="mt-4 border-t border-gray-100 pt-3">
+          <button
+            type="button"
+            onClick={() => setShowRemoved((v) => !v)}
+            className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700"
+            aria-expanded={showRemoved}
+          >
+            <span className="text-gray-400">{showRemoved ? '▾' : '▸'}</span>
+            Removed ({removedCandidates.length})
+          </button>
+          {showRemoved && (
+            <>
+              <p className="text-xs text-gray-400 mt-1.5">
+                Candidates removed from this request. Restoring returns them to the list above; if they had
+                an invitation, that link was revoked — re-invite to send a fresh one.
+              </p>
+              <ul className="mt-2 divide-y divide-gray-100">
+                {removedCandidates.map((c) => (
+                  <li key={c.suggestionId} className="py-2 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-700 truncate">
+                        {c.name || '(unnamed)'}
+                        {c.wasInvited && (
+                          <span className="ml-2 text-xs text-gray-400">(invite was revoked)</span>
+                        )}
+                      </p>
+                      {c.affiliation && <p className="text-xs text-gray-400 truncate">{c.affiliation}</p>}
+                    </div>
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={() => restoreCandidate(c)}
+                        disabled={restoringId === c.suggestionId}
+                        className="text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50 whitespace-nowrap"
+                        title="Restore this candidate to the list above"
+                      >
+                        {restoringId === c.suggestionId ? 'Restoring…' : 'Restore'}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
       )}
 
       {modal && (
