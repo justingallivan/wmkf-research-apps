@@ -82,13 +82,15 @@ describe('disposition optionset + helpers', () => {
 });
 
 describe('restore scope guard (Codex S285 review High)', () => {
-  test('re-selects a genuinely removed row (selected=false, disposition=null)', async () => {
-    DynamicsService.getRecord.mockResolvedValue({ wmkf_selected: false, wmkf_applicantdisposition: null });
+  test('re-selects a genuinely removed row (selected=false, disposition=null), ETag-guarded', async () => {
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_selected: false, wmkf_applicantdisposition: null, _etag: 'W/"42"' });
     await restore(SUGGESTION_ID, { actingUserSystemId: 'SYS-1' });
     // updateLifecycle re-reads then PATCHes wmkf_selected:true.
     const patched = DynamicsService.updateRecord.mock.calls.find((c) => c[2] && 'wmkf_selected' in c[2]);
     expect(patched).toBeTruthy();
     expect(patched[2].wmkf_selected).toBe(true);
+    // TOCTOU guard: the write is conditional on the row read by the scope check.
+    expect(patched[3]).toMatchObject({ ifMatch: 'W/"42"' });
   });
 
   test('refuses to restore an applicant-recommended row (must use promotion path)', async () => {
