@@ -80,19 +80,18 @@ roll-up/export is a deferred add-on.
 Staff-facing rollout polish around the grantee portal/workbench flow — remaining copy, PD preview, awardee
 workflow ergonomics.
 
-### 4. `applications.wmkeck.org` staff auth — Azure done; `NEXTAUTH_URL` held empty ON PURPOSE
-**Resolved 2026-06-23:** the staff Azure app registration (client `a652a292-2574-434c-ae6f-aa01f61d82ad`,
-"WMK: SSO Authentication") now includes the redirect URI
-`https://applications.wmkeck.org/api/auth/callback/azure-ad`, and **staff sign-in on the branded host is
-verified working**. `NEXTAUTH_URL` is **intentionally kept empty** (`NEXTAUTH_URL=""`) so BOTH
-`applications.wmkeck.org` and legacy `wmkfresearch.vercel.app` keep working during the staff rollout
-(host-derived callbacks). Owner is rolling out the branded host to non-tech-savvy colleagues and will
-deprecate the old host later. **Do NOT set `NEXTAUTH_URL` until that deprecation** — setting it pins the
-callback to the branded host AND turns on the `lib/utils/auth.js` Origin/Referer CSRF check (currently
-OFF), after which writes from `wmkfresearch.vercel.app` 403. At deprecation: set
-`NEXTAUTH_URL=https://applications.wmkeck.org`, redeploy, smoke a sign-in + one cookie-bearing write from
-the branded host, then optionally remove the old vercel.app redirect URI from Azure. See
-`project-branded-domains.md`.
+### 4. `applications.wmkeck.org` staff auth — CUT OVER + VERIFIED (2026-06-23)
+**Done:** staff auth is live on the branded host. Azure app registration (client
+`a652a292-2574-434c-ae6f-aa01f61d82ad`, "WMK: SSO Authentication") includes the redirect URI
+`https://applications.wmkeck.org/api/auth/callback/azure-ad`, and `NEXTAUTH_URL=https://applications.wmkeck.org`
+is set in Production. VERIFIED via live runtime `/api/health` + an authenticated write probe (POST/DELETE
+200) on the branded host — sign-in + reads + writes all work; the `lib/utils/auth.js` Origin CSRF check is
+ON, pinned to the branded host. Legacy `wmkfresearch.vercel.app` now 403s writes and funnels sign-in to the
+branded host (deprecation tail; don't hard-retire until staff bookmarks + old magic links are accounted
+for). **Correction logged:** the prior "NEXTAUTH_URL is empty in prod" claim was a Sensitive-var `vercel
+env pull` artifact (read back `""`); runtime was always non-empty — trust `/api/health`, not the pull.
+**OPEN:** `NEXTAUTH_URL` was also set in **Preview** to the prod host — that likely breaks preview
+deployments; remove it from Preview (leave host-derived). See `project-branded-domains.md` [verify-removed].
 
 ### 5. Optional: migrate new reviewer invitations to `reviews.wmkeck.org`
 Low risk (no outstanding reviewer invitations). Remember reviewer links are **latest-link-wins**:
@@ -123,9 +122,10 @@ re-rendering/re-sending mints a new hash and invalidates older links.
   is what's sent; `lib/seed/email-defaults/*` is backup. Prod was re-baselined this session; future seed
   changes need `rebaseline-email-defaults.mjs --force-keys` to reach prod (and `--force-keys` CLOBBERS
   admin-panel edits).
-- **Do not set `NEXTAUTH_URL` yet** — held empty on purpose so both hosts work during the staff rollout
-  (Azure callback is registered + sign-in verified; the flip is the later deprecation switch). See item #4
-  and `project-branded-domains.md`.
+- **`NEXTAUTH_URL` is now `https://applications.wmkeck.org`** (Production; staff auth cut over + verified
+  2026-06-23). The Origin CSRF check is ON and pinned there; old-host writes 403. Don't trust `vercel env
+  pull` for it (Sensitive-var history read back `""` → false "empty" belief); use runtime `/api/health`.
+  See item #4 and `project-branded-domains.md`.
 - **Vercel sensitive env pull:** sensitive values read back empty; the reviewer/grantee base-URL vars are
   non-sensitive and verifiable.
 - **External request numbers:** visible public copy/JSON must never expose the internal request number.

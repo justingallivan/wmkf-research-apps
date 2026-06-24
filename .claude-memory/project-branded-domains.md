@@ -1,11 +1,11 @@
 ---
 name: project-branded-domains
-description: External-facing comms use wmkeck.org branded domains (anti-phishing); reviewer/grantee portal base URLs are live on reviews./grantees.wmkeck.org; applications.wmkeck.org staff-auth callback is registered and sign-in is verified, but NEXTAUTH_URL is intentionally kept empty so BOTH hosts work during the staff rollout (the flip is the later deprecation switch).
+description: External-facing comms use wmkeck.org branded domains (anti-phishing); reviewer/grantee portal base URLs are live on reviews./grantees.wmkeck.org; applications.wmkeck.org is now the LIVE staff-auth host — NEXTAUTH_URL=https://applications.wmkeck.org (cut over 2026-06-23, verified sign-in+read+write), CSRF Origin check pinned to it, old wmkfresearch.vercel.app host now 403s writes and funnels sign-in to the branded host.
 metadata:
   type: project
   status: active
   scope: dev-environment
-  last_verified: 2026-06-23 via vercel alias ls + env pull + HTTPS probes + live staff sign-in on applications.wmkeck.org
+  last_verified: 2026-06-23 via live runtime /api/health probe + authenticated write probe (POST/DELETE 200) on applications.wmkeck.org
 ---
 
 ## The strategy (owner + Codex, S271; refreshed 2026-06-23)
@@ -26,18 +26,24 @@ Origin/Referer checks.
   in Production as a non-sensitive env var and was redeployed.
 - **`submissions.wmkeck.org`** — attached/aliased in Vercel and `/apply` routes
   to the applicant sign-in flow. No separate base-url env switch was made.
-- **`applications.wmkeck.org`** — attached/aliased in Vercel and serving the app.
-  The staff Azure app registration NOW INCLUDES the redirect URI
-  `https://applications.wmkeck.org/api/auth/callback/azure-ad` (added 2026-06-23),
-  and **staff sign-in on the branded host is verified working** (full OAuth
-  round-trip). `NEXTAUTH_URL` is **intentionally kept empty** so that BOTH
-  `applications.wmkeck.org` and the legacy `wmkfresearch.vercel.app` continue to
-  work during the staff rollout — with `NEXTAUTH_URL` empty, NextAuth derives the
-  callback from the browsing host and both hosts' callbacks are registered, so
-  sign-in + writes work on either. Setting `NEXTAUTH_URL` is the **later
-  deprecation switch**: it pins the flow to `applications.wmkeck.org` AND turns on
-  the `lib/utils/auth.js` Origin/Referer CSRF check, after which writes from the
-  old host return 403. Throw it only once staff have moved to the branded host.
+- **`applications.wmkeck.org`** — attached/aliased in Vercel and **now the LIVE
+  staff-auth host** (cut over 2026-06-23). The staff Azure app registration
+  ("WMK: SSO Authentication", client `a652a292-2574-434c-ae6f-aa01f61d82ad`)
+  includes the redirect URI
+  `https://applications.wmkeck.org/api/auth/callback/azure-ad`, and
+  `NEXTAUTH_URL=https://applications.wmkeck.org` is set in Production (non-sensitive
+  now). VERIFIED via live probe: runtime `/api/health` reports the branded host,
+  and an authenticated write probe on the branded host returned POST/DELETE 200
+  (preference persisted + cleaned up). So sign-in + reads + writes all work on the
+  branded host, and the `lib/utils/auth.js` Origin/Referer CSRF check is ON, pinned
+  to `applications.wmkeck.org`. The legacy `wmkfresearch.vercel.app` host now
+  behaves as the deprecation tail: GET still works, but POST/PUT/PATCH/DELETE 403
+  (Origin mismatch), and sign-in there pins the callback to the branded host so
+  users funnel over. **Lesson:** the earlier "NEXTAUTH_URL is empty in prod" claim
+  was WRONG — it came from `vercel env pull` reading a then-Sensitive var back as
+  `""`; runtime was always `wmkfresearch.vercel.app` until this cut-over (see the
+  sensitive-var trap below). Trust the runtime producer (`/api/health`), not the
+  pull, for Sensitive vars.
 
 ## Verification trail (2026-06-23)
 
@@ -56,15 +62,21 @@ Origin/Referer checks.
 
 - `REVIEWER_PORTAL_BASE_URL` = `https://reviews.wmkeck.org`.
 - `GRANTEE_PORTAL_BASE_URL` = `https://grantees.wmkeck.org`.
-- `NEXTAUTH_URL` = empty in prod (verified `NEXTAUTH_URL=""` via env pull
-  2026-06-23 — the key exists, value is blank). Azure redirect URI is now
-  registered and branded-host sign-in is verified, so the prerequisite is met;
-  the var is held empty ON PURPOSE for the dual-host rollout. Future target is
-  `https://applications.wmkeck.org`, to be set at deprecation time (after staff
-  have migrated). `lib/utils/auth.js` compares state-changing request
-  Origin/Referer to `NEXTAUTH_URL` — that CSRF check is therefore OFF while the
-  var is empty (baseline protection is SameSite cookies); setting it turns the
-  check on.
+- `NEXTAUTH_URL` = `https://applications.wmkeck.org` in **Production** (set
+  2026-06-23, now non-sensitive). `lib/utils/auth.js` compares state-changing
+  request Origin/Referer to `NEXTAUTH_URL`, so the CSRF check is ON and pinned to
+  the branded host; writes from any other host (incl. `wmkfresearch.vercel.app`)
+  403. Do NOT trust `vercel env pull` history here — while it was Sensitive the
+  pull read back `""`, which produced a months-long false "empty in prod" belief;
+  the real runtime value (`wmkfresearch.vercel.app` before, `applications.wmkeck.org`
+  now) only shows via the runtime `/api/health` producer.
+- **Preview caveat:** `NEXTAUTH_URL` was ALSO set to `https://applications.wmkeck.org`
+  in the **Preview** environment on 2026-06-23. That likely breaks preview
+  deployments (preview sign-in callback would target the prod host, and preview-URL
+  writes 403 on Origin mismatch). Preview previously had no `NEXTAUTH_URL`
+  (host-derived, matching the registered `wmkfresearchapps-preview.vercel.app`
+  callback). Recommended fix: REMOVE `NEXTAUTH_URL` from Preview, keep it only in
+  Production. [status: verify-removed]
 
 **How to apply future host changes:** point DNS at Vercel, attach/alias the host
 to the project, set any matching public base URL as **non-sensitive** so it can

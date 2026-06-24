@@ -64,22 +64,25 @@ private Blob/file access, prompt-injection hardening, and download proxy pattern
   and grantee token context APIs intentionally omit `requestNumber`, and the
   reviewer/grantee send paths guard against sending hydrated email subject/body
   copy that contains the internal request number.
-- Staff-auth branded host (2026-06-23): the staff Azure app registration now
-  includes the redirect URI
-  `https://applications.wmkeck.org/api/auth/callback/azure-ad`, and staff sign-in
-  on the branded host is verified working. `NEXTAUTH_URL` is **intentionally kept
-  empty** so both `applications.wmkeck.org` and legacy `wmkfresearch.vercel.app`
-  work during the staff rollout — with the var empty, NextAuth derives the callback
-  from the browsing host and both hosts' callbacks are registered.
-- Deprecation switch (later, after staff migrate): set
-  `NEXTAUTH_URL=https://applications.wmkeck.org`, redeploy, then smoke-test a
-  staff sign-in and one cookie-bearing state-changing staff API action from
-  `applications.wmkeck.org`. This pins the callback AND activates the Origin check:
-  `lib/utils/auth.js` rejects POST/PUT/PATCH/DELETE requests whose Origin/Referer
-  does not match `NEXTAUTH_URL` (the check is OFF while the var is empty). After
-  the flip, writes from `wmkfresearch.vercel.app` return 403.
-- Do not redirect/retire `wmkfresearch.vercel.app` until outstanding staff
+- Staff-auth cut over to the branded host (2026-06-23): the staff Azure app
+  registration includes the redirect URI
+  `https://applications.wmkeck.org/api/auth/callback/azure-ad`, and
+  `NEXTAUTH_URL=https://applications.wmkeck.org` is set in Production. VERIFIED via
+  live runtime `/api/health` + an authenticated write probe (POST/DELETE 200) on
+  the branded host: sign-in + reads + writes all work there. The Origin check is
+  ON, pinned to the branded host: `lib/utils/auth.js` rejects POST/PUT/PATCH/DELETE
+  whose Origin/Referer ≠ `NEXTAUTH_URL`.
+- Legacy `wmkfresearch.vercel.app` is now the deprecation tail: GET works, but
+  state-changing requests 403, and sign-in there pins the callback to the branded
+  host so users funnel over. Do not hard-retire it until outstanding staff
   bookmarks and old external magic links are accounted for.
+- `NEXTAUTH_URL` runtime-vs-pull trap: while it was a Sensitive Vercel var,
+  `vercel env pull` read it back as `""`, producing a false "empty in prod" belief
+  in earlier docs. The authoritative producer is runtime `/api/health` (reports
+  `process.env.NEXTAUTH_URL`); do not infer the value from a pull of a Sensitive
+  var.
+- Preview env should NOT carry a fixed `NEXTAUTH_URL` (leave host-derived) or
+  preview-deployment sign-in/writes break; see `project-branded-domains.md`.
 
 ## Trust-Boundary GUID Validation
 
