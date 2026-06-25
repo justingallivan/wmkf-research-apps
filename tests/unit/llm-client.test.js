@@ -89,6 +89,21 @@ describe('LLMClient.complete', () => {
     expect(result.textStreamed).toBe(false);
   });
 
+  describe('_buildBody temperature handling (S286)', () => {
+    test('omits temperature for Opus 4.8 (alias and dated id), keeps it for others', () => {
+      const opus = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-opus-4-8' });
+      const opusDated = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-opus-4-8-20260601' });
+      const sonnet = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-sonnet-4-6' });
+      const haiku = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-haiku-4-5' });
+      const opts = { messages: [{ role: 'user', content: 'hi' }], temperature: 0.3 };
+
+      expect('temperature' in opus._buildBody(opts, false)).toBe(false);
+      expect('temperature' in opusDated._buildBody(opts, false)).toBe(false);
+      expect(sonnet._buildBody(opts, false).temperature).toBe(0.3);
+      expect(haiku._buildBody(opts, false).temperature).toBe(0.3);
+    });
+  });
+
   test('retries on 429 then succeeds', async () => {
     safeFetch
       .mockResolvedValueOnce(jsonResponse({ error: 'rate limited' }, { status: 429, headers: { 'retry-after': '0' } }))

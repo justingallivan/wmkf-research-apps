@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-13
+last_verified: 2026-06-24
 stale_after_days: 90
 owner: ai-platform
 source_files:
@@ -37,6 +37,10 @@ reviewer-finder prompt migration.
 - Use `lib/services/llm-client.js` for provider calls.
 - Use `lib/services/execute-prompt.js` for shared Executor behavior.
 - Prompt claims must trace resolver, composer, runtime caller, fallback behavior, and tests.
+- **Model-aware request building (S286):** `llm-client._buildBody` OMITS the `temperature`
+  param for models that reject it (Opus 4.8 — the API 400s with "`temperature` is
+  deprecated for this model"); `modelSupportsTemperature()` gates it. When adding an
+  app on a reasoning-tier model, don't assume `temperature` is accepted.
 
 ## Durable Memory
 

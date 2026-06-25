@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-13
+last_verified: 2026-06-24
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -80,6 +80,24 @@ namesake-collision worked example in `reviewer-identity.md`), not origination.
 - CAUTION — don't over-correct the over-correction: Claude's senior-bias and the
   niche/pivot/sparse tail are REAL (the S231 probe found 2/10 analyze under-deliveries).
   Keep *targeted* hardening for that tail; just don't mistake it for an engine problem.
+- MODEL — origination now runs on **Opus 4.8** by default, not Sonnet (S286,
+  baseConfig `reviewer-finder`: `{ model: 'opus', fallback: 'sonnet' }`). On a niche
+  out-of-mainstream proposal (synthetic torpor; req 1002821) Sonnet 4.6 fell into a
+  token-repetition/hallucination loop: it could confidently name only the ~6 reviewers
+  the applicant already cited in the proposal prose, then padded the fixed 15-quota with
+  an invented, repeated name ("Dr. Bhanu Bhanu") until truncation — intermittently
+  hard-failing the whole search (`analysis_invalid`). Opus 4.8 handled the same proposal
+  cleanly on the first attempt and added real *independent* names. Two code guardrails
+  shipped with it: (1) a code-owned anti-fabrication block (`ANALYZE_INTEGRITY_BLOCK`,
+  appended by `composeAnalyzePrompt` so it survives a Dataverse prompt override) telling
+  the model to return FEWER real reviewers rather than pad; (2) first-attempt token budget
+  raised 4096→8192 (`ClaudeReviewerService.MAX_TOKENS`). **Caveat:** live model resolution
+  is governed by the `model_override:reviewer-finder:model` admin setting in Dataverse
+  `wmkf_appsystemsettings` (loaded via `loadModelOverrides()`), which takes precedence
+  over baseConfig — switching prod to Opus requires clearing/updating that override in
+  `/admin` (and confirming no `CLAUDE_MODEL_REVIEWER_FINDER` env var pins it in Vercel). Opus 4.8 also deprecates the `temperature` API param (`llm-client`
+  omits it for that model); the reviewer-finder had no temperature UI control and the dead
+  route-level plumbing was removed.
 
 Read the `## Direction` bullets below as the lane mechanics under this posture — a
 sparse-tail toolkit, not a mandate to replace Claude.

@@ -29,7 +29,11 @@ export const BASE_CONFIG = {
     'phase-i-writeup':             { model: 'sonnet', fallback: 'haiku' },
     'phase-ii-writeup':            { model: 'sonnet', fallback: 'haiku' },
     // Workbench reviewer-finding services still resolve this model namespace.
-    'reviewer-finder':             { model: 'sonnet', fallback: 'haiku' },
+    // Opus (S286): Sonnet 4.6 fell into a token-repetition/hallucination loop on
+    // niche/out-of-mainstream proposals (padding a fixed reviewer quota past its
+    // confident set); Opus 4.8 handled the same proposals cleanly and added real
+    // independent names. Fallback is Sonnet (haiku can't do origination).
+    'reviewer-finder':             { model: 'opus',   fallback: 'sonnet' },
     'reviewers':                   { model: 'sonnet', fallback: 'haiku' },
     'peer-review-summarizer':      { model: 'sonnet', fallback: 'haiku' },
     'funding-analysis':            { model: 'sonnet', fallback: 'haiku' },

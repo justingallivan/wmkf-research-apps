@@ -112,7 +112,7 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 
 `getModelForApp()` in `shared/config/baseConfig.js` reads a runtime env var of the form `CLAUDE_MODEL_<APP>` for static per-app overrides (DB-stored overrides in Dataverse `wmkf_appsystemsettings`, loaded via `loadModelOverrides()`, take precedence — the Postgres `system_settings` table was dropped 2026-05-12; see §"How It Works" below). Examples:
 
-- `CLAUDE_MODEL_REVIEWER_FINDER=claude-sonnet-4-6`
+- `CLAUDE_MODEL_REVIEWER_FINDER=claude-opus-4-8` (reviewer-finder origination runs on Opus as of S286; see baseConfig default + the `model_override:reviewer-finder` Dataverse override that governs live resolution)
 - `CLAUDE_MODEL_BATCH_PHASE_I_SUMMARIES=claude-haiku-4-5-20251001`
 - App key transformation: lowercase + hyphens → uppercase + underscores. The full app-key list is in `shared/config/appRegistry.js`.
 

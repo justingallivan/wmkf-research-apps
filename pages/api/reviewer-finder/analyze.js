@@ -84,7 +84,7 @@ export default async function handler(req, res) {
   let budgetSeconds = null;
 
   try {
-    const { proposalText, blobUrl, additionalNotes, excludedNames, temperature, reviewerCount, summaryPages } = req.body;
+    const { proposalText, blobUrl, additionalNotes, excludedNames, reviewerCount, summaryPages } = req.body;
 
     const apiKey = process.env.CLAUDE_API_KEY;
     if (!apiKey) {
@@ -184,7 +184,6 @@ export default async function handler(req, res) {
     const result = await ClaudeReviewerService.analyzeProposal(text, apiKey, {
       additionalNotes: additionalNotes || '',
       excludedNames: excludedNames || [],
-      temperature: temperature !== undefined ? temperature : 0.3,
       reviewerCount: reviewerCount || DEFAULT_REVIEWER_COUNT,
       userProfileId,
       signal: deadlineController.signal,
