@@ -15,6 +15,11 @@
  * old, prompting a manual pricing audit. The monthly drift cron is a
  * stronger signal, but the age check is a no-auth-required safety net.
  *
+ * Also compares Anthropic's live `/v1/models` list against the reviewed local
+ * capability/pricing registries. Newer same-family model ids are advisory only:
+ * alert humans to review capability + pricing entries, never auto-advance
+ * fallbacks or persisted model settings.
+ *
  * Auth: Vercel CRON_SECRET (dev mode bypasses).
  */
 
@@ -23,11 +28,15 @@ import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import NotificationService from '../../../lib/services/notification-service';
 import AlertService from '../../../lib/services/alert-service';
 import MaintenanceService from '../../../lib/services/maintenance-service';
-import { lookupPricing, LAST_REVIEWED_AT } from '../../../lib/utils/model-pricing';
+import { MODEL_CAPABILITIES, LAST_CAPABILITY_REVIEWED_AT } from '../../../lib/services/model-capabilities';
+import { lookupPricing, MODEL_PRICING, LAST_REVIEWED_AT } from '../../../lib/utils/model-pricing';
 
 const STALE_DAYS = 60;
 const ALERT_KEY_UNKNOWN = 'pricing:unknown-models';
 const ALERT_KEY_STALE   = 'pricing:table-stale';
+const ALERT_KEY_MODEL_DISCOVERY = 'model-registry:live-unreviewed-models';
+const ANTHROPIC_MODELS_URL = 'https://api.anthropic.com/v1/models?limit=1000';
+const ANTHROPIC_VERSION = '2023-06-01';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -41,13 +50,14 @@ export default async function handler(req, res) {
   try {
     const unknown = await checkUnknownModels();
     const stale = await checkTableAge();
-    const anyAlerting = unknown.status === 'alerting' || stale.status === 'alerting';
+    const modelDiscovery = await checkLiveModelRegistry();
+    const anyAlerting = unknown.status === 'alerting' || stale.status === 'alerting' || modelDiscovery.status === 'alerting';
     await MaintenanceService.completeRun(runId, {
       status: 'completed',
       recordsProcessed: unknown.totalChecked ?? 0,
-      details: { unknown, stale, anyAlerting },
+      details: { unknown, stale, modelDiscovery, anyAlerting },
     });
-    return res.json({ ok: true, unknown, stale });
+    return res.json({ ok: true, unknown, stale, modelDiscovery });
   } catch (error) {
     console.error('pricing-canary cron error:', error);
     await MaintenanceService.completeRun(runId, {
@@ -135,4 +145,121 @@ async function checkTableAge() {
   });
 
   return { status: 'alerting', ageDays };
+}
+
+async function checkLiveModelRegistry() {
+  const apiKey = process.env.CLAUDE_API_KEY;
+  if (!apiKey) {
+    return { status: 'skipped', reason: 'CLAUDE_API_KEY not set' };
+  }
+
+  let models;
+  try {
+    const response = await fetch(ANTHROPIC_MODELS_URL, {
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': ANTHROPIC_VERSION,
+      },
+    });
+    if (!response.ok) {
+      return { status: 'unavailable', httpStatus: response.status };
+    }
+    const data = await response.json();
+    models = Array.isArray(data?.data) ? data.data : [];
+  } catch (error) {
+    return { status: 'unavailable', error: error.message };
+  }
+
+  const unreviewed = findUnreviewedLiveClaudeModels(models, {
+    reviewedAt: LAST_CAPABILITY_REVIEWED_AT,
+  });
+
+  if (unreviewed.length === 0) {
+    const resolved = await AlertService.autoResolve(ALERT_KEY_MODEL_DISCOVERY);
+    return {
+      status: 'ok',
+      reviewedAt: LAST_CAPABILITY_REVIEWED_AT,
+      totalChecked: models.length,
+      unreviewedCount: 0,
+      resolved,
+    };
+  }
+
+  const summary = unreviewed
+    .map((m) => `${m.id} (${m.createdAt || 'unknown created_at'}, capability=${m.capabilityCoverage.status}, pricing=${m.pricingCoverage.status})`)
+    .join('; ');
+
+  await NotificationService.notify({
+    type: 'model_registry_unreviewed_live_models',
+    severity: 'warning',
+    title: `Model canary: ${unreviewed.length} newer Claude model id(s) need review`,
+    message:
+      `Anthropic's /v1/models list contains Claude model ids newer than ` +
+      `lib/services/model-capabilities.js LAST_CAPABILITY_REVIEWED_AT = ${LAST_CAPABILITY_REVIEWED_AT}, ` +
+      `but they are not specifically covered by both the capability and pricing registries. ` +
+      `Review request-shaping behavior, refusal semantics, retention class, and pricing before ` +
+      `using any of these ids or advancing a tier fallback.\n\n${summary}`,
+    metadata: { reviewedAt: LAST_CAPABILITY_REVIEWED_AT, unreviewed },
+    source: 'cron/pricing-canary',
+    autoResolveKey: ALERT_KEY_MODEL_DISCOVERY,
+    category: 'ops',
+  });
+
+  return {
+    status: 'alerting',
+    reviewedAt: LAST_CAPABILITY_REVIEWED_AT,
+    totalChecked: models.length,
+    unreviewedCount: unreviewed.length,
+    unreviewed,
+  };
+}
+
+export function findUnreviewedLiveClaudeModels(models, { reviewedAt = LAST_CAPABILITY_REVIEWED_AT } = {}) {
+  return (models || [])
+    .filter((model) => model?.id && String(model.id).startsWith('claude-'))
+    .filter((model) => isCreatedAfterReview(model.created_at, reviewedAt))
+    .map((model) => {
+      const id = String(model.id);
+      const capabilityCoverage = classifyRegistryCoverage(id, MODEL_CAPABILITIES);
+      const pricingCoverage = classifyRegistryCoverage(id, MODEL_PRICING);
+      return {
+        id,
+        displayName: model.display_name || null,
+        createdAt: model.created_at || null,
+        family: inferClaudeFamily(id),
+        capabilityCoverage,
+        pricingCoverage,
+      };
+    })
+    .filter((model) => !isCoverageReviewed(model.capabilityCoverage) || !isCoverageReviewed(model.pricingCoverage));
+}
+
+export function classifyRegistryCoverage(modelId, registry) {
+  const keys = Object.keys(registry || {}).sort((a, b) => b.length - a.length);
+  for (const key of keys) {
+    if (modelId !== key && !modelId.startsWith(`${key}-`)) continue;
+    const suffix = modelId.slice(key.length);
+    if (!suffix) return { status: 'reviewed_exact', matchedKey: key };
+    if (/^-\d{8}$/.test(suffix)) return { status: 'reviewed_dated', matchedKey: key };
+    return { status: 'ancestor_match', matchedKey: key, suffix };
+  }
+  return { status: 'missing', matchedKey: null };
+}
+
+function isCoverageReviewed(coverage) {
+  return coverage.status === 'reviewed_exact' || coverage.status === 'reviewed_dated';
+}
+
+function isCreatedAfterReview(createdAt, reviewedAt) {
+  if (!createdAt || !reviewedAt) return false;
+  const created = new Date(createdAt);
+  if (Number.isNaN(created.getTime())) return false;
+  return created.toISOString().slice(0, 10) > reviewedAt;
+}
+
+function inferClaudeFamily(modelId) {
+  for (const family of ['opus', 'sonnet', 'haiku', 'fable', 'mythos']) {
+    if (modelId.includes(`-${family}-`)) return family;
+  }
+  return 'unknown';
 }

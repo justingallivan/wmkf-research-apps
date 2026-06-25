@@ -84,7 +84,7 @@ Cron-driven health checks (7 services), alert log, cron audit trail. `maintenanc
 
 ### `api_usage_log` (1,724 rows)
 **Source of truth:** Postgres-only.
-Per-Claude-call ledger (model, tokens, cost, latency). Written by `lib/services/llm-client.js` via `lib/utils/usage-logger.js` (`logUsage`). Not routed through `DatabaseService`. Cost is computed locally from `lib/utils/model-pricing.js`; rows with an unknown model id land with `estimated_cost_cents = NULL` and are surfaced by the weekly `pricing-canary` cron.
+Per-Claude-call ledger (model, tokens, cost, latency). Written by `lib/services/llm-client.js` via `lib/utils/usage-logger.js` (`logUsage`). Not routed through `DatabaseService`. Cost is computed locally from `lib/utils/model-pricing.js`; rows with an unknown model id land with `estimated_cost_cents = NULL` and are surfaced by the weekly `pricing-canary` cron. That same cron writes a `maintenance_runs` heartbeat and, when `CLAUDE_API_KEY` is available, compares Anthropic `/v1/models` against the reviewed capability/pricing registries to raise advisory `ops` alerts for newer Claude ids before runtime use.
 
 ### `model_pricing_audit` (S181, V032)
 **Source of truth:** Postgres-only.
