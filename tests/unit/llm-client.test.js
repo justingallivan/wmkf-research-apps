@@ -27,9 +27,14 @@ jest.mock('../../lib/utils/safe-fetch.js', () => ({
 jest.mock('../../lib/utils/usage-logger.js', () => ({
   logUsage: jest.fn(),
 }));
+jest.mock('../../lib/services/notification-service.js', () => ({
+  __esModule: true,
+  default: { notify: jest.fn(async () => ({ id: 1 })) },
+}));
 
 const { safeFetch } = require('../../lib/utils/safe-fetch.js');
 const { logUsage } = require('../../lib/utils/usage-logger.js');
+const NotificationService = require('../../lib/services/notification-service.js').default;
 const {
   LLMClient,
   modelSupportsTemperature,
@@ -80,6 +85,7 @@ function streamResponse(events, { status = 200 } = {}) {
 beforeEach(() => {
   safeFetch.mockReset();
   logUsage.mockClear();
+  NotificationService.notify.mockClear().mockResolvedValue({ id: 1 });
 });
 
 describe('LLMClient.complete', () => {
@@ -274,6 +280,109 @@ describe('LLMClient.complete', () => {
     safeFetch.mockResolvedValueOnce(jsonResponse({ error: 'bad request' }, { status: 400 }));
     const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'm' });
     await expect(client.complete({ messages: [] })).rejects.toThrow(/Claude API error 400/);
+  });
+
+  test('strips a deprecated temperature parameter once and retries', async () => {
+    const messages = [{ role: 'user', content: 'hi' }];
+    safeFetch
+      .mockResolvedValueOnce(jsonResponse(
+        { error: { message: 'temperature is deprecated for this model' } },
+        { status: 400 },
+      ))
+      .mockResolvedValueOnce(jsonResponse({
+        content: [{ type: 'text', text: 'ok' }],
+        model: 'claude-sonnet-4-6',
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }));
+
+    const client = new LLMClient({
+      apiKey: 'sk-ant-test',
+      model: 'claude-sonnet-4-6',
+      initialRetryDelayMs: 1,
+    });
+    const result = await client.complete({
+      messages,
+      system: 'system prompt',
+      tools: [{ name: 'lookup', input_schema: { type: 'object', properties: {} } }],
+      maxTokens: 123,
+      temperature: 0.7,
+    });
+
+    const firstBody = JSON.parse(safeFetch.mock.calls[0][1].body);
+    const retryBody = JSON.parse(safeFetch.mock.calls[1][1].body);
+    expect(result.text).toBe('ok');
+    expect(firstBody.temperature).toBe(0.7);
+    expect(retryBody).toEqual(expect.objectContaining({
+      model: 'claude-sonnet-4-6',
+      messages,
+      system: 'system prompt',
+      max_tokens: 123,
+    }));
+    expect(retryBody).not.toHaveProperty('temperature');
+    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'claude_deprecated_param_retry',
+      severity: 'warning',
+      source: 'llm-client',
+      category: 'ops',
+    }));
+  });
+
+  test('does not retry generic 400s even when they mention temperature', async () => {
+    safeFetch.mockResolvedValueOnce(jsonResponse(
+      { error: { message: 'temperature must be between 0 and 1' } },
+      { status: 400 },
+    ));
+    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-sonnet-4-6' });
+
+    await expect(client.complete({ messages: [], temperature: 2 })).rejects.toThrow(/Claude API error 400/);
+    expect(safeFetch).toHaveBeenCalledTimes(1);
+    expect(NotificationService.notify).not.toHaveBeenCalled();
+  });
+
+  test('does not loop if the deprecated-parameter retry still fails', async () => {
+    safeFetch
+      .mockResolvedValueOnce(jsonResponse(
+        { error: { message: 'temperature is deprecated for this model' } },
+        { status: 400 },
+      ))
+      .mockResolvedValueOnce(jsonResponse(
+        { error: { message: 'temperature is deprecated for this model' } },
+        { status: 400 },
+      ));
+    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-sonnet-4-6' });
+
+    await expect(client.complete({ messages: [], temperature: 0.4 })).rejects.toThrow(/Claude API error 400/);
+    expect(safeFetch).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(safeFetch.mock.calls[1][1].body)).not.toHaveProperty('temperature');
+    expect(NotificationService.notify).toHaveBeenCalledTimes(1);
+  });
+
+  test('deprecated-parameter alert failure does not block the retry', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    NotificationService.notify.mockRejectedValueOnce(new Error('alert backend down'));
+    safeFetch
+      .mockResolvedValueOnce(jsonResponse(
+        { error: { message: 'temperature is deprecated for this model' } },
+        { status: 400 },
+      ))
+      .mockResolvedValueOnce(jsonResponse({
+        content: [{ type: 'text', text: 'ok' }],
+        model: 'claude-sonnet-4-6',
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }));
+    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-sonnet-4-6' });
+
+    try {
+      const result = await client.complete({ messages: [], temperature: 0.4 });
+      expect(result.text).toBe('ok');
+      expect(safeFetch).toHaveBeenCalledTimes(2);
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[LLMClient] deprecated-param retry alert failed:',
+        'alert backend down',
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   test('normalizes successful classifier refusals as explicit refusal metadata', async () => {
@@ -480,6 +589,29 @@ describe('LLMClient.stream', () => {
       temperature: 0.3,
       stream: true,
     }));
+  });
+
+  test('deprecated temperature retry preserves the stream flag', async () => {
+    safeFetch
+      .mockResolvedValueOnce(jsonResponse(
+        { error: { message: 'temperature is deprecated for this model' } },
+        { status: 400 },
+      ))
+      .mockResolvedValueOnce(streamResponse([
+        { type: 'message_start', message: { model: 'claude-sonnet-4-6', usage: { input_tokens: 4 } } },
+        { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+        { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'ok' } },
+        { type: 'content_block_stop', index: 0 },
+        { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 2 } },
+      ]));
+    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-sonnet-4-6' });
+
+    const result = await client.stream({ messages: [], temperature: 0.4 });
+
+    const retryBody = JSON.parse(safeFetch.mock.calls[1][1].body);
+    expect(result.text).toBe('ok');
+    expect(retryBody.stream).toBe(true);
+    expect(retryBody).not.toHaveProperty('temperature');
   });
 });
 

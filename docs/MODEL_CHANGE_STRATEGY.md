@@ -4,8 +4,9 @@
 approach for navigating future Anthropic model changes (new releases, parameter
 deprecations, capability differences, refusal semantics, retention classes). S286
 shipped the interim Opus 4.8 hardening in §1. S287 shipped the first registry/gate
-slice in §1.5. Transport, admin write-path, resolver ergonomics, and canary
-expansion have since landed; replay automation in §3 remains planned.
+slice in §1.5. Transport, admin write-path, resolver ergonomics, canary expansion,
+and the deprecated-parameter retry safety net have since landed; replay automation
+in §3 remains planned.
 
 Authority note: this is a design doc. Live behavior is governed by source —
 `lib/services/llm-client.js`, `lib/services/model-capabilities.js`,
@@ -88,6 +89,11 @@ These are DONE and reduce the next-model blast radius:
   with `CLAUDE_API_KEY` and alert `ops` when newer Claude ids are not specifically
   covered by both the capability and pricing registries. This is advisory only:
   it never advances fallbacks or persists model settings.
+- Added `LLMClient`'s narrow runtime safety net for recognized deprecated-parameter
+  400s. It strips only the named optional field currently emitted by request shaping
+  (`temperature` or `output_config.effort`), writes best-effort structured `ops`
+  telemetry, retries once, and leaves all broad/unrecognized 400s on the normal
+  failure path.
 
 Important remaining boundary: the offline gate is static. Executor runtime and admin
 Dataverse writes now reject unreviewed prompt/model ids, but environment overrides are
@@ -118,12 +124,11 @@ deployment configuration and still rely on the pre-deploy registry/pricing check
    coverage is complete and the replay checklist passes.
 
 4. **Explicit first, narrow self-healing second.** The registry + gate are the primary
-   defense. Add a **narrow** runtime retry-once safety net for *recognized*
-   deprecated-param 400s only (strip the named param, log structured telemetry, retry
-   once; never broad 400s, never auto-persist registry changes). Claude review note:
-   given the rollout stakes, treat this as **should-do**, not optional — it catches the
-   *next* uncatalogued deprecation gracefully where the gate (which only knows *current*
-   drift) cannot.
+   defense. `LLMClient` now has a **narrow** runtime retry-once safety net for
+   *recognized* deprecated-param 400s only: strip the named optional param, log
+   structured best-effort telemetry, retry once, never broad 400s, and never
+   auto-persist registry changes. This catches the next uncatalogued deprecation
+   gracefully where the gate (which only knows *current* drift) cannot.
 
 5. **CI gate — the keystone.** `check:model-registry` plus its self-test now follows
    the existing `check:*` pattern. v1 is offline/static (no Anthropic creds): it scans
@@ -159,7 +164,7 @@ deployment configuration and still rely on the pre-deploy registry/pricing check
 | 3b (done 2026-06-25) | Executor runtime rejects unreviewed prompt-row ids; admin model override writes reject unreviewed concrete Claude ids before Dataverse persistence; prompt publish rejects cloning an unreviewed concrete Claude id. Env overrides are documented as deploy-time preflight values, not route-validated writes. | M | Med |
 | 4 (done 2026-06-25) | Resolver returns `{ resolvedId, capabilities }` through `resolveModelWithCapabilities()` so callers cannot accidentally split resolution from capability lookup. | M | Med |
 | 5 (done 2026-06-25) | Extend the pricing-canary cron to alert when `/v1/models` has a newer same-family id than the registry review date and is not specifically covered by capability + pricing registries, before runtime use. | M | Med |
-| 6 (should) | Narrow retry-once deprecated-param safety net in `lib/services/llm-client.js`, with structured alerting; disabled for broad 400s. | M | Med |
+| 6 (done 2026-06-25) | Narrow retry-once deprecated-param safety net in `lib/services/llm-client.js`, with structured alerting; disabled for broad 400s. | M | Med |
 | 7 (nice) | Admin Models tab shows resolved capability + pricing status read-only beside each effective model. | M | Low |
 | 8 (nice) | `validate-reviewer-analyze.mjs` JSON artifact + a one-page pre-flip runbook. | S | Low |
 
