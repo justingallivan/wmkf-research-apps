@@ -1,131 +1,119 @@
-# Session 286 Prompt: Post-rollout workbench fixes settled; review-upload design + E2E still open
+# Session 287 Prompt: Opus cutover pending an /admin override flip; model-change strategy parked
 
-## Session 285 Summary
+## Session 286 Summary
 
-The workbench went live to Justin's colleagues, and this was a **rapid response session**
-to issues they surfaced — three shipped changes plus a prod-400 hotfix, each Codex-reviewed
-to convergence. Started green on CI. All work committed directly to `main` (auto-deploys to prod).
+A diagnosis-driven session: a colleague's reviewer search **failed on a niche proposal**,
+which traced to a model limitation, not a bug. We switched reviewer-finder origination to
+**Opus 4.8**, hardened the surrounding machinery, ran a **Codex adversarial review → Codex
+fixes → Claude review** loop, and wrote a durable **model-change strategy**. All work is
+committed and pushed to `main`. **The Opus switch is INERT in prod until the `/admin`
+override is flipped — that flip is the actual cutover and has NOT happened.**
 
 ### What Was Completed
 
-1. **Custom Dataverse schema inventory for Connor (external admin).** `c4308fd8` —
-   `docs/DATAVERSE_CUSTOM_SCHEMA_INVENTORY.md`: all `wmkf_*` tables/fields/option-sets we
-   created or write to, ownership split (ours vs. AkoyaGO/standard), plus a confirm/cleanup
-   list (e.g. the `wmkf__ai_summary` double-underscore dup, vestigial `wmkf_ai_compliancecheck`).
-   Compiled from schema-as-code + Atlas; read/write traced from call sites — NOT a fresh
-   live-metadata probe (offer the probe scripts if field-level certainty is wanted before sending).
+1. **Diagnosed the live failure (req 1002821, synthetic-torpor proposal).** The reviewer
+   search intermittently hard-failed (`analysis_invalid`). Root cause via Vercel runtime
+   logs + a local replay of the real PDF: **Sonnet 4.6 fell into a token-repetition /
+   hallucination loop** — for a niche topic it could confidently name only ~6 reviewers
+   (all already named in the proposal's prose), then **padded the fixed 15-quota with an
+   invented, repeated name ("Dr. Bhanu Bhanu")** until it truncated. Temperature/count
+   tuning did not fix it; **Opus 4.8 handled the same proposal cleanly and added real
+   *independent* names.** Owner's instinct confirmed: higher temperature would worsen
+   hallucination, not help.
 
-2. **Restore removed ("X'd") candidates.** `51ef988a` — the Invite Reviewers tab "X" is a
-   soft-delete (`wmkf_selected=false` + token revoke); nothing surfaced removed rows, so an
-   X'd candidate looked permanently gone (it does NOT return to Find — Find is ephemeral
-   discovery). Added a collapsible **"Removed (N)" list with Restore** at the bottom of
-   `CandidatesPanel`. Adapter `findRemovedByRequest` (`selected=false AND disposition=null`,
-   so it only lists curated-then-removed rows, never unpromoted applicant-suggested) +
-   `restore()`. `restore` is scope-guarded AND ETag-conditional (Codex). Remove-confirm now
-   says it's reversible.
+2. **Switched reviewer-finder origination to Opus 4.8 + guardrails** (`8f22bbd8`): anti-
+   fabrication prompt block (`ANALYZE_INTEGRITY_BLOCK`, code-owned, survives Dataverse
+   prompt overrides — "return fewer real reviewers, never pad"); first-attempt token
+   budget 4096→8192; `temperature` omitted for Opus 4.8 (it deprecates the param — the
+   API 400s) via `modelSupportsTemperature()` in `llm-client.js`; `claude-opus-4-8` priced;
+   dead temperature plumbing removed from the analyze route.
 
-3. **PD identity override — confirm + add a low-confidence (real) reviewer.** `a2eb7642` —
-   a real reviewer flagged `needs_identity_review` (auto-resolver couldn't confirm) with the
-   wrong suggested email/website was a dead end (not selectable, edit hidden, save hard-rejected).
-   Now a card shows **"✓ This is the right person → edit & add"** → `CandidateEditModal` in
-   `confirmMode` (edit email/website/affiliation + required "I've verified this person" checkbox).
-   An isolated server `pdIdentityConfirmed` override in `save-candidates` skips the identity
-   hard-reject, persists ONLY the PD-typed contact (forced `emailSource='manual'` → confirm-
-   before-invite still fires; no enrichment fallback), force-nulls resolver-sourced ORCID/Scholar/
-   metrics, skips `writeIdentityDecision`. **Institution-COI is NOT waived.** This is the
-   *contact-wrong, person-right* case; the heavier *person-wrong* (namesake) re-resolve stays
-   deferred (see `reviewer-identity.md` Future Work).
+3. **Split the exclusion parser onto its own Haiku key** (`875abd11`). `reviewer-exclusion-parser`
+   was riding the `reviewer-finder` model key, so the Opus switch would have dragged a cheap
+   deterministic name-parse onto Opus. New `reviewer-exclusion` APP_MODELS key → Haiku.
 
-4. **Prod-400 hotfix: Dynamics string-cap clamps.** `f8c6e1e5` + `d6b387cd` — req **1002833**
-   ("Hongjun Song") failed the whole save: `wmkf_primaryaffiliation` exceeded its 500-char cap
-   (long multi-institution OpenAlex affiliation). Clamped at every writer (`FIELD_MAX` in
-   `potential-reviewer.js`; `clampField` in `researcher.js`). Codex then caught the sibling
-   `wmkf_department` (255 cap, from schema-as-code) — also clamped. Caps are the real schema
-   maxLengths; only free-text columns clamped (URL/ID fields left — bounded upstream, ellipsis
-   would corrupt them). **Colleague can re-run the 1002833 save now.**
+4. **Codex adversarial review → fixes → Claude review** (`ca7f1e4d`). Codex found 2 HIGH issues:
+   (a) `_fetchWithRetries` swapped only `body.model` on a 529 fallback, so the temperature
+   decision was carried to the wrong model; (b) `TIER_FALLBACK_IDS.opus` was stale (4-7).
+   Fixes: rebuild the body for the fallback model on swap (both directions + stream tested);
+   bump the tier fallback to 4-8; **pin `reviewer-finder` to the concrete `claude-opus-4-8`**
+   so resolution is deterministic and the temperature gate always matches.
 
-5. **Process: sharpened the self-review memory.** `eabe78d8` — Codex caught self-catchable
-   issues across these reviews (client-trusted `emailSource`; restore write-scope ⊋ read-scope;
-   read-validate-write TOCTOU; capped-the-named-column-not-its-siblings). Added an observable
-   trip-wire to `feedback-self-review-before-delegating-review`: a delegation prompt that says
-   "look for / check whether \<nameable risk\>" IS the deflection — rewrite each as a completed
-   "traced X at file:line → found Y" before sending.
+5. **Model-change strategy doc** (`2fd322ac`, `docs/MODEL_CHANGE_STRATEGY.md`). Design proposal:
+   a single capability registry, capability derived from the *resolved concrete id*, a
+   fail-loud CI gate (`check:model-registry`), a narrow self-healing retry, and "cover every
+   transport" (incl. the `multi-llm-service` gap). **Implementation is PLANNED / deferred.**
+
+6. **Process memory** (`d5b8650a`): `feedback-pause-for-codex-on-high-stakes` — on high-stakes
+   colleague-facing work, offer Codex plan/review BEFORE solo-implementing.
 
 ### Commits
-- `c4308fd8` — Custom Dataverse schema inventory doc for Connor
-- `51ef988a` — Restore removed (X'd) candidates
-- `a2eb7642` — PD confirm + add a low-confidence reviewer
-- `f75628a5` — Codex fixes: force emailSource=manual + restore scope guard
-- `051b6b42` — Codex fix: close restore TOCTOU with optimistic lock
-- `eabe78d8` — Memory: self-review trip-wire (S285)
-- `f8c6e1e5` — Clamp wmkf_primaryaffiliation (500)
-- `d6b387cd` — Clamp wmkf_department (255)
+- `8f22bbd8` — reviewer-finder → Opus 4.8 + anti-fabrication guardrails
+- `875abd11` — split reviewer-exclusion parser onto a Haiku key
+- `d5b8650a` — memory: pause-for-Codex-on-high-stakes
+- `ca7f1e4d` — Codex-reviewed fixes (fallback body rebuild + concrete pin)
+- `2fd322ac` — docs: Model-Change Strategy (proposal)
 
-Full suite green throughout (ended at 3101 passing).
+Full suite green throughout except the 2 known-red suites (bill, discovery-verification-status).
 
 ## Potential Next Steps
 
-> Each checked against this session's work. None of the carried items were touched this session.
+> Verify each against ground truth before treating as actionable.
 
-### 1. E2E-verify the two NEW workbench features on the live site (NEW — recommended first)
-Both the **Restore** and **PD identity override** flows are live in prod but only unit-tested.
-Exercise each once against the **parked test request 1002788** (NOT a real proposal — local dev
-hits PROD Dataverse, no sandbox): remove→Removed list→Restore; and confirm+correct a low-confidence
-card→verify it lands with the right email and NO stray ORCID/metrics. Confirms behavior before
-colleagues lean on them.
+### 1. GO-LIVE: flip the `/admin` override to Opus (NEW — the actual cutover, not yet done)
+The code is pushed but **prod still runs Sonnet**: model resolution is governed by the
+Dataverse `model_override:reviewer-finder:model` setting, which overrides baseConfig.
+**Set it in `/admin` → Models to the concrete `claude-opus-4-8`** (we pin concrete — pick
+the concrete id, NOT the `opus` tier), and confirm no `CLAUDE_MODEL_REVIEWER_FINDER` env var
+pins Sonnet in Vercel. Then **re-validate live**: `node scripts/validate-reviewer-analyze.mjs
+--request 1002821` — confirm a clean result with real added names. ⚠️ Local dev hits PROD
+Dataverse; this harness is read-only.
 
-### 2. Reviewer-portal review-upload DESIGN decision (carried from S283/S285 — still OPEN)
-Live form captures 3 structured ratings (Q1/Q3/Q10) + uploaded PDF by deliberate
-`lib/external/review-form-schema.js` design. Open decision for Justin: capture more of the 11
-questions as structured Dataverse fields, or is "3 ratings + PDF" sufficient? Flow is already
-built/live — do NOT re-plan as greenfield.
+### 2. Model-change strategy sprint (PARKED by owner — deliberate later session)
+Phases 1-3 of `docs/MODEL_CHANGE_STRATEGY.md`: capability registry
+(`lib/services/model-capabilities.js`), wire `_buildBody`/529-rebuild + `multi-llm-service`
+through it (retire the regex), and the offline `check:model-registry` gate. Do NOT start
+without an explicit go — owner chose to park it.
 
-### 3. E2E test of the review flow with request 1002788 (carried — still OPEN)
-Run a reviewer through accept → materials → upload on the live form; confirm SharePoint write +
-Dataverse PATCH + ReviewsTab readback. **A fresh accept now requires both policy acks (S284).**
-⚠️ Confirm the prod-accept automation hazard first — a real accept fires a live honorarium/Bill.com
-chain; capture-only is locked via `HONORARIUM_ONBOARDING_DEFERRED=true`. (`project-reviewer-accept-prod-automation`.)
-
-### 4. Test-data cleanup (OWED, UNVERIFIED) — revert 1002788 to Set-aside
-1002788 was flipped to Advancing for testing (per S284/S285); revert to Set-aside when done.
-Not touched this session — verify its current `wmkf_triagestatus` before assuming it still needs reverting.
-
-### 5. Auto-on-award abstract cron — still unbuilt, OPTIONAL
-Idempotent `pages/api/cron/*` to pre-generate the publishable abstract for research awardees
-(distinct from `generate-grantee-titles.js`). See `docs/GRANTEE_PORTAL_BUILD_PLAN.md`. Lower priority.
+### 3. Carryovers NOT touched this session (from S285/S286 — re-verify before acting)
+- **Test-data revert:** 1002788 was flipped to Advancing for testing; revert to Set-aside when
+  done. Verify current `wmkf_triagestatus` first. (OWED since S284/S285.)
+- **E2E-verify the two S285 workbench features** (Restore removed candidates; PD identity
+  override) against parked req 1002788 — still only unit-tested.
+- **Reviewer-portal review-upload DESIGN decision** (S283/S285, OPEN): keep "3 ratings + PDF"
+  or capture more of the 11 questions as structured fields? Flow is built/live — not greenfield.
+- **Auto-on-award abstract cron** — still unbuilt, OPTIONAL/low priority.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/DATAVERSE_CUSTOM_SCHEMA_INVENTORY.md` | The Connor handoff doc (custom schema inventory) |
-| `shared/components/reviewers/CandidatesPanel.js` | Removed/Restore list |
-| `shared/components/reviewers/ReviewerSearchSection.js` | `confirmIdentityContact`, `isSelectable`, needs-review card affordance |
-| `shared/components/reviewers/CandidateEditModal.js` | `confirmMode` (identity-confirm checkbox) |
-| `pages/api/reviewer-finder/save-candidates.js` | `pdIdentityConfirmed` override (isolated; firewall intact for normal rows) |
-| `pages/api/reviewer-finder/my-candidates.js` | GET `removedCandidates`; PATCH `{restore:true}` |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | `findRemovedByRequest`, `restore` (scope-guarded + ETag) |
-| `lib/dataverse/adapters/researcher.js` | `FIELD_MAX` {affiliation:500, department:255} + `clampField` |
-| `lib/dataverse/adapters/potential-reviewer.js` | `FIELD_MAX` (now incl. primaryaffiliation:500) |
-
-## Gotchas / Continuity
-
-- **`main` auto-deploys to prod; local dev hits PROD Dataverse.** No sandbox isolation — any
-  remove/restore/save run locally mutates live CRM. Use parked request 1002788 for destructive tests.
-  If a look-before-colleagues buffer is wanted, a preview-branch flow is the fix (offered, not built).
-- **Dynamics string columns have hard caps** — over-length 400s the WHOLE write. Caps live in
-  schema-as-code (`lib/dataverse/schema/wave6/*.json`); clamp NEW free-text writes at the adapter
-  boundary (`FIELD_MAX`). URL/ID fields are intentionally NOT ellipsis-clamped (would corrupt them) —
-  if one ever 400s, use a drop-not-truncate strategy.
-- **PD identity override is the contact-fix case only.** It vouches for WHO + supplies contact; it
-  does NOT bless auto-fetched ORCID/metrics and does NOT waive institution-COI. The namesake
-  (person-wrong) re-resolve is still deferred.
-- **Known-red suites:** `bill.test.js` + `discovery-verification-status.test.js` only (CI-excluded).
+| `shared/config/baseConfig.js` | `reviewer-finder` pinned to `claude-opus-4-8`; new `reviewer-exclusion` → Haiku |
+| `lib/services/llm-client.js` | `modelSupportsTemperature` + `_buildBody(opts,stream,model)`; 529 fallback rebuilds the body |
+| `lib/services/model-resolver.js` | `TIER_FALLBACK_IDS.opus` = `claude-opus-4-8` |
+| `lib/services/claude-reviewer-service.js` | first-attempt `MAX_TOKENS` 8192 (origination engine) |
+| `shared/config/prompts/reviewer-finder.js` + `lib/services/reviewer-prompt-composer.js` | `ANALYZE_INTEGRITY_BLOCK` (always appended) |
+| `lib/services/reviewer-exclusion-parser.js` | resolves/logs under `reviewer-exclusion` (Haiku, temp 0) |
+| `docs/MODEL_CHANGE_STRATEGY.md` | the parked strategy + pre-flip validation checklist |
+| `scripts/validate-reviewer-analyze.mjs` | sanctioned read-only replay harness for the analyze prompt |
 
 ## Testing
 
 ```bash
-npm test                          # full suite (only the 2 known-red above should fail locally)
+npm test                       # full suite (only the 2 known-red suites should fail locally)
 npm run lint
-npx jest reviewer-route-identity-gate reviewer-suggestion-disposition reviewer-adapters-writeback
+node scripts/validate-reviewer-analyze.mjs --request 1002821   # live replay after the override flip
 ```
+
+## Gotchas / Continuity
+
+- **The Opus switch does nothing until the `/admin` override flips** — model resolution is
+  DB-override → env → baseConfig; the Dataverse override wins. This is the #1 next step.
+- **`reviewer-finder` is now pinned to a CONCRETE id** by design (the `^claude-opus-4-8`
+  temperature gate must match the served model). Unpinning requires the registry + gate +
+  replay checklist in `docs/MODEL_CHANGE_STRATEGY.md`.
+- **Opus 4.8 rejects `temperature`.** `llm-client` omits it for that model only; this is a
+  per-model regex today (`/^claude-opus-4-8/`) — the strategy doc is the plan to generalize it.
+- **`multi-llm-service._callClaude` still passes `temperature` unconditionally** — a second
+  transport that bypasses the gate. Latent (its consumer is on Sonnet); folded into the strategy.
+- **Known-red suites:** `bill.test.js` + `discovery-verification-status.test.js` only.
