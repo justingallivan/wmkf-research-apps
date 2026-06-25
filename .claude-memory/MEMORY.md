@@ -63,6 +63,7 @@
 - Reviewer identity / ORCID / contact / COI / PI identity: ../docs/agent-wiki/topics/reviewer-identity.md; project-reviewer-verify-fail-dangerous.md
 - Reviewer workbench / lifecycle / roster / referral: ../docs/agent-wiki/topics/reviewer-workbench-lifecycle.md
 - Workbench consolidation / non-techsavvy PD rollout / remove dead-end (now-automated) UI / reviewer-finder+review-manager sunset: project-workbench-consolidation-rollout.md
+- Reviewer duplicate merge / email alt-key (wmkf_emailaddress_unique) 412 dead-end / the THREE distinct duplicate problems (PR↔PR vs PR↔contact vs contact↔contact): project-reviewer-duplicate-merge.md
 - External reviewer portal / accept-decline / E2E / SharePoint: ../docs/agent-wiki/topics/external-reviewer-portal.md
 - Reviewer invite→accept collapse (S279: onboard up front at one final Accept; no hold/finalize step; capture-only honorarium; .ics on accept): project-reviewer-hold-step-decouple.md
 - Intake portal / attachments / institution match / virus scan: ../docs/agent-wiki/topics/intake-portal.md
