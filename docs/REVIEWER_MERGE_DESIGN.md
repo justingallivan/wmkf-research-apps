@@ -205,11 +205,16 @@ commit (not amended). Target ≤ ~1100 net lines per chunk.
   - Unit tests: block predicate (each ineligible trigger incl. a removed row with a
     honorarium link), collision-delete branch, repoint branch, email-move ordering.
 - **Chunk 3 — API route (new `pages/api/reviewer-finder/merge-candidates`).**
-  - Stricter authz than my-candidates: `requireAppAccess(...,'reviewer-finder',
-    'reviewers')` PLUS an admin/superuser check (`lib/utils/auth.js` superuser
-    helper) — merge deactivates a person across all proposals, a larger blast radius
-    than a field edit (O7). GUID-validate BOTH ids (trust-boundary gate). `?plan=1`
-    returns the plan; POST executes. Register in
+  - Authz = **same as my-candidates**: `requireAppAccess(req, res, 'reviewer-finder',
+    'reviewers')`. (S289 decision, supersedes O7's superuser proposal.) Rationale:
+    the fail-closed block predicate ALREADY restricts a regular user to merging a
+    loser that is pre-engagement AND not promoted to a contact — i.e. exactly the
+    low-risk misspelled-duplicate case. The high-blast-radius scenarios
+    (engaged/promoted loser) are *refused by the predicate*, not permission-gated,
+    so a superuser gate would mostly just stop the person who hit the bug from
+    fixing it. Most potential-reviewers live on old, unrevisited proposals; a
+    pre-engagement PR-side correction there is very low risk. GUID-validate BOTH ids
+    (trust-boundary gate). `?plan=1` returns the plan; POST executes. Register in
     `docs/API_ROUTE_SECURITY_MATRIX.md`. Route tests.
 - **Chunk 4 — UI merge mode (`CandidateEditModal`).**
   - On a 409 carrying `conflictingRecordId`, switch to merge mode: fetch the plan,
