@@ -4,8 +4,8 @@
 approach for navigating future Anthropic model changes (new releases, parameter
 deprecations, capability differences, refusal semantics, retention classes). S286
 shipped the interim Opus 4.8 hardening in §1. S287 shipped the first registry/gate
-slice in §1.5. Transport and admin write-path hardening have since landed; resolver
-ergonomics, canary expansion, and replay automation in §3 remain planned.
+slice in §1.5. Transport, admin write-path, and resolver ergonomics hardening have
+since landed; canary expansion and replay automation in §3 remain planned.
 
 Authority note: this is a design doc. Live behavior is governed by source —
 `lib/services/llm-client.js`, `lib/services/model-capabilities.js`,
@@ -81,6 +81,9 @@ These are DONE and reduce the next-model blast radius:
   unreviewed concrete Claude ids before writing Dataverse model overrides, and
   `/api/admin/prompts/[name]` rejects publishing/resuming a prompt version whose
   cloned `wmkf_ai_model` is an unreviewed concrete Claude id.
+- Added `resolveModelWithCapabilities()` in `lib/services/model-resolver.js`.
+  `LLMClient`, `multi-llm-service`, and `execute-prompt` now resolve tier/concrete
+  ids and retrieve reviewed request capabilities through one helper.
 
 Important remaining boundary: the offline gate is static. Executor runtime and admin
 Dataverse writes now reject unreviewed prompt/model ids, but environment overrides are
@@ -149,7 +152,7 @@ deployment configuration and still rely on the pre-deploy registry/pricing check
 | 2c (done S288) | Route `lib/services/execute-prompt.js` prompt-row model/temperature handling through the same capability helper. | M | Med |
 | 3a (done S287) | Add `check:model-registry` + self-test for static config/fallback/pricing/capability parity. | M | Low |
 | 3b (done 2026-06-25) | Executor runtime rejects unreviewed prompt-row ids; admin model override writes reject unreviewed concrete Claude ids before Dataverse persistence; prompt publish rejects cloning an unreviewed concrete Claude id. Env overrides are documented as deploy-time preflight values, not route-validated writes. | M | Med |
-| 4 (should) | Resolver returns `{ resolvedId, capabilities }` so callers cannot accidentally split resolution from capability lookup. | M | Med |
+| 4 (done 2026-06-25) | Resolver returns `{ resolvedId, capabilities }` through `resolveModelWithCapabilities()` so callers cannot accidentally split resolution from capability lookup. | M | Med |
 | 5 (should) | Extend the pricing-canary cron to alert when `/v1/models` has a newer same-family id than the registry review date, before runtime use. | M | Med |
 | 6 (should) | Narrow retry-once deprecated-param safety net in `lib/services/llm-client.js`, with structured alerting; disabled for broad 400s. | M | Med |
 | 7 (nice) | Admin Models tab shows resolved capability + pricing status read-only beside each effective model. | M | Low |

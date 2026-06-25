@@ -41,6 +41,11 @@ jest.mock('../../lib/services/app-access-service', () => ({
 // callClaude; the extra /v1/models fetch trips the "exactly one fetch" assert.
 jest.mock('../../lib/services/model-resolver', () => ({
   resolveModel: (v) => v || null,
+  resolveModelWithCapabilities: (v) => {
+    const { requestCapabilitiesForModel } = require('../../lib/services/model-capabilities');
+    const model = v || null;
+    return { rawModel: model, model, resolvedId: model, isTier: false, capabilities: requestCapabilitiesForModel(model) };
+  },
   loadAvailableModels: jest.fn(() => Promise.resolve([])),
 }));
 

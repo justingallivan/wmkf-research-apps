@@ -89,6 +89,22 @@ describe('MultiLLMService Claude capability shaping', () => {
     expect(body).not.toHaveProperty('output_config');
   });
 
+  test('resolves tier aliases before applying Claude capabilities', async () => {
+    await MultiLLMService._callClaude(
+      'sk-ant-test',
+      'prompt',
+      '',
+      'sonnet',
+      1000,
+      0.2,
+    );
+
+    expect(sentBody()).toEqual(expect.objectContaining({
+      model: 'claude-sonnet-4-6',
+      temperature: 0.2,
+    }));
+  });
+
   test('surfaces HTTP-200 refusal metadata for Fable responses', async () => {
     safeFetch.mockResolvedValueOnce(claudeResponse({
       model: 'claude-fable-5',

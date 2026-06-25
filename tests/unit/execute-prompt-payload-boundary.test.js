@@ -39,6 +39,11 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 // the resolver's in-memory cache and only see the messages fetch).
 jest.mock('../../lib/services/model-resolver', () => ({
   resolveModel: (v) => v || null,
+  resolveModelWithCapabilities: (v) => {
+    const { requestCapabilitiesForModel } = require('../../lib/services/model-capabilities');
+    const model = v || null;
+    return { rawModel: model, model, resolvedId: model, isTier: false, capabilities: requestCapabilitiesForModel(model) };
+  },
   loadAvailableModels: jest.fn(() => Promise.resolve([])),
 }));
 

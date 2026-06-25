@@ -15,7 +15,7 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`model-review-validation.js`** — Shared write-time validator for tier keys and concrete Claude model ids. Admin model overrides and prompt publishes use it to reject unreviewed concrete Claude ids unless both capability and pricing entries exist.
 - **`execute-prompt.js`** — Live prompt-execution Executor implementing `docs/EXECUTOR_CONTRACT.md`. Reads current prompt rows from Dataverse entity set `wmkf_ai_prompts`, rejects unreviewed concrete Claude model ids before execution, and writes audit rows to `wmkf_ai_runs`. Used in production by `/api/phase-i-dynamics/summarize-v2`.
 - **`prompt-resolver.js`** — Legacy Session 103 holdover. Reads prompts from a scratch row on `wmkf_ai_runs`, 5-min cache, `{{var}}` interpolation, bundled `.js` fallback. `PROMPT_RESOLVER_STRICT=true` disables fallback. Currently used only by scripts; no live API route depends on it.
-- **`model-resolver.js`** / **`model-override-loader.js`** — Per-app model overrides for `baseConfig.js`. Resolver computes effective model per app at call time; loader caches DB-backed overrides.
+- **`model-resolver.js`** / **`model-override-loader.js`** — Per-app model overrides for `baseConfig.js`. Resolver computes effective model per app at call time and exposes `resolveModelWithCapabilities()` for coupled concrete-id + reviewed-capability lookup; loader caches DB-backed overrides.
 - **`claude-reviewer-service.js`** — Legacy Claude wrapper with retry/fallback (new code uses `llm-client.js`).
 
 ### Dynamics / Dataverse

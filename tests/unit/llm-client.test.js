@@ -158,6 +158,14 @@ describe('LLMClient.complete', () => {
       expect(caps.supportsTemperature).toBe(false);
       expect(caps.requiresRefusalHandling).toBe(true);
     });
+
+    test('tier aliases resolve before request shaping', () => {
+      const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'sonnet' });
+      const body = client._buildBody({ messages: [{ role: 'user', content: 'hi' }], temperature: 0.2 }, false);
+
+      expect(body.model).toBe('claude-sonnet-4-6');
+      expect(body.temperature).toBe(0.2);
+    });
   });
 
   test('retries on 429 then succeeds', async () => {
