@@ -27,8 +27,9 @@ and no pre-deploy tripwire:
   (`TIERS`, `TIER_FALLBACK_IDS`, `resolveModel`) and can drift from the capability gate;
 - pricing lives separately again in `lib/utils/model-pricing.js`;
 - `shared/config/baseConfig.js` `APP_MODELS` mixes tier keys with one concrete pin;
-- a second LLM transport, `lib/services/multi-llm-service.js` `_callClaude`, builds its
-  own body and passes `temperature` unconditionally — bypassing the gate entirely;
+- before S288, a second LLM transport, `lib/services/multi-llm-service.js`
+  `_callClaude`, built its own body and passed `temperature` unconditionally —
+  bypassing the gate entirely;
 - "Anthropic shipped a new model / deprecated a param" had **no checklist and no CI
   gate**, so it failed at *runtime* (a 400 in front of users), the one failure mode the
   reviewer/Workbench rollout cannot afford.
@@ -65,14 +66,19 @@ These are DONE and reduce the next-model blast radius:
 - `LLMClient` normalizes successful refusal responses explicitly (`stopReason`,
   `stopDetails`, `refused`) so Fable-style HTTP-200 refusals cannot disappear as an
   ordinary empty response.
+- `lib/services/multi-llm-service.js` now uses the same capability registry for its
+  Claude request body and preserves refusal metadata for virtual-review-panel calls.
+- `lib/services/execute-prompt.js` now resolves prompt-row models before execution
+  and fails loud when a concrete Claude id is not reviewed in the capability/pricing
+  registry.
 - Added Fable/Mythos 5 pricing entries to `lib/utils/model-pricing.js`.
 - Added `check:model-registry` + `check:model-registry:self-test`. The offline gate
   fails when static configured concrete ids, tier fallback ids, capabilities, or
   pricing drift from one another.
 
-Important remaining boundary: this first gate is static. It does not yet validate
-Dataverse admin overrides, environment overrides, or prompt-row models at write time.
-Those paths still need the follow-up phases below.
+Important remaining boundary: this first gate is static. Executor runtime now rejects
+unreviewed prompt-row model ids before a Claude call, but Dataverse admin writes and
+environment overrides still need validation before they can introduce an unreviewed id.
 
 ## §2 — Target design
 
@@ -121,9 +127,9 @@ Those paths still need the follow-up phases below.
    (model, fallback used, parse status, reviewer count, quality signals) so transport /
    model / parse invariants are deterministic while humans still judge quality.
 
-7. **Cover every transport.** The capability wiring must include
-   `lib/services/multi-llm-service.js`, not just `LLMClient` — a second transport that
-   bypasses the gate is not "done."
+7. **Cover every transport.** Capability wiring now includes
+   `lib/services/multi-llm-service.js` and `LLMClient`; future Anthropic transports
+   must use one of those paths or the same capability helper.
 
 ## §3 — Phased plan (mixed status — extend existing machinery, do not greenfield)
 
@@ -132,10 +138,10 @@ Those paths still need the follow-up phases below.
 | 0 (done S286) | Keep `reviewer-finder` pinned to `claude-opus-4-8`; unpinning requires registry + gate + replay checklist. | S | Low |
 | 1 (done S287) | Add capability registry with exact/prefix matching, unknown handling, `reviewedAt`/`source`, and unit tests. | M | Med |
 | 2a (done S287) | Wire `LLMClient._buildBody` + 529 rebuild through capabilities; normalize refusal metadata. | M | Med |
-| 2b (must) | Fix `lib/services/multi-llm-service.js` Claude path, or converge it onto `LLMClient`. | M | Med |
-| 2c (must) | Route `lib/services/execute-prompt.js` prompt-row model/temperature handling through the same capability helper. | M | Med |
+| 2b (done S288) | Fix `lib/services/multi-llm-service.js` Claude request shaping and refusal metadata. | M | Med |
+| 2c (done S288) | Route `lib/services/execute-prompt.js` prompt-row model/temperature handling through the same capability helper. | M | Med |
 | 3a (done S287) | Add `check:model-registry` + self-test for static config/fallback/pricing/capability parity. | M | Low |
-| 3b (must) | Validate Dataverse admin overrides, env override documentation, and prompt-row model values against the registry before they can introduce an unreviewed id. | M | Med |
+| 3b (partial S288; must finish) | Executor runtime rejects unreviewed prompt-row ids. Still validate Dataverse admin writes and env override documentation before they can introduce an unreviewed id. | M | Med |
 | 4 (should) | Resolver returns `{ resolvedId, capabilities }` so callers cannot accidentally split resolution from capability lookup. | M | Med |
 | 5 (should) | Extend the pricing-canary cron to alert when `/v1/models` has a newer same-family id than the registry review date, before runtime use. | M | Med |
 | 6 (should) | Narrow retry-once deprecated-param safety net in `lib/services/llm-client.js`, with structured alerting; disabled for broad 400s. | M | Med |

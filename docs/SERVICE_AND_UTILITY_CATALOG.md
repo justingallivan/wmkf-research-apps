@@ -11,7 +11,8 @@ If you're touching a service or utility, read its header before this catalog. If
 ### AI / prompt execution
 
 - **`llm-client.js`** — Canonical Anthropic API wrapper (`complete()` + `stream()`). SSRF allowlist, abortable timeouts, 429/529 retry, single fallback-model swap, usage logging, API-key redaction. **Use this — not ad-hoc `fetch`** for new Anthropic API calls.
-- **`execute-prompt.js`** — Live prompt-execution Executor implementing `docs/EXECUTOR_CONTRACT.md`. Reads current prompt rows from Dataverse entity set `wmkf_ai_prompts` and writes audit rows to `wmkf_ai_runs`. Used in production by `/api/phase-i-dynamics/summarize-v2`.
+- **`model-capabilities.js`** — Reviewed Anthropic model capability registry for request shaping (`temperature`, `output_config.effort`) and response semantics (refusals, retention class, max tokens). Unknown runtime ids fail closed for optional params; configured ids are guarded by `check:model-registry`.
+- **`execute-prompt.js`** — Live prompt-execution Executor implementing `docs/EXECUTOR_CONTRACT.md`. Reads current prompt rows from Dataverse entity set `wmkf_ai_prompts`, rejects unreviewed concrete Claude model ids before execution, and writes audit rows to `wmkf_ai_runs`. Used in production by `/api/phase-i-dynamics/summarize-v2`.
 - **`prompt-resolver.js`** — Legacy Session 103 holdover. Reads prompts from a scratch row on `wmkf_ai_runs`, 5-min cache, `{{var}}` interpolation, bundled `.js` fallback. `PROMPT_RESOLVER_STRICT=true` disables fallback. Currently used only by scripts; no live API route depends on it.
 - **`model-resolver.js`** / **`model-override-loader.js`** — Per-app model overrides for `baseConfig.js`. Resolver computes effective model per app at call time; loader caches DB-backed overrides.
 - **`claude-reviewer-service.js`** — Legacy Claude wrapper with retry/fallback (new code uses `llm-client.js`).
@@ -50,7 +51,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### Multi-LLM panel (Virtual Review Panel)
 
-- **`multi-llm-service.js`** — Claude / OpenAI / Gemini / Perplexity wrappers with normalized responses + retry/fan-out.
+- **`multi-llm-service.js`** — Claude / OpenAI / Gemini / Perplexity wrappers with normalized responses + retry/fan-out. Claude request shaping uses `model-capabilities.js`; Fable-style refusal metadata is surfaced in normalized results.
 - **`panel-review-service.js`** — VRP pipeline: optional pre-review intelligence → optional claim verification → structured review → synthesis. Persistence in `panel_reviews` / `panel_review_items`. See `docs/VIRTUAL_REVIEW_PANEL.md`.
 - **`literature-search-service.js`** — Stage 0 academic search orchestration; normalized results.
 

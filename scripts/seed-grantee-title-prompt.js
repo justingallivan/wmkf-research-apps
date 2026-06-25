@@ -88,9 +88,11 @@ const recordData = {
   wmkf_ai_promptoutputschema: JSON.stringify(promptOutputSchema, null, 2),
   // Tier key — resolveModel() maps 'sonnet' to the current Sonnet at call time.
   // Sonnet (validated S269 against 12 J26 answer keys): materially better than
-  // Haiku on this distillation, and the Opus tier REJECTS the `temperature`
-  // parameter the Executor sends unconditionally. temperature 0.1 for run-to-run
-  // consistency (the residual length variance is sampling, not the prompt).
+  // Haiku on this distillation. The Executor now omits prompt-row temperature
+  // for reviewed temperature-less models; keep this on Sonnet until title
+  // replay proves an Opus/Fable-class model is worth the cost/risk.
+  // temperature 0.1 for run-to-run consistency (the residual length variance is
+  // sampling, not the prompt).
   wmkf_ai_model: 'sonnet',
   wmkf_ai_temperature: 0.1,
   wmkf_ai_maxtokens: 100,

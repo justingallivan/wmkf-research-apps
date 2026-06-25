@@ -138,11 +138,10 @@ const recordData = {
   wmkf_ai_promptvariables: JSON.stringify(promptVariables, null, 2),
   wmkf_ai_promptoutputschema: JSON.stringify(promptOutputSchema, null, 2),
   // Tier key — resolveModel() maps 'sonnet' to the current Sonnet at call time.
-  // Sonnet (not opus): the current Opus tier REJECTS the `temperature` parameter
-  // ("deprecated for this model", live 400 on first run S248), and the Executor
-  // sends the row's temperature unconditionally. Sonnet accepts temperature and
-  // handles this structured-synthesis task well. Revisit opus only if the
-  // Executor is taught to omit temperature for temperature-less models.
+  // Sonnet remains the conservative primer default. The Executor now routes
+  // prompt-row temperature through LLMClient, which omits it for reviewed
+  // temperature-less models; revisit Opus/Fable-class models only after the
+  // primer replay checklist says the cost/risk tradeoff is worth it.
   wmkf_ai_model: 'sonnet',
   wmkf_ai_temperature: 0.3,
   wmkf_ai_maxtokens: 16384,

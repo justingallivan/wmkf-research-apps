@@ -106,7 +106,7 @@ function buildPromptRow() {
       parseMode: 'json',
       rawOutputRetention: 'hash',
     }),
-    wmkf_ai_model: 'claude-test',
+    wmkf_ai_model: 'claude-sonnet-4-6',
     wmkf_ai_maxtokens: 1024,
     wmkf_ai_temperature: 0.1,
   };

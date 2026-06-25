@@ -87,7 +87,7 @@ function buildPromptRow(outputs) {
       parseMode: 'json',
       rawOutputRetention: 'hash',
     }),
-    wmkf_ai_model: 'claude-test',
+    wmkf_ai_model: 'claude-sonnet-4-6',
     wmkf_ai_maxtokens: 1024,
     wmkf_ai_temperature: 0.1,
   };
@@ -272,7 +272,7 @@ describe('parseClaudeOutput — validationSchema (A7 step 3)', () => {
         rawOutputRetention: 'hash',
         validationSchema,
       }),
-      wmkf_ai_model: 'claude-test',
+      wmkf_ai_model: 'claude-sonnet-4-6',
       wmkf_ai_maxtokens: 1024,
       wmkf_ai_temperature: 0.1,
     };

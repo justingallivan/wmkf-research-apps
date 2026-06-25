@@ -93,7 +93,13 @@ import { executePrompt } from '../../lib/services/execute-prompt';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildPromptRow({ variables, systemPrompt = 'SYS', promptBody = 'BODY: {{proposal_text}}', rawOutputRetention = 'full' }) {
+function buildPromptRow({
+  variables,
+  systemPrompt = 'SYS',
+  promptBody = 'BODY: {{proposal_text}}',
+  rawOutputRetention = 'full',
+  model = 'claude-sonnet-4-6',
+}) {
   return {
     wmkf_ai_promptid: 'prompt-1',
     wmkf_ai_promptname: 'phase-i.summary',
@@ -108,7 +114,7 @@ function buildPromptRow({ variables, systemPrompt = 'SYS', promptBody = 'BODY: {
       parseMode: 'raw',
       rawOutputRetention,
     }),
-    wmkf_ai_model: 'claude-test',
+    wmkf_ai_model: model,
     wmkf_ai_maxtokens: 1024,
     wmkf_ai_temperature: 0.1,
   };
@@ -412,6 +418,25 @@ describe('executePrompt — LLMClient transport (Phase 2)', () => {
     }));
     expect(sent.system[0].text).toContain('SYS');
     expect(sent.messages[0]).toEqual(expect.objectContaining({ role: 'user' }));
+  });
+
+  test('prompt-row concrete Claude model must be reviewed before execution', async () => {
+    PROMPT_ROW = buildPromptRow({
+      variables: [],
+      systemPrompt: 'SYS',
+      promptBody: 'BODY',
+      model: 'claude-future-99',
+    });
+
+    await expect(executePrompt({
+      promptName: 'phase-i.summary',
+      overrideVariables: {},
+      runSource: 'Vercel Test',
+    })).rejects.toThrow(/unreviewed Claude model "claude-future-99"/);
+
+    expect(fetchedBodies).toHaveLength(0);
+    const runRow = createdRunRows.find(c => c.entitySet === 'wmkf_ai_runs');
+    expect(runRow?.payload?.wmkf_ai_notes).toContain('unreviewed Claude model');
   });
 
   test('cache-hit detection fires when the API reports cache_read tokens (re-shape preserved)', async () => {
