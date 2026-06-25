@@ -57,6 +57,8 @@
     "check:prompt-injection-tagging:self-test": "node scripts/check-prompt-injection-tagging-self-test.js",
     "check:memory-router": "node scripts/check-memory-router.js",
     "check:memory-router:self-test": "node scripts/check-memory-router-self-test.js",
+    "check:model-registry": "node scripts/check-model-registry.js",
+    "check:model-registry:self-test": "node scripts/check-model-registry-self-test.js",
     "check:model-override-warming": "node scripts/check-model-override-warming.js",
     "check:model-override-warming:self-test": "node scripts/check-model-override-warming-self-test.js",
     "check:status-enum-parity": "node scripts/check-status-enum-parity.js",

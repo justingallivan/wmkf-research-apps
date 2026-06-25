@@ -1,15 +1,16 @@
 # Model-Change Strategy
 
-**Status: PROPOSAL / strategy (design only — S286, 2026-06-24).** This documents a
-durable approach for navigating future Anthropic model changes (new releases,
-parameter deprecations, capability differences). It is the deliverable of a Codex
-design pass plus Claude review; **the registry + CI-gate sprint below is PLANNED, not
-built.** What *is* shipped is the interim hardening in §1.
+**Status: PARTIALLY IMPLEMENTED (S286/S287, 2026-06-25).** This documents a durable
+approach for navigating future Anthropic model changes (new releases, parameter
+deprecations, capability differences, refusal semantics, retention classes). S286
+shipped the interim Opus 4.8 hardening in §1. S287 shipped the first registry/gate
+slice in §1.5. The broader transport/admin/canary work in §3 remains planned.
 
 Authority note: this is a design doc. Live behavior is governed by source —
-`lib/services/llm-client.js`, `lib/services/model-resolver.js`,
-`lib/utils/model-pricing.js`, and `shared/config/baseConfig.js`. If this doc and code
-disagree, code wins and this doc is stale.
+`lib/services/llm-client.js`, `lib/services/model-capabilities.js`,
+`lib/services/model-resolver.js`, `lib/utils/model-pricing.js`, and
+`shared/config/baseConfig.js`. If this doc and code disagree, code wins and this doc
+is stale.
 
 ## Why this exists (the incident)
 
@@ -48,20 +49,42 @@ These are DONE and make the current state safe to run:
   `lib/services/model-resolver.js`.
 - `claude-opus-4-8` added to `lib/utils/model-pricing.js`.
 
-These are patches, not the system. The rest of this doc is the system.
+These were patches, not the system.
+
+## §1.5 — First registry/gate slice shipped (S287)
+
+These are DONE and reduce the next-model blast radius:
+
+- Added `lib/services/model-capabilities.js`, a reviewed local capability registry for
+  Anthropic request shaping. It covers temperature support, effort support, thinking
+  mode, max input/output tokens, refusal semantics, retention class, review date, and
+  source URL. Unknown runtime ids fail closed for optional request params.
+- `lib/services/llm-client.js` now shapes `temperature` and `output_config.effort`
+  from reviewed capabilities, not an ad-hoc model regex. Fallback-body rebuilds reuse
+  the same capability lookup for the fallback model.
+- `LLMClient` normalizes successful refusal responses explicitly (`stopReason`,
+  `stopDetails`, `refused`) so Fable-style HTTP-200 refusals cannot disappear as an
+  ordinary empty response.
+- Added Fable/Mythos 5 pricing entries to `lib/utils/model-pricing.js`.
+- Added `check:model-registry` + `check:model-registry:self-test`. The offline gate
+  fails when static configured concrete ids, tier fallback ids, capabilities, or
+  pricing drift from one another.
+
+Important remaining boundary: this first gate is static. It does not yet validate
+Dataverse admin overrides, environment overrides, or prompt-row models at write time.
+Those paths still need the follow-up phases below.
 
 ## §2 — Target design
 
-1. **Single source of truth for capabilities.** A new capability registry — planned
-   module `lib/services/model-capabilities.js` (planned, not yet created) — is the only
-   place that answers request-shaping questions (`supportsTemperature`,
-   `maxOutputTokens`, reasoning-tier, future flags), keyed by concrete model id with
-   exact/prefix matching and a `reviewedAt`/`source` per entry. Unknown ids **fail loud
-   in CI** and **fail closed in prod** (omit non-required params until reviewed).
-   Hybrid: use `/v1/models` for existence / release ordering / max-token limits; keep
-   request-param compatibility (e.g. `supportsTemperature`) in the reviewed local
-   registry. (Whether `/v1/models` exposes temperature compatibility is unverified and
-   does not matter — the local registry owns that field regardless.)
+1. **Single source of truth for capabilities.** `lib/services/model-capabilities.js`
+   answers request-shaping and response-semantics questions (`supportsTemperature`,
+   `supportsEffort`, `thinkingMode`, `maxOutputTokens`, `refusalSemantics`,
+   retention class, future flags), keyed by concrete model id/prefix with a
+   `reviewedAt`/`source` per entry. Unknown ids **fail loud in CI** where statically
+   configured, and **fail closed in prod** for optional params (omit non-required
+   params until reviewed). Hybrid: use `/v1/models` for existence / release ordering /
+   max-token limits; keep request-param compatibility and response semantics in the
+   reviewed local registry.
 
 2. **Consistency by construction.** Capability lookup happens **after** resolution, on
    the concrete id that will actually be sent (and again for the fallback id on a 529
@@ -72,7 +95,8 @@ These are patches, not the system. The rest of this doc is the system.
 3. **Tier-vs-pin policy.** Tier keys are the default; **pin a concrete id for high-risk
    workflows** (expensive, user-visible, long-running, quality-sensitive — e.g. reviewer
    origination) until the new model passes the pre-flip checklist (§4). Keep
-   `reviewer-finder` pinned to `claude-opus-4-8` until the registry + gate exist.
+   `reviewer-finder` pinned to `claude-opus-4-8` until the remaining transport/admin
+   coverage is complete and the replay checklist passes.
 
 4. **Explicit first, narrow self-healing second.** The registry + gate are the primary
    defense. Add a **narrow** runtime retry-once safety net for *recognized*
@@ -82,15 +106,14 @@ These are patches, not the system. The rest of this doc is the system.
    *next* uncatalogued deprecation gracefully where the gate (which only knows *current*
    drift) cannot.
 
-5. **CI gate — the keystone.** A planned gate `check:model-registry` (planned) plus its
-   self-test, following the existing `check:*` pattern, fails the build when any
-   configured / fallback / resolver-served concrete model id is missing from either the
-   capability registry or `lib/utils/model-pricing.js`. v1 is offline/static (no
-   Anthropic creds): it scans `BASE_CONFIG.APP_MODELS`, `TIER_FALLBACK_IDS`, pricing
-   keys, and the capability registry. A credentialed cron (extend
-   `pages/api/cron/pricing-canary.js`) compares live `/v1/models` against the registry
-   review date as an advisory ops alert. Do not rely on the pricing canary alone — it
-   only sees a model *after* runtime usage has already occurred.
+5. **CI gate — the keystone.** `check:model-registry` plus its self-test now follows
+   the existing `check:*` pattern. v1 is offline/static (no Anthropic creds): it scans
+   `BASE_CONFIG.APP_MODELS`, `TIER_FALLBACK_IDS`, pricing keys, and the capability
+   registry. Next step: validate admin/env/prompt-row overrides before they are saved
+   or published. A credentialed cron (extend `pages/api/cron/pricing-canary.js`) should
+   compare live `/v1/models` against the registry review date as an advisory ops alert.
+   Do not rely on the pricing canary alone — it only sees a model *after* runtime usage
+   has already occurred.
 
 6. **Repeatable pre-flip validation.** Build on the existing read-only harness
    `scripts/validate-reviewer-analyze.mjs` (resolves a request, downloads the proposal,
@@ -102,15 +125,18 @@ These are patches, not the system. The rest of this doc is the system.
    `lib/services/multi-llm-service.js`, not just `LLMClient` — a second transport that
    bypasses the gate is not "done."
 
-## §3 — Phased plan (PLANNED — extend existing machinery, do not greenfield)
+## §3 — Phased plan (mixed status — extend existing machinery, do not greenfield)
 
 | Phase | What | Effort | Risk |
 |---|---|---|---|
-| 0 (now, done) | Keep `reviewer-finder` pinned to `claude-opus-4-8`; this doc records that unpinning requires the registry + gate + replay checklist. | S | Low |
-| 1 (must) | Add the planned capability registry module with exact/prefix matching, unknown handling, `reviewedAt`/`source`, and unit tests. | M | Med |
-| 2 (must) | Wire `_buildBody` + the 529 rebuild through resolved-model capabilities and retire the `modelSupportsTemperature` regex; also fix the `multi-llm-service.js` Claude path. | M | Med |
-| 3 (must) | Add the planned `check:model-registry` gate + self-test (offline/static across `APP_MODELS`, `TIER_FALLBACK_IDS`, pricing, capabilities); register in `package.json`. | M | Low |
-| 4 (should) | Resolver returns `{ resolvedId, capabilities }`; route the `lib/services/execute-prompt.js` Executor path through it too. | M | Med |
+| 0 (done S286) | Keep `reviewer-finder` pinned to `claude-opus-4-8`; unpinning requires registry + gate + replay checklist. | S | Low |
+| 1 (done S287) | Add capability registry with exact/prefix matching, unknown handling, `reviewedAt`/`source`, and unit tests. | M | Med |
+| 2a (done S287) | Wire `LLMClient._buildBody` + 529 rebuild through capabilities; normalize refusal metadata. | M | Med |
+| 2b (must) | Fix `lib/services/multi-llm-service.js` Claude path, or converge it onto `LLMClient`. | M | Med |
+| 2c (must) | Route `lib/services/execute-prompt.js` prompt-row model/temperature handling through the same capability helper. | M | Med |
+| 3a (done S287) | Add `check:model-registry` + self-test for static config/fallback/pricing/capability parity. | M | Low |
+| 3b (must) | Validate Dataverse admin overrides, env override documentation, and prompt-row model values against the registry before they can introduce an unreviewed id. | M | Med |
+| 4 (should) | Resolver returns `{ resolvedId, capabilities }` so callers cannot accidentally split resolution from capability lookup. | M | Med |
 | 5 (should) | Extend the pricing-canary cron to alert when `/v1/models` has a newer same-family id than the registry review date, before runtime use. | M | Med |
 | 6 (should) | Narrow retry-once deprecated-param safety net in `lib/services/llm-client.js`, with structured alerting; disabled for broad 400s. | M | Med |
 | 7 (nice) | Admin Models tab shows resolved capability + pricing status read-only beside each effective model. | M | Low |
@@ -119,9 +145,10 @@ These are patches, not the system. The rest of this doc is the system.
 ## §4 — Pre-flip validation checklist (use NOW, before any reviewer-affecting model change)
 
 1. Pick the candidate model + fallback.
-2. Add the capability-registry entry (once §2 exists) and confirm the pricing prefix in
+2. Add the capability-registry entry and confirm the pricing prefix in
    `lib/utils/model-pricing.js`.
-3. Run the static gates (once `check:model-registry` exists) + the pricing self-test.
+3. Run `npm run check:model-registry && npm run check:model-registry:self-test` plus
+   the pricing self-test.
 4. Resolve the effective app model through the same path prod uses
    (`getModelForApp` after `loadModelOverrides`).
 5. Replay at least one real, previously-problematic proposal PDF through
@@ -138,4 +165,6 @@ These are patches, not the system. The rest of this doc is the system.
 
 Add capability entry → add/confirm pricing prefix → run `check:model-registry` +
 pricing self-test → run §4 replay if reviewer-finder is affected → record reviewed
-date/source → only then advance a tier fallback or unpin.
+date/source → only then advance a tier fallback or unpin. If the target is
+Fable/Mythos-class, also verify refusal handling, retention constraints, and effort /
+thinking behavior before any user-facing cutover.

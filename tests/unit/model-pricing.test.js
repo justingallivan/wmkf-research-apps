@@ -21,6 +21,11 @@ beforeEach(() => {
 });
 
 describe('pricing table — S181 bug fixes pinned', () => {
+  test('Fable/Mythos 5 are $10/$50', () => {
+    expect(MODEL_PRICING['claude-fable-5']).toEqual({ input: 1000, output: 5000 });
+    expect(MODEL_PRICING['claude-mythos-5']).toEqual({ input: 1000, output: 5000 });
+  });
+
   test('Haiku 4.5 is $1/$5 (was $0.80/$4 in the pre-S181 bug)', () => {
     expect(MODEL_PRICING['claude-haiku-4-5']).toEqual({ input: 100, output: 500 });
   });
@@ -52,6 +57,12 @@ describe('cache multipliers', () => {
 describe('lookupPricing — matcher semantics', () => {
   test('exact match wins', () => {
     expect(lookupPricing('claude-opus-4-6')).toEqual({ input: 500, output: 2500 });
+  });
+
+  test('Fable/Mythos exact and dated-like ids route to their tier', () => {
+    expect(lookupPricing('claude-fable-5')).toBe(MODEL_PRICING['claude-fable-5']);
+    expect(lookupPricing('claude-fable-5-20260609')).toBe(MODEL_PRICING['claude-fable-5']);
+    expect(lookupPricing('claude-mythos-5')).toBe(MODEL_PRICING['claude-mythos-5']);
   });
 
   test('longest-prefix-first beats the .includes() bug — dated Opus 4.7 goes to the 4.7 tier, not Opus 4', () => {

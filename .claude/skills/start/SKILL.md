@@ -105,6 +105,7 @@ npm run check:build-claim-freshness && npm run check:build-claim-freshness:self-
 
 npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging:self-test # A7 prompt-injection surface markers
 npm run check:memory-router && npm run check:memory-router:self-test           # MEMORY.md router shape + valid statuses/links
+npm run check:model-registry && npm run check:model-registry:self-test         # Anthropic model capability/pricing registry parity
 npm run check:model-override-warming && npm run check:model-override-warming:self-test # API routes that resolve an LLM model must call loadModelOverrides() first
 npm run check:agent-wiki && npm run check:agent-wiki:self-test                 # agent retrieval-layer structure
 npm run check:status-enum-parity && npm run check:status-enum-parity:self-test # producer↔consumer key parity (status/enum/workRemaining vs label/bucket maps)
@@ -112,7 +113,7 @@ npm run check:trust-boundary-guid && npm run check:trust-boundary-guid:self-test
 npm run check:memory-drift:no-write                                            # advisory: memory↔code drift (read-only)
 ```
 
-**This list is the full set as of 2026-06-23. Before running, `grep '"check:' package.json` — if a `check:*` script exists that is NOT above (and is not a `:self-test` of one already listed), run it too and add it here.** That keeps the list from silently going stale as gates are added. Skip silently only if NONE of these scripts is defined (not every project has them); do not skip a gate that IS defined.
+**This list is the full set as of 2026-06-25. Before running, `grep '"check:' package.json` — if a `check:*` script exists that is NOT above (and is not a `:self-test` of one already listed), run it too and add it here.** That keeps the list from silently going stale as gates are added. Skip silently only if NONE of these scripts is defined (not every project has them); do not skip a gate that IS defined.
 
 **If any gate is red:** report it as the FIRST thing in the Step 4 summary, before recapping the previous session. A red gate is a P0 blocker for any new feature work in the affected area (data layer for `check:atlas`, API routes for `check:api-routes`, docs/memory drift for the rest), regardless of which session caused it. Treat fixing it as a candidate first task, not a side-note. Two gates in this list (`doc-currency`, `prompt-storage-mentions`) are here precisely because they each sat red and unnoticed while the short list omitted them — running the complete set is what prevents a recurrence.
 

@@ -36,6 +36,10 @@ const {
   normalizeUnaryResponse,
   parseClaudeStream,
 } = require('../../lib/services/llm-client.js');
+const {
+  lookupModelCapabilities,
+  requestCapabilitiesForModel,
+} = require('../../lib/services/model-capabilities.js');
 const { getModelForApp } = require('../../shared/config/baseConfig.js');
 const { clearAvailableModelsCache } = require('../../lib/services/model-resolver.js');
 
@@ -97,17 +101,62 @@ describe('LLMClient.complete', () => {
   });
 
   describe('_buildBody temperature handling (S286)', () => {
-    test('omits temperature for Opus 4.8 (alias and dated id), keeps it for others', () => {
+    test('omits temperature for temperature-less reviewed models, keeps it for supported models', () => {
       const opus = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-opus-4-8' });
       const opusDated = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-opus-4-8-20260601' });
+      const fable = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-fable-5' });
       const sonnet = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-sonnet-4-6' });
       const haiku = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-haiku-4-5' });
+      const unknown = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-future-99' });
       const opts = { messages: [{ role: 'user', content: 'hi' }], temperature: 0.3 };
 
       expect('temperature' in opus._buildBody(opts, false)).toBe(false);
       expect('temperature' in opusDated._buildBody(opts, false)).toBe(false);
+      expect('temperature' in fable._buildBody(opts, false)).toBe(false);
       expect(sonnet._buildBody(opts, false).temperature).toBe(0.3);
       expect(haiku._buildBody(opts, false).temperature).toBe(0.3);
+      expect('temperature' in unknown._buildBody(opts, false)).toBe(false);
+    });
+
+    test('includes effort only for models reviewed as effort-capable', () => {
+      const fable = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-fable-5' });
+      const haiku = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-haiku-4-5' });
+      const opts = { messages: [{ role: 'user', content: 'hi' }], effort: 'medium' };
+
+      expect(fable._buildBody(opts, false).output_config).toEqual({ effort: 'medium' });
+      expect(haiku._buildBody(opts, false)).not.toHaveProperty('effort');
+      expect(haiku._buildBody(opts, false)).not.toHaveProperty('output_config');
+    });
+
+    test('preserves output_config while stripping unsupported effort', () => {
+      const fable = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-fable-5' });
+      const haiku = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-haiku-4-5' });
+      const opts = {
+        messages: [{ role: 'user', content: 'hi' }],
+        outputConfig: { effort: 'medium', verbosity: 'concise' },
+      };
+
+      expect(fable._buildBody(opts, false).output_config).toEqual({
+        effort: 'medium',
+        verbosity: 'concise',
+      });
+      expect(haiku._buildBody(opts, false).output_config).toEqual({ verbosity: 'concise' });
+    });
+  });
+
+  describe('model capabilities registry', () => {
+    test('exact and dated-prefix lookups share reviewed capabilities', () => {
+      expect(lookupModelCapabilities('claude-opus-4-8-20260601'))
+        .toBe(lookupModelCapabilities('claude-opus-4-8'));
+      expect(modelSupportsTemperature('claude-opus-4-8')).toBe(false);
+      expect(modelSupportsTemperature('claude-sonnet-4-6')).toBe(true);
+    });
+
+    test('unknown runtime model ids fail closed for optional params', () => {
+      const caps = requestCapabilitiesForModel('claude-future-99');
+      expect(caps.unknown).toBe(true);
+      expect(caps.supportsTemperature).toBe(false);
+      expect(caps.requiresRefusalHandling).toBe(true);
     });
   });
 
@@ -217,6 +266,21 @@ describe('LLMClient.complete', () => {
     safeFetch.mockResolvedValueOnce(jsonResponse({ error: 'bad request' }, { status: 400 }));
     const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'm' });
     await expect(client.complete({ messages: [] })).rejects.toThrow(/Claude API error 400/);
+  });
+
+  test('normalizes successful classifier refusals as explicit refusal metadata', async () => {
+    safeFetch.mockResolvedValueOnce(jsonResponse({
+      content: [{ type: 'text', text: '' }],
+      model: 'claude-fable-5',
+      usage: { input_tokens: 10, output_tokens: 0 },
+      stop_reason: 'refusal',
+      stop_details: { classifier: 'safety' },
+    }));
+    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-fable-5' });
+    const r = await client.complete({ messages: [{ role: 'user', content: 'hi' }] });
+    expect(r.stopReason).toBe('refusal');
+    expect(r.stopDetails).toEqual({ classifier: 'safety' });
+    expect(r.refused).toBe(true);
   });
 
   test('logs usage on success when appName is set', async () => {

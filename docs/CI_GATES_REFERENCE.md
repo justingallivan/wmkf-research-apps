@@ -113,6 +113,14 @@ AST gate (`@babel/parser`). Every `pages/api/**` route that reaches a `getModelF
 - Exemption marker for a route that imports a MIXED module but never reaches its model path: `// model-override-warming:ignore reason=<id>` — exempts TRANSITIVE reachability only; a direct resolver call in the route still requires warming.
 - Self-test: `scripts/check-model-override-warming-self-test.js` (17 cases over isolated fixture trees). Codex-reviewed twice (S230).
 
+### `check:model-registry` — Anthropic model capability/pricing parity (S287)
+
+Offline/static gate for future Anthropic model changes. Scans `shared/config/baseConfig.js` (`APP_MODELS` + Claude defaults), `lib/services/model-resolver.js` (`TIER_FALLBACK_IDS`), `lib/services/model-capabilities.js` (`MODEL_CAPABILITIES`), and `lib/utils/model-pricing.js` (`MODEL_PRICING`) without importing app modules or touching Anthropic. Tier keys (`opus`/`sonnet`/`haiku`) are allowed in config; concrete Claude ids reachable from static config or tier fallback ids must match both a reviewed capability entry and a pricing entry. Capability entries must carry required request/response metadata (`supportsTemperature`, `supportsEffort`, `thinkingMode`, max tokens, refusal semantics, retention class, `reviewedAt`, `source`).
+
+- Blocks static model drift before runtime: a new concrete id in base config or tier fallback cannot ship until both request-shaping capabilities and pricing are reviewed.
+- Deliberate boundary: v1 does NOT inspect Dataverse admin overrides, env overrides, or prompt-row model values at write time. Those are tracked in `docs/MODEL_CHANGE_STRATEGY.md` as the next hardening phase.
+- Self-test: `scripts/check-model-registry-self-test.js` (clean fixture + missing capability + missing pricing + tier-fallback drift + malformed capability metadata).
+
 ### `check:agent-wiki` — agent retrieval-layer structure
 
 Validates `docs/agent-wiki/` as a subordinate retrieval layer rather than a parallel source of truth. The gate checks required files, frontmatter, stale `last_verified` dates, source/canonical path existence, topic routing from the index, and local markdown links. Semantic truth still belongs to source files, Atlas pages, probes, and `/sweep`.
@@ -151,6 +159,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:doc-symbol-refs` | `check:doc-symbol-refs:self-test` — positive (dangling), negative (existing/annotated/marker/glob/ellipsis/relative/URL/gitignored), and live-baseline-clean fixtures. |
 | `check:build-claim-freshness` | `check:build-claim-freshness:self-test` — positive (pending construction on an existing path: before/after/colon/to-be-created), negative (pending on absent path, plain ref, done-marker, "now lives at", bare-planned label, multi-path, ignore-marker, gitignored), and live-baseline-clean fixtures. |
 | `check:canonical-pointers` | `check:canonical-pointers-self-test` |
+| `check:model-registry` | `check:model-registry:self-test` |
 | `check:agent-wiki` | `check:agent-wiki:self-test` |
 | `check:status-enum-parity` | `check:status-enum-parity:self-test` |
 | `check:trust-boundary-guid` | `check:trust-boundary-guid:self-test` |
@@ -176,4 +185,5 @@ Several self-tests write synthetic fixtures into paths that the main gate also s
 - `check:prompt-storage-mentions` then `check:prompt-storage-mentions-self-test` (same hazard)
 - `check:doc-symbol-refs` then `check:doc-symbol-refs:self-test` (self-test writes fixtures into `docs/agent-wiki/`, which the gate scans)
 - `check:build-claim-freshness` then `check:build-claim-freshness:self-test` (self-test writes fixtures into `docs/agent-wiki/`, which the gate scans)
+- `check:model-registry` then `check:model-registry:self-test`
 - `check:agent-wiki` then `check:agent-wiki:self-test`
