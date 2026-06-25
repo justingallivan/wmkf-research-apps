@@ -32,8 +32,10 @@ export const BASE_CONFIG = {
     // Opus (S286): Sonnet 4.6 fell into a token-repetition/hallucination loop on
     // niche/out-of-mainstream proposals (padding a fixed reviewer quota past its
     // confident set); Opus 4.8 handled the same proposals cleanly and added real
-    // independent names. Fallback is Sonnet (haiku can't do origination).
-    'reviewer-finder':             { model: 'opus',   fallback: 'sonnet' },
+    // independent names. Pin the concrete id to avoid tier drift past the
+    // temperature-gate's known Opus id. Fallback is Sonnet (haiku can't do
+    // origination).
+    'reviewer-finder':             { model: 'claude-opus-4-8', fallback: 'sonnet' },
     // Excluded-reviewer NAME PARSING only (reviewer-exclusion-parser) — a cheap,
     // deterministic JSON extraction kept off the pricey origination model. Split
     // from `reviewer-finder` in S286 when that key moved to Opus (which also

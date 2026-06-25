@@ -87,7 +87,11 @@ enterDynamicsBypassForScript('seed-reviewer-finder-prompts');
 
 const ENTITY_SET = 'wmkf_ai_prompts';
 const PROMPTSTATUS_PUBLISHED = 682090001; // confirmed Session 109 schema probe
-const REVIEWER_FINDER_MODEL = 'sonnet'; // tier key — resolveModel() maps to the current Sonnet (matches baseConfig['reviewer-finder'])
+const REVIEWER_FINDER_MODEL = 'sonnet'; // illustrative prompt-row tier key only; analyze runtime does not consume it
+// Prompt-row model/temperature/maxTokens/count metadata below is illustrative
+// only. /api/reviewer-finder/analyze does not consume it; runtime model/tokens
+// come from baseConfig + ClaudeReviewerService. Do not change the seed numbers
+// unless the stored prompt metadata itself is intentionally being revised.
 
 const DRY = process.argv.includes('--dry-run');
 const EXECUTE = process.argv.includes('--execute');

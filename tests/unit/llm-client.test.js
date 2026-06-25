@@ -30,7 +30,14 @@ jest.mock('../../lib/utils/usage-logger.js', () => ({
 
 const { safeFetch } = require('../../lib/utils/safe-fetch.js');
 const { logUsage } = require('../../lib/utils/usage-logger.js');
-const { LLMClient, normalizeUnaryResponse, parseClaudeStream } = require('../../lib/services/llm-client.js');
+const {
+  LLMClient,
+  modelSupportsTemperature,
+  normalizeUnaryResponse,
+  parseClaudeStream,
+} = require('../../lib/services/llm-client.js');
+const { getModelForApp } = require('../../shared/config/baseConfig.js');
+const { clearAvailableModelsCache } = require('../../lib/services/model-resolver.js');
 
 function jsonResponse(body, { status = 200, headers = {} } = {}) {
   const h = new Map(Object.entries(headers));
@@ -135,6 +142,75 @@ describe('LLMClient.complete', () => {
     expect(r.text).toBe('fallback');
     const secondBody = JSON.parse(safeFetch.mock.calls[1][1].body);
     expect(secondBody.model).toBe('fallback');
+  });
+
+  test('rebuilds Opus primary to Sonnet fallback body with temperature and existing fields on 529', async () => {
+    safeFetch
+      .mockResolvedValueOnce(jsonResponse({ error: 'overloaded' }, { status: 529 }))
+      .mockResolvedValueOnce(jsonResponse({
+        content: [{ type: 'text', text: 'fallback' }],
+        model: 'claude-sonnet-4-6',
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }));
+    const client = new LLMClient({
+      apiKey: 'sk-ant-test',
+      model: 'claude-opus-4-8',
+      fallbackModel: 'claude-sonnet-4-6',
+      initialRetryDelayMs: 1,
+    });
+    const messages = [{ role: 'user', content: 'hi' }];
+    const system = 'system prompt';
+    const tools = [{ name: 'lookup', input_schema: { type: 'object', properties: {} } }];
+
+    await client.complete({ messages, system, tools, maxTokens: 1234, temperature: 0.42 });
+
+    const firstBody = JSON.parse(safeFetch.mock.calls[0][1].body);
+    const retryBody = JSON.parse(safeFetch.mock.calls[1][1].body);
+    expect(firstBody.model).toBe('claude-opus-4-8');
+    expect(firstBody).not.toHaveProperty('temperature');
+    expect(retryBody).toEqual(expect.objectContaining({
+      model: 'claude-sonnet-4-6',
+      messages,
+      system,
+      tools,
+      max_tokens: 1234,
+      temperature: 0.42,
+    }));
+    expect(retryBody).not.toHaveProperty('stream');
+  });
+
+  test('rebuilds Sonnet primary to Opus fallback body without temperature on 529', async () => {
+    safeFetch
+      .mockResolvedValueOnce(jsonResponse({ error: 'overloaded' }, { status: 529 }))
+      .mockResolvedValueOnce(jsonResponse({
+        content: [{ type: 'text', text: 'fallback' }],
+        model: 'claude-opus-4-8',
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }));
+    const client = new LLMClient({
+      apiKey: 'sk-ant-test',
+      model: 'claude-sonnet-4-6',
+      fallbackModel: 'claude-opus-4-8',
+      initialRetryDelayMs: 1,
+    });
+    const messages = [{ role: 'user', content: 'hi' }];
+    const system = 'system prompt';
+    const tools = [{ name: 'lookup', input_schema: { type: 'object', properties: {} } }];
+
+    await client.complete({ messages, system, tools, maxTokens: 1234, temperature: 0.42 });
+
+    const firstBody = JSON.parse(safeFetch.mock.calls[0][1].body);
+    const retryBody = JSON.parse(safeFetch.mock.calls[1][1].body);
+    expect(firstBody.temperature).toBe(0.42);
+    expect(retryBody).toEqual(expect.objectContaining({
+      model: 'claude-opus-4-8',
+      messages,
+      system,
+      tools,
+      max_tokens: 1234,
+    }));
+    expect(retryBody).not.toHaveProperty('temperature');
+    expect(retryBody).not.toHaveProperty('stream');
   });
 
   test('non-retryable error throws with status', async () => {
@@ -298,6 +374,41 @@ describe('LLMClient.stream', () => {
       { type: 'text', text: 'should not stream' },
     ]);
   });
+
+  test('rebuilds fallback body with stream flag and fallback temperature on 529', async () => {
+    safeFetch
+      .mockResolvedValueOnce(jsonResponse({ error: 'overloaded' }, { status: 529 }))
+      .mockResolvedValueOnce(streamResponse([
+        { type: 'message_start', message: { model: 'claude-sonnet-4-6', usage: { input_tokens: 4 } } },
+        { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+        { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'ok' } },
+        { type: 'content_block_stop', index: 0 },
+        { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 2 } },
+      ]));
+    const client = new LLMClient({
+      apiKey: 'sk-ant-test',
+      model: 'claude-opus-4-8',
+      fallbackModel: 'claude-sonnet-4-6',
+      initialRetryDelayMs: 1,
+    });
+    const messages = [{ role: 'user', content: 'hi' }];
+    const system = 'system prompt';
+    const tools = [{ name: 'lookup', input_schema: { type: 'object', properties: {} } }];
+
+    const result = await client.stream({ messages, system, tools, maxTokens: 1234 });
+
+    const retryBody = JSON.parse(safeFetch.mock.calls[1][1].body);
+    expect(result.text).toBe('ok');
+    expect(retryBody).toEqual(expect.objectContaining({
+      model: 'claude-sonnet-4-6',
+      messages,
+      system,
+      tools,
+      max_tokens: 1234,
+      temperature: 0.3,
+      stream: true,
+    }));
+  });
 });
 
 describe('normalizeUnaryResponse', () => {
@@ -307,5 +418,26 @@ describe('normalizeUnaryResponse', () => {
     expect(r.content).toEqual([]);
     expect(r.model).toBe('requested-model');
     expect(r.usage).toEqual({ inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 });
+  });
+});
+
+describe('reviewer-finder Opus 4.8 pinning', () => {
+  const originalEnv = process.env.CLAUDE_MODEL_REVIEWER_FINDER;
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env.CLAUDE_MODEL_REVIEWER_FINDER;
+    } else {
+      process.env.CLAUDE_MODEL_REVIEWER_FINDER = originalEnv;
+    }
+    clearAvailableModelsCache();
+  });
+
+  test('getModelForApp resolves reviewer-finder to Opus 4.8 without live model list', () => {
+    delete process.env.CLAUDE_MODEL_REVIEWER_FINDER;
+    clearAvailableModelsCache();
+
+    expect(getModelForApp('reviewer-finder')).toBe('claude-opus-4-8');
+    expect(modelSupportsTemperature(getModelForApp('reviewer-finder'))).toBe(false);
   });
 });

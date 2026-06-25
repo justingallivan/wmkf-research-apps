@@ -12,7 +12,7 @@ import {
   composeScorePrompt,
   buildAnalyzeBlockVars,
 } from '../../lib/services/reviewer-prompt-composer.js';
-import { createAnalysisPrompt } from '../../shared/config/prompts/reviewer-finder.js';
+import { ANALYZE_INTEGRITY_BLOCK, createAnalysisPrompt } from '../../shared/config/prompts/reviewer-finder.js';
 import {
   ANALYZE_USER_PROMPT_TEMPLATE,
   SCORE_CANDIDATES_USER_PROMPT_TEMPLATE,
@@ -55,6 +55,25 @@ describe('buildAnalyzeBlockVars matches legacy conditional layout', () => {
     expect(v.additional_notes_block).toBe('**ADDITIONAL CONTEXT FROM USER:**\nX\n');
     expect(v.excluded_names_block).toBe('\n**EXCLUDED NAMES (conflicts of interest - do NOT suggest these):**\nA, B\n');
     expect(v.reviewer_count).toBe('9');
+  });
+});
+
+describe('composeAnalyzePrompt repair ordering', () => {
+  it('places integrity block before repair block, both after the interpolated body', () => {
+    const out = composeAnalyzePrompt({
+      body: 'BODY:\n{{proposal_text}}',
+      proposalText: WRAPPED,
+      nonces: [NONCE],
+      repairInstructions: 'Return valid JSON only.',
+    });
+
+    const bodyIndex = out.indexOf(`BODY:\n${WRAPPED}`);
+    const integrityIndex = out.indexOf(ANALYZE_INTEGRITY_BLOCK);
+    const repairIndex = out.indexOf('**REPAIR INSTRUCTIONS (TRUSTED SYSTEM-OWNED BLOCK):**');
+
+    expect(bodyIndex).toBeGreaterThan(-1);
+    expect(integrityIndex).toBeGreaterThan(bodyIndex);
+    expect(repairIndex).toBeGreaterThan(integrityIndex);
   });
 });
 
