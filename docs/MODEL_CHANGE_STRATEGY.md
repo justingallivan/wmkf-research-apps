@@ -5,8 +5,8 @@ approach for navigating future Anthropic model changes (new releases, parameter
 deprecations, capability differences, refusal semantics, retention classes). S286
 shipped the interim Opus 4.8 hardening in §1. S287 shipped the first registry/gate
 slice in §1.5. Transport, admin write-path, resolver ergonomics, canary expansion,
-the deprecated-parameter retry safety net, and Admin Models read-only registry
-status have since landed; replay automation in §3 remains planned.
+the deprecated-parameter retry safety net, Admin Models read-only registry status,
+and replay artifacts/runbook have since landed.
 
 Authority note: this is a design doc. Live behavior is governed by source —
 `lib/services/llm-client.js`, `lib/services/model-capabilities.js`,
@@ -98,6 +98,9 @@ These are DONE and reduce the next-model blast radius:
   each effective resolved model, and the Admin Models tab displays compact status
   badges beside the concrete model id. This is visibility only; saving still goes
   through `validateReviewedClaudeModelValue()`.
+- `scripts/validate-reviewer-analyze.mjs` now supports `--json-out` for a
+  machine-readable replay artifact, and `docs/MODEL_PREFLIP_REPLAY_RUNBOOK.md`
+  defines the reviewer-finder pre-flip evidence workflow.
 
 Important remaining boundary: the offline gate is static. Executor runtime and admin
 Dataverse writes now reject unreviewed prompt/model ids, but environment overrides are
@@ -145,11 +148,11 @@ deployment configuration and still rely on the pre-deploy registry/pricing check
    is unavailable, the model-discovery check reports `skipped`/`unavailable` without
    failing the whole cron.
 
-6. **Repeatable pre-flip validation.** Build on the existing read-only harness
-   `scripts/validate-reviewer-analyze.mjs` (resolves a request, downloads the proposal,
-   replays the production analyze prompt). Make it emit a machine-readable JSON artifact
-   (model, fallback used, parse status, reviewer count, quality signals) so transport /
-   model / parse invariants are deterministic while humans still judge quality.
+6. **Repeatable pre-flip validation.** `scripts/validate-reviewer-analyze.mjs`
+   resolves a request, downloads the proposal, replays the production analyze prompt,
+   and can emit a machine-readable JSON artifact with model, fallback usage, parse
+   status, reviewer count, validation issues, and quality signals. Humans still judge
+   topical quality through `docs/MODEL_PREFLIP_REPLAY_RUNBOOK.md`.
 
 7. **Cover every transport.** Capability wiring now includes
    `lib/services/multi-llm-service.js` and `LLMClient`; future Anthropic transports
@@ -170,7 +173,7 @@ deployment configuration and still rely on the pre-deploy registry/pricing check
 | 5 (done 2026-06-25) | Extend the pricing-canary cron to alert when `/v1/models` has a newer same-family id than the registry review date and is not specifically covered by capability + pricing registries, before runtime use. | M | Med |
 | 6 (done 2026-06-25) | Narrow retry-once deprecated-param safety net in `lib/services/llm-client.js`, with structured alerting; disabled for broad 400s. | M | Med |
 | 7 (done 2026-06-25) | Admin Models tab shows resolved capability + pricing status read-only beside each effective model. | M | Low |
-| 8 (nice) | `validate-reviewer-analyze.mjs` JSON artifact + a one-page pre-flip runbook. | S | Low |
+| 8 (done 2026-06-25) | `validate-reviewer-analyze.mjs` JSON artifact + a one-page pre-flip runbook. | S | Low |
 
 ## §4 — Pre-flip validation checklist (use NOW, before any reviewer-affecting model change)
 
@@ -182,7 +185,8 @@ deployment configuration and still rely on the pre-deploy registry/pricing check
 4. Resolve the effective app model through the same path prod uses
    (`getModelForApp` after `loadModelOverrides`).
 5. Replay at least one real, previously-problematic proposal PDF through
-   `scripts/validate-reviewer-analyze.mjs`.
+   `scripts/validate-reviewer-analyze.mjs --json-out ...`; follow
+   `docs/MODEL_PREFLIP_REPLAY_RUNBOOK.md`.
 6. Confirm: no request-param 400, no fallback unless expected, no empty parse.
 7. Confirm quality invariants: real independent names, no quota-padding loop, no
    duplicate/excluded names, topical reasoning, no COI text (COI is screened
