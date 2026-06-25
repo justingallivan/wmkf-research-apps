@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Claude model-change guardrails shipped (Session 287)
+
+**Milestone:** The S286 model-change strategy became working architecture: Claude model capability/pricing drift now fails loud in gates/admin/runtime paths instead of waiting to 400 in front of reviewers.
+
+**Sessions:** 287. Codex implemented the registry, transport wiring, admin validation/status, live discovery canary, deprecated-param safety net, and replay artifact workflow.
+
+**Ship state:**
+- `model-capabilities` + `resolveModelWithCapabilities()` now shape Claude request params after tier resolution; `LLMClient`, `multi-llm-service`, and Executor paths share the contract.
+- `check:model-registry` blocks static capability/pricing/fallback drift; admin model overrides and prompt publish/runtime reject unreviewed concrete Claude ids before persistence/use.
+- Pricing canary queries Anthropic `/v1/models` for newer uncovered ids; `LLMClient` has a narrow retry-once safety net for recognized deprecated optional params only.
+- Admin Models shows read-only capability/pricing status; `validate-reviewer-analyze.mjs --json-out` plus `MODEL_PREFLIP_REPLAY_RUNBOOK` define repeatable reviewer-finder pre-flip evidence.
+
+**Why it matters:** protects the colleague-facing reviewer Workbench from future Anthropic model releases/deprecations by turning model drift into reviewable CI/admin evidence rather than runtime surprise.
+
+**Pointers:** `docs/MODEL_CHANGE_STRATEGY.md`, `docs/MODEL_PREFLIP_REPLAY_RUNBOOK.md`, `lib/services/model-capabilities.js`, `scripts/check-model-registry.js`. Commits `881f2555` through `d1c65eb5`.
+
 ## June 2026 — Reviewer acknowledgement policies live; jsdom purged from serverless (Session 284)
 
 **Milestone:** Reviewer Confidentiality + Responsible-Use-of-AI acknowledgements went live (Stage 2a accept now requires both), and a latent prod-breaking jsdom/serverless incompatibility was fixed across all three markdown renderers.

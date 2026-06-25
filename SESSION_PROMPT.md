@@ -1,119 +1,182 @@
-# Session 287 Prompt: Opus cutover pending an /admin override flip; model-change strategy parked
+# Session 288 Prompt: Demo stability after model-change hardening
 
-## Session 286 Summary
+## Session 287 Summary
 
-A diagnosis-driven session: a colleague's reviewer search **failed on a niche proposal**,
-which traced to a model limitation, not a bug. We switched reviewer-finder origination to
-**Opus 4.8**, hardened the surrounding machinery, ran a **Codex adversarial review → Codex
-fixes → Claude review** loop, and wrote a durable **model-change strategy**. All work is
-committed and pushed to `main`. **The Opus switch is INERT in prod until the `/admin`
-override is flipped — that flip is the actual cutover and has NOT happened.**
+Session 287 took the S286 model-change strategy from parked design to implemented
+guardrails. The immediate goal was protecting the colleague-facing Workbench/reviewer
+experience from future Anthropic model drift: new model ids, deprecated request
+parameters, tier fallback drift, and silent parser failures. All code/doc work is
+committed and pushed to `main`.
 
 ### What Was Completed
 
-1. **Diagnosed the live failure (req 1002821, synthetic-torpor proposal).** The reviewer
-   search intermittently hard-failed (`analysis_invalid`). Root cause via Vercel runtime
-   logs + a local replay of the real PDF: **Sonnet 4.6 fell into a token-repetition /
-   hallucination loop** — for a niche topic it could confidently name only ~6 reviewers
-   (all already named in the proposal's prose), then **padded the fixed 15-quota with an
-   invented, repeated name ("Dr. Bhanu Bhanu")** until it truncated. Temperature/count
-   tuning did not fix it; **Opus 4.8 handled the same proposal cleanly and added real
-   *independent* names.** Owner's instinct confirmed: higher temperature would worsen
-   hallucination, not help.
+1. **Capability registry + request shaping**
+   - Added `lib/services/model-capabilities.js` as the reviewed source of truth for
+     Claude request-shaping metadata: temperature support, effort support, thinking
+     mode, max tokens, refusal semantics, retention class, source, and review date.
+   - Routed `LLMClient` request bodies and 529 fallback rebuilds through reviewed
+     capabilities instead of ad-hoc model regexes.
+   - Added refusal metadata normalization so HTTP-200 refusals cannot disappear as an
+     ordinary empty response.
 
-2. **Switched reviewer-finder origination to Opus 4.8 + guardrails** (`8f22bbd8`): anti-
-   fabrication prompt block (`ANALYZE_INTEGRITY_BLOCK`, code-owned, survives Dataverse
-   prompt overrides — "return fewer real reviewers, never pad"); first-attempt token
-   budget 4096→8192; `temperature` omitted for Opus 4.8 (it deprecates the param — the
-   API 400s) via `modelSupportsTemperature()` in `llm-client.js`; `claude-opus-4-8` priced;
-   dead temperature plumbing removed from the analyze route.
+2. **Cross-transport coverage**
+   - Routed `lib/services/multi-llm-service.js` Claude calls through the same
+     capability registry and preserved refusal metadata for the virtual-review-panel
+     path.
+   - Routed `lib/services/execute-prompt.js` prompt-row model execution through the
+     same resolver/capability contract.
 
-3. **Split the exclusion parser onto its own Haiku key** (`875abd11`). `reviewer-exclusion-parser`
-   was riding the `reviewer-finder` model key, so the Opus switch would have dragged a cheap
-   deterministic name-parse onto Opus. New `reviewer-exclusion` APP_MODELS key → Haiku.
+3. **Model registry gates and write-path validation**
+   - Added `npm run check:model-registry` and `npm run check:model-registry:self-test`.
+   - Added admin/runtime validation so unreviewed concrete Claude ids are rejected
+     before Dataverse model overrides, prompt publish/resume clones, or Executor
+     prompt-row execution can persist/use them.
+   - Added `resolveModelWithCapabilities()` so callers resolve a concrete model and
+     retrieve reviewed capabilities together.
 
-4. **Codex adversarial review → fixes → Claude review** (`ca7f1e4d`). Codex found 2 HIGH issues:
-   (a) `_fetchWithRetries` swapped only `body.model` on a 529 fallback, so the temperature
-   decision was carried to the wrong model; (b) `TIER_FALLBACK_IDS.opus` was stale (4-7).
-   Fixes: rebuild the body for the fallback model on swap (both directions + stream tested);
-   bump the tier fallback to 4-8; **pin `reviewer-finder` to the concrete `claude-opus-4-8`**
-   so resolution is deterministic and the temperature gate always matches.
+4. **Live model discovery + runtime safety net**
+   - Extended `/api/cron/pricing-canary` to query Anthropic `/v1/models` and emit ops
+     alerts when a newer same-family model is not covered by both capability and
+     pricing registries.
+   - Added a narrow retry-once safety net in `LLMClient` for recognized deprecated
+     optional-parameter 400s only (`temperature` / `output_config.effort`), with
+     structured ops telemetry and no broad 400 retry.
 
-5. **Model-change strategy doc** (`2fd322ac`, `docs/MODEL_CHANGE_STRATEGY.md`). Design proposal:
-   a single capability registry, capability derived from the *resolved concrete id*, a
-   fail-loud CI gate (`check:model-registry`), a narrow self-healing retry, and "cover every
-   transport" (incl. the `multi-llm-service` gap). **Implementation is PLANNED / deferred.**
+5. **Admin model visibility**
+   - `/api/admin/models` now returns read-only capability/pricing registry status for
+     each effective resolved model.
+   - Admin Models UI displays compact `cap ok` / `price ok` style status beside the
+     concrete resolved model id. Saving still goes through the reviewed-model validator.
 
-6. **Process memory** (`d5b8650a`): `feedback-pause-for-codex-on-high-stakes` — on high-stakes
-   colleague-facing work, offer Codex plan/review BEFORE solo-implementing.
+6. **Reviewer-finder pre-flip replay artifacts**
+   - `scripts/validate-reviewer-analyze.mjs` now supports `--json-out` for a structured
+     replay artifact: request/file/extraction metadata, model/fallback/stop reason,
+     prompt provenance, parse status, validation issues, quality signals, side effects,
+     progress events, and human-review fields.
+   - Added `docs/MODEL_PREFLIP_REPLAY_RUNBOOK.md`.
+   - Updated `docs/MODEL_CHANGE_STRATEGY.md`; phases 0-8 are now marked done.
+
+7. **Post-implementation verification and production smoke**
+   - Verified the effective `reviewer-finder` model resolves to `claude-opus-4-8` with
+     `.env.local` loaded.
+   - Vercel production deployment `dpl_5vbDziZHX8WoLPchXAhtpcAdhcDT` was `Ready`
+     and aliased to `reviews.wmkeck.org`, `grantees.wmkeck.org`,
+     `submissions.wmkeck.org`, `applications.wmkeck.org`, and the Vercel aliases.
+   - Production logs for the last hour had no `500/502/503/504`. Expanded error-level
+     entries were `pg` SSL-mode warnings on successful `GET /api/cron/drain-submissions`
+     requests with status `200`.
+   - Unauthenticated `/admin` and `/admin/models` smokes correctly redirected to
+     sign-in and returned `200` on the sign-in page.
+   - Real proposal replay for request `1002836` was blocked by the Codex sandbox
+     because it would transmit private proposal text to Anthropic. User approved, but
+     the sandbox still rejected it. A synthetic non-confidential replay through
+     `ClaudeReviewerService.analyzeProposal` succeeded on `claude-opus-4-8` with no
+     fallback, `end_turn`, 6/6 suggestions, and 0 validation issues. That synthetic
+     artifact was moved out of the repo to `/private/tmp/wmkf-model-replays/`.
 
 ### Commits
-- `8f22bbd8` — reviewer-finder → Opus 4.8 + anti-fabrication guardrails
-- `875abd11` — split reviewer-exclusion parser onto a Haiku key
-- `d5b8650a` — memory: pause-for-Codex-on-high-stakes
-- `ca7f1e4d` — Codex-reviewed fixes (fallback body rebuild + concrete pin)
-- `2fd322ac` — docs: Model-Change Strategy (proposal)
 
-Full suite green throughout except the 2 known-red suites (bill, discovery-verification-status).
+- `881f2555` - Add Claude model capability registry gate
+- `e636d5f1` - Harden Claude request shaping across executor paths
+- `690e3a82` - Validate reviewed Claude model overrides
+- `67a9b04d` - Couple model resolution with capabilities
+- `4ead7598` - Add live Claude model discovery canary
+- `048540a9` - Add Claude deprecated-parameter retry safety net
+- `a2e58f02` - Show model registry status in admin
+- `d1c65eb5` - Add reviewer model preflip replay artifact
 
 ## Potential Next Steps
 
-> Verify each against ground truth before treating as actionable.
+### 1. Real proposal replay evidence remains blocked in Codex
 
-### 1. GO-LIVE: flip the `/admin` override to Opus (NEW — the actual cutover, not yet done)
-The code is pushed but **prod still runs Sonnet**: model resolution is governed by the
-Dataverse `model_override:reviewer-finder:model` setting, which overrides baseConfig.
-**Set it in `/admin` → Models to the concrete `claude-opus-4-8`** (we pin concrete — pick
-the concrete id, NOT the `opus` tier), and confirm no `CLAUDE_MODEL_REVIEWER_FINDER` env var
-pins Sonnet in Vercel. Then **re-validate live**: `node scripts/validate-reviewer-analyze.mjs
---request 1002821` — confirm a clean result with real added names. ⚠️ Local dev hits PROD
-Dataverse; this harness is read-only.
+The one remaining pre-flip evidence gap is a real, previously-problematic proposal replay
+through `scripts/validate-reviewer-analyze.mjs --json-out ...`. Codex could list files for
+request `1002836` and found one proposal-classified PDF:
 
-### 2. Model-change strategy sprint (PARKED by owner — deliberate later session)
-Phases 1-3 of `docs/MODEL_CHANGE_STRATEGY.md`: capability registry
-(`lib/services/model-capabilities.js`), wire `_buildBody`/529-rebuild + `multi-llm-service`
-through it (retire the regex), and the offline `check:model-registry` gate. Do NOT start
-without an explicit go — owner chose to park it.
+```text
+akoya_request::1002836_AF594C797B42F11188B5000D3A3065B8/Phase I::ProjectDescription.pdf
+```
 
-### 3. Carryovers NOT touched this session (from S285/S286 — re-verify before acting)
-- **Test-data revert:** 1002788 was flipped to Advancing for testing; revert to Set-aside when
-  done. Verify current `wmkf_triagestatus` first. (OWED since S284/S285.)
-- **E2E-verify the two S285 workbench features** (Restore removed candidates; PD identity
-  override) against parked req 1002788 — still only unit-tested.
-- **Reviewer-portal review-upload DESIGN decision** (S283/S285, OPEN): keep "3 ratings + PDF"
-  or capture more of the 11 questions as structured fields? Flow is built/live — not greenfield.
-- **Auto-on-award abstract cron** — still unbuilt, OPTIONAL/low priority.
+But the sandbox forbids transmitting private proposal text to Anthropic, even with user
+approval. To close this gap, use the normal logged-in app flow or run the harness from a
+non-sandboxed local terminal. Once an artifact exists, Codex can inspect it and call the
+pass/fail without rerunning the private replay.
+
+### 2. Logged-in Admin Models visual smoke
+
+Unauthenticated health is good, but the actual `/admin` Models content requires a logged-in
+browser/session. If an authenticated browser is available, confirm the effective
+`reviewer-finder` row shows `claude-opus-4-8` with capability/pricing status OK.
+
+### 3. Historical carryovers from S285/S286
+
+These were not re-verified in S287. Do not act on them until probing current state first:
+
+- request `1002788` test-data triage/status revert;
+- E2E verification of Restore Removed Candidates and PD identity override;
+- reviewer-portal review-upload design decision;
+- optional auto-on-award abstract cron.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `shared/config/baseConfig.js` | `reviewer-finder` pinned to `claude-opus-4-8`; new `reviewer-exclusion` → Haiku |
-| `lib/services/llm-client.js` | `modelSupportsTemperature` + `_buildBody(opts,stream,model)`; 529 fallback rebuilds the body |
-| `lib/services/model-resolver.js` | `TIER_FALLBACK_IDS.opus` = `claude-opus-4-8` |
-| `lib/services/claude-reviewer-service.js` | first-attempt `MAX_TOKENS` 8192 (origination engine) |
-| `shared/config/prompts/reviewer-finder.js` + `lib/services/reviewer-prompt-composer.js` | `ANALYZE_INTEGRITY_BLOCK` (always appended) |
-| `lib/services/reviewer-exclusion-parser.js` | resolves/logs under `reviewer-exclusion` (Haiku, temp 0) |
-| `docs/MODEL_CHANGE_STRATEGY.md` | the parked strategy + pre-flip validation checklist |
-| `scripts/validate-reviewer-analyze.mjs` | sanctioned read-only replay harness for the analyze prompt |
+| `docs/MODEL_CHANGE_STRATEGY.md` | Current model-change strategy; phases 0-8 done; pre-flip checklist still requires real replay evidence. |
+| `docs/MODEL_PREFLIP_REPLAY_RUNBOOK.md` | How to run and judge reviewer-finder model replay artifacts. |
+| `lib/services/model-capabilities.js` | Reviewed Claude model capability registry. |
+| `lib/services/model-resolver.js` | Tier resolution and `resolveModelWithCapabilities()`. |
+| `lib/services/llm-client.js` | Capability-shaped Claude transport, refusal normalization, deprecated-param retry safety net. |
+| `lib/services/multi-llm-service.js` | Secondary Claude transport now uses the same capability contract. |
+| `lib/services/execute-prompt.js` | Executor prompt-row model validation/resolution. |
+| `lib/services/model-review-validation.js` | Admin/prompt write-path validator for reviewed Claude ids. |
+| `pages/api/admin/models.js` | Admin model settings API with read-only registry status. |
+| `pages/admin.js` | Admin Models UI status badges. |
+| `pages/api/cron/pricing-canary.js` | Live Anthropic model discovery advisory alerting. |
+| `scripts/check-model-registry.js` | Static model registry consistency gate. |
+| `scripts/validate-reviewer-analyze.mjs` | Reviewer-finder replay harness with JSON artifact output. |
 
-## Testing
+## Testing / Verification From S287
 
 ```bash
-npm test                       # full suite (only the 2 known-red suites should fail locally)
-npm run lint
-node scripts/validate-reviewer-analyze.mjs --request 1002821   # live replay after the override flip
+npm run check:model-registry
+npm run check:model-registry:self-test
+npm run check:doc-symbol-refs
+npm run check:doc-symbol-refs:self-test
+npm run check:build-claim-freshness
+npm run check:build-claim-freshness:self-test
+npm run check:doc-currency
+npm run check:doc-currency:self-test
+npm run check:fact-consistency
+npm run check:fact-consistency:self-test
+npx jest tests/unit/llm-client.test.js tests/unit/model-capabilities.test.js tests/unit/model-registry-check.test.js tests/unit/model-review-validation.test.js tests/unit/model-resolver-capabilities.test.js tests/unit/multi-llm-service.test.js tests/unit/execute-prompt-model-validation.test.js tests/unit/pricing-canary.test.js tests/unit/admin-models.test.js tests/unit/validate-reviewer-analyze-artifact.test.js --runInBand
+npx eslint scripts/validate-reviewer-analyze.mjs tests/unit/validate-reviewer-analyze-artifact.test.js
+node --import ./scripts/lib/use-extensionless.mjs scripts/validate-reviewer-analyze.mjs --help
 ```
+
+Production smoke performed in S287:
+
+```bash
+vercel ls wmkf_research_apps --scope team_bAyoqgvSJhFJC3blheJgTMXQ
+vercel inspect https://wmkfresearchapps-imn5cg34o-justin-gallivans-projects.vercel.app --scope team_bAyoqgvSJhFJC3blheJgTMXQ
+vercel logs --project wmkf_research_apps --scope team_bAyoqgvSJhFJC3blheJgTMXQ --environment production --level error --since 1h --limit 3 --expand
+vercel logs --project wmkf_research_apps --scope team_bAyoqgvSJhFJC3blheJgTMXQ --environment production --status-code 500,502,503,504 --since 1h --limit 50
+curl -I -L --max-time 20 https://reviews.wmkeck.org/admin
+curl -I -L --max-time 20 https://reviews.wmkeck.org/admin/models
+```
+
+Known recurring local noise remains the same unless re-verified otherwise: the two known-red
+suites `tests/unit/bill.test.js` and `tests/unit/discovery-verification-status.test.js`.
 
 ## Gotchas / Continuity
 
-- **The Opus switch does nothing until the `/admin` override flips** — model resolution is
-  DB-override → env → baseConfig; the Dataverse override wins. This is the #1 next step.
-- **`reviewer-finder` is now pinned to a CONCRETE id** by design (the `^claude-opus-4-8`
-  temperature gate must match the served model). Unpinning requires the registry + gate +
-  replay checklist in `docs/MODEL_CHANGE_STRATEGY.md`.
-- **Opus 4.8 rejects `temperature`.** `llm-client` omits it for that model only; this is a
-  per-model regex today (`/^claude-opus-4-8/`) — the strategy doc is the plan to generalize it.
-- **`multi-llm-service._callClaude` still passes `temperature` unconditionally** — a second
-  transport that bypasses the gate. Latent (its consumer is on Sonnet); folded into the strategy.
-- **Known-red suites:** `bill.test.js` + `discovery-verification-status.test.js` only.
+- `SESSION_PROMPT.md` before this update was stale: it said the model strategy was parked
+  and that the Opus cutover depended on an admin override flip. In S287, with `.env.local`
+  loaded, `getModelForApp('reviewer-finder')` resolved to `claude-opus-4-8`.
+- The real-proposal replay artifact is the only missing high-value evidence. Codex cannot
+  create it from this sandbox if doing so requires sending private proposal text to Anthropic.
+- The synthetic replay proves transport/model/parse mechanics only; it does not prove real
+  reviewer quality on a private proposal.
+- Keep `reviewer-finder` pinned to concrete `claude-opus-4-8` until a real replay artifact
+  and human review support any tier advance or unpin.
+- Broad feature work immediately before the colleague demo is probably higher risk than
+  reward unless there is a known user-facing defect.
