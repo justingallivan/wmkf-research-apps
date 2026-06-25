@@ -34,6 +34,11 @@ export const BASE_CONFIG = {
     // confident set); Opus 4.8 handled the same proposals cleanly and added real
     // independent names. Fallback is Sonnet (haiku can't do origination).
     'reviewer-finder':             { model: 'opus',   fallback: 'sonnet' },
+    // Excluded-reviewer NAME PARSING only (reviewer-exclusion-parser) — a cheap,
+    // deterministic JSON extraction kept off the pricey origination model. Split
+    // from `reviewer-finder` in S286 when that key moved to Opus (which also
+    // deprecates the temperature:0 this parser relies on for determinism).
+    'reviewer-exclusion':          { model: 'haiku',  fallback: 'haiku' },
     'reviewers':                   { model: 'sonnet', fallback: 'haiku' },
     'peer-review-summarizer':      { model: 'sonnet', fallback: 'haiku' },
     'funding-analysis':            { model: 'sonnet', fallback: 'haiku' },
