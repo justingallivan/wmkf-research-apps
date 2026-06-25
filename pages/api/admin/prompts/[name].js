@@ -29,6 +29,7 @@ import { requireSuperuser } from '../../../../lib/utils/auth';
 import { DynamicsService } from '../../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
 import { validatePromptForSave } from '../../../../lib/utils/prompt-validators';
+import { validateReviewedClaudeModelValue } from '../../../../lib/services/model-review-validation';
 
 const PROMPTS_ENTITY = 'wmkf_ai_prompts';
 const ROW_SELECT = [
@@ -132,6 +133,10 @@ async function handlePut(req, res, name, profileId) {
     const topHash = createHash('sha256').update(top.wmkf_ai_promptbody || '').digest('hex');
     const consecutive = (top.wmkf_promptversion || 0) === (sorted[1].wmkf_promptversion || 0) + 1;
     if (topHash === bodyHash && consecutive) {
+      const topModelValidation = validateReviewedPromptModel(top.wmkf_ai_model);
+      if (!topModelValidation.valid) {
+        return res.status(400).json(topModelValidation.response);
+      }
       // Resume: `top` is our intended new version; flip the rest down.
       await writePendingAudit({ requestId, name, targetVersion: top.wmkf_promptversion, priorId: sorted[1].wmkf_ai_promptid, bodyHash, profileId });
       const flipResult = await flipPriorRows(sorted.slice(1));
@@ -145,6 +150,11 @@ async function handlePut(req, res, name, profileId) {
 
   const priorId = priorRow.wmkf_ai_promptid;
   const targetVersion = (priorRow.wmkf_promptversion || 0) + 1;
+  const priorModelValidation = validateReviewedPromptModel(priorRow.wmkf_ai_model);
+  if (!priorModelValidation.valid) {
+    return res.status(400).json(priorModelValidation.response);
+  }
+  const clonedModelValue = priorModelValidation.value;
 
   // 4. Pending audit (hard-abort on failure).
   try {
@@ -169,7 +179,7 @@ async function handlePut(req, res, name, profileId) {
       wmkf_ai_systemprompt: typeof systemPrompt === 'string' ? systemPrompt : (priorRow.wmkf_ai_systemprompt || ''),
       wmkf_ai_promptvariables: typeof variables === 'string' ? variables : (priorRow.wmkf_ai_promptvariables || null),
       wmkf_ai_promptoutputschema: priorRow.wmkf_ai_promptoutputschema || null,
-      wmkf_ai_model: priorRow.wmkf_ai_model || null,
+      wmkf_ai_model: clonedModelValue,
       wmkf_ai_temperature: priorRow.wmkf_ai_temperature ?? null,
       wmkf_ai_maxtokens: priorRow.wmkf_ai_maxtokens ?? null,
       wmkf_ai_promptstatus: priorRow.wmkf_ai_promptstatus ?? null,
@@ -306,6 +316,21 @@ function mapRow(r) {
     modifiedOn: r.modifiedon ?? null,
     modifiedById: r._modifiedby_value ?? null,
     modifiedByName: r._modifiedby_value_formatted ?? null,
+  };
+}
+
+function validateReviewedPromptModel(modelId) {
+  const validation = validateReviewedClaudeModelValue(modelId, { allowEmpty: true });
+  if (validation.valid) {
+    return { valid: true, value: validation.value };
+  }
+  return {
+    valid: false,
+    response: {
+      status: 'invalid_model',
+      code: validation.code,
+      error: validation.error,
+    },
   };
 }
 

@@ -19,8 +19,8 @@ import {
   getTierCatalog,
   isTier,
   resolveModel,
-  TIERS,
 } from '../../../lib/services/model-resolver';
+import { validateReviewedClaudeModelValue } from '../../../lib/services/model-review-validation';
 
 // Valid model types that can be overridden
 const VALID_MODEL_TYPES = ['model', 'visionModel', 'fallback'];
@@ -146,26 +146,31 @@ async function handlePut(req, res, profileId) {
     // requireSuperuser returns profileId=null in dev (AUTH_REQUIRED=false) — keep
     // it null so the FK to user_profiles isn't violated.
     const updatedBy = profileId;
+    let savedModelId = null;
 
     if (modelId === null || modelId === undefined || modelId === '') {
       // Delete the override — revert to env/hardcoded default
       await deleteSetting(settingKey);
     } else {
-      // Stored value may be a tier key (opus/sonnet/haiku) or a concrete
-      // Anthropic id. Reject anything else so typos don't get persisted.
-      const value = String(modelId).trim();
-      if (!isTier(value) && !value.startsWith('claude-')) {
+      // Stored value may be a tier key (opus/sonnet/haiku) or a reviewed
+      // concrete Anthropic id. Future model ids must first be added to the
+      // capability + pricing registries so request shaping and cost logging
+      // cannot drift silently.
+      const validation = validateReviewedClaudeModelValue(modelId);
+      if (!validation.valid) {
         return res.status(400).json({
-          error: `Invalid model value "${value}". Must be a tier (${Object.keys(TIERS).join('/')}) or a concrete Anthropic model id starting with "claude-".`,
+          error: validation.error,
+          code: validation.code,
         });
       }
-      await setSetting(settingKey, value, updatedBy);
+      await setSetting(settingKey, validation.value, updatedBy);
+      savedModelId = validation.value;
     }
 
     // Clear the in-memory cache so the next API request picks up the change
     clearModelOverridesCache();
 
-    return res.json({ success: true, settingKey, modelId: modelId || null });
+    return res.json({ success: true, settingKey, modelId: savedModelId });
   } catch (error) {
     console.error('Admin models PUT error:', error);
     return res.status(500).json({ error: 'Failed to update model override' });

@@ -4,11 +4,13 @@
 approach for navigating future Anthropic model changes (new releases, parameter
 deprecations, capability differences, refusal semantics, retention classes). S286
 shipped the interim Opus 4.8 hardening in §1. S287 shipped the first registry/gate
-slice in §1.5. The broader transport/admin/canary work in §3 remains planned.
+slice in §1.5. Transport and admin write-path hardening have since landed; resolver
+ergonomics, canary expansion, and replay automation in §3 remain planned.
 
 Authority note: this is a design doc. Live behavior is governed by source —
 `lib/services/llm-client.js`, `lib/services/model-capabilities.js`,
-`lib/services/model-resolver.js`, `lib/utils/model-pricing.js`, and
+`lib/services/model-review-validation.js`, `lib/services/model-resolver.js`,
+`lib/utils/model-pricing.js`, and
 `shared/config/baseConfig.js`. If this doc and code disagree, code wins and this doc
 is stale.
 
@@ -75,10 +77,14 @@ These are DONE and reduce the next-model blast radius:
 - Added `check:model-registry` + `check:model-registry:self-test`. The offline gate
   fails when static configured concrete ids, tier fallback ids, capabilities, or
   pricing drift from one another.
+- Added `lib/services/model-review-validation.js`. `/api/admin/models` now rejects
+  unreviewed concrete Claude ids before writing Dataverse model overrides, and
+  `/api/admin/prompts/[name]` rejects publishing/resuming a prompt version whose
+  cloned `wmkf_ai_model` is an unreviewed concrete Claude id.
 
-Important remaining boundary: this first gate is static. Executor runtime now rejects
-unreviewed prompt-row model ids before a Claude call, but Dataverse admin writes and
-environment overrides still need validation before they can introduce an unreviewed id.
+Important remaining boundary: the offline gate is static. Executor runtime and admin
+Dataverse writes now reject unreviewed prompt/model ids, but environment overrides are
+deployment configuration and still rely on the pre-deploy registry/pricing checklist.
 
 ## §2 — Target design
 
@@ -115,11 +121,12 @@ environment overrides still need validation before they can introduce an unrevie
 5. **CI gate — the keystone.** `check:model-registry` plus its self-test now follows
    the existing `check:*` pattern. v1 is offline/static (no Anthropic creds): it scans
    `BASE_CONFIG.APP_MODELS`, `TIER_FALLBACK_IDS`, pricing keys, and the capability
-   registry. Next step: validate admin/env/prompt-row overrides before they are saved
-   or published. A credentialed cron (extend `pages/api/cron/pricing-canary.js`) should
-   compare live `/v1/models` against the registry review date as an advisory ops alert.
-   Do not rely on the pricing canary alone — it only sees a model *after* runtime usage
-   has already occurred.
+   registry. Runtime/publish/write validation now covers prompt rows and Dataverse
+   admin model overrides; env overrides remain a deploy-time preflight because they
+   are not written through an app route. A credentialed cron (extend
+   `pages/api/cron/pricing-canary.js`) should compare live `/v1/models` against the
+   registry review date as an advisory ops alert. Do not rely on the pricing canary
+   alone — it only sees a model *after* runtime usage has already occurred.
 
 6. **Repeatable pre-flip validation.** Build on the existing read-only harness
    `scripts/validate-reviewer-analyze.mjs` (resolves a request, downloads the proposal,
@@ -141,7 +148,7 @@ environment overrides still need validation before they can introduce an unrevie
 | 2b (done S288) | Fix `lib/services/multi-llm-service.js` Claude request shaping and refusal metadata. | M | Med |
 | 2c (done S288) | Route `lib/services/execute-prompt.js` prompt-row model/temperature handling through the same capability helper. | M | Med |
 | 3a (done S287) | Add `check:model-registry` + self-test for static config/fallback/pricing/capability parity. | M | Low |
-| 3b (partial S288; must finish) | Executor runtime rejects unreviewed prompt-row ids. Still validate Dataverse admin writes and env override documentation before they can introduce an unreviewed id. | M | Med |
+| 3b (done 2026-06-25) | Executor runtime rejects unreviewed prompt-row ids; admin model override writes reject unreviewed concrete Claude ids before Dataverse persistence; prompt publish rejects cloning an unreviewed concrete Claude id. Env overrides are documented as deploy-time preflight values, not route-validated writes. | M | Med |
 | 4 (should) | Resolver returns `{ resolvedId, capabilities }` so callers cannot accidentally split resolution from capability lookup. | M | Med |
 | 5 (should) | Extend the pricing-canary cron to alert when `/v1/models` has a newer same-family id than the registry review date, before runtime use. | M | Med |
 | 6 (should) | Narrow retry-once deprecated-param safety net in `lib/services/llm-client.js`, with structured alerting; disabled for broad 400s. | M | Med |

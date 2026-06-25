@@ -22,6 +22,7 @@ jest.mock('@vercel/postgres', () => ({ sql: jest.fn(async () => ({ rows: [] })) 
 
 import handler from '../../pages/api/admin/prompts/[name]';
 import { DynamicsService } from '../../lib/services/dynamics-service';
+import { sql } from '@vercel/postgres';
 import { ANALYZE_USER_PROMPT_TEMPLATE } from '../../shared/config/prompts/reviewer-finder-dynamics';
 
 const NAME = 'reviewer-finder.analyze';
@@ -30,14 +31,15 @@ const VALID_BODY = ANALYZE_USER_PROMPT_TEMPLATE;
 function mockRes() {
   return { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
 }
-function currentRow({ version = 3, id = 'prior', body = VALID_BODY } = {}) {
-  return { wmkf_ai_promptid: id, wmkf_ai_promptname: NAME, wmkf_promptversion: version, wmkf_ai_iscurrent: true, wmkf_ai_promptbody: body };
+function currentRow({ version = 3, id = 'prior', body = VALID_BODY, model = 'sonnet' } = {}) {
+  return { wmkf_ai_promptid: id, wmkf_ai_promptname: NAME, wmkf_promptversion: version, wmkf_ai_iscurrent: true, wmkf_ai_promptbody: body, wmkf_ai_model: model };
 }
 
 beforeEach(() => {
   DynamicsService.queryRecords.mockReset();
   DynamicsService.createRecord.mockClear();
   DynamicsService.updateRecord.mockClear();
+  sql.mockClear();
 });
 
 describe('PUT /api/admin/prompts/[name]', () => {
@@ -71,7 +73,7 @@ describe('PUT /api/admin/prompts/[name]', () => {
   it('happy path: creates v+1, flips prior, verifies one current → completed', async () => {
     // 1st query: current rows (one). 2nd query: post-flip verify (one).
     DynamicsService.queryRecords
-      .mockResolvedValueOnce({ records: [currentRow({ version: 3, id: 'prior' })] })
+      .mockResolvedValueOnce({ records: [currentRow({ version: 3, id: 'prior', model: 'Sonnet' })] })
       .mockResolvedValueOnce({ records: [{ wmkf_ai_promptid: 'new-row', wmkf_promptversion: 4 }] });
     const res = mockRes();
     await handler({ method: 'PUT', query: { name: NAME }, body: { body: `${VALID_BODY}\nEDIT` } }, res);
@@ -83,10 +85,25 @@ describe('PUT /api/admin/prompts/[name]', () => {
     const created = DynamicsService.createRecord.mock.calls[0][1];
     expect(created.wmkf_ai_iscurrent).toBe(true);
     expect(created.wmkf_promptversion).toBe(4);
+    expect(created.wmkf_ai_model).toBe('sonnet');
     // S269: every admin-published version carries a domain publish time (parity w/ seed).
     expect(typeof created.wmkf_ai_publisheddatetime).toBe('string');
     expect(DynamicsService.updateRecord).toHaveBeenCalledWith(
       'wmkf_ai_prompts', 'prior', { wmkf_ai_iscurrent: false }, expect.objectContaining({ ifMatch: 'W/"1"' }));
+  });
+
+  it('rejects an unreviewed concrete Claude model before audit or create', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({
+      records: [currentRow({ version: 3, id: 'prior', model: 'claude-future-99' })],
+    });
+    const res = mockRes();
+    await handler({ method: 'PUT', query: { name: NAME }, body: { body: `${VALID_BODY}\nEDIT` } }, res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.status).toBe('invalid_model');
+    expect(res.body.code).toBe('unreviewed_claude_model');
+    expect(sql).toHaveBeenCalledTimes(1); // idempotency preflight only; no pending/final audit row.
+    expect(DynamicsService.createRecord).not.toHaveBeenCalled();
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
 
   it('flags an invariant violation (partial) when >1 current remains after flip', async () => {

@@ -110,13 +110,13 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 
 ### Optional — Per-App Model Overrides
 
-`getModelForApp()` in `shared/config/baseConfig.js` reads a runtime env var of the form `CLAUDE_MODEL_<APP>` for static per-app overrides (DB-stored overrides in Dataverse `wmkf_appsystemsettings`, loaded via `loadModelOverrides()`, take precedence — the Postgres `system_settings` table was dropped 2026-05-12; see §"How It Works" below). Examples:
+`getModelForApp()` in `shared/config/baseConfig.js` reads a runtime env var of the form `CLAUDE_MODEL_<APP>` for static per-app overrides (DB-stored overrides in Dataverse `wmkf_appsystemsettings`, loaded via `loadModelOverrides()`, take precedence — the Postgres `system_settings` table was dropped 2026-05-12; see §"How It Works" below). Prefer tier keys (`opus`, `sonnet`, `haiku`) unless a concrete pin has passed the model-change checklist. Concrete `claude-*` env values are deployment configuration, not route-validated writes: before setting one, add/confirm matching entries in `lib/services/model-capabilities.js` and `lib/utils/model-pricing.js`, then run `npm run check:model-registry` followed by `npm run check:model-registry:self-test`.
 
 - `CLAUDE_MODEL_REVIEWER_FINDER=claude-opus-4-8` (reviewer-finder origination runs on Opus as of S286; see baseConfig default + the `model_override:reviewer-finder` Dataverse override that governs live resolution)
 - `CLAUDE_MODEL_BATCH_PHASE_I_SUMMARIES=claude-haiku-4-5-20251001`
 - App key transformation: lowercase + hyphens → uppercase + underscores. The full app-key list is in `shared/config/appRegistry.js`.
 
-Prefer the admin dashboard (`/admin` → Models tab) for non-static overrides — env var values are baked into the deployment until next redeploy.
+Prefer the admin dashboard (`/admin` → Models tab) for non-static overrides — env var values are baked into the deployment until next redeploy. The admin Models API rejects unreviewed concrete Claude ids before writing Dataverse; env overrides rely on the pre-deploy check above.
 
 ### Optional — Operational Flags
 

@@ -118,7 +118,7 @@ AST gate (`@babel/parser`). Every `pages/api/**` route that reaches a `getModelF
 Offline/static gate for future Anthropic model changes. Scans `shared/config/baseConfig.js` (`APP_MODELS` + Claude defaults), `lib/services/model-resolver.js` (`TIER_FALLBACK_IDS`), `lib/services/model-capabilities.js` (`MODEL_CAPABILITIES`), and `lib/utils/model-pricing.js` (`MODEL_PRICING`) without importing app modules or touching Anthropic. Tier keys (`opus`/`sonnet`/`haiku`) are allowed in config; concrete Claude ids reachable from static config or tier fallback ids must match both a reviewed capability entry and a pricing entry. Capability entries must carry required request/response metadata (`supportsTemperature`, `supportsEffort`, `thinkingMode`, max tokens, refusal semantics, retention class, `reviewedAt`, `source`).
 
 - Blocks static model drift before runtime: a new concrete id in base config or tier fallback cannot ship until both request-shaping capabilities and pricing are reviewed.
-- Deliberate boundary: v1 does NOT inspect Dataverse admin overrides, env overrides, or prompt-row model values at write time. Those are tracked in `docs/MODEL_CHANGE_STRATEGY.md` as the next hardening phase.
+- Deliberate boundary: v1 is still an offline/static gate and does not inspect live Dataverse rows or env values. Runtime/write-time guards now cover prompt execution, admin prompt publish, and admin model override writes; env overrides remain a pre-deploy checklist item in `docs/CREDENTIALS_RUNBOOK.md` / `docs/MODEL_CHANGE_STRATEGY.md`.
 - Self-test: `scripts/check-model-registry-self-test.js` (clean fixture + missing capability + missing pricing + tier-fallback drift + malformed capability metadata).
 
 ### `check:agent-wiki` — agent retrieval-layer structure
