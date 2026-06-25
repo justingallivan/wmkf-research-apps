@@ -169,3 +169,102 @@ describe('executeMerge', () => {
     expect(deps.researcher.updateById).toHaveBeenCalledWith(KEEPER, { emailSource: 'manual' }, expect.any(Object));
   });
 });
+
+describe('executeMerge — empty-loser overwrite guard (Codex S289 ITEM-3)', () => {
+  // Picking "loser" for a field the loser left EMPTY must never null the keeper's
+  // real value — even though the field "differs" (keeper-has / loser-empty).
+  test('email: empty loser email is NOT moved over the keeper (no clearEmail, no null set)', async () => {
+    const deps = makeDeps({
+      keeperRow: { ...bareKeeper, wmkf_emailaddress: 'keeper@princeton.edu' },
+      loserRow: { ...bareLoser, wmkf_emailaddress: null },
+      loserSug: [],
+    });
+    const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: { email: 'loser' } }, deps);
+    expect(summary.emailMoved).toBe(false);
+    expect(deps.potentialReviewer.clearEmail).not.toHaveBeenCalled();
+    // keeper email must not be patched to null
+    expect(deps.potentialReviewer.update).not.toHaveBeenCalledWith(KEEPER, expect.objectContaining({ email: null }), expect.any(Object));
+  });
+
+  test('affiliation: empty loser value does not overwrite the keeper', async () => {
+    const deps = makeDeps({
+      keeperRow: { ...bareKeeper, wmkf_primaryaffiliation: 'Princeton' },
+      loserRow: { ...bareLoser, wmkf_primaryaffiliation: null },
+      loserSug: [],
+    });
+    await executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: { affiliation: 'loser' } }, deps);
+    expect(deps.potentialReviewer.update).not.toHaveBeenCalled();
+    expect(deps.researcher.updateById).not.toHaveBeenCalled();
+  });
+
+  test('whitespace-only loser value is treated as empty (name)', async () => {
+    const deps = makeDeps({
+      keeperRow: { ...bareKeeper, wmkf_name: 'Joshua Rabinowitz' },
+      loserRow: { ...bareLoser, wmkf_name: '   ' },
+      loserSug: [],
+    });
+    await executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: { name: 'loser' } }, deps);
+    expect(deps.potentialReviewer.update).not.toHaveBeenCalled();
+  });
+
+  test('website/hIndex: empty loser values do not overwrite; hIndex 0 IS a real value', async () => {
+    const deps = makeDeps({
+      keeperRow: { ...bareKeeper, wmkf_website: 'https://keeper.edu', wmkf_hindex: 42 },
+      loserRow: { ...bareLoser, wmkf_website: '', wmkf_hindex: 0 },
+      loserSug: [],
+    });
+    await executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: { website: 'loser', hIndex: 'loser' } }, deps);
+    // website empty → skipped; hIndex 0 is real and differs → written
+    expect(deps.researcher.updateById).toHaveBeenCalledWith(KEEPER, { hIndex: 0 }, expect.any(Object));
+    expect(deps.researcher.updateById).not.toHaveBeenCalledWith(KEEPER, expect.objectContaining({ website: expect.anything() }), expect.any(Object));
+  });
+});
+
+describe('executeMerge — re-run / double-submit safety (Codex S289 ITEM-1)', () => {
+  test('refuses an already-inactive loser (statecode=1) before any mutation', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper,
+      loserRow: { ...bareLoser, statecode: 1 },
+      loserSug: [],
+    });
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: { email: 'loser' } }, deps))
+      .rejects.toThrow(/already inactive/i);
+    expect(deps.potentialReviewer.clearEmail).not.toHaveBeenCalled();
+    expect(deps.potentialReviewer.update).not.toHaveBeenCalled();
+    expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
+  });
+
+  test('an active loser (statecode=0) is NOT blocked by the guard', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper,
+      loserRow: { ...bareLoser, statecode: 0 },
+      loserSug: [],
+    });
+    const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: {} }, deps);
+    expect(summary).toMatchObject({ repointed: 0, deleted: 0 });
+    expect(deps.potentialReviewer.deactivate).toHaveBeenCalled();
+  });
+});
+
+describe('planMerge — identity non-downgrade block (Codex S289 ITEM-5)', () => {
+  test('blocks when the loser is confirmed and the keeper is not', async () => {
+    const deps = makeDeps({
+      keeperRow: { ...bareKeeper, wmkf_identitystatus: 'probable' },
+      loserRow: { ...bareLoser, wmkf_identitystatus: 'confirmed' },
+      loserSug: [],
+    });
+    const plan = await planMerge({ keeperId: KEEPER, loserId: LOSER }, deps);
+    expect(plan.blocked).toBe(true);
+    expect(plan.reasons.map((r) => r.code)).toContain('loser_confirmed_identity');
+  });
+
+  test('does NOT block when both are confirmed (keeper keeps its own attestation)', async () => {
+    const deps = makeDeps({
+      keeperRow: { ...bareKeeper, wmkf_identitystatus: 'confirmed' },
+      loserRow: { ...bareLoser, wmkf_identitystatus: 'confirmed' },
+      loserSug: [],
+    });
+    const plan = await planMerge({ keeperId: KEEPER, loserId: LOSER }, deps);
+    expect(plan.reasons.map((r) => r.code)).not.toContain('loser_confirmed_identity');
+  });
+});

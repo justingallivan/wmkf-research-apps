@@ -1,10 +1,12 @@
 # Reviewer Record Merge — Build Plan & Design (v1)
 
-status: PLANNED (not built) — v1 scope approved 2026-06-25 (S289), evidence-backed
+status: v1 backend BUILT (chunks 1–3, S289 2026-06-25, Codex post-impl folded); UI (chunk 4) + ordering probe (chunk 5) pending
 owner: reviewer-finder
 
-> Forward-looking design doc. Nothing named "(new)" exists yet; don't treat any
-> path below as live until its chunk ships. Build follows the project's
+> Chunks 1–3 (adapters, `lib/services/reviewer-merge.js`, the
+> `pages/api/reviewer-finder/merge-candidates` route) are committed and tested;
+> chunk 4 (UI) and chunk 5 (live-ordering probe) are NOT built yet — don't treat
+> them as live. Build follows the project's
 > design → Codex pre-impl → implement+tests → commit → Codex post-impl loop
 > (`project-codex-design-pre-impl-iteration`). This doc was twice-reviewed by Codex
 > + an internal aggressive review + a live probe; see "How we got here" at the end.
@@ -110,8 +112,12 @@ Resolve ALL chosen literal values BEFORE any clear/mutate (O6), then:
    request the keeper already has a row for (collision) → the loser's row is
    un-engaged by predicate, so conditional-delete it (`If-Match`, new helper) to
    free the (person,request) key; keep keeper's row.
-5. **Applicant slots:** repoint `wmkf_potentialreviewer1..5` on `akoya_request`
-   from loser → keeper (null a slot that would duplicate keeper in the same request).
+5. **Applicant slots — BLOCK, do not repoint (v1, narrowed S289).** The earlier
+   design repointed `wmkf_potentialreviewer1..5` from loser → keeper. The shipped
+   v1 instead **blocks** the merge when the loser sits in ANY `akoya_request`
+   applicant slot (`loser_in_applicant_slot`) — strictly more conservative, and the
+   Rabinowitz case (the bug this fixes) has no slot references. Repointing slots is
+   deferred to a later version if a real case needs it.
 6. **Email (only if the surviving email differs from keeper's current email):**
    clear loser email, THEN set keeper email (alt-key forces clear-before-set), and
    stamp keeper `wmkf_emailsource='manual'`. The clear→set window is the ONE tear
@@ -154,7 +160,10 @@ the merge is blocked — that's correct.)
   weaker resolver verdict (mirror `researcher.js`'s no-automated-downgrade
   protection; the invite-confidence gate reads `wmkf_identitystatus`,
   `reviewer-invite.js:72-112`). A human can't adjudicate "which ORCID wins," so we
-  don't ask them to.
+  don't ask them to. **Where the LOSER is `confirmed` and the keeper is not, the
+  merge BLOCKS (`loser_confirmed_identity`)** rather than transplanting the loser's
+  identity bundle onto the keeper — staff re-run with the verified record as keeper.
+  Fail-closed; no human attestation is silently discarded (S289 post-impl).
 - Per-request descriptive fields (`wmkf_matchreason`/`wmkf_sources`/
   `wmkf_relevancescore`, which live on the suggestion, not the person) are NOT
   reconciled; the surviving suggestion's values stand. Stated so it isn't a surprise.
@@ -199,9 +208,11 @@ commit (not amended). Target ≤ ~1100 net lines per chunk.
   - Unit tests per helper.
 - **Chunk 2 — Merge service (new `reviewer-merge` service).**
   - `planMerge({keeperId, loserId})` → read-only diff + block-predicate evaluation
-    + which suggestions repoint/delete + applicant slots.
+    + which suggestions repoint/delete + applicant-slot block check.
   - `executeMerge({keeperId, loserId, fieldChoices})` → re-validate, ordered,
     literals-first, idempotent (re-runnable from live state). Identity non-downgrade.
+    Re-run safety: refuses an already-inactive loser (`statecode != 0`), and
+    `fieldChoices` never null out a keeper value with an empty loser one (S289).
   - Unit tests: block predicate (each ineligible trigger incl. a removed row with a
     honorarium link), collision-delete branch, repoint branch, email-move ordering.
 - **Chunk 3 — API route (new `pages/api/reviewer-finder/merge-candidates`).**
@@ -214,7 +225,8 @@ commit (not amended). Target ≤ ~1100 net lines per chunk.
     so a superuser gate would mostly just stop the person who hit the bug from
     fixing it. Most potential-reviewers live on old, unrevisited proposals; a
     pre-engagement PR-side correction there is very low risk. GUID-validate BOTH ids
-    (trust-boundary gate). `?plan=1` returns the plan; POST executes. Register in
+    (trust-boundary gate). Route is **POST-only**: `POST {keeperId, loserId}` returns
+    the read-only plan; `POST {…, fieldChoices, confirm:true}` executes. Register in
     `docs/API_ROUTE_SECURITY_MATRIX.md`. Route tests.
 - **Chunk 4 — UI merge mode (`CandidateEditModal`).**
   - On a 409 carrying `conflictingRecordId`, switch to merge mode: fetch the plan,
