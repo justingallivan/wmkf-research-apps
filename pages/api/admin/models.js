@@ -21,6 +21,8 @@ import {
   resolveModel,
 } from '../../../lib/services/model-resolver';
 import { validateReviewedClaudeModelValue } from '../../../lib/services/model-review-validation';
+import { lookupModelCapabilities } from '../../../lib/services/model-capabilities';
+import { lookupPricing, LAST_REVIEWED_AT } from '../../../lib/utils/model-pricing';
 
 // Valid model types that can be overridden
 const VALID_MODEL_TYPES = ['model', 'visionModel', 'fallback'];
@@ -71,6 +73,8 @@ async function handleGet(req, res) {
       dbOverrides[suffix] = value;
     }
 
+    const statusIds = new Set();
+
     // Build apps array from APP_MODELS config
     const apps = Object.entries(BASE_CONFIG.APP_MODELS).map(([appKey, config]) => {
       const result = { appKey, models: {} };
@@ -100,11 +104,13 @@ async function handleGet(req, res) {
         // storedValue may be a tier key or a concrete id; resolve to the
         // concrete id that callers will actually send to Anthropic.
         const resolvedId = resolveModel(storedValue) || storedValue;
+        if (resolvedId) statusIds.add(resolvedId);
 
         result.models[modelType] = {
           effective: resolvedId,           // back-compat: the concrete id
           stored: storedValue,             // tier OR concrete id
           isTier: isTier(storedValue),
+          registryStatus: buildModelRegistryStatus(resolvedId),
           source,
           dbOverride,
           envOverride,
@@ -115,17 +121,64 @@ async function handleGet(req, res) {
       return result;
     });
 
+    for (const model of availableModels) {
+      if (model.id) statusIds.add(model.id);
+    }
+    const tiers = getTierCatalog();
+    for (const tier of tiers) {
+      if (tier.resolvedId) statusIds.add(tier.resolvedId);
+      if (tier.fallbackId) statusIds.add(tier.fallbackId);
+    }
+    const defaultModelResolved = resolveModel(BASE_CONFIG.CLAUDE.DEFAULT_MODEL) || BASE_CONFIG.CLAUDE.DEFAULT_MODEL;
+    if (defaultModelResolved) statusIds.add(defaultModelResolved);
+
+    const modelStatuses = {};
+    for (const modelId of statusIds) {
+      modelStatuses[modelId] = buildModelRegistryStatus(modelId);
+    }
+
     return res.json({
       apps,
       availableModels,
-      tiers: getTierCatalog(),
+      tiers,
       defaultModel: BASE_CONFIG.CLAUDE.DEFAULT_MODEL,
-      defaultModelResolved: resolveModel(BASE_CONFIG.CLAUDE.DEFAULT_MODEL) || BASE_CONFIG.CLAUDE.DEFAULT_MODEL,
+      defaultModelResolved,
+      modelStatuses,
     });
   } catch (error) {
     console.error('Admin models GET error:', error);
     return res.status(500).json({ error: 'Failed to fetch model configuration' });
   }
+}
+
+export function buildModelRegistryStatus(modelId) {
+  const capabilities = lookupModelCapabilities(modelId);
+  const pricing = lookupPricing(modelId);
+  return {
+    modelId,
+    ok: Boolean(capabilities && pricing),
+    capability: capabilities ? {
+      status: 'reviewed',
+      family: capabilities.family || null,
+      reviewedAt: capabilities.reviewedAt || null,
+      supportsTemperature: capabilities.supportsTemperature === true,
+      supportsEffort: capabilities.supportsEffort === true,
+      refusalSemantics: capabilities.refusalSemantics || null,
+      dataRetentionClass: capabilities.dataRetentionClass || null,
+      source: capabilities.source || null,
+    } : {
+      status: 'missing',
+    },
+    pricing: pricing ? {
+      status: 'reviewed',
+      inputCentsPerMTok: pricing.input,
+      outputCentsPerMTok: pricing.output,
+      lastReviewedAt: LAST_REVIEWED_AT,
+    } : {
+      status: 'missing',
+      lastReviewedAt: LAST_REVIEWED_AT,
+    },
+  };
 }
 
 async function handlePut(req, res, profileId) {

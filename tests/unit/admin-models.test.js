@@ -10,18 +10,80 @@ jest.mock('../../lib/services/settings-service', () => ({
   deleteSetting: jest.fn(async () => true),
 }));
 
-import handler from '../../pages/api/admin/models';
-import { setSetting, deleteSetting } from '../../lib/services/settings-service';
+import handler, { buildModelRegistryStatus } from '../../pages/api/admin/models';
+import { listSettings, setSetting, deleteSetting } from '../../lib/services/settings-service';
 import { clearModelOverridesCache } from '../../lib/services/model-override-loader';
+import { clearAvailableModelsCache } from '../../lib/services/model-resolver';
 
 function mockRes() {
   return { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
 }
 
+const originalClaudeKey = process.env.CLAUDE_API_KEY;
+
 beforeEach(() => {
+  listSettings.mockClear().mockResolvedValue({});
   setSetting.mockClear();
   deleteSetting.mockClear();
   clearModelOverridesCache.mockClear();
+  clearAvailableModelsCache();
+  delete process.env.CLAUDE_API_KEY;
+});
+
+afterEach(() => {
+  if (originalClaudeKey === undefined) {
+    delete process.env.CLAUDE_API_KEY;
+  } else {
+    process.env.CLAUDE_API_KEY = originalClaudeKey;
+  }
+});
+
+describe('GET /api/admin/models', () => {
+  it('returns read-only capability and pricing status for effective models', async () => {
+    listSettings.mockResolvedValueOnce({
+      'model_override:reviewer-finder:model': 'claude-future-99',
+    });
+
+    const res = mockRes();
+    await handler({ method: 'GET', query: {} }, res);
+
+    const reviewerFinder = res.body.apps.find(app => app.appKey === 'reviewer-finder');
+    expect(res.statusCode).toBe(200);
+    expect(reviewerFinder.models.model).toMatchObject({
+      stored: 'claude-future-99',
+      effective: 'claude-future-99',
+      source: 'db',
+      registryStatus: {
+        ok: false,
+        capability: { status: 'missing' },
+        pricing: { status: 'missing' },
+      },
+    });
+    expect(res.body.modelStatuses['claude-future-99']).toMatchObject({
+      ok: false,
+      capability: { status: 'missing' },
+      pricing: { status: 'missing' },
+    });
+    expect(setSetting).not.toHaveBeenCalled();
+    expect(deleteSetting).not.toHaveBeenCalled();
+  });
+
+  it('classifies reviewed concrete ids as capability and pricing covered', () => {
+    expect(buildModelRegistryStatus('claude-sonnet-4-6')).toMatchObject({
+      modelId: 'claude-sonnet-4-6',
+      ok: true,
+      capability: {
+        status: 'reviewed',
+        supportsTemperature: true,
+        supportsEffort: true,
+      },
+      pricing: {
+        status: 'reviewed',
+        inputCentsPerMTok: 300,
+        outputCentsPerMTok: 1500,
+      },
+    });
+  });
 });
 
 describe('PUT /api/admin/models', () => {

@@ -5,8 +5,8 @@ approach for navigating future Anthropic model changes (new releases, parameter
 deprecations, capability differences, refusal semantics, retention classes). S286
 shipped the interim Opus 4.8 hardening in §1. S287 shipped the first registry/gate
 slice in §1.5. Transport, admin write-path, resolver ergonomics, canary expansion,
-and the deprecated-parameter retry safety net have since landed; replay automation
-in §3 remains planned.
+the deprecated-parameter retry safety net, and Admin Models read-only registry
+status have since landed; replay automation in §3 remains planned.
 
 Authority note: this is a design doc. Live behavior is governed by source —
 `lib/services/llm-client.js`, `lib/services/model-capabilities.js`,
@@ -94,6 +94,10 @@ These are DONE and reduce the next-model blast radius:
   (`temperature` or `output_config.effort`), writes best-effort structured `ops`
   telemetry, retries once, and leaves all broad/unrecognized 400s on the normal
   failure path.
+- `/api/admin/models` now returns read-only capability/pricing registry status for
+  each effective resolved model, and the Admin Models tab displays compact status
+  badges beside the concrete model id. This is visibility only; saving still goes
+  through `validateReviewedClaudeModelValue()`.
 
 Important remaining boundary: the offline gate is static. Executor runtime and admin
 Dataverse writes now reject unreviewed prompt/model ids, but environment overrides are
@@ -165,7 +169,7 @@ deployment configuration and still rely on the pre-deploy registry/pricing check
 | 4 (done 2026-06-25) | Resolver returns `{ resolvedId, capabilities }` through `resolveModelWithCapabilities()` so callers cannot accidentally split resolution from capability lookup. | M | Med |
 | 5 (done 2026-06-25) | Extend the pricing-canary cron to alert when `/v1/models` has a newer same-family id than the registry review date and is not specifically covered by capability + pricing registries, before runtime use. | M | Med |
 | 6 (done 2026-06-25) | Narrow retry-once deprecated-param safety net in `lib/services/llm-client.js`, with structured alerting; disabled for broad 400s. | M | Med |
-| 7 (nice) | Admin Models tab shows resolved capability + pricing status read-only beside each effective model. | M | Low |
+| 7 (done 2026-06-25) | Admin Models tab shows resolved capability + pricing status read-only beside each effective model. | M | Low |
 | 8 (nice) | `validate-reviewer-analyze.mjs` JSON artifact + a one-page pre-flip runbook. | S | Low |
 
 ## §4 — Pre-flip validation checklist (use NOW, before any reviewer-affecting model change)

@@ -909,6 +909,37 @@ function shortModelLabel(id) {
   return String(id).replace(/^claude-/, '').replace(/-\d{8}$/, '');
 }
 
+function formatPriceDollars(cents) {
+  if (typeof cents !== 'number') return '—';
+  return `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
+}
+
+function RegistryStatusPills({ status }) {
+  if (!status) return null;
+  const capabilityOk = status.capability?.status === 'reviewed';
+  const pricingOk = status.pricing?.status === 'reviewed';
+  const base = 'inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium border';
+  const okClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  const warnClass = 'bg-amber-50 text-amber-700 border-amber-200';
+  const capTitle = capabilityOk
+    ? `Reviewed ${status.capability.reviewedAt || 'date unknown'}; temperature=${status.capability.supportsTemperature ? 'yes' : 'no'}; effort=${status.capability.supportsEffort ? 'yes' : 'no'}; retention=${status.capability.dataRetentionClass || 'unknown'}`
+    : 'Missing capability registry entry';
+  const pricingTitle = pricingOk
+    ? `Pricing reviewed ${status.pricing.lastReviewedAt || 'date unknown'}; input ${formatPriceDollars(status.pricing.inputCentsPerMTok)}/MTok; output ${formatPriceDollars(status.pricing.outputCentsPerMTok)}/MTok`
+    : 'Missing pricing table entry';
+
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-1">
+      <span className={`${base} ${capabilityOk ? okClass : warnClass}`} title={capTitle}>
+        cap {capabilityOk ? 'ok' : 'missing'}
+      </span>
+      <span className={`${base} ${pricingOk ? okClass : warnClass}`} title={pricingTitle}>
+        price {pricingOk ? 'ok' : 'missing'}
+      </span>
+    </div>
+  );
+}
+
 function ModelConfigSection() {
   const [serverState, setServerState] = useState(null); // { apps, availableModels, tiers, defaultModel }
   const [localOverrides, setLocalOverrides] = useState({}); // { "appKey:modelType": tier|modelId|null }
@@ -958,7 +989,7 @@ function ModelConfigSection() {
 
   if (!serverState) return null;
 
-  const { apps, availableModels, tiers = [], defaultModel } = serverState;
+  const { apps, availableModels, tiers = [], defaultModel, modelStatuses = {} } = serverState;
 
   // Build server-side DB override map for diff calculation
   const serverDbOverrides = {};
@@ -1110,8 +1141,10 @@ function ModelConfigSection() {
                   // the current selection (tier → concrete via the tiers
                   // catalog from the server).
                   const tierMap = Object.fromEntries(tiers.map(t => [t.key, t.resolvedId]));
-                  const effectiveStored = localVal || info.hardcoded || '';
-                  const effectiveResolved = tierMap[effectiveStored] || effectiveStored;
+                  const effectiveStored = localVal || info.stored || '';
+                  const tierKey = typeof effectiveStored === 'string' ? effectiveStored.toLowerCase() : effectiveStored;
+                  const effectiveResolved = tierMap[tierKey] || effectiveStored;
+                  const registryStatus = modelStatuses[effectiveResolved] || info.registryStatus;
 
                   return (
                     <td key={modelType} className="py-2 px-2">
@@ -1154,6 +1187,7 @@ function ModelConfigSection() {
                               </span>
                             )}
                           </div>
+                          <RegistryStatusPills status={registryStatus} />
                         </div>
                       ) : (
                         <span className="text-gray-400 text-xs">—</span>
