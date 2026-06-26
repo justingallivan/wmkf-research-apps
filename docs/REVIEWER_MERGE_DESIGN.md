@@ -1,15 +1,18 @@
 # Reviewer Record Merge — Build Plan & Design (v1)
 
-status: v1 backend BUILT (chunks 1–3, S289 2026-06-25, Codex post-impl folded); UI (chunk 4) + ordering probe (chunk 5) pending
+status: v1 backend BUILT (chunks 1–3, S289 2026-06-25, Codex post-impl folded); UI merge mode BUILT (chunk 4, S290 2026-06-25, 2 Codex pre-impl passes folded, 11 tests green, Codex post-impl pending); ordering probe (chunk 5) pending
 owner: reviewer-finder
 
 > Chunks 1–3 (adapters, `lib/services/reviewer-merge.js`, the
-> `pages/api/reviewer-finder/merge-candidates` route) are committed and tested;
-> chunk 4 (UI) and chunk 5 (live-ordering probe) are NOT built yet — don't treat
-> them as live. Build follows the project's
+> `pages/api/reviewer-finder/merge-candidates` route) are committed and tested.
+> Chunk 4 (the `CandidateEditModal` UI merge mode + recovery, S290) is BUILT with
+> tests (`tests/unit/candidate-edit-modal-merge.test.js`); Codex post-impl review is
+> still pending — fold its catches before treating it as final. Chunk 5
+> (live-ordering probe) is NOT built yet. Build follows the project's
 > design → Codex pre-impl → implement+tests → commit → Codex post-impl loop
-> (`project-codex-design-pre-impl-iteration`). This doc was twice-reviewed by Codex
-> + an internal aggressive review + a live probe; see "How we got here" at the end.
+> (`project-codex-design-pre-impl-iteration`). This v1 design was twice-reviewed by
+> Codex + an internal aggressive review + a live probe (chunk 4 got two more Codex
+> pre-impl passes); see "How we got here" at the end.
 
 ## Problem
 
@@ -123,8 +126,10 @@ Resolve ALL chosen literal values BEFORE any clear/mutate (O6), then:
    stamp keeper `wmkf_emailsource='manual'`. The clear→set window is the ONE tear
    point not reconstructible from live Dataverse alone (FINAL-2); per the resolved
    decision below (Option B), a tear here leaves the keeper without the email and
-   the UI's half-done-state detection prompts staff to re-enter it — no durable
-   email log. Keeper=email-owner default (§Keeper selection) makes this move rare.
+   the UI's weak-proxy recovery prompts staff to re-enter it — no durable email log.
+   With keeper defaulting to the edited record (§Keeper selection), this email move
+   is the COMMON path in the trigger case; only the tear itself is rare (needs a 500
+   in the clear→set window).
 7. **Deactivate the loser** (statecode=1; email already blanked if it moved). Hard
    delete only if proven reference-free.
 
@@ -136,12 +141,16 @@ step was a misframed no-op and is gone).
 
 `conflictingRecordId` is the record that already OWNS the email — i.e. the record
 the staffer is NOT editing. Defaulting it to keeper would deactivate the row the
-staffer just curated. v1: **keeper is staff-selectable in the merge UI**, defaulting
-to the **more-engaged / fresher** record (engagement count, then most-recent
-activity), NOT the email owner. The picker clearly labels which record survives.
-(If the chosen keeper is the engaged one and the loser pre-engagement, the block
-predicate is satisfied; if the staffer picks the engaged record as the *loser*,
-the merge is blocked — that's correct.)
+staffer just curated. v1: **keeper is staff-selectable in the merge UI via a Swap
+control**, defaulting to **the edited record** (the row the staffer just curated),
+NOT the email owner. (The earlier draft said default to the "more-engaged / fresher"
+record, but `planMerge` returns no engagement/recency signal — S289 chunk-4 pre-impl
+Q1 — so v1 defaults to the curated record and relies on Swap + the server block
+predicate to correct a wrong orientation rather than widening the plan response.)
+The picker clearly labels which record survives. (If the chosen keeper is the
+engaged one and the loser pre-engagement, the block predicate is satisfied; if the
+staffer picks the engaged record as the *loser*, the merge is blocked — that's
+correct, and Swap fixes it.)
 
 ## Field-picker semantics
 
@@ -171,22 +180,42 @@ the merge is blocked — that's correct.)
 ## Email-move atomicity (FINAL-2) — RESOLVED: Option B (no new storage)
 
 The clear-loser-email → set-keeper-email window can tear, and the chosen email
-literal isn't reconstructible from live state afterward. This only matters when the
-**surviving email differs from the keeper's current email**; with the keeper
-defaulting to the email-owner/more-engaged record (§Keeper selection), the common
-trigger case keeps the keeper's existing email and skips step 6 entirely.
+literal isn't reconstructible from live state afterward. It matters when the
+**surviving email differs from the keeper's current email**. With keeper defaulting
+to the **edited record** (§Keeper selection) and the email-field picker defaulting
+to the conflict target (the address the staffer was setting, which lives on the
+loser), the **canonical trigger case DOES run step 6** — the staffer's address moves
+from the loser onto the keeper. (This corrects the earlier draft, which assumed
+keeper defaulted to the email owner and so claimed email moves were rare and step 6
+usually skipped — S289 chunk-4 pre-impl additional flag. Email moves are the common
+path; the tear stays rare because it needs a 500 inside the narrow clear→set window.)
 
 **Decision (S289): Option B — explicit re-edit UX, no durable email log.** Accept
-the tear as a rare, bounded inconsistency: the loser email is already blanked and
-the keeper simply lacks the email. The merge UI detects this half-done state on
-next open (keeper has no email but a recent merge touched it) and prompts staff to
-re-enter the email. No new table, no migration; cost is a documented manual-repair
-path, kept consistent with the journal cut the probe justified.
+the tear as a rare, bounded inconsistency. A tear surfaces as a **500 on confirm**:
+`clearEmail(loser)` succeeds, then `update(keeper,{email})` throws
+(`reviewer-merge.js` step 6), so the conflict-target address is now blanked on the
+loser and never landed on the keeper — **orphaned from both rows**, while the keeper
+keeps its OLD email. The recovery therefore must NOT proxy on "keeper has no email"
+(a false negative — the keeper still has its old address); it detects the actual
+orphan signature (S289 chunk-4 pre-impl pass 2): on a confirm 500, re-plan and test
+whether the staffer's target address is still owned by either side. If it is →
+ordinary transient failure, generic error + retry allowed. If it is NOT → the tear
+orphaned the address; show an explicit repair prompt naming the address ("…was
+removed mid-merge — open this record from the Candidates list and set its email"),
+refresh, and do NOT offer a plain retry (a retry would complete the merge WITHOUT
+restoring it — on the retry plan the loser email is empty and `resolvePersonUpdates`
+refuses to write an empty loser value, `reviewer-merge.js:202`, so the loser would
+be deactivated with the address permanently lost). A benign sibling case — confirm
+returns 200 but the surviving keeper has no email at all — shows the same "add it
+from the list" note. No inline re-entry (the surviving keeper suggestion id isn't
+reliably available to the modal when the loser's known suggestion collided and was
+hard-deleted). No new table, no migration; cost is a documented manual-repair path,
+kept consistent with the journal cut the probe justified.
 
 (Rejected — Option A: a tiny single-purpose Postgres table holding the resolved
 survivor email written before the clear, deleted after the set, for true idempotent
-resume. Cleaner but re-introduces a migration; not warranted given email moves are
-rare under the keeper default.)
+resume. Cleaner but re-introduces a migration; not warranted given the tear itself
+(a 500 inside the clear→set window) is rare and Option B's manual re-entry covers it.)
 
 ## Chunked build plan
 
@@ -229,13 +258,27 @@ commit (not amended). Target ≤ ~1100 net lines per chunk.
     the read-only plan; `POST {…, fieldChoices, confirm:true}` executes. Register in
     `docs/API_ROUTE_SECURITY_MATRIX.md`. Route tests.
 - **Chunk 4 — UI merge mode (`CandidateEditModal`).**
-  - On a 409 carrying `conflictingRecordId`, switch to merge mode: fetch the plan,
-    show the keeper selector (default = more-engaged/fresher), the field-by-field
-    picker, and — if `blocked` — the explainer with no confirm. Confirm → execute →
-    refresh.
-  - **Half-done email recovery (Option B):** detect the rare torn-email state
-    (keeper lacks an email after a merge touched it) and prompt staff to re-enter
-    it, closing the FINAL-2 tear without durable storage.
+  - On a 409 carrying `conflictingRecordId` (saved-Candidates PATCH only — guard on
+    `candidate.potentialReviewerId` + `!onApply && !confirmMode`), switch to merge
+    mode: fetch the plan with keeper = the edited record / loser = `conflictingRecordId`,
+    show the keeper Swap control (default = the edited record, not the email owner),
+    the field-by-field picker, and — if `blocked` — the explainer with no confirm
+    (Swap stays available). Confirm → execute → refresh.
+  - **Email-field default is orientation-aware (S289 chunk-4 pre-impl Q2):** the
+    email pick defaults to whichever record currently OWNS the conflict-target value,
+    recomputed on every (re)plan incl. after Swap — so it realizes the staffer's
+    original edit and never silently transplants the edited row's OLD email onto an
+    email-owner keeper.
+  - **Half-done email recovery (Option B):** on a confirm 500, re-plan and detect the
+    tear by its true signature — the staffer's target address is no longer owned by
+    EITHER side (not "keeper has no email", which is a false negative since the keeper
+    keeps its old address). If orphaned → explicit repair prompt naming the address,
+    no plain retry; if still owned → generic transient error + retry. Benign sibling:
+    confirm 200 with the surviving keeper holding no email → "add it from the list".
+    No inline re-entry (no reliable survivor suggestion id). Closes the FINAL-2 tear
+    without durable storage. (See §Email-move atomicity for the full rationale.)
+  - **Stale-async guard:** plan/swap/confirm/recovery responses that land after the
+    modal closes or the candidate identity changes must not write state.
 - **Chunk 5 — Non-mocked ordering probe (O8).**
   - A guarded integration probe that exercises the real alt-key ordering (email +
     (person,request) key) against live/staging Dataverse on throwaway rows, because

@@ -115,14 +115,19 @@ solves #1:
 ### 1. Chunk 4 — UI merge mode in `CandidateEditModal` (the natural next build)
 Backend is done and tested; the feature is not usable until the UI lands. On a 409
 carrying `conflictingRecordId` (from `PATCH /api/reviewer-finder/my-candidates`),
-switch the modal to merge mode: POST the plan, show the keeper selector
-(default = more-engaged/fresher, **NOT** the email owner — see design §Keeper
-selection), the field-by-field picker (keeper value vs loser value per field),
-and — if `blocked` — the reasons explainer with no confirm button. Confirm →
-`POST {…, confirm:true}` → refresh. Also handle **half-done email recovery**
-(Option B): if a merge tore between clear-loser-email and set-keeper-email, the
-keeper lacks an email; detect and prompt staff to re-enter. Spec: chunk 4 in
-`docs/REVIEWER_MERGE_DESIGN.md`.
+switch the modal to merge mode: POST the plan with keeper = the edited record /
+loser = `conflictingRecordId`, show the keeper **Swap** control (default = the
+edited record, **NOT** the email owner — see design §Keeper selection), the
+field-by-field picker (keeper value vs loser value per field; email default tracks
+the conflict-target owner), and — if `blocked` — the reasons explainer with no
+confirm button (Swap stays available). Confirm → `POST {…, confirm:true}` → refresh.
+Also handle **half-done email recovery** (Option B): on a confirm 500, re-plan and
+detect the tear by its true signature — the target address is no longer owned by
+EITHER side (NOT "keeper has no email", a false negative) — and show an explicit
+repair prompt naming the address with no plain retry; benign sibling: confirm 200
+with the surviving keeper holding no email → "add it from the list". Spec: chunk 4
+in `docs/REVIEWER_MERGE_DESIGN.md` (S289 chunk-4 pre-impl ×2 folded — keeper-default
++ orientation-aware email-default + orphan-detection recovery reconciled).
 
 ### 2. Deferred Codex P2 backend hardening (optional, design-doc'd)
 From the post-impl review, not yet built (Justin's call whether any precede the UI):
