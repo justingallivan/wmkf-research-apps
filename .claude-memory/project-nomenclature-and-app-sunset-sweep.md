@@ -54,6 +54,11 @@ legacy apps (**Reviewer Finder** + **Reviewer Manager**) into the single
 app is broken / I did it wrong." Overloaded language also keeps re-causing agent
 mis-routing and stale-doc churn.
 
+**Recommended strategy (S290):** `docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md` —
+classification framework (deprecated-app vs borrowed-live-infra vs pure-naming), a separate
+`APP_LIFECYCLE_REGISTRY` export (never re-add dead apps to `APP_REGISTRY`), route-paths-as-
+contracts → LEAVE+DOCUMENT, a phased plan, and the first 3 commits. Codex-reviewed.
+
 **How to apply:** follow the sequencing already decided in
 [[project-workbench-consolidation-rollout]] — **dead-end UI removal FIRST** (shrinks
 the surface), THEN renomenclature the smaller live surface. Build a grounded inventory
