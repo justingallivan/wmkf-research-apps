@@ -1,6 +1,9 @@
 # Reviewer ↔ CRM-Contact Boundary Gap — Findings & Design Stub
 
-Status: **FINDINGS / DESIGN STUB — not an implementation record. No code changed.**
+Status: **FINDINGS / DESIGN STUB. One increment SHIPPED (2026-06-26): the
+duplicate-contact-on-corrected-email fix — `ensureContact` ORCID fallback (see §Status /
+Next Step). The origination-time contact match and any field-sync remain unbuilt and
+policy-gated.**
 Drafted: 2026-06-25 (S290)
 Owner: reviewer-finder
 Scope: the `wmkf_potentialreviewers` ↔ CRM `contacts` boundary (reviewer origination,
@@ -219,7 +222,16 @@ continue with ORCID back-prop and address capture as designed. [`send-emails.js:
 
 ## Status / Next Step
 
-Findings + scope only. No code changed. The build decision is gated on the owner's answers to
-the policy questions above (especially auto-link vs. staff-confirm, and conflict ownership). When
-revisited, treat the duplicate-contact-on-corrected-email fix (`ensureContact` ORCID fallback) as
-the highest-impact, lowest-policy-dependency increment.
+**SHIPPED 2026-06-26 — duplicate-contact-on-corrected-email fix (`ensureContact` ORCID fallback).**
+`lib/bill/honorarium-onboard-orchestrator.js` `ensureContact` now, on an email miss, falls back to
+the reviewer's ORCID (`contacts.findByOrcidCandidates`) before creating: a unique match LINKS to the
+existing contact; an ambiguous match creates new + logs a `contactDuplicateRisk` staff-review warning
+(server log only — a workbench-visible surface is deferred); link-only, no field sync; fail-open
+throughout. A concurrency guard binds the honorarium to the reviewer's existing LIVE contact link if
+one appeared since the reviewer row was read. Owner decisions: unique-ORCID→link; ambiguous→create+flag
+(never block). Tests in `tests/unit/honorarium-onboard-orchestrator.test.js`. Codex-reviewed.
+
+**Still findings/scope only (NOT built), gated on the owner's policy answers above (auto-link vs.
+staff-confirm, conflict ownership):** origination-time contact match in `save-candidates` (the
+"Design Stub" section), any reviewer→CRM-contact field sync, and a durable/workbench-visible staff-review
+surface for the `contactDuplicateRisk` flag.
