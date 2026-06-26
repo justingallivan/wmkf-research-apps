@@ -1,118 +1,114 @@
-# Session 291 Prompt: Nomenclature/app-lifecycle execution + contact-boundary policy
+# Session 292 Prompt: Nomenclature cleanup Phase 3/4 + parked domain discussion
 
 ## ⚠️ Top-of-session must-knows
 
 1. **`scripts/probe-rabinowitz-conflict.js` is UNTRACKED on purpose and must STAY
    untracked** — it hardcodes a real reviewer's email (`joshr@princeton.edu`),
    names-stay-local norm. Never `git add -A` it in. Stage specific files only.
-2. **Push posture:** S290's 10 commits were pushed at end of session (see below). No
-   standing no-push instruction carries into S291 unless Justin sets one. Pushing
-   `main` auto-deploys to Vercel prod — the Invite Reviewers UI change is
-   colleague-facing, so confirm before shipping anything new outward.
+2. **Push posture:** S291's commits were pushed at end of session. No standing
+   no-push instruction carries into S292 unless Justin sets one. Pushing `main`
+   auto-deploys to Vercel prod — confirm before shipping anything new outward.
 3. **Known-red test suites (unchanged):** `tests/unit/bill.test.js` and
    `tests/unit/discovery-verification-status.test.js` only. Confirm any red is ONLY
    these before chasing.
+4. **Two new CI gates this session — keep them green:** `check:route-lifecycle-auth`
+   (auth-parity for `ROUTE_NAMESPACE_LIFECYCLE` namespaces, fail-closed) and
+   `check:scaffolding-tokens` (rejects leaked scaffolding tag lines in committed
+   files; also a fail-closed Write/Edit hook). Both are in `.github/workflows/test.yml`
+   and the `/start` gate list. If you add/rename a lifecycle route namespace or its
+   guard, expect `check:route-lifecycle-auth` to enforce parity.
 
-## Session 290 Summary
+## Session 291 Summary
 
-Closed the reviewer-record merge track end-to-end and **prod-confirmed** it, fixed a
-real prod bug the non-mocked probe caught, shipped a colleague-facing Invite
-Reviewers UX fix, and produced two Codex-reviewed strategy/findings docs.
+Executed the first phases of the nomenclature/app-lifecycle strategy and — after a
+"that isn't enforcement if it doesn't happen" challenge — built **mechanical
+enforcement** so the new nomenclature claims are gated against source instead of
+relying on advisory safeguards. Then archived a true-orphan legacy surface and
+renamed a live component, each Codex-reviewed before commit.
 
 ### What Was Completed
 
-1. **Reviewer-merge Chunk 4 — UI merge mode** (`080e7069`, `10ab7d4a`).
-   `CandidateEditModal` flips into merge mode on a duplicate-key 409: keeper swap,
-   orientation-aware field picker, blocked-reasons explainer, orphan-recovery on a
-   torn email move. 13 RTL tests. Codex post-impl (4 catches) folded.
+1. **Commit 1 — additive lifecycle registry + glossary** (`230e9bab`, `4bf6dcca`).
+   New exports `APP_LIFECYCLE_REGISTRY` + `ROUTE_NAMESPACE_LIFECYCLE` in
+   `shared/config/appRegistry.js` (non-active keys only — "active" derives from
+   `APP_REGISTRY`, no duplication); `docs/NOMENCLATURE_GLOSSARY.md` created;
+   de-overloaded `ownerAppKey` (semantic only, NOT auth) and added `guardAppKeys`
+   (full accepted OR-logic set per namespace). Codex adversarial review folded
+   (stray scaffolding, bare path, ownership/auth overload, "backed by" framing).
 
-2. **Reviewer-merge Chunk 5 — non-mocked prod ordering probe (O8)** (`39d44117`,
-   `169d8454`, prod-confirmed via `a19b934f`).
-   `scripts/probe-merge-altkey-ordering.mjs` (prod-write, reversible, marker-gated
-   teardown) — sub-probes A (email alt-key + 409 translation), B ((person,request)
-   collision vs free), C (e2e `executeMerge`). `--run` → **A/B/C all pass, O8
-   settled, cleanup verified.**
+2. **Enforcement gates + fail-closed hook** (`33360fb7`).
+   - `check:route-lifecycle-auth` (`scripts/check-route-lifecycle-auth.js` +
+     self-test): AST-based, scoped to `ROUTE_NAMESPACE_LIFECYCLE`, verifies each
+     namespace's live `requireAppAccess` accepted-key set equals `guardAppKeys`;
+     **null-branch fail-closed** on any guardless route.
+   - `check:scaffolding-tokens` (`scripts/check-scaffolding-tokens.js` + self-test)
+     + `.claude/hooks/block-scaffolding-tokens.js`: rejects lines that are SOLELY
+     scaffolding tags (outside fenced blocks); inline/backticked mentions allowed.
+     Hook wired in `settings.json` fail-closed (exit 2, no `|| true`).
+   - Both added to `.github/workflows/test.yml` and `/start`'s gate list;
+     `feedback-enforcement-hierarchy.md` memory + MEMORY.md router line added.
 
-3. **Real prod bug the probe caught + fixed** (`a19b934f`). The 409 derived
-   `conflictingRecordId` from the 412 body — which carries the record being WRITTEN
-   plus its `modifiedby` systemuser, **NOT** the existing owner — so it surfaced a
-   systemuser GUID and broke merge-mode entry. Fix: resolve the owner from the
-   duplicate email via `potentialReviewerAdapter.findByEmailCandidates` (fail-closed
-   on `statecode`); extracted `lib/dataverse/duplicate-key.js` (field/value only),
-   pinned by `tests/unit/duplicate-key.test.js`. Codex pre+post-impl folded.
+3. **Phase 1 / Commit 2 — archive the legacy Phase II writeup surface** (`b00b43b6`).
+   `git mv` of `phase-ii-writeup-legacy.js`, `/api/process-legacy.js`,
+   `proposal-summarizer-legacy.js` into `_archived/` after the owner confirmed the
+   page is invisible to all suite users and not in use (runtime-log retention ~1 day
+   couldn't prove months of non-use). Removed the `/api/process-legacy` row from the
+   API matrix, its prompt-injection-tagging entry, the payload-boundary test block,
+   and the dead `LEGACY_BATCH_*` constants; dropped its `ROUTE_NAMESPACE_LIFECYCLE`
+   entry (the gate forced this to be atomic); regenerated `CANONICAL_COUNTS.md`
+   (requireAppAccess endpoints 79→78, route files 134→133).
 
-4. **Invite Reviewers tab: edit affordance + no-email guard** (`5f8412de`).
-   Explicit "✏️ Edit contact" button on each card (mirrors the Find tab; the editor
-   already existed but was hidden behind the clickable name). Invite checkbox
-   disabled for never-invited no-email rows + Send set requires email (already-invited
-   rows stay selectable for release). Local nomenclature cleanup: header
-   "Candidates"→"Invite Reviewers", stale Invite/Completed tab refs fixed. Codex
-   sanity-check (no safety findings) folded.
+4. **Phase 2 — rename `CandidatesPanel` → `ReviewerInvitePanel`** (`a1815859`).
+   Component file + symbol + 2 unit tests renamed; `ReviewersTab.js` import/JSX
+   updated. The route path, the `?sub=candidates` deep-link, and the `candidates`
+   tab key are contracts and were left as-is. Codex caught a LIVE `npx jest` command
+   in `REVIEWER_E2E_REHEARSAL_RUNBOOK.md` naming the deleted test file — fixed +
+   fanned out to `REVIEWER_GENERATION_DATA_QUALITY_DESIGN.md`.
 
-5. **Two Codex-reviewed docs** (`83ef65e4`, `0ee9e158`, `2b43668c`).
-   - `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` — Codex-led trace of the
-     `wmkf_potentialreviewers ↔ CRM contacts` gap (no contact match at origination;
-     corrections stranded; `ensureContact` email-only match spawns duplicate
-     contacts). Findings + design stub, NOT built.
-   - `docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md` — strategy for the legacy-app
-     nomenclature/lifecycle cleanup, **hardened by a Codex adversarial review**
-     (added a 4th "live-cross-cutting" bucket, reclassified `phase-ii-writeup-legacy`
-     as sunset-candidate, ALIAS auth-parity + grant/persisted-key preconditions, gate
-     additions). `REVIEWER_MERGE_DESIGN.md` reconciled to Chunk-5 prod-confirmed.
-
-### Commits (all pushed)
-- `e0365b47` - Fix red doc-symbol-refs gate on local-only probe ref
-- `080e7069` / `10ab7d4a` - Chunk 4 UI merge mode + Codex post-impl
-- `39d44117` / `169d8454` - Chunk 5 ordering probe + Codex post-impl
-- `a19b934f` - conflictingRecordId fix (prod-confirmed)
-- `5f8412de` - Invite Reviewers edit + no-email guard
-- `83ef65e4` - Chunk 5 prod-confirmed docs + contact-boundary findings
-- `0ee9e158` / `2b43668c` - Nomenclature/app-lifecycle strategy + fact-consistency fix
+### Commits (all pushed at /stop)
+- `230e9bab` - Add app lifecycle registry + nomenclature glossary
+- `4bf6dcca` - Fold Codex review of nomenclature Commit 1
+- `33360fb7` - Enforce nomenclature claims against source: auth-parity + scaffolding gates
+- `b00b43b6` - Archive the legacy Phase II writeup surface (Phase 1 / Commit 2)
+- `a1815859` - Rename CandidatesPanel → ReviewerInvitePanel (Phase 2)
 
 ## Potential Next Steps
 
-### 1. Execute the nomenclature/app-lifecycle strategy (IN PROGRESS — S291)
-`docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md` is the plan. **S291 shipped:**
-Commit 1 (additive `APP_LIFECYCLE_REGISTRY` + `ROUTE_NAMESPACE_LIFECYCLE` exports
-+ `docs/NOMENCLATURE_GLOSSARY.md`); the enforcement gates `check:route-lifecycle-auth`
-+ `check:scaffolding-tokens` (+ a fail-closed scaffolding-token Write/Edit hook);
-and **Phase 1 / Commit 2** — archived `phase-ii-writeup-legacy` + `/api/process-legacy`
-+ `proposal-summarizer-legacy` after the owner confirmed the page is invisible to all
-suite users and not in active use (runtime-log retention is ~1 day so logs couldn't
-prove months of non-use); and Phase 2 (renamed `CandidatesPanel` → `ReviewerInvitePanel`;
-route path + `?sub=candidates` tab key left as contracts). **Remaining:** Phase 3 (document
-the borrowed `/api/reviewer-finder` + `/api/review-manager` namespaces), Phase 4 (fact-level
-`/sweep` — also reconciles the ~20 historical `docs/` design docs that still say
-`CandidatesPanel`). Honor the consolidated-grant + persisted-key inventory **precondition**
-in §3 before any rename/alias. **Parked for discussion:** bookmarks to the old
-`wmkfresearch.vercel.app` domain (vs `applications.wmkeck.org`) "may cause problems"
-— owner wants to talk through those soon.
+### 1. Nomenclature strategy — Phase 3 + Phase 4 (the remaining work)
+`docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md` is the plan. Phases 1–2 shipped (S291).
+**Remaining:**
+- **Phase 3 — LEAVE+DOCUMENT** the borrowed `/api/reviewer-finder` + `/api/review-manager`
+  namespaces. Largely already captured in `NOMENCLATURE_GLOSSARY.md` + the lifecycle
+  registry; Phase 3 is confirming nothing else needs documenting and is now gated by
+  `check:route-lifecycle-auth`. Verify scope before treating as open work.
+- **Phase 4 — fact-level `/sweep`** to reconcile lingering `CandidatesPanel` mentions
+  across `.claude-memory/` files, `docs/agent-wiki/` topic pages, and the ~20 historical
+  `docs/` design docs. Many of those are historical records (classify, don't silently
+  rewrite per `.claude/rules/durable-docs.md`); the live-runnable references were already
+  fixed in S291. Honor the consolidated-grant + persisted-key inventory precondition in §3
+  before any further rename/alias.
 
-### 2. Contact-boundary gap — owner policy decision, then build
+### 2. Parked — old `wmkfresearch.vercel.app` bookmarks (owner wants to talk)
+Owner flagged that bookmarks to the legacy `wmkfresearch.vercel.app` domain (vs the
+current `applications.wmkeck.org`) "may cause problems." This is a **discussion item**,
+not a green-lit task — start by asking what behavior they're seeing / want. Cross-ref
+`project-branded-domains.md` (staff auth cut over to `applications.wmkeck.org` 2026-06-23).
+
+### 3. Contact-boundary gap — owner policy decision, then build
 `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` lists the open policy questions
 (auto-link vs staff-confirm; who owns truth on conflicts). When decided, the
 **lowest-policy-dependency increment** is the `ensureContact` ORCID-fallback fix
-(stops the duplicate-contact-on-corrected-email bug). Build is blocked on Justin's
-policy answers.
+(stops the duplicate-contact-on-corrected-email bug). Blocked on Justin's policy answers.
 
-### 3. Deferred Codex P2 merge hardening (optional, design-doc'd)
+### 4. Deferred Codex P2 merge hardening (optional, design-doc'd)
 Not built; Justin's call: map mid-merge Dataverse 409/412 to a retryable 409
 (currently 500); trim suggestion/request IDs from the plan response if unused; add
-an audit breadcrumb on keeper+loser at deactivate. (Chunk 5 — DONE this session.)
-
-### 4. Step-2 reviewer↔contact linker (BLOCKED — do not start cold)
-`docs/REVIEWER_CONTACT_LINKER_DESIGN.md`. Blocked on Connor's Q1–Q4
-(`CONNOR_CONTACT_MERGE_AND_REVIEWER_LINKING.md`) + a probe of which contact→request
-links count as "associated with an active award". Note: the newer S290
-contact-boundary findings doc (#2) overlaps this boundary — reconcile the two before
-building either.
+an audit breadcrumb on keeper+loser at deactivate.
 
 ### 5. Long-stale carryovers (VERIFY-FIRST or retire — do NOT assume open)
-Ridden forward several sessions without re-verification; probe live state before
-acting, and retire if already done/blocked:
+Ridden forward several sessions without re-verification; probe live state before acting:
 - S288: record real-replay human sign-off in `docs/MODEL_CHANGE_STRATEGY.md`
-  (reviewer-finder already pinned to `claude-opus-4-8` in prod); logged-in Admin
-  Models visual smoke (owner-only check).
+  (reviewer-finder already pinned to `claude-opus-4-8` in prod); Admin Models visual smoke.
 - S285/S286: request `1002788` test-data triage; E2E of Restore Removed Candidates
   + PD identity override; reviewer-portal review-upload design decision; optional
   auto-on-award abstract cron.
@@ -121,39 +117,39 @@ acting, and retire if already done/blocked:
 
 | File | Purpose |
 |------|---------|
-| `shared/components/reviewers/ReviewerInvitePanel.js` | Invite Reviewers tab (renamed from `CandidatesPanel.js` S291) — edit button + no-email guard (S290). |
-| `lib/dataverse/duplicate-key.js` | `translateDuplicateKeyError` (field/value only); shared by route + probe. |
-| `pages/api/reviewer-finder/my-candidates.js` | PATCH 409 resolves conflicting owner by email, fail-closed on statecode. |
-| `scripts/probe-merge-altkey-ordering.mjs` | Non-mocked prod alt-key/merge probe (O8). `--run` against throwaway rows. |
+| `shared/config/appRegistry.js` | `APP_REGISTRY` (16 active) + `APP_LIFECYCLE_REGISTRY` + `ROUTE_NAMESPACE_LIFECYCLE` (non-active keys; `guardAppKeys` = full OR-logic set). |
+| `docs/NOMENCLATURE_GLOSSARY.md` | Canonical glossary for overloaded names (Workbench, Reviewer Finder, candidates/ReviewerInvitePanel, etc.). |
 | `docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md` | Cleanup strategy (Codex adversarially reviewed). Entry point for #1. |
-| `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` | potentialreviewer↔contact gap findings + stub (#2). |
-| `docs/REVIEWER_MERGE_DESIGN.md` | Merge v1 — chunks 1–5 BUILT + prod-confirmed. |
+| `scripts/check-route-lifecycle-auth.js` | Auth-parity gate for lifecycle namespaces (AST, fail-closed). |
+| `scripts/check-scaffolding-tokens.js` | Scaffolding-leak gate; paired with `.claude/hooks/block-scaffolding-tokens.js`. |
+| `shared/components/reviewers/ReviewerInvitePanel.js` | Invite Reviewers tab (renamed from `CandidatesPanel.js` S291). |
+| `.claude-memory/feedback-enforcement-hierarchy.md` | The eliminate→gate→friction enforcement hierarchy lesson. |
 | `scripts/probe-rabinowitz-conflict.js` | UNTRACKED, names-local. Never commit. |
 
 ## Testing
 
 ```bash
-# Merge + duplicate-key unit tests:
-npx jest tests/unit/candidate-edit-modal-merge.test.js tests/unit/duplicate-key.test.js \
-  tests/unit/reviewer-merge-service.test.js
+# The two new gates (+ self-tests), run sequentially:
+npm run check:route-lifecycle-auth && npm run check:route-lifecycle-auth:self-test
+npm run check:scaffolding-tokens && npm run check:scaffolding-tokens:self-test
 
-# Non-mocked prod probe (Justin runs it; auto-mode prod-deploy guard blocks the agent):
-#   ! node scripts/probe-merge-altkey-ordering.mjs          # plan-only
-#   ! node scripts/probe-merge-altkey-ordering.mjs --run    # 3 sub-probes + cleanup
-
-# Gates touched this session (all green):
+# Drift gates touched by nomenclature work:
 npm run check:fact-consistency && npm run check:doc-symbol-refs \
   && npm run check:build-claim-freshness && npm run check:agent-wiki
 ```
 
 ## Gotchas / Continuity
 
-- The reviewer-merge track is **DONE + prod-confirmed**; do not re-open it as a build
-  task. Remaining merge items are the optional P2 hardening (#3).
-- The Invite Reviewers edit is live to colleagues once deployed — the editor and the
-  name-click open the SAME PATCH-mode modal; no-email rows are unselectable for
-  invite (but `send-emails` also skips `no_email`, a triple backstop).
 - Nomenclature cleanup is sequenced: dead-end UI removal → archive true orphans →
-  rename live internals → `/sweep` docs. Don't rename route paths (contracts) or
-  bare-rename persisted keys (`model_override:reviewer-finder:model`, preferences).
+  rename live internals → `/sweep` docs. Phases 1–2 done; Phase 3 (document borrowed
+  namespaces) + Phase 4 (`/sweep` historical docs) remain. Don't rename route paths
+  (contracts) or bare-rename persisted keys (`model_override:reviewer-finder:model`,
+  `reviewer-finder.*` preferences, the `candidates` tab key).
+- The two new gates are fail-closed by design. If `check:route-lifecycle-auth` goes
+  red after a route change, the live `requireAppAccess` accepted-key set drifted from
+  `guardAppKeys` — fix the registry or the route, don't loosen the gate.
+- The scaffolding-token hook blocks Write/Edit of files containing bare scaffolding
+  tag lines. Inline/backticked mentions (e.g. in a doc explaining the gate) are fine.
+- Archived legacy Phase II writeup surface is in `_archived/`; do not resurrect into
+  `APP_REGISTRY` or the route tree.
 ```
