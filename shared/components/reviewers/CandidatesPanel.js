@@ -1,5 +1,5 @@
 /**
- * CandidatesPanel — the Workbench "Candidates" sub-tab. The persistent roster of
+ * CandidatesPanel — the Workbench "Invite Reviewers" sub-tab. The persistent roster of
  * every saved candidate for a request (applicant-recommended + search-found),
  * with their invitation status, and the surface to actually INVITE them.
  *
@@ -8,7 +8,7 @@
  * invitation runs through InviteEmailModal (render-emails → send-emails,
  * templateType 'invitation' → real Dynamics email with an accept/decline magic
  * link; sets invited=true). Once a candidate accepts in the external portal they
- * move into the Invite/Track/Completed tabs (accepted-only).
+ * move into the Track Reviewers tab (accepted-only).
  *
  * Props:
  *   - requestId
@@ -77,7 +77,7 @@ export default function CandidatesPanel({ requestId, candidates = [], removedCan
   const [showRemoved, setShowRemoved] = useState(false);
 
   // Remove a candidate from THIS request. Same server-authoritative DELETE the
-  // Invite/Track rows use (my-candidates → soft-delete wmkf_selected=false + revoke
+  // Track Reviewers rows use (my-candidates → soft-delete wmkf_selected=false + revoke
   // any link atomically) — never touches the global person/contact. fetch() doesn't
   // throw on 4xx/5xx, so we check resp.ok before refreshing.
   const removeCandidate = async (c) => {
@@ -131,7 +131,7 @@ export default function CandidatesPanel({ requestId, candidates = [], removedCan
     }
   };
 
-  // Accepted candidates are managed in the Invite/Track tabs; not selectable here.
+  // Accepted candidates are managed in the Track Reviewers tab; not selectable here.
   const selectable = candidates.filter((c) => !c.accepted);
   const toggle = (id) => setSelected((prev) => {
     const next = new Set(prev);
@@ -140,7 +140,11 @@ export default function CandidatesPanel({ requestId, candidates = [], removedCan
   });
 
   const selectedRows = candidates.filter((c) => selected.has(c.suggestionId));
-  const selectedNotInvited = selectedRows.filter((c) => !c.invited && !c.accepted);
+  // Require an email for the Send set (mirrors the checkbox-disable predicate): if a
+  // row was selected and then edited to clear its email mid-session, it must drop out
+  // of the invite count + InviteEmailModal rather than ride along as a doomed,
+  // server-skipped send (Codex S290 sanity-check #2 — stale `selected` not pruned).
+  const selectedNotInvited = selectedRows.filter((c) => !c.invited && !c.accepted && c.email);
   // Still-pending = invited, no response yet (not accepted/declined, and no resolved
   // responseType — excludes already-withdrawn/no_response). The only rows the PD may
   // "no longer needed"-release (reviewer-engagement Phase 4 §3.C). Server re-guards this.
@@ -184,7 +188,7 @@ export default function CandidatesPanel({ requestId, candidates = [], removedCan
   return (
     <Card hover={false}>
       <div className="flex items-center justify-between mb-3">
-        <p className="font-medium text-gray-900">Candidates ({candidates.length})</p>
+        <p className="font-medium text-gray-900">Invite Reviewers ({candidates.length})</p>
         {loading && <div className="w-5 h-5 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />}
       </div>
 
@@ -197,18 +201,23 @@ export default function CandidatesPanel({ requestId, candidates = [], removedCan
         <>
           <p className="text-sm text-gray-600 mb-2">
             Select candidates and send invitations. Each invitation includes a secure accept/decline link; once a
-            reviewer accepts they appear in the <span className="font-medium">Invite</span> tab.
+            reviewer accepts they appear in the <span className="font-medium">Track Reviewers</span> tab.
           </p>
 
           <ul className="divide-y divide-gray-100 max-h-[34rem] overflow-y-auto">
             {candidates.map((c) => (
               <li key={c.suggestionId} className="py-3 flex items-start gap-3">
+                {/* No email ⇒ can't be invited (send-emails skips no_email). Block
+                    selection so a doomed invite can't be queued — but let an
+                    already-invited row through (email may have been cleared after
+                    invite) so it stays releasable. */}
                 <input
                   type="checkbox"
                   className="mt-1"
                   checked={selected.has(c.suggestionId)}
-                  disabled={c.accepted}
+                  disabled={c.accepted || (!c.email && !c.invited)}
                   onChange={() => toggle(c.suggestionId)}
+                  title={!c.email && !c.invited ? 'Add an email (✏️ Edit contact) before this candidate can be invited' : undefined}
                   aria-label={`Select ${c.name}`}
                 />
                 <div className="flex-1 min-w-0">
@@ -317,6 +326,19 @@ export default function CandidatesPanel({ requestId, candidates = [], removedCan
                       <a href={c.orcidUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:text-emerald-900" title="ORCID profile">
                         ORCID
                       </a>
+                    )}
+                    {/* Explicit edit affordance, mirroring the Find tab's "✏️ Edit
+                        contact" (ReviewerSearchSection) so staff don't have to discover
+                        that the name is clickable. Same PATCH-mode modal as the name. */}
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={() => setEditing(c)}
+                        className="text-gray-500 hover:text-blue-700 flex items-center gap-1"
+                        title="Edit this candidate’s details (name, email, affiliation…)"
+                      >
+                        ✏️ Edit contact
+                      </button>
                     )}
                   </div>
                 </div>
