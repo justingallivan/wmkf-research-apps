@@ -1,6 +1,6 @@
 # Reviewer Record Merge — Build Plan & Design (v1)
 
-status: v1 backend BUILT (chunks 1–3, S289 2026-06-25, Codex post-impl folded); UI merge mode BUILT (chunk 4, S290 2026-06-25, 2 Codex pre-impl + 1 post-impl passes folded, 13 tests green); ordering probe BUILT (chunk 5, S290, `scripts/probe-merge-altkey-ordering.mjs`, Codex pre-impl consensus reached — awaiting first prod run to settle O8)
+status: v1 backend BUILT (chunks 1–3, S289 2026-06-25, Codex post-impl folded); UI merge mode BUILT (chunk 4, S290 2026-06-25, 2 Codex pre-impl + 1 post-impl passes folded, 13 tests green); ordering probe BUILT + PROD-CONFIRMED (chunk 5, S290, `scripts/probe-merge-altkey-ordering.mjs`; `--run` settled O8 — sub-probes A/B/C all pass — and caught + fixed a real prod bug in the 409 `conflictingRecordId` derivation, commit a19b934f)
 owner: reviewer-finder
 
 > Chunks 1–3 (adapters, `lib/services/reviewer-merge.js`, the
@@ -9,8 +9,9 @@ owner: reviewer-finder
 > tests (`tests/unit/candidate-edit-modal-merge.test.js`); the Codex post-impl review
 > is folded (stale-async guards on enter/swap, re-plan-failure withholds retry,
 > recovery always refreshes on exit). Chunk 5 (the live-ordering probe
-> `scripts/probe-merge-altkey-ordering.mjs`) is BUILT and reached Codex pre-impl
-> consensus; its first prod run (which settles O8) is still pending. Build follows the project's
+> `scripts/probe-merge-altkey-ordering.mjs`) is BUILT and PROD-CONFIRMED
+> (the `--run` settled O8 — sub-probes A/B/C all pass — and caught a real prod bug in the
+> 409 `conflictingRecordId` derivation, since fixed: commit a19b934f). Build follows the project's
 > design → Codex pre-impl → implement+tests → commit → Codex post-impl loop
 > (`project-codex-design-pre-impl-iteration`). This v1 design was twice-reviewed by
 > Codex + an internal aggressive review + a live probe (chunk 4 got two more Codex
@@ -299,8 +300,17 @@ commit (not amended). Target ≤ ~1100 net lines per chunk.
     auto-cleans in a `finally` (marker-gated teardown; `--keep` opts out). To remove
     drift, `translateDuplicateKeyError` was extracted to `lib/dataverse/duplicate-key.js`
     and is shared by the probe and `my-candidates.js`.
-  - **Pending:** the first `--run` against prod (settles O8 empirically). Codex
-    pre-impl consensus reached; Codex post-impl review of the code still to fold.
+  - **PROD-CONFIRMED S290:** the `--run` against prod settled O8 — sub-probes A (email
+    alt-key + `translateDuplicateKeyError` round-trip), B ((person,request) collision
+    vs free), and C (end-to-end `executeMerge`) all PASS, with marker-gated cleanup
+    verified (no probe rows left). The run also caught a real prod bug the mocked tests
+    missed: the 409 path derived `conflictingRecordId` from the 412 body, which carries
+    the record being WRITTEN plus its `modifiedby` systemuser — NOT the existing owner —
+    so it surfaced a systemuser GUID and broke merge-mode entry. Fixed by resolving the
+    owner from the duplicate email via `potentialReviewerAdapter.findByEmailCandidates`
+    (fail-closed on `statecode`); `lib/dataverse/duplicate-key.js` returns field/value
+    only. Codex pre-impl + post-impl both folded. Commit a19b934f; pinned regression
+    test `tests/unit/duplicate-key.test.js`.
 
 ## Red gates in scope
 
