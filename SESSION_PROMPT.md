@@ -1,205 +1,151 @@
-# Session 290 Prompt: Reviewer-merge UI (Chunk 4) + step-2 linker
+# Session 291 Prompt: Nomenclature/app-lifecycle execution + contact-boundary policy
 
-## ⚠️ Top-of-session must-knows (S289)
+## ⚠️ Top-of-session must-knows
 
-1. **FOUR commits are UNPUSHED and the user has NOT approved a push.** Justin's
-   standing instruction this session was *"No pushing until I approve."* Do NOT
-   `git push` until he explicitly says so. Unpushed (oldest→newest):
-   `612efee5`, `be7f624f`, `1a3b8c40`, `c41b7539`.
-2. **`scripts/probe-rabinowitz-conflict.js` is UNTRACKED on purpose and must STAY
-   untracked.** It hardcodes a real reviewer's email (`joshr@princeton.edu`) — the
-   names-stay-local norm. Never `git add -A` it in. (`git add -A` staged it twice
-   this session; both times it was unstaged before commit.)
+1. **`scripts/probe-rabinowitz-conflict.js` is UNTRACKED on purpose and must STAY
+   untracked** — it hardcodes a real reviewer's email (`joshr@princeton.edu`),
+   names-stay-local norm. Never `git add -A` it in. Stage specific files only.
+2. **Push posture:** S290's 10 commits were pushed at end of session (see below). No
+   standing no-push instruction carries into S291 unless Justin sets one. Pushing
+   `main` auto-deploys to Vercel prod — the Invite Reviewers UI change is
+   colleague-facing, so confirm before shipping anything new outward.
+3. **Known-red test suites (unchanged):** `tests/unit/bill.test.js` and
+   `tests/unit/discovery-verification-status.test.js` only. Confirm any red is ONLY
+   these before chasing.
 
-## Session 289 Summary
+## Session 290 Summary
 
-Built the **reviewer-record merge** feature (v1 backend) to fix a prod dead-end a
-colleague hit: editing a candidate's email to an address another
-`wmkf_potentialreviewers` row already owns 412s on the `wmkf_emailaddress_unique`
-alternate key, and the error told staff to "merge" the records with no way to do
-it. v1 is a real **field-by-field merge** of two duplicate person records, scoped
-to the safe case and fail-closed everywhere else.
-
-### The three distinct problems (don't conflate them)
-
-This session repeatedly untangled three different "duplicate" problems. v1 only
-solves #1:
-
-1. **`wmkf_potentialreviewers` ↔ `wmkf_potentialreviewers`** — duplicate reviewer
-   person rows (the misspelled-email bug). **Built this session.**
-   `docs/REVIEWER_MERGE_DESIGN.md`.
-2. **`wmkf_potentialreviewers` ↔ `contacts`** — linking a reviewer to its CRM
-   contact (the payment identity) and keeping them consistent. **Designed, not
-   built.** `docs/REVIEWER_CONTACT_LINKER_DESIGN.md`.
-3. **`contacts` ↔ `contacts`** — duplicate CRM contacts. **Connor owns this** via
-   native Dynamics merge. Handoff + open questions:
-   `docs/CONNOR_CONTACT_MERGE_AND_REVIEWER_LINKING.md`.
+Closed the reviewer-record merge track end-to-end and **prod-confirmed** it, fixed a
+real prod bug the non-mocked probe caught, shipped a colleague-facing Invite
+Reviewers UX fix, and produced two Codex-reviewed strategy/findings docs.
 
 ### What Was Completed
 
-1. **Probed the real duplicate population** (read-only prod probes, point-in-time):
-   `scripts/probe-reviewer-duplicates.js` — 4,294 active person rows; 28
-   ORCID-duplicate clusters, 27 fully pre-engagement, **0 with ≥2 engaged members**;
-   only 3 of 4,294 promoted to a contact (all test rows). The dangerous cases the
-   original design over-engineered (both-sides engaged on one request; two-contact
-   merge) **do not occur in live data** → v1 deliberately handles only the safe case.
-   The Rabinowitz conflict itself: two pre-engagement rows ("Joshua Ravinowitz"
-   owns the email, "Joshua Rabinowitz" has 1 selected suggestion, neither engaged,
-   different requests, **no collision**) — v1 handles it cleanly.
+1. **Reviewer-merge Chunk 4 — UI merge mode** (`080e7069`, `10ab7d4a`).
+   `CandidateEditModal` flips into merge mode on a duplicate-key 409: keeper swap,
+   orientation-aware field picker, blocked-reasons explainer, orphan-recovery on a
+   torn email move. 13 RTL tests. Codex post-impl (4 catches) folded.
 
-2. **v1 merge backend (chunks 1–3), `be7f624f`:**
-   - `lib/services/reviewer-merge.js` (NEW) — `planMerge()` (read-only diff +
-     fail-closed block predicate + repoint/collision plan) and `executeMerge()`
-     (re-validates, resolves literals up front, then ordered: reconcile person
-     fields → repoint non-colliding loser suggestions → conditional-delete
-     collisions → email move → deactivate loser). Adapters are dependency-injected
-     for testing (mirrors the honorarium orchestrator).
-   - `lib/dataverse/adapters/potential-reviewer.js` — `MERGE_FIELD_SELECT`
-     (wide read incl. wave6 biblio/identity), `getByIdForMerge`, `clearEmail`,
-     `deactivate`.
-   - `lib/dataverse/adapters/reviewer-suggestion.js` — `MERGE_PREDICATE_SELECT`,
-     `findAllByPotentialReviewer` (NO `selected` filter — removed rows still hold
-     the (person,request) key), `repointToPotentialReviewer`, `hardDeleteById`.
-   - `lib/services/dynamics-service.js` — `deleteRecord` now takes optional
-     `ifMatch` (conditional delete) + `.status` on the error.
-   - `pages/api/reviewer-finder/merge-candidates.js` (NEW) — POST-only. POST
-     `{keeperId, loserId}` → `{plan}`; POST `{…, fieldChoices, confirm:true}` →
-     `{success, summary}`. `requireAppAccess(req,res,'reviewer-finder','reviewers')`
-     (same as my-candidates — the **block predicate, not a permission gate**, keeps
-     merge to the low-risk case so the colleague who hit the bug can fix it),
-     GUID-validates both ids, `bypassDynamicsRestrictions`. 400/409/500 mapping.
-   - Registered in `docs/API_ROUTE_SECURITY_MATRIX.md` + `docs/CANONICAL_COUNTS.md`
-     (79 requireAppAccess endpoints / 134 route files) + `.claude-memory/`.
+2. **Reviewer-merge Chunk 5 — non-mocked prod ordering probe (O8)** (`39d44117`,
+   `169d8454`, prod-confirmed via `a19b934f`).
+   `scripts/probe-merge-altkey-ordering.mjs` (prod-write, reversible, marker-gated
+   teardown) — sub-probes A (email alt-key + 409 translation), B ((person,request)
+   collision vs free), C (e2e `executeMerge`). `--run` → **A/B/C all pass, O8
+   settled, cleanup verified.**
 
-3. **Step-2 + Connor design capture (`612efee5`, `1a3b8c40`):** the linker design
-   doc (capabilities A seen-before / B consistency-diff / C guarded PD contact-edit
-   with the `akoya_requeststatus='Active'` active-award predicate, fail-closed /
-   D idempotent linker) and the Connor contact-dedup handoff (Q1 reparent cascade,
-   Q2 1:1 collision, Q3 loser→master GUID map for Postgres
-   `bill_onboarding_state.reviewer_contact_id`, Q4 shared-inbox exclusions).
+3. **Real prod bug the probe caught + fixed** (`a19b934f`). The 409 derived
+   `conflictingRecordId` from the 412 body — which carries the record being WRITTEN
+   plus its `modifiedby` systemuser, **NOT** the existing owner — so it surfaced a
+   systemuser GUID and broke merge-mode entry. Fix: resolve the owner from the
+   duplicate email via `potentialReviewerAdapter.findByEmailCandidates` (fail-closed
+   on `statecode`); extracted `lib/dataverse/duplicate-key.js` (field/value only),
+   pinned by `tests/unit/duplicate-key.test.js`. Codex pre+post-impl folded.
 
-4. **Codex post-impl review folded (`c41b7539`).** Codex confirmed all four of my
-   self-traced findings and surfaced two I missed. Folded as a follow-up commit
-   (not an amend), full suite green (251 suites / 3185 tests):
-   - **ITEM-3 empty-overwrite (P0):** `resolvePersonUpdates` wrote a null/empty
-     loser value over a populated keeper value whenever the field "differed"
-     (true for keeper-has / loser-empty). Worst case nulled the keeper's email.
-     Fixed: `isSet()` guard on the resolver + the `emailMoves` gate; `isSet` now
-     trims strings (whitespace-only = empty); hIndex 0 stays a real value.
-   - **ITEM-1 double-submit (P0):** `executeMerge` was not idempotent — after run 1
-     deactivated the loser, run 2's plan was no longer blocked and (with ITEM-3)
-     could corrupt the keeper. Fixed: added `statecode` to `MERGE_FIELD_SELECT`
-     (Codex wrongly assumed it was already there — it was NOT), surface
-     `plan.loser.statecode`, refuse an already-inactive loser before any mutation.
-   - **IND-A block-predicate gap (P1):** `wmkf_completedat`, COI/AI acks,
-     selective-decline, revoked token, and reviewer-supplied stage-2a identity
-     fields were absent from the engagement signal list. Added (fail-closed).
-   - **ITEM-5 identity non-downgrade (P1):** instead of transplanting a loser's
-     identity bundle, **block** (`loser_confirmed_identity`) when the loser is
-     human-`confirmed` and the keeper is not — respects `researcher.js`'s
-     sticky-confirmed invariant. Staff re-run with the verified record as keeper.
-   - **Applicant-slot drift:** the code **blocks** when the loser sits in an
-     `akoya_request` applicant slot; the original design said *repoint*. Kept the
-     conservative block for v1 (Rabinowitz has no slot refs) and reconciled the
-     design doc to match.
+4. **Invite Reviewers tab: edit affordance + no-email guard** (`5f8412de`).
+   Explicit "✏️ Edit contact" button on each card (mirrors the Find tab; the editor
+   already existed but was hidden behind the clickable name). Invite checkbox
+   disabled for never-invited no-email rows + Send set requires email (already-invited
+   rows stay selectable for release). Local nomenclature cleanup: header
+   "Candidates"→"Invite Reviewers", stale Invite/Completed tab refs fixed. Codex
+   sanity-check (no safety findings) folded.
 
-### Commits (all UNPUSHED — see top of file)
+5. **Two Codex-reviewed docs** (`83ef65e4`, `0ee9e158`, `2b43668c`).
+   - `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` — Codex-led trace of the
+     `wmkf_potentialreviewers ↔ CRM contacts` gap (no contact match at origination;
+     corrections stranded; `ensureContact` email-only match spawns duplicate
+     contacts). Findings + design stub, NOT built.
+   - `docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md` — strategy for the legacy-app
+     nomenclature/lifecycle cleanup, **hardened by a Codex adversarial review**
+     (added a 4th "live-cross-cutting" bucket, reclassified `phase-ii-writeup-legacy`
+     as sunset-candidate, ALIAS auth-parity + grant/persisted-key preconditions, gate
+     additions). `REVIEWER_MERGE_DESIGN.md` reconciled to Chunk-5 prod-confirmed.
 
-- `612efee5` - Add reviewer-merge v1 design, Connor contact-dedup handoff, dedup probes
-- `be7f624f` - Reviewer merge v1 backend + route (chunks 1-3) — pre-engagement-loser merge
-- `1a3b8c40` - Add reviewer<->contact linker design doc (S289 step-2 capture)
-- `c41b7539` - Reviewer merge: fold Codex S289 post-impl review catches
+### Commits (all pushed)
+- `e0365b47` - Fix red doc-symbol-refs gate on local-only probe ref
+- `080e7069` / `10ab7d4a` - Chunk 4 UI merge mode + Codex post-impl
+- `39d44117` / `169d8454` - Chunk 5 ordering probe + Codex post-impl
+- `a19b934f` - conflictingRecordId fix (prod-confirmed)
+- `5f8412de` - Invite Reviewers edit + no-email guard
+- `83ef65e4` - Chunk 5 prod-confirmed docs + contact-boundary findings
+- `0ee9e158` / `2b43668c` - Nomenclature/app-lifecycle strategy + fact-consistency fix
 
 ## Potential Next Steps
 
-### 1. Chunk 4 — UI merge mode in `CandidateEditModal` (the natural next build)
-Backend is done and tested; the feature is not usable until the UI lands. On a 409
-carrying `conflictingRecordId` (from `PATCH /api/reviewer-finder/my-candidates`),
-switch the modal to merge mode: POST the plan with keeper = the edited record /
-loser = `conflictingRecordId`, show the keeper **Swap** control (default = the
-edited record, **NOT** the email owner — see design §Keeper selection), the
-field-by-field picker (keeper value vs loser value per field; email default tracks
-the conflict-target owner), and — if `blocked` — the reasons explainer with no
-confirm button (Swap stays available). Confirm → `POST {…, confirm:true}` → refresh.
-Also handle **half-done email recovery** (Option B): on a confirm 500, re-plan and
-detect the tear by its true signature — the target address is no longer owned by
-EITHER side (NOT "keeper has no email", a false negative) — and show an explicit
-repair prompt naming the address with no plain retry; benign sibling: confirm 200
-with the surviving keeper holding no email → "add it from the list". Spec: chunk 4
-in `docs/REVIEWER_MERGE_DESIGN.md` (S289 chunk-4 pre-impl ×2 folded — keeper-default
-+ orientation-aware email-default + orphan-detection recovery reconciled).
+### 1. Execute the nomenclature/app-lifecycle strategy (greenlight-gated)
+`docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md` is the plan. Lowest-risk first
+move is **Commit 1** (additive, zero-risk): add `APP_LIFECYCLE_REGISTRY` +
+`ROUTE_NAMESPACE_LIFECYCLE` exports to `shared/config/appRegistry.js` and seed
+`docs/NOMENCLATURE_GLOSSARY.md`. Do NOT archive anything (Phase 1) without the
+Vercel access-log check for `/phase-ii-writeup-legacy` + `/api/process-legacy`
+first. Honor the consolidated-grant + persisted-key inventory **precondition** in
+§3 before any rename/alias. Owner greenlight needed before starting.
 
-### 2. Deferred Codex P2 backend hardening (optional, design-doc'd)
-From the post-impl review, not yet built (Justin's call whether any precede the UI):
-- map mid-merge Dataverse 409/412 conflicts to a retryable 409 (currently 500);
-- trim suggestion/request IDs out of the plan response if the UI doesn't need them;
-- add an audit breadcrumb (`wmkf_notes` / timestamp) on keeper+loser at deactivate;
-- **Chunk 5** — a non-mocked alt-key ordering probe against staging Dataverse on
-  throwaway rows (mocked adapters reproduce neither alt-key enforcement nor 412).
+### 2. Contact-boundary gap — owner policy decision, then build
+`docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` lists the open policy questions
+(auto-link vs staff-confirm; who owns truth on conflicts). When decided, the
+**lowest-policy-dependency increment** is the `ensureContact` ORCID-fallback fix
+(stops the duplicate-contact-on-corrected-email bug). Build is blocked on Justin's
+policy answers.
 
-### 3. Step-2 reviewer↔contact linker (BLOCKED on inputs — do not start cold)
-`docs/REVIEWER_CONTACT_LINKER_DESIGN.md`. Blocked on: Connor's answers to Q1–Q4
-(`CONNOR_CONTACT_MERGE_AND_REVIEWER_LINKING.md`), and a short probe of which
-contact→request link fields count as "associated with an active award" before the
-guard predicate (capability C) is finalized. Capabilities A/B (seen-before +
-consistency-diff) are independent and could land earlier.
+### 3. Deferred Codex P2 merge hardening (optional, design-doc'd)
+Not built; Justin's call: map mid-merge Dataverse 409/412 to a retryable 409
+(currently 500); trim suggestion/request IDs from the plan response if unused; add
+an audit breadcrumb on keeper+loser at deactivate. (Chunk 5 — DONE this session.)
 
-### 4. Carried from S288 (separate track — verify before acting)
-- **Record real-replay human sign-off** (optional): set `humanReview.pass=true` in
-  the private artifact and/or note in `docs/MODEL_CHANGE_STRATEGY.md` that the
-  real-replay requirement was met 2026-06-24 (req 1002836, opus-4-8, 12/12, no
-  fallback). `reviewer-finder` is already pinned to `claude-opus-4-8` in prod.
-- **Logged-in Admin Models visual smoke** (still open): confirm the effective
-  `reviewer-finder` row shows `claude-opus-4-8` / `cap ok` / `price ok`.
+### 4. Step-2 reviewer↔contact linker (BLOCKED — do not start cold)
+`docs/REVIEWER_CONTACT_LINKER_DESIGN.md`. Blocked on Connor's Q1–Q4
+(`CONNOR_CONTACT_MERGE_AND_REVIEWER_LINKING.md`) + a probe of which contact→request
+links count as "associated with an active award". Note: the newer S290
+contact-boundary findings doc (#2) overlaps this boundary — reconcile the two before
+building either.
 
-### 5. Historical carryovers from S285/S286 (UNVERIFIED — probe live state first)
-Have ridden forward several sessions without re-verification; do NOT act before
-probing: request `1002788` test-data triage/status revert; E2E of Restore Removed
-Candidates + PD identity override; reviewer-portal review-upload design decision;
-optional auto-on-award abstract cron.
+### 5. Long-stale carryovers (VERIFY-FIRST or retire — do NOT assume open)
+Ridden forward several sessions without re-verification; probe live state before
+acting, and retire if already done/blocked:
+- S288: record real-replay human sign-off in `docs/MODEL_CHANGE_STRATEGY.md`
+  (reviewer-finder already pinned to `claude-opus-4-8` in prod); logged-in Admin
+  Models visual smoke (owner-only check).
+- S285/S286: request `1002788` test-data triage; E2E of Restore Removed Candidates
+  + PD identity override; reviewer-portal review-upload design decision; optional
+  auto-on-award abstract cron.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/services/reviewer-merge.js` | Core merge: `planMerge` (diff + fail-closed block predicate) + `executeMerge` (ordered, literals-first, re-run-safe). DI adapters. |
-| `lib/dataverse/adapters/potential-reviewer.js` | `MERGE_FIELD_SELECT` (incl. `statecode`), `getByIdForMerge`, `clearEmail`, `deactivate`. |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | `MERGE_PREDICATE_SELECT`, `findAllByPotentialReviewer` (no selected filter), `repointToPotentialReviewer`, `hardDeleteById`. |
-| `pages/api/reviewer-finder/merge-candidates.js` | POST-only plan/confirm route. |
-| `docs/REVIEWER_MERGE_DESIGN.md` | v1 design; status = backend built (chunks 1-3), UI (4) + ordering probe (5) pending; Codex catches folded. |
-| `docs/REVIEWER_CONTACT_LINKER_DESIGN.md` | Step-2 reviewer↔contact linker design (not built). |
-| `docs/CONNOR_CONTACT_MERGE_AND_REVIEWER_LINKING.md` | Connor contact-dedup handoff + Q1–Q4. |
-| `tests/unit/reviewer-merge-{service,adapters,route}.test.js` | 36 tests (incl. empty-overwrite, statecode re-run guard, confirmed-identity block). |
-| `scripts/probe-rabinowitz-conflict.js` | UNTRACKED, names-local — the live conflict probe. Do not commit. |
+| `shared/components/reviewers/CandidatesPanel.js` | Invite Reviewers tab — edit button + no-email guard (S290). |
+| `lib/dataverse/duplicate-key.js` | `translateDuplicateKeyError` (field/value only); shared by route + probe. |
+| `pages/api/reviewer-finder/my-candidates.js` | PATCH 409 resolves conflicting owner by email, fail-closed on statecode. |
+| `scripts/probe-merge-altkey-ordering.mjs` | Non-mocked prod alt-key/merge probe (O8). `--run` against throwaway rows. |
+| `docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md` | Cleanup strategy (Codex adversarially reviewed). Entry point for #1. |
+| `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` | potentialreviewer↔contact gap findings + stub (#2). |
+| `docs/REVIEWER_MERGE_DESIGN.md` | Merge v1 — chunks 1–5 BUILT + prod-confirmed. |
+| `scripts/probe-rabinowitz-conflict.js` | UNTRACKED, names-local. Never commit. |
 
 ## Testing
 
 ```bash
-# Merge unit tests (36):
-npx jest tests/unit/reviewer-merge-service.test.js tests/unit/reviewer-merge-adapters.test.js tests/unit/reviewer-merge-route.test.js
+# Merge + duplicate-key unit tests:
+npx jest tests/unit/candidate-edit-modal-merge.test.js tests/unit/duplicate-key.test.js \
+  tests/unit/reviewer-merge-service.test.js
 
-# Full suite (green this session: 251 suites / 3185 tests):
-npm test
+# Non-mocked prod probe (Justin runs it; auto-mode prod-deploy guard blocks the agent):
+#   ! node scripts/probe-merge-altkey-ordering.mjs          # plan-only
+#   ! node scripts/probe-merge-altkey-ordering.mjs --run    # 3 sub-probes + cleanup
 
 # Gates touched this session (all green):
-npm run check:build-claim-freshness && npm run check:doc-symbol-refs \
-  && npm run check:trust-boundary-guid && npm run check:fact-consistency
+npm run check:fact-consistency && npm run check:doc-symbol-refs \
+  && npm run check:build-claim-freshness && npm run check:agent-wiki
 ```
-
-Known recurring local noise unchanged: the two known-red suites
-`tests/unit/bill.test.js` and `tests/unit/discovery-verification-status.test.js`
-(only these — confirm before chasing any red).
 
 ## Gotchas / Continuity
 
-- **Push is gated on Justin's approval** (top of file). Pushing deploys the merge
-  backend + route to Vercel prod; the feature has no UI yet, so the route is live
-  but unreferenced by the client until Chunk 4 ships — harmless but inert.
-- The merge **route is reachable** once pushed (POST-only, GUID-gated, block
-  predicate fail-closed). It mutates nothing on a plan request; an execute is
-  refused unless the loser is fully pre-engagement and not contact-promoted.
-- The block predicate is the **load-bearing safety rule**, defined as a positive
-  whitelist (a future lifecycle field defaults to *blocking*, never silently
-  passing). Read the design's "block predicate" section before touching it.
-- Email moves stamp keeper `wmkf_emailsource='manual'` → the invite-confidence gate
-  reads that as **low** confidence (forces re-verification). Intentional.
+- The reviewer-merge track is **DONE + prod-confirmed**; do not re-open it as a build
+  task. Remaining merge items are the optional P2 hardening (#3).
+- The Invite Reviewers edit is live to colleagues once deployed — the editor and the
+  name-click open the SAME PATCH-mode modal; no-email rows are unselectable for
+  invite (but `send-emails` also skips `no_email`, a triple backstop).
+- Nomenclature cleanup is sequenced: dead-end UI removal → archive true orphans →
+  rename live internals → `/sweep` docs. Don't rename route paths (contracts) or
+  bare-rename persisted keys (`model_override:reviewer-finder:model`, preferences).
+```

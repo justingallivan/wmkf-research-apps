@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer-record merge shipped + prod-confirmed (Session 290)
+
+**Milestone:** The duplicate-reviewer dead-end a colleague hit is fully closed: staff can now merge two duplicate `wmkf_potentialreviewers` rows from the candidate edit modal, and the whole path is empirically confirmed against production.
+
+**Sessions:** 289 (backend chunks 1–3) → 290 (UI merge mode, non-mocked prod probe, conflictingRecordId fix). Codex pre/post-impl folded throughout.
+
+**Ship state:**
+- Chunk 4: `CandidateEditModal` flips into merge mode on a duplicate-key 409 (keeper swap, orientation-aware field picker, blocked-reasons explainer, orphan-recovery). 13 RTL tests.
+- Chunk 5: `scripts/probe-merge-altkey-ordering.mjs` exercises both alt-keys + e2e merge against prod on throwaway rows; `--run` settled O8 (A/B/C pass, cleanup verified).
+- The probe caught a real prod bug all mocked tests missed: the 409 derived `conflictingRecordId` from the 412 body (which carries the written record + its `modifiedby` systemuser, NOT the owner). Fixed by resolving the owner via `findByEmailCandidates` (fail-closed on statecode); `lib/dataverse/duplicate-key.js` extracted + pinned by a regression test.
+- Also shipped the **Invite Reviewers** tab: explicit "✏️ Edit contact" button + no-email invite guard + local nomenclature cleanup.
+
+**Why it matters:** a non-technical PD can now self-serve a duplicate-reviewer fix instead of hitting a 412 with no recourse; the non-mocked probe is the pattern that caught a bug green unit tests could not.
+
+**Pointers:** `docs/REVIEWER_MERGE_DESIGN.md` (Chunk 5 prod-confirmed), `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md`, `docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md`. Commits `080e7069`, `10ab7d4a`, `39d44117`, `169d8454`, `a19b934f`, `5f8412de`.
+
 ## June 2026 — Claude model-change guardrails shipped (Session 287)
 
 **Milestone:** The S286 model-change strategy became working architecture: Claude model capability/pricing drift now fails loud in gates/admin/runtime paths instead of waiting to 400 in front of reviewers.
