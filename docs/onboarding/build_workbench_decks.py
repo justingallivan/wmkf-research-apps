@@ -3,8 +3,13 @@
 
 Grounded in source read this session:
 - Shell: pages/workbench/[requestId].js (query-string ?tab=&sub= routing; RequireAppAccess 'reviewers')
-- Live tabs: Overview, Proposal, Reviewers, Status, Awardee (5 lifecycle tabs are placeholders)
+- Live tabs: Overview, Proposal, Reviewers, Reviews, Status, Awardee (4 lifecycle tabs are placeholders)
 - Reviewers sub-tabs: Find, Invite Reviewers, Track Reviewers (collapsed S280 from 5: Find, Candidates, Invite, Track, Completed)
+
+NOTE (2026-06-26): the STEP 7 / STEP 11 slide titles + the Invite/Track sub-tab bullets
+below still reflect the pre-S280 5-sub-tab funnel (Candidates / Invite / Track / Completed).
+They need a content pass to the 3 sub-tabs above (+ a deck regen); the source-grounding
+notes here and the architecture-slide live-tab/sub-tab counts are current.
 """
 import os
 from pptx import Presentation
@@ -299,10 +304,10 @@ def build_tech():
 
     content_slide(prs, "ARCHITECTURE", "The shell", [
         "Per-request shell: pages/workbench/[requestId].js (tier-3 page).",
-        "Tab + sub-tab selection is query-string driven: ?tab=reviewers&sub=invite (deep-linkable).",
+        "Tab + sub-tab selection is query-string driven: ?tab=reviewers&sub=track (deep-linkable; legacy sub=invite/completed normalize to track).",
         "Live tab components:",
-        (1, "OverviewTab · ProposalTab · ReviewersTab · StatusTab · AwardeeTab (shared/components/...)."),
-        (1, "The other 5 tab keys fall through to a \"coming in a later update\" card."),
+        (1, "OverviewTab · ProposalTab · ReviewersTab · ReviewsTab · StatusTab · AwardeeTab (shared/components/...)."),
+        (1, "The other 4 tab keys fall through to a \"coming in a later update\" card."),
         "Consolidation: the Workbench merges the old reviewer-finder + review-manager apps; one app-access grant ('reviewers') now covers them.",
     ])
     content_slide(prs, "ARCHITECTURE", "Access & auth", [

@@ -53,7 +53,7 @@ place. Close the files in PowerPoint first, or the write can collide with the op
 Deck content was read from source during the authoring session (S277), not memory:
 
 - Shell + tab strip: `pages/workbench/[requestId].js` — live tabs are **Overview, Proposal,
-  Reviewers, Status, Awardee**; the other five lifecycle tabs render a "coming in a later
+  Reviewers, Reviews, Status, Awardee**; the other four lifecycle tabs render a "coming in a later
   update" card.
 - Reviewers sub-tabs: `shared/components/reviewers/ReviewersTab.js` — Find · Invite
   Reviewers · Track Reviewers (collapsed S280 from 5: Find · Candidates · Invite · Track ·
