@@ -183,6 +183,11 @@ export const DEFAULT_APP_GRANTS = ['dynamics-explorer'];
  * for a key that already lives in APP_REGISTRY — that would create a second
  * source of truth for active apps that silently drifts.
  *
+ * GATE NOTE: any future check that needs full app coverage (e.g. a
+ * check:nomenclature-lifecycle gate) must union APP_REGISTRY (active) with
+ * APP_LIFECYCLE_REGISTRY (non-active) — iterating this map alone silently
+ * misses all active apps.
+ *
  * See docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md and
  * docs/NOMENCLATURE_GLOSSARY.md.
  *
@@ -255,6 +260,10 @@ export const APP_LIFECYCLE_REGISTRY = {
  * docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md §4 and
  * docs/NOMENCLATURE_GLOSSARY.md.
  *
+ * ownerAppKey is the ACTIVE app key whose grant gates the namespace (safe for a
+ * gate to derive required access from); legacySurfaceKey, when present, names the
+ * non-active lifecycle key the route is associated with.
+ *
  * status values:
  *   'canonical'          — current, correctly-named namespace
  *   'legacy-live'        — legacy app name, but owned by a live app (borrowed-live-infra)
@@ -286,9 +295,10 @@ export const ROUTE_NAMESPACE_LIFECYCLE = {
   },
   '/api/process-legacy': {
     status: 'sunset-candidate',
-    ownerAppKey: 'phase-ii-writeup-legacy',
+    ownerAppKey: 'phase-ii-writeup',
+    legacySurfaceKey: 'phase-ii-writeup-legacy',
     notes:
-      'Paired with the phase-ii-writeup-legacy page. Still guarded and routable. Archive only after a Vercel access-log check (strategy Phase 0/1). Registered in check:prompt-injection-tagging.',
+      'Paired with the phase-ii-writeup-legacy page (the legacy surface), but the route is guarded by active grants — requireAppAccess(req, res, "batch-proposal-summaries", "phase-ii-writeup"); the page requires "phase-ii-writeup". ownerAppKey is the active auth key (do not use the legacy surface key for grant derivation). Archive only after a Vercel access-log check (strategy Phase 0/1). Registered in check:prompt-injection-tagging.',
     lastVerified: '2026-06-26',
   },
   '/api/field-primer': {

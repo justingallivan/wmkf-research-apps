@@ -1,10 +1,12 @@
 # Nomenclature Glossary
 
 Canonical, human-readable glossary for confusing or overloaded names across the
-multi-app repo. It is backed by the `APP_LIFECYCLE_REGISTRY` and
-`ROUTE_NAMESPACE_LIFECYCLE` exports in `shared/config/appRegistry.js` (the data),
-and explains how a legacy / overloaded term maps to its current canonical name,
-owner app, and allowed use.
+multi-app repo. It explains how a legacy / overloaded term maps to its current
+canonical name, owner app, and allowed use. App-key and route-namespace terms are
+**backed by** the `APP_LIFECYCLE_REGISTRY` and `ROUTE_NAMESPACE_LIFECYCLE` exports
+in `shared/config/appRegistry.js` (the data); component, data-model, and
+preference-key terms (e.g. `candidates`/`CandidatesPanel`, `reviewer-suggestion`)
+are glossary-only and point at their source/Atlas instead.
 
 Strategy and classification framework: `docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md`.
 The agent wiki routes here; it does not duplicate these entries. When a term's
@@ -43,7 +45,7 @@ legacy-live | deprecated | ambiguous | direct-url-test`. `migrationDecision` ∈
 - **ownerAppKey:** `reviewers`
 - **successorKey:** `reviewers`
 - **surfaceType:** route-namespace
-- **currentPaths:** `/api/reviewer-finder/*`; persisted prefs in `shared/config/reviewerFinderPreferences.js` (per-user draw + prompt overrides keyed `reviewer-finder.*`); model-override settings stored under the `model_override:` namespace keyed by app (loader strips the `model_override:` prefix — `model-override-loader.js:44,54`)
+- **currentPaths:** `/api/reviewer-finder/*`; persisted prefs in `shared/config/reviewerFinderPreferences.js` (per-user draw + prompt overrides keyed `reviewer-finder.*`); model-override settings stored under the `model_override:` namespace keyed by app (loader strips the `model_override:` prefix — `lib/services/model-override-loader.js:44,54`)
 - **allowedUse:** Borrowed-live-infra. The `/api/reviewer-finder/*` routes are live and owned by the Workbench. Reference them by path as-is.
 - **forbiddenUse:** Do NOT rename the route path or bare-rename any persisted `reviewer-finder` key — both are contracts (route + stored preference/override). Don't re-add `reviewer-finder` to `APP_REGISTRY`.
 - **migrationDecision:** LEAVE+DOCUMENT
@@ -109,5 +111,3 @@ legacy-live | deprecated | ambiguous | direct-url-test`. `migrationDecision` ∈
 - **migrationDecision:** —
 - **notes:** Deprecated 2026-04-25 (S110); concept-stage screening superseded, intake AI work moved to backend automation. Page/API/prompt archived. Existing `concept-evaluator` grants left in place (no app to grant). `multi-perspective-evaluator` reuses some prompt content but is a distinct active app, not the successor.
 - **lastVerified:** 2026-06-26
-</content>
-</invoke>
