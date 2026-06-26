@@ -260,9 +260,20 @@ export const APP_LIFECYCLE_REGISTRY = {
  * docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md §4 and
  * docs/NOMENCLATURE_GLOSSARY.md.
  *
- * ownerAppKey is the ACTIVE app key whose grant gates the namespace (safe for a
- * gate to derive required access from); legacySurfaceKey, when present, names the
- * non-active lifecycle key the route is associated with.
+ * ownerAppKey is a SEMANTIC label (the owning app, for humans/docs). It must NOT
+ * be used to derive auth/grants — ownership is not the same as the accepted grant
+ * set. legacySurfaceKey, when present, names the non-active lifecycle key the
+ * route is associated with.
+ *
+ * guardAppKeys is the AUTH contract: the full set of app keys the namespace's
+ * route(s) accept via requireAppAccess (OR logic — see lib/utils/auth.js). It is
+ * verified against live route source by check:route-lifecycle-auth (fail-closed).
+ * Set it to an array ONLY when every handler in the namespace shares one accepted
+ * set (the gate asserts every handler's requireAppAccess args equal that set).
+ * Set it to null (with a guardNote) when guards are heterogeneous per route; the
+ * gate then asserts every route still carries a parseable requireAppAccess guard
+ * (fail-closed — an aliased/missing guard is not silently accepted) AND that the
+ * accepted sets genuinely vary, rather than a uniform set you forgot to list.
  *
  * status values:
  *   'canonical'          — current, correctly-named namespace
@@ -274,12 +285,16 @@ export const ROUTE_NAMESPACE_LIFECYCLE = {
   '/api/workbench': {
     status: 'canonical',
     ownerAppKey: 'reviewers',
+    guardAppKeys: null,
+    guardNote:
+      'Heterogeneous per-route guards: most handlers accept ["reviewers"] only (e.g. dashboard.js, export-candidates.js); a few also accept "reviewer-finder" (manual-reviewer.js, orcid-lookup.js, reviewer-lookup.js, reviewer-roster.js). No single namespace-wide accepted set; check:route-lifecycle-auth asserts every route carries a parseable requireAppAccess guard (fail-closed) and that the accepted sets genuinely vary.',
     notes: 'Canonical successor namespace for the Request Workbench.',
     lastVerified: '2026-06-26',
   },
   '/api/reviewer-finder': {
     status: 'legacy-live',
     ownerAppKey: 'reviewers',
+    guardAppKeys: ['reviewer-finder', 'reviewers'],
     migrationDecision: 'LEAVE+DOCUMENT',
     notes:
       'Borrowed-live-infra. Legacy app name; owned by reviewers (Workbench). Called in-repo from many reviewer components and possibly externally. Routes accept BOTH a legacy reviewer-finder grant and a reviewers grant via variadic requireAppAccess. Do not rename the path.',
@@ -288,6 +303,7 @@ export const ROUTE_NAMESPACE_LIFECYCLE = {
   '/api/review-manager': {
     status: 'legacy-live',
     ownerAppKey: 'reviewers',
+    guardAppKeys: ['review-manager', 'reviewers'],
     migrationDecision: 'LEAVE+DOCUMENT',
     notes:
       'Borrowed-live-infra. Legacy app name; owned by reviewers (Workbench). Variadic grant accepts legacy review-manager AND reviewers. Do not rename the path.',
@@ -297,16 +313,18 @@ export const ROUTE_NAMESPACE_LIFECYCLE = {
     status: 'sunset-candidate',
     ownerAppKey: 'phase-ii-writeup',
     legacySurfaceKey: 'phase-ii-writeup-legacy',
+    guardAppKeys: ['batch-proposal-summaries', 'phase-ii-writeup'],
     notes:
-      'Paired with the phase-ii-writeup-legacy page (the legacy surface), but the route is guarded by active grants — requireAppAccess(req, res, "batch-proposal-summaries", "phase-ii-writeup"); the page requires "phase-ii-writeup". ownerAppKey is the active auth key (do not use the legacy surface key for grant derivation). Archive only after a Vercel access-log check (strategy Phase 0/1). Registered in check:prompt-injection-tagging.',
+      'Paired with the phase-ii-writeup-legacy page (the legacy surface), but the route is guarded by active grants — requireAppAccess(req, res, "batch-proposal-summaries", "phase-ii-writeup"); the page requires "phase-ii-writeup". ownerAppKey is a semantic label, not the auth contract — guardAppKeys carries the accepted grant set. Archive only after a Vercel access-log check (strategy Phase 0/1). Registered in check:prompt-injection-tagging.',
     lastVerified: '2026-06-26',
   },
   '/api/field-primer': {
     status: 'live-cross-cutting',
     ownerAppKey: 'reviewers',
+    guardAppKeys: ['reviewer-finder', 'reviewers'],
     migrationDecision: 'LEAVE+DOCUMENT',
     notes:
-      'NOT legacy. /api/field-primer/generate persists akoya_request.wmkf_ai_fieldprimer (called from the Workbench ProposalTab, read back via resolve-request). Recognize & skip — do not rename or deprecate.',
+      'NOT legacy. /api/field-primer/generate persists akoya_request.wmkf_ai_fieldprimer (called from the Workbench ProposalTab, read back via resolve-request) and is guarded by requireAppAccess(req, res, "reviewer-finder", "reviewers"). Recognize & skip — do not rename or deprecate.',
     lastVerified: '2026-06-26',
   },
 };

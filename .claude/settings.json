@@ -17,6 +17,17 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/block-scaffolding-tokens.js\"",
+            "timeout": 10,
+            "statusMessage": "scaffolding-token block"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/memory-router-guard.js\"",
             "timeout": 10,
             "statusMessage": "memory-router budget check"

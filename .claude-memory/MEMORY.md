@@ -31,6 +31,7 @@
 - New/changed enum value, column, or status (plan or code): feedback-symbol-consumer-fanout.md
 - "idempotent"/"no re-stamp"/"reuse existing guard"/"backward compatible" claim: feedback-idempotency-name-the-mechanism.md
 - Adding a branch/type/gate, or EXEMPTING a path from a gate (check the complement/fall-through): feedback-scrutinize-exemptions-and-fallthrough.md
+- Building a safeguard, or an advisory hook fired but the mistake still happened — gate the artifact against source in CI fail-closed, not promises: feedback-enforcement-hierarchy.md
 - rtk reference: project-rtk-grep-output-corruption.md
 - Checking a Vercel deploy after push (use `vercel inspect`, don't poll-grep `vercel ls` for the hash): feedback-deployment-monitoring-use-inspect.md
 - Verifying a Vercel env var VALUE via pull (Sensitive vars read back EMPTY — can't be verified; recreate non-sensitive): reference-vercel-sensitive-env-unreadable.md

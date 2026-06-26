@@ -64,7 +64,11 @@
     "check:status-enum-parity": "node scripts/check-status-enum-parity.js",
     "check:status-enum-parity:self-test": "node scripts/check-status-enum-parity.js --self-test",
     "check:trust-boundary-guid": "node scripts/check-trust-boundary-guid.js",
-    "check:trust-boundary-guid:self-test": "node scripts/check-trust-boundary-guid-self-test.js"
+    "check:trust-boundary-guid:self-test": "node scripts/check-trust-boundary-guid-self-test.js",
+    "check:route-lifecycle-auth": "node scripts/check-route-lifecycle-auth.js",
+    "check:route-lifecycle-auth:self-test": "node scripts/check-route-lifecycle-auth-self-test.js",
+    "check:scaffolding-tokens": "node scripts/check-scaffolding-tokens.js",
+    "check:scaffolding-tokens:self-test": "node scripts/check-scaffolding-tokens-self-test.js"
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",
