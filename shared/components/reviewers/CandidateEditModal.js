@@ -114,6 +114,9 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
     e.preventDefault();
     setIsSaving(true);
     setError(null);
+    // Capture the token BEFORE the PATCH so a 409 that lands after the candidate
+    // changed doesn't open merge mode for the stale candidate (Codex S290 post-impl).
+    const submitToken = reqToken.current;
 
     try {
       // CONFIRM mode (PD identity override): always send email/website/affiliation
@@ -182,7 +185,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
           !onApply &&
           !confirmMode
         ) {
-          await enterMergeMode(data);
+          await enterMergeMode(data, submitToken);
           return;
         }
         // Prefer the human-readable `message` (set for translated errors like
@@ -242,7 +245,9 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
 
   // Entry point from the 409 handler. keeper defaults to the EDITED record (the row
   // the staffer just curated), loser = the email owner (conflictingRecordId).
-  const enterMergeMode = async (data) => {
+  const enterMergeMode = async (data, token) => {
+    // Bail if the PATCH 409 landed after the candidate changed (stale-async).
+    if (token !== undefined && !guard(token)) return;
     const keeperId = candidate.potentialReviewerId;
     const loserId = data.conflictingRecordId;
     const conflictValue = data.value || null;
@@ -254,13 +259,11 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
   // default). Tracks whether BOTH orientations are blocked so the UI can stop
   // implying Swap will help.
   const swapKeeper = async () => {
+    const token = reqToken.current;
     const wasBlocked = !!merge?.plan?.blocked;
     await loadPlan(merge.loserId, merge.keeperId, merge.conflictValue);
-    if (wasBlocked) {
-      setMerge((m) => (m ? { ...m, bothBlocked: !!m.plan?.blocked } : m));
-    } else {
-      setMerge((m) => (m ? { ...m, bothBlocked: false } : m));
-    }
+    if (!guard(token)) return;
+    setMerge((m) => (m ? { ...m, bothBlocked: wasBlocked ? !!m.plan?.blocked : false } : m));
   };
 
   const setFieldChoice = (field, pick) => {
@@ -268,26 +271,34 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
   };
 
   // After a confirm, re-plan to detect the FINAL-2 email tear by its true signature.
-  // after500=true  → orphan check: the conflict-target address is owned by NEITHER
-  //                  side ⇒ the clear-loser/set-keeper move tore. Returns
-  //                  {kind:'orphan', address}. If still owned ⇒ null (transient).
-  // after500=false → benign post-success check: surviving keeper has no email at
-  //                  all ⇒ {kind:'empty'}.
+  // after500=true  → the conflict-target address is owned by NEITHER side ⇒ the
+  //                  clear-loser/set-keeper move tore: {kind:'orphan', address}.
+  //                  Still owned ⇒ null (transient, safe to retry). If the re-plan
+  //                  ITSELF failed we can't confirm the email is safe, so return
+  //                  {kind:'unknown'} — NOT null — to block a silent retry that
+  //                  could deactivate the loser and orphan the address
+  //                  (Codex S290 post-impl Q1).
+  // after500=false → benign post-success check: surviving keeper has no email ⇒
+  //                  {kind:'empty'}. A re-plan failure here is harmless (the merge
+  //                  already succeeded) ⇒ null.
   const detectRecovery = async (keeperId, loserId, conflictValue, token, after500) => {
+    let plan = null;
     try {
       const { ok, data } = await fetchPlan(keeperId, loserId, token);
       if (!guard(token)) return null;
-      if (!ok || !data.plan) return null; // can't tell — treat as no recovery
-      const { keeper, loser } = data.plan;
-      if (after500) {
-        if (!conflictValue) return null;
-        const stillOwned = norm(keeper.email) === norm(conflictValue) || norm(loser.email) === norm(conflictValue);
-        return stillOwned ? null : { kind: 'orphan', address: conflictValue };
-      }
-      return isSet(keeper.email) ? null : { kind: 'empty' };
+      if (ok && data.plan) plan = data.plan;
     } catch {
-      return null;
+      plan = null;
     }
+    if (!guard(token)) return null;
+    if (after500) {
+      if (!conflictValue) return plan ? null : { kind: 'unknown' };
+      if (!plan) return { kind: 'unknown' };
+      const stillOwned = norm(plan.keeper.email) === norm(conflictValue) || norm(plan.loser.email) === norm(conflictValue);
+      return stillOwned ? null : { kind: 'orphan', address: conflictValue };
+    }
+    if (!plan) return null;
+    return isSet(plan.keeper.email) ? null : { kind: 'empty' };
   };
 
   const confirmMerge = async () => {
@@ -339,8 +350,10 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
     }
   };
 
-  const refreshAndClose = () => {
-    if (onSaved) onSaved();
+  // Always refresh the list before closing out of a recovery/stale state so a
+  // partial tear can't leave a stale candidate row visible (Codex S290 post-impl Q4).
+  const refreshAndClose = async () => {
+    if (onSaved) await onSaved();
     onClose();
   };
 
@@ -509,9 +522,11 @@ function MergeMode({ merge, onSwap, onSetField, onConfirm, onCancel, onRefreshCl
   const { plan, fieldChoices, loading, error, recovery, bothBlocked, staleValidation } = merge;
 
   // ── Half-done email recovery (FINAL-2 / Option B) ──
+  // Dismissing via the overlay/X routes through onRefreshClose (not onCancel) so a
+  // partial tear always refreshes the list on the way out (Codex S290 post-impl Q4).
   if (recovery) {
     return (
-      <MergeShell onCancel={onCancel}>
+      <MergeShell onCancel={onRefreshClose}>
         <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900 space-y-2">
           {recovery.kind === 'orphan' ? (
             <>
@@ -523,6 +538,12 @@ function MergeMode({ merge, onSwap, onSetField, onConfirm, onCancel, onRefreshCl
                 not removed.
               </p>
             </>
+          ) : recovery.kind === 'unknown' ? (
+            <p>
+              The merge didn’t complete and the record state couldn’t be verified. Don’t retry from here —
+              reopen this reviewer from the Candidates list and check their email is still set before trying
+              again.
+            </p>
           ) : (
             <p>
               The merge completed, but the surviving record has no email. Open it from the Candidates list to

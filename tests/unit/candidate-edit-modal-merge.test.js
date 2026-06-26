@@ -273,4 +273,41 @@ describe('CandidateEditModal — merge mode', () => {
     // The stale plan never opened merge mode.
     expect(screen.queryByText(/Merge duplicate reviewer records/i)).not.toBeInTheDocument();
   });
+
+  // (k) stale-async guard on the PATCH 409 itself: a 409 landing after the candidate
+  // changed must NOT open merge mode for the stale candidate.
+  test('a PATCH 409 that resolves after the candidate changes does not enter merge mode', async () => {
+    let releasePatch;
+    const patchGate = new Promise((r) => { releasePatch = r; });
+    jest.spyOn(global, 'fetch').mockImplementation(async (url) => {
+      if (url === '/api/reviewer-finder/my-candidates') { await patchGate; return patch409; }
+      return resp({ plan: planForward() });
+    });
+    const other = { name: 'Someone Else', affiliation: 'MIT', email: 'else@mit.edu', website: '', hIndex: 5, suggestionId: 'S2', potentialReviewerId: 'cccccccc-cccc-cccc-cccc-cccccccccccc' };
+    const { rerender } = render(<CandidateEditModal candidate={candidate} onClose={jest.fn()} onSaved={jest.fn()} />);
+    triggerMerge(); // PATCH is in flight (gated)
+    rerender(<CandidateEditModal candidate={other} onClose={jest.fn()} onSaved={jest.fn()} />);
+    releasePatch();
+    await waitFor(() => expect(screen.getByDisplayValue('else@mit.edu')).toBeInTheDocument());
+    expect(screen.queryByText(/Merge duplicate reviewer records/i)).not.toBeInTheDocument();
+  });
+
+  // (l) torn-email where the recovery re-plan ALSO fails: must NOT offer a plain
+  // retry (would deactivate the loser and orphan the address) — show the unknown-state
+  // repair prompt instead.
+  test('a confirm 500 whose recovery re-plan also fails shows the unverifiable-state prompt, not a retry', async () => {
+    let confirmed = false;
+    jest.spyOn(global, 'fetch').mockImplementation(async (url, opts) => {
+      if (url === '/api/reviewer-finder/my-candidates') return patch409;
+      const body = parse(opts);
+      if (body.confirm) { confirmed = true; return resp({ error: 'Merge failed' }, { ok: false, status: 500 }); }
+      // initial plan loads fine; the post-confirm recovery re-plan fails (can't verify live state)
+      return confirmed ? resp({ error: 'unavailable' }, { ok: false, status: 500 }) : resp({ plan: planForward() });
+    });
+    render(<CandidateEditModal candidate={candidate} onClose={jest.fn()} onSaved={jest.fn()} />);
+    triggerMerge();
+    fireEvent.click(await screen.findByRole('button', { name: /merge records/i }));
+    expect(await screen.findByText(/couldn’t be verified|don’t retry from here/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /merge records/i })).not.toBeInTheDocument();
+  });
 });

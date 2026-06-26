@@ -1,14 +1,14 @@
 # Reviewer Record Merge — Build Plan & Design (v1)
 
-status: v1 backend BUILT (chunks 1–3, S289 2026-06-25, Codex post-impl folded); UI merge mode BUILT (chunk 4, S290 2026-06-25, 2 Codex pre-impl passes folded, 11 tests green, Codex post-impl pending); ordering probe (chunk 5) pending
+status: v1 backend BUILT (chunks 1–3, S289 2026-06-25, Codex post-impl folded); UI merge mode BUILT (chunk 4, S290 2026-06-25, 2 Codex pre-impl + 1 post-impl passes folded, 13 tests green); ordering probe (chunk 5) pending
 owner: reviewer-finder
 
 > Chunks 1–3 (adapters, `lib/services/reviewer-merge.js`, the
 > `pages/api/reviewer-finder/merge-candidates` route) are committed and tested.
 > Chunk 4 (the `CandidateEditModal` UI merge mode + recovery, S290) is BUILT with
-> tests (`tests/unit/candidate-edit-modal-merge.test.js`); Codex post-impl review is
-> still pending — fold its catches before treating it as final. Chunk 5
-> (live-ordering probe) is NOT built yet. Build follows the project's
+> tests (`tests/unit/candidate-edit-modal-merge.test.js`); the Codex post-impl review
+> is folded (stale-async guards on enter/swap, re-plan-failure withholds retry,
+> recovery always refreshes on exit). Chunk 5 (live-ordering probe) is NOT built yet. Build follows the project's
 > design → Codex pre-impl → implement+tests → commit → Codex post-impl loop
 > (`project-codex-design-pre-impl-iteration`). This v1 design was twice-reviewed by
 > Codex + an internal aggressive review + a live probe (chunk 4 got two more Codex
@@ -205,9 +205,12 @@ removed mid-merge — open this record from the Candidates list and set its emai
 refresh, and do NOT offer a plain retry (a retry would complete the merge WITHOUT
 restoring it — on the retry plan the loser email is empty and `resolvePersonUpdates`
 refuses to write an empty loser value, `reviewer-merge.js:202`, so the loser would
-be deactivated with the address permanently lost). A benign sibling case — confirm
-returns 200 but the surviving keeper has no email at all — shows the same "add it
-from the list" note. No inline re-entry (the surviving keeper suggestion id isn't
+be deactivated with the address permanently lost). If the recovery re-plan ITSELF
+fails (the 500's live state can't be re-read), withhold retry too and tell staff to
+reopen the record and confirm the email is still set before trying again — an
+unverifiable state must not be treated as safe-to-retry (S290 post-impl Q1). A
+benign sibling case — confirm returns 200 but the surviving keeper has no email at
+all — shows the "add it from the list" note. No inline re-entry (the surviving keeper suggestion id isn't
 reliably available to the modal when the loser's known suggestion collided and was
 hard-deleted). No new table, no migration; cost is a documented manual-repair path,
 kept consistent with the journal cut the probe justified.
