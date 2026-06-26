@@ -36,6 +36,6 @@ a `confirmed` (human-attested) loser identity over a non-confirmed keeper BLOCKS
 than transplanting. NOT built yet: Chunk 4 UI (`CandidateEditModal` merge mode) and
 Chunk 5 live alt-key ordering probe.
 
-Probe `scripts/probe-rabinowitz-conflict.js` is UNTRACKED (hardcodes a real email) —
-keep it local. See [[feedback-self-review-before-delegating-review]],
+Probe `scripts/probe-rabinowitz-conflict.js` is UNTRACKED (hardcodes a real email) — keep it local. <!-- doc-symbol-refs:ignore reason=untracked-local-pii-probe -->
+ See [[feedback-self-review-before-delegating-review]],
 [[feedback-symbol-consumer-fanout]], [[project-workbench-consolidation-rollout]].
