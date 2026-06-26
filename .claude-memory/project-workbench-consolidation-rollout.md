@@ -29,15 +29,16 @@ sunset.
 
 ## Reviewers sub-tab restructure + proposal-release trigger (owner, S280)
 
-- **Sub-tabs collapse.** Today the Reviewers tab has 5 sub-tabs (`Find · Candidates ·
-  Invite · Track · Completed`, `ReviewersTab.js:40`). Target: **`Find · Invite
-  Reviewers · Track Reviewers`** — rename Candidates→"Invite Reviewers" (where the
-  invitation is actually sent), Track→"Track Reviewers"; REMOVE the "Invite" sub-tab
-  (its `accepted` bucket + its "Release to reviewers" action fold into Track
-  Reviewers); FOLD "Completed" into Track Reviewers (a separate Completed tab is empty
-  this cycle and reads as a dead-end to non-tech PDs). Keep the `reviewer-modes.js`
-  no-fallthrough invariant: `complete` must move into Track's bucket or a reviewer
-  vanishes. (Open: whether to also fold Find into Invite Reviewers → 2-tab layout.)
+- **Sub-tabs collapse. [SHIPPED — commit `4d45b4c8`, the S280-planned collapse.]** The
+  Reviewers tab now has **3 sub-tabs** (`Find · Invite Reviewers · Track Reviewers`,
+  `ReviewersTab.js:41-43`), down from 5 (`Find · Candidates · Invite · Track ·
+  Completed`). Candidates→"Invite Reviewers" (where the invitation is actually sent; the
+  tab key stays `candidates`), Track→"Track Reviewers"; the old "Invite" sub-tab (its
+  `accepted` bucket + "Release to reviewers" action) and "Completed" were folded into
+  Track Reviewers; legacy `invite`/`completed` deep-links normalize to `track`
+  (`ReviewersTab.js:63`). The `reviewer-modes.js` no-fallthrough invariant holds
+  (`complete` lands in Track's bucket). (Still open: whether to also fold Find into
+  Invite Reviewers → 2-tab layout.)
 - **Proposal-release timing.** Reviewers are invited off early-stage material; the
   FULL proposal arrives later (the "delay"). Historic process: (1) proposals received
   → (2) Connor compliance-checks → (3) put in SharePoint → (4) PDs told "ready" → they

@@ -55,8 +55,9 @@ Deck content was read from source during the authoring session (S277), not memor
 - Shell + tab strip: `pages/workbench/[requestId].js` — live tabs are **Overview, Proposal,
   Reviewers, Status, Awardee**; the other five lifecycle tabs render a "coming in a later
   update" card.
-- Reviewers sub-tabs: `shared/components/reviewers/ReviewersTab.js` — Find · Candidates ·
-  Invite · Track · Completed.
+- Reviewers sub-tabs: `shared/components/reviewers/ReviewersTab.js` — Find · Invite
+  Reviewers · Track Reviewers (collapsed S280 from 5: Find · Candidates · Invite · Track ·
+  Completed).
 - Tab components: `OverviewTab.js`, `ProposalTab.js`, `StatusTab.js`, `AwardeeTab.js`.
 - Reviewer engagement (campaign config, reminders, token TTL, quota, withdraw):
   `docs/REVIEWER_ENGAGEMENT_SPEC.md` (IMPLEMENTED, all four phases LIVE S275) and the

@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: Reviewer Finder + Reviewer Manager are slated to be replaced by a unified Request Workbench (per-request, holistic) + standalone Reviewer Pool. Holistic frame locked S195; build sequence = reviewer-lifecycle slice first (= Workbench v1). Reviewer-tab structure DECIDED S206: 4-tab + status badges (Find/Invite/Track/Completed) — SHIPPED as 5 sub-tabs (a Candidates saved-roster tab was added S211). Workbench Phases 0–3 (reviewer-lifecycle slice) all SHIPPED; Proposal (S258, expert-link enrichment S260), Overview + Status (Group A, S260), and Awardee/grantee-deliverables also shipped — 5 live tabs; the other 5 request-lifecycle tabs are still placeholders (scoped in docs/REQUEST_WORKBENCH_BUILD_PLAN.md §"Remaining lifecycle tabs — scope (S260)").
+description: Reviewer Finder + Reviewer Manager are slated to be replaced by a unified Request Workbench (per-request, holistic) + standalone Reviewer Pool. Holistic frame locked S195; build sequence = reviewer-lifecycle slice first (= Workbench v1). Reviewer-tab structure: DECIDED S206 as 4-tab; built as 5 sub-tabs (Candidates added S211); now COLLAPSED to 3 sub-tabs (Find · Invite Reviewers · Track Reviewers, S280). Workbench Phases 0–3 (reviewer-lifecycle slice) all SHIPPED; Proposal (S258, expert-link enrichment S260), Overview + Status (Group A, S260), and Awardee/grantee-deliverables also shipped — 5 live tabs; the other 5 request-lifecycle tabs are still placeholders (scoped in docs/REQUEST_WORKBENCH_BUILD_PLAN.md §"Remaining lifecycle tabs — scope (S260)").
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-06-23 via source (live tabs: Reviewers w/ 5 sub-tabs, Proposal w/ Field Primer, Overview + Status [Group A, S260], Awardee/grantee-deliverables; 5 tabs still placeholders — see body)
+  last_verified: 2026-06-26 via source (live tabs: Reviewers w/ 3 sub-tabs [Find · Invite Reviewers · Track Reviewers, ReviewersTab.js:41-43], Proposal w/ Field Primer, Overview + Status [Group A, S260], Awardee/grantee-deliverables; 5 top-level tabs still placeholders — see body)
 ---
 
 ## Recall Rule
@@ -14,7 +14,7 @@ Read this when: building or planning the Request Workbench, the cycle dashboard,
 
 Do:
 - Build toward the per-request-holistic destination; the near-term build is the reviewer-lifecycle slice as Workbench v1 (URL `/workbench/[requestId]/...`).
-- Use the DECIDED reviewer-tab structure: 4-tab + status badges (Find / Invite / Track / Completed), state-aware default landing — **shipped as 5 sub-tabs** (Candidates roster tab added between Find and Invite, S211).
+- Reviewer-tab structure: DECIDED S206 as 4-tab; built as 5 sub-tabs (Candidates added S211); now **COLLAPSED to 3 sub-tabs — Find · Invite Reviewers · Track Reviewers (S280, commit `4d45b4c8`)** — with state-aware default landing. The `candidates` tab key now backs the "Invite Reviewers" label; legacy `invite`/`completed` deep-links normalize to `track`.
 - Treat `akoya_requeststatus` (Status tab) as a read-only living taxonomy — enumerate live, never hardcode; the board decides approve/decline, staff only recommend.
 - Verify-before-relying on the D26 allowlist: grep reviewer/invite/honorarium paths to confirm only dashboard visibility is gated on grant status.
 
@@ -32,7 +32,7 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 - **Phase 1** (`44c10b6`): `/workbench` tier-2 cycle dashboard + `/api/workbench/{dashboard,resolve-request}`. Additive union: status-gated query ∪ (for D26) a committed allowlist of 35 going-forward request NUMBERS (`shared/config/d26Allowlist.js`, throwaway) — they're Phase I Pending so the normal gate excludes them. `my-proposals.js` untouched. Scope my/all. Per-request work-remaining rollup.
 - **Per-request shell** (`eeb5da3`): `/workbench/[requestId].js` shell (tab strip + placeholder panels) so dashboard rows resolve. *(At this commit all panels were stubs; the Reviewers panel was made live by Phases 2–3 below, the Proposal tab later (S258), Overview + Status in Group A (S260), and Awardee/grantee-deliverables later; the other 5 tabs remain placeholders.)*
 - **Phase 2 — SHIPPED S209 (`64f694f`):** real Manage panel `shared/components/reviewers/ReviewerManagePanel.js`, shared by Review Manager + Workbench; `ReviewersTab.js` wires the Reviewers tab (Invite/Track/Completed + state-aware landing).
-- **Phase 3 — SHIPPED S210 (`79a2840`) + S211 (`bd95087`):** `ReviewerFindPanel.js` (auto-load proposal, in-panel `analyze→discover→enrich→save` search at full standalone parity), applicant-reviewer ingestion (`/api/workbench/applicant-reviewers.js`, recommended→candidates / excluded→per-request soft-block), and the new **Candidates** saved-roster sub-tab (`CandidatesPanel.js` + real invitations). Manual reviewer add SHIPPED S236 (`/api/workbench/manual-reviewer.js`). So the live Reviewers tab has **5** sub-tabs (Find · Candidates · Invite · Track · Completed), not the 4 of the S206 design. Authoritative phase status: `docs/REQUEST_WORKBENCH_BUILD_PLAN.md`.
+- **Phase 3 — SHIPPED S210 (`79a2840`) + S211 (`bd95087`):** `ReviewerFindPanel.js` (auto-load proposal, in-panel `analyze→discover→enrich→save` search at full standalone parity), applicant-reviewer ingestion (`/api/workbench/applicant-reviewers.js`, recommended→candidates / excluded→per-request soft-block), and the new **Candidates** saved-roster sub-tab (`CandidatesPanel.js` + real invitations). Manual reviewer add SHIPPED S236 (`/api/workbench/manual-reviewer.js`). At S210–S211 the live Reviewers tab had **5** sub-tabs (Find · Candidates · Invite · Track · Completed), not the 4 of the S206 design; it was later **collapsed to 3 (Find · Invite Reviewers · Track Reviewers, S280, commit `4d45b4c8`)**. Authoritative phase status: `docs/REQUEST_WORKBENCH_BUILD_PLAN.md`.
 - **Still pending (operational, NOT code — verify, don't assume):** grant the `reviewers` app to the pilot PDs via `/admin`, and browser-smoke `/workbench`. No source artifact proves these are done; treat as open until checked live.
 
 **S260 (2026-06-15) — Group A tabs + triage-field plan + app-retirement started:**
@@ -141,7 +141,7 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 
 **Why this slice first:** needed for D26 Phase II peer review (real deadline, ~mid-June 2026 Phase I→II flip with BILL honoraria); needed for every future cycle as the post-shortlist surface; survives the Phase I sunset; most code-broken piece today.
 
-**Tabs — DECIDED S206: 4-tab + status badges; SHIPPED as 5 sub-tabs (Candidates added S211).** Default landing is state-aware (earliest funnel step with outstanding work; see the S206 decisions block above), not a fixed tab. The four below are the S206 design; the build added a **Candidates** saved-roster sub-tab between Find and Invite (the persistent home for saved-but-not-yet-invited candidates — `CandidatesPanel.js`).
+**Tabs — DECIDED S206: 4-tab + status badges; built as 5 sub-tabs (Candidates added S211); now COLLAPSED to 3 (Find · Invite Reviewers · Track Reviewers, S280).** Default landing is state-aware (earliest funnel step with outstanding work; see the S206 decisions block above), not a fixed tab. The four below are the S206 design; the build added a **Candidates** saved-roster sub-tab between Find and Invite (later renamed "Invite Reviewers"; component `CandidatesPanel.js` → `ReviewerInvitePanel.js`, S291).
 - **Find** — candidate discovery (current Reviewer Finder behavior, request-aware). Badge: candidate count.
 - **Invite** — build shortlist + compose/dispatch invitations. Badge: # shortlisted candidates awaiting dispatch (matches the count shown in the panel).
 - **Track** — confirmed/pending/declined, materials state, review-in-progress, overdue chasing — the home base once invites are out. Badge: pending count + overdue (⚠).

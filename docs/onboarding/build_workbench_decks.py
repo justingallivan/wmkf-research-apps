@@ -4,7 +4,7 @@
 Grounded in source read this session:
 - Shell: pages/workbench/[requestId].js (query-string ?tab=&sub= routing; RequireAppAccess 'reviewers')
 - Live tabs: Overview, Proposal, Reviewers, Status, Awardee (5 lifecycle tabs are placeholders)
-- Reviewers sub-tabs: Find, Candidates, Invite, Track, Completed
+- Reviewers sub-tabs: Find, Invite Reviewers, Track Reviewers (collapsed S280 from 5: Find, Candidates, Invite, Track, Completed)
 """
 import os
 from pptx import Presentation

@@ -163,7 +163,7 @@ row is written for the unresolved candidate.
 
 **T2.4 — No false-positive gating of a resolved reviewer.**
 *Steps:* save a confirmed/probable candidate (normal case).
-*Expected:* it saves normally and appears in the Candidates tab — it is **not** caught by the
+*Expected:* it saves normally and appears in the Invite Reviewers tab — it is **not** caught by the
 gate even if its provenance kind is unusual.
 
 ---
@@ -210,7 +210,7 @@ low-confidence address — enforced server-side.
 **T3.1 — HIGH-confidence invite is frictionless.**
 *Precondition:* a candidate whose email is ORCID/PubMed-sourced (or scoped-search on a confirmed
 identity).
-*Steps:* Candidates tab → invite → preview.
+*Steps:* Invite Reviewers tab → invite → preview.
 *Expected:* no warning; the button reads "Send N invitations"; sends normally.
 *Verify:* recipient receives the invite; the `email_sent` record carries
 `emailConfidence.level: 'high'`.
@@ -273,7 +273,7 @@ institution's own page to find and enter the address — with **no** server-side
 **T4.1 — Link appears only on a no-email candidate with a page.**
 *Precondition:* a saved candidate with no `wmkf_emailaddress` but a non-null `wmkf_facultypageurl`
 (or `wmkf_website`).
-*Steps:* open the Candidates tab.
+*Steps:* open the Invite Reviewers tab.
 *Expected:* the row shows "no email — can't invite · **find on faculty page →**"; the link opens
 the persisted faculty page in a new tab. A candidate **with** an email shows the address (no
 recovery link); a no-email candidate with **no** page shows the plain "can't invite" text.
