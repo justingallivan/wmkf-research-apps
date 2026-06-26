@@ -166,3 +166,137 @@ export const ALWAYS_ACCESSIBLE = ['/', '/admin', '/guide', '/profile-settings', 
 
 /** App keys granted to new users by default */
 export const DEFAULT_APP_GRANTS = ['dynamics-explorer'];
+
+/**
+ * App lifecycle registry — historical / non-active app keys and their state.
+ *
+ * SEPARATE from APP_REGISTRY on purpose. APP_REGISTRY is the single source of
+ * truth for ACTIVE, navigable, grantable apps, and its consumers (Layout nav,
+ * home page, app-access grant validation, ALL_APP_KEYS) must keep reading ONLY
+ * APP_REGISTRY. This map exists so docs / CI / agents can explain historical
+ * keys (consolidated, deprecated, direct-URL legacy) without re-adding them to
+ * APP_REGISTRY.
+ *
+ * CONTRACT: every APP_REGISTRY key is implicitly `active` and is intentionally
+ * NOT duplicated here. This registry covers ONLY keys whose lifecycle is
+ * something other than "active + present in APP_REGISTRY". Never add an entry
+ * for a key that already lives in APP_REGISTRY — that would create a second
+ * source of truth for active apps that silently drifts.
+ *
+ * See docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md and
+ * docs/NOMENCLATURE_GLOSSARY.md.
+ *
+ * status values:
+ *   'consolidated-into' — former identity now served by a successor app key
+ *   'deprecated'        — retired and archived to _archived/
+ *   'sunset-candidate'  — not navigable but still routable; archive pending a usage check
+ *   'direct-url-test'   — live direct-URL / test surface, intentionally not in nav
+ */
+export const APP_LIFECYCLE_REGISTRY = {
+  'reviewer-finder': {
+    name: 'Reviewer Finder',
+    status: 'consolidated-into',
+    successorKey: 'reviewers',
+    notes:
+      'Consolidated into the Request Workbench (key: reviewers, /workbench). Infrastructure is still live under the /api/reviewer-finder/* namespace and existing user_app_access grants are still honored variadically — see ROUTE_NAMESPACE_LIFECYCLE.',
+    lastVerified: '2026-06-26',
+  },
+  'review-manager': {
+    name: 'Review Manager',
+    status: 'consolidated-into',
+    successorKey: 'reviewers',
+    notes:
+      'Consolidated into the Request Workbench (key: reviewers, /workbench). Infrastructure is still live under the /api/review-manager/* namespace and grants are honored variadically — see ROUTE_NAMESPACE_LIFECYCLE.',
+    lastVerified: '2026-06-26',
+  },
+  'concept-evaluator': {
+    name: 'Concept Evaluator',
+    status: 'deprecated',
+    successorKey: null,
+    deprecatedAt: '2026-04-25',
+    archivedTo: '_archived/pages/concept-evaluator.js',
+    grantsRetained: true,
+    notes:
+      'Deprecated S110. Page / API / prompt archived to _archived/. Existing concept-evaluator grants left in place (no app to grant). multi-perspective-evaluator reuses some prompt content but is a distinct active app, not the successor.',
+    lastVerified: '2026-06-26',
+  },
+  'phase-ii-writeup-legacy': {
+    name: 'Phase II Writeup (legacy)',
+    status: 'sunset-candidate',
+    successorKey: 'phase-ii-writeup',
+    pagePath: '/phase-ii-writeup-legacy',
+    notes:
+      'Authenticated direct-URL legacy variant of the active phase-ii-writeup app; calls /api/process-legacy. NOT a proven orphan — archive only after a Vercel access-log check confirms no direct hits (strategy Phase 0/1).',
+    lastVerified: '2026-06-26',
+  },
+  'phase-i-dynamics': {
+    name: 'Phase I (Dynamics)',
+    status: 'direct-url-test',
+    pagePath: '/phase-i-dynamics',
+    notes: 'Live direct-URL surface, intentionally not in home nav. NOT an orphan; do not archive.',
+    lastVerified: '2026-06-26',
+  },
+  'test-email': {
+    name: 'Test Email',
+    status: 'direct-url-test',
+    pagePath: '/test-email',
+    notes: 'Live test surface (/test-email + /api/test-email). NOT an orphan; do not archive.',
+    lastVerified: '2026-06-26',
+  },
+};
+
+/**
+ * Route-namespace lifecycle — legacy / borrowed API namespaces and notable
+ * cross-cutting routes whose name no longer matches their owner app.
+ *
+ * Route PATHS are contracts: they have in-repo callers AND possible external
+ * callers (Power Automate, Dynamics, bookmarks) that the repo cannot disprove.
+ * Default action for a borrowed namespace is LEAVE+DOCUMENT, never rename. See
+ * docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md §4 and
+ * docs/NOMENCLATURE_GLOSSARY.md.
+ *
+ * status values:
+ *   'canonical'          — current, correctly-named namespace
+ *   'legacy-live'        — legacy app name, but owned by a live app (borrowed-live-infra)
+ *   'sunset-candidate'   — routable but archive-pending a usage check
+ *   'live-cross-cutting' — live, persists/serves durable state across apps; recognize & skip
+ */
+export const ROUTE_NAMESPACE_LIFECYCLE = {
+  '/api/workbench': {
+    status: 'canonical',
+    ownerAppKey: 'reviewers',
+    notes: 'Canonical successor namespace for the Request Workbench.',
+    lastVerified: '2026-06-26',
+  },
+  '/api/reviewer-finder': {
+    status: 'legacy-live',
+    ownerAppKey: 'reviewers',
+    migrationDecision: 'LEAVE+DOCUMENT',
+    notes:
+      'Borrowed-live-infra. Legacy app name; owned by reviewers (Workbench). Called in-repo from many reviewer components and possibly externally. Routes accept BOTH a legacy reviewer-finder grant and a reviewers grant via variadic requireAppAccess. Do not rename the path.',
+    lastVerified: '2026-06-26',
+  },
+  '/api/review-manager': {
+    status: 'legacy-live',
+    ownerAppKey: 'reviewers',
+    migrationDecision: 'LEAVE+DOCUMENT',
+    notes:
+      'Borrowed-live-infra. Legacy app name; owned by reviewers (Workbench). Variadic grant accepts legacy review-manager AND reviewers. Do not rename the path.',
+    lastVerified: '2026-06-26',
+  },
+  '/api/process-legacy': {
+    status: 'sunset-candidate',
+    ownerAppKey: 'phase-ii-writeup-legacy',
+    notes:
+      'Paired with the phase-ii-writeup-legacy page. Still guarded and routable. Archive only after a Vercel access-log check (strategy Phase 0/1). Registered in check:prompt-injection-tagging.',
+    lastVerified: '2026-06-26',
+  },
+  '/api/field-primer': {
+    status: 'live-cross-cutting',
+    ownerAppKey: 'reviewers',
+    migrationDecision: 'LEAVE+DOCUMENT',
+    notes:
+      'NOT legacy. /api/field-primer/generate persists akoya_request.wmkf_ai_fieldprimer (called from the Workbench ProposalTab, read back via resolve-request). Recognize & skip — do not rename or deprecate.',
+    lastVerified: '2026-06-26',
+  },
+};

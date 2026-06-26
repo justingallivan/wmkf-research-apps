@@ -47,6 +47,7 @@ reviewing. It is subordinate to source, Atlas, and live probes.
 | Applicant integrity screening, Retraction Watch, PubPeer, News, SerpAPI residual | [Integrity Screener](topics/integrity-screener.md) | `docs/APPLICATION_STATE_ATLAS.md`, `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md` |
 | Dev environment, secrets, Vercel deploys, local Jest/build quirks, Claude config sync | [Dev Environment](topics/dev-environment.md) | `docs/CREDENTIALS_RUNBOOK.md`, deployment docs, local scripts |
 | Strategy, system model, roadmap, phasing, planned automation | [Strategy & Roadmap](topics/strategy-roadmap.md) | `docs/SYSTEM_MODEL.md`, `DEVELOPMENT_LOG.md`, current handoff |
+| Nomenclature, overloaded/legacy names, app lifecycle (consolidated/deprecated/direct-URL), borrowed route namespaces | `docs/NOMENCLATURE_GLOSSARY.md` | `docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md`, `shared/config/appRegistry.js` (`APP_LIFECYCLE_REGISTRY`, `ROUTE_NAMESPACE_LIFECYCLE`) |
 
 ## Maintenance
 
