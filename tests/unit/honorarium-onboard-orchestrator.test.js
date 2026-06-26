@@ -40,7 +40,12 @@ function makeDeps(overrides = {}) {
       updateRecord: jest.fn().mockResolvedValue(undefined),
       ...overrides.dynamics,
     },
-    contacts: { findOrCreateByEmail: jest.fn().mockResolvedValue({ id: 'contact-new', created: true }), ...overrides.contacts },
+    contacts: {
+      findByEmail: jest.fn().mockResolvedValue(null),
+      findByOrcidCandidates: jest.fn().mockResolvedValue({ none: true }),
+      findOrCreateByEmail: jest.fn().mockResolvedValue({ id: 'contact-new', created: true }),
+      ...overrides.contacts,
+    },
     potentialReviewers: { setContactLink: jest.fn().mockResolvedValue(undefined), ...overrides.potentialReviewers },
     suggestions: { setHonorariumRequest: jest.fn().mockResolvedValue(undefined), ...overrides.suggestions },
     onboard: overrides.onboard || jest.fn().mockResolvedValue({ status: 'alert_only' }),
@@ -83,6 +88,106 @@ describe('ensureHonorariumOnboarding', () => {
     expect(deps.contacts.findOrCreateByEmail).toHaveBeenCalledWith(expect.objectContaining({ email: 'jane@uni.edu' }), { actingUserSystemId: undefined });
     expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-new', { actingUserSystemId: undefined });
     expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-new)');
+  });
+
+  it('contact absent, email matches an existing contact → links it; no create, no ORCID lookup', async () => {
+    const deps = makeDeps({ contacts: { findByEmail: jest.fn().mockResolvedValue({ contactid: 'contact-email' }) } });
+    const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_potentialreviewersid: 'pr-1', wmkf_emailaddress: 'jane@uni.edu', wmkf_orcid: '0000-0002-1825-0097', wmkf_name: 'Jane' } });
+    await ensureHonorariumOnboarding(args, deps);
+    expect(deps.contacts.findByEmail).toHaveBeenCalledWith('jane@uni.edu');
+    expect(deps.contacts.findByOrcidCandidates).not.toHaveBeenCalled();
+    expect(deps.contacts.findOrCreateByEmail).not.toHaveBeenCalled();
+    expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-email', { actingUserSystemId: undefined });
+    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-email)');
+  });
+
+  it('email misses but reviewer ORCID uniquely matches a contact → links existing, NO duplicate created', async () => {
+    const deps = makeDeps({
+      contacts: {
+        findByEmail: jest.fn().mockResolvedValue(null),
+        findByOrcidCandidates: jest.fn().mockResolvedValue({ one: true, id: 'contact-orcid' }),
+      },
+    });
+    const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_potentialreviewersid: 'pr-1', wmkf_emailaddress: 'corrected@new.edu', wmkf_orcid: '0000-0002-1825-0097', wmkf_name: 'Jane' } });
+    await ensureHonorariumOnboarding(args, deps);
+    expect(deps.contacts.findByOrcidCandidates).toHaveBeenCalledWith('0000-0002-1825-0097');
+    expect(deps.contacts.findOrCreateByEmail).not.toHaveBeenCalled(); // the bug fix: no duplicate
+    expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-orcid', { actingUserSystemId: undefined });
+    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-orcid)');
+  });
+
+  it('email misses and ORCID is ambiguous → creates a new contact + logs a server warning (durable staff-review surface deferred), never blocks', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const deps = makeDeps({
+        contacts: {
+          findByEmail: jest.fn().mockResolvedValue(null),
+          findByOrcidCandidates: jest.fn().mockResolvedValue({ ambiguous: true, count: 2 }),
+        },
+      });
+      const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_potentialreviewersid: 'pr-1', wmkf_emailaddress: 'corrected@new.edu', wmkf_orcid: '0000-0002-1825-0097', wmkf_name: 'Jane' } });
+      const res = await ensureHonorariumOnboarding(args, deps);
+      expect(deps.contacts.findOrCreateByEmail).toHaveBeenCalledWith(expect.objectContaining({ email: 'corrected@new.edu' }), { actingUserSystemId: undefined });
+      expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-new', { actingUserSystemId: undefined });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('contactDuplicateRisk'));
+      expect(res.created).toBe(true); // honorarium proceeds; not blocked
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('ORCID lookup throws → fails open to create (honorarium never stalls on the lookup)', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const deps = makeDeps({
+        contacts: {
+          findByEmail: jest.fn().mockResolvedValue(null),
+          findByOrcidCandidates: jest.fn().mockRejectedValue(new Error('dataverse 500')),
+        },
+      });
+      const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_potentialreviewersid: 'pr-1', wmkf_emailaddress: 'corrected@new.edu', wmkf_orcid: '0000-0002-1825-0097', wmkf_name: 'Jane' } });
+      const res = await ensureHonorariumOnboarding(args, deps);
+      expect(deps.contacts.findOrCreateByEmail).toHaveBeenCalled();
+      expect(res.honorariumRequestId).toBe(`det-${SUGGESTION_ID}`);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('setContactLink reports reviewer already linked elsewhere → honorarium binds to the existing LIVE link (concurrency guard)', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const linkErr = Object.assign(new Error('linked elsewhere'), {
+        code: 'reviewer_linked_elsewhere',
+        details: { existingContactId: 'contact-live' },
+      });
+      const deps = makeDeps({
+        contacts: { findByEmail: jest.fn().mockResolvedValue({ contactid: 'contact-email' }) },
+        potentialReviewers: { setContactLink: jest.fn().mockRejectedValue(linkErr) },
+      });
+      const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_potentialreviewersid: 'pr-1', wmkf_emailaddress: 'jane@uni.edu', wmkf_name: 'Jane' } });
+      await ensureHonorariumOnboarding(args, deps);
+      // Authoritative live link wins over the contact we picked by email.
+      expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-live)');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('setContactLink fails for another reason → non-fatal; honorarium proceeds with the chosen contact', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const deps = makeDeps({
+        contacts: { findByEmail: jest.fn().mockResolvedValue({ contactid: 'contact-email' }) },
+        potentialReviewers: { setContactLink: jest.fn().mockRejectedValue(new Error('dataverse 500')) },
+      });
+      const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_potentialreviewersid: 'pr-1', wmkf_emailaddress: 'jane@uni.edu', wmkf_name: 'Jane' } });
+      const res = await ensureHonorariumOnboarding(args, deps);
+      expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-email)');
+      expect(res.honorariumRequestId).toBe(`det-${SUGGESTION_ID}`);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('no email anywhere → throws honorarium_no_email (caller alerts, accept survives)', async () => {
