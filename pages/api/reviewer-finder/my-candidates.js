@@ -31,6 +31,7 @@ import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/poten
 import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
 import { ensureToken } from '../../../lib/external/token-lifecycle';
 import { ContactParser } from '../../../lib/utils/contact-parser';
+import { translateDuplicateKeyError } from '../../../lib/dataverse/duplicate-key';
 
 const REQUEST_FIELDS = [
   'akoya_requestid',
@@ -594,25 +595,8 @@ async function handlePatch(req, res, access) {
   }
 }
 
-// Extracts a usable shape from a Dataverse 412 "Entity Key violated" error.
-// Returns null for any other error. The Id in the DuplicateEntity XML is the
-// row that ALREADY holds the conflicting value — i.e. the merge target.
-function translateDuplicateKeyError(error) {
-  if (!error || error.status !== 412) return null;
-  const msg = String(error.message || '');
-  if (!/Entity Key|0x80060892/.test(msg)) return null;
-  const fieldMatch = msg.match(/DuplicateAttributes>[\s\S]*?<([a-z0-9_]+)>([^<]+)</);
-  const idMatch = msg.match(/<Id>([0-9a-f-]{36})<\/Id>/i);
-  return {
-    error: 'duplicate_key',
-    message: fieldMatch
-      ? `Another reviewer record already has ${fieldMatch[1]} = "${fieldMatch[2]}". Edit blocked — the two records need to be merged before this field can move.`
-      : 'A Dataverse alternate-key constraint blocked this update.',
-    field: fieldMatch?.[1] || null,
-    value: fieldMatch?.[2] || null,
-    conflictingRecordId: idMatch?.[1] || null,
-  };
-}
+// translateDuplicateKeyError now lives in lib/dataverse/duplicate-key.js (S290
+// chunk-5) so the alt-key ordering probe and this route share one definition.
 
 // ───────── DELETE ─────────
 

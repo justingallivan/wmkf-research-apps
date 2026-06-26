@@ -1,6 +1,6 @@
 # Reviewer Record Merge — Build Plan & Design (v1)
 
-status: v1 backend BUILT (chunks 1–3, S289 2026-06-25, Codex post-impl folded); UI merge mode BUILT (chunk 4, S290 2026-06-25, 2 Codex pre-impl + 1 post-impl passes folded, 13 tests green); ordering probe (chunk 5) pending
+status: v1 backend BUILT (chunks 1–3, S289 2026-06-25, Codex post-impl folded); UI merge mode BUILT (chunk 4, S290 2026-06-25, 2 Codex pre-impl + 1 post-impl passes folded, 13 tests green); ordering probe BUILT (chunk 5, S290, `scripts/probe-merge-altkey-ordering.mjs`, Codex pre-impl consensus reached — awaiting first prod run to settle O8)
 owner: reviewer-finder
 
 > Chunks 1–3 (adapters, `lib/services/reviewer-merge.js`, the
@@ -8,7 +8,9 @@ owner: reviewer-finder
 > Chunk 4 (the `CandidateEditModal` UI merge mode + recovery, S290) is BUILT with
 > tests (`tests/unit/candidate-edit-modal-merge.test.js`); the Codex post-impl review
 > is folded (stale-async guards on enter/swap, re-plan-failure withholds retry,
-> recovery always refreshes on exit). Chunk 5 (live-ordering probe) is NOT built yet. Build follows the project's
+> recovery always refreshes on exit). Chunk 5 (the live-ordering probe
+> `scripts/probe-merge-altkey-ordering.mjs`) is BUILT and reached Codex pre-impl
+> consensus; its first prod run (which settles O8) is still pending. Build follows the project's
 > design → Codex pre-impl → implement+tests → commit → Codex post-impl loop
 > (`project-codex-design-pre-impl-iteration`). This v1 design was twice-reviewed by
 > Codex + an internal aggressive review + a live probe (chunk 4 got two more Codex
@@ -282,11 +284,23 @@ commit (not amended). Target ≤ ~1100 net lines per chunk.
     without durable storage. (See §Email-move atomicity for the full rationale.)
   - **Stale-async guard:** plan/swap/confirm/recovery responses that land after the
     modal closes or the candidate identity changes must not write state.
-- **Chunk 5 — Non-mocked ordering probe (O8).**
+- **Chunk 5 — Non-mocked ordering probe (O8). BUILT S290.**
   - A guarded integration probe that exercises the real alt-key ordering (email +
-    (person,request) key) against live/staging Dataverse on throwaway rows, because
+    (person,request) key) against PRODUCTION Dataverse on throwaway rows, because
     mocked adapters reproduce neither key enforcement nor the 412 precondition
     (`dynamics-service.js:823`) — the exact bug class the two Codex passes caught.
+  - Built as `scripts/probe-merge-altkey-ordering.mjs` (prod-write, reversible;
+    mirrors `scripts/smoke-test-candidate.mjs`'s safety model). The sandbox isn't
+    wired for `DynamicsService`, so the probe runs against prod on synthetic
+    throwaway rows (marker `ZZZ Merge Probe (DELETE)`, `@example.invalid` emails) on
+    the dedicated test request 1002788. Plan-only by default; `--run` executes three
+    sub-probes (A email alt-key + `translateDuplicateKeyError` round-trip; B
+    (person,request) repoint collision vs free; C end-to-end `executeMerge`) then
+    auto-cleans in a `finally` (marker-gated teardown; `--keep` opts out). To remove
+    drift, `translateDuplicateKeyError` was extracted to `lib/dataverse/duplicate-key.js`
+    and is shared by the probe and `my-candidates.js`.
+  - **Pending:** the first `--run` against prod (settles O8 empirically). Codex
+    pre-impl consensus reached; Codex post-impl review of the code still to fold.
 
 ## Red gates in scope
 

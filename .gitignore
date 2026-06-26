@@ -59,6 +59,7 @@ outputs/
 # Smoke-test helper state (live prod GUIDs + tester email — never commit)
 scripts/.smoke-test-candidate.json
 scripts/.grantee-smoke-deliverable.json
+scripts/.merge-probe-altkey.json
 .git.nosync
 # iCloud-exclusion artifacts (local-only build/dep dirs)
 *.nosync/
