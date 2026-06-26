@@ -242,10 +242,11 @@ to maintain). If built, ship its fixture self-test first.
 - `APP_REGISTRY`: **16** active apps; no `reviewer-finder`/`review-manager` key (only
   `reviewers` → `/workbench`, "successor to Reviewer Finder + Review Manager").
   [VERIFIED: `appRegistry.js:8-159,70-74`]
-- Borrowed-live-infra: `/api/reviewer-finder/*` (13 route files) and `/api/review-manager/*`
-  (10) are the LEGACY-named borrowed namespaces; `/api/workbench/*` (22, recursive) is the
-  canonical successor namespace — one app, three namespaces; plus `shared/components/reviewers/*`
-  and many `lib/services/*`. [VERIFIED via `find pages/api/<ns> -name '*.js' | wc -l` → 13 / 10 / 22]
+- Borrowed-live-infra: `/api/reviewer-finder/*` and `/api/review-manager/*` are the
+  LEGACY-named borrowed namespaces; `/api/workbench/*` is the canonical successor namespace —
+  one app, three namespaces; plus `shared/components/reviewers/*` and many `lib/services/*`.
+  (Per-namespace file counts via `find pages/api/<ns> -name '*.js' | wc -l`; not pinned here,
+  to avoid drift against the canonical `api-route-file-count` fact.)
 - Orphan candidates: `phase-ii-writeup-legacy` (**sunset-candidate / direct-URL legacy — NOT
   a proven orphan**, log-check pending); `phase-i-dynamics` + `test-email` (NOT orphans — live
   direct-URL/test surfaces); plus the live-cross-cutting `field-primer` (recognize & skip).
