@@ -196,7 +196,7 @@ toggle. It writes the `tierResults.openalex_author` DTO that the resolver re-pro
 ## 7. Faculty-page email recovery — default zero-SSRF; opt-in guarded fetch (S265) `[VERIFIED 2026-06-17]`
 
 **Contract.** By DEFAULT the faculty-page path is still the **ZERO-SSRF path — no server-side fetch.**
-`my-candidates` GET returns `facultyPageUrl` (selects `wmkf_facultypageurl`); `CandidatesPanel` shows
+`my-candidates` GET returns `facultyPageUrl` (selects `wmkf_facultypageurl`); `ReviewerInvitePanel` shows
 a "find on faculty page →" link on no-email candidates; staff read the address there and enter it via
 `CandidateEditModal` → manual stamp (`emailSource='manual'`, reads LOW per Contract 3) → Slice-G confirm.
 
@@ -220,7 +220,7 @@ lookup), `_validateEmailAgainstVerifiedDomain` (`contact-enrichment-service.js:2
 — preventing namesake-collapse. ORCID/PubMed/affiliation emails outrank the heuristic.
 
 **Enforcement points.** Default no-fetch/manual-link boundary: `pages/api/reviewer-finder/my-candidates.js:189`
-(returns `facultyPageUrl`, no fetch) · `shared/components/reviewers/CandidatesPanel.js:185` (staff-facing
+(returns `facultyPageUrl`, no fetch) · `shared/components/reviewers/ReviewerInvitePanel.js:185` (staff-facing
 "find on faculty page →" link). Opt-in guarded fetch (flag-gated): `lib/utils/safe-fetch.js`
 (`safeFetchInstitutionPage`, `hostWithinDomain`, `isPrivateAddress`) ·
 `lib/services/contact-enrichment-service.js:934` (`_attachEmailFromResolvedPage`) +
@@ -266,5 +266,5 @@ exported `:568`). **Audit:** `tests/unit/reviewer-identity-evidence.test.js`
 | 4 | Structured-PI fail-open/augment-only | `proposal-pi-identity.js:125+` + `reviewer-identity-evidence.js:316-321` |
 | 5 | S240 institution COI hard drop | `save-candidates.js:116,150-160` + `discover.js`/`DiscoveryService` `filterConflicts` |
 | 6 | OpenAlex bibliometrics/verified-domain | `contact-enrichment-service.js:676-790` |
-| 7 | Faculty-page: default zero-SSRF; opt-in guarded fetch (flag) | `my-candidates.js:189` + `CandidatesPanel.js:185` (default) · `safe-fetch.js` `safeFetchInstitutionPage` + `contact-enrichment-service.js:934` (opt-in) |
+| 7 | Faculty-page: default zero-SSRF; opt-in guarded fetch (flag) | `my-candidates.js:189` + `ReviewerInvitePanel.js:185` (default) · `safe-fetch.js` `safeFetchInstitutionPage` + `contact-enrichment-service.js:934` (opt-in) |
 | 8 | Work-grounding rescue | `reviewer-identity-evidence.js:212-271` |

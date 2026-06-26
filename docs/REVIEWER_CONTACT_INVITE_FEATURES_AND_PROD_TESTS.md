@@ -257,7 +257,7 @@ institution's own page to find and enter the address — with **no** server-side
 
 - **DTO carries the faculty page:** `my-candidates` GET now selects `wmkf_facultypageurl` and
   returns `facultyPageUrl` per candidate.
-- **Actionable no-email state:** `CandidatesPanel`'s "no email — can't invite" state, when a
+- **Actionable no-email state:** `ReviewerInvitePanel`'s "no email — can't invite" state, when a
   `facultyPageUrl`/`website` exists, shows a **"find on faculty page →"** link (opens in a new
   tab).
 - **Reuses the rest of the pipeline:** staff read the real address on that page, enter it via

@@ -23,7 +23,7 @@ Current live behavior separates invite-safe contact data poorly from staff-usefu
 - `[VERIFIED via lib/services/contact-enrichment-service.js:545-551]` Claude can report `emailRejectedReason: 'name_mismatch'`, but the code does not mutate `claudeResult.email` in the analogous way.
 - `[VERIFIED via pages/api/reviewer-finder/save-candidates.js:56-67]` unresolved system-discovered identities are hard-rejected at save.
 - `[VERIFIED via pages/api/reviewer-finder/save-candidates.js:79-82 and pages/api/reviewer-finder/save-candidates.js:169-187]` unresolved exempt rows can save as name rows, but contact and identity-derived fields are force-nulled or field-gated before persistence.
-- `[VERIFIED via shared/components/reviewers/CandidatesPanel.js:191-205]` the saved-candidates UI already has a manual recovery pattern: when no email exists but a page exists, it shows "find on faculty page ->".
+- `[VERIFIED via shared/components/reviewers/ReviewerInvitePanel.js:191-205]` the saved-candidates UI already has a manual recovery pattern: when no email exists but a page exists, it shows "find on faculty page ->".
 
 That behavior is right for automated persistence and invitations. It is too strict for a staff workbench whose practical goal is: "give me enough context to find and evaluate possible reviewers."
 
@@ -324,7 +324,7 @@ the reviewer's own page that differs from the Google-suggested one — overridin
 existing value. Email/website go through the SAME `setManualContact` mutation as promotion
 (`emailSource:'manual'` → low-confidence invite). The Name field is locked in this mode (the
 Find card is keyed by normalized name; renaming there would desync selection/dedup). The
-saved-candidates editor (CandidatesPanel) keeps full PATCH-mode editing including name.
+saved-candidates editor (ReviewerInvitePanel) keeps full PATCH-mode editing including name.
 
 Add a manual promotion path:
 

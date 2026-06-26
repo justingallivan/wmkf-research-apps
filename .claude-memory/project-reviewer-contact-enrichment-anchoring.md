@@ -95,7 +95,7 @@ is IMPLEMENTED S235 (branch `reviewer-slice-g-invite-confidence`, design+impl in
 stamp `emailSource='manual'`. No schema change. Slice F (faculty-page email recovery) SHIPPED S235 via the
 ZERO-SSRF path — the automated server-side fetch was Codex-reviewed (READY WITH NAMED CHANGES: undici
 IP-pinning dispatcher, scholarVerifiedEmail-only allowlist, IPv6 private-IP blocklist) but NOT built; instead
-`my-candidates` surfaces the persisted `facultyPageUrl` and `CandidatesPanel` shows a "find on faculty page →"
+`my-candidates` surfaces the persisted `facultyPageUrl` and `ReviewerInvitePanel` shows a "find on faculty page →"
 link on no-email candidates → staff enter the address via the existing Edit (→ `emailSource='manual'` →
 Slice-G confirm). Design+decision: `docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md`.
 

@@ -57,7 +57,7 @@ old affordance." That erodes trust in the tool the owner is trying to land.
 
 **How to apply:** the dead-end-UI audit and the code carve-out are ONE exercise. Walk
 the Reviewers tab affordance-by-affordance (`shared/components/reviewers/*`:
-`ReviewersTab`, `ReviewerManagePanel`, `CandidatesPanel`) and classify each control
+`ReviewersTab`, `ReviewerManagePanel`, `ReviewerInvitePanel`) and classify each control
 keep vs now-automated-dead-end. Removing a dead-end affordance also lets its backing
 route/component be deleted — which SHRINKS the surface that then needs renaming. Do
 the UI dead-end removal first (rollout-blocking + reduces scope), then renomenclature

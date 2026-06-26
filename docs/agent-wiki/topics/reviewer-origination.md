@@ -205,7 +205,7 @@ bare keyword→author lane is what underperformed.
   tier's fetch chokepoint (`_orderCandidateUrls`), and — after a Codex post-impl review caught the
   display/persist fan-out — the `facultyPageUrl` capture/persist/read/render path
   (`contact-enrichment-service.js` Claude-tier capture + side-save, `save-candidates.js`,
-  `my-candidates.js`, `CandidatesPanel.js`) plus the `enr.website` render fallback in `mergeEnrichment`.
+  `my-candidates.js`, `ReviewerInvitePanel.js`) plus the `enr.website` render fallback in `mergeEnrichment`.
   **Lesson: a chokepoint/merge guard is NOT enough — `facultyPageUrl` is also persisted to Dataverse
   and rendered as a clickable link, so the guard must reach the persist + read + render surfaces too.**
   Design: `docs/REVIEWER_GENERATION_DATA_QUALITY_DESIGN.md`.

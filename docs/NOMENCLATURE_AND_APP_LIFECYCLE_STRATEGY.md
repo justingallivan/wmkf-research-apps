@@ -1,9 +1,10 @@
 # Nomenclature & App-Lifecycle Cleanup — Strategy
 
-Status: **STRATEGY / PLAN with S291 execution annotations.** Commit 1 (lifecycle
-exports + glossary), the enforcement gates, and Phase 1 / Commit 2 (archive of the
-`phase-ii-writeup-legacy` surface) have shipped — see the inline `DONE S291` markers.
-Phases 2–4 remain. Re-confirm live state before executing any remaining phase.
+Status: **STRATEGY / PLAN — all phases EXECUTED S291–S292 (see inline `DONE` markers).**
+Commit 1 (lifecycle exports + glossary), the enforcement gates, and Phase 1 / Commit 2
+(archive of the `phase-ii-writeup-legacy` surface) shipped S291; Phase 2 (rename) shipped
+S291; Phase 3 (document borrowed namespaces) confirmed and Phase 4 (fact-level `/sweep`)
+executed S292. Re-confirm live state before relying on any specific file:line citation.
 Codex adversarial review (S290) folded: added the live-cross-cutting bucket, reclassified
 `phase-ii-writeup-legacy` as a sunset-candidate (not orphan), added ALIAS auth-parity +
 consolidated-grant/persisted-key preconditions, Phase 1 gate additions, Phase 2 blast radius,
@@ -198,11 +199,20 @@ live surface.** Run each gate and its `:self-test` sequentially.
   historical `docs/` design docs that record the old name. (MEMORY.md router has no
   CandidatesPanel ref; the earlier `:66` citation was stale.) Gates: reviewer-tab unit/integration
   tests, `check:doc-symbol-refs`, `check:build-claim-freshness`, `check:agent-wiki`.
-- **Phase 3 — Document borrowed namespaces.** LEAVE+DOCUMENT the legacy route namespaces in
+- **Phase 3 — Document borrowed namespaces. [DONE S292 2026-06-26: verified every `/api/*`
+  namespace maps to an active `APP_REGISTRY` key, documented infrastructure, or a lifecycle
+  entry; the only legacy-named borrowed namespaces (`/api/reviewer-finder/*`,
+  `/api/review-manager/*`) are captured in `ROUTE_NAMESPACE_LIFECYCLE` + `NOMENCLATURE_GLOSSARY.md`
+  + the API matrix and gated by `check:route-lifecycle-auth`. Nothing else needed documenting;
+  no `/api/workbench/*` ALIAS wrappers added — LEAVE+DOCUMENT stands.]** LEAVE+DOCUMENT the legacy route namespaces in
   `docs/API_ROUTE_SECURITY_MATRIX.md` + the glossary (or add `/api/workbench/*` ALIAS
   wrappers). Gates: `check:api-routes`(+self-test); `check:trust-boundary-guid` if a new
   route passes a request id into a Dataverse selector.
-- **Phase 4 — One fact-level `/sweep`.** Reconcile docs/memory/wiki after the code/lifecycle
+- **Phase 4 — One fact-level `/sweep`. [DONE S292 2026-06-26: swept `CandidatesPanel`
+  repo-wide — reconciled the filename/symbol to `ReviewerInvitePanel` in current-state wiki,
+  memory, enforcement-contracts/specs, and the build plan; left dated design docs / audits /
+  "SHIPPED SNNN" narratives as point-in-time HISTORICAL records per `.claude/rules/durable-docs.md`.
+  Drift gates re-run green.]** Reconcile docs/memory/wiki after the code/lifecycle
   facts settle (NOT before — a docs-only sweep re-anchors to surviving legacy code names).
   Gates: `check:fact-consistency`, `check:doc-symbol-refs`, `check:build-claim-freshness`,
   `check:agent-wiki` (with self-tests).

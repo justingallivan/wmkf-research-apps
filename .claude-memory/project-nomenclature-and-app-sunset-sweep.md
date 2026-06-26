@@ -1,12 +1,12 @@
 ---
 name: project-nomenclature-and-app-sunset-sweep
-description: "Owner-requested DEFERRED initiative (2026-06-25): a deeper sweep to fix overloaded/stale reviewer-domain nomenclature, sunset legacy apps no longer in use, and reconcile stale memories + wiki entries. Not yet started — a TODO."
+description: "Owner-requested initiative (2026-06-25) to fix overloaded/stale reviewer-domain nomenclature, sunset legacy apps, and reconcile stale memories + wiki. Strategy (S290) + Phases 1-4 EXECUTED S291-S292; authoritative record in docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md. Retained as the historical index."
 metadata:
   node_type: memory
   type: project
   status: active
   scope: repo
-  last_verified: 2026-06-25
+  last_verified: 2026-06-26
 ---
 
 ## Recall Rule
@@ -15,6 +15,19 @@ Read this when planning any reviewer-domain rename, app sunset, or memory/wiki
 cleanup session. This is the owner's parked "deeper sweep" TODO — a candidate
 initiative, NOT green-lit work. Verify live callers before any destructive step
 ([[feedback-verify-before-destructive-carryover]]).
+
+## Status (2026-06-26): Phases 1-4 SHIPPED
+
+Strategy drafted S290; **Phases 1-4 executed S291-S292** — authoritative record:
+`docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md`. Shipped: the `APP_LIFECYCLE_REGISTRY`
++ `ROUTE_NAMESPACE_LIFECYCLE` exports (`shared/config/appRegistry.js`) +
+`docs/NOMENCLATURE_GLOSSARY.md`; the `check:route-lifecycle-auth` +
+`check:scaffolding-tokens` enforcement gates; the legacy Phase II writeup surface
+archived to `_archived/`; the `CandidatesPanel` -> `ReviewerInvitePanel` rename (Phase 2);
+and the Phase 4 doc/memory/wiki reconcile sweep. The borrowed namespaces
+(`/api/reviewer-finder/*`, `/api/review-manager/*`) are intentionally LEAVE+DOCUMENT and
+gated. The "What the owner asked for" notes below are the original 2026-06-25 framing,
+kept for provenance; live status lives in the strategy doc.
 
 ## What the owner asked for (2026-06-25)
 
@@ -25,13 +38,11 @@ legacy apps (**Reviewer Finder** + **Reviewer Manager**) into the single
 1. **Nomenclature.** Legacy/overloaded language causes real routing errors (it
    misled this agent mid-session). Live examples observed 2026-06-25:
    - Tab label **"Invite Reviewers"** (`ReviewersTab.js:42`) is backed by
-     `CandidatesPanel.js`, whose in-panel header still renders **"Candidates (N)"**
-     (`CandidatesPanel.js:187`) — same surface, two user-visible names. (Owner
-     approved keeping the tab label "Invite Reviewers"; a local header fix to match
-     may land with the nearby edit-affordance work — see
-     [[project-workbench-consolidation-rollout]].)
+     `ReviewerInvitePanel.js` (renamed from `CandidatesPanel.js`, S291). Its in-panel
+     header read **"Candidates (N)"** but was fixed to "Invite Reviewers" (S290), so the
+     surface no longer shows two user-visible names. **RESOLVED (S290 header + S291 rename).**
    - Stale comments cite tabs that no longer exist ("Invite"/"Completed" folded into
-     Track Reviewers): `CandidatesPanel.js:11`, `:200`.
+     Track Reviewers): in `ReviewerInvitePanel.js` (formerly `CandidatesPanel.js`).
    - **One app, three API namespaces:** `/api/reviewer-finder/*`,
      `/api/review-manager/*`, `/api/workbench/*`. Consolidation is a question for the
      sweep, not a casual rename (route paths are contracts).
