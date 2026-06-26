@@ -60,6 +60,8 @@ outputs/
 scripts/.smoke-test-candidate.json
 scripts/.grantee-smoke-deliverable.json
 scripts/.merge-probe-altkey.json
+scripts/.merge-probe-412-email.txt
+scripts/.merge-probe-412-personrequest.txt
 .git.nosync
 # iCloud-exclusion artifacts (local-only build/dep dirs)
 *.nosync/

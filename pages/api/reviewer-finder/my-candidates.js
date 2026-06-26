@@ -584,8 +584,30 @@ async function handlePatch(req, res, access) {
     // value so they can decide whether to merge or pick a different email.
     const translated = translateDuplicateKeyError(error);
     if (translated) {
-      console.warn('[my-candidates] duplicate-key on update:', translated);
-      return res.status(409).json(translated);
+      // The 412 carries the duplicate field/value but NOT the conflicting record's
+      // id (verified S290 chunk-5: the error's DuplicateEntity is the row being
+      // written; the existing owner is absent). Resolve the owner by the duplicate
+      // email so chunk-4 merge mode gets the RIGHT loser. Ambiguity-aware: only
+      // attach conflictingRecordId for a single ACTIVE owner — a none/ambiguous/
+      // inactive/lookup-failed result returns null so the modal shows the
+      // duplicate-key message WITHOUT auto-opening a misdirected merge.
+      let conflictingRecordId = null;
+      if (translated.field === 'wmkf_emailaddress' && translated.value) {
+        try {
+          const match = await potentialReviewerAdapter.findByEmailCandidates(translated.value);
+          // Fail-closed: only attach for a single owner whose statecode is an
+          // explicit Active (0). A missing statecode suppresses merge mode rather
+          // than risking a misdirected merge (Codex S290 post-impl V2/V5).
+          if (match.one && typeof match.row?.statecode === 'number' && match.row.statecode === 0) {
+            conflictingRecordId = match.id;
+          }
+        } catch (lookupErr) {
+          console.warn('[my-candidates] conflicting-owner lookup failed:', lookupErr.message);
+        }
+      }
+      const payload = { ...translated, conflictingRecordId };
+      console.warn('[my-candidates] duplicate-key on update:', payload);
+      return res.status(409).json(payload);
     }
     console.error('Update candidate error:', error);
     return res.status(500).json({

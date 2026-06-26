@@ -149,16 +149,28 @@ async function subprobeA(suffix) {
   } catch (e) { err = e; }
   assert(err, 'A1: setting A.email to B\'s email WITHOUT clearing B succeeded — the email alt-key is NOT enforced (would corrupt the merge).');
   log(`  A1 update rejected: status=${err.status}`);
+  // Diagnostic: persist the FULL raw 412 body so the alt-key error shape stays
+  // analysable offline (this is the body that proved conflictingRecordId is NOT in
+  // the 412 — the DuplicateEntity is the row being written, not the owner B).
+  try { fs.writeFileSync(path.join(__dirname, '.merge-probe-412-email.txt'), `expected conflicting record (B) = ${B}\n\n${String(err.message)}`); log(`  (raw 412 body → scripts/.merge-probe-412-email.txt)`); } catch { /* non-fatal */ }
 
   // 2. the REAL error must round-trip through the shared translateDuplicateKeyError
-  //    (the my-candidates 409 path; a miss falls through to an opaque 500).
+  //    (the my-candidates 409 path; a miss falls through to an opaque 500). The 412
+  //    only carries field/value — NOT the conflicting record id.
   const translated = translateDuplicateKeyError(err);
   assert(translated, `A2: real 412 did NOT translate (status=${err.status}). my-candidates would 500. RAW: ${String(err.message).slice(0, 500)}`);
-  assert(
-    norm(translated.conflictingRecordId) === norm(B),
-    `A2: translated.conflictingRecordId=${translated.conflictingRecordId} !== B=${B} — chunk-4 merge mode would not get the conflicting id. RAW: ${String(err.message).slice(0, 500)}`,
-  );
-  log(`  A2 translateDuplicateKeyError ✓ field=${translated.field} value=${translated.value} conflictingRecordId=B`);
+  assert(translated.field === 'wmkf_emailaddress', `A2: translated.field=${translated.field}, expected wmkf_emailaddress. RAW: ${String(err.message).slice(0, 500)}`);
+  assert(norm(translated.value) === norm(eB), `A2: translated.value=${translated.value} !== ${eB}`);
+  log(`  A2 translateDuplicateKeyError ✓ field=${translated.field} value=${translated.value}`);
+
+  // 2b. the conflicting owner is resolved BY VALUE (the route's real path:
+  //     findByEmailCandidates → the single active owner), since the 412 doesn't
+  //     carry it. This is what feeds chunk-4 merge mode's loserId.
+  const match = await potentialReviewer.findByEmailCandidates(eB);
+  assert(match.one, `A2b: findByEmailCandidates(eB) did not resolve a single owner (got ${JSON.stringify(match).slice(0, 200)}).`);
+  assert(norm(match.id) === norm(B), `A2b: resolved owner ${match.id} !== B=${B} — merge mode would target the wrong loser.`);
+  assert((match.row?.statecode ?? 0) === 0, 'A2b: resolved owner B is not active.');
+  log(`  A2b resolve-by-email ✓ findByEmailCandidates(eB) → B (active)`);
 
   // 3. clear-then-set must succeed (the ordering the merge uses).
   await potentialReviewer.clearEmail(B);
@@ -188,6 +200,7 @@ async function subprobeB(suffix, requestId) {
     'B1: repointing into an occupied (person,request) slot SUCCEEDED — the (person,request) alt-key is NOT enforced on a lookup PATCH; the merge\'s delete-collision design would create duplicates.',
   );
   log(`  B1 colliding repoint rejected ✓ status=${err.status}`);
+  try { fs.writeFileSync(path.join(__dirname, '.merge-probe-412-personrequest.txt'), String(err.message)); } catch { /* non-fatal */ }
 
   // 2. free the slot (delete P's row), then the same repoint must succeed.
   const { records: pSugs } = await DynamicsService.queryRecords(SUG_ENTITY, {
