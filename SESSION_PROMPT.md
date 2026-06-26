@@ -71,14 +71,21 @@ Reviewers UX fix, and produced two Codex-reviewed strategy/findings docs.
 
 ## Potential Next Steps
 
-### 1. Execute the nomenclature/app-lifecycle strategy (greenlight-gated)
-`docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md` is the plan. Lowest-risk first
-move is **Commit 1** (additive, zero-risk): add `APP_LIFECYCLE_REGISTRY` +
-`ROUTE_NAMESPACE_LIFECYCLE` exports to `shared/config/appRegistry.js` and seed
-`docs/NOMENCLATURE_GLOSSARY.md`. Do NOT archive anything (Phase 1) without the
-Vercel access-log check for `/phase-ii-writeup-legacy` + `/api/process-legacy`
-first. Honor the consolidated-grant + persisted-key inventory **precondition** in
-§3 before any rename/alias. Owner greenlight needed before starting.
+### 1. Execute the nomenclature/app-lifecycle strategy (IN PROGRESS — S291)
+`docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md` is the plan. **S291 shipped:**
+Commit 1 (additive `APP_LIFECYCLE_REGISTRY` + `ROUTE_NAMESPACE_LIFECYCLE` exports
++ `docs/NOMENCLATURE_GLOSSARY.md`); the enforcement gates `check:route-lifecycle-auth`
++ `check:scaffolding-tokens` (+ a fail-closed scaffolding-token Write/Edit hook);
+and **Phase 1 / Commit 2** — archived `phase-ii-writeup-legacy` + `/api/process-legacy`
++ `proposal-summarizer-legacy` after the owner confirmed the page is invisible to all
+suite users and not in active use (runtime-log retention is ~1 day so logs couldn't
+prove months of non-use). **Remaining:** Phase 2 (rename live internals, e.g.
+`CandidatesPanel` → an Invite-Reviewers name), Phase 3 (document the borrowed
+`/api/reviewer-finder` + `/api/review-manager` namespaces), Phase 4 (fact-level
+`/sweep`). Honor the consolidated-grant + persisted-key inventory **precondition**
+in §3 before any rename/alias. **Parked for discussion:** bookmarks to the old
+`wmkfresearch.vercel.app` domain (vs `applications.wmkeck.org`) "may cause problems"
+— owner wants to talk through those soon.
 
 ### 2. Contact-boundary gap — owner policy decision, then build
 `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` lists the open policy questions

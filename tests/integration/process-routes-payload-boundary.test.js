@@ -30,8 +30,6 @@ import {
   BATCH_PHASE_II_PROPOSAL_MAX_CHARS,
   BATCH_PHASE_I_PROPOSAL_MAX_CHARS,
   PHASE_I_WRITEUP_PROPOSAL_MAX_CHARS,
-  LEGACY_BATCH_SUMMARY_MAX_CHARS,
-  LEGACY_BATCH_EXTRACTION_MAX_CHARS,
 } from '../../lib/utils/ai-payload-boundary';
 
 // Shared scaffolding for all four routes -------------------------------------
@@ -174,76 +172,10 @@ describe('/api/process payload boundary', () => {
 });
 
 // ---------------------------------------------------------------------------
-// /api/process-legacy — asymmetric 15k summary / 10k extraction caps
+// /api/process-legacy was archived to _archived/ in S291 (2026-06-26); its
+// payload-boundary tests were removed with it. The live /api/process,
+// /api/process-phase-i, and /api/process-phase-i-writeup routes remain below.
 // ---------------------------------------------------------------------------
-
-describe('/api/process-legacy payload boundary', () => {
-  test('applies the 15k summary cap and 10k extraction cap independently', async () => {
-    mockedPdfText = makeOverLimit(LEGACY_BATCH_SUMMARY_MAX_CHARS);
-
-    const res = await runRoute(
-      '../../pages/api/process-legacy',
-      { files: [{ filename: 'big.pdf', url: 'https://test.public.blob.vercel-storage.com/big.pdf' }] },
-      ['batch-proposal-summaries']
-    );
-
-    expect(sentUserMessages.length).toBe(2);
-    for (const prompt of sentUserMessages) {
-      expect(prompt).not.toContain('UNSENT_TAIL');
-    }
-
-    // The summary prompt embeds bounded text capped at 15k; the extraction
-    // prompt embeds bounded text capped at 10k. Both markers must appear in
-    // the right calls so we can confirm the asymmetric pattern is preserved.
-    expect(sentUserMessages[0]).toContain(`AI payload boundary: legacy.summary.proposalText`);
-    expect(sentUserMessages[1]).toContain(`AI payload boundary: legacy.extraction.proposalText`);
-
-    const ev = findBoundaryEvent(res);
-    expect(ev?.aiPayloadBoundary).toEqual(expect.objectContaining({
-      source: 'legacy.summary.proposalText',
-      maxChars: LEGACY_BATCH_SUMMARY_MAX_CHARS,
-      transmittedChars: LEGACY_BATCH_SUMMARY_MAX_CHARS,
-      truncated: true,
-    }));
-  });
-
-  test('extraction cap (10k) is honored even when input is just over the smaller cap but under the summary cap', async () => {
-    // Text length between the two caps: extraction is truncated, summary is not.
-    const mid = LEGACY_BATCH_EXTRACTION_MAX_CHARS + 1_000;
-    mockedPdfText = `${'A'.repeat(mid)}UNSENT_TAIL`;
-
-    await runRoute(
-      '../../pages/api/process-legacy',
-      { files: [{ filename: 'mid.pdf', url: 'https://test.public.blob.vercel-storage.com/mid.pdf' }] },
-      ['batch-proposal-summaries']
-    );
-
-    // Summary call: under 15k, sends the tail. Extraction call: must not.
-    expect(sentUserMessages.length).toBe(2);
-    expect(sentUserMessages[0]).toContain('UNSENT_TAIL');
-    expect(sentUserMessages[1]).not.toContain('UNSENT_TAIL');
-    expect(sentUserMessages[1]).toContain('AI payload boundary: legacy.extraction.proposalText');
-  });
-
-  // A7 Part 5: both Claude calls wrap proposal text + carry the preamble.
-  test('wraps proposal text in untrusted-content sentinels with the hardening preamble', async () => {
-    mockedPdfText = `${'A'.repeat(2_000)} proposal body`;
-
-    await runRoute(
-      '../../pages/api/process-legacy',
-      { files: [{ filename: 'leg.pdf', url: 'https://test.public.blob.vercel-storage.com/leg.pdf' }] },
-      ['batch-proposal-summaries']
-    );
-
-    expect(sentUserMessages.length).toBe(2);
-    for (const prompt of sentUserMessages) {
-      expect(prompt).toContain('UNTRUSTED CONTENT RULES:');
-      const open = prompt.match(/\[\[WMKF-UNTRUSTED-CONTENT nonce=([0-9a-f]{24})/);
-      expect(open).not.toBeNull();
-      expect(prompt).toContain(`[[/WMKF-UNTRUSTED-CONTENT nonce=${open[1]}]]`);
-    }
-  });
-});
 
 // ---------------------------------------------------------------------------
 // /api/process-phase-i — Phase I batch summarizer
@@ -360,7 +292,5 @@ describe('payload boundary constants', () => {
     expect(BATCH_PHASE_II_PROPOSAL_MAX_CHARS).toBe(100_000);
     expect(BATCH_PHASE_I_PROPOSAL_MAX_CHARS).toBe(100_000);
     expect(PHASE_I_WRITEUP_PROPOSAL_MAX_CHARS).toBe(100_000);
-    expect(LEGACY_BATCH_SUMMARY_MAX_CHARS).toBe(15_000);
-    expect(LEGACY_BATCH_EXTRACTION_MAX_CHARS).toBe(10_000);
   });
 });

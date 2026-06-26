@@ -1,6 +1,9 @@
 # Nomenclature & App-Lifecycle Cleanup — Strategy
 
-Status: **STRATEGY / PLAN — not an implementation record. No code changed by this doc.**
+Status: **STRATEGY / PLAN with S291 execution annotations.** Commit 1 (lifecycle
+exports + glossary), the enforcement gates, and Phase 1 / Commit 2 (archive of the
+`phase-ii-writeup-legacy` surface) have shipped — see the inline `DONE S291` markers.
+Phases 2–4 remain. Re-confirm live state before executing any remaining phase.
 Codex adversarial review (S290) folded: added the live-cross-cutting bucket, reclassified
 `phase-ii-writeup-legacy` as a sunset-candidate (not orphan), added ALIAS auth-parity +
 consolidated-grant/persisted-key preconditions, Phase 1 gate additions, Phase 2 blast radius,
@@ -163,18 +166,23 @@ live surface.** Run each gate and its `:self-test` sequentially.
 - **Phase 0 — Confirm orphan status.** `rg` inbound refs + Vercel access-log check for
   `/phase-ii-writeup-legacy`, `/api/process-legacy`, `/phase-i-dynamics`,
   `/api/phase-i-dynamics/*`, `/test-email`, `/api/test-email`. Repo evidence: Phase II
-  legacy is a **sunset-candidate (direct-URL legacy), NOT a proven orphan** — an
-  authenticated direct-URL page (`phase-ii-writeup-legacy.js:423`) calling a still-guarded
-  `/api/process-legacy` (`process-legacy.js:20` [VERIFIED]); treat it like the other
-  direct-URL surfaces until access logs prove no use. **`phase-i-dynamics` and `test-email`
-  are live direct-URL/test surfaces — NOT to be archived.** [VERIFIED: `pages/phase-i-dynamics.js:7-16`; `pages/api/test-email.js:1-7,18-23`;
+  legacy WAS a **sunset-candidate (direct-URL legacy)** — an authenticated direct-URL page
+  (now `_archived/pages/phase-ii-writeup-legacy.js:423`) calling a still-guarded
+  `/api/process-legacy` (now `_archived/pages/api/process-legacy.js:20`); the plan was to treat
+  it like the other direct-URL surfaces until access logs prove no use. **[DONE S291 2026-06-26: Vercel
+  runtime-log retention is ~1 day so logs cannot prove months of non-use; owner confirmed the
+  page is invisible to all suite users and not in active use → archived in Phase 1 / Commit 2.]**
+  **`phase-i-dynamics` and `test-email` are live direct-URL/test surfaces — NOT to be archived.** [VERIFIED: `pages/phase-i-dynamics.js:7-16`; `pages/api/test-email.js:1-7,18-23`;
   `docs/API_ROUTE_SECURITY_MATRIX.md:121-122,154`]
 - **Phase 1 — Retire confirmed dead ends.** Concept-Evaluator archive pattern: move
   page/API/prompt to `_archived/`, update `_archived/README.md`, mark API-matrix/docs/tests
-  archived. Start with `phase-ii-writeup-legacy` + `/api/process-legacy` (+ any
-  `proposal-summarizer-legacy` prompt) only if logs confirm. Gates: `check:api-routes`(+self-test);
-  `check:prompt-injection-tagging`(+self-test) — `process-legacy` is registered there
-  (`scripts/check-prompt-injection-tagging.js:128` [VERIFIED]), and the process-route
+  archived. **[DONE S291 2026-06-26: `phase-ii-writeup-legacy` + `/api/process-legacy` +
+  `proposal-summarizer-legacy` prompt archived; `ROUTE_NAMESPACE_LIFECYCLE` entry removed,
+  `APP_LIFECYCLE_REGISTRY` flipped to `deprecated`, canonical counts regenerated (79→78,
+  134→133).]** (Original gating: start with `phase-ii-writeup-legacy` + `/api/process-legacy`
+  (+ the `proposal-summarizer-legacy` prompt) only if logs confirm.) Gates: `check:api-routes`(+self-test);
+  `check:prompt-injection-tagging`(+self-test) — `process-legacy` WAS registered there
+  (entry removed S291; see the archive comment in `scripts/check-prompt-injection-tagging.js`), and the process-route
   payload-boundary tests (`tests/integration/process-routes-payload-boundary.test.js`) +
   `docs/AI_DATA_FLOW_MATRIX.md` must move in the SAME commit; plus `check:doc-symbol-refs`,
   `check:build-claim-freshness`, `check:fact-consistency` if counts move.
@@ -224,8 +232,10 @@ to maintain). If built, ship its fixture self-test first.
    candidates / reviewer-suggestion / Concept Evaluator; wiki index links it. Gates:
    `check:fact-consistency`, `check:doc-symbol-refs`, `check:build-claim-freshness`,
    `check:agent-wiki`(+self-test if wiki touched).
-2. **`Archive Phase II legacy writeup surface`** — precondition: Vercel logs confirm no
-   direct hits. Move `pages/phase-ii-writeup-legacy.js`, `/api/process-legacy`, and any
+2. **`Archive Phase II legacy writeup surface`** — **[DONE S291 2026-06-26. Precondition was
+   "Vercel logs confirm no direct hits"; runtime-log retention is ~1 day so logs could not
+   prove months of non-use — cleared instead by owner confirmation that the page is invisible
+   to all suite users and unused.]** Moved `pages/phase-ii-writeup-legacy.js`, `/api/process-legacy`, and the
    `proposal-summarizer-legacy` prompt to `_archived/`; update `_archived/README.md`,
    API matrix, data-flow matrix, prompt-injection tagging config/tests. Gates:
    `check:api-routes`(+self-test), process-route/prompt-boundary tests, `check:doc-symbol-refs`,
@@ -247,9 +257,10 @@ to maintain). If built, ship its fixture self-test first.
   one app, three namespaces; plus `shared/components/reviewers/*` and many `lib/services/*`.
   (Per-namespace file counts via `find pages/api/<ns> -name '*.js' | wc -l`; not pinned here,
   to avoid drift against the canonical `api-route-file-count` fact.)
-- Orphan candidates: `phase-ii-writeup-legacy` (**sunset-candidate / direct-URL legacy — NOT
-  a proven orphan**, log-check pending); `phase-i-dynamics` + `test-email` (NOT orphans — live
-  direct-URL/test surfaces); plus the live-cross-cutting `field-primer` (recognize & skip).
+- Orphan candidates: `phase-ii-writeup-legacy` (**ARCHIVED S291 2026-06-26** — owner confirmed
+  it is invisible to all suite users and not in active use; page + `/api/process-legacy` +
+  `proposal-summarizer-legacy` prompt moved to `_archived/`); `phase-i-dynamics` + `test-email`
+  (NOT orphans — live direct-URL/test surfaces); plus the live-cross-cutting `field-primer` (recognize & skip).
 - Deprecation precedent: Concept Evaluator — removed from registry and archived to `_archived/`
   [VERIFIED: `_archived/README.md:15-17`]; the grants-retained decision is documented in the
   `appRegistry.js:9-14` comment [VERIFIED]. (The `project-app-roadmap-2026-04-25` memory is

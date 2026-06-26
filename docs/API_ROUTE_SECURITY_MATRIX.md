@@ -122,7 +122,6 @@ There are no open findings from the initial matrix pass as of this update. New f
 | `/api/phase-i-dynamics/summarize-v2` | POST | App | `requireAppAccess('batch-phase-i-summaries')` | App-wide request ID writeback | Updates target field on subject entity, writes `wmkf_ai_run` (DV) via execute-prompt; `api_usage_log` (PG) | Medium | Shared executor path; policy checkpoint for who may target records. |
 | `/api/process` | POST | App | `requireAppAccess('batch-proposal-summaries', 'phase-ii-writeup')` | Request payload | Writes `api_usage_log` (PG) via llm-client | Low | AI payload review. |
 | `/api/process-expenses` | POST | App | `requireAppAccess('expense-reporter')` | Request payload | Writes `api_usage_log` (PG) via llm-client | Low | File/data minimization review. |
-| `/api/process-legacy` | POST | App | `requireAppAccess('batch-proposal-summaries', 'phase-ii-writeup')` | Request payload | Writes `api_usage_log` (PG) via llm-client | Low | Legacy route; consider retirement date. |
 | `/api/process-peer-reviews` | POST | App | `requireAppAccess('peer-review-summarizer')` | Request payload | Writes `api_usage_log` (PG) via llm-client | Low | AI payload review. |
 | `/api/process-phase-i` | POST | App | `requireAppAccess('batch-phase-i-summaries')` | Request payload | Writes `api_usage_log` (PG) via llm-client | Low | AI payload review. |
 | `/api/process-phase-i-writeup` | POST | App | `requireAppAccess('phase-i-writeup')` | Request payload | Writes `api_usage_log` (PG) via llm-client | Low | AI payload review. |

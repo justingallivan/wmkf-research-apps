@@ -124,22 +124,9 @@ const SURFACES = [
     ],
     callSiteFiles: ['pages/api/process.js'],
   },
-  {
-    id: 'process-legacy',
-    inv: 4,
-    status: 'migrated',
-    promptFiles: ['shared/config/prompts/proposal-summarizer-legacy.js'],
-    callSiteFiles: ['pages/api/process-legacy.js'],
-    // The summary/extraction builders self-carry the preamble and are called
-    // by process-legacy.js; the refinement/Q&A builders are exported but wired
-    // to no live route (noCallSite).
-    builders: [
-      'createSummarizationPrompt',
-      'createStructuredDataExtractionPrompt',
-      { name: 'createRefinementPrompt', noCallSite: true },
-      { name: 'createQAPrompt', noCallSite: true },
-    ],
-  },
+  // process-legacy (page + /api/process-legacy + proposal-summarizer-legacy prompt)
+  // archived to _archived/ in S291 (2026-06-26) — removed from the active
+  // prompt-injection surface registry.
   {
     id: 'qa',
     inv: 5,

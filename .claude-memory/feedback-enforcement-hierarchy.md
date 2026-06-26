@@ -18,7 +18,9 @@ recurring".
 The trap (S291): nomenclature Commit 1 hand-wrote
 `ROUTE_NAMESPACE_LIFECYCLE['/api/process-legacy'].ownerAppKey` from inference; it
 was wrong (overloaded ownership with the auth grant), yet ALL green gates passed
-because no gate compared the claim to source. A PreToolUse self-trace hook even
+because no gate compared the claim to source. (The `/api/process-legacy` route was
+later archived in S291 Commit 2, so that exact entry no longer exists — the lesson
+stands on the incident, not the live entry.) A PreToolUse self-trace hook even
 fired telling me to trace it first — it is fail-open (`|| true` in
 `.claude/settings.json`), so it nagged and I proceeded. An advisory/fail-open hook
 is NOT enforcement: it routes through my judgment, the exact thing that failed.
