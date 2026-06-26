@@ -3,7 +3,7 @@
  */
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import CandidatesPanel from '../../shared/components/reviewers/CandidatesPanel';
+import ReviewerInvitePanel from '../../shared/components/reviewers/ReviewerInvitePanel';
 import { readSseStream } from '../../shared/components/reviewers/sse';
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -87,11 +87,11 @@ afterEach(() => {
   window.confirm.mockRestore();
 });
 
-describe('CandidatesPanel invitation capture rehearsal', () => {
+describe('ReviewerInvitePanel invitation capture rehearsal', () => {
   test('selects a candidate, sends through the modal, and shows the captured artifact', async () => {
     const onRefresh = jest.fn();
     render(
-      <CandidatesPanel
+      <ReviewerInvitePanel
         requestId="REQ-1"
         candidates={[candidate]}
         onRefresh={onRefresh}

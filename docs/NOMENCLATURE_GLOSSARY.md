@@ -75,11 +75,11 @@ legacy-live | deprecated | ambiguous | direct-url-test`. `migrationDecision` ∈
 - **ownerAppKey:** `reviewers`
 - **successorKey:** —
 - **surfaceType:** component
-- **currentPaths:** `shared/components/reviewers/CandidatesPanel.js` (the Invite Reviewers tab); `/api/reviewer-finder/my-candidates`
+- **currentPaths:** `shared/components/reviewers/ReviewerInvitePanel.js` (the Invite Reviewers tab; renamed from `CandidatesPanel.js` S291); `/api/reviewer-finder/my-candidates`
 - **allowedUse:** In NEW user-facing copy use "Invite Reviewers" for the tab. "Candidate" remains acceptable for an individual potential-reviewer record.
-- **forbiddenUse:** Don't use "Candidates" as the tab title in new UI (the S290 header is already "Invite Reviewers"). Don't rename the `my-candidates` route path or the persisted preference keys.
-- **migrationDecision:** RENAME (component/UI text only; planned Phase 2 — `CandidatesPanel.js` → an Invite-Reviewers name. Route path stays.)
-- **notes:** Overloaded: the word refers to (a) potential-reviewer data records, (b) the "Invite Reviewers" tab UI (`CandidatesPanel`), and (c) the `my-candidates` route. Only the component/UI-text sense is safely renameable.
+- **forbiddenUse:** Don't use "Candidates" as the tab title in new UI (the S290 header is already "Invite Reviewers"). Don't rename the `my-candidates` route path, the `?sub=candidates` deep-link / tab key, or the persisted preference keys.
+- **migrationDecision:** RENAME — **DONE S291**: `CandidatesPanel.js` → `ReviewerInvitePanel.js` (component file + symbol only). The route path, the sub-tab key `candidates`, and the `?sub=candidates` deep-link are contracts and stay.
+- **notes:** Overloaded: the word refers to (a) potential-reviewer data records, (b) the "Invite Reviewers" tab UI (`ReviewerInvitePanel`, formerly `CandidatesPanel`), and (c) the `my-candidates` route + `?sub=candidates` tab key. Only the component file/symbol sense was renamed; the rest are contracts.
 - **lastVerified:** 2026-06-26
 
 ## reviewer-suggestion

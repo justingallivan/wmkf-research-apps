@@ -45,7 +45,7 @@ Run the invitation/capture unit and integration coverage:
 
 ```bash
 npm test -- --runTestsByPath \
-  tests/unit/candidates-panel-invite-capture.test.js \
+  tests/unit/reviewer-invite-panel-invite-capture.test.js \
   tests/unit/invite-email-modal-capture.test.js \
   tests/integration/send-emails-route.test.js \
   --runInBand
@@ -247,7 +247,7 @@ Do not run capture mode in Vercel Production. For production, the smoke check sh
 
 | Surface | Test |
 |---|---|
-| Workbench candidate selection -> invitation modal -> captured artifact | `tests/unit/candidates-panel-invite-capture.test.js` |
+| Workbench candidate selection -> invitation modal -> captured artifact | `tests/unit/reviewer-invite-panel-invite-capture.test.js` |
 | Invitation modal capture result rendering | `tests/unit/invite-email-modal-capture.test.js` |
 | Send route capture mode and production refusal | `tests/integration/send-emails-route.test.js` |
 | Program Director reviewer-engagement rehearsal: captured invite, campaign settings, release to reviewers, no-longer-needed withdraw | `tests/e2e/program-director-invite.spec.js` |

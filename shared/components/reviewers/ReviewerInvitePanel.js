@@ -1,5 +1,7 @@
 /**
- * CandidatesPanel — the Workbench "Invite Reviewers" sub-tab. The persistent roster of
+ * ReviewerInvitePanel — the Workbench "Invite Reviewers" sub-tab (was CandidatesPanel;
+ * renamed S291. The sub-tab key `candidates` / `?sub=candidates` deep-link is unchanged).
+ * The persistent roster of
  * every saved candidate for a request (applicant-recommended + search-found),
  * with their invitation status, and the surface to actually INVITE them.
  *
@@ -67,7 +69,7 @@ function candidateContactPageUrl(c) {
   return facultyPageUrl || c.website;
 }
 
-export default function CandidatesPanel({ requestId, candidates = [], removedCandidates = [], loading = false, onRefresh, settings = {}, canManage = true }) {
+export default function ReviewerInvitePanel({ requestId, candidates = [], removedCandidates = [], loading = false, onRefresh, settings = {}, canManage = true }) {
   const [selected, setSelected] = useState(() => new Set());
   const [modal, setModal] = useState(null); // { candidates, allowResend } | null
   const [editing, setEditing] = useState(null); // candidate row being edited | null

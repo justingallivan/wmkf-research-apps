@@ -347,7 +347,7 @@ def build_tech():
 
     section_slide(prs, "7", SPINE[6])
     content_slide(prs, "STEP 7", "Reviewers · Candidates (+ invite)", [
-        "Component: CandidatesPanel.js; roster from /api/reviewer-finder/my-candidates?requestId=.",
+        "Component: ReviewerInvitePanel.js; roster from /api/reviewer-finder/my-candidates?requestId=.",
         "Candidate detail maps off the person row wmkf_potentialreviewers (bibliometrics folded on; sidecar dropped S213).",
         "Invite → InviteEmailModal → render-emails / send-emails with templateType:'invitation'.",
         "S277: the manual \"Re-invite already-invited\" button was REMOVED;",

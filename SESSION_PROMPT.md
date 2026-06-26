@@ -79,10 +79,11 @@ Commit 1 (additive `APP_LIFECYCLE_REGISTRY` + `ROUTE_NAMESPACE_LIFECYCLE` export
 and **Phase 1 / Commit 2** — archived `phase-ii-writeup-legacy` + `/api/process-legacy`
 + `proposal-summarizer-legacy` after the owner confirmed the page is invisible to all
 suite users and not in active use (runtime-log retention is ~1 day so logs couldn't
-prove months of non-use). **Remaining:** Phase 2 (rename live internals, e.g.
-`CandidatesPanel` → an Invite-Reviewers name), Phase 3 (document the borrowed
-`/api/reviewer-finder` + `/api/review-manager` namespaces), Phase 4 (fact-level
-`/sweep`). Honor the consolidated-grant + persisted-key inventory **precondition**
+prove months of non-use); and Phase 2 (renamed `CandidatesPanel` → `ReviewerInvitePanel`;
+route path + `?sub=candidates` tab key left as contracts). **Remaining:** Phase 3 (document
+the borrowed `/api/reviewer-finder` + `/api/review-manager` namespaces), Phase 4 (fact-level
+`/sweep` — also reconciles the ~20 historical `docs/` design docs that still say
+`CandidatesPanel`). Honor the consolidated-grant + persisted-key inventory **precondition**
 in §3 before any rename/alias. **Parked for discussion:** bookmarks to the old
 `wmkfresearch.vercel.app` domain (vs `applications.wmkeck.org`) "may cause problems"
 — owner wants to talk through those soon.
@@ -120,7 +121,7 @@ acting, and retire if already done/blocked:
 
 | File | Purpose |
 |------|---------|
-| `shared/components/reviewers/CandidatesPanel.js` | Invite Reviewers tab — edit button + no-email guard (S290). |
+| `shared/components/reviewers/ReviewerInvitePanel.js` | Invite Reviewers tab (renamed from `CandidatesPanel.js` S291) — edit button + no-email guard (S290). |
 | `lib/dataverse/duplicate-key.js` | `translateDuplicateKeyError` (field/value only); shared by route + probe. |
 | `pages/api/reviewer-finder/my-candidates.js` | PATCH 409 resolves conflicting owner by email, fail-closed on statecode. |
 | `scripts/probe-merge-altkey-ordering.mjs` | Non-mocked prod alt-key/merge probe (O8). `--run` against throwaway rows. |

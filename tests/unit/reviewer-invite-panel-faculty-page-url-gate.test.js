@@ -3,7 +3,7 @@
  */
 
 import { render, screen } from '@testing-library/react';
-import CandidatesPanel from '../../shared/components/reviewers/CandidatesPanel';
+import ReviewerInvitePanel from '../../shared/components/reviewers/ReviewerInvitePanel';
 
 jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
@@ -15,10 +15,10 @@ jest.mock('../../shared/components/reviewers/CandidateEditModal', () => function
   return null;
 });
 
-describe('CandidatesPanel — facultyPageUrl document gate', () => {
+describe('ReviewerInvitePanel — facultyPageUrl document gate', () => {
   test('does not render a PDF facultyPageUrl as a clickable fallback', () => {
     render(
-      <CandidatesPanel
+      <ReviewerInvitePanel
         requestId="REQ-1"
         candidates={[{
           suggestionId: 'S1',

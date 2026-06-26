@@ -186,12 +186,17 @@ live surface.** Run each gate and its `:self-test` sequentially.
   payload-boundary tests (`tests/integration/process-routes-payload-boundary.test.js`) +
   `docs/AI_DATA_FLOW_MATRIX.md` must move in the SAME commit; plus `check:doc-symbol-refs`,
   `check:build-claim-freshness`, `check:fact-consistency` if counts move.
-- **Phase 2 — Rename live internals (RENAME bucket).** e.g. `CandidatesPanel.js` → an
-  Invite-Reviewers component name. **Blast radius (S290 review) — all move in the same
-  commit:** direct test imports (`tests/unit/candidates-panel-*.test.js`), the tab import
-  (`ReviewersTab.js:34`), onboarding decks (`docs/onboarding/build_workbench_decks.py`), the
-  memory router (`.claude-memory/MEMORY.md:66`), and any wiki refs. Leave
-  `/api/reviewer-finder/my-candidates` etc. untouched. Gates: reviewer-tab unit/integration
+- **Phase 2 — Rename live internals (RENAME bucket). [DONE S291 2026-06-26.]**
+  `CandidatesPanel.js` → `ReviewerInvitePanel.js` (fits the `ReviewerFindPanel`/`ReviewerManagePanel`
+  sibling convention). Moved in the same commit: the two unit tests (renamed to
+  `tests/unit/reviewer-invite-panel-*.test.js`), the tab import + JSX in `ReviewersTab.js`, the
+  onboarding deck (`docs/onboarding/build_workbench_decks.py`), the glossary, and the strategy
+  + handoff docs. **Left untouched (contracts):** `/api/reviewer-finder/my-candidates`, the
+  sub-tab key `candidates`, and the `?sub=candidates` deep-link. **Deferred to the Phase 4
+  `/sweep`:** the bare-symbol `CandidatesPanel` mentions in `.claude-memory` + `docs/agent-wiki`
+  (NOT path-scanned by `check:doc-symbol-refs`, so they don't break a gate) and the ~20
+  historical `docs/` design docs that record the old name. (MEMORY.md router has no
+  CandidatesPanel ref; the earlier `:66` citation was stale.) Gates: reviewer-tab unit/integration
   tests, `check:doc-symbol-refs`, `check:build-claim-freshness`, `check:agent-wiki`.
 - **Phase 3 — Document borrowed namespaces.** LEAVE+DOCUMENT the legacy route namespaces in
   `docs/API_ROUTE_SECURITY_MATRIX.md` + the glossary (or add `/api/workbench/*` ALIAS
@@ -240,10 +245,12 @@ to maintain). If built, ship its fixture self-test first.
    API matrix, data-flow matrix, prompt-injection tagging config/tests. Gates:
    `check:api-routes`(+self-test), process-route/prompt-boundary tests, `check:doc-symbol-refs`,
    `check:build-claim-freshness`.
-3. **`Rename Workbench invite-reviewers internals`** — rename `CandidatesPanel.js` to an
-   Invite-Reviewers name; update in-repo imports/tests/docs; leave reviewer route paths
-   untouched. Gates: reviewer-tab tests, `check:doc-symbol-refs`, `check:build-claim-freshness`,
-   `check:agent-wiki` if wiki path refs change.
+3. **`Rename Workbench invite-reviewers internals`** — **[DONE S291 2026-06-26]** renamed
+   `CandidatesPanel.js` → `ReviewerInvitePanel.js`; updated in-repo imports/tests/deck + the
+   glossary/strategy/handoff docs; left reviewer route paths + the `candidates` tab key /
+   `?sub=candidates` deep-link untouched. Descriptive memory/wiki + historical `docs/` mentions
+   deferred to the Phase 4 `/sweep`. Gates green: reviewer-tab tests, `check:doc-symbol-refs`,
+   `check:build-claim-freshness`, `check:agent-wiki`.
 
 ---
 

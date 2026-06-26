@@ -31,7 +31,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import ReviewerManagePanel from './ReviewerManagePanel';
 import ReviewerFindPanel from './ReviewerFindPanel';
-import CandidatesPanel from './CandidatesPanel';
+import ReviewerInvitePanel from './ReviewerInvitePanel';
 import EmailTemplatesModal from './EmailTemplatesModal';
 import CampaignConfigModal from './CampaignConfigModal';
 import { SubTabBadge } from './SubTabBadges';
@@ -227,7 +227,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           onSaved={refreshAll}
         />
       ) : current === 'candidates' ? (
-        <CandidatesPanel
+        <ReviewerInvitePanel
           requestId={requestId}
           candidates={candidates}
           removedCandidates={removedCandidates}
