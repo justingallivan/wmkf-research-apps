@@ -5,11 +5,8 @@ Grounded in source read this session:
 - Shell: pages/workbench/[requestId].js (query-string ?tab=&sub= routing; RequireAppAccess 'reviewers')
 - Live tabs: Overview, Proposal, Reviewers, Reviews, Status, Awardee (4 lifecycle tabs are placeholders)
 - Reviewers sub-tabs: Find, Invite Reviewers, Track Reviewers (collapsed S280 from 5: Find, Candidates, Invite, Track, Completed)
-
-NOTE (2026-06-26): the STEP 7 / STEP 11 slide titles + the Invite/Track sub-tab bullets
-below still reflect the pre-S280 5-sub-tab funnel (Candidates / Invite / Track / Completed).
-They need a content pass to the 3 sub-tabs above (+ a deck regen); the source-grounding
-notes here and the architecture-slide live-tab/sub-tab counts are current.
+  - Invite Reviewers = the old Candidates tab (save shortlist + send invitations).
+  - Track Reviewers = the old Invite + Completed sub-tabs (release materials, monitor, completion).
 """
 import os
 from pptx import Presentation
@@ -120,13 +117,13 @@ SPINE = [
     "Overview tab — the command center",
     "Proposal tab",
     "Reviewers · Find",
-    "Reviewers · Candidates (and inviting)",
+    "Reviewers · Invite Reviewers",
     "Campaign settings",
     "Sending the invitation",
     "What the reviewer sees",
-    "Reviewers · Invite & Track",
+    "Reviewers · Track Reviewers",
     "Quota & winding down",
-    "Reviewers · Completed",
+    "Reviewers · Track Reviewers (completion)",
     "Status tab",
     "Awardee tab — grantee deliverables",
 ]
@@ -169,10 +166,10 @@ def build_pd():
 
     section_slide(prs, "3", SPINE[2])
     content_slide(prs, "STEP 3", "The tab strip", [
-        "Five tabs are live today:",
-        (1, "Overview · Proposal · Reviewers · Status · Awardee"),
-        "Five more are placeholders for the rest of the request lifecycle:",
-        (1, "Initial Writeup · Reviews · Pre/Site Visit · Final Writeup — they say \"coming in a later update.\""),
+        "Six tabs are live today:",
+        (1, "Overview · Proposal · Reviewers · Reviews · Status · Awardee"),
+        "Four more are placeholders for the rest of the request lifecycle:",
+        (1, "Initial Writeup · Pre Site Visit · Site Visit · Final Writeup — they say \"coming in a later update.\""),
         "You'll spend most of your time on the Reviewers tab.",
     ])
 
@@ -203,8 +200,8 @@ def build_pd():
     ])
 
     section_slide(prs, "7", SPINE[6])
-    content_slide(prs, "STEP 7", "Reviewers · Candidates (and inviting)", [
-        "Your saved shortlist for this request, with the detail you need to decide:",
+    content_slide(prs, "STEP 7", "Reviewers · Invite Reviewers", [
+        "Your saved shortlist for this request — this is where you invite (the tab was renamed from \"Candidates\"):",
         (1, "Why they fit, h-index/citations, expertise keywords, Scholar/ORCID/website links."),
         "Select candidates and click Send invitation to invite the ones not yet invited.",
         "Heads-up — there is no longer a \"Re-invite\" button:",
@@ -237,9 +234,9 @@ def build_pd():
     ])
 
     section_slide(prs, "11", SPINE[10])
-    content_slide(prs, "STEP 11", "Reviewers · Invite & Track", [
-        "Invite sub-tab — accepted reviewers awaiting materials; use Release to reviewers to send the proposal.",
-        "Track sub-tab — reviewers in flight, from materials sent through review received.",
+    content_slide(prs, "STEP 11", "Reviewers · Track Reviewers", [
+        "Accepted reviewers live here — use Release to reviewers to send the proposal to those awaiting materials.",
+        "Track everyone in flight, from materials sent through review received (this one tab absorbed the old Invite and Completed sub-tabs).",
         "The system chases for you:",
         (1, "Respond-by reminder nudges invitees who haven't replied."),
         (1, "Review-due reminder nudges accepted reviewers who haven't submitted."),
@@ -254,9 +251,9 @@ def build_pd():
     ])
 
     section_slide(prs, "13", SPINE[12])
-    content_slide(prs, "STEP 13", "Reviewers · Completed", [
-        "Reviewers whose review is in.",
-        "Your end-state view of the panel for this request.",
+    content_slide(prs, "STEP 13", "Reviewers · Track Reviewers (completion)", [
+        "Completed reviewers (review returned) show within Track Reviewers — there is no separate Completed tab anymore.",
+        "Marking a review complete is record-keeping only; nothing auto-pays or drops the row off.",
     ])
 
     section_slide(prs, "14", SPINE[13])
@@ -351,7 +348,7 @@ def build_tech():
     ])
 
     section_slide(prs, "7", SPINE[6])
-    content_slide(prs, "STEP 7", "Reviewers · Candidates (+ invite)", [
+    content_slide(prs, "STEP 7", "Reviewers · Invite Reviewers", [
         "Component: ReviewerInvitePanel.js; roster from /api/reviewer-finder/my-candidates?requestId=.",
         "Candidate detail maps off the person row wmkf_potentialreviewers (bibliometrics folded on; sidecar dropped S213).",
         "Invite → InviteEmailModal → render-emails / send-emails with templateType:'invitation'.",
@@ -386,7 +383,7 @@ def build_tech():
     ])
 
     section_slide(prs, "11", SPINE[10])
-    content_slide(prs, "STEP 11", "Invite & Track + token TTL + reminders", [
+    content_slide(prs, "STEP 11", "Track Reviewers + token TTL + reminders", [
         "Release/materials send mints a long-lived token (~review-due + 90d); only accepted reviewers receive it.",
         "Non-responder/invite links cap at review-due + grace (lib/external/reviewer-token-ttl.js via render-emails).",
         "Reminders cron: /api/cron/reviewer-reminders (daily) → lib/services/reviewer-reminder-sweep.js.",
@@ -402,9 +399,9 @@ def build_tech():
         (1, "writes withdrawn_sufficient + wmkf_withdrawnsufficientat on still-pending rows only; clears the respond marker."),
     ])
 
-    section_slide(prs, "13-14", "Completed & Status")
-    content_slide(prs, "STEPS 13-14", "Completed list & Status reflection", [
-        "Completed: reviews returned (review-manager reviewers feed; wmkf_accepted lifecycle).",
+    section_slide(prs, "13-14", "Completion (in Track Reviewers) & Status")
+    content_slide(prs, "STEPS 13-14", "Completed reviews & Status reflection", [
+        "Completed reviews show within Track Reviewers (no separate Completed tab): reviews returned via the review-manager reviewers feed; wmkf_accepted lifecycle.",
         "StatusTab.js: read-only reflection of akoya_requeststatus.",
         (1, "statusClass derived via the value->class map in lib/services/dataverse-export/constants.js."),
         (1, "Unknown status -> UNCLASSIFIED, shown raw (never coerced). Workbench never writes status."),

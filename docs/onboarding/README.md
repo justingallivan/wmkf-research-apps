@@ -24,13 +24,13 @@ Technical = what's under the hood).
 4. Overview tab — the command center
 5. Proposal tab
 6. Reviewers · Find
-7. Reviewers · Candidates (and inviting)
+7. Reviewers · Invite Reviewers
 8. Campaign settings
 9. Sending the invitation
 10. What the reviewer sees (external portal)
-11. Reviewers · Invite & Track
+11. Reviewers · Track Reviewers
 12. Quota & winding down
-13. Reviewers · Completed
+13. Reviewers · Track Reviewers (completion)
 14. Status tab
 15. Awardee tab — grantee deliverables
 
@@ -50,7 +50,9 @@ place. Close the files in PowerPoint first, or the write can collide with the op
 
 ## Grounding / source of truth
 
-Deck content was read from source during the authoring session (S277), not memory:
+Deck content was read from source during the authoring session (S277), not memory; refreshed
+2026-06-26 for the S280 3-sub-tab collapse (Find · Invite Reviewers · Track Reviewers) and the
+now-live Reviews tab:
 
 - Shell + tab strip: `pages/workbench/[requestId].js` — live tabs are **Overview, Proposal,
   Reviewers, Reviews, Status, Awardee**; the other four lifecycle tabs render a "coming in a later
@@ -58,7 +60,7 @@ Deck content was read from source during the authoring session (S277), not memor
 - Reviewers sub-tabs: `shared/components/reviewers/ReviewersTab.js` — Find · Invite
   Reviewers · Track Reviewers (collapsed S280 from 5: Find · Candidates · Invite · Track ·
   Completed).
-- Tab components: `OverviewTab.js`, `ProposalTab.js`, `StatusTab.js`, `AwardeeTab.js`.
+- Tab components: `OverviewTab.js`, `ProposalTab.js`, `ReviewsTab.js`, `StatusTab.js`, `AwardeeTab.js`.
 - Reviewer engagement (campaign config, reminders, token TTL, quota, withdraw):
   `docs/REVIEWER_ENGAGEMENT_SPEC.md` (IMPLEMENTED, all four phases LIVE S275) and the
   `docs/atlas/dataverse-*` pages.
@@ -75,7 +77,7 @@ when resumed:
 1. Extend the safe rehearsal harness (`scripts/rehearse-pd-invite-browser.mjs` + Playwright)
    to mock the not-yet-covered tab endpoints — Overview (`/api/workbench/reviewer-rollup`),
    Proposal (`/api/workbench/proposal-documents`), Status, Awardee
-   (`/api/workbench/grantee-deliverables/*`). The Reviewers→Candidates flow and the reviewer
+   (`/api/workbench/grantee-deliverables/*`). The Reviewers→Invite Reviewers flow and the reviewer
    portal are already mocked.
 2. Navigate each tab/sub-tab and capture PNGs.
 3. Replace the text-only step slides in the PD deck with screenshot + caption (decide whether
