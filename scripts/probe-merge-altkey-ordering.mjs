@@ -268,34 +268,48 @@ async function teardownPerson(personId) {
   }
 }
 
+// Returns { clean, leftover, remaining }. Suggestions are deleted ONLY inside the
+// marker-gated teardownPerson (which deletes them BEFORE the person, so they're
+// gone even when a person delete later fails) — there is NO delete-suggestion-by-id
+// path, which would lack the marker gate (Codex S290 post-impl Q2/R-S2). Recorded
+// suggestion ids are kept for debugging only, never used to delete.
 async function cleanup(personOverride) {
   STATE = readState();
   const targets = personOverride ? [personOverride] : STATE.persons.map((p) => p.id);
-  if (!targets.length) { log('No recorded probe rows — nothing to clean.'); return; }
+  if (!targets.length) { log('No recorded probe rows — nothing to clean.'); return { clean: true, leftover: [], remaining: [] }; }
   const leftover = [];
   for (const id of targets) {
     const r = await teardownPerson(id);
     if (!r.deleted) leftover.push(r);
   }
-  // Tolerate already-gone suggestion ids (e.g. the merge-deleted collision row).
-  for (const s of STATE.suggestions) {
+  // Post-cleanup read-back (Codex S290 post-impl Q5c): prove no suggestions remain
+  // for any recorded synthetic person. A non-empty result means cleanup did NOT
+  // fully succeed (teardown deletes them, so this should be zero).
+  const remaining = [];
+  for (const id of targets) {
     try {
-      await DynamicsService.getRecord(SUG_ENTITY, s.id, { select: 'wmkf_appreviewersuggestionid' });
-      // Still present and not caught above (its person may already be gone) — delete by id.
-      await DynamicsService.deleteRecord(SUG_ENTITY, s.id);
-      log(`  deleted stray suggestion ${s.id}`);
-    } catch { /* 404 / already deleted — fine */ }
+      const { records } = await DynamicsService.queryRecords(SUG_ENTITY, {
+        select: 'wmkf_appreviewersuggestionid', filter: `_wmkf_potentialreviewer_value eq ${id}`, top: 5,
+      });
+      if (records.length) remaining.push({ id, count: records.length });
+    } catch { /* read error — don't claim clean; surfaced below if leftover too */ }
   }
-  if (leftover.length) {
-    STATE.persons = STATE.persons.filter((p) => leftover.some((l) => l.id === p.id));
-    STATE.suggestions = [];
-    writeState(STATE);
-    log(`\n⚠ Cleanup PARTIAL: ${leftover.length} person row(s) could not be deleted — left in state for retry:`);
-    for (const l of leftover) log(`    ${l.id} — ${l.error}`);
-    return;
+  const clean = leftover.length === 0 && remaining.length === 0;
+  if (clean) {
+    if (personOverride) { STATE.persons = STATE.persons.filter((p) => p.id !== personOverride); writeState(STATE); }
+    else writeState({ persons: [], suggestions: [] });
+    log('\nCleanup complete (verified: no probe persons or suggestions remain). State cleared.');
+    return { clean: true, leftover: [], remaining: [] };
   }
-  writeState({ persons: [], suggestions: [] });
-  log('\nCleanup complete. State file cleared.');
+  // PARTIAL — retain the unresolved persons in state for a retry.
+  const keepIds = new Set([...leftover.map((l) => l.id), ...remaining.map((r) => r.id)]);
+  STATE.persons = STATE.persons.filter((p) => keepIds.has(p.id));
+  writeState(STATE);
+  log('\n⚠ Cleanup PARTIAL — left in state for retry:');
+  for (const l of leftover) log(`    person ${l.id} could not be deleted — ${l.error}`);
+  for (const r of remaining) log(`    person ${r.id} still has ${r.count} suggestion(s)`);
+  log(`  Retry: node scripts/probe-merge-altkey-ordering.mjs cleanup  (state: ${STATE_PATH})`);
+  return { clean: false, leftover, remaining };
 }
 
 // ───────── run ─────────
@@ -313,6 +327,7 @@ async function run(keep) {
   const requestId = await resolveTestRequest();
   log(`Test request ${TEST_REQUEST_NUM} → ${requestId}\nRun suffix: ${suffix}`);
   const results = [];
+  let cleanupResult = null;
   const probes = [['A', () => subprobeA(suffix)], ['B', () => subprobeB(suffix, requestId)], ['C', () => subprobeC(suffix, requestId)]];
   try {
     for (const [name, fn] of probes) {
@@ -325,21 +340,30 @@ async function run(keep) {
       log('  Tear down with: node scripts/probe-merge-altkey-ordering.mjs cleanup');
     } else {
       log('\n── cleanup ──');
-      try { await cleanup(null); } catch (e) { log(`⚠ cleanup error: ${e.message} — run \`cleanup\` manually (state: ${STATE_PATH}).`); }
+      try { cleanupResult = await cleanup(null); }
+      catch (e) { cleanupResult = { clean: false, error: e.message }; log(`⚠ cleanup error: ${e.message} — run \`cleanup\` manually (state: ${STATE_PATH}).`); }
     }
   }
   log('\n══ SUMMARY ══');
   for (const r of results) log(`  ${r.pass ? '✓ PASS' : '✗ FAIL'}  ${r.name}${r.error ? ` — ${r.error}` : ''}`);
   const failed = results.filter((r) => !r.pass);
-  if (failed.length) { log(`\n${failed.length} sub-probe(s) FAILED.`); process.exit(1); }
-  log('\nAll sub-probes passed — real Dataverse alt-key ordering confirmed (O8).');
+  // A partial cleanup leaving prod rows is itself a failure, even if every sub-probe
+  // passed (Codex S290 post-impl Q6) — do not exit 0 with rows still in prod.
+  const cleanupFailed = !keep && cleanupResult && !cleanupResult.clean;
+  if (failed.length || cleanupFailed) {
+    if (failed.length) log(`\n${failed.length} sub-probe(s) FAILED.`);
+    if (cleanupFailed) log('\n⚠ Cleanup did NOT fully complete — prod rows may remain. Run `cleanup`.');
+    process.exit(1);
+  }
+  log('\nAll sub-probes passed and cleanup verified — real Dataverse alt-key ordering confirmed (O8).');
 }
 
 const args = process.argv.slice(2);
 try {
   if (args[0] === 'cleanup') {
     const pIdx = args.indexOf('--person');
-    await bypassDynamicsRestrictions('probe-merge-altkey', () => cleanup(pIdx >= 0 ? args[pIdx + 1] : null));
+    const res = await bypassDynamicsRestrictions('probe-merge-altkey', () => cleanup(pIdx >= 0 ? args[pIdx + 1] : null));
+    if (res && !res.clean) process.exit(1);
   } else if (args.includes('--run')) {
     await bypassDynamicsRestrictions('probe-merge-altkey', () => run(args.includes('--keep')));
   } else {
