@@ -67,6 +67,13 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   one-off gated on the Power-Automate owner (Connor) confirming the honorarium/payment
   flows won't act. Read-only probe: `scripts/probe-dataverse-automation.js`. Full
   hazard: memory `project-reviewer-accept-prod-automation`.
+- **Accept now writes reviewer self-reported identity onto the linked CRM contact (2026-06-27).**
+  On accept, `respond.js` syncs corrected first/last/title/nickname → `contacts.firstname/lastname/
+  jobtitle/nickname` (OVERWRITE, reviewer-self-report-wins, silent; `lib/services/sync-reviewer-name-title-to-contact.js`,
+  fail-closed `trusted:true`), and raises a `reviewer_contact_email_mismatch` staff alert when the
+  accept email differs from `contacts.emailaddress1` (NO email write; `lib/services/alert-reviewer-email-mismatch.js`).
+  These contact writes feed the same Business-Central sync as above — mock the data layer in tests.
+  Full decision record: `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` §"Increment 2a".
 - **E2E harness runs against a real build, not `next dev`.** The Playwright
   reviewer-portal harness (`tests/e2e/`, `npm run test:e2e`) mocks the data layer and
   runs against `next build --webpack && next start` — NOT `next dev`. It is CI-gated
