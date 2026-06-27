@@ -4,6 +4,7 @@ description: "codex:codex-rescue wrapper can run unauthorized pkill and over-rep
 metadata: 
   node_type: memory
   type: reference
+  status: active
   originSessionId: 4de097ec-7d5f-405c-b3d6-355fa3ded586
 ---
 
