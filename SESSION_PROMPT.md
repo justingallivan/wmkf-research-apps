@@ -1,111 +1,123 @@
-# Session 295 Prompt: Pick the next thread (contact-boundary epic is done)
+# Session 296 Prompt: Wiki positive-framing pass
 
-## ⚠️ Top-of-session must-knows
+## Top-of-session must-knows
 
-1. **The reviewer↔CRM-contact boundary epic SHIPPED COMPLETE in S294** (13 commits, all
-   prod-pushed). Do NOT re-open or re-plan it. Every reviewer correction now either **syncs**
-   to the contact (name/title/nickname, overwrite) or **alerts** staff (email, affiliation).
-   Full decision record + reversals: `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md`.
-2. **Alert-only is a deliberate owner decision for email + affiliation** — do NOT "upgrade"
-   them to contact writes without a new decision. Affiliation specifically REJECTED
-   account-resolution (no account name-search precedent; `parentcustomerid` is a COI-weighted
-   cross-domain lookup with no write precedent — a wrong-account link is high-harm/low-yield).
-3. **The accept path now does several contact writes + alerts.** A real-prod reviewer accept
-   fires AkoyaGo plugins + classic workflows + a contact→Business-Central sync + live Bill.com
-   — MOCK the data layer in automated tests; real-prod accept is human-supervised, gated on the
-   PA owner (Connor). Hazard: memory `project-reviewer-accept-prod-automation`.
-4. **Known-red suites (unchanged):** `tests/unit/bill.test.js` and
-   `tests/unit/discovery-verification-status.test.js` only. Confirm any red is ONLY these.
-5. **Delegating a BUILD to `codex:codex-rescue`:** launch a FRESH agent whose prompt is
-   explicitly an implementation/fix ("Implement and APPLY…"). Do NOT frame it "plan only" and
-   then resume-to-implement — the read-only sandbox is fixed at launch and a resume can't flip
-   it (S294 lost a round-trip to this). Memory: `reference-codex-rescue-plan-task-runs-readonly`.
-6. **Staging norm:** stage specific files, never `git add -A` (names-local norm).
+1. **Session 295 shipped the active harness positive-framing refactor.** The implementation commit is `e7ef62bd` (`Refactor agent harness framing`). The stop-session doc commit follows it.
+2. **Rollback protection exists.** The pre-refactor commit is tagged `harness-pre-positive-framing-2026-06-27` (`42e1f9b3`). Preserved originals are in `.harness-backups/2026-06-27-positive-framing/MANIFEST.json`.
+3. **Use the new sidecar pattern for instruction rationale.** Active instructions should state the desired operating pattern; historical failure/rationale belongs in sidecars such as skill `RATIONALE.md`, `.claude-memory/rationale/*.md`, or a comparable rationale document.
+4. **Read `docs/AGENT_HARNESS_STYLE_GUIDE.md` before more harness edits.** The gate is `npm run check:harness-framing`; its self-test is `npm run check:harness-framing:self-test`.
+5. **Wiki topics were audited but not refactored in S295.** The next likely thread is a positive-framing pass over `docs/agent-wiki/topics/*.md`, using the same backup, sidecar rationale, and checker principles.
+6. **Known-red suites carried from S294:** `tests/unit/bill.test.js` and `tests/unit/discovery-verification-status.test.js` only. Confirm any full-suite red is only those two.
 
-## Session 294 Summary
+## Session 295 Summary
 
-Shipped the **entire reviewer↔CRM-contact boundary epic** in one session — six owner-gated
-increments, Codex-implements / Claude-reviews loop throughout, each with my own
-lifecycle/provenance trace on the diff before landing. Two build decisions were reversed by
-verifying before building (nickname's "no clean target" was wrong → it shipped; affiliation's
-account-resolution → downgraded to alert-only). Full suite green except the two known-red
-suites at every step; all drift/wiki/fact gates green.
+Session 295 investigated why the agent instruction harness might be degrading Claude behavior despite intending to add safety. The working hypothesis was that repeatedly phrasing rules as "what the model does wrong" can make failure patterns more salient in the active prompt. The session audited root instructions, `SESSION_PROMPT.md` language, durable memories, hooks, skills, and the agent wiki, then refactored the active harness surfaces to prefer capability/desired-pattern framing while preserving rationale in sidecars.
 
-### What Was Completed (all prod-pushed)
+### What Was Completed
 
-1. **Increment 1 — origination match + honorarium split guards** (`35693cf2`). `save-candidates`
-   runs `lookupReviewerIdentity` before upsert → `setContactLink` on a confident unique
-   ORCID/email match; ambiguous/conflict → save unlinked + `reviewer_contact_match_needs_review`
-   alert. `ensureContact` cross-checks ORCID on an email HIT (email→A vs unique ORCID→B →
-   `contact_orcid_email_split`, proceeds with email contact, never overwrites `emailaddress1`).
-2. **Increment 2a — name/title sync** (`027fe256`). Reviewer self-reported first/last/title
-   OVERWRITE `contacts.firstname/lastname/jobtitle` on accept (silent, fail-open).
-3. **Gate relaxation + nickname** (`a073dd35`). Dropped the `wmkf_identitystatus` gate (token
-   proves identity) for a fail-closed `trusted:true`; added nickname → `contacts.nickname`.
-4. **Email alert** (`3ce2607c`). Accept email ≠ contact `emailaddress1` → durable
-   `reviewer_contact_email_mismatch` staff alert (NO write).
-5. **Affiliation alert** (`fa15ee4b`). Reported affiliation differing from the contact's
-   institution (parentcustomerid FormattedValue / `adx_organizationname`) → durable
-   `reviewer_contact_affiliation_mismatch` staff alert (NO write). Account-resolution rejected
-   after verification.
-6. **Memory:** `reference-codex-rescue-plan-task-runs-readonly` (the read-only-sandbox lesson).
+1. **Positive-framing harness style guide**
+   - Added `docs/AGENT_HARNESS_STYLE_GUIDE.md`.
+   - Documented the active-instruction vs rationale-sidecar split.
+   - Added safe examples for rules, hook output, skills, memories, and backups.
 
-### Commits (newest first)
-- `6c03cc8b` / `fa15ee4b` - affiliation alert + doc reconcile
-- `4986de69` / `3ce2607c` - email alert + doc reconcile
-- `cb5e3d97` / `a073dd35` - gate relaxation + nickname + doc reconcile
-- `661b40ca` - codex read-only-sandbox memory
-- `caf80748` / `027fe256` / `63ac0cab` - Increment 2a (reconcile / impl / decisions)
-- `67e6f614` / `35693cf2` / `d16c5a95` - Increment 1 (reconcile / impl / decisions)
+2. **Harness framing gate**
+   - Added `scripts/check-harness-framing.js`.
+   - Added `scripts/check-harness-framing-self-test.js`.
+   - Added `npm run check:harness-framing` and `npm run check:harness-framing:self-test`.
+   - Wired the gate into `.github/workflows/test.yml`, `docs/CI_GATES_REFERENCE.md`, and `.claude/skills/start/SKILL.md`.
 
-## Potential Next Steps
+3. **Live hook and skill cleanup**
+   - Rephrased active hook output in `.claude/hooks/` toward explicit desired behavior.
+   - Refactored `contract-reconcile`, `sweep`, `start`, and `stop` skill bodies.
+   - Added skill `RATIONALE.md` sidecars for why the rules exist.
 
-### 1. PD-override-correction sync (the contact-boundary epic's one genuinely-open tail)
-[VERIFIED OPEN — not started] PD identity-override corrections land on
-`wmkf_potentialreviewers`/`wmkf_appresearcher` via `save-candidates` (the `pdConfirmed` path),
-NOT the accept path, so the S294 sync/alert work does NOT cover them. Syncing/alerting these to
-the linked contact is a separate trigger (different file, different timing — there may be no
-contact link yet at save time). Needs its own owner decisions (sync vs alert; which fields).
-Logical continuation if you want to keep closing the boundary.
+4. **Durable memory cleanup**
+   - Refactored active feedback memories into trigger/procedure/evidence style.
+   - Added `.claude-memory/rationale/*.md` sidecars for historical failure context.
 
-### 2. Long-stale carryovers — VERIFY-FIRST, do NOT assume open (untouched since before S294)
-- S288: record model real-replay human sign-off in `docs/MODEL_CHANGE_STRATEGY.md`
-  (reviewer-finder already pinned to `claude-opus-4-8` in prod); Admin Models visual smoke.
-- S285/S286: request `1002788` test-data triage; E2E of Restore Removed Candidates + PD identity
-  override; reviewer-portal review-upload design decision.
+5. **Backup and rollback**
+   - Created `.harness-backups/2026-06-27-positive-framing/MANIFEST.json` with original copies of touched files.
+   - Created rollback tag `harness-pre-positive-framing-2026-06-27`.
+
+### Commits
+
+- `e7ef62bd` - Refactor agent harness framing
+- Stop-session commit - Documents Session 295 and creates this Session 296 prompt
+
+## Next Items
+
+### Verified Open
+
+1. **Wiki positive-framing pass**
+   Evidence: S295 audited `docs/agent-wiki/topics/*.md` but did not patch those topic pages; `scripts/check-harness-framing.js` currently scopes only `docs/agent-wiki/index.md` under the wiki.
+   Start with a backup/tag such as `wiki-pre-positive-framing-2026-06-27`, then classify topic language as active guidance, historical rationale, or source-cited fact. Likely first files: `reviewer-origination`, `reviewer-identity`, `dev-environment`, and `integrity-screener`.
+
+### Owner Decision Needed
+
+None currently for the wiki pass. If a wiki entry contains a hard behavioral claim that conflicts with source/Atlas/probes, stop and ask whether to correct the wiki fact or preserve it as historical rationale.
+
+### Parked
+
+1. **PD-override-correction sync**
+   Evidence currently available: S295 did not re-verify this S294 carryover. Previous prompt said PD identity-override corrections land through `save-candidates`, not the reviewer accept path.
+   Re-open trigger: user chooses to continue the reviewer-contact boundary tail after verifying current source paths.
+
+### Verify Before Acting
+
+1. **Long-stale pre-S294 carryovers**
+   Evidence currently available: prior `SESSION_PROMPT.md` listed model real-replay signoff/Admin Models smoke, request `1002788` triage, Restore Removed Candidates + PD identity override E2E, and reviewer-portal upload design decision.
+   Required preflight: verify each against source/docs/probes before carrying it into an actionable worklist.
+
+2. **Any destructive wiki cleanup**
+   Evidence currently available: the wiki is a subordinate routing aid, not authority.
+   Required preflight: before removing or retiring a wiki claim, check the authoritative source named by the entry, then preserve rationale in a sidecar when useful.
+
+### Do Not Reopen Without New Decision
+
+1. **Reviewer to CRM-contact boundary epic**
+   Evidence: `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` and S294 commits record the completed policy: name/title/nickname sync; email and affiliation alert-only.
+
+2. **Email and affiliation contact writes**
+   Evidence: S294 owner decision kept email and affiliation alert-only. Do not convert them to contact writes without a new owner decision.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` | Full epic decision record (all 6 increments, the two reversals, §Policy Decisions + §Increment 2a). |
-| `lib/services/sync-reviewer-name-title-to-contact.js` | name/title/nickname OVERWRITE sync; fail-closed `trusted:true`. |
-| `lib/services/alert-reviewer-email-mismatch.js` | `reviewer_contact_email_mismatch` (no write). |
-| `lib/services/alert-reviewer-affiliation-mismatch.js` | `reviewer_contact_affiliation_mismatch`; reads contact institution via processed `_parentcustomerid_value_formatted` (annotation) → `adx_organizationname` fallback. |
-| `lib/dataverse/adapters/contact.js` | `updateIdentityFields` (overwrite name/title/nickname); `normalizeEmail` (now exported). |
-| `pages/api/external/review/[token]/respond.js` | Accept-path orchestration of the ORCID capture + all four sync/alert calls (each in a fail-open try/catch). |
+| `docs/AGENT_HARNESS_STYLE_GUIDE.md` | Style guide for active instructions, rationale sidecars, examples, and backups. |
+| `scripts/check-harness-framing.js` | Gate for negative self-framing and rationale leakage in active harness surfaces. |
+| `scripts/check-harness-framing-self-test.js` | Self-test fixture runner for the harness framing gate. |
+| `.github/workflows/test.yml` | CI wiring for the new harness framing gate. |
+| `docs/CI_GATES_REFERENCE.md` | Gate catalog entry for harness framing. |
+| `.claude/hooks/` | Live hook output that was rephrased toward desired behavior. |
+| `.claude/skills/*/RATIONALE.md` | Skill rationale sidecars created in S295. |
+| `.claude-memory/rationale/*.md` | Durable memory rationale sidecars created in S295. |
+| `.harness-backups/2026-06-27-positive-framing/MANIFEST.json` | Backup manifest for original files touched by S295. |
+| `docs/agent-wiki/topics/*.md` | Next-pass target for wiki positive-framing work. |
 
 ## Testing
 
 ```bash
-# Full suite — expect ONLY the two known-red suites:
-npm test
-# The S294 contact-boundary units:
-npx jest tests/unit/sync-reviewer-name-title-to-contact.test.js \
-  tests/unit/contact-update-identity-fields.test.js \
-  tests/unit/alert-reviewer-email-mismatch.test.js \
-  tests/unit/alert-reviewer-affiliation-mismatch.test.js \
-  tests/unit/reviewer-route-identity-gate.test.js \
-  tests/unit/honorarium-onboard-orchestrator.test.js
+npm run check:harness-framing
+npm run check:harness-framing:self-test
+npm run check:scaffolding-tokens
+npm run check:memory-router
+npm run check:agent-wiki
+npm run check:instruction-architecture
+npm run check:doc-symbol-refs
+npm run check:fact-consistency
+npm run check:agent-invariants:ci
+npm run check:memory-router:self-test
+npm run check:agent-wiki:self-test
+npm run check:doc-symbol-refs:self-test
+npm run check:scaffolding-tokens:self-test
 ```
+
+Full `npm test` was not run in S295.
 
 ## Gotchas / Continuity
 
-- Any NEW caller of `syncReviewerNameTitleToContact` MUST pass `trusted: true` — it's fail-closed
-  (returns `{skipped:'untrusted'}` otherwise). The accept path is the only sanctioned caller.
-- The affiliation alert reads the contact institution from the **processed**
-  `_parentcustomerid_value_formatted` key (DynamicsService.processAnnotations strips the raw
-  `@OData…FormattedValue` and appends `_formatted`). `context.js:335` reads the RAW key — that's
-  effectively dead code there (latent, lowest-priority prefill); NOT fixed in S294 (out of scope).
-- Email + affiliation are ALERT-ONLY by owner decision. Don't convert to writes without a decision.
-- Heavy Codex-implements / Claude-reviews loop; relay Codex output verbatim.
+- The backup archive intentionally preserves original wording. Do not run broad style rewrites inside `.harness-backups/`.
+- `check:harness-framing` intentionally excludes backup and rationale paths; active guidance must stay clean, but rationale sidecars may name the historical anti-patterns they explain.
+- For wiki work, keep source/Atlas/probes authoritative. The wiki is a routing aid and retrieval surface, not the final source of truth.
+- Preserve exact source-grounded facts while changing the behavioral wrapper around them.

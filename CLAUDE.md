@@ -53,6 +53,7 @@ Task-specific conventions load from `.claude/rules/` when matching files are rea
 - Authentication architecture: `docs/AUTHENTICATION_SETUP.md` and `docs/SECURITY_ARCHITECTURE.md`
 - Environment variables and rotation: `docs/CREDENTIALS_RUNBOOK.md`
 - Operational gate details: `docs/CI_GATES_REFERENCE.md`
+- Agent instruction framing and rationale sidecars: `docs/AGENT_HARNESS_STYLE_GUIDE.md`
 - Agent retrieval wiki: `docs/agent-wiki/index.md` (subordinate routing aid; source/Atlas/probes remain authoritative)
 - Task routing and historical rationale: `.claude-memory/MEMORY.md`
 - Milestone history: `DEVELOPMENT_LOG.md`
