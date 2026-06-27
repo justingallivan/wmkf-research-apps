@@ -47,8 +47,8 @@ const planForward = (over = {}) => ({
     { field: 'website', keeper: '', loser: '', differs: false },
     { field: 'hIndex', keeper: 10, loser: null, differs: true },
   ],
-  repoint: [{ suggestionId: 'sug1', requestId: 'r1', etag: 'W/"1"' }],
-  collisions: [],
+  repointCount: 1,
+  collisionCount: 0,
   ...over,
 });
 
@@ -65,8 +65,8 @@ const planSwapped = (over = {}) => ({
     { field: 'website', keeper: '', loser: '', differs: false },
     { field: 'hIndex', keeper: null, loser: 10, differs: true },
   ],
-  repoint: [],
-  collisions: [],
+  repointCount: 0,
+  collisionCount: 0,
   ...over,
 });
 
@@ -90,6 +90,16 @@ describe('CandidateEditModal — merge mode', () => {
     triggerMerge();
     expect(await screen.findByText(/Merge duplicate reviewer records/i)).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: /merge records/i })).toBeInTheDocument();
+  });
+
+  test('the merge plan summary reads projected repoint/collision counts', async () => {
+    jest.spyOn(global, 'fetch').mockImplementation(async (url) => {
+      if (url === '/api/reviewer-finder/my-candidates') return patch409;
+      return resp({ plan: planForward({ repointCount: 2, collisionCount: 1 }) });
+    });
+    render(<CandidateEditModal candidate={candidate} onClose={jest.fn()} onSaved={jest.fn()} />);
+    triggerMerge();
+    expect(await screen.findByText(/2 proposals re-linked, 1 duplicate entry removed/i)).toBeInTheDocument();
   });
 
   // (b)
@@ -171,7 +181,7 @@ describe('CandidateEditModal — merge mode', () => {
     jest.spyOn(global, 'fetch').mockImplementation(async (url, opts) => {
       if (url === '/api/reviewer-finder/my-candidates') return patch409;
       const body = parse(opts);
-      if (body.confirm) return resp({ error: 'Merge failed' }, { ok: false, status: 500 });
+      if (body.confirm) return resp({ error: 'Merge failed during email transfer', code: 'merge_email_move_failed' }, { ok: false, status: 500 });
       // recovery re-read: TARGET cleared from loser, never landed on keeper → orphaned
       return resp({ plan: planForward({ keeper: { id: KEEPER, name: 'Joshua Rabinowitz', email: 'old@princeton.edu', identityStatus: null }, loser: { id: LOSER, name: 'Joshua Ravinowitz', email: '', identityStatus: null, statecode: 0 } }) });
     });
@@ -235,6 +245,41 @@ describe('CandidateEditModal — merge mode', () => {
     expect(screen.queryByRole('button', { name: /merge records/i })).not.toBeInTheDocument();
     expect(onSaved).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  test('a retryable confirm 409 re-plans, shows retry guidance, and does not run Option-B', async () => {
+    const onSaved = jest.fn();
+    const onClose = jest.fn();
+    let confirmed = false;
+    const spy = jest.spyOn(global, 'fetch').mockImplementation(async (url, opts) => {
+      if (url === '/api/reviewer-finder/my-candidates') return patch409;
+      const body = parse(opts);
+      if (body.confirm) {
+        confirmed = true;
+        return resp({
+          error: 'Concurrent modification - re-plan and retry',
+          code: 'merge_retryable_replan',
+          retryable: true,
+          action: 'replan',
+          step: 4,
+          operation: 'suggestion_repoint',
+          reason: 'precondition_failed',
+        }, { ok: false, status: 409 });
+      }
+      return resp({ plan: confirmed ? planForward({ repointCount: 2 }) : planForward() });
+    });
+    render(<CandidateEditModal candidate={candidate} onClose={onClose} onSaved={onSaved} />);
+    triggerMerge();
+    fireEvent.click(await screen.findByRole('button', { name: /merge records/i }));
+    expect(await screen.findByText(/records changed while merging/i)).toBeInTheDocument();
+    expect(await screen.findByText(/2 proposals re-linked/i)).toBeInTheDocument();
+    expect(screen.queryByText(/removed during a failed merge/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /merge records/i })).toBeInTheDocument();
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    const mergeCalls = spy.mock.calls.filter(([url]) => url === '/api/reviewer-finder/merge-candidates');
+    expect(mergeCalls.filter(([, opts]) => parse(opts).confirm)).toHaveLength(1);
+    expect(mergeCalls.filter(([, opts]) => !parse(opts).confirm)).toHaveLength(2);
   });
 
   // (i.2) confirm-time 400 → message + refresh-close affordance, no onSaved

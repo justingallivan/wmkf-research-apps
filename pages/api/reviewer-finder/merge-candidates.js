@@ -17,7 +17,7 @@
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
-import { planMerge, executeMerge } from '../../../lib/services/reviewer-merge';
+import { planMerge, executeMerge, projectMergePlanForClient } from '../../../lib/services/reviewer-merge';
 
 export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'reviewer-finder', 'reviewers');
@@ -41,13 +41,30 @@ export default async function handler(req, res) {
     try {
       if (!confirm) {
         const plan = await planMerge({ keeperId, loserId });
-        return res.status(200).json({ plan });
+        return res.status(200).json({ plan: projectMergePlanForClient(plan) });
       }
       const summary = await executeMerge({ keeperId, loserId, fieldChoices, actingUserSystemId });
       return res.status(200).json({ success: true, summary });
     } catch (err) {
       if (err?.code === 'merge_validation') return res.status(400).json({ error: err.message });
       if (err?.code === 'merge_blocked') return res.status(409).json({ error: err.message, reasons: err.reasons });
+      if (err?.code === 'merge_retryable_replan') {
+        return res.status(409).json({
+          error: 'Concurrent modification - re-plan and retry',
+          code: 'merge_retryable_replan',
+          retryable: true,
+          action: 'replan',
+          step: err.step,
+          operation: err.operation,
+          reason: err.reason,
+        });
+      }
+      if (err?.code === 'merge_email_move_failed') {
+        return res.status(500).json({
+          error: 'Merge failed during email transfer',
+          code: 'merge_email_move_failed',
+        });
+      }
       console.error('merge-candidates error:', err);
       return res.status(500).json({
         error: 'Merge failed',

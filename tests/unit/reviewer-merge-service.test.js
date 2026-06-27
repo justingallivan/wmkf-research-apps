@@ -7,7 +7,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { planMerge, executeMerge } from '../../lib/services/reviewer-merge.js';
+import { planMerge, executeMerge, projectMergePlanForClient } from '../../lib/services/reviewer-merge.js';
 
 const KEEPER = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const LOSER = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -152,6 +152,51 @@ describe('executeMerge', () => {
     expect(summary).toMatchObject({ repointed: 0, deleted: 1 });
   });
 
+  test('step 4 repoint 412 becomes retryable re-plan and stops before email/deactivate', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser,
+      loserSug: [{ wmkf_appreviewersuggestionid: SUG_L, _wmkf_request_value: REQ1, _etag: 'W/"1"' }],
+    });
+    deps.suggestions.repointToPotentialReviewer = jest.fn(async () => {
+      throw Object.assign(new Error('precondition failed'), { status: 412 });
+    });
+
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: {} }, deps))
+      .rejects.toMatchObject({
+        code: 'merge_retryable_replan',
+        status: 409,
+        retryable: true,
+        action: 'replan',
+        step: 4,
+        operation: 'suggestion_repoint',
+        reason: 'precondition_failed',
+      });
+    expect(deps.potentialReviewer.clearEmail).not.toHaveBeenCalled();
+    expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
+  });
+
+  test('step 4 duplicate-key 409 becomes retryable re-plan', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser,
+      loserSug: [{ wmkf_appreviewersuggestionid: SUG_L, _wmkf_request_value: REQ1, _etag: 'W/"1"' }],
+    });
+    deps.suggestions.repointToPotentialReviewer = jest.fn(async () => {
+      throw Object.assign(new Error('duplicate alternate key matching key exists'), { status: 409 });
+    });
+
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: {} }, deps))
+      .rejects.toMatchObject({
+        code: 'merge_retryable_replan',
+        status: 409,
+        retryable: true,
+        step: 4,
+        operation: 'suggestion_repoint',
+        reason: 'duplicate_key',
+      });
+    expect(deps.potentialReviewer.clearEmail).not.toHaveBeenCalled();
+    expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
+  });
+
   test('email move: clears loser email, sets keeper, stamps manual provenance — in that order', async () => {
     const calls = [];
     const deps = makeDeps({
@@ -167,6 +212,56 @@ describe('executeMerge', () => {
     expect(summary.emailMoved).toBe(true);
     expect(calls).toEqual(['clearLoser', 'setKeeper', 'stampManual']);
     expect(deps.researcher.updateById).toHaveBeenCalledWith(KEEPER, { emailSource: 'manual' }, expect.any(Object));
+  });
+
+  test('step 6 keeper email update failure stays a 500 email-move failure', async () => {
+    const deps = makeDeps({
+      keeperRow: { ...bareKeeper, wmkf_emailaddress: 'old@princeton.edu' },
+      loserRow: { ...bareLoser, wmkf_emailaddress: 'joshr@princeton.edu' },
+      loserSug: [],
+    });
+    deps.potentialReviewer.update = jest.fn(async (id, u) => {
+      if (u.email) throw Object.assign(new Error('Dataverse unavailable'), { status: 503 });
+    });
+
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: { email: 'loser' } }, deps))
+      .rejects.toMatchObject({
+        code: 'merge_email_move_failed',
+        status: 500,
+        retryable: false,
+        phase: 'email_move',
+      });
+    expect(deps.potentialReviewer.clearEmail).toHaveBeenCalledWith(LOSER, expect.any(Object));
+    expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
+  });
+});
+
+describe('projectMergePlanForClient', () => {
+  test('strips internal GUID/ETag fields and returns display fields plus counts', () => {
+    const plan = {
+      blocked: true,
+      keeper: { id: KEEPER, name: 'Keeper', email: 'keeper@example.org' },
+      loser: { id: LOSER, name: 'Loser', email: 'loser@example.org' },
+      fields: [{ field: 'email', keeper: 'keeper@example.org', loser: 'loser@example.org', differs: true }],
+      reasons: [{ code: 'loser_engaged', detail: 'Engaged.', requestIds: [REQ1] }],
+      repoint: [{ suggestionId: SUG_L, requestId: REQ1, etag: 'W/"1"' }],
+      collisions: [{ suggestionId: 'c2222222-2222-2222-2222-222222222222', requestId: 'd2222222-2222-2222-2222-222222222222', etag: 'W/"2"' }],
+    };
+
+    const projected = projectMergePlanForClient(plan);
+    expect(projected).toEqual({
+      blocked: true,
+      keeper: plan.keeper,
+      loser: plan.loser,
+      fields: plan.fields,
+      reasons: [{ code: 'loser_engaged', detail: 'Engaged.' }],
+      repointCount: 1,
+      collisionCount: 1,
+    });
+    expect(JSON.stringify(projected)).not.toContain(SUG_L);
+    expect(JSON.stringify(projected)).not.toContain(REQ1);
+    expect(JSON.stringify(projected)).not.toContain('W/"1"');
+    expect(JSON.stringify(projected)).not.toContain('requestIds');
   });
 });
 

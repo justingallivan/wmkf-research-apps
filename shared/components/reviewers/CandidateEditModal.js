@@ -327,6 +327,17 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
       }
 
       if (res.status === 409) {
+        if (data.code === 'merge_retryable_replan') {
+          await loadPlan(keeperId, loserId, conflictValue);
+          if (!guard(token)) return;
+          setMerge((m) => ({
+            ...m,
+            loading: false,
+            error: 'The records changed while merging. Review the updated plan and try again.',
+            recovery: null,
+          }));
+          return;
+        }
         // Became blocked between plan and confirm — re-plan to show accurate reasons.
         await loadPlan(keeperId, loserId, conflictValue);
         return;
@@ -654,8 +665,8 @@ function MergeMode({ merge, onSwap, onSetField, onConfirm, onCancel, onRefreshCl
           </div>
 
           <p className="text-xs text-gray-500">
-            {plan.repoint.length} proposal{plan.repoint.length === 1 ? '' : 's'} re-linked
-            {plan.collisions.length > 0 && `, ${plan.collisions.length} duplicate entr${plan.collisions.length === 1 ? 'y' : 'ies'} removed`}
+            {plan.repointCount} proposal{plan.repointCount === 1 ? '' : 's'} re-linked
+            {plan.collisionCount > 0 && `, ${plan.collisionCount} duplicate entr${plan.collisionCount === 1 ? 'y' : 'ies'} removed`}
             . The removed record is deactivated.
           </p>
         </>

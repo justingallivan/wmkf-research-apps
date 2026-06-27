@@ -14,7 +14,24 @@ jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
 }));
 jest.mock('../../lib/services/reviewer-merge', () => ({
-  planMerge: jest.fn(async () => ({ blocked: false, repoint: [], collisions: [] })),
+  planMerge: jest.fn(async () => ({
+    blocked: false,
+    reasons: [],
+    keeper: { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', name: 'Keeper' },
+    loser: { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', name: 'Loser' },
+    fields: [],
+    repoint: [],
+    collisions: [],
+  })),
+  projectMergePlanForClient: jest.fn((plan) => ({
+    blocked: plan.blocked,
+    keeper: plan.keeper,
+    loser: plan.loser,
+    fields: plan.fields,
+    reasons: (plan.reasons || []).map((r) => ({ code: r.code, detail: r.detail })),
+    repointCount: (plan.repoint || []).length,
+    collisionCount: (plan.collisions || []).length,
+  })),
   executeMerge: jest.fn(async () => ({ repointed: 1, deleted: 0, emailMoved: false })),
 }));
 
@@ -54,6 +71,7 @@ test('POST without confirm returns the read-only plan', async () => {
   expect(res.statusCode).toBe(200);
   expect(res.body).toHaveProperty('plan');
   expect(mergeService.planMerge).toHaveBeenCalledWith({ keeperId: KEEPER, loserId: LOSER });
+  expect(mergeService.projectMergePlanForClient).toHaveBeenCalled();
   expect(mergeService.executeMerge).not.toHaveBeenCalled();
 });
 
@@ -80,4 +98,62 @@ test('maps a validation error to 400', async () => {
   const res = mockRes();
   await handler({ method: 'POST', body: { keeperId: KEEPER, loserId: LOSER } }, res);
   expect(res.statusCode).toBe(400);
+});
+
+test('maps retryable re-plan errors to 409 with retry metadata', async () => {
+  mergeService.executeMerge.mockRejectedValueOnce(Object.assign(new Error('replan'), {
+    code: 'merge_retryable_replan',
+    status: 409,
+    retryable: true,
+    action: 'replan',
+    step: 4,
+    operation: 'suggestion_repoint',
+    reason: 'precondition_failed',
+  }));
+  const res = mockRes();
+  await handler({ method: 'POST', body: { keeperId: KEEPER, loserId: LOSER, confirm: true } }, res);
+  expect(res.statusCode).toBe(409);
+  expect(res.body).toMatchObject({
+    code: 'merge_retryable_replan',
+    retryable: true,
+    action: 'replan',
+    step: 4,
+    operation: 'suggestion_repoint',
+    reason: 'precondition_failed',
+  });
+});
+
+test('maps email move failures to 500 with stable code', async () => {
+  mergeService.executeMerge.mockRejectedValueOnce(Object.assign(new Error('email move failed'), {
+    code: 'merge_email_move_failed',
+    status: 500,
+  }));
+  const res = mockRes();
+  await handler({ method: 'POST', body: { keeperId: KEEPER, loserId: LOSER, confirm: true } }, res);
+  expect(res.statusCode).toBe(500);
+  expect(res.body).toEqual({
+    error: 'Merge failed during email transfer',
+    code: 'merge_email_move_failed',
+  });
+});
+
+test('POST without confirm does not return internal suggestion/request/ETag ids', async () => {
+  mergeService.planMerge.mockResolvedValueOnce({
+    blocked: true,
+    reasons: [{ code: 'loser_engaged', detail: 'Engaged.', requestIds: ['d1111111-1111-1111-1111-111111111111'] }],
+    keeper: { id: KEEPER, name: 'Keeper' },
+    loser: { id: LOSER, name: 'Loser' },
+    fields: [],
+    repoint: [{ suggestionId: 'c1111111-1111-1111-1111-111111111111', requestId: 'd1111111-1111-1111-1111-111111111111', etag: 'W/"1"' }],
+    collisions: [],
+  });
+  const res = mockRes();
+  await handler({ method: 'POST', body: { keeperId: KEEPER, loserId: LOSER } }, res);
+  const body = JSON.stringify(res.body);
+  expect(res.statusCode).toBe(200);
+  expect(res.body.plan).toMatchObject({ repointCount: 1, collisionCount: 0 });
+  expect(body).not.toContain('suggestionId');
+  expect(body).not.toContain('requestId');
+  expect(body).not.toContain('etag');
+  expect(body).not.toContain('requestIds');
 });
