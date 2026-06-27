@@ -43,6 +43,7 @@ import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/
 import { ensureHonorariumOnboarding } from '../../../../../lib/bill/honorarium-onboard-orchestrator';
 import { captureSelfReportedReviewerOrcid } from '../../../../../lib/services/capture-self-reported-orcid';
 import { syncReviewerNameTitleToContact } from '../../../../../lib/services/sync-reviewer-name-title-to-contact';
+import { alertReviewerEmailMismatch } from '../../../../../lib/services/alert-reviewer-email-mismatch';
 import { normalizeOrcid } from '../../../../../lib/utils/orcid-normalize';
 import NotificationService from '../../../../../lib/services/notification-service';
 import { maybeNotifyQuotaReached } from '../../../../../lib/services/reviewer-quota';
@@ -256,6 +257,7 @@ function suggestionWithAppliedContactEdits(suggestion, body) {
     wmkf_reviewerlastname: suggestion?.wmkf_reviewerlastname ?? null,
     wmkf_reviewernickname: suggestion?.wmkf_reviewernickname ?? null,
     wmkf_reviewertitle: suggestion?.wmkf_reviewertitle ?? null,
+    wmkf_revieweremail: suggestion?.wmkf_revieweremail ?? null,
   };
   const edits = body?.contactEdits || {};
   const editMap = {
@@ -263,6 +265,7 @@ function suggestionWithAppliedContactEdits(suggestion, body) {
     lastName: 'wmkf_reviewerlastname',
     nickname: 'wmkf_reviewernickname',
     title: 'wmkf_reviewertitle',
+    email: 'wmkf_revieweremail',
   };
   for (const [key, column] of Object.entries(editMap)) {
     if (!Object.prototype.hasOwnProperty.call(edits, key)) continue;
@@ -308,6 +311,22 @@ async function syncReviewerNameTitle({ reviewer, suggestion, contactId }) {
     );
   } catch (nameTitleErr) {
     console.warn('[external respond] reviewer name/title contact sync failed (non-fatal):', nameTitleErr?.message || nameTitleErr);
+  }
+}
+
+async function alertOnReviewerEmailMismatch({ reviewer, suggestion, contactId, reviewerEmail }) {
+  // NON-FATAL: the accept has already committed; a mismatch-alert failure must
+  // never surface as an error to the reviewer. The service is built to fail-open
+  // internally, but wrap defensively here too (mirrors syncReviewerNameTitle).
+  try {
+    await alertReviewerEmailMismatch({
+      reviewer,
+      contactId: contactId || reviewer?._wmkf_contact_value || null,
+      reviewerEmail,
+      suggestionId: suggestion?.wmkf_appreviewersuggestionid || null,
+    });
+  } catch (mismatchErr) {
+    console.warn('[external respond] reviewer email-mismatch alert failed (non-fatal):', mismatchErr?.message || mismatchErr);
   }
 }
 
@@ -633,6 +652,12 @@ export default async function handler(req, res) {
     // from the typed delta OR the persisted engagement value (confirm-without-edit).
     await captureReviewerSelfReportedOrcid({ reviewer, contactId: honContactId, rawOrcid: acceptOrcidRaw });
     await syncReviewerNameTitle({ reviewer, suggestion: acceptedSuggestion, contactId: honContactId });
+    await alertOnReviewerEmailMismatch({
+      reviewer,
+      suggestion,
+      contactId: honContactId,
+      reviewerEmail: body?.contactEdits?.email || acceptedSuggestion?.wmkf_revieweremail || null,
+    });
 
     // ── Acceptance confirmation email (NON-FATAL; fire-once on fresh accept) ─
     // No new Dataverse marker: the existing isAcceptRepeat signal enforces first
