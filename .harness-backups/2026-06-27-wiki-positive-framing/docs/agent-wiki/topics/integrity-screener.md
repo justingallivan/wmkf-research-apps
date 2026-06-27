@@ -53,10 +53,11 @@ moved the reviewer-finder metrics/literature paths to OpenAlex. For the integrit
 (#6) and News (#7) remain on SerpAPI** — News is an irreducible keeper (no free equivalent), and
 PubPeer is the parked future item below. Retraction Watch was already free.
 
-## Parked Future Item — Migrate PubPeer Off SerpAPI (Contingent; Recall Only on Request)
+## Parked future item — migrate PubPeer off SerpAPI (contingent; do NOT proactively resurface)
 
-> This is a low-priority, externally gated maybe, not active work. Recall it only if Justin asks
-> or PubPeer responds about API access. The old "Slice 3" label for this is retired.
+> This is a low-priority, EXTERNALLY-GATED maybe — not active work. Justin will ask to recall it
+> if/when PubPeer responds about API access (he suspects they won't). Do not list it as a recurring
+> "next step" or remind him each session. The old "Slice 3" label for this is retired.
 
 **The problem:** we'd like PubPeer integrity to use precise DOI/PMID lookups instead of a fuzzy,
 name-based Google search via the (being-retired) SerpAPI. **But there is no usable sanctioned API.**
@@ -73,7 +74,7 @@ Verified S251 from primary sources:
 (volume pitched: ≈1 batched request per person vetted, ~hundreds per review cycle, cacheable). Do **NOT**
 call `/v3/publications` server-side without explicit sanction.
 
-**Load vs authorization (why the direct endpoint is not the current route — two axes, opposite ways):**
+**Load vs authorization (why we did NOT just switch to the direct endpoint — two axes, opposite ways):**
 - *Load:* the SerpAPI `site:pubpeer.com` route hits **Google's index, not PubPeer** → zero real-time load
   on PubPeer. The `/v3/publications` endpoint is the ONLY route that touches PubPeer's DB. So the Google
   route is *lighter* on PubPeer — "gentler on their infrastructure" is the WRONG argument.
@@ -91,5 +92,6 @@ run while PubPeer is unconfigured and vice-versa; and **preserve the `sources.pu
 integrity UI/export consume. Applicant DOIs/PMIDs already come from the PubMed/OpenAlex enrichment data
 (no extra PubPeer calls to obtain them).
 
-**Verification posture:** the S250 plan scoped a "PubPeer Developer API" migration around an API that
-doesn't exist. Confirm external capabilities from primary sources before scoping work around them.
+**Lesson (don't repeat):** the S250 plan scoped a "PubPeer Developer API" migration around an API that
+doesn't exist — a verify-external-platform-claims miss. Confirm external capabilities from primary
+sources before scoping work around them.

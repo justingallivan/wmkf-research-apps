@@ -35,17 +35,17 @@ update_triggers:
 # Dev Environment
 
 Use this page for local test/build quirks, Vercel CLI deploy posture, secrets,
-Claude config sync, and environment-specific operating notes.
+Claude config sync, and environment-specific gotchas.
 
 ## Durable Memory
 
 - Instruction architecture, hooks, rules: `project-claude-instruction-architecture`.
 - Dev environment and Vercel deploy: `project-dev-environment`, `project-vercel-sensitive-env-pull-empty`, `project-vercel-cli-deploy-preview-auth`.
 - Claude config sync: `claude-config-git-sync`.
-- Local Jest/build/git operating notes: `local-jest-build-environment`, `env-broken-git-autogc`.
+- Local Jest/build/git gotchas: `local-jest-build-environment`, `env-broken-git-autogc`.
 - Decision log: `decision-module-typeless-warning-accept`.
 
-## Operating Notes
+## Gotchas
 
 - **`scripts/reset-request-reviewers.mjs` protects applicant-sourced rows by
   default.** It clears a single request's reviewer working state for testing. Rows
@@ -65,7 +65,7 @@ Three `PreToolUse(Bash)` hooks fire on `git commit` (wired in `.claude/settings.
   reaches a Dataverse selector without a GUID guard (`check:trust-boundary-guid`). See
   `security-auth.md` → "Trust-Boundary GUID Validation".
 - **`pre-commit-self-review.js`** — ADVISORY (injects a staged-diff-tailored checklist,
-  never blocks). It keeps the fan-out and verify-claims checklist visible during commits.
+  never blocks). The forcing function behind the fan-out / verify-claims rules.
 
 All three share ONE trigger, **`.claude/hooks/lib/git-commit-detect.js`** (`isGitCommit` /
 `isAmend`) — a single source of truth so the trigger cannot drift across the siblings (the
@@ -75,15 +75,18 @@ directly).
 
 Design rules these hooks encode (Codex S259 two-round review — important when editing them):
 
-- **Broad commit detection for blocking guards.** Every `git commit` form should run the
-  blocking guard. `isGitCommit` matches any `git` token in a segment (not anchored to segment
-  start) and walks past global options (`-c key=val`, `-C dir`, `--no-pager`, ...) to the first
-  subcommand; harmless false positives such as `echo git commit` on a clean tree just re-run
-  the gate. It strips quoted spans by substituting a `__QUOTED__` placeholder and splits on
-  `&& || ; | newline` and unescaped `( )`.
-- **Fail open on helper errors.** Each hook does `require('./lib/git-commit-detect')` inside
-  its `try/catch`, so a missing or broken helper exits 0 (allow). The test matrix locks this
-  fail-open behavior.
+- **Liberal match, never miss.** For a BLOCKING guard a missed `git commit` form silently
+  disables it — the dangerous direction. So `isGitCommit` matches ANY `git` token in a
+  segment (not anchored to segment start) and walks past global options (`-c key=val`,
+  `-C dir`, `--no-pager`, …) to the first subcommand; it accepts harmless false-positives
+  (e.g. `echo git commit` on a clean tree just re-runs the gate). It strips quoted spans
+  (substituting a `__QUOTED__` placeholder, NOT a bare space — a bare space let a
+  value-taking global eat `commit`, a real false-negative) and splits on `&& || ; | newline`
+  and unescaped `( )`.
+- **Fail OPEN, never wedge.** Each hook does `require('./lib/git-commit-detect')` INSIDE its
+  `try/catch`, so a missing/broken helper exits 0 (allow) rather than crashing with a non-2
+  code whose block/allow behavior is undefined. Locked by fail-open regression tests in the
+  test matrix.
 - Blocking guards gate `--amend` (an amend can introduce a violation); the advisory
   self-review skips it. `isAmend` strips quotes first so `--amend` inside a commit MESSAGE
   does not falsely skip.
@@ -97,11 +100,14 @@ fail open on any other error; then wire it into the `PreToolUse`→`Bash` block 
 
 - **`pre-review-delegation-trace-guard.js`** — `PreToolUse(Task|Agent)`, ADVISORY (injects
   context, never blocks). Fires before a review/verify delegation (any Codex subagent, or any
-  agent with a review-worded prompt) and adds a LIFECYCLE (trace from the landed state /
+  agent with a review-worded prompt) and demands a LIFECYCLE (trace from the landed state /
   the edge the code omits) + PROVENANCE (what produced a value; a contract's failure path,
-  not just its shape) self-trace with file:line evidence before delegating. The reviewer should
-  receive the trace evidence, not just the assertion. Complements the PostToolUse
-  `codex-verbatim-reminder.js`. Fail-open.
+  not just its shape) self-trace WITH file:line evidence before delegating — so the reviewer
+  confirms a trace, not a bare assertion, and so a named check isn't deflected to the reviewer
+  or into a future project tool. The forcing function behind modes 5–6 of
+  `feedback-self-review-before-delegating-review` (added S272 after Codex reviews repeatedly
+  caught lifecycle/provenance misses — a one-way latch gone stale, a 200-on-failure DELETE).
+  Complements the PostToolUse `codex-verbatim-reminder.js`. Fail-open.
 
 ## Standard Probe
 

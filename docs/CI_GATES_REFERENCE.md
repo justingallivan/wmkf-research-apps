@@ -133,7 +133,7 @@ Validates `docs/agent-wiki/` as a subordinate retrieval layer rather than a para
 
 Scans active agent-facing harness surfaces for self-focused failure framing while allowing technical safety language such as `fail-open`, failure paths, and hazards.
 
-- Scope: root/session instructions, `.claude/skills/**/SKILL.md`, `.claude/rules/*.md`, emitted hook source, `.claude-memory/MEMORY.md`, active feedback memories, and `docs/agent-wiki/index.md`.
+- Scope: root/session instructions, `.claude/skills/**/SKILL.md`, `.claude/rules/*.md`, emitted hook source, `.claude-memory/MEMORY.md`, active feedback memories, `docs/agent-wiki/index.md`, and `docs/agent-wiki/topics/*.md`.
 - Rationale sidecars and `.harness-backups/` are excluded so incident history remains available to maintainers without entering normal execution prompts.
 - Self-test: `npm run check:harness-framing:self-test`.
 

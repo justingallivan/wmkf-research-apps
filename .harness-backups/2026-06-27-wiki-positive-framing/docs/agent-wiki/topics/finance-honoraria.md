@@ -51,7 +51,7 @@ capture the reviewer's contact + mailing address upstream and pay manually:
   alert posture from the deferred result, in priority order:
   - `addressCaptureError` set (the address PATCH failed → no downstream copy) →
     emailing **warning** `honorarium_capture_failed`, deduped per suggestion, on
-    every accept until resolved (keeps address-copy failure visible — Codex S274 P1).
+    every accept until resolved (avoids silent data loss — Codex S274 P1).
   - `partialDiscriminatorConfig` (some-but-not-all GUIDs, no explicit flag → likely
     a botched go-live) → emailing **warning** `honorarium_discriminator_partial_config`,
     deduped to one recurring alert (Codex S274 P2).

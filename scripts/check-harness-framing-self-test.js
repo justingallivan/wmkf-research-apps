@@ -42,6 +42,11 @@ Trace lifecycle and provenance before delegating review.
 write(path.join(cleanRoot, '.claude/skills/example/RATIONALE.md'), `
 Historical note: Codex kept catching this before the procedure existed.
 `);
+write(path.join(cleanRoot, 'docs/agent-wiki/topics/example.md'), `
+# Example
+
+Use this page to route recurring work to source files and verification commands.
+`);
 let result = run(cleanRoot);
 expect('clean active files pass and rationale sidecar is ignored', result.status === 0, result.stderr);
 
@@ -61,6 +66,15 @@ const msg = 'Codex kept catching this for you, so do the check.';
 `);
 result = run(badHookRoot);
 expect('emitted hook failure framing fails but comment alone would not', result.status === 1 && /Codex kept catching/.test(result.stderr), result.stderr);
+
+const badWikiTopicRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-framing-bad-wiki-topic-'));
+write(path.join(badWikiTopicRoot, 'docs/agent-wiki/topics/example.md'), `
+# Example
+
+Use this because I keep missing the surrounding lifecycle.
+`);
+result = run(badWikiTopicRoot);
+expect('self-focused wiki topic framing fails', result.status === 1 && /I keep missing/.test(result.stderr), result.stderr);
 
 const backupRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'harness-framing-backup-'));
 write(path.join(backupRoot, '.harness-backups/old/.claude/skills/example/SKILL.md'), `

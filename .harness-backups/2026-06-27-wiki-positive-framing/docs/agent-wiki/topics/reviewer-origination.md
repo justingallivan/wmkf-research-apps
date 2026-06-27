@@ -41,43 +41,46 @@ lanes, provenance, ranking, and the recall-vs-precision posture. For who a
 candidate *is* (identity, contact, COI, PI identity), use the
 [Reviewer Identity](reviewer-identity.md) page instead.
 
-## Production Signal & Current Posture
+## Genesis & corrected posture (READ FIRST)
 
 **The tool worked in production (J26).** Claude proposes a candidate pool → staff
 curate against priorities, using the surfaced papers to drop the occasional bad one
 → reviewer *declines* yield referral suggestions. That human-in-the-loop,
 recall-oriented workflow produced usable panels. This lived-success signal is the
-strongest evidence we have. The origination plan's §1 "stop mining J26" caveat was
-right for the narrow *causal* question, but the workflow success remains a separate
-valid signal.
+strongest evidence we have, and it was systematically under-weighted during the
+redesign (the origination plan's §1 "stop mining J26" caveat was right about the
+narrow *causal* question but had the side effect of discounting the *workflow*
+success — a different, valid signal).
 
-**S231 validation split two concerns.** The verify path needed fixes for hallucinated
-forenames laundering into real near-namesakes (for example, a fabricated "Dr. Alfred
-Laederach" verifying against the real Alain Laederach at 100% confidence). Those fixes
-shipped: forename/exact-existence gate, field-aware verification, and recency ranking.
-The separate theory critique — "LLM-as-generator is stale / senior-biased /
-hallucination-prone" — led to a proposed retrieval-first inversion that needed direct
-measurement against grounded retrieval.
+**Why the retrieval-first detour happened (S231).** A validation pass became a
+bug-hunt that found two different things and conflated them: (a) a REAL verify-path
+bug — hallucinated forenames laundering into real near-namesakes (a fabricated "Dr.
+Alfred Laederach" verified against the real Alain Laederach at 100% confidence),
+which justified a proportionate verify/identity fix; and (b) a theory critique —
+"LLM-as-generator is stale / senior-biased / hallucination-prone." (a) got the right
+fix (forename/exact-existence gate, field-aware verification, recency ranking —
+shipped). (b) got OVER-extrapolated into "demote Claude from candidate generator to a
+non-naming retrieval-first engine" — an inference from Claude's failure modes that was
+NEVER measured against whether grounded retrieval *originates* better.
 
-**S246 measured the inversion: keep Claude as the origination spine**
-(`project-reviewer-origination-experiment-result`). The off-organism noise came from
-the *grounded* arm, not Claude (origination probe, 1002878: every plant-virologist
-candidate was grounded-arm only). The pipeline's weak link is downstream identity
-resolution (see the namesake-collision worked example in `reviewer-identity.md`), not
-origination.
+**S246 measured it: Claude wins** (`project-reviewer-origination-experiment-result`).
+The extrapolation was wrong — the off-organism noise came from the *grounded* arm, not
+Claude (origination probe, 1002878: every plant-virologist candidate was grounded-arm
+only). The pipeline's weak link is DOWNSTREAM identity resolution (see the
+namesake-collision worked example in `reviewer-identity.md`), not origination.
 
-**Current posture:**
-- Keep Claude as the origination engine — recall-oriented, human-curated.
-- Keep the edge hardening the retrieval-first work produced: exact-existence/forename gate,
+**Corrected posture:**
+- KEEP Claude as the origination engine — recall-oriented, human-curated.
+- KEEP the edge-hardening the detour produced: exact-existence/forename gate,
   field-aware + (next) ORCID-anchored resolution, recency ranking, recall-over-precision
   (review is a floor, not a ranker), referral capture, and §12/multilane as a TARGETED
   tool for the genuinely-sparse tail ONLY.
-- Park retrieval-first inversion as the *primary engine* (deferred by S246; §12/multilane
+- PARK retrieval-first inversion as the *primary engine* (deferred by S246; §12/multilane
   remains valid + unrefuted as a sparse-tail tool, just not the engine).
-- Keep targeted hardening for Claude's senior-bias and the
+- CAUTION — don't over-correct the over-correction: Claude's senior-bias and the
   niche/pivot/sparse tail are REAL (the S231 probe found 2/10 analyze under-deliveries).
-  Treat that tail as a sparse-case toolkit, not an engine replacement.
-- Model: origination now runs on **Opus 4.8** by default, not Sonnet (S286,
+  Keep *targeted* hardening for that tail; just don't mistake it for an engine problem.
+- MODEL — origination now runs on **Opus 4.8** by default, not Sonnet (S286,
   baseConfig `reviewer-finder`: `{ model: 'opus', fallback: 'sonnet' }`). On a niche
   out-of-mainstream proposal (synthetic torpor; req 1002821) Sonnet 4.6 fell into a
   token-repetition/hallucination loop: it could confidently name only the ~6 reviewers
@@ -99,12 +102,12 @@ origination.
 Read the `## Direction` bullets below as the lane mechanics under this posture — a
 sparse-tail toolkit, not a mandate to replace Claude.
 
-## Direction (Validated Sparse-Tail Toolkit; Mostly Not Built)
+## Direction (validated, mostly NOT BUILT)
 
 - **Multi-lane origination is the validated direction (S239), not yet built.**
   Lanes: cited-DOI, PI-trail (ORCID works list), peer-groups, topic→author
   aggregation. **Coverage = union of lanes; confidence = convergence ON IDENTITY,
-  not on name.** The issue was unanchored keyword→author mechanism, not keywords per se.
+  not on name.** The keyword *mechanism* was the disease, not keywords per se.
   Canonical: `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md` §12; memory
   `project-reviewer-origination-multilane`.
 - **Retrieval-redesign framing (S231):** demote the Claude generator to a
@@ -130,14 +133,14 @@ sparse-tail toolkit, not a mandate to replace Claude.
   `docs/REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md`; memory
   `project-reviewer-origination-experiment-result`.
 
-## Track B — Archived Dormant Code
+## Track B — archived working code (storage shed)
 
 **Status: OFF, archived in code (S248).** `DiscoveryService.TRACK_B_ENABLED = false`
 (`lib/services/discovery-service.js`) gates the four Track-B DB-search blocks. The code
 is **intact and dormant**, kept for future repurposing — flip the one constant to
 re-enable. This is a code-level switch by design, **NOT** an admin/user toggle and **NOT**
 `searchPubmed` (that flag also routes Track-A verification via `suggestionVerifierRouting`,
-so flipping it would change Track A through coupled behavior).
+so flipping it would change Track A — the coupling trap).
 
 **What Track B was:** the second origination lane — Claude's `analyze` step *used to* emit
 `searchQueries` (keyword queries per source); Track B runs them against **PubMed / arXiv /
@@ -149,7 +152,7 @@ the Track-A verified set. The `discovery-service` search machinery is preserved,
 empty `searchQueries` shape (Track-B-only output, dead while the lane is off). Re-enabling the
 lane therefore needs the queries regenerated too (see "To re-enable" below).
 
-**Archive evidence:**
+**Why archived (the evidence):**
 - **~0 contribution to saved panels** last cycle — `scholarly-only-saved ≈ 0` by
   construction (pre-resolution dedup + the 25-cap identity budget + the save-gate reject
   unresolved system-discovered rows). See `REVIEWER_FINDER_ORIGINATION_PLAN.md` §1.
@@ -167,20 +170,20 @@ lane therefore needs the queries regenerated too (see "To re-enable" below).
 own** — the analyze prompt's PART 3 query generation was removed S253, so the lane would run
 against empty `searchQueries`. A re-enable also needs query generation restored (re-add PART 3 to
 both `createAnalysisPrompt` and `ANALYZE_USER_PROMPT_TEMPLATE`, plus the parser + the
-`prompt-validators` required labels). If grounded origination is revisited, build the
-**ORCID-works-anchored multilane** (§12) with
+`prompt-validators` required labels). But if grounded origination is ever revisited properly, do
+NOT just re-enable bare Track B — build the **ORCID-works-anchored multilane** (§12) with
 organism/field-scoped facets + the trainee/deceased filter, judged on real accept/decline. The
 bare keyword→author lane is what underperformed.
 
-## Operating Notes
+## Recurring Hazards
 
 - **Web-discovery via an ungrounded LLM was EVALUATED and ABANDONED (S230).**
-  The Perplexity reviewer-agent produced ungrounded reviewers and affiliations.
-  Keep reviewer web discovery grounded before using it. Memory
+  The Perplexity reviewer-agent verifiably hallucinated reviewers and affiliations.
+  Do NOT re-attempt ungrounded web discovery. Memory
   `project-reviewer-web-discovery-abandoned`.
 - **Ranking: recency must outweigh citations / h-index.** A high-citation but
   inactive author is the wrong pick. Memory `project-reviewer-ranking-recency-over-citations`.
-- **Coverage is a union; surface removals.** When a lane or filter removes a
+- **Coverage is a union; don't silently drop.** When a lane or filter removes a
   candidate the PD might expect, surface it (excluded-summary) rather than hiding it.
   Count invariants live in memory `project-reviewer-count-invariant`.
 - **Proposal-doc context is thin in Phase I (no bibliography).** Phase I under-delivers
@@ -203,8 +206,8 @@ bare keyword→author lane is what underperformed.
   display/persist fan-out — the `facultyPageUrl` capture/persist/read/render path
   (`contact-enrichment-service.js` Claude-tier capture + side-save, `save-candidates.js`,
   `my-candidates.js`, `ReviewerInvitePanel.js`) plus the `enr.website` render fallback in `mergeEnrichment`.
-  **Fan-out note:** `facultyPageUrl` is also persisted to Dataverse and rendered as a clickable
-  link, so the guard must reach the persist + read + render surfaces too.
+  **Lesson: a chokepoint/merge guard is NOT enough — `facultyPageUrl` is also persisted to Dataverse
+  and rendered as a clickable link, so the guard must reach the persist + read + render surfaces too.**
   Design: `docs/REVIEWER_GENERATION_DATA_QUALITY_DESIGN.md`.
 
 ## Durable Memory

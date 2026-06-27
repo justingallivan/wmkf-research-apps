@@ -58,15 +58,15 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   acknowledgement) is enforced in `send-emails.js` via `lib/utils/reviewer-invite.js` —
   see the [Reviewer Identity](reviewer-identity.md) page for the full gate semantics.
 
-## Operating Notes
+## Recurring Hazards
 
-- **Prod accept triggers a live automation chain — keep automated tests mocked/fenced.**
+- **Real-prod accept fires a live automation chain — never run automated/unfenced prod accept tests.**
   A reviewer accept CREATEs a honorarium `akoya_request`, which fires AkoyaGo plugins
   + classic workflows + a live Bill.com payment flow + a contact→Business-Central sync.
   **MOCK the data layer** for automated tests; a real-prod accept is a human-supervised
   one-off gated on the Power-Automate owner (Connor) confirming the honorarium/payment
   flows won't act. Read-only probe: `scripts/probe-dataverse-automation.js`. Full
-  detail: memory `project-reviewer-accept-prod-automation`.
+  hazard: memory `project-reviewer-accept-prod-automation`.
 - **Accept now writes reviewer self-reported identity onto the linked CRM contact (2026-06-27).**
   On accept, `respond.js` syncs corrected first/last/title/nickname → `contacts.firstname/lastname/
   jobtitle/nickname` (OVERWRITE, reviewer-self-report-wins, silent; `lib/services/sync-reviewer-name-title-to-contact.js`,
@@ -85,8 +85,8 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   expiry model before widening what an external token can read; see memory
   `project-external-reviewer-file-access` and `project-sharepoint-integration`.
 - **Accept/decline links are durable, signed surfaces.** Changes to link
-  generation or response handling need an in-flight invitation compatibility check;
-  see memory `project-reviewer-accept-decline-links`.
+  generation or response handling can silently break in-flight invitations; see
+  memory `project-reviewer-accept-decline-links`.
 
 ## Durable Memory
 

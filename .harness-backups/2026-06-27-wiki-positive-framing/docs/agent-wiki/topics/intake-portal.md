@@ -55,7 +55,7 @@ intake-to-Dataverse mapping.
 - Virus scan and Cloudmersive: `project-intake-portal-virus-scan-e2e-deferred`, `project-virus-scanning-it-context`, `project-cloudmersive-advanced-endpoint`.
 - Cross-topic hard constraint: `project-no-banking-pii-in-dataverse`.
 
-## Operating Notes
+## Recurring Hazards
 
 - Virus-scan E2E was deferred and must run before the next cycle.
 - Slice-0 deactivates and recalculates; it does not hard-delete removed lines.

@@ -40,7 +40,7 @@ reviewer-finder prompt migration.
 - **Model-aware request building (S286):** `llm-client._buildBody` OMITS the `temperature`
   param for models that reject it (Opus 4.8 — the API 400s with "`temperature` is
   deprecated for this model"); `modelSupportsTemperature()` gates it. When adding an
-  app on a reasoning-tier model, confirm whether `temperature` is accepted.
+  app on a reasoning-tier model, don't assume `temperature` is accepted.
 
 ## Durable Memory
 

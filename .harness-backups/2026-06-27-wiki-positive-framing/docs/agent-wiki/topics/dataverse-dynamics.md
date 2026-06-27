@@ -54,7 +54,7 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 - Explorer and Power Tools: `project-dynamics-explorer-details`, `project-dynamics-explorer-schema-diff`, `project-dynamics-explorer-reuse-power-tools`, `project-dynamics-feedback-admin-shipped`, `project-dataverse-power-tools`.
 - Export and lifecycle facts: `dataverse-export-floor-scoping`, `project-akoya-request-pd-fields`, `project-grant-lifecycle-states-confirmed`, `akoya-temporal-axis-encodings`.
 
-## Operating Notes
+## Recurring Hazards
 
 - OData null filters do not behave like SQL.
 - The sandbox is not drop-in prod parity.

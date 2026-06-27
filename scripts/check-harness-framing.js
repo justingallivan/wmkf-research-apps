@@ -42,6 +42,7 @@ const ACTIVE_PATHS = [
   /^\.claude-memory\/MEMORY\.md$/,
   /^\.claude-memory\/feedback-[^/]+\.md$/,
   /^docs\/agent-wiki\/index\.md$/,
+  /^docs\/agent-wiki\/topics\/[^/]+\.md$/,
 ];
 
 const EXCLUDED_PATHS = [

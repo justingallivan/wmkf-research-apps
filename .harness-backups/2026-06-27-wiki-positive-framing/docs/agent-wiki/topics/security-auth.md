@@ -80,7 +80,7 @@ private Blob/file access, prompt-injection hardening, and download proxy pattern
   state-changing 403'd). Underlying Origin-403 still applies to any API call that reaches
   the old host. Do not hard-retire the host until outstanding external magic links are
   accounted for.
-- `NEXTAUTH_URL` runtime-vs-pull note: while it was a Sensitive Vercel var,
+- `NEXTAUTH_URL` runtime-vs-pull trap: while it was a Sensitive Vercel var,
   `vercel env pull` read it back as `""`, producing a false "empty in prod" belief
   in earlier docs. The authoritative producer is runtime `/api/health` (reports
   `process.env.NEXTAUTH_URL`); do not infer the value from a pull of a Sensitive
@@ -102,7 +102,7 @@ private Blob/file access, prompt-injection hardening, and download proxy pattern
   modeled); a sink whose id is provably server-derived in a helper this gate can't
   follow may carry `// trust-boundary-guid:ignore reason=<id>`.
 - Origin: Codex's S259 adversarial review found this guard had been applied to one
-  route (`resolve-request.js`) and then expanded it across the reviewer surface; the fix +
+  route (`resolve-request.js`) but missed across the reviewer surface; the fix +
   gate are the fan-out remediation. See `feedback-symbol-consumer-fanout`.
 
 ## Durable Memory
