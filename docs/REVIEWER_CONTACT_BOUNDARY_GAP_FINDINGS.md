@@ -4,8 +4,9 @@ Status: **FINDINGS / DESIGN STUB. One increment SHIPPED (2026-06-26): the
 duplicate-contact-on-corrected-email fix — `ensureContact` ORCID fallback (see §Status /
 Next Step). Owner policy decisions RESOLVED 2026-06-27 (see §Policy Decisions). Increment 1
 (origination-time contact match + honorarium split-contact ORCID cross-check) SHIPPED
-2026-06-27 (commit 35693cf2). Reviewer→CRM-contact field sync remains deferred to a
-later policy-gated increment.**
+2026-06-27 (commit 35693cf2). Increment 2a (reviewer portal-accept name/title → contact,
+overwrite) SHIPPED 2026-06-27 (commit 027fe256). Remaining field sync — affiliation/email/
+nickname (2b) and PD-override corrections — still deferred.**
 Drafted: 2026-06-25 (S290)
 Owner: reviewer-finder
 Scope: the `wmkf_potentialreviewers` ↔ CRM `contacts` boundary (reviewer origination,
@@ -94,10 +95,14 @@ reviewer identity matching.
 
 - **No-match-at-origination** — Claude/PD-saved candidates are upserted by potentialreviewer
   email and not checked against existing CRM contacts. [`save-candidates.js:271`,
-  `potential-reviewer.js:220`]
+  `potential-reviewer.js:220`] *(RESOLVED 2026-06-27, Increment 1: `save-candidates` now
+  matches + links via `lookupReviewerIdentity`.)*
 - **Corrections-stranded** — reviewer-supplied name/email/title/affiliation corrections stay
   on the suggestion row; PD override corrections stay on potentialreviewer/researcher rows.
   Neither writes to CRM contact. [`reviewer-suggestion.js:977`, `save-candidates.js:190`]
+  *(PARTIALLY RESOLVED 2026-06-27, Increment 2a: reviewer portal-accept name/title now overwrite
+  `contacts.firstname/lastname/jobtitle`. Still stranded: affiliation/email/nickname, and all
+  PD-override corrections.)*
 - **Email-only-match-spawns-duplicate** — honorarium fallback contact creation uses
   corrected/current email only, so an existing contact filed under another email is missed
   and a new contact is created. [`honorarium-onboard-orchestrator.js:195`, `contact.js:75`]
@@ -177,7 +182,7 @@ increment.
 
 ---
 
-## Increment 2a — Reviewer→contact field sync, name+title (DECIDED 2026-06-27; NOT yet built)
+## Increment 2a — Reviewer→contact field sync, name+title (SHIPPED 2026-06-27, commit 027fe256)
 
 Owner (Justin) locked the field-by-field specifics for the first field-sync slice. This
 **refines** the general Q3/Q4 posture above for these specific low-stakes, self-corrected
@@ -301,5 +306,12 @@ email-only; fail-open per candidate. AND the honorarium split-contact ORCID cros
 *hit* in `ensureContact` — email→A vs unique ORCID→B raises a `contact_orcid_email_split` warning
 and proceeds with the email-matched contact (never blocks, never overwrites `emailaddress1`).
 Owner decisions per §Policy Decisions; no migration (alert_type is free-text VARCHAR(50)); +63
-unit tests. Still **deferred** to a later, separately policy-gated increment: any
-reviewer→CRM-contact field sync.
+unit tests.
+
+**SHIPPED 2026-06-27 — Increment 2a (commit 027fe256).** Reviewer portal-accept name/title sync:
+on the external-reviewer accept path, the reviewer's self-reported firstName/lastName/title
+**overwrite** `contacts.firstname/lastname/jobtitle` (reviewer-self-report-wins, silent, no alert),
+gated to `wmkf_identitystatus ∈ {confirmed, probable}`, fail-open. See §"Increment 2a" for the
+full decision record. Still **deferred** to Increment 2b: affiliation (needs a contact-schema
+probe — likely `adx_organizationname`), email (never overwrite `emailaddress1`), nickname, and any
+sync of PD-override corrections (which land on potentialreviewer/researcher, not the accept path).
