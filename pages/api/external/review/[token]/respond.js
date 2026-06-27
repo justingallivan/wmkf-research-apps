@@ -44,6 +44,7 @@ import { ensureHonorariumOnboarding } from '../../../../../lib/bill/honorarium-o
 import { captureSelfReportedReviewerOrcid } from '../../../../../lib/services/capture-self-reported-orcid';
 import { syncReviewerNameTitleToContact } from '../../../../../lib/services/sync-reviewer-name-title-to-contact';
 import { alertReviewerEmailMismatch } from '../../../../../lib/services/alert-reviewer-email-mismatch';
+import { alertReviewerAffiliationMismatch } from '../../../../../lib/services/alert-reviewer-affiliation-mismatch';
 import { normalizeOrcid } from '../../../../../lib/utils/orcid-normalize';
 import NotificationService from '../../../../../lib/services/notification-service';
 import { maybeNotifyQuotaReached } from '../../../../../lib/services/reviewer-quota';
@@ -257,6 +258,7 @@ function suggestionWithAppliedContactEdits(suggestion, body) {
     wmkf_reviewerlastname: suggestion?.wmkf_reviewerlastname ?? null,
     wmkf_reviewernickname: suggestion?.wmkf_reviewernickname ?? null,
     wmkf_reviewertitle: suggestion?.wmkf_reviewertitle ?? null,
+    wmkf_revieweraffiliation: suggestion?.wmkf_revieweraffiliation ?? null,
     wmkf_revieweremail: suggestion?.wmkf_revieweremail ?? null,
   };
   const edits = body?.contactEdits || {};
@@ -265,6 +267,7 @@ function suggestionWithAppliedContactEdits(suggestion, body) {
     lastName: 'wmkf_reviewerlastname',
     nickname: 'wmkf_reviewernickname',
     title: 'wmkf_reviewertitle',
+    affiliation: 'wmkf_revieweraffiliation',
     email: 'wmkf_revieweremail',
   };
   for (const [key, column] of Object.entries(editMap)) {
@@ -327,6 +330,22 @@ async function alertOnReviewerEmailMismatch({ reviewer, suggestion, contactId, r
     });
   } catch (mismatchErr) {
     console.warn('[external respond] reviewer email-mismatch alert failed (non-fatal):', mismatchErr?.message || mismatchErr);
+  }
+}
+
+async function alertOnReviewerAffiliationMismatch({ reviewer, suggestion, contactId, reviewerAffiliation }) {
+  // NON-FATAL: the accept has already committed; a mismatch-alert failure must
+  // never surface as an error to the reviewer. The service is built to fail-open
+  // internally, but wrap defensively here too (mirrors alertOnReviewerEmailMismatch).
+  try {
+    await alertReviewerAffiliationMismatch({
+      reviewer,
+      contactId: contactId || reviewer?._wmkf_contact_value || null,
+      reviewerAffiliation,
+      suggestionId: suggestion?.wmkf_appreviewersuggestionid || null,
+    });
+  } catch (mismatchErr) {
+    console.warn('[external respond] reviewer affiliation-mismatch alert failed (non-fatal):', mismatchErr?.message || mismatchErr);
   }
 }
 
@@ -657,6 +676,12 @@ export default async function handler(req, res) {
       suggestion,
       contactId: honContactId,
       reviewerEmail: body?.contactEdits?.email || acceptedSuggestion?.wmkf_revieweremail || null,
+    });
+    await alertOnReviewerAffiliationMismatch({
+      reviewer,
+      suggestion,
+      contactId: honContactId,
+      reviewerAffiliation: body?.contactEdits?.affiliation || acceptedSuggestion?.wmkf_revieweraffiliation || null,
     });
 
     // ── Acceptance confirmation email (NON-FATAL; fire-once on fresh accept) ─
