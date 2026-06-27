@@ -1,10 +1,16 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-22
+last_verified: 2026-06-27
 stale_after_days: 90
 owner: reviewers
 source_files:
+  - shared/components/reviewers/email-template-store.js
+  - shared/components/reviewers/EmailTemplatesModal.js
+  - shared/components/admin/EmailDefaultsSection.js
+  - shared/config/editableTextDefaults.js
+  - pages/api/email-defaults/reviewer-templates.js
+  - lib/seed/email-defaults/reviewer-templates.js
   - shared/components/reviewers/ReviewersTab.js
   - shared/components/reviewers/ReviewerFindPanel.js
   - shared/components/reviewers/ReviewerSearchSection.js
@@ -88,14 +94,32 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 
 **Contact leads (S267, Slices 3–5):** `shared/components/reviewers/ContactLeads.js` renders the quarantined `contactEnrichment.contactLeads` (Slice 2a) in `ReviewerSearchSection`'s `CandidateCard`, gated on `!identityUnverified` (NOT `!email` — promoting one field must not hide the other still-unfixed leads; the component self-hides when empty and resolved candidates carry no leads) and deduped against the email + website chips — high/medium prominent, low/rejected behind a "Show N weak / rejected leads" toggle with the not-auto-used reason. **Slice 4 promotion:** a manage-only `onUse` ("Use this email"/"Use this page", gated on `canManage`) calls `ReviewerSearchSection.useLead`, which stamps `emailSource:'manual'`, clears the contact-layer abstain (e.g. `verified_domain_contradiction`) so save persists it, and auto-selects the row; `emailConfidence` (`reviewer-invite.js`) classifies `manual` as LOW so the invite still requires confirm-before-send. **Slice 5 persistence:** `pruneContactLeads` + `pruneCandidateForRoster` persist a compact bounded (≤8) payload-free leads array, so the section survives a roster reload (`mergeEnrichment` already keeps it on live rows via full spread). No Dataverse change. **On-card manual edit (follow-up):** a manage-only "✏️ Edit contact" opens `CandidateEditModal` in local mode (`onApply` prop instead of the saved-row PATCH); `ReviewerSearchSection.setManualContact` applies the edit to client state — email/website stamped `manual` (low-confidence invite), Name locked (the card is name-keyed), auto-selects. The same `setManualContact` backs the lead promotion (`useLead` wraps it). The saved-candidates `ReviewerInvitePanel` editor — the **Invite Reviewers** sub-tab (`ReviewersTab.js:42`; file renamed `CandidatesPanel.js`→`ReviewerInvitePanel.js` S291, header text fixed from legacy "Candidates" to "Invite Reviewers" S290) — keeps full PATCH-mode editing (incl. name), now surfaced via BOTH the clickable name AND an explicit "✏️ Edit contact" button mirroring the Find tab (S290), so staff don't have to discover the name is clickable. The invite checkbox is disabled for never-invited no-email rows (`c.accepted || (!c.email && !c.invited)`) and the Send set requires an email, so a doomed (server-skipped) invite can't be queued; already-invited rows stay selectable so they remain releasable. **Merge mode (S290, chunk 4):** when a saved-candidate email edit PATCH returns a duplicate-key 409 with `conflictingRecordId` (another `wmkf_potentialreviewers` row owns that email), the modal switches into a record-merge flow instead of dead-ending — keeper defaults to the edited record (Swap to flip), an orientation-aware field picker (email defaults to whichever side owns the conflict-target address), a blocked-reasons explainer when the loser isn't pre-engagement, and an orphan-detection recovery prompt if the email-move step tears (confirm 500 + the address now owned by neither side). Backend: `lib/services/reviewer-merge.js` + `POST /api/reviewer-finder/merge-candidates`. Spec: `docs/REVIEWER_MERGE_DESIGN.md`. Spec/status: `docs/REVIEWER_CONTACT_LEADS_SPEC.md`; produced in `contact-enrichment-service.js` (see reviewer-identity topic).
 
-## Email templates (per-PD)
+## Email templates (admin org default + per-PD override)
 
-- The four reviewer email templates (`invitation`, `materials`, `followup`,
-  `thankyou`) live in `shared/components/reviewers/email-template-store.js`
-  (`DEFAULT_TEMPLATES` + `loadEmailTemplates`/`saveEmailTemplates`, persisted per-PD
-  under `PREFERENCE_KEYS.EMAIL_TEMPLATES`). Edit them in **Profile Settings** (the
-  canonical hub) OR the Workbench Reviewers tab's "✎ Email templates" — both open
-  the SAME `EmailTemplatesModal` against the same preference key.
+- **Two layers (S297).** The four reviewer templates (`invitation`, `materials`,
+  `followup`, `thankyou`) now resolve as **per-PD override → admin org default**,
+  with no runtime code fallback (a blank/unavailable admin value renders blank in
+  the PD's preview-before-send, by design — all four are interactive
+  preview-then-send only, no headless path).
+  - **Admin org default:** edited in `/admin` → **Email Defaults**
+    (`EmailDefaultsSection`), stored in Dataverse `wmkf_appsystemsetting` under
+    `email.reviewer_<type>.{subject,body}`, read by PDs via
+    `GET /api/email-defaults/reviewer-templates`. Shipped copy is **seeded** from
+    `lib/seed/email-defaults/reviewer-templates.js` (the single source of the
+    default text; init data, NOT a runtime fallback) via
+    `scripts/seed-email-defaults.mjs --execute` / `rebaseline-email-defaults.mjs`.
+    **Deploy step:** the seed must run or every reviewer template renders blank.
+  - **Per-PD override:** still `shared/components/reviewers/email-template-store.js`
+    (`loadEmailTemplates`/`saveEmailTemplates`, `PREFERENCE_KEYS.EMAIL_TEMPLATES` in
+    `wmkf_appuserpreferences`), edited in **Profile Settings** OR the Workbench
+    Reviewers tab's "✎ Email templates" (same `EmailTemplatesModal`). `saveEmailTemplates`
+    now persists **override-only** (fields differing from the admin default), so later
+    admin edits flow through to non-overridden fields; "reset to default" clears the
+    override back to the admin org default. The store no longer holds `DEFAULT_TEMPLATES`;
+    `EMPTY_TEMPLATES` is the blank skeleton used until a load completes.
+  - **Recovery of a fat-fingered blank** is parked for Connor: enable Dataverse
+    table-level auditing on `wmkf_appsystemsetting` — see
+    `project-dataverse-settings-audit-enablement`.
   (The `hold` + `finalize` templates were **REMOVED in S279** along with the rest of
   the hold path — see `project-reviewer-hold-step-decouple`.)
 - All four templates are sendable: `invitation` (first contact, via ReviewerInvitePanel →

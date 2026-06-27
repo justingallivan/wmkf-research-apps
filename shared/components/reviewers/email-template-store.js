@@ -1,19 +1,26 @@
 /**
- * Per-user reviewer email templates — single source of truth.
+ * Per-PD reviewer email templates — resolution + persistence.
  *
- * Templates live in Dataverse `wmkf_appuserpreferences` under
- * PREFERENCE_KEYS.EMAIL_TEMPLATES (a JSON object keyed by template type), via
- * /api/user-preferences. This replaces the old browser-localStorage template
- * store (Review Manager) and the hardcoded invitation constant (Workbench).
+ * Two layers (S297):
+ *   1. Admin org default — the shipped copy, edited in the admin "Email Defaults"
+ *      panel, stored in Dataverse `wmkf_appsystemsetting` under keys
+ *      email.reviewer_<type>.{subject,body}. Read here via
+ *      /api/email-defaults/reviewer-templates. Seeded from
+ *      lib/seed/email-defaults/reviewer-templates.js (init data, NOT a runtime
+ *      code fallback — a blank admin value renders blank in the PD's
+ *      preview-before-send, by design).
+ *   2. Per-PD override — optional, stored per-PD in `wmkf_appuserpreferences`
+ *      under PREFERENCE_KEYS.EMAIL_TEMPLATES via /api/user-preferences. Only the
+ *      fields a PD actually changed from the admin default are persisted, so
+ *      later admin edits flow through to non-overridden fields.
  *
  * Types: invitation, materials, followup, thankyou — each { subject, body }.
  *
  * Placeholder note: bodies use server placeholders ({{greeting}}, {{proposalTitle}},
- * {{piInstitution}}, {{externalLink}}, {{reviewDueDate}}, {{signature}}, …) resolved
- * by /api/review-manager/render-emails. The invitation template ALSO uses the
- * client-side timing tokens {{respondBy}} / {{proposalDelivery}} / {{reviewDue}},
- * which InviteEmailModal substitutes locally (see that file) — render-emails
- * leaves them untouched.
+ * {{piInstitution}}, {{externalLink}}, {{reviewDueDate}}, {{customField:honorarium}},
+ * {{signature}}, …) resolved by /api/review-manager/render-emails. The invitation
+ * template ALSO uses the client-side timing tokens {{respondBy}} /
+ * {{proposalDelivery}} / {{reviewDue}}, which InviteEmailModal substitutes locally.
  */
 
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
@@ -27,111 +34,99 @@ export const TEMPLATE_TYPE_LABELS = {
   thankyou: 'Thank-you',
 };
 
-export const DEFAULT_TEMPLATES = {
-  invitation: {
-    subject: 'Invitation to review for the W. M. Keck Foundation — {{proposalTitle}}',
-    body: `{{greeting}},
+/** Blank skeleton so callers always get the full {type:{subject,body}} shape. */
+export const EMPTY_TEMPLATES = Object.freeze(
+  Object.fromEntries(TEMPLATE_TYPES.map((type) => [type, Object.freeze({ subject: '', body: '' })])),
+);
 
-The W. M. Keck Foundation is assembling a review panel and would value your expertise. We’re writing to ask whether you’d be willing to review the proposal below. The summary here is enough to decide — and to flag any conflict of interest — before the full materials go out.
-
-{{proposalDetails}}
-
-{{proposalAbstract}}
-
-Please use your secure personal link to accept or decline:
-{{externalLink}}
-
-Review timeline:
-- Please respond by {{respondBy}}.
-- We expect to send the full proposal and review form on {{proposalDelivery}}.
-- Completed reviews would be due by {{reviewDue}}.
-
-When you accept, you’ll confirm a few details — the conflict-of-interest and AI-use acknowledgements, and how you’d like any honorarium handled. The full proposal and review form then follow once it’s released for review. If the summary already surfaces a conflict, a quick decline is just as helpful. We would be grateful for your help.
-
-{{signature}}`,
-  },
-  materials: {
-    subject: 'Review Materials: {{proposalTitle}}',
-    body: `{{greeting}},
-
-Thank you for agreeing to review the proposal “{{proposalTitle}}” from {{piInstitution}}.
-
-Please use your secure reviewer link to download the proposal materials and submit your completed review:
-{{externalLink}}
-
-This link is unique to you. We ask that you submit your review by {{reviewDueDate}}.
-
-If you have any questions about the review process, please don’t hesitate to reach out.
-
-Thank you for your time and expertise.
-
-{{signature}}`,
-  },
-  followup: {
-    subject: 'Reminder: Review Due — {{proposalTitle}}',
-    body: `{{greeting}},
-
-This is a friendly reminder that your review of “{{proposalTitle}}” is due by {{reviewDueDate}}.
-
-Your secure reviewer link (use the one in this email — it supersedes any earlier link):
-{{externalLink}}
-
-Please let us know if you need additional time or have any questions.
-
-Thank you,
-
-{{signature}}`,
-  },
-  thankyou: {
-    subject: 'Thank You for Your Review — {{proposalTitle}}',
-    body: `{{greeting}},
-
-Thank you very much for completing your review of “{{proposalTitle}}”. Your expertise and thoughtful evaluation are greatly appreciated and will be invaluable to the Foundation’s decision-making process.
-
-We will be in touch regarding the processing of your honorarium.
-
-With gratitude,
-
-{{signature}}`,
-  },
-};
-
-/** Deep-ish merge: stored templates override defaults per type/field. */
-export function mergeTemplates(stored) {
+/** Coerce an arbitrary object into the full template shape (missing → ''). */
+function toShape(obj) {
   const out = {};
   for (const type of TEMPLATE_TYPES) {
     out[type] = {
-      subject: stored?.[type]?.subject ?? DEFAULT_TEMPLATES[type].subject,
-      body: stored?.[type]?.body ?? DEFAULT_TEMPLATES[type].body,
+      subject: obj?.[type]?.subject ?? '',
+      body: obj?.[type]?.body ?? '',
     };
   }
   return out;
 }
 
 /**
- * Load the current user's templates merged over defaults. Best-effort: any
- * failure (not signed in, network) falls back to defaults so the email flow
- * never breaks.
+ * Layer per-PD overrides over the admin org defaults. A missing override
+ * field falls through to the admin default (which itself may be blank).
+ */
+export function mergeTemplates(stored, adminDefaults) {
+  const base = toShape(adminDefaults);
+  const out = {};
+  for (const type of TEMPLATE_TYPES) {
+    out[type] = {
+      subject: stored?.[type]?.subject ?? base[type].subject,
+      body: stored?.[type]?.body ?? base[type].body,
+    };
+  }
+  return out;
+}
+
+/**
+ * Reduce a full template set to ONLY the fields that differ from the admin
+ * default, so we persist genuine per-PD deviations and let admin edits flow
+ * through to everything else.
+ */
+export function toOverrides(templates, adminDefaults) {
+  const base = toShape(adminDefaults);
+  const out = {};
+  for (const type of TEMPLATE_TYPES) {
+    const diff = {};
+    if ((templates?.[type]?.subject ?? '') !== base[type].subject) diff.subject = templates[type].subject;
+    if ((templates?.[type]?.body ?? '') !== base[type].body) diff.body = templates[type].body;
+    if (Object.keys(diff).length > 0) out[type] = diff;
+  }
+  return out;
+}
+
+/**
+ * Fetch the admin org defaults (the base layer). Best-effort: any failure
+ * returns the blank skeleton so a transient outage degrades to blank previews
+ * (which the PD sees and won't send) rather than throwing.
+ */
+export async function loadAdminTemplateDefaults() {
+  try {
+    const res = await fetch('/api/email-defaults/reviewer-templates');
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data?.templates) return toShape(data.templates);
+  } catch { /* fall through to blank skeleton */ }
+  return toShape(null);
+}
+
+/**
+ * Load the current PD's resolved templates: per-PD override layered over the
+ * admin org default. Best-effort — never throws; missing layers degrade to blank.
  */
 export async function loadEmailTemplates() {
+  const adminDefaults = await loadAdminTemplateDefaults();
   try {
     const res = await fetch(`/api/user-preferences?key=${encodeURIComponent(PREFERENCE_KEYS.EMAIL_TEMPLATES)}`);
     const data = await res.json().catch(() => ({}));
     if (data?.value) {
       const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-      return mergeTemplates(parsed);
+      return mergeTemplates(parsed, adminDefaults);
     }
-  } catch { /* fall through to defaults */ }
-  return mergeTemplates(null);
+  } catch { /* fall through to admin defaults */ }
+  return mergeTemplates(null, adminDefaults);
 }
 
-/** Persist the user's templates. Returns true on success. */
+/**
+ * Persist the PD's templates as override-only (fields differing from the admin
+ * default). Re-reads the admin default to diff against. Returns true on success.
+ */
 export async function saveEmailTemplates(templates) {
   try {
+    const adminDefaults = await loadAdminTemplateDefaults();
+    const overrides = toOverrides(templates, adminDefaults);
     const res = await fetch('/api/user-preferences', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: PREFERENCE_KEYS.EMAIL_TEMPLATES, value: JSON.stringify(templates) }),
+      body: JSON.stringify({ key: PREFERENCE_KEYS.EMAIL_TEMPLATES, value: JSON.stringify(overrides) }),
     });
     return res.ok;
   } catch {

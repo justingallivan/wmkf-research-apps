@@ -27,6 +27,16 @@ import {
   REVIEWER_WITHDRAW_SEED_BODY,
   REVIEWER_WITHDRAW_SEED_SUBJECT,
 } from '../lib/seed/email-defaults/reviewer-actions.js';
+import {
+  REVIEWER_INVITATION_SEED_SUBJECT,
+  REVIEWER_INVITATION_SEED_BODY,
+  REVIEWER_MATERIALS_SEED_SUBJECT,
+  REVIEWER_MATERIALS_SEED_BODY,
+  REVIEWER_FOLLOWUP_SEED_SUBJECT,
+  REVIEWER_FOLLOWUP_SEED_BODY,
+  REVIEWER_THANKYOU_SEED_SUBJECT,
+  REVIEWER_THANKYOU_SEED_BODY,
+} from '../lib/seed/email-defaults/reviewer-templates.js';
 
 export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.grantee_invite.subject': GRANTEE_INVITE_SEED_SUBJECT,
@@ -39,6 +49,14 @@ export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.reviewer_acceptance.body': REVIEWER_ACCEPTANCE_SEED_BODY,
   'email.reviewer_withdraw.subject': REVIEWER_WITHDRAW_SEED_SUBJECT,
   'email.reviewer_withdraw.body': REVIEWER_WITHDRAW_SEED_BODY,
+  'email.reviewer_invitation.subject': REVIEWER_INVITATION_SEED_SUBJECT,
+  'email.reviewer_invitation.body': REVIEWER_INVITATION_SEED_BODY,
+  'email.reviewer_materials.subject': REVIEWER_MATERIALS_SEED_SUBJECT,
+  'email.reviewer_materials.body': REVIEWER_MATERIALS_SEED_BODY,
+  'email.reviewer_followup.subject': REVIEWER_FOLLOWUP_SEED_SUBJECT,
+  'email.reviewer_followup.body': REVIEWER_FOLLOWUP_SEED_BODY,
+  'email.reviewer_thankyou.subject': REVIEWER_THANKYOU_SEED_SUBJECT,
+  'email.reviewer_thankyou.body': REVIEWER_THANKYOU_SEED_BODY,
   'email.grantee_reminder.subject': GRANTEE_REMINDER_SEED_SUBJECT,
   'email.grantee_reminder.body': GRANTEE_REMINDER_SEED_BODY,
 });

@@ -12,8 +12,8 @@ import { useState, useEffect } from 'react';
 import {
   TEMPLATE_TYPES,
   TEMPLATE_TYPE_LABELS,
-  DEFAULT_TEMPLATES,
   loadEmailTemplates,
+  loadAdminTemplateDefaults,
   saveEmailTemplates,
 } from './email-template-store';
 
@@ -22,6 +22,7 @@ const INVITATION_TIMING_HINT = '{{respondBy}} {{proposalDelivery}} {{reviewDue}}
 
 export default function EmailTemplatesModal({ onClose }) {
   const [templates, setTemplates] = useState(null);
+  const [adminDefaults, setAdminDefaults] = useState(null);
   const [active, setActive] = useState('invitation');
   const [status, setStatus] = useState('loading'); // loading | ready | saving | saved | error
   const [error, setError] = useState(null);
@@ -29,8 +30,8 @@ export default function EmailTemplatesModal({ onClose }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const t = await loadEmailTemplates();
-      if (!cancelled) { setTemplates(t); setStatus('ready'); }
+      const [t, defs] = await Promise.all([loadEmailTemplates(), loadAdminTemplateDefaults()]);
+      if (!cancelled) { setTemplates(t); setAdminDefaults(defs); setStatus('ready'); }
     })();
     return () => { cancelled = true; };
   }, []);
@@ -38,8 +39,10 @@ export default function EmailTemplatesModal({ onClose }) {
   const update = (field, value) =>
     setTemplates((prev) => ({ ...prev, [active]: { ...prev[active], [field]: value } }));
 
+  // Reset to the org default (admin "Email Defaults" panel). Clearing the per-PD
+  // override this way lets future admin edits flow through to this field again.
   const resetActiveToDefault = () =>
-    setTemplates((prev) => ({ ...prev, [active]: { ...DEFAULT_TEMPLATES[active] } }));
+    setTemplates((prev) => ({ ...prev, [active]: { ...(adminDefaults?.[active] || { subject: '', body: '' }) } }));
 
   const handleSave = async () => {
     setStatus('saving'); setError(null);

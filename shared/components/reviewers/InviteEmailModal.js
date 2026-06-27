@@ -27,7 +27,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { readSseStream } from './sse';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
-import { loadEmailTemplates, DEFAULT_TEMPLATES } from './email-template-store';
+import { loadEmailTemplates, EMPTY_TEMPLATES } from './email-template-store';
 
 // Parse a YYYY-MM-DD as LOCAL time (not UTC) and format as "January 15, 2026".
 function formatDate(ymd) {
@@ -92,7 +92,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [rawDrafts, setRawDrafts] = useState([]); // from render-emails, timing tokens still literal
   const [edits, setEdits] = useState({}); // suggestionId -> { subject?, body? } user overrides
   const [timing, setTiming] = useState({ respondOffsetDays: 7, proposalSendDate: '', reviewDueDate: '' });
-  const [template, setTemplate] = useState(DEFAULT_TEMPLATES.invitation); // user's invitation template
+  const [template, setTemplate] = useState(EMPTY_TEMPLATES.invitation); // resolved invitation template (admin default + per-PD override), loaded on open
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState({ current: 0, total: 0, message: 'Rendering previews…' });
   const [results, setResults] = useState({ sent: [], failed: [], skipped: [] });

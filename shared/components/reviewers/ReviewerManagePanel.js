@@ -28,7 +28,7 @@ import { createPortal } from 'react-dom';
 import { Card, Button } from '../Layout';
 import ReviewFormFields from '../external/ReviewFormFields';
 import { STATUS_PIPELINE, getStatusInfo, filterByMode } from './reviewer-modes';
-import { DEFAULT_TEMPLATES, loadEmailTemplates, saveEmailTemplates } from './email-template-store';
+import { EMPTY_TEMPLATES, loadEmailTemplates, saveEmailTemplates } from './email-template-store';
 
 // Pure status-pipeline / mode-bucketing logic lives in ./reviewer-modes
 // (React-free + unit-tested). Re-export the pipeline so existing importers of
@@ -36,9 +36,11 @@ import { DEFAULT_TEMPLATES, loadEmailTemplates, saveEmailTemplates } from './ema
 export { STATUS_PIPELINE, MODE_STATUSES, MODE_WORK_REMAINING, filterByMode } from './reviewer-modes';
 
 // ─── Template Defaults ──────────────────────────────────────────────────────
-// Defaults + per-user persistence live in email-template-store.js (Dataverse,
-// PREFERENCE_KEYS.EMAIL_TEMPLATES). DEFAULT_TEMPLATES is imported from there so
-// the invitation + materials/followup/thankyou defaults stay in one place.
+// Resolution + per-PD persistence live in email-template-store.js: the org
+// default (admin "Email Defaults" panel, Dataverse wmkf_appsystemsetting) with a
+// per-PD override layered on top (wmkf_appuserpreferences, EMAIL_TEMPLATES).
+// loadEmailTemplates() returns the resolved set; EMPTY_TEMPLATES is the blank
+// skeleton used until that load completes.
 
 // ─── Status Badge ───────────────────────────────────────────────────────────
 
@@ -224,7 +226,7 @@ const emptyProposalDoc = () => ({
 
 function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, settings, onEmailsSent }) {
   const [templateType, setTemplateType] = useState('materials');
-  const [templates, setTemplates] = useState(DEFAULT_TEMPLATES);
+  const [templates, setTemplates] = useState(EMPTY_TEMPLATES);
   const [step, setStep] = useState('compose'); // compose | preview | sending | sent
   const [progress, setProgress] = useState({ current: 0, total: 0, message: '' });
   const [drafts, setDrafts] = useState([]); // [{ suggestionId, candidateName, candidateEmail, requestNumber, subject, body, skipped? }]
