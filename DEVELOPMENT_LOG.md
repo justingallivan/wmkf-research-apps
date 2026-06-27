@@ -66,7 +66,7 @@ The pre-Session 84 chronological per-session log (everything after the September
 **Ship state:**
 - Azure staff app ("WMK: SSO Authentication", client `a652a292-…`) now allows `https://applications.wmkeck.org/api/auth/callback/azure-ad`; `NEXTAUTH_URL=https://applications.wmkeck.org` set in Production.
 - VERIFIED via live `/api/health` + an authenticated POST/DELETE write probe on the branded host: sign-in + reads + writes all work; Origin CSRF check ON and pinned there.
-- Legacy `wmkfresearch.vercel.app` now 403s writes and funnels sign-in to the branded host (deprecation tail; old callback retained for now). Preview `NEXTAUTH_URL` removed (had been wrongly set to the prod host).
+- Legacy `wmkfresearch.vercel.app` 403s writes and funnels sign-in to the branded host (deprecation tail; old callback retained for now). Preview `NEXTAUTH_URL` removed (had been wrongly set to the prod host). *(S293 follow-up: the legacy host now also 307-redirects page navigations to the branded host via a `next.config.js` rule, so bookmarks land on the branded host before hitting the Origin-403; `/api/*` excluded.)*
 - **Correction:** the months-long "NEXTAUTH_URL empty in prod" belief was a Sensitive-var `vercel env pull` artifact (reads back `""`); runtime was always non-empty — trust `/api/health`, not the pull.
 
 **Why it matters:** staff now see a WMKF-owned domain (anti-phishing parity with the external portals), and state-changing staff API calls are host-locked by the CSRF check.

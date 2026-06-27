@@ -72,10 +72,14 @@ private Blob/file access, prompt-injection hardening, and download proxy pattern
   the branded host: sign-in + reads + writes all work there. The Origin check is
   ON, pinned to the branded host: `lib/utils/auth.js` rejects POST/PUT/PATCH/DELETE
   whose Origin/Referer ≠ `NEXTAUTH_URL`.
-- Legacy `wmkfresearch.vercel.app` is now the deprecation tail: GET works, but
-  state-changing requests 403, and sign-in there pins the callback to the branded
-  host so users funnel over. Do not hard-retire it until outstanding staff
-  bookmarks and old external magic links are accounted for.
+- Legacy `wmkfresearch.vercel.app` now **307-redirects page navigations to
+  `applications.wmkeck.org`** (S293, `next.config.js` host-conditioned `redirects()`,
+  `permanent:false`, prod-verified; runs before the `proxy.js` auth gate). `/api/*` is
+  EXCLUDED, so an in-flight POST from an already-open old-host tab still 403s on Origin
+  mismatch until the next navigation. Pre-S293 it was a bare deprecation tail (GET worked,
+  state-changing 403'd). Underlying Origin-403 still applies to any API call that reaches
+  the old host. Do not hard-retire the host until outstanding external magic links are
+  accounted for.
 - `NEXTAUTH_URL` runtime-vs-pull trap: while it was a Sensitive Vercel var,
   `vercel env pull` read it back as `""`, producing a false "empty in prod" belief
   in earlier docs. The authoritative producer is runtime `/api/health` (reports

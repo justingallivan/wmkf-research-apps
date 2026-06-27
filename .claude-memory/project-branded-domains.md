@@ -1,6 +1,6 @@
 ---
 name: project-branded-domains
-description: External-facing comms use wmkeck.org branded domains (anti-phishing); reviewer/grantee portal base URLs are live on reviews./grantees.wmkeck.org; applications.wmkeck.org is now the LIVE staff-auth host — NEXTAUTH_URL=https://applications.wmkeck.org (cut over 2026-06-23, verified sign-in+read+write), CSRF Origin check pinned to it, old wmkfresearch.vercel.app host now 403s writes and funnels sign-in to the branded host.
+description: External-facing comms use wmkeck.org branded domains (anti-phishing); reviewer/grantee portal base URLs are live on reviews./grantees.wmkeck.org; applications.wmkeck.org is now the LIVE staff-auth host — NEXTAUTH_URL=https://applications.wmkeck.org (cut over 2026-06-23, verified sign-in+read+write), CSRF Origin check pinned to it. The old wmkfresearch.vercel.app host now 307-REDIRECTS page navigations to applications.wmkeck.org (next.config.js host rule, S293, prod-verified; /api/* excluded → those still 403 on Origin mismatch).
 metadata:
   type: project
   status: active
@@ -37,9 +37,15 @@ Origin/Referer checks.
   (preference persisted + cleaned up). So sign-in + reads + writes all work on the
   branded host, and the `lib/utils/auth.js` Origin/Referer CSRF check is ON, pinned
   to `applications.wmkeck.org`. The legacy `wmkfresearch.vercel.app` host now
-  behaves as the deprecation tail: GET still works, but POST/PUT/PATCH/DELETE 403
-  (Origin mismatch), and sign-in there pins the callback to the branded host so
-  users funnel over. **Lesson:** the earlier "NEXTAUTH_URL is empty in prod" claim
+  **307-redirects page navigations to `applications.wmkeck.org`** (S293,
+  `next.config.js` host-conditioned `redirects()` rule, `permanent:false`,
+  prod-verified: `/` and `/workbench/123?tab=foo` both redirect path+query intact).
+  This runs before the `proxy.js` auth gate, so old bookmarks land on the branded
+  host before they can hit the Origin-403. `/api/*` is EXCLUDED from the redirect
+  (redirecting API POSTs wouldn't help — Origin still mismatches), so a stale
+  old-host tab's in-flight POST/PUT/PATCH/DELETE still 403s (Origin mismatch) until
+  its next navigation. Pre-S293 the host was a bare deprecation tail (GET worked,
+  state-changing 403'd, sign-in funneled over). **Lesson:** the earlier "NEXTAUTH_URL is empty in prod" claim
   was WRONG — it came from `vercel env pull` reading a then-Sensitive var back as
   `""`; runtime was always `wmkfresearch.vercel.app` until this cut-over (see the
   sensitive-var trap below). Trust the runtime producer (`/api/health`), not the
