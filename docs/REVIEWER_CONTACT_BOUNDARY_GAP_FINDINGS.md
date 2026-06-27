@@ -2,9 +2,10 @@
 
 Status: **FINDINGS / DESIGN STUB. One increment SHIPPED (2026-06-26): the
 duplicate-contact-on-corrected-email fix — `ensureContact` ORCID fallback (see §Status /
-Next Step). Owner policy decisions RESOLVED 2026-06-27 (see §Policy Decisions); the
-origination-time contact match (Increment 1) is greenlit for build but NOT yet built.
-Reviewer→CRM-contact field sync remains deferred to a later policy-gated increment.**
+Next Step). Owner policy decisions RESOLVED 2026-06-27 (see §Policy Decisions). Increment 1
+(origination-time contact match + honorarium split-contact ORCID cross-check) SHIPPED
+2026-06-27 (commit 35693cf2). Reviewer→CRM-contact field sync remains deferred to a
+later policy-gated increment.**
 Drafted: 2026-06-25 (S290)
 Owner: reviewer-finder
 Scope: the `wmkf_potentialreviewers` ↔ CRM `contacts` boundary (reviewer origination,
@@ -260,7 +261,13 @@ ambiguous-ORCID case now writes a `system_alerts` row (see the SHIPPED note abov
 the /admin alerts dashboard, so the flag no longer lives only in server logs. An in-*workbench* (per
 reviewer card) surface remains optional, not required.
 
-**Policy decisions RESOLVED 2026-06-27 (see §Policy Decisions).** Greenlit for Increment 1 but
-NOT yet built: origination-time contact match in `save-candidates` (the "Design Stub" section)
-plus the honorarium split-contact ORCID cross-check on email *hit*. Still **deferred** to a later,
-separately policy-gated increment: any reviewer→CRM-contact field sync.
+**SHIPPED 2026-06-27 — Increment 1 (commit 35693cf2).** Origination-time contact match in
+`save-candidates` (the "Design Stub" section) — `lookupReviewerIdentity` over both stores, then
+`setContactLink` on a confident unique ORCID/email match; candidates/conflict → save unlinked +
+durable `reviewer_contact_match_needs_review` system_alerts warning; pdConfirmed rows lookup
+email-only; fail-open per candidate. AND the honorarium split-contact ORCID cross-check on email
+*hit* in `ensureContact` — email→A vs unique ORCID→B raises a `contact_orcid_email_split` warning
+and proceeds with the email-matched contact (never blocks, never overwrites `emailaddress1`).
+Owner decisions per §Policy Decisions; no migration (alert_type is free-text VARCHAR(50)); +63
+unit tests. Still **deferred** to a later, separately policy-gated increment: any
+reviewer→CRM-contact field sync.
