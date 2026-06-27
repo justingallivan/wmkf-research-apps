@@ -23,6 +23,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: {} })
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   upsertByEmail: jest.fn(async () => ({ id: 'PID-1' })),
   getById: jest.fn(async () => ({ wmkf_primaryaffiliation: 'MIT' })),
+  setContactLink: jest.fn(async () => ({ action: 'link' })),
 }));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   upsertByPotentialReviewer: jest.fn(async () => ({ id: 'PID-1' })),
@@ -59,11 +60,20 @@ jest.mock('../../lib/services/contact-enrichment-service', () => ({
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: jest.fn(async () => 1),
 }));
+jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
+  lookupReviewerIdentity: jest.fn(async () => ({ outcome: 'none' })),
+}));
+jest.mock('../../lib/services/notification-service', () => ({
+  __esModule: true,
+  default: { notify: jest.fn(async () => ({ id: 'alert-1' })) },
+}));
 
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const rosterStore = require('../../lib/services/reviewer-roster-store');
+const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
+const NotificationService = require('../../lib/services/notification-service').default;
 const { RESOLVER_SOURCED_FIELDS } = require('../../lib/services/reviewer-identity-resolver');
 
 function mockRes() {
@@ -94,6 +104,8 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     reviewerSuggestionAdapter.upsert.mockResolvedValue({ id: 'S1' });
+    lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
+    NotificationService.notify.mockResolvedValue({ id: 'alert-1' });
   });
 
   const run = (identity) => {
@@ -152,6 +164,174 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
 
+  test('confident ORCID contact match → links the potential reviewer and does not notify', async () => {
+    lookupReviewerIdentity.mockResolvedValueOnce({
+      outcome: 'confident',
+      match: { reviewerId: null, contactId: 'CONTACT-ORCID', matchKey: 'orcid', nameConsistent: true, context: {} },
+    });
+    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr ORCID', email: 'orcid@example.edu', orcid: '0000-0002-1825-0097' }] } };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(lookupReviewerIdentity).toHaveBeenCalledWith({
+      name: 'Dr ORCID',
+      email: 'orcid@example.edu',
+      orcid: '0000-0002-1825-0097',
+    });
+    expect(potentialReviewerAdapter.setContactLink).toHaveBeenCalledWith('PID-1', 'CONTACT-ORCID', { actingUserSystemId: 'SYS-1' });
+    expect(NotificationService.notify).not.toHaveBeenCalled();
+  });
+
+  test('confident email contact match → links the potential reviewer and does not notify', async () => {
+    lookupReviewerIdentity.mockResolvedValueOnce({
+      outcome: 'confident',
+      match: { reviewerId: null, contactId: 'CONTACT-EMAIL', matchKey: 'email', nameConsistent: true, context: {} },
+    });
+    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr Email', email: 'email@example.edu' }] } };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(potentialReviewerAdapter.setContactLink).toHaveBeenCalledWith('PID-1', 'CONTACT-EMAIL', { actingUserSystemId: 'SYS-1' });
+    expect(NotificationService.notify).not.toHaveBeenCalled();
+  });
+
+  test('name-only candidates outcome → saves unlinked and alerts staff review', async () => {
+    const candidates = [{ source: 'reviewer', reviewerId: 'PID-EXISTING', contactId: null, matchKey: 'name', context: { name: 'Dr Name' } }];
+    lookupReviewerIdentity.mockResolvedValueOnce({ outcome: 'candidates', candidates });
+    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr Name' }] } };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.savedCount).toBe(1);
+    expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'reviewer_contact_match_needs_review',
+      severity: 'warning',
+      category: 'reviewers',
+      autoResolveKey: 'reviewer-contact-match:PID-1:REQ-1',
+      metadata: expect.objectContaining({
+        requestId: 'REQ-1',
+        potentialReviewerId: 'PID-1',
+        candidateName: 'Dr Name',
+        lookupOutcome: 'candidates',
+        candidates,
+        policyDecision: 'save_unlinked_staff_review',
+      }),
+    }));
+  });
+
+  test('conflict outcome → saves unlinked and alerts with conflict reason/details', async () => {
+    const details = { emailContactId: 'C-EMAIL', orcidContactId: 'C-ORCID' };
+    lookupReviewerIdentity.mockResolvedValueOnce({ outcome: 'conflict', reason: 'orcid_email_split', details });
+    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr Split', email: 'split@example.edu', orcid: '0000-0002-1825-0097' }] } };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'reviewer_contact_match_needs_review',
+      message: expect.stringContaining('conflict (orcid_email_split)'),
+      metadata: expect.objectContaining({
+        lookupOutcome: 'conflict',
+        conflictReason: 'orcid_email_split',
+        conflictDetails: details,
+        candidates: [],
+      }),
+    }));
+  });
+
+  test('lookup none → saves without link or alert', async () => {
+    lookupReviewerIdentity.mockResolvedValueOnce({ outcome: 'none' });
+    const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr None', email: 'none@example.edu' }] } };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.savedCount).toBe(1);
+    expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+    expect(NotificationService.notify).not.toHaveBeenCalled();
+  });
+
+  test('lookup throws → still saves without link or batch error', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      lookupReviewerIdentity.mockRejectedValueOnce(new Error('lookup down'));
+      const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr Lookup Down', email: 'down@example.edu' }] } };
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toMatchObject({ success: true, savedCount: 1, savedNames: ['Dr Lookup Down'] });
+      expect(res.body.errors).toBeUndefined();
+      expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test('setContactLink linked-elsewhere conflict → still succeeds and keeps live link authoritative', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      lookupReviewerIdentity.mockResolvedValueOnce({
+        outcome: 'confident',
+        match: { reviewerId: null, contactId: 'CONTACT-EMAIL', matchKey: 'email', nameConsistent: true, context: {} },
+      });
+      potentialReviewerAdapter.setContactLink.mockRejectedValueOnce(Object.assign(new Error('linked'), {
+        code: 'reviewer_linked_elsewhere',
+        details: { existingContactId: 'CONTACT-LIVE' },
+      }));
+      const req = { method: 'POST', body: { requestId: 'REQ-1', candidates: [{ name: 'Dr Race', email: 'race@example.edu' }] } };
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.savedCount).toBe(1);
+      expect(res.body.errors).toBeUndefined();
+      expect(potentialReviewerAdapter.setContactLink).toHaveBeenCalledWith('PID-1', 'CONTACT-EMAIL', { actingUserSystemId: 'SYS-1' });
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test('partial batch still preserves saved rows when one later Dataverse write fails', async () => {
+    lookupReviewerIdentity
+      .mockResolvedValueOnce({
+        outcome: 'confident',
+        match: { reviewerId: null, contactId: 'CONTACT-SAVED', matchKey: 'email', nameConsistent: true, context: {} },
+      })
+      .mockResolvedValueOnce({ outcome: 'none' });
+    reviewerSuggestionAdapter.upsert.mockImplementation(async ({ suggestionLabel }) => {
+      if (suggestionLabel?.includes('Failing Candidate')) throw new Error('Dataverse write failed');
+      return { id: 'S1' };
+    });
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        proposalTitle: 'Proposal',
+        candidates: [
+          { name: 'Saved Candidate', email: 'saved@example.edu', relevanceScore: 41 },
+          { name: 'Failing Candidate', email: 'fail@example.edu', relevanceScore: 87 },
+        ],
+      },
+    };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({
+      success: true,
+      savedCount: 1,
+      savedNames: ['Saved Candidate'],
+      errors: [{ name: 'Failing Candidate', error: 'Dataverse write failed' }],
+    });
+    expect(potentialReviewerAdapter.setContactLink).toHaveBeenCalledWith('PID-1', 'CONTACT-SAVED', { actingUserSystemId: 'SYS-1' });
+  });
+
   test('openalex_author skipped fallback (no verdict) → Scholar fields nulled, ORCID kept, no decision/clear', async () => {
     const ce = enrichmentFor(null);                                  // identity absent
     ce.tierResults = { openalex_author: { skipped: 'identity_gate_failed' } };
@@ -193,6 +373,18 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
     expect(payload.email).toBe('correct@uni.edu');
     expect(payload.emailSource).toBe('manual');
+  });
+
+  test('PD override: contact lookup receives manual email but no ORCID', async () => {
+    const res = mockRes();
+    await handler(pdConfirmedReq({ email: 'pd@example.edu', orcid: '0000-0002-1825-0097' }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(lookupReviewerIdentity).toHaveBeenCalledWith({
+      name: 'Dr Real Person',
+      email: 'pd@example.edu',
+      orcid: null,
+    });
   });
 
   test('PD override: emailSource is FORCED manual server-side (forged source ignored)', async () => {

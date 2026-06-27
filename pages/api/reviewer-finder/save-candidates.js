@@ -17,6 +17,8 @@ import * as reviewerSuggestionAdapter from '../../../lib/dataverse/adapters/revi
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { mayPersistIdentity, RESOLVER_SOURCED_FIELDS } from '../../../lib/services/reviewer-identity-resolver';
+import { lookupReviewerIdentity } from '../../../lib/services/reviewer-identity-lookup';
+import NotificationService from '../../../lib/services/notification-service';
 import { saveSourceListForCandidate, withReviewerProvenance, buildReviewerProvenance, isIdentityReviewExemptProvenance } from '../../../lib/utils/reviewer-provenance';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 
@@ -267,6 +269,18 @@ export default async function handler(req, res) {
           || contactBlocked; // unresolved cited/PI-named exempt row → null ORCID/Scholar/metrics too
         const blockScholar = pdConfirmed || scholarSkipped || blockByIdentity
           || candidate.scholarPersistAllowed === false;
+        const effectiveLookupOrcid = (pdConfirmed || blockByIdentity) ? null : candidateOrcid;
+
+        let contactMatch = null;
+        try {
+          contactMatch = await lookupReviewerIdentity({
+            name: candidate.name,
+            email: candidateEmail || null,
+            orcid: effectiveLookupOrcid || null,
+          });
+        } catch (lookupErr) {
+          console.warn('[save-candidates] reviewer identity lookup failed (non-fatal):', lookupErr?.message || lookupErr);
+        }
 
         const { id: potentialReviewerId } = await potentialReviewerAdapter.upsertByEmail({
           name: candidate.name,
@@ -276,6 +290,51 @@ export default async function handler(req, res) {
           // Proposal-scoped reasoning is retained even when contact/profile fields are blocked.
           whyChosen: matchReason || null,
         }, { actingUserSystemId });
+
+        if (
+          contactMatch?.outcome === 'confident'
+          && contactMatch.match?.contactId
+          && (contactMatch.match.matchKey === 'orcid' || contactMatch.match.matchKey === 'email')
+        ) {
+          try {
+            await potentialReviewerAdapter.setContactLink(potentialReviewerId, contactMatch.match.contactId, { actingUserSystemId });
+          } catch (linkErr) {
+            if (linkErr?.code === 'reviewer_linked_elsewhere') {
+              console.warn(
+                `[save-candidates] potentialReviewer ${potentialReviewerId} already linked elsewhere; keeping live link authoritative.`
+              );
+            } else {
+              console.warn('[save-candidates] setContactLink failed (non-fatal):', linkErr?.message || linkErr);
+            }
+          }
+        } else if (contactMatch?.outcome === 'candidates' || contactMatch?.outcome === 'conflict') {
+          try {
+            await NotificationService.notify({
+              type: 'reviewer_contact_match_needs_review',
+              severity: 'warning',
+              title: 'Reviewer saved without CRM contact link',
+              message: `Reviewer candidate "${candidate.name}" was saved for request ${requestId}, but CRM contact matching returned ${contactMatch.outcome}${contactMatch.reason ? ` (${contactMatch.reason})` : ''}. The reviewer remains unlinked for staff review.`,
+              metadata: {
+                requestId,
+                potentialReviewerId,
+                candidateName: candidate.name || null,
+                candidateEmail: candidateEmail || null,
+                candidateOrcid: effectiveLookupOrcid || null,
+                candidateAffiliation: candidateAffiliation || null,
+                lookupOutcome: contactMatch.outcome,
+                conflictReason: contactMatch.outcome === 'conflict' ? contactMatch.reason : null,
+                conflictDetails: contactMatch.outcome === 'conflict' ? contactMatch.details : null,
+                candidates: contactMatch.outcome === 'candidates' ? contactMatch.candidates : [],
+                policyDecision: 'save_unlinked_staff_review',
+              },
+              source: 'reviewer-finder/save-candidates',
+              category: 'reviewers',
+              autoResolveKey: `reviewer-contact-match:${potentialReviewerId}:${requestId}`,
+            });
+          } catch (notifyErr) {
+            console.warn('[save-candidates] contact match review alert failed (non-fatal):', notifyErr?.message || notifyErr);
+          }
+        }
 
         await researcherAdapter.upsertByPotentialReviewer(potentialReviewerId, {
           name: candidate.name,
