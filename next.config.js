@@ -1,3 +1,8 @@
+const {
+  LEGACY_HOST,
+  CANONICAL_HOST,
+} = require('./lib/utils/legacy-host-redirect');
+
 const securityHeaders = [
   {
     key: 'Strict-Transport-Security',
@@ -43,6 +48,23 @@ const nextConfig = {
   poweredByHeader: false,
   async redirects() {
     return [
+      // Legacy production host page navigations move to the canonical branded host.
+      // API routes are excluded, especially /api/auth/*, because auth state cookies
+      // are host-scoped; this prevents future old-host page loads from issuing
+      // same-origin POSTs there but does not rescue an already-open old-host tab
+      // until its next navigation. Owner production checks remain: confirm the live
+      // Vercel alias with `vercel alias ls` and live NEXTAUTH_URL via /api/health.
+      {
+        source: '/:path((?!api(?:/|$)).*)',
+        has: [
+          {
+            type: 'host',
+            value: LEGACY_HOST,
+          },
+        ],
+        destination: `https://${CANONICAL_HOST}/:path*`,
+        permanent: false,
+      },
       {
         source: '/proposal-summarizer',
         destination: '/phase-ii-writeup',

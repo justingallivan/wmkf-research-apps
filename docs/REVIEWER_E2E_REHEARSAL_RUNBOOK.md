@@ -143,7 +143,7 @@ and records the GUIDs needed for cleanup.
 1. Save a normal browser auth state for the deployed app:
 
 ```bash
-npm run smoke:reviewer-invite:auth -- --base-url https://wmkfresearch.vercel.app
+npm run smoke:reviewer-invite:auth -- --base-url https://applications.wmkeck.org
 ```
 
 Sign in in the opened browser, return to the terminal, and press Enter. The
@@ -168,7 +168,7 @@ The wrapper refuses to run unless the target email is in
 TEST_REVIEWER_EMAIL_ALLOWLIST=your.test.address@example.org \
 LIVE_REVIEWER_EMAIL_SMOKE=true \
 npm run smoke:reviewer-invite:live -- open \
-  --base-url https://wmkfresearch.vercel.app \
+  --base-url https://applications.wmkeck.org \
   --auth-state .auth/reviewer-invite-smoke.json \
   --confirm-live-email
 ```
