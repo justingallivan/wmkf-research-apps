@@ -177,6 +177,38 @@ increment.
 
 ---
 
+## Increment 2a — Reviewer→contact field sync, name+title (DECIDED 2026-06-27; NOT yet built)
+
+Owner (Justin) locked the field-by-field specifics for the first field-sync slice. This
+**refines** the general Q3/Q4 posture above for these specific low-stakes, self-corrected
+identity fields — it does NOT change the posture for history-bearing fields.
+
+- **Fields in scope:** `firstName→contacts.firstname`, `lastName→contacts.lastname`,
+  `title→contacts.jobtitle`. (Contact target for title verified: three-tier source
+  `firstNonEmpty(suggestion.wmkf_reviewertitle, reviewer.wmkf_title, contact.jobtitle)` at
+  `pages/api/external/review/[token]/context.js:342`; map documented at
+  `docs/REVIEWER_STAGE_2A_BUILD_PLAN.md:145`.)
+- **Write mode:** **OVERWRITE (reviewer self-report wins), SILENTLY — no conflict alert.**
+  Rationale: the reviewer is the authority on their own name/title; the contact link is already
+  confidently theirs (Increment 1 auto-links only on unique exact ORCID/email, and the
+  email/ORCID-split case raises its own alert); a name/title that legitimately changes (marriage,
+  promotion, e.g. "Professor"→"Lucasian Professor of Mathematics") must flow without staff noise.
+  No similarity guard — it would false-positive on exactly the legitimate marriage-name case it
+  was meant to protect, and the wrong-link risk is already handled at link time (Increment 1).
+- **Trigger:** promotion-time (mirror the existing ORCID back-prop call sites), NOT
+  correction-time. Sync only matters once a contact link exists.
+- **Eligibility gate:** only sync reviewer-self-attested (authenticated portal) / PD-confirmed
+  corrections, mirroring the ORCID back-prop gate (`wmkf_identitystatus ∈ {confirmed, probable}`).
+- **DEFERRED to Increment 2b (NOT in 2a):** affiliation (no simple text field on contact today —
+  likely `adx_organizationname`, needs a schema probe before scoping), email (per the
+  payment-email note above — never overwrite `emailaddress1`), nickname (no clean contact target).
+- **Supersedes prior intent:** `docs/REVIEWER_STAGE_2A_BUILD_PLAN.md:177` marked
+  `contacts.firstname/lastname/jobtitle` as "staff-curated, read-only at Stage 2a." That read-only
+  rule is scoped to the *Stage 2a response handler*; promotion-time sync is the same exception
+  ORCID back-prop already uses. Owner consciously accepts overwrite for these low-weight fields.
+
+---
+
 ## `contact-bridge-service` Assessment
 
 `lib/services/contact-bridge-service.js` is a useful precedent for ordered contact resolution
