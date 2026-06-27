@@ -42,6 +42,7 @@ import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 import { ensureHonorariumOnboarding } from '../../../../../lib/bill/honorarium-onboard-orchestrator';
 import { captureSelfReportedReviewerOrcid } from '../../../../../lib/services/capture-self-reported-orcid';
+import { syncReviewerNameTitleToContact } from '../../../../../lib/services/sync-reviewer-name-title-to-contact';
 import { normalizeOrcid } from '../../../../../lib/utils/orcid-normalize';
 import NotificationService from '../../../../../lib/services/notification-service';
 import { maybeNotifyQuotaReached } from '../../../../../lib/services/reviewer-quota';
@@ -249,6 +250,26 @@ function selfReportedOrcidOf(body, suggestion) {
   return body?.contactEdits?.orcid || suggestion?.wmkf_reviewerorcid || null;
 }
 
+function suggestionWithAppliedContactEdits(suggestion, body) {
+  const next = {
+    wmkf_reviewerfirstname: suggestion?.wmkf_reviewerfirstname ?? null,
+    wmkf_reviewerlastname: suggestion?.wmkf_reviewerlastname ?? null,
+    wmkf_reviewertitle: suggestion?.wmkf_reviewertitle ?? null,
+  };
+  const edits = body?.contactEdits || {};
+  const editMap = {
+    firstName: 'wmkf_reviewerfirstname',
+    lastName: 'wmkf_reviewerlastname',
+    title: 'wmkf_reviewertitle',
+  };
+  for (const [key, column] of Object.entries(editMap)) {
+    if (!Object.prototype.hasOwnProperty.call(edits, key)) continue;
+    const value = edits[key];
+    next[column] = (value === null || value === '') ? null : value;
+  }
+  return next;
+}
+
 // Capture the reviewer's self-confirmed ORCID onto the person + contact (the
 // reviewer-side twin of PR3 — highest-trust source, persisted as a sticky
 // 'confirmed'). NON-FATAL: the accept/decline already committed. contactId is
@@ -266,6 +287,24 @@ async function captureReviewerSelfReportedOrcid({ reviewer, contactId, rawOrcid 
     );
   } catch (orcidErr) {
     console.warn('[external respond] self-reported ORCID capture failed (non-fatal):', orcidErr?.message || orcidErr);
+  }
+}
+
+// Sync accepted self-reported name/title onto the linked CRM contact. NON-FATAL:
+// the accept has already committed. The suggestion values passed here are the
+// post-apply durable values: fresh accepts thread applyStage2aResponse's contact
+// edit semantics locally, while repeat accepts use the already-loaded row.
+async function syncReviewerNameTitle({ reviewer, suggestion, contactId }) {
+  try {
+    await bypassDynamicsRestrictions('external-name-title-sync', () =>
+      syncReviewerNameTitleToContact({
+        reviewer,
+        suggestion,
+        contactId: contactId || reviewer?._wmkf_contact_value || null,
+      }),
+    );
+  } catch (nameTitleErr) {
+    console.warn('[external respond] reviewer name/title contact sync failed (non-fatal):', nameTitleErr?.message || nameTitleErr);
   }
 }
 
@@ -388,6 +427,7 @@ export default async function handler(req, res) {
     // step, which may not have completed on the first attempt (Codex pre-impl
     // P1 #2). The honorarium step is itself idempotent.
     const isAcceptRepeat = accepted && !declined;
+    let acceptedSuggestion = suggestion;
     // Opt-out honors BOTH the request body AND the persisted flag (a reviewer who
     // declined-with-opt-out then returns to accept stays opted out; and a re-accept
     // whose body omits the flag must not mint a honorarium for someone who opted
@@ -452,6 +492,7 @@ export default async function handler(req, res) {
         }
         throw e;
       }
+      acceptedSuggestion = suggestionWithAppliedContactEdits(suggestion, body);
     }
 
     // Reflect a valid self-reported ORCID onto the in-memory reviewer BEFORE
@@ -588,6 +629,7 @@ export default async function handler(req, res) {
     // and repeat accepts (idempotent); independent of honorarium opt-out. Sourced
     // from the typed delta OR the persisted engagement value (confirm-without-edit).
     await captureReviewerSelfReportedOrcid({ reviewer, contactId: honContactId, rawOrcid: acceptOrcidRaw });
+    await syncReviewerNameTitle({ reviewer, suggestion: acceptedSuggestion, contactId: honContactId });
 
     // ── Acceptance confirmation email (NON-FATAL; fire-once on fresh accept) ─
     // No new Dataverse marker: the existing isAcceptRepeat signal enforces first
