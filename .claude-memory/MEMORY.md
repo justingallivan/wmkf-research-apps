@@ -54,6 +54,7 @@
 - Prior-context lookup: feedback-check-memory-before-asking-user.md
 - Startup / next-step summary (omit parked items): feedback-dont-resurface-parked-items.md
 - Codex app/delegation loop: project-codex-design-pre-impl-iteration.md; project-codex-recurring-review.md; feedback-commit-before-delegating-to-worktree-agent.md
+- codex:codex-rescue self-report ("killed it"/"done") or unexpected pkill/Bash from the rescue wrapper — verify process state directly, don't trust it: reference-codex-rescue-pkill-overstep.md
 - High-stakes / colleague-facing / prod-deploying change — offer Codex plan/review BEFORE solo-implementing, don't rush then review at the end: feedback-pause-for-codex-on-high-stakes.md
 - Delegating a Codex task whose acceptance includes `npm run build` (Next 16/Turbopack sandbox panic = env failure, not app failure; escalate, don't delete .next): feedback-codex-build-gate-turbopack-sandbox.md
 - Grep/search posture: feedback-grep-general-codebase-terms.md

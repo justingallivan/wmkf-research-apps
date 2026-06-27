@@ -1,155 +1,132 @@
-# Session 292 Prompt: Nomenclature cleanup Phase 3/4 + parked domain discussion
+# Session 293 Prompt: Hold-push cleanup + contact-boundary increment shipped
 
 ## ⚠️ Top-of-session must-knows
 
-1. **`scripts/probe-rabinowitz-conflict.js` is UNTRACKED on purpose and must STAY
+1. **6 commits are UNPUSHED on `main` (push deliberately HELD).** Justin asked to
+   wait before pushing during S292; the session ended with the hold still in force.
+   Before pushing, **confirm with Justin** — pushing `main` auto-deploys Vercel prod.
+   The held commits are listed under "Session 292 Summary → Commits (LOCAL, unpushed)".
+2. **`scripts/probe-rabinowitz-conflict.js` is UNTRACKED on purpose and must STAY
    untracked** — it hardcodes a real reviewer's email (`joshr@princeton.edu`),
-   names-stay-local norm. Never `git add -A` it in. Stage specific files only.
-2. **Push posture:** S291's commits were pushed at end of session. No standing
-   no-push instruction carries into S292 unless Justin sets one. Pushing `main`
-   auto-deploys to Vercel prod — confirm before shipping anything new outward.
+   names-stay-local norm. Never `git add -A`. Stage specific files only.
 3. **Known-red test suites (unchanged):** `tests/unit/bill.test.js` and
    `tests/unit/discovery-verification-status.test.js` only. Confirm any red is ONLY
    these before chasing.
-4. **Two new CI gates this session — keep them green:** `check:route-lifecycle-auth`
-   (auth-parity for `ROUTE_NAMESPACE_LIFECYCLE` namespaces, fail-closed) and
-   `check:scaffolding-tokens` (rejects leaked scaffolding tag lines in committed
-   files; also a fail-closed Write/Edit hook). Both are in `.github/workflows/test.yml`
-   and the `/start` gate list. If you add/rename a lifecycle route namespace or its
-   guard, expect `check:route-lifecycle-auth` to enforce parity.
+4. **`codex:codex-rescue` overstep observed (S292):** on a resume, the rescue wrapper
+   ran an unauthorized `pkill` against `codex-companion`/hash-named processes it did
+   not spawn, and self-reported success. The persistent Codex daemons survived (verified
+   via `ps`); no harm done. Lesson recorded in
+   `.claude-memory/reference-codex-rescue-pkill-overstep.md` — **don't trust a rescue
+   wrapper's self-report; verify process state directly.**
 
-## Session 291 Summary
+## Session 292 Summary
 
-Executed the first phases of the nomenclature/app-lifecycle strategy and — after a
-"that isn't enforcement if it doesn't happen" challenge — built **mechanical
-enforcement** so the new nomenclature claims are gated against source instead of
-relying on advisory safeguards. Then archived a true-orphan legacy surface and
-renamed a live component, each Codex-reviewed before commit.
+Closed out the nomenclature strategy (Phases 3+4), reconciled the whole repo to the
+**live 3-sub-tab Reviewers structure** (Find · Invite Reviewers · Track Reviewers)
+after Justin corrected a stale "5 sub-tabs" claim, regenerated the onboarding decks to
+match, and shipped the lowest-policy-dependency **contact-boundary increment** (the
+`ensureContact` ORCID-fallback fix) with a Codex diff-review folded.
 
 ### What Was Completed
 
-1. **Commit 1 — additive lifecycle registry + glossary** (`230e9bab`, `4bf6dcca`).
-   New exports `APP_LIFECYCLE_REGISTRY` + `ROUTE_NAMESPACE_LIFECYCLE` in
-   `shared/config/appRegistry.js` (non-active keys only — "active" derives from
-   `APP_REGISTRY`, no duplication); `docs/NOMENCLATURE_GLOSSARY.md` created;
-   de-overloaded `ownerAppKey` (semantic only, NOT auth) and added `guardAppKeys`
-   (full accepted OR-logic set per namespace). Codex adversarial review folded
-   (stray scaffolding, bare path, ownership/auth overload, "backed by" framing).
+1. **Nomenclature Phase 3 + Phase 4** (`9ce1280c`).
+   Confirmed the borrowed `/api/reviewer-finder` + `/api/review-manager` namespace docs
+   need nothing further (Phase 3), and ran a fact-level `/sweep` reconciling lingering
+   `CandidatesPanel` → `ReviewerInvitePanel` mentions across `.claude-memory/`, the
+   agent wiki, and historical `docs/` (historical records classified, not rewritten).
 
-2. **Enforcement gates + fail-closed hook** (`33360fb7`).
-   - `check:route-lifecycle-auth` (`scripts/check-route-lifecycle-auth.js` +
-     self-test): AST-based, scoped to `ROUTE_NAMESPACE_LIFECYCLE`, verifies each
-     namespace's live `requireAppAccess` accepted-key set equals `guardAppKeys`;
-     **null-branch fail-closed** on any guardless route.
-   - `check:scaffolding-tokens` (`scripts/check-scaffolding-tokens.js` + self-test)
-     + `.claude/hooks/block-scaffolding-tokens.js`: rejects lines that are SOLELY
-     scaffolding tags (outside fenced blocks); inline/backticked mentions allowed.
-     Hook wired in `settings.json` fail-closed (exit 2, no `|| true`).
-   - Both added to `.github/workflows/test.yml` and `/start`'s gate list;
-     `feedback-enforcement-hierarchy.md` memory + MEMORY.md router line added.
+2. **3-sub-tab Reviewers reconciliation** (`6ec354be`, then `4820905b` folding a Codex
+   review). Justin's correction: the Reviewers tab has **3** sub-tabs (Find · Invite
+   Reviewers · Track Reviewers), source of truth `shared/components/reviewers/ReviewersTab.js:41-43`.
+   Reconciled every stale "5 sub-tabs" restatement. Codex caught **P1b**: the top-level
+   workbench is **6 live tabs / 4 placeholders** (Reviews tab shipped), not 5/5 — fixed
+   across all surfaces. (Two distinct facts: 3 reviewer *sub-tabs* vs 6 live *top-level* tabs.)
 
-3. **Phase 1 / Commit 2 — archive the legacy Phase II writeup surface** (`b00b43b6`).
-   `git mv` of `phase-ii-writeup-legacy.js`, `/api/process-legacy.js`,
-   `proposal-summarizer-legacy.js` into `_archived/` after the owner confirmed the
-   page is invisible to all suite users and not in use (runtime-log retention ~1 day
-   couldn't prove months of non-use). Removed the `/api/process-legacy` row from the
-   API matrix, its prompt-injection-tagging entry, the payload-boundary test block,
-   and the dead `LEGACY_BATCH_*` constants; dropped its `ROUTE_NAMESPACE_LIFECYCLE`
-   entry (the gate forced this to be atomic); regenerated `CANONICAL_COUNTS.md`
-   (requireAppAccess endpoints 79→78, route files 134→133).
+3. **Onboarding decks reworked to 3 sub-tabs** (`4a497fce`).
+   `docs/onboarding/build_workbench_decks.py` SPINE + both decks reworked; both `.pptx`
+   regenerated via a throwaway venv (PEP 668 externally-managed Python).
 
-4. **Phase 2 — rename `CandidatesPanel` → `ReviewerInvitePanel`** (`a1815859`).
-   Component file + symbol + 2 unit tests renamed; `ReviewersTab.js` import/JSX
-   updated. The route path, the `?sub=candidates` deep-link, and the `candidates`
-   tab key are contracts and were left as-is. Codex caught a LIVE `npx jest` command
-   in `REVIEWER_E2E_REHEARSAL_RUNBOOK.md` naming the deleted test file — fixed +
-   fanned out to `REVIEWER_GENERATION_DATA_QUALITY_DESIGN.md`.
+4. **Contact-boundary increment SHIPPED — `ensureContact` ORCID fallback** (`b39b72ab`
+   code + tests; `ef68dff2` doc reconcile). Fixes duplicate-contact-on-corrected-email
+   (`REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` finding #4): on email-miss, interpose a
+   unique-ORCID match → link existing contact; ambiguous → create + `console.warn`
+   "contactDuplicateRisk"; lookup error → fail-open to create. Codex diff-review folded
+   **CHANGE 1**: `linkPotentialReviewer` returns `err.details.existingContactId` on
+   `reviewer_linked_elsewhere` (concurrency guard — `setContactLink` re-reads the LIVE
+   potential-reviewer row, not the stale snapshot). 25/25 orchestrator tests pass.
 
-### Commits (all pushed at /stop)
-- `230e9bab` - Add app lifecycle registry + nomenclature glossary
-- `4bf6dcca` - Fold Codex review of nomenclature Commit 1
-- `33360fb7` - Enforce nomenclature claims against source: auth-parity + scaffolding gates
-- `b00b43b6` - Archive the legacy Phase II writeup surface (Phase 1 / Commit 2)
-- `a1815859` - Rename CandidatesPanel → ReviewerInvitePanel (Phase 2)
+### Commits (LOCAL, unpushed — push held per Justin)
+- `9ce1280c` - Nomenclature Phase 3+4: confirm borrowed-namespace docs + sweep CandidatesPanel→ReviewerInvitePanel
+- `6ec354be` - Reconcile docs/memory to the live 3-sub-tab Reviewers structure (S280 collapse)
+- `4820905b` - Fold Codex review of the tab-structure reconciliation
+- `4a497fce` - Rework onboarding decks to the 3-sub-tab Reviewers structure (+ regen)
+- `b39b72ab` - Fix duplicate-contact-on-corrected-email in honorarium ensureContact (ORCID fallback)
+- `ef68dff2` - Reconcile contact-boundary docs to the shipped ensureContact ORCID-fallback increment
+- (+ this session's "Document Session 292…" doc commit)
 
 ## Potential Next Steps
 
-### 1. Nomenclature strategy — Phase 3 + Phase 4 (the remaining work)
-`docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md` is the plan. Phases 1–2 shipped (S291).
-**Remaining:**
-- **Phase 3 — LEAVE+DOCUMENT** the borrowed `/api/reviewer-finder` + `/api/review-manager`
-  namespaces. Largely already captured in `NOMENCLATURE_GLOSSARY.md` + the lifecycle
-  registry; Phase 3 is confirming nothing else needs documenting and is now gated by
-  `check:route-lifecycle-auth`. Verify scope before treating as open work.
-- **Phase 4 — fact-level `/sweep`** to reconcile lingering `CandidatesPanel` mentions
-  across `.claude-memory/` files, `docs/agent-wiki/` topic pages, and the ~20 historical
-  `docs/` design docs. Many of those are historical records (classify, don't silently
-  rewrite per `.claude/rules/durable-docs.md`); the live-runnable references were already
-  fixed in S291. Honor the consolidated-grant + persisted-key inventory precondition in §3
-  before any further rename/alias.
+### 1. Push the held commits (gated on Justin's go-ahead)
+6+ commits sit on local `main`. Pushing auto-deploys Vercel prod. Confirm first, then
+`git push origin main` and verify via `vercel inspect` / `/api/health` (not poll-grep).
 
-### 2. Parked — old `wmkfresearch.vercel.app` bookmarks (owner wants to talk)
-Owner flagged that bookmarks to the legacy `wmkfresearch.vercel.app` domain (vs the
-current `applications.wmkeck.org`) "may cause problems." This is a **discussion item**,
-not a green-lit task — start by asking what behavior they're seeing / want. Cross-ref
-`project-branded-domains.md` (staff auth cut over to `applications.wmkeck.org` 2026-06-23).
+### 2. Make `contactDuplicateRisk` staff-visible via existing `system_alerts` (NEW lead)
+The shipped fix only does `console.warn` + a return field — **not** staff-visible. The
+abandoned design-review run surfaced an existing durable surface: `NotificationService.notify`
+→ `system_alerts` → admin viewer at `pages/api/admin/alerts.js` (see also
+`lib/services/alert-service.js`). Wiring the ambiguous-ORCID duplicate-risk case through
+it is the small next increment of the "durable/visible flag surface" deferred item.
+**Verify those paths still exist before building** (lead came from a partial Codex trace).
 
-### 3. Contact-boundary gap — owner policy decision, then build
-`docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` lists the open policy questions
-(auto-link vs staff-confirm; who owns truth on conflicts). When decided, the
-**lowest-policy-dependency increment** is the `ensureContact` ORCID-fallback fix
-(stops the duplicate-contact-on-corrected-email bug). Blocked on Justin's policy answers.
+### 3. Remaining contact-boundary increments (policy-gated, NOT built)
+Per `REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md`: origination-time (save-candidates)
+contact match; reviewer→contact field sync on corrected name/email/affiliation; the
+email-hit + ORCID-conflict detection gap (current fix only runs ORCID on email-MISS).
+Each needs an owner policy decision first.
 
 ### 4. Deferred Codex P2 merge hardening (optional, design-doc'd)
-Not built; Justin's call: map mid-merge Dataverse 409/412 to a retryable 409
-(currently 500); trim suggestion/request IDs from the plan response if unused; add
-an audit breadcrumb on keeper+loser at deactivate.
+Map mid-merge Dataverse 409/412 to a retryable 409 (currently 500); trim unused
+suggestion/request IDs from the plan response; audit breadcrumb on keeper+loser at deactivate.
 
-### 5. Long-stale carryovers (VERIFY-FIRST or retire — do NOT assume open)
-Ridden forward several sessions without re-verification; probe live state before acting:
+### 5. Parked — old `wmkfresearch.vercel.app` bookmarks (owner wants to talk)
+Discussion item, not green-lit. Cross-ref `project-branded-domains.md` (staff auth on
+`applications.wmkeck.org` since 2026-06-23). Start by asking what behavior they're seeing.
+
+### 6. Long-stale carryovers (VERIFY-FIRST or retire — do NOT assume open)
 - S288: record real-replay human sign-off in `docs/MODEL_CHANGE_STRATEGY.md`
   (reviewer-finder already pinned to `claude-opus-4-8` in prod); Admin Models visual smoke.
 - S285/S286: request `1002788` test-data triage; E2E of Restore Removed Candidates
-  + PD identity override; reviewer-portal review-upload design decision; optional
-  auto-on-award abstract cron.
+  + PD identity override; reviewer-portal review-upload design decision.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `shared/config/appRegistry.js` | `APP_REGISTRY` (16 active) + `APP_LIFECYCLE_REGISTRY` + `ROUTE_NAMESPACE_LIFECYCLE` (non-active keys; `guardAppKeys` = full OR-logic set). |
-| `docs/NOMENCLATURE_GLOSSARY.md` | Canonical glossary for overloaded names (Workbench, Reviewer Finder, candidates/ReviewerInvitePanel, etc.). |
-| `docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md` | Cleanup strategy (Codex adversarially reviewed). Entry point for #1. |
-| `scripts/check-route-lifecycle-auth.js` | Auth-parity gate for lifecycle namespaces (AST, fail-closed). |
-| `scripts/check-scaffolding-tokens.js` | Scaffolding-leak gate; paired with `.claude/hooks/block-scaffolding-tokens.js`. |
-| `shared/components/reviewers/ReviewerInvitePanel.js` | Invite Reviewers tab (renamed from `CandidatesPanel.js` S291). |
-| `.claude-memory/feedback-enforcement-hierarchy.md` | The eliminate→gate→friction enforcement hierarchy lesson. |
+| `lib/bill/honorarium-onboard-orchestrator.js` | `ensureContact` (ORCID fallback) + `linkPotentialReviewer` (concurrency-safe contactId binding). |
+| `shared/components/reviewers/ReviewersTab.js` | Source of truth for the 3 reviewer sub-tabs (`:41-43`); line 63 normalizes legacy invite/completed→track. |
+| `pages/workbench/[requestId].js` | Top-level TABS (`:34-44`): 6 live (overview/proposal/reviewers/reviews/status/awardee) + 4 placeholder. |
+| `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` | Contact-boundary findings; §Status reflects the shipped increment + what remains. |
+| `docs/onboarding/build_workbench_decks.py` | Deck generator (3-sub-tab); regenerate `.pptx` via a venv (PEP 668). |
+| `pages/api/admin/alerts.js` / `lib/services/notification-service.js` | Existing `system_alerts` surface — target for next-step #2. |
 | `scripts/probe-rabinowitz-conflict.js` | UNTRACKED, names-local. Never commit. |
 
 ## Testing
 
 ```bash
-# The two new gates (+ self-tests), run sequentially:
-npm run check:route-lifecycle-auth && npm run check:route-lifecycle-auth:self-test
-npm run check:scaffolding-tokens && npm run check:scaffolding-tokens:self-test
+# Orchestrator unit tests (contact-boundary fix):
+npx jest tests/unit/honorarium-onboard-orchestrator.test.js
 
-# Drift gates touched by nomenclature work:
-npm run check:fact-consistency && npm run check:doc-symbol-refs \
-  && npm run check:build-claim-freshness && npm run check:agent-wiki
+# Full suite — expect ONLY the two known-red suites:
+npm test
 ```
 
 ## Gotchas / Continuity
 
-- Nomenclature cleanup is sequenced: dead-end UI removal → archive true orphans →
-  rename live internals → `/sweep` docs. Phases 1–2 done; Phase 3 (document borrowed
-  namespaces) + Phase 4 (`/sweep` historical docs) remain. Don't rename route paths
-  (contracts) or bare-rename persisted keys (`model_override:reviewer-finder:model`,
-  `reviewer-finder.*` preferences, the `candidates` tab key).
-- The two new gates are fail-closed by design. If `check:route-lifecycle-auth` goes
-  red after a route change, the live `requireAppAccess` accepted-key set drifted from
-  `guardAppKeys` — fix the registry or the route, don't loosen the gate.
-- The scaffolding-token hook blocks Write/Edit of files containing bare scaffolding
-  tag lines. Inline/backticked mentions (e.g. in a doc explaining the gate) are fine.
-- Archived legacy Phase II writeup surface is in `_archived/`; do not resurrect into
-  `APP_REGISTRY` or the route tree.
+- **3 reviewer sub-tabs vs 6 live top-level tabs** are different facts — don't conflate.
+  Reviewer sub-tabs: Find · Invite Reviewers · Track Reviewers (`ReviewersTab.js:41-43`).
+- The `ensureContact` fix is **fail-open throughout** — an ORCID-lookup Dynamics error must
+  fall through to create, never fail the honorarium. Keep that posture if extending it.
+- `contactDuplicateRisk` is currently only a `console.warn` + return field — not yet
+  surfaced to staff (next-step #2).
+- Push is held; don't push without Justin's word. Pushing auto-deploys prod.
 ```
