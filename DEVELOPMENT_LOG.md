@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer↔CRM-contact boundary reconciled (Session 294)
+
+**Milestone:** The reviewer-pipeline → CRM-`contact` boundary is closed end to end: a reviewer's identity corrections now reliably reach (or are surfaced for) their CRM contact, where before they stranded on pipeline rows and could spawn duplicate/stale contacts on the payment-bearing accept path.
+
+**Sessions:** 294 (single session; each increment owner-decision-gated, Codex-implements/Claude-reviews loop throughout, all prod-pushed).
+
+**Ship state:**
+- Origination-time contact match in `save-candidates` (unique ORCID/email auto-link, else staff alert) + honorarium split/duplicate guards (Increment 1, `35693cf2`).
+- Reviewer self-reported name/title/nickname OVERWRITE the contact on accept (silent; identity-status gate dropped for a fail-closed `trusted:true` since the magic-link token already proves identity) (`027fe256`, `a073dd35`).
+- Email + affiliation differences raise durable staff alerts (`reviewer_contact_email_mismatch`, `reviewer_contact_affiliation_mismatch`) — NO write. Affiliation was downgraded from account-resolution to alert-only after verification found no account name-search precedent and a COI-weighted, write-precedent-free `parentcustomerid` (`3ce2607c`, `fa15ee4b`).
+
+**Why it matters:** reviewer-supplied corrections stop stranding on pipeline rows; staff get an /admin alert queue for the ambiguous cases instead of silent duplicate/stale contacts on the path that mints honorarium payments. Two build decisions were reversed by verifying before building (nickname target existed; affiliation account-resolution did not).
+
+**Pointers:** `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` (full decision record), `docs/agent-wiki/topics/reviewer-identity.md`. Commits `35693cf2`, `027fe256`, `a073dd35`, `3ce2607c`, `fa15ee4b`.
+
 ## June 2026 — Reviewer-record merge shipped + prod-confirmed (Session 290)
 
 **Milestone:** The duplicate-reviewer dead-end a colleague hit is fully closed: staff can now merge two duplicate `wmkf_potentialreviewers` rows from the candidate edit modal, and the whole path is empirically confirmed against production.
