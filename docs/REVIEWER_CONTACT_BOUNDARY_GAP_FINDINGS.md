@@ -2,8 +2,9 @@
 
 Status: **FINDINGS / DESIGN STUB. One increment SHIPPED (2026-06-26): the
 duplicate-contact-on-corrected-email fix — `ensureContact` ORCID fallback (see §Status /
-Next Step). The origination-time contact match and any field-sync remain unbuilt and
-policy-gated.**
+Next Step). Owner policy decisions RESOLVED 2026-06-27 (see §Policy Decisions); the
+origination-time contact match (Increment 1) is greenlit for build but NOT yet built.
+Reviewer→CRM-contact field sync remains deferred to a later policy-gated increment.**
 Drafted: 2026-06-25 (S290)
 Owner: reviewer-finder
 Scope: the `wmkf_potentialreviewers` ↔ CRM `contacts` boundary (reviewer origination,
@@ -137,20 +138,41 @@ to a separate increment.
 
 ---
 
-## Open Questions / Policy Decisions (for the owner)
+## Policy Decisions — RESOLVED 2026-06-27 (owner: Justin)
 
-- Should origination auto-link exact CRM contact matches, or only surface them for staff
-  confirmation?
-- Which keys are safe enough for automatic link: exact ORCID, exact email, name plus
-  affiliation, or only combinations?
-- When reviewer-supplied corrections conflict with CRM contact data, who owns the truth:
-  reviewer, PD, CRM staff, or a field-by-field policy?
-- Should corrected fields sync one-way from reviewer pipeline to contact, bidirectionally, or
-  only create a review task?
-- Should ambiguous contact matches block saving, save unlinked with a warning, or require
-  staff resolution before the reviewer can be invited?
-- Should honorarium onboarding refuse to create a new contact when ORCID/name suggests an
-  existing contact with a different email?
+All six open questions are answered. These decisions govern **Increment 1**
+(origination-time contact match + honorarium split-contact cross-check). Field-sync
+overwrite mechanics (Q3/Q4) remain **deferred** to a later, separately policy-gated
+increment.
+
+1. **Auto-link vs. surface-for-staff:** HYBRID. Auto-link on a *unique* exact
+   identity-key hit; surface-for-staff confirmation on anything weaker or ambiguous.
+2. **Safe auto-link keys:** unique exact ORCID **or** unique exact normalized email only.
+   Name-plus-affiliation = staff-confirmation candidate only (never auto-link). Any split
+   (email→contact A, ORCID→contact B) or multi-hit → no auto-link. Consistent with the
+   shipped `ensureContact` posture.
+3. **Conflict ownership:** field-by-field, *additive-not-overwrite* — and moot for
+   Increment 1 (link-only). When field sync is built: CRM staff own the canonical contact;
+   reviewer/PD corrections *propose*, they never silently overwrite history-bearing CRM
+   fields.
+4. **Sync direction:** NONE in Increment 1 (link only). Later: one-way reviewer→contact for
+   safe *additive* fields only (e.g. ORCID when the contact has none); a review-task/alert
+   for anything that would overwrite an existing CRM value. Never bidirectional.
+5. **Ambiguous match handling:** save unlinked + durable `system_alerts` warning (reuse the
+   `contact_duplicate_risk` surface). Do NOT block save or invite. Mirrors the honorarium
+   create+flag-never-block posture and the recall-over-precision preference.
+6. **Honorarium refuse-to-create on different-email contact:** NO — keep create+flag, never
+   block. Someone who did the work must get paid; Bill.com address/payment correctness is
+   the payee's responsibility. BUT close the split-contact gap: run the ORCID cross-check on
+   email *hit* too — if email→contact A while a unique ORCID→contact B, flag via
+   `system_alerts`, proceed with the email-matched contact, never block.
+   - **Payment-email legitimacy (owner note):** a user-supplied payment email that differs
+     from CRM `emailaddress1` is *often legitimate* (people use a personal/payment email vs.
+     their institutional email of record). Do NOT treat the mismatch as a conflict to
+     suppress, and do NOT overwrite the contact's `emailaddress1` with the supplied payment
+     email — it is payment-routing context, not a correction to the CRM record of truth. Use
+     ORCID to link to the right existing contact (avoiding a duplicate); the supplied email
+     rides along to Bill.com without clobbering the contact of record.
 
 ---
 
@@ -238,6 +260,7 @@ ambiguous-ORCID case now writes a `system_alerts` row (see the SHIPPED note abov
 the /admin alerts dashboard, so the flag no longer lives only in server logs. An in-*workbench* (per
 reviewer card) surface remains optional, not required.
 
-**Still findings/scope only (NOT built), gated on the owner's policy answers above (auto-link vs.
-staff-confirm, conflict ownership):** origination-time contact match in `save-candidates` (the
-"Design Stub" section) and any reviewer→CRM-contact field sync.
+**Policy decisions RESOLVED 2026-06-27 (see §Policy Decisions).** Greenlit for Increment 1 but
+NOT yet built: origination-time contact match in `save-candidates` (the "Design Stub" section)
+plus the honorarium split-contact ORCID cross-check on email *hit*. Still **deferred** to a later,
+separately policy-gated increment: any reviewer→CRM-contact field sync.
