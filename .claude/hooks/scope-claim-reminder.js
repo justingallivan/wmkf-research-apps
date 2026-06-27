@@ -40,10 +40,10 @@ process.stdin.on('end', () => {
     if (!QUANT.test(text)) return;
 
     const msg =
-      'Scope/quantity claim detected in a durable artifact. Before asserting: run the ' +
-      'DISCONFIRMING query (search the complement set / a counter-instance), not just a ' +
-      'confirming one; and derive any denominator independently from the numerator. If no ' +
-      'falsifying query is constructible, hedge instead of asserting.';
+      'Scope/quantity claim detected in a durable artifact. Verify it by running the ' +
+      'DISCONFIRMING query (search the complement set / a counter-instance), and derive any ' +
+      'denominator independently from the numerator. If no falsifying query is constructible, ' +
+      'label the claim [ASSUMED] or narrow it.';
 
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: msg },

@@ -129,6 +129,14 @@ Validates `docs/agent-wiki/` as a subordinate retrieval layer rather than a para
 - Reminder: `.claude/hooks/agent-wiki-reminder.js` is advisory; it nudges when edits match a topic's `watch_paths`.
 - Self-test: `scripts/check-agent-wiki-self-test.js`.
 
+### `check:harness-framing` — active harness wording
+
+Scans active agent-facing harness surfaces for self-focused failure framing while allowing technical safety language such as `fail-open`, failure paths, and hazards.
+
+- Scope: root/session instructions, `.claude/skills/**/SKILL.md`, `.claude/rules/*.md`, emitted hook source, `.claude-memory/MEMORY.md`, active feedback memories, and `docs/agent-wiki/index.md`.
+- Rationale sidecars and `.harness-backups/` are excluded so incident history remains available to maintainers without entering normal execution prompts.
+- Self-test: `npm run check:harness-framing:self-test`.
+
 ### `check:status-enum-parity` — producer↔consumer key parity (S257)
 
 Guards the "producer-without-consumer-sweep" defect class: a value added to a producer set (an enum / status / `workRemaining` stage) but NOT to a consumer that maps/labels/buckets it, so the new value falls through unstyled / uncounted / unhandled. Enforces a registry of producer↔consumer key-parity invariants (currently `deriveWorkRemaining` stages ⊆ `STAGE_META` chips). **Extend the registry** when adding a producer set whose values must be mirrored by a consumer (label map / filter bucket / count rollup); runtime- or test-enforced pairs (derived inverses, throwing merges) need no entry.
@@ -161,6 +169,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:canonical-pointers` | `check:canonical-pointers-self-test` |
 | `check:model-registry` | `check:model-registry:self-test` |
 | `check:agent-wiki` | `check:agent-wiki:self-test` |
+| `check:harness-framing` | `check:harness-framing:self-test` |
 | `check:status-enum-parity` | `check:status-enum-parity:self-test` |
 | `check:trust-boundary-guid` | `check:trust-boundary-guid:self-test` |
 

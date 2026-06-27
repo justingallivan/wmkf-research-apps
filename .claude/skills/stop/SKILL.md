@@ -33,7 +33,7 @@ If there are uncommitted changes:
    - New session number (increment from current)
    - Summary of what was completed this session (with commit hashes if applicable)
    - Key files that were added or modified
-   - Potential next steps for the next session
+   - Status-labeled next items for the next session
    - Any relevant context or gotchas for continuity
 
    **Verify every "next step" against ground truth before writing it as actionable.**
@@ -113,13 +113,36 @@ Display:
 - `hash` - Message
 - `hash` - Message
 
-## Potential Next Steps
+## Next Items
 
-### 1. [Next task]
-Description of what could be done next
+### Verified Open
 
-### 2. [Another task]
-Description
+1. [Next task]
+   Evidence: [file/command/memory].
+   Description of what could be done next.
+
+### Owner Decision Needed
+
+1. [Decision]
+   Evidence: [file/command/memory].
+   Decision needed.
+
+### Parked
+
+1. [Parked item]
+   Evidence: [file/command/memory].
+   Re-open trigger.
+
+### Verify Before Acting
+
+1. [Stale carryover / destructive or additive claim]
+   Evidence currently available: [file/command/memory].
+   Required preflight before acting.
+
+### Do Not Reopen Without New Decision
+
+1. [Closed or owner-decided item]
+   Evidence: [file/command/memory].
 
 ## Key Files Reference
 

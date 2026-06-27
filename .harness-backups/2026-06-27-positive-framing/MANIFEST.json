@@ -1,0 +1,134 @@
+{
+  "createdAt": "2026-06-27T20:22:54.718Z",
+  "gitTag": "harness-pre-positive-framing-2026-06-27",
+  "note": "Original harness files before positive-framing refactor. This directory is backup material, not an active prompt surface.",
+  "files": [
+    {
+      "originalPath": "package.json",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/package.json",
+      "sha256": "b601bc2e8661217d98590f339dd95b7a9512173dbeb37efa421ee8810f54aae1",
+      "bytes": 6461
+    },
+    {
+      "originalPath": ".github/workflows/test.yml",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.github/workflows/test.yml",
+      "sha256": "8a3bf963a3d14a18349293e6b3cfe69c3370425ff4f9b0d3a5e8a512bd5e4ea2",
+      "bytes": 1607
+    },
+    {
+      "originalPath": "docs/CI_GATES_REFERENCE.md",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/docs/CI_GATES_REFERENCE.md",
+      "sha256": "bea2c78b4256d269cc9031e49a090e99a8a999cd6ec896c74639107e14b27b42",
+      "bytes": 22955
+    },
+    {
+      "originalPath": ".claude/skills/contract-reconcile/SKILL.md",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude/skills/contract-reconcile/SKILL.md",
+      "sha256": "b42655442ba52c5664b85852ba8922946203417eac57dba1d309638dbaa870d4",
+      "bytes": 11593
+    },
+    {
+      "originalPath": ".claude/skills/sweep/SKILL.md",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude/skills/sweep/SKILL.md",
+      "sha256": "2fc3320a9836d1de8f267f479fa23a68a2ab1e06c8a6b3abc9b386af87cee220",
+      "bytes": 5202
+    },
+    {
+      "originalPath": ".claude/skills/start/SKILL.md",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude/skills/start/SKILL.md",
+      "sha256": "bfbadf5a0c8b81c1ab2433041743b8860229fde4931db7d231091f5c3471c0ea",
+      "bytes": 10182
+    },
+    {
+      "originalPath": ".claude/skills/stop/SKILL.md",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude/skills/stop/SKILL.md",
+      "sha256": "a4b0496a276de85d37eb1b65355cf607010760ea6fd6e7b050c005781040d167",
+      "bytes": 4849
+    },
+    {
+      "originalPath": ".claude/hooks/pre-commit-self-review.js",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude/hooks/pre-commit-self-review.js",
+      "sha256": "7a3d8e586e83a9bc35c5e18de09898a3ca50f6aff9d4f668bea079ed3b430686",
+      "bytes": 4527
+    },
+    {
+      "originalPath": ".claude/hooks/pre-review-delegation-trace-guard.js",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude/hooks/pre-review-delegation-trace-guard.js",
+      "sha256": "ff2cfbd32c8e82e2940024a5ef2cc6f925bac18adbb2c6b93bf4a3bc7f26ef59",
+      "bytes": 5774
+    },
+    {
+      "originalPath": ".claude/hooks/doc-edit-reconcile-reminder.js",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude/hooks/doc-edit-reconcile-reminder.js",
+      "sha256": "18a7b921cf09ecca410e89175888c729252054126db3b5f8778e4d4853401664",
+      "bytes": 2019
+    },
+    {
+      "originalPath": ".claude/hooks/contract-surface-reminder.js",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude/hooks/contract-surface-reminder.js",
+      "sha256": "16a87a1080759dfd59246978132d8b4b90205c55914f91d3974be9d431bf0599",
+      "bytes": 3765
+    },
+    {
+      "originalPath": ".claude/hooks/scope-claim-reminder.js",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude/hooks/scope-claim-reminder.js",
+      "sha256": "7e4d26e4d893a2069cebf33baa2ee9cbdcb6ec8f9ad7a886ff4e117346fcdfcb",
+      "bytes": 2138
+    },
+    {
+      "originalPath": ".claude-memory/feedback-reconcile-dont-append-docs.md",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude-memory/feedback-reconcile-dont-append-docs.md",
+      "sha256": "fef2015b8f180e093cc58853c07078c072baa25eb21d9d9dd1cf0490830cc57b",
+      "bytes": 6887
+    },
+    {
+      "originalPath": ".claude-memory/feedback-falsify-not-confirm.md",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude-memory/feedback-falsify-not-confirm.md",
+      "sha256": "81040730a26a1c6a6d1de5269b429b4cb1769c0339a0561f41f9f4da6482aa82",
+      "bytes": 3847
+    },
+    {
+      "originalPath": ".claude-memory/feedback-self-review-before-delegating-review.md",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude-memory/feedback-self-review-before-delegating-review.md",
+      "sha256": "e40d414c894af860a0631c1063e814984282342d2ec89924fb0a310a8eea6c83",
+      "bytes": 7158
+    },
+    {
+      "originalPath": ".claude-memory/feedback-enforcement-hierarchy.md",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude-memory/feedback-enforcement-hierarchy.md",
+      "sha256": "9ea461d4c9c2dfe1c09e0db23aa36003184337967f50e6451df46411a6cb37fa",
+      "bytes": 3927
+    },
+    {
+      "originalPath": ".claude-memory/feedback-apply-reconcile-to-fix-work.md",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude-memory/feedback-apply-reconcile-to-fix-work.md",
+      "sha256": "2cbcffab1ae32601c24b0516887f2b137614759932cbee55a4c9c156dccd8ff8",
+      "bytes": 4628
+    },
+    {
+      "originalPath": ".claude-memory/feedback-no-performative-contrition.md",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude-memory/feedback-no-performative-contrition.md",
+      "sha256": "12f41e8a5c7140e58d329740e6639e028125ef852bf85c1eeff73e4bddfa8b25",
+      "bytes": 2429
+    },
+    {
+      "originalPath": "SESSION_PROMPT.md",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/SESSION_PROMPT.md",
+      "sha256": "b12e0da4e210df8a6e1c95b77951a0df6a5f19bd9d1419bf9a5a5bb693cdfd72",
+      "bytes": 7473
+    },
+    {
+      "originalPath": ".claude-memory/feedback-drive-to-completion.md",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude-memory/feedback-drive-to-completion.md",
+      "sha256": "86ee06366ea8c695636ca5a7c6972a57cdcd2697dca25a91633bf9fb71f474b3",
+      "bytes": 1876
+    },
+    {
+      "originalPath": ".claude-memory/feedback-share-codex-verbatim.md",
+      "backupPath": ".harness-backups/2026-06-27-positive-framing/.claude-memory/feedback-share-codex-verbatim.md",
+      "sha256": "fa9b9263e967fb8122e2684b6df3e2195d5e4ce2d224eb1079104d10affb0504",
+      "bytes": 6173
+    }
+  ],
+  "updatedAt": "2026-06-27T20:28:46.086Z"
+}

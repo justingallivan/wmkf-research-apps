@@ -1,26 +1,28 @@
 ---
 name: sweep
-description: Force a whole-repo reconcile sweep when Claude claims a doc-fix is done. Catches the "fixed-the-line-in-front-of-me" failure mode where stale restatements survive elsewhere.
+description: Whole-repo reconcile sweep for fact-level doc or memory changes. Verifies that every live restatement of a changed fact agrees before completion is claimed.
 allowed-tools: Read, Edit, Bash(grep:*, rg:*, git diff:*, git log:*)
 ---
 
 # /sweep — Whole-Repo Doc Reconcile
 
-**When invoked:** the user just caught me claiming a doc fix is done (or about to be done) and wants to force the reconciliation discipline that the `feedback-reconcile-dont-append-docs` memory entry mandates but I keep skipping.
+**When invoked:** a fact-level doc or memory change needs repo-wide reconciliation before completion is claimed.
 
-**Purpose:** turn the per-line-patch failure mode into a structural one. I don't get to call a fact-reconciliation done until every restatement across the repo agrees.
+**Purpose:** prove that every live restatement of the changed fact agrees across the repo.
 
-**This skill is BLOCKING.** I cannot claim the originating work complete until I've run every step below and reported the results. Skipping ahead because "I already checked" is the exact failure mode this skill exists to interrupt.
+**Blocking semantics:** the originating fact-level change is complete only after every step below has run and the report shows zero remaining live stale restatements.
+
+Maintainer rationale lives in `RATIONALE.md`; normal execution should use the procedure below.
 
 ---
 
 ## Step 1: State the claim
 
-Write the claim I just made or am about to make, in one sentence. Format:
+Write the claim being reconciled, in one sentence. Format:
 
 > Claim: `<fact / state>` is now reconciled across the repo, originally fixed at `<file>:<line>`.
 
-If I can't articulate the claim cleanly, the sweep can't run — go back and reduce it to a single fact statement first.
+If the claim cannot be articulated cleanly, reduce it to a single fact statement first.
 
 ## Step 2: Identify the search terms
 
@@ -36,7 +38,7 @@ Example for a B2-F6-shaped claim ("wmkf_appproposalsearch is deployed"):
 
 ## Step 3: Run the sweep
 
-For each term, run `rg -n` (or `grep -rn`) against `docs/`, `lib/`, `pages/`, `scripts/`, `shared/`, and the relevant subset of `.claude-memory/`. Capture every hit. Don't filter by "probably fine" without reading the line.
+For each term, run `rg -n` (or `grep -rn`) against `docs/`, `lib/`, `pages/`, `scripts/`, `shared/`, and the relevant subset of `.claude-memory/`. Capture every hit. Read each hit before classifying it.
 
 Default scope: live docs + code. Archive docs (`docs/archive/`) and auto-generated outputs (`docs/security-audit/*.json`) excluded unless the user opts in.
 
@@ -51,15 +53,15 @@ For every hit, classify into exactly one of:
 | **HISTORICAL** — line is a dated audit doc / changelog entry where the pre-fix state is the historical record | Leave it; note in the sweep report |
 | **UNRELATED** — false positive (grep term collided with a different context) | Note in the sweep report |
 
-If I find myself wanting to add a fifth bucket like "probably fine" or "doesn't matter" — that's the failure mode firing. Force into one of the four.
+Use exactly these four buckets. If a hit does not fit cleanly, read more context until it does.
 
 ## Step 5: Check for structural-vs-tactical
 
-If STALE-bucket hits exceed ~5 lines OR cluster in one section, the right move is a structural fix (banner, section-level rewrite, doc supersession), NOT per-line edits. Two rounds of per-line patching on the same shape = the wrong tool. Stop and propose a structural fix instead.
+If STALE-bucket hits exceed ~5 lines OR cluster in one section, use a structural fix (banner, section-level rewrite, doc supersession) rather than scattered per-line edits. After two tactical passes on the same shape, stop and propose a structural fix instead.
 
 ## Step 6: Fix the STALE hits
 
-Apply edits. After applying, re-grep the same terms. Any remaining STALE hits are the failure-loop firing again — surface them explicitly rather than declaring victory.
+Apply edits. After applying, re-grep the same terms. Report any remaining STALE hits explicitly.
 
 ## Step 7: Report
 
@@ -79,16 +81,16 @@ Memory entries that should have fired pre-claim (and didn't):
 
 If "Remaining STALE after fix pass" is non-zero, the claim is NOT done. Go back to step 6.
 
-## Step 8: Acknowledge the memory-fire failure
+## Step 8: Record relevant prior guidance
 
-Note explicitly which memory entries SHOULD have prevented the need for this sweep. Adding this line is part of the price of needing the user to call `/sweep` — it makes the prophylactic-vs-post-mortem failure (audit pattern §"Cross-cutting observation") visible.
+Note which memory entries or rules were relevant to this sweep.
 
-Do NOT turn this into multi-paragraph self-criticism. One sentence: "the X memory entry would have caught this if I'd queried it pre-claim." That's it. Per `feedback-no-performative-contrition`.
+Keep this to one concise sentence. Per `feedback-no-performative-contrition`, the report should stay focused on the fix and evidence.
 
 ---
 
 ## What this skill is NOT
 
-- It is NOT a substitute for me running the sweep proactively. The whole point is that I should be doing this without the user typing `/sweep`. The skill exists for when I've failed at that.
+- It is NOT a substitute for proactive reconciliation during normal doc work.
 - It is NOT a guarantee. If my grep terms (step 2) miss the spot where staleness lives, the sweep won't catch it. The skill is only as good as the term-selection step.
 - It is NOT scoped to documentation only. The same shape applies to code (e.g., a constant renamed in one place but referenced by string in another).

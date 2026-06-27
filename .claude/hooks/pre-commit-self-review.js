@@ -49,9 +49,9 @@ process.stdin.on('end', () => {
     if (!isApi && !isComponent && !isService && !isDurableDoc) return;
 
     const lines = [];
-    lines.push('PRE-COMMIT SELF-REVIEW — confirm each before committing (these are the failure modes Codex kept catching; catch them here, not in a review round):');
-    lines.push('1. VERIFY-DON\'T-ASSERT: every claim about how existing code/data behaves (a field, helper, return shape, enum) was confirmed by reading/grepping the source — not inferred. Label material claims [VERIFIED].');
-    lines.push('2. FAN-OUT THE GUARD: any validation/guard/null-check/scope-check you added — grep for its SIBLINGS and confirm it is applied to ALL of them (the #1 repeat finding). Name the sibling sites you checked.');
+    lines.push('PRE-COMMIT SELF-REVIEW — complete the staged-surface evidence pass before committing:');
+    lines.push('1. VERIFY-DON\'T-ASSERT: every claim about how existing code/data behaves (a field, helper, return shape, enum) is confirmed by reading/grepping the source. Label material claims [VERIFIED].');
+    lines.push('2. FAN-OUT THE GUARD: any validation/guard/null-check/scope-check you added is checked against STRUCTURAL SIBLINGS. Name the sibling sites you checked.');
     if (isApi) {
       lines.push('   • API routes staged: client input (requestId/ids/filters) is format-validated AND scoped to the authorized set before becoming a DB/SharePoint selector; raw upstream errors are sanitized; new/changed route reflected in docs/API_ROUTE_SECURITY_MATRIX.md (check:api-routes).');
     }
@@ -64,7 +64,7 @@ process.stdin.on('end', () => {
     if (isDurableDoc) {
       lines.push('   • Durable docs/memory staged: the fact was reconciled across EVERY restatement (grep the repo), not just the line in front of you.');
     }
-    lines.push('3. SHIFT-LEFT: if a Codex/agent review is next, you should have already self-run the contract-reconcile + fan-out pass above so the review CONFIRMS rather than DISCOVERS.');
+    lines.push('3. SHIFT-LEFT: if a Codex/agent review is next, include your completed contract-reconcile + fan-out evidence so the review can verify it directly.');
 
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: lines.join('\n') },

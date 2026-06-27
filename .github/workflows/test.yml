@@ -37,6 +37,8 @@ jobs:
       - run: npm run check:route-lifecycle-auth:self-test
       - run: npm run check:scaffolding-tokens
       - run: npm run check:scaffolding-tokens:self-test
+      - run: npm run check:harness-framing
+      - run: npm run check:harness-framing:self-test
       # Build re-runs prebuild (build-migrations-manifest); then assert the
       # committed manifest is in sync. Catches "added a migration but forgot
       # to regenerate the manifest" before it reaches prod.

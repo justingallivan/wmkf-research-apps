@@ -1,23 +1,49 @@
 ---
 name: Self-review (verify + fan-out) before delegating a code review
-description: The failure modes Codex review kept catching (S258 build + S272 + S285) were self-catchable — run the verify/fan-out/trust-boundary/concurrency + lifecycle + provenance self-pass BEFORE delegating, and don't deflect a behavioral fix into a project artifact, so the review confirms rather than discovers. S285 trip-wire — a delegation prompt that says "look for / check whether <nameable risk>" IS the deflection; rewrite each as a completed "traced X at file:line → found Y".
+description: Before committing or delegating review, run the verify/fan-out/trust-boundary/concurrency/lifecycle/provenance self-pass and include file evidence in the review prompt.
 type: feedback
 status: active
 scope: workflow
 last_verified: S285 (2026-06-24)
 ---
 
-## Recall Rule
-Read before: declaring a slice done, committing code, or delegating a review (Codex `/code-review`, contract-reconcile, etc.). Two hooks inject the relevant checklist; this memory is the why: `.claude/hooks/pre-commit-self-review.js` fires on `git commit` (modes 1–4), and `.claude/hooks/pre-review-delegation-trace-guard.js` fires on a Task/Agent review delegation (modes 5–6, the lifecycle + provenance axes added S272).
+## Recall Trigger
 
-**Why:** Across a long multi-slice build (S258 Workbench Proposal tab + Field Primer), Codex review caught the SAME self-catchable failure modes round after round, forcing multiple revise→re-review cycles. The user named it directly ("lazy and forgetful") and asked for hook-enforced prevention. Scattered per-edit advisory hooks did NOT prevent it — the checks have to happen at the done/commit decision point.
+Read before declaring a slice done, committing code, or delegating a review
+through Codex, `/code-review`, contract-reconcile, or another reviewer.
 
-**The six modes (1–4 observed S258, code; 5–6 added S272, design):**
-1. **Verify-don't-assert.** Every plan/code claim about how an EXISTING field/helper/return-shape/enum behaves must be confirmed by reading or grepping the source — not plausibly inferred. (Misfires this build: co-PIs are junction-only not UNION-read; the Executor DOES expose `meta.promptVersion`; two similar pickers had divergent `.docx`/`.pdf` preference.) Label material claims `[VERIFIED via X]`.
-2. **Fan-out the guard (the #1 repeat).** When you add a validation / null-check / scope-check / coercion, immediately grep for its STRUCTURAL SIBLINGS and apply it to ALL of them in the same pass. (Misfires: GUID-validated one endpoint not its sibling; stale-fetch guard on one effect not the other; ETag fail-closed at the claim not the persist; coerced every field but missed one badge.) This generalizes [[feedback-symbol-consumer-fanout]] from enum/status consumers to guards/validations.
-3. **Harden trust boundaries.** Wherever untrusted data crosses a boundary (client→DB selector, SharePoint→stream, LLM→render): validate format, scope to the AUTHORIZED set (not just "belongs to the request"), sanitize outputs, type-guard before render.
-4. **Concurrency on durable writes.** For any claim/persist on shared durable state, reason explicitly about interleavings (two writers, expiry mid-op, lost update); name the idempotency/locking mechanism ([[feedback-idempotency-name-the-mechanism]]) — don't assume it.
-5. **Lifecycle, not snapshot — trace from the LANDED state and the edge the code OMITS.** My default is to trace forward from creation along the edges the code contains and verify each; the bug is the edge the code *leaves out*. For any stateful thing — flag, ref, resource (open/close, acquire/release, subscribe/unsubscribe), cache (set/invalidate) — don't stop at the happy-path entry. Trace *from* its landed/steady state: enumerate every event that can arrive there and every transition OUT. **A value set in one direction with no reset is a bug until proven a deliberate one-shot.** Ask: what un-does this, and when? what re-fires after an async value lands? what goes stale when its identity changes / the component remounts? (S272: `userEditedBodyRef` set true on type AND on reset, never false → went stale across a profile switch and froze `[Name]` after reset. I traced the edges INTO the latch and stopped; the missing exit edge was the bug.) Distinct from mode 4: single-threaded re-entry/lifecycle, not multi-writer interleaving.
-6. **Provenance & value-semantics — track what PRODUCED a thing and what both sides MEAN, not just its value/shape.** Two faces of one habit. (a) For state: record/verify *which identity produced it* — does it survive an identity change it shouldn't (the deeper root cause of the S272 latch: the component stored the body text but not which profile/template produced it)? (b) For a cross-layer contract: check the **failure path** and the actual values each side sends/interprets, not just that a field exists. (S272: a DELETE route returns HTTP 200 + `{success:false}` on failure while the client keyed only on `response.ok`; a merge-only reducer structurally CANNOT express a key-delete via `{[k]:undefined}`.) Generalizes mode 1 from "does the field exist / what shape" to "do the two sides mean the same thing, and where did this value come from."
+## Expert Procedure
 
-**How to apply:** Before delegating a review, self-run the contract-reconcile + fan-out pass (`/contract-reconcile` targets modes 3–4; a sibling grep targets mode 2; the delegation-time hook prompts modes 5–6 and demands file:line evidence so the reviewer confirms a trace, not a bare assertion). **Anti-deflection (the meta-defect):** if you can NAME the check ("does X reset?", "does this survive a profile switch?", "what does the failure path return?"), DO it yourself — handing the named trace to a reviewer, or proposing a project tool/gate to catch it *later*, is the defect dodging the fix, not the cure. **S285 — the observable trip-wire (third recurrence, after the hook existed AND fired):** the delegation prompt itself is the evidence. If it contains "look (hard) for / check whether / any way <a specific, nameable risk>", that risk is a trace I OWE, not a question for the reviewer — rewrite each as "traced X at file:line → found Y" (or "traced X, none found") BEFORE sending; a prompt with zero such trace-statements and several "look for" items is malformed. The S285 misses were all already covered: client-trusted `emailSource` gating confirm-before-invite (mode 3/6 — I'd even commented "stamped manual client-side" without asking *is it enforced server-side*; the pattern was in `manual-reviewer.js`), `restore` write-scope ⊋ its read-scope (mode 3 — I scoped the READ to `disposition=null` because applicant rows are born `selected=false`, then failed to carry that same conclusion to the WRITE in the same commit), and a read-validate-write with no etag (mode 4 — `updateLifecycle` already took `ifMatch`). Re-reading my own delegation prompt for "look for"-shaped items is the seconds-long check that converts this memory from acknowledged to executed. The behavioral correction lives in this memory + the hooks (my own config), NOT in new project code. The point is SHIFT-LEFT: the review should confirm a clean slice, not be the primary bug-finder. Blocking gates are reserved for precise checks (e.g. enum-parity) — these modes are judgment-shaped, so the hooks inject the checklist rather than blocking. See [[feedback-timebox-metawork]] (this self-pass IS the work, not metawork).
+1. **Verify existing behavior from source.** Read or grep the producer before
+   claiming how a field, helper, return shape, enum, or route behaves.
+2. **Fan out new guards.** When adding validation, null checks, scope checks, or
+   coercion, grep for structural siblings and apply the same principle where the
+   contract matches.
+3. **Harden trust boundaries.** Validate untrusted input format, scope it to the
+   authorized set, sanitize outbound errors, and type-guard external or LLM data
+   before render.
+4. **Name durable-write concurrency.** For shared durable state, identify the
+   idempotency, locking, ETag, unique key, or retry mechanism.
+5. **Trace lifecycle from landed state.** For flags, refs, resources, caches, and
+   subscriptions, enumerate transitions into and out of the landed state.
+6. **Trace provenance and value semantics.** Identify what produced each value
+   and what each side of a cross-layer contract means on success and failure.
+
+## Evidence Required
+
+- Include file:line evidence for each named risk before delegating review.
+- Convert any "look for/check whether X" review prompt item into "traced X at
+  file:line -> found Y" or "traced X at file:line -> none found".
+- Run the relevant contract-reconcile and sibling-grep pass before committing
+  code that changes cross-layer behavior.
+
+## Related Rules
+
+- Hooks: `.claude/hooks/pre-commit-self-review.js`,
+  `.claude/hooks/pre-review-delegation-trace-guard.js`.
+- Skill: `.claude/skills/contract-reconcile/SKILL.md`.
+- Related memories: `feedback-symbol-consumer-fanout.md`,
+  `feedback-idempotency-name-the-mechanism.md`,
+  `feedback-scrutinize-exemptions-and-fallthrough.md`.
+- Maintainer rationale:
+  `.claude-memory/rationale/feedback-self-review-before-delegating-review.md`.

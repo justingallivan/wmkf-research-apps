@@ -30,11 +30,9 @@ process.stdin.on('end', () => {
     if (!inScope) return;
 
     const msg =
-      'Reconcile, don\'t patch (durable-doc Edit): a fact usually appears in MORE than the line ' +
-      'you are changing (frontmatter description/status, recall rule, body, lead-ins, tails, ' +
-      'summaries). Before calling this fix done: confirm you have READ THE WHOLE FILE — not a ' +
-      'grep-targeted slice — and GREPPED the repo for the same fact, then fix EVERY instance in ' +
-      'one pass. A partial fix that leaves a contradiction elsewhere is worse than none. ' +
+      'Durable-doc reconcile reminder: a changed fact can appear in frontmatter, status, recall ' +
+      'rules, body, lead-ins, tails, and summaries. Before calling this complete: READ THE WHOLE ' +
+      'FILE, GREP the repo for the same fact, and reconcile every live restatement in one pass. ' +
       'See feedback-reconcile-dont-append-docs.';
 
     process.stdout.write(JSON.stringify({

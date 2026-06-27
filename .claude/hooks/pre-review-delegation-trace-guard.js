@@ -60,9 +60,9 @@ process.stdin.on('end', () => {
     if (!looksCodex && !looksReview) return;
 
     const msg =
-      'SELF-TRACE GATE — before this review delegation, run your OWN trace on the two ' +
-      'axes a reviewer keeps catching for you (S272). Do not outsource a trace you can ' +
-      'do yourself; the reviewer should CONFIRM your work, not replace it.\n' +
+      'SELF-TRACE GATE — before this review delegation, complete lifecycle and ' +
+      'provenance/value-semantics tracing with file evidence. Put the trace in the ' +
+      'delegation prompt so the reviewer can verify it directly.\n' +
       '  (1) LIFECYCLE (not snapshot) — for every stateful thing (flag, ref, resource, ' +
       'cache, subscription), trace FROM its landed state, not just the happy-path entry. ' +
       'Enumerate what arrives there and every transition OUT. A value set in one direction ' +
@@ -73,14 +73,12 @@ process.stdin.on('end', () => {
       'an identity change it should not?), and for every cross-layer contract check the ' +
       'FAILURE path and what both sides MEAN, not just field shape (200 + {success:false} ' +
       'vs. response.ok; can the structure even EXPRESS the op — a merge-only reducer cannot delete).\n' +
-      'State your findings on BOTH axes in your delegation prompt WITH EVIDENCE, so the ' +
-      'reviewer confirms a trace and not a bare assertion. For each axis give either a ' +
+      'State your findings on BOTH axes in your delegation prompt WITH EVIDENCE. For each axis give either a ' +
       'concrete artifact — file:line of the state change / both contract sides, the ' +
       'caller→consumer path, and "checked X, found Y" — or an explicit "traced <the ' +
       'specific thing> at <file:line>, none found". A finding with no file:line is an ' +
-      'assertion, not a trace. If you caught yourself about to ask the reviewer to ' +
-      '"trace whether X" — or to propose a project tool/gate to catch it later — that ' +
-      'is the signal to trace X yourself NOW.';
+      'assertion, not a trace. If the prompt asks the reviewer to "trace whether X" ' +
+      'or proposes a future tool/gate for a named risk, first trace X now and include the result.';
 
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: msg },

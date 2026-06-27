@@ -6,9 +6,11 @@ allowed-tools: Read, Grep, Glob, Edit, Bash(grep:*, rg:*, git diff:*, git log:*,
 
 # /contract-reconcile — Whole-Flow Contract Verification
 
-**Why this exists:** my recurring failures aren't knowledge gaps, they're *verification-shape* gaps — reading a headline/grep-hit/plan-claim as the whole file, fixing the flagged line while leaving the same fact stale elsewhere, taking a plan's intended state as already-built, changing one layer and missing the caller/persistence/response/UI/docs/gate, treating partial success as total, adding awaited/streamed work without a stale-generation guard, and extracting a "shared" helper that quietly collapses exact-vs-fuzzy. Full rationale: `docs/CLAUDE_SKILL_REMEDIATION_PLAN.md`.
+**Purpose:** verify the full behavior contract before a review verdict or implementation completion claim. This skill turns caller→persistence→consumer tracing into the default operating path for high-risk changes.
 
-**This skill is BLOCKING for the claim it guards.** I do not get to say "ready", "done", "confirmed", or "no issues" until the relevant audits below have run with cited evidence. "I already checked" is the exact failure this interrupts.
+**Blocking semantics:** for the claim this skill guards, completion language such as "ready", "done", "confirmed", or "no issues" requires the relevant audits below and cited evidence.
+
+Maintainer rationale lives in `RATIONALE.md`; normal execution should use the procedure below.
 
 Two modes — pick by task:
 - **Mode A — Review** (reviewing a plan / verifying findings / confirm-refute).
@@ -18,7 +20,7 @@ Two modes — pick by task:
 
 ## Step 0 — Name the surface (both modes)
 
-Write these before any claim. If I can't fill one, I haven't read enough yet.
+Write these before any claim. If any field is unknown, read more before proceeding.
 - **Change surface:** one sentence.
 - **Entry points:** UI component / API route / script / command / doc.
 - **Persistence:** Postgres table / Dataverse entity / Blob / localStorage / memory-doc / **none**.

@@ -61,10 +61,10 @@ process.stdin.on('end', () => {
     }
 
     const msg =
-      'Durable contract surface touched. Before calling this done, run the /contract-reconcile ' +
-      'durable-surface + whole-flow audits — caller→persistence→consumer, plus: ' +
-      obligations.join('; ') + '. Also confirm: tests for the new contract, and the CI gate that ' +
-      'would catch the omission is green. Don\'t declare done on the layer in front of you alone.';
+      'Durable contract surface touched. Complete the /contract-reconcile durable-surface + ' +
+      'whole-flow audits — caller→persistence→consumer, plus: ' +
+      obligations.join('; ') + '. Also confirm tests for the new contract and the CI gate that ' +
+      'covers this omission are green.';
 
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: msg },

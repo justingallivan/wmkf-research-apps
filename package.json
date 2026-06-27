@@ -68,7 +68,9 @@
     "check:route-lifecycle-auth": "node scripts/check-route-lifecycle-auth.js",
     "check:route-lifecycle-auth:self-test": "node scripts/check-route-lifecycle-auth-self-test.js",
     "check:scaffolding-tokens": "node scripts/check-scaffolding-tokens.js",
-    "check:scaffolding-tokens:self-test": "node scripts/check-scaffolding-tokens-self-test.js"
+    "check:scaffolding-tokens:self-test": "node scripts/check-scaffolding-tokens-self-test.js",
+    "check:harness-framing": "node scripts/check-harness-framing.js",
+    "check:harness-framing:self-test": "node scripts/check-harness-framing-self-test.js"
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",

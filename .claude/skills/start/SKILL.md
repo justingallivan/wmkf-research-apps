@@ -89,9 +89,11 @@ header). The symlink above is the only sanctioned way to share skills with Codex
 
 Before reading any session context, run the project's CI gates to surface rubric violations *before* doing other work. A red gate is a violation of the ground-truth rule (`docs/CLAUDE_REMEDIATION_PLAN.md` + CLAUDE.md "Ground-truth requirement"), regardless of which session caused it.
 
-Run **every** `check:*` gate, not a subset — a gate left out of this list is a gate that can sit red and unnoticed (this is exactly how `check:prompt-storage-mentions` was red for ~1 session: it wasn't in the old short list, and `check:doc-currency` before it sat red ~8 sessions). Run each gate and its `:self-test` **sequentially, never in parallel** — the self-tests write synthetic fixtures into paths the main gate scans (CLAUDE.md "Operating rules"). The `&&` below pairs each gate with its self-test so a red gate skips its own self-test but the next gate still runs:
+Run **every** `check:*` gate, not a subset. Run each gate and its `:self-test` **sequentially, never in parallel** — the self-tests write synthetic fixtures into paths the main gate scans (CLAUDE.md "Operating rules"). The `&&` below pairs each gate with its self-test so a red gate skips its own self-test but the next gate still runs:
 ```bash
 npm run check:migrations-manifest                                              # migrations-manifest ↔ on-disk .sql files
+npm run check:agent-invariants                                                # local symlinks for CLAUDE/AGENTS and Codex skills
+npm run check:agent-invariants:ci                                             # tracked symlink invariant for CI
 npm run check:instruction-architecture                                        # CLAUDE.md/AGENTS.md invariants + lifecycle hooks + fresh-install guard
 npm run check:api-routes && npm run check:api-routes:self-test                 # API route security matrix coverage (+ HMAC guard recognition)
 npm run check:atlas && npm run check:atlas:self-test                           # Application State Atlas coverage
@@ -112,12 +114,13 @@ npm run check:status-enum-parity && npm run check:status-enum-parity:self-test #
 npm run check:trust-boundary-guid && npm run check:trust-boundary-guid:self-test # client-supplied id → Dataverse selector must be GUID-validated (also a blocking commit guard)
 npm run check:route-lifecycle-auth && npm run check:route-lifecycle-auth:self-test # ROUTE_NAMESPACE_LIFECYCLE.guardAppKeys must match each route's real requireAppAccess args (fail-closed)
 npm run check:scaffolding-tokens && npm run check:scaffolding-tokens:self-test  # no leaked tool-call scaffolding tags (bare-line </content>/</invoke>/antml:*) in tracked files
+npm run check:harness-framing && npm run check:harness-framing:self-test        # active harness wording stays expert/procedural; rationale lives in sidecars/backups
 npm run check:memory-drift:no-write                                            # advisory: memory↔code drift (read-only)
 ```
 
 **This list is the full set as of 2026-06-26. Before running, `grep '"check:' package.json` — if a `check:*` script exists that is NOT above (and is not a `:self-test` of one already listed), run it too and add it here.** That keeps the list from silently going stale as gates are added. Skip silently only if NONE of these scripts is defined (not every project has them); do not skip a gate that IS defined.
 
-**If any gate is red:** report it as the FIRST thing in the Step 4 summary, before recapping the previous session. A red gate is a P0 blocker for any new feature work in the affected area (data layer for `check:atlas`, API routes for `check:api-routes`, docs/memory drift for the rest), regardless of which session caused it. Treat fixing it as a candidate first task, not a side-note. Two gates in this list (`doc-currency`, `prompt-storage-mentions`) are here precisely because they each sat red and unnoticed while the short list omitted them — running the complete set is what prevents a recurrence.
+**If any gate is red:** report it as the FIRST thing in the Step 4 summary, before recapping the previous session. A red gate is a P0 blocker for any new feature work in the affected area (data layer for `check:atlas`, API routes for `check:api-routes`, docs/memory drift for the rest), regardless of which session caused it. Treat fixing it as a candidate first task, not a side-note.
 
 ## Step 3: Load Context
 

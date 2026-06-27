@@ -1,0 +1,45 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: Jest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run check:api-routes
+      - run: npm run check:atlas
+      - run: npm run check:atlas:self-test
+      - run: npm run check:doc-currency
+      - run: npm run check:doc-currency:self-test
+      - run: npm run check:migrations-manifest
+      - run: npm run check:agent-invariants:ci
+      - run: npm run check:instruction-architecture
+      - run: npm run check:memory-router
+      - run: npm run check:memory-router:self-test
+      - run: npm run check:doc-symbol-refs
+      - run: npm run check:doc-symbol-refs:self-test
+      - run: npm run check:build-claim-freshness
+      - run: npm run check:build-claim-freshness:self-test
+      - run: npm run check:model-override-warming
+      - run: npm run check:model-override-warming:self-test
+      - run: npm run check:route-lifecycle-auth
+      - run: npm run check:route-lifecycle-auth:self-test
+      - run: npm run check:scaffolding-tokens
+      - run: npm run check:scaffolding-tokens:self-test
+      # Build re-runs prebuild (build-migrations-manifest); then assert the
+      # committed manifest is in sync. Catches "added a migration but forgot
+      # to regenerate the manifest" before it reaches prod.
+      - run: npm run build
+      - run: git diff --exit-code lib/db/migrations-manifest.json
+      - run: npm run test:ci
