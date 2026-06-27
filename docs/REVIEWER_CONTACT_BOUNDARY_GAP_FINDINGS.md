@@ -5,8 +5,10 @@ duplicate-contact-on-corrected-email fix — `ensureContact` ORCID fallback (see
 Next Step). Owner policy decisions RESOLVED 2026-06-27 (see §Policy Decisions). Increment 1
 (origination-time contact match + honorarium split-contact ORCID cross-check) SHIPPED
 2026-06-27 (commit 35693cf2). Increment 2a (reviewer portal-accept name/title → contact,
-overwrite) SHIPPED 2026-06-27 (commit 027fe256). Remaining field sync — affiliation/email/
-nickname (2b) and PD-override corrections — still deferred.**
+overwrite) SHIPPED 2026-06-27 (commit 027fe256); nickname sync + the identity-gate drop
+(token-authenticated `trusted:true`) SHIPPED 2026-06-27 (commit a073dd35). Remaining: affiliation
+(its own account-resolution increment → `parentcustomerid`) + email (alert-on-mismatch, owner-chosen)
++ PD-override-correction sync — all still deferred.**
 Drafted: 2026-06-25 (S290)
 Owner: reviewer-finder
 Scope: the `wmkf_potentialreviewers` ↔ CRM `contacts` boundary (reviewer origination,
@@ -100,9 +102,9 @@ reviewer identity matching.
 - **Corrections-stranded** — reviewer-supplied name/email/title/affiliation corrections stay
   on the suggestion row; PD override corrections stay on potentialreviewer/researcher rows.
   Neither writes to CRM contact. [`reviewer-suggestion.js:977`, `save-candidates.js:190`]
-  *(PARTIALLY RESOLVED 2026-06-27, Increment 2a: reviewer portal-accept name/title now overwrite
-  `contacts.firstname/lastname/jobtitle`. Still stranded: affiliation/email/nickname, and all
-  PD-override corrections.)*
+  *(PARTIALLY RESOLVED 2026-06-27, Increment 2a + nickname: reviewer portal-accept name/title/
+  nickname now overwrite `contacts.firstname/lastname/jobtitle/nickname`. Still stranded:
+  affiliation, email, and all PD-override corrections.)*
 - **Email-only-match-spawns-duplicate** — honorarium fallback contact creation uses
   corrected/current email only, so an existing contact filed under another email is missed
   and a new contact is created. [`honorarium-onboard-orchestrator.js:195`, `contact.js:75`]
@@ -202,11 +204,18 @@ identity fields — it does NOT change the posture for history-bearing fields.
   was meant to protect, and the wrong-link risk is already handled at link time (Increment 1).
 - **Trigger:** promotion-time (mirror the existing ORCID back-prop call sites), NOT
   correction-time. Sync only matters once a contact link exists.
-- **Eligibility gate:** only sync reviewer-self-attested (authenticated portal) / PD-confirmed
-  corrections, mirroring the ORCID back-prop gate (`wmkf_identitystatus ∈ {confirmed, probable}`).
-- **DEFERRED to Increment 2b (NOT in 2a):** affiliation (no simple text field on contact today —
-  likely `adx_organizationname`, needs a schema probe before scoping), email (per the
-  payment-email note above — never overwrite `emailaddress1`), nickname (no clean contact target).
+- **Eligibility gate:** originally mirrored the ORCID back-prop gate
+  (`wmkf_identitystatus ∈ {confirmed, probable}`). **SUPERSEDED 2026-06-27 (commit a073dd35):**
+  the gate was REMOVED — the magic-link token already proves the reviewer's identity, so the sync
+  no longer reads `wmkf_identitystatus`; instead the service is fail-closed and requires the
+  accept-path caller to pass an explicit `trusted: true`. The token-authenticated accept is the
+  trust boundary.
+- **Increment-2b status:** **nickname → `contacts.nickname` SHIPPED 2026-06-27 (a073dd35)** —
+  `contacts.nickname` is a real live-updateable field, read/used as the portal's 2nd-priority
+  nickname source (`context.js:165,341`); the earlier "no clean contact target" note was wrong.
+  Still **deferred:** affiliation (owner chose account-resolution → `parentcustomerid`, its own
+  greenfield increment — no account adapter exists yet) and email (owner chose alert-on-mismatch,
+  no contact write).
 - **Supersedes prior intent:** `docs/REVIEWER_STAGE_2A_BUILD_PLAN.md:177` marked
   `contacts.firstname/lastname/jobtitle` as "staff-curated, read-only at Stage 2a." That read-only
   rule is scoped to the *Stage 2a response handler*; promotion-time sync is the same exception
@@ -311,7 +320,10 @@ unit tests.
 **SHIPPED 2026-06-27 — Increment 2a (commit 027fe256).** Reviewer portal-accept name/title sync:
 on the external-reviewer accept path, the reviewer's self-reported firstName/lastName/title
 **overwrite** `contacts.firstname/lastname/jobtitle` (reviewer-self-report-wins, silent, no alert),
-gated to `wmkf_identitystatus ∈ {confirmed, probable}`, fail-open. See §"Increment 2a" for the
-full decision record. Still **deferred** to Increment 2b: affiliation (needs a contact-schema
-probe — likely `adx_organizationname`), email (never overwrite `emailaddress1`), nickname, and any
-sync of PD-override corrections (which land on potentialreviewer/researcher, not the accept path).
+fail-open. See §"Increment 2a" for the full decision record. **Follow-ups SHIPPED 2026-06-27
+(commit a073dd35):** nickname → `contacts.nickname` added (same posture); and the identity-status
+gate was REMOVED — the magic-link token proves identity, so the sync now requires an explicit
+`trusted:true` from the accept-path caller (fail-closed) instead of reading `wmkf_identitystatus`.
+Still **deferred:** affiliation (owner chose account-resolution → `parentcustomerid`, a greenfield
+increment), email (owner chose alert-on-mismatch, no contact write), and any sync of PD-override
+corrections (which land on potentialreviewer/researcher, not the accept path).
