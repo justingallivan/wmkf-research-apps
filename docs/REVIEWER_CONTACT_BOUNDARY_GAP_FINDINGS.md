@@ -8,8 +8,10 @@ Next Step). Owner policy decisions RESOLVED 2026-06-27 (see §Policy Decisions).
 overwrite) SHIPPED 2026-06-27 (commit 027fe256); nickname sync + the identity-gate drop
 (token-authenticated `trusted:true`) SHIPPED 2026-06-27 (commit a073dd35). Email handling SHIPPED
 2026-06-27 (commit 3ce2607c): a reviewer email differing from the contact's `emailaddress1` raises a
-`reviewer_contact_email_mismatch` staff alert (NO contact write). Remaining: affiliation only (its own
-greenfield account-resolution increment → `parentcustomerid`) + PD-override-correction sync — deferred.**
+`reviewer_contact_email_mismatch` staff alert (NO contact write). Affiliation SHIPPED 2026-06-27
+(commit fa15ee4b) as ALERT-ONLY (`reviewer_contact_affiliation_mismatch`; owner reversed the
+account-resolution plan after verification — see §"Increment 2a"). Only remaining: PD-override-correction
+sync (a separate, non-accept-path trigger) — deferred.**
 Drafted: 2026-06-25 (S290)
 Owner: reviewer-finder
 Scope: the `wmkf_potentialreviewers` ↔ CRM `contacts` boundary (reviewer origination,
@@ -105,15 +107,18 @@ reviewer identity matching.
   Neither writes to CRM contact. [`reviewer-suggestion.js:977`, `save-candidates.js:190`]
   *(PARTIALLY RESOLVED 2026-06-27, Increment 2a + nickname: reviewer portal-accept name/title/
   nickname now overwrite `contacts.firstname/lastname/jobtitle/nickname`; a differing email now
-  raises a `reviewer_contact_email_mismatch` staff alert (no write). Still stranded: affiliation,
-  and all PD-override corrections.)*
+  raises a `reviewer_contact_email_mismatch` staff alert, and a differing affiliation raises a
+  `reviewer_contact_affiliation_mismatch` staff alert (neither writes the contact). Still stranded:
+  all PD-override corrections.)*
 - **Email-only-match-spawns-duplicate** — honorarium fallback contact creation uses
   corrected/current email only, so an existing contact filed under another email is missed
   and a new contact is created. [`honorarium-onboard-orchestrator.js:195`, `contact.js:75`]
-- **ORCID/affiliation sync gap** — affiliation is never propagated to CRM contact by any
+- **ORCID/affiliation sync gap** — affiliation is never *written* to the CRM contact by any
   correction path. ORCID propagates only when a contact link already exists or a later
   promotion fires — it remains stranded on the potentialreviewer until then.
-  [`capture-self-reported-orcid.js:76`, `:83`]
+  [`capture-self-reported-orcid.js:76`, `:83`] *(UPDATE 2026-06-27: affiliation is still not written
+  — owner chose ALERT-ONLY; a portal-accept affiliation differing from the contact's institution now
+  raises a `reviewer_contact_affiliation_mismatch` staff alert, fa15ee4b.)*
 
 ---
 
@@ -217,9 +222,15 @@ identity fields — it does NOT change the posture for history-bearing fields.
   nickname source (`context.js:165,341`); the earlier "no clean contact target" note was wrong.
   **email SHIPPED 2026-06-27 (3ce2607c):** a reviewer email differing from the contact's
   `emailaddress1` raises a `reviewer_contact_email_mismatch` staff alert (no contact write —
-  `lib/services/alert-reviewer-email-mismatch.js`). Still **deferred:** affiliation only (owner
-  chose account-resolution → `parentcustomerid`, its own greenfield increment — no account adapter
-  exists yet).
+  `lib/services/alert-reviewer-email-mismatch.js`). **affiliation SHIPPED 2026-06-27 (fa15ee4b) as
+  ALERT-ONLY:** the owner initially chose account-resolution → `parentcustomerid`, but the
+  verification reversed that — there is NO account search-by-name precedent, institution names carry
+  AKAs/acronyms (unreliable to auto-match), and `parentcustomerid` is a cross-domain applicant/COI
+  lookup with no write precedent, so a wrong-account auto-link is high-harm for low confident-match
+  yield. Instead, a reviewer affiliation differing from / absent on the contact's institution
+  (parentcustomerid FormattedValue, fallback `adx_organizationname`) raises a
+  `reviewer_contact_affiliation_mismatch` staff alert (no write; `lib/services/alert-reviewer-affiliation-mismatch.js`).
+  Only remaining deferred item: sync of PD-override corrections (a different, non-accept-path trigger).
 - **Supersedes prior intent:** `docs/REVIEWER_STAGE_2A_BUILD_PLAN.md:177` marked
   `contacts.firstname/lastname/jobtitle` as "staff-curated, read-only at Stage 2a." That read-only
   rule is scoped to the *Stage 2a response handler*; promotion-time sync is the same exception
@@ -329,7 +340,8 @@ fail-open. See §"Increment 2a" for the full decision record. **Follow-ups SHIPP
 gate was REMOVED — the magic-link token proves identity, so the sync now requires an explicit
 `trusted:true` from the accept-path caller (fail-closed) instead of reading `wmkf_identitystatus`.
 **Email SHIPPED 2026-06-27 (3ce2607c):** a reviewer email differing from the contact's
-`emailaddress1` raises a `reviewer_contact_email_mismatch` staff alert (no contact write). Still
-**deferred:** affiliation (owner chose account-resolution → `parentcustomerid`, a greenfield
-increment), and any sync of PD-override corrections (which land on potentialreviewer/researcher,
-not the accept path).
+`emailaddress1` raises a `reviewer_contact_email_mismatch` staff alert (no contact write).
+**Affiliation SHIPPED 2026-06-27 (fa15ee4b) as ALERT-ONLY** (`reviewer_contact_affiliation_mismatch`;
+the account-resolution plan was reversed after verification — see §"Increment 2a"). Only
+**deferred** item left: sync of PD-override corrections (which land on potentialreviewer/researcher,
+a separate non-accept-path trigger).

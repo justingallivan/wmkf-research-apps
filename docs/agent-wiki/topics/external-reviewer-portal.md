@@ -70,8 +70,10 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 - **Accept now writes reviewer self-reported identity onto the linked CRM contact (2026-06-27).**
   On accept, `respond.js` syncs corrected first/last/title/nickname → `contacts.firstname/lastname/
   jobtitle/nickname` (OVERWRITE, reviewer-self-report-wins, silent; `lib/services/sync-reviewer-name-title-to-contact.js`,
-  fail-closed `trusted:true`), and raises a `reviewer_contact_email_mismatch` staff alert when the
-  accept email differs from `contacts.emailaddress1` (NO email write; `lib/services/alert-reviewer-email-mismatch.js`).
+  fail-closed `trusted:true`), and raises staff alerts (NO write) when the accept email differs from
+  `contacts.emailaddress1` (`reviewer_contact_email_mismatch`; `lib/services/alert-reviewer-email-mismatch.js`)
+  or the reported affiliation differs from the contact's institution (`reviewer_contact_affiliation_mismatch`;
+  `lib/services/alert-reviewer-affiliation-mismatch.js`).
   These contact writes feed the same Business-Central sync as above — mock the data layer in tests.
   Full decision record: `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` §"Increment 2a".
 - **E2E harness runs against a real build, not `next dev`.** The Playwright
