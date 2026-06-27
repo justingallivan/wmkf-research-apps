@@ -126,7 +126,9 @@ npm test
   Reviewer sub-tabs: Find · Invite Reviewers · Track Reviewers (`ReviewersTab.js:41-43`).
 - The `ensureContact` fix is **fail-open throughout** — an ORCID-lookup Dynamics error must
   fall through to create, never fail the honorarium. Keep that posture if extending it.
-- `contactDuplicateRisk` is currently only a `console.warn` + return field — not yet
-  surfaced to staff (next-step #2).
+- `contactDuplicateRisk` is now staff-visible (S293): the ambiguous-ORCID case writes a
+  durable `system_alerts` row (type `contact_duplicate_risk`, `warning`, category `reviewers`,
+  deduped one-per-reviewer) on top of the `console.warn`, surfacing on the /admin alerts
+  dashboard. Best-effort/fail-open — the alert write never blocks the honorarium. (next-step #2 DONE)
 - Push is held; don't push without Justin's word. Pushing auto-deploys prod.
 ```

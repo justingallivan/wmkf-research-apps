@@ -226,12 +226,18 @@ continue with ORCID back-prop and address capture as designed. [`send-emails.js:
 `lib/bill/honorarium-onboard-orchestrator.js` `ensureContact` now, on an email miss, falls back to
 the reviewer's ORCID (`contacts.findByOrcidCandidates`) before creating: a unique match LINKS to the
 existing contact; an ambiguous match creates new + logs a `contactDuplicateRisk` staff-review warning
-(server log only — a workbench-visible surface is deferred); link-only, no field sync; fail-open
-throughout. A concurrency guard binds the honorarium to the reviewer's existing LIVE contact link if
+AND writes a durable `system_alerts` row (`warning` severity, type `contact_duplicate_risk`, category
+`reviewers`, deduped one-per-reviewer via `autoResolveKey`) that surfaces on the /admin alerts
+dashboard (`pages/api/admin/alerts.js`) — best-effort, a notify failure never blocks the honorarium;
+link-only, no field sync; fail-open throughout. A concurrency guard binds the honorarium to the reviewer's existing LIVE contact link if
 one appeared since the reviewer row was read. Owner decisions: unique-ORCID→link; ambiguous→create+flag
 (never block). Tests in `tests/unit/honorarium-onboard-orchestrator.test.js`. Codex-reviewed.
 
+**SHIPPED 2026-06-26 — durable staff-visible surface for the `contactDuplicateRisk` flag.** The
+ambiguous-ORCID case now writes a `system_alerts` row (see the SHIPPED note above) that staff see on
+the /admin alerts dashboard, so the flag no longer lives only in server logs. An in-*workbench* (per
+reviewer card) surface remains optional, not required.
+
 **Still findings/scope only (NOT built), gated on the owner's policy answers above (auto-link vs.
 staff-confirm, conflict ownership):** origination-time contact match in `save-candidates` (the
-"Design Stub" section), any reviewer→CRM-contact field sync, and a durable/workbench-visible staff-review
-surface for the `contactDuplicateRisk` flag.
+"Design Stub" section) and any reviewer→CRM-contact field sync.

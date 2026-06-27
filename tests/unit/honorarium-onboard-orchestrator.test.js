@@ -52,6 +52,7 @@ function makeDeps(overrides = {}) {
     getAmount: overrides.getAmount || jest.fn().mockResolvedValue(250),
     backProp: overrides.backProp || jest.fn().mockResolvedValue({ action: 'noop' }),
     deriveGuid: overrides.deriveGuid || jest.fn((name) => `det-${name}`),
+    notify: overrides.notify || jest.fn().mockResolvedValue({ id: 'alert-1' }),
     ...(overrides.isDeferred ? { isDeferred: overrides.isDeferred } : {}),
   };
 }
@@ -130,7 +131,35 @@ describe('ensureHonorariumOnboarding', () => {
       expect(deps.contacts.findOrCreateByEmail).toHaveBeenCalledWith(expect.objectContaining({ email: 'corrected@new.edu' }), { actingUserSystemId: undefined });
       expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-new', { actingUserSystemId: undefined });
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('contactDuplicateRisk'));
+      // Durable, staff-visible surface: a warning system_alerts row, deduped per reviewer.
+      expect(deps.notify).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'contact_duplicate_risk',
+        severity: 'warning',
+        category: 'reviewers',
+        autoResolveKey: 'contact-dup-risk:pr-1',
+        metadata: expect.objectContaining({ orcid: '0000-0002-1825-0097', matchedContactCount: 2, potentialReviewerId: 'pr-1' }),
+      }));
       expect(res.created).toBe(true); // honorarium proceeds; not blocked
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('ambiguous ORCID + duplicate-risk alert throws → non-fatal, honorarium still proceeds', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const deps = makeDeps({
+        contacts: {
+          findByEmail: jest.fn().mockResolvedValue(null),
+          findByOrcidCandidates: jest.fn().mockResolvedValue({ ambiguous: true, count: 2 }),
+        },
+        notify: jest.fn().mockRejectedValue(new Error('postgres down')),
+      });
+      const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_potentialreviewersid: 'pr-1', wmkf_emailaddress: 'corrected@new.edu', wmkf_orcid: '0000-0002-1825-0097', wmkf_name: 'Jane' } });
+      const res = await ensureHonorariumOnboarding(args, deps);
+      expect(deps.notify).toHaveBeenCalled();
+      expect(deps.contacts.findOrCreateByEmail).toHaveBeenCalled();
+      expect(res.created).toBe(true); // alert failure swallowed; payment not blocked
     } finally {
       warn.mockRestore();
     }
