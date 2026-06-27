@@ -4,31 +4,54 @@
 
 import { syncReviewerNameTitleToContact } from '../../lib/services/sync-reviewer-name-title-to-contact.js';
 
-function fakeContacts(result = { updated: ['firstname', 'lastname', 'jobtitle'] }) {
+function fakeContacts(result = { updated: ['firstname', 'lastname', 'nickname', 'jobtitle'] }) {
   return {
     updateIdentityFields: jest.fn().mockResolvedValue(result),
   };
 }
 
 describe('syncReviewerNameTitleToContact', () => {
-  test('ineligible identitystatus skips and does not update contact', async () => {
+  test('untrusted caller skips and does not update contact', async () => {
     const contactsAdapter = fakeContacts();
     const out = await syncReviewerNameTitleToContact({
-      reviewer: { wmkf_identitystatus: 'unresolved', _wmkf_contact_value: 'contact-1' },
+      reviewer: { wmkf_identitystatus: 'confirmed', _wmkf_contact_value: 'contact-1' },
       suggestion: {
         wmkf_reviewerfirstname: 'Ada',
         wmkf_reviewerlastname: 'Lovelace',
+        wmkf_reviewernickname: 'Addie',
         wmkf_reviewertitle: 'Professor',
       },
     }, { contactsAdapter });
 
-    expect(out).toEqual({ skipped: 'ineligible' });
+    expect(out).toEqual({ skipped: 'untrusted' });
     expect(contactsAdapter.updateIdentityFields).not.toHaveBeenCalled();
+  });
+
+  test('trusted accept-path syncs regardless of identitystatus when contact is present', async () => {
+    const contactsAdapter = fakeContacts({ updated: ['firstname', 'lastname', 'nickname', 'jobtitle'] });
+    const out = await syncReviewerNameTitleToContact({
+      trusted: true,
+      reviewer: { wmkf_identitystatus: 'unresolved', _wmkf_contact_value: 'contact-1' },
+      suggestion: {
+        wmkf_reviewerfirstname: 'Ada',
+        wmkf_reviewerlastname: 'Lovelace',
+        wmkf_reviewernickname: 'Addie',
+        wmkf_reviewertitle: 'Professor',
+      },
+    }, { contactsAdapter });
+
+    expect(out).toEqual({ updated: ['firstname', 'lastname', 'nickname', 'jobtitle'] });
+    expect(contactsAdapter.updateIdentityFields).toHaveBeenCalledWith(
+      'contact-1',
+      { firstName: 'Ada', lastName: 'Lovelace', nickname: 'Addie', jobTitle: 'Professor' },
+      { actingUserSystemId: undefined },
+    );
   });
 
   test('no contactId on reviewer or argument skips no_contact', async () => {
     const contactsAdapter = fakeContacts();
     const out = await syncReviewerNameTitleToContact({
+      trusted: true,
       reviewer: { wmkf_identitystatus: 'confirmed' },
       suggestion: {
         wmkf_reviewerfirstname: 'Ada',
@@ -41,42 +64,46 @@ describe('syncReviewerNameTitleToContact', () => {
     expect(contactsAdapter.updateIdentityFields).not.toHaveBeenCalled();
   });
 
-  test('happy path writes all three non-empty fields', async () => {
-    const contactsAdapter = fakeContacts({ updated: ['firstname', 'lastname', 'jobtitle'] });
+  test('happy path writes all four non-empty fields', async () => {
+    const contactsAdapter = fakeContacts({ updated: ['firstname', 'lastname', 'nickname', 'jobtitle'] });
     const out = await syncReviewerNameTitleToContact({
+      trusted: true,
       reviewer: { wmkf_identitystatus: 'probable', _wmkf_contact_value: 'contact-pointer' },
       suggestion: {
         wmkf_reviewerfirstname: 'Ada',
         wmkf_reviewerlastname: 'Lovelace',
+        wmkf_reviewernickname: 'Addie',
         wmkf_reviewertitle: 'Professor',
       },
       contactId: 'contact-explicit',
       actingUserSystemId: 'user-1',
     }, { contactsAdapter });
 
-    expect(out).toEqual({ updated: ['firstname', 'lastname', 'jobtitle'] });
+    expect(out).toEqual({ updated: ['firstname', 'lastname', 'nickname', 'jobtitle'] });
     expect(contactsAdapter.updateIdentityFields).toHaveBeenCalledWith(
       'contact-explicit',
-      { firstName: 'Ada', lastName: 'Lovelace', jobTitle: 'Professor' },
+      { firstName: 'Ada', lastName: 'Lovelace', nickname: 'Addie', jobTitle: 'Professor' },
       { actingUserSystemId: 'user-1' },
     );
   });
 
-  test('partial source writes only title when it is the only non-empty field', async () => {
-    const contactsAdapter = fakeContacts({ updated: ['jobtitle'] });
+  test('partial source writes only nickname and title when they are the only non-empty fields', async () => {
+    const contactsAdapter = fakeContacts({ updated: ['nickname', 'jobtitle'] });
     const out = await syncReviewerNameTitleToContact({
+      trusted: true,
       reviewer: { wmkf_identitystatus: 'confirmed', _wmkf_contact_value: 'contact-1' },
       suggestion: {
         wmkf_reviewerfirstname: '',
         wmkf_reviewerlastname: '   ',
+        wmkf_reviewernickname: 'Ada',
         wmkf_reviewertitle: 'Assistant Professor',
       },
     }, { contactsAdapter });
 
-    expect(out).toEqual({ updated: ['jobtitle'] });
+    expect(out).toEqual({ updated: ['nickname', 'jobtitle'] });
     expect(contactsAdapter.updateIdentityFields).toHaveBeenCalledWith(
       'contact-1',
-      { jobTitle: 'Assistant Professor' },
+      { nickname: 'Ada', jobTitle: 'Assistant Professor' },
       { actingUserSystemId: undefined },
     );
   });
@@ -84,10 +111,12 @@ describe('syncReviewerNameTitleToContact', () => {
   test('empty and blank source fields are not written', async () => {
     const contactsAdapter = fakeContacts();
     const out = await syncReviewerNameTitleToContact({
+      trusted: true,
       reviewer: { wmkf_identitystatus: 'confirmed', _wmkf_contact_value: 'contact-1' },
       suggestion: {
         wmkf_reviewerfirstname: '',
         wmkf_reviewerlastname: '   ',
+        wmkf_reviewernickname: ' ',
         wmkf_reviewertitle: null,
       },
     }, { contactsAdapter });
@@ -104,10 +133,12 @@ describe('syncReviewerNameTitleToContact', () => {
     const warn = jest.fn();
 
     const out = await syncReviewerNameTitleToContact({
+      trusted: true,
       reviewer: { wmkf_identitystatus: 'confirmed', _wmkf_contact_value: 'contact-1' },
       suggestion: {
         wmkf_reviewerfirstname: 'Ada',
         wmkf_reviewerlastname: 'Lovelace',
+        wmkf_reviewernickname: 'Addie',
         wmkf_reviewertitle: 'Professor',
       },
     }, { contactsAdapter, warn });

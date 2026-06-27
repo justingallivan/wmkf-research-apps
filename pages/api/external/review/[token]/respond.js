@@ -254,12 +254,14 @@ function suggestionWithAppliedContactEdits(suggestion, body) {
   const next = {
     wmkf_reviewerfirstname: suggestion?.wmkf_reviewerfirstname ?? null,
     wmkf_reviewerlastname: suggestion?.wmkf_reviewerlastname ?? null,
+    wmkf_reviewernickname: suggestion?.wmkf_reviewernickname ?? null,
     wmkf_reviewertitle: suggestion?.wmkf_reviewertitle ?? null,
   };
   const edits = body?.contactEdits || {};
   const editMap = {
     firstName: 'wmkf_reviewerfirstname',
     lastName: 'wmkf_reviewerlastname',
+    nickname: 'wmkf_reviewernickname',
     title: 'wmkf_reviewertitle',
   };
   for (const [key, column] of Object.entries(editMap)) {
@@ -290,7 +292,7 @@ async function captureReviewerSelfReportedOrcid({ reviewer, contactId, rawOrcid 
   }
 }
 
-// Sync accepted self-reported name/title onto the linked CRM contact. NON-FATAL:
+// Sync accepted self-reported name/title/nickname onto the linked CRM contact. NON-FATAL:
 // the accept has already committed. The suggestion values passed here are the
 // post-apply durable values: fresh accepts thread applyStage2aResponse's contact
 // edit semantics locally, while repeat accepts use the already-loaded row.
@@ -301,6 +303,7 @@ async function syncReviewerNameTitle({ reviewer, suggestion, contactId }) {
         reviewer,
         suggestion,
         contactId: contactId || reviewer?._wmkf_contact_value || null,
+        trusted: true,
       }),
     );
   } catch (nameTitleErr) {

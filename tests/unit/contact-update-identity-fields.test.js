@@ -29,6 +29,7 @@ describe('contact.updateIdentityFields', () => {
     const out = await updateIdentityFields('contact-1', {
       firstName: undefined,
       lastName: null,
+      nickname: '',
       jobTitle: '   ',
     });
 
@@ -42,6 +43,7 @@ describe('contact.updateIdentityFields', () => {
     await updateIdentityFields('contact-2', {
       firstName: ' Ada ',
       lastName: 'Lovelace',
+      nickname: ' Countess ',
       jobTitle: '',
     });
 
@@ -49,8 +51,22 @@ describe('contact.updateIdentityFields', () => {
     expect(patch.mock.calls[0]).toEqual([
       'contacts',
       'contact-2',
-      { firstname: 'Ada', lastname: 'Lovelace' },
+      { firstname: 'Ada', lastname: 'Lovelace', nickname: 'Countess' },
       { actingUserSystemId: undefined },
     ]);
+  });
+
+  test('nickname-only PATCH writes contacts.nickname', async () => {
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    const out = await updateIdentityFields('contact-3', { nickname: 'Dr. Lee' }, { actingUserSystemId: 'user-2' });
+
+    expect(out).toEqual({ updated: ['nickname'] });
+    expect(patch).toHaveBeenCalledWith(
+      'contacts',
+      'contact-3',
+      { nickname: 'Dr. Lee' },
+      { actingUserSystemId: 'user-2' },
+    );
   });
 });
