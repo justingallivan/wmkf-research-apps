@@ -96,6 +96,46 @@ magic-link → Stage 2a accept flow already automates ([[project-bill-honorarium
 [[project-reviewer-hold-step-decouple]]). So onboarding is a solved problem on the
 portal side; the unsolved part is the vendor+payment tail for an individual payee.
 
+## Scoping: capturing PNIs without BILL API access (S298, Justin)
+Goal: capture each reviewer's **PNI** (BILL Payment Network ID — the unique key) so
+Rosie can find + vendor + pay them in BILL. Addresses are **obsolete going forward
+per Steph** (they only existed to mail checks) — but KEEP collecting for now (still
+serve checks for non-BILL reviewers + the zip disambiguator for BILL name search).
+
+- **PNI is private to BILL; no public lookup.** Without API access the only ways to
+  get one are: the reviewer **self-reports** it, or Rosie **manually** looks it
+  up / invites them in BILL.
+- **Q1 ≈ option (b): manual operator action in BILL's web UI** [Justin's operational
+  understanding S298 — confirm w/ Steph/Rosie]. This resolves the design's
+  hard-gating open question (`docs/BILL_LIB_DESIGN.md` Q1): no API exists to
+  auto-invite a non-network reviewer, so Steph personally invites each one.
+- **PNI format [VERIFIED, 301 live values 2026-06-27]:** canonical = **16 digits,
+  leading zero** (270/301 = 90%). Variants: trailing whitespace (~9 — trim);
+  international = optional single-letter prefix + 15 digits (e.g. `u164216946333850`);
+  junk (`N/A`, `5`, short) ~7% → reject. NOTE: `BILL_LIB_DESIGN.md` assumes a
+  `0rv` prefix — **NOT present in any live value**; reconcile when the BILL slice is
+  revisited (likely the network *result-id* vs the stored PNI).
+
+**Conservation-of-friction principle.** Without API access, friction can be
+RELOCATED but not REMOVED. Every no-API option just shifts Rosie's manual work onto
+someone: the **reviewer** (find/enter their PNI), **this app** (kludgy capture
+infra), or back on **Rosie**. The only true removal is **BILL API access** → the
+portal-integrated onboarding already built ([[project-bill-honorarium-integration]]),
+gated and waiting on credentials.
+
+**Scoping recommendation (S298):**
+- **Build (small):** a "Do you have a Bill.com account? (Y/N) + PNI" self-report
+  field on the reviewer portal; format-validate per the spec above; **persist on the
+  `contact`** (today PNIs live only on the per-cycle request, 0 on contacts, so they
+  don't carry forward). Value = **segmentation** (Rosie only manually invites the
+  "No" reviewers), not capture volume (yield is low — only 8 reviewers ever had a
+  PNI, 2 of those junk).
+- **Don't build:** "walk the reviewer through BILL signup + PNI retrieval" infra —
+  high effort, fragile, and it just dumps Ops's friction onto the app + reviewers.
+- **Real lever:** BILL API access. Put it back to Ops/leadership as the
+  authorization decision it is — "frictionless requires the API; the integration is
+  built and gated; without it the friction stays manual, it doesn't vanish."
+
 ## Verifiable provenance (probe scripts were one-off, in session scratchpad)
 Key records: honorarium #1002764 (Amy Gladfelter, Duke, $250, Pending, 0 payments);
 institutional grants #1002794 (Wayne State) and paid #1002238 (Utah State, $900K,
