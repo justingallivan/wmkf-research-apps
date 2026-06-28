@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: bill
-  last_verified: 2026-06-28 — Thread 2 approval-flag scan (refutes "flags dead"); core 0/9,151 finding 2026-06-27
+  last_verified: 2026-06-28 — Threads 1+2 resolved (classification=fixed template, automatable; approval-flags NOT dead); core 0/9,151 finding 2026-06-27
 ---
 
 ## Recall Rule
@@ -41,10 +41,24 @@ vendor.
    bromelkampadmin@wmkeck.org (uniform across all 87 — a system/vendor account,
    NOT per-reviewer human entry); akoya_entitysource = GOapply. Contact created
    as a NON-vendor (akoya_isvendor=false, 0/87 ever true; 0/87 wmkf_billcomid).
-4. Connor MANUALLY classifies the honorarium the next day — sets program=Research
-   Reviewer, wmkf_grantprogram=Honorarium, wmkf_type/request_type=Individual,
-   amount, meeting date (e.g. #1002764 created 2-18 by the sync, classified 2-19
-   by Connor Noda). The one staff step visible in Dataverse.
+4. Connor MANUALLY classifies the honorarium the next day. **[VERIFIED via full-cohort
+   change-history 2026-06-28, `scripts/probe-akoya-honorarium-classification-step.js`]**
+   Across all 87 (Connor Noda 601 field-edits; Sarah Hibler a handful) the step is a
+   **FIXED TEMPLATE** — every value deterministic or per-cycle-constant:
+   - `akoya_programid` = Research Reviewer (87/87)
+   - `wmkf_grantprogram` = Honorarium (87/87)
+   - `wmkf_request_type` = Individual (87/87)
+   - amount `akoya_request` / `wmkf_invitedamount` / `akoya_recommendedamount` = **$250**
+     (86/86 — flat rate)
+   - `wmkf_meetingdate` = the cycle's review-meeting date (3 distinct across the whole
+     cohort = essentially one per cycle, e.g. 6/4/2026×85)
+   Everything else on the record is SYNC-set (incl. `wmkf_authorizationtoremitpaymentflag`,
+   sync-initialized on 87/87 and never flipped by staff — see the remit-flag candidate
+   below). (e.g. #1002764 created 2-18 by the sync, classified 2-19 by Connor.) The one
+   staff step visible in Dataverse.
+   - **Automatable: YES.** No per-reviewer judgment — the only signal an automation
+     needs is "this synced request is a reviewer honorarium" (the GoApply source
+     program), then it stamps the fixed template above. Thread 1 resolved.
 5. …then nothing. No vendor record, no akoya_requestpayment row. Paid by physical
    check OFFLINE last cycle (no approval needed — see below). Rosie never touched
    Amy Gladfelter's honorarium #1002764 (0 audit entries by her).
@@ -161,6 +175,10 @@ gated and waiting on credentials.
   as the eligible-to-pay marker. Confirmed trigger (Justin, 2026-06-28). Frame it as a
   **fulfillment/eligibility trigger, not a financial approval** (the field name reads
   like an approval, but the intent is "deliverable is in, payment may proceed").
+  **Clean fit confirmed 2026-06-28:** the AkoyaGO sync already initializes this flag on
+  87/87 honoraria and staff never flip it — the field is present and waiting on every
+  reviewer honorarium, so our app setting it on review-completion writes to existing
+  scaffolding, no schema change.
 - **This REVISES, if pursued, the S188/S206 decision** that "the integration never
   touches this flag; staff retains it as the final pay-out gate"
   ([[project-bill-honorarium-integration]], `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`,
@@ -177,7 +195,10 @@ against #1002238's PAID child #0024011). Audit via RetrieveRecordChangeHistory
 (bulk `audits` query is blocked — app user lacks ReadAuditSummary).
 
 ## Open threads (session tasks)
-1. Connor's manual 2/19 classification — what exactly, and is it automatable?
+1. (done 2026-06-28) Connor's classification = a FIXED TEMPLATE, fully automatable —
+   Individual / Honorarium / Research Reviewer / $250 flat / cycle meeting-date; no
+   per-reviewer judgment. Only signal an automation needs is "this synced request is a
+   reviewer honorarium" (GoApply source). See chain step 4 + the probe.
 2. (done 2026-06-28) Approval fields are NOT dead org-wide — 3 of 4 populated on
    grants (303/323/611), only `wmkf_controllerapproved` unused; 0 on honorarium-type.
    REFUTES the earlier "all dead" read. See the Approvals section.

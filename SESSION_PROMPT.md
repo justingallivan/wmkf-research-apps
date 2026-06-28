@@ -77,9 +77,11 @@ A consolidated register of every genuine loose end found across `.claude-memory/
 and `docs/`. None are silently abandoned — each has an owner, blocker, or rationale.
 
 **Actionable now — no external blocker**
-1. **Honorarium Thread 1** — what exactly Connor sets in his manual classification,
-   and whether it's automatable (read-only Dataverse audit). Evidence:
-   `.claude-memory/project-honorarium-payment-landscape.md`.
+1. ~~**Honorarium Thread 1**~~ **(DONE 2026-06-28)** — Connor's classification is a
+   FIXED TEMPLATE (Individual / Honorarium / Research Reviewer / $250 flat / cycle
+   meeting-date), no per-reviewer judgment → fully automatable. Probe:
+   `scripts/probe-akoya-honorarium-classification-step.js`; detail in
+   `.claude-memory/project-honorarium-payment-landscape.md` chain step 4.
 2. **SerpAPI hobby-tier cost eval** — $150/mo; only contact + PubPeer + news still
    ride it (Scholar/lit/PI-pubs moved to OpenAlex). Check billing-dashboard volume.
    Evidence: `.claude-memory/project-serpapi-capability-erosion.md`.
