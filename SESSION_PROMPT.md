@@ -82,9 +82,11 @@ and `docs/`. None are silently abandoned — each has an owner, blocker, or rati
    meeting-date), no per-reviewer judgment → fully automatable. Probe:
    `scripts/probe-akoya-honorarium-classification-step.js`; detail in
    `.claude-memory/project-honorarium-payment-landscape.md` chain step 4.
-2. **SerpAPI hobby-tier cost eval** — $150/mo; only contact + PubPeer + news still
-   ride it (Scholar/lit/PI-pubs moved to OpenAlex). Check billing-dashboard volume.
-   Evidence: `.claude-memory/project-serpapi-capability-erosion.md`.
+2. ~~**SerpAPI hobby-tier cost eval**~~ **(EVALUATED 2026-06-28)** — actual usage
+   **259/mo on the 15k Production plan (1.7%)** via the account API. **Recommend
+   downgrade to Developer ($75/mo, 5k) — saves ~$75/mo;** not Starter (1k) given
+   cyclical peaks. **Billing change = Justin's call.** Evidence:
+   `.claude-memory/project-serpapi-capability-erosion.md`.
 3. **Stale-audit cleanup** — F-001 is already fixed (`getEntityRelationships` DOES
    call `checkRestriction`, verified 2026-06-28); mark it resolved and confirm the
    F-002 ALS-shim status. Evidence: `docs/CORRECTED_AUDIT_FINDINGS_FOR_CLAUDE_REVIEW_2026_05_26.md`.

@@ -6,7 +6,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-06-13 (S251) — 1b+2 shipped via OpenAlex; PubPeer API non-existence verified from primary sources
+  last_verified: 2026-06-28 — downgrade eval: 259/mo actual vs 15k plan (1.7%), recommend Developer $75 tier; 1b+2 shipped via OpenAlex (S251); PubPeer API non-existence verified
 ---
 
 ## Recall Rule
@@ -18,7 +18,11 @@ is about the *subscription's value*) and [[project-api-credit-monitoring]].
 ## The cost fact (Justin-confirmed 2026-06-11)
 **SerpAPI = the largest monthly line item: $150/mo** (Production, ~15,000 calls/mo).
 There is **no in-repo SerpAPI credit/usage monitoring** — admin stats track Anthropic spend
-only; actual call volume + invoice live in the SerpAPI billing dashboard, not the repo.
+only; the invoice lives in the SerpAPI billing dashboard. **But live usage IS pullable
+without the dashboard:** `GET https://serpapi.com/account?api_key=$SERP_API_KEY` returns
+`this_month_usage`, `plan_searches_left`, `searches_per_month`, plan name/price (read-only;
+discovered 2026-06-28). This is the data source the parked admin-observability item
+([[project-api-credit-monitoring]]) would use for SerpAPI spend.
 
 ## Capability erosion (audit 2026-06-11; SerpAPI docs cited)
 - **`google_scholar_profiles` (author profile SEARCH) is DISCONTINUED** — Google's Scholar
@@ -47,9 +51,14 @@ only; actual call volume + invoice live in the SerpAPI billing dashboard, not th
   a slice + parked as a contingent future item — full context (facts, endpoint, load-vs-auth,
   build-if-granted) in `docs/agent-wiki/topics/integrity-screener.md`. Do NOT re-assume an API is
   available, and do NOT proactively resurface it (Justin recalls it on demand if PubPeer replies).
-- **Hobby-tier downgrade** (~$100/mo): the bulk of volume (per-candidate Scholar calls) is gone, so
-  evaluate it NOW against real billing-dashboard volume — even though PubPeer (#6) keeps a residual
-  SerpAPI call. Residual = contact (#1) + PubPeer (#6) + news (#7).
+- **Downgrade EVALUATED 2026-06-28 [VERIFIED via account API]:** actual `this_month_usage` = **259**
+  on the 15,000/mo Production plan (**~1.7% utilized**) — the S251 migration removed the bulk as
+  intended. Current ladder: Free $0/250 · Starter $25/1k · Developer $75/5k · Production $150/15k ·
+  Big Data $275/30k. **Recommendation: Developer ($75/mo, 5,000) — saves ~$75/mo.** NOT Starter
+  (1k): usage is cyclical and this is a single (likely off-cycle) month; a peak review cycle at
+  ~3 residual SerpAPI calls/candidate (contact #1 + PubPeer #6 + news #7) could clear 1,000.
+  Developer's 5,000 = ~19× current headroom + peak-cycle room. Re-check a full peak cycle (J27
+  ~Dec 2026) before considering Starter. **Owner action (billing change) — Justin's call.**
 - Full migration plan + per-slice disposition: `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md`.
 
 ## Caveat (don't migrate blind)
