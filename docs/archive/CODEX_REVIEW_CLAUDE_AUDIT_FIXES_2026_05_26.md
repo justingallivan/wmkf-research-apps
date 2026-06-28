@@ -6,11 +6,11 @@ Reviewer: Codex
 
 Target commit reviewed: `f841013` (`Ship F-001 + F-002 from 2026-05-26 audit`)
 
-Spec reviewed against: `docs/CORRECTED_AUDIT_FINDINGS_FOR_CLAUDE_REVIEW_2026_05_26.md`
+Spec reviewed against: `docs/archive/CORRECTED_AUDIT_FINDINGS_FOR_CLAUDE_REVIEW_2026_05_26.md`
 
 ## Context
 
-Claude implemented the corrected audit findings from `docs/CORRECTED_AUDIT_FINDINGS_FOR_CLAUDE_REVIEW_2026_05_26.md`.
+Claude implemented the corrected audit findings from `docs/archive/CORRECTED_AUDIT_FINDINGS_FOR_CLAUDE_REVIEW_2026_05_26.md`.
 
 The spec asked for:
 

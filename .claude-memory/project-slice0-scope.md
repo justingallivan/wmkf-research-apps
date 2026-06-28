@@ -20,11 +20,11 @@ Do not:
 - Trust carryover enumerations (the 3-item count dropped the membership entity and propagated ~5 sessions).
 - Pull `contact.wmkf_portal_oid` / `wmkf_phaseiisubmittedat`/`by` into slice-0 on the design doc's authority alone (doc-vs-catalog gap).
 
-Ground truth: `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` (2026-05-14 catalog), `docs/BUDGET_FORM_SPEC.md` v3, `docs/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md`, `lib/dataverse/schema/wave4/`. Point-in-time status snapshot — defer to live SESSION_PROMPT handoffs. Related: [[project-slice0-role-probe]].
+Ground truth: `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` (2026-05-14 catalog), `docs/BUDGET_FORM_SPEC.md` v3, `docs/archive/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md`, `lib/dataverse/schema/wave4/`. Point-in-time status snapshot — defer to live SESSION_PROMPT handoffs. Related: [[project-slice0-role-probe]].
 
 Intake-portal "slice 0" was a **single Dataverse schema-deploy event** that multiple work-streams converged on — NOT the budget-only slice. **DEPLOYED to prod Dataverse S178, 2026-05-22.** The SESSION_PROMPT carryover item C enumerated only 3 items and dropped the membership entity; Codex caught it, verified S155.
 
-**Authoritative source:** `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` 2026-05-14 section (the slice-0 catalog) + `docs/BUDGET_FORM_SPEC.md` v3 + `docs/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md`. The design doc `docs/INTAKE_PORTAL_DESIGN.md` is older (v2, 2026-05-12) — defer to the catalog where they differ.
+**Authoritative source:** `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` 2026-05-14 section (the slice-0 catalog) + `docs/BUDGET_FORM_SPEC.md` v3 + `docs/archive/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md`. The design doc `docs/INTAKE_PORTAL_DESIGN.md` is older (v2, 2026-05-12) — defer to the catalog where they differ.
 
 **Slice-0 schema scope = 4 targets:**
 1. NEW `wmkf_proposalbudgetline` entity (child of `akoya_request`; 10-value `wmkf_category` enum 100000000–100000009 — `Tuition` was added at 100000005 pre-deploy in S178, cost-share block renumbered up by 1; deployed values authoritative).

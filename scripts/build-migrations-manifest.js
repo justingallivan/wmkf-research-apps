@@ -9,7 +9,7 @@
  * Wired into `package.json` `prebuild` so every `next build` regenerates
  * the file. Drift detected at runtime via `lib/utils/migration-drift.js`.
  *
- * See docs/READINESS_AUDIT_PHASE0_PLAN.md § Step 4b.
+ * See docs/archive/READINESS_AUDIT_PHASE0_PLAN.md § Step 4b.
  */
 
 const fs = require('fs');

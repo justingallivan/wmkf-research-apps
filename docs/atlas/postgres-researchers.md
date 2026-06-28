@@ -84,7 +84,7 @@ Pre-W5/W6 writers (now removed):
 
 ## Migration disposition
 
-Per `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`: identity → `wmkf_potentialreviewers`; bibliometric snapshot → also `wmkf_potentialreviewers` (S213: folded onto the person; the `wmkf_appresearcher` sidecar that originally held these was dropped — see `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`). Browse/edit UI rewrites endpoints to query Dataverse directly. Postgres `researchers` retired post-cutover.
+Per `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`: identity → `wmkf_potentialreviewers`; bibliometric snapshot → also `wmkf_potentialreviewers` (S213: folded onto the person; the `wmkf_appresearcher` sidecar that originally held these was dropped — see `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md`). Browse/edit UI rewrites endpoints to query Dataverse directly. Postgres `researchers` retired post-cutover.
 
 ## Open questions / gotchas
 

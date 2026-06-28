@@ -13,7 +13,7 @@
 
 You've just run `/start`, so you have the project context, operating rules, and memory router. Today's work isn't in `SESSION_PROMPT.md` yet, so start here:
 
-- `docs/REVIEWER_FINDER_ORIGINATION_PROBE_FINDINGS.md`
+- `docs/archive/REVIEWER_FINDER_ORIGINATION_PROBE_FINDINGS.md`
 
 It reports a live probe (run today, S239) testing whether reviewer-finder's candidate **origination** is the broken layer. It links the rescue dossier and the retrieval redesign plan.
 
@@ -31,7 +31,7 @@ It reports a live probe (run today, S239) testing whether reviewer-finder's cand
 
 ## Reading order (all on `main`)
 
-1. `docs/REVIEWER_FINDER_ORIGINATION_PROBE_FINDINGS.md` — **start here** (S239 probe verdict + evidence).
+1. `docs/archive/REVIEWER_FINDER_ORIGINATION_PROBE_FINDINGS.md` — **start here** (S239 probe verdict + evidence).
 2. `docs/REVIEWER_FINDER_RESCUE_DOSSIER.md` — problem statement + every abandoned strategy.
 3. `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` — canonical design (§2.3 OpenAlex-metrics claim corrected S239; §4/§5 coverage-ground-truth claim still stands; **§8f** = the activity-signal flaw).
 4. `scripts/probe-grounded-origination.mjs` — the probe (read-only; re-runnable).

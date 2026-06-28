@@ -22,11 +22,11 @@ Do:
 Do not:
 - Optimize for normalization purity at the expense of non-technical staff having to learn a proliferation of obscure tables.
 
-Ground truth: historical-only (principle set by Justin, 2026-05-14 Connor schema-review, `docs/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md` Item 1; catalog `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`). Aligns with [[project-dynamics-as-prompt-ground-truth]].
+Ground truth: historical-only (principle set by Justin, 2026-05-14 Connor schema-review, `docs/archive/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md` Item 1; catalog `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`). Aligns with [[project-dynamics-as-prompt-ground-truth]].
 
 When weighing "new child entity" vs "expand an enum / add a discriminator on an existing entity", default to the latter unless the semantic cost is irrecoverable. Non-technical staff browsing Dataverse should not have to learn a proliferation of obscure tables to understand a proposal's data.
 
-**Why:** Stated by Justin during the 2026-05-14 Connor schema-review (Item 1 of `docs/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md`). I had recommended a separate `wmkf_proposalcostshare` entity to keep "WMKF spend" aggregates clean of cost-share rows; Justin chose to expand `wmkf_proposalbudgetline.wmkf_category` with `WaivedIndirect / WaivedTuition / OtherCostShare` instead — accepting the forever-filter cost in aggregate queries in exchange for a single legible budget table. The general principle he set: fewer obscure tables, even at the cost of more enum values or filter logic downstream.
+**Why:** Stated by Justin during the 2026-05-14 Connor schema-review (Item 1 of `docs/archive/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md`). I had recommended a separate `wmkf_proposalcostshare` entity to keep "WMKF spend" aggregates clean of cost-share rows; Justin chose to expand `wmkf_proposalbudgetline.wmkf_category` with `WaivedIndirect / WaivedTuition / OtherCostShare` instead — accepting the forever-filter cost in aggregate queries in exchange for a single legible budget table. The general principle he set: fewer obscure tables, even at the cost of more enum values or filter logic downstream.
 
 **How to apply:**
 - When sketching new schema, ask "could this be a choice value, lookup, or discriminator column on an existing entity?" before proposing a new entity.

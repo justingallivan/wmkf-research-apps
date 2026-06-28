@@ -11,7 +11,7 @@
  * (after `npm run build`) to catch the case where a developer added a
  * migration but didn't regenerate the manifest.
  *
- * See docs/READINESS_AUDIT_PHASE0_PLAN.md § Step 4b.
+ * See docs/archive/READINESS_AUDIT_PHASE0_PLAN.md § Step 4b.
  */
 
 const fs = require('fs');

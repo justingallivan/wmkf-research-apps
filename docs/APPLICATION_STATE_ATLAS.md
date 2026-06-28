@@ -37,7 +37,7 @@ The canonical reference for the live state of the application's data layer.
 
 | Entity | Rows | Status | Page |
 |---|---:|---|---|
-| `wmkf_appresearcher` | — | **DROPPED S213** — bibliometric sidecar collapsed into `wmkf_potentialreviewers` (17 fields folded onto the person); see `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md` | (page removed) |
+| `wmkf_appresearcher` | — | **DROPPED S213** — bibliometric sidecar collapsed into `wmkf_potentialreviewers` (17 fields folded onto the person); see `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md` | (page removed) |
 | `wmkf_appreviewersuggestion` | 336 | active lifecycle ledger | [dataverse-wmkf-appreviewersuggestion.md](atlas/dataverse-wmkf-appreviewersuggestion.md) |
 | `wmkf_potentialreviewers` (vendor + ext.) | 4,269 | per-person scratch+history; **now also carries the bibliometric fields** (affiliation/h-index/citations/scholar/orcid/etc.) folded in from the dropped sidecar (S213) | [dataverse-wmkf-potentialreviewers.md](atlas/dataverse-wmkf-potentialreviewers.md) |
 | `wmkf_apppublication` | — | **DROPPED S213** (was 0 rows, no callers) — went down with the appresearcher collapse | (page section removed) |

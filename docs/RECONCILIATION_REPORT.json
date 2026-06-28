@@ -138,7 +138,7 @@
       "evidence": "feedback_surface_full_review_findings.md; audit text classified as verified"
     },
     {
-      "claim_text": "Pure behavioral rule. The S141 doc-currency reference (`docs/DOC_TRIAGE_2026-05-07.md`) exists. CLEAN.",
+      "claim_text": "Pure behavioral rule. The S141 doc-currency reference (`docs/archive/DOC_TRIAGE_2026-05-07.md`) exists. CLEAN.",
       "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
       "status": "verified",
       "evidence": "feedback_thoroughness_default.md; audit text classified as verified"
@@ -552,7 +552,7 @@
       "evidence": "project_intake_portal_pilot_decisions_2026-05-06.md; audit text classified as stale"
     },
     {
-      "claim_text": "**THIS MEMORY IS ONE-DAY STALE.** The 2026-05-14 schema review (`docs/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md` at 11:40 today, `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` at 14:05 today, `docs/INTAKE_PORTAL_DESIGN.md:587-588` at 14:05 today) supersedes this memory.",
+      "claim_text": "**THIS MEMORY IS ONE-DAY STALE.** The 2026-05-14 schema review (`docs/archive/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md` at 11:40 today, `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` at 14:05 today, `docs/INTAKE_PORTAL_DESIGN.md:587-588` at 14:05 today) supersedes this memory.",
       "source_file": "docs/AUDIT_S154_MEMORY_V2.md",
       "status": "stale",
       "evidence": "project_intake_portal_pilot_decisions_2026-05-13.md; audit text classified as stale"

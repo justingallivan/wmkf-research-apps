@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * ONE-SHOT DROP (appresearcher collapse, S213 — docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md Phase 5).
+ * ONE-SHOT DROP (appresearcher collapse, S213 — docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md Phase 5).
  * POINT OF NO RETURN. Drops the wmkf_appresearcher sidecar + the two empty
  * publication tables AFTER the caller cutover (Phases 3–4) is live and smoke-
  * verified. The bibliometric data already lives on wmkf_potentialreviewers

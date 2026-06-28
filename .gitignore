@@ -75,7 +75,7 @@ tmp/
 # unlink()s + recreates (Codex-verified cli.py:452-470) — that SEVERS the
 # symlink into a regular file = visible tracked diff, never a silent CLAUDE.md
 # mutation. Restore with `git checkout AGENTS.md`. Do not run migrate-to-codex
-# here. Background: docs/DOCS_GROUND_TRUTH_AUDIT_2026-05-19.md.
+# here. Background: docs/archive/DOCS_GROUND_TRUTH_AUDIT_2026-05-19.md.
 .agents/
 
 # appresearcher collapse backfill snapshot (local rollback insurance, S213)

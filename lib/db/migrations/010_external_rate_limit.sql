@@ -12,7 +12,7 @@
 --
 -- Postgres-backed (not in-memory): Vercel Fluid Compute spreads requests
 -- across instances, so per-instance memory buckets do not enforce a real
--- shared limit. See docs/security-audit/SECURITY_AUDIT_2026-05-21.md.
+-- shared limit. See docs/archive/SECURITY_AUDIT_2026-05-21.md.
 
 CREATE TABLE IF NOT EXISTS external_rate_limit (
   bucket_key    TEXT NOT NULL,

@@ -39,5 +39,5 @@ write-rate, periodic big-bang cleanups always lose the race.
 **Rule of thumb:** router line = terse trigger + slugs + `→ wiki:<topic>`; domain
 detail (hazards, source maps, mechanisms) → a `docs/agent-wiki/topics/*.md` page;
 memory file = intent/lessons/hazard. Canonical: `docs/CLAUDE_MEMORY_REORGANIZATION_PLAN.md`
-Phase 5 + `docs/MEMORY_ROUTER_WIKI_RECOMMENDATIONS_2026-06-11.md`. Related:
+Phase 5 + `docs/archive/MEMORY_ROUTER_WIKI_RECOMMENDATIONS_2026-06-11.md`. Related:
 [[memory-store-propagation]].

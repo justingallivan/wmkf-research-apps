@@ -90,14 +90,13 @@ and `docs/`. None are silently abandoned — each has an owner, blocker, or rati
    are resolved in code (relationship restriction check present; ALS migration complete,
    0 shim callers, fails closed) and the drain-table "deferred cleanup" is superseded
    (dropped via migration 018). Doc stamped. Only the generic write-helper restriction
-   policy remains an owner decision. Evidence: `docs/CORRECTED_AUDIT_FINDINGS_FOR_CLAUDE_REVIEW_2026_05_26.md`.
-4. **Docs ARCHIVE batch (follow-up from the staleness audit)** — Codex audited all 309
-   `docs/` files (`docs/DOCS_STALENESS_AUDIT_2026-06-28.md`, merged 2026-06-28). The 2
-   DELETEs are done; **40 files are recommended ARCHIVE** and deferred. Apply in a focused
-   batch: either add an in-place `Status: historical` banner, or move to `docs/archive/`
-   **with every exact-path reference updated first**, then run `check:doc-symbol-refs` +
-   `check:canonical-pointers` sequentially. Most ARCHIVE items have inbound refs — don't
-   bulk-move blind.
+   policy remains an owner decision. Evidence: `docs/archive/CORRECTED_AUDIT_FINDINGS_FOR_CLAUDE_REVIEW_2026_05_26.md`.
+4. ~~**Docs ARCHIVE batch (from the staleness audit)**~~ **(DONE 2026-06-28)** — Codex
+   audited all 309 `docs/` files (`docs/DOCS_STALENESS_AUDIT_2026-06-28.md`). Acted on in
+   full: 2 DELETEs removed, **39 ARCHIVE files moved to `docs/archive/`** with every
+   inbound full-path reference rewritten across docs/memory/code; 11 doc/structure gates
+   green. (Residual bare-basename *prose* mentions in a few live docs left as-is — not
+   load-bearing path refs, gates clean.)
 
 **Blocked on a named owner / decision**
 1. **Reviewer-Workbench access boundaries** (3 unresolved: team-open read set?

@@ -4,7 +4,7 @@
 **Date:** 2026-05-25
 **Reviewer:** Claude (Opus 4.7), single-session pass
 **Branch:** main (clean, c8dc122)
-**Companion doc:** [`docs/READINESS_AUDIT_2026-05-25.md`](READINESS_AUDIT_2026-05-25.md) (full bucket-by-bucket findings + dry-run details)
+**Companion doc:** [`docs/archive/READINESS_AUDIT_2026-05-25.md`](READINESS_AUDIT_2026-05-25.md) (full bucket-by-bucket findings + dry-run details)
 
 ---
 
@@ -268,7 +268,7 @@ For future sessions: the rubric should expand from "did the source/source check 
 
 ## 9. References
 
-- Audit doc: [`docs/READINESS_AUDIT_2026-05-25.md`](READINESS_AUDIT_2026-05-25.md)
+- Audit doc: [`docs/archive/READINESS_AUDIT_2026-05-25.md`](READINESS_AUDIT_2026-05-25.md)
 - Session prompt: `SESSION_PROMPT.md` (the mandate, the 8 buckets, mode rules)
 - Drain plan: `docs/INTAKE_PORTAL_DRAIN_PLAN.md`
 - S184 attach build scoping: `docs/INTAKE_ATTACH_BUILD_SCOPING.md`

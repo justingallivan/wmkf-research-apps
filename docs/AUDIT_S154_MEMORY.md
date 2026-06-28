@@ -133,7 +133,7 @@ The following memories were checked and all factual claims hold against live sta
 - `feedback_check_memory_before_asking_user.md` — pure behavioral rule, no state claims.
 - `feedback_codex_verbatim_output.md` — behavioral rule.
 - `feedback_cycle_vs_executor_scope.md` — behavioral framing; aligned with other memories.
-- `feedback_human_legibility_schema_principle.md` — behavioral rule; supporting context (S149 doc) verified at `docs/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md`.
+- `feedback_human_legibility_schema_principle.md` — behavioral rule; supporting context (S149 doc) verified at `docs/archive/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md`.
 - `feedback_red_gates_are_p0.md` — accurate; gates exist and run as described.
 - `feedback_review_panel_tone.md` — pure tone rule.
 - `feedback_surface_full_review_findings.md` — pure behavioral rule.

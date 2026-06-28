@@ -111,5 +111,5 @@ saves ~one search. Verified via arXiv help pages (email-protection / registerhel
 automated arXiv-email fetcher.
 
 ## Design docs
-`docs/REVIEWER_IDENTITY_CONTACT_FIX_PLAN.md` (+ `_REVIEW`, `_REVIEW_2` Codex passes),
-`docs/REVIEWER_IDENTITY_STRATEGY_EVALUATION.md`, `docs/REVIEWER_IDENTITY_VERIFICATION_FINDINGS.md`.
+`docs/archive/REVIEWER_IDENTITY_CONTACT_FIX_PLAN.md` (+ `_REVIEW`, `_REVIEW_2` Codex passes),
+`docs/REVIEWER_IDENTITY_STRATEGY_EVALUATION.md`, `docs/archive/REVIEWER_IDENTITY_VERIFICATION_FINDINGS.md`.

@@ -153,7 +153,7 @@ Key reads:
   OA found 100% and returned an **inline ORCID** for most; ORCID-direct 92%.
 - **OpenAlex finds; its canonical (ORCID-anchored) records are complete — the
   "fragmented records / low `works_count`" reading was a NAME-SEARCH ARTIFACT.**
-  `[CORRECTED S239 via scripts/probe-grounded-origination.mjs — see docs/REVIEWER_FINDER_ORIGINATION_PROBE_FINDINGS.md]`
+  `[CORRECTED S239 via scripts/probe-grounded-origination.mjs — see docs/archive/REVIEWER_FINDER_ORIGINATION_PROBE_FINDINGS.md]`
   A naive author-search returns the canonical record *plus* ORCID-less stub shards
   that share the name; the original probe picked a stub. Live re-check: Frebel's
   canonical record = **323 works + ORCID + MIT** (the "6" was a 0-citation,

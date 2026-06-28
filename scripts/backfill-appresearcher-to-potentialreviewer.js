@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * ONE-SHOT BACKFILL (appresearcher collapse, S213 — docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md Phase 2).
+ * ONE-SHOT BACKFILL (appresearcher collapse, S213 — docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md Phase 2).
  *
  * Copies each wmkf_appresearcher sidecar's bibliometric fields onto its linked
  * wmkf_potentialreviewers person row (the 17 fields added in Phase 1). After

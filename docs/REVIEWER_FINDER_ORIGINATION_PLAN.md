@@ -4,7 +4,7 @@ Date: 2026-06-12
 
 Status: ACTIVE PLAN — a pilot of the §3 forward experiment was **RUN (S246, 2026-06-12)**. Result: for the D26 Phase-I cohort, **Claude-assisted beats the minimal grounded arm** → the "Claude-assisted wins" gate fires for the practical cutover question; the ORCID-works-anchored multilane design + live accept/decline outcomes remain untested. Full result: `docs/REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md`. §4 below is updated accordingly.
 
-Supersedes: `docs/REVIEWER_FINDER_ORIGINATION_EVIDENCE_2026-06-12.md` section 6
+Supersedes: `docs/archive/REVIEWER_FINDER_ORIGINATION_EVIDENCE_2026-06-12.md` section 6
 
 Revision (2026-06-12, Claude review folded into Codex's draft): grounded arm
 re-specified to the actual §12 design (Claude plans facets, never names reviewers)
@@ -14,7 +14,7 @@ need confirmed against the UI.
 
 ## SECTION 1 - CORRECTLY-NARROWED EVIDENCE
 
-The J26 saved-reviewer data licenses only this narrow claim: Claude-present candidates survived the historical production workflow and staff curation under the instrumentation and UI signals that existed when those rows were saved. It does not license a causal origination claim, a Track-B contribution claim, or a claim that Claude-assisted origination would beat grounded lanes under source-blinded conditions. [VERIFIED via `docs/REVIEWER_FINDER_ORIGINATION_EVIDENCE_2026-06-12.md` section 0 and section 5]
+The J26 saved-reviewer data licenses only this narrow claim: Claude-present candidates survived the historical production workflow and staff curation under the instrumentation and UI signals that existed when those rows were saved. It does not license a causal origination claim, a Track-B contribution claim, or a claim that Claude-assisted origination would beat grounded lanes under source-blinded conditions. [VERIFIED via `docs/archive/REVIEWER_FINDER_ORIGINATION_EVIDENCE_2026-06-12.md` section 0 and section 5]
 
 The saved-tag data cannot speak to origination because the current save/dedup path suppresses or relabels exactly the cases that would be needed to measure independent grounded-lane contribution:
 
@@ -30,7 +30,7 @@ Closure: stop mining J26 saved tags for the origination question. The J26 datase
 
 ### Banked Items
 
-Seniority-relaxation prompt change: shipped in commit `13800e3`. It is independent of origination direction because it changes how the existing Claude-assisted prompt treats founder/Nobel/emeritus/very-senior candidates; it does not decide whether candidate origination should come from Claude-assisted names or grounded scholarly lanes. [VERIFIED via `docs/REVIEWER_FINDER_ORIGINATION_EVIDENCE_2026-06-12.md` section 2]
+Seniority-relaxation prompt change: shipped in commit `13800e3`. It is independent of origination direction because it changes how the existing Claude-assisted prompt treats founder/Nobel/emeritus/very-senior candidates; it does not decide whether candidate origination should come from Claude-assisted names or grounded scholarly lanes. [VERIFIED via `docs/archive/REVIEWER_FINDER_ORIGINATION_EVIDENCE_2026-06-12.md` section 2]
 
 SerpAPI erosion finding: `google_scholar_profiles` is discontinued, `google_scholar_author` remains active but has login-wall degradation risk, four of six SerpAPI uses can be replaced with free academic APIs, and only general web contact lookup plus news remain genuinely irreplaceable. This warrants migrating topic-to-author and metric-bearing scholarly retrieval toward OpenAlex, Semantic Scholar, PubPeer, and field-specific free APIs where coverage and latency are validated. It does not by itself decide whether Claude-assisted or grounded-lane origination wins; it changes the cost/risk calculus for the sources available to a grounded experiment. [VERIFIED via `.claude-memory/project-serpapi-capability-erosion.md`]
 
@@ -92,7 +92,7 @@ Primary metrics (two, co-equal): (1) accepted-invitation-plus-useful-referral ra
 
 ### Sample Size
 
-Base rate: **none usable from J26.** An earlier draft of this plan anchored on "≈50% accept-among-invited" from the J26 `invited`/`accepted` flags — **retract that.** Codex flagged, correctly, that the old `invited/accepted/declined` booleans "include defaults and are not engagement signals" (`docs/READINESS_AUDIT_2026-05-25.md:406`), so a rate derived from them is unsound. *(This same caveat lightly touches the session's `accepted`-flag reads — but the specific accepted reviewers were independently **confirmed by Justin from his own notes** per proposal, so those identities are ground truth even though the boolean as a quantitative rate is not.)* Size the experiment off a minimum-detectable-effect with no historical rate assumed; collect the real accept/referral rate prospectively as a by-product.
+Base rate: **none usable from J26.** An earlier draft of this plan anchored on "≈50% accept-among-invited" from the J26 `invited`/`accepted` flags — **retract that.** Codex flagged, correctly, that the old `invited/accepted/declined` booleans "include defaults and are not engagement signals" (`docs/archive/READINESS_AUDIT_2026-05-25.md:406`), so a rate derived from them is unsound. *(This same caveat lightly touches the session's `accepted`-flag reads — but the specific accepted reviewers were independently **confirmed by Justin from his own notes** per proposal, so those identities are ground truth even though the boolean as a quantitative rate is not.)* Size the experiment off a minimum-detectable-effect with no historical rate assumed; collect the real accept/referral rate prospectively as a by-product.
 
 **Sample selection — do NOT pre-filter to grounded-friendly proposals.** Draw a representative sample across fields and novelty (continuing-line AND pivot proposals). Grounded-arm starvation on a proposal is a *result* (a coverage verdict), not a reason to drop that proposal; excluding starve-prone proposals would rig the coverage metric.
 

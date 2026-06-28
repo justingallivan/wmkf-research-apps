@@ -325,7 +325,7 @@ Run the reviewer suites: `npx jest reviewer contact provenance discovery identit
 - **Slice F:** `f6b5bd4` · `c5a4a0a` (merge).
 
 ## 8. Related design docs
-- `docs/REVIEWER_IDENTITY_CONTACT_FIX_PLAN.md` (+ `_REVIEW*`) — S234 design + Codex reviews.
+- `docs/archive/REVIEWER_IDENTITY_CONTACT_FIX_PLAN.md` (+ `_REVIEW*`) — S234 design + Codex reviews.
 - `docs/REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md` — the E/G/F follow-on plan (all shipped).
 - `docs/REVIEWER_INVITE_CONFIDENCE_DESIGN.md` — Slice G design + impl notes.
 - `docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md` — Slice F decision + the unbuilt auto-fetch design.

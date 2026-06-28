@@ -1,9 +1,12 @@
 # Docs Staleness Audit - 2026-06-28
 
-> **Action taken 2026-06-28:** the 2 DELETE recommendations were executed (the two
-> unreferenced `memory-wiki-*-PROMPT-2026-06-23.md` prompt files, deleted after an
-> independent 0-inbound-reference re-check). The 40 ARCHIVE recommendations are
-> deferred to a follow-up batch (tracked in `SESSION_PROMPT.md`). KEEP items need no action.
+> **Action taken 2026-06-28:** all recommendations executed. The 2 DELETEs removed
+> (the unreferenced `memory-wiki-*-PROMPT-2026-06-23.md` prompt files, after an
+> independent 0-inbound-reference re-check). The **39 ARCHIVE files** (the table below
+> lists 39; the summary's "40" was an off-by-one) were **moved to `docs/archive/`**,
+> with every inbound full-path reference rewritten across docs, memory, and code
+> comments; all doc gates green. KEEP items unchanged. Paths in the tables below are the
+> **original pre-move locations** (this report is left as the audit snapshot).
 
 Scope: all 309 markdown files under `docs/` were scanned for dated filenames, point-in-time audit/review markers, shipped/superseded status banners, and durable-reference candidates. Existing `docs/archive/**` files are treated as already archived unless a live path points at them. This report is recommend-only; no source doc should be moved or deleted without a final reference grep immediately before action.
 

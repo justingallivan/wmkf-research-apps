@@ -3,7 +3,7 @@
 **Created:** 2026-06-05  
 **Status:** Initial implementation complete; blocking-hook rollout and repeated Claude trials pending  
 **Scope:** Improve Claude instruction adherence while reducing root `CLAUDE.md` startup load.  
-**Inputs:** `docs/CLAUDE_INSTRUCTION_ARCHITECTURE_CLEANUP_PLAN.md`, `docs/CLAUDE_INSTRUCTION_ARCHITECTURE_REVIEW_RESPONSE.md`, and subsequent Codex review.
+**Inputs:** `docs/archive/CLAUDE_INSTRUCTION_ARCHITECTURE_CLEANUP_PLAN.md`, `docs/archive/CLAUDE_INSTRUCTION_ARCHITECTURE_REVIEW_RESPONSE.md`, and subsequent Codex review.
 
 ## Objective
 

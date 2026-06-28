@@ -304,7 +304,7 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 **Why it matters:** new sensitive grant/expense document uploads no longer get auth-free public Blob URLs in production; and the codebase now has a reusable record-scoped private-download pattern for the expected future Postgres-backed storage.
 
-**Pointers:** `docs/security-audit/PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md` (cohort, prod-promoted), `docs/security-audit/DOWNLOAD_PROXY_DESIGN_2026-06-11.md` (proxy, parked), memory `project-download-proxy-parked`. Commits `ac31c82`→`535260e` (S243).
+**Pointers:** `docs/archive/PHASE_1_PRIVATE_BLOB_DESIGN_2026-06-11.md` (cohort, prod-promoted), `docs/security-audit/DOWNLOAD_PROXY_DESIGN_2026-06-11.md` (proxy, parked), memory `project-download-proxy-parked`. Commits `ac31c82`→`535260e` (S243).
 
 ## June 2026 — Reviewer manual-add cross-store dedup + a silent save-failure incident (Session 237)
 
@@ -486,7 +486,7 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 **Why it matters:** removed a structural-redundancy join hop from every reviewer query; the disposable-data insight turned S196's ~8h careful "post-pilot" migration into a lighter clean cutover. The dig also surfaced — and tee'd up — the reviewer-identity false-match problem (a search for a PI attached a *lab member's* Scholar metrics because the institution-only guard can't tell them apart): Codex redesign plan saved, Phase 1 (a Scholar name-guard) not yet built.
 
-**Pointers:** `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`, `docs/REVIEWER_IDENTITY_RESOLUTION_PLAN.md`, `.claude-memory/project-appresearcher-collapse-post-pilot.md`. Commits `bfc903d`→`fb0a3f4` (collapse), `ca95de5`→`e9d5660` (remove-reviewer feature).
+**Pointers:** `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md`, `docs/REVIEWER_IDENTITY_RESOLUTION_PLAN.md`, `.claude-memory/project-appresearcher-collapse-post-pilot.md`. Commits `bfc903d`→`fb0a3f4` (collapse), `ca95de5`→`e9d5660` (remove-reviewer feature).
 
 ## May 2026 — Canonical system model + falsification guardrails + drift reconciliation (Session 197)
 
@@ -498,11 +498,11 @@ The pre-Session 84 chronological per-session log (everything after the September
 - `docs/SYSTEM_MODEL.md` — canonical conceptual model (rote/thinking principle, automation vs record-maturity axes, capabilities/trunk/substrate, Mode 1/2, doc-resolution provenance tiers). Codex-reviewed twice; built-vs-target honesty enforced.
 - **Falsification guardrails (permanent):** PreToolUse hook `.claude/hooks/scope-claim-reminder.js` (wired in `.claude/settings.json`) nags on scope/quantity claims into durable artifacts; Codex stop-time review gate enabled project-wide; protocol in `.claude-memory/feedback-falsify-not-confirm.md`.
 - **Drift reconciled:** the defunct "mid-June 2026 Phase II Research intake pilot" framing rewritten across 16 files (intake is a Phase I build for the next cycle); 142 live `Phase II Pending` status rows + form-module paths left untouched (dual-meaning hazard respected). No-judgment findings + Codex-caught siblings fixed.
-- `docs/CODEBASE_EVALUATION_2026-05-29.md` — read-only 10-front eval (36 agents, 94 retained findings), Codex-corrected; for triage, not applied.
+- `docs/archive/CODEBASE_EVALUATION_2026-05-29.md` — read-only 10-front eval (36 agents, 94 retained findings), Codex-corrected; for triage, not applied.
 
 **Why it matters:** S186 named the source-vs-live blind spot; S197 names the agent-vs-its-own-premise blind spot. Self-review can't catch errors baked into its own premise, so the fix is a forcing function (hook) + independent backstop (Codex gate), not willpower. The canonical model gives planning an anchor that prior sessions lacked, which is what let the drift be *reconciled* rather than re-litigated.
 
-**Pointers:** `docs/SYSTEM_MODEL.md`, `docs/CODEBASE_EVALUATION_2026-05-29.md`, `.claude-memory/{project-system-model,feedback-falsify-not-confirm}.md`. Commits `d4e61e9`→`7332da3`.
+**Pointers:** `docs/SYSTEM_MODEL.md`, `docs/archive/CODEBASE_EVALUATION_2026-05-29.md`, `.claude-memory/{project-system-model,feedback-falsify-not-confirm}.md`. Commits `d4e61e9`→`7332da3`.
 
 ## May 2026 — Backend battle-readiness audit + Phase 0 migration tracker (Session 186)
 
@@ -519,7 +519,7 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 **Why it matters:** First time a source-side CI sweep's blind spot was named structurally. The pre-S186 gates (`check:atlas`, `check:api-routes`, `check:fact-consistency`, etc.) all verify source-vs-source consistency; none verified source-vs-live-state. 13 commits + ~200 unit tests of S184 attach-dance work + 14 commits of S179 drain work were both non-functional in prod because no one noticed migrations didn't ship. The new tracker + manifest pipeline + cold-start drift check converts that class of drift into a `system_alerts` row at next cold start.
 
-**Pointers:** `docs/READINESS_AUDIT_2026-05-25.md`, `docs/READINESS_AUDIT_2026-05-25_CODEX_REPORT.md`, `docs/READINESS_AUDIT_PHASE0_PLAN.md` (plan v6 GREENLIT). Commits `ffe1dec` (Phase 0 main), `c35a4f2` (closeout: jose dep + CLAUDE.md schema text correction).
+**Pointers:** `docs/archive/READINESS_AUDIT_2026-05-25.md`, `docs/archive/READINESS_AUDIT_2026-05-25_CODEX_REPORT.md`, `docs/archive/READINESS_AUDIT_PHASE0_PLAN.md` (plan v6 GREENLIT). Commits `ffe1dec` (Phase 0 main), `c35a4f2` (closeout: jose dep + CLAUDE.md schema text correction).
 
 ## May 2026 — Three-call browser-direct attachment dance shipped end-to-end (Session 184)
 
@@ -606,7 +606,7 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 **Why it matters:** Untrusted document/form/external content reaching an LLM was previously interpolated raw — no delimiter, no instruction boundary. A7 establishes boundary-tagging as the standard and the registry gate prevents silent regression. The Codex re-audit also proved the gate's original file-granular design could false-green (one hardened call masking an unhardened sibling) — step 4 next session hardens that.
 
-**Pointers:** `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md`; `docs/security-audit/SECURITY_AUDIT_2026-05-21.md`; `lib/utils/ai-payload-boundary.js`, `lib/utils/ai-output-schema.js`, `scripts/check-prompt-injection-tagging.js`. Commits `adf8df5`·`e79460a`·`0a80da5`·`bc51233`·`5bae845`·`aa0a16d`·`04979f2` (S173–174); `2ad5297`→`f0f3fbd` (S176, 18 commits).
+**Pointers:** `docs/security-audit/A7_PROMPT_INJECTION_PLAN.md`; `docs/archive/SECURITY_AUDIT_2026-05-21.md`; `lib/utils/ai-payload-boundary.js`, `lib/utils/ai-output-schema.js`, `scripts/check-prompt-injection-tagging.js`. Commits `adf8df5`·`e79460a`·`0a80da5`·`bc51233`·`5bae845`·`aa0a16d`·`04979f2` (S173–174); `2ad5297`→`f0f3fbd` (S176, 18 commits).
 
 ---
 
@@ -657,14 +657,14 @@ The pre-Session 84 chronological per-session log (everything after the September
 - W6 step 2 (cleanup cron + restore script) **deferred to post-pilot** per Codex's Wave 1 same-day DROP precedent. Trigger memory `project_w6_table_drop_pending.md` fires ≥ 2026-07-01.
 - New shared utilities: `shared/utils/app-markdown.js` (marked v12 + DOMPurify with `uponSanitizeAttribute` hook for href scheme + class allowlist) and `shared/utils/sse-stream.js` (async-iterator parser with AbortSignal, CRLF-aware). 36 Jest cases. `phase-ii-writeup.js` 879 → 597 lines via modal extraction (`Phase2{QA,Feedback,WordExport}Modal.js`).
 - CI gates green: `check:atlas`, `check:atlas:self-test`, `check:api-routes` (80 routes after IRS adds + `extract-summary.js` removal).
-- **Known gap:** Gemini refactor not visually smoke-tested (CLI-agent limitation); flagged in `docs/CODEX_HANDOFF_REPORT_2026-05-12.md`.
+- **Known gap:** Gemini refactor not visually smoke-tested (CLI-agent limitation); flagged in `docs/archive/CODEX_HANDOFF_REPORT_2026-05-12.md`.
 
 **Why it matters:** The IRS layer is the first non-migration use of Postgres after Wave 1 closeout — proves the architectural reframe (Postgres = reference data + per-user/per-session state; Dataverse = organizational ground truth). The capability is PA-callable so it slots into Connor's backend-automation flows without new Vercel UI. W6 step 1 finishes the reviewer-finder reads cutover; remaining Postgres reviewer tables are drain-only and dropped post-pilot. The Gemini refactor extracts two shared utilities (`app-markdown`, `sse-stream`) that 10+ other pages can adopt later (`pages/dynamics-explorer.js:95` is the first candidate).
 
 **Pointers:**
 - `lib/services/irs-bmf-service.js`, `pages/api/cron/refresh-irs-bmf.js`, `pages/api/irs/verify-ein.js`, `scripts/import-irs-bmf.js`, `docs/atlas/postgres-irs-exempt-orgs.md`
 - `shared/utils/app-markdown.js`, `shared/utils/sse-stream.js`, `shared/components/Phase2{QA,Feedback,WordExport}Modal.js`
-- `docs/CODEX_HANDOFF_REPORT_2026-05-12.md` (Gemini refactor handoff + known-gap list)
+- `docs/archive/CODEX_HANDOFF_REPORT_2026-05-12.md` (Gemini refactor handoff + known-gap list)
 - `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` (W6 step 2 deferred checklist)
 - `.claude-memory/project_irs_exempt_verification.md` (planned → SHIPPED), `project_w6_table_drop_pending.md` (post-pilot trigger)
 
@@ -798,7 +798,7 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 **Why it matters:** First user-app surface where Postgres has no read consumers. The dual-write in `save-candidates` is now the only Postgres tether — its removal becomes a single-commit cleanup once another smoke session goes by. Five end-to-end phases (read / patch / send / upload / thank-you) validated against real auth on the J26 Quantum Chimera test set.
 
-**Pointers:** `docs/REVIEWER_FINDER_DATAVERSE_CUTOVER_PLAN.md`; commits `a4961db` (Workstream 3 backfill), `ef233a0` (Workstream 2 Review Manager migration), `ada645d` (validation fixes)
+**Pointers:** `docs/archive/REVIEWER_FINDER_DATAVERSE_CUTOVER_PLAN.md`; commits `a4961db` (Workstream 3 backfill), `ef233a0` (Workstream 2 Review Manager migration), `ada645d` (validation fixes)
 
 ---
 
@@ -812,7 +812,7 @@ The pre-Session 84 chronological per-session log (everything after the September
 - Adapter extensions: `findByRequest`, `findByPD` (queryAllRecords-paginated to handle PDs with >500 historical requests), `updateLifecycle`, `softDelete`, `bulkUpdateByRequest`; person/researcher `update` methods with the same 100-char `wmkf_organizationname` clamp
 - Bug fixes uncovered during validation: `claude-reviewer-service.js` converted from CJS `require()` to ESM `import` (Next 16 + Turbopack interop returned undefined for `usage-logger`'s named exports under CJS); `bypassRestrictions('<endpoint>')` mandatory at handler entry — `DynamicsService` fails closed otherwise; `akoya_request` proposal title field is `akoya_title`, not the assumed `akoya_name`
 **Why it matters:** Real production-shape exercise of Connor's table model end-to-end (lead → bibliometric sidecar → lifecycle ledger). Validates the "all org-visible, dashboards filter by PD" pattern in a working surface, not a smoke test. Sets the template for the rest of the user apps that still talk to Postgres.
-**Pointers:** `docs/REVIEWER_ARCHITECTURE.md`, `docs/REVIEWER_FINDER_DATAVERSE_CUTOVER_PLAN.md`; commits `b440173` (save dual-write), `9215d03` (validation fixes), `f66cdad` (read cutover), `992126c` (pagination), `cc5f710` (next-steps plan)
+**Pointers:** `docs/REVIEWER_ARCHITECTURE.md`, `docs/archive/REVIEWER_FINDER_DATAVERSE_CUTOVER_PLAN.md`; commits `b440173` (save dual-write), `9215d03` (validation fixes), `f66cdad` (read cutover), `992126c` (pagination), `cc5f710` (next-steps plan)
 
 ---
 
@@ -3186,7 +3186,7 @@ Long meeting day. Eight schema items + one deferred decision worked across two s
 
 ### Morning — 2026-05-14 schema review
 
-Walked through `docs/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md` with Connor. Eight items closed under a "human-legibility over normalization purity" design principle that emerged mid-meeting (memory `feedback_human_legibility_schema_principle`). Material outcomes:
+Walked through `docs/archive/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md` with Connor. Eight items closed under a "human-legibility over normalization purity" design principle that emerged mid-meeting (memory `feedback_human_legibility_schema_principle`). Material outcomes:
 
 - Item 1: cost-share **unified into `wmkf_proposalbudgetline.wmkf_category` enum** (3 new values: WaivedIndirect / WaivedTuition / OtherCostShare) instead of a separate `wmkf_proposalcostshare` entity.
 - Item 3: roster **extends existing `wmkf_apprequestperson`** (3 nullable fields + 5-value `wmkf_role` enum) instead of a new `wmkf_proposalroster` entity.

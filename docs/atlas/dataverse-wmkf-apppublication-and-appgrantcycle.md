@@ -2,7 +2,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-> **⚠ S213 (2026-06-02): `wmkf_apppublication` and `wmkf_apppublicationauthor` were DROPPED** (deployed with 0 rows, no callers; went down with the `wmkf_appresearcher` collapse — `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`). The publication sections below are historical. **`wmkf_appgrantcycle` is unaffected and remains live** — see its section.
+> **⚠ S213 (2026-06-02): `wmkf_apppublication` and `wmkf_apppublicationauthor` were DROPPED** (deployed with 0 rows, no callers; went down with the `wmkf_appresearcher` collapse — `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md`). The publication sections below are historical. **`wmkf_appgrantcycle` is unaffected and remains live** — see its section.
 
 **Last verified:** 2026-05-07 via `scripts/audit-dataverse-state.js` + EntityDefinitions metadata probe. **`wmkf_appgrantcycle` section re-verified 2026-05-19** post-W3 cutover (see that section); the publication entities were dropped S213 (above).
 
@@ -16,7 +16,7 @@ Custom attrs (14, all confirmed deployed): `wmkf_apppublicationid` (PK), `wmkf_t
 
 **No adapter exists** (no `lib/dataverse/adapters/publication.js`). No callers anywhere.
 
-**Migration disposition (CLOSED S213):** Postgres `publications` is also empty (0 rows). Wave 2 plan was to retire the Postgres table and only start writing here when discovery is rewired. **S213 outcome:** both `wmkf_apppublication` and `wmkf_apppublicationauthor` were **DROPPED** with the appresearcher collapse (both were deployed, empty, and unused; see `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`). The earlier "junction NOT deployed" claim was based on a probe of the wrong logical name — the junction's deployed logical name was `wmkf_apppublicationauthor` (no `_z_`; that artifact was only in the schema-as-code FILE name).
+**Migration disposition (CLOSED S213):** Postgres `publications` is also empty (0 rows). Wave 2 plan was to retire the Postgres table and only start writing here when discovery is rewired. **S213 outcome:** both `wmkf_apppublication` and `wmkf_apppublicationauthor` were **DROPPED** with the appresearcher collapse (both were deployed, empty, and unused; see `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md`). The earlier "junction NOT deployed" claim was based on a probe of the wrong logical name — the junction's deployed logical name was `wmkf_apppublicationauthor` (no `_z_`; that artifact was only in the schema-as-code FILE name).
 
 ## `wmkf_appgrantcycle` — DEPLOYED, DATAVERSE-PRIMARY (W3 cutover 2026-05-12)
 
@@ -44,7 +44,7 @@ S185 audit catch (2026-05-25-B): the prior "NOT DEPLOYED" claim (from 2026-05-07
 **Entity set (gone):** `wmkf_apppublicationauthors`
 **Schema-as-code (deleted S213):** `lib/dataverse/schema/wave2/wmkf_app_z_publication_author.json` (file name had `_z_` artifact; deployed entity logical name was `wmkf_apppublicationauthor` without the `_z_`)
 
-Junction for `wmkf_apppublication ↔ wmkf_appresearcher`. Originally marked NOT DEPLOYED in the 2026-05-07 probe — that was wrong (the probe used the `_z_`-named entity set, which never existed). The deployed entity used the no-`_z_` logical name. Both publication entities were dropped S213 in the appresearcher collapse (see `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`).
+Junction for `wmkf_apppublication ↔ wmkf_appresearcher`. Originally marked NOT DEPLOYED in the 2026-05-07 probe — that was wrong (the probe used the `_z_`-named entity set, which never existed). The deployed entity used the no-`_z_` logical name. Both publication entities were dropped S213 in the appresearcher collapse (see `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md`).
 
 ## What this means for the migration plan
 
@@ -59,4 +59,4 @@ Junction for `wmkf_apppublication ↔ wmkf_appresearcher`. Originally marked NOT
 | `wmkf_appproposalsearch` | ✅ | ✅ (entity set is `wmkf_appproposalsearchs`, NOT `-es`) | empty |
 | `wmkf_apppublicationauthor` (file: `wmkf_app_z_publication_author.json`) | (deleted S213) | **DROPPED S213** (404) | was empty |
 
-The "as-built vs. as-designed" reconciliation Codex round-3 #5 asked for is captured here. (S213: the three sidecar/publication entities were dropped — see `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`.)
+The "as-built vs. as-designed" reconciliation Codex round-3 #5 asked for is captured here. (S213: the three sidecar/publication entities were dropped — see `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md`.)

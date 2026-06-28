@@ -1,7 +1,7 @@
 # Reviewer Identity / Contact-Enrichment Fix Plan Review
 
 Date: 2026-06-08
-Scope: read-only engineering review of `docs/REVIEWER_IDENTITY_CONTACT_FIX_PLAN.md` against live code.
+Scope: read-only engineering review of `docs/archive/REVIEWER_IDENTITY_CONTACT_FIX_PLAN.md` against live code.
 
 ## 1. Per-Fix Verdicts
 

@@ -44,7 +44,7 @@ No memory edits applied during this audit.
 - Pure behavioral rule. CLEAN.
 
 ### `feedback_thoroughness_default.md`
-- Pure behavioral rule. The S141 doc-currency reference (`docs/DOC_TRIAGE_2026-05-07.md`) exists. CLEAN.
+- Pure behavioral rule. The S141 doc-currency reference (`docs/archive/DOC_TRIAGE_2026-05-07.md`) exists. CLEAN.
 
 ### `feedback_verify_before_destructive_carryover.md`
 - Behavioral rule, codified at `CLAUDE.md:11-17`. The historical "20+ live UPDATE sites" can't be re-verified post-W5/W6 retirement, but the rule stands. CLEAN as a rule.
@@ -177,7 +177,7 @@ No memory edits applied during this audit.
 - **Line 28 STALE entity list:** `wmkf_budgetline, wmkf_personnel, wmkf_priorsupport, wmkf_milestone` — superseded by 2026-05-14 (`wmkf_proposalbudgetline` only; roster extends `wmkf_apprequestperson`; milestones/prior-support deferred). Memory's own top-of-file warning catches the 2026-05-13 supersession but not the 2026-05-14 one.
 
 ### `project_intake_portal_pilot_decisions_2026-05-13.md`
-- **THIS MEMORY IS ONE-DAY STALE.** The 2026-05-14 schema review (`docs/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md` at 11:40 today, `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` at 14:05 today, `docs/INTAKE_PORTAL_DESIGN.md:587-588` at 14:05 today) supersedes this memory.
+- **THIS MEMORY IS ONE-DAY STALE.** The 2026-05-14 schema review (`docs/archive/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md` at 11:40 today, `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` at 14:05 today, `docs/INTAKE_PORTAL_DESIGN.md:587-588` at 14:05 today) supersedes this memory.
 - **Line 20 STALE:** "narrowed scope to budget + roster only. JSON specs drafted by 2026-05-15, applied by 2026-05-18." — refined to: budget = new `wmkf_proposalbudgetline`; roster extends `wmkf_apprequestperson`; no new `wmkf_proposalroster` (per `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md:40`).
 - **Line 30 STALE path:** "Two JSON schema specs under `lib/dataverse/schema/intake/`" — that directory does NOT exist (verified `find lib/dataverse/schema -maxdepth 3 -type d` returns `roles, wave1, wave2, wave2-existing, wave3` only). Budget spec landed at `docs/BUDGET_FORM_SPEC.md` instead.
 - **Line 24 STALE:** "Naming alignment is open... between `wmkf_proposalroster` and `wmkf_personnel`" — closed 2026-05-14: no new roster entity at all.

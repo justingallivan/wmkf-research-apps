@@ -60,6 +60,6 @@ Implication: skipping migration of sidecar `wmkf_notes` is live-data safe today,
 ## Review Implications
 
 - The earlier DNS blocker is no longer absolute: escalated one-off probes can reach Azure auth and Dataverse.
-- `docs/APPRESEARCHER_COLLAPSE_PLAN.md` is correct that `wmkf_apppublicationauthor` is deployed and empty.
+- `docs/archive/APPRESEARCHER_COLLAPSE_PLAN.md` is correct that `wmkf_apppublicationauthor` is deployed and empty.
 - Any audit or doc still treating `wmkf_app_z_publication_authors` as the live entity set is stale.
 - The D-AFF max-length concern is real: `wmkf_primaryaffiliation` has 500 chars while `wmkf_organizationname` has 100.

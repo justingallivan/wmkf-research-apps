@@ -16,8 +16,8 @@ Read when: working on `CLAUDE.md` structure, `.claude/rules/`, `.claude/hooks/`,
 Justin flagged this session's behavior as unacceptable — Claude repeatedly violated rules **already in** `CLAUDE.md`/memory (probe-before-plan, time-box meta-work, falsify-don't-confirm, don't-assert-unverified-state-as-built) across a long design churn. Root-cause framing: the 308-line root file (over Anthropic's documented ~200-line adherence threshold) dilutes must-follow rules into skimmed-past noise.
 
 Two committed docs (commit `1c40a13`):
-- `docs/CLAUDE_INSTRUCTION_ARCHITECTURE_CLEANUP_PLAN.md` — **Justin-authored** plan: route the root file's 4 jobs (guardrails / arch reference / live-state catalogue / doc router) to the right mechanism (root rules / path-scoped `.claude/rules/` / skills / hooks+gates / memory); reduce to ~80-120 lines; **enforce before deleting prose** (Phase 2 before Phase 3).
-- `docs/CLAUDE_INSTRUCTION_ARCHITECTURE_REVIEW_RESPONSE.md` — **Claude's** Phase-1 review (AGREE/MODIFY/OBJECT + evidence). Verdict: accept direction, revise before implementing.
+- `docs/archive/CLAUDE_INSTRUCTION_ARCHITECTURE_CLEANUP_PLAN.md` — **Justin-authored** plan: route the root file's 4 jobs (guardrails / arch reference / live-state catalogue / doc router) to the right mechanism (root rules / path-scoped `.claude/rules/` / skills / hooks+gates / memory); reduce to ~80-120 lines; **enforce before deleting prose** (Phase 2 before Phase 3).
+- `docs/archive/CLAUDE_INSTRUCTION_ARCHITECTURE_REVIEW_RESPONSE.md` — **Claude's** Phase-1 review (AGREE/MODIFY/OBJECT + evidence). Verdict: accept direction, revise before implementing.
 
 ## Load-bearing facts (verified vs Claude Code docs, S225 — DON'T re-derive wrong)
 - `.claude/rules/` with `paths:` frontmatter IS real; loads **when a matching file is READ** (not at startup, not on edit). Weak for "before you create a NEW file" + planning-time rules → those stay in root or become hooks/skills.

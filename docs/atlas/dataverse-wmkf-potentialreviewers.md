@@ -39,7 +39,7 @@ Field caps observed empirically:
 - `wmkf_organizationname` — 100 chars
 - `wmkf_areaofexpertise` — 100 chars
 
-**Bibliometric fields (S213 — folded in from the dropped `wmkf_appresearcher` sidecar):** `wmkf_primaryaffiliation` (500, the canonical full-string affiliation per D-AFF), `wmkf_department` (255), `wmkf_orcid`/`wmkf_orcidurl`, `wmkf_googlescholarid`/`wmkf_googlescholarurl`, `wmkf_hindex`/`wmkf_i10index`/`wmkf_totalcitations`, `wmkf_website`/`wmkf_facultypageurl`, `wmkf_keywords` (Memo), `wmkf_emailsource`, `wmkf_lastchecked`/`wmkf_metricsupdatedat`/`wmkf_contactenrichedat`/`wmkf_contactenrichmentsource`. (`wmkf_organizationname` kept as a clamped-100 compat shadow.) Written by `adapters/researcher.js` (now person-targeting) + `potential-reviewer.js`. See `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`.
+**Bibliometric fields (S213 — folded in from the dropped `wmkf_appresearcher` sidecar):** `wmkf_primaryaffiliation` (500, the canonical full-string affiliation per D-AFF), `wmkf_department` (255), `wmkf_orcid`/`wmkf_orcidurl`, `wmkf_googlescholarid`/`wmkf_googlescholarurl`, `wmkf_hindex`/`wmkf_i10index`/`wmkf_totalcitations`, `wmkf_website`/`wmkf_facultypageurl`, `wmkf_keywords` (Memo), `wmkf_emailsource`, `wmkf_lastchecked`/`wmkf_metricsupdatedat`/`wmkf_contactenrichedat`/`wmkf_contactenrichmentsource`. (`wmkf_organizationname` kept as a clamped-100 compat shadow.) Written by `adapters/researcher.js` (now person-targeting) + `potential-reviewer.js`. See `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md`.
 
 ## Adapter contract (`lib/dataverse/adapters/potential-reviewer.js`)
 

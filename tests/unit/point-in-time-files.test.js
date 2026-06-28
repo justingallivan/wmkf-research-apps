@@ -33,7 +33,7 @@ describe('isPointInTimeBasename', () => {
 
   test('does NOT match live docs that happen to contain "AUDIT" mid-name', () => {
     // Live security-audit docs use directory scoping + non-prefix naming, e.g.
-    // docs/security-audit/SECURITY_AUDIT_2026-05-21.md. Classifier works on
+    // docs/archive/SECURITY_AUDIT_2026-05-21.md. Classifier works on
     // basename only, so the directory scoping is the caller's responsibility,
     // but the basename SECURITY_AUDIT_... must not match — it starts with
     // "SECURITY_", not "AUDIT_".

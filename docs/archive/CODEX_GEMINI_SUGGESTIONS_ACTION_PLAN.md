@@ -2,7 +2,7 @@
 
 **Status:** Approved implementation plan (reviewed and revised 2026-05-12, Session 147)
 **Owner:** Codex implements; Claude reviews via the handoff report (§ "Handoff report" below).
-**Source reviewed:** `docs/GEMINI_CODE_REVIEW_SUGGESTIONS.md`
+**Source reviewed:** `docs/archive/GEMINI_CODE_REVIEW_SUGGESTIONS.md`
 **Goal:** Capture the high-value, low-to-medium-risk refactors from the Gemini review without creating broad churn or conflicts.
 
 ## Coordination notes

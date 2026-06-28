@@ -1,6 +1,6 @@
 # `wmkf_appresearcher` Collapse Plan
 
-**Status: ✅ EXECUTED 2026-06-02 (S213) via the lighter cutover in `docs/APPRESEARCHER_COLLAPSE_PLAN_V2.md`.** The "post-pilot, do not execute mid-pilot" posture below was reversed (disposable data). This S196 doc remains the reference for the exhaustive doc-cleanup file list; V2 is the as-executed record.
+**Status: ✅ EXECUTED 2026-06-02 (S213) via the lighter cutover in `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md`.** The "post-pilot, do not execute mid-pilot" posture below was reversed (disposable data). This S196 doc remains the reference for the exhaustive doc-cleanup file list; V2 is the as-executed record.
 
 **Goal:** Eliminate the `wmkf_appresearcher` 1:1 sidecar by folding its bibliometric fields into `wmkf_potentialreviewer` directly. Background and rationale: `.claude-memory/project-appresearcher-collapse-post-pilot.md` and `docs/REVIEWER_DATA_MODEL.md` § "Open design notes."
 
@@ -69,7 +69,7 @@ WRONG-NOW items fixed during S196 rounds 2/3 (confirmed 2026-05-28):
 - ✓ `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` line 578: `contact-enrichment-service.js` now documented as Dataverse-backed via `researcherAdapter`.
 - ✓ `.claude-memory/project-appresearcher-collapse-post-pilot.md`: caller count corrected to 4 (Review Manager included).
 - ✓ `.claude-memory/project-reviewer-postgres-to-dataverse-migration.md` lines 12-13: `wmkf_potentialreviewer` corrected to global per-person, not per-proposal slot.
-- ✓ `docs/APPRESEARCHER_COLLAPSE_PLAN.md` (this file): publication-author logical name corrected, caller count corrected.
+- ✓ `docs/archive/APPRESEARCHER_COLLAPSE_PLAN.md` (this file): publication-author logical name corrected, caller count corrected.
 
 WRONG-AFTER (touched in Phase 6, after execution):
 - `docs/atlas/dataverse-wmkf-appresearcher.md` → delete
@@ -327,7 +327,7 @@ In one commit:
 - `docs/SERVICE_AND_UTILITY_CATALOG.md` → confirm no `researcher.js` entry to remove (catalog only lists `contact-enrichment-service.js`); update that entry's description to drop "1:1 sidecar" framing.
 - `.claude-memory/project-appresearcher-collapse-post-pilot.md` → update description + body to "SHIPPED [date]"; keep file for historical context.
 - `.claude-memory/project-reviewer-postgres-to-dataverse-migration.md` → drop the 1:1 sidecar "locked decision" (lines 12-13, 20-23).
-- `docs/APPRESEARCHER_COLLAPSE_PLAN.md` (this file) → add "EXECUTED [date]" status header; retain for historical record.
+- `docs/archive/APPRESEARCHER_COLLAPSE_PLAN.md` (this file) → add "EXECUTED [date]" status header; retain for historical record.
 
 Run `npm run check:fact-consistency` and `npm run check:atlas` afterward to verify nothing broke.
 

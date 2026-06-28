@@ -301,7 +301,7 @@ legacy corpus hardens through use.
 
 - **Data-model consolidation** ("keep everything in Dynamics"): multi-wave Postgres→Dataverse
   migration; remaining cleanup includes the reviewer bibliometric **sidecar collapse**
-  (`docs/APPRESEARCHER_COLLAPSE_PLAN.md`). This sits *under* the Reviewer capability, so its real
+  (`docs/archive/APPRESEARCHER_COLLAPSE_PLAN.md`). This sits *under* the Reviewer capability, so its real
   gate is **"the reviewer Workbench has stabilized," not the (defunct) intake pilot.**
 - **Auth & security:** dual-provider auth, prompt-injection hardening (shipped), virus scanning.
 - **System-of-record matrix:** already exists — the **Application State Atlas** (per-entity

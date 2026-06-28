@@ -8,7 +8,7 @@ This runbook captures the current repeatable shape for security audits in this r
 
 Start from these repo-native precedents:
 
-- `docs/security-audit/SECURITY_AUDIT_2026-05-21.md` for the concise security-audit report shape.
+- `docs/archive/SECURITY_AUDIT_2026-05-21.md` for the concise security-audit report shape.
 - `docs/THIRD_PARTY_LLM_AUDIT_PROMPT.md` for the full-repository audit prompt and deliverables.
 - `docs/THIRD_PARTY_LLM_AUDIT_FOLLOWUP_PROMPT.md` for the correction pass after a first audit report.
 - `docs/THIRD_PARTY_LLM_AUDIT_PRACTICE_IMPROVEMENT_PROMPT.md` for methodology guardrails learned from prior audit mistakes.
@@ -118,4 +118,4 @@ After the first report, run a correction pass using `docs/THIRD_PARTY_LLM_AUDIT_
 - Avoid overcorrection: narrowing a finding is not the same as retracting it.
 - Check that every finding ID referenced in the action plan exists.
 
-For durable or cross-layer findings, distill the corrected result into a short actionable packet before implementation, following the shape of `docs/CORRECTED_AUDIT_FINDINGS_FOR_CLAUDE_REVIEW_2026_05_26.md`.
+For durable or cross-layer findings, distill the corrected result into a short actionable packet before implementation, following the shape of `docs/archive/CORRECTED_AUDIT_FINDINGS_FOR_CLAUDE_REVIEW_2026_05_26.md`.

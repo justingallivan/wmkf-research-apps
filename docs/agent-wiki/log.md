@@ -29,4 +29,4 @@ update_triggers:
   and routed each from the index. Pages absorb the dense operational clusters that had
   accumulated in `.claude-memory/MEMORY.md`; the memory router lines were collapsed to
   terse triggers that point here. Per the Codex handoff brief
-  `docs/MEMORY_ROUTER_WIKI_RECOMMENDATIONS_2026-06-11.md`.
+  `docs/archive/MEMORY_ROUTER_WIKI_RECOMMENDATIONS_2026-06-11.md`.

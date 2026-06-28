@@ -2,7 +2,7 @@
 
 **Created:** 2026-06-05 (S225)
 **Reviewer:** Claude (Opus 4.8)
-**Reviews:** `docs/CLAUDE_INSTRUCTION_ARCHITECTURE_CLEANUP_PLAN.md`
+**Reviews:** `docs/archive/CLAUDE_INSTRUCTION_ARCHITECTURE_CLEANUP_PLAN.md`
 **Verdict format:** `AGREE` / `MODIFY` / `OBJECT` with evidence, per the plan's "Claude Architecture Review Questions."
 
 > **Why this review exists.** This session (S225) Claude repeatedly violated rules that are *already present* in `CLAUDE.md` and memory — probe-before-plan, time-box meta-work, falsify-don't-confirm, and "don't assert unverified state as built." The cleanup plan's thesis — that a 308-line root file (over Anthropic's documented ~200-line adherence threshold) dilutes must-follow rules into skimmed-past noise — is a fair root-cause diagnosis of that behavior. This review takes the plan seriously and grounds every claim in a probe rather than assertion, which is the discipline that lapsed.

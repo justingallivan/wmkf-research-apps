@@ -19,7 +19,7 @@
  * (relying on the tracker, not on migration-body IF NOT EXISTS guards —
  * some migrations like 007 are NOT re-runnable).
  *
- * See docs/READINESS_AUDIT_PHASE0_PLAN.md § Step 4a.
+ * See docs/archive/READINESS_AUDIT_PHASE0_PLAN.md § Step 4a.
  */
 
 const fs = require('fs');

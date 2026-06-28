@@ -4,7 +4,7 @@
 
 **(original status:** Proposed for immediate execution, pending Codex review + sign-off — all resolved.)
 
-**Supersedes the *timing* of** `docs/APPRESEARCHER_COLLAPSE_PLAN.md` (S196), which said "post-pilot, do not execute now." That posture was driven by a data-preservation caution that no longer applies (see "Why now"). The S196 doc remains the reference for the **exhaustive doc-cleanup file list** (its Phase 6) and detailed mechanics; this V2 overrides the parts that changed and re-grounds every state claim against a live probe.
+**Supersedes the *timing* of** `docs/archive/APPRESEARCHER_COLLAPSE_PLAN.md` (S196), which said "post-pilot, do not execute now." That posture was driven by a data-preservation caution that no longer applies (see "Why now"). The S196 doc remains the reference for the **exhaustive doc-cleanup file list** (its Phase 6) and detailed mechanics; this V2 overrides the parts that changed and re-grounds every state claim against a live probe.
 
 **Goal (unchanged):** eliminate the `wmkf_appresearcher` 1:1 bibliometric sidecar by folding its fields into `wmkf_potentialreviewers` directly, drop the sidecar + the two empty publication tables, and leave the reviewer domain at two tables (person + engagement) instead of three. This V2 also formalizes **`wmkf_department` as a person-level field** populated by both reviewer search and reviewer self-correction, for use in staff write-ups.
 
@@ -23,7 +23,7 @@ Net: this becomes a **clean cutover** — add fields → repoint callers → re-
 
 ## Live ground truth (probed 2026-06-02 against prod `wmkf.crm.dynamics.com`)
 
-> **Independently verified by a network-enabled Codex probe, 2026-06-02** — every count, attribute total, max-length, and the collision set below was reproduced. Full findings: `docs/DATAVERSE_LIVE_PROBE_FINDINGS_2026-06-02.md`. Three additions from that run are folded in below: a **clean link-shape audit** (0 anomalies), `wmkf_notes` **0 populated rows**, and the obsolete `wmkf_app_z_publication_authors` set returns **404** (only the `wmkf_apppublicationauthor` logical name is deployed).
+> **Independently verified by a network-enabled Codex probe, 2026-06-02** — every count, attribute total, max-length, and the collision set below was reproduced. Full findings: `docs/archive/DATAVERSE_LIVE_PROBE_FINDINGS_2026-06-02.md`. Three additions from that run are folded in below: a **clean link-shape audit** (0 anomalies), `wmkf_notes` **0 populated rows**, and the obsolete `wmkf_app_z_publication_authors` set returns **404** (only the `wmkf_apppublicationauthor` logical name is deployed).
 
 **Row counts**
 | Entity set | Rows | S196 (2026-05-28) |
@@ -158,7 +158,7 @@ Row counts, attribute inventory + types both entities, collision check, the **5-
 
 ## Codex review outcome (2026-06-02)
 
-**Part 2 — ground truth: independently confirmed.** A network-enabled Codex probe reproduced every count, attribute total, max-length, and the collision set; full findings in `docs/DATAVERSE_LIVE_PROBE_FINDINGS_2026-06-02.md`. No discrepancies with this doc. Added: clean link audit (0/0/0), `wmkf_notes` 0 rows, `_z_` set 404.
+**Part 2 — ground truth: independently confirmed.** A network-enabled Codex probe reproduced every count, attribute total, max-length, and the collision set; full findings in `docs/archive/DATAVERSE_LIVE_PROBE_FINDINGS_2026-06-02.md`. No discrepancies with this doc. Added: clean link audit (0/0/0), `wmkf_notes` 0 rows, `_z_` set 404.
 
 **Part 1 — structure/risk findings, folded in above:**
 - P0 — keep the link-shape audit as a pre-backfill gate (→ Phase 2.0).

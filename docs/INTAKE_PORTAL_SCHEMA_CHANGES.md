@@ -121,7 +121,7 @@ Distinct from `wmkf_reviewreceivedat`: that field marks when the *reviewer* subm
 
 **Scope:** Live schema-decision walkthrough with Connor. Established "human-legibility over normalization purity" as the governing principle (memory `feedback_human_legibility_schema_principle`). Multiple proposed new entities collapsed into extensions of existing ones; live Dataverse probe found existing fields covering 3 of 4 proposed aggregate additions.
 
-**Status:** Decisions locked; JSON specs not yet written. **Schema slice deploy blocked on Item 6** (drain-vs-PA write conflict on aggregate fields) until that decision is taken separately. Authoritative summary: `docs/BUDGET_FORM_SPEC.md` v3 top status block + `docs/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md` outcome banner.
+**Status:** Decisions locked; JSON specs not yet written. **Schema slice deploy blocked on Item 6** (drain-vs-PA write conflict on aggregate fields) until that decision is taken separately. Authoritative summary: `docs/BUDGET_FORM_SPEC.md` v3 top status block + `docs/archive/INTAKE_PORTAL_SCHEMA_REVIEW_2026-05-14.md` outcome banner.
 
 ### Cost-share — unified into `wmkf_proposalbudgetline.wmkf_category` enum
 

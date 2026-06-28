@@ -90,7 +90,7 @@ const ALLOWLIST_FILES = new Set([
   // Migration plans — describing the cutover history is the doc's purpose.
   'docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md',
   'docs/POSTGRES_TO_DATAVERSE_MIGRATION.md',
-  'docs/REVIEWER_FINDER_DATAVERSE_CUTOVER_PLAN.md',
+  'docs/archive/REVIEWER_FINDER_DATAVERSE_CUTOVER_PLAN.md',
   // Historical design sketch with top supersession banner.
   'docs/REVIEWER_FINDER_FUTURE_ARCHITECTURE.md',
   // Meta-doc cataloging past drift / lessons-learned — the PG mentions
