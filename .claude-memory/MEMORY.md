@@ -78,6 +78,7 @@
 - Prompt / Executor / document processing: ../docs/agent-wiki/topics/prompt-executor.md
 - Adding a prompt / editing a seed / prompt-store governance (two-tier, create-only seed, version-preserving --force, timestamps): project-prompt-governance.md
 - BILL / honoraria / payment semantics: ../docs/agent-wiki/topics/finance-honoraria.md
+- Reviewer honorarium onboarding→payment current-state / Ops "mimic Rosie's grant flow" / why no individual gets paid (0/9,151): project-honorarium-payment-landscape.md
 - Auth / admin / access / security: ../docs/agent-wiki/topics/security-auth.md
 - Private Blob / file download patterns: ../docs/agent-wiki/topics/security-auth.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
