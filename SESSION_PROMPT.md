@@ -1,134 +1,142 @@
-# Session 298 Prompt: Choose next verified objective
+# Session 299 Prompt: Ops BILL/honorarium update + parallel-agent skill
 
-## Session 297 Summary
+## Session 298 Summary
 
-Session 297 moved the four PD-composed reviewer email templates (invitation,
-materials, follow-up, thank-you) out of a hardcoded code constant and into the
-admin **Email Defaults** panel as org-wide defaults, with an optional per-PD
-override layered on top. It also restored the honorarium amount to the invitation
-(the S296 wiki/voice rewrite had dropped the `{{customField:honorarium}}` token,
-even though `render-emails` still injects the live admin amount).
+Two parallel tracks ran via a git worktree (Codex on the admin dashboard, Claude
+on a deep honorarium-payment investigation), then the worktree workflow itself was
+turned into reusable tooling.
 
 ### What Was Completed
 
-1. **Reviewer templates → admin Email Defaults (two-layer: per-PD override → admin org default)**
-   - Single source of default copy: `lib/seed/email-defaults/reviewer-templates.js`
-     (init data, NOT a runtime fallback). 8 catalog entries in
-     `shared/config/editableTextDefaults.js` → the admin panel renders them.
-   - New PD-readable read path: `GET /api/email-defaults/reviewer-templates`.
-   - `shared/components/reviewers/email-template-store.js` resolves admin default +
-     per-PD override and persists **override-only** (so later admin edits flow
-     through to non-overridden fields). Removed `DEFAULT_TEMPLATES`; added
-     `EMPTY_TEMPLATES` / `loadAdminTemplateDefaults` / `toOverrides`. No runtime code
-     fallback — a blank admin value renders blank in the preview-before-send (all
-     four are interactive-send only; verified no headless/cron path).
-   - Rewired `EmailTemplatesModal` / `InviteEmailModal` / `ReviewerManagePanel`;
-     "reset to default" now targets the admin org default.
+1. **Reverse-engineered the reviewer honorarium onboarding→payment reality** (live
+   Dataverse probes, read-only). Key findings, all `[VERIFIED via probe 2026-06-27]`:
+   - **Onboarding chain:** staff invites each reviewer into GoApply (87/87 have an
+     `akoya_goapplyinviteurl`, invite precedes registration ~3.6d median) → reviewer
+     **self-registers** under their own email (87/87, 0 staff submissions) → AkoyaGO
+     sync provisions the contact (as a **non-vendor**) + honorarium `akoya_request`
+     → **Connor manually classifies** it (the 2/19 edits) → then nothing.
+   - **The wall:** **0 of 9,151** PAID disbursements ever went to an individual —
+     the payment engine is **rail-agnostic** (ACH/check/BILL all just channels;
+     pre-BILL grant #997034 paid by ACH through the same machinery) but
+     **payee-bound to institutions**. Honoraria have 0 payment rows, 0 vendor
+     records. "Mimic Rosie's grant flow" = a payee-model capability question for
+     Connor/Sarah/Bromelkamp, not a portal task.
+   - **Approvals are two-stage:** a human advances the `akoya_folio` state machine
+     (Ready To Send → Ready to Pay, e.g. Sarah Hibler) in Dataverse; the money-out
+     approval happens in BILL/offline (the `wmkf_*approval` flag-fields are all
+     null/false even on the paid $900K grant #1002238).
+   - **PNI-without-API scoping:** the BILL PNI is the asset (16-digit, leading-0
+     format from 301 live values); without API access friction is *relocated*, not
+     removed. Recommendation: build a small self-report "BILL account? + PNI"
+     segmentation field (persist on the contact), not the kludgy signup-help infra;
+     the real lever is BILL API access. Steph: addresses obsolete going forward
+     (kept for now).
+   - Captured in `.claude-memory/project-honorarium-payment-landscape.md` (new) +
+     extended `akoya-payment-field-semantics.md` and `akoya-request-honorarium-nomenclature.md`
+     + a dated probe note in `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`.
 
-2. **Honorarium restored to the invitation default** via `{{customField:honorarium}}`.
+2. **Admin dashboard Dataverse-info buttons** (Codex, in a parallel worktree).
+   Each Dataverse-backed admin card (Email Defaults, Policies, Prompt Templates,
+   honorarium amount) gets an ⓘ button revealing the backing entity/field/row for
+   manual Power Automate edits. Reviewed read-only (in scope, no shared-primitive
+   edits, **all field mappings verified against live `pages/api/admin/*` routes**),
+   lint 0 / build clean. **Merged + deployed to prod** (READY on `applications.wmkeck.org`).
 
-3. **Prod data + cleanup (done this session, with per-step authorization)**
-   - Ran `scripts/seed-email-defaults.mjs --execute` against prod: 8 keys created,
-     idempotent on re-run; honorarium token confirmed live in
-     `email.reviewer_invitation.body`.
-   - Cleared one stale test pref (`reviewer_email_templates` for jgallivan) to `{}`
-     so it falls through to the admin default; before-value captured in the S297
-     transcript. (Probe found it was the ONLY saved template, a pre-rewrite snapshot.)
-
-4. **Docs/gates** — API security matrix row added, `CANONICAL_COUNTS` 133→134, wiki
-   topic `reviewer-workbench-lifecycle.md` "Email templates" section + frontmatter.
-   All ~24 gates green; full `npm test` green except the two known-red carryover
-   suites; lint 0 errors.
+3. **Parallel-agent worktree workflow → reusable tooling.**
+   `docs/PARALLEL_AGENT_WORKTREE_RUNBOOK.md` (command-level how-to, keep-and-reuse vs
+   teardown, gotchas) + `scripts/bootstrap-machine.sh` (idempotent per-machine setup:
+   `.agents/skills` symlink, path-derived auto-memory symlink, `npm install`,
+   `.env.local` presence check; optional `--worktree NAME`; verified idempotent) +
+   a dev-environment wiki pointer. The Codex worktree is **parked** at
+   `../WMKF_Apps-codex` on `codex/parked` for reuse (node_modules + symlinks intact).
 
 ### Commits
-- `c01a9baa` - Move reviewer email templates into admin Email Defaults panel
-- Stop-session commit - Documents Session 297 and creates this Session 298 prompt
+- `19db48f0` - Person-vs-institution payee + BILL vendor-id field divergence
+- `ebcf18b7` - Reverse-engineered honorarium onboarding→payment current-state
+- `db742c72` - PNI-without-API scoping conclusion
+- `8d694a34` - Merge codex/admin-card-dataverse-info (Dataverse field-info buttons)
+- `ae99ace5` / `ed56e384` / `9d0107b5` - Worktree runbook (+ keep-and-reuse, bootstrap req)
+- `760e47e7` - scripts/bootstrap-machine.sh
 
 ## Next Items
 
 ### Verified Open
 
-1. **Confirm the c01a9baa Vercel deploy landed.**
-   Evidence: pushed `main` `d01beb51..c01a9baa`; deploy not yet verified this session.
-   Use `vercel inspect` (NOT poll-grep of `vercel ls`) per
-   `feedback-deployment-monitoring-use-inspect`. Once live, spot-check that an
-   invitation preview renders the honorarium amount (admin default is already seeded).
+1. **Draft the Ops/Steph BILL-honorarium update.**
+   Evidence: `.claude-memory/project-honorarium-payment-landscape.md`.
+   The evidence chain is complete; frame it around the conservation-of-friction
+   point and the capability question (can AkoyaGO's payment engine take a `contact`
+   payee at all?) to Connor/Sarah/Bromelkamp.
+
+2. **Thread 1 — Connor's manual honorarium classification.**
+   Evidence: landscape memory "open threads" + the 2/19 audit on #1002764.
+   What exactly Connor sets, and whether that classification step is automatable.
+
+3. **Thread 2 — confirm the `wmkf_*approval` flag-fields are dead org-wide.**
+   Evidence: landscape memory; null/false on paid grant #1002238.
+   Confirms the two-stage (Dataverse folio + BILL/offline) approval model.
+
+4. **Write the `parallel-agent-worktree` skill.**
+   Evidence: `docs/PARALLEL_AGENT_WORKTREE_RUNBOOK.md` "Turning this into a skill";
+   `scripts/bootstrap-machine.sh` already exists for the skill to call.
 
 ### Owner Decision Needed
 
-None currently known.
+1. **BILL API access** — the only thing that *removes* (vs relocates) honorarium
+   payment friction. Evidence: landscape memory scoping section. Decision for
+   Ops/leadership; the portal-integrated BILL onboarding is already built and gated.
+
+2. **Self-report PNI segmentation field on the reviewer portal** — build the small
+   version now or wait? Evidence: landscape memory scoping section.
 
 ### Parked
 
-1. **Dataverse settings auditing (Connor).**
-   Evidence: `.claude-memory/project-dataverse-settings-audit-enablement.md`;
-   live probe `scripts/probe-appsystemsetting-audit.mjs`. Org auditing is ON, but
-   table `wmkf_appsystemsetting` auditing is OFF (`CanBeChanged:true`), so a
-   fat-fingered blank of any admin setting is currently unrecoverable. Re-open
-   trigger: Connor decides scope (which tables/columns) + retention policy, then
-   flips the table audit flag; re-verify with the probe.
+1. **Dataverse settings auditing (Connor).** Evidence:
+   `project-dataverse-settings-audit-enablement.md`. Re-open when Connor sets scope
+   + retention and flips the `wmkf_appsystemsetting` table audit flag.
 
-2. **PD-override-correction sync.**
-   Evidence: `docs/agent-wiki/topics/reviewer-identity.md` still distinguishes the
-   shipped contact-correction override from deferred edit-and-re-resolve work.
-   Re-open trigger: user chooses to continue the reviewer-contact boundary tail.
+2. **PD-override-correction sync.** Evidence:
+   `docs/agent-wiki/topics/reviewer-identity.md`. Re-open if the reviewer-contact
+   boundary tail is resumed.
 
 ### Verify Before Acting
 
-1. **Long-stale pre-S294 carryovers.**
-   Evidence: prior prompts listed model real-replay signoff / Admin Models smoke,
-   request `1002788` triage, Restore Removed Candidates + PD identity override E2E,
-   and reviewer-portal upload design decision. Verify each against source/docs/probes
-   before treating as actionable.
-
-2. **Any destructive wiki cleanup.**
-   Evidence: `docs/agent-wiki/index.md` + `.claude/rules/agent-wiki.md` define the
-   wiki as a subordinate routing aid. Check the authoritative source before removing
-   a wiki claim; preserve rationale in a sidecar when useful.
-
-3. **Any harness-framing checker expansion.**
-   Evidence: `scripts/check-harness-framing.js` covers root/session instructions,
-   skills, rules, hook output, active memory/router files, and `docs/agent-wiki/`.
-   Inspect active-path vs excluded-path coverage before widening; update the
-   self-test + `docs/CI_GATES_REFERENCE.md` in the same pass.
+1. **Long-stale pre-S294 carryovers** (model real-replay signoff, request `1002788`
+   triage, Restore-Removed-Candidates E2E, reviewer-portal upload design). Verify
+   each against source/docs/probes before treating as actionable.
 
 ### Do Not Reopen Without New Decision
 
-1. **Reviewer↔CRM-contact boundary epic** — `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md`
-   + S294 commits record the completed policy (name/title/nickname sync; email and
-   affiliation alert-only).
+1. **c01a9baa reviewer-email-defaults deploy** — confirmed live this session (Vercel
+   shows the deployment READY in production); S297's open verify-item is **DONE**.
 
-2. **Email and affiliation contact writes** — S294 owner decision kept them
-   alert-only. Do not convert to contact writes without a new owner decision.
+2. **Reviewer↔CRM-contact boundary epic** —
+   `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md`; email/affiliation stay alert-only.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `shared/components/reviewers/email-template-store.js` | Two-layer resolution (admin default + per-PD override) + override-only persistence. |
-| `lib/seed/email-defaults/reviewer-templates.js` | Single source of the shipped default copy; seeded into Dataverse. |
-| `shared/config/editableTextDefaults.js` | Admin Email Defaults catalog (8 reviewer entries added). |
-| `pages/api/email-defaults/reviewer-templates.js` | PD-readable GET for the admin org defaults. |
-| `scripts/seed-email-defaults.mjs` | Seeds catalog defaults into `wmkf_appsystemsetting` (idempotent; `--execute`). |
-| `scripts/probe-appsystemsetting-audit.mjs` | Read-only probe for Dataverse audit state (re-run after Connor's toggle). |
-| `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` | "Email templates" section documents the two-layer model. |
+| `.claude-memory/project-honorarium-payment-landscape.md` | The reverse-engineered honorarium onboarding→payment current-state + Ops scoping. |
+| `docs/PARALLEL_AGENT_WORKTREE_RUNBOOK.md` | How to run Claude + Codex in parallel via a worktree. |
+| `scripts/bootstrap-machine.sh` | Idempotent per-machine setup (symlinks, npm install); run after cloning on a new machine. |
+| `shared/components/admin/DataverseFieldInfoButton.js` | The admin Dataverse-info popover component (Codex). |
 
 ## Testing
 
 ```bash
-npx jest tests/unit/email-template-store.test.js tests/integration/render-emails-route.test.js
-node scripts/seed-email-defaults.mjs            # dry-run (should be created=0 skippedExisting=20)
-npm run check:api-routes
-npm run check:fact-consistency
-npm run check:agent-wiki
+./scripts/bootstrap-machine.sh           # idempotent; reports all-green on a set-up machine
+npm run check:agent-invariants           # symlink invariants
+npm run check:agent-wiki                  # dev-environment topic pointer
+# Codex worktree reuse next time:
+git -C ../WMKF_Apps-codex fetch origin && git -C ../WMKF_Apps-codex checkout -B codex/<task> origin/main
 ```
 
 ## Gotchas / Continuity
 
-- **No runtime code fallback for the four templates.** Seed must run before any
-  deploy that changes the resolution path, or templates render blank. Prod is
-  already seeded (S297); future fresh envs need `seed-email-defaults.mjs --execute`.
-- Admin defaults use mustache `{{tokens}}`, unlike the `[bracket]` reminder/grantee
-  entries in the same panel — intentional (these flow through `render-emails`).
-- Per-PD overrides are now stored override-only; pre-existing FULL snapshots (none
-  remain in prod after the S297 cleanup) would pin all fields until reset+resave.
+- **Codex worktree is parked, not torn down** at `../WMKF_Apps-codex` (`codex/parked`).
+  Reuse it; don't recreate. Its `.env.local` is a symlink to the main repo's.
+- **`scripts/bootstrap-machine.sh` never creates `.env.local`** (secrets) — provision
+  separately (secure copy, or `vercel env pull` + hand-fill Sensitive vars).
+- The honorarium findings are investigation/analysis, not shipped code — the only
+  prod change this session was the admin info-buttons.
