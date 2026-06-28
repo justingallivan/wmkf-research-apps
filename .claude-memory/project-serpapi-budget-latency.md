@@ -1,12 +1,12 @@
 ---
 name: project-serpapi-budget-latency
-description: "SerpAPI plan is ~15,000 calls/month (user-stated S234) — call COST is no longer the binding constraint on reviewer contact enrichment; LATENCY is. A program director won't use the tool if enriching is slower than Googling the names by hand."
+description: "SerpAPI plan is ~5,000 calls/month (Developer plan since 2026-06-28; was 15k Production) — call COST is no longer the binding constraint on reviewer contact enrichment; LATENCY is. A program director won't use the tool if enriching is slower than Googling the names by hand."
 metadata:
   node_type: memory
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-06-08
+  last_verified: 2026-06-28 — plan now Developer 5k/$75 (was 15k/$150); latency-not-cost point unchanged
 ---
 
 ## Recall Rule
@@ -15,12 +15,14 @@ that adds per-candidate external round-trips. Pairs with [[project-api-credit-mo
 [[project-reviewer-contact-enrichment-anchoring]].
 
 **Scope note:** "cost is not the limiter" below is about per-call **fan-out design** (you won't hit
-the 15k/mo cap) — NOT a claim that the SerpAPI *subscription* is good value. At $150/mo it's the
-project's largest expense and its value has eroded (capability loss + free alternatives); that
-cost-justification + migration story lives in [[project-serpapi-capability-erosion]] (2026-06-11).
+the 5k/mo cap — actual usage is ~hundreds/cycle) — NOT a claim that the SerpAPI *subscription* is
+good value. Now $75/mo (Developer, downgraded 2026-06-28; was $150 Production) and its value had
+eroded (capability loss + free alternatives); that cost-justification + migration + downgrade story
+lives in [[project-serpapi-capability-erosion]].
 
 ## The fact (user-stated, S234)
-The SerpAPI plan allows **~15,000 calls/month** — ample. Early enrichment design was shaped by
+The SerpAPI plan allows **~5,000 calls/month** (Developer, since 2026-06-28; was 15k) — still ample
+(actual usage ~hundreds/cycle). Early enrichment design was shaped by
 cost-minimization (contact search skipped if a free tier already found an email; single-shot per
 candidate; broad-then-stop fallbacks). **That cost pressure is largely lifted.**
 

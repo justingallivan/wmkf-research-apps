@@ -37,7 +37,7 @@ Verified mechanics (file:line confirmed against HEAD `77799eb`):
 
 **Governing principle (already adopted in this codebase):** *unresolved is acceptable; wrong-and-confident is not.* Extended here: **a confirmed identity does NOT license unvalidated contact details.** Identity-confirmed ≠ contact-validated.
 
-**Binding constraint:** latency. A program director won't use the tool if enrichment is slower than Googling the names themselves. SerpAPI call budget (~15k/mo) is NOT the constraint; sequential wall-clock is. The preferred fixes therefore **reuse anchors already fetched** and **abstain**, rather than adding round-trips.
+**Binding constraint:** latency. A program director won't use the tool if enrichment is slower than Googling the names themselves. SerpAPI call budget (~5k/mo on the Developer plan since 2026-06-28; was 15k) is NOT the constraint; sequential wall-clock is. The preferred fixes therefore **reuse anchors already fetched** and **abstain**, rather than adding round-trips.
 
 ---
 

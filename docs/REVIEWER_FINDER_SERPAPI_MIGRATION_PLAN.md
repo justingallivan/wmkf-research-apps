@@ -6,9 +6,11 @@
 > "PubPeer integrity" below + the integrity-screener agent-wiki topic).
 > **Author:** Justin Gallivan + Claude.
 > **Date:** 2026-06-13.
-> **Why:** SerpAPI is the project's largest single monthly line item (~$150/mo Production,
-> ~15k calls — Justin-confirmed 2026-06-11). Its value has eroded: `google_scholar_profiles`
-> is dead (Google login wall) and most academic uses are now done better by free APIs.
+> **Why:** SerpAPI was the project's largest single monthly line item (~$150/mo Production,
+> ~15k calls — Justin-confirmed 2026-06-11) when this plan was written. Its value had eroded:
+> `google_scholar_profiles` is dead (Google login wall) and most academic uses are now done
+> better by free APIs. **Outcome:** migration shipped (S251); usage fell to ~1.7%, and the plan
+> was downgraded to Developer ($75/mo, 5k) on 2026-06-28.
 > Source memories: `project-serpapi-capability-erosion`, `project-serpapi-budget-latency`.
 > **Binding constraint:** LATENCY, not cost (a PD won't use the tool if enriching is slower
 > than Googling the names by hand). Every slice is measured in per-candidate round-trips.

@@ -233,7 +233,7 @@ named personnel is a sensible future add — NOT yet implemented.)
 4. **Disable Track B** — ✅ DONE (S248): archived behind `DiscoveryService.TRACK_B_ENABLED
    = false`; code left dormant for future repurposing (it ran but contributed ~0 to saved
    panels and cost ~27s). See the ⬛ section + agent-wiki reviewer-origination.
-5. **SerpAPI → free-stack migration** — $150/mo, value eroded; 4 of 6 uses replaceable.
+5. **SerpAPI → free-stack migration** — was $150/mo, value eroded; 4 of 6 uses replaceable. (Migration shipped S251; plan downgraded to Developer $75/mo 2026-06-28.)
 6. **Verify-loop latency — MEASURED, not the bottleneck (deprioritized).** All latency
    figures below are **single example local runs** from the committed profiling scripts
    (reproducible, not CI-tracked artifacts) — directional, not benchmarks. Profiled

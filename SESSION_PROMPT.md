@@ -82,10 +82,9 @@ and `docs/`. None are silently abandoned — each has an owner, blocker, or rati
    meeting-date), no per-reviewer judgment → fully automatable. Probe:
    `scripts/probe-akoya-honorarium-classification-step.js`; detail in
    `.claude-memory/project-honorarium-payment-landscape.md` chain step 4.
-2. ~~**SerpAPI hobby-tier cost eval**~~ **(EVALUATED 2026-06-28)** — actual usage
-   **259/mo on the 15k Production plan (1.7%)** via the account API. **Recommend
-   downgrade to Developer ($75/mo, 5k) — saves ~$75/mo;** not Starter (1k) given
-   cyclical peaks. **Billing change = Justin's call.** Evidence:
+2. ~~**SerpAPI hobby-tier cost eval**~~ **(DONE 2026-06-28)** — usage was ~1.7% of the
+   15k Production plan, so Justin **downgraded to Developer ($75/mo, 5k)** (confirmed via
+   account API), saving ~$75/mo. Cost fact reconciled across 5 files. Evidence:
    `.claude-memory/project-serpapi-capability-erosion.md`.
 3. ~~**Stale-audit cleanup**~~ **(DONE 2026-06-28)** — verified BOTH F-001 and F-002
    are resolved in code (relationship restriction check present; ALS migration complete,
