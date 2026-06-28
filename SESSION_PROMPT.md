@@ -1,177 +1,147 @@
-# Session 299 Prompt: Ops BILL/honorarium update + parallel-agent skill
+# Session 300 Prompt: Reviewer review-form rework (queued)
 
-## Session 298 Summary
+## Session 299 Summary
 
-Two parallel tracks ran via a git worktree (Codex on the admin dashboard, Claude
-on a deep honorarium-payment investigation), then the worktree workflow itself was
-turned into reusable tooling.
+A long, mostly-investigation session: closed both open honorarium threads, ran a
+cost optimization, shipped the parallel-agent skill, and did a full docs-staleness
+cleanup via a Codex parallel worktree. No production app code shipped — the one
+near-term build (the reviewer review-form rework) was deliberately set aside for a
+dedicated next session.
 
 ### What Was Completed
 
-1. **Reverse-engineered the reviewer honorarium onboarding→payment reality** (live
-   Dataverse probes, read-only). Key findings, all `[VERIFIED via probe 2026-06-27]`:
-   - **Onboarding chain:** staff invites each reviewer into GoApply (87/87 have an
-     `akoya_goapplyinviteurl`, invite precedes registration ~3.6d median) → reviewer
-     **self-registers** under their own email (87/87, 0 staff submissions) → AkoyaGO
-     sync provisions the contact (as a **non-vendor**) + honorarium `akoya_request`
-     → **Connor manually classifies** it (the 2/19 edits) → then nothing.
-   - **The wall:** **0 of 9,151** PAID disbursements ever went to an individual —
-     the payment engine is **rail-agnostic** (ACH/check/BILL all just channels;
-     pre-BILL grant #997034 paid by ACH through the same machinery) but
-     **payee-bound to institutions**. Honoraria have 0 payment rows, 0 vendor
-     records. "Mimic Rosie's grant flow" = a payee-model capability question for
-     Connor/Sarah/Bromelkamp, not a portal task.
-   - **Approvals are two-stage:** a human advances the `akoya_folio` state machine
-     (Ready To Send → Ready to Pay, e.g. Sarah Hibler) in Dataverse; the money-out
-     approval happens in BILL/offline (the `wmkf_*approval` flag-fields are all
-     null/false even on the paid $900K grant #1002238).
-   - **PNI-without-API scoping:** the BILL PNI is the asset (16-digit, leading-0
-     format from 301 live values); without API access friction is *relocated*, not
-     removed. Recommendation: build a small self-report "BILL account? + PNI"
-     segmentation field (persist on the contact), not the kludgy signup-help infra;
-     the real lever is BILL API access. Steph: addresses obsolete going forward
-     (kept for now).
-   - Captured in `.claude-memory/project-honorarium-payment-landscape.md` (new) +
-     extended `akoya-payment-field-semantics.md` and `akoya-request-honorarium-nomenclature.md`
-     + a dated probe note in `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`.
-
-2. **Admin dashboard Dataverse-info buttons** (Codex, in a parallel worktree).
-   Each Dataverse-backed admin card (Email Defaults, Policies, Prompt Templates,
-   honorarium amount) gets an ⓘ button revealing the backing entity/field/row for
-   manual Power Automate edits. Reviewed read-only (in scope, no shared-primitive
-   edits, **all field mappings verified against live `pages/api/admin/*` routes**),
-   lint 0 / build clean. **Merged + deployed to prod** (READY on `applications.wmkeck.org`).
-
-3. **Parallel-agent worktree workflow → reusable tooling.**
-   `docs/PARALLEL_AGENT_WORKTREE_RUNBOOK.md` (command-level how-to, keep-and-reuse vs
-   teardown, gotchas) + `scripts/bootstrap-machine.sh` (idempotent per-machine setup:
-   `.agents/skills` symlink, path-derived auto-memory symlink, `npm install`,
-   `.env.local` presence check; optional `--worktree NAME`; verified idempotent) +
-   a dev-environment wiki pointer. The Codex worktree is **parked** at
-   `../WMKF_Apps-codex` on `codex/parked` for reuse (node_modules + symlinks intact).
+1. **Honorarium Thread 2 — RESOLVED + REFUTED.** The `wmkf_*approval` fields are
+   **not** dead org-wide (full-table scan, `scripts/probe-akoya-approval-flags-deadness.js`):
+   3 of 4 are populated (`wmkf_authorizationtoremitpaymentflag` 303 Yes; ED/DO approval
+   datetimes 323/611; only `wmkf_controllerapproved` unused). Reconciled the contradicting
+   "all dead" claim across two memory files.
+2. **Honorarium Thread 1 — RESOLVED.** Connor's manual classification is a **fixed,
+   fully-automatable template** (Individual / Honorarium / Research Reviewer / $250 flat /
+   cycle meeting-date), 87/87, no per-reviewer judgment (`scripts/probe-akoya-honorarium-classification-step.js`).
+3. **Remit-flag scope decision (Justin).** Our app *may* set
+   `wmkf_authorizationtoremitpaymentflag` when a review lands (`wmkf_reviewreceivedat`) as a
+   fulfillment/eligible-to-pay trigger; **all approvals stay out of scope.** Tracked
+   candidate, not committed (revises the S188/S206 "integration never touches this flag").
+4. **SerpAPI downgraded** Production→Developer ($150→$75/mo, 5k searches) — usage was
+   ~1.7% of plan (account API). Justin executed it; cost fact reconciled across 5 files.
+5. **`parallel-agent-worktree` skill shipped** (`ca07945e`) over the worktree runbook.
+6. **Stale-audit cleanup** — verified F-001 + F-002 already resolved in code; drain-table
+   "deferred cleanup" superseded (migration 018). Doc stamped + archived.
+7. **Docs staleness audit (Codex parallel worktree)** — Codex reviewed all 309 `docs/`
+   files → 21 KEEP / 39 ARCHIVE / 2 DELETE. Acted on in full: 2 deletes, **39 archived to
+   `docs/archive/`** with every inbound full-path ref rewritten (docs/memory/code); 11
+   doc/structure gates green. Report kept as the snapshot.
+8. **Ops/Steph BILL-honorarium update drafted** → `scratchpad/ops-bill-honorarium-update.md`
+   (ready to send/convert; Justin's to send).
+9. **Reviewer review-form reviewed** (not changed). The "submit your review" surface is the
+   external portal `stage2b` view (`MaterialsView.js`), a 4-question schema-driven form
+   (`lib/external/review-form-schema.js`) + file upload. **Rework queued for S300.**
 
 ### Commits
-- `19db48f0` - Person-vs-institution payee + BILL vendor-id field divergence
-- `ebcf18b7` - Reverse-engineered honorarium onboarding→payment current-state
-- `db742c72` - PNI-without-API scoping conclusion
-- `8d694a34` - Merge codex/admin-card-dataverse-info (Dataverse field-info buttons)
-- `ae99ace5` / `ed56e384` / `9d0107b5` - Worktree runbook (+ keep-and-reuse, bootstrap req)
-- `760e47e7` - scripts/bootstrap-machine.sh
+- `d8a2aded` / `6dd8cfa1` / `67a532b7` / `a38c26a6` - Docs staleness audit + archive 39 + 2 deletes
+- `af53c885` / `22a9f64b` - SerpAPI downgrade to Developer + cost-fact reconcile
+- `784c26f1` - Stale-audit F-001/F-002 stamped resolved
+- `63d4ff26` - Thread 1: classification is a fixed automatable template
+- `6d15133c` - Dangling-threads register folded into SESSION_PROMPT
+- `e88d8852` / `fc12c384` - Remit-flag candidate scope decision + trigger
+- `beba534b` - Thread 2: refute "approval flags dead"
+- `ca07945e` - parallel-agent-worktree skill
 
 ## Next Items
 
-> **S299 progress (2026-06-28):** Ops/Steph BILL-honorarium update **drafted**
-> (`scratchpad/ops-bill-honorarium-update.md` — ready to send/convert). **Thread 2
-> RESOLVED + REFUTED** — the `wmkf_*approval` fields are NOT dead org-wide (3 of 4
-> populated; only `wmkf_controllerapproved` unused); see
-> `.claude-memory/project-honorarium-payment-landscape.md` + the probe
-> `scripts/probe-akoya-approval-flags-deadness.js`. **`parallel-agent-worktree`
-> skill shipped** (commit `ca07945e`). **New scope decision:** our app *may* set
-> `wmkf_authorizationtoremitpaymentflag` when a review lands (`wmkf_reviewreceivedat`)
-> as a fulfillment/eligible-to-pay trigger — all approvals stay out of scope (tracked
-> candidate, not committed).
+### Verified Open
 
-### Standing Dangling Threads (full memory + design-doc sweep, S299 2026-06-28)
+1. **Reviewer review-form rework (HEADLINE — Justin set this aside for a focused session).**
+   The reviewer "submit your review" screen is the external portal `stage2b` view. The
+   structured form is **schema-driven, 4 questions** in `lib/external/review-form-schema.js`
+   (affiliation + Q1 impact / Q3 risk / Q10 overall; free-text Qs stay in the uploaded PDF);
+   layout in `shared/components/external/{ReviewFormFields,MaterialsView}.js`; write path
+   `lib/services/review-upload.js` (sets `wmkf_reviewreceivedat`). Justin wants changes to
+   how it "looks and acts" — start by previewing, then edit the schema.
+   **Preview recipe (verified S299):** the E2E harness mocks `stage2b` with no token/Dataverse —
+   recreate a throwaway spec from `tests/e2e/reviewer-return-upload.spec.js` (`buildContext({view:'stage2b'})`
+   + `mockPortal`) ending in `await page.pause()`, then `npx playwright test <spec> --headed`
+   (reuses a `next build && next start -p 3100`; harness uses `--webpack`).
 
-A consolidated register of every genuine loose end found across `.claude-memory/`
-and `docs/`. None are silently abandoned — each has an owner, blocker, or rationale.
+### Owner Decision Needed
 
-**Actionable now — no external blocker**
-1. ~~**Honorarium Thread 1**~~ **(DONE 2026-06-28)** — Connor's classification is a
-   FIXED TEMPLATE (Individual / Honorarium / Research Reviewer / $250 flat / cycle
-   meeting-date), no per-reviewer judgment → fully automatable. Probe:
-   `scripts/probe-akoya-honorarium-classification-step.js`; detail in
-   `.claude-memory/project-honorarium-payment-landscape.md` chain step 4.
-2. ~~**SerpAPI hobby-tier cost eval**~~ **(DONE 2026-06-28)** — usage was ~1.7% of the
-   15k Production plan, so Justin **downgraded to Developer ($75/mo, 5k)** (confirmed via
-   account API), saving ~$75/mo. Cost fact reconciled across 5 files. Evidence:
-   `.claude-memory/project-serpapi-capability-erosion.md`.
-3. ~~**Stale-audit cleanup**~~ **(DONE 2026-06-28)** — verified BOTH F-001 and F-002
-   are resolved in code (relationship restriction check present; ALS migration complete,
-   0 shim callers, fails closed) and the drain-table "deferred cleanup" is superseded
-   (dropped via migration 018). Doc stamped. Only the generic write-helper restriction
-   policy remains an owner decision. Evidence: `docs/archive/CORRECTED_AUDIT_FINDINGS_FOR_CLAUDE_REVIEW_2026_05_26.md`.
-4. ~~**Docs ARCHIVE batch (from the staleness audit)**~~ **(DONE 2026-06-28)** — Codex
-   audited all 309 `docs/` files (`docs/DOCS_STALENESS_AUDIT_2026-06-28.md`). Acted on in
-   full: 2 DELETEs removed, **39 ARCHIVE files moved to `docs/archive/`** with every
-   inbound full-path reference rewritten across docs/memory/code; 11 doc/structure gates
-   green. (Residual bare-basename *prose* mentions in a few live docs left as-is — not
-   load-bearing path refs, gates clean.)
+1. **Remit-flag candidate — build it?** Set `wmkf_authorizationtoremitpaymentflag` on
+   review-completion (`wmkf_reviewreceivedat`). Sync already initializes the flag on 87/87
+   honoraria, staff never flip it → clean fit. Evidence: `.claude-memory/project-honorarium-payment-landscape.md`.
+   Natural pairing with the form rework (same flow).
+2. **Ops/Steph BILL-honorarium update** — drafted; Justin to send. `scratchpad/ops-bill-honorarium-update.md`.
+3. **BILL API access** — the only thing that *removes* (vs relocates) honorarium friction;
+   portal onboarding built + gated → Ops/leadership.
+4. **Self-report PNI segmentation field** — build the small version now or wait? → owner.
+5. **Reviewer-Workbench access boundaries** (team-open read set? reviewer-mgmt = lead PD only?
+   writeup-edit perms + CSO/President view?) → Justin. Evidence: `.claude-memory/project-reviewer-apps-redesign-direction.md`.
+6. **Generic write-helper restriction policy** — should `createRecord/updateRecord/deleteRecord`
+   enforce restrictions internally, or only route-level? → owner. Evidence: `docs/archive/CORRECTED_AUDIT_FINDINGS_FOR_CLAUDE_REVIEW_2026_05_26.md`.
+7. **Applicant-exclusion policy** — how broadly may a PI exclude reviewers → foundation.
+   Evidence: `.claude-memory/project-applicant-exclusion-policy-pending.md`.
+8. **Awardee onboarding** — GAL-sent status field unknown, discover in Dataverse first → Connor.
+9. **Dataverse settings auditing** → Connor (re-open when he sets scope + flips the audit flag).
+10. **GRANTEE_PORTAL title-field provenance** (`wmkf_wmkfprojectdescription` vs `wmkf_projecttitle1`)
+    → Connor + Sarah (doc-only; doesn't block the build). Evidence: `docs/GRANTEE_PORTAL_BUILD_PLAN.md`.
 
-**Blocked on a named owner / decision**
-1. **Reviewer-Workbench access boundaries** (3 unresolved: team-open read set?
-   reviewer-mgmt = lead PD only? writeup-edit perms + CSO/President view?) → **Justin**.
-   Evidence: `.claude-memory/project-reviewer-apps-redesign-direction.md`.
-2. **BILL API access** — the only thing that *removes* (vs relocates) honorarium
-   friction; portal-integrated onboarding is built + gated → **Ops/leadership**.
-3. **Self-report PNI segmentation field** — build the small version now or wait? → owner.
-4. **Applicant-exclusion policy** — how broadly may a PI exclude reviewers, on what
-   basis → **foundation/stakeholders**. Evidence:
-   `.claude-memory/project-applicant-exclusion-policy-pending.md`.
-5. **Awardee onboarding** — GAL-sent status field is unknown; must be discovered in
-   Dataverse before any build → **Connor**. Evidence: `.claude-memory/project-awardee-onboarding.md`.
-6. **Dataverse settings auditing** → **Connor** (re-open when he sets scope + retention
-   and flips the `wmkf_appsystemsetting` audit flag). Evidence:
-   `.claude-memory/project-dataverse-settings-audit-enablement.md`.
-7. **GRANTEE_PORTAL title-field provenance** (`wmkf_wmkfprojectdescription` vs
-   `wmkf_projecttitle1`) → **Connor + Sarah** (doc-only; doesn't block the build).
-   Evidence: `docs/GRANTEE_PORTAL_BUILD_PLAN.md`.
+### Gates A Real Launch (soft deadlines)
 
-**Gates a real launch (soft deadlines)**
 1. **Stage-2A pre-cycle TODOs** — COI policy body still `[PLACEHOLDER]`; `wmkf_policy*`
-   delete-privilege role unrestricted. Both before slice 1 ships to a real cycle.
-   Evidence: `docs/REVIEWER_STAGE_2A_BUILD_PLAN.md`.
-2. **Intake-portal virus-scan E2E** — must run before the portal goes live to real
-   applicants. Evidence: `.claude-memory/project-intake-portal-virus-scan-e2e-deferred.md`.
-3. **J27 cluster (~Dec 2026)** — `wmkf_requestdocument` doc-capture table,
-   grant-phasing relabel model, ~300-proposal triage dashboard, prompt-storage
-   Phase 1/2. Design-locked; awaiting next cycle + Connor/Sarah form design.
+   delete-privilege role unrestricted. Both before slice 1 ships to a real cycle. Evidence:
+   `docs/REVIEWER_STAGE_2A_BUILD_PLAN.md`.
+2. **Intake-portal virus-scan E2E** — before the portal goes live to real applicants.
+   Evidence: `.claude-memory/project-intake-portal-virus-scan-e2e-deferred.md`.
+3. **J27 cluster (~Dec 2026)** — `wmkf_requestdocument` doc-capture table, grant-phasing
+   relabel model, ~300-proposal triage dashboard, prompt-storage Phase 1/2. Design-locked.
 
-**Parked by design / already tracked**
-PD-override-correction sync (`docs/agent-wiki/topics/reviewer-identity.md`) ·
-honorarium BILL capture-only lock · Wave-1 role-elevation revert · drain-table drops
-(date-gated 2026-07-01) · VRP/Perplexity provider coupling · Dynamics sandbox stale
-schema · nomenclature/app-sunset sweep · deferred code cleanup ·
-`docs/REVIEWER_IDENTITY_RECONCILIATION_EDITS.md` four doc-hygiene questions.
+### Parked By Design / Already Tracked
+
+PD-override-correction sync (`docs/agent-wiki/topics/reviewer-identity.md`) · honorarium BILL
+capture-only lock · Wave-1 role-elevation revert · drain-table drops (date-gated 2026-07-01)
+· VRP/Perplexity provider coupling · Dynamics sandbox stale schema · nomenclature/app-sunset
+sweep · deferred code cleanup · `docs/REVIEWER_IDENTITY_RECONCILIATION_EDITS.md` four
+doc-hygiene questions.
 
 ### Verify Before Acting
 
-1. **Long-stale pre-S294 carryovers** (model real-replay signoff, request `1002788`
-   triage, Restore-Removed-Candidates E2E, reviewer-portal upload design). Verify
-   each against source/docs/probes before treating as actionable.
+1. **Long-stale pre-S294 carryovers** — model real-replay signoff, request `1002788` triage,
+   Restore-Removed-Candidates E2E. Verify each against source/docs/probes before acting.
+   (NOTE: "reviewer-portal upload design" is removed from this list — confirmed **shipped + live**
+   S299: `stage2b` upload via `pages/api/external/review/[token]/upload.js` + `review-upload.js`.)
 
 ### Do Not Reopen Without New Decision
 
-1. **c01a9baa reviewer-email-defaults deploy** — confirmed live this session (Vercel
-   shows the deployment READY in production); S297's open verify-item is **DONE**.
-
-2. **Reviewer↔CRM-contact boundary epic** —
-   `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md`; email/affiliation stay alert-only.
+1. **c01a9baa reviewer-email-defaults deploy** — confirmed live (S297).
+2. **Reviewer↔CRM-contact boundary epic** — `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md`;
+   email/affiliation stay alert-only.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `.claude-memory/project-honorarium-payment-landscape.md` | The reverse-engineered honorarium onboarding→payment current-state + Ops scoping. |
-| `docs/PARALLEL_AGENT_WORKTREE_RUNBOOK.md` | How to run Claude + Codex in parallel via a worktree. |
-| `scripts/bootstrap-machine.sh` | Idempotent per-machine setup (symlinks, npm install); run after cloning on a new machine. |
-| `shared/components/admin/DataverseFieldInfoButton.js` | The admin Dataverse-info popover component (Codex). |
+| `lib/external/review-form-schema.js` | The 4-question reviewer review-form schema (S300 rework target). |
+| `shared/components/external/MaterialsView.js` | The `stage2b` "submit your review" screen. |
+| `lib/services/review-upload.js` | Review-upload write path (sets `wmkf_reviewreceivedat`). |
+| `docs/DOCS_STALENESS_AUDIT_2026-06-28.md` | The staleness-audit record (acted on; snapshot). |
+| `.claude-memory/project-honorarium-payment-landscape.md` | Honorarium onboarding→payment current-state + remit-flag candidate. |
+| `.claude/skills/parallel-agent-worktree/SKILL.md` | The parallel Claude+Codex worktree workflow. |
 
 ## Testing
 
 ```bash
-./scripts/bootstrap-machine.sh           # idempotent; reports all-green on a set-up machine
-npm run check:agent-invariants           # symlink invariants
-npm run check:agent-wiki                  # dev-environment topic pointer
-# Codex worktree reuse next time:
+# Reviewer review-form preview (S300): recreate a paused stage2b spec, then:
+npx playwright test <spec> --headed       # mocks stage2b; no token/Dataverse
+# Codex worktree reuse (parked, ready):
 git -C ../WMKF_Apps-codex fetch origin && git -C ../WMKF_Apps-codex checkout -B codex/<task> origin/main
+npm run check:agent-invariants            # symlink invariants
 ```
 
 ## Gotchas / Continuity
 
-- **Codex worktree is parked, not torn down** at `../WMKF_Apps-codex` (`codex/parked`).
-  Reuse it; don't recreate. Its `.env.local` is a symlink to the main repo's.
-- **`scripts/bootstrap-machine.sh` never creates `.env.local`** (secrets) — provision
-  separately (secure copy, or `vercel env pull` + hand-fill Sensitive vars).
-- The honorarium findings are investigation/analysis, not shipped code — the only
-  prod change this session was the admin info-buttons.
+- **Codex worktree is parked** at `../WMKF_Apps-codex` (`codex/parked`, at the latest
+  `origin/main`). Reuse it; don't recreate. `node_modules` + symlinks intact.
+- The **reviewer review-form is schema-driven** — most "what it asks" changes are one file
+  (`review-form-schema.js`); the E2E harness is the only way to preview `stage2b` (token-authed,
+  state-driven — a plain URL won't render it).
+- **Remit-flag candidate revises a settled decision** — five docs/memories say "integration
+  never touches `wmkf_authorizationtoremitpaymentflag`." Reconcile all of them only if/when it's built.
