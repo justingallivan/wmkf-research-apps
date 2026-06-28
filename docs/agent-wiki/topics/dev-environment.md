@@ -47,6 +47,12 @@ Claude config sync, and environment-specific operating notes.
 
 ## Operating Notes
 
+- **New-machine setup:** `scripts/bootstrap-machine.sh` (idempotent) recreates the
+  per-machine, gitignored state after a fresh clone — the `.agents/skills` +
+  auto-memory symlinks (slug computed from the repo path at runtime), `npm install`,
+  and an `.env.local` presence check (secrets provisioned separately per
+  `docs/CREDENTIALS_RUNBOOK.md`). `--worktree NAME` also sets up a sibling Codex
+  worktree. Full workflow: `docs/PARALLEL_AGENT_WORKTREE_RUNBOOK.md`.
 - **`scripts/reset-request-reviewers.mjs` protects applicant-sourced rows by
   default.** It clears a single request's reviewer working state for testing. Rows
   the applicant proposed (`wmkf_applicantdisposition` non-null, or `applicant` in

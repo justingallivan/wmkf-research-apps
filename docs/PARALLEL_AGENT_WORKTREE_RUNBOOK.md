@@ -187,9 +187,10 @@ it subordinate to `agent-coordination` (scoping/ownership) and
 ### Cross-machine bootstrap (must-have — repo runs on home + office machines)
 
 The per-machine, gitignored state is the recurring friction: it does **not** travel
-with git, so **every machine** needs it recreated. The skill should ship (or call) an
-**idempotent bootstrap script** (safe to re-run; skip what exists; compute paths at
-runtime so one script works on every machine — no hardcoded paths). Two layers:
+with git, so **every machine** needs it recreated. A working starter already exists
+at **`scripts/bootstrap-machine.sh`** (idempotent; computes paths at runtime; run it
+after cloning on a new machine, optionally with `--worktree NAME`) — the skill can
+call it. It covers two layers:
 
 **Layer 1 — main repo on a fresh machine** (clone first; NOT in a cloud-synced folder):
 - `.agents/skills` → `.claude/skills` symlink (Codex's skills; per-machine, gitignored).
