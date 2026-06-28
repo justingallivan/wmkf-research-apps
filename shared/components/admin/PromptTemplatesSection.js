@@ -11,6 +11,7 @@
  */
 import { useEffect, useState } from 'react';
 import { validatePromptForSave } from '../../../lib/utils/prompt-validators';
+import DataverseFieldInfoButton from './DataverseFieldInfoButton';
 
 const STATUS_COPY = {
   completed:             { tone: 'green', text: 'Published — new version is now current.' },
@@ -83,9 +84,10 @@ export default function PromptTemplatesSection() {
 function PromptPanel({ prompt, onPublished }) {
   const [expanded, setExpanded] = useState(false);
   const [outcome, setOutcome] = useState(null);
+  const dataverseFields = buildPromptDataverseFields(prompt);
   return (
     <div className="border rounded-lg overflow-hidden">
-      <div className="p-4 bg-gray-50 border-b flex items-baseline justify-between">
+      <div className="p-4 bg-gray-50 border-b flex items-baseline justify-between gap-3">
         <div>
           <div className="font-medium text-gray-900">
             <code>{prompt.name}</code>
@@ -103,22 +105,25 @@ function PromptPanel({ prompt, onPublished }) {
             {prompt.modifiedByName ? <> by {prompt.modifiedByName}</> : null}
           </div>
         </div>
-        {prompt.hasCurrent ? (
-          <button
-            onClick={() => setExpanded((e) => !e)}
-            className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded hover:bg-gray-800"
-          >
-            {expanded ? 'Cancel' : 'Edit & publish'}
-          </button>
-        ) : (
-          <button
-            onClick={() => setExpanded((e) => !e)}
-            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-100"
-            title="No published current version. View the body; publishing requires seeding a current version first."
-          >
-            {expanded ? 'Hide' : 'View'}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <DataverseFieldInfoButton items={dataverseFields} />
+          {prompt.hasCurrent ? (
+            <button
+              onClick={() => setExpanded((e) => !e)}
+              className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded hover:bg-gray-800"
+            >
+              {expanded ? 'Cancel' : 'Edit & publish'}
+            </button>
+          ) : (
+            <button
+              onClick={() => setExpanded((e) => !e)}
+              className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-100"
+              title="No published current version. View the body; publishing requires seeding a current version first."
+            >
+              {expanded ? 'Hide' : 'View'}
+            </button>
+          )}
+        </div>
       </div>
 
       {expanded && (
@@ -131,6 +136,78 @@ function PromptPanel({ prompt, onPublished }) {
       {outcome && <OutcomeBanner outcome={outcome} onDismiss={() => setOutcome(null)} />}
     </div>
   );
+}
+
+function buildPromptDataverseFields(prompt) {
+  const row = prompt.id
+    ? `wmkf_ai_promptid = "${prompt.id}"`
+    : `wmkf_ai_promptname = "${prompt.name}"`;
+  return [
+    {
+      label: 'Prompt name',
+      entity: 'wmkf_ai_prompt',
+      entitySet: 'wmkf_ai_prompts',
+      field: 'wmkf_ai_promptname',
+      row,
+    },
+    {
+      label: 'Version number',
+      entity: 'wmkf_ai_prompt',
+      entitySet: 'wmkf_ai_prompts',
+      field: 'wmkf_promptversion',
+      row,
+    },
+    {
+      label: 'Current flag',
+      entity: 'wmkf_ai_prompt',
+      entitySet: 'wmkf_ai_prompts',
+      field: 'wmkf_ai_iscurrent',
+      row,
+    },
+    {
+      label: 'System prompt',
+      entity: 'wmkf_ai_prompt',
+      entitySet: 'wmkf_ai_prompts',
+      field: 'wmkf_ai_systemprompt',
+      row,
+    },
+    {
+      label: 'Prompt body',
+      entity: 'wmkf_ai_prompt',
+      entitySet: 'wmkf_ai_prompts',
+      field: 'wmkf_ai_promptbody',
+      row,
+    },
+    {
+      label: 'Prompt status',
+      entity: 'wmkf_ai_prompt',
+      entitySet: 'wmkf_ai_prompts',
+      field: 'wmkf_ai_promptstatus',
+      row,
+    },
+    {
+      label: 'Published timestamp',
+      entity: 'wmkf_ai_prompt',
+      entitySet: 'wmkf_ai_prompts',
+      field: 'wmkf_ai_publisheddatetime',
+      row,
+    },
+    {
+      label: 'Last touched timestamp',
+      entity: 'wmkf_ai_prompt',
+      entitySet: 'wmkf_ai_prompts',
+      field: 'modifiedon',
+      row,
+    },
+    {
+      label: 'Last touched by',
+      entity: 'wmkf_ai_prompt',
+      entitySet: 'wmkf_ai_prompts',
+      field: '_modifiedby_value',
+      row,
+      note: 'The route displays the Dataverse formatted value as the user name.',
+    },
+  ];
 }
 
 function PublishForm({ prompt, onSuccess, onOutcome }) {

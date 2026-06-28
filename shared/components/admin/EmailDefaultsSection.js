@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import DataverseFieldInfoButton, { appSystemSettingField } from './DataverseFieldInfoButton';
 
 const TONE = {
   saved: 'text-green-700',
@@ -80,20 +81,26 @@ export default function EmailDefaultsSection() {
         const value = drafts[entry.key] ?? '';
         const status = statusByKey[entry.key];
         const Input = entry.multiline ? 'textarea' : 'input';
+        const dataverseFields = [
+          appSystemSettingField(entry.label, entry.key, 'The admin editor reads and writes this setting value.'),
+        ];
         return (
           <section key={entry.key} className="border border-gray-200 rounded-lg p-4 space-y-3">
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-sm font-semibold text-gray-900">{entry.label}</h3>
-                {entry.unavailable ? (
-                  <span className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
-                    unavailable — settings read failed
-                  </span>
-                ) : value === '' ? (
-                  <span className="text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                    blank — not configured
-                  </span>
-                ) : null}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold text-gray-900">{entry.label}</h3>
+                  {entry.unavailable ? (
+                    <span className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
+                      unavailable — settings read failed
+                    </span>
+                  ) : value === '' ? (
+                    <span className="text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                      blank — not configured
+                    </span>
+                  ) : null}
+                </div>
+                <DataverseFieldInfoButton items={dataverseFields} />
               </div>
               <p className="text-xs text-gray-500 mt-1">{entry.description}</p>
               {entry.placeholders?.length ? (
