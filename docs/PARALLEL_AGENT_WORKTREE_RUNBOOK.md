@@ -183,3 +183,26 @@ template, and (4) provide the wind-down review/verify/merge/teardown checklist. 
 it subordinate to `agent-coordination` (scoping/ownership) and
 `docs/AGENT_COLLABORATION_PLAN.md` (the contract); this runbook is the body of the
 "how."
+
+### Cross-machine bootstrap (must-have — repo runs on home + office machines)
+
+The per-machine, gitignored state is the recurring friction: it does **not** travel
+with git, so **every machine** needs it recreated. The skill should ship (or call) an
+**idempotent bootstrap script** (safe to re-run; skip what exists; compute paths at
+runtime so one script works on every machine — no hardcoded paths). Two layers:
+
+**Layer 1 — main repo on a fresh machine** (clone first; NOT in a cloud-synced folder):
+- `.agents/skills` → `.claude/skills` symlink (Codex's skills; per-machine, gitignored).
+- Memory-store symlink: `~/.claude/projects/<slug>/memory` → `<repo>/.claude-memory`,
+  where `<slug>` is the repo's absolute path with `/` and `_` replaced by `-`. This is
+  **path-derived, so it differs per machine** — compute it from `pwd`, never hardcode.
+  (Same logic the `/start` skill already runs.)
+- `npm install`.
+- `.env.local`: **secrets — a script must NOT embed them.** Provision separately via
+  `vercel env pull` or a secure copy; see `docs/CREDENTIALS_RUNBOOK.md`. Structure
+  only in the script.
+- Verify with `npm run check:agent-invariants`.
+
+**Layer 2 — the worktree** (per Steps 2–3 above): `git worktree add`, then in the
+worktree recreate `.agents/skills` symlink, `.env.local` symlink → the main repo's,
+and `npm install`.
