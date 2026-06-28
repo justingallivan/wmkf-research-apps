@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: bill
-  last_verified: S188 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-06-27 — vendor-location + payment-substrate re-probed live (#1002238 paid org vs #1002764 honorarium)
 ---
 
 ## Recall Rule
@@ -39,6 +39,15 @@ S188 probe (2026-05-25) audited which `akoya_request` / `akoya_requestpayment` f
 **Other field semantics surveyed:**
 - `wmkf_exisitngbillcomaccount` (Picklist Yes/No/Recently Confirmed) — actively used on grantee-org flow (385 non-null rows: 270 Yes / 115 No). Semantically maps to BILL's "is this entity in our network?" — appropriate for honorarium integration to write to.
 - `wmkf_paymentcontactconfirmed` (Picklist) — 398 non-null (357 Yes / 32 Recently Confirmed / 9 No). Grantee-org concern (who at the institution handles payments); doesn't translate to individuals.
+
+**Where the BILL vendor record lives — and why honoraria can't reuse the grant path (re-probed 2026-06-27).** A paid-through-BILL institutional grant (Utah State #1002238, $900K, with an `akoya_folio="PAID"` Payment child #0024011) stores its BILL linkage on the **applicant `account`**, NOT on the request or the contact:
+- `account.wmkf_billcomvendorid` = the BILL.com vendor id (e.g. `00901SAWVXCGEX3pth8g`) — this is the field the live grant flow keys on.
+- `account.akoya_isvendor = true`; `account.wmkf_vendorid` = internal vendor code (e.g. `UTA110`). (`akoya_billvendorid`, `_wmkf_billcomcontact_value`, QBO/Intacct payee ids were null.)
+- the `akoya_request` carries the snapshot only: `wmkf_paymentnetworkidpni` (PNI), `wmkf_exisitngbillcomaccount = Yes`, `wmkf_organizationnameonbillcomaccount`.
+
+**Honoraria have no account**, so the BILL honorarium design instead targets **`contact.wmkf_billcomid`** — a *different field on a different entity* (null for Amy #1002764, who also has `akoya_isvendor=false`). Consequence: the live grant→BILL vendor logic (keyed on `account.wmkf_billcomvendorid` / `account.akoya_isvendor`) has **no individual code path** and reads a field honoraria never populate. Any "mimic Rosie's grant-payment workflow for honoraria" effort must fork the vendor record account→contact and `wmkf_billcomvendorid`→`wmkf_billcomid` before it can run. This diverges from `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md` (which names `contact.wmkf_billcomid` without flagging that the live grant path uses a different field) — see the dated probe note there.
+
+**Honoraria currently have ZERO payment substrate. [VERIFIED via probe 2026-06-27]** 0 of 87 `Research Reviewer` honorarium `akoya_request` rows have any `akoya_requestpayment` child (denominator from the `_akoya_programid_value=Research Reviewer` cohort; child query via `_akoya_requestlookup_value`, the parent lookup validated against grant #1002238's known PAID child). Grants get their `folio=PAID` Payment child from AkoyaGO's award process; honoraria have no equivalent generator, so **the payment row a BILL workflow consumes does not exist yet for any honorarium** — payment last cycle happened entirely outside Dataverse. See [[akoya-request-honorarium-nomenclature]] for the person-vs-institution discriminators.
 
 **Why:** During S188 design of [[project-bill-honorarium-integration]], Justin flagged the legitimate concern that `wmkf_vendorverified=No` might be silently interpreted as "do not pay" by some downstream flow — which would have blocked the entire honorarium-onboarding integration for individual reviewers (who never have nonprofit tax status). The empirical audit dismissed this.
 

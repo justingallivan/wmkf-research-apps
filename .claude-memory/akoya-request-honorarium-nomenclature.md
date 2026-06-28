@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: bill
-  last_verified: 2026-05-25 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-06-27 — re-probed live (#1002764 person vs #1002794/#1002238 institutions)
 ---
 
 ## Recall Rule
@@ -24,7 +24,7 @@ Ground truth: live discriminators as of 2026-05-25 in body; [[project-bill-honor
 
 **The trap.** Two very different concepts share the `akoya_request` entity. Saying "request" alone is ambiguous and has caused confusion in design conversations (S188).
 
-**Discriminators (live as of 2026-05-25):**
+**Discriminators (re-probed live 2026-06-27, #1002764 person vs #1002794/#1002238 institutions):**
 
 | Term | What it is | Discriminator |
 |---|---|---|
@@ -32,6 +32,12 @@ Ground truth: live discriminators as of 2026-05-25 in body; [[project-bill-honor
 | **Honorarium request** | A payment record for an individual who reviewed a grant request | `akoya_program = "Research Reviewer"` AND `wmkf_grantprogram = "Honorarium"` AND `wmkf_type = "Individual"` AND `wmkf_request_type = "Individual"` |
 
 Concrete example: Utah State submitted **grant request** #1002238. Amy Gladfelter agreed to review it and was issued **honorarium request** #1002764 for $250.
+
+**Two single-field discriminators that say person-vs-institution directly (re-probed 2026-06-27):**
+- **`akoya_requesttype`** (option-set on the request itself, no lookup hop) — **`Scholarship` (100000001) = individual/honorarium**, **`Grant` (100000000) = institution**. Verified: Amy #1002764 = Scholarship; #1002794 + #1002238 = Grant.
+- **Applicant-account presence** — institution/grant requests have `_akoya_applicantid_value` → an `account` (Wayne State University #1002794, Utah State University #1002238) that **IS the payee**; honorarium/individual requests have `_akoya_applicantid_value = null`, and the payee is the person on `_akoya_primarycontactid_value` (a `contact`). The structural "who gets paid" tell: **applicant `account` present = institution; contact-only, no applicant account = individual.** (Both kinds still have a primary contact, so primary-contact presence alone does NOT discriminate.)
+
+This payee-type split is the crux for any "mimic the grant→BILL payment flow for honoraria" work — the vendor record and BILL id live on the `account` for orgs, not the contact: see [[akoya-payment-field-semantics]].
 
 **Critical: old/backfilled rows may have no data link between them.** Honorarium request #1002764 had ZERO lookup fields pointing back to grant request #1002238. For those rows, reconstruct "this honorarium was paid for reviewing which grant?" via:
 - Honorarium row's `_akoya_primarycontactid_value` → the reviewer's contact (Amy)

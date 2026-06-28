@@ -82,6 +82,8 @@ Since the portal owns the reviewer journey end-to-end going forward, we skip the
 | `address1_line1`, `address1_city`, `address1_stateorprovince`, `address1_postalcode`, `address1_country` | String × 5 | Already 98.8% populated for current reviewers | We PATCH if the reviewer updates address on the accept form |
 | `akoya_isvendor` | Boolean | "Send payments directly to this individual" | Deferred to staff (Q1) |
 
+**⚠️ [PROBE 2026-06-27] Vendor-id field divergence from the live grant→BILL flow.** This design writes the BILL vendor id to **`contact.wmkf_billcomid`** (above). But the existing, working grant-payment flow that Ops/Rosie runs stores the BILL vendor id on the applicant **`account`** as **`wmkf_billcomvendorid`** (a *different field on a different entity*), with `account.akoya_isvendor=true` and an internal `account.wmkf_vendorid` code. Verified on paid grant Utah State #1002238 (`account.wmkf_billcomvendorid="00901SAWVXCGEX3pth8g"`); Amy #1002764's `contact.wmkf_billcomid` is null. Honoraria have no `account`, so an individual-payee path is genuinely needed — but any plan to "mimic Rosie's grant workflow" for honoraria must reconcile this account→contact / `wmkf_billcomvendorid`→`wmkf_billcomid` fork, because the grant flow's vendor logic reads the account field and has no individual code path. Ground truth: [[akoya-payment-field-semantics]], [[akoya-request-honorarium-nomenclature]].
+
 ---
 
 ## Proposed integration
