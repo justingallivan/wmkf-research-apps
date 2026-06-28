@@ -155,8 +155,10 @@ gated and waiting on credentials.
   human sign-offs (`wmkf_executivedirectorapproval`, `wmkf_directorofoperationsapproved`,
   `wmkf_controllerapproved`) are approver concerns we neither own nor automate.
 - **Candidate — TRACK, not committed:** `wmkf_authorizationtoremitpaymentflag` (303
-  Yes org-wide, confirmed LIVE 2026-06-28) is the one field our app *might* set — on
-  **receiving a completed review**, as the eligible-to-pay marker. Frame it as a
+  Yes org-wide, confirmed LIVE 2026-06-28) is the one field our app *might* set — when
+  **the reviewer's completed review lands** (`wmkf_reviewreceivedat`, already the
+  documented payment-eligibility signal per [[project-reviewer-apps-redesign-direction]]),
+  as the eligible-to-pay marker. Confirmed trigger (Justin, 2026-06-28). Frame it as a
   **fulfillment/eligibility trigger, not a financial approval** (the field name reads
   like an approval, but the intent is "deliverable is in, payment may proceed").
 - **This REVISES, if pursued, the S188/S206 decision** that "the integration never
