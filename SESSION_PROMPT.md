@@ -87,9 +87,11 @@ and `docs/`. None are silently abandoned — each has an owner, blocker, or rati
    downgrade to Developer ($75/mo, 5k) — saves ~$75/mo;** not Starter (1k) given
    cyclical peaks. **Billing change = Justin's call.** Evidence:
    `.claude-memory/project-serpapi-capability-erosion.md`.
-3. **Stale-audit cleanup** — F-001 is already fixed (`getEntityRelationships` DOES
-   call `checkRestriction`, verified 2026-06-28); mark it resolved and confirm the
-   F-002 ALS-shim status. Evidence: `docs/CORRECTED_AUDIT_FINDINGS_FOR_CLAUDE_REVIEW_2026_05_26.md`.
+3. ~~**Stale-audit cleanup**~~ **(DONE 2026-06-28)** — verified BOTH F-001 and F-002
+   are resolved in code (relationship restriction check present; ALS migration complete,
+   0 shim callers, fails closed) and the drain-table "deferred cleanup" is superseded
+   (dropped via migration 018). Doc stamped. Only the generic write-helper restriction
+   policy remains an owner decision. Evidence: `docs/CORRECTED_AUDIT_FINDINGS_FOR_CLAUDE_REVIEW_2026_05_26.md`.
 
 **Blocked on a named owner / decision**
 1. **Reviewer-Workbench access boundaries** (3 unresolved: team-open read set?

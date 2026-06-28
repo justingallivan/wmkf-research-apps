@@ -2,6 +2,15 @@
 
 Date: 2026-05-26
 
+> **RESOLUTION STATUS (verified 2026-06-28):** Both actionable findings are **RESOLVED**
+> in current code — F-001 (`getEntityRelationships` now calls `checkRestriction`) and
+> F-002 (module-level restriction globals + deprecated shims removed; 0 callers;
+> `checkRestriction` fails closed when no AsyncLocalStorage context). The "Deferred
+> Cleanup: drain tables" section is **SUPERSEDED** — those 5 tables were dropped early
+> via migration `018_drop_reviewer_finder_postgres_tables.sql` (backup `scripts/w6-drop-backup.js`).
+> Only the "Generic Write Helper Restriction Policy" owner-decision remains open. This
+> doc is retained as a historical record; per-section status lines below are stamped.
+
 Purpose: this document distills the useful findings from the third-party audit cycle into a corrected, evidence-bounded review packet for Claude. It intentionally omits retracted findings and avoids destructive recommendations that are not yet due.
 
 ## Summary
@@ -20,7 +29,10 @@ Two areas should **not** be treated as ready-to-act findings:
 
 Severity: P2
 
-Status: Verified
+Status: **RESOLVED (verified 2026-06-28)** — `lib/services/dynamics-service.js:379`
+`getEntityRelationships(tableName)` calls `this.checkRestriction(tableName)` as its first
+statement, matching `getEntityAttributes`. (No dedicated regression gate was added; the
+fix is in source. Original finding below for history.)
 
 Category: Security / Metadata Exposure / Dynamics Restrictions
 
@@ -60,7 +72,12 @@ static async getEntityRelationships(tableName) {
 
 Severity: P2
 
-Status: Verified
+Status: **RESOLVED (verified 2026-06-28)** — in `lib/services/dynamics-service.js`:
+module-level `activeRestrictions` / `_restrictionRequestId` are gone, the
+`setRestrictions()` / `bypassRestrictions()` shims are gone, `rg` finds **0** direct
+callers across `scripts tests lib pages`, and `checkRestriction()` now **fails closed**
+(throws "Restrictions not initialized" when `getDynamicsContext()` is absent — fix step 6).
+The AsyncLocalStorage migration is complete. Original finding below for history.
 
 Category: Concurrency / Security Hygiene / Migration Completion
 
@@ -122,7 +139,10 @@ Recommendation: do **not** patch `updateRecord()` alone. First decide the policy
 
 ## Deferred Cleanup: Reviewer-Domain Postgres Drain Tables
 
-Status: Not yet due / deferred
+Status: **SUPERSEDED / DONE (verified 2026-06-28)** — the 5 drain tables were dropped
+early via migration `018_drop_reviewer_finder_postgres_tables.sql` (rows backed up to
+local JSONL + Vercel Blob by `scripts/w6-drop-backup.js` before the drop). The deferral
+guidance below is historical.
 
 Do not perform drain-table drops as part of the immediate audit fix.
 
