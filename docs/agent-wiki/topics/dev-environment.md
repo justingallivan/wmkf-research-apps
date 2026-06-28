@@ -52,7 +52,8 @@ Claude config sync, and environment-specific operating notes.
   auto-memory symlinks (slug computed from the repo path at runtime), `npm install`,
   and an `.env.local` presence check (secrets provisioned separately per
   `docs/CREDENTIALS_RUNBOOK.md`). `--worktree NAME` also sets up a sibling Codex
-  worktree. Full workflow: `docs/PARALLEL_AGENT_WORKTREE_RUNBOOK.md`.
+  worktree. Run the `parallel-agent-worktree` skill for the guided procedure;
+  `docs/PARALLEL_AGENT_WORKTREE_RUNBOOK.md` is the full command-level detail.
 - **`scripts/reset-request-reviewers.mjs` protects applicant-sourced rows by
   default.** It clears a single request's reviewer working state for testing. Rows
   the applicant proposed (`wmkf_applicantdisposition` non-null, or `applicant` in

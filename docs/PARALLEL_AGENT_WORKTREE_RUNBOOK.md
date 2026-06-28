@@ -8,8 +8,8 @@ honorarium-payment investigation in the main checkout.
 
 This complements `docs/AGENT_COLLABORATION_PLAN.md` (the contract) and the
 `agent-coordination` skill (the procedure). This runbook is the concrete,
-command-level "how." A future session may turn it into a skill — see the last
-section.
+command-level "how." The `parallel-agent-worktree` skill runs the guided procedure
+over it — see the last section.
 
 ## Why a worktree (not just branches)
 
@@ -174,15 +174,16 @@ git branch -d codex/<slug>
 - **Disjoint surfaces are the real safety** — the worktree isolates the *working
   directory*, but two branches editing the same file still conflict at merge.
 
-## Turning this into a skill (next session)
+## The skill over this runbook
 
-A `parallel-agent-worktree` skill would parameterize: `<task-slug>`, the worktree
-path, and the owned file surface. It should: (1) run the precondition checks, (2)
-create the worktree + repair per-machine state, (3) emit the task brief from a
-template, and (4) provide the wind-down review/verify/merge/teardown checklist. Keep
-it subordinate to `agent-coordination` (scoping/ownership) and
-`docs/AGENT_COLLABORATION_PLAN.md` (the contract); this runbook is the body of the
-"how."
+The `parallel-agent-worktree` skill (`.claude/skills/parallel-agent-worktree/SKILL.md`)
+runs the guided procedure: it parameterizes `<task-slug>`, the worktree path, and the
+owned file surface, and walks (1) the precondition checks, (2) worktree creation +
+per-machine-state repair (via `scripts/bootstrap-machine.sh --worktree`), (3) the task
+brief template, and (4) the wind-down review/verify/merge/teardown checklist. It stays
+subordinate to `agent-coordination` (scoping/ownership) and
+`docs/AGENT_COLLABORATION_PLAN.md` (the contract); this runbook remains the body of the
+"how" and the consolidated gotchas.
 
 ### Cross-machine bootstrap (must-have — repo runs on home + office machines)
 
