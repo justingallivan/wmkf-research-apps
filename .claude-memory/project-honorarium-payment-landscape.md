@@ -150,6 +150,22 @@ gated and waiting on credentials.
   authorization decision it is — "frictionless requires the API; the integration is
   built and gated; without it the friction stays manual, it doesn't vanish."
 
+**Scope boundary + flag-setting candidate (Justin, 2026-06-28):**
+- **All approval fields are OUT OF SCOPE for our apps — someone else's job.** The
+  human sign-offs (`wmkf_executivedirectorapproval`, `wmkf_directorofoperationsapproved`,
+  `wmkf_controllerapproved`) are approver concerns we neither own nor automate.
+- **Candidate — TRACK, not committed:** `wmkf_authorizationtoremitpaymentflag` (303
+  Yes org-wide, confirmed LIVE 2026-06-28) is the one field our app *might* set — on
+  **receiving a completed review**, as the eligible-to-pay marker. Frame it as a
+  **fulfillment/eligibility trigger, not a financial approval** (the field name reads
+  like an approval, but the intent is "deliverable is in, payment may proceed").
+- **This REVISES, if pursued, the S188/S206 decision** that "the integration never
+  touches this flag; staff retains it as the final pay-out gate"
+  ([[project-bill-honorarium-integration]], `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`,
+  [[project-reviewer-apps-redesign-direction]]). Those restatements still describe
+  **today's** behavior (we don't touch it yet); leave them until the candidate is
+  committed, then reconcile all of them in one pass. Confirm scope before building.
+
 ## Verifiable provenance (probe scripts were one-off, in session scratchpad)
 Key records: honorarium #1002764 (Amy Gladfelter, Duke, $250, Pending, 0 payments);
 institutional grants #1002794 (Wayne State) and paid #1002238 (Utah State, $900K,
