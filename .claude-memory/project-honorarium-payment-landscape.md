@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: bill
-  last_verified: 2026-06-27 — live Dataverse probes this session
+  last_verified: 2026-06-28 — Thread 2 approval-flag scan (refutes "flags dead"); core 0/9,151 finding 2026-06-27
 ---
 
 ## Recall Rule
@@ -80,14 +80,28 @@ vendor.
 ## Approvals are two-stage (board concurrence is NOT one of them)
 - Honoraria skip **board concurrence** (that's why they pay before the board
   meeting), but money-out still needs the normal approvals.
-- The Dataverse approval flag-fields are **dead** — `wmkf_authorizationtoremitpaymentflag`,
-  `wmkf_executivedirectorapproval`, `wmkf_controllerapproved`, `wmkf_directorofoperationsapproved`
-  are all null/false even on the paid $900K grant #1002238.
-- The real control is the **`akoya_folio` state machine**: Ready To Send → (human
-  release: Sarah Hibler) → Ready to Pay → (BILL/Bromelkamp execution) → Not Paid →
-  PAID. So **Stage 1 = a human advancing folio in Dataverse; Stage 2 = the
-  money-out approval(s) happen in BILL/offline**, invisible to Dataverse. (Thread 2,
-  to fully confirm: are the flag fields dead org-wide?)
+- **Thread 2 RESOLVED — the earlier "flag-fields are dead" read is REFUTED
+  [VERIFIED via full-table scan 2026-06-28, `scripts/probe-akoya-approval-flags-deadness.js`].**
+  S298 over-generalized from one record (#1002238 happened to have them unset).
+  These are not uniform "flags" and 3 of 4 are populated org-wide on `akoya_request`
+  (n=25,584) — matching the "Real gates" note in [[akoya-payment-field-semantics]]:
+  - `wmkf_authorizationtoremitpaymentflag` (Boolean) — **303 Yes** / 5,748 No /
+    19,533 null → LIVE; the staff remit gate the BILL design keeps
+    ([[project-bill-honorarium-integration]]).
+  - `wmkf_executivedirectorapproval` (**DateTime**, not a flag) — **323 dated** → LIVE ED sign-off.
+  - `wmkf_directorofoperationsapproved` (**DateTime**) — **611 dated** → LIVE.
+  - `wmkf_controllerapproved` (Picklist) — **0 / 25,584 set** → the only truly dead one.
+  Used on a minority (~1–2%) of records, so a gate on *some* payments, not a universal one.
+- **For honoraria specifically they stay unused:** all 303 `=Yes` are grant-type
+  (Discretionary 154 / Program 138 / Special 9 / …); **0 on Individual/honorarium type.**
+  So the honorarium-side conclusion still holds (honoraria paid offline by check, no
+  Dataverse approval record) — but the blanket "approval is invisible to Dataverse"
+  is wrong for **grants** (the flag + ED/DO dates *are* the Dataverse approval record);
+  it's only true for honoraria.
+- **`akoya_folio` lives on `akoya_requestpayment` (String), not `akoya_request`** —
+  the folio state machine governs the payment child, not the request. The folio control
+  stands: a human advances it (Ready To Send → Ready to Pay → … → PAID, e.g. Sarah
+  Hibler), then BILL/Bromelkamp executes money-out.
 
 ## Portal connection
 The front-of-funnel manual step (staff invites reviewers into GoApply → they
@@ -146,5 +160,7 @@ against #1002238's PAID child #0024011). Audit via RetrieveRecordChangeHistory
 
 ## Open threads (session tasks)
 1. Connor's manual 2/19 classification — what exactly, and is it automatable?
-2. Confirm the approval flag-fields are dead org-wide (two-stage model).
+2. (done 2026-06-28) Approval fields are NOT dead org-wide — 3 of 4 populated on
+   grants (303/323/611), only `wmkf_controllerapproved` unused; 0 on honorarium-type.
+   REFUTES the earlier "all dead" read. See the Approvals section.
 3. (done) Pre-BILL ACH trace — #997034.
