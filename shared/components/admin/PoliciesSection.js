@@ -16,6 +16,7 @@
 
 import { useEffect, useState } from 'react';
 import { renderPolicyMarkdown } from '../../utils/policy-markdown-client';
+import DataverseFieldInfoButton from './DataverseFieldInfoButton';
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -94,12 +95,16 @@ export default function PoliciesSection() {
 function SlotPanel({ slot, onPublishedReload }) {
   const [expanded, setExpanded] = useState(false);
   const [outcome, setOutcome] = useState(null);
+  const dataverseFields = buildSlotDataverseFields(slot);
 
   if (slot.invariantError) {
     const tone = STATUS_COPY[slot.invariantError]?.tone || 'red';
     return (
       <div className="border rounded-lg p-4">
-        <div className="font-medium text-gray-900">{slot.code}</div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="font-medium text-gray-900">{slot.code}</div>
+          <DataverseFieldInfoButton items={dataverseFields} />
+        </div>
         <div className={`mt-2 text-sm px-3 py-2 rounded border ${TONE_CLASSES[tone]}`}>
           {STATUS_COPY[slot.invariantError]?.text || slot.invariantError}
           {slot.duplicateIds && (
@@ -118,12 +123,15 @@ function SlotPanel({ slot, onPublishedReload }) {
             <div className="font-medium text-gray-900">{slot.displayName || slot.code}</div>
             <div className="text-xs text-gray-500">slot: <code>{slot.code}</code></div>
           </div>
-          <button
-            onClick={() => setExpanded(e => !e)}
-            className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded hover:bg-gray-800"
-          >
-            {expanded ? 'Cancel' : 'Publish new version'}
-          </button>
+          <div className="flex items-center gap-2">
+            <DataverseFieldInfoButton items={dataverseFields} />
+            <button
+              onClick={() => setExpanded(e => !e)}
+              className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded hover:bg-gray-800"
+            >
+              {expanded ? 'Cancel' : 'Publish new version'}
+            </button>
+          </div>
         </div>
 
         {slot.activeVersion ? (
@@ -158,6 +166,73 @@ function SlotPanel({ slot, onPublishedReload }) {
       )}
     </div>
   );
+}
+
+function buildSlotDataverseFields(slot) {
+  const slotRow = `wmkf_code = "${slot.code}"`;
+  const versionRow = slot.activeVersion?.id
+    ? `wmkf_policyversionid = "${slot.activeVersion.id}"`
+    : 'Current child is selected by the parent wmkf_activeversion lookup.';
+  return [
+    {
+      label: 'Slot code',
+      entity: 'wmkf_policy',
+      entitySet: 'wmkf_policies',
+      field: 'wmkf_code',
+      row: slotRow,
+    },
+    {
+      label: 'Slot display name',
+      entity: 'wmkf_policy',
+      entitySet: 'wmkf_policies',
+      field: 'wmkf_displayname',
+      row: slotRow,
+    },
+    {
+      label: 'Active version pointer',
+      entity: 'wmkf_policy',
+      entitySet: 'wmkf_policies',
+      field: 'wmkf_activeversion',
+      row: slotRow,
+      note: 'The route reads this as _wmkf_activeversion_value and publishes by flipping the parent lookup.',
+    },
+    {
+      label: 'Active version label',
+      entity: 'wmkf_policyversion',
+      entitySet: 'wmkf_policyversions',
+      field: 'wmkf_versionlabel',
+      row: versionRow,
+    },
+    {
+      label: 'Active version title',
+      entity: 'wmkf_policyversion',
+      entitySet: 'wmkf_policyversions',
+      field: 'wmkf_policytitle',
+      row: versionRow,
+    },
+    {
+      label: 'Active version body',
+      entity: 'wmkf_policyversion',
+      entitySet: 'wmkf_policyversions',
+      field: 'wmkf_policybody',
+      row: versionRow,
+    },
+    {
+      label: 'Effective date',
+      entity: 'wmkf_policyversion',
+      entitySet: 'wmkf_policyversions',
+      field: 'wmkf_effectivedate',
+      row: versionRow,
+    },
+    {
+      label: 'Version state',
+      entity: 'wmkf_policyversion',
+      entitySet: 'wmkf_policyversions',
+      field: 'statecode / statuscode',
+      row: versionRow,
+      note: 'The active version is authoritative through the parent lookup; state is shown for repair/history context.',
+    },
+  ];
 }
 
 function PublishForm({ slot, onSuccess, onOutcome }) {

@@ -3,6 +3,10 @@ import Layout, { PageHeader, Card } from '../shared/components/Layout';
 import PoliciesSection from '../shared/components/admin/PoliciesSection';
 import PromptTemplatesSection from '../shared/components/admin/PromptTemplatesSection';
 import EmailDefaultsSection from '../shared/components/admin/EmailDefaultsSection';
+import DataverseFieldInfoButton, {
+  appSystemSettingField,
+  appSystemSettingPattern,
+} from '../shared/components/admin/DataverseFieldInfoButton';
 import { APP_REGISTRY } from '../shared/config/appRegistry';
 
 const PERIOD_OPTIONS = [
@@ -49,6 +53,78 @@ const SERVICE_LABELS = {
   encryption: 'Encryption Key',
   nextAuthUrl: 'NEXTAUTH_URL',
 };
+
+const SECRET_EXPIRATION_DATAVERSE_FIELDS = [
+  appSystemSettingPattern(
+    'Expiration date',
+    'secret_expiration:<secret key>',
+    'The status and days-left columns are computed from this stored date.',
+  ),
+  appSystemSettingPattern('Last rotated date', 'secret_rotation:<secret key>'),
+];
+
+const ALERT_RECIPIENT_DATAVERSE_FIELDS = [
+  appSystemSettingField(
+    'Per-category recipient JSON',
+    'alertRecipientsByCategory',
+    'The active-superuser fallback roster is Postgres-backed, not Dataverse.',
+  ),
+];
+
+const MODEL_CONFIG_DATAVERSE_FIELDS = [
+  appSystemSettingPattern(
+    'Saved model override dropdown',
+    'model_override:<appKey>:<modelType>',
+    'Only saved overrides live here. Defaults, environment overrides, model registry status, and pricing are not stored in this Dataverse row.',
+  ),
+];
+
+const HONORARIUM_DATAVERSE_FIELDS = [
+  appSystemSettingField('Reviewer honorarium amount', 'honorarium.default_amount'),
+];
+
+const REVIEWER_TIME_BUDGET_DATAVERSE_FIELDS = [
+  appSystemSettingField(
+    'Reviewer search time budget',
+    'reviewer.time_budget_seconds',
+    'The UI clamps this value into the supported min/max range before saving.',
+  ),
+];
+
+const POLICY_SECTION_DATAVERSE_FIELDS = [
+  {
+    label: 'Policy slot rows',
+    entity: 'wmkf_policy',
+    entitySet: 'wmkf_policies',
+    field: 'wmkf_code / wmkf_displayname / wmkf_activeversion',
+    row: 'Visible slots are selected by wmkf_code.',
+  },
+  {
+    label: 'Policy version rows',
+    entity: 'wmkf_policyversion',
+    entitySet: 'wmkf_policyversions',
+    field: 'wmkf_versionlabel / wmkf_policytitle / wmkf_policybody / wmkf_effectivedate',
+    row: 'Version rows are filtered by _wmkf_policy_value.',
+  },
+];
+
+const PROMPT_SECTION_DATAVERSE_FIELDS = [
+  {
+    label: 'Prompt inventory and editable body',
+    entity: 'wmkf_ai_prompt',
+    entitySet: 'wmkf_ai_prompts',
+    field: 'wmkf_ai_promptname / wmkf_promptversion / wmkf_ai_systemprompt / wmkf_ai_promptbody / wmkf_ai_iscurrent',
+    row: 'Prompt panels are grouped by wmkf_ai_promptname.',
+  },
+];
+
+const EMAIL_DEFAULTS_DATAVERSE_FIELDS = [
+  appSystemSettingPattern(
+    'Editable email default value',
+    'email.<workflow>.<subject|body>',
+    'Each email default card shows its exact key in its own field mapping popover.',
+  ),
+];
 
 // --- Section A: Service Health ---
 function HealthSection() {
@@ -609,7 +685,10 @@ function SecretExpirationSection() {
 
   return (
     <Card>
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Secret Expiration Tracking</h2>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-gray-900">Secret Expiration Tracking</h2>
+        <DataverseFieldInfoButton items={SECRET_EXPIRATION_DATAVERSE_FIELDS} />
+      </div>
       <p className="text-xs text-gray-500 mb-3">
         Set expiration dates to receive automated alerts as secrets approach expiry. Dates are checked daily at 8:00 AM UTC.
       </p>
@@ -2268,7 +2347,7 @@ function AlertRecipientsSection() {
 // after. Used for heavyweight admin sections whose data fetches are
 // expensive or rarely consulted. Pass `bare`-styled children (i.e.
 // children that DON'T render their own outer Card).
-function CollapsibleCard({ title, subtitle, defaultOpen = false, children }) {
+function CollapsibleCard({ title, subtitle, defaultOpen = false, dataverseFields = [], children }) {
   const [open, setOpen] = useState(defaultOpen);
   const [everOpened, setEverOpened] = useState(defaultOpen);
   const toggle = () => {
@@ -2280,16 +2359,27 @@ function CollapsibleCard({ title, subtitle, defaultOpen = false, children }) {
   };
   return (
     <Card>
-      <button
-        onClick={toggle}
-        className="w-full flex items-center justify-between text-left"
-      >
-        <div>
+      <div className="flex items-start justify-between gap-3">
+        <button
+          type="button"
+          onClick={toggle}
+          className="flex-1 text-left"
+        >
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
           {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+        </button>
+        <div className="flex items-center gap-2">
+          <DataverseFieldInfoButton items={dataverseFields} />
+          <button
+            type="button"
+            onClick={toggle}
+            className="text-xs text-gray-500"
+            aria-label={open ? `Collapse ${title}` : `Expand ${title}`}
+          >
+            {open ? '▼' : '▶'}
+          </button>
         </div>
-        <span className="text-xs text-gray-500 ml-3">{open ? '▼' : '▶'}</span>
-      </button>
+      </div>
       {everOpened && <div className={`mt-4 ${open ? '' : 'hidden'}`}>{children}</div>}
     </Card>
   );
@@ -2504,26 +2594,46 @@ export default function AdminDashboard() {
         <SystemAlertsSection />
         <MaintenanceSection />
         <SecretExpirationSection />
-        <CollapsibleCard title="Alert Recipients" subtitle="Route system alerts to per-category email addresses">
+        <CollapsibleCard
+          title="Alert Recipients"
+          subtitle="Route system alerts to per-category email addresses"
+          dataverseFields={ALERT_RECIPIENT_DATAVERSE_FIELDS}
+        >
           <AlertRecipientsSection />
         </CollapsibleCard>
         <UsageSection />
-        <CollapsibleCard title="Model Configuration">
+        <CollapsibleCard title="Model Configuration" dataverseFields={MODEL_CONFIG_DATAVERSE_FIELDS}>
           <ModelConfigSection />
         </CollapsibleCard>
-        <CollapsibleCard title="Reviewer Honorarium Amount" subtitle="Single ground-truth amount for reviewer honoraria">
+        <CollapsibleCard
+          title="Reviewer Honorarium Amount"
+          subtitle="Single ground-truth amount for reviewer honoraria"
+          dataverseFields={HONORARIUM_DATAVERSE_FIELDS}
+        >
           <HonorariumAmountSection />
         </CollapsibleCard>
-        <CollapsibleCard title="Reviewer Search Time Budget" subtitle="How long a reviewer search may run before stopping gracefully">
+        <CollapsibleCard
+          title="Reviewer Search Time Budget"
+          subtitle="How long a reviewer search may run before stopping gracefully"
+          dataverseFields={REVIEWER_TIME_BUDGET_DATAVERSE_FIELDS}
+        >
           <ReviewerTimeBudgetSection />
         </CollapsibleCard>
-        <CollapsibleCard title="Policies">
+        <CollapsibleCard title="Policies" dataverseFields={POLICY_SECTION_DATAVERSE_FIELDS}>
           <PoliciesSection />
         </CollapsibleCard>
-        <CollapsibleCard title="Prompt Templates" subtitle="Edit + publish versioned AI prompt bodies (Dataverse wmkf_ai_prompt)">
+        <CollapsibleCard
+          title="Prompt Templates"
+          subtitle="Edit + publish versioned AI prompt bodies (Dataverse wmkf_ai_prompt)"
+          dataverseFields={PROMPT_SECTION_DATAVERSE_FIELDS}
+        >
           <PromptTemplatesSection />
         </CollapsibleCard>
-        <CollapsibleCard title="Email Defaults" subtitle="Edit shared default copy for email workflows">
+        <CollapsibleCard
+          title="Email Defaults"
+          subtitle="Edit shared default copy for email workflows"
+          dataverseFields={EMAIL_DEFAULTS_DATAVERSE_FIELDS}
+        >
           <EmailDefaultsSection />
         </CollapsibleCard>
         <CollapsibleCard title="Role Management">
