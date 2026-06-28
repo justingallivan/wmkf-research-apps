@@ -71,9 +71,10 @@ readlink .agents/skills            # expect: ../.claude/skills
 # 2. node_modules — absent in a fresh worktree; needed for lint/build/test.
 npm install
 
-# 3. .env.local — untracked, NOT copied in. Only needed if the agent runs the dev
-#    server / live probes. Copy if required:
-cp ../WMKF_Apps/.env.local .       # only if needed
+# 3. .env.local — untracked, NOT copied in. Only needed for the dev server / live
+#    probes. Prefer a SYMLINK to the main repo's (auto-syncs, no stale copy; it's
+#    gitignored, so the symlink is never committed):
+ln -s ../WMKF_Apps/.env.local .env.local   # or `cp ../WMKF_Apps/.env.local .` for a frozen snapshot
 ```
 
 Things that **do** travel automatically (no action): the tracked `AGENTS.md ->
@@ -135,12 +136,28 @@ cd ../WMKF_Apps-codex && npm run build         # expect clean; a Turbopack sandb
 (Optional: visual check — needs the dev server + the page's auth, e.g. superuser for
 `/admin`.)
 
-**Merge + deploy + tear down** (from the main checkout, on the owner's go):
+**Merge + deploy** (from the main checkout, on the owner's go — `main` deploys):
 
 ```bash
 git merge --no-ff codex/<slug>                 # clean when surfaces are disjoint
 git push                                        # triggers Vercel deploy
 vercel inspect <url>                            # confirm deploy (don't poll-grep `vercel ls`)
+```
+
+**Then dispose of the worktree — two options:**
+
+*Keep & reuse (preferred for a recurring workflow).* Leave the directory in place
+with its `node_modules` + symlinks (`.agents/skills`, `.env.local`); just free the
+merged branch by parking the worktree on `main`:
+```bash
+git -C ../WMKF_Apps-codex fetch origin
+git -C ../WMKF_Apps-codex checkout -B codex/parked origin/main   # move off the merged branch
+git branch -d codex/<slug>
+# next session, from the worktree: git fetch && git checkout -B codex/<next-slug> origin/main
+```
+
+*Full teardown (one-off / reclaim disk).* Deletes the directory too:
+```bash
 git worktree remove --force ../WMKF_Apps-codex  # --force: clears the agent's untracked .codex/
 git branch -d codex/<slug>
 ```
