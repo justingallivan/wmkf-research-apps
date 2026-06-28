@@ -60,44 +60,68 @@ turned into reusable tooling.
 
 ## Next Items
 
-### Verified Open
+> **S299 progress (2026-06-28):** Ops/Steph BILL-honorarium update **drafted**
+> (`scratchpad/ops-bill-honorarium-update.md` — ready to send/convert). **Thread 2
+> RESOLVED + REFUTED** — the `wmkf_*approval` fields are NOT dead org-wide (3 of 4
+> populated; only `wmkf_controllerapproved` unused); see
+> `.claude-memory/project-honorarium-payment-landscape.md` + the probe
+> `scripts/probe-akoya-approval-flags-deadness.js`. **`parallel-agent-worktree`
+> skill shipped** (commit `ca07945e`). **New scope decision:** our app *may* set
+> `wmkf_authorizationtoremitpaymentflag` when a review lands (`wmkf_reviewreceivedat`)
+> as a fulfillment/eligible-to-pay trigger — all approvals stay out of scope (tracked
+> candidate, not committed).
 
-1. **Draft the Ops/Steph BILL-honorarium update.**
-   Evidence: `.claude-memory/project-honorarium-payment-landscape.md`.
-   The evidence chain is complete; frame it around the conservation-of-friction
-   point and the capability question (can AkoyaGO's payment engine take a `contact`
-   payee at all?) to Connor/Sarah/Bromelkamp.
+### Standing Dangling Threads (full memory + design-doc sweep, S299 2026-06-28)
 
-2. **Thread 1 — Connor's manual honorarium classification.**
-   Evidence: landscape memory "open threads" + the 2/19 audit on #1002764.
-   What exactly Connor sets, and whether that classification step is automatable.
+A consolidated register of every genuine loose end found across `.claude-memory/`
+and `docs/`. None are silently abandoned — each has an owner, blocker, or rationale.
 
-3. **Thread 2 — confirm the `wmkf_*approval` flag-fields are dead org-wide.**
-   Evidence: landscape memory; null/false on paid grant #1002238.
-   Confirms the two-stage (Dataverse folio + BILL/offline) approval model.
+**Actionable now — no external blocker**
+1. **Honorarium Thread 1** — what exactly Connor sets in his manual classification,
+   and whether it's automatable (read-only Dataverse audit). Evidence:
+   `.claude-memory/project-honorarium-payment-landscape.md`.
+2. **SerpAPI hobby-tier cost eval** — $150/mo; only contact + PubPeer + news still
+   ride it (Scholar/lit/PI-pubs moved to OpenAlex). Check billing-dashboard volume.
+   Evidence: `.claude-memory/project-serpapi-capability-erosion.md`.
+3. **Stale-audit cleanup** — F-001 is already fixed (`getEntityRelationships` DOES
+   call `checkRestriction`, verified 2026-06-28); mark it resolved and confirm the
+   F-002 ALS-shim status. Evidence: `docs/CORRECTED_AUDIT_FINDINGS_FOR_CLAUDE_REVIEW_2026_05_26.md`.
 
-4. **Write the `parallel-agent-worktree` skill.**
-   Evidence: `docs/PARALLEL_AGENT_WORKTREE_RUNBOOK.md` "Turning this into a skill";
-   `scripts/bootstrap-machine.sh` already exists for the skill to call.
+**Blocked on a named owner / decision**
+1. **Reviewer-Workbench access boundaries** (3 unresolved: team-open read set?
+   reviewer-mgmt = lead PD only? writeup-edit perms + CSO/President view?) → **Justin**.
+   Evidence: `.claude-memory/project-reviewer-apps-redesign-direction.md`.
+2. **BILL API access** — the only thing that *removes* (vs relocates) honorarium
+   friction; portal-integrated onboarding is built + gated → **Ops/leadership**.
+3. **Self-report PNI segmentation field** — build the small version now or wait? → owner.
+4. **Applicant-exclusion policy** — how broadly may a PI exclude reviewers, on what
+   basis → **foundation/stakeholders**. Evidence:
+   `.claude-memory/project-applicant-exclusion-policy-pending.md`.
+5. **Awardee onboarding** — GAL-sent status field is unknown; must be discovered in
+   Dataverse before any build → **Connor**. Evidence: `.claude-memory/project-awardee-onboarding.md`.
+6. **Dataverse settings auditing** → **Connor** (re-open when he sets scope + retention
+   and flips the `wmkf_appsystemsetting` audit flag). Evidence:
+   `.claude-memory/project-dataverse-settings-audit-enablement.md`.
+7. **GRANTEE_PORTAL title-field provenance** (`wmkf_wmkfprojectdescription` vs
+   `wmkf_projecttitle1`) → **Connor + Sarah** (doc-only; doesn't block the build).
+   Evidence: `docs/GRANTEE_PORTAL_BUILD_PLAN.md`.
 
-### Owner Decision Needed
+**Gates a real launch (soft deadlines)**
+1. **Stage-2A pre-cycle TODOs** — COI policy body still `[PLACEHOLDER]`; `wmkf_policy*`
+   delete-privilege role unrestricted. Both before slice 1 ships to a real cycle.
+   Evidence: `docs/REVIEWER_STAGE_2A_BUILD_PLAN.md`.
+2. **Intake-portal virus-scan E2E** — must run before the portal goes live to real
+   applicants. Evidence: `.claude-memory/project-intake-portal-virus-scan-e2e-deferred.md`.
+3. **J27 cluster (~Dec 2026)** — `wmkf_requestdocument` doc-capture table,
+   grant-phasing relabel model, ~300-proposal triage dashboard, prompt-storage
+   Phase 1/2. Design-locked; awaiting next cycle + Connor/Sarah form design.
 
-1. **BILL API access** — the only thing that *removes* (vs relocates) honorarium
-   payment friction. Evidence: landscape memory scoping section. Decision for
-   Ops/leadership; the portal-integrated BILL onboarding is already built and gated.
-
-2. **Self-report PNI segmentation field on the reviewer portal** — build the small
-   version now or wait? Evidence: landscape memory scoping section.
-
-### Parked
-
-1. **Dataverse settings auditing (Connor).** Evidence:
-   `project-dataverse-settings-audit-enablement.md`. Re-open when Connor sets scope
-   + retention and flips the `wmkf_appsystemsetting` table audit flag.
-
-2. **PD-override-correction sync.** Evidence:
-   `docs/agent-wiki/topics/reviewer-identity.md`. Re-open if the reviewer-contact
-   boundary tail is resumed.
+**Parked by design / already tracked**
+PD-override-correction sync (`docs/agent-wiki/topics/reviewer-identity.md`) ·
+honorarium BILL capture-only lock · Wave-1 role-elevation revert · drain-table drops
+(date-gated 2026-07-01) · VRP/Perplexity provider coupling · Dynamics sandbox stale
+schema · nomenclature/app-sunset sweep · deferred code cleanup ·
+`docs/REVIEWER_IDENTITY_RECONCILIATION_EDITS.md` four doc-hygiene questions.
 
 ### Verify Before Acting
 
