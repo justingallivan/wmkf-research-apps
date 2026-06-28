@@ -242,7 +242,7 @@ The reviewer-history surface for a contact is `wmkf_appreviewersuggestion` rows 
 - External-token lifecycle: `wmkf_ExternalTokenHash`, `wmkf_ExternalTokenIssued`, `wmkf_ExternalTokenExpires`, `wmkf_ExternalTokenRevoked`
 - Engagement timestamps: `wmkf_ProposalFirstAccessed`
 - Review delivery: `wmkf_ReviewSharePointFolder`, `wmkf_ReviewUploadedByStaff`
-- Review form responses: `wmkf_ReviewerAffiliation`, `wmkf_ReviewerImpact`, `wmkf_ReviewerRisk`, `wmkf_ReviewerOverallRating` (with sentinel `99 = unable to answer` on each picklist)
+- Review form responses: `wmkf_ReviewerAffiliation`, `wmkf_ReviewerImpact`, `wmkf_ReviewerRisk`, `wmkf_ReviewerOverallRating`
 
 **Implications:**
 - The "engagement predicate" for the post-pilot one-shot cleanup reads signals from both sides: (a) suggestion-side signals on `wmkf_appreviewersuggestion` (`wmkf_ExternalTokenIssued`, `wmkf_ProposalFirstAccessed`, any review-form picklist, `wmkf_emailsentat`, `wmkf_responsetype`); and (b) slot-side signals on `wmkf_potentialreviewer` (`wmkf_contact` populated indicates the person was promoted to a contact at some point — a cross-proposal "this person is engaged with us" signal). The keep decision is the union of both — see §"Engaged predicate" above for the full enumerated signal list. Cleanup acts on suggestion rows; the slot itself is never deleted by the script.
@@ -534,7 +534,7 @@ The `wmkf_appreviewersuggestion` adapter (`reviewer-suggestion.js:57`) **throws 
 | `review_received` | (same) |
 | `complete` | (same) |
 
-**Net-new picklists from extensions**: `wmkf_ReviewerImpact` (1–4 + 99 sentinel), `wmkf_ReviewerRisk` (1–4 + 99), `wmkf_ReviewerOverallRating` (1–5 + 99). Backfill never writes these — they originate at review submission time. Aggregations always filter `< 99`.
+**Net-new picklists from extensions**: `wmkf_ReviewerImpact` (1–4), `wmkf_ReviewerRisk` (1–4), `wmkf_ReviewerOverallRating` (1–5). Backfill never writes these — they originate at review submission time.
 
 **Validation**: backfill rejects rows with picklist values not in the adapter maps — log to `Anomalies` count, do not coerce.
 

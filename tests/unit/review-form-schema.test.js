@@ -21,9 +21,9 @@ describe('reviewFormSchema definition', () => {
     expect(new Set(dvFields).size).toBe(dvFields.length);
   });
 
-  test('all picklist fields include 99 = Unable to answer', () => {
+  test('no picklist field offers an "Unable to answer" option', () => {
     for (const f of reviewFormSchema.fields.filter(f => f.type === 'picklist')) {
-      expect(f.options.some(o => o.value === 99 && /unable/i.test(o.label))).toBe(true);
+      expect(f.options.some(o => o.value === 99 || /unable/i.test(o.label))).toBe(false);
     }
   });
 });
@@ -51,9 +51,10 @@ describe('validateReviewForm', () => {
     expect(r.dataverseValues.wmkf_reviewerimpact).toBe(3);
   });
 
-  test('accepts 99 (Unable to answer) on each picklist', () => {
+  test('rejects the removed "Unable to answer" value (99) on each picklist', () => {
     const r = validateReviewForm({ affiliation: 'X', impact: 99, risk: 99, overallRating: 99 });
-    expect(r.ok).toBe(true);
+    expect(r.ok).toBe(false);
+    expect(r.errors.every(e => /invalid choice/.test(e))).toBe(true);
   });
 
   test('rejects missing required fields', () => {

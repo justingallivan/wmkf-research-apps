@@ -61,8 +61,9 @@ test('renders submitted reviews with decoded ratings + download link, hides pend
   // Decoded ratings (not raw numbers).
   expect(screen.getByText('Will rewrite textbooks')).toBeInTheDocument(); // impact 4
   expect(screen.getByText('Excellent')).toBeInTheDocument(); // overall 5
-  expect(screen.getByText('Unable to answer')).toBeInTheDocument(); // overall 99
-  expect(screen.getByText('Not provided')).toBeInTheDocument(); // NoFile risk = null
+  // NoFile has risk = null and a legacy overall = 99 (the removed "Unable to
+  // answer" sentinel); both now decode to "Not provided".
+  expect(screen.getAllByText('Not provided').length).toBeGreaterThanOrEqual(2);
 
   // Download link reuses the existing endpoint, keyed by suggestionId.
   const link = screen.getByTitle('Download: review.pdf');

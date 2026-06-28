@@ -163,9 +163,9 @@ fields; the remaining free-text questions stay in the uploaded PDF.
 |---|---|---|---|
 | Reviewer Name | (existing on `wmkf_potentialreviewer`) | text, required | Pre-fill from CRM, editable |
 | Title & Organization | `wmkf_revieweraffiliation` | string(300), required | Pre-fill from CRM if known, editable |
-| Q1 — Impact | `wmkf_reviewerimpact` | picklist, required | 4 values + "Unable to answer" |
-| Q3 — Risk | `wmkf_reviewerrisk` | picklist, required | 4 values + "Unable to answer" |
-| Q10 — Overall rating | `wmkf_revieweroverallrating` | picklist, required | 5 values + "Unable to answer" |
+| Q1 — Impact | `wmkf_reviewerimpact` | picklist, required | 4 values |
+| Q3 — Risk | `wmkf_reviewerrisk` | picklist, required | 4 values |
+| Q10 — Overall rating | `wmkf_revieweroverallrating` | picklist, required | 5 values |
 
 ### In the uploaded PDF (free text — no value in retyping)
 
@@ -183,7 +183,6 @@ Q11 (anything else, optional).
 | 2 | Publications of disciplinary interest |
 | 3 | Publications of broad interest |
 | 4 | Will rewrite textbooks |
-| 99 | Unable to answer |
 
 **`wmkf_reviewerrisk`** — note: higher is **not** worse here; Keck's mission is funding risky projects. Document this in the column description.
 
@@ -193,7 +192,6 @@ Q11 (anything else, optional).
 | 2 | Medium risk |
 | 3 | High risk |
 | 4 | Impossible (fatal flaw) |
-| 99 | Unable to answer |
 
 **`wmkf_revieweroverallrating`** — higher = better for clean averaging.
 
@@ -204,7 +202,6 @@ Q11 (anything else, optional).
 | 3 | Good |
 | 4 | Very Good |
 | 5 | Excellent |
-| 99 | Unable to answer |
 
 ### Form schema config
 
@@ -225,7 +222,6 @@ export const reviewFormSchema = {
         { value: 2, label: 'Will result in publications of disciplinary interest' },
         { value: 3, label: 'Will result in publications of broad interest' },
         { value: 4, label: 'Will rewrite textbooks' },
-        { value: 99, label: 'Unable to answer' },
       ] },
     // ...risk, overallRating identically structured
   ],
@@ -235,7 +231,9 @@ export const reviewFormSchema = {
 Both upload endpoints (token and staff) validate posted values against this
 schema before PATCHing to Dataverse. Single source of truth.
 
-When math runs (averages, rankings), filter `WHERE field < 99`.
+The "Unable to answer" sentinel (99) was removed from all three picklists, so
+every stored rating is a real point on the scale. Any pre-removal `99` should be
+treated as "not provided" (it decodes to null), not averaged in.
 
 ---
 

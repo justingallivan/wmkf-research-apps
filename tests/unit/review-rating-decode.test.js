@@ -1,7 +1,7 @@
 /**
  * labelForReviewRating — decode for the Reviews-tab read surface. Must mirror
- * the exact option labels the form wrote (single source of truth), and must
- * distinguish "not provided" (null) from a real "Unable to answer" (99).
+ * the exact option labels the form wrote (single source of truth) and return
+ * null for absent or out-of-range values.
  */
 import { labelForReviewRating, reviewRatingShortLabels } from '../../lib/external/review-form-schema';
 
@@ -11,9 +11,9 @@ test('decodes each rating field to its written label', () => {
   expect(labelForReviewRating('overallRating', 5)).toBe('Excellent');
 });
 
-test('decodes the "Unable to answer" sentinel (99) to its own label, not null', () => {
-  expect(labelForReviewRating('impact', 99)).toBe('Unable to answer');
-  expect(labelForReviewRating('overallRating', 99)).toBe('Unable to answer');
+test('the removed "Unable to answer" sentinel (99) now decodes to null', () => {
+  expect(labelForReviewRating('impact', 99)).toBeNull();
+  expect(labelForReviewRating('overallRating', 99)).toBeNull();
 });
 
 test('accepts string-numeric values (as they can arrive over the wire)', () => {
