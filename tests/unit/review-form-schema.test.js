@@ -16,15 +16,61 @@ function valid() {
 }
 
 describe('reviewFormSchema definition', () => {
-  test('all fields have unique dataverseField mappings', () => {
-    const dvFields = reviewFormSchema.fields.map(f => f.dataverseField);
+  test('parent-mapped fields have unique dataverseField mappings', () => {
+    // Only string/picklist fields map to parent columns; richtext answers go to
+    // the snapshot child table and intentionally carry no dataverseField.
+    const dvFields = reviewFormSchema.fields
+      .map(f => f.dataverseField)
+      .filter(Boolean);
     expect(new Set(dvFields).size).toBe(dvFields.length);
+  });
+
+  test('richtext fields carry no dataverseField (snapshot-child content)', () => {
+    for (const f of reviewFormSchema.fields.filter(f => f.type === 'richtext')) {
+      expect(f.dataverseField).toBeUndefined();
+    }
+  });
+
+  test('every question field (picklist + richtext) has a unique 1..11 order; affiliation has none', () => {
+    const questions = reviewFormSchema.fields.filter(f => f.type === 'picklist' || f.type === 'richtext');
+    const orders = questions.map(f => f.order);
+    expect(orders.every(o => Number.isInteger(o) && o >= 1 && o <= 11)).toBe(true);
+    expect(new Set(orders).size).toBe(orders.length);
+    expect(reviewFormSchema.fields.find(f => f.key === 'affiliation').order).toBeUndefined();
+  });
+
+  test('the 8 narrative questions (Q2/Q4–Q9/Q11) are present as richtext keys', () => {
+    const richtextKeys = reviewFormSchema.fields.filter(f => f.type === 'richtext').map(f => f.key);
+    expect(richtextKeys.sort()).toEqual(['q11', 'q2', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9']);
+    // Q11 is the only optional free-text field.
+    expect(reviewFormSchema.fields.find(f => f.key === 'q11').required).toBe(false);
+    for (const k of ['q2', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9']) {
+      expect(reviewFormSchema.fields.find(f => f.key === k).required).toBe(true);
+    }
   });
 
   test('no picklist field offers an "Unable to answer" option', () => {
     for (const f of reviewFormSchema.fields.filter(f => f.type === 'picklist')) {
       expect(f.options.some(o => o.value === 99 || /unable/i.test(o.label))).toBe(false);
     }
+  });
+});
+
+describe('validateReviewForm — richtext is not parent-validated', () => {
+  test('missing required richtext answers do NOT fail parent validation', () => {
+    // The legacy upload path supplies only affiliation + ratings; required
+    // richtext questions must not break it (they validate at submit, Phase 3).
+    const r = validateReviewForm(valid());
+    expect(r.ok).toBe(true);
+    expect(r.dataverseValues.wmkf_revieweraffiliation).toBeDefined();
+  });
+
+  test('richtext values are ignored (never returned as dataverseValues)', () => {
+    const r = validateReviewForm({ ...valid(), q2: '<p>impactful</p>' });
+    expect(r.ok).toBe(true);
+    expect(Object.keys(r.dataverseValues)).toEqual([
+      'wmkf_revieweraffiliation', 'wmkf_reviewerimpact', 'wmkf_reviewerrisk', 'wmkf_revieweroverallrating',
+    ]);
   });
 });
 

@@ -11,13 +11,19 @@
  * Intentionally uncontrolled (uses native form elements). The parent reads
  * values via FormData on submit; this keeps the component cheap to mount
  * and reusable in either an HTML <form> POST or a fetch-based submit.
+ *
+ * Rich-text questions (`type: 'richtext'`) are intentionally NOT rendered here:
+ * they need a controlled WYSIWYG editor (RichReviewEditor) with autosave, which
+ * the in-browser authoring surface owns. This legacy renderer stays scoped to
+ * the string + picklist fields so the staff/landing upload surfaces are
+ * unaffected by the new questions.
  */
 import { reviewFormSchema } from '../../../lib/external/review-form-schema';
 
 export default function ReviewFormFields({ initialValues = {}, disabled = false, idPrefix = 'rf' }) {
   return (
     <div className="space-y-6">
-      {reviewFormSchema.fields.map(field => (
+      {reviewFormSchema.fields.filter(field => field.type !== 'richtext').map(field => (
         <div key={field.key} className="space-y-2">
           <label
             htmlFor={`${idPrefix}-${field.key}`}

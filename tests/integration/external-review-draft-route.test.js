@@ -148,6 +148,22 @@ describe('PUT (autosave)', () => {
     });
   });
 
+  it('persists a richtext answer ONLY as sanitized HTML', async () => {
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion() });
+    ReviewDraftService.upsertDraftJson.mockResolvedValue({ id: 12, updated_at: 'TS' });
+    const req = createMockReq({
+      method: 'PUT',
+      query: { token: 't' },
+      body: { draftJson: { q2: '<p>real impact</p><img src=x onerror=alert(1)><script>steal()</script>' } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    const persisted = ReviewDraftService.upsertDraftJson.mock.calls[0][0].draftJson;
+    expect(persisted.q2).toContain('<p>real impact</p>');
+    expect(persisted.q2).not.toMatch(/onerror|<img|<script|steal\(/i);
+  });
+
   it('409 review_received_locked once submitted (no write)', async () => {
     verifySuggestionToken.mockResolvedValue({
       ok: true,

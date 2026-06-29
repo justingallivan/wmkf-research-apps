@@ -90,7 +90,7 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`token-lifecycle.js`** — `mintAndStore` / `revoke` / `ensureToken` (idempotent) / `extendForPostSubmissionWindow` / `buildExternalUrl`.
 - **`verify-suggestion-token.js`** — Combined JWT + suggestion-row check; discriminated result with reason codes.
 - **`reviewer-materials.js`** — Enforces "files outside `Reviewer_Downloads/` are invisible to reviewers" at list + download. Case-insensitive segment matching; env override available.
-- **`review-form-schema.js`** — 4 structured fields (affiliation, impact, risk, overallRating); supports `{ partial: true }` validation.
+- **`review-form-schema.js`** — single source for the 12 review-form fields: affiliation + 3 ratings (impact/risk/overallRating, parent-mapped) + 8 in-browser `richtext` narrative questions (Q2/Q4–Q9/Q11, no parent column — they map to the `wmkf_appreviewanswer` snapshot). `validateReviewForm` validates only the parent-mapped fields (richtext is validated at submit); supports `{ partial: true }`.
 - **`policy-fetcher.js`** — Policy-document fetcher with `bypassDynamicsRestrictions` wrapper.
 
 ---
