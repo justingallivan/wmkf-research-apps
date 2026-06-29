@@ -95,6 +95,22 @@ export default function ReviewAuthoringForm({ data, token }) {
     });
   }, [scheduleSave]);
 
+  // Don't render any editable surface until the saved draft has loaded.
+  // Otherwise a returning reviewer could start typing into the prefill-seeded
+  // form in the ~100-300ms before GET /draft resolves, and the load would
+  // overwrite those keystrokes (Codex S301 P0). Gating render here makes the
+  // race structurally impossible — the editors mount once, with merged values.
+  if (!loaded) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200 p-6">
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+          <span className="inline-block w-5 h-5 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin" />
+          Loading your review…
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6">
       <div className="flex items-center justify-between">

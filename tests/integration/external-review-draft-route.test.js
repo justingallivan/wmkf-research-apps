@@ -164,6 +164,21 @@ describe('PUT (autosave)', () => {
     expect(persisted.q2).not.toMatch(/onerror|<img|<script|steal\(/i);
   });
 
+  it('400 answer_too_long when a richtext answer exceeds maxLength (no write)', async () => {
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion() });
+    // q2 maxLength is 50000; a plain string longer than that sanitizes to >50000 chars.
+    const huge = 'a'.repeat(50001);
+    const req = createMockReq({
+      method: 'PUT', query: { token: 't' }, body: { draftJson: { q2: huge } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(400);
+    expect(res._data).toMatchObject({ reason: 'answer_too_long' });
+    expect(res._data.fields[0]).toMatchObject({ key: 'q2', maxLength: 50000 });
+    expect(ReviewDraftService.upsertDraftJson).not.toHaveBeenCalled();
+  });
+
   it('409 review_received_locked once submitted (no write)', async () => {
     verifySuggestionToken.mockResolvedValue({
       ok: true,

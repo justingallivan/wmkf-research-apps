@@ -73,4 +73,32 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
     await expect(page.locator('[aria-label^="Q2 —"]')).toContainText('This work could reshape the field.');
     await page.screenshot({ path: 'test-results/stage2b-authoring-rehydrated.png', fullPage: true });
   });
+
+  test('no editable surface renders until the saved draft loads (P0 race fix)', async ({ page }) => {
+    await mockPortal(page, { context: buildContext({ view: 'stage2b' }) });
+
+    // Delay GET /draft so we can observe the pre-load state; it returns a saved
+    // answer the form must hydrate (not clobber).
+    await page.route(`**/api/external/review/${TOKEN}/draft`, async (route) => {
+      if (route.request().method() === 'GET') {
+        await new Promise((r) => setTimeout(r, 800));
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true, draftJson: { q2: '<p>previously saved answer</p>' }, submitted: false }),
+        });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, draftId: 1, updatedAt: 'TS' }) });
+    });
+
+    await page.goto(portalUrl(TOKEN));
+    // While the draft loads: loading copy shown, and NO editors/inputs mounted
+    // (so keystrokes can't be discarded by the late load).
+    await expect(page.getByText('Loading your review…')).toBeVisible();
+    await expect(page.locator('.ProseMirror')).toHaveCount(0);
+
+    // After load: the saved answer is hydrated into the editor.
+    await expect(page.locator('[aria-label^="Q2 —"]')).toContainText('previously saved answer', { timeout: 5000 });
+    await expect(page.locator('.ProseMirror')).toHaveCount(8);
+  });
 });

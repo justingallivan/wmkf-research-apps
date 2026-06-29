@@ -55,22 +55,32 @@ const FIELD_BY_KEY = new Map(reviewFormSchema.fields.map((f) => [f.key, f]));
 /**
  * Reduce a client-supplied draft body to a sanitized, whitelisted object:
  *   - only keys defined in review-form-schema survive (no arbitrary blobs);
- *   - richtext answers are server-sanitized (the stored-XSS boundary);
+ *   - richtext answers are server-sanitized (the stored-XSS boundary) and
+ *     length-checked against the field's maxLength (the server is the boundary —
+ *     the editor cap is convenience). Oversize answers are reported so the PUT
+ *     can 400 rather than store a draft Phase-3 submit would later reject.
  *   - picklist/string answers pass through (full validation happens at submit).
  * Drafts are partial by design, so missing/empty values are allowed here.
+ *
+ * @returns {{ draftJson: object, oversized: Array<{ key, length, maxLength }> }}
  */
 function buildSanitizedDraftJson(input) {
   const out = {};
+  const oversized = [];
   for (const [key, value] of Object.entries(input)) {
     const field = FIELD_BY_KEY.get(key);
     if (!field) continue; // drop unknown keys
     if (field.type === 'richtext') {
-      out[key] = typeof value === 'string' ? sanitizeReviewHtml(value) : '';
+      const html = typeof value === 'string' ? sanitizeReviewHtml(value) : '';
+      if (field.maxLength && html.length > field.maxLength) {
+        oversized.push({ key, length: html.length, maxLength: field.maxLength });
+      }
+      out[key] = html;
     } else {
       out[key] = value;
     }
   }
-  return out;
+  return { draftJson: out, oversized };
 }
 
 export default async function handler(req, res) {
@@ -139,7 +149,15 @@ export default async function handler(req, res) {
       });
     }
 
-    const sanitized = buildSanitizedDraftJson(draftJson);
+    const { draftJson: sanitized, oversized } = buildSanitizedDraftJson(draftJson);
+    if (oversized.length > 0) {
+      return res.status(400).json({
+        ok: false,
+        reason: 'answer_too_long',
+        fields: oversized,
+        message: 'One or more answers exceed the maximum length.',
+      });
+    }
     const row = await ReviewDraftService.upsertDraftJson({ suggestionId, draftJson: sanitized });
 
     return res.status(200).json({ ok: true, draftId: row.id, updatedAt: row.updated_at });
