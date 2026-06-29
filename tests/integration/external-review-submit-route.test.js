@@ -34,6 +34,15 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 jest.mock('../../lib/services/review-draft-service', () => ({
   deleteBySuggestion: jest.fn(async () => 1),
 }));
+// The route loads the question set from Dataverse; mock the fetcher to return the
+// static schema fields so the submit pipeline behaves exactly as before.
+jest.mock('../../lib/external/review-question-fetcher', () => {
+  const { reviewFormSchema } = jest.requireActual('../../lib/external/review-form-schema');
+  return {
+    getActiveQuestionSet: jest.fn(async () => reviewFormSchema.fields),
+    questionSetVersion: jest.fn(() => 'testver'),
+  };
+});
 
 const SUGGESTION_ID = '550e8400-e29b-41d4-a716-446655440000';
 const ETAG = 'W/"1234567"';
@@ -163,6 +172,21 @@ describe('validation', () => {
     await handler(req, res);
     expect(res.statusCode).toBe(400);
     expect(res._data.errors.join(' ')).toMatch(/invalid choice/);
+  });
+
+  it('409s set_changed when the client submits a stale setVersion (does not write)', async () => {
+    // The mocked questionSetVersion returns 'testver'; submit a different one.
+    const { req, res } = post({ answers: validAnswers(), setVersion: 'stale-version' });
+    await handler(req, res);
+    expect(res.statusCode).toBe(409);
+    expect(res._data.reason).toBe('set_changed');
+    expect(DynamicsService.executeChangeset).not.toHaveBeenCalled();
+  });
+
+  it('proceeds normally when setVersion matches (or is omitted)', async () => {
+    const { req, res } = post({ answers: validAnswers(), setVersion: 'testver' });
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
   });
 });
 

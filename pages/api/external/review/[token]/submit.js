@@ -40,7 +40,7 @@ import { DynamicsService } from '../../../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
 import ReviewDraftService from '../../../../../lib/services/review-draft-service';
 import { computeEngagementState } from '../../../../../lib/external/review-engagement-state';
-import { reviewFormSchema } from '../../../../../lib/external/review-form-schema';
+import { getActiveQuestionSet, questionSetVersion } from '../../../../../lib/external/review-question-fetcher';
 import { sanitizeReviewHtml } from '../../../../../lib/external/sanitize-review-html';
 import { validateReviewSubmission, buildReviewSubmission } from '../../../../../lib/external/build-review-submission';
 
@@ -54,14 +54,6 @@ const REVIEW_RECEIVED_LOCKED_MESSAGE =
 // S302: this form CREATEs on first upsert and UPDATEs idempotently on retry.]
 const ANSWER_KEY_LOOKUP_ATTR = '_wmkf_appreviewersuggestion_value';
 
-const RICHTEXT_KEYS = reviewFormSchema.fields.filter((f) => f.type === 'richtext').map((f) => f.key);
-// Allowlist of valid snapshot question keys — answer rows only ever carry these
-// (buildReviewSubmission iterates the schema), but the URL builder asserts it as
-// defense in depth before interpolating the key into an OData predicate.
-const SNAPSHOT_QUESTION_KEYS = new Set(
-  reviewFormSchema.fields.filter((f) => typeof f.order === 'number').map((f) => f.key),
-);
-
 // Rich-text answers can be sizeable; cap the JSON body (mirrors /draft).
 export const config = {
   api: {
@@ -70,9 +62,9 @@ export const config = {
 };
 
 /** Server-sanitize every rich-text answer before validation/build — the write is the boundary. */
-function sanitizeRichText(answers) {
+function sanitizeRichText(answers, richtextKeys) {
   const out = { ...answers };
-  for (const key of RICHTEXT_KEYS) {
+  for (const key of richtextKeys) {
     if (typeof out[key] === 'string') out[key] = sanitizeReviewHtml(out[key]);
     else if (out[key] != null) out[key] = ''; // non-string → drop to empty
   }
@@ -86,8 +78,8 @@ function sanitizeRichText(answers) {
  * does not decode inside a quoted literal). Keys are also asserted against the
  * schema allowlist so an unexpected value can't address the wrong row.
  */
-function answerRowUrl(entitySet, suggestionId, questionKey) {
-  if (!SNAPSHOT_QUESTION_KEYS.has(questionKey)) {
+function answerRowUrl(entitySet, suggestionId, questionKey, snapshotKeys) {
+  if (!snapshotKeys.has(questionKey)) {
     throw new Error(`answerRowUrl: "${questionKey}" is not a known snapshot question key`);
   }
   const literal = String(questionKey).replace(/'/g, "''");
@@ -157,17 +149,38 @@ export default async function handler(req, res) {
       });
     }
 
-    // Sanitize → validate against the current schema.
+    // Load the CURRENT question set (Dataverse-authored, fail-closed). The whole
+    // pipeline — sanitize, validate, build, snapshot-key allowlist — uses it.
+    const questionSet = await getActiveQuestionSet();
+    const richtextKeys = questionSet.filter((f) => f.type === 'richtext').map((f) => f.key);
+    const snapshotKeys = new Set(
+      questionSet.filter((f) => f.type === 'picklist' || f.type === 'richtext').map((f) => f.key),
+    );
+
+    // set_changed reload signal (Codex P1): if the client submitted against an
+    // older question set than the live one, tell it to reload rather than
+    // returning a confusing field-level validation error. The client echoes the
+    // setVersion it rendered; an absent setVersion skips the check (older clients).
+    const clientSetVersion = req.body && typeof req.body === 'object' ? req.body.setVersion : undefined;
+    if (typeof clientSetVersion === 'string' && clientSetVersion !== questionSetVersion(questionSet)) {
+      return res.status(409).json({
+        ok: false,
+        reason: 'set_changed',
+        message: 'The review questions changed since you opened this form. Please reload to see the current questions.',
+      });
+    }
+
+    // Sanitize → validate against the current set.
     const answers = (req.body && typeof req.body === 'object' && req.body.answers) || {};
-    const sanitized = sanitizeRichText(answers);
-    const validation = validateReviewSubmission(sanitized);
+    const sanitized = sanitizeRichText(answers, richtextKeys);
+    const validation = validateReviewSubmission(sanitized, questionSet);
     if (!validation.ok) {
       return res.status(400).json({ ok: false, reason: 'validation', errors: validation.errors });
     }
 
     // Single producer of parent PATCH + answer rows.
     const receivedAt = new Date().toISOString();
-    const { parentPatch, answerRows } = buildReviewSubmission(validation.normalized, { receivedAt });
+    const { parentPatch, answerRows } = buildReviewSubmission(validation.normalized, { receivedAt, questionSet });
 
     // Atomic write: N answer upserts (by alternate key) + the parent PATCH
     // (If-Match-guarded) in one changeset.
@@ -202,7 +215,7 @@ export default async function handler(req, res) {
         const answerEntitySet = await DynamicsService.resolveEntitySetName('wmkf_appreviewanswer');
         const operations = answerRows.map((row) => ({
           method: 'PATCH',
-          url: answerRowUrl(answerEntitySet, suggestionId, row.questionKey),
+          url: answerRowUrl(answerEntitySet, suggestionId, row.questionKey, snapshotKeys),
           body: answerRowBody(row),
         }));
         operations.push({
