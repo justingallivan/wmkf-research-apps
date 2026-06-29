@@ -82,7 +82,7 @@
     "@vercel/postgres": "^0.10.0",
     "busboy": "^1.6.0",
     "cors": "^2.8.6",
-    "csv-parse": "^6.2.1",
+    "csv-parse": "^7.0.0",
     "docx": "^9.7.1",
     "dompurify": "^3.4.9",
     "exceljs": "^4.4.0",
