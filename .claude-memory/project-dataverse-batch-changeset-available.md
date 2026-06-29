@@ -32,11 +32,15 @@ dry-run by default, self-cleans its `__probe*` rows). Verdict was GO on all thre
 - Atomic multi-row Dataverse writes ARE available — use a `$batch` changeset (create/PATCH/delete,
   per-op `Content-ID`, per-op `If-Match`) when you need all-or-nothing semantics. The single-row
   helpers in `lib/services/dynamics-service.js` (`createRecord`/`updateRecord`/`deleteRecord`) are
-  not the only option.
+  not the only option. **The helper now exists: `DynamicsService.executeChangeset(operations, { actingUserSystemId })`**
+  (built S302, 2026-06-28). Pass ordered ops `{ method, url, body?, ifMatch? }` (url is a v9.2-relative
+  path, no leading slash; POST/PATCH need a body). It throws a structured service-error on any op failure
+  (atomic → nothing committed) with `.status` = the failing op's HTTP status (412 on If-Match conflict),
+  mirroring the single-row helpers. Unit-tested in `tests/unit/dynamics-service-changeset.test.js`.
 - The reviewer review-form submit (Phase 3 of [[../docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN]])
-  is the first planned consumer: build `DynamicsService.executeChangeset(operations, { actingUserSystemId })`
-  to upsert the `wmkf_appreviewanswer` snapshot child rows + PATCH the parent ratings in one atomic
-  changeset. The §5a non-atomic fallback (and its unsolved P0-R1/P0-R2 controls) is **not needed**.
+  is the first consumer: `executeChangeset` upserts the `wmkf_appreviewanswer` snapshot child rows by
+  alternate key + PATCHes the parent ratings in one atomic changeset. The §5a non-atomic fallback (and
+  its unsolved P0-R1/P0-R2 controls) is **not needed**.
 - The prior `prompts/[name].js` non-atomic publish mirror predates this verification; if it's ever
   reworked, $batch is now a real option (rename the belief, not just the doc — [[feedback-rename-code-not-just-docs]]).
 
