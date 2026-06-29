@@ -1,7 +1,7 @@
 # Atlas: `wmkf_reviewquestion` (Dataverse, WMKF config entity)
 
-**Last verified:** 2026-06-29 (S303) — schema authored + dry-run validated against **prod** (`node scripts/apply-dataverse-schema.js --target=prod --wave=9-review-questions` reports the full entity + 8 attributes + alt key as `✓ created` in dry-run). **NOT YET CREATED in prod** — the `--execute` run + seed are pending (see Open Questions). **[VERIFIED via `lib/dataverse/schema/wave9-review-questions/01_wmkf_reviewquestion.json`].**
-**Live row count:** 0 (entity not yet created). After create + seed: 12 rows (the current question set — affiliation + 11 questions).
+**Last verified:** 2026-06-29 (S303) — **CREATED in prod** via `scripts/apply-dataverse-schema.js --target=prod --wave=9-review-questions --execute` (entity + 8 attributes + alt key all `✓ created`), then **seeded** with the current 12 fields via `scripts/seed-review-questions.mjs --execute` (the alt-key index gate held at `Pending`, then ran once `Active`). **Read-back verified end-to-end:** `getActiveQuestionSet()` returns all 12 questions from live prod, ordered, with types/required/option-counts matching the static schema. **[VERIFIED via live fetch S303 + `lib/dataverse/schema/wave9-review-questions/01_wmkf_reviewquestion.json`].**
+**Live row count:** 12 (affiliation order 0 + 11 questions), as of 2026-06-29.
 **Entity set:** `wmkf_reviewquestions`
 **Schema spec:** `lib/dataverse/schema/wave9-review-questions/01_wmkf_reviewquestion.json`
 **Seed:** `scripts/seed-review-questions.mjs` (idempotent upsert by alt key from `lib/external/review-form-schema.js`).
@@ -44,7 +44,7 @@ Data:
 
 ## Open Questions / Gotchas
 
-- **Not yet created in prod.** Dry-run is green; the `--execute` create + seed are a deliberate, gated step (creating prod schema is hard to reverse). `schema-apply` is creation-only/idempotent.
+- **Created + seeded in prod S303.** `schema-apply` is creation-only/idempotent, so re-running is safe; the seed upserts by alt key (idempotent) and self-gates on `EntityKeyIndexStatus === 'Active'`.
 - **Schema will live only in prod.** The sandbox is schema-stale (sibling reviewer entities 404 there; memory `project-dynamics-sandbox-state`), same as `wmkf_appreviewanswer`.
 - **`affiliation` is seeded as a question row (order 0, type `string`)** so the fetched set equals today's static set 1:1 (behavior-preserving for Phase B). Its mapping to the parent `wmkf_revieweraffiliation` column stays in code, not in this entity. Whether staff may *remove* affiliation is a Phase-C editor policy, not a data constraint here.
 - **Key format** allows camelCase (`overallRating`) — `^[a-z][a-zA-Z0-9_]*$`, not the lowercase-only form first drafted in the plan.
