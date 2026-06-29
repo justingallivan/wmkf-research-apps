@@ -1,21 +1,11 @@
 /**
  * `computeEngagementState(suggestion)` decides which portal view renders.
  *
- * The route pulls in the token verifier → jose (ESM) and other I/O libs at import
- * time. We only exercise the pure dispatch helper, so stub those to keep module
- * load side-effect-free (mirrors respond-required-address.test.js).
+ * The helper now lives in a pure, dependency-free module (S301 extraction), so
+ * this test imports it directly — no module-load stubbing of the route's I/O
+ * libraries is required anymore.
  */
-jest.mock('../../lib/external/verify-suggestion-token', () => ({ verifySuggestionToken: jest.fn() }));
-jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: {} }));
-jest.mock('../../lib/services/graph-service', () => ({ GraphService: {} }));
-jest.mock('../../lib/utils/sharepoint-buckets', () => ({ getRequestSharePointBuckets: jest.fn() }));
-jest.mock('../../lib/services/dynamics-context', () => ({ bypassDynamicsRestrictions: jest.fn() }));
-jest.mock('../../lib/external/review-form-schema', () => ({ reviewFormSchema: {} }));
-jest.mock('../../lib/external/reviewer-materials', () => ({ isReviewerMaterial: jest.fn() }));
-jest.mock('../../lib/external/policy-fetcher', () => ({ getActivePolicies: jest.fn() }));
-jest.mock('../../lib/external/rate-limit', () => ({ checkRateLimit: jest.fn(), recordTokenOutcome: jest.fn() }));
-
-const { computeEngagementState } = require('../../pages/api/external/review/[token]/context');
+const { computeEngagementState } = require('../../lib/external/review-engagement-state');
 
 const RESPONSE_TYPE_DECLINED = 100000001;
 const RESPONSE_TYPE_WITHDRAWN_SUFFICIENT = 100000003;

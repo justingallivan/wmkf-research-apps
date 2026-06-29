@@ -16,8 +16,9 @@
  *
  * Auth: public magic-link token — verifySuggestionToken + checkRateLimit +
  * recordTokenOutcome, identical to /respond and /upload. The engagement gate
- * reuses computeEngagementState (the single source of truth in context.js) so
- * draft writes can't drift from the rendered view.
+ * reuses computeEngagementState (the single source of truth in
+ * lib/external/review-engagement-state.js) so draft writes can't drift from the
+ * rendered view.
  *
  * Responses:
  *   200 GET  { ok: true, draftJson, submitted }
@@ -37,7 +38,7 @@ import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/
 import ReviewDraftService from '../../../../../lib/services/review-draft-service';
 import { reviewFormSchema } from '../../../../../lib/external/review-form-schema';
 import { sanitizeReviewHtml } from '../../../../../lib/external/sanitize-review-html';
-import { computeEngagementState } from './context';
+import { computeEngagementState } from '../../../../../lib/external/review-engagement-state';
 
 // Rich-text answers can be sizeable; cap the JSON body so a single autosave
 // can't buffer an arbitrary payload. Comfortably above the worst-case set of

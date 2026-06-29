@@ -25,18 +25,19 @@ import { getActivePolicies } from '../../../../../lib/external/policy-fetcher';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 import { normalizeCountryToIso2 } from '../../../../../shared/config/countries';
 import { fetchCoPIs } from '../../../../../lib/services/proposal-participants';
+import { computeEngagementState } from '../../../../../lib/external/review-engagement-state';
 
 // Slots Stage 2a renders. Hardcoded per build plan §4a.
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
 
-// wmkf_reviewstatus picklist values; reversibility lock kicks in at materials_sent.
+// wmkf_reviewstatus picklist values.
 const REVIEW_STATUS_ACCEPTED = 100000000;
-const REVIEW_STATUS_MATERIALS_SENT = 100000001;
 
 // wmkf_responsetype picklist values.
 const RESPONSE_TYPE_ACCEPTED = 100000000;
 const RESPONSE_TYPE_DECLINED = 100000001;
-const RESPONSE_TYPE_WITHDRAWN_SUFFICIENT = 100000003;
+// REVIEW_STATUS_MATERIALS_SENT / RESPONSE_TYPE_WITHDRAWN_SUFFICIENT moved to
+// lib/external/review-engagement-state.js with computeEngagementState.
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -247,59 +248,9 @@ export default async function handler(req, res) {
   }
 }
 
-/**
- * Compute the high-level engagement state from suggestion fields. Drives
- * page-level view dispatch and the reversibility lock.
- *
- * `view`:
- *   stage2a   — pre-materials, reviewer can still accept/decline/flip
- *   accepted-pre-materials — accepted but materials not yet sent (post-accept screen)
- *   declined  — reviewer declined (post-decline screen)
- *   stage2b   — materials sent; existing review-form view
- *   submitted — review received; post-submission view
- *   withdrawn-sufficient — terminal, "no longer needed" copy
- *
- * `canFlipState`: true if Stage 2a's accept/decline buttons should still
- * permit transitions. Locks once review status reaches materials_sent.
- */
-export function computeEngagementState(s) {
-  const responseType = s.wmkf_responsetype ?? null;
-  const reviewStatus = s.wmkf_reviewstatus ?? null;
-  const submitted = !!s.wmkf_reviewreceivedat;
-  const accepted = s.wmkf_accepted === true;
-  const declined = s.wmkf_declined === true;
-
-  // The lock: once staff have released materials, reviewer self-service flip ends.
-  const canFlipState = (reviewStatus === null || reviewStatus < REVIEW_STATUS_MATERIALS_SENT)
-    && responseType !== RESPONSE_TYPE_WITHDRAWN_SUFFICIENT;
-
-  let view;
-  if (responseType === RESPONSE_TYPE_WITHDRAWN_SUFFICIENT) {
-    view = 'withdrawn-sufficient';
-  } else if (submitted) {
-    view = 'submitted';
-  } else if (reviewStatus !== null && reviewStatus >= REVIEW_STATUS_MATERIALS_SENT) {
-    view = 'stage2b';
-  } else if (accepted) {
-    view = 'accepted-pre-materials';
-  } else if (declined) {
-    view = 'declined';
-  } else {
-    // No active terminal/accepted/declined state. Historical `held` values fall
-    // through here so those reviewers can complete the single accept flow.
-    view = 'stage2a';
-  }
-
-  return {
-    view,
-    canFlipState,
-    accepted,
-    declined,
-    responseType,
-    responseReceivedAt: s.wmkf_responsereceivedat || null,
-    reviewStatus,
-  };
-}
+// computeEngagementState moved to lib/external/review-engagement-state.js (S301)
+// so the draft/submit routes can share it without importing this route's I/O
+// dependency graph. Imported at the top of this file.
 
 // fetchCoPIs is now shared — see lib/services/proposal-participants.js (S258,
 // extracted so the Workbench Proposal tab and this context route share it).
