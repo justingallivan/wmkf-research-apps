@@ -8,10 +8,12 @@
  * reviewer's affiliation, when the review was received, and a download link to
  * the uploaded file.
  *
- * No new backend: reuses the existing GET
- * `/api/review-manager/reviewers?proposalId=<guid>` (which already projects the
- * rating fields) and the existing `/api/review-manager/download-review` stream.
- * Ratings decode through `labelForReviewRating` — the same schema the form wrote.
+ * Reuses the existing GET `/api/review-manager/reviewers?proposalId=<guid>`,
+ * which projects the rating fields AND (Phase 4) the narrative answer snapshot
+ * `reviewer.answers[]` read from the `wmkf_appreviewanswer` child table. Ratings
+ * decode through `labelForReviewRating` — the same schema the form wrote; the
+ * narrative rich-text answers render as sanitized HTML (the route re-sanitizes
+ * server-side immediately before this read, so the bytes here are trusted).
  *
  * Panel-prep roll-up / export is a deferred add-on, intentionally out of scope.
  */
@@ -80,7 +82,34 @@ function ReviewCard({ reviewer }) {
           <RatingCell key={k} fieldKey={k} value={reviewer[PROJECTION_FIELD[k]]} />
         ))}
       </div>
+      <NarrativeAnswers answers={reviewer.answers} />
     </Card>
+  );
+}
+
+// The narrative (rich-text) answers from the answer snapshot. Ratings already
+// render as cells above, so only the rich-text questions show here, in question
+// order. HTML is rendered as-is because the API re-sanitizes on read (the stored
+// value was sanitized on write, and the route is the trusted server boundary
+// immediately before this render).
+function NarrativeAnswers({ answers }) {
+  const narrative = (answers || []).filter(
+    (a) => a.questionType === 'richtext' && a.answerHtml && a.answerHtml.trim().length > 0,
+  );
+  if (narrative.length === 0) return null;
+  return (
+    <div className="mt-4 border-t border-gray-100 pt-3 space-y-4">
+      {narrative.map((a) => (
+        <div key={a.questionKey || a.questionOrder}>
+          <div className="text-xs font-semibold text-gray-700">{a.questionText}</div>
+          <div
+            className="prose prose-sm max-w-none text-gray-800 mt-1"
+            // eslint-disable-next-line react/no-danger
+            dangerouslySetInnerHTML={{ __html: a.answerHtml }}
+          />
+        </div>
+      ))}
+    </div>
   );
 }
 

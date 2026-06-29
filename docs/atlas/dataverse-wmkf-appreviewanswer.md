@@ -1,7 +1,7 @@
 # Atlas: `wmkf_appreviewanswer` (Dataverse, WMKF child entity)
 
 **Last verified:** 2026-06-28 (S301) — created in **prod** via `scripts/apply-dataverse-schema.js --target=prod --wave=8-review-answer-snapshot --execute` (all 8 metadata artifacts reported `✓ created`). **[VERIFIED via `lib/dataverse/schema/wave8-review-answer-snapshot/01_wmkf_appreviewanswer.json`].**
-**Live row count:** 0 (Phase 0 created the schema only; no rows are written until the submit path ships — Phase 3).
+**Live row count:** non-zero in prod once reviewers submit (Phase 3 write path is live S302); not independently re-counted here.
 **Entity set:** `wmkf_appreviewanswers`
 **Schema spec:** `lib/dataverse/schema/wave8-review-answer-snapshot/01_wmkf_appreviewanswer.json`
 **Lookup `@odata.bind` key:** `wmkf_AppReviewerSuggestion@odata.bind` (→ `wmkf_appreviewersuggestion`) — PascalCase per schema-apply convention; bind/read value field is `_wmkf_appreviewersuggestion_value`.
@@ -33,11 +33,11 @@ Data:
 
 ## Read Paths
 
-**None yet (Phase 0 = schema only).** Planned: a separate keyed child query (not `$expand`) — `queryRecords('wmkf_appreviewanswers', { filter: '_wmkf_appreviewersuggestion_value eq <id>', orderby: 'wmkf_questionorder' })` — surfaced through `/api/review-manager/reviewers` and `shared/components/workbench/ReviewsTab.js` in Phase 4. See plan §6.
+**LIVE (Phase 4, S302).** `/api/review-manager/reviewers` GET reads the rows via a separate keyed child query (not `$expand`) — `queryAllRecords('wmkf_appreviewanswers', { filter: '_wmkf_appreviewersuggestion_value eq <id>', orderby: 'wmkf_questionorder' })`, chunked + paginated, attaching `answers[]` per submitted reviewer (re-sanitized on read). Rendered by `shared/components/workbench/ReviewsTab.js` (narrative rich-text answers). See plan §6.
 
 ## Write Paths
 
-**None yet (Phase 0 = schema only).** Planned: the `/api/external/review/[token]/submit` route upserts the N answer rows by alternate key inside an all-or-nothing Dataverse changeset (the `DynamicsService.executeChangeset` helper to be built — plan §5a / Phase 2.5/3), alongside the parent rating/affiliation/`wmkf_reviewreceivedat` PATCH.
+**LIVE (Phase 3, S302).** `/api/external/review/[token]/submit` upserts the N answer rows by alternate key (lookup addressed as `_wmkf_appreviewersuggestion_value=<guid>` — memory `reference-dataverse-altkey-lookup-upsert-url`) inside an all-or-nothing `DynamicsService.executeChangeset` changeset, alongside the parent rating/affiliation/`wmkf_reviewreceivedat` PATCH (If-Match-guarded).
 
 ## Open Questions / Gotchas
 

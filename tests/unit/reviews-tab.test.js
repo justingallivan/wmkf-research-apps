@@ -73,6 +73,39 @@ test('renders submitted reviews with decoded ratings + download link, hides pend
   expect(screen.getByText('No file on record')).toBeInTheDocument();
 });
 
+test('renders the narrative rich-text answers (Phase 4), not the picklist rows', async () => {
+  const reviewer = {
+    suggestionId: 'g1',
+    name: 'Dr. Narrative',
+    reviewReceivedAt: '2026-06-20T00:00:00Z',
+    reviewerImpact: 3,
+    reviewerRisk: 2,
+    reviewerOverallRating: 4,
+    answers: [
+      // Picklist rows must NOT render in the narrative section (shown as cells).
+      { questionKey: 'impact', questionOrder: 1, questionType: 'picklist', answerHtml: '', answerText: 'Will result in publications of broad interest', answerValue: 3 },
+      { questionKey: 'q2', questionOrder: 2, questionType: 'richtext', questionText: 'Q2 — What specific significant impacts do you foresee?', answerHtml: '<p>This could <strong>reshape</strong> the field.</p>', answerText: '...', answerValue: null },
+      // Empty optional richtext: skipped.
+      { questionKey: 'q11', questionOrder: 11, questionType: 'richtext', questionText: 'Q11 — Anything else?', answerHtml: '', answerText: '', answerValue: null },
+    ],
+  };
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true, proposals: [{ proposalId: 'req1', reviewers: [reviewer] }] }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+
+  // The richtext question label + its rendered HTML show.
+  expect(await screen.findByText('Q2 — What specific significant impacts do you foresee?')).toBeInTheDocument();
+  expect(screen.getByText('reshape')).toBeInTheDocument(); // <strong> rendered
+  // The empty optional question is not rendered.
+  expect(screen.queryByText('Q11 — Anything else?')).not.toBeInTheDocument();
+  // The impact picklist label shows once (the rating cell) — the narrative
+  // section does NOT add a second copy of the picklist answer.
+  expect(screen.getAllByText('Will result in publications of broad interest')).toHaveLength(1);
+});
+
 test('shows an empty state when no reviewer has submitted', async () => {
   fetch.mockResolvedValue({
     ok: true,
