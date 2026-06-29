@@ -169,14 +169,22 @@ export default async function handler(req, res) {
       await bypassDynamicsRestrictions('external-review-submit', async () => {
         // The parent PATCH MUST carry a row-version If-Match — it is the only
         // guard against a true pre-commit race (two submits that both passed the
-        // finality precheck). Fail closed if we can't get one: re-read once for a
-        // fresh etag, and refuse to write unguarded if it's still absent (Codex
-        // P1). The finality precheck alone is insufficient for a concurrent race.
+        // finality precheck). Fail closed if we can't get one (Codex S302 P1).
         let parentEtag = suggestion._etag;
         if (!parentEtag) {
+          // Re-read for a fresh etag — AND re-check finality in the SAME read.
+          // The verify-time receivedat is stale here; without re-checking it, a
+          // racing submit that committed between our verify and this re-read
+          // would hand us a fresh (non-stale) etag whose If-Match then PASSES,
+          // letting us overwrite the already-submitted review (Codex S302 P1b).
           const fresh = await DynamicsService.getRecord(PARENT_ENTITY_SET, suggestionId, {
-            select: 'wmkf_appreviewersuggestionid',
+            select: 'wmkf_appreviewersuggestionid,wmkf_reviewreceivedat',
           });
+          if (fresh?.wmkf_reviewreceivedat) {
+            const err = new Error('Review was submitted concurrently');
+            err.code = 'ALREADY_SUBMITTED';
+            throw err;
+          }
           parentEtag = fresh?._etag || null;
         }
         if (!parentEtag) {
@@ -200,6 +208,16 @@ export default async function handler(req, res) {
         await DynamicsService.executeChangeset(operations);
       });
     } catch (e) {
+      // ALREADY_SUBMITTED = a racing submit committed before ours (caught by the
+      // fallback finality re-read). Surface the same locked reason as the
+      // up-front precheck so the client shows the final, no-retry message.
+      if (e.code === 'ALREADY_SUBMITTED') {
+        return res.status(409).json({
+          ok: false,
+          reason: 'review_received_locked',
+          message: 'This review has already been submitted. To make a change, please contact your Program Director.',
+        });
+      }
       // 412 = concurrent change since page load (a staff edit, or a racing
       // submit). NO_ETAG = we refused to write without a lock. Both mean nothing
       // was written (the changeset is atomic) — surface a 409 so the client

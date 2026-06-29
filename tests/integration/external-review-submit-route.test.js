@@ -272,7 +272,7 @@ describe('fail-closed on missing parent etag (Codex P1)', () => {
 
   it('409 conflict (and no write) when no etag can be obtained even after a re-read', async () => {
     verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion({ _etag: undefined }) });
-    DynamicsService.getRecord.mockResolvedValue({}); // no _etag
+    DynamicsService.getRecord.mockResolvedValue({}); // no _etag, no receivedat
     const { req, res } = post({ answers: validAnswers() });
     await handler(req, res);
 
@@ -280,5 +280,30 @@ describe('fail-closed on missing parent etag (Codex P1)', () => {
     expect(res._data).toMatchObject({ reason: 'conflict' });
     expect(DynamicsService.executeChangeset).not.toHaveBeenCalled();
     expect(ReviewDraftService.deleteBySuggestion).not.toHaveBeenCalled();
+  });
+
+  it('409 review_received_locked when the fallback re-read finds a concurrent commit (Codex P1b)', async () => {
+    // _etag absent at verify time → fallback re-read; that re-read must ALSO
+    // re-check finality, or a racing submit that committed in between would hand
+    // us a fresh (non-stale) etag and we'd overwrite the submitted review.
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion({ _etag: undefined }) });
+    DynamicsService.getRecord.mockResolvedValue({ _etag: 'W/"fresh"', wmkf_reviewreceivedat: '2026-06-28T11:59:00Z' });
+    const { req, res } = post({ answers: validAnswers() });
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(409);
+    expect(res._data).toMatchObject({ reason: 'review_received_locked' });
+    expect(DynamicsService.executeChangeset).not.toHaveBeenCalled();
+    expect(ReviewDraftService.deleteBySuggestion).not.toHaveBeenCalled();
+  });
+
+  it('re-read selects both the etag and receivedat (so the finality re-check is possible)', async () => {
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion({ _etag: undefined }) });
+    DynamicsService.getRecord.mockResolvedValue({ _etag: 'W/"reread"' });
+    const { req, res } = post({ answers: validAnswers() });
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    const selectArg = DynamicsService.getRecord.mock.calls[0][2].select;
+    expect(selectArg).toContain('wmkf_reviewreceivedat');
   });
 });

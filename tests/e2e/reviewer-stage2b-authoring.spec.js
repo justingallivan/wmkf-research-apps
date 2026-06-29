@@ -109,6 +109,28 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
     expect(submitBody.answers.q2).toContain('a');
   });
 
+  test('a 409 from submit locks the form into a terminal conflict state (no resubmit)', async ({ page }) => {
+    await mockPortal(page, { context: buildContext({ view: 'stage2b' }) });
+    const fullDraft = {
+      impact: 3, risk: 2, overallRating: 4,
+      q2: '<p>a</p>', q4: '<p>a</p>', q5: '<p>a</p>', q6: '<p>a</p>',
+      q7: '<p>a</p>', q8: '<p>a</p>', q9: '<p>a</p>',
+    };
+    await page.route(`**/api/external/review/${TOKEN}/draft`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, draftJson: fullDraft, submitted: false }) }));
+    await page.route(`**/api/external/review/${TOKEN}/submit`, (route) =>
+      route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ ok: false, reason: 'review_received_locked', message: 'This review has already been submitted.' }) }));
+
+    await page.goto(portalUrl(TOKEN));
+    await page.getByRole('button', { name: 'Submit review' }).click();
+
+    // Terminal: conflict notice + reload, no editors, no resubmit button.
+    await expect(page.getByText('This review can no longer be submitted here')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
+    await expect(page.locator('.ProseMirror')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Submit review' })).toHaveCount(0);
+  });
+
   test('no editable surface renders until the saved draft loads (P0 race fix)', async ({ page }) => {
     await mockPortal(page, { context: buildContext({ view: 'stage2b' }) });
 

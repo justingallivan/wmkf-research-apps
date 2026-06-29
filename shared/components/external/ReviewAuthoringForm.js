@@ -70,10 +70,15 @@ export default function ReviewAuthoringForm({ data, token }) {
   const [values, setValues] = useState(() => buildInitialValues(data.prefill));
   const [loaded, setLoaded] = useState(false);
   const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
-  const [submitState, setSubmitState] = useState('idle'); // idle | submitting | submitted | error
+  const [submitState, setSubmitState] = useState('idle'); // idle | submitting | submitted | conflict | error
   const [submitErrors, setSubmitErrors] = useState([]);
   const [submittedAt, setSubmittedAt] = useState(null);
   const timerRef = useRef(null);
+  const autosaveAbortRef = useRef(null);
+  // Editing is frozen while a submit is in flight and after a terminal conflict
+  // (already-submitted / concurrent-collision) — neither is something the
+  // reviewer can resolve by editing (Codex S302). 'submitted' early-returns below.
+  const frozen = submitState === 'submitting' || submitState === 'conflict';
 
   // Load any existing draft once, then merge it over the prefill.
   useEffect(() => {
@@ -97,42 +102,52 @@ export default function ReviewAuthoringForm({ data, token }) {
 
   const persist = useCallback(async (next) => {
     setSaveState('saving');
+    const controller = new AbortController();
+    autosaveAbortRef.current = controller;
     try {
       const resp = await fetch(`/api/external/review/${encodeURIComponent(token)}/draft`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ draftJson: next }),
+        signal: controller.signal,
       });
       setSaveState(resp.ok ? 'saved' : 'error');
-    } catch {
+    } catch (e) {
+      if (e?.name === 'AbortError') return; // aborted by submit — not a real save failure
       setSaveState('error');
+    } finally {
+      if (autosaveAbortRef.current === controller) autosaveAbortRef.current = null;
     }
   }, [token]);
 
   // Debounced autosave. Never fires until the initial draft load has settled
-  // (so loading a draft can't immediately re-PUT the same content).
+  // (so loading a draft can't immediately re-PUT the same content), and never
+  // once a submit is in flight / the form is frozen (Codex S302 P2).
   const scheduleSave = useCallback((next) => {
-    if (!loaded) return;
+    if (!loaded || frozen) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => persist(next), AUTOSAVE_DEBOUNCE_MS);
-  }, [loaded, persist]);
+  }, [loaded, frozen, persist]);
 
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
   const update = useCallback((key, val) => {
+    if (frozen) return; // ignore edits once a submit is in flight / form is locked
     setValues((prev) => {
       const next = { ...prev, [key]: val };
       scheduleSave(next);
       return next;
     });
-  }, [scheduleSave]);
+  }, [frozen, scheduleSave]);
 
   const handleSubmit = useCallback(async () => {
     setSubmitState('submitting');
     setSubmitErrors([]);
-    // Cancel any pending autosave so it can't race the submit (and so it doesn't
-    // fire a post-submit PUT that the server would 409).
+    // Stop any autosave from racing the submit: cancel a pending debounce AND
+    // abort an already-in-flight PUT (which would otherwise land post-submit and
+    // 409 against the draft route).
     if (timerRef.current) clearTimeout(timerRef.current);
+    if (autosaveAbortRef.current) autosaveAbortRef.current.abort();
     try {
       const resp = await fetch(`/api/external/review/${encodeURIComponent(token)}/submit`, {
         method: 'POST',
@@ -145,14 +160,19 @@ export default function ReviewAuthoringForm({ data, token }) {
         setSubmitState('submitted');
         return;
       }
+      if (resp.status === 409) {
+        // Terminal: already submitted / concurrent collision / row changed —
+        // none of these are resolvable by editing and resubmitting. Lock the form.
+        setSubmitErrors([json.message || 'This review has already been submitted or changed.']);
+        setSubmitState('conflict');
+        return;
+      }
       if (resp.status === 400 && Array.isArray(json.errors)) {
         setSubmitErrors(json.errors);
-      } else if (resp.status === 409) {
-        setSubmitErrors([json.message || 'This review has already been submitted or changed. Please reload the page.']);
       } else {
         setSubmitErrors(['Something went wrong submitting your review. Please try again.']);
       }
-      setSubmitState('error');
+      setSubmitState('error'); // recoverable — form stays editable
     } catch {
       setSubmitErrors(['Network error — your review was not submitted. Please try again.']);
       setSubmitState('error');
@@ -191,6 +211,27 @@ export default function ReviewAuthoringForm({ data, token }) {
     );
   }
 
+  // Terminal conflict (server 409): already submitted, concurrent collision, or
+  // the row changed under us. Not resolvable by editing — lock the form and
+  // offer only a reload (Codex S302 P2).
+  if (submitState === 'conflict') {
+    return (
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5" role="alert">
+        <p className="text-sm font-semibold text-amber-900">This review can no longer be submitted here</p>
+        <p className="text-sm text-amber-800 mt-1">
+          {submitErrors[0] || 'This review has already been submitted or changed.'}
+        </p>
+        <button
+          type="button"
+          onClick={() => { if (typeof window !== 'undefined') window.location.reload(); }}
+          className="mt-3 px-4 py-2 bg-amber-900 text-white text-sm font-semibold rounded-lg hover:bg-amber-800"
+        >
+          Reload
+        </button>
+      </div>
+    );
+  }
+
   const submitting = submitState === 'submitting';
   const canSubmit = isComplete(values) && !submitting;
 
@@ -206,7 +247,7 @@ export default function ReviewAuthoringForm({ data, token }) {
 
       <div className="mt-6 space-y-6">
         {reviewFormSchema.fields.map((field) => (
-          <FieldRow key={field.key} field={field} value={values[field.key]} onChange={update} />
+          <FieldRow key={field.key} field={field} value={values[field.key]} onChange={update} disabled={frozen} />
         ))}
       </div>
 
@@ -243,7 +284,7 @@ export default function ReviewAuthoringForm({ data, token }) {
   );
 }
 
-function FieldRow({ field, value, onChange }) {
+function FieldRow({ field, value, onChange, disabled = false }) {
   const id = `rf-${field.key}`;
   return (
     <div className="space-y-2">
@@ -259,13 +300,14 @@ function FieldRow({ field, value, onChange }) {
           type="text"
           maxLength={field.maxLength}
           value={value ?? ''}
+          disabled={disabled}
           onChange={(e) => onChange(field.key, e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 disabled:bg-gray-50 disabled:text-gray-500"
         />
       )}
 
       {field.type === 'picklist' && (
-        <fieldset className="space-y-2">
+        <fieldset className="space-y-2" disabled={disabled}>
           <legend className="sr-only">{field.label}</legend>
           {field.options.map((option) => {
             const optId = `${id}-${option.value}`;
@@ -277,6 +319,7 @@ function FieldRow({ field, value, onChange }) {
                   type="radio"
                   value={option.value}
                   checked={Number(value) === option.value}
+                  disabled={disabled}
                   onChange={() => onChange(field.key, option.value)}
                   className="mt-1"
                 />
@@ -292,6 +335,7 @@ function FieldRow({ field, value, onChange }) {
           value={value ?? ''}
           onChange={(html) => onChange(field.key, html)}
           ariaLabel={field.label}
+          disabled={disabled}
         />
       )}
     </div>
