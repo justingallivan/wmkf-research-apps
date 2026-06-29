@@ -19,7 +19,6 @@ import { DynamicsService } from '../../../../../lib/services/dynamics-service';
 import { GraphService } from '../../../../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../../../../lib/utils/sharepoint-buckets';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
-import { reviewFormSchema } from '../../../../../lib/external/review-form-schema';
 import { isReviewerMaterial } from '../../../../../lib/external/reviewer-materials';
 import { getActivePolicies } from '../../../../../lib/external/policy-fetcher';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
@@ -240,7 +239,6 @@ export default async function handler(req, res) {
         }])
       ) : null,
       files,
-      formSchema: reviewFormSchema,
     });
   } catch (e) {
     console.error('[external context] unexpected error:', e);

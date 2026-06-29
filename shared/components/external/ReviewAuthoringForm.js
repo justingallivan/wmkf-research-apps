@@ -28,8 +28,13 @@ function buildInitialValues(prefill = {}, draftJson = {}) {
     if (field.type === 'richtext') {
       values[field.key] = draftJson[field.key] ?? '';
     } else if (field.type === 'picklist') {
-      const v = draftJson[field.key] ?? prefill[field.key] ?? null;
-      values[field.key] = v === null || v === undefined ? null : Number(v);
+      // Normalize to a valid option value or null — never 0/NaN/out-of-range,
+      // so an empty/garbage stored value can't render as a phantom selection or
+      // get spread back into the draft on autosave (Codex S301 P2).
+      const raw = draftJson[field.key] ?? prefill[field.key] ?? null;
+      const n = Number(raw);
+      values[field.key] = (raw === null || raw === undefined || raw === ''
+        || !Number.isFinite(n) || !field.options.some((o) => o.value === n)) ? null : n;
     } else {
       values[field.key] = draftJson[field.key] ?? prefill[field.key] ?? '';
     }

@@ -72,7 +72,6 @@ function buildContext({ address, honorariumOptOut = false, longBody = false, vie
     },
     policies: buildPolicies({ longBody }),
     files: [],
-    formSchema: null,
   };
 }
 

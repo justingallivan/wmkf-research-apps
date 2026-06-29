@@ -101,4 +101,28 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
     await expect(page.locator('[aria-label^="Q2 —"]')).toContainText('previously saved answer', { timeout: 5000 });
     await expect(page.locator('.ProseMirror')).toHaveCount(8);
   });
+
+  test('submitted view is read-only — receipt notice, no editors, no autosave', async ({ page }) => {
+    const context = {
+      ...buildContext({ view: 'submitted' }),
+      // computeEngagementState derives 'submitted' from receivedAt; the fixture
+      // must set it so MaterialsView renders the read-only notice (not the form).
+      submission: { receivedAt: '2026-06-20T15:00:00Z', filename: null },
+    };
+    await mockPortal(page, { context });
+
+    let draftHit = false;
+    await page.route(`**/api/external/review/${TOKEN}/draft`, async (route) => {
+      draftHit = true;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, draftJson: null, submitted: true }) });
+    });
+
+    await page.goto(portalUrl(TOKEN));
+    await expect(page.getByText('Review received')).toBeVisible();
+    await expect(page.getByText(/Your review is final/i)).toBeVisible();
+    // No authoring surface: no editors, no Submit button, no draft fetch.
+    await expect(page.locator('.ProseMirror')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Submit review' })).toHaveCount(0);
+    expect(draftHit).toBe(false);
+  });
 });
