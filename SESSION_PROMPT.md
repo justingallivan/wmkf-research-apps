@@ -88,12 +88,13 @@ documented expected-red `bill.test.js` / `discovery-verification-status.test.js`
    + pure `lib/admin/review-question-save.js` + `ReviewQuestionsSection.js`
    (drag-reorder), atomic `executeChangeset` save, row-identity key-immutability,
    `questionSetVersion` optimistic-lock (409 set_changed), Postgres audit
-   (migration 022 — **not yet applied to prod**), `invalidate()`. 25 tests green
+   (migration 022 — **applied to prod S304**), `invalidate()`. 31 tests green
    (17 unit save + 10 route integration + 4 RTL). **Codex-reviewed (S304): no P0;
    3 P1s fixed** — required `baseVersion` + per-row `If-Match` optimistic lock
    (412→409 reload), 100-row cap, and a guard rejecting removal of the four
    parent-bound rows (affiliation/impact/risk/overallRating) until Phase E.
-   **Next: apply migration 022 to prod, then Phases D → E**
+   Migration 022 applied to prod (S304) — the editor is fully operational.
+   **Next: Phases D → E**
    (migrate the §6 parent-column readers + two legacy staff writers to the
    snapshot; then stop-write/drop the parent columns — external gate already clear).
 
