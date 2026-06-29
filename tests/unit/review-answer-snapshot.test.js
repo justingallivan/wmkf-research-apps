@@ -1,10 +1,24 @@
+jest.mock('../../lib/services/dynamics-service', () => ({
+  DynamicsService: {
+    resolveEntitySetName: jest.fn(async () => 'wmkf_appreviewanswers'),
+    queryAllRecords: jest.fn(async () => ({ records: [] })),
+  },
+}));
+jest.mock('../../lib/services/dynamics-context', () => ({
+  bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
+}));
+
 import {
   ANSWER_KEY_LOOKUP_ATTR,
   answerRowUrl,
   answerRowBody,
   buildRatingSnapshotRows,
+  ratingsFromAnswers,
+  readRatingsBySuggestion,
+  REVIEW_RATING_KEYS,
 } from '../../lib/external/review-answer-snapshot';
 import { reviewFormSchema } from '../../lib/external/review-form-schema';
+import { DynamicsService } from '../../lib/services/dynamics-service';
 
 const SNAPSHOT_KEYS = new Set(
   reviewFormSchema.fields.filter((f) => f.type === 'picklist' || f.type === 'richtext').map((f) => f.key),
@@ -80,5 +94,58 @@ describe('buildRatingSnapshotRows', () => {
     expect(rows).toEqual([
       expect.objectContaining({ questionKey: 'impact', answerValue: 99, answerText: '' }),
     ]);
+  });
+});
+
+describe('ratingsFromAnswers', () => {
+  it('maps the three rating keys from snapshot answer rows', () => {
+    expect(ratingsFromAnswers([
+      { questionKey: 'impact', answerValue: 3 },
+      { questionKey: 'q2', answerValue: null },
+      { questionKey: 'risk', answerValue: 2 },
+      { questionKey: 'overallRating', answerValue: 5 },
+    ])).toEqual({ impact: 3, risk: 2, overallRating: 5 });
+  });
+
+  it('returns null for a rating with no snapshot row (informal / unrated)', () => {
+    expect(ratingsFromAnswers([{ questionKey: 'impact', answerValue: 4 }]))
+      .toEqual({ impact: 4, risk: null, overallRating: null });
+    expect(ratingsFromAnswers([])).toEqual({ impact: null, risk: null, overallRating: null });
+    expect(ratingsFromAnswers(null)).toEqual({ impact: null, risk: null, overallRating: null });
+  });
+
+  it('ignores non-rating question keys and preserves the rating-key set', () => {
+    expect(REVIEW_RATING_KEYS).toEqual(['impact', 'risk', 'overallRating']);
+    expect(ratingsFromAnswers([{ questionKey: 'q11', answerValue: 7 }]))
+      .toEqual({ impact: null, risk: null, overallRating: null });
+  });
+});
+
+describe('readRatingsBySuggestion', () => {
+  const GUID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  beforeEach(() => jest.clearAllMocks());
+
+  it('throws on a non-GUID id before touching Dataverse (trust boundary)', async () => {
+    await expect(readRatingsBySuggestion('suggestion-1')).rejects.toThrow(/must be a GUID/);
+    expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
+  });
+
+  it('queries the snapshot by the suggestion lookup and derives the ratings', async () => {
+    DynamicsService.queryAllRecords.mockResolvedValueOnce({
+      records: [
+        { wmkf_questionkey: 'impact', wmkf_answervalue: 3 },
+        { wmkf_questionkey: 'overallRating', wmkf_answervalue: 5 },
+      ],
+    });
+    const ratings = await readRatingsBySuggestion(GUID);
+    expect(ratings).toEqual({ impact: 3, risk: null, overallRating: 5 });
+    const [, opts] = DynamicsService.queryAllRecords.mock.calls[0];
+    expect(opts.filter).toBe(`_wmkf_appreviewersuggestion_value eq ${GUID}`);
+    expect(opts.select).toBe('wmkf_questionkey,wmkf_answervalue');
+  });
+
+  it('returns all-null when the suggestion has no snapshot rows', async () => {
+    DynamicsService.queryAllRecords.mockResolvedValueOnce({ records: [] });
+    expect(await readRatingsBySuggestion(GUID)).toEqual({ impact: null, risk: null, overallRating: null });
   });
 });

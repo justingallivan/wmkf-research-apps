@@ -26,6 +26,7 @@ import { normalizeCountryToIso2 } from '../../../../../shared/config/countries';
 import { fetchCoPIs } from '../../../../../lib/services/proposal-participants';
 import { computeEngagementState } from '../../../../../lib/external/review-engagement-state';
 import { getActiveQuestionSet, questionSetVersion } from '../../../../../lib/external/review-question-fetcher';
+import { readRatingsBySuggestion } from '../../../../../lib/external/review-answer-snapshot';
 
 // Slots Stage 2a renders. Hardcoded per build plan §4a.
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
@@ -141,6 +142,12 @@ export default async function handler(req, res) {
       questionSetVer = questionSetVersion(set);
     }
 
+    // Phase D: the three ratings now live in the wmkf_appreviewanswer snapshot,
+    // not the parent columns. Read them for the prefill so a returning/submitted
+    // reviewer still sees their prior ratings. No snapshot row → null, identical
+    // to the old parent-column read for an unrated review.
+    const ratingPrefill = await readRatingsBySuggestion(suggestion.wmkf_appreviewersuggestionid);
+
     // Stage 2a data (policies + prefill) is needed whenever the reviewer
     // could re-render Stage2aView. That includes the initial stage2a view
     // AND the declined view when canFlipState is still true (re-accept path
@@ -235,9 +242,9 @@ export default async function handler(req, res) {
       prefill: {
         affiliation:
           suggestion.wmkf_revieweraffiliation || reviewer?.wmkf_primaryaffiliation || reviewer?.wmkf_organizationname || '',
-        impact: suggestion.wmkf_reviewerimpact ?? null,
-        risk: suggestion.wmkf_reviewerrisk ?? null,
-        overallRating: suggestion.wmkf_revieweroverallrating ?? null,
+        impact: ratingPrefill.impact,
+        risk: ratingPrefill.risk,
+        overallRating: ratingPrefill.overallRating,
         ...(needStage2aData
           ? buildStage2aPrefill(suggestion, reviewer, contactPrefill)
           : {}),

@@ -81,6 +81,9 @@ test('attaches ordered, sanitized answers[] to a submitted reviewer', async () =
   expect(res.statusCode).toBe(200);
   const reviewer = res._data.proposals[0].reviewers[0];
   expect(reviewer.answers.map((a) => a.questionOrder)).toEqual([1, 4]); // ordered
+  // Phase D: the DTO rating is sourced from the snapshot answer row (impact=3),
+  // NOT the parent column.
+  expect(reviewer.reviewerImpact).toBe(3);
   const q4 = reviewer.answers.find((a) => a.questionKey === 'q4');
   expect(q4.answerHtml).not.toMatch(/<script/i); // re-sanitized on read
   expect(q4.answerHtml).toContain('ok');
@@ -94,7 +97,14 @@ test('a submitted reviewer whose child query returns nothing gets answers: []', 
   const { req, res } = get({ proposalId: REQUEST_ID });
   await handler(req, res);
   expect(res.statusCode).toBe(200);
-  expect(res._data.proposals[0].reviewers[0].answers).toEqual([]);
+  const reviewer = res._data.proposals[0].reviewers[0];
+  expect(reviewer.answers).toEqual([]);
+  // Phase D load-bearing: the fixture's PARENT columns are set (impact=3 etc.,
+  // beforeEach), but with no snapshot rows the DTO ratings are null — proving the
+  // source is the snapshot, not the parent column. Fails if the migration regresses.
+  expect(reviewer.reviewerImpact).toBeNull();
+  expect(reviewer.reviewerRisk).toBeNull();
+  expect(reviewer.reviewerOverallRating).toBeNull();
 });
 
 test('null / non-string answerHtml normalizes to empty (no sanitizer crash)', async () => {

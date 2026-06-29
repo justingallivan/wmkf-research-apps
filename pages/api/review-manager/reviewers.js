@@ -33,6 +33,7 @@ import { resolveByEmail as resolvePD } from '../../../lib/services/program-direc
 import { meetingDateToCycleCode, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import { sanitizeReviewHtml } from '../../../lib/external/sanitize-review-html';
+import { ratingsFromAnswers } from '../../../lib/external/review-answer-snapshot';
 
 // Answer-snapshot child columns read back for the workbench Reviews tab (Phase 4).
 const ANSWER_FIELDS = [
@@ -234,11 +235,13 @@ async function handleGet(req, res, access) {
         proposalFirstAccessedAt: s.wmkf_proposalfirstaccessed || null,
         reviewSharePointFolder: s.wmkf_reviewsharepointfolder || null,
         reviewUploadedByStaff: s.wmkf_reviewuploadedbystaff === true,
-        // Structured review form values (numeric picklist or null)
+        // Structured review form values. Ratings are sourced from the answer
+        // snapshot below (Phase D — the snapshot is the system of record); only
+        // affiliation remains a parent column (identity field, never snapshotted).
         reviewerAffiliation: s.wmkf_revieweraffiliation || null,
-        reviewerImpact: s.wmkf_reviewerimpact ?? null,
-        reviewerRisk: s.wmkf_reviewerrisk ?? null,
-        reviewerOverallRating: s.wmkf_revieweroverallrating ?? null,
+        reviewerImpact: null,
+        reviewerRisk: null,
+        reviewerOverallRating: null,
       });
     }
 
@@ -256,6 +259,13 @@ async function handleGet(req, res, access) {
     for (const p of Object.values(byRequest)) {
       for (const r of p.reviewers) {
         r.answers = answersBySuggestion[r.suggestionId] || [];
+        // Phase D: derive the three ratings from the snapshot (system of record)
+        // rather than the parent columns. A rating with no snapshot row → null,
+        // identical to the old parent-column read for an unrated review.
+        const ratings = ratingsFromAnswers(r.answers);
+        r.reviewerImpact = ratings.impact;
+        r.reviewerRisk = ratings.risk;
+        r.reviewerOverallRating = ratings.overallRating;
       }
     }
 

@@ -14,6 +14,7 @@ import {
 
 import { verifySuggestionToken } from '../../lib/external/verify-suggestion-token';
 import { DynamicsService } from '../../lib/services/dynamics-service';
+import { readRatingsBySuggestion } from '../../lib/external/review-answer-snapshot';
 import { GraphService } from '../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../lib/utils/sharepoint-buckets';
 import { writeReviewFiles } from '../../lib/services/review-upload';
@@ -42,6 +43,12 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 // would 500 the handler before its file-listing logic. Stub it to return
 // minimal valid policy data — these file-listing tests don't assert on
 // policy contents.
+// Phase D: context prefill reads ratings from the answer snapshot. These
+// file-listing/etag tests don't assert on ratings, so stub the read to nulls
+// (a dedicated test asserts the snapshot→prefill mapping).
+jest.mock('../../lib/external/review-answer-snapshot', () => ({
+  readRatingsBySuggestion: jest.fn(async () => ({ impact: null, risk: null, overallRating: null })),
+}));
 jest.mock('../../lib/external/review-question-fetcher', () => {
   const { reviewFormSchema } = jest.requireActual('../../lib/external/review-form-schema');
   return {
@@ -289,6 +296,22 @@ describe('/api/external/review/[token]/context', () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res._data.etag).toBeNull();
+  });
+
+  it('Phase D: prefill ratings come from the answer snapshot, not the suggestion row', async () => {
+    verifySuggestionToken.mockResolvedValue(verifiedSuggestion);
+    getRequestSharePointBuckets.mockResolvedValue([]);
+    DynamicsService.updateRecord.mockResolvedValue({});
+    // The snapshot read drives the prefill ratings.
+    readRatingsBySuggestion.mockResolvedValueOnce({ impact: 4, risk: 2, overallRating: 5 });
+
+    const req = createMockReq({ method: 'GET', query: { token: 'good-token' } });
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(readRatingsBySuggestion).toHaveBeenCalledWith('suggestion-1');
+    expect(res._data.prefill).toMatchObject({ impact: 4, risk: 2, overallRating: 5 });
   });
 });
 
