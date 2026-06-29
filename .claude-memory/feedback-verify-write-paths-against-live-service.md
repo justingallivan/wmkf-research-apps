@@ -4,6 +4,7 @@ description: "Mocked-boundary tests can't catch real service write-contract bugs
 metadata: 
   node_type: memory
   type: feedback
+  status: active
   originSessionId: abec04f6-7e77-489e-b52b-e14e75677c96
 ---
 
