@@ -175,19 +175,33 @@ describe('executeChangeset — per-operation If-Match', () => {
 // ── 3. Multipart-response parsing (success) ─────────────────────────────────────
 
 describe('executeChangeset — multipart-response parsing', () => {
-  test('success returns per-op contentId + status + parsed body', async () => {
+  test('success returns one 2xx result per op (real upsert shape: 204 No Content, body null)', async () => {
     mockToken();
+    // The reviewer submit shape: PATCH upsert-by-alt-key → 204, parent PATCH → 204.
+    // Create-in-changeset ops also return 204 (no body); we do not surface OData-EntityId.
     fetch.mockImplementationOnce(() => Promise.resolve(multipartResponse([
-      { contentId: 1, status: 201, body: { wmkf_appreviewanswerid: 'new-1' } },
+      { contentId: 1, status: 204 },
       { contentId: 2, status: 204 },
     ])));
 
     const result = await DynamicsService.executeChangeset(TWO_UPSERTS);
     expect(result.ok).toBe(true);
     expect(result.operations).toEqual([
-      { contentId: 1, status: 201, body: { wmkf_appreviewanswerid: 'new-1' } },
+      { contentId: 1, status: 204, body: null },
       { contentId: 2, status: 204, body: null },
     ]);
+  });
+
+  test('parses an op JSON body when one is returned (e.g. return=representation)', async () => {
+    mockToken();
+    fetch.mockImplementationOnce(() => Promise.resolve(multipartResponse([
+      { contentId: 1, status: 201, body: { wmkf_appreviewanswerid: 'new-1' } },
+    ])));
+
+    const result = await DynamicsService.executeChangeset(
+      [{ method: 'POST', url: 'wmkf_appreviewanswers', body: { wmkf_questionkey: 'q2' } }],
+    );
+    expect(result.operations).toEqual([{ contentId: 1, status: 201, body: { wmkf_appreviewanswerid: 'new-1' } }]);
   });
 
   test('attaches MSCRMCallerID to the $batch request when actingUserSystemId is set', async () => {
@@ -247,6 +261,93 @@ describe('executeChangeset — all-or-nothing rollback', () => {
       status: 400,
       dataverseCode: '0x80048d19',
     });
+  });
+});
+
+// ── 4b. Fail-closed when the parser can't confirm every op (P1) ─────────────────
+
+describe('executeChangeset — fail-closed on unconfirmable commit', () => {
+  test('an outer-200 multipart response that under-counts ops throws (does not report ok)', async () => {
+    mockToken();
+    // Two ops requested, but the response only carries ONE embedded result — the
+    // parser cannot prove the second op committed, so the changeset is unconfirmed.
+    fetch.mockImplementationOnce(() => Promise.resolve(multipartResponse([
+      { contentId: 1, status: 204 },
+    ])));
+
+    await expect(DynamicsService.executeChangeset(TWO_UPSERTS)).rejects.toThrow(
+      /could not confirm an atomic commit: parsed 1 of 2/,
+    );
+  });
+
+  test('an embedded op with an unparseable status line (status 0) throws', async () => {
+    mockToken();
+    // Hand-craft a multipart body whose embedded HTTP response has no status line.
+    const cs = 'changesetresponse_X';
+    const batch = 'batchresponse_Y';
+    const raw = [
+      `--${batch}`,
+      `Content-Type: multipart/mixed; boundary=${cs}`,
+      '',
+      `--${cs}`,
+      'Content-Type: application/http',
+      'Content-Transfer-Encoding: binary',
+      'Content-ID: 1',
+      '',
+      'garbage-not-a-status-line',
+      '',
+      `--${cs}--`,
+      `--${batch}--`,
+      '',
+    ].join(CRLF);
+    fetch.mockImplementationOnce(() => Promise.resolve({
+      ok: true,
+      status: 200,
+      headers: { get: (k) => (k.toLowerCase() === 'content-type' ? `multipart/mixed; boundary=${batch}` : null) },
+      text: () => Promise.resolve(raw),
+    }));
+
+    await expect(
+      DynamicsService.executeChangeset([{ method: 'PATCH', url: 'akoya_requests(g)', body: { x: 1 } }]),
+    ).rejects.toThrow(/could not confirm an atomic commit/);
+  });
+});
+
+// ── 4c. Wire-format tolerance: LF endings + case-insensitive MIME (P2) ──────────
+
+describe('executeChangeset — response parser tolerance', () => {
+  test('parses a response with LF line endings and lowercase content-type headers', async () => {
+    mockToken();
+    const cs = 'changesetresponse_LF';
+    const batch = 'batchresponse_LF';
+    const raw = [
+      `--${batch}`,
+      `content-type: Multipart/Mixed; boundary=${cs}`, // mixed-case MIME type
+      '',
+      `--${cs}`,
+      'content-type: Application/HTTP', // mixed-case MIME type
+      'content-transfer-encoding: binary',
+      'Content-ID: 1',
+      '',
+      'HTTP/1.1 204 No Content',
+      'OData-Version: 4.0',
+      '',
+      `--${cs}--`,
+      `--${batch}--`,
+      '',
+    ].join('\n'); // LF, not CRLF
+    fetch.mockImplementationOnce(() => Promise.resolve({
+      ok: true,
+      status: 200,
+      headers: { get: (k) => (k.toLowerCase() === 'content-type' ? `multipart/mixed; boundary=${batch}` : null) },
+      text: () => Promise.resolve(raw),
+    }));
+
+    const result = await DynamicsService.executeChangeset(
+      [{ method: 'PATCH', url: 'akoya_requests(g)', body: { x: 1 } }],
+    );
+    expect(result.ok).toBe(true);
+    expect(result.operations).toEqual([{ contentId: 1, status: 204, body: null }]);
   });
 });
 
