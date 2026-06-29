@@ -23,6 +23,12 @@
  *
  * Requires the wave9 entity to exist first:
  *   node scripts/apply-dataverse-schema.js --target=prod --wave=9-review-questions --execute
+ *
+ * The alternate-key INDEX can lag behind metadata creation. This script gates
+ * its --execute writes on `EntityKeyIndexStatus === Active` (Codex Phase-A P1) —
+ * if the key isn't Active yet, it aborts with a clear message rather than racing
+ * the index (which would create duplicate rows instead of upserting). Just wait
+ * and re-run.
  */
 
 import { createRequire } from 'module';
@@ -36,6 +42,28 @@ const { DynamicsService } = await import('../lib/services/dynamics-service.js');
 const { bypassDynamicsRestrictions } = await import('../lib/services/dynamics-context.js');
 
 const ENTITY_SET = 'wmkf_reviewquestions';
+const ENTITY_LOGICAL = 'wmkf_reviewquestion';
+const ALT_KEY_LOGICAL = 'wmkf_reviewquestion_key';
+
+/**
+ * Refuse to write until the alternate-key index is Active — otherwise an
+ * upsert-by-key races the index and creates duplicates instead of updating.
+ */
+async function assertAltKeyActive() {
+  const key = await bypassDynamicsRestrictions('seed-review-questions', async () =>
+    DynamicsService.getEntityKey(ENTITY_LOGICAL, ALT_KEY_LOGICAL),
+  );
+  if (!key) {
+    throw new Error(
+      `Alternate key '${ALT_KEY_LOGICAL}' not found on '${ENTITY_LOGICAL}'. Create the wave9 entity first (apply-dataverse-schema.js --wave=9-review-questions --execute).`,
+    );
+  }
+  if (key.EntityKeyIndexStatus !== 'Active') {
+    throw new Error(
+      `Alternate key '${ALT_KEY_LOGICAL}' index is '${key.EntityKeyIndexStatus}', not 'Active'. Wait for the index to activate, then re-run (upserting against a non-Active key would create duplicate rows).`,
+    );
+  }
+}
 
 function parseArgs(argv) {
   const out = { execute: false };
@@ -74,6 +102,11 @@ async function main() {
 
   console.log(`Seed wmkf_reviewquestion — ${fields.length} field(s) from review-form-schema.js`);
   console.log(args.execute ? 'MODE: EXECUTE (prod writes)\n' : 'MODE: DRY RUN (no writes)\n');
+
+  if (args.execute) {
+    await assertAltKeyActive();
+    console.log(`  [ok]  alternate key '${ALT_KEY_LOGICAL}' index is Active\n`);
+  }
 
   let created = 0;
   for (const field of fields) {

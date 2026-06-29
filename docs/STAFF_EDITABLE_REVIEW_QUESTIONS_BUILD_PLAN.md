@@ -1,6 +1,6 @@
 # Staff-Editable Review Questions — Build Plan
 
-**Status:** DRAFT — scoped + Codex-reviewed S303 (2026-06-29) from `REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md` §0 #6 (the deferred staff-editable-questions phase, now eligible because the authoring flow shipped). **Not started.** Codex design-review findings folded in (see §11); the Phase-A P0 (missing `primaryNameAttribute`) is resolved in §2. Owner decisions captured below (S303).
+**Status:** IN PROGRESS — scoped + Codex-reviewed S303 (2026-06-29) from `REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md` §0 #6 (the deferred staff-editable-questions phase, now eligible because the authoring flow shipped). **Phase A artifacts built + Codex-reviewed S303** (entity spec, fetcher + 18 unit tests, seed, Atlas — commit `f06316bb` + the P1/P2 fixes); prod `--execute` create + seed are the gated next step. Phases B–E not started. Codex design-review findings folded in (see §11); the Phase-A P0 (missing `primaryNameAttribute`) is resolved in §2. Owner decisions captured below (S303).
 
 **Codex correction (S303):** the parent-rating-column reader fan-out was re-verified by literal-column grep. `virtual-review-panel.js` and `dataverse-export/preview.js` do **NOT** read `wmkf_reviewer{impact,risk,overallrating}` (they matched an unrelated "average/aggregate" term search in the initial scoping pass) — they are removed from the §6 reader list. `ReviewerManagePanel.js:977-979` (a DTO consumer) was missed and is added. Net: the retirement fan-out is smaller and has no LLM-prompt/export dependency.
 
@@ -213,3 +213,14 @@ Codex reviewed the DRAFT plan read-only (`/contract-reconcile`-style) and surfac
 - **P1 — legacy staff write paths** (`review-upload.js`, `mark-received-no-file.js`) still PATCH parent columns and must move to the snapshot before §6d (§6 6b-legacy, Phase D).
 - **P1 — OData discipline on keys** mirroring `submit.js:82-95` (§7/§9).
 - **Phasing — split Phase B** into server + client/context, ship together behind parity tests (§8).
+
+### Phase A code review (S303, commit `f06316bb` + fixes)
+
+Codex reviewed the built Phase A read-only. **No P0.** Schema engine compatibility, the `wmkf_questionkey` String-100 snapshot-join match, the Boolean shape, and the single-attribute alt key all confirmed sound. Findings folded in (same-session fixes):
+- **P1 — `invalidate()` race:** an in-flight pre-edit fetch could repopulate stale cache. Fixed with a generation counter (`review-question-fetcher.js` — cache write skipped if `generation` changed mid-fetch). Test added.
+- **P1 — >100-row silent truncation:** `queryRecords` caps `$top` at 100. Fixed — the fetcher now throws (fail-closed) on `hasMore`/`totalCount > records.length`. Test added.
+- **P1 — seed/alt-key index race:** `seed-review-questions.mjs` now gates `--execute` on `EntityKeyIndexStatus === 'Active'` (via `DynamicsService.getEntityKey`) and aborts otherwise, so seeding can't race a not-yet-Active index into duplicate rows.
+- **P2s:** strict-boolean `wmkf_required` (throws, no silent optional); strict-integer option values (rejects `"4abc"`); duplicate `wmkf_questionorder` rejected; plan status line corrected. All tested (18 fetcher tests green).
+- **Noted, not fixed:** dry-run validates URLs/existence, not POST metadata bodies — the real prod `--execute` is the first true validation (Atlas + seed header say so).
+
+**Verdict:** prod `--execute` create is safe to attempt; the seed self-gates on the key being Active; the Phase-B-blocking P1s are resolved.

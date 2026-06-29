@@ -140,6 +140,47 @@ describe('fail-closed', () => {
     await expect(getActiveQuestionSet()).rejects.toThrow(/no options/);
   });
 
+  it('throws on a non-boolean required flag (does not degrade to optional)', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: [rowRich('q2', 2, { wmkf_required: null })] });
+    await expect(getActiveQuestionSet()).rejects.toThrow(/non-boolean required/);
+  });
+
+  it('throws on a numeric-prefix-junk option value ("4abc")', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: [rowPick('impact', 1, [{ value: '4abc', label: 'x' }])] });
+    await expect(getActiveQuestionSet()).rejects.toThrow(/non-integer option value/);
+  });
+
+  it('throws on a duplicate question order', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: [rowRich('q2', 5), rowRich('q4', 5)] });
+    await expect(getActiveQuestionSet()).rejects.toThrow(/duplicate question order/);
+  });
+
+  it('throws (does not truncate) when the active set exceeds the 100-row fetch cap', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: [rowRich('q2', 2)], totalCount: 130, hasMore: true });
+    await expect(getActiveQuestionSet()).rejects.toThrow(/exceeds the 100-row fetch cap/);
+  });
+});
+
+describe('invalidate() generation guard', () => {
+  it('an in-flight pre-edit fetch that resolves after invalidate() does not repopulate stale cache', async () => {
+    let resolveFirst;
+    // First fetch hangs until we resolve it manually.
+    DynamicsService.queryRecords.mockImplementationOnce(
+      () => new Promise((r) => { resolveFirst = () => r({ records: [rowRich('old', 1)] }); }),
+    );
+
+    const firstCall = getActiveQuestionSet(); // starts the in-flight fetch (gen 0)
+    invalidate();                              // admin save lands mid-fetch → gen 1, cache cleared
+    resolveFirst();                            // the stale fetch now resolves
+    await firstCall;                           // awaiter still gets the in-flight value once
+
+    // The stale result must NOT have been cached — the next call refetches.
+    DynamicsService.queryRecords.mockResolvedValue({ records: [rowRich('new', 1)] });
+    const set = await getActiveQuestionSet();
+    expect(set[0].key).toBe('new');
+    expect(DynamicsService.queryRecords).toHaveBeenCalledTimes(2);
+  });
+
   it('does not cache a failed fetch (next call retries)', async () => {
     DynamicsService.queryRecords.mockRejectedValueOnce(new Error('transient'));
     await expect(getActiveQuestionSet()).rejects.toThrow(/transient/);
