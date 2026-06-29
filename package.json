@@ -95,7 +95,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^0.575.0",
     "mammoth": "^1.12.0",
-    "marked": "^12.0.2",
+    "marked": "^18.0.5",
     "multer": "^1.4.5-lts.1",
     "next": "^16.2.9",
     "next-auth": "^4.24.14",
