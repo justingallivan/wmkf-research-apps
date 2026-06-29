@@ -73,6 +73,10 @@
     "check:harness-framing:self-test": "node scripts/check-harness-framing-self-test.js"
   },
   "dependencies": {
+    "@tiptap/extension-link": "^2.27.2",
+    "@tiptap/pm": "^2.27.2",
+    "@tiptap/react": "^2.27.2",
+    "@tiptap/starter-kit": "^2.27.2",
     "@vercel/analytics": "^1.6.1",
     "@vercel/blob": "^2.4.0",
     "@vercel/postgres": "^0.10.0",

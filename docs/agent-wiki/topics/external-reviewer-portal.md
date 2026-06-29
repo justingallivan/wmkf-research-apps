@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-10
+last_verified: 2026-06-28
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -10,6 +10,13 @@ source_files:
   - pages/api/external/review/[token]/proposal.js
   - pages/api/external/review/[token]/respond.js
   - pages/api/external/review/[token]/upload.js
+  - pages/api/external/review/[token]/draft.js
+  - shared/components/external/ReviewAuthoringForm.js
+  - shared/components/external/RichReviewEditor.js
+  - shared/components/external/MaterialsView.js
+  - lib/external/sanitize-review-html.js
+  - lib/services/review-draft-service.js
+  - lib/external/review-engagement-state.js
   - pages/api/review-manager/send-emails.js
   - pages/api/review-manager/regenerate-token.js
   - pages/api/review-manager/revoke-token.js
@@ -60,6 +67,19 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 
 ## Operating Notes
 
+- **The stage2b "submit your review" surface is now in-browser authoring, not file upload (S301, Phase 2).**
+  `MaterialsView` renders `ReviewAuthoringForm` (controlled) with the 11 questions —
+  3 rating radios + 8 `RichReviewEditor` (tiptap) narrative answers — autosaving to
+  Postgres `review_drafts` via the `GET/PUT /api/external/review/[token]/draft` route
+  (`ReviewDraftService`). Reviewer HTML is UNTRUSTED: the draft PUT server-sanitizes
+  every rich-text answer with `lib/external/sanitize-review-html.js` (DOM-free
+  `sanitize-html`, never DOMPurify+jsdom) before persisting, and the staff render must
+  re-sanitize. The file-upload route/infra (`upload.js`, `review-upload.js`) is RETAINED
+  server-side but no longer surfaced in the UI (plan §7). **Final submit is not built
+  yet — Phase 3** (`/submit` + the Dataverse `executeChangeset` atomic write into the
+  `wmkf_appreviewanswer` snapshot child table); the Submit button is disabled until then.
+  The engagement gate is the shared pure helper `lib/external/review-engagement-state.js::computeEngagementState`.
+  Full plan: `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md`.
 - **Prod accept triggers a live automation chain — keep automated tests mocked/fenced.**
   A reviewer accept CREATEs a honorarium `akoya_request`, which fires AkoyaGo plugins
   + classic workflows + a live Bill.com payment flow + a contact→Business-Central sync.
