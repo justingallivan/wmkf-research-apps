@@ -93,8 +93,10 @@ documented expected-red `bill.test.js` / `discovery-verification-status.test.js`
    3 P1s fixed** — required `baseVersion` + per-row `If-Match` optimistic lock
    (412→409 reload), 100-row cap, and a guard rejecting removal of the four
    parent-bound rows (affiliation/impact/risk/overallRating) until Phase E.
-   Migration 022 applied to prod (S304) — the editor is fully operational.
-   **Next: Phases D → E**
+   Migration 022 applied to prod (S304); all 5 B2+C commits **pushed + deployed**
+   to prod (Vercel `dpl_4fPgYurs…`, READY); `/admin` → Review Questions
+   **browser-verified** loading the live 12-question set (read-only — no save
+   performed). **Next: Phases D → E**
    (migrate the §6 parent-column readers + two legacy staff writers to the
    snapshot; then stop-write/drop the parent columns — external gate already clear).
 
