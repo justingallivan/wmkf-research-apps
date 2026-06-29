@@ -11,6 +11,8 @@ source_files:
   - pages/api/external/review/[token]/respond.js
   - pages/api/external/review/[token]/upload.js
   - pages/api/external/review/[token]/draft.js
+  - pages/api/external/review/[token]/submit.js
+  - lib/external/build-review-submission.js
   - shared/components/external/ReviewAuthoringForm.js
   - shared/components/external/RichReviewEditor.js
   - shared/components/external/MaterialsView.js
@@ -75,10 +77,18 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   every rich-text answer with `lib/external/sanitize-review-html.js` (DOM-free
   `sanitize-html`, never DOMPurify+jsdom) before persisting, and the staff render must
   re-sanitize. The file-upload route/infra (`upload.js`, `review-upload.js`) is RETAINED
-  server-side but no longer surfaced in the UI (plan §7). **Final submit is not built
-  yet — Phase 3** (`/submit` + the Dataverse `executeChangeset` atomic write into the
-  `wmkf_appreviewanswer` snapshot child table); the Submit button is disabled until then.
-  The engagement gate is the shared pure helper `lib/external/review-engagement-state.js::computeEngagementState`.
+  server-side but no longer surfaced in the UI (plan §7). **Final submit is LIVE (S302,
+  Phase 3):** the wired Submit button POSTs to `pages/api/external/review/[token]/submit.js`,
+  which finality-prechecks (409 if `wmkf_reviewreceivedat` set), server-sanitizes + validates
+  (`lib/external/build-review-submission.js`: `validateReviewSubmission` + the single producer
+  `buildReviewSubmission`), then writes ONE atomic `DynamicsService.executeChangeset`: the 11
+  `wmkf_appreviewanswer` snapshot rows upserted by the **`_wmkf_appreviewersuggestion_value=<guid>`**
+  alternate-key form (NOT the bare logical name — memory `reference-dataverse-altkey-lookup-upsert-url`)
+  + the parent ratings/affiliation/receivedat PATCH guarded fail-closed by `If-Match`. Submit is
+  FINAL — the form locks read-only, and both `/draft` PUT and the reviewer-token `upload.js` 409
+  post-submit (P0-1). The engagement gate is the shared pure helper
+  `lib/external/review-engagement-state.js::computeEngagementState`.
+  Still open: Phase 4 surfaces the narrative answers in the workbench (keyed child read).
   Full plan: `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md`.
 - **Prod accept triggers a live automation chain — keep automated tests mocked/fenced.**
   A reviewer accept CREATEs a honorarium `akoya_request`, which fires AkoyaGo plugins
