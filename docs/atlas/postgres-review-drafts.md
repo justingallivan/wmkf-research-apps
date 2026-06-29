@@ -1,7 +1,7 @@
 # Atlas: `review_drafts` (Postgres — operational scratchpad)
 
 **Last verified:** 2026-06-28 (S301) — created by migration `021_review_drafts.sql` (reviewer in-browser authoring build, Phase 1). **[VERIFIED via `lib/db/migrations/021_review_drafts.sql`, `lib/services/review-draft-service.js`].**
-**Live row count:** 0 (new table; no rows until the authoring UI ships in Phase 2 and reviewers begin autosaving). Migration not yet applied to the live database as of S301 — `node scripts/apply-migrations.js` is a deploy-time step.
+**Live row count:** 0 (new table; no rows until the authoring UI ships in Phase 2 and reviewers begin autosaving). Migration applied to the live database 2026-06-28 (S301) via `node scripts/apply-migrations.js` (`[apply ok] 021_review_drafts.sql`).
 
 ## Source of truth
 
