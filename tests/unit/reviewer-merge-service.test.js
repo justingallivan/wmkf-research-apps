@@ -62,6 +62,23 @@ describe('planMerge — block predicate (fail-closed)', () => {
     expect(plan.reasons.map((r) => r.code)).toContain('loser_engaged');
   });
 
+  test('blocks a submitted review via wmkf_reviewreceivedat even with NULL rating columns (Phase D co-set)', async () => {
+    // The 3 rating columns were dropped from ENGAGEMENT_SIGNAL_FIELDS. A submitted
+    // review co-sets wmkf_reviewreceivedat, so engagement is still detected from
+    // that signal alone — proving the drop didn't weaken the merge block.
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser,
+      loserSug: [{
+        wmkf_appreviewersuggestionid: SUG_L, _wmkf_request_value: REQ1,
+        wmkf_reviewreceivedat: '2026-06-28T00:00:00Z',
+        wmkf_reviewerimpact: null, wmkf_reviewerrisk: null, wmkf_revieweroverallrating: null,
+      }],
+    });
+    const plan = await planMerge({ keeperId: KEEPER, loserId: LOSER }, deps);
+    expect(plan.blocked).toBe(true);
+    expect(plan.reasons.map((r) => r.code)).toContain('loser_engaged');
+  });
+
   test('blocks when a loser suggestion is applicant-excluded (disposition)', async () => {
     const deps = makeDeps({
       keeperRow: bareKeeper, loserRow: bareLoser,
