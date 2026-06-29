@@ -93,7 +93,7 @@ function lastBatchCall() {
 }
 
 const TWO_UPSERTS = [
-  { method: 'PATCH', url: "wmkf_appreviewanswers(wmkf_AppReviewerSuggestion=11111111-1111-1111-1111-111111111111,wmkf_questionkey='q2')", body: { wmkf_answervalue: 'A' } },
+  { method: 'PATCH', url: "wmkf_appreviewanswers(_wmkf_appreviewersuggestion_value=11111111-1111-1111-1111-111111111111,wmkf_questionkey='q2')", body: { wmkf_answervalue: 'A' } },
   { method: 'PATCH', url: 'akoya_requests(22222222-2222-2222-2222-222222222222)', body: { wmkf_reviewrating1: 3 }, ifMatch: 'W/"123"' },
 ];
 
@@ -122,7 +122,7 @@ describe('executeChangeset — changeset body construction', () => {
     // both ops present, with 1-based Content-IDs and absolute URLs
     expect(body).toContain('Content-ID: 1');
     expect(body).toContain('Content-ID: 2');
-    expect(body).toContain("PATCH https://example.crm.dynamics.com/api/data/v9.2/wmkf_appreviewanswers(wmkf_AppReviewerSuggestion=11111111-1111-1111-1111-111111111111,wmkf_questionkey='q2') HTTP/1.1");
+    expect(body).toContain("PATCH https://example.crm.dynamics.com/api/data/v9.2/wmkf_appreviewanswers(_wmkf_appreviewersuggestion_value=11111111-1111-1111-1111-111111111111,wmkf_questionkey='q2') HTTP/1.1");
     expect(body).toContain('PATCH https://example.crm.dynamics.com/api/data/v9.2/akoya_requests(22222222-2222-2222-2222-222222222222) HTTP/1.1');
     expect(body).toContain('{"wmkf_answervalue":"A"}');
     expect(body).toContain('{"wmkf_reviewrating1":3}');

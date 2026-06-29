@@ -14,8 +14,8 @@
  *
  * What it answers (on --execute), all via DynamicsService.executeChangeset (so it
  * also re-validates the helper end-to-end in prod):
- *   1. Does a changeset PATCH to the alt-key URL
- *        wmkf_appreviewanswers(wmkf_appreviewersuggestion=<guid>,wmkf_questionkey='__probe_uk1')
+ *   1. Does a changeset PATCH to the verified alt-key URL
+ *        wmkf_appreviewanswers(_wmkf_appreviewersuggestion_value=<guid>,wmkf_questionkey='__probe_uk1')
  *      CREATE the row (upsert-create), auto-binding the lookup from the URL key?
  *   2. Does re-running the SAME changeset with a changed value UPDATE in place
  *      (still N rows, not 2N) — i.e. is it a true idempotent upsert?
@@ -40,14 +40,12 @@ const { bypassDynamicsRestrictions } = await import('../lib/services/dynamics-co
 
 const PROBE_PREFIX = '__probe_uk';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// Candidate URL forms for the lookup component of the alternate key. The key
-// declares keyAttributes ["wmkf_appreviewersuggestion", "wmkf_questionkey"], but
-// Dataverse rejected the bare logical name (0x80060888), so try the documented
-// alternatives. First one that CREATEs a row wins.
+// Candidate URL forms for the lookup component of the alternate key. The value
+// attribute is the production-verified form; the navigation property remains as a
+// fallback probe because it is a documented-looking alternate and cheap to test.
 const LOOKUP_ATTR_CANDIDATES = [
   '_wmkf_appreviewersuggestion_value', // the lookup's value attribute
   'wmkf_AppReviewerSuggestion',        // the navigation property (schema casing)
-  'wmkf_appreviewersuggestion',        // the bare logical name (already failed; kept for the record)
 ];
 
 function parseArgs(argv) {

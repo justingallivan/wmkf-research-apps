@@ -45,6 +45,8 @@ import { sanitizeReviewHtml } from '../../../../../lib/external/sanitize-review-
 import { validateReviewSubmission, buildReviewSubmission } from '../../../../../lib/external/build-review-submission';
 
 const PARENT_ENTITY_SET = 'wmkf_appreviewersuggestions';
+const REVIEW_RECEIVED_LOCKED_MESSAGE =
+  'This review has already been submitted. To make a change, please contact your Program Director.';
 // Alternate-key lookup component in the upsert URL. The lookup must be addressed
 // by its VALUE attribute (`_wmkf_appreviewersuggestion_value`), NOT the bare
 // logical name or the navigation property — both of those are rejected with
@@ -104,6 +106,14 @@ function answerRowBody(row) {
   };
 }
 
+function reviewReceivedLocked(res) {
+  return res.status(409).json({
+    ok: false,
+    reason: 'review_received_locked',
+    message: REVIEW_RECEIVED_LOCKED_MESSAGE,
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -135,11 +145,7 @@ export default async function handler(req, res) {
     // the authoritative finality guard (the If-Match below can be defeated by a
     // client re-reading a fresh post-submit etag).
     if (suggestion.wmkf_reviewreceivedat) {
-      return res.status(409).json({
-        ok: false,
-        reason: 'review_received_locked',
-        message: 'This review has already been submitted. To make a change, please contact your Program Director.',
-      });
+      return reviewReceivedLocked(res);
     }
     // Authoring-stage gate: submit only while the form is open (materials
     // released, not withdrawn). Mirrors the /draft PUT gate.
@@ -212,11 +218,7 @@ export default async function handler(req, res) {
       // fallback finality re-read). Surface the same locked reason as the
       // up-front precheck so the client shows the final, no-retry message.
       if (e.code === 'ALREADY_SUBMITTED') {
-        return res.status(409).json({
-          ok: false,
-          reason: 'review_received_locked',
-          message: 'This review has already been submitted. To make a change, please contact your Program Director.',
-        });
+        return reviewReceivedLocked(res);
       }
       // 412 = concurrent change since page load (a staff edit, or a racing
       // submit). NO_ETAG = we refused to write without a lock. Both mean nothing
