@@ -23,6 +23,15 @@ jest.mock('../../lib/services/review-draft-service', () => ({
   getBySuggestion: jest.fn(),
   upsertDraftJson: jest.fn(),
 }));
+// PUT loads the question set from Dataverse for the key whitelist; mock the
+// fetcher to return the static fields so the whitelist behaves as before.
+jest.mock('../../lib/external/review-question-fetcher', () => {
+  const { reviewFormSchema } = jest.requireActual('../../lib/external/review-form-schema');
+  return {
+    getActiveQuestionSet: jest.fn(async () => reviewFormSchema.fields),
+    questionSetVersion: jest.fn(() => 'testver'),
+  };
+});
 
 const SUGGESTION_ID = '550e8400-e29b-41d4-a716-446655440000';
 

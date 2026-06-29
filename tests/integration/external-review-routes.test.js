@@ -42,6 +42,13 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 // would 500 the handler before its file-listing logic. Stub it to return
 // minimal valid policy data — these file-listing tests don't assert on
 // policy contents.
+jest.mock('../../lib/external/review-question-fetcher', () => {
+  const { reviewFormSchema } = jest.requireActual('../../lib/external/review-form-schema');
+  return {
+    getActiveQuestionSet: jest.fn(async () => reviewFormSchema.fields),
+    questionSetVersion: jest.fn(() => 'testver'),
+  };
+});
 jest.mock('../../lib/external/policy-fetcher', () => ({
   getActivePolicies: jest.fn(async (slotCodes) => {
     const out = {};
@@ -224,6 +231,11 @@ describe('/api/external/review/[token]/context', () => {
         library: 'akoya_request',
       }),
     ]);
+    // stage2b authoring view: the live question set + version are attached for
+    // the client to render from / echo back on submit.
+    expect(Array.isArray(res._data.questions)).toBe(true);
+    expect(res._data.questions.length).toBeGreaterThan(0);
+    expect(res._data.questionSetVersion).toBe('testver');
   });
 
   it('surfaces the suggestion _etag (returning visitor, no first-access stamp) so the client can round-trip it as If-Match (eval #2)', async () => {

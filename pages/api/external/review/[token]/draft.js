@@ -36,7 +36,7 @@
 import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 import ReviewDraftService from '../../../../../lib/services/review-draft-service';
-import { reviewFormSchema } from '../../../../../lib/external/review-form-schema';
+import { getActiveQuestionSet } from '../../../../../lib/external/review-question-fetcher';
 import { sanitizeReviewHtml } from '../../../../../lib/external/sanitize-review-html';
 import { computeEngagementState } from '../../../../../lib/external/review-engagement-state';
 
@@ -49,12 +49,9 @@ export const config = {
   },
 };
 
-// Schema fields indexed by stable key, for the whitelist + per-type handling.
-const FIELD_BY_KEY = new Map(reviewFormSchema.fields.map((f) => [f.key, f]));
-
 /**
  * Reduce a client-supplied draft body to a sanitized, whitelisted object:
- *   - only keys defined in review-form-schema survive (no arbitrary blobs);
+ *   - only keys in the CURRENT question set survive (no arbitrary blobs);
  *   - richtext answers are server-sanitized (the stored-XSS boundary) and
  *     length-checked against the field's maxLength (the server is the boundary —
  *     the editor cap is convenience). Oversize answers are reported so the PUT
@@ -62,13 +59,15 @@ const FIELD_BY_KEY = new Map(reviewFormSchema.fields.map((f) => [f.key, f]));
  *   - picklist/string answers pass through (full validation happens at submit).
  * Drafts are partial by design, so missing/empty values are allowed here.
  *
+ * @param {object} input - client draft body keyed by field.key
+ * @param {Map} fieldByKey - the current question set indexed by key
  * @returns {{ draftJson: object, oversized: Array<{ key, length, maxLength }> }}
  */
-function buildSanitizedDraftJson(input) {
+function buildSanitizedDraftJson(input, fieldByKey) {
   const out = {};
   const oversized = [];
   for (const [key, value] of Object.entries(input)) {
-    const field = FIELD_BY_KEY.get(key);
+    const field = fieldByKey.get(key);
     if (!field) continue; // drop unknown keys
     if (field.type === 'richtext') {
       const html = typeof value === 'string' ? sanitizeReviewHtml(value) : '';
@@ -149,7 +148,10 @@ export default async function handler(req, res) {
       });
     }
 
-    const { draftJson: sanitized, oversized } = buildSanitizedDraftJson(draftJson);
+    // Whitelist/sanitize against the CURRENT question set (Dataverse-authored).
+    const questionSet = await getActiveQuestionSet();
+    const fieldByKey = new Map(questionSet.map((f) => [f.key, f]));
+    const { draftJson: sanitized, oversized } = buildSanitizedDraftJson(draftJson, fieldByKey);
     if (oversized.length > 0) {
       return res.status(400).json({
         ok: false,

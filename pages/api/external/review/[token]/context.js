@@ -25,6 +25,7 @@ import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/
 import { normalizeCountryToIso2 } from '../../../../../shared/config/countries';
 import { fetchCoPIs } from '../../../../../lib/services/proposal-participants';
 import { computeEngagementState } from '../../../../../lib/external/review-engagement-state';
+import { getActiveQuestionSet, questionSetVersion } from '../../../../../lib/external/review-question-fetcher';
 
 // Slots Stage 2a renders. Hardcoded per build plan §4a.
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
@@ -125,6 +126,19 @@ export default async function handler(req, res) {
         console.error('[external context] file listing failed:', e.message);
         // Non-fatal — page still renders, file list shows the error.
       }
+    }
+
+    // The authoring form's question set (Dataverse-authored). Needed only in the
+    // stage2b authoring view; the client renders from `questions` and echoes
+    // `questionSetVersion` back on submit so a mid-edit question change is caught
+    // (submit → 409 set_changed). Fail-closed: if the set can't load, the whole
+    // context 500s — the form cannot render against an unknown question set.
+    let questions = null;
+    let questionSetVer = null;
+    if (engagementState.view === 'stage2b') {
+      const set = await getActiveQuestionSet();
+      questions = set;
+      questionSetVer = questionSetVersion(set);
     }
 
     // Stage 2a data (policies + prefill) is needed whenever the reviewer
@@ -239,6 +253,10 @@ export default async function handler(req, res) {
         }])
       ) : null,
       files,
+      // stage2b authoring: the live question set + its version tag. null outside
+      // the authoring view (the form isn't rendered there).
+      questions,
+      questionSetVersion: questionSetVer,
     });
   } catch (e) {
     console.error('[external context] unexpected error:', e);
