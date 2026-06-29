@@ -64,8 +64,11 @@ documented expected-red `bill.test.js` / `discovery-verification-status.test.js`
    the draft type-aware on load; `ReviewFormFields` gained an optional `fields` prop
    (default static; `ReviewerManagePanel` stays static per §5). Real-build E2E green
    (7 cases incl. render-from-context, setVersion echo, set_changed reload, type-mismatch
-   reconcile). Next: **Phase C (admin variable-length editor)** + the Phase B Codex review.
-   Evidence: plan §5/§8 (✅ DONE), `tests/e2e/reviewer-stage2b-authoring.spec.js`.
+   reconcile). **Phase B Codex-reviewed (S304):** no P0; two P1s fixed + regression-tested
+   — `questionSetVersion` now hashes `label`/`hint` (audit integrity: snapshot persists
+   `questionText=label`), and the `set_changed` branch flushes the draft so in-debounce
+   edits survive reload (plan §11). Next: **Phase C (admin variable-length editor)**.
+   Evidence: plan §5/§8/§11 (✅ DONE), `tests/e2e/reviewer-stage2b-authoring.spec.js`.
 
    _Superseded original task note:_
    - Make both components consume the question set from the `context` response

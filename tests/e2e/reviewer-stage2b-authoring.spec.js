@@ -112,19 +112,32 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
     expect(submitBody.setVersion).toBe(QUESTION_SET_VERSION);
   });
 
-  test('a set_changed 409 prompts a reload (not a terminal conflict)', async ({ page }) => {
+  test('a set_changed 409 prompts a reload (not a terminal conflict) and flushes debounce-window edits to the draft', async ({ page }) => {
     await mockPortal(page, { context: buildContext({ view: 'stage2b' }) });
     const fullDraft = {
       impact: 3, risk: 2, overallRating: 4,
       q2: '<p>a</p>', q4: '<p>a</p>', q5: '<p>a</p>', q6: '<p>a</p>',
       q7: '<p>a</p>', q8: '<p>a</p>', q9: '<p>a</p>',
     };
-    await page.route(`**/api/external/review/${TOKEN}/draft`, (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, draftJson: fullDraft, submitted: false }) }));
+    const draftPuts = [];
+    await page.route(`**/api/external/review/${TOKEN}/draft`, (route) => {
+      if (route.request().method() === 'PUT') {
+        draftPuts.push(route.request().postDataJSON());
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, draftId: 1, updatedAt: 'TS' }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, draftJson: fullDraft, submitted: false }) });
+    });
     await page.route(`**/api/external/review/${TOKEN}/submit`, (route) =>
       route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ ok: false, reason: 'set_changed', message: 'The review questions changed since you opened this form. Please reload to see the current questions.' }) }));
 
     await page.goto(portalUrl(TOKEN));
+
+    // Type an edit, then click Submit INSIDE the 1200ms autosave debounce so the
+    // scheduled autosave is cancelled by handleSubmit — the only way this edit
+    // reaches the draft is the P1-B set_changed flush.
+    const q2 = page.locator('[aria-label^="Q2 —"]');
+    await q2.click();
+    await page.keyboard.type(' debounced-edit');
     await page.getByRole('button', { name: 'Submit review' }).click();
 
     // Distinct, non-terminal reload prompt — NOT the "can no longer be submitted"
@@ -134,6 +147,11 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
     await expect(page.getByText('This review can no longer be submitted here')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
     await expect(page.locator('.ProseMirror')).toHaveCount(0);
+
+    // P1-B: the in-debounce edit was flushed to the draft before the reload
+    // prompt, so "your saved answers will be kept" is actually true.
+    expect(draftPuts.length).toBeGreaterThan(0);
+    expect(draftPuts.some((p) => (p.draftJson?.q2 || '').includes('debounced-edit'))).toBe(true);
   });
 
   test('type-aware draft reconciliation: a draft value whose shape mismatches the current field type is discarded', async ({ page }) => {

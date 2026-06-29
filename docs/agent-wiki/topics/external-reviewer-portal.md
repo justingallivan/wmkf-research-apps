@@ -106,8 +106,11 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   reviewer routes read it: `context.js` attaches `questions` + `questionSetVersion` (stage2b only);
   `ReviewAuthoringForm` renders from `data.questions` as a prop (no static import); `submit.js`
   echoes `setVersion` back and 409s `set_changed` if the staff set changed mid-edit (client shows a
-  distinct reload prompt). Draft load reconciles type-aware — a draft value whose shape ≠ the current
-  field type is discarded. `lib/external/review-form-schema.js` is RETAINED as the field-shape +
+  distinct reload prompt **and flushes the latest draft first** so in-debounce edits survive the reload —
+  Codex Phase B P1-B). The version hash (`questionSetVersion`) covers `label`/`hint` too, not just
+  structure: the submit snapshot persists `questionText = field.label`, so a wording edit MUST invalidate
+  an in-flight session or the answer is recorded against text the reviewer never saw (Codex Phase B P1-A).
+  Draft load reconciles type-aware — a draft value whose shape ≠ the current field type is discarded. `lib/external/review-form-schema.js` is RETAINED as the field-shape +
   seed + helper source (`reviewParentColumnByKey` dual-write binding, label decoders) and the
   dormant default param; the seeded set is byte-identical to it, so behavior is unchanged. Staff
   upload (`ReviewFormFields`/`ReviewerManagePanel`) + the two legacy `validateReviewForm` paths

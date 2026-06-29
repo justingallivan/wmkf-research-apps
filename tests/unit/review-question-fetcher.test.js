@@ -8,7 +8,7 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: { queryRecords: jest.fn() } }));
 
 import { DynamicsService } from '../../lib/services/dynamics-service';
-import { getActiveQuestionSet, invalidate } from '../../lib/external/review-question-fetcher';
+import { getActiveQuestionSet, invalidate, questionSetVersion } from '../../lib/external/review-question-fetcher';
 
 const rowRich = (key, order, overrides = {}) => ({
   wmkf_reviewquestionid: `id-${key}`,
@@ -188,5 +188,40 @@ describe('invalidate() generation guard', () => {
     const set = await getActiveQuestionSet();
     expect(set).toHaveLength(1);
     expect(DynamicsService.queryRecords).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('questionSetVersion', () => {
+  const base = [
+    { key: 'q2', type: 'richtext', required: true, order: 2, maxLength: 50000, label: 'Q2 — original', hint: null, options: null },
+    { key: 'impact', type: 'picklist', required: true, order: 1, hint: 'pick one',
+      options: [{ value: 1, label: 'Low' }, { value: 2, label: 'High' }], label: 'Q1 — impact' },
+  ];
+  const clone = (mut) => {
+    const c = base.map((f) => ({ ...f, options: f.options ? f.options.map((o) => ({ ...o })) : f.options }));
+    mut(c);
+    return c;
+  };
+
+  it('is deterministic and order-insensitive', () => {
+    expect(questionSetVersion(base)).toBe(questionSetVersion([...base].reverse()));
+  });
+
+  // Codex Phase B P1-A: label/hint changes MUST flip the version so an in-flight
+  // session 409s set_changed — the submit snapshot persists questionText=label.
+  it('changes when a question LABEL changes', () => {
+    const edited = clone((c) => { c[0].label = 'Q2 — reworded'; });
+    expect(questionSetVersion(edited)).not.toBe(questionSetVersion(base));
+  });
+
+  it('changes when a question HINT changes', () => {
+    const edited = clone((c) => { c[1].hint = 'pick the best one'; });
+    expect(questionSetVersion(edited)).not.toBe(questionSetVersion(base));
+  });
+
+  it('also changes on type/required/order/option edits', () => {
+    expect(questionSetVersion(clone((c) => { c[0].required = false; }))).not.toBe(questionSetVersion(base));
+    expect(questionSetVersion(clone((c) => { c[0].order = 9; }))).not.toBe(questionSetVersion(base));
+    expect(questionSetVersion(clone((c) => { c[1].options[0].label = 'Very Low'; }))).not.toBe(questionSetVersion(base));
   });
 });

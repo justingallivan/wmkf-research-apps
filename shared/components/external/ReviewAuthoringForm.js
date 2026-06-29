@@ -202,8 +202,14 @@ export default function ReviewAuthoringForm({ data, token }) {
       if (resp.status === 409) {
         if (json.reason === 'set_changed') {
           // The staff question set changed since this form loaded. NOT terminal:
-          // the reviewer's answers are autosaved, so a reload re-fetches the
-          // current set and reconciles the draft onto it. Prompt a reload.
+          // a reload re-fetches the current set and reconciles the draft onto it.
+          // The submit did NOT commit, so the draft is still writable — flush the
+          // current values first so edits made inside the autosave debounce
+          // window (which handleSubmit cancelled above) aren't lost on reload.
+          // This makes the "your saved answers will be kept" copy true (Codex
+          // Phase B P1-B). persist() swallows its own errors; a failed flush just
+          // falls back to the last autosaved draft, no worse than before.
+          await persist(values);
           setSubmitErrors([json.message || 'The review questions changed since you opened this form. Please reload to see the current questions.']);
           setSubmitState('set_changed');
           return;
@@ -224,7 +230,7 @@ export default function ReviewAuthoringForm({ data, token }) {
       setSubmitErrors(['Network error — your review was not submitted. Please try again.']);
       setSubmitState('error');
     }
-  }, [token, values, setVersion]);
+  }, [token, values, setVersion, persist]);
 
   // Fail-closed: never render a partial or empty form. /context is fail-closed
   // and 500s when the question set can't load, so this is a defensive backstop
