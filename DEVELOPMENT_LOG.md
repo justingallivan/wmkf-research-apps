@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer rating columns retired; ratings live solely in the answer snapshot (Session 305)
+
+**Milestone:** The three legacy parent rating columns on `wmkf_appreviewersuggestion` (`wmkf_reviewerimpact` / `wmkf_reviewerrisk` / `wmkf_revieweroverallrating`) are **gone** — dropped from Dataverse. Review ratings now live in exactly one place, the `wmkf_appreviewanswer` snapshot. This closes the staff-editable-review-questions epic (Phases A–E).
+
+**Sessions:** 305 (Phase D: migrate readers + writers to the snapshot, backfill; Phase E1: stop the dual-write; Phase E2: drop the columns). Two Codex design reviews, both caught load-bearing P0s.
+
+**Ship state:**
+- **Phase D** — DTO (`reviewers.js`), external prefill (`context.js`), and the merge engagement predicate all read ratings from the snapshot (`ratingsFromAnswers` / `readRatingsBySuggestion`); legacy staff writers (`review-upload.js`, `mark-received-no-file.js`) dual-write snapshot rows; one historical parent-only row backfilled. Shared `lib/external/review-answer-snapshot.js`.
+- **Phase E1** — all 3 writers stopped PATCHing the parent columns; `validateReviewForm` returns a separate `ratings` bucket (strict parse); producer backstop re-anchored on `CORE_RATING_KEYS`; admin removal guard decoupled (`PARENT_BOUND_KEYS`) and retained.
+- **Phase E2** — attrs retired from schema-as-code first (so the create-only applier can't resurrect them), then dropped via `scripts/drop-reviewer-rating-columns.mjs --execute`; verified gone.
+- Codex caught: the writers-before-readers ordering (a readers-first order would have nulled historical staff reviews) and the schema-as-code resurrection trap + a producer-backstop no-op.
+
+**Why it matters:** the denormalization is fully retired; the snapshot is the single system of record for ratings, so staff-edited question sets and historical reviews never drift against a parallel column store. **Forward constraint: never redeploy pre-E1 code** — it would PATCH the now-missing columns.
+
+**Pointers:** `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md` §6/§8; `docs/atlas/dataverse-wmkf-appreviewanswer.md`; commits `ed9747d9`…`f08944d7` (Phase D `20ba8add`/`b8cc067a`/`ae6fac22`, E1 `cc0bce6b`, E2 `f08944d7`).
+
 ## June 2026 — Review-form question set became staff-editable live data (Sessions 303–304)
 
 **Milestone:** The external-reviewer review-form question set is no longer a static code array — it's a Dataverse entity (`wmkf_reviewquestion`) read at runtime and edited live by staff in a `/admin` editor, without a deploy and without disturbing past reviews (the `wmkf_appreviewanswer` snapshot preserves history).
