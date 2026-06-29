@@ -60,9 +60,9 @@ describe('answerRowBody', () => {
 describe('buildRatingSnapshotRows', () => {
   const fields = reviewFormSchema.fields;
 
-  it('builds one row per present canonical rating, decoded like submit', () => {
+  it('builds one row per present rating (field.key-keyed), decoded like submit', () => {
     const rows = buildRatingSnapshotRows(
-      { wmkf_reviewerimpact: 3, wmkf_reviewerrisk: 2, wmkf_revieweroverallrating: 5, wmkf_revieweraffiliation: 'MIT' },
+      { impact: 3, risk: 2, overallRating: 5 },
       fields,
     );
     expect(rows).toHaveLength(3);
@@ -72,25 +72,25 @@ describe('buildRatingSnapshotRows', () => {
       answerHtml: null, answerValue: 3, answerText: 'Will result in publications of broad interest',
     });
     expect(byKey.overallRating).toMatchObject({ answerValue: 5, answerText: 'Excellent', questionOrder: 10 });
-    // affiliation is a parent string field, never a snapshot row
+    // affiliation is a string field, never a snapshot row
     expect(rows.find((r) => r.questionKey === 'affiliation')).toBeUndefined();
   });
 
   it('omits a rating that is absent (informal-feedback / partial path)', () => {
-    const rows = buildRatingSnapshotRows({ wmkf_reviewerimpact: 1 }, fields);
+    const rows = buildRatingSnapshotRows({ impact: 1 }, fields);
     expect(rows.map((r) => r.questionKey)).toEqual(['impact']);
   });
 
   it('treats null/undefined as absent, not a row with null value', () => {
     expect(buildRatingSnapshotRows({}, fields)).toEqual([]);
-    expect(buildRatingSnapshotRows({ wmkf_reviewerrisk: null }, fields)).toEqual([]);
+    expect(buildRatingSnapshotRows({ risk: null }, fields)).toEqual([]);
     expect(buildRatingSnapshotRows(null, fields)).toEqual([]);
   });
 
-  it('does not synthesize a row when the value is out of the picklist domain (answerText empty, value preserved)', () => {
+  it('does not synthesize a label when the value is out of the picklist domain (answerText empty, value preserved)', () => {
     // value present but not a known option → row still emitted (caller validated),
     // answerText falls back to '' so we never invent a label.
-    const rows = buildRatingSnapshotRows({ wmkf_reviewerimpact: 99 }, fields);
+    const rows = buildRatingSnapshotRows({ impact: 99 }, fields);
     expect(rows).toEqual([
       expect.objectContaining({ questionKey: 'impact', answerValue: 99, answerText: '' }),
     ]);

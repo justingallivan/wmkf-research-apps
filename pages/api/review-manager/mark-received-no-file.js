@@ -72,12 +72,12 @@ export default async function handler(req, res) {
 
     const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
 
-    // Phase D: dual-write the rating snapshot rows so the child table is the
-    // complete system of record before the DTO/prefill readers stop reading the
-    // parent rating columns. Only ratings actually present get a row — the
-    // "informal feedback" scenario omits structuredData, so ratings stay null,
-    // no snapshot row is written, and aggregates keep skipping the row.
-    const ratingRows = buildRatingSnapshotRows(formResult.dataverseValues, questionSet);
+    // Write the rating snapshot rows. Post-Phase-E ratings live ONLY in the
+    // snapshot (`patch` no longer carries the rating columns). Only ratings
+    // actually present get a row — the "informal feedback" scenario omits
+    // structuredData, so ratings stay empty, no snapshot row is written, and
+    // aggregates keep skipping the row.
+    const ratingRows = buildRatingSnapshotRows(formResult.ratings, questionSet);
     const snapshotKeys = new Set(
       questionSet.filter((f) => f.type === 'picklist' || f.type === 'richtext').map((f) => f.key),
     );

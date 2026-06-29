@@ -54,7 +54,22 @@ const EXECUTE = process.argv.includes('--execute');
 // The three parent rating columns, in field-key order.
 const RATING_COLUMNS = ['impact', 'risk', 'overallRating'].map((k) => reviewParentColumnByKey[k]);
 
+// FROZEN (Phase E, S305). This one-shot backfill already ran S305 (1 row filled,
+// idempotent-verified) and is now obsolete: Phase E retired the parent rating
+// columns this script reads (`reviewParentColumnByKey` no longer maps them, so
+// the OData filter would be `undefined ne null`) and changed `buildRatingSnapshotRows`
+// to take field.key-keyed ratings, not a column-keyed suggestion row. Kept for the
+// historical record; refuse to run rather than query dropped/undefined columns.
+const FROZEN = true;
+
 async function main() {
+  if (FROZEN) {
+    console.error(
+      'backfill-rating-snapshot-rows is FROZEN (Phase E): the parent rating columns it reads were retired '
+      + 'and its helper contract changed. It already ran successfully in S305. Refusing to run.',
+    );
+    process.exit(1);
+  }
   console.log(`\n=== Phase D rating-snapshot backfill (${EXECUTE ? 'EXECUTE' : 'DRY RUN'}) ===\n`);
 
   const questionSet = await getActiveQuestionSet();

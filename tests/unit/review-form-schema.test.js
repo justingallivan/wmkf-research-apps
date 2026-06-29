@@ -65,25 +65,24 @@ describe('validateReviewForm — richtext is not parent-validated', () => {
     expect(r.dataverseValues.wmkf_revieweraffiliation).toBeDefined();
   });
 
-  test('richtext values are ignored (never returned as dataverseValues)', () => {
+  test('richtext values are ignored (never returned as dataverseValues or ratings)', () => {
     const r = validateReviewForm({ ...valid(), q2: '<p>impactful</p>' });
     expect(r.ok).toBe(true);
-    expect(Object.keys(r.dataverseValues)).toEqual([
-      'wmkf_revieweraffiliation', 'wmkf_reviewerimpact', 'wmkf_reviewerrisk', 'wmkf_revieweroverallrating',
-    ]);
+    // Post-Phase-E: dataverseValues holds only the affiliation parent column;
+    // ratings live in the separate `ratings` bucket (snapshot-only, by field.key).
+    expect(Object.keys(r.dataverseValues)).toEqual(['wmkf_revieweraffiliation']);
+    expect(r.ratings).toEqual({ impact: 3, risk: 2, overallRating: 4 });
   });
 });
 
 describe('validateReviewForm', () => {
-  test('happy path returns dataverseValues keyed by dataverseField', () => {
+  test('happy path: affiliation → dataverseValues, ratings → ratings bucket', () => {
     const r = validateReviewForm(valid());
     expect(r.ok).toBe(true);
     expect(r.dataverseValues).toEqual({
       wmkf_revieweraffiliation: 'Professor of Biology, University of Example',
-      wmkf_reviewerimpact: 3,
-      wmkf_reviewerrisk: 2,
-      wmkf_revieweroverallrating: 4,
     });
+    expect(r.ratings).toEqual({ impact: 3, risk: 2, overallRating: 4 });
   });
 
   test('trims whitespace from string fields', () => {
@@ -91,10 +90,18 @@ describe('validateReviewForm', () => {
     expect(r.dataverseValues.wmkf_revieweraffiliation).toBe('Trimmed');
   });
 
-  test('accepts numeric strings for picklists', () => {
+  test('accepts clean numeric strings for picklists (routed to ratings)', () => {
     const r = validateReviewForm({ ...valid(), impact: '3' });
     expect(r.ok).toBe(true);
-    expect(r.dataverseValues.wmkf_reviewerimpact).toBe(3);
+    expect(r.ratings.impact).toBe(3);
+  });
+
+  test('rejects a malformed numeric string (strict parse, no parseInt truncation)', () => {
+    // "3abc" previously truncated to 3 via parseInt; the strict parse rejects it
+    // so only clean values reach the snapshot rows (Codex Phase E P1-3).
+    const r = validateReviewForm({ ...valid(), impact: '3abc' });
+    expect(r.ok).toBe(false);
+    expect(r.errors[0]).toMatch(/whole number/);
   });
 
   test('rejects the removed "Unable to answer" value (99) on each picklist', () => {
@@ -159,11 +166,12 @@ describe('validateReviewForm', () => {
       const r = validateReviewForm({}, { partial: true });
       expect(r.ok).toBe(true);
       expect(r.dataverseValues).toEqual({});
+      expect(r.ratings).toEqual({});
     });
 
     test('accepts null/undefined input', () => {
-      expect(validateReviewForm(null, { partial: true })).toEqual({ ok: true, dataverseValues: {} });
-      expect(validateReviewForm(undefined, { partial: true })).toEqual({ ok: true, dataverseValues: {} });
+      expect(validateReviewForm(null, { partial: true })).toEqual({ ok: true, dataverseValues: {}, ratings: {} });
+      expect(validateReviewForm(undefined, { partial: true })).toEqual({ ok: true, dataverseValues: {}, ratings: {} });
     });
 
     test('still validates types/ranges of present values', () => {
@@ -172,10 +180,11 @@ describe('validateReviewForm', () => {
       expect(r.errors[0]).toMatch(/invalid choice/);
     });
 
-    test('writes only the fields that were provided', () => {
+    test('routes only the ratings that were provided to the ratings bucket', () => {
       const r = validateReviewForm({ overallRating: 4 }, { partial: true });
       expect(r.ok).toBe(true);
-      expect(r.dataverseValues).toEqual({ wmkf_revieweroverallrating: 4 });
+      expect(r.dataverseValues).toEqual({});
+      expect(r.ratings).toEqual({ overallRating: 4 });
     });
   });
 });

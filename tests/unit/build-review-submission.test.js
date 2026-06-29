@@ -4,8 +4,8 @@
  * Covers (plan §5/§9, Codex P1-N4 / P1-R3 / S301-P1):
  *   - full-form validation: required richtext emptiness-after-strip, optional Q11,
  *     rating live-domain (removed 99 + out-of-range rejected), maxLength.
- *   - the single mapping: parentPatch (affiliation + 3 ratings + receivedat) and
- *     11 ordered answer rows; rating rows carry value+label and equal the parent;
+ *   - the single mapping: parentPatch (affiliation + receivedat — ratings are
+ *     snapshot-only post-Phase-E) and 11 ordered answer rows; rating rows carry value+label;
  *     richtext rows carry sanitized html + plain-text rendition.
  *   - producer backstops: exactly-3-ratings, rating-domain, parent/child equality,
  *     snapshot-fidelity, receivedAt required.
@@ -130,15 +130,16 @@ describe('buildReviewSubmission — mapping', () => {
     return buildReviewSubmission(v.normalized, { receivedAt: RECEIVED_AT });
   }
 
-  test('parentPatch carries affiliation, the 3 ratings, and receivedat', () => {
+  test('parentPatch carries affiliation + receivedat ONLY (ratings are snapshot-only post-Phase-E)', () => {
     const { parentPatch } = build();
     expect(parentPatch).toEqual({
       wmkf_revieweraffiliation: 'Professor of Physics, Example University',
-      wmkf_reviewerimpact: 3,
-      wmkf_reviewerrisk: 2,
-      wmkf_revieweroverallrating: 4,
       wmkf_reviewreceivedat: RECEIVED_AT,
     });
+    // The rating columns are no longer written.
+    expect(parentPatch.wmkf_reviewerimpact).toBeUndefined();
+    expect(parentPatch.wmkf_reviewerrisk).toBeUndefined();
+    expect(parentPatch.wmkf_revieweroverallrating).toBeUndefined();
   });
 
   test('emits exactly 11 answer rows in question order', () => {
@@ -150,8 +151,8 @@ describe('buildReviewSubmission — mapping', () => {
     ]);
   });
 
-  test('rating rows carry value + label + null html, and equal the parent', () => {
-    const { parentPatch, answerRows } = build();
+  test('rating rows carry value + label + null html (snapshot is the only home now)', () => {
+    const { answerRows } = build();
     const impact = answerRows.find((r) => r.questionKey === 'impact');
     expect(impact).toMatchObject({
       questionType: 'picklist',
@@ -159,7 +160,6 @@ describe('buildReviewSubmission — mapping', () => {
       answerHtml: null,
       answerText: 'Will result in publications of broad interest',
     });
-    expect(impact.answerValue).toBe(parentPatch.wmkf_reviewerimpact);
   });
 
   test('richtext rows carry sanitized html + a plain-text rendition + null value', () => {
@@ -212,10 +212,12 @@ describe('buildReviewSubmission — producer backstops', () => {
   });
 
   test('throws if a required rating is null at build time (fewer than 3 rating rows)', () => {
+    // Re-anchored on CORE_RATING_KEYS (not the parent-column map) so the producer
+    // backstop survived the Phase E column retirement (Codex P1-1).
     const v = validateReviewSubmission(validInput());
     const bad = { ...v.normalized, risk: null };
     expect(() => buildReviewSubmission(bad, { receivedAt: RECEIVED_AT })).toThrow(
-      /exactly 3 parent-bound rating rows/,
+      /exactly 3 core rating rows/,
     );
   });
 });

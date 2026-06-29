@@ -66,13 +66,14 @@ test('ratings present → atomic changeset with 3 rating upserts + parent PATCH;
   expect(impactOp.url).toContain(`_wmkf_appreviewersuggestion_value=${SUGGESTION_ID}`);
   expect(impactOp.body).toMatchObject({ wmkf_answervalue: 3, wmkf_questiontype: 'picklist', wmkf_questionorder: 1 });
 
-  // Parent PATCH is the LAST op and carries the received-at + staff flag + ratings.
+  // Parent PATCH is the LAST op and carries received-at + staff flag — but NOT
+  // the rating columns (Phase E: ratings live only in the snapshot rows above).
   const parentOp = ops[ops.length - 1];
   expect(parentOp.url).toBe(`wmkf_appreviewersuggestions(${SUGGESTION_ID})`);
-  expect(parentOp.body).toMatchObject({
-    wmkf_reviewerimpact: 3,
-    wmkf_reviewuploadedbystaff: true,
-  });
+  expect(parentOp.body).toMatchObject({ wmkf_reviewuploadedbystaff: true });
+  expect(parentOp.body.wmkf_reviewerimpact).toBeUndefined();
+  expect(parentOp.body.wmkf_reviewerrisk).toBeUndefined();
+  expect(parentOp.body.wmkf_revieweroverallrating).toBeUndefined();
   expect(parentOp.body.wmkf_reviewreceivedat).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 });
 

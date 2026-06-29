@@ -216,7 +216,8 @@ describe('happy path — atomic write', () => {
     }
 
     // Parent op PATCHes the suggestion by GUID, guarded by If-Match, carrying
-    // ratings + affiliation + receivedat.
+    // affiliation + receivedat. Post-Phase-E the rating columns are NOT written —
+    // ratings live only in the answer snapshot rows.
     expect(parentOp).toMatchObject({
       method: 'PATCH',
       url: `wmkf_appreviewersuggestions(${SUGGESTION_ID})`,
@@ -224,11 +225,14 @@ describe('happy path — atomic write', () => {
     });
     expect(parentOp.body).toMatchObject({
       wmkf_revieweraffiliation: 'Professor of Physics, Example University',
-      wmkf_reviewerimpact: 3,
-      wmkf_reviewerrisk: 2,
-      wmkf_revieweroverallrating: 4,
       wmkf_reviewreceivedat: res._data.receivedAt,
     });
+    expect(parentOp.body.wmkf_reviewerimpact).toBeUndefined();
+    expect(parentOp.body.wmkf_reviewerrisk).toBeUndefined();
+    expect(parentOp.body.wmkf_revieweroverallrating).toBeUndefined();
+    // The 11 answer upserts still carry the ratings (impact/risk/overallRating rows).
+    const ratingAnswerOps = answerOps.filter((o) => /wmkf_questionkey='(impact|risk|overallRating)'/.test(o.url));
+    expect(ratingAnswerOps).toHaveLength(3);
 
     expect(ReviewDraftService.deleteBySuggestion).toHaveBeenCalledWith(SUGGESTION_ID);
   });

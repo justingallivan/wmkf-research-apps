@@ -230,16 +230,17 @@ describe('writeReviewFiles — happy paths', () => {
     const patch = parentPatch();
     expect(patch).toMatchObject({
       wmkf_revieweraffiliation: 'Prof X, U of Example',
-      wmkf_reviewerimpact: 3,
-      wmkf_reviewerrisk: 2,
-      wmkf_revieweroverallrating: 4,
       wmkf_reviewsharepointfolder: EXPECTED_FOLDER,
       wmkf_reviewfilename: 'review.pdf',
       wmkf_reviewuploadedbystaff: false,
     });
+    // Phase E: the parent PATCH no longer carries the rating columns.
+    expect(patch.wmkf_reviewerimpact).toBeUndefined();
+    expect(patch.wmkf_reviewerrisk).toBeUndefined();
+    expect(patch.wmkf_revieweroverallrating).toBeUndefined();
     expect(patch.wmkf_reviewreceivedat).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    // Phase D dual-write: the same changeset carries the 3 rating snapshot rows,
-    // addressed by alternate key, byte-identical to a reviewer-written row.
+    // The changeset carries the 3 rating snapshot rows, addressed by alternate
+    // key, byte-identical to a reviewer-written row.
     const [ops] = DynamicsService.executeChangeset.mock.calls[0];
     const answerOps = ops.filter((o) => /wmkf_questionkey=/.test(o.url));
     expect(answerOps).toHaveLength(3);
