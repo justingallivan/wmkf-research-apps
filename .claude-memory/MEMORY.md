@@ -70,6 +70,7 @@
 - Reviewer duplicate merge / email alt-key (wmkf_emailaddress_unique) 412 dead-end / the THREE distinct duplicate problems (PR↔PR vs PR↔contact vs contact↔contact): project-reviewer-duplicate-merge.md
 - External reviewer portal / accept-decline / E2E / SharePoint: ../docs/agent-wiki/topics/external-reviewer-portal.md
 - Reviewer invite→accept collapse (S279: onboard up front at one final Accept; no hold/finalize step; capture-only honorarium; .ics on accept): project-reviewer-hold-step-decouple.md
+- Reviewer review-form in-browser authoring rework (S300 plan; tiptap rich-text + autosave + answer-snapshot child table; submit-final; needs $batch helper): ../docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md
 - Intake portal / attachments / institution match / virus scan: ../docs/agent-wiki/topics/intake-portal.md
 - Dataverse / Dynamics / Explorer / Power Tools: ../docs/agent-wiki/topics/dataverse-dynamics.md
 - Dynamics CRM facts / grant lifecycle fields: ../docs/agent-wiki/topics/dataverse-dynamics.md
