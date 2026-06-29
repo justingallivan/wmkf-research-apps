@@ -74,6 +74,13 @@ export default function ReviewQuestionsSection() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null); // { tone, text } | { tone:'reload', text }
   const [validationErrors, setValidationErrors] = useState([]);
+  // A 409 set_changed means baseVersion is stale; block Save until the user
+  // reloads (re-saving the same stale version just 409s again — Codex P2).
+  const [staleReload, setStaleReload] = useState(false);
+  // A committed write whose 'final' audit row failed (route returns
+  // auditWritten:false). Persists across the post-save reload so the operator
+  // sees it — the change IS applied, but it's under-recorded (Codex P2).
+  const [auditWarning, setAuditWarning] = useState(false);
   const dragIndex = useRef(null);
 
   const load = useCallback(() => {
@@ -81,6 +88,7 @@ export default function ReviewQuestionsSection() {
     setError(null);
     setMessage(null);
     setValidationErrors([]);
+    setStaleReload(false);
     fetch('/api/admin/review-questions')
       .then((r) => {
         if (r.status === 403) throw new Error('Admin access required');
@@ -129,6 +137,7 @@ export default function ReviewQuestionsSection() {
     setSaving(true);
     setMessage(null);
     setValidationErrors([]);
+    setAuditWarning(false);
     try {
       const res = await fetch('/api/admin/review-questions', {
         method: 'POST',
@@ -137,6 +146,7 @@ export default function ReviewQuestionsSection() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 409 && data.status === 'set_changed') {
+        setStaleReload(true); // disable Save until the user reloads a fresh version
         setMessage({ tone: 'reload', text: data.error || 'The question set changed since you loaded it. Reload to see the current version.' });
         return;
       }
@@ -156,6 +166,9 @@ export default function ReviewQuestionsSection() {
       if (s.reordered) parts.push(`${s.reordered} reordered`);
       if (s.deleted) parts.push(`${s.deleted} removed`);
       setMessage({ tone: 'saved', text: data.noop || parts.length === 0 ? 'No changes to save.' : `Saved — ${parts.join(', ')}.` });
+      // A committed write whose audit row failed: the change is applied but
+      // under-recorded — surface a persistent warning (survives the reload).
+      if (data.auditWritten === false) setAuditWarning(true);
       // Reload to pick up new ids + the fresh version (so the next save diffs correctly).
       load();
     } catch (e) {
@@ -200,6 +213,12 @@ export default function ReviewQuestionsSection() {
         <ul className="mb-3 list-disc list-inside text-xs text-red-700 space-y-0.5">
           {validationErrors.map((e, i) => <li key={i}>{e}</li>)}
         </ul>
+      )}
+
+      {auditWarning && (
+        <div className="mb-3 px-3 py-2 rounded-lg text-sm border bg-amber-50 text-amber-800 border-amber-200" role="alert" data-testid="rq-audit-warning">
+          Your change was saved, but its audit record could not be written. The change is applied — please notify an admin so the edit is recorded.
+        </div>
       )}
 
       <ol className="space-y-3">
@@ -305,10 +324,10 @@ export default function ReviewQuestionsSection() {
         </button>
         <button
           onClick={save}
-          disabled={saving || !dirty || rows.length === 0}
+          disabled={saving || !dirty || rows.length === 0 || staleReload}
           className="ml-auto px-4 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {saving ? 'Saving…' : dirty ? 'Save changes' : 'No changes'}
+          {saving ? 'Saving…' : staleReload ? 'Reload to save' : dirty ? 'Save changes' : 'No changes'}
         </button>
       </div>
     </div>

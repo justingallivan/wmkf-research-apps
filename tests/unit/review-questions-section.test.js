@@ -75,6 +75,37 @@ test('a 409 set_changed shows a reload prompt instead of succeeding', async () =
 
   await waitFor(() => expect(screen.getByText(/changed since you loaded it/i)).toBeInTheDocument());
   expect(screen.getByRole('button', { name: /^Reload$/ })).toBeInTheDocument();
+  // Codex P2: Save is disabled until reload (re-saving a stale version just 409s again).
+  expect(screen.getByRole('button', { name: /reload to save/i })).toBeDisabled();
+});
+
+test('clicking Reload after a 409 re-fetches and re-enables editing', async () => {
+  global.fetch = mockFetch({ postResponse: { ok: false, status: 409, json: async () => ({ status: 'set_changed', error: 'stale' }) } });
+  render(<ReviewQuestionsSection />);
+  await waitFor(() => expect(screen.getAllByTestId('rq-row')).toHaveLength(2));
+  fireEvent.change(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text'), { target: { value: 'x' } });
+  fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+  await waitFor(() => expect(screen.getByRole('button', { name: /reload to save/i })).toBeInTheDocument());
+
+  fireEvent.click(screen.getByRole('button', { name: /^Reload$/ }));
+  // A fresh GET fired and the stale-reload lock cleared (button back to its normal label).
+  await waitFor(() => {
+    const gets = global.fetch.mock.calls.filter(([, o]) => !o?.method);
+    expect(gets.length).toBeGreaterThanOrEqual(2);
+  });
+  await waitFor(() => expect(screen.queryByRole('button', { name: /reload to save/i })).not.toBeInTheDocument());
+});
+
+test('a completed save with auditWritten:false surfaces a persistent audit warning', async () => {
+  global.fetch = mockFetch({ postResponse: { ok: true, status: 200, json: async () => ({ status: 'completed', summary: { created: 0, updated: 1, deleted: 0, reordered: 0 }, version: 'v2', auditWritten: false }) } });
+  render(<ReviewQuestionsSection />);
+  await waitFor(() => expect(screen.getAllByTestId('rq-row')).toHaveLength(2));
+  fireEvent.change(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text'), { target: { value: 'edited' } });
+  fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+  // The warning survives the post-save reload (it's separate from the transient message).
+  await waitFor(() => expect(screen.getByTestId('rq-audit-warning')).toBeInTheDocument());
+  expect(screen.getByTestId('rq-audit-warning')).toHaveTextContent(/audit record could not be written/i);
 });
 
 test('drag-to-reorder changes the submitted order', async () => {
