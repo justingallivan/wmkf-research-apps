@@ -80,6 +80,10 @@ describe('buildChangeset', () => {
     expect(out.operations).toHaveLength(1);
     expect(out.operations[0]).toMatchObject({ method: 'POST', url: ENTITY_SET });
     expect(out.operations[0].body.wmkf_questionkey).toBe('q2');
+    // Primary name must be the LOWERCASE logical name; the schema-name casing
+    // `wmkf_Name` is rejected by the Web API (0x80048d19) — caught in prod S304.
+    expect(out.operations[0].body.wmkf_name).toBe('Label q2');
+    expect(out.operations[0].body).not.toHaveProperty('wmkf_Name');
     expect(out.summary).toEqual({ created: 1, updated: 0, deleted: 0, reordered: 0 });
   });
 
