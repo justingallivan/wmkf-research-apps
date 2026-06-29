@@ -81,6 +81,7 @@ Promote any of these to a per-entity page if app code starts writing to it.
 | Integrity Screener | `integrity_screenings`, `screening_dismissals`, `retractions` | same |
 | Virtual Review Panel | `panel_reviews`, `panel_review_items` | same |
 | Intake portal (pre-pilot) | `intake_drafts`, `intake_audit` | same |
+| External reviewer authoring | `review_drafts` (autosave scratchpad; Dataverse `wmkf_appreviewanswer` is the submitted system of record) | [postgres-review-drafts.md](atlas/postgres-review-drafts.md) |
 | Monitoring | `health_check_history`, `system_alerts`, `maintenance_runs`, `api_usage_log` | same |
 | BILL.com | `bill_webhook_events` (webhook dedup), `bill_onboarding_state` (honorarium onboarding durable state) | same |
 
@@ -117,6 +118,7 @@ The high-leverage services for data-layer work — full source remains authorita
 | `execute-prompt.js` | none — calls Claude through `llm-client.js` and rejects unreviewed concrete prompt-row Claude ids before execution | `wmkf_ai_prompts` (read in `fetchCurrentPrompt()`), `akoya_requests` (read once up-front for the skip-if-populated guard in `preflightGuards()`; **coalesced write to the prompt's declared `target.field` via `persistOutputs()` → `DynamicsService.updateRecord`**), `wmkf_ai_runs` (write audit in `writeRunRow()` with FKs to prompt + request) | Executor contract; **dynamically writes to `akoya_request` flat fields** (e.g. `wmkf_ai_summary`) — the Executor is the canonical writer for prompts that declare a target |
 | `llm-client.js` / `model-capabilities.js` | `api_usage_log` (write via DatabaseService when `appName` supplied) | none | canonical Anthropic wrapper plus reviewed model capability registry for request shaping/refusal semantics |
 | `intake-draft-service.js` | `intake_drafts` (R/W) | none | drafts cleared on submit |
+| `review-draft-service.js` | `review_drafts` (R/W) | none | external reviewer review-form autosave scratchpad; submit maps draft → Dataverse `wmkf_appreviewanswer` then deletes the draft (Phase 3) |
 | `intake-audit-service.js` | `intake_audit` (write append-only) | none | sha256-hashed |
 | `integrity-service.js`, `integrity-matching-service.js` | `integrity_screenings`, `screening_dismissals`, `retractions` | none — Postgres-only chain | imports only `@vercel/postgres`; no Dynamics client. UI may pass Dataverse-derived applicant data into the request body, but the service itself doesn't read `akoya_request`. |
 | `panel-review-service.js`, `multi-llm-service.js` | `panel_reviews`, `panel_review_items` | none | Virtual Review Panel; Claude request shaping uses `model-capabilities.js` |

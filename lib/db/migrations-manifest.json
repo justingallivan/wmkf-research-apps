@@ -18,6 +18,7 @@
     "017_bill_onboarding_state.sql",
     "018_drop_reviewer_finder_postgres_tables.sql",
     "019_prompt_publish_audit.sql",
-    "020_reviewer_find_roster.sql"
+    "020_reviewer_find_roster.sql",
+    "021_review_drafts.sql"
   ]
 }
