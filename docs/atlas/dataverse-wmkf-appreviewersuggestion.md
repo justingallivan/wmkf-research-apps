@@ -64,10 +64,10 @@ External-reviewer intake (S128–S130):
 - `wmkf_reviewuploadedbystaff`
 
 Structured review fields (S130 schema additions):
-- `wmkf_revieweraffiliation` (String)
-- `wmkf_reviewerimpact` (Picklist)
-- `wmkf_reviewerrisk` (Picklist)
-- `wmkf_revieweroverallrating` (Picklist)
+- `wmkf_revieweraffiliation` (String) — parent identity column; still the read source for the review-context affiliation prefill.
+- `wmkf_reviewerimpact` (Picklist) — **Phase D (S305): no longer read.** Ratings are now sourced from the `wmkf_appreviewanswer` snapshot (DTO, prefill, merge engagement signal all migrated). Still dual-written by `build-review-submission.js` until Phase E retires the column.
+- `wmkf_reviewerrisk` (Picklist) — same as impact (snapshot-sourced; dual-written until Phase E).
+- `wmkf_revieweroverallrating` (Picklist) — same as impact (snapshot-sourced; dual-written until Phase E).
 
 Stage 2a slice 1 additions (S143, deployed 2026-05-09):
 
