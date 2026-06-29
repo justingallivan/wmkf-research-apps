@@ -21,6 +21,7 @@
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
 import { mintAndStore } from '../../../lib/external/token-lifecycle';
+import ReviewDraftService from '../../../lib/services/review-draft-service';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { APPLICANT_DISPOSITION_EXCLUDED } from '../../../lib/dataverse/adapters/reviewer-suggestion';
@@ -91,6 +92,21 @@ export default async function handler(req, res) {
     }
 
     const result = await mintAndStore({ suggestionId, requestId, expiresAt, actingUserSystemId });
+
+    // Regenerating mints a NEW link (lost email / leak / re-enable). Drafts key on
+    // the stable suggestion_id, not the token, so a stale (possibly tampered)
+    // draft would otherwise resurface under the new link — drop it here, NOT in
+    // mintAndStore (which also runs on every benign reminder/email resend via
+    // reviewer-reminder-sweep.js + render-emails.js, where the draft must
+    // survive). Plan §9 #draft-token / Codex P1-4. Accepted edge: a benign
+    // "lost email" regen also clears the draft (rare; the reviewer re-enters).
+    // Best-effort: the token is already minted, so a delete failure must not fail
+    // the regenerate (GC / the next regen sweeps a leftover).
+    try {
+      await ReviewDraftService.deleteBySuggestion(suggestionId);
+    } catch (e) {
+      console.error('[review-manager regenerate-token] draft cleanup failed (non-fatal):', e.message);
+    }
 
     return res.status(200).json({
       ok: true,

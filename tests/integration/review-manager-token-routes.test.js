@@ -13,6 +13,7 @@ import {
 
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import { mintAndStore, revoke } from '../../lib/external/token-lifecycle';
+import ReviewDraftService from '../../lib/services/review-draft-service';
 
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
@@ -23,6 +24,10 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 jest.mock('../../lib/external/token-lifecycle', () => ({
   mintAndStore: jest.fn(),
   revoke: jest.fn(),
+}));
+
+jest.mock('../../lib/services/review-draft-service', () => ({
+  deleteBySuggestion: jest.fn(async () => 1),
 }));
 
 jest.mock('../../lib/services/dynamics-context', () => ({
@@ -109,6 +114,23 @@ describe('/api/review-manager/regenerate-token', () => {
       expiresAt: expiresAt.toISOString(),
       jti: 'jti-1',
     });
+    // Regenerating drops any stale in-progress draft (plan §9 #draft-token).
+    expect(ReviewDraftService.deleteBySuggestion).toHaveBeenCalledWith(SUGGESTION_ID);
+  });
+
+  it('still returns 200 if the post-mint draft cleanup fails (non-fatal)', async () => {
+    mockAuthenticatedUser(2, ['review-manager']);
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_request_value: REQUEST_ID,
+    });
+    mintAndStore.mockResolvedValue({ url: 'https://app.example/x', expiresAt: new Date(Date.now() + 60_000), jti: 'j' });
+    ReviewDraftService.deleteBySuggestion.mockRejectedValueOnce(new Error('pg down'));
+
+    const req = createMockReq({ method: 'POST', body: { suggestionId: SUGGESTION_ID } });
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 
   it('rejects a past expiresAt before minting', async () => {
@@ -206,6 +228,20 @@ describe('/api/review-manager/revoke-token', () => {
     expect(revoke).toHaveBeenCalledWith(SUGGESTION_ID, { actingUserSystemId: null });
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({ ok: true });
+    // Revoke is a leak/compromise action → drop any in-progress draft.
+    expect(ReviewDraftService.deleteBySuggestion).toHaveBeenCalledWith(SUGGESTION_ID);
+  });
+
+  it('still returns 200 if the post-revoke draft cleanup fails (non-fatal)', async () => {
+    mockAuthenticatedUser(3, ['review-manager']);
+    revoke.mockResolvedValue(undefined);
+    ReviewDraftService.deleteBySuggestion.mockRejectedValueOnce(new Error('pg down'));
+    const req = createMockReq({ method: 'POST', body: { suggestionId: SUGGESTION_ID } });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 
   it('rejects missing suggestionId before revoking', async () => {

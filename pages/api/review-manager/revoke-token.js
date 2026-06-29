@@ -10,6 +10,7 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { revoke } from '../../../lib/external/token-lifecycle';
+import ReviewDraftService from '../../../lib/services/review-draft-service';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -35,6 +36,18 @@ export default async function handler(req, res) {
         return res.status(404).json({ ok: false, reason: 'not_found' });
       }
       throw e;
+    }
+
+    // Revoke is a leak/compromise action — drop any in-progress review draft so a
+    // stale (possibly tampered) draft can't resurface if a new token is later
+    // minted for this suggestion (drafts key on the stable suggestion_id, not the
+    // token; plan §9 #draft-token / Codex P1-4). Best-effort: the revoke already
+    // succeeded, and a leftover draft is otherwise swept by GC / the next
+    // regenerate, so a delete failure must not fail the revoke.
+    try {
+      await ReviewDraftService.deleteBySuggestion(suggestionId);
+    } catch (e) {
+      console.error('[review-manager revoke-token] draft cleanup failed (non-fatal):', e.message);
     }
 
     return res.status(200).json({ ok: true });

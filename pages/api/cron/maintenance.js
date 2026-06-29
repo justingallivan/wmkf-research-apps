@@ -17,6 +17,7 @@
 
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import MaintenanceService from '../../../lib/services/maintenance-service';
+import ReviewDraftService from '../../../lib/services/review-draft-service';
 import AlertService from '../../../lib/services/alert-service';
 import FeedbackService from '../../../lib/services/feedback-service';
 import NotificationService from '../../../lib/services/notification-service';
@@ -169,6 +170,18 @@ export default async function handler(req, res) {
       totalDeleted += results.feedback;
     } catch (error) {
       results.feedback = { error: error.message };
+    }
+
+    // 9. External reviewer review-draft GC (reviewer authoring build, Phase 5).
+    //    review_drafts is the Postgres autosave scratchpad. It's normally
+    //    deleted on submit and on token revoke/regenerate; this reaps drafts
+    //    abandoned mid-authoring (untouched > 90d), mirroring intake's draft
+    //    retention. Pure scratchpad — a returning reviewer just re-enters.
+    try {
+      results.reviewDrafts = await ReviewDraftService.deleteExpired({ olderThanDays: 90 });
+      if (typeof results.reviewDrafts === 'number') totalDeleted += results.reviewDrafts;
+    } catch (error) {
+      results.reviewDrafts = { error: error.message };
     }
 
     // Identify subtasks that failed (Codex pass-1 Q-P3 + pass-2 §3 #29).
