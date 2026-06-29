@@ -1,6 +1,7 @@
 import { useState, useEffect, Fragment } from 'react';
 import Layout, { PageHeader, Card } from '../shared/components/Layout';
 import PoliciesSection from '../shared/components/admin/PoliciesSection';
+import ReviewQuestionsSection from '../shared/components/admin/ReviewQuestionsSection';
 import PromptTemplatesSection from '../shared/components/admin/PromptTemplatesSection';
 import EmailDefaultsSection from '../shared/components/admin/EmailDefaultsSection';
 import DataverseFieldInfoButton, {
@@ -105,6 +106,16 @@ const POLICY_SECTION_DATAVERSE_FIELDS = [
     entitySet: 'wmkf_policyversions',
     field: 'wmkf_versionlabel / wmkf_policytitle / wmkf_policybody / wmkf_effectivedate',
     row: 'Version rows are filtered by _wmkf_policy_value.',
+  },
+];
+
+const REVIEW_QUESTIONS_DATAVERSE_FIELDS = [
+  {
+    label: 'Review question rows',
+    entity: 'wmkf_reviewquestion',
+    entitySet: 'wmkf_reviewquestions',
+    field: 'wmkf_questionkey / wmkf_questionorder / wmkf_questiontext / wmkf_questiontype / wmkf_required / wmkf_options',
+    row: 'Active rows (statecode 0) ordered by wmkf_questionorder. Saves apply one atomic changeset; edits are audited in Postgres review_question_audit.',
   },
 ];
 
@@ -2621,6 +2632,13 @@ export default function AdminDashboard() {
         </CollapsibleCard>
         <CollapsibleCard title="Policies" dataverseFields={POLICY_SECTION_DATAVERSE_FIELDS}>
           <PoliciesSection />
+        </CollapsibleCard>
+        <CollapsibleCard
+          title="Review Questions"
+          subtitle="Edit the external-reviewer review form questions (Dataverse wmkf_reviewquestion)"
+          dataverseFields={REVIEW_QUESTIONS_DATAVERSE_FIELDS}
+        >
+          <ReviewQuestionsSection />
         </CollapsibleCard>
         <CollapsibleCard
           title="Prompt Templates"

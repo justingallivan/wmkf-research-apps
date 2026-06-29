@@ -1,0 +1,131 @@
+/** Pure validate + diff + changeset builder for the staff review-question editor. */
+import { validateSubmittedSet, buildChangeset, ENTITY_SET, INACTIVE_STATE } from '../../lib/admin/review-question-save';
+
+const richField = (key, over = {}) => ({ key, label: `Label ${key}`, type: 'richtext', required: true, ...over });
+const pickField = (key, over = {}) => ({
+  key, label: `Rate ${key}`, type: 'picklist', required: true,
+  options: [{ value: 1, label: 'Low' }, { value: 2, label: 'High' }], ...over,
+});
+// A "current" row as readActiveSetWithIds would produce it (normalized + id).
+const current = (id, key, order, over = {}) => ({ id, key, order, label: `Label ${key}`, type: 'richtext', required: true, ...over });
+
+describe('validateSubmittedSet', () => {
+  it('rejects an empty set', () => {
+    expect(validateSubmittedSet([]).ok).toBe(false);
+    expect(validateSubmittedSet(null).ok).toBe(false);
+  });
+
+  it('assigns order from list position (ignores any client order)', () => {
+    const r = validateSubmittedSet([richField('a', { order: 99 }), richField('b', { order: 5 })]);
+    expect(r.ok).toBe(true);
+    expect(r.rows.map((x) => [x.key, x.order])).toEqual([['a', 0], ['b', 1]]);
+  });
+
+  it('rejects a bad key format and a duplicate key', () => {
+    expect(validateSubmittedSet([richField('1bad')]).ok).toBe(false);
+    expect(validateSubmittedSet([richField('Ok'), richField('Ok')]).ok).toBe(false);
+    // camelCase allowed (the live overallRating key)
+    expect(validateSubmittedSet([richField('overallRating')]).ok).toBe(true);
+  });
+
+  it('rejects missing label, bad type, non-boolean required', () => {
+    expect(validateSubmittedSet([richField('a', { label: '   ' })]).ok).toBe(false);
+    expect(validateSubmittedSet([richField('a', { type: 'date' })]).ok).toBe(false);
+    expect(validateSubmittedSet([richField('a', { required: 'yes' })]).ok).toBe(false);
+  });
+
+  it('validates picklist options (≥1, integer unique values, labelled)', () => {
+    expect(validateSubmittedSet([pickField('r', { options: [] })]).ok).toBe(false);
+    expect(validateSubmittedSet([pickField('r', { options: [{ value: 1.5, label: 'x' }] })]).ok).toBe(false);
+    expect(validateSubmittedSet([pickField('r', { options: [{ value: 1, label: 'x' }, { value: 1, label: 'y' }] })]).ok).toBe(false);
+    expect(validateSubmittedSet([pickField('r', { options: [{ value: 1, label: '' }] })]).ok).toBe(false);
+    const ok = validateSubmittedSet([pickField('r')]);
+    expect(ok.ok).toBe(true);
+    expect(ok.rows[0].options).toEqual([{ value: 1, label: 'Low' }, { value: 2, label: 'High' }]);
+  });
+
+  it('validates maxLength + hint bounds', () => {
+    expect(validateSubmittedSet([richField('a', { maxLength: 0 })]).ok).toBe(false);
+    expect(validateSubmittedSet([richField('a', { maxLength: 'abc' })]).ok).toBe(false);
+    const ok = validateSubmittedSet([richField('a', { maxLength: 5000, hint: 'help' })]);
+    expect(ok.rows[0]).toMatchObject({ maxLength: 5000, hint: 'help' });
+  });
+});
+
+describe('buildChangeset', () => {
+  const v = (rows) => { const r = validateSubmittedSet(rows); if (!r.ok) throw new Error(r.errors.join('; ')); return r.rows; };
+
+  it('emits a POST create for a new (id-less) row, with the key in the body', () => {
+    const out = buildChangeset([], v([richField('q2')]));
+    expect(out.ok).toBe(true);
+    expect(out.operations).toHaveLength(1);
+    expect(out.operations[0]).toMatchObject({ method: 'POST', url: ENTITY_SET });
+    expect(out.operations[0].body.wmkf_questionkey).toBe('q2');
+    expect(out.summary).toEqual({ created: 1, updated: 0, deleted: 0, reordered: 0 });
+  });
+
+  it('emits a PATCH-by-id update for an edited row, WITHOUT the key', () => {
+    const cur = [current('id-1', 'q2', 0)];
+    const out = buildChangeset(cur, v([{ id: 'id-1', ...richField('q2', { label: 'New text' }) }]));
+    expect(out.operations).toHaveLength(1);
+    expect(out.operations[0]).toMatchObject({ method: 'PATCH', url: `${ENTITY_SET}(id-1)` });
+    expect(out.operations[0].body.wmkf_questiontext).toBe('New text');
+    expect(out.operations[0].body).not.toHaveProperty('wmkf_questionkey');
+    expect(out.summary.updated).toBe(1);
+  });
+
+  it('REJECTS changing an existing row\'s key (immutability)', () => {
+    const cur = [current('id-1', 'q2', 0)];
+    const out = buildChangeset(cur, v([{ id: 'id-1', ...richField('q2_renamed') }]));
+    expect(out.ok).toBe(false);
+    expect(out.errors[0]).toMatch(/can't be changed/i);
+  });
+
+  it('REJECTS an unknown id (edited row that no longer exists)', () => {
+    const out = buildChangeset([], v([{ id: 'ghost', ...richField('q2') }]));
+    expect(out.ok).toBe(false);
+    expect(out.errors[0]).toMatch(/no longer exists/i);
+  });
+
+  it('soft-deletes a removed row (current id not resubmitted)', () => {
+    const cur = [current('id-1', 'q2', 0), current('id-2', 'q4', 1)];
+    const out = buildChangeset(cur, v([{ id: 'id-1', ...richField('q2') }]));
+    const del = out.operations.find((o) => o.url === `${ENTITY_SET}(id-2)`);
+    expect(del).toMatchObject({ method: 'PATCH', body: INACTIVE_STATE });
+    expect(out.summary.deleted).toBe(1);
+  });
+
+  it('counts a pure reorder as reordered, not updated', () => {
+    const cur = [current('id-1', 'a', 0), current('id-2', 'b', 1)];
+    // Submit b first, a second → both rows change order only.
+    const out = buildChangeset(cur, v([{ id: 'id-2', ...richField('b') }, { id: 'id-1', ...richField('a') }]));
+    expect(out.summary).toMatchObject({ updated: 0, reordered: 2, created: 0, deleted: 0 });
+    expect(out.operations).toHaveLength(2);
+  });
+
+  it('emits NO ops when nothing changed', () => {
+    const cur = [current('id-1', 'q2', 0)];
+    const out = buildChangeset(cur, v([{ id: 'id-1', ...richField('q2') }]));
+    expect(out.ok).toBe(true);
+    expect(out.operations).toHaveLength(0);
+    expect(out.summary).toEqual({ created: 0, updated: 0, deleted: 0, reordered: 0 });
+  });
+
+  it('handles a mixed create + edit + delete + reorder in one changeset', () => {
+    const cur = [current('id-1', 'a', 0), current('id-2', 'b', 1), current('id-3', 'c', 2)];
+    const out = buildChangeset(cur, v([
+      { id: 'id-2', ...richField('b', { label: 'edited b' }) }, // edit + moved to 0
+      richField('d'),                                            // new
+      { id: 'id-1', ...richField('a') },                         // moved to 2
+      // id-3 'c' removed
+    ]));
+    expect(out.ok).toBe(true);
+    expect(out.summary.created).toBe(1);
+    expect(out.summary.deleted).toBe(1);
+    // id-2 changed text AND order → counts as updated (not reordered)
+    expect(out.summary.updated).toBe(1);
+    // id-1 only moved → reordered
+    expect(out.summary.reordered).toBe(1);
+    expect(out.operations.some((o) => o.url === `${ENTITY_SET}(id-3)` && o.body.statecode === 1)).toBe(true);
+  });
+});

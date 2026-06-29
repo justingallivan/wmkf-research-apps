@@ -15,6 +15,9 @@ source_files:
   - lib/external/build-review-submission.js
   - lib/external/review-question-fetcher.js
   - lib/external/review-form-schema.js
+  - pages/api/admin/review-questions.js
+  - lib/admin/review-question-save.js
+  - shared/components/admin/ReviewQuestionsSection.js
   - shared/components/external/ReviewAuthoringForm.js
   - shared/components/external/RichReviewEditor.js
   - shared/components/external/MaterialsView.js
@@ -100,7 +103,7 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   file-upload path: memory `project-reviewer-upload-dormant-not-deleted`.
   **The whole epic (Phases 0–5) is COMPLETE (S302).**
   Full plan: `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md`.
-- **The review question SET is staff-editable (Dataverse `wmkf_reviewquestion`), not hardcoded — Phase A+B LIVE (S303–S304).**
+- **The review question SET is staff-editable (Dataverse `wmkf_reviewquestion`), not hardcoded — Phases A+B+C LIVE (S303–S304).**
   `lib/external/review-question-fetcher.js::getActiveQuestionSet()` (cached, single-flight,
   **fail-closed** — context/draft/submit 500 if the set can't load) is the runtime source. The
   reviewer routes read it: `context.js` attaches `questions` + `questionSetVersion` (stage2b only);
@@ -114,7 +117,14 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   seed + helper source (`reviewParentColumnByKey` dual-write binding, label decoders) and the
   dormant default param; the seeded set is byte-identical to it, so behavior is unchanged. Staff
   upload (`ReviewFormFields`/`ReviewerManagePanel`) + the two legacy `validateReviewForm` paths
-  stay on the static default until Phase C/D. Plan: `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md`.
+  stay on the static default until Phase D. **Phase C (S304): superuser editor** at `/admin` →
+  `ReviewQuestionsSection` → `pages/api/admin/review-questions.js`: add/edit/drag-reorder/remove the set;
+  the route diffs by row id (`lib/admin/review-question-save.js`) and applies ONE atomic
+  `executeChangeset` (create/update/soft-delete), enforces key-immutability + `questionSetVersion`
+  optimistic-lock (409 `set_changed`), audits to Postgres `review_question_audit` (pending→final,
+  hard-abort if audit down), and calls `invalidate()`. No guard yet against removing the four
+  parent-bound rows (affiliation/impact/risk/overallRating) — see the atlas gotcha. Plan:
+  `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md`.
 - **Prod accept triggers a live automation chain — keep automated tests mocked/fenced.**
   A reviewer accept CREATEs a honorarium `akoya_request`, which fires AkoyaGo plugins
   + classic workflows + a live Bill.com payment flow + a contact→Business-Central sync.

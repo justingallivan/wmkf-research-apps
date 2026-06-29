@@ -84,11 +84,16 @@ documented expected-red `bill.test.js` / `discovery-verification-status.test.js`
    - **Ship B1+B2 together is now moot** (B1 already shipped behavior-identically
      because the seeded set == the static schema; B2 is additive on top).
 2. **Phase B Codex review** once B2 lands (cadence: each phase Codex-reviewed).
-3. **Phases C → D → E** (plan §8): C = admin variable-length editor
-   (`pages/api/admin/review-questions.js` + `ReviewQuestionsSection.js`, atomic
-   `executeChangeset` save, row-identity key-immutability, `invalidate()`); D =
-   migrate the §6 parent-column readers + the two legacy staff writers to the
-   snapshot; E = stop-write/drop the parent columns (external gate already clear).
+3. **Phase C — admin editor. ✅ LIVE (S304).** `pages/api/admin/review-questions.js`
+   + pure `lib/admin/review-question-save.js` + `ReviewQuestionsSection.js`
+   (drag-reorder), atomic `executeChangeset` save, row-identity key-immutability,
+   `questionSetVersion` optimistic-lock (409 set_changed), Postgres audit
+   (migration 022 — **not yet applied to prod**), `invalidate()`. 25 tests green
+   (14 unit save + 7 route integration + 4 RTL). Known gap: no guard against
+   removing the four parent-bound rows (affiliation/impact/risk/overallRating).
+   **Next: Phase C Codex review, then apply migration 022, then Phases D → E**
+   (migrate the §6 parent-column readers + two legacy staff writers to the
+   snapshot; then stop-write/drop the parent columns — external gate already clear).
 
 ### Owner Decision Needed (carried from S303, not addressed)
 
