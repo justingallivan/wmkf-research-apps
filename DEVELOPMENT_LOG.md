@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Reviewer in-browser review-form authoring shipped end-to-end (Session 302)
+
+**Milestone:** External reviewers now author AND submit their review in the browser — the file-upload review path is retired from the UI. A submitted review is captured as a point-in-time Dataverse answer-snapshot (`wmkf_appreviewanswer`) written atomically, then read back in the staff workbench.
+
+**Sessions:** 300 (plan + data-model pivot) → 301 (Phases 0–2 + the `$batch` spike) → 302 (Phase 2.5 Part B through Phase 5). Codex-reviewed every phase; findings folded.
+
+**Ship state:**
+- `DynamicsService.executeChangeset` — atomic Dataverse `$batch` changeset helper (per-op `If-Match`, fail-closed multipart parse); refutes the old "no $batch transaction" belief. `_wmkf_appreviewersuggestion_value=<guid>` is the prod-verified alt-key upsert form (NOT the bare logical name) (`d3ed821b`, `cc787b4e`).
+- `/submit` — finality precheck + sanitize/validate + atomic changeset (answer rows upserted by alt key + parent ratings/affiliation/receivedat, fail-closed `If-Match`) + draft-delete-post-commit; the wired Submit button locks the form read-only (`1bf0f317`, `ce6bbf99`, `73ac41b1`).
+- Workbench read-back: `/api/review-manager/reviewers` attaches re-sanitized `answers[]`, rendered by `ReviewsTab` (`b08c7323`). Draft lifecycle: deleted on submit / token revoke+regenerate (not `mintAndStore`) + 90d cron GC (`c00c7e6f`).
+
+**Why it matters:** reviewers no longer assemble a PDF — the narrative answers are structured, lossless across question-set changes, and machine-readable for the future review-document assembler/VRP. The file-upload route is hidden-not-deleted (finality-guarded). Net-new atomic-multi-row Dataverse write primitive is now available repo-wide.
+
+**Pointers:** `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md` (Phases 0–5 done), `docs/atlas/dataverse-wmkf-appreviewanswer.md`, memory `reference-dataverse-altkey-lookup-upsert-url` + `project-dataverse-batch-changeset-available`. Commits `d3ed821b`…`84d00cdb`.
+
 ## June 2026 — Reviewer↔CRM-contact boundary reconciled (Session 294)
 
 **Milestone:** The reviewer-pipeline → CRM-`contact` boundary is closed end to end: a reviewer's identity corrections now reliably reach (or are surfaced for) their CRM contact, where before they stranded on pipeline rows and could spawn duplicate/stale contacts on the payment-bearing accept path.
