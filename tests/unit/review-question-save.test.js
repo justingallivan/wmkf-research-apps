@@ -1,5 +1,5 @@
 /** Pure validate + diff + changeset builder for the staff review-question editor. */
-import { validateSubmittedSet, buildChangeset, ENTITY_SET, INACTIVE_STATE } from '../../lib/admin/review-question-save';
+import { validateSubmittedSet, buildChangeset, missingParentBoundKeys, PARENT_BOUND_KEYS, MAX_QUESTIONS, ENTITY_SET, INACTIVE_STATE } from '../../lib/admin/review-question-save';
 
 const richField = (key, over = {}) => ({ key, label: `Label ${key}`, type: 'richtext', required: true, ...over });
 const pickField = (key, over = {}) => ({
@@ -50,6 +50,25 @@ describe('validateSubmittedSet', () => {
     const ok = validateSubmittedSet([richField('a', { maxLength: 5000, hint: 'help' })]);
     expect(ok.rows[0]).toMatchObject({ maxLength: 5000, hint: 'help' });
   });
+
+  it('rejects a set over the 100-row cap (Codex P1-2)', () => {
+    const over = Array.from({ length: MAX_QUESTIONS + 1 }, (_, i) => richField(`q${i}`));
+    const r = validateSubmittedSet(over);
+    expect(r.ok).toBe(false);
+    expect(r.errors[0]).toMatch(/too many/i);
+    // at the cap is fine
+    expect(validateSubmittedSet(Array.from({ length: MAX_QUESTIONS }, (_, i) => richField(`q${i}`))).ok).toBe(true);
+  });
+});
+
+describe('missingParentBoundKeys (Codex P1-3)', () => {
+  it('lists the four required keys that are absent', () => {
+    expect(PARENT_BOUND_KEYS).toEqual(expect.arrayContaining(['affiliation', 'impact', 'risk', 'overallRating']));
+    expect(missingParentBoundKeys([richField('q2')])).toEqual(expect.arrayContaining(['affiliation', 'impact', 'risk', 'overallRating']));
+    const full = PARENT_BOUND_KEYS.map((k) => ({ key: k }));
+    expect(missingParentBoundKeys(full)).toEqual([]);
+    expect(missingParentBoundKeys([...full.filter((r) => r.key !== 'risk')])).toEqual(['risk']);
+  });
 });
 
 describe('buildChangeset', () => {
@@ -93,6 +112,18 @@ describe('buildChangeset', () => {
     const del = out.operations.find((o) => o.url === `${ENTITY_SET}(id-2)`);
     expect(del).toMatchObject({ method: 'PATCH', body: INACTIVE_STATE });
     expect(out.summary.deleted).toBe(1);
+  });
+
+  it('attaches the row etag as If-Match on update + delete ops (Codex P1-1)', () => {
+    const cur = [
+      { ...current('id-1', 'q2', 0), etag: 'W/"11"' },
+      { ...current('id-2', 'q4', 1), etag: 'W/"22"' },
+    ];
+    const out = buildChangeset(cur, v([{ id: 'id-1', ...richField('q2', { label: 'edited' }) }]));
+    const upd = out.operations.find((o) => o.url === `${ENTITY_SET}(id-1)` && o.body.wmkf_questiontext);
+    const del = out.operations.find((o) => o.url === `${ENTITY_SET}(id-2)` && o.body.statecode === 1);
+    expect(upd.ifMatch).toBe('W/"11"');
+    expect(del.ifMatch).toBe('W/"22"');
   });
 
   it('counts a pure reorder as reordered, not updated', () => {

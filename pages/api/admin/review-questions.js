@@ -32,7 +32,7 @@ import { requireSuperuser } from '../../../lib/utils/auth';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { normalizeRow, questionSetVersion, invalidate } from '../../../lib/external/review-question-fetcher';
-import { validateSubmittedSet, buildChangeset, ENTITY_SET } from '../../../lib/admin/review-question-save';
+import { validateSubmittedSet, buildChangeset, missingParentBoundKeys, ENTITY_SET } from '../../../lib/admin/review-question-save';
 
 const SELECT = [
   'wmkf_reviewquestionid',
@@ -73,14 +73,20 @@ export default async function handler(req, res) {
  * partial editor.
  */
 async function readActiveSetWithIds() {
-  const { records } = await DynamicsService.queryRecords(ENTITY_SET, {
+  const { records, totalCount, hasMore } = await DynamicsService.queryRecords(ENTITY_SET, {
     select: SELECT,
     filter: 'statecode eq 0',
     orderby: 'wmkf_questionorder',
     top: 100,
   });
+  // Same 100-row fail-closed contract the reviewer fetcher enforces: never show
+  // the editor a truncated set (it would soft-delete the unseen rows on save).
+  if (hasMore || (Number.isFinite(totalCount) && totalCount > (records || []).length)) {
+    throw new Error(`active question set exceeds the 100-row fetch cap (count=${totalCount})`);
+  }
   return (records || []).map((row) => ({
     id: row.wmkf_reviewquestionid,
+    etag: row._etag || null, // row-version for per-op If-Match on save
     ...normalizeRow(row),
   }));
 }
@@ -107,6 +113,22 @@ async function handlePost(req, res, profileId) {
   }
   const submittedRows = validation.rows;
 
+  // 1a. Require the optimistic-lock token — a client that omits it must not be
+  // able to bypass the concurrency check (Codex Phase C P1-1).
+  if (!baseVersion) {
+    return res.status(400).json({ status: 'invalid', errors: ['Missing baseVersion (reload the editor and try again).'] });
+  }
+
+  // 1b. The four parent-bound keys must stay in the set until Phase E retires
+  // their dual-write columns (Codex Phase C P1-3).
+  const missing = missingParentBoundKeys(submittedRows);
+  if (missing.length > 0) {
+    return res.status(400).json({
+      status: 'invalid',
+      errors: [`These required questions can't be removed yet: ${missing.join(', ')}.`],
+    });
+  }
+
   // 2. Re-read live state for the optimistic check + the diff base.
   let currentRows;
   try {
@@ -117,7 +139,7 @@ async function handlePost(req, res, profileId) {
   const currentVersion = questionSetVersion(currentRows);
 
   // 3. Optimistic concurrency — the editor must have loaded against the live set.
-  if (baseVersion && baseVersion !== currentVersion) {
+  if (baseVersion !== currentVersion) {
     await bestEffortAudit({
       requestId: randomUUID(), profileId, phase: 'final', status: 'set_changed',
       baseVersion, resultVersion: null, summary: null,
@@ -163,11 +185,22 @@ async function handlePost(req, res, profileId) {
     await DynamicsService.executeChangeset(plan.operations);
   } catch (err) {
     console.error('[admin/review-questions] changeset failed:', err);
+    // A 412 means a concurrent save touched a row between our version read and
+    // the changeset (the per-op If-Match guard fired). The whole changeset rolled
+    // back; tell the client to reload, same as a version mismatch (Codex P1-1).
+    const concurrency = err.status === 412;
     await bestEffortAudit({
-      requestId, profileId, phase: 'final', status: 'failed',
+      requestId, profileId, phase: 'final', status: concurrency ? 'set_changed' : 'failed',
       baseVersion, resultVersion: null, summary: plan.summary,
-      before: currentRows, after: submittedRows, warnings: [`changeset_error:${err.message}`],
+      before: currentRows, after: submittedRows,
+      warnings: [concurrency ? 'concurrent_write_412' : `changeset_error:${err.message}`],
     });
+    if (concurrency) {
+      return res.status(409).json({
+        status: 'set_changed',
+        error: 'Another save landed while you were editing. Reload to see the current version before saving.',
+      });
+    }
     return res.status(502).json({
       status: 'failed',
       error: 'Saving the question set failed; no changes were applied.',

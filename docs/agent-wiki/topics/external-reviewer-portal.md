@@ -122,9 +122,10 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   the route diffs by row id (`lib/admin/review-question-save.js`) and applies ONE atomic
   `executeChangeset` (create/update/soft-delete), enforces key-immutability + `questionSetVersion`
   optimistic-lock (409 `set_changed`), audits to Postgres `review_question_audit` (pending→final,
-  hard-abort if audit down), and calls `invalidate()`. No guard yet against removing the four
-  parent-bound rows (affiliation/impact/risk/overallRating) — see the atlas gotcha. Plan:
-  `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md`.
+  hard-abort if audit down), and calls `invalidate()`. Concurrency-hardened (Codex Phase C P1s):
+  `baseVersion` is required + each update/delete carries the row's `_etag` as `If-Match` (412 → 409
+  reload); set capped at 100; the four parent-bound rows (affiliation/impact/risk/overallRating)
+  can't be removed until Phase E (server 400). Plan: `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md`.
 - **Prod accept triggers a live automation chain — keep automated tests mocked/fenced.**
   A reviewer accept CREATEs a honorarium `akoya_request`, which fires AkoyaGo plugins
   + classic workflows + a live Bill.com payment flow + a contact→Business-Central sync.
