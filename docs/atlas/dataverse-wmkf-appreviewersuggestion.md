@@ -65,9 +65,7 @@ External-reviewer intake (S128–S130):
 
 Structured review fields (S130 schema additions):
 - `wmkf_revieweraffiliation` (String) — parent identity column; still the read source for the review-context affiliation prefill.
-- `wmkf_reviewerimpact` (Picklist) — **DEAD (Phase E1, S305): no reader, no writer.** Ratings live solely in the `wmkf_appreviewanswer` snapshot. The column still exists in the Dataverse schema (dormant) until E2 drops it; nothing reads or writes it.
-- `wmkf_reviewerrisk` (Picklist) — same as impact (dead; dormant until E2 drop).
-- `wmkf_revieweroverallrating` (Picklist) — same as impact (dead; dormant until E2 drop).
+- ~~`wmkf_reviewerimpact` / `wmkf_reviewerrisk` / `wmkf_revieweroverallrating` (Picklist)~~ — **DROPPED from Dataverse (Phase E2, S305).** Ratings now live solely in the `wmkf_appreviewanswer` snapshot (migrated to read in Phase D, write stopped in E1, columns deleted in E2 via `scripts/drop-reviewer-rating-columns.mjs`). Retired from schema-as-code so a re-apply can't recreate them. Forward constraint: never redeploy pre-E1 code (it would PATCH these missing columns).
 
 Stage 2a slice 1 additions (S143, deployed 2026-05-09):
 

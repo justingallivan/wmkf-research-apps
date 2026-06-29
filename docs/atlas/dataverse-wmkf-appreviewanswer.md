@@ -8,7 +8,7 @@
 
 ## Source of Truth
 
-Point-in-time **answer snapshot** for an external reviewer's submitted review. One row per question per submitted review (all 11 questions, ratings included), each storing the question text exactly as asked beside the answer, so a submitted review reconstructs losslessly even after the question set changes. **Sole system of record for the three ratings** (post-Phase-E1, S305) as well as the narrative answers — the DTO, the review-context prefill, and the merge engagement signal all read ratings from here. The former parent columns (`wmkf_reviewerimpact/risk/overallrating`) are no longer written (E1 ended the dual-write) and no longer read; they remain dormant in the Dataverse schema until E2 drops them. Adding questions later = more rows, never new columns.
+Point-in-time **answer snapshot** for an external reviewer's submitted review. One row per question per submitted review (all 11 questions, ratings included), each storing the question text exactly as asked beside the answer, so a submitted review reconstructs losslessly even after the question set changes. **Sole system of record for the three ratings** (post-Phase-E1, S305) as well as the narrative answers — the DTO, the review-context prefill, and the merge engagement signal all read ratings from here. The former parent columns (`wmkf_reviewerimpact/risk/overallrating`) were retired entirely — no reader (Phase D), no writer (E1), and the columns themselves **dropped from Dataverse (E2, S305)**. Adding questions later = more rows, never new columns.
 
 Full design: `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md` §3a.
 
