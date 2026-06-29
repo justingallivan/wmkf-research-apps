@@ -40,7 +40,15 @@ const { bypassDynamicsRestrictions } = await import('../lib/services/dynamics-co
 
 const PROBE_PREFIX = '__probe_uk';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const LOOKUP_ATTR = 'wmkf_appreviewersuggestion'; // alt-key lookup attribute logical name
+// Candidate URL forms for the lookup component of the alternate key. The key
+// declares keyAttributes ["wmkf_appreviewersuggestion", "wmkf_questionkey"], but
+// Dataverse rejected the bare logical name (0x80060888), so try the documented
+// alternatives. First one that CREATEs a row wins.
+const LOOKUP_ATTR_CANDIDATES = [
+  '_wmkf_appreviewersuggestion_value', // the lookup's value attribute
+  'wmkf_AppReviewerSuggestion',        // the navigation property (schema casing)
+  'wmkf_appreviewersuggestion',        // the bare logical name (already failed; kept for the record)
+];
 
 function parseArgs(argv) {
   const out = { suggestion: null, execute: false };
@@ -54,10 +62,10 @@ function parseArgs(argv) {
 }
 
 /** Build an alt-key upsert PATCH op for executeChangeset (no lookup in the body — relies on the URL key). */
-function upsertOp(entitySet, suggestionId, questionKey, body) {
+function upsertOp(entitySet, lookupAttr, suggestionId, questionKey, body) {
   return {
     method: 'PATCH',
-    url: `${entitySet}(${LOOKUP_ATTR}=${suggestionId},wmkf_questionkey='${questionKey}')`,
+    url: `${entitySet}(${lookupAttr}=${suggestionId},wmkf_questionkey='${questionKey}')`,
     body,
   };
 }
@@ -84,58 +92,50 @@ async function main() {
     const entitySet = await DynamicsService.resolveEntitySetName('wmkf_appreviewanswer');
     console.log(`Resolved entity set: ${entitySet}`);
 
-    const ops1 = [
-      upsertOp(entitySet, args.suggestion, `${PROBE_PREFIX}1`, { wmkf_answertext: 'v1', wmkf_questionorder: 1, wmkf_questiontype: 'string' }),
-      upsertOp(entitySet, args.suggestion, `${PROBE_PREFIX}2`, { wmkf_answertext: 'v1', wmkf_questionorder: 2, wmkf_questiontype: 'string' }),
-    ];
-
     if (!args.execute) {
-      console.log('\n━━━ DRY RUN — planned upsert ops ━━━');
-      for (const op of ops1) console.log(`  ${op.method} ${op.url}  body=${JSON.stringify(op.body)}`);
+      console.log('\n━━━ DRY RUN — candidate lookup-attr URL forms ━━━');
+      for (const attr of LOOKUP_ATTR_CANDIDATES) {
+        console.log(`  ${upsertOp(entitySet, attr, args.suggestion, `${PROBE_PREFIX}1`, { wmkf_answertext: 'v1' }).url}`);
+      }
       console.log('\n(dry run — nothing written. Re-run with --execute.)');
       return;
     }
 
-    const verdict = {};
-
-    // ── Round 1: alt-key upsert should CREATE both rows ──────────────────────
-    console.log('\n━━━ Round 1: alt-key upsert (expect CREATE of 2 rows) ━━━');
-    try {
-      const r = await DynamicsService.executeChangeset(ops1);
-      console.log(`  executeChangeset ok; op statuses: [${r.operations.map((o) => o.status).join(', ')}]`);
-    } catch (e) {
-      console.log(`  FAILED: status=${e.status} code=${e.dataverseCode || '-'} msg=${(e.dataverseMessage || e.message || '').slice(0, 300)}`);
-      verdict.altKeyUpsertWorks = false;
-    }
-    let rows = await findProbeRows(entitySet, args.suggestion);
-    console.log(`  probe rows now: ${rows.length} (expect 2); values: [${rows.map((x) => x.wmkf_answertext).join(', ')}]`);
-    if (verdict.altKeyUpsertWorks !== false) verdict.altKeyUpsertWorks = rows.length === 2;
-
-    // ── Round 2: SAME keys, changed value → UPDATE in place (still 2 rows) ────
-    console.log('\n━━━ Round 2: re-upsert same keys, new value (expect UPDATE, still 2 rows) ━━━');
-    if (verdict.altKeyUpsertWorks) {
-      const ops2 = [
-        upsertOp(entitySet, args.suggestion, `${PROBE_PREFIX}1`, { wmkf_answertext: 'v2' }),
-        upsertOp(entitySet, args.suggestion, `${PROBE_PREFIX}2`, { wmkf_answertext: 'v2' }),
-      ];
+    // ── Find the working lookup-attr URL form (one create op per candidate) ──
+    console.log('\n━━━ Candidate search: which alt-key URL form CREATEs a row? ━━━');
+    let workingAttr = null;
+    for (let i = 0; i < LOOKUP_ATTR_CANDIDATES.length; i++) {
+      const attr = LOOKUP_ATTR_CANDIDATES[i];
+      const qk = `${PROBE_PREFIX}c${i}`;
       try {
-        await DynamicsService.executeChangeset(ops2);
+        await DynamicsService.executeChangeset([
+          upsertOp(entitySet, attr, args.suggestion, qk, { wmkf_answertext: 'v1', wmkf_questionorder: 1, wmkf_questiontype: 'string' }),
+        ]);
+        const made = (await findProbeRows(entitySet, args.suggestion)).some((x) => x.wmkf_questionkey === qk);
+        console.log(`  ${attr.padEnd(38)} → ${made ? 'CREATED ✓' : 'no row'}`);
+        if (made && !workingAttr) workingAttr = attr;
       } catch (e) {
-        console.log(`  re-upsert FAILED: ${(e.dataverseMessage || e.message || '').slice(0, 200)}`);
+        console.log(`  ${attr.padEnd(38)} → ${e.status || '?'} ${e.dataverseCode || ''} ${(e.dataverseMessage || e.message || '').slice(0, 90)}`);
       }
-      rows = await findProbeRows(entitySet, args.suggestion);
-      const allV2 = rows.length === 2 && rows.every((x) => x.wmkf_answertext === 'v2');
-      console.log(`  probe rows now: ${rows.length} (expect 2, no dupes); values: [${rows.map((x) => x.wmkf_answertext).join(', ')}]`);
-      verdict.idempotentUpsert = allV2;
+    }
+
+    const verdict = { workingAttr };
+
+    // ── Idempotency: re-upsert the working form's key, expect UPDATE not dupe ─
+    if (workingAttr) {
+      console.log(`\n━━━ Idempotency: re-upsert via "${workingAttr}" (expect UPDATE, no dupe) ━━━`);
+      const qk = `${PROBE_PREFIX}c${LOOKUP_ATTR_CANDIDATES.indexOf(workingAttr)}`;
+      await DynamicsService.executeChangeset([upsertOp(entitySet, workingAttr, args.suggestion, qk, { wmkf_answertext: 'v2' })]);
+      const matching = (await findProbeRows(entitySet, args.suggestion)).filter((x) => x.wmkf_questionkey === qk);
+      verdict.idempotentUpsert = matching.length === 1 && matching[0].wmkf_answertext === 'v2';
+      console.log(`  rows for ${qk}: ${matching.length} (expect 1); value: ${matching.map((x) => x.wmkf_answertext).join(',')}`);
     } else {
       verdict.idempotentUpsert = null;
-      console.log('  skipped (round 1 did not create the rows).');
     }
 
-    // ── Cleanup ──────────────────────────────────────────────────────────────
+    // ── Cleanup every probe row ──────────────────────────────────────────────
     console.log('\n━━━ Cleanup ━━━');
-    rows = await findProbeRows(entitySet, args.suggestion);
-    for (const r of rows) {
+    for (const r of await findProbeRows(entitySet, args.suggestion)) {
       try {
         await DynamicsService.deleteRecord(entitySet, r.wmkf_appreviewanswerid);
         console.log(`  deleted ${r.wmkf_questionkey} (${r.wmkf_appreviewanswerid})`);
@@ -148,11 +148,11 @@ async function main() {
     console.log(`  probe rows remaining: ${leftover.length}`);
 
     console.log('\n═══ VERDICT ═══');
-    console.log(`  alt-key upsert CREATEs (lookup auto-bound from URL): ${verdict.altKeyUpsertWorks ? 'YES' : 'NO'}`);
-    console.log(`  re-upsert UPDATEs in place (idempotent, no dupes):   ${verdict.idempotentUpsert === null ? 'N/A' : verdict.idempotentUpsert ? 'YES' : 'NO'}`);
-    console.log(`  cleanup left the table clean:                        ${verdict.cleanupClean ? 'YES' : 'NO — MANUAL CLEANUP NEEDED'}`);
-    const go = verdict.altKeyUpsertWorks && verdict.idempotentUpsert;
-    console.log(`\n  → ${go ? 'GO: /submit can upsert answer rows by alternate key.' : 'NO-GO: alt-key upsert URL syntax needs revision (try _wmkf_appreviewersuggestion_value=, or @odata.bind in the body).'}`);
+    console.log(`  working alt-key URL form:        ${verdict.workingAttr || 'NONE — all candidates rejected'}`);
+    console.log(`  idempotent (re-upsert UPDATEs):  ${verdict.idempotentUpsert === null ? 'N/A' : verdict.idempotentUpsert ? 'YES' : 'NO'}`);
+    console.log(`  cleanup left the table clean:    ${verdict.cleanupClean ? 'YES' : 'NO — MANUAL CLEANUP NEEDED'}`);
+    const go = !!verdict.workingAttr && verdict.idempotentUpsert;
+    console.log(`\n  → ${go ? `GO: /submit uses "${verdict.workingAttr}" as the alt-key lookup component.` : 'NO-GO: no candidate alt-key URL form worked — fall back to @odata.bind in the body or a read-then-create.'}`);
   });
 }
 

@@ -75,7 +75,8 @@
 - Dataverse / Dynamics / Explorer / Power Tools: ../docs/agent-wiki/topics/dataverse-dynamics.md
 - Dynamics CRM facts / grant lifecycle fields: ../docs/agent-wiki/topics/dataverse-dynamics.md
 - Is a Dataverse field human- or flow-populated? (audit-trail actor detection): reference-dataverse-audit-trail-actor-detection.md
-- Atomic multi-row Dataverse write / `$batch` changeset availability (WORKS in prod, refutes the prompts/[name].js "no $batch" belief): project-dataverse-batch-changeset-available.md
+- Atomic multi-row Dataverse write / `$batch` changeset availability (WORKS in prod, refutes the prompts/[name].js "no $batch" belief; helper = `DynamicsService.executeChangeset`): project-dataverse-batch-changeset-available.md
+- Dataverse alt-key upsert URL whose key includes a LOOKUP (address by `_<lookup>_value=<guid>`, NOT bare logical name/nav property — else 400 0x80060888; verified S302): reference-dataverse-altkey-lookup-upsert-url.md
 - Dataverse settings auditing / recovering an accidentally-blanked admin email default (or any wmkf_appsystemsetting value) — PARKED, needs Connor on scope + retention: project-dataverse-settings-audit-enablement.md
 - Prompt / Executor / document processing: ../docs/agent-wiki/topics/prompt-executor.md
 - Adding a prompt / editing a seed / prompt-store governance (two-tier, create-only seed, version-preserving --force, timestamps): project-prompt-governance.md

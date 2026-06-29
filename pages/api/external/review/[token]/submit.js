@@ -45,10 +45,12 @@ import { sanitizeReviewHtml } from '../../../../../lib/external/sanitize-review-
 import { validateReviewSubmission, buildReviewSubmission } from '../../../../../lib/external/build-review-submission';
 
 const PARENT_ENTITY_SET = 'wmkf_appreviewersuggestions';
-// Alternate-key lookup attribute (lowercase logical name) — see
-// lib/dataverse/schema/wave8-review-answer-snapshot and
-// scripts/probe-altkey-upsert-changeset.mjs which validates this URL form.
-const ANSWER_KEY_LOOKUP_ATTR = 'wmkf_appreviewersuggestion';
+// Alternate-key lookup component in the upsert URL. The lookup must be addressed
+// by its VALUE attribute (`_wmkf_appreviewersuggestion_value`), NOT the bare
+// logical name or the navigation property — both of those are rejected with
+// 0x80060888. [VERIFIED in prod via scripts/probe-altkey-upsert-changeset.mjs,
+// S302: this form CREATEs on first upsert and UPDATEs idempotently on retry.]
+const ANSWER_KEY_LOOKUP_ATTR = '_wmkf_appreviewersuggestion_value';
 
 const RICHTEXT_KEYS = reviewFormSchema.fields.filter((f) => f.type === 'richtext').map((f) => f.key);
 

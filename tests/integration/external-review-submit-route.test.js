@@ -184,7 +184,7 @@ describe('happy path — atomic write', () => {
     for (const op of answerOps) {
       expect(op.method).toBe('PATCH');
       expect(op.url).toMatch(
-        /^wmkf_appreviewanswers\(wmkf_appreviewersuggestion=550e8400-e29b-41d4-a716-446655440000,wmkf_questionkey='[^']+'\)$/,
+        /^wmkf_appreviewanswers\(_wmkf_appreviewersuggestion_value=550e8400-e29b-41d4-a716-446655440000,wmkf_questionkey='[^']+'\)$/,
       );
       expect(op.url).not.toContain('If-Match'); // no per-answer If-Match
     }
