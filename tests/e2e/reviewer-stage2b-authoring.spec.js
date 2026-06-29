@@ -7,7 +7,7 @@
 // render with NO Dataverse/Postgres touch.
 
 const { test, expect } = require('@playwright/test');
-const { TOKEN, buildContext, mockPortal, portalUrl } = require('./helpers/reviewer-portal');
+const { TOKEN, buildContext, mockPortal, portalUrl, QUESTION_SET_VERSION } = require('./helpers/reviewer-portal');
 
 test.describe('Reviewer stage2b in-browser authoring', () => {
   test('renders the rich-text form, autosaves on edit, rehydrates on reload, submit gated until complete', async ({ page }) => {
@@ -107,6 +107,60 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
     await expect(page.locator('.ProseMirror')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Submit review' })).toHaveCount(0);
     expect(submitBody.answers.q2).toContain('a');
+    // B2: the client echoes the context-supplied question-set version so the
+    // server can detect a mid-edit staff change (set_changed).
+    expect(submitBody.setVersion).toBe(QUESTION_SET_VERSION);
+  });
+
+  test('a set_changed 409 prompts a reload (not a terminal conflict)', async ({ page }) => {
+    await mockPortal(page, { context: buildContext({ view: 'stage2b' }) });
+    const fullDraft = {
+      impact: 3, risk: 2, overallRating: 4,
+      q2: '<p>a</p>', q4: '<p>a</p>', q5: '<p>a</p>', q6: '<p>a</p>',
+      q7: '<p>a</p>', q8: '<p>a</p>', q9: '<p>a</p>',
+    };
+    await page.route(`**/api/external/review/${TOKEN}/draft`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, draftJson: fullDraft, submitted: false }) }));
+    await page.route(`**/api/external/review/${TOKEN}/submit`, (route) =>
+      route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ ok: false, reason: 'set_changed', message: 'The review questions changed since you opened this form. Please reload to see the current questions.' }) }));
+
+    await page.goto(portalUrl(TOKEN));
+    await page.getByRole('button', { name: 'Submit review' }).click();
+
+    // Distinct, non-terminal reload prompt — NOT the "can no longer be submitted"
+    // terminal conflict copy. Reload offered; editors gone while it shows.
+    await expect(page.getByText('The review questions were updated')).toBeVisible();
+    await expect(page.getByText(/your saved answers will be kept/i)).toBeVisible();
+    await expect(page.getByText('This review can no longer be submitted here')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible();
+    await expect(page.locator('.ProseMirror')).toHaveCount(0);
+  });
+
+  test('type-aware draft reconciliation: a draft value whose shape mismatches the current field type is discarded', async ({ page }) => {
+    await mockPortal(page, { context: buildContext({ view: 'stage2b' }) });
+
+    // A draft saved under a PRIOR set where q2 was a picklist (number) and
+    // impact was richtext (HTML). Against the current set (q2 richtext, impact
+    // picklist) both values are shape-mismatched and must be discarded, never
+    // fed to the wrong control. q4 is a valid richtext answer and survives.
+    const staleDraft = {
+      q2: 3,                 // number left by a former picklist → discard (richtext now)
+      impact: '<p>x</p>',    // HTML left by a former richtext → discard (picklist now)
+      q4: '<p>kept</p>',     // valid richtext → survives
+    };
+    await page.route(`**/api/external/review/${TOKEN}/draft`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, draftJson: staleDraft, submitted: false }) }));
+
+    await page.goto(portalUrl(TOKEN));
+
+    // q4's valid answer hydrated; q2's mismatched number was dropped (empty).
+    await expect(page.locator('[aria-label^="Q4 —"]')).toContainText('kept');
+    await expect(page.locator('[aria-label^="Q2 —"]')).not.toContainText('3');
+    // The mismatched impact value did not select any radio.
+    await expect(page.getByLabel('Little to no impact')).not.toBeChecked();
+    await expect(page.getByLabel('Will result in publications of disciplinary interest')).not.toBeChecked();
+    await expect(page.getByLabel('Will result in publications of broad interest')).not.toBeChecked();
+    await expect(page.getByLabel('Will rewrite textbooks')).not.toBeChecked();
   });
 
   test('a 409 from submit locks the form into a terminal conflict state (no resubmit)', async ({ page }) => {

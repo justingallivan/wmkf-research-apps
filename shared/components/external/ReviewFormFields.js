@@ -17,13 +17,19 @@
  * the in-browser authoring surface owns. This legacy renderer stays scoped to
  * the string + picklist fields so the staff/landing upload surfaces are
  * unaffected by the new questions.
+ *
+ * The question set is injectable via the `fields` prop (staff-editable-questions
+ * epic), defaulting to the static `reviewFormSchema.fields`. The staff upload
+ * path (ReviewerManagePanel) stays on the static default for Phase B per plan
+ * §5 — only the external authoring surface (ReviewAuthoringForm) renders from
+ * the Dataverse-authored set today.
  */
 import { reviewFormSchema } from '../../../lib/external/review-form-schema';
 
-export default function ReviewFormFields({ initialValues = {}, disabled = false, idPrefix = 'rf' }) {
+export default function ReviewFormFields({ initialValues = {}, disabled = false, idPrefix = 'rf', fields = reviewFormSchema.fields }) {
   return (
     <div className="space-y-6">
-      {reviewFormSchema.fields.filter(field => field.type !== 'richtext').map(field => (
+      {fields.filter(field => field.type !== 'richtext').map(field => (
         <div key={field.key} className="space-y-2">
           <label
             htmlFor={`${idPrefix}-${field.key}`}

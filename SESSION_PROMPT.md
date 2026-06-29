@@ -58,9 +58,16 @@ documented expected-red `bill.test.js` / `discovery-verification-status.test.js`
 
 ### Verified Open
 
-1. **Phase B2 — client cutover (the next task).**
-   Evidence: plan §5/§8 (Phase B B2); `shared/components/external/ReviewAuthoringForm.js`
-   + `ReviewFormFields.js` still statically import `reviewFormSchema`.
+1. **Phase B2 — client cutover. ✅ DONE (S304).**
+   `ReviewAuthoringForm` renders from the `context` set (`data.questions`, no static
+   import), echoes `setVersion` + handles the `set_changed` 409 reload, and reconciles
+   the draft type-aware on load; `ReviewFormFields` gained an optional `fields` prop
+   (default static; `ReviewerManagePanel` stays static per §5). Real-build E2E green
+   (7 cases incl. render-from-context, setVersion echo, set_changed reload, type-mismatch
+   reconcile). Next: **Phase C (admin variable-length editor)** + the Phase B Codex review.
+   Evidence: plan §5/§8 (✅ DONE), `tests/e2e/reviewer-stage2b-authoring.spec.js`.
+
+   _Superseded original task note:_
    - Make both components consume the question set from the `context` response
      (`data.questions`) as props instead of the static import.
    - Send `data.questionSetVersion` back on the `/submit` POST body as `setVersion`
@@ -84,8 +91,8 @@ documented expected-red `bill.test.js` / `discovery-verification-status.test.js`
 
 1. Remit-flag on review-completion — wire `wmkf_authorizationtoremitpaymentflag`
    on submit? Evidence: `.claude-memory/project-honorarium-payment-landscape.md`.
-2. Ops/Steph BILL-honorarium update — drafted, Justin to send.
-   Evidence: `scratchpad/ops-bill-honorarium-update.md`.
+
+(Ops/Steph BILL-honorarium update — DONE, sent by Justin S304.)
 
 ### Parked
 
@@ -121,7 +128,7 @@ documented expected-red `bill.test.js` / `discovery-verification-status.test.js`
 | `lib/external/build-review-submission.js` | `validateReviewSubmission`/`buildReviewSubmission(…, questionSet)`. |
 | `lib/external/review-form-schema.js` | Retained: field shape, seed, helpers, `reviewParentColumnByKey` (dual-write binding), `labelForOption`. |
 | `pages/api/external/review/[token]/{submit,draft,context}.js` | Reviewer routes — now read the fetched set; context emits `questions`+`questionSetVersion`; submit `set_changed`. |
-| `shared/components/external/ReviewAuthoringForm.js` + `ReviewFormFields.js` | **B2 target** — still static-import; migrate to context-supplied set. |
+| `shared/components/external/ReviewAuthoringForm.js` + `ReviewFormFields.js` | **B2 ✅ DONE** — `ReviewAuthoringForm` renders from `data.questions`; `ReviewFormFields` has an optional `fields` prop (default static, staff path unchanged). |
 | `scripts/seed-review-questions.mjs` | Idempotent seed (self-gates on alt-key Active). |
 
 ## Testing

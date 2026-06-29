@@ -1,43 +1,70 @@
 /**
  * ReviewAuthoringForm — the in-browser reviewer review form (stage2b).
  *
- * Replaces the old file-upload card. Renders all review questions from
- * reviewFormSchema in order: affiliation (text), the three ratings (radios),
- * and the eight narrative questions (RichReviewEditor). Work autosaves to the
- * Postgres draft route as the reviewer types.
+ * Replaces the old file-upload card. Renders all review questions from the
+ * STAFF-EDITABLE question set delivered by /context (`data.questions`, the
+ * Dataverse `wmkf_reviewquestion` set) in order: affiliation (text), the
+ * ratings (radios), and the narrative questions (RichReviewEditor). Work
+ * autosaves to the Postgres draft route as the reviewer types.
+ *
+ * The set is supplied as a prop (no static import) so staff edits flow through
+ * without a deploy (staff-editable-questions epic Phase B2). `data.questions`
+ * is loaded synchronously with the rest of the context payload — context is
+ * fail-closed, so this view never renders against an unknown/empty set.
  *
  * CONTROLLED (unlike the legacy uncontrolled ReviewFormFields) because autosave
  * needs the live values. Initial values = the saved draft overlaid on the
- * server prefill (CRM affiliation / any previously-saved ratings).
+ * server prefill (CRM affiliation / any previously-saved ratings), reconciled
+ * type-aware against the CURRENT set so a question whose type changed since the
+ * draft was saved can't feed the wrong control shape (Codex P1).
  *
- * Final submit (Phase 3) POSTs the answers to /submit, which atomically writes
- * the Dataverse answer-snapshot rows + parent ratings and deletes the draft. On
- * success the form locks read-only. The security boundary is server-side: both
- * the draft PUT and /submit sanitize + validate every answer regardless of what
- * this client sends; the client-side completeness check only gates the button.
+ * Final submit POSTs the answers + the `setVersion` it rendered to /submit,
+ * which atomically writes the Dataverse answer-snapshot rows + parent ratings
+ * and deletes the draft. A stale setVersion comes back 409 `set_changed` →
+ * reload. On success the form locks read-only. The security boundary is
+ * server-side: both the draft PUT and /submit sanitize + validate every answer
+ * regardless of what this client sends; the client-side completeness check only
+ * gates the button.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { reviewFormSchema } from '../../../lib/external/review-form-schema';
 import RichReviewEditor from './RichReviewEditor';
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
 
-function buildInitialValues(prefill = {}, draftJson = {}) {
+function buildInitialValues(fields, prefill = {}, draftJson = {}) {
   const values = {};
-  for (const field of reviewFormSchema.fields) {
+  for (const field of (fields || [])) {
     if (field.type === 'richtext') {
-      values[field.key] = draftJson[field.key] ?? '';
+      // Type-aware reconciliation (Codex P1): only a string is a valid richtext
+      // answer. A value left behind by a question that USED to be a picklist
+      // (a number) is discarded → empty, never fed to the rich-text editor.
+      const d = draftJson[field.key];
+      values[field.key] = typeof d === 'string' ? d : '';
     } else if (field.type === 'picklist') {
-      // Normalize to a valid option value or null — never 0/NaN/out-of-range,
-      // so an empty/garbage stored value can't render as a phantom selection or
-      // get spread back into the draft on autosave (Codex S301 P2).
-      const raw = draftJson[field.key] ?? prefill[field.key] ?? null;
-      const n = Number(raw);
-      values[field.key] = (raw === null || raw === undefined || raw === ''
-        || !Number.isFinite(n) || !field.options.some((o) => o.value === n)) ? null : n;
+      // Prefer a shape-valid draft value; a draft value that doesn't coerce to
+      // one of THIS field's options (e.g. HTML left behind by a former richtext
+      // question, or empty/garbage) is discarded and we fall back to the
+      // CRM/parent prefill. Never render a phantom selection or spread garbage
+      // back into the draft on autosave (Codex S301 P2 + S304 reconciliation).
+      const draftRaw = draftJson[field.key];
+      const draftNum = Number(draftRaw);
+      const draftValid = draftRaw !== null && draftRaw !== undefined && draftRaw !== ''
+        && typeof draftRaw !== 'object' && Number.isFinite(draftNum)
+        && field.options.some((o) => o.value === draftNum);
+      if (draftValid) {
+        values[field.key] = draftNum;
+      } else {
+        const p = prefill[field.key];
+        const pn = Number(p);
+        values[field.key] = (p === null || p === undefined || p === ''
+          || !Number.isFinite(pn) || !field.options.some((o) => o.value === pn)) ? null : pn;
+      }
     } else {
-      values[field.key] = draftJson[field.key] ?? prefill[field.key] ?? '';
+      // string (affiliation): only a string draft value is valid; otherwise the
+      // CRM prefill (also a string).
+      const d = draftJson[field.key];
+      values[field.key] = typeof d === 'string' ? d : (prefill[field.key] ?? '');
     }
   }
   return values;
@@ -51,8 +78,8 @@ function hasText(html) {
   return String(html || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim().length > 0;
 }
 
-function isComplete(values) {
-  for (const field of reviewFormSchema.fields) {
+function isComplete(fields, values) {
+  for (const field of (fields || [])) {
     if (!field.required) continue;
     const v = values[field.key];
     if (field.type === 'richtext') {
@@ -67,18 +94,26 @@ function isComplete(values) {
 }
 
 export default function ReviewAuthoringForm({ data, token }) {
-  const [values, setValues] = useState(() => buildInitialValues(data.prefill));
+  // The staff-editable question set + its version tag, delivered with /context.
+  // Fail-closed: context 500s if the set can't load, so a stage2b render always
+  // carries a non-empty set. We still guard below rather than render a partial
+  // or empty form.
+  const fields = Array.isArray(data.questions) ? data.questions : null;
+  const setVersion = typeof data.questionSetVersion === 'string' ? data.questionSetVersion : null;
+
+  const [values, setValues] = useState(() => buildInitialValues(fields, data.prefill));
   const [loaded, setLoaded] = useState(false);
   const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
-  const [submitState, setSubmitState] = useState('idle'); // idle | submitting | submitted | conflict | error
+  const [submitState, setSubmitState] = useState('idle'); // idle | submitting | submitted | conflict | set_changed | error
   const [submitErrors, setSubmitErrors] = useState([]);
   const [submittedAt, setSubmittedAt] = useState(null);
   const timerRef = useRef(null);
   const autosaveAbortRef = useRef(null);
   // Editing is frozen while a submit is in flight and after a terminal conflict
-  // (already-submitted / concurrent-collision) — neither is something the
-  // reviewer can resolve by editing (Codex S302). 'submitted' early-returns below.
-  const frozen = submitState === 'submitting' || submitState === 'conflict';
+  // (already-submitted / concurrent-collision) or a set_changed reload prompt —
+  // none is something the reviewer can resolve by editing in place (Codex S302).
+  // 'submitted' early-returns below.
+  const frozen = submitState === 'submitting' || submitState === 'conflict' || submitState === 'set_changed';
 
   // Load any existing draft once, then merge it over the prefill.
   useEffect(() => {
@@ -88,7 +123,7 @@ export default function ReviewAuthoringForm({ data, token }) {
         const resp = await fetch(`/api/external/review/${encodeURIComponent(token)}/draft`);
         const json = await resp.json().catch(() => ({}));
         if (!cancelled && resp.ok && json.ok && json.draftJson) {
-          setValues(buildInitialValues(data.prefill, json.draftJson));
+          setValues(buildInitialValues(fields, data.prefill, json.draftJson));
         }
       } catch {
         /* non-fatal: start from prefill */
@@ -152,7 +187,11 @@ export default function ReviewAuthoringForm({ data, token }) {
       const resp = await fetch(`/api/external/review/${encodeURIComponent(token)}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers: values }),
+        // Echo the question-set version we rendered against. A stale version
+        // comes back 409 `set_changed` (questions edited since load) so we can
+        // prompt a reload instead of surfacing a confusing field error. Older
+        // payloads with no version skip the server-side check.
+        body: JSON.stringify({ answers: values, ...(setVersion ? { setVersion } : {}) }),
       });
       const json = await resp.json().catch(() => ({}));
       if (resp.ok && json.ok) {
@@ -161,6 +200,14 @@ export default function ReviewAuthoringForm({ data, token }) {
         return;
       }
       if (resp.status === 409) {
+        if (json.reason === 'set_changed') {
+          // The staff question set changed since this form loaded. NOT terminal:
+          // the reviewer's answers are autosaved, so a reload re-fetches the
+          // current set and reconciles the draft onto it. Prompt a reload.
+          setSubmitErrors([json.message || 'The review questions changed since you opened this form. Please reload to see the current questions.']);
+          setSubmitState('set_changed');
+          return;
+        }
         // Terminal: already submitted / concurrent collision / row changed —
         // none of these are resolvable by editing and resubmitting. Lock the form.
         setSubmitErrors([json.message || 'This review has already been submitted or changed.']);
@@ -177,7 +224,21 @@ export default function ReviewAuthoringForm({ data, token }) {
       setSubmitErrors(['Network error — your review was not submitted. Please try again.']);
       setSubmitState('error');
     }
-  }, [token, values]);
+  }, [token, values, setVersion]);
+
+  // Fail-closed: never render a partial or empty form. /context is fail-closed
+  // and 500s when the question set can't load, so this is a defensive backstop
+  // (a malformed/empty `data.questions` must show an error, not a blank form).
+  if (!fields || fields.length === 0) {
+    return (
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5" role="alert">
+        <p className="text-sm font-semibold text-amber-900">The review form is temporarily unavailable</p>
+        <p className="text-sm text-amber-800 mt-1">
+          We couldn&apos;t load the review questions. Please reload, and contact your Program Director if this persists.
+        </p>
+      </div>
+    );
+  }
 
   // Don't render any editable surface until the saved draft has loaded.
   // Otherwise a returning reviewer could start typing into the prefill-seeded
@@ -232,8 +293,30 @@ export default function ReviewAuthoringForm({ data, token }) {
     );
   }
 
+  // set_changed (server 409): the staff question set was edited after this form
+  // loaded. NOT terminal — autosaved answers survive a reload, which re-fetches
+  // the current set and reconciles the draft onto it (type-aware overlay).
+  if (submitState === 'set_changed') {
+    return (
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5" role="alert">
+        <p className="text-sm font-semibold text-amber-900">The review questions were updated</p>
+        <p className="text-sm text-amber-800 mt-1">
+          {submitErrors[0] || 'The review questions changed since you opened this form. Please reload to see the current questions.'}
+          {' '}Your saved answers will be kept where they still apply.
+        </p>
+        <button
+          type="button"
+          onClick={() => { if (typeof window !== 'undefined') window.location.reload(); }}
+          className="mt-3 px-4 py-2 bg-amber-900 text-white text-sm font-semibold rounded-lg hover:bg-amber-800"
+        >
+          Reload
+        </button>
+      </div>
+    );
+  }
+
   const submitting = submitState === 'submitting';
-  const canSubmit = isComplete(values) && !submitting;
+  const canSubmit = isComplete(fields, values) && !submitting;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6">
@@ -246,7 +329,7 @@ export default function ReviewAuthoringForm({ data, token }) {
       </p>
 
       <div className="mt-6 space-y-6">
-        {reviewFormSchema.fields.map((field) => (
+        {fields.map((field) => (
           <FieldRow key={field.key} field={field} value={values[field.key]} onChange={update} disabled={frozen} />
         ))}
       </div>

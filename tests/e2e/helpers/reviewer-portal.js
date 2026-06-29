@@ -9,7 +9,17 @@
 // The context fixture mirrors the real 200 shape in `context.js` (proposal /
 // reviewer / prefill / policies / etag / engagementState).
 
+const { reviewFormSchema } = require('../../../lib/external/review-form-schema');
+
 const TOKEN = 'e2e-test-token';
+
+// The authoring views render the form from the context-supplied question set
+// (staff-editable-questions Phase B2). The seeded prod set is identical to the
+// static schema, so the static fields are a faithful fixture. The version tag is
+// arbitrary-but-stable; the client echoes it back on submit and a stale value
+// drives the server's `set_changed` 409 (asserted in the spec).
+const QUESTION_SET = reviewFormSchema.fields;
+const QUESTION_SET_VERSION = 'e2e-questionset-v1';
 
 // A short policy body fits the modal without scrolling → the ack button enables
 // immediately (PolicyAckModal: `scrollHeight <= clientHeight` short-circuit).
@@ -47,6 +57,9 @@ function buildContext({ address, honorariumOptOut = false, longBody = false, vie
   };
   const accepted = ['accepted-pre-materials', 'stage2b', 'submitted'].includes(view);
   const declined = view === 'declined';
+  // context.js attaches the question set only in the stage2b authoring view; it
+  // is null everywhere else (the form isn't rendered). Mirror that here.
+  const authoring = view === 'stage2b';
   return {
     ok: true,
     engagementState: { view, accepted, declined },
@@ -72,6 +85,8 @@ function buildContext({ address, honorariumOptOut = false, longBody = false, vie
     },
     policies: buildPolicies({ longBody }),
     files: [],
+    questions: authoring ? QUESTION_SET : null,
+    questionSetVersion: authoring ? QUESTION_SET_VERSION : null,
   };
 }
 
@@ -120,4 +135,4 @@ async function mockPortal(page, { context, respond } = {}) {
 
 const portalUrl = (token = TOKEN) => `/external/review/${token}`;
 
-module.exports = { TOKEN, buildContext, buildPolicies, mockPortal, portalUrl, SHORT_BODY, LONG_BODY };
+module.exports = { TOKEN, buildContext, buildPolicies, mockPortal, portalUrl, SHORT_BODY, LONG_BODY, QUESTION_SET_VERSION };

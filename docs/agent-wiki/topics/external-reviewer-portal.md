@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-28
+last_verified: 2026-06-29
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -13,6 +13,8 @@ source_files:
   - pages/api/external/review/[token]/draft.js
   - pages/api/external/review/[token]/submit.js
   - lib/external/build-review-submission.js
+  - lib/external/review-question-fetcher.js
+  - lib/external/review-form-schema.js
   - shared/components/external/ReviewAuthoringForm.js
   - shared/components/external/RichReviewEditor.js
   - shared/components/external/MaterialsView.js
@@ -70,8 +72,10 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 ## Operating Notes
 
 - **The stage2b "submit your review" surface is now in-browser authoring, not file upload (S301, Phase 2).**
-  `MaterialsView` renders `ReviewAuthoringForm` (controlled) with the 11 questions —
-  3 rating radios + 8 `RichReviewEditor` (tiptap) narrative answers — autosaving to
+  `MaterialsView` renders `ReviewAuthoringForm` (controlled) with the staff-editable
+  question set (seeded as the 11 questions — 3 rating radios + 8 `RichReviewEditor`
+  (tiptap) narrative answers + the affiliation field; now Dataverse-sourced, see the
+  staff-editable-questions note below) — autosaving to
   Postgres `review_drafts` via the `GET/PUT /api/external/review/[token]/draft` route
   (`ReviewDraftService`). Reviewer HTML is UNTRUSTED: the draft PUT server-sanitizes
   every rich-text answer with `lib/external/sanitize-review-html.js` (DOM-free
@@ -96,6 +100,18 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   file-upload path: memory `project-reviewer-upload-dormant-not-deleted`.
   **The whole epic (Phases 0–5) is COMPLETE (S302).**
   Full plan: `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md`.
+- **The review question SET is staff-editable (Dataverse `wmkf_reviewquestion`), not hardcoded — Phase A+B LIVE (S303–S304).**
+  `lib/external/review-question-fetcher.js::getActiveQuestionSet()` (cached, single-flight,
+  **fail-closed** — context/draft/submit 500 if the set can't load) is the runtime source. The
+  reviewer routes read it: `context.js` attaches `questions` + `questionSetVersion` (stage2b only);
+  `ReviewAuthoringForm` renders from `data.questions` as a prop (no static import); `submit.js`
+  echoes `setVersion` back and 409s `set_changed` if the staff set changed mid-edit (client shows a
+  distinct reload prompt). Draft load reconciles type-aware — a draft value whose shape ≠ the current
+  field type is discarded. `lib/external/review-form-schema.js` is RETAINED as the field-shape +
+  seed + helper source (`reviewParentColumnByKey` dual-write binding, label decoders) and the
+  dormant default param; the seeded set is byte-identical to it, so behavior is unchanged. Staff
+  upload (`ReviewFormFields`/`ReviewerManagePanel`) + the two legacy `validateReviewForm` paths
+  stay on the static default until Phase C/D. Plan: `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md`.
 - **Prod accept triggers a live automation chain — keep automated tests mocked/fenced.**
   A reviewer accept CREATEs a honorarium `akoya_request`, which fires AkoyaGo plugins
   + classic workflows + a live Bill.com payment flow + a contact→Business-Central sync.
