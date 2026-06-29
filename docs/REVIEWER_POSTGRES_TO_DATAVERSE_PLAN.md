@@ -216,7 +216,7 @@ On the suggestion (`wmkf_appreviewersuggestion`):
 - `wmkf_ExternalTokenIssued` populated (we issued a magic link)
 - `wmkf_ProposalFirstAccessed` populated (they engaged with the link)
 - `wmkf_ReviewSharePointFolder` populated (review folder was created)
-- Any of `wmkf_ReviewerImpact`, `wmkf_ReviewerRisk`, `wmkf_ReviewerOverallRating` populated (they submitted a review form) — **Phase-E caveat (S305):** these 3 rating columns are retiring (still dual-written now, stop in the staff-editable-questions epic's Phase E). When that lands, switch this "submitted a review" signal to `wmkf_reviewreceivedat` (co-set by every rating writer), as the reviewer-merge engagement predicate already did in Phase D.
+- Any of `wmkf_ReviewerImpact`, `wmkf_ReviewerRisk`, `wmkf_ReviewerOverallRating` populated (they submitted a review form) — **MOOT (S305):** this predicate is historical; migration 018 already dropped the `reviewer_suggestions` Postgres table it gated (2026-06-04). For the record, these 3 rating columns stopped being written at the epic's Phase E1; a live "submitted a review" signal would read `wmkf_reviewreceivedat` (co-set by every rating writer), as the reviewer-merge engagement predicate already does.
 
 On the linked `wmkf_potentialreviewer` (global per-person):
 - `wmkf_contact` populated (contact promotion happened — applies to ANY suggestion this person has)

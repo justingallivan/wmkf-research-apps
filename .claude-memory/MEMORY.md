@@ -72,7 +72,7 @@
 - External reviewer portal / accept-decline / E2E / SharePoint: ../docs/agent-wiki/topics/external-reviewer-portal.md
 - Reviewer invite→accept collapse (S279: onboard up front at one final Accept; no hold/finalize step; capture-only honorarium; .ics on accept): project-reviewer-hold-step-decouple.md
 - Reviewer review-form in-browser authoring rework — Phases 0–5 DONE (S302): tiptap authoring, /submit atomic snapshot changeset, workbench read-back, draft lifecycle: ../docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md
-- Staff-editable review questions epic (S303–S305): A–D LIVE; D moved ratings to wmkf_appreviewanswer snapshot (readers+legacy writers migrated, backfilled). E next = drop parent rating cols: ../docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md
+- Staff-editable review questions epic (S303–S305): A–D + E1 LIVE; ratings now snapshot-only (E1 stopped the parent dual-write). E2 next = drop the 3 parent rating cols: ../docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md
 - Reviewer file-upload path is hidden-not-deleted (Phase 2 cutover; route retained + finality-guarded; how to re-enable): project-reviewer-upload-dormant-not-deleted.md
 - Intake portal / attachments / institution match / virus scan: ../docs/agent-wiki/topics/intake-portal.md
 - Dataverse / Dynamics / Explorer / Power Tools: ../docs/agent-wiki/topics/dataverse-dynamics.md

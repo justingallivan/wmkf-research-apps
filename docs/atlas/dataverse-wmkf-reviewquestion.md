@@ -1,6 +1,6 @@
 # Atlas: `wmkf_reviewquestion` (Dataverse, WMKF config entity)
 
-**Phase status:** A (entity+fetcher+seed) LIVE S303 · B (reviewer consumers read the set) LIVE S303–S304 · C (superuser editor) LIVE S304 · D (rating reader+writer migration to the `wmkf_appreviewanswer` snapshot) LIVE S305 · E (stop parent dual-write + retire `wmkf_reviewer{impact,risk,overallrating}`) not started.
+**Phase status:** A (entity+fetcher+seed) LIVE S303 · B (reviewer consumers read the set) LIVE S303–S304 · C (superuser editor) LIVE S304 · D (rating reader+writer migration to the `wmkf_appreviewanswer` snapshot) LIVE S305 · E1 (stop the parent dual-write — ratings snapshot-only) LIVE S305 · E2 (drop `wmkf_reviewer{impact,risk,overallrating}` columns) not started.
 **Last verified:** 2026-06-29 (S303) — **CREATED in prod** via `scripts/apply-dataverse-schema.js --target=prod --wave=9-review-questions --execute` (entity + 8 attributes + alt key all `✓ created`), then **seeded** with the current 12 fields via `scripts/seed-review-questions.mjs --execute` (the alt-key index gate held at `Pending`, then ran once `Active`). **Read-back verified end-to-end:** `getActiveQuestionSet()` returns all 12 questions from live prod, ordered, with types/required/option-counts matching the static schema. **[VERIFIED via live fetch S303 + `lib/dataverse/schema/wave9-review-questions/01_wmkf_reviewquestion.json`].**
 **Live row count:** 12 (affiliation order 0 + 11 questions), as of 2026-06-29.
 **Entity set:** `wmkf_reviewquestions`

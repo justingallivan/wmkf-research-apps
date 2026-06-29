@@ -8,7 +8,7 @@
 
 ## Source of Truth
 
-Point-in-time **answer snapshot** for an external reviewer's submitted review. One row per question per submitted review (all 11 questions, ratings included), each storing the question text exactly as asked beside the answer, so a submitted review reconstructs losslessly even after the question set changes. System of record for the narrative answers **and (post-Phase-D, S305) for the three ratings** — the DTO, the review-context prefill, and the merge engagement signal all read ratings from here now. The ratings are **still also** dual-written onto the parent `wmkf_appreviewersuggestion` row (`wmkf_reviewerimpact/risk/overallrating`) for native year-over-year aggregation, but that duplication is read-dead and retires in Phase E. Adding questions later = more rows, never new columns.
+Point-in-time **answer snapshot** for an external reviewer's submitted review. One row per question per submitted review (all 11 questions, ratings included), each storing the question text exactly as asked beside the answer, so a submitted review reconstructs losslessly even after the question set changes. **Sole system of record for the three ratings** (post-Phase-E1, S305) as well as the narrative answers — the DTO, the review-context prefill, and the merge engagement signal all read ratings from here. The former parent columns (`wmkf_reviewerimpact/risk/overallrating`) are no longer written (E1 ended the dual-write) and no longer read; they remain dormant in the Dataverse schema until E2 drops them. Adding questions later = more rows, never new columns.
 
 Full design: `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md` §3a.
 
@@ -39,11 +39,11 @@ Data:
 
 ## Write Paths
 
-**LIVE (Phase 3, S302).** `/api/external/review/[token]/submit` upserts the N answer rows by alternate key (lookup addressed as `_wmkf_appreviewersuggestion_value=<guid>` — memory `reference-dataverse-altkey-lookup-upsert-url`) inside an all-or-nothing `DynamicsService.executeChangeset` changeset, alongside the parent rating/affiliation/`wmkf_reviewreceivedat` PATCH (If-Match-guarded).
+**LIVE (Phase 3, S302).** `/api/external/review/[token]/submit` upserts the N answer rows by alternate key (lookup addressed as `_wmkf_appreviewersuggestion_value=<guid>` — memory `reference-dataverse-altkey-lookup-upsert-url`) inside an all-or-nothing `DynamicsService.executeChangeset` changeset, alongside the parent affiliation/`wmkf_reviewreceivedat` PATCH (If-Match-guarded). Post-E1 the parent PATCH no longer carries the rating columns — the rating rows in this snapshot are their only home.
 
 **LIVE (Phase D, S305).** The two legacy staff writers — `lib/services/review-upload.js` (file upload) and `pages/api/review-manager/mark-received-no-file.js` — now also upsert the **rating** snapshot rows atomically with their parent PATCH (shared `buildRatingSnapshotRows` + `answerRowUrl`/`answerRowBody`), so staff-entered ratings are in the snapshot too. They write only the rating rows (narrative answers live in the uploaded PDF); the informal-feedback no-file path writes none. One-time backfill `scripts/backfill-rating-snapshot-rows.mjs` filled historical parent-only rows (1 in prod).
 
 ## Open Questions / Gotchas
 
 - **Schema lives only in prod.** The sandbox (`orgd9e66399`) could not host this table — its parent `wmkf_appreviewersuggestion` 404s there (schema-stale; memory `project-dynamics-sandbox-state`). Re-running `apply-dataverse-schema.js` is idempotent (creation-only) if a future env needs it.
-- **Snapshot ↔ parent rating invariant.** Ratings live both here (`wmkf_answervalue` on the rating rows) and on the parent columns. `buildReviewSubmission()` (Phase 3) is the single producer of both and must assert equality + live-picklist validity before writing. Post-Phase-D this is the dual-write **safety net** (readers already source from the snapshot); Phase E stops the parent write and relaxes the assert.
+- **Producer rating backstop (post-E1).** Ratings live ONLY here now (the parent/child equality invariant retired with the dual-write at E1). `buildReviewSubmission()` is still the single producer and asserts the core ratings (`CORE_RATING_KEYS`) are present + in the live picklist domain before writing — re-anchored on the explicit key list, not the parent-column map, so the backstop survived the column retirement.
