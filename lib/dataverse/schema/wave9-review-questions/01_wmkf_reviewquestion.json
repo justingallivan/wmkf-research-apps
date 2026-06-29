@@ -1,0 +1,86 @@
+{
+  "name": "wmkf_reviewquestion",
+  "kind": "new-entity",
+  "schemaName": "wmkf_ReviewQuestion",
+  "displayName": "Review Question",
+  "displayCollectionName": "Review Questions",
+  "description": "Staff-editable definition of the external-reviewer review-form question set (one row per current question). System of record for WHICH questions the review form asks and how they render/validate; read at runtime through ReviewQuestionFetcher (cached), replacing the former static lib/external/review-form-schema.js array. The wmkf_appreviewanswer snapshot (one answer row per question per submitted review, denormalizing the question text as asked) preserves historical fidelity, so this set can be edited live without disturbing past reviews. Removing a question deactivates its row (statecode), never a hard delete, so wmkf_questionkey stays stable as the snapshot join. See docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md.",
+  "ownershipType": "OrganizationOwned",
+  "primaryNameAttribute": {
+    "schemaName": "wmkf_Name",
+    "displayName": "Name",
+    "description": "Display name for the question row (writer populates with the question key or a short label). Not load-bearing.",
+    "maxLength": 200,
+    "requiredLevel": "ApplicationRequired"
+  },
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_QuestionKey",
+      "displayName": "Question Key",
+      "description": "Stable question id (impact, risk, overallRating, q2, q4..q11). Immutable, never reused for a different question. The join to wmkf_appreviewanswer.wmkf_questionkey (also String 100) across question-set changes. Mirrors field.key in the former static schema.",
+      "maxLength": 100,
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_QuestionOrder",
+      "displayName": "Question Order",
+      "description": "Display/snapshot position of the question (field.order). Drives form ordering and the answer-row order at submission.",
+      "minValue": 0,
+      "maxValue": 1000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_QuestionText",
+      "displayName": "Question Text",
+      "description": "The question label/text shown to the reviewer (field.label). Copied verbatim into each wmkf_appreviewanswer row at submission for point-in-time fidelity.",
+      "maxLength": 4000
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_QuestionType",
+      "displayName": "Question Type",
+      "description": "picklist | richtext | string (mirrors field.type). Drives the editor control and validation.",
+      "maxLength": 50
+    },
+    {
+      "type": "Boolean",
+      "schemaName": "wmkf_Required",
+      "displayName": "Required",
+      "description": "Whether an answer is required to submit. Defaults to required.",
+      "default": true,
+      "trueLabel": "Required",
+      "falseLabel": "Optional"
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_MaxLength",
+      "displayName": "Max Length",
+      "description": "Character cap for richtext/string answers (field.maxLength). Null falls back to the code default. Not used for picklists.",
+      "minValue": 0,
+      "maxValue": 1000000
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_Hint",
+      "displayName": "Hint",
+      "description": "Optional helper text shown under the question (field.hint). Null when none.",
+      "maxLength": 500
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_Options",
+      "displayName": "Options (JSON)",
+      "description": "For picklist questions: a JSON array of { value, label } option objects (field.options). Null for non-picklist questions. Options are never queried natively (only answers are, in the snapshot), so JSON is sufficient.",
+      "maxLength": 20000
+    }
+  ],
+  "alternateKeys": [
+    {
+      "schemaName": "wmkf_reviewquestion_key",
+      "displayName": "Question Key (unique)",
+      "keyAttributes": ["wmkf_questionkey"]
+    }
+  ]
+}
