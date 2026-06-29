@@ -10,7 +10,7 @@ const { test, expect } = require('@playwright/test');
 const { TOKEN, buildContext, mockPortal, portalUrl } = require('./helpers/reviewer-portal');
 
 test.describe('Reviewer stage2b in-browser authoring', () => {
-  test('renders the rich-text form, autosaves on edit, rehydrates on reload, submit disabled', async ({ page }) => {
+  test('renders the rich-text form, autosaves on edit, rehydrates on reload, submit gated until complete', async ({ page }) => {
     const draftCalls = { puts: [] };
     let savedDraft = null; // what the last PUT stored; GET returns it (rehydrate)
 
@@ -48,7 +48,8 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
     await expect(page.locator('.ProseMirror')).toHaveCount(8);
     await expect(page.getByRole('button', { name: 'Bold' }).first()).toBeVisible();
 
-    // (d) Submit is disabled (final submit is Phase 3).
+    // (d) Submit is disabled until every required answer is filled (the draft
+    // here starts empty, so the rich-text questions are blank → gated).
     await expect(page.getByRole('button', { name: 'Submit review' })).toBeDisabled();
 
     // (c) Editing a rich-text answer triggers a debounced autosave PUT.
@@ -72,6 +73,40 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
     await page.reload();
     await expect(page.locator('[aria-label^="Q2 —"]')).toContainText('This work could reshape the field.');
     await page.screenshot({ path: 'test-results/stage2b-authoring-rehydrated.png', fullPage: true });
+  });
+
+  test('completing all required answers enables submit; submitting locks the form read-only', async ({ page }) => {
+    await mockPortal(page, { context: buildContext({ view: 'stage2b' }) });
+
+    // The draft pre-fills every required answer so the form loads complete and
+    // the Submit button is enabled without typing into 8 editors.
+    const fullDraft = {
+      impact: 3, risk: 2, overallRating: 4,
+      q2: '<p>a</p>', q4: '<p>a</p>', q5: '<p>a</p>', q6: '<p>a</p>',
+      q7: '<p>a</p>', q8: '<p>a</p>', q9: '<p>a</p>',
+    };
+    await page.route(`**/api/external/review/${TOKEN}/draft`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, draftJson: fullDraft, submitted: false }) }));
+
+    let submitBody = null;
+    await page.route(`**/api/external/review/${TOKEN}/submit`, (route) => {
+      submitBody = route.request().postDataJSON();
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, receivedAt: '2026-06-28T12:00:00Z' }) });
+    });
+
+    await page.goto(portalUrl(TOKEN));
+
+    const submitBtn = page.getByRole('button', { name: 'Submit review' });
+    await expect(submitBtn).toBeEnabled();
+    await submitBtn.click();
+
+    // Submit transitions the UI to a final, read-only receipt — no editors, no
+    // Submit button (the server has the snapshot; the draft is gone).
+    await expect(page.getByText('Review received')).toBeVisible();
+    await expect(page.getByText(/Your review is final/i)).toBeVisible();
+    await expect(page.locator('.ProseMirror')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Submit review' })).toHaveCount(0);
+    expect(submitBody.answers.q2).toContain('a');
   });
 
   test('no editable surface renders until the saved draft loads (P0 race fix)', async ({ page }) => {

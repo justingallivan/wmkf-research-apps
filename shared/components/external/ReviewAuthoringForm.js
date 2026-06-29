@@ -10,10 +10,11 @@
  * needs the live values. Initial values = the saved draft overlaid on the
  * server prefill (CRM affiliation / any previously-saved ratings).
  *
- * Autosave only — FINAL SUBMIT is Phase 3 (the /submit route + atomic Dataverse
- * changeset don't exist yet), so the Submit button is present but disabled. The
- * security boundary is server-side: the draft PUT sanitizes every rich-text
- * answer regardless of what this client sends.
+ * Final submit (Phase 3) POSTs the answers to /submit, which atomically writes
+ * the Dataverse answer-snapshot rows + parent ratings and deletes the draft. On
+ * success the form locks read-only. The security boundary is server-side: both
+ * the draft PUT and /submit sanitize + validate every answer regardless of what
+ * this client sends; the client-side completeness check only gates the button.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -42,10 +43,36 @@ function buildInitialValues(prefill = {}, draftJson = {}) {
   return values;
 }
 
+// Cheap client-side "has visible text" check to gate the Submit button. NOT a
+// security or validation boundary — /submit re-sanitizes and re-validates every
+// answer (emptiness-after-strip included). Kept dependency-free so the server
+// sanitizer (sanitize-html) never enters the client bundle.
+function hasText(html) {
+  return String(html || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim().length > 0;
+}
+
+function isComplete(values) {
+  for (const field of reviewFormSchema.fields) {
+    if (!field.required) continue;
+    const v = values[field.key];
+    if (field.type === 'richtext') {
+      if (!hasText(v)) return false;
+    } else if (field.type === 'picklist') {
+      if (v === null || v === undefined || v === '') return false;
+    } else if (typeof v !== 'string' || v.trim().length === 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export default function ReviewAuthoringForm({ data, token }) {
   const [values, setValues] = useState(() => buildInitialValues(data.prefill));
   const [loaded, setLoaded] = useState(false);
   const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
+  const [submitState, setSubmitState] = useState('idle'); // idle | submitting | submitted | error
+  const [submitErrors, setSubmitErrors] = useState([]);
+  const [submittedAt, setSubmittedAt] = useState(null);
   const timerRef = useRef(null);
 
   // Load any existing draft once, then merge it over the prefill.
@@ -100,6 +127,38 @@ export default function ReviewAuthoringForm({ data, token }) {
     });
   }, [scheduleSave]);
 
+  const handleSubmit = useCallback(async () => {
+    setSubmitState('submitting');
+    setSubmitErrors([]);
+    // Cancel any pending autosave so it can't race the submit (and so it doesn't
+    // fire a post-submit PUT that the server would 409).
+    if (timerRef.current) clearTimeout(timerRef.current);
+    try {
+      const resp = await fetch(`/api/external/review/${encodeURIComponent(token)}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers: values }),
+      });
+      const json = await resp.json().catch(() => ({}));
+      if (resp.ok && json.ok) {
+        setSubmittedAt(json.receivedAt || new Date().toISOString());
+        setSubmitState('submitted');
+        return;
+      }
+      if (resp.status === 400 && Array.isArray(json.errors)) {
+        setSubmitErrors(json.errors);
+      } else if (resp.status === 409) {
+        setSubmitErrors([json.message || 'This review has already been submitted or changed. Please reload the page.']);
+      } else {
+        setSubmitErrors(['Something went wrong submitting your review. Please try again.']);
+      }
+      setSubmitState('error');
+    } catch {
+      setSubmitErrors(['Network error — your review was not submitted. Please try again.']);
+      setSubmitState('error');
+    }
+  }, [token, values]);
+
   // Don't render any editable surface until the saved draft has loaded.
   // Otherwise a returning reviewer could start typing into the prefill-seeded
   // form in the ~100-300ms before GET /draft resolves, and the load would
@@ -115,6 +174,25 @@ export default function ReviewAuthoringForm({ data, token }) {
       </div>
     );
   }
+
+  // Submit is final — once it succeeds the form locks read-only (matches the
+  // server contract: the draft is gone and /submit, /draft, and the reviewer
+  // upload all refuse post-submission).
+  if (submitState === 'submitted') {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-2xl p-5" role="status" aria-live="polite">
+        <p className="text-sm font-semibold text-green-900">Review received</p>
+        <p className="text-sm text-green-800 mt-1">
+          Thank you — we received your review
+          {submittedAt ? ` on ${new Date(submittedAt).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' })}` : ''}.
+          Your review is final. If you need to make a change, please contact your Program Director.
+        </p>
+      </div>
+    );
+  }
+
+  const submitting = submitState === 'submitting';
+  const canSubmit = isComplete(values) && !submitting;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6">
@@ -132,19 +210,33 @@ export default function ReviewAuthoringForm({ data, token }) {
         ))}
       </div>
 
+      {submitState === 'error' && submitErrors.length > 0 && (
+        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4" role="alert">
+          <p className="text-sm font-semibold text-red-900">Your review was not submitted</p>
+          <ul className="mt-2 list-disc list-inside text-sm text-red-800 space-y-1">
+            {submitErrors.map((err, i) => <li key={i}>{err}</li>)}
+          </ul>
+        </div>
+      )}
+
       <div className="mt-8 border-t border-gray-100 pt-5 flex items-center justify-between gap-4">
         <p className="text-xs text-gray-500">
-          Final submission will be enabled shortly. Your answers are saved as a draft until then.
+          {canSubmit
+            ? 'Submitting is final — you will not be able to edit your review afterward.'
+            : 'Answer every required question (marked *) to submit. Your work is saved as you go.'}
         </p>
-        {/* TODO(Phase 3): wire to POST /api/external/review/[token]/submit once the
-            atomic changeset submit exists; then lock the form read-only on success. */}
         <button
           type="button"
-          disabled
-          title="Final submission is not available yet"
-          className="px-5 py-2.5 bg-gray-300 text-white text-sm font-semibold rounded-lg cursor-not-allowed"
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+          title={canSubmit ? 'Submit your review' : 'Answer all required questions first'}
+          className={`px-5 py-2.5 text-sm font-semibold rounded-lg ${
+            canSubmit
+              ? 'bg-gray-900 text-white hover:bg-gray-800'
+              : 'bg-gray-300 text-white cursor-not-allowed'
+          }`}
         >
-          Submit review
+          {submitting ? 'Submitting…' : 'Submit review'}
         </button>
       </div>
     </div>
