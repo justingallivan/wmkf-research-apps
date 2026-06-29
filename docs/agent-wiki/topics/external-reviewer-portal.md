@@ -88,7 +88,13 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   FINAL — the form locks read-only, and both `/draft` PUT and the reviewer-token `upload.js` 409
   post-submit (P0-1). The engagement gate is the shared pure helper
   `lib/external/review-engagement-state.js::computeEngagementState`.
-  Still open: Phase 4 surfaces the narrative answers in the workbench (keyed child read).
+  **Phase 4 (read-back):** `/api/review-manager/reviewers` attaches the re-sanitized `answers[]`
+  snapshot per submitted reviewer (keyed child read on `wmkf_appreviewanswers`), rendered by
+  `ReviewsTab`. **Phase 5 (draft lifecycle):** the `review_drafts` scratchpad is deleted on submit,
+  on token **revoke/regenerate** (`revoke-token.js`/`regenerate-token.js` — NOT `mintAndStore`,
+  which runs on benign resends), and GC'd at 90d by the maintenance cron. The hidden-not-deleted
+  file-upload path: memory `project-reviewer-upload-dormant-not-deleted`.
+  **The whole epic (Phases 0–5) is COMPLETE (S302).**
   Full plan: `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md`.
 - **Prod accept triggers a live automation chain — keep automated tests mocked/fenced.**
   A reviewer accept CREATEs a honorarium `akoya_request`, which fires AkoyaGo plugins

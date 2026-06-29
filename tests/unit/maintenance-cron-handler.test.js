@@ -22,6 +22,9 @@ jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
   default: { notify: jest.fn(async () => {}) },
 }));
+jest.mock('../../lib/services/review-draft-service', () => ({
+  deleteExpired: jest.fn(async () => 0),
+}));
 jest.mock('../../lib/services/maintenance-service', () => ({
   __esModule: true,
   default: {
@@ -74,6 +77,18 @@ describe('maintenance cron — maintenance_runs retention step wiring', () => {
     // All other steps return 0 here, so totalDeleted is exactly this step's count.
     expect(res.body.totalDeleted).toBe(17);
     expect(res.body.failedSubtasks).not.toContain('maintenanceRuns');
+  });
+
+  it('wires the reviewer review-draft GC step (90d) into the run', async () => {
+    const ReviewDraftService = require('../../lib/services/review-draft-service');
+    ReviewDraftService.deleteExpired.mockResolvedValueOnce(4);
+    const res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+
+    expect(ReviewDraftService.deleteExpired).toHaveBeenCalledWith({ olderThanDays: 90 });
+    expect(res.body.ok).toBe(true);
+    expect(res.body.results.reviewDrafts).toBe(4);
+    expect(res.body.failedSubtasks).not.toContain('reviewDrafts');
   });
 
   it('a thrown cleanup is caught, surfaced in failedSubtasks, and marks the run failed', async () => {
