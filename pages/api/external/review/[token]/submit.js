@@ -53,6 +53,12 @@ const PARENT_ENTITY_SET = 'wmkf_appreviewersuggestions';
 const ANSWER_KEY_LOOKUP_ATTR = '_wmkf_appreviewersuggestion_value';
 
 const RICHTEXT_KEYS = reviewFormSchema.fields.filter((f) => f.type === 'richtext').map((f) => f.key);
+// Allowlist of valid snapshot question keys — answer rows only ever carry these
+// (buildReviewSubmission iterates the schema), but the URL builder asserts it as
+// defense in depth before interpolating the key into an OData predicate.
+const SNAPSHOT_QUESTION_KEYS = new Set(
+  reviewFormSchema.fields.filter((f) => typeof f.order === 'number').map((f) => f.key),
+);
 
 // Rich-text answers can be sizeable; cap the JSON body (mirrors /draft).
 export const config = {
@@ -71,9 +77,19 @@ function sanitizeRichText(answers) {
   return out;
 }
 
-/** Single source for the alternate-key upsert URL of one answer row. */
+/**
+ * Single source for the alternate-key upsert URL of one answer row. The question
+ * key goes into an OData single-quoted key predicate, so it is escaped by
+ * doubling apostrophes (the OData rule — NOT percent-encoding, which Dataverse
+ * does not decode inside a quoted literal). Keys are also asserted against the
+ * schema allowlist so an unexpected value can't address the wrong row.
+ */
 function answerRowUrl(entitySet, suggestionId, questionKey) {
-  return `${entitySet}(${ANSWER_KEY_LOOKUP_ATTR}=${suggestionId},wmkf_questionkey='${encodeURIComponent(questionKey)}')`;
+  if (!SNAPSHOT_QUESTION_KEYS.has(questionKey)) {
+    throw new Error(`answerRowUrl: "${questionKey}" is not a known snapshot question key`);
+  }
+  const literal = String(questionKey).replace(/'/g, "''");
+  return `${entitySet}(${ANSWER_KEY_LOOKUP_ATTR}=${suggestionId},wmkf_questionkey='${literal}')`;
 }
 
 /** Map one answerRow to the Dataverse column body for the upsert (key columns come from the URL). */
@@ -151,6 +167,24 @@ export default async function handler(req, res) {
     // (If-Match-guarded) in one changeset.
     try {
       await bypassDynamicsRestrictions('external-review-submit', async () => {
+        // The parent PATCH MUST carry a row-version If-Match — it is the only
+        // guard against a true pre-commit race (two submits that both passed the
+        // finality precheck). Fail closed if we can't get one: re-read once for a
+        // fresh etag, and refuse to write unguarded if it's still absent (Codex
+        // P1). The finality precheck alone is insufficient for a concurrent race.
+        let parentEtag = suggestion._etag;
+        if (!parentEtag) {
+          const fresh = await DynamicsService.getRecord(PARENT_ENTITY_SET, suggestionId, {
+            select: 'wmkf_appreviewersuggestionid',
+          });
+          parentEtag = fresh?._etag || null;
+        }
+        if (!parentEtag) {
+          const err = new Error('Could not obtain a row-version etag for the parent If-Match guard');
+          err.code = 'NO_ETAG';
+          throw err;
+        }
+
         const answerEntitySet = await DynamicsService.resolveEntitySetName('wmkf_appreviewanswer');
         const operations = answerRows.map((row) => ({
           method: 'PATCH',
@@ -161,15 +195,16 @@ export default async function handler(req, res) {
           method: 'PATCH',
           url: `${PARENT_ENTITY_SET}(${suggestionId})`,
           body: parentPatch,
-          ...(suggestion._etag ? { ifMatch: suggestion._etag } : {}),
+          ifMatch: parentEtag,
         });
         await DynamicsService.executeChangeset(operations);
       });
     } catch (e) {
       // 412 = concurrent change since page load (a staff edit, or a racing
-      // submit). The changeset is atomic, so nothing was written — surface a
-      // 409 so the client can reload rather than retry blindly.
-      if (e.status === 412) {
+      // submit). NO_ETAG = we refused to write without a lock. Both mean nothing
+      // was written (the changeset is atomic) — surface a 409 so the client
+      // reloads rather than retrying blindly.
+      if (e.status === 412 || e.code === 'NO_ETAG') {
         return res.status(409).json({
           ok: false,
           reason: 'conflict',

@@ -28,6 +28,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
     resolveEntitySetName: jest.fn(async () => 'wmkf_appreviewanswers'),
     executeChangeset: jest.fn(async () => ({ ok: true, operations: [] })),
+    getRecord: jest.fn(async () => ({ _etag: 'W/"fresh"' })),
   },
 }));
 jest.mock('../../lib/services/review-draft-service', () => ({
@@ -79,6 +80,7 @@ beforeEach(() => {
   verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion() });
   DynamicsService.resolveEntitySetName.mockResolvedValue('wmkf_appreviewanswers');
   DynamicsService.executeChangeset.mockResolvedValue({ ok: true, operations: [] });
+  DynamicsService.getRecord.mockResolvedValue({ _etag: 'W/"fresh"' });
   ReviewDraftService.deleteBySuggestion.mockResolvedValue(1);
 });
 
@@ -249,6 +251,34 @@ describe('concurrency + failure mapping', () => {
     const { req, res } = post({ answers: validAnswers() });
     await handler(req, res);
     expect(res.statusCode).toBe(500);
+    expect(ReviewDraftService.deleteBySuggestion).not.toHaveBeenCalled();
+  });
+});
+
+describe('fail-closed on missing parent etag (Codex P1)', () => {
+  it('re-reads for a fresh etag when the verified suggestion lacks one, then writes guarded', async () => {
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion({ _etag: undefined }) });
+    DynamicsService.getRecord.mockResolvedValue({ _etag: 'W/"reread"' });
+    const { req, res } = post({ answers: validAnswers() });
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(DynamicsService.getRecord).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions', SUGGESTION_ID, expect.any(Object),
+    );
+    const [operations] = DynamicsService.executeChangeset.mock.calls[0];
+    expect(operations[operations.length - 1].ifMatch).toBe('W/"reread"');
+  });
+
+  it('409 conflict (and no write) when no etag can be obtained even after a re-read', async () => {
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion({ _etag: undefined }) });
+    DynamicsService.getRecord.mockResolvedValue({}); // no _etag
+    const { req, res } = post({ answers: validAnswers() });
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(409);
+    expect(res._data).toMatchObject({ reason: 'conflict' });
+    expect(DynamicsService.executeChangeset).not.toHaveBeenCalled();
     expect(ReviewDraftService.deleteBySuggestion).not.toHaveBeenCalled();
   });
 });

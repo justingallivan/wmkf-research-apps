@@ -75,6 +75,12 @@ describe('validateReviewSubmission', () => {
     expect(r.errors.join(' ')).toMatch(/invalid choice/);
   });
 
+  test('rejects a malformed numeric-string rating (no silent parseInt truncation)', () => {
+    expect(validateReviewSubmission(validInput({ impact: '3abc' })).ok).toBe(false);
+    expect(validateReviewSubmission(validInput({ impact: '3.5' })).ok).toBe(false);
+    expect(validateReviewSubmission(validInput({ risk: '2 ' })).ok).toBe(true); // trims surrounding ws
+  });
+
   test('rejects an out-of-range rating value', () => {
     const r = validateReviewSubmission(validInput({ overallRating: 6 })); // domain is 1..5
     expect(r.ok).toBe(false);
