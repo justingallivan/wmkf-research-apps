@@ -46,6 +46,19 @@ export default async function handler(req, res) {
       });
     }
 
+    // Finality guard (Codex P0-1): the reviewer-token upload path is hidden from
+    // the Phase-2 UI but still reachable directly. A submitted review is final —
+    // refuse a reviewer-token (self-serve) upload once wmkf_reviewreceivedat is
+    // set, so the legacy file path can't overwrite a completed in-browser review.
+    // The staff path (staff_upload, a different route) is unaffected.
+    if (verified.suggestion.wmkf_reviewreceivedat) {
+      return res.status(409).json({
+        ok: false,
+        reason: 'review_received_locked',
+        message: 'This review has already been submitted. To make a change, please contact your Program Director.',
+      });
+    }
+
     let parsed;
     try {
       parsed = await parseMultipart(req);
