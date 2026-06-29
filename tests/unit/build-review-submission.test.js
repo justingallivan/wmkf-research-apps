@@ -12,8 +12,18 @@
  */
 
 import { validateReviewSubmission, buildReviewSubmission } from '../../lib/external/build-review-submission';
+import { reviewFormSchema } from '../../lib/external/review-form-schema';
 
 const RECEIVED_AT = '2026-06-28T12:00:00.000Z';
+
+// The question set as ReviewQuestionFetcher returns it from Dataverse: the same
+// questions, but WITHOUT the code-only `dataverseField` and with affiliation
+// carrying order 0 (the seed gives it order 0; the static schema had none). The
+// runtime path must produce output byte-identical to the static-default path.
+const RUNTIME_SET = reviewFormSchema.fields.map((f) => {
+  const { dataverseField, ...rest } = f;
+  return { ...rest, order: typeof f.order === 'number' ? f.order : 0 };
+});
 
 // A complete, valid, already-sanitized submit keyed by field.key.
 function validInput(overrides = {}) {
@@ -205,7 +215,31 @@ describe('buildReviewSubmission — producer backstops', () => {
     const v = validateReviewSubmission(validInput());
     const bad = { ...v.normalized, risk: null };
     expect(() => buildReviewSubmission(bad, { receivedAt: RECEIVED_AT })).toThrow(
-      /exactly 3 rating rows/,
+      /exactly 3 parent-bound rating rows/,
     );
+  });
+});
+
+describe('parity: Dataverse-loaded question set == static default', () => {
+  test('validateReviewSubmission produces identical normalized output', () => {
+    const input = validInput();
+    const staticR = validateReviewSubmission(input);
+    const runtimeR = validateReviewSubmission(input, RUNTIME_SET);
+    expect(runtimeR).toEqual(staticR);
+  });
+
+  test('buildReviewSubmission produces identical parentPatch + answerRows', () => {
+    const { normalized } = validateReviewSubmission(validInput());
+    const staticOut = buildReviewSubmission(normalized, { receivedAt: RECEIVED_AT });
+    const runtimeOut = buildReviewSubmission(normalized, { receivedAt: RECEIVED_AT, questionSet: RUNTIME_SET });
+    expect(runtimeOut).toEqual(staticOut);
+  });
+
+  test('the runtime set does NOT emit an affiliation snapshot row (despite order 0)', () => {
+    const { normalized } = validateReviewSubmission(validInput());
+    const { answerRows, parentPatch } = buildReviewSubmission(normalized, { receivedAt: RECEIVED_AT, questionSet: RUNTIME_SET });
+    expect(answerRows.some((r) => r.questionKey === 'affiliation')).toBe(false);
+    expect(answerRows).toHaveLength(11); // the 11 questions, affiliation excluded
+    expect(parentPatch.wmkf_revieweraffiliation).toBe('Professor of Physics, Example University');
   });
 });
