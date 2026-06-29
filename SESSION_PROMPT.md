@@ -1,131 +1,150 @@
-# Session 303 Prompt: Reviewer authoring epic shipped — pick the next epic (staff-editable questions / doc assembler) or carried owner decisions
+# Session 304 Prompt: Staff-editable review questions — Phase A live, B1 (server) done; do B2 (client cutover) + E2E + Codex review of B
 
-## Session 302 Summary
+## Session 303 Summary
 
-**Completed the reviewer in-browser review-form authoring epic end-to-end** —
-Phases 2.5 Part B through 5 (plan `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md`,
-now marked **COMPLETE, Phases 0–5**). Every phase was Codex-reviewed and its findings
-folded in; all gates green; full `npm test` green except the documented expected-red
-`bill.test.js` / `discovery-verification-status.test.js`.
+**Scoped + started a new epic: staff-editable reviewer review questions** (the
+deferred §0 #6 from the authoring epic). Owner decisions captured, plan written +
+Codex design-reviewed, **Phase A built + Codex-reviewed + deployed live to prod**,
+and **Phase B1 (the entire server side) migrated** — all behavior-preserving.
 
-Reviewers now author + finalize a review in the browser; a submitted review is an
-atomic Dataverse answer-snapshot; staff read the narrative answers back in the
-workbench; the draft lifecycle (submit / token revoke+regenerate / cron GC) is wired.
+Plan: `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md` (status IN PROGRESS;
+Phase A ✅ live, B1 server ✅, B2/C/D/E pending). Full `npm test` green except the
+documented expected-red `bill.test.js` / `discovery-verification-status.test.js`.
+
+### Owner decisions (S303, all in plan §0)
+1. Fully variable scope — staff edit **all** questions incl. ratings.
+2. System of record = new Dataverse entity `wmkf_reviewquestion`, read via a
+   cached fail-closed fetcher (PolicyFetcher pattern).
+3. Live edit; the `wmkf_appreviewanswer` snapshot protects history (no versioning).
+4. All ratings → snapshot; retire the 3 parent rating columns. **External
+   (Connor/reporting) gate RESOLVED** — only internal reader migration orders it.
 
 ### What Was Completed
 
-1. **Phase 2.5 Part B — `DynamicsService.executeChangeset`.** Atomic `$batch`
-   changeset helper (per-op `If-Match`, fail-closed multipart parse that throws
-   unless every op confirms 2xx, CRLF/LF + case-insensitive MIME tolerance).
-   17 unit tests. Refutes the prior "Dataverse has no $batch transaction" belief.
-2. **Alt-key upsert URL form — PROD-VERIFIED.** The `wmkf_appreviewanswer` alt key
-   includes a lookup; the working upsert URL addresses it as
-   `_wmkf_appreviewersuggestion_value=<guid>` (the bare logical name + nav property
-   both 400 with `0x80060888`). Settled by `scripts/probe-altkey-upsert-changeset.mjs --execute`.
-   Memory: `reference-dataverse-altkey-lookup-upsert-url`.
-3. **Phase 3 — `/submit` + the wired Submit button.** `validateReviewSubmission` +
-   `buildReviewSubmission` (single producer; snapshot-fidelity / exactly-3-ratings /
-   rating-domain / parent-child-equality backstops). `/submit`: finality precheck
-   (409) → sanitize → validate → atomic `executeChangeset` (answer upserts by alt
-   key + parent PATCH **fail-closed on `If-Match`**, re-reads + re-checks finality if
-   the verify-time etag is absent) → draft delete post-commit. `upload.js` reviewer
-   path 409s post-submit (P0-1). Submit button locks the form read-only; 409 → terminal
-   conflict lock. 21 unit + 13 integration + 5 E2E.
-4. **Phase 4 — workbench read-back.** `/api/review-manager/reviewers` attaches the
-   re-sanitized `answers[]` snapshot per submitted reviewer (keyed child read, paginated,
-   capped→fail-loud); `ReviewsTab` renders the narrative answers. XSS boundary +
-   OData injection both Codex-confirmed sound.
-5. **Phase 5 — draft lifecycle cleanup.** Draft deleted on token revoke/regenerate
-   (in the route handlers, **not** `mintAndStore` — which runs on benign resends) +
-   90d maintenance-cron GC. Dormant file-upload infra documented
-   (`project-reviewer-upload-dormant-not-deleted`). revoke now `isGuid`-guarded.
+1. **Plan scoped + Codex design-reviewed.** Codex caught: the parent-rating-column
+   readers are fewer than I first claimed — **VRP prompt + dataverse-export do NOT
+   read them** (re-verified by literal grep); `ReviewerManagePanel.js:977-979` is a
+   missed DTO reader. Folded into plan §6/§11.
+2. **Phase A — entity + fetcher + seed, LIVE IN PROD.**
+   - `lib/dataverse/schema/wave9-review-questions/01_wmkf_reviewquestion.json`
+     (entity + 8 attrs + alt key on `wmkf_questionkey`) — **created in prod**.
+   - `lib/external/review-question-fetcher.js` — `getActiveQuestionSet()` (cached,
+     single-flight, **fail-closed**, generation-guarded invalidate, >100 cap,
+     strict sanity) + `questionSetVersion()`. 18 unit tests.
+   - `scripts/seed-review-questions.mjs` — idempotent alt-key upsert; self-gates on
+     `EntityKeyIndexStatus === 'Active'`. **Seeded 12 rows in prod** (affiliation
+     order 0 + 11 questions); `getActiveQuestionSet()` read-back verified end-to-end.
+   - Codex Phase-A review (no P0) folded: invalidate race, >100 truncation, seed
+     index-race, strict-boolean required, strict-int options, dup-order.
+3. **Phase B1 — server fully migrated to the fetched set (behavior-identical).**
+   - `build-review-submission.js` + `validateReviewForm`: take the question set as
+     a param (default static); parent-column dual-write binding via the code-side
+     `reviewParentColumnByKey`; snapshot rows selected by TYPE (picklist|richtext),
+     NOT "has order" (seeded affiliation has order 0). Parity tests prove the
+     Dataverse-shaped set yields byte-identical output.
+   - `submit.js`, `draft.js`, `context.js` all read `getActiveQuestionSet()`.
+     `context.js` (stage2b) returns `questions` + `questionSetVersion`; `submit.js`
+     409s `set_changed` on a stale client `setVersion` (client wiring is B2).
 
 ### Commits
-- `d3ed821b` / `1709d7e3` — executeChangeset + Codex fixes
-- `1bf0f317` `ce6bbf99` `cc787b4e` `7e472b18` `73ac41b1` `cd7ee8ad` `e230173a` `cf4d46ef` — Phase 3
-- `b08c7323` `1ba8d4a9` — Phase 4
-- `c00c7e6f` `9a436cc9` `84d00cdb` — Phase 5
+- `c5a4b085` — scope + Codex design review folded into the plan
+- `f06316bb` `d6b4d69c` — Phase A build + Codex-review fixes
+- `3701dc46` — Phase A live in prod (entity created + 12 rows seeded)
+- `b13bda93` — B1 producers parameterized (parity-tested)
+- `2beb247e` — B1 submit route + set_changed
+- `de28dbe6` — B1 draft + context routes
 
 ## Next Items
 
 ### Verified Open
 
-1. **Staff-editable review questions — eligible to re-open as its own phase.**
-   Evidence: plan §0 #6 ("DECIDED: defer; re-open as its own phase **after the
-   authoring flow ships**"). The authoring flow shipped this session, so the gate is
-   cleared. Unlike the fixed-field admin editors, this surface needs a **variable**
-   number of questions (add/remove/reorder); the `wmkf_appreviewanswer` snapshot
-   already supports it (more rows, never new columns). This is a fresh design+build,
-   not a carryover task — scope it first.
-2. **Human-readable review-document assembler / VRP coupling.** Evidence: plan §6 #B
-   ("the future document assembler reads the child snapshot — explicitly enabled by
-   this model, built later"). The snapshot is now populated in prod, so this is
-   unblocked. Out of scope until owner prioritizes; pairs with the Virtual Review
-   Panel work.
+1. **Phase B2 — client cutover (the next task).**
+   Evidence: plan §5/§8 (Phase B B2); `shared/components/external/ReviewAuthoringForm.js`
+   + `ReviewFormFields.js` still statically import `reviewFormSchema`.
+   - Make both components consume the question set from the `context` response
+     (`data.questions`) as props instead of the static import.
+   - Send `data.questionSetVersion` back on the `/submit` POST body as `setVersion`
+     (the server-side `set_changed` 409 is already wired; client must echo + handle
+     it by prompting a reload).
+   - **Type-aware draft reconciliation** (Codex P1): on form load, overlay
+     `draft_json` onto the current set by key, discarding a value whose stored
+     shape doesn't match the current field `type` (richtext↔picklist change).
+   - Then E2E parity (Playwright/Chromium, real build): authoring renders from the
+     context set, autosave, submit → read-only, set_changed reload path.
+   - **Ship B1+B2 together is now moot** (B1 already shipped behavior-identically
+     because the seeded set == the static schema; B2 is additive on top).
+2. **Phase B Codex review** once B2 lands (cadence: each phase Codex-reviewed).
+3. **Phases C → D → E** (plan §8): C = admin variable-length editor
+   (`pages/api/admin/review-questions.js` + `ReviewQuestionsSection.js`, atomic
+   `executeChangeset` save, row-identity key-immutability, `invalidate()`); D =
+   migrate the §6 parent-column readers + the two legacy staff writers to the
+   snapshot; E = stop-write/drop the parent columns (external gate already clear).
 
-### Owner Decision Needed
+### Owner Decision Needed (carried from S303, not addressed)
 
-1. **Remit-flag on review-completion — build it now?** (carried; now newly natural)
-   Evidence: `.claude-memory/project-honorarium-payment-landscape.md`. Set
-   `wmkf_authorizationtoremitpaymentflag` on review submit — the `/submit` path now
-   exists as the obvious hook. Owner call on whether to wire it.
-2. **Ops/Steph BILL-honorarium update** — drafted, Justin to send.
-   `scratchpad/ops-bill-honorarium-update.md`.
-3. (carried) BILL API access · self-report PNI field · Workbench access boundaries ·
-   generic write-helper restriction policy · applicant-exclusion policy · awardee
-   onboarding · Dataverse settings auditing · GRANTEE_PORTAL title-field provenance.
+1. Remit-flag on review-completion — wire `wmkf_authorizationtoremitpaymentflag`
+   on submit? Evidence: `.claude-memory/project-honorarium-payment-landscape.md`.
+2. Ops/Steph BILL-honorarium update — drafted, Justin to send.
+   Evidence: `scratchpad/ops-bill-honorarium-update.md`.
 
-### Verify Before Acting
+### Parked
 
-1. **Drain-table drops — date gate is now imminent (was 2026-07-01).** DESTRUCTIVE.
-   Evidence: prior SESSION_PROMPT parked list. Before acting: grep live callers and
-   read load-bearing paths (the 2026-05-03 lesson — "dormant" PG reviewer tables were
-   load-bearing). Do not drop on the date alone.
-2. Long-stale pre-S294 carryovers — model real-replay signoff, request `1002788`
-   triage, Restore-Removed-Candidates E2E. Verify each against source/docs/probes.
+1. The longer carried list (BILL API access, PNI self-report, workbench access
+   boundaries, applicant-exclusion, awardee onboarding, Dataverse settings audit,
+   GRANTEE_PORTAL title provenance, nomenclature/app-sunset sweep). Re-open trigger:
+   owner prioritization. Evidence: S302 prompt + `.claude-memory/MEMORY.md` router.
 
 ### Do Not Reopen Without New Decision
 
-1. **Reviewer authoring epic is COMPLETE (Phases 0–5).** Do not "finish" or "wire"
-   any of its phases — they shipped. The Submit button is live; the file-upload UI is
-   intentionally retired (route retained + finality-guarded, `project-reviewer-upload-dormant-not-deleted`).
-2. **`$batch` atomic changeset works in prod** (`project-dataverse-batch-changeset-available`);
-   the alt-key upsert lookup is addressed by `_wmkf_appreviewersuggestion_value=`
-   (`reference-dataverse-altkey-lookup-upsert-url`). Do not relearn these from a prod 400.
-3. **Phase-5 autosave-resurrection TOCTOU is an ACCEPTED RESIDUAL** (documented in
-   revoke-token.js / regenerate-token.js) — a resurrected draft under a dead token is
-   harmless (unreadable/unsubmittable, GC-swept). Do not bolt on a per-autosave re-check.
+1. **Phase A is COMPLETE + LIVE** (`wmkf_reviewquestion` created + seeded in prod,
+   read-back verified). Do not re-create or re-seed (seed is idempotent if needed).
+   Evidence: `docs/atlas/dataverse-wmkf-reviewquestion.md`.
+2. **B1 server is done + behavior-identical.** The static `reviewFormSchema` is
+   retained as the field-shape + seed + helper source + the default param — do NOT
+   delete it. Evidence: plan §1, `commit de28dbe6`.
+3. **VRP prompt + dataverse-export do NOT read the parent rating columns** (Codex
+   re-verified S303). Don't list them as retirement blockers. Evidence: plan §6.
+
+### Verify Before Acting
+
+1. **Phase D/E parent-column retirement is DESTRUCTIVE.** Before stop-write/drop:
+   grep the live §6 reader table + the two legacy staff writers, confirm each reads
+   the snapshot. Evidence: plan §6/§7. (External gate is resolved; internal
+   migration is not.)
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md` | The epic plan — Phases 0–5 DONE; §0 #6 = the staff-editable-questions deferral now eligible to re-open. |
-| `lib/services/dynamics-service.js` | `executeChangeset` (atomic `$batch`) + the multipart builders/parser. |
-| `lib/external/build-review-submission.js` | `validateReviewSubmission` + `buildReviewSubmission` (the single submit producer). |
-| `pages/api/external/review/[token]/submit.js` | The final-submit route (finality, atomic write, fail-closed If-Match). |
-| `pages/api/review-manager/reviewers.js` | Workbench read-back — `fetchAnswersBySuggestion` keyed child read. |
-| `scripts/probe-altkey-upsert-changeset.mjs` | Re-validates the alt-key upsert form + executeChangeset against prod (self-cleaning). |
+| `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md` | The epic plan — Phase A ✅ live, B1 server ✅; §5 = B2 client spec; §11 = Codex logs. |
+| `lib/external/review-question-fetcher.js` | `getActiveQuestionSet()` (cached, fail-closed) + `questionSetVersion()`. |
+| `lib/external/build-review-submission.js` | `validateReviewSubmission`/`buildReviewSubmission(…, questionSet)`. |
+| `lib/external/review-form-schema.js` | Retained: field shape, seed, helpers, `reviewParentColumnByKey` (dual-write binding), `labelForOption`. |
+| `pages/api/external/review/[token]/{submit,draft,context}.js` | Reviewer routes — now read the fetched set; context emits `questions`+`questionSetVersion`; submit `set_changed`. |
+| `shared/components/external/ReviewAuthoringForm.js` + `ReviewFormFields.js` | **B2 target** — still static-import; migrate to context-supplied set. |
+| `scripts/seed-review-questions.mjs` | Idempotent seed (self-gates on alt-key Active). |
 
 ## Testing
 
 ```bash
-# Epic unit + integration (all green):
-npx jest tests/unit/dynamics-service-changeset.test.js tests/unit/build-review-submission.test.js \
-  tests/integration/external-review-submit-route.test.js tests/integration/review-manager-reviewers-answers.test.js \
-  tests/unit/reviews-tab.test.js tests/integration/review-manager-token-routes.test.js \
-  tests/unit/maintenance-cron-handler.test.js
-# stage2b authoring E2E (builds + Chromium; 5 specs incl. submit→read-only, 409 conflict-lock):
-npx playwright test tests/e2e/reviewer-stage2b-authoring.spec.js --project=chromium
-# Re-validate the alt-key upsert form in prod (self-cleaning; needs a test suggestion GUID):
-node scripts/probe-altkey-upsert-changeset.mjs --suggestion=834d3453-e061-f111-a826-000d3a3065b8 --execute
+# Phase A + B1 unit/integration (all green):
+npx jest tests/unit/review-question-fetcher.test.js tests/unit/build-review-submission.test.js \
+  tests/integration/external-review-submit-route.test.js tests/integration/external-review-draft-route.test.js \
+  tests/integration/external-review-routes.test.js
+# Re-verify the live prod question set reads back (12 rows):
+#   getActiveQuestionSet() via a small script with lib/dataverse/client loadEnvLocal()
+# Full suite green except expected-red bill/discovery:
+npm test
 ```
 
 ## Gotchas / Continuity
 
-- **Full `npm test` is green except the documented expected-red** `bill.test.js` /
-  `discovery-verification-status.test.js` (`project-bill-com-integration-tests-known-red`).
-- **Submit is FINAL** — no edit/re-submit; reviewers contact staff for changes. Both
-  `/draft` PUT and the reviewer-token `/upload` 409 post-submit.
-- **`executeChangeset` is the repo-wide atomic-multi-row Dataverse primitive now** —
-  use it (not a non-atomic mirror) for any future all-or-nothing Dataverse write.
+- **Current prod state is consistent + safe:** server reads the Dataverse set,
+  which is seeded IDENTICAL to the static schema the client still imports — the
+  live reviewer flow behaves exactly as before. `questions`/`questionSetVersion`
+  in the context response are additive and currently ignored by the client.
+- **Fetcher is fail-closed** — if `wmkf_reviewquestion` is empty/unreachable,
+  context/submit/draft 500 (intentional; can't author against an unknown set).
+- **Key format allows camelCase** (`overallRating`): `^[a-z][a-zA-Z0-9_]*$`.
+- **`set_changed`**: server already 409s a stale `setVersion`; client doesn't send
+  one yet (B2), so the check is skipped today — no false positives.
