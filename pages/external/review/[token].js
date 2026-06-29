@@ -167,7 +167,12 @@ function Dispatcher({ data, token, viewOverride, onRequestDecline, onRequestFlip
 
     case 'stage2b':
     case 'submitted':
-      return <MaterialsView data={data} token={token} />;
+      // key={token} forces a fresh remount if this page instance ever serves a
+      // different token (Next reuses the [token] page component across client
+      // route changes). Without it, MaterialsView/ReviewAuthoringForm would keep
+      // `loaded=true` + the prior token's editor state while the new token's
+      // draft GET later calls setValues — a stale-data/overwrite edge (Codex S301 P2).
+      return <MaterialsView key={token} data={data} token={token} />;
 
     case 'withdrawn-sufficient':
       return <WithdrawnSufficientNotice />;
