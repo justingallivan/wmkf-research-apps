@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## June 2026 — Review-form question set became staff-editable live data (Sessions 303–304)
+
+**Milestone:** The external-reviewer review-form question set is no longer a static code array — it's a Dataverse entity (`wmkf_reviewquestion`) read at runtime and edited live by staff in a `/admin` editor, without a deploy and without disturbing past reviews (the `wmkf_appreviewanswer` snapshot preserves history).
+
+**Sessions:** 303 (Phase A: entity + `ReviewQuestionFetcher` fail-closed + seed, created+seeded in prod; Phase B server) → 304 (Phase B2 reviewer client cutover; Phase C superuser editor). Codex-reviewed each phase; findings folded.
+
+**Ship state:**
+- `lib/external/review-question-fetcher.js` — `getActiveQuestionSet()` (cached, single-flight, **fail-closed**) replaces the static `reviewFormSchema.fields` as the runtime source; `questionSetVersion()` optimistic-lock hash. Reviewer `context`/`submit`/`draft` + `ReviewAuthoringForm` all render from the fetched set.
+- `/admin` → Review Questions editor (`pages/api/admin/review-questions.js` + pure `lib/admin/review-question-save.js` + `ReviewQuestionsSection.js`): one atomic `executeChangeset` (create/update/soft-delete by row-id + `If-Match`), key-immutability, parent-bound-row guard, 100-row cap, Postgres `review_question_audit` (migration 022, pending→final hard-abort). Prod-verified read + live save (200).
+- Incident folded: first prod save 502'd on schema-name casing (`wmkf_Name` vs logical `wmkf_name`) — mocks couldn't catch a service contract (`2ea15905`); memory `feedback-verify-write-paths-against-live-service`.
+
+**Why it matters:** staff change which questions reviewers answer (text/order/type/options/required) with no engineering involvement, and the answer-snapshot keeps every past review intact across edits. Phase D/E (retire the legacy `wmkf_reviewer{impact,risk,overallrating}` parent columns) remain.
+
+**Pointers:** `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md`, `docs/atlas/dataverse-wmkf-reviewquestion.md`; commits `7ef56014`, `f0a65112`, `2ea15905`, `cfbad4a6`.
+
 ## June 2026 — Reviewer in-browser review-form authoring shipped end-to-end (Session 302)
 
 **Milestone:** External reviewers now author AND submit their review in the browser — the file-upload review path is retired from the UI. A submitted review is captured as a point-in-time Dataverse answer-snapshot (`wmkf_appreviewanswer`) written atomically, then read back in the staff workbench.

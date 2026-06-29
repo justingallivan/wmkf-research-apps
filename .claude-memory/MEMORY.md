@@ -22,6 +22,7 @@
 - Full `npm test` shows red (confirm it's ONLY the known bill.com expected-red set before chasing): project-bill-com-integration-tests-known-red.md
 - Scope/count/quantity claim: feedback-falsify-not-confirm.md
 - Claim about how THIS system behaves (screen/return/feature-live/field/gate/token/link), incl. in chat — cite producer, not consumer: feedback-behavior-claims-cite-the-producer.md
+- New Dataverse WRITE path "done" on green MOCKS (casing/payload/state contract lives in the service, not our code — verify w/ a real write or metadata+seed-parity probe): feedback-verify-write-paths-against-live-service.md
 - Durable docs/memory/fact edit: feedback-reconcile-dont-append-docs.md; feedback-apply-reconcile-to-fix-work.md
 - Retiring/consolidating a renamed-or-merged capability, or a `/sweep` keeps re-finding the same stale claim (rename the CODE/ground truth, not just docs): feedback-rename-code-not-just-docs.md
 - Cleanup/audit/verification loop: feedback-timebox-metawork.md
