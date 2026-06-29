@@ -1,6 +1,6 @@
 # Reviewer Review-Form — In-Browser Authoring Build Plan
 
-**Status:** **PLAN — build-ready, not started.** Drafted 2026-06-28 (Session 300); revised same session after a Codex design review (all P0/P1/P2 folded in) and a data-model pivot to a point-in-time **answer-snapshot child table**. No code written yet — Phase 0 (Dataverse schema: one new child table, zero new parent columns) is the next action.
+**Status:** **PLAN — build-ready, not started.** Drafted 2026-06-28 (Session 300); revised same session after **two** Codex design-review passes (all P0/P1/P2 + the pivot findings P0-N1/P0-N2/P1-N3/P1-N4 folded in) and a data-model pivot to a point-in-time **answer-snapshot child table**. Key build prerequisite surfaced by review: a Dataverse **changeset helper does not exist and must be built** (§5a) — owner chose to build it (over a non-atomic redesign). No code written yet — Phase 0 (Dataverse schema: one new child table + alternate key, zero new parent columns) is the next action.
 
 **Date:** 2026-06-28
 
@@ -71,6 +71,8 @@
 
 This holds **all 11 questions** (ratings included) so the snapshot — and the future document assembler — is complete and self-contained. Adding questions later = more rows, **never new columns**. `wmkf_questiontext` denormalizes the question into each answer, so historical reviews survive any future question edit/move/delete.
 
+**Alternate key for idempotency (Codex P0-N2):** define a Dataverse **alternate key on `(wmkf_AppReviewerSuggestion, wmkf_questionkey)`** so child-row creation is idempotent — a retry after an uncertain network failure upserts rather than duplicating. The submit write uses this key (create-or-update by alternate key), so a partial-then-retried submit can't produce two rows for the same question.
+
 **Parent suggestion row — no new columns.** Keep the existing discrete ratings (`wmkf_reviewerimpact/risk/overallrating`), `wmkf_revieweraffiliation`, and `wmkf_reviewreceivedat`. Ratings are denormalized to the parent for native aggregation (year-over-year averages); they *also* appear in the child snapshot for document fidelity. This is a deliberate, documented duplication.
 
 ### 3b. Postgres — drafts / autosave
@@ -113,7 +115,7 @@ review_drafts(
 |---|---|---|---|
 | `/api/external/review/[token]/draft` (new) | GET | token | Return saved `draft_json` so the editor rehydrates on return visits. **404/empty if the review is already submitted** (no draft after finality). |
 | `/api/external/review/[token]/draft` (new) | PUT | token | Debounced autosave. Sanitize each rich-text answer (§4) before persisting; `upsertDraftJson`. Gated on materials-sent (same gate as `/upload`). **Refuses with 409 once `wmkf_reviewreceivedat` is set** (submit is final, §9 #C). Explicit `bodyParser.sizeLimit` (P1-3). |
-| `/api/external/review/[token]/submit` (new) | POST | token | Final submit. Validate all fields (ratings + Q2/Q4–Q9 + affiliation required, Q11 optional; "empty richtext" = no text after tag-strip — §9 #E). Sanitize → derive plain text → build the snapshot. **Single Dataverse `$batch` changeset (all-or-nothing, Codex P0-2):** create the N `wmkf_appreviewanswer` rows + PATCH the parent (3 rating columns, affiliation, `wmkf_reviewreceivedat`) **guarded by `If-Match: <etag>`** (or a `wmkf_reviewreceivedat eq null` precondition) → 412/409 on conflict. **Only after the changeset commits**, delete the Postgres draft and tighten the token window. Explicit `bodyParser.sizeLimit` (P1-3). |
+| `/api/external/review/[token]/submit` (new) | POST | token | Final submit. Validate all fields (ratings + Q2/Q4–Q9 + affiliation required, Q11 optional; "empty richtext" = no text after tag-strip — §9 #E). One mapping fn `buildReviewSubmission(validated) → { parentPatch, answerRows }` (Codex P1-N4). **Finality precheck:** reject with 409 if `wmkf_reviewreceivedat` is already set. **Atomic write via the changeset helper (§5a, Codex P0-N1/P0-N2):** upsert the N `wmkf_appreviewanswer` rows by alternate key + PATCH the parent (3 rating columns, affiliation, `wmkf_reviewreceivedat`) in one changeset, the parent PATCH **guarded by `If-Match: <etag>`** → 412 on concurrent change. **Only after the changeset commits**, delete the Postgres draft and tighten the token window. Explicit `bodyParser.sizeLimit` (P1-3). |
 | `context.js` | GET | token | Extend `prefill`: pre-submit from the draft; post-submit reconstruct from the child rows. Expose the new schema. Continues to return `_etag` (consumed by `/submit`). |
 | `upload.js` | POST | token | **Hidden from UI but hardened (Codex P0-1):** the reviewer-token path (`opts.source === 'reviewer_self_token'`) **refuses once `wmkf_reviewreceivedat` is set**. Staff path (`staff_upload`) unaffected. |
 | `/api/review-manager/reviewers` | GET | session | Extend to expand/return the child answer rows for workbench read-back (Codex P1-1). |
@@ -124,11 +126,24 @@ review_drafts(
 
 All new routes register in `docs/API_ROUTE_SECURITY_MATRIX.md` and pass `check:api-routes`. Public token surfaces → preserve expiry, row binding, rate-limit, replay/duplicate guards consistent with `/upload` and `/respond` (`.claude/rules/external-reviewers.md`).
 
+### 5a. The Dataverse changeset helper (Codex P0-N1 — net-new infra, prerequisite for submit)
+
+**[VERIFIED via `lib/services/dynamics-service.js`, S300]** `DynamicsService` exposes only single-row writes — `createRecord` (`:786`), `updateRecord` (`:823`, supports `ifMatch`), `updateIfEmpty` (`:872`), `deleteRecord` (`:928`, supports `ifMatch`). **There is no `$batch`/changeset/multipart method anywhere in `lib/`.** So the "all-or-nothing submit" the snapshot model needs does **not** exist yet and must be built. **[VERIFIED via `pages/api/admin/prompts/[name].js:12`]** the prompt/policy publish flows carry a comment that "Dataverse has no $batch transaction" and deliberately use a non-atomic mirror — so a prior author believed `$batch` was unavailable here. Treat that as a real risk, not settled fact.
+
+Plan (owner chose to **build the helper**, not redesign around non-atomic writes):
+1. **Feasibility spike first** — confirm the Dataverse Web API `$batch` endpoint accepts a `multipart/mixed` body with a single atomic changeset in *this* environment (auth, base URL, error surfacing). Time-boxed; if it proves unavailable, fall through to the documented fallback below and re-confirm with the owner.
+2. **`DynamicsService.executeChangeset(operations, { actingUserSystemId })`** — builds one `multipart/mixed` `$batch` request wrapping a single changeset of create/PATCH/delete operations (all-or-nothing), supports **per-operation `If-Match`**, parses the multipart response, and surfaces per-operation failures with the same structured-error shape as the single-row helpers. Reuses the existing token/headers/`bypassDynamicsRestrictions` plumbing.
+3. **Isolated tests** for the helper (changeset body construction, multipart-response parsing, per-op `If-Match`, all-or-nothing rollback on one failed op) **before** `/submit` consumes it.
+
+**Documented fallback (if the spike fails):** non-atomic submit — upsert child rows by the `(suggestion, questionkey)` alternate key first, then stamp `wmkf_reviewreceivedat` **last** as the commit marker (a review with rows but no `receivedat` is "not submitted"); idempotent retry via the alternate key; a maintenance sweep reaps orphaned answer rows whose parent never got `receivedat` within a window. This is the same shape as the prompt/policy publish flows.
+
 ---
 
 ## 6. Staff read-back (workbench)
 
-`ReviewsTab.js` renders, per submitted reviewer: the existing rating cells (from the discrete parent columns) **plus** the narrative answers from the child rows, each as `question text` → sanitized HTML (re-sanitized before render). The SharePoint download link shows only when a file actually exists (uploads hidden going forward). `/api/review-manager/reviewers` extended to expand the child rows.
+`ReviewsTab.js` renders, per submitted reviewer: the existing rating cells (from the discrete parent columns) **plus** the narrative answers from the child rows, each as `question text` → sanitized HTML (re-sanitized before render). The SharePoint download link shows only when a file actually exists (uploads hidden going forward).
+
+**Child read mechanics (Codex P1-N3 — net-new, no 1:N child-expand precedent in `reviewer-suggestion.js`):** read answers with a **separate keyed query**, not `$expand` — `DynamicsService.queryRecords('wmkf_appreviewanswers', { filter: '_wmkf_appreviewersuggestion_value eq <id>', orderby: 'wmkf_questionorder', select: [...] })`. This reuses the existing `queryRecords` primitive (`dynamics-service.js:433`), is trivially testable, and sidesteps `$expand` collection-size limits. Specify at build time: the entity **set name** (`wmkf_appreviewanswers`), the **lookup navigation property** on the child, and the **answer DTO** (`{ questionKey, questionOrder, questionText, questionType, answerHtml, answerText, answerValue }`). The `/api/review-manager/reviewers` response gains an `answers[]` array per reviewer, ordered by `questionOrder`.
 
 **[#B — deferred default]** Panel-prep export/roll-up of the narrative answers stays out of scope; revisit after the authoring surface ships. The future **human-readable review-document assembler** reads the child snapshot — explicitly enabled by this model, built later.
 
@@ -144,10 +159,11 @@ All new routes register in `docs/API_ROUTE_SECURITY_MATRIX.md` and pass `check:a
 
 ## 8. Phasing (lowest-risk first)
 
-- **Phase 0 (blocking inputs):** Justin + Claude create the `wmkf_appreviewanswer` child table (§3a) and finalize its column names. Question wording resolved (§2). Confirm decision #6 (defer staff-editable questions?).
+- **Phase 0 (blocking inputs):** Justin + Claude create the `wmkf_appreviewanswer` child table (§3a), its `(suggestion, questionkey)` alternate key, and finalize column names. Question wording resolved (§2). Confirm decision #6 (defer staff-editable questions?).
 - **Phase 1 (data layer + sanitizer, no UI):** `sanitize-review-html.js` + its full bypass test suite **first**; migration `021_review_drafts.sql` + manifest; `ReviewDraftService`; draft GET/PUT routes (sanitize on write, finality refusal, size limits); unit tests. Update Atlas (new PG table + new Dataverse entity) + API matrix.
 - **Phase 2 (editor):** `RichReviewEditor` (tiptap); schema `richtext` type; wire the authoring form into `stage2b`, replacing the file UI; autosave wired to Phase 1.
-- **Phase 3 (submit + lifecycle):** `/submit` route → `$batch` changeset (child rows + parent ratings + receivedat, `If-Match`-guarded); draft deleted post-commit; token window tightened; reviewer-token `/upload` finality guard (P0-1); `context.js` prefill (draft pre-submit / child rows post-submit); `submitted` view read-only.
+- **Phase 2.5 (changeset helper — Codex P0-N1, prerequisite for Phase 3):** feasibility spike on the Dataverse `$batch` endpoint (§5a); then `DynamicsService.executeChangeset` with per-op `If-Match` + all-or-nothing semantics + isolated tests. If the spike fails, switch to the §5a fallback and re-confirm with the owner before Phase 3.
+- **Phase 3 (submit + lifecycle):** the single `buildReviewSubmission()` mapping fn (P1-N4); `/submit` route → finality precheck + `executeChangeset` (child upserts by alternate key + parent ratings/affiliation/receivedat, parent `If-Match`-guarded); draft deleted post-commit; token window tightened; reviewer-token `/upload` finality guard (P0-1); `context.js` prefill (draft pre-submit / child rows post-submit); `submitted` view read-only.
 - **Phase 4 (workbench + fan-out):** child-row expand in `/api/review-manager/reviewers`; `ReviewsTab` renders the narrative answers; complete the P1-1 fan-out in this phase.
 - **Phase 5 (lifecycle integration + cleanup + gates):** delete review draft on token **revoke** and **regenerate** (Codex P1-4 — wired into `revoke-token.js` + `regenerate-token.js`, **not** `mintAndStore`); draft GC in the maintenance cron; hide upload UI + document dormant infra; full gate sweep + the `stage2b` E2E.
 
@@ -157,7 +173,8 @@ All new routes register in `docs/API_ROUTE_SECURITY_MATRIX.md` and pass `check:a
 
 - **[#C — submit is final.]** On submit the form **locks read-only**; no edit/re-submit. **Diverges from today's "replace your submission" grace behavior** (removed with the upload UI). Enforced **server-side** (draft PUT + reviewer-token upload both reject post-submission, P0-1); draft deleted post-commit; `submitted` view renders answers read-only. A reviewer needing a correction contacts staff (staff retain server-side edit/upload paths).
 - **[#E — all required except Q11.]** Q2/Q4–Q9 hard-required alongside the 3 ratings + affiliation; Q11 optional. "Empty richtext" = no text content after tag-strip, not merely `<p></p>` — the validator strips tags before the emptiness test.
-- **[#C-conc — concurrency (Codex P0-2).]** `/submit` is guarded by the context `_etag` via `If-Match` (or a `wmkf_reviewreceivedat eq null` precondition) inside the `$batch` changeset; a second concurrent submit gets 412/409, not a silent clobber. The Postgres draft is deleted **only after** the changeset commits (never on a PATCH failure).
+- **[#C-conc — concurrency + idempotency (Codex P0-2 / P0-N2).]** `If-Match` alone is insufficient — a client can fetch a fresh post-submit etag and re-submit ([VERIFIED via `context.js` returns an etag on every load, incl. submitted state]). So `/submit` uses **both**: a **finality precheck** (reject 409 if `wmkf_reviewreceivedat` is already set) **and** an `If-Match`-guarded parent PATCH inside the changeset (412 on concurrent change). Child rows upsert by the `(suggestion, questionkey)` alternate key so an uncertain-failure retry can't duplicate rows. The Postgres draft is deleted **only after** the changeset commits (never on a write failure).
+- **[#snapshot-consistency — parent/child rating invariant (Codex P1-N4).]** Ratings live both as parent columns and as child snapshot rows. To prevent silent drift, `buildReviewSubmission(validated)` is the **single** producer of `{ parentPatch, answerRows }` from one normalized validated object; before building the changeset, assert the child rating rows' `answerValue` equals the corresponding `parentPatch` column. Unit-tested.
 - **[#draft-token — token revoke/regenerate (Codex P1-4, TRACED S300).]** Drafts key on `suggestion_id`, which is **stable across token regeneration** (`mintAndStore` rewrites only the hash/expiry — [VERIFIED via `token-lifecycle.js:42`]), so a stale/tampered draft *would* resurface under a regenerated link. **Resolution:** delete the review draft in the staff **revoke-token** and **regenerate-token** endpoints (the leak/compromise actions per `token-lifecycle.js:5`), **not** in `mintAndStore` — that primitive is also called on every benign email (re)send ([render-emails.js:165], [reviewer-reminder-sweep.js:272]), where the draft must survive. Accepted edge: regenerating for a benign "lost email" also clears the draft (rare; reviewer re-enters) — documented, not silent.
 - **[#D — draft retention/GC]** Mirror intake's `deleteExpired` (90 days) or tie GC to `wmkf_externaltokenexpires`. Recommended: GC some interval after token expiry. Minor; finalize at Phase 5.
 - **Concurrency (autosave):** single reviewer; two-tab autosave → last-write-wins on `draft_json` is acceptable (no async drain to corrupt). No idempotency key.
@@ -177,14 +194,15 @@ npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging
 ```
 **[Decide in Phase 1]** whether `check:prompt-injection-tagging` applies to reviewer-authored HTML that is stored and later rendered to staff (not fed to an LLM). If the eventual document assembler or VRP ever feeds these answers to a model, the untrusted-content markers apply then.
 
-**Tests:** unit — sanitizer allowlist + every bypass vector (§4), plain-text rendition, `ReviewDraftService` (upsert/get/finality-refusal/GC), `validateReviewForm` with `richtext` + emptiness-after-strip, submit-path snapshot/changeset mapping. Integration — draft GET/PUT/submit (token gating, materials-sent gate, post-submit 409, `If-Match` 412, replay). E2E (Codex P2-3) — assert: (a) **no file input** present in `stage2b`, (b) autosave **restores the draft on reload** pre-submit, (c) submit transitions UI to **read-only**, (d) a subsequent autosave PUT returns **409/frozen**, (e) a direct reviewer-token POST to `/upload` after final submit is **rejected server-side**.
+**Tests:** unit — sanitizer allowlist + every bypass vector (§4), plain-text rendition, `ReviewDraftService` (upsert/get/finality-refusal/GC), `validateReviewForm` with `richtext` + emptiness-after-strip, `buildReviewSubmission` mapping + parent/child rating invariant (P1-N4), `executeChangeset` (body construction, multipart-response parse, per-op `If-Match`, all-or-nothing rollback). Integration — draft GET/PUT/submit (token gating, materials-sent gate, finality 409, `If-Match` 412, alternate-key retry idempotency, replay). E2E (Codex P2-3) — assert: (a) **no file input** in `stage2b`, (b) autosave **restores the draft on reload** pre-submit, (c) submit transitions UI to **read-only**, (d) a subsequent autosave PUT returns **409/frozen**, (e) a direct reviewer-token POST to `/upload` after final submit is **rejected server-side**.
 
 **Top risks:**
-1. **Stored XSS** (highest) — reviewer HTML rendered to staff. Mitigation: the enumerated `sanitize-html` contract (§4) applied on write *and* render; per-vector tests.
-2. **Serverless sanitizer** — `sanitize-html`, never DOMPurify+jsdom.
-3. **Submit atomicity/concurrency** — the single `$batch` changeset + `If-Match` + draft-delete-after-commit (P0-2) is the crux; partial child-row writes must not be possible.
-4. **Consumer fan-out (P1-1)** — answers written but not surfaced reads as data loss; complete schema → child-expand → reviewers DTO → ReviewsTab in Phase 4.
-5. **Dataverse dependency** — Phase 0 child-table creation (Justin + Claude) blocks Phases 3–4.
+1. **Changeset feasibility (new, gating P0-N1)** — the atomic submit depends on a `$batch` changeset helper that does **not** exist, and prior code believed `$batch` was unavailable here ([prompts/[name].js:12]). Mitigation: feasibility spike **before** committing Phase 3 (§5a); documented non-atomic fallback if it fails.
+2. **Stored XSS** — reviewer HTML rendered to staff. Mitigation: the enumerated `sanitize-html` contract (§4) on write *and* render; per-vector tests.
+3. **Serverless sanitizer** — `sanitize-html`, never DOMPurify+jsdom.
+4. **Submit atomicity/concurrency** — changeset + finality precheck + `If-Match` + alternate-key idempotency + draft-delete-after-commit (P0-2/P0-N2); partial or duplicate child rows must be impossible.
+5. **Consumer fan-out (P1-1)** — answers written but not surfaced reads as data loss; complete schema → keyed child read → reviewers DTO → ReviewsTab in Phase 4.
+6. **Dataverse dependency** — Phase 0 child-table + alternate-key creation (Justin + Claude) blocks Phases 3–4.
 
 ---
 
@@ -194,6 +212,7 @@ npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging
 - Sanitizer: `sanitize-html` already in `package.json` (use server-side); `marked` present if markdown is ever wanted.
 - Migration mechanism: `node scripts/apply-migrations.js` + `lib/db/migrations-manifest.json` (manifest currently ends at `020`).
 - Token verify + lifecycle: `lib/external/verify-suggestion-token.js`, `lib/external/token-lifecycle.js`; staff token endpoints `pages/api/review-manager/{regenerate-token,revoke-token}.js` (P1-4 integration points).
-- Optimistic lock precedent: `context.js` `_etag` + `/respond` `If-Match` (model for `/submit`).
+- Optimistic lock precedent: `context.js` `_etag` + `/respond` `If-Match` (model for `/submit`). Single-row `If-Match` is supported by `DynamicsService.updateRecord`/`deleteRecord` ([dynamics-service.js:823,928]).
+- **Changeset helper does NOT exist — must be built (§5a, P0-N1).** No `$batch`/changeset/multipart method in `lib/`; the prompt/policy publish flows ([prompts/[name].js:12]) deliberately use a non-atomic mirror because a prior author believed Dataverse `$batch` was unavailable here. Feasibility spike required.
 - Dataverse-authored-content precedent (for the future staff-editable-questions phase): the Stage 2a `wmkf_policy` + `wmkf_policy_version` library.
 - Schema single-source: `lib/external/review-form-schema.js`.
