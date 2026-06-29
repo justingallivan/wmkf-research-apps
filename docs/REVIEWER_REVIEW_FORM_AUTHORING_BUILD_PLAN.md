@@ -1,6 +1,6 @@
 # Reviewer Review-Form — In-Browser Authoring Build Plan
 
-**Status:** **PLAN — build-ready (start Phase 0), not started.** Drafted 2026-06-28 (Session 300); revised same session after **three** Codex design-review passes and a data-model pivot to a point-in-time **answer-snapshot child table**. All findings folded in: pass-1 (P0-1/P0-2/P1-1..4/P2-1..3), pass-2 pivot findings (P0-N1/P0-N2/P1-N3/P1-N4), pass-3 (P1-R3 rating validity, P1-R4 explicit token guards, and the §5a-fallback hardening P0-R1/P0-R2). Codex pass-3 verdict: **"Yes with conditions — Phase 0 can start"**; the two open P0s (P0-R1/P0-R2) gate **only the non-atomic fallback**, which is marked do-not-ship until they're designed — the primary changeset path is sound. Key build prerequisite: a Dataverse **changeset helper does not exist and must be built** (§5a, Phase 2.5) — owner chose to build it. No code written yet — Phase 0 (Dataverse schema: one new child table + alternate key, zero new parent columns) is the next action.
+**Status:** **PHASE 0 DONE (2026-06-28, S301) — Phase 1 is the next action.** The `wmkf_appreviewanswer` child table, its 7 columns + `wmkf_Name` primary, the `wmkf_appreviewanswer_suggestion` N:1 lookup to `wmkf_appreviewersuggestion`, and the `wmkf_appreviewanswer_suggestion_question_key` alternate key on `(wmkf_appreviewersuggestion, wmkf_questionkey)` were created in **prod** via schema-as-code ([VERIFIED via `lib/dataverse/schema/wave8-review-answer-snapshot/01_wmkf_appreviewanswer.json`] + `scripts/apply-dataverse-schema.js --target=prod --wave=8-review-answer-snapshot --execute`). The sandbox could not host it (schema-stale — parent `wmkf_appreviewersuggestion` 404s there; memory `project-dynamics-sandbox-state`), so prod dry-run → execute was the path. Drafted 2026-06-28 (Session 300); revised same session after **three** Codex design-review passes and a data-model pivot to a point-in-time **answer-snapshot child table**. All findings folded in: pass-1 (P0-1/P0-2/P1-1..4/P2-1..3), pass-2 pivot findings (P0-N1/P0-N2/P1-N3/P1-N4), pass-3 (P1-R3 rating validity, P1-R4 explicit token guards, and the §5a-fallback hardening P0-R1/P0-R2). Codex pass-3 verdict: **"Yes with conditions — Phase 0 can start"**; the two open P0s (P0-R1/P0-R2) gate **only the non-atomic fallback**, which is marked do-not-ship until they're designed — the primary changeset path is sound. Key build prerequisite: a Dataverse **changeset helper does not exist and must be built** (§5a, Phase 2.5) — owner chose to build it. No app code written yet — Phase 1 (sanitizer + bypass tests → `review_drafts` migration `021` → `ReviewDraftService` → draft GET/PUT routes) is buildable now with no external dependency.
 
 **Date:** 2026-06-28
 
@@ -10,7 +10,7 @@
 3. **Editor = full WYSIWYG (tiptap)** → HTML, sanitized server-side with `sanitize-html`. Each narrative answer is stored **twice**: sanitized **HTML** (rich rendering) and a **plain-text** rendition (clean for Connor's Excel exports).
 4. **File uploads = keep the infrastructure, hide from the UI**, and enforce finality **server-side** (not just by hiding the input).
 5. **Submit is final / read-only**; all free-text required except Q11.
-6. **Questions live in code for v1** (simplest-first); the snapshot guarantees fidelity, so a later phase can move authoring into Dataverse (staff-editable, versioned) losslessly. **[CONFIRM: build staff-editable questions now, or defer to a later phase? Plan assumes defer.]**
+6. **Questions live in code for v1** (simplest-first); the snapshot guarantees fidelity, so a later phase can move authoring into Dataverse (staff-editable, versioned) losslessly. **DECIDED (S301): defer staff-editable questions to a later phase.** Owner design note for that phase: unlike the existing admin-panel editors (which edit a **fixed set** of entries/fields), a staff question-authoring surface must let staff **change the number of questions** — a variable-length, add/remove/reorder editor, not a fixed-field form. That's the twist to design for; the `wmkf_appreviewanswer` snapshot already supports it structurally (more questions = more rows, never new columns), so deferring costs nothing in fidelity.
 
 **Predecessors:** `docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md` (token lifecycle + original schema-capture design), `docs/INTAKE_PORTAL_DESIGN.md` + `docs/INTAKE_PORTAL_DRAIN_PLAN.md` (the Postgres draft/autosave pattern we mirror), `docs/REVIEWER_STAGE_2A_BUILD_PLAN.md` (the etag optimistic-lock + Dataverse-authored-content patterns).
 
@@ -56,7 +56,7 @@
 
 ### 3a. Dataverse — answer-snapshot child table (system of record)
 
-**New child entity `wmkf_appreviewanswer`** (names final at creation; Justin + Claude build it together — **not Connor-gated**). One row **per question per submitted review**:
+**New child entity `wmkf_appreviewanswer`** (✅ created in prod S301; spec at `lib/dataverse/schema/wave8-review-answer-snapshot/01_wmkf_appreviewanswer.json`). One row **per question per submitted review**:
 
 | Column | Type | Holds |
 |---|---|---|
@@ -163,7 +163,7 @@ This is the same general shape as the prompt/policy publish flows, but those don
 
 ## 8. Phasing (lowest-risk first)
 
-- **Phase 0 (blocking inputs):** Justin + Claude create the `wmkf_appreviewanswer` child table (§3a), its `(suggestion, questionkey)` alternate key, and finalize column names. Question wording resolved (§2). Confirm decision #6 (defer staff-editable questions?).
+- **Phase 0 (blocking inputs) — ✅ DONE (S301, 2026-06-28).** Created the `wmkf_appreviewanswer` child table (§3a), its 7 columns + `wmkf_Name` primary, the `wmkf_appreviewanswer_suggestion` N:1 lookup, and the `wmkf_appreviewanswer_suggestion_question_key` alternate key on `(wmkf_appreviewersuggestion, wmkf_questionkey)` in **prod** via `scripts/apply-dataverse-schema.js --wave=8-review-answer-snapshot --execute`. Column names finalized; question wording resolved (§2); decision #6 = **defer** (see §0 #6). Minor calls: `wmkf_QuestionType` is plain text (not a Choice); `wmkf_Name` primary is optional. Sandbox was unusable (parent entity 404s there), so prod dry-run → execute.
 - **Phase 1 (data layer + sanitizer, no UI):** `sanitize-review-html.js` + its full bypass test suite **first**; migration `021_review_drafts.sql` + manifest; `ReviewDraftService`; draft GET/PUT routes (sanitize on write, finality refusal, size limits); unit tests. Update Atlas (new PG table + new Dataverse entity) + API matrix.
 - **Phase 2 (editor):** `RichReviewEditor` (tiptap); schema `richtext` type; wire the authoring form into `stage2b`, replacing the file UI; autosave wired to Phase 1.
 - **Phase 2.5 (changeset helper — Codex P0-N1, prerequisite for Phase 3):** feasibility spike on the Dataverse `$batch` endpoint (§5a); then `DynamicsService.executeChangeset` with per-op `If-Match` + all-or-nothing semantics + isolated tests. If the spike fails, switch to the §5a fallback and re-confirm with the owner before Phase 3.
@@ -206,7 +206,7 @@ npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging
 3. **Serverless sanitizer** — `sanitize-html`, never DOMPurify+jsdom.
 4. **Submit atomicity/concurrency** — changeset + finality precheck + `If-Match` + alternate-key idempotency + draft-delete-after-commit (P0-2/P0-N2); partial or duplicate child rows must be impossible.
 5. **Consumer fan-out (P1-1)** — answers written but not surfaced reads as data loss; complete schema → keyed child read → reviewers DTO → ReviewsTab in Phase 4.
-6. **Dataverse dependency** — Phase 0 child-table + alternate-key creation (Justin + Claude) blocks Phases 3–4.
+6. **Dataverse dependency** — ✅ resolved: Phase 0 child-table + alternate-key creation is done (S301), so Phases 3–4 are no longer blocked on it.
 
 ---
 

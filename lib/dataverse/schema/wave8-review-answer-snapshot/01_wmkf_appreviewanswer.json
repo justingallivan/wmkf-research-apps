@@ -1,0 +1,88 @@
+{
+  "name": "wmkf_appreviewanswer",
+  "kind": "new-entity",
+  "schemaName": "wmkf_AppReviewAnswer",
+  "displayName": "App Review Answer",
+  "displayCollectionName": "App Review Answers",
+  "description": "Point-in-time answer snapshot for an external reviewer's submitted review. One row per question per submitted review (all 11 questions, ratings included), each storing the question text exactly as asked beside the answer, so a submitted review reconstructs losslessly even after the question set changes. System of record for the narrative answers; ratings are also denormalized onto the parent wmkf_appreviewersuggestion row for native aggregation. Adding questions later = more rows, never new columns. See docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md §3a. Idempotent submit/retry is enforced by the (suggestion, questionkey) alternate key.",
+  "ownershipType": "OrganizationOwned",
+  "primaryNameAttribute": {
+    "schemaName": "wmkf_Name",
+    "displayName": "Name",
+    "description": "Synthetic display name for the snapshot answer row (the writer populates the question key). Not load-bearing.",
+    "maxLength": 200,
+    "requiredLevel": "None"
+  },
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_QuestionKey",
+      "displayName": "Question Key",
+      "description": "Stable question id (impact, risk, overallRating, q2, q4..q11). The join back to the question across question-set changes. Never reused for a different question. Mirrors field.key in lib/external/review-form-schema.js.",
+      "maxLength": 100,
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_QuestionOrder",
+      "displayName": "Question Order",
+      "description": "Display order of the question at submission time (field.order in the schema). Drives read-back ordering.",
+      "minValue": 0,
+      "maxValue": 1000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_QuestionText",
+      "displayName": "Question Text",
+      "description": "The question text exactly as asked at submission (field.label). Denormalized into each answer row for point-in-time fidelity.",
+      "maxLength": 4000
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_QuestionType",
+      "displayName": "Question Type",
+      "description": "picklist | richtext | string (mirrors field.type in the schema).",
+      "maxLength": 50
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_AnswerHtml",
+      "displayName": "Answer HTML",
+      "description": "Server-sanitized HTML for narrative (richtext) answers; null for ratings. Sanitized again before render (defense in depth).",
+      "maxLength": 150000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_AnswerText",
+      "displayName": "Answer Text",
+      "description": "Plain-text rendition of the answer for clean Excel export; for ratings this holds the chosen label.",
+      "maxLength": 150000
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_AnswerValue",
+      "displayName": "Answer Value",
+      "description": "Picklist numeric value for rating questions (impact/risk/overallRating); null for narrative answers.",
+      "minValue": -2147483648,
+      "maxValue": 2147483647
+    }
+  ],
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_appreviewanswer_suggestion",
+      "referencedEntity": "wmkf_appreviewersuggestion",
+      "lookupSchemaName": "wmkf_AppReviewerSuggestion",
+      "lookupDisplayName": "Reviewer Suggestion",
+      "lookupDescription": "The submitted reviewer review (wmkf_appreviewersuggestion) this answer snapshot row belongs to. One suggestion -> many answers.",
+      "required": "ApplicationRequired"
+    }
+  ],
+  "alternateKeys": [
+    {
+      "schemaName": "wmkf_appreviewanswer_suggestion_question_key",
+      "displayName": "Reviewer Suggestion + Question Key (unique)",
+      "keyAttributes": ["wmkf_appreviewersuggestion", "wmkf_questionkey"]
+    }
+  ]
+}

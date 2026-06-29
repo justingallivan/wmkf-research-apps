@@ -45,6 +45,7 @@ The canonical reference for the live state of the application's data layer.
 | `wmkf_appproposalsearch` | 0 | DEPLOYED (S185), entity set is the unconventional `wmkf_appproposalsearchs`; verified S188 audit re-sweep 2026-05-25 | same page |
 | `wmkf_app_z_publication_author` | n/a | NOT DEPLOYED | same page |
 | `wmkf_apprequestperson` | 5,561 | active junction (S139); awaiting Connor PA dual-write | [dataverse-wmkf-apprequestperson.md](atlas/dataverse-wmkf-apprequestperson.md) |
+| `wmkf_appreviewanswer` | 0 | **[CREATED prod S301]** point-in-time answer-snapshot child of `wmkf_appreviewersuggestion` (one row per question per submitted review); schema only — read/write paths land in Phases 3–4 of the reviewer authoring build | [dataverse-wmkf-appreviewanswer.md](atlas/dataverse-wmkf-appreviewanswer.md) |
 
 ### Vendor entities (master records)
 
