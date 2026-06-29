@@ -6,19 +6,36 @@
  * @jest-environment node
  */
 
-import { jest } from '@jest/globals';
+// Phase D: the upload core now loads the live question set + dual-writes the
+// rating snapshot rows. Pin the set to the static schema so snapshot decode is
+// deterministic without a Dataverse round trip. (Hoisted above imports.)
+jest.mock('../../lib/external/review-question-fetcher', () => {
+  const { reviewFormSchema } = require('../../lib/external/review-form-schema');
+  return { getActiveQuestionSet: jest.fn(async () => reviewFormSchema.fields) };
+});
+
 import { GraphService } from '../../lib/services/graph-service.js';
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import NotificationService from '../../lib/services/notification-service.js';
 import { clearResolverCache } from '../../lib/services/program-director-resolver.js';
 import { writeReviewFiles, buildReviewerSubfolder } from '../../lib/services/review-upload.js';
 
+// The parent PATCH body, whichever write path ran: an atomic changeset when
+// rating rows are present (the happy path), or a bare updateRecord otherwise.
+function parentPatch() {
+  if (DynamicsService.executeChangeset.mock.calls.length) {
+    const [ops] = DynamicsService.executeChangeset.mock.calls[0];
+    return ops[ops.length - 1].body;
+  }
+  return DynamicsService.updateRecord.mock.calls[0]?.[2];
+}
+
 // Replace specific methods with jest.fn() before each test, restore afterwards.
 const originals = {};
 function installMocks() {
   for (const [obj, names] of [
     [GraphService, ['getDriveId', 'uploadFile', 'deleteFile']],
-    [DynamicsService, ['getRecord', 'updateRecord']],
+    [DynamicsService, ['getRecord', 'updateRecord', 'resolveEntitySetName', 'executeChangeset']],
   ]) {
     for (const name of names) {
       if (originals[name] === undefined) originals[name] = obj[name];
@@ -29,7 +46,7 @@ function installMocks() {
 function restoreMocks() {
   for (const [obj, names] of [
     [GraphService, ['getDriveId', 'uploadFile', 'deleteFile']],
-    [DynamicsService, ['getRecord', 'updateRecord']],
+    [DynamicsService, ['getRecord', 'updateRecord', 'resolveEntitySetName', 'executeChangeset']],
   ]) {
     for (const name of names) {
       if (originals[name] !== undefined) obj[name] = originals[name];
@@ -89,6 +106,8 @@ beforeEach(() => {
   });
   GraphService.deleteFile.mockResolvedValue(undefined);
   DynamicsService.updateRecord.mockResolvedValue(undefined);
+  DynamicsService.resolveEntitySetName.mockResolvedValue('wmkf_appreviewanswers');
+  DynamicsService.executeChangeset.mockResolvedValue({ ok: true, operations: [] });
 });
 
 describe('writeReviewFiles — argument validation', () => {
@@ -208,10 +227,8 @@ describe('writeReviewFiles — happy paths', () => {
       PDF_BYTES,
       'application/pdf',
     );
-    const patchArgs = DynamicsService.updateRecord.mock.calls[0];
-    expect(patchArgs[0]).toBe('wmkf_appreviewersuggestions');
-    expect(patchArgs[1]).toBe(SUGGESTION_ID);
-    expect(patchArgs[2]).toMatchObject({
+    const patch = parentPatch();
+    expect(patch).toMatchObject({
       wmkf_revieweraffiliation: 'Prof X, U of Example',
       wmkf_reviewerimpact: 3,
       wmkf_reviewerrisk: 2,
@@ -220,7 +237,21 @@ describe('writeReviewFiles — happy paths', () => {
       wmkf_reviewfilename: 'review.pdf',
       wmkf_reviewuploadedbystaff: false,
     });
-    expect(patchArgs[2].wmkf_reviewreceivedat).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(patch.wmkf_reviewreceivedat).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    // Phase D dual-write: the same changeset carries the 3 rating snapshot rows,
+    // addressed by alternate key, byte-identical to a reviewer-written row.
+    const [ops] = DynamicsService.executeChangeset.mock.calls[0];
+    const answerOps = ops.filter((o) => /wmkf_questionkey=/.test(o.url));
+    expect(answerOps).toHaveLength(3);
+    const impactOp = answerOps.find((o) => o.url.includes("wmkf_questionkey='impact'"));
+    expect(impactOp.url).toContain(`_wmkf_appreviewersuggestion_value=${SUGGESTION_ID}`);
+    expect(impactOp.body).toMatchObject({
+      wmkf_questionorder: 1,
+      wmkf_questiontype: 'picklist',
+      wmkf_answervalue: 3,
+      wmkf_answertext: 'Will result in publications of broad interest',
+      wmkf_answerhtml: null,
+    });
   });
 
   test('staff source: sets wmkf_reviewuploadedbystaff = true', async () => {
@@ -229,7 +260,7 @@ describe('writeReviewFiles — happy paths', () => {
       opts: { source: 'staff_upload', performedBy: 42 },
     }));
     expect(r.ok).toBe(true);
-    expect(DynamicsService.updateRecord.mock.calls[0][2].wmkf_reviewuploadedbystaff).toBe(true);
+    expect(parentPatch().wmkf_reviewuploadedbystaff).toBe(true);
   });
 
   test('multi-file upload writes each file in order', async () => {
@@ -247,7 +278,7 @@ describe('writeReviewFiles — happy paths', () => {
     expect(GraphService.uploadFile).toHaveBeenCalledTimes(2);
     expect(r.files).toHaveLength(2);
     // primary filename = first file
-    expect(DynamicsService.updateRecord.mock.calls[0][2].wmkf_reviewfilename).toBe('a.pdf');
+    expect(parentPatch().wmkf_reviewfilename).toBe('a.pdf');
   });
 });
 
@@ -281,12 +312,13 @@ describe('writeReviewFiles — failure paths', () => {
     expect(r.partial).toEqual(['a.pdf']);
     expect(GraphService.deleteFile).toHaveBeenCalledWith('drive-id-123', 'item-1');
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+    expect(DynamicsService.executeChangeset).not.toHaveBeenCalled();
   });
 
   test('Dataverse PATCH failure triggers SharePoint rollback', async () => {
     mockSuggestionFound();
     GraphService.uploadFile.mockResolvedValue({ id: 'item-1', name: 'review.pdf', size: 50, webUrl: 'x' });
-    DynamicsService.updateRecord.mockRejectedValue(new Error('Dataverse 500'));
+    DynamicsService.executeChangeset.mockRejectedValue(new Error('Dataverse 500'));
     const r = await writeReviewFiles(validInput());
     expect(r.ok).toBe(false);
     expect(r.reason).toBe('dataverse_failed');
@@ -297,7 +329,7 @@ describe('writeReviewFiles — failure paths', () => {
   test('Dataverse failure + cleanup failure flags cleanedUp=false', async () => {
     mockSuggestionFound();
     GraphService.uploadFile.mockResolvedValue({ id: 'item-1', name: 'review.pdf', size: 50, webUrl: 'x' });
-    DynamicsService.updateRecord.mockRejectedValue(new Error('Dataverse 500'));
+    DynamicsService.executeChangeset.mockRejectedValue(new Error('Dataverse 500'));
     GraphService.deleteFile.mockRejectedValue(new Error('SharePoint cleanup 500'));
     // Suppress the expected console.error during this test
     const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});

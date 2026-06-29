@@ -31,6 +31,8 @@ import { isGuid } from '../../../lib/utils/guid';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { validateReviewForm } from '../../../lib/external/review-form-schema';
+import { getActiveQuestionSet } from '../../../lib/external/review-question-fetcher';
+import { buildRatingSnapshotRows, answerRowUrl, answerRowBody } from '../../../lib/external/review-answer-snapshot';
 
 const ENTITY_SET = 'wmkf_appreviewersuggestions';
 
@@ -54,7 +56,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId must be a valid GUID.'] });
     }
 
-    const formResult = validateReviewForm(structuredData, { partial: true });
+    // Validate against the LIVE question set (fail-closed) so a staff-edited
+    // rating domain/order is honoured exactly as the reviewer submit path does.
+    const questionSet = await getActiveQuestionSet();
+    const formResult = validateReviewForm(structuredData, { partial: true, fields: questionSet });
     if (!formResult.ok) {
       return res.status(400).json(formResult);
     }
@@ -67,12 +72,36 @@ export default async function handler(req, res) {
 
     const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
 
+    // Phase D: dual-write the rating snapshot rows so the child table is the
+    // complete system of record before the DTO/prefill readers stop reading the
+    // parent rating columns. Only ratings actually present get a row — the
+    // "informal feedback" scenario omits structuredData, so ratings stay null,
+    // no snapshot row is written, and aggregates keep skipping the row.
+    const ratingRows = buildRatingSnapshotRows(formResult.dataverseValues, questionSet);
+    const snapshotKeys = new Set(
+      questionSet.filter((f) => f.type === 'picklist' || f.type === 'richtext').map((f) => f.key),
+    );
+
     try {
-      await bypassDynamicsRestrictions('mark-received-no-file', () =>
-        DynamicsService.updateRecord(ENTITY_SET, suggestionId, patch, { actingUserSystemId }),
-      );
+      await bypassDynamicsRestrictions('mark-received-no-file', async () => {
+        if (ratingRows.length === 0) {
+          await DynamicsService.updateRecord(ENTITY_SET, suggestionId, patch, { actingUserSystemId });
+          return;
+        }
+        // Atomic: rating upserts (by alternate key) + the parent PATCH in one
+        // changeset, so a parent-only row can never be left behind on a partial
+        // failure (the exact gap Phase D closes).
+        const answerEntitySet = await DynamicsService.resolveEntitySetName('wmkf_appreviewanswer');
+        const operations = ratingRows.map((row) => ({
+          method: 'PATCH',
+          url: answerRowUrl(answerEntitySet, suggestionId, row.questionKey, snapshotKeys),
+          body: answerRowBody(row),
+        }));
+        operations.push({ method: 'PATCH', url: `${ENTITY_SET}(${suggestionId})`, body: patch });
+        await DynamicsService.executeChangeset(operations, { actingUserSystemId });
+      });
     } catch (e) {
-      if (/update.*failed.*404/i.test(e.message || '')) {
+      if (/(?:update|changeset).*404/i.test(e.message || '') || e.status === 404) {
         return res.status(404).json({ ok: false, reason: 'not_found' });
       }
       throw e;
