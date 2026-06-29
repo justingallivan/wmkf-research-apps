@@ -254,5 +254,17 @@ describe('/api/review-manager/revoke-token', () => {
     expect(res.status).toHaveBeenCalledWith(400);
     expect(revoke).not.toHaveBeenCalled();
   });
+
+  it('rejects a non-GUID suggestionId with 400 before revoking or touching the draft', async () => {
+    mockAuthenticatedUser(3, ['review-manager']);
+    const req = createMockReq({ method: 'POST', body: { suggestionId: 'not-a-guid' } });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(revoke).not.toHaveBeenCalled();
+    expect(ReviewDraftService.deleteBySuggestion).not.toHaveBeenCalled();
+  });
 });
 

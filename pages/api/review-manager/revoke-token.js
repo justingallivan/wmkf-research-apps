@@ -9,6 +9,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { isGuid } from '../../../lib/utils/guid';
 import { revoke } from '../../../lib/external/token-lifecycle';
 import ReviewDraftService from '../../../lib/services/review-draft-service';
 
@@ -28,6 +29,12 @@ export default async function handler(req, res) {
     if (!suggestionId || typeof suggestionId !== 'string') {
       return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId required.'] });
     }
+    // GUID-validate before it becomes a Dataverse record-id selector (revoke →
+    // updateRecord) and before the draft cleanup hits deleteBySuggestion's UUID
+    // assertion. Mirrors regenerate-token; a non-GUID is a clean 400, not a 500.
+    if (!isGuid(suggestionId)) {
+      return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId must be a valid GUID.'] });
+    }
 
     try {
       await revoke(suggestionId, { actingUserSystemId });
@@ -44,6 +51,14 @@ export default async function handler(req, res) {
     // token; plan §9 #draft-token / Codex P1-4). Best-effort: the revoke already
     // succeeded, and a leftover draft is otherwise swept by GC / the next
     // regenerate, so a delete failure must not fail the revoke.
+    //
+    // ACCEPTED RESIDUAL (Codex S302 P1): a sub-second TOCTOU exists — a draft PUT
+    // whose verifySuggestionToken passed JUST before this revoke flipped the flag
+    // can land its upsert AFTER this delete, resurrecting the draft under a now-
+    // dead token. Not closed because the resurrected draft is harmless: the dead
+    // token can't GET it back or submit it, and GC / the next regenerate sweep it.
+    // A pre-write re-check in the draft route would only narrow (not close) the
+    // window at the cost of a Dataverse read on every autosave.
     try {
       await ReviewDraftService.deleteBySuggestion(suggestionId);
     } catch (e) {

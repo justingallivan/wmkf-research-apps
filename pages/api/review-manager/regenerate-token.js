@@ -101,7 +101,10 @@ export default async function handler(req, res) {
     // survive). Plan §9 #draft-token / Codex P1-4. Accepted edge: a benign
     // "lost email" regen also clears the draft (rare; the reviewer re-enters).
     // Best-effort: the token is already minted, so a delete failure must not fail
-    // the regenerate (GC / the next regen sweeps a leftover).
+    // the regenerate (GC / the next regen sweeps a leftover). Same accepted
+    // sub-second autosave-resurrection residual as revoke-token.js (Codex S302
+    // P1): a draft PUT verified just before the hash flip can land after this
+    // delete, but the resurrected draft is dead (old token can't read/submit it).
     try {
       await ReviewDraftService.deleteBySuggestion(suggestionId);
     } catch (e) {

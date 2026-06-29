@@ -79,7 +79,7 @@ describe('maintenance cron — maintenance_runs retention step wiring', () => {
     expect(res.body.failedSubtasks).not.toContain('maintenanceRuns');
   });
 
-  it('wires the reviewer review-draft GC step (90d) into the run', async () => {
+  it('wires the reviewer review-draft GC step (90d) into the run and totalDeleted', async () => {
     const ReviewDraftService = require('../../lib/services/review-draft-service');
     ReviewDraftService.deleteExpired.mockResolvedValueOnce(4);
     const res = makeRes();
@@ -88,7 +88,20 @@ describe('maintenance cron — maintenance_runs retention step wiring', () => {
     expect(ReviewDraftService.deleteExpired).toHaveBeenCalledWith({ olderThanDays: 90 });
     expect(res.body.ok).toBe(true);
     expect(res.body.results.reviewDrafts).toBe(4);
+    // All other steps return 0 here, so the GC count is folded into totalDeleted.
+    expect(res.body.totalDeleted).toBe(4);
     expect(res.body.failedSubtasks).not.toContain('reviewDrafts');
+  });
+
+  it('a thrown review-draft GC is caught, surfaced in failedSubtasks, and marks the run failed', async () => {
+    const ReviewDraftService = require('../../lib/services/review-draft-service');
+    ReviewDraftService.deleteExpired.mockRejectedValueOnce(new Error('pg down'));
+    const res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+
+    expect(res.body.ok).toBe(false);
+    expect(res.body.results.reviewDrafts).toEqual({ error: 'pg down' });
+    expect(res.body.failedSubtasks).toContain('reviewDrafts');
   });
 
   it('a thrown cleanup is caught, surfaced in failedSubtasks, and marks the run failed', async () => {
