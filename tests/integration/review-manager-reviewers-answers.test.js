@@ -89,6 +89,48 @@ test('attaches ordered, sanitized answers[] to a submitted reviewer', async () =
   expect(filterArg).toContain(`_wmkf_appreviewersuggestion_value eq ${SUGGESTION_ID}`);
 });
 
+test('a submitted reviewer whose child query returns nothing gets answers: []', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [] });
+  const { req, res } = get({ proposalId: REQUEST_ID });
+  await handler(req, res);
+  expect(res.statusCode).toBe(200);
+  expect(res._data.proposals[0].reviewers[0].answers).toEqual([]);
+});
+
+test('null / non-string answerHtml normalizes to empty (no sanitizer crash)', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({
+    records: [
+      { _wmkf_appreviewersuggestion_value: SUGGESTION_ID, wmkf_questionkey: 'risk', wmkf_questionorder: 3, wmkf_questiontype: 'picklist', wmkf_answerhtml: null, wmkf_answertext: 'med', wmkf_answervalue: 2 },
+      { _wmkf_appreviewersuggestion_value: SUGGESTION_ID, wmkf_questionkey: 'q5', wmkf_questionorder: 5, wmkf_questiontype: 'richtext', wmkf_questiontext: 'Q5', wmkf_answerhtml: '', wmkf_answertext: '', wmkf_answervalue: null },
+    ],
+  });
+  const { req, res } = get({ proposalId: REQUEST_ID });
+  await handler(req, res);
+  expect(res.statusCode).toBe(200);
+  const answers = res._data.proposals[0].reviewers[0].answers;
+  expect(answers.find((a) => a.questionKey === 'risk').answerHtml).toBe('');
+  expect(answers.find((a) => a.questionKey === 'q5').answerHtml).toBe('');
+});
+
+test('child rows for an unrelated suggestion are not attached to this reviewer', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({
+    records: [
+      { _wmkf_appreviewersuggestion_value: 'ffffffff-ffff-ffff-ffff-ffffffffffff', wmkf_questionkey: 'q2', wmkf_questionorder: 2, wmkf_questiontype: 'richtext', wmkf_answerhtml: '<p>other</p>', wmkf_answervalue: null },
+    ],
+  });
+  const { req, res } = get({ proposalId: REQUEST_ID });
+  await handler(req, res);
+  expect(res.statusCode).toBe(200);
+  expect(res._data.proposals[0].reviewers[0].answers).toEqual([]); // grouped by sid, not ours
+});
+
+test('a truncated (capped) child read fails loud rather than returning a partial snapshot', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [], capped: true });
+  const { req, res } = get({ proposalId: REQUEST_ID });
+  await handler(req, res);
+  expect(res.statusCode).toBe(500); // route catch → 500, never a silent partial
+});
+
 test('does not query answers when no reviewer has submitted', async () => {
   suggestionAdapter.findByRequest.mockResolvedValue([{
     wmkf_appreviewersuggestionid: SUGGESTION_ID,

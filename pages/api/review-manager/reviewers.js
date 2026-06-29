@@ -242,8 +242,10 @@ async function handleGet(req, res, access) {
       });
     }
 
-    // Phase 4: attach the narrative answer snapshot to each SUBMITTED reviewer
-    // (only those carry child rows). One keyed child read for the whole page.
+    // Phase 4: attach the narrative answer snapshot. Child rows are QUERIED only
+    // for submitted reviewers (only they have rows), but EVERY reviewer in the
+    // DTO gets an `answers` array (empty for non-submitted) so the shape is
+    // uniform for the client. One keyed child read for the whole page.
     const submittedIds = [];
     for (const p of Object.values(byRequest)) {
       for (const r of p.reviewers) {
@@ -397,11 +399,20 @@ async function fetchAnswersBySuggestion(suggestionIds) {
   for (let i = 0; i < suggestionIds.length; i += CHUNK) {
     const chunk = suggestionIds.slice(i, i + CHUNK);
     const orChain = chunk.map((id) => `_wmkf_appreviewersuggestion_value eq ${id}`).join(' or ');
-    const { records } = await DynamicsService.queryAllRecords('wmkf_appreviewanswers', {
+    const { records, capped } = await DynamicsService.queryAllRecords('wmkf_appreviewanswers', {
       select: ANSWER_FIELDS.join(','),
       filter: orChain,
       orderby: 'wmkf_questionorder',
     });
+    // Fail loud rather than silently drop answers. With ~11 rows/reviewer and a
+    // chunk of 20, this is far under the 5000 cap — capped here means the volume
+    // assumption broke (e.g. a far larger question set), and a partial snapshot
+    // must not pass for a complete one.
+    if (capped) {
+      throw new Error(
+        `fetchAnswersBySuggestion: queryAllRecords truncated at the 5000-row cap for ${chunk.length} suggestion(s) — answer snapshot would be incomplete.`,
+      );
+    }
     for (const a of records) {
       const sid = a._wmkf_appreviewersuggestion_value;
       if (!sid) continue;
