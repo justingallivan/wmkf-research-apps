@@ -43,16 +43,11 @@ import { computeEngagementState } from '../../../../../lib/external/review-engag
 import { getActiveQuestionSet, questionSetVersion } from '../../../../../lib/external/review-question-fetcher';
 import { sanitizeReviewHtml } from '../../../../../lib/external/sanitize-review-html';
 import { validateReviewSubmission, buildReviewSubmission } from '../../../../../lib/external/build-review-submission';
+import { answerRowUrl, answerRowBody } from '../../../../../lib/external/review-answer-snapshot';
 
 const PARENT_ENTITY_SET = 'wmkf_appreviewersuggestions';
 const REVIEW_RECEIVED_LOCKED_MESSAGE =
   'This review has already been submitted. To make a change, please contact your Program Director.';
-// Alternate-key lookup component in the upsert URL. The lookup must be addressed
-// by its VALUE attribute (`_wmkf_appreviewersuggestion_value`), NOT the bare
-// logical name or the navigation property — both of those are rejected with
-// 0x80060888. [VERIFIED in prod via scripts/probe-altkey-upsert-changeset.mjs,
-// S302: this form CREATEs on first upsert and UPDATEs idempotently on retry.]
-const ANSWER_KEY_LOOKUP_ATTR = '_wmkf_appreviewersuggestion_value';
 
 // Rich-text answers can be sizeable; cap the JSON body (mirrors /draft).
 export const config = {
@@ -69,33 +64,6 @@ function sanitizeRichText(answers, richtextKeys) {
     else if (out[key] != null) out[key] = ''; // non-string → drop to empty
   }
   return out;
-}
-
-/**
- * Single source for the alternate-key upsert URL of one answer row. The question
- * key goes into an OData single-quoted key predicate, so it is escaped by
- * doubling apostrophes (the OData rule — NOT percent-encoding, which Dataverse
- * does not decode inside a quoted literal). Keys are also asserted against the
- * schema allowlist so an unexpected value can't address the wrong row.
- */
-function answerRowUrl(entitySet, suggestionId, questionKey, snapshotKeys) {
-  if (!snapshotKeys.has(questionKey)) {
-    throw new Error(`answerRowUrl: "${questionKey}" is not a known snapshot question key`);
-  }
-  const literal = String(questionKey).replace(/'/g, "''");
-  return `${entitySet}(${ANSWER_KEY_LOOKUP_ATTR}=${suggestionId},wmkf_questionkey='${literal}')`;
-}
-
-/** Map one answerRow to the Dataverse column body for the upsert (key columns come from the URL). */
-function answerRowBody(row) {
-  return {
-    wmkf_questionorder: row.questionOrder,
-    wmkf_questiontext: row.questionText,
-    wmkf_questiontype: row.questionType,
-    wmkf_answerhtml: row.answerHtml,
-    wmkf_answertext: row.answerText,
-    wmkf_answervalue: row.answerValue,
-  };
 }
 
 function reviewReceivedLocked(res) {
