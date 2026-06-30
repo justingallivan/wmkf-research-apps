@@ -27,7 +27,7 @@
  *   - loading, onRefresh, settings ({ signature })
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Card } from '../Layout';
 import InviteEmailModal from './InviteEmailModal';
 import CandidateEditModal from './CandidateEditModal';
@@ -77,6 +77,62 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
   const [withdrawing, setWithdrawing] = useState(false);
   const [restoringId, setRestoringId] = useState(null);
   const [showRemoved, setShowRemoved] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(null);
+  const exportingRef = useRef(false);
+
+  // Export the saved candidate list to Excel (same Request Info + Candidates
+  // workbook the Find tab builds, server-side). The persisted rows carry only
+  // invite-stage fields (contact, affiliation, rationale, expertise, metrics) —
+  // search-time COI / publication counts aren't persisted, so those columns read
+  // as "None noted"/blank, matching what this tab shows. Board-writeup identity
+  // (rank/department/institution) is captured at acceptance, not here.
+  const exportCandidates = async () => {
+    if (exportingRef.current || candidates.length === 0) return;
+    exportingRef.current = true;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const rows = candidates.map((c) => ({
+        name: c.name,
+        affiliation: c.affiliation || null,
+        email: c.email || null,
+        reasoning: c.reasoning || null,
+        isApplicantRecommended: !!c.applicantRecommended,
+        keywords: c.keywords || null,
+        orcidUrl: c.orcidUrl || null,
+        scholarUrl: c.googleScholarUrl || buildScholarSearchUrl(c.name, c.affiliation),
+        hasRealScholar: isRealScholarProfileUrl(c.googleScholarUrl),
+        hIndex: c.hIndex ?? null,
+      }));
+      const res = await fetch('/api/workbench/export-candidates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, candidates: rows }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : 'reviewer-candidates.xlsx';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setExportError(e.message);
+    } finally {
+      exportingRef.current = false;
+      setExporting(false);
+    }
+  };
 
   // Remove a candidate from THIS request. Same server-authoritative DELETE the
   // Track Reviewers rows use (my-candidates → soft-delete wmkf_selected=false + revoke
@@ -191,8 +247,24 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
     <Card hover={false}>
       <div className="flex items-center justify-between mb-3">
         <p className="font-medium text-gray-900">Invite Reviewers ({candidates.length})</p>
-        {loading && <div className="w-5 h-5 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />}
+        <span className="flex items-center gap-3">
+          {candidates.length > 0 && (
+            <button
+              type="button"
+              onClick={exportCandidates}
+              disabled={exporting}
+              className="text-sm text-gray-600 hover:text-gray-900 underline disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+              title="Download the saved candidate list as an Excel workbook"
+            >
+              {exporting ? 'Exporting…' : '⬇ Export to Excel'}
+            </button>
+          )}
+          {loading && <div className="w-5 h-5 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />}
+        </span>
       </div>
+      {exportError && (
+        <p className="text-xs text-red-600 mb-2">Export failed: {exportError}</p>
+      )}
 
       {candidates.length === 0 ? (
         <p className="text-sm text-gray-600">

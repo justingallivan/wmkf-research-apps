@@ -80,6 +80,7 @@ describe('buildReviewerCandidateWorkbook', () => {
           affiliation: 'MIT',
           email: 'a@mit.edu',
           reasoning: 'Expert in catalysis.',
+          keywords: 'catalysis; surface chemistry',
           orcidUrl: 'https://orcid.org/0000-0002-1825-0097',
           scholarUrl: 'https://scholar.google.com/citations?user=abc',
           hasRealScholar: true,
@@ -103,17 +104,20 @@ describe('buildReviewerCandidateWorkbook', () => {
     expect(sheet.rowCount).toBe(3);
     expect(sheet.getRow(1).getCell(1).value).toBe('Reviewer name');
     expect(sheet.getRow(2).getCell(1).value).toBe('Dr A');
-    // conflicts column composed
-    const conflictsCol = sheet.getRow(2).getCell(6).value;
+    // expertise tags column (col 6) carries the candidate's keywords verbatim
+    expect(sheet.getRow(1).getCell(6).value).toBe('Expertise tags');
+    expect(sheet.getRow(2).getCell(6).value).toBe('catalysis; surface chemistry');
+    // conflicts column composed (now col 7, after the expertise-tags column)
+    const conflictsCol = sheet.getRow(2).getCell(7).value;
     expect(String(conflictsCol)).toContain('Institution COI: Stanford University');
     // applicant row gets the named-by note
     expect(sheet.getRow(3).getCell(5).value).toBe('Named by the applicant');
     // metric columns: numeric h-index/pub-count, string seniority; blank (not 0) when absent
-    expect(sheet.getRow(1).getCell(9).value).toBe('h-index');
-    expect(sheet.getRow(2).getCell(9).value).toBe(42);
-    expect(sheet.getRow(2).getCell(10).value).toBe(17);
-    expect(sheet.getRow(2).getCell(11).value).toBe('Senior');
+    expect(sheet.getRow(1).getCell(10).value).toBe('h-index');
+    expect(sheet.getRow(2).getCell(10).value).toBe(42);
+    expect(sheet.getRow(2).getCell(11).value).toBe(17);
+    expect(sheet.getRow(2).getCell(12).value).toBe('Senior');
     // Dr B has no h-index → blank, NOT 0 (the whole point of num()'s '' return)
-    expect([null, '', undefined]).toContain(sheet.getRow(3).getCell(9).value);
+    expect([null, '', undefined]).toContain(sheet.getRow(3).getCell(10).value);
   });
 });

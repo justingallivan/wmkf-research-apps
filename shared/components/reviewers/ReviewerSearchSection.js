@@ -1182,6 +1182,9 @@ export default function ReviewerSearchSection({
           affiliation: c.affiliation || null,
           email: c.email || enr.email || null,
           reasoning: c.reasoning || c.generatedReasoning || null,
+          keywords: Array.isArray(c.expertiseAreas) && c.expertiseAreas.length
+            ? c.expertiseAreas.join(', ')
+            : (c.expertise || c.keywords || null),
           isApplicantRecommended: !!c.isApplicantRecommended,
           provenance: c.provenance || null,
           orcidUrl: c.orcidUrl || enr.orcidUrl || null,
