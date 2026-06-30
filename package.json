@@ -67,6 +67,8 @@
     "check:trust-boundary-guid:self-test": "node scripts/check-trust-boundary-guid-self-test.js",
     "check:route-lifecycle-auth": "node scripts/check-route-lifecycle-auth.js",
     "check:route-lifecycle-auth:self-test": "node scripts/check-route-lifecycle-auth-self-test.js",
+    "check:secret-scan": "node scripts/check-secret-scan.js",
+    "check:secret-scan:self-test": "node scripts/check-secret-scan-self-test.js",
     "check:scaffolding-tokens": "node scripts/check-scaffolding-tokens.js",
     "check:scaffolding-tokens:self-test": "node scripts/check-scaffolding-tokens-self-test.js",
     "check:harness-framing": "node scripts/check-harness-framing.js",
