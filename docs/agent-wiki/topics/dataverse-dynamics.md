@@ -60,6 +60,7 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 - The sandbox is not drop-in prod parity.
 - Do not rebuild Explorer behavior when the Power Tools surface should be reused.
 - Treat any Dataverse/Power Automate/Azure claim as external-platform state; verify before asserting.
+- **`wmkf_potentialreviewers.wmkf_name` whitespace is stored, not display-only; the adapter does NOT trim it.** [VERIFIED via `lib/dataverse/adapters/potential-reviewer.js:148` (create) and `:284` (update)] both write `wmkf_name = name` raw; only `splitName` (`:35`) trims the derived `wmkf_firstname`/`wmkf_lastname`. No central trim, so each caller's whitespace hygiene leaks to storage. [VERIFIED via Explorer length probe 2026-06-30] a manual-add row stored `wmkf_name = " Test 3 Reviewer "` (leading+trailing pad, len 17) while `wmkf_firstname`="Test"(4)/`wmkf_lastname`="3 Reviewer"(10) were clean; a 14-row sample showed non-uniform `nameLen−(firstLen+lastLen)` deltas (0,1,2,3) incl. double internal spaces and trailing spaces baked into `wmkf_firstname`. [ASSUMED — schema field definition not inspected] the non-uniform deltas imply `wmkf_name` is NOT a calculated-on-read/composite column (that would pad every row identically); confirm in the maker portal before asserting the schema. Render-time defense exists ([VERIFIED] `ContactParser.normalizeDisplayName`, commit 3a359cc5, strips it in emails/UI); the candidate durable fix is to trim `wmkf_name` (+ first/last) in the adapter `create`/`update` and one-time-clean existing rows.
 
 ## Standard Probe
 
