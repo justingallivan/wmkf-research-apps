@@ -32,12 +32,23 @@ Full `npm test` green except the documented expected-red `bill.test.js` /
    `wmkf_potentialreviewerses`). +15 merge tests; merge suites 76/76.
 4. **Reviewer nice-to-haves planning doc** (`docs/REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md`,
    Codex-authored, planning-only) — feasibility for the colleague's 6-item wishlist.
+5. **Security: repo made PRIVATE + secret-scan gate added.** A cold proxy-vendor sales
+   email ("anyIP") prompted a check — the GitHub repo `justingallivan/wmkf-research-apps`
+   was PUBLIC; flipped to **private**. A scan of the tree AND full history came back
+   clean: NO real secret was ever committed (only `.env.example` placeholders + synthetic
+   test fixtures; secrets live server-side per `lib/utils/tracked-secrets.js`), so nothing
+   needed rotating. GitHub's native secret-scanning isn't free on private repos (needs
+   GHAS), so built a GHAS-free `check:secret-scan` CI gate (Codex-built, reviewer-fixed
+   its self-test fixtures, merged) — scans the tracked tree for real secret-shaped
+   literals, fails closed in CI, empty allowlist.
 
 ### Commits
 - `22ec18f9` — read-only slot nav-prop probe (pushed earlier in the session)
 - `fa62db30` — lift `loser_in_applicant_slot` block: repoint applicant slots
 - `6cf450b2`/`c8b74fd3`/`f85db100`/`eb24e702` — Codex nice-to-haves plan (worktree)
 - `937fb7df` — merge the nice-to-haves plan branch
+- `81402395` — Session 307 docs + Session 308 prompt
+- `f1710ee3` + `ee711536` — `check:secret-scan` CI gate (Codex build + reviewer fix) + merge
 
 ## Next Items
 
@@ -93,6 +104,7 @@ Full `npm test` green except the documented expected-red `bill.test.js` /
 | `shared/components/reviewers/CandidateEditModal.js` | S306 Swap hint removed (block no longer produced). |
 | `scripts/probe-akoya-potentialreviewer-slot-navprops.mjs` | Read-only nav-prop probe (slot N → `wmkf_PotentialReviewer<N>`). |
 | `docs/REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md` | Codex feasibility plan for the 6-item wishlist. |
+| `scripts/check-secret-scan.js` (+ `-allowlist.js`, `-self-test.js`) | `check:secret-scan` CI gate — fails closed on real secret-shaped literals in the tracked tree (GHAS-free push protection). Empty allowlist. Wired into `.github/workflows/test.yml`. |
 
 ## Testing
 
