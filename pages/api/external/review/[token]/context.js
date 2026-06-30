@@ -318,6 +318,14 @@ function buildStage2aPrefill(suggestion, reviewer, contact) {
     affiliationHint,
     email: firstNonEmpty(suggestion.wmkf_revieweremail, reviewer?.wmkf_emailaddress, contact?.emailaddress1),
     orcid: firstNonEmpty(suggestion.wmkf_reviewerorcid, contact?.wmkf_orcid),
+    // S308 board-writeup identity (person-level confirmed). Prefer the reviewer's own
+    // prior confirmed value; seed department/institution from the enrichment fields
+    // (wmkf_department / wmkf_primaryaffiliation) so the three required fields aren't
+    // friction. Rank has no enrichment source → starts blank. NOT sourced from the
+    // engagement-level wmkf_revieweraffiliation (that's legacy per-request).
+    academicRank: firstNonEmpty(reviewer?.wmkf_academicrank),
+    primaryDepartment: firstNonEmpty(reviewer?.wmkf_primarydepartment, reviewer?.wmkf_department),
+    mainInstitution: firstNonEmpty(reviewer?.wmkf_maininstitution, reviewer?.wmkf_primaryaffiliation, reviewer?.wmkf_organizationname),
     honorariumOptOut: suggestion.wmkf_honorariumoptout === true,
     // Payment-address prefill (chunk 5). Sourced from the promoted contact only
     // (no address fields exist on the potentialreviewer snapshot), so this is

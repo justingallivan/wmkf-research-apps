@@ -39,6 +39,17 @@ export const REQUIRED_ADDRESS_FIELDS = ['line1', 'city', 'postalCode', 'country'
 // a value (keys match respond.js ADDRESS_MAX exactly).
 const ADDRESS_FIELD_KEYS = new Set(['line1', 'line2', 'city', 'state', 'postalCode', 'country', 'phone']);
 
+// S308 board-writeup identity — three REQUIRED fields captured at accept (academic
+// rank, primary department, main institution). Person-level confirmed values used in
+// board write-ups; the server re-validates on the public token endpoint.
+const BOARD_IDENTITY_FIELDS = ['academicRank', 'primaryDepartment', 'mainInstitution'];
+const BOARD_IDENTITY_FIELD_KEYS = new Set(BOARD_IDENTITY_FIELDS);
+
+/** Required board-identity fields that are empty/whitespace. */
+export function missingBoardIdentityFields(identity) {
+  return BOARD_IDENTITY_FIELDS.filter((k) => !((identity[k] || '').trim()));
+}
+
 /**
  * Required address fields that are empty OR (for country) not a 2-char code.
  * The country guard makes the client contract explicit even though the closed
@@ -96,6 +107,15 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
   });
   const [honorariumOptOut, setHonorariumOptOut] = useState(!!prefill.honorariumOptOut);
 
+  // S308 board-writeup identity — required at accept. Prefilled from the person's
+  // prior confirmed value (or enrichment seed for dept/institution); rank starts blank.
+  const [boardIdentity, setBoardIdentity] = useState({
+    academicRank: prefill.academicRank || '',
+    primaryDepartment: prefill.primaryDepartment || '',
+    mainInstitution: prefill.mainInstitution || '',
+  });
+  const [identityErrors, setIdentityErrors] = useState([]);
+
   // Payment mailing address — prefilled from the promoted contact when present
   // (empty for not-yet-promoted reviewers). Collected only when the reviewer is
   // taking the honorarium; the card is hidden when they opt out.
@@ -144,11 +164,27 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
     }
   }
 
+  function updateIdentityField(name, value) {
+    setBoardIdentity((i) => ({ ...i, [name]: value }));
+    if (value && value.trim()) {
+      setIdentityErrors((errs) => errs.filter((k) => k !== name));
+    }
+  }
+
   async function handleAccept() {
     setError(null);
     setAddressErrors([]);
+    setIdentityErrors([]);
     if (!allAcked) {
       setError('Please acknowledge both policies to proceed.');
+      return;
+    }
+    // Board-writeup identity is required for every accept, independent of the
+    // honorarium choice.
+    const missingIdentity = missingBoardIdentityFields(boardIdentity);
+    if (missingIdentity.length) {
+      setIdentityErrors(missingIdentity);
+      setError('Please complete your academic rank, primary department, and main institution.');
       return;
     }
     // Address is required only when the reviewer is taking the honorarium.
@@ -193,6 +229,14 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
           contactEdits: Object.keys(contactEdits).length ? contactEdits : undefined,
           honorariumOptOut,
           address: addressPayload,
+          // S308 board-writeup identity — always sent (required, validated above),
+          // trimmed. Person-scoped, so it rides outside contactEdits (which is
+          // engagement-scoped + allowlisted server-side).
+          boardIdentity: {
+            academicRank: boardIdentity.academicRank.trim(),
+            primaryDepartment: boardIdentity.primaryDepartment.trim(),
+            mainInstitution: boardIdentity.mainInstitution.trim(),
+          },
           policyAcks: Object.fromEntries(policySlots.map((s) => [s, true])),
         }),
       });
@@ -216,6 +260,14 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
             : [];
           if (fields.length) setAddressErrors(fields);
           setError('Please complete your mailing address and phone number to receive the honorarium.');
+        } else if (json.reason === 'board_identity_required') {
+          // Server rejected a missing board-identity field (defensive — the client
+          // pre-validates). Flag the named fields inline.
+          const fields = Array.isArray(json.fields)
+            ? json.fields.filter((f) => BOARD_IDENTITY_FIELD_KEYS.has(f))
+            : [];
+          if (fields.length) setIdentityErrors(fields);
+          setError('Please complete your academic rank, primary department, and main institution.');
         } else if (resp.status === 400 && VALIDATION_REASON_COPY[json.reason]) {
           // Surface the specific server validation reason and, when it points at
           // a named address field, flag that field inline.
@@ -256,6 +308,13 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
         contact={contact}
         affiliationHint={prefill.affiliationHint}
         onUpdate={updateField}
+        disabled={submitting}
+      />
+
+      <BoardIdentityCard
+        identity={boardIdentity}
+        errors={identityErrors}
+        onUpdate={updateIdentityField}
         disabled={submitting}
       />
 
@@ -396,6 +455,56 @@ function ContactConfirmCard({ contact, affiliationHint, onUpdate, disabled }) {
         />
         <Field label="Email" value={contact.email} onChange={(v) => onUpdate('email', v)} type="email" disabled={disabled} />
         <Field label="ORCID" value={contact.orcid} onChange={(v) => onUpdate('orcid', v)} placeholder="0000-0000-0000-0000" disabled={disabled} />
+      </div>
+    </div>
+  );
+}
+
+function BoardIdentityCard({ identity, errors, onUpdate, disabled }) {
+  const fieldErr = (k) => errors.includes(k);
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-6">
+      <h3 className="text-base font-semibold text-gray-900">Your academic identity</h3>
+      <p className="text-sm text-gray-600 mt-1">
+        We include this in the review materials prepared for our board. All three are required.
+      </p>
+      <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field
+          label="Academic rank"
+          value={identity.academicRank}
+          onChange={(v) => onUpdate('academicRank', v)}
+          placeholder="e.g., Professor, Associate Professor, Investigator, Group Leader"
+          disabled={disabled}
+          required
+          name="academicRank"
+          error={fieldErr('academicRank')}
+          errorMessage="Please enter your academic rank."
+          fullWidth
+        />
+        <Field
+          label="Primary department"
+          value={identity.primaryDepartment}
+          onChange={(v) => onUpdate('primaryDepartment', v)}
+          placeholder="e.g., Department of Chemistry"
+          disabled={disabled}
+          required
+          name="primaryDepartment"
+          error={fieldErr('primaryDepartment')}
+          errorMessage="Please enter your primary department."
+          hint="If you're affiliated with more than one, give your primary department."
+        />
+        <Field
+          label="Main institution"
+          value={identity.mainInstitution}
+          onChange={(v) => onUpdate('mainInstitution', v)}
+          placeholder="e.g., Stanford University"
+          disabled={disabled}
+          required
+          name="mainInstitution"
+          error={fieldErr('mainInstitution')}
+          errorMessage="Please enter your main institution."
+          hint="Your main institution — the parent organization, not a center or institute within it."
+        />
       </div>
     </div>
   );

@@ -141,6 +141,18 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   or the reported affiliation differs from the contact's institution (`reviewer_contact_affiliation_mismatch`;
   `lib/services/alert-reviewer-affiliation-mismatch.js`).
   These contact writes feed the same Business-Central sync as above — mock the data layer in tests.
+- **Board-writeup identity is REQUIRED at accept (S308).** The Stage 2a accept form collects three
+  required fields — academic rank, primary department, main institution (`BoardIdentityCard` in
+  `Stage2aView`) — sent as a dedicated `boardIdentity` payload object (NOT `contactEdits`, which is
+  engagement-scoped + allowlisted). `respond.js` re-validates them on the fresh-accept (`!isAcceptRepeat`)
+  path: trimmed-non-empty, else 400 `board_identity_required` + `fields`. On success they're captured to
+  the PERSON record (`wmkf_academicrank`/`wmkf_primarydepartment`/`wmkf_maininstitution`) via
+  `lib/services/capture-self-reported-reviewer-identity.js` — non-fatal post-commit (ORCID-twin pattern)
+  BUT with no suggestion-row fallback, so a failure fires a `board_identity_capture_failed` admin alert,
+  and the workbench edit (`CandidateEditModal`) ships alongside so staff can repair. Prefill seeds
+  department/institution from the person's enrichment fields (`wmkf_department`/`wmkf_primaryaffiliation`);
+  rank starts blank. Person-level, one canonical current value — board write-ups freeze it (no per-request
+  snapshot). Repeat/legacy accepts skip the gate (back-compat). Full trace: `docs/REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md`.
   Full decision record: `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` §"Increment 2a".
 - **E2E harness runs against a real build, not `next dev`.** The Playwright
   reviewer-portal harness (`tests/e2e/`, `npm run test:e2e`) mocks the data layer and

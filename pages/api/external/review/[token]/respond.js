@@ -42,6 +42,7 @@ import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 import { ensureHonorariumOnboarding } from '../../../../../lib/bill/honorarium-onboard-orchestrator';
 import { captureSelfReportedReviewerOrcid } from '../../../../../lib/services/capture-self-reported-orcid';
+import { captureSelfReportedReviewerIdentity } from '../../../../../lib/services/capture-self-reported-reviewer-identity';
 import { syncReviewerNameTitleToContact } from '../../../../../lib/services/sync-reviewer-name-title-to-contact';
 import { alertReviewerEmailMismatch } from '../../../../../lib/services/alert-reviewer-email-mismatch';
 import { alertReviewerAffiliationMismatch } from '../../../../../lib/services/alert-reviewer-affiliation-mismatch';
@@ -483,6 +484,19 @@ export default async function handler(req, res) {
           return res.status(400).json({ ok: false, reason: 'policy_ack_required', slot });
         }
       }
+      // S308 board-writeup identity: academic rank + primary department + main
+      // institution are REQUIRED at accept (person-level confirmed values for board
+      // write-ups + the reviewer-database surface). The client enforces this too, but
+      // the server is the only guarantee on a public token endpoint. Fresh accept only:
+      // a re-accept already captured them (or is a legacy pre-feature row staff fill in
+      // the workbench — we do NOT retro-require). Trimmed-non-empty, mirroring the
+      // address gate and the existing String(...).trim() validation precedent.
+      const boardIdentity = body.boardIdentity || {};
+      const missingIdentity = ['academicRank', 'primaryDepartment', 'mainInstitution']
+        .filter((k) => !(typeof boardIdentity[k] === 'string' && boardIdentity[k].trim()));
+      if (missingIdentity.length) {
+        return res.status(400).json({ ok: false, reason: 'board_identity_required', fields: missingIdentity });
+      }
       // A non-opted-out reviewer MUST supply a complete mailing address + phone so
       // staff can pay the honorarium manually this cycle (BILL onboarding deferred).
       // The client enforces this too, but the server is the only guarantee on a
@@ -670,6 +684,41 @@ export default async function handler(req, res) {
     // and repeat accepts (idempotent); independent of honorarium opt-out. Sourced
     // from the typed delta OR the persisted engagement value (confirm-without-edit).
     await captureReviewerSelfReportedOrcid({ reviewer, contactId: honContactId, rawOrcid: acceptOrcidRaw });
+    // S308 board-writeup identity → person (rank/department/institution). The accept
+    // already committed, so a failure is NON-FATAL — BUT unlike ORCID these fields
+    // have no suggestion-row fallback, so a silent loss of REQUIRED data must alert
+    // (staff repair via the workbench edit, which ships in this same change). Runs on
+    // fresh + repeat accepts; the service no-ops when no values were supplied.
+    try {
+      await bypassDynamicsRestrictions('external-board-identity', () =>
+        captureSelfReportedReviewerIdentity({
+          potentialReviewerId: reviewer?.wmkf_potentialreviewersid || null,
+          academicRank: body?.boardIdentity?.academicRank,
+          primaryDepartment: body?.boardIdentity?.primaryDepartment,
+          mainInstitution: body?.boardIdentity?.mainInstitution,
+        }),
+      );
+    } catch (identityErr) {
+      console.error('[external respond] board-identity capture failed (non-fatal):', identityErr?.message || identityErr);
+      try {
+        await NotificationService.notify({
+          type: 'board_identity_capture_failed',
+          severity: 'warning',
+          emailAdmins: true,
+          title: 'Board-writeup identity capture failed after reviewer accept',
+          message: identityErr?.message || String(identityErr),
+          metadata: {
+            suggestionId: suggestion.wmkf_appreviewersuggestionid,
+            potentialReviewerId: reviewer?.wmkf_potentialreviewersid || null,
+            requestNumber: request?.akoya_requestnum || null,
+          },
+          source: 'external/review/respond',
+          category: 'reviewer',
+        });
+      } catch (notifyErr) {
+        console.error('[external respond] board-identity alert failed:', notifyErr?.message || notifyErr);
+      }
+    }
     await syncReviewerNameTitle({ reviewer, suggestion: acceptedSuggestion, contactId: honContactId });
     await alertOnReviewerEmailMismatch({
       reviewer,

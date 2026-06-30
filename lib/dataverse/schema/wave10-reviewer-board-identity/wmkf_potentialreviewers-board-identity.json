@@ -1,0 +1,29 @@
+{
+  "name": "wmkf_potentialreviewers-board-identity",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_potentialreviewers",
+  "_comment": "S308 board-writeup identity capture. Three reviewer/staff-CONFIRMED person fields, captured (required) at Stage 2a accept and editable in the workbench, for board write-ups and a future reviewer-database browse. Kept DISTINCT from the enrichment-sourced wmkf_PrimaryAffiliation / wmkf_Department (wave6) — those are auto-populated guesses that prefill these confirmed fields, but overwriting them would degrade reviewer-card display + identity scoring (Codex design pass, S308). RequiredLevel stays None: the person row is created by enrichment paths without these fields, so Dataverse-required would break those writes; 'required' is enforced in the accept UI + route only. Idempotent: ensureAttribute checks existence before create. Deploy: node scripts/apply-dataverse-schema.js --target=prod --wave=10-reviewer-board-identity --execute (MUST run before the code that $selects these columns deploys — selecting a not-yet-created column hard-400s).",
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_AcademicRank",
+      "displayName": "Academic Rank",
+      "description": "Reviewer-confirmed current ACADEMIC rank (e.g. Professor, Associate Professor, Assistant Professor, Member, Investigator, Group Leader). NOT an administrative title (Chair/Dean/Director) — distinct from the generic wmkf_Title / contact jobtitle. Free text. Captured at Stage 2a accept; staff-editable in the workbench.",
+      "maxLength": 200
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_PrimaryDepartment",
+      "displayName": "Primary Department",
+      "description": "Reviewer-confirmed PRIMARY department only (a reviewer affiliated with multiple departments names one). Prefilled from enrichment wmkf_Department but kept distinct as the confirmed value. Captured at Stage 2a accept; staff-editable.",
+      "maxLength": 255
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_MainInstitution",
+      "displayName": "Main Institution",
+      "description": "Reviewer-confirmed MAIN institution — the parent organization, NOT a center or institute within it. Prefilled from enrichment wmkf_PrimaryAffiliation but kept distinct (overwriting the enrichment affiliation would degrade reviewer-card display + identity scoring). Captured at Stage 2a accept; staff-editable.",
+      "maxLength": 255
+    }
+  ]
+}

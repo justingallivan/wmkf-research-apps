@@ -209,6 +209,11 @@ async function handleGet(req, res, access) {
         potentialReviewerId: s._wmkf_potentialreviewer_value || null,
         name: person.wmkf_name || null,
         affiliation: researcher?.wmkf_primaryaffiliation || person.wmkf_organizationname || null,
+        // S308 board-writeup identity (person-level confirmed). Surfaced so clicking a
+        // reviewer in the workbench shows + edits them.
+        academicRank: person.wmkf_academicrank || null,
+        primaryDepartment: person.wmkf_primarydepartment || null,
+        mainInstitution: person.wmkf_maininstitution || null,
         email: person.wmkf_emailaddress || null,
         website: researcher?.wmkf_website || null,
         // Slice F (zero-SSRF email recovery): surface the persisted faculty-page URL so staff
@@ -349,7 +354,7 @@ async function fetchPotentialReviewers(ids) {
     const chunk = ids.slice(i, i + CHUNK);
     const orChain = chunk.map((id) => `wmkf_potentialreviewersid eq ${id}`).join(' or ');
     const { records } = await DynamicsService.queryRecords('wmkf_potentialreviewerses', {
-      select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_emailaddress,wmkf_organizationname,wmkf_areaofexpertise',
+      select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_emailaddress,wmkf_organizationname,wmkf_areaofexpertise,wmkf_academicrank,wmkf_primarydepartment,wmkf_maininstitution',
       filter: orChain,
       top: 500,
     });
@@ -455,6 +460,10 @@ async function handlePatch(req, res, access) {
       email,
       website,
       hIndex,
+      // S308 board-writeup identity (person-level confirmed).
+      academicRank,
+      primaryDepartment,
+      mainInstitution,
     } = body;
 
     // ── Bulk by request (proposalId) ──
@@ -525,7 +534,8 @@ async function handlePatch(req, res, access) {
 
     const hasLifecycle = Object.keys(lifecycle).length > 0;
     const hasResearcher = name !== undefined || affiliation !== undefined || email !== undefined ||
-      website !== undefined || hIndex !== undefined;
+      website !== undefined || hIndex !== undefined ||
+      academicRank !== undefined || primaryDepartment !== undefined || mainInstitution !== undefined;
 
     if (!hasLifecycle && !hasResearcher) {
       return res.status(400).json({ error: 'No supported fields to update' });
@@ -565,11 +575,20 @@ async function handlePatch(req, res, access) {
       const personUpdates = {};
       if (name !== undefined) personUpdates.name = name;
       if (affiliation !== undefined) personUpdates.affiliation = affiliation;
+      // S308 board-writeup identity — reviewer/staff-confirmed person fields (own
+      // columns, never the enrichment affiliation/department). Server-derived personId
+      // only; no client→selector path (mirrors name/affiliation).
+      if (academicRank !== undefined) personUpdates.academicRank = academicRank;
+      if (primaryDepartment !== undefined) personUpdates.primaryDepartment = primaryDepartment;
+      if (mainInstitution !== undefined) personUpdates.mainInstitution = mainInstitution;
       if (Object.keys(personUpdates).length > 0) {
         await potentialReviewerAdapter.update(personId, personUpdates, { actingUserSystemId });
       }
       if (name !== undefined) savedFields.push('name');
       if (affiliation !== undefined) savedFields.push('affiliation');
+      if (academicRank !== undefined) savedFields.push('academicRank');
+      if (primaryDepartment !== undefined) savedFields.push('primaryDepartment');
+      if (mainInstitution !== undefined) savedFields.push('mainInstitution');
 
       // Bibliometric edits go straight onto the person now (S213 collapse —
       // updateById takes the person id; email is identity, handled separately
@@ -605,7 +624,7 @@ async function handlePatch(req, res, access) {
     return res.status(200).json({
       success: true,
       message: 'Candidate updated',
-      updated: { suggestionId, ...lifecycle, ...(hasResearcher && { name, affiliation, email, website, hIndex }) },
+      updated: { suggestionId, ...lifecycle, ...(hasResearcher && { name, affiliation, email, website, hIndex, academicRank, primaryDepartment, mainInstitution }) },
     });
   } catch (error) {
     // Translate Dataverse alternate-key violations (412 on a unique field

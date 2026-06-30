@@ -69,7 +69,7 @@ function defaultFieldChoices(plan, conflictValue) {
 }
 
 export default function CandidateEditModal({ candidate, onClose, onSaved, onApply, onConfirm, confirmMode = false, nameEditable = true }) {
-  const [formData, setFormData] = useState({ name: '', affiliation: '', email: '', website: '', hIndex: '' });
+  const [formData, setFormData] = useState({ name: '', affiliation: '', email: '', website: '', hIndex: '', academicRank: '', primaryDepartment: '', mainInstitution: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
   // confirmMode only: the PD must tick "I've verified this is the correct person"
@@ -98,6 +98,9 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
         email: candidate.email || '',
         website: candidate.website || '',
         hIndex: candidate.hIndex ?? '',
+        academicRank: candidate.academicRank || '',
+        primaryDepartment: candidate.primaryDepartment || '',
+        mainInstitution: candidate.mainInstitution || '',
       });
       setError(null);
       setIdentityConfirmed(false);
@@ -151,6 +154,11 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
       if (String(formData.hIndex) !== String(candidate.hIndex ?? '')) {
         updates.hIndex = formData.hIndex === '' ? null : parseInt(formData.hIndex, 10);
       }
+      // S308 board-writeup identity (saved-candidate edit only — hidden in local/confirm
+      // modes, so these never differ there). Only changed fields are sent.
+      if (formData.academicRank !== (candidate.academicRank || '')) updates.academicRank = formData.academicRank;
+      if (formData.primaryDepartment !== (candidate.primaryDepartment || '')) updates.primaryDepartment = formData.primaryDepartment;
+      if (formData.mainInstitution !== (candidate.mainInstitution || '')) updates.mainInstitution = formData.mainInstitution;
 
       if (Object.keys(updates).length === 0) {
         onClose();
@@ -460,6 +468,45 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
                 min="0"
                 placeholder="e.g., 25"
               />
+            </div>
+          )}
+
+          {/* Board-writeup identity (S308) — only on the saved-candidate edit (not
+              the pre-save Find card / confirm flow). These are the reviewer-confirmed
+              values captured at accept; staff can correct them here. */}
+          {!confirmMode && !onApply && (
+            <div className="space-y-4 rounded-md bg-gray-50 border border-gray-200 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Board-writeup identity</p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Academic rank</label>
+                <input
+                  type="text"
+                  value={formData.academicRank}
+                  onChange={(e) => setFormData({ ...formData, academicRank: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="e.g., Professor, Investigator, Group Leader"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Primary department</label>
+                <input
+                  type="text"
+                  value={formData.primaryDepartment}
+                  onChange={(e) => setFormData({ ...formData, primaryDepartment: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="e.g., Department of Chemistry"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Main institution</label>
+                <input
+                  type="text"
+                  value={formData.mainInstitution}
+                  onChange={(e) => setFormData({ ...formData, mainInstitution: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="e.g., Stanford University"
+                />
+              </div>
             </div>
           )}
 

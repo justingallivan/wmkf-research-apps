@@ -496,7 +496,7 @@ describe('/api/external/review/[token]/respond', () => {
       method: 'POST',
       query: { token: 'good-token' },
       headers: {},
-      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'Town', postalCode: '94000', country: 'US', phone: '+1 555 0100' } },
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'Town', postalCode: '94000', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
     await handler(req, res);
@@ -505,6 +505,45 @@ describe('/api/external/review/[token]/respond', () => {
       suggestion: fresh.suggestion, request: fresh.request, reviewer: fresh.reviewer,
     }));
     expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it('fresh accept WITHOUT board identity is rejected 400 board_identity_required (S308)', async () => {
+    verifySuggestionToken.mockResolvedValue(fresh);
+    applyStage2aResponse.mockClear();
+    const req = createMockReq({
+      method: 'POST',
+      query: { token: 'good-token' },
+      headers: {},
+      // policy acks present, but boardIdentity omitted entirely
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'Town', postalCode: '94000', country: 'US', phone: '+1 555 0100' } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      ok: false,
+      reason: 'board_identity_required',
+      fields: ['academicRank', 'primaryDepartment', 'mainInstitution'],
+    }));
+    // The suggestion accept must NOT have committed.
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
+  });
+
+  it('fresh accept with a whitespace-only board field is rejected 400 (S308)', async () => {
+    verifySuggestionToken.mockResolvedValue(fresh);
+    const req = createMockReq({
+      method: 'POST',
+      query: { token: 'good-token' },
+      headers: {},
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: '   ', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'Town', postalCode: '94000', country: 'US', phone: '+1 555 0100' } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      reason: 'board_identity_required',
+      fields: ['primaryDepartment'],
+    }));
   });
 
   it('fresh accept sends acceptance confirmation email with review-due .ics', async () => {
@@ -519,7 +558,7 @@ describe('/api/external/review/[token]/respond', () => {
       method: 'POST',
       query: { token: 'good-token' },
       headers: {},
-      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'Town', postalCode: '94000', country: 'US', phone: '+1 555 0100' } },
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'Town', postalCode: '94000', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
     await handler(req, res);
@@ -557,7 +596,7 @@ describe('/api/external/review/[token]/respond', () => {
     verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
       method: 'POST', query: { token: 'good-token' }, headers: {},
-      body: { action: 'accept', honorariumOptOut: true, policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true } },
+      body: { action: 'accept', honorariumOptOut: true, policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' } },
     });
     const res = createMockRes();
     await handler(req, res);
@@ -627,7 +666,7 @@ describe('/api/external/review/[token]/respond', () => {
     verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
       method: 'POST', query: { token: 'good-token' }, headers: {},
-      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
     await handler(req, res);
@@ -645,7 +684,7 @@ describe('/api/external/review/[token]/respond', () => {
     });
     const req = createMockReq({
       method: 'POST', query: { token: 'good-token' }, headers: {},
-      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
     await handler(req, res);
@@ -670,7 +709,7 @@ describe('/api/external/review/[token]/respond', () => {
     });
     const req = createMockReq({
       method: 'POST', query: { token: 'good-token' }, headers: {},
-      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
     await handler(req, res);
@@ -696,7 +735,7 @@ describe('/api/external/review/[token]/respond', () => {
     });
     const req = createMockReq({
       method: 'POST', query: { token: 'good-token' }, headers: {},
-      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
     await handler(req, res);
@@ -818,7 +857,7 @@ describe('/api/external/review/[token]/respond', () => {
     verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
       method: 'POST', query: { token: 'good-token' }, headers: {},
-      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
     await handler(req, res);
@@ -868,7 +907,7 @@ describe('/api/external/review/[token]/respond', () => {
     });
     const req = createMockReq({
       method: 'POST', query: { token: 'good-token' }, headers: {},
-      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
     await handler(req, res);
