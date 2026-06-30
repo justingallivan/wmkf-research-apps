@@ -38,8 +38,12 @@ check('test Vercel Blob token is ignored', scan('INTAKE_BLOB_RW_TOKEN=' + fakeBl
 check('secret-named env assignment with high entropy is flagged', scan('NEXTAUTH_SECRET=' + realGenericSecret).length === 1);
 check('placeholder env assignment is ignored', scan('NEXTAUTH_SECRET=your_nextauth_secret_here').length === 0);
 check('AWS example marker is ignored', scan('AWS_KEY=AKIAIOSFODNN7EXAMPLE').length === 0);
-check('AWS access key shape is flagged', scan('AWS_KEY=AKIA1B2C3D4E5F6G7H8I').length === 1);
-check('private key header is flagged', scan('-----BEGIN PRIVATE KEY-----').length === 1);
+// NB: build the real-looking AWS/private-key inputs from fragments so no complete
+// secret SHAPE appears as a tracked literal in this file — otherwise the gate
+// (which scans git ls-files, including this script) would flag its own fixtures.
+// The runtime string is unchanged, so the assertions still hold.
+check('AWS access key shape is flagged', scan('AWS_KEY=' + 'AKIA' + '1B2C3D4E5F6G7H8I').length === 1);
+check('private key header is flagged', scan('-----BEGIN ' + 'PRIVATE KEY-----').length === 1);
 check('placeholder private key header is ignored', scan('example: -----BEGIN PRIVATE KEY-----').length === 0);
 
 const tmpRel = path.join('docs', 'agent-wiki', '_secret_scan_selftest_tmp');
