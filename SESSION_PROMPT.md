@@ -1,51 +1,43 @@
-# Session 306 Prompt: Staff-editable review questions epic COMPLETE (Phases A–E); rating columns dropped
+# Session 307 Prompt: Reviewer workbench correction-path fixes (merge UX + applicant promote)
 
-## Session 305 Summary
+## Session 306 Summary
 
-Completed the staff-editable-review-questions epic by shipping **Phase D** (migrate
-all rating readers + writers to the `wmkf_appreviewanswer` snapshot) and **Phase E**
-(E1: stop the parent-column dual-write; E2: drop the 3 columns from Dataverse).
-Two Codex design reviews, each caught a load-bearing P0. Full `npm test` green
-except the documented expected-red `bill.test.js` / `discovery-verification-status.test.js`.
-Plan: `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md` (A–E all ✅).
+Investigated a program-director bug report from the reviewer workbench (editing a
+wrong-namesake "Jun Ye" whose corrected email collided with the applicant-suggested
+duplicate, losing all typed edits) and shipped three fixes across two commits, each
+Codex design-reviewed before implementation. The data was never actually corrupted —
+the system correctly refused a conflicting write and routed to merge — but the UX
+around it lost edits and dead-ended. Full `npm test` green except the documented
+expected-red `bill.test.js` / `discovery-verification-status.test.js`.
 
 ### What Was Completed
 
-1. **Red gate fixed first.** `check:memory-router` was red at startup —
-   `feedback-verify-write-paths-against-live-service.md` lacked a `status:` key.
-   Added `status: active` (`a8cc5f39`).
-2. **Phase D — readers + writers onto the snapshot.** DTO (`reviewers.js`),
-   external prefill (`context.js`), and the merge engagement predicate now read
-   ratings from `wmkf_appreviewanswer` (`ratingsFromAnswers` / `readRatingsBySuggestion`,
-   shared `lib/external/review-answer-snapshot.js`). Legacy staff writers
-   (`review-upload.js`, `mark-received-no-file.js`) dual-write snapshot rows
-   atomically. One historical parent-only row (legacy `99` sentinel) backfilled +
-   idempotent-verified. **Codex caught a P0**: the legacy writers wrote parent
-   columns ONLY, so a readers-first order would have nulled historical staff
-   reviews → order reversed to writers→backfill→readers.
-3. **Phase E1 — stop the dual-write.** All 3 writers stopped PATCHing the rating
-   columns; `validateReviewForm` returns a separate `ratings` bucket (strict
-   integer parse); producer backstop re-anchored on `CORE_RATING_KEYS` (not the
-   parent map); admin removal guard decoupled (`PARENT_BOUND_KEYS`) + retained;
-   backfill script frozen. Codex-reviewed (P1×4 + P2×1 folded). Deployed + baked.
-4. **Phase E2 — drop the columns.** Retired the 3 attrs from schema-as-code first
-   (so the create-only applier can't resurrect them — Codex P0-1), then dropped
-   `wmkf_reviewer{impact,risk,overallrating}` from Dataverse via
-   `scripts/drop-reviewer-rating-columns.mjs --execute`. Verified gone; post-drop
-   grep confirmed no live select/read/write references them.
+1. **Email-collision no longer discards the other edits** (`my-candidates.js handlePatch`).
+   The email used to ride in the same atomic person PATCH as name+affiliation, with
+   website/h-index written only afterward — so a duplicate-email 409 rolled back
+   affiliation AND skipped website/h-index. Now the conflict-safe fields write FIRST
+   and the email is isolated LAST; a 409 returns `partialSuccess` + `savedFields`,
+   `emailSource:'manual'` is stamped only after the email lands, and
+   `CandidateEditModal` shows a "saved" note + routes any cancel through
+   `refreshAndClose` so the card isn't left stale.
+2. **Blocked-merge message points to the way out** (`CandidateEditModal` MergeMode).
+   A merge blocked solely by `loser_in_applicant_slot` is orientation-specific
+   (keeping the applicant-suggested record as keeper IS allowed), so the modal now
+   tells staff to use **Swap** instead of dead-ending. Softened wording; `bothBlocked`
+   CRM/Connor message unchanged; no auto-orient.
+3. **Promote persists the PD's hand-corrections** (`promote-applicant-reviewer`).
+   Applicant-suggested is the lowest-trust input (no email / wrong-namesake common);
+   promote used to flip `wmkf_selected=true` only and silently drop the corrected
+   contact — including PD identity-confirmed rows (they route here by
+   `provenanceKindOf`→`APPLICANT_SUGGESTED`, NOT to `save-candidates`). Now it flips
+   selected first, then writes ONLY the client-marked `manualContactFields` to the
+   suggestion's own person record, forcing `emailSource:'manual'` server-side, with a
+   non-fatal partial-success `contactError` on email collision (resolves on the
+   Invite-tab merge from fix #1/#2).
 
 ### Commits
-- `a8cc5f39` — memory-router gate fix
-- `ed9747d9` — Phase D prep: shared snapshot helpers
-- `20ba8add` — Phase D step 1: legacy writers dual-write
-- `c6fdde57` — Phase D: .js extension fix + backfill executed (1 row)
-- `b8cc067a` — Phase D step 3: readers re-pointed
-- `ae6fac22` — Phase D step 4: merge predicate drop
-- `c0bedd44` — Phase D docs reconcile
-- `cc0bce6b` — Phase E1: stop the dual-write
-- `79aa8e13` — Phase E1 docs reconcile
-- `bbeef92b` — Phase E2 artifacts (drop NOT run)
-- `f08944d7` — Phase E2 DONE: columns dropped + docs
+- `10c7932a` — merge UX: stop email-collision from discarding edits + Swap guidance
+- `ab9b4274` — promote: persist PD hand-corrections instead of dropping them
 
 ## Next Items
 
@@ -57,47 +49,48 @@ Plan: `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md` (A–E all ✅).
 
 ### Parked
 
-1. Longer carried list (BILL API access, PNI self-report, workbench access
+1. **Lift the `loser_in_applicant_slot` v1 merge block** (the real root fix behind
+   S306's symptom-patches). Re-point applicant slot lookups (`findApplicantSlotRefs`)
+   to the keeper so EITHER merge orientation works, not just Swap.
+   Evidence: `.claude-memory/project-reviewer-duplicate-merge.md` (S306 note),
+   `lib/services/reviewer-merge.js:185-186`.
+   Re-open trigger: real usage shows namesake/wrong-identity applicant merges are
+   frequent (parked pending volume — ~4 users, low usage as of S306).
+2. Longer carried list (BILL API access, PNI self-report, workbench access
    boundaries, applicant-exclusion, awardee onboarding, Dataverse settings audit,
    GRANTEE_PORTAL title provenance, nomenclature/app-sunset sweep).
    Re-open trigger: owner prioritization. Evidence: `.claude-memory/MEMORY.md` router.
 
 ### Do Not Reopen Without New Decision
 
-1. **The staff-editable-review-questions epic is COMPLETE (A–E).** Ratings live
-   solely in the `wmkf_appreviewanswer` snapshot; the 3 parent columns are dropped
-   from Dataverse (retired from schema-as-code too). Don't re-add or re-read them.
-   Evidence: `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md` §6d-E2,
-   `docs/atlas/dataverse-wmkf-appreviewersuggestion.md`.
-2. **FORWARD CONSTRAINT — never redeploy pre-E1 code.** Any bundle older than
-   commit `cc0bce6b` PATCHes the now-missing rating columns and would 500 the
-   submit/upload/no-file paths. Evidence: build plan §6d-E2, this session's E2 work.
+1. **The staff-editable-review-questions epic is COMPLETE (A–E).** Ratings live solely
+   in the `wmkf_appreviewanswer` snapshot; the 3 parent rating columns are dropped from
+   Dataverse. Never redeploy any bundle older than `cc0bce6b` (it PATCHes the now-
+   missing columns and would 500 submit/upload/no-file).
+   Evidence: `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md` §6d-E2.
 
 ### Verify Before Acting
 
-1. Anything that claims to read or write `wmkf_reviewer{impact,risk,overallrating}`
-   — those columns no longer exist. Treat such a claim as stale; the data is in
-   the snapshot (`wmkf_appreviewanswer`, `wmkf_answervalue` keyed by `wmkf_questionkey`).
+1. Anything claiming `promote-applicant-reviewer` "only flips selected" or that the
+   saved-candidate edit "loses other fields on an email collision" — both are now
+   FIXED (S306). Treat such a claim as stale; check `git log` / the two commits above.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/external/review-answer-snapshot.js` | Shared snapshot I/O: `buildRatingSnapshotRows`, `ratingsFromAnswers`, `readRatingsBySuggestion`, `answerRowUrl/Body`. |
-| `lib/external/review-form-schema.js` | `reviewParentColumnByKey` (affiliation only now), `CORE_RATING_KEYS`, `validateReviewForm` (returns `{dataverseValues, ratings}`). |
-| `lib/external/build-review-submission.js` | Submit producer; parentPatch = affiliation + receivedat; backstop on `CORE_RATING_KEYS`. |
-| `lib/admin/review-question-save.js` | `PARENT_BOUND_KEYS` = explicit `[affiliation,...CORE_RATING_KEYS]` (editor removal guard). |
-| `scripts/drop-reviewer-rating-columns.mjs` | E2 metadata-delete (already run; idempotent, 404-safe). |
-| `scripts/backfill-rating-snapshot-rows.mjs` | FROZEN (already ran; contracts changed). |
-| `docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md` | Epic plan — A–E all ✅. |
+| `pages/api/reviewer-finder/my-candidates.js` | `handlePatch` — safe-fields-first + email-isolated write; 409 returns `partialSuccess`/`savedFields`. |
+| `pages/api/workbench/promote-applicant-reviewer.js` | `writePromotedContact` — persists client-marked manual contact on promote; force-manual; partial-success on email conflict. |
+| `shared/components/reviewers/CandidateEditModal.js` | Merge mode: partial-save note, refresh-on-cancel, applicant-slot Swap hint. |
+| `shared/components/reviewers/ReviewerSearchSection.js` | `setManualContact` records `manualContactFields`; `saveSelected` sends the manual subset + surfaces contact conflicts. |
+| `lib/services/reviewer-merge.js` | `planMerge` block predicate (`loser_in_applicant_slot` at :185-186) — the v1 limitation to lift. |
 
 ## Testing
 
 ```bash
-npx jest tests/unit/review-form-schema.test.js tests/unit/build-review-submission.test.js \
-  tests/unit/review-answer-snapshot.test.js tests/unit/review-question-save.test.js \
-  tests/unit/review-upload.test.js tests/integration/mark-received-no-file-route.test.js \
-  tests/integration/external-review-submit-route.test.js tests/integration/external-review-routes.test.js \
-  tests/integration/review-manager-reviewers-answers.test.js tests/unit/reviewer-merge-service.test.js
+npx jest tests/unit/my-candidates-partial-save-on-email-conflict.test.js \
+  tests/unit/candidate-edit-modal-merge.test.js \
+  tests/unit/promote-applicant-reviewer-contact.test.js \
+  tests/unit/promote-applicant-reviewer-endpoint.test.js
 npm test   # full suite, green except expected-red bill / discovery-verification-status
 ```
