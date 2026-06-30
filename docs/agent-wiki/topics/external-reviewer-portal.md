@@ -154,6 +154,18 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   rank starts blank. Person-level, one canonical current value — board write-ups freeze it (no per-request
   snapshot). Repeat/legacy accepts skip the gate (back-compat). Full trace: `docs/REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md`.
   Full decision record: `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` §"Increment 2a".
+- **Smoke-testing the live prod accept form (S308 procedure).** To get a working
+  magic link for a test reviewer WITHOUT sending an email: hit `POST /api/review-manager/
+  regenerate-token { suggestionId }` from an authenticated STAFF session — it mints the
+  token *in prod* (where `EXTERNAL_LINK_SECRET` lives) and returns `{ url }`, the
+  `reviews.wmkeck.org/external/review/<jwt>` link. Two dead-ends: (1) minting locally
+  fails — `.env.local` has no `EXTERNAL_LINK_SECRET` (sensitive Vercel var, reads back
+  empty); (2) `REVIEWER_EMAIL_DELIVERY_MODE=capture` is hard-blocked in Vercel production
+  (`send-emails.js:778`), so "capture for rehearsal" only works on non-prod. Loading the
+  link is read-only (stamps first-access); a real ACCEPT fires the honorarium automation
+  (creates an `akoya_request`), so for UI checks opt out of the honorarium and stop before
+  accept. Revoke when done via `POST /api/review-manager/revoke-token { suggestionId }`
+  (or the Invite-tab "X", which soft-deletes + revokes).
 - **E2E harness runs against a real build, not `next dev`.** The Playwright
   reviewer-portal harness (`tests/e2e/`, `npm run test:e2e`) mocks the data layer and
   runs against `next build --webpack && next start` — NOT `next dev`. It is CI-gated
