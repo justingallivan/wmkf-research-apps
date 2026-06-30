@@ -129,10 +129,18 @@ async function handleGet(req, res, access) {
     // on the in-scope requests. One batched query each.
     const personIds = [...new Set(suggestions.map((s) => s._wmkf_potentialreviewer_value).filter(Boolean))];
     const accountIds = [...new Set(Object.values(requestById).map((r) => r.applicantId).filter(Boolean))];
-    const [personById, researcherByPerson, akaByAccount] = await Promise.all([
+    const [personById, researcherByPerson, akaByAccount, reviewHistoryByPerson] = await Promise.all([
       fetchPotentialReviewers(personIds),
       fetchResearchersByPerson(personIds),
       fetchApplicantAkas(accountIds),
+      // S308 review-history: prior reviews completed (received) per person, across
+      // every request, so the PD can see "reviewed N times, last <date>" before inviting.
+      // Supplementary — a history-query failure must NOT take down the candidate list,
+      // so it degrades to no history rather than rejecting the Promise.all.
+      suggestionAdapter.aggregateReviewHistory(personIds).catch((err) => {
+        console.warn('[my-candidates] review-history aggregation failed (non-fatal):', err?.message || err);
+        return {};
+      }),
     ]);
 
     // Group by request
@@ -243,6 +251,10 @@ async function handleGet(req, res, access) {
         responseType: suggestionAdapter.RESPONSE_TYPE_BY_VALUE[s.wmkf_responsetype] ?? null,
         responseReceivedAt: s.wmkf_responsereceivedat || null,
         savedAt: s.createdon,
+        // S308 review-history: count of prior reviews this person has SUBMITTED for
+        // WMKF (across all requests) + the most recent date. Derived, not stored.
+        priorReviewCount: reviewHistoryByPerson[s._wmkf_potentialreviewer_value]?.reviewCount || 0,
+        lastReviewAt: reviewHistoryByPerson[s._wmkf_potentialreviewer_value]?.lastReviewAt || null,
       });
     }
 

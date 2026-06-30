@@ -363,6 +363,14 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
                     )}
                     {c.hIndex != null && <span>h-index {c.hIndex}</span>}
                     {c.totalCitations != null && <span>{Number(c.totalCitations).toLocaleString()} citations</span>}
+                    {c.priorReviewCount > 0 && (
+                      <span
+                        className="text-gray-600"
+                        title="Reviews this person has completed for WMKF across all requests"
+                      >
+                        reviewed {c.priorReviewCount}×{c.lastReviewAt ? ` · last ${new Date(c.lastReviewAt).toLocaleDateString()}` : ''}
+                      </span>
+                    )}
                     {c.emailSentAt && <span>invited {new Date(c.emailSentAt).toLocaleDateString()}</span>}
                   </div>
 

@@ -18,6 +18,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   __esModule: true,
   findByRequest: jest.fn(),
   findRemovedByRequest: jest.fn(async () => []),
+  aggregateReviewHistory: jest.fn(async () => ({})),
   APPLICANT_DISPOSITION_MAP: { recommended: 100000000 },
   RESPONSE_TYPE_BY_VALUE: {},
 }));
