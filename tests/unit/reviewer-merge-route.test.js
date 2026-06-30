@@ -93,6 +93,16 @@ test('maps a blocked merge to 409 with reasons', async () => {
   expect(res.body.reasons).toEqual([{ code: 'loser_engaged' }]);
 });
 
+test('maps an applicant-provenance conflict to 409 with the request id', async () => {
+  mergeService.executeMerge.mockRejectedValueOnce(Object.assign(new Error('applicant provenance conflict'), {
+    code: 'merge_applicant_provenance_conflict', status: 409, requestId: 'd1111111-1111-1111-1111-111111111111',
+  }));
+  const res = mockRes();
+  await handler({ method: 'POST', body: { keeperId: KEEPER, loserId: LOSER, confirm: true } }, res);
+  expect(res.statusCode).toBe(409);
+  expect(res.body).toMatchObject({ code: 'merge_applicant_provenance_conflict', requestId: 'd1111111-1111-1111-1111-111111111111' });
+});
+
 test('maps a validation error to 400', async () => {
   mergeService.planMerge.mockRejectedValueOnce(Object.assign(new Error('keeper record not found'), { code: 'merge_validation', status: 400 }));
   const res = mockRes();

@@ -14,7 +14,15 @@ const LOSER = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const REQ1 = 'd1111111-1111-1111-1111-111111111111';
 const SUG_L = 'c1111111-1111-1111-1111-111111111111';
 
-function makeDeps({ keeperRow, loserRow, loserSug = [], keeperSug = [], slots = [] } = {}) {
+// Build an akoya_request slot row for the findApplicantSlotRefs query mock.
+// slotMap maps slot number → person GUID, e.g. { 1: LOSER, 3: KEEPER }.
+function slotRow(requestId, slotMap, etag = 'W/"req1"') {
+  const row = { akoya_requestid: requestId, _etag: etag };
+  for (const [n, v] of Object.entries(slotMap)) row[`_wmkf_potentialreviewer${n}_value`] = v;
+  return row;
+}
+
+function makeDeps({ keeperRow, loserRow, loserSug = [], keeperSug = [], slots = [], slotsCapped = false } = {}) {
   return {
     potentialReviewer: {
       getByIdForMerge: jest.fn(async (id) => (id === KEEPER ? keeperRow : loserRow)),
@@ -27,8 +35,18 @@ function makeDeps({ keeperRow, loserRow, loserSug = [], keeperSug = [], slots = 
       repointToPotentialReviewer: jest.fn(async () => {}),
       hardDeleteById: jest.fn(async () => {}),
       isExcluded: jest.fn((row) => row?.wmkf_applicantdisposition === 'EXCLUDED'),
+      // Sentinel-based mock (matches this file's string-disposition convention):
+      // applicant provenance = 'RECOMMENDED' disposition OR an 'applicant' source token.
+      hasApplicantProvenance: jest.fn((row) =>
+        row?.wmkf_applicantdisposition === 'RECOMMENDED' ||
+        String(row?.wmkf_sources || '').split(',').map((s) => s.trim()).includes('applicant')),
+      ensureApplicantRecommended: jest.fn(async () => ({ id: 'keeper-sug', created: false, selected: true })),
     },
-    dynamics: { queryRecords: jest.fn(async () => ({ records: slots })) },
+    dynamics: {
+      queryAllRecords: jest.fn(async () => ({ records: slots, capped: slotsCapped })),
+      updateRecord: jest.fn(async () => {}),
+      disassociate: jest.fn(async () => {}),
+    },
     researcher: { updateById: jest.fn(async () => {}) },
   };
 }
@@ -89,11 +107,16 @@ describe('planMerge — block predicate (fail-closed)', () => {
     expect(plan.reasons.map((r) => r.code)).toContain('loser_engaged');
   });
 
-  test('blocks when the loser is referenced by an applicant slot', async () => {
-    const deps = makeDeps({ keeperRow: bareKeeper, loserRow: bareLoser, slots: [{ akoya_requestid: REQ1 }] });
+  test('an applicant-slot reference NO LONGER blocks — it plans a slot repoint (v1 block lifted)', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser,
+      slots: [slotRow(REQ1, { 2: LOSER })],
+    });
     const plan = await planMerge({ keeperId: KEEPER, loserId: LOSER }, deps);
-    expect(plan.blocked).toBe(true);
-    expect(plan.reasons.map((r) => r.code)).toContain('loser_in_applicant_slot');
+    expect(plan.blocked).toBe(false);
+    expect(plan.reasons.map((r) => r.code)).not.toContain('loser_in_applicant_slot');
+    expect(plan.slotRepoints).toHaveLength(1);
+    expect(plan.slotRepoints[0]).toMatchObject({ requestId: REQ1, etag: 'W/"req1"', ops: [{ slot: 2, action: 'repoint' }] });
   });
 });
 
@@ -253,6 +276,138 @@ describe('executeMerge', () => {
   });
 });
 
+describe('executeMerge — applicant-slot repoint (v1 block lifted)', () => {
+  const REQ_ENTITY = 'akoya_requests';
+
+  test('keeper not in any slot: repoints the loser slot to the keeper (with request ETag)', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser, loserSug: [],
+      slots: [slotRow(REQ1, { 2: LOSER }, 'W/"req9"')],
+    });
+    const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER, actingUserSystemId: 'sys' }, deps);
+    expect(deps.dynamics.updateRecord).toHaveBeenCalledWith(
+      REQ_ENTITY, REQ1,
+      { 'wmkf_PotentialReviewer2@odata.bind': `/wmkf_potentialreviewerses(${KEEPER})` },
+      { ifMatch: 'W/"req9"', actingUserSystemId: 'sys' },
+    );
+    expect(deps.dynamics.disassociate).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ slotsRepointed: 1, slotsCleared: 0 });
+  });
+
+  test('keeper already in a slot: clears the loser slot ($ref disassociate), does NOT repoint', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser, loserSug: [],
+      slots: [slotRow(REQ1, { 2: LOSER, 3: KEEPER })],
+    });
+    const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER, actingUserSystemId: 'sys' }, deps);
+    expect(deps.dynamics.disassociate).toHaveBeenCalledWith(REQ_ENTITY, REQ1, 'wmkf_PotentialReviewer2', { actingUserSystemId: 'sys' });
+    expect(deps.dynamics.updateRecord).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ slotsRepointed: 0, slotsCleared: 1 });
+  });
+
+  test('loser in TWO slots, keeper in none: repoints the first, clears the rest (no keeper-in-two-slots)', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser, loserSug: [],
+      slots: [slotRow(REQ1, { 1: LOSER, 4: LOSER })],
+    });
+    const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps);
+    expect(deps.dynamics.updateRecord).toHaveBeenCalledTimes(1);
+    expect(deps.dynamics.updateRecord).toHaveBeenCalledWith(
+      REQ_ENTITY, REQ1,
+      { 'wmkf_PotentialReviewer1@odata.bind': `/wmkf_potentialreviewerses(${KEEPER})` },
+      expect.any(Object),
+    );
+    expect(deps.dynamics.disassociate).toHaveBeenCalledWith(REQ_ENTITY, REQ1, 'wmkf_PotentialReviewer4', expect.any(Object));
+    expect(summary).toMatchObject({ slotsRepointed: 1, slotsCleared: 1 });
+  });
+
+  test('slot repoint runs BEFORE the email move and the loser deactivate', async () => {
+    const order = [];
+    const deps = makeDeps({
+      keeperRow: { ...bareKeeper, wmkf_emailaddress: 'old@princeton.edu' },
+      loserRow: { ...bareLoser, wmkf_emailaddress: 'joshr@princeton.edu' },
+      loserSug: [],
+      slots: [slotRow(REQ1, { 2: LOSER })],
+    });
+    deps.dynamics.updateRecord = jest.fn(async () => { order.push('slot'); });
+    deps.potentialReviewer.clearEmail = jest.fn(async () => { order.push('email'); });
+    deps.potentialReviewer.deactivate = jest.fn(async () => { order.push('deactivate'); });
+    await executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: { email: 'loser' } }, deps);
+    expect(order).toEqual(['slot', 'email', 'deactivate']);
+  });
+
+  test('slot PATCH 412 → retryable replan (step 5) and stops before email/deactivate', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser, loserSug: [],
+      slots: [slotRow(REQ1, { 2: LOSER })],
+    });
+    deps.dynamics.updateRecord = jest.fn(async () => { throw Object.assign(new Error('precondition failed'), { status: 412 }); });
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps))
+      .rejects.toMatchObject({ code: 'merge_retryable_replan', status: 409, step: 5, operation: 'slot_repoint', reason: 'precondition_failed' });
+    expect(deps.potentialReviewer.clearEmail).not.toHaveBeenCalled();
+    expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
+  });
+
+  test('slot PATCH 404 stays a HARD failure (not a retryable replan)', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser, loserSug: [],
+      slots: [slotRow(REQ1, { 2: LOSER })],
+    });
+    deps.dynamics.updateRecord = jest.fn(async () => { throw Object.assign(new Error('not found'), { status: 404 }); });
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps)).rejects.toMatchObject({ status: 404 });
+    expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
+  });
+
+  test('planMerge fails closed when the slot query is capped', async () => {
+    const deps = makeDeps({ keeperRow: bareKeeper, loserRow: bareLoser, slotsCapped: true });
+    await expect(planMerge({ keeperId: KEEPER, loserId: LOSER }, deps)).rejects.toThrow(/Too many applicant-slot references/);
+  });
+});
+
+describe('executeMerge — collision-row applicant-provenance union', () => {
+  const COLLIDE = 'e0000000-0000-0000-0000-000000000000';
+
+  test('applicant-recommended colliding loser: transplants intent onto keeper BEFORE deleting the loser row', async () => {
+    const order = [];
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser,
+      loserSug: [{ wmkf_appreviewersuggestionid: SUG_L, _wmkf_request_value: REQ1, _etag: 'W/"5"', wmkf_applicantdisposition: 'RECOMMENDED' }],
+      keeperSug: [{ wmkf_appreviewersuggestionid: COLLIDE, _wmkf_request_value: REQ1 }],
+    });
+    deps.suggestions.ensureApplicantRecommended = jest.fn(async () => { order.push('union'); return { skippedExcluded: false }; });
+    deps.suggestions.hardDeleteById = jest.fn(async () => { order.push('delete'); });
+    const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER, actingUserSystemId: 'sys' }, deps);
+    expect(deps.suggestions.ensureApplicantRecommended).toHaveBeenCalledWith({ potentialReviewerId: KEEPER, requestId: REQ1 }, { actingUserSystemId: 'sys' });
+    expect(order).toEqual(['union', 'delete']);
+    expect(summary).toMatchObject({ provenanceTransferred: 1, deleted: 1 });
+  });
+
+  test('ordinary (non-applicant) colliding loser: no union, just delete', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser,
+      loserSug: [{ wmkf_appreviewersuggestionid: SUG_L, _wmkf_request_value: REQ1, _etag: 'W/"5"' }],
+      keeperSug: [{ wmkf_appreviewersuggestionid: COLLIDE, _wmkf_request_value: REQ1 }],
+    });
+    const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps);
+    expect(deps.suggestions.ensureApplicantRecommended).not.toHaveBeenCalled();
+    expect(deps.suggestions.hardDeleteById).toHaveBeenCalled();
+    expect(summary).toMatchObject({ provenanceTransferred: 0, deleted: 1 });
+  });
+
+  test('union skippedExcluded (keeper row is applicant-EXCLUDED): fail closed, no delete, no deactivate', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser,
+      loserSug: [{ wmkf_appreviewersuggestionid: SUG_L, _wmkf_request_value: REQ1, _etag: 'W/"5"', wmkf_sources: 'applicant' }],
+      keeperSug: [{ wmkf_appreviewersuggestionid: COLLIDE, _wmkf_request_value: REQ1 }],
+    });
+    deps.suggestions.ensureApplicantRecommended = jest.fn(async () => ({ skippedExcluded: true }));
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps))
+      .rejects.toMatchObject({ code: 'merge_applicant_provenance_conflict', status: 409, requestId: REQ1 });
+    expect(deps.suggestions.hardDeleteById).not.toHaveBeenCalled();
+    expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
+  });
+});
+
 describe('projectMergePlanForClient', () => {
   test('strips internal GUID/ETag fields and returns display fields plus counts', () => {
     const plan = {
@@ -263,6 +418,7 @@ describe('projectMergePlanForClient', () => {
       reasons: [{ code: 'loser_engaged', detail: 'Engaged.', requestIds: [REQ1] }],
       repoint: [{ suggestionId: SUG_L, requestId: REQ1, etag: 'W/"1"' }],
       collisions: [{ suggestionId: 'c2222222-2222-2222-2222-222222222222', requestId: 'd2222222-2222-2222-2222-222222222222', etag: 'W/"2"' }],
+      slotRepoints: [{ requestId: REQ1, etag: 'W/"req1"', ops: [{ slot: 2, action: 'repoint' }, { slot: 4, action: 'clear' }] }],
     };
 
     const projected = projectMergePlanForClient(plan);
@@ -274,6 +430,7 @@ describe('projectMergePlanForClient', () => {
       reasons: [{ code: 'loser_engaged', detail: 'Engaged.' }],
       repointCount: 1,
       collisionCount: 1,
+      slotRepointCount: 2,
     });
     expect(JSON.stringify(projected)).not.toContain(SUG_L);
     expect(JSON.stringify(projected)).not.toContain(REQ1);

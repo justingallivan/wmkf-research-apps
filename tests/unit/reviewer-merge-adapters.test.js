@@ -81,6 +81,7 @@ describe('reviewer-suggestion merge helpers', () => {
     expect(opts.filter).toBe(`_wmkf_potentialreviewer_value eq ${LOSER}`);
     expect(opts.filter).not.toMatch(/selected/); // removed rows must be included
     expect(opts.select).toMatch(/_wmkf_honorariumrequest_value/); // engagement signal present
+    expect(opts.select).toMatch(/wmkf_sources/); // applicant-provenance gate (collision union) present
   });
 
   test('findAllByPotentialReviewer rejects a non-GUID', async () => {
@@ -110,5 +111,27 @@ describe('reviewer-suggestion merge helpers', () => {
 
   test('hardDeleteById GUID-validates', async () => {
     await expect(suggestionAdapter.hardDeleteById('nope')).rejects.toThrow(/GUID/);
+  });
+
+  describe('hasApplicantProvenance', () => {
+    const RECOMMENDED = suggestionAdapter.APPLICANT_DISPOSITION_MAP.recommended;
+    const EXCLUDED = suggestionAdapter.APPLICANT_DISPOSITION_MAP.excluded;
+
+    test('true on the recommended disposition', () => {
+      expect(suggestionAdapter.hasApplicantProvenance({ wmkf_applicantdisposition: RECOMMENDED })).toBe(true);
+    });
+    test('true on an "applicant" source token (even with null disposition)', () => {
+      expect(suggestionAdapter.hasApplicantProvenance({ wmkf_sources: 'staff_manual,applicant', wmkf_applicantdisposition: null })).toBe(true);
+    });
+    test('false on a non-applicant row', () => {
+      expect(suggestionAdapter.hasApplicantProvenance({ wmkf_sources: 'staff_manual', wmkf_applicantdisposition: null })).toBe(false);
+    });
+    test('false on an excluded row with no applicant source', () => {
+      expect(suggestionAdapter.hasApplicantProvenance({ wmkf_applicantdisposition: EXCLUDED, wmkf_sources: '' })).toBe(false);
+    });
+    test('false on null/undefined', () => {
+      expect(suggestionAdapter.hasApplicantProvenance(null)).toBe(false);
+      expect(suggestionAdapter.hasApplicantProvenance(undefined)).toBe(false);
+    });
   });
 });

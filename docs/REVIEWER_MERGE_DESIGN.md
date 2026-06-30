@@ -1,6 +1,6 @@
 # Reviewer Record Merge — Build Plan & Design (v1)
 
-status: v1 backend BUILT (chunks 1–3, S289 2026-06-25, Codex post-impl folded); UI merge mode BUILT (chunk 4, S290 2026-06-25, 2 Codex pre-impl + 1 post-impl passes folded, 13 tests green); ordering probe BUILT + PROD-CONFIRMED (chunk 5, S290, `scripts/probe-merge-altkey-ordering.mjs`; `--run` settled O8 — sub-probes A/B/C all pass — and caught + fixed a real prod bug in the 409 `conflictingRecordId` derivation, commit a19b934f)
+status: v1 backend BUILT (chunks 1–3, S289 2026-06-25, Codex post-impl folded); UI merge mode BUILT (chunk 4, S290 2026-06-25, 2 Codex pre-impl + 1 post-impl passes folded, 13 tests green); ordering probe BUILT + PROD-CONFIRMED (chunk 5, S290, `scripts/probe-merge-altkey-ordering.mjs`; `--run` settled O8 — sub-probes A/B/C all pass — and caught + fixed a real prod bug in the 409 `conflictingRecordId` derivation, commit a19b934f); applicant-slot repoint BUILT (S307 2026-06-29, Codex pre-impl folded — the v1 `loser_in_applicant_slot` BLOCK was LIFTED: executeMerge Step 5 now repoints `wmkf_potentialreviewer1..5` loser→keeper, clearing keeper-duplicate slots, with a provenance-gated junction collision-union; nav props verified via `scripts/probe-akoya-potentialreviewer-slot-navprops.mjs`)
 owner: reviewer-finder
 
 > Chunks 1–3 (adapters, `lib/services/reviewer-merge.js`, the
@@ -118,12 +118,25 @@ Resolve ALL chosen literal values BEFORE any clear/mutate (O6), then:
    request the keeper already has a row for (collision) → the loser's row is
    un-engaged by predicate, so conditional-delete it (`If-Match`, new helper) to
    free the (person,request) key; keep keeper's row.
-5. **Applicant slots — BLOCK, do not repoint (v1, narrowed S289).** The earlier
-   design repointed `wmkf_potentialreviewer1..5` from loser → keeper. The shipped
-   v1 instead **blocks** the merge when the loser sits in ANY `akoya_request`
-   applicant slot (`loser_in_applicant_slot`) — strictly more conservative, and the
-   Rabinowitz case (the bug this fixes) has no slot references. Repointing slots is
-   deferred to a later version if a real case needs it.
+5. **Applicant slots — REPOINT loser → keeper (S307; the S289–S306 block was lifted).**
+   S289 shipped a conservative **block** (`loser_in_applicant_slot`) instead of the
+   repoint the original design called for. S307 implemented the repoint and removed
+   the block: `executeMerge` Step 5 (after the suggestion reference work, before the
+   non-retryable email window and before deactivate) PATCHes each
+   `akoya_request.wmkf_PotentialReviewer<N>@odata.bind` loser → keeper. When the
+   keeper would otherwise occupy two slots (it already holds a slot on that request,
+   OR the loser holds more than one slot) the extra loser slot is CLEARED via a
+   `$ref` disassociate (`DynamicsService.disassociate`) rather than repointed — the
+   applicant's recommendation stays represented by exactly one keeper slot, matching
+   the by-person dedup the ingestion route already applies on read. Conflict handling
+   mirrors the suggestion repoint (412/409 → retryable replan; 404/400 hard-fail).
+   Nav-property names verified live (`wmkf_PotentialReviewer1..5`,
+   `scripts/probe-akoya-potentialreviewer-slot-navprops.mjs`); clear-via-`$ref`-delete
+   mirrors the proven `scripts/reset-request-reviewers.mjs --include-slots` path.
+   Provenance: the authoritative slot is preserved by the repoint; for a colliding
+   junction row, Step 4 first transplants applicant-recommended intent onto the
+   keeper's surviving row (gated on `hasApplicantProvenance`, fail-closed if the
+   keeper row is applicant-excluded) before deleting the loser row.
 6. **Email (only if the surviving email differs from keeper's current email):**
    clear loser email, THEN set keeper email (alt-key forces clear-before-set), and
    stamp keeper `wmkf_emailsource='manual'`. The clear→set window is the ONE tear

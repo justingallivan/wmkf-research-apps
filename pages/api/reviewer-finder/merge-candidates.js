@@ -48,6 +48,9 @@ export default async function handler(req, res) {
     } catch (err) {
       if (err?.code === 'merge_validation') return res.status(400).json({ error: err.message });
       if (err?.code === 'merge_blocked') return res.status(409).json({ error: err.message, reasons: err.reasons });
+      if (err?.code === 'merge_applicant_provenance_conflict') {
+        return res.status(409).json({ error: err.message, code: err.code, requestId: err.requestId });
+      }
       if (err?.code === 'merge_retryable_replan') {
         return res.status(409).json({
           error: 'Concurrent modification - re-plan and retry',

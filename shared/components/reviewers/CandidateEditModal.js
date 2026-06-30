@@ -640,19 +640,10 @@ function MergeMode({ merge, onSwap, onSetField, onConfirm, onCancel, onRefreshCl
           <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
             {(plan.reasons || []).map((r, i) => <li key={r.code || i}>{r.detail}</li>)}
           </ul>
-          {bothBlocked ? (
+          {bothBlocked && (
             <p className="text-xs text-red-700">
               Neither record can be discarded automatically. These duplicates need to be resolved in CRM
               (e.g. by Connor) rather than here.
-            </p>
-          ) : (plan.reasons || []).some((r) => r.code === 'loser_in_applicant_slot') && (
-            // The block is orientation-specific: an applicant-suggested record can't be
-            // the discarded one, but it CAN be the kept one. Point staff at Swap rather
-            // than dead-ending. Softened ("may") because we haven't re-planned the
-            // reversed orientation yet — if Swap also blocks, bothBlocked takes over.
-            <p className="text-xs text-red-700">
-              This may be resolved by swapping to keep the applicant-suggested record, then reviewing the new
-              plan — use “Swap” above.
             </p>
           )}
         </div>
