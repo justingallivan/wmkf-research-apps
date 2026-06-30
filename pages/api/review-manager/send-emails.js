@@ -43,6 +43,7 @@ import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { findByShortCode as findCycleByShortCode } from '../../../lib/services/grant-cycles-dataverse';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
+import { ContactParser } from '../../../lib/utils/contact-parser';
 import { isYmd } from '../../../lib/utils/date-ymd';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { safeFetch, isAllowedUrl } from '../../../lib/utils/safe-fetch';
@@ -321,7 +322,7 @@ export default async function handler(req, res) {
       }
 
       const { suggestion, person, request } = ctx;
-      const name = person?.wmkf_name || null;
+      const name = ContactParser.normalizeDisplayName(person?.wmkf_name);
       const email = person?.wmkf_emailaddress || null;
 
       if (!email) {

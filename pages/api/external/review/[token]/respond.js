@@ -47,6 +47,7 @@ import { syncReviewerNameTitleToContact } from '../../../../../lib/services/sync
 import { alertReviewerEmailMismatch } from '../../../../../lib/services/alert-reviewer-email-mismatch';
 import { alertReviewerAffiliationMismatch } from '../../../../../lib/services/alert-reviewer-affiliation-mismatch';
 import { normalizeOrcid } from '../../../../../lib/utils/orcid-normalize';
+import { ContactParser } from '../../../../../lib/utils/contact-parser';
 import NotificationService from '../../../../../lib/services/notification-service';
 import { maybeNotifyQuotaReached } from '../../../../../lib/services/reviewer-quota';
 import { DynamicsService } from '../../../../../lib/services/dynamics-service';
@@ -156,7 +157,7 @@ function applyTemplatePlaceholders(template, replacements) {
 }
 
 function renderAcceptanceConfirmationEmail({ subjectTemplate, bodyTemplate, reviewer, request, signatureBlock }) {
-  const reviewerName = reviewer?.wmkf_name || 'Reviewer';
+  const reviewerName = ContactParser.normalizeDisplayName(reviewer?.wmkf_name) || 'Reviewer';
   const title = request?.akoya_title || 'the proposal';
   const due = formatReviewDueDate(request?.wmkf_reviewduedate);
   const dueSentence = due

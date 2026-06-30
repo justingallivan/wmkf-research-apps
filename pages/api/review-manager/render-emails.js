@@ -33,6 +33,7 @@ import {
 } from '../../../lib/utils/email-generator';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { allGuids } from '../../../lib/utils/guid';
+import { ContactParser } from '../../../lib/utils/contact-parser';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
@@ -174,7 +175,7 @@ export default async function handler(req, res) {
 
     const drafts = rows.map(({ suggestionId, sug, person, request }) => {
       const requestNumber = request?.akoya_requestnum || null;
-      const candidateName = person?.wmkf_name || null;
+      const candidateName = ContactParser.normalizeDisplayName(person?.wmkf_name);
       const candidateEmail = person?.wmkf_emailaddress || null;
 
       if (!candidateEmail) {
