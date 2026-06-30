@@ -111,7 +111,9 @@ it('selects the existing applicant-recommended row', async () => {
   await handler(post({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID }), r);
 
   expect(r.statusCode).toBe(200);
-  expect(r.body).toEqual({ success: true, suggestionId: SUGGESTION_ID });
+  // S306: the response now carries the contact partial-success contract. With no
+  // `contact` payload nothing is written, so it's an empty/clean result.
+  expect(r.body).toEqual({ success: true, suggestionId: SUGGESTION_ID, savedFields: [], partialSuccess: false, contactError: null });
   expect(updateLifecycle).toHaveBeenCalledWith(
     SUGGESTION_ID,
     { selected: true },

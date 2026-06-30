@@ -921,6 +921,13 @@ export default function ReviewerSearchSection({
       if (candKey(c) !== key) return c;
       const enr = { ...(c.contactEnrichment || {}) };
       const next = { ...c, contactEnrichment: enr };
+      // Record EXACTLY which fields the human edited, so the applicant-promote path
+      // persists only those (Codex: affiliationPersistAllowed/hIndex are also set by
+      // enrichment, so they're NOT a manual signal — overwriting from the card would
+      // clobber enrichment values). Monotonic: a later edit unions with prior ones.
+      const manualFields = new Set(Array.isArray(c.manualContactFields) ? c.manualContactFields : []);
+      for (const k of Object.keys(updates)) manualFields.add(k);
+      next.manualContactFields = Array.from(manualFields);
       // A manual email OR website is a staff override of the contact-quality
       // abstain (e.g. verified_domain_contradiction) — clear it for both so save
       // can persist the typed value (Codex review LOW: website edits were missing
@@ -1045,20 +1052,36 @@ export default function ReviewerSearchSection({
 
       let promoted = 0;
       const promotedNames = [];
+      const contactConflicts = [];
       if (applicantChosen.length > 0) {
         pushProgress(`Promoting ${applicantChosen.length} applicant-suggested reviewer(s)…`);
         const results = await Promise.all(applicantChosen.map(async (c) => {
           try {
+            // Carry the PD's hand-corrections (ONLY the fields marked manual) so the
+            // promote route persists them instead of dropping them. Send VALUES only —
+            // the server writes to the suggestion's own person record, never a
+            // client-supplied id, and forces email/website provenance to 'manual'.
+            const manualFields = Array.isArray(c.manualContactFields) ? c.manualContactFields : [];
+            const contact = {};
+            if (manualFields.includes('email')) contact.email = c.email || null;
+            if (manualFields.includes('website')) contact.website = c.website || null;
+            if (manualFields.includes('affiliation')) contact.affiliation = c.affiliation || null;
+            if (manualFields.includes('hIndex')) contact.hIndex = c.hIndex ?? null;
+            const body = { requestId, suggestionId: c.suggestionId };
+            if (Object.keys(contact).length > 0) body.contact = contact;
+
             const res = await fetch('/api/workbench/promote-applicant-reviewer', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ requestId, suggestionId: c.suggestionId }),
+              body: JSON.stringify(body),
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) {
               throw new Error(data.error || `Promotion failed (${res.status})`);
             }
-            return { ok: true, candidate: c };
+            // Promotion succeeded even if a contact correction conflicted (the row is
+            // selected; the conflict resolves via the Invite-tab merge flow).
+            return { ok: true, candidate: c, contactError: data.contactError || null };
           } catch (e) {
             return { ok: false, candidate: c, error: e.message };
           }
@@ -1067,6 +1090,7 @@ export default function ReviewerSearchSection({
           if (result.ok) {
             promoted += 1;
             promotedNames.push(result.candidate.name);
+            if (result.contactError) contactConflicts.push(result.candidate.name || 'a reviewer');
           } else {
             failures.push({ name: result.candidate.name || 'Applicant-suggested reviewer', error: result.error });
           }
@@ -1082,6 +1106,9 @@ export default function ReviewerSearchSection({
       const messageParts = [];
       if (saved > 0) messageParts.push(`Saved ${saved} of ${toSave.length} to this request's candidate pool.`);
       if (promoted > 0) messageParts.push(`Promoted ${promoted} of ${applicantChosen.length} applicant-suggested reviewer${applicantChosen.length === 1 ? '' : 's'}.`);
+      if (contactConflicts.length > 0) {
+        messageParts.push(`Couldn't save the corrected email for ${contactConflicts.join(', ')} — that address is already used by another reviewer record. Open them on the Invite Reviewers tab to merge or re-enter it.`);
+      }
       if (failures.length > 0) {
         const detail = failures.map((f) => `${f.name || 'Unknown candidate'}: ${f.error || 'failed'}`).join('; ');
         messageParts.push(`${failures.length} could not be saved (${detail}).`);
