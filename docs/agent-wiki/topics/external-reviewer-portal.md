@@ -153,6 +153,16 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   department/institution from the person's enrichment fields (`wmkf_department`/`wmkf_primaryaffiliation`);
   rank starts blank. Person-level, one canonical current value — board write-ups freeze it (no per-request
   snapshot). Repeat/legacy accepts skip the gate (back-compat). Full trace: `docs/REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md`.
+- **Accept form simplified to remove duplicate fields (2026-06-30, S309).** The contact card no
+  longer shows **Display preference** (nickname), **Title**, or **Affiliation** as inputs — they
+  duplicated the board-identity card (Title≈Academic rank, Affiliation≈Main institution) and confused
+  reviewers. The contact card now shows only first/last/email/ORCID. On submit, `Stage2aView`
+  (`buildSubmitContactEdits`) DERIVES the `contactEdits` `title` ← **academic rank** and
+  `affiliation` ← **main institution**, so the existing server paths are unchanged: `wmkf_reviewertitle`
+  (→ CRM `jobtitle` via the sync above) gets the rank, and `wmkf_revieweraffiliation` (→ the
+  `reviewer_contact_affiliation_mismatch` COI alert) gets the institution. Nickname is no longer
+  collected here (the CRM `nickname` field is untouched, not blanked). Net: Academic rank now feeds
+  the CRM job title; Main institution now feeds the COI mismatch check.
   Full decision record: `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` §"Increment 2a".
 - **Smoke-testing the live prod accept form (S308 procedure).** To get a working
   magic link for a test reviewer WITHOUT sending an email: hit `POST /api/review-manager/

@@ -51,6 +51,31 @@ export function missingBoardIdentityFields(identity) {
 }
 
 /**
+ * The contactEdits object POSTed to /respond on accept. Contains only the
+ * visible contact fields the reviewer actually changed (trimmed; unchanged
+ * fields are omitted so we never re-write stale prefill), PLUS two values
+ * DERIVED from the board-identity card:
+ *   - title       ← academicRank   (becomes the CRM job title via wmkf_reviewertitle)
+ *   - affiliation ← mainInstitution (the value used for the COI mismatch check)
+ * Title and Affiliation are no longer separate inputs, so they always mirror
+ * the reviewer-confirmed board identity rather than a stale on-file value.
+ */
+export function buildSubmitContactEdits({ contact, prefill = {}, boardIdentity }) {
+  const edits = {};
+  for (const [k, v] of Object.entries(contact)) {
+    const trimmed = (v || '').trim();
+    if (trimmed !== (prefill[k] || '').trim()) edits[k] = trimmed;
+  }
+  // Clamp to the server contactEdits caps (respond.js CONTACT_EDIT_MAX:
+  // title 200, affiliation 300) so an over-long board value can't 400 the whole
+  // accept. The board card has no maxLength and its person columns only truncate,
+  // so without this an implausibly long rank/institution would hard-fail here.
+  edits.title = (boardIdentity.academicRank || '').trim().slice(0, 200);
+  edits.affiliation = (boardIdentity.mainInstitution || '').trim().slice(0, 300);
+  return edits;
+}
+
+/**
  * Required address fields that are empty OR (for country) not a 2-char code.
  * The country guard makes the client contract explicit even though the closed
  * <select> only ever emits valid ISO-2 codes — server requires length === 2.
@@ -99,9 +124,6 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
   const [contact, setContact] = useState({
     firstName: prefill.firstName || '',
     lastName: prefill.lastName || '',
-    nickname: prefill.nickname || '',
-    title: prefill.title || '',
-    affiliation: prefill.affiliation || '',
     email: prefill.email || '',
     orcid: prefill.orcid || '',
   });
@@ -203,11 +225,8 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
       // value before comparing — a whitespace-only edit (trailing space
       // pasted from email, accidental spacebar in an empty field) shouldn't
       // count as a real change. The trimmed value is what gets written.
-      const contactEdits = {};
-      for (const [k, v] of Object.entries(contact)) {
-        const trimmed = (v || '').trim();
-        if (trimmed !== (prefill[k] || '').trim()) contactEdits[k] = trimmed;
-      }
+      // Only changed visible fields + derived title/affiliation (see helper).
+      const contactEdits = buildSubmitContactEdits({ contact, prefill, boardIdentity });
       // Address rides along only when taking the honorarium; opting out means
       // no payment, so we collect and send nothing. Send only the non-empty,
       // trimmed fields (required-field completeness was checked above).
@@ -306,7 +325,6 @@ export default function Stage2aView({ data, token, onRequestDecline, onAccepted 
 
       <ContactConfirmCard
         contact={contact}
-        affiliationHint={prefill.affiliationHint}
         onUpdate={updateField}
         disabled={submitting}
       />
@@ -433,7 +451,7 @@ function ProposalSummaryCard({ proposal }) {
   );
 }
 
-function ContactConfirmCard({ contact, affiliationHint, onUpdate, disabled }) {
+function ContactConfirmCard({ contact, onUpdate, disabled }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6">
       <h3 className="text-base font-semibold text-gray-900">Confirm your contact info</h3>
@@ -443,16 +461,6 @@ function ContactConfirmCard({ contact, affiliationHint, onUpdate, disabled }) {
       <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="First name" value={contact.firstName} onChange={(v) => onUpdate('firstName', v)} disabled={disabled} />
         <Field label="Last name" value={contact.lastName} onChange={(v) => onUpdate('lastName', v)} disabled={disabled} />
-        <Field label="Display preference" value={contact.nickname} onChange={(v) => onUpdate('nickname', v)} placeholder="e.g., 'Sam' or 'Dr. Lee'" disabled={disabled} />
-        <Field label="Title" value={contact.title} onChange={(v) => onUpdate('title', v)} disabled={disabled} />
-        <Field
-          label="Affiliation"
-          value={contact.affiliation}
-          onChange={(v) => onUpdate('affiliation', v)}
-          disabled={disabled}
-          fullWidth
-          hint={affiliationHint ? `On file from your prior role at ${affiliationHint} — please update if you've moved.` : null}
-        />
         <Field label="Email" value={contact.email} onChange={(v) => onUpdate('email', v)} type="email" disabled={disabled} />
         <Field label="ORCID" value={contact.orcid} onChange={(v) => onUpdate('orcid', v)} placeholder="0000-0000-0000-0000" disabled={disabled} />
       </div>

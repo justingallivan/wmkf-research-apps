@@ -6,7 +6,10 @@
  */
 
 import { render, screen } from '@testing-library/react';
-import Stage2aView, { missingBoardIdentityFields } from '../../shared/components/external/Stage2aView';
+import Stage2aView, {
+  missingBoardIdentityFields,
+  buildSubmitContactEdits,
+} from '../../shared/components/external/Stage2aView';
 
 function makeData(identityPrefill = {}) {
   return {
@@ -38,6 +41,67 @@ describe('Stage2aView board-identity card', () => {
     // Prefill roundtrip from the person enrichment seed.
     expect(screen.getByDisplayValue('Department of Chemistry')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Stanford University')).toBeInTheDocument();
+  });
+
+  it('no longer shows the removed contact fields (Display preference, Title, Affiliation)', () => {
+    render(
+      <Stage2aView
+        data={makeData({ primaryDepartment: 'Chemistry', mainInstitution: 'MIT' })}
+        token="tok"
+        onRequestDecline={() => {}}
+        onAccepted={() => {}}
+      />,
+    );
+    expect(screen.getByText('Confirm your contact info')).toBeInTheDocument();
+    expect(screen.queryByText('Display preference')).not.toBeInTheDocument();
+    expect(screen.queryByText('Title')).not.toBeInTheDocument();
+    expect(screen.queryByText('Affiliation')).not.toBeInTheDocument();
+  });
+});
+
+describe('buildSubmitContactEdits', () => {
+  const boardIdentity = { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'Princeton University' };
+
+  it('derives title from academic rank and affiliation from main institution', () => {
+    const edits = buildSubmitContactEdits({
+      contact: { firstName: 'Jane', lastName: 'Doe', email: 'jane@x.org', orcid: '' },
+      prefill: { firstName: 'Jane', lastName: 'Doe', email: 'jane@x.org', orcid: '' },
+      boardIdentity,
+    });
+    // Title -> CRM job title; Affiliation -> COI mismatch value.
+    expect(edits.title).toBe('Professor');
+    expect(edits.affiliation).toBe('Princeton University');
+  });
+
+  it('still includes genuinely changed contact fields, omits unchanged ones', () => {
+    const edits = buildSubmitContactEdits({
+      contact: { firstName: 'Janet', lastName: 'Doe', email: 'jane@x.org', orcid: '' },
+      prefill: { firstName: 'Jane', lastName: 'Doe', email: 'jane@x.org', orcid: '' },
+      boardIdentity,
+    });
+    expect(edits.firstName).toBe('Janet'); // changed
+    expect(edits).not.toHaveProperty('lastName'); // unchanged -> omitted
+    expect(edits).not.toHaveProperty('email'); // unchanged -> omitted
+  });
+
+  it('trims the derived values and tolerates blank board identity', () => {
+    const edits = buildSubmitContactEdits({
+      contact: {},
+      prefill: {},
+      boardIdentity: { academicRank: '  Associate Professor  ', mainInstitution: '' },
+    });
+    expect(edits.title).toBe('Associate Professor');
+    expect(edits.affiliation).toBe('');
+  });
+
+  it('clamps derived title/affiliation to the server contactEdits caps (200/300)', () => {
+    const edits = buildSubmitContactEdits({
+      contact: {},
+      prefill: {},
+      boardIdentity: { academicRank: 'R'.repeat(250), mainInstitution: 'I'.repeat(350) },
+    });
+    expect(edits.title).toHaveLength(200);
+    expect(edits.affiliation).toHaveLength(300);
   });
 });
 
