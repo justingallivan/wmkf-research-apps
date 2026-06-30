@@ -64,9 +64,10 @@ S for Invite Reviewers export using existing candidate-stage columns; M if paire
 
 **Open Decisions For Justin/Connor**
 
+- [PLANNED] At the identification stage, export only the information the system actually has at that stage.
 - [ASSUMED] Staff probably expect "candidate reviewer list" to mean the saved Invite Reviewers list, not just the live Find search results; confirm export scope.
 - [ASSUMED] Decide whether the export should include removed candidates, accepted candidates, released/no-response candidates, and applicant-suggested provenance.
-- [ASSUMED] Decide whether the requested Excel sheet can be an accepted-reviewer export; if it must be a candidate export, it should not promise departmental affiliation.
+- [ASSUMED] Decide whether a second accepted-reviewer export is useful for board-writeup identity fields; the candidate export should not promise departmental affiliation.
 
 ## 2. Academic Title Of Reviewer + Department
 
@@ -119,9 +120,10 @@ M for required accepted-reviewer rank/title, department, and institution capture
 
 **Open Decisions For Justin/Connor**
 
-- [ASSUMED] Confirm whether "rank" should reuse `wmkf_reviewertitle` or become a separate controlled/structured value.
-- [ASSUMED] Confirm that department and institution are required at acceptance, including whether "not applicable" is allowed.
-- [ASSUMED] Decide whether accepted-reviewer title/department should remain engagement-scoped, promote to `wmkf_potentialreviewers`, sync to `contact`, or use a priority order by consumer.
+- [PLANNED] Use what the reviewer lists at acceptance as the source of truth for board-writeup rank/title, department, and institution.
+- [PLANNED] Require accepted reviewers to enter rank/title, department, and institution; do not offer a blank or "not applicable" shortcut in the first pass.
+- [PLANNED] Keep accepted-reviewer title/department/institution engagement-scoped because titles and affiliations change over time.
+- [ASSUMED] Decide exact field shape: reuse `wmkf_reviewertitle` for rank/title, or add a separate controlled rank field in addition to the free-form title.
 
 ## 3. Institutional Affiliation In A Separate Column
 
@@ -162,8 +164,8 @@ M if Stage 2a splits institution from department on the engagement row; L if nor
 
 **Open Decisions For Justin/Connor**
 
-- [ASSUMED] Decide whether official writeups need institution-only plus department, or also a full display affiliation string.
-- [ASSUMED] Decide whether accepted-reviewer affiliation should stay engagement-scoped or be promoted/synced into person/contact records after acceptance.
+- [PLANNED] Capture institution and department as separate engagement-scoped fields at acceptance for board writeups.
+- [ASSUMED] Decide whether official writeups also need a full display affiliation string in addition to institution-only plus department.
 - [ASSUMED] Decide whether account matching is worth the risk/cost; prior reviewer/contact work treated affiliation mismatch as alert-only rather than auto-linking.
 
 ## 4. Positive / Negative Flag And Searchable Notes After Reviewer Is Added
@@ -182,34 +184,38 @@ M if Stage 2a splits institution from department on the engagement row; L if nor
 **What's Missing**
 
 - [VERIFIED via `docs/atlas/dataverse-wmkf-appreviewersuggestion.md:45-47`] Existing `wmkf_notes` is request-scoped, so it does not follow the reviewer as a global person-level note.
-- [ASSUMED] A positive/negative reviewer flag is intended to be global reviewer history, not just a note for one proposal.
+- [ASSUMED] A "would ask again" reviewer flag is likely intended to inform future reviewer selection, not just one proposal row.
 - [ASSUMED] A searchable Notes field likely requires either Dataverse searchable columns/views or an application-level search endpoint; no existing Workbench route provides person-note search today.
 
 **Proposed Approach**
 
 - [PLANNED] Do not make global reviewer flag/notes a candidate-export requirement.
 - [PLANNED] Keep `wmkf_appreviewersuggestion.wmkf_notes` for request-specific Track Reviewers notes during the active review cycle.
-- [PLANNED] If staff want durable positive/negative reviewer memory for future selection, capture it after meaningful interaction: accepted, declined, completed, or staff-reviewed outcome.
-- [PLANNED] Add new person-level Dataverse columns on `wmkf_potentialreviewers` only if the desired semantics are global across cycles: one flag field and one notes field.
+- [PLANNED] Trigger optional PD feedback after review closeout, not during candidate identification or acceptance.
+- [PLANNED] Do not gate review closeout, candidate export, or future reviewer use on whether a PD completes this feedback.
+- [PLANNED] Capture a flag with the plain business meaning "would you ask this reviewer to help us again?" plus a required notes field when the PD chooses to submit feedback.
+- [PLANNED] Let PDs judge whether their note is useful rather than providing a "not applicable" path.
+- [PLANNED] Add new reviewer-memory Dataverse columns only if the desired semantics are global across cycles: one flag field and one searchable notes field.
 - [PLANNED] Add search/filter support only after deciding whether search should be Dataverse-side, client-side over loaded rows, or a dedicated reviewer pool endpoint.
 
 **Where It Plugs In**
 
 - [VERIFIED via `lib/dataverse/adapters/potential-reviewer.js:259-300`] Existing person-level PATCH adapter pattern can update a subset of person fields.
-- [VERIFIED via `pages/api/reviewer-finder/my-candidates.js:539-590`] Saved-candidate edit already updates linked person/researcher fields after resolving the suggestion's person id.
-- [VERIFIED via `shared/components/reviewers/ReviewerInvitePanel.js:335-343`] Invite Reviewers already has an edit affordance where a person-level flag/notes editor could be linked.
+- [VERIFIED via `shared/components/reviewers/ReviewerManagePanel.js:1300-1306`] Track Reviewers already updates review status through `PATCH /api/review-manager/reviewers`.
+- [VERIFIED via `pages/api/review-manager/reviewers.js:330-337`] The `reviewStatus=complete` closeout path already centralizes complete stamps before a post-closeout feedback prompt could fire.
 - [VERIFIED via `shared/components/reviewers/ReviewerManagePanel.js:1452-1464`] Track Reviewers already has request-note editing, which should remain distinct from global reviewer notes.
 
 **Rough Effort**
 
-M if using two new person columns and simple filters; L if adding full-text search, audit history, or reusable reviewer-pool browsing. Candidate export remains S/no-op if this is deferred to post-interaction reviewer memory.
+M if using two new reviewer-memory columns and simple filters; L if adding full-text search, audit history, or reusable reviewer-pool browsing. Candidate export remains S/no-op because this is post-closeout feedback.
 
 **Open Decisions For Justin/Connor**
 
-- [ASSUMED] Decide whether the flag is global to the reviewer or scoped to one request/cycle.
-- [ASSUMED] Decide flag shape: positive/negative only, neutral/none, severity, reason code, or multiple flags.
+- [PLANNED] PDs own reviewer feedback entry.
+- [PLANNED] Feedback is optional and triggered after closeout.
+- [PLANNED] Flag shape is the business question "would you ask this reviewer to help us again?" plus notes.
+- [ASSUMED] Decide exact storage scope: global person-level reviewer memory, per-engagement closeout feedback, or both with an aggregate current flag.
 - [ASSUMED] Decide whether notes are searchable by all staff and whether Dataverse auditing should be enabled for changes.
-- [ASSUMED] Decide which workflow moment creates the flag: after acceptance, after review completion, during staff closeout, or manually at any time.
 
 ## 5. Expertise Keywords / Tags
 
@@ -272,6 +278,7 @@ S-M for free tags; L for controlled taxonomy or multi-select reporting.
 - [VERIFIED via `pages/api/reviewer-finder/my-candidates.js:199-246`] Saved candidate rows do not include aggregate review counts or last completed/submitted review date.
 - [VERIFIED via `pages/api/review-manager/reviewers.js:208-245`] Track reviewer rows do not include cross-request aggregate history.
 - [ASSUMED] "Completed a review" needs a business definition: reviewer submitted a review (`wmkf_reviewreceivedat`) versus PD closed it out (`wmkf_completedat` / `reviewStatus=complete`).
+- [VERIFIED via `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md:55`] Request-level reviewer campaign config includes `wmkf_reviewduedate`, and review-due reminders use it as the deadline for accepted/materials-sent/not-submitted reviewers.
 
 **Proposed Approach**
 
@@ -279,6 +286,8 @@ S-M for free tags; L for controlled taxonomy or multi-select reporting.
 - [PLANNED] Add a read helper that queries suggestions by potential reviewer id and computes count plus last date.
 - [PLANNED] Decide whether count means accepted, review submitted, or PD completed; expose the label accordingly.
 - [PLANNED] Keep review history out of candidate capture; it is derived after review lifecycle events exist.
+- [PLANNED] Compute lateness automatically by comparing the request's review due date to the review receipt/submission date.
+- [PLANNED] Allow a PD to override the automatic late/not-late assessment when entering post-closeout notes.
 - [PLANNED] Add aggregate fields to `my-candidates` only if staff need prior-review history while deciding whom to invite; otherwise prefer Track Reviewers, completed-review views, or a reviewer-pool surface.
 - [PLANNED] Consider caching only if the cross-reviewer query volume is too high for a request with many candidates.
 
@@ -288,6 +297,8 @@ S-M for free tags; L for controlled taxonomy or multi-select reporting.
 - [VERIFIED via `lib/dataverse/adapters/reviewer-suggestion.js:287-302`] Existing reviewer-scoped query shape can be adapted into a history-specific read helper.
 - [VERIFIED via `pages/api/reviewer-finder/my-candidates.js:127-136`] `my-candidates` already batches person/researcher hydration; history aggregation could be added in the same server-side DTO build.
 - [VERIFIED via `pages/api/review-manager/reviewers.js:169-173`] `reviewers` already batches person/researcher hydration; history aggregation could be added there too.
+- [VERIFIED via `docs/API_ROUTE_SECURITY_MATRIX.md:134`] Campaign config currently reads/writes `wmkf_reviewduedate` on `akoya_request`.
+- [VERIFIED via `shared/components/reviewers/CampaignConfigModal.js:105-114`] Staff can already edit the fixed review due date used for completed reviews.
 
 **Rough Effort**
 
@@ -298,6 +309,7 @@ M for derived counts and last-date display; L if staff need drill-down history r
 - [ASSUMED] Choose the definition of "completed a review": reviewer-submitted, PD-completed, or both as separate metrics.
 - [ASSUMED] Decide whether declined/no-response invitations count anywhere in history.
 - [ASSUMED] Decide whether the UI should show only a summary or a drill-down list of prior requests.
+- [ASSUMED] Decide where the PD override is stored and whether override reasons are required.
 - [ASSUMED] Decide whether prior-review history is useful before invitation, or whether it belongs only in completed-review/reviewer-pool reporting.
 
 ## Suggested Sequencing
@@ -318,9 +330,10 @@ M for derived counts and last-date display; L if staff need drill-down history r
 **Post-Review / Reviewer-Memory Work**
 
 1. [PLANNED] Add review-history aggregation from `wmkf_appreviewersuggestion`.
-2. [PLANNED] Add optional review-history workbook/report columns after defining "completed review."
-3. [PLANNED] Add global reviewer flag/notes only after deciding the closeout moment, scope, and search behavior.
-4. [PLANNED] Add controlled expertise-tag tables only if free tags in `wmkf_keywords` are insufficient.
+2. [PLANNED] Add automatic lateness calculation from `wmkf_reviewduedate` and review receipt/submission date, with PD override during notes entry.
+3. [PLANNED] Add optional review-history workbook/report columns after defining "completed review."
+4. [PLANNED] Add optional PD closeout feedback: "would ask again?" flag plus required notes.
+5. [PLANNED] Add controlled expertise-tag tables only if free tags in `wmkf_keywords` are insufficient.
 
 ## Contract-Reconcile Notes
 
