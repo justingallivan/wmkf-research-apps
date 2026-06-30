@@ -125,6 +125,35 @@ describe('CandidateEditModal — merge mode', () => {
     expect(screen.getByRole('button', { name: /swap — keep/i })).toBeInTheDocument();
   });
 
+  // (c2) Fix #1 — a block caused ONLY by an applicant-suggested loser is
+  // orientation-specific (Swap makes that record the keeper, which is allowed), so
+  // the modal must point staff at Swap rather than reading as a hard dead-end.
+  test('a blocked plan citing loser_in_applicant_slot points the staffer to Swap', async () => {
+    jest.spyOn(global, 'fetch').mockImplementation(async (url) => {
+      if (url === '/api/reviewer-finder/my-candidates') return patch409;
+      return resp({ plan: planForward({ blocked: true, reasons: [{ code: 'loser_in_applicant_slot', detail: 'Loser is referenced as an applicant-suggested reviewer; not supported in v1.' }] }) });
+    });
+    render(<CandidateEditModal candidate={candidate} onClose={jest.fn()} onSaved={jest.fn()} />);
+    triggerMerge();
+    expect(await screen.findByText(/swapping to keep the applicant-suggested record/i)).toBeInTheDocument();
+  });
+
+  // (c3) Fix #2 (client) — a partialSuccess 409 means the route already saved the
+  // non-email edits, so merge mode reassures the staffer rather than implying total loss.
+  test('a partialSuccess 409 surfaces a "saved" note inside merge mode', async () => {
+    const patch409Partial = resp(
+      { error: 'duplicate_key', message: 'Another reviewer record already has that email.', field: 'wmkf_emailaddress', value: TARGET, conflictingRecordId: LOSER, partialSuccess: true, savedFields: ['affiliation', 'website'] },
+      { ok: false, status: 409 },
+    );
+    jest.spyOn(global, 'fetch').mockImplementation(async (url) => {
+      if (url === '/api/reviewer-finder/my-candidates') return patch409Partial;
+      return resp({ plan: planForward() });
+    });
+    render(<CandidateEditModal candidate={candidate} onClose={jest.fn()} onSaved={jest.fn()} />);
+    triggerMerge();
+    expect(await screen.findByText(/only the email still needs resolving/i)).toBeInTheDocument();
+  });
+
   // (d) + (f)
   test('confirm posts {keeperId, loserId, fieldChoices, confirm} with email defaulted to the TARGET owner, then refreshes', async () => {
     const onSaved = jest.fn();

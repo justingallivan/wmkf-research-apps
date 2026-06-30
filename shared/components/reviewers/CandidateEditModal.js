@@ -251,7 +251,15 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
     const keeperId = candidate.potentialReviewerId;
     const loserId = data.conflictingRecordId;
     const conflictValue = data.value || null;
-    setMerge({ keeperId, loserId, conflictValue, plan: null, fieldChoices: {}, loading: true, error: null, recovery: null, bothBlocked: false });
+    // Carry the route's partial-save report (the conflict-safe fields the server
+    // already committed) into merge state so MergeMode can reassure the staffer and
+    // so a cancel refreshes the list to show them (R: don't leave a stale card).
+    setMerge({
+      keeperId, loserId, conflictValue, plan: null, fieldChoices: {}, loading: true,
+      error: null, recovery: null, bothBlocked: false,
+      partialSuccess: !!data.partialSuccess,
+      savedFields: Array.isArray(data.savedFields) ? data.savedFields : [],
+    });
     await loadPlan(keeperId, loserId, conflictValue);
   };
 
@@ -375,7 +383,10 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
         onSwap={swapKeeper}
         onSetField={setFieldChoice}
         onConfirm={confirmMerge}
-        onCancel={onClose}
+        // After a partial-success 409 the server already saved the non-email fields,
+        // so any cancel/close must refresh the list (not just clear edit state) or
+        // the card shows stale values (Codex review: cancel-from-partial-merge).
+        onCancel={merge.partialSuccess ? refreshAndClose : onClose}
         onRefreshClose={refreshAndClose}
       />
     );
@@ -530,7 +541,7 @@ function MergeRecordLine({ label, rec, tone }) {
 }
 
 function MergeMode({ merge, onSwap, onSetField, onConfirm, onCancel, onRefreshClose }) {
-  const { plan, fieldChoices, loading, error, recovery, bothBlocked, staleValidation } = merge;
+  const { plan, fieldChoices, loading, error, recovery, bothBlocked, staleValidation, partialSuccess, savedFields = [] } = merge;
 
   // ── Half-done email recovery (FINAL-2 / Option B) ──
   // Dismissing via the overlay/X routes through onRefreshClose (not onCancel) so a
@@ -601,6 +612,13 @@ function MergeMode({ merge, onSwap, onSetField, onConfirm, onCancel, onRefreshCl
         its proposals are re-linked to the kept record.
       </p>
 
+      {partialSuccess && savedFields.length > 0 && (
+        <div className="rounded-md bg-emerald-50 border border-emerald-200 p-2 text-xs text-emerald-800">
+          Saved: {savedFields.map(fieldLabel).join(', ')}. Only the email still needs resolving — your other
+          edits are already on this record.
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-2">
         <MergeRecordLine label="Kept" rec={keeper} tone="border-blue-200 bg-blue-50" />
         <MergeRecordLine label="Removed" rec={loser} tone="border-gray-200 bg-gray-50" />
@@ -622,10 +640,19 @@ function MergeMode({ merge, onSwap, onSetField, onConfirm, onCancel, onRefreshCl
           <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
             {(plan.reasons || []).map((r, i) => <li key={r.code || i}>{r.detail}</li>)}
           </ul>
-          {bothBlocked && (
+          {bothBlocked ? (
             <p className="text-xs text-red-700">
               Neither record can be discarded automatically. These duplicates need to be resolved in CRM
               (e.g. by Connor) rather than here.
+            </p>
+          ) : (plan.reasons || []).some((r) => r.code === 'loser_in_applicant_slot') && (
+            // The block is orientation-specific: an applicant-suggested record can't be
+            // the discarded one, but it CAN be the kept one. Point staff at Swap rather
+            // than dead-ending. Softened ("may") because we haven't re-planned the
+            // reversed orientation yet — if Swap also blocks, bothBlocked takes over.
+            <p className="text-xs text-red-700">
+              This may be resolved by swapping to keep the applicant-suggested record, then reviewing the new
+              plan — use “Swap” above.
             </p>
           )}
         </div>

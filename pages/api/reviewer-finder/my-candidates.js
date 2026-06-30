@@ -417,6 +417,10 @@ async function projectRemovedCandidates(rows) {
 
 async function handlePatch(req, res, access) {
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
+  // Tracks which person/researcher fields committed, so a duplicate-email 409
+  // (which rejects only the isolated email PATCH below) can report partial success
+  // instead of looking like a total failure that discarded the staffer's edits.
+  const savedFields = [];
   try {
     const body = req.body || {};
     const {
@@ -540,34 +544,49 @@ async function handlePatch(req, res, access) {
         return res.status(404).json({ error: 'Linked potential reviewer not found for this suggestion' });
       }
 
+      // Email is the only alt-key-constrained field here (wmkf_emailaddress_unique),
+      // so a duplicate email is what 409s. Write the conflict-SAFE fields FIRST and
+      // isolate the email write LAST, so a collision can't roll back the staffer's
+      // affiliation/website/h-index edits (which would otherwise be silently lost
+      // when the modal flips to merge mode). `savedFields` records what committed so
+      // the 409 below can report partial success rather than total failure.
       const personUpdates = {};
       if (name !== undefined) personUpdates.name = name;
-      if (email !== undefined) personUpdates.email = email;
       if (affiliation !== undefined) personUpdates.affiliation = affiliation;
       if (Object.keys(personUpdates).length > 0) {
         await potentialReviewerAdapter.update(personId, personUpdates, { actingUserSystemId });
       }
+      if (name !== undefined) savedFields.push('name');
+      if (affiliation !== undefined) savedFields.push('affiliation');
 
       // Bibliometric edits go straight onto the person now (S213 collapse —
-      // updateById takes the person id; email is identity, handled elsewhere).
-      // NOTE (Phase 2): this PATCH is a MANUAL STAFF EDIT and is intentionally
-      // NOT resolver-gated — a human correcting a record is the authority (the
-      // identity resolver's human-in-the-loop override). Automated enrichment
-      // paths (save-candidates / enrich-recommended / saveToDatabase) ARE gated;
-      // staff hand-edits are not, by design.
+      // updateById takes the person id; email is identity, handled separately
+      // below). NOTE (Phase 2): this PATCH is a MANUAL STAFF EDIT and is
+      // intentionally NOT resolver-gated — a human correcting a record is the
+      // authority (the identity resolver's human-in-the-loop override). Automated
+      // enrichment paths (save-candidates / enrich-recommended / saveToDatabase)
+      // ARE gated; staff hand-edits are not, by design.
       const researcherUpdates = {};
       if (affiliation !== undefined) researcherUpdates.affiliation = affiliation;
       if (website !== undefined) researcherUpdates.website = website;
       if (hIndex !== undefined) researcherUpdates.hIndex = hIndex;
-      // Slice G — when staff hand-enter/replace the email, stamp emailSource='manual' so the
-      // invite send step reads it as LOW-confidence (this path bypasses the Fix-C enrichment
-      // gate, so the address is unverified against the reviewer's identity until a human
-      // confirms it at send). Does NOT change the "human is authority" stance above — it just
-      // records provenance. Only on an email edit, so an affiliation-only edit won't clobber a
-      // real source. wmkf_emailsource lives on the same person entity (researcher adapter map).
-      if (email !== undefined) researcherUpdates.emailSource = 'manual';
       if (Object.keys(researcherUpdates).length > 0) {
         await researcherAdapter.updateById(personId, researcherUpdates, { actingUserSystemId });
+      }
+      if (website !== undefined) savedFields.push('website');
+      if (hIndex !== undefined) savedFields.push('hIndex');
+
+      // Email LAST, in its OWN PATCH. A duplicate-key 409 here leaves everything
+      // above already committed (→ partialSuccess). Slice G — stamp
+      // emailSource='manual' ONLY after the address actually lands, so a rejected
+      // email never records a manual provenance for a value that didn't save. The
+      // manual source makes the invite step read the address as LOW-confidence
+      // (this path bypasses the Fix-C enrichment gate, so it's unverified against
+      // the reviewer's identity until a human confirms it at send).
+      if (email !== undefined) {
+        await potentialReviewerAdapter.update(personId, { email }, { actingUserSystemId });
+        await researcherAdapter.updateById(personId, { emailSource: 'manual' }, { actingUserSystemId });
+        savedFields.push('email');
       }
     }
 
@@ -605,7 +624,11 @@ async function handlePatch(req, res, access) {
           console.warn('[my-candidates] conflicting-owner lookup failed:', lookupErr.message);
         }
       }
-      const payload = { ...translated, conflictingRecordId };
+      // The reorder above writes the conflict-safe fields BEFORE the isolated email
+      // PATCH, so a duplicate-email 409 typically lands with those already saved.
+      // Report that (partialSuccess + savedFields) so the modal can tell the staffer
+      // their affiliation/website/etc. persisted and only the email needs resolving.
+      const payload = { ...translated, conflictingRecordId, partialSuccess: savedFields.length > 0, savedFields };
       console.warn('[my-candidates] duplicate-key on update:', payload);
       return res.status(409).json(payload);
     }
