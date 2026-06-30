@@ -153,6 +153,14 @@ Guards the trust-boundary fan-out defect class: a client-supplied id (`req.query
 - **Commit control:** a PreToolUse(Bash) hook runs the gate on `git commit` and BLOCKS (exit 2) on a missing guard.
 - Self-test: `npm run check:trust-boundary-guid:self-test` (FAIL fixtures prove it catches violations + live-baseline-clean assertion).
 
+### `check:secret-scan` — tracked-tree real secret push protection
+
+Scans `git ls-files` text content (current tree only, not history) and skips `package-lock.json` / `*.lock`. It fails closed on real secret/key-shaped literals: long Anthropic `sk-ant-apiNN-*` values, AWS `AKIA...`, GitHub `ghp_` / `github_pat_`, Slack `xoxb-`, Google `AIza...`, real `vercel_blob_rw_<store>_<secret>` tokens, private-key headers / JSON `private_key`, and high-entropy assignments to env names derived from `lib/utils/tracked-secrets.js`.
+
+- Precision guard: short/low-entropy values and obvious placeholders (`test`, `stub`, `fixture`, `example`, `placeholder`, `your`, `xxx`, `redact`, `fake`, `dummy`, `sample`, `mock`, `throwaway`, `rehearsal`, `TESTSTORE`, literal ellipses) are ignored so synthetic fixtures and `.env.example` do not require broad exemptions.
+- Allowlist: `scripts/check-secret-scan-allowlist.js`; entries must be file/line or substring-narrow and carry a reason comment. The current allowlist is empty.
+- Self-test: `npm run check:secret-scan:self-test` writes temporary fixtures, proves a real-looking secret is flagged, proves fake/test-marked values pass, and asserts the live baseline is clean.
+
 ## Coverage tool self-tests (binding contract)
 
 When modifying any `scripts/check-*.js` gate (or building a new one), the matching self-test must pass:
@@ -172,6 +180,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:harness-framing` | `check:harness-framing:self-test` |
 | `check:status-enum-parity` | `check:status-enum-parity:self-test` |
 | `check:trust-boundary-guid` | `check:trust-boundary-guid:self-test` |
+| `check:secret-scan` | `check:secret-scan:self-test` |
 
 **When external review catches a structural pattern an existing gate missed, the order is mandatory:**
 
@@ -196,3 +205,4 @@ Several self-tests write synthetic fixtures into paths that the main gate also s
 - `check:build-claim-freshness` then `check:build-claim-freshness:self-test` (self-test writes fixtures into `docs/agent-wiki/`, which the gate scans)
 - `check:model-registry` then `check:model-registry:self-test`
 - `check:agent-wiki` then `check:agent-wiki:self-test`
+- `check:secret-scan` then `check:secret-scan:self-test`

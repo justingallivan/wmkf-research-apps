@@ -35,6 +35,8 @@ jobs:
       - run: npm run check:model-override-warming:self-test
       - run: npm run check:route-lifecycle-auth
       - run: npm run check:route-lifecycle-auth:self-test
+      - run: npm run check:secret-scan
+      - run: npm run check:secret-scan:self-test
       - run: npm run check:scaffolding-tokens
       - run: npm run check:scaffolding-tokens:self-test
       - run: npm run check:harness-framing
