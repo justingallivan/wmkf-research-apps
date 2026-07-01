@@ -1,7 +1,17 @@
 # Email Template Token-Syntax Unification Plan v2
 
 **Created:** 2026-07-01 (S311)  
-**Status:** v2.1 — Claude-reviewed against source (2026-07-01), two strengthenings folded in (whole-token/longest-first matching guard; `fillInviteBody` missing-data fallback spec). Owner-confirmed the grantee-invite-subject decision = IMPLEMENT resolution. Implementation-ready; no product code or migration has been run.  
+**Status:** ✅ EXECUTED 2026-07-01 — build shipped, deployed to prod, and the data migration ran successfully (see "Execution record" below). Plan authored v2 by Codex, reviewed against source by Claude (two strengthenings folded in: whole-token/longest-first matching guard; `fillInviteBody` missing-data fallback spec), owner-confirmed the grantee-invite-subject decision = IMPLEMENT resolution.  
+
+## Execution record (2026-07-01, S311)
+
+- **Build:** commit `0222a7a0` — dual-syntax resolvers (reviewer acceptance/withdraw/both reminders + grantee invite/reminder), new `fillInviteSubject` subject resolution wired into `AwardeeTab`, seeds + `editableTextDefaults` hints + Profile Settings copy → mustache, and `scripts/migrate-email-token-syntax.mjs`. Full suite green (283 suites / 3571 tests); affected gates green. Codex-built, Claude-reviewed against source.
+- **Deploy:** live in prod (`dpl_AE69EEbbTR1wThddNiG8d96TsX5m`, aliased to `reviews.wmkeck.org`) before any data write, so dual-syntax resolvers were serving throughout the migration window. (Pushed to `main`; the GitHub→Vercel webhook did not fire, so the deploy was triggered via `vercel --prod` — root-cause a transient missed webhook, integration itself is connected.)
+- **Migration:** `node scripts/migrate-email-token-syntax.mjs --execute` → `adminUpdated=6 preferenceUpdated=2` (the 6 System-B admin bodies + both per-user `grantee_invite_body` rows; 6 admin subjects were no-change, carrying no tokens). Dry-run first validated every transform (copy-preservation reverse-substitution assertion + per-user count-guard = 2). Live admin copy preserved byte-for-byte; only token syntax changed.
+- **Verify:** post-migration dry-run reports `adminChanged=0 preferenceChanged=0` — zero bracket tokens remain in any stored value.
+- **Outstanding (optional, non-urgent):** (1) after a soak, a cleanup PR to drop the legacy `[bracket]` aliases from the dual-syntax resolvers (§5); (2) `scripts/seed-email-defaults.mjs --execute` is effectively a no-op for prod now (values already migrated) — seeds matter only for a fresh install, and the seed files are already mustache in code.
+
+The sections below are the plan-of-record as authored; the sequencing/"do not run until…" guidance in §3–§7 was followed in the order above and is retained for provenance.
 **Owner decisions:** standardize on mustache `{{token}}`; cover all admin-editable reviewer + grantee email templates; plan first, implementation later.  
 **Goal:** Replace legacy `[bracket]` tokens with mustache `{{token}}` in admin-editable email templates while preserving live stored copy exactly except for token spelling.
 
