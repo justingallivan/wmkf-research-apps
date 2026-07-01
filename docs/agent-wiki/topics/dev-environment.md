@@ -61,6 +61,17 @@ Claude config sync, and environment-specific operating notes.
   must not clobber applicant input. Dry-run by default; reversible soft-delete
   unless `--hard`. To undo a soft-delete, `scripts/restore-request-reviewers-selected.mjs`
   flips `wmkf_selected` back to true.
+- **`scripts/reset-reviewer-for-testing.js` resets ONE reviewer to pre-invite pristine
+  for a full PD→reviewer E2E re-run** (invite → accept/decline → materials → submit
+  review) without minting a new person+email. Target `--email <x> --requestNumber <n>`
+  (or `--suggestionId`). It PATCHes the suggestion back to `{selected:true, invited:false}`
+  with 40 lifecycle/response/token/review fields cleared, clears the honorarium lookup
+  via `disassociate()` (NOT `@odata.bind:null` — Dataverse rejects that), deletes the
+  `wmkf_appreviewanswer` snapshot rows + the review draft, and nulls the person's 3
+  board-identity fields. Parent PATCH runs BEFORE the child deletes (crash-safe order).
+  Guards: refuses applicant-disposition rows and any reviewer whose name lacks "test"
+  (override `--force`). Dry-run by default; `--commit` writes. Codex-reviewed (3 rounds).
+  No `akoya_request` teardown — accept is capture-only in prod.
 
 ## Commit Guards & Triggers
 
