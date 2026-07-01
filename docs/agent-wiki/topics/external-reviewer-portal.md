@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-29
+last_verified: 2026-07-01
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -187,6 +187,23 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 - **Accept/decline links are durable, signed surfaces.** Changes to link
   generation or response handling need an in-flight invitation compatibility check;
   see memory `project-reviewer-accept-decline-links`.
+- **Design direction — reviewer-materials selection: folder-convention today, move to explicit attach-and-verify (decided S312, NOT yet built).**
+  Which file a reviewer receives is decided *only* by placement in the request's
+  `Reviewer_Downloads/` SharePoint folder by Connor's PowerAutomate flow (see
+  `listProposalFiles` in `context.js` → `getRequestSharePointBuckets` +
+  `isReviewerMaterial`). No Dataverse link entity or outbound-file pointer field
+  exists — the suggestion's `wmkf_reviewfilename` is the *inbound* review upload,
+  `wmkf_materialssentat` is a timestamp, not a file ref. Gap: the folder-drop is
+  invisible to staff (no in-app confirmation the file was staged), request-wide (no
+  per-reviewer scoping). Near-term direction (option 2): a staff "attach reviewer
+  materials" action in the workbench backed by a Dataverse link entity
+  (request/suggestion → SharePoint file reference), surfacing a queryable
+  "materials attached ✓" state; keep the live folder-walk as a transition fallback —
+  it re-resolves files on each load, so it tolerates re-uploads, whereas a stored
+  driveItemId can go stale. Future: once the intake/submission portal (see
+  `topics/intake-portal.md`) owns the submitted file, the link entry points directly
+  at the WMKF-owned file, retiring the folder + PA-flow dependency entirely. Do not
+  cite a link table/field as built until this ships.
 
 ## Durable Memory
 
