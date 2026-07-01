@@ -150,13 +150,14 @@ function formatReviewDueDate(reviewDueDate) {
 
 function applyTemplatePlaceholders(template, replacements) {
   let text = String(template || '');
-  for (const [placeholder, value] of Object.entries(replacements)) {
+  const entries = Object.entries(replacements).sort((a, b) => b[0].length - a[0].length);
+  for (const [placeholder, value] of entries) {
     text = text.split(placeholder).join(String(value ?? ''));
   }
   return text;
 }
 
-function renderAcceptanceConfirmationEmail({ subjectTemplate, bodyTemplate, reviewer, request, signatureBlock }) {
+export function renderAcceptanceConfirmationEmail({ subjectTemplate, bodyTemplate, reviewer, request, signatureBlock }) {
   const reviewerName = ContactParser.normalizeDisplayName(reviewer?.wmkf_name) || 'Reviewer';
   const title = request?.akoya_title || 'the proposal';
   const due = formatReviewDueDate(request?.wmkf_reviewduedate);
@@ -171,10 +172,15 @@ function renderAcceptanceConfirmationEmail({ subjectTemplate, bodyTemplate, revi
   // Transitional strip: a legacy [requestNumber] token in a pre-fix seeded/edited
   // value renders EMPTY (never a literal token) until the prod default is re-baselined.
   const replacements = {
-    '[reviewerName]': reviewerName,
-    '[title]': title,
-    '[reviewDueDate]': dueSentence,
     '[Program Director signature]': signature,
+    '{{reviewerName}}': reviewerName,
+    '[reviewerName]': reviewerName,
+    '{{proposalTitle}}': title,
+    '[title]': title,
+    '{{reviewDueDate}}': dueSentence,
+    '[reviewDueDate]': dueSentence,
+    '{{signature}}': signature,
+    '{{requestNumber}}': '',
     '[requestNumber]': '',
   };
   const subject = applyTemplatePlaceholders(subjectTemplate, replacements);

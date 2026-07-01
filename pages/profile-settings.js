@@ -390,8 +390,8 @@ export default function ProfileSettings() {
               Your default body for the grantee abstract-review email (the Workbench
               Awardee tab). Do not include your name or signature — your saved Email
               Signature is appended automatically when you send. Keep the{' '}
-              <code className="text-xs">[Name]</code>, <code className="text-xs">[title]</code>, and{' '}
-              <code className="text-xs">COB [date]</code> placeholders; they’re filled in per-grantee.
+              <code className="text-xs">{'{{granteeName}}'}</code>, <code className="text-xs">{'{{proposalTitle}}'}</code>, and{' '}
+              <code className="text-xs">COB {'{{dueDate}}'}</code> placeholders; they’re filled in per-grantee.
             </p>
             <form onSubmit={handleSaveInviteBody} className="space-y-4">
               <label className="block text-sm font-medium text-gray-700">

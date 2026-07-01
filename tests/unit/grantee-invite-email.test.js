@@ -46,3 +46,18 @@ test('reminder body uses the resolved signature block instead of pdName/pdTitle'
   expect(body).toContain('Connor Noda\nW. M. Keck Foundation');
   expect(body).not.toContain('Program Director');
 });
+
+test('grantee reminder resolves legacy and mustache placeholders identically', () => {
+  const args = {
+    piName: 'Dr. Elena Vasquez',
+    title: 'Neural signaling',
+    signatureBlock: { signature: 'Connor Noda\nW. M. Keck Foundation' },
+    invitedDate: '2026-06-08T00:00:00.000Z',
+  };
+  const legacy = 'Dear Professor [Name],\n\nAward “[title]” is due by COB [date].\n\n[Program Director signature]';
+  const mustache = 'Dear Professor {{granteeName}},\n\nAward “{{proposalTitle}}” is due by COB {{dueDate}}.\n\n{{signature}}';
+  const renderedMustache = buildGranteeReminderBodyText({ ...args, bodyTemplate: mustache });
+  expect(renderedMustache).toBe(buildGranteeReminderBodyText({ ...args, bodyTemplate: legacy }));
+  expect(renderedMustache).toContain('COB June 22, 2026');
+  expect(renderedMustache).not.toContain('{{dueDate}}');
+});

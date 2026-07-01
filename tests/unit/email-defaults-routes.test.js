@@ -58,14 +58,14 @@ describe('/api/admin/email-defaults', () => {
       label: expect.any(String),
       description: expect.any(String),
       multiline: false,
-      placeholders: ['[title]'],
+      placeholders: ['{{proposalTitle}}'],
       value: 'Stored subject',
       unavailable: false,
     });
     expect(byKey[bodyKey]).toMatchObject({
       key: bodyKey,
       multiline: true,
-      placeholders: ['[Name]', '[title]', 'COB [date]'],
+      placeholders: ['{{granteeName}}', '{{proposalTitle}}', 'COB {{dueDate}}'],
       value: '',
       unavailable: false,
     });

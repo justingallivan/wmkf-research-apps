@@ -31,8 +31,18 @@ export function surnameFromName(name) {
  * simply leaves a gap rather than throwing.
  */
 export function fillInviteBody(baseTemplate, { piName, title, baseDate } = {}) {
+  const granteeName = surnameFromName(piName);
   return String(baseTemplate || '')
-    .replaceAll('[Name]', surnameFromName(piName) || '[Name]')
+    .replaceAll('{{granteeName}}', granteeName || '{{granteeName}}')
+    .replaceAll('[Name]', granteeName || '[Name]')
+    .replaceAll('{{proposalTitle}}', title || '{{proposalTitle}}')
     .replaceAll('[title]', title || '[title]')
+    .replaceAll('COB {{dueDate}}', `COB ${formatCobDate(baseDate)}`)
     .replaceAll('COB [date]', `COB ${formatCobDate(baseDate)}`);
+}
+
+export function fillInviteSubject(baseTemplate, { title } = {}) {
+  return String(baseTemplate || '')
+    .replaceAll('{{proposalTitle}}', title || '{{proposalTitle}}')
+    .replaceAll('[title]', title || '[title]');
 }

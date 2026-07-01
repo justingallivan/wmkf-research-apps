@@ -24,7 +24,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { GRANTEE_DELIVERABLE_LABEL } from '../../config/granteeDeliverableStatus';
 import { useProfile } from '../../context/ProfileContext';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
-import { fillInviteBody } from '../../config/granteeInviteEmail';
+import { fillInviteBody, fillInviteSubject } from '../../config/granteeInviteEmail';
 
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || '').trim());
 
@@ -127,7 +127,6 @@ export default function AwardeeTab({ requestId, context }) {
         loaded: true,
       };
       setEmailDefaults(next);
-      if (!subjectDirtyRef.current) setSubject(next.subject);
     } catch {
       if (defaultLoadSeqRef.current !== seq) return;
       setEmailDefaults({ subject: '', body: '', configured: false, unavailable: true, loaded: true });
@@ -196,8 +195,8 @@ export default function AwardeeTab({ requestId, context }) {
     setDirty(false);
     setTemplateMode('auto');
     subjectDirtyRef.current = false;
-    setSubject(emailDefaults.subject || '');
-  }, [currentProfile?.id, emailDefaults.subject]);
+    setSubject(fillInviteSubject(emailDefaults.subject || '', { title: awardTitle }));
+  }, [currentProfile?.id, emailDefaults.subject, awardTitle]);
 
   // Derive the body from the chosen template + recipients UNLESS the PD has taken
   // ownership by typing. `dirty` is in the deps so the render after an identity reset
@@ -208,6 +207,11 @@ export default function AwardeeTab({ requestId, context }) {
     const base = templateMode === 'foundation' ? adminDefaultBody : baseTemplate;
     setBody(fillInviteBody(base, { piName: recipients?.pi?.name, title: awardTitle }));
   }, [dirty, templateMode, adminDefaultBody, baseTemplate, recipients?.pi?.name, awardTitle]);
+
+  useEffect(() => {
+    if (subjectDirtyRef.current) return;
+    setSubject(fillInviteSubject(emailDefaults.subject || '', { title: awardTitle }));
+  }, [emailDefaults.subject, awardTitle]);
 
   async function generate(regenerate = false) {
     setGenerating(true); setError(null); setSentMsg(null); setAbstractMsg(null);
@@ -254,7 +258,7 @@ export default function AwardeeTab({ requestId, context }) {
     try {
       const res = await fetch('/api/workbench/grantee-deliverables/send-invite', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, toEmail, ccEmail, subject, bodyText: body }),
+        body: JSON.stringify({ requestId, toEmail, ccEmail, subject: fillInviteSubject(subject, { title: awardTitle }), bodyText: body }),
       });
       const data = await res.json();
       if (!res.ok) setError(data.error || 'Could not send the invitation.');
@@ -277,7 +281,7 @@ export default function AwardeeTab({ requestId, context }) {
       if (!res.ok) { setError(data.error || 'Could not render the preview.'); return; }
       const w = window.open('', '_blank');
       if (!w) { setError('Allow pop-ups to preview the email in a new tab.'); return; }
-      const safeSubject = String(subject).replace(/[&<>"']/g, (c) =>
+      const safeSubject = fillInviteSubject(subject, { title: awardTitle }).replace(/[&<>"']/g, (c) =>
         ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
       w.document.write(
         '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invitation preview</title></head>' +

@@ -6,7 +6,7 @@
  * #6 (S272): every occurrence of a token must fill, not just the first — a PD's
  * custom body may repeat [Name]/[title]/COB [date].
  */
-import { fillInviteBody } from '../../shared/config/granteeInviteEmail';
+import { fillInviteBody, fillInviteSubject } from '../../shared/config/granteeInviteEmail';
 import { GRANTEE_INVITE_SEED_BODY } from '../../lib/seed/email-defaults/grantee-invite';
 
 test('fills the default template placeholders', () => {
@@ -36,9 +36,31 @@ test('fills EVERY occurrence of a repeated placeholder (#6)', () => {
   expect(out).not.toContain('[title]');
 });
 
-test('leaves a token in place when its value is missing (no throw)', () => {
+test('fills mustache placeholders with the same values as legacy placeholders', () => {
+  const legacy = 'Dear [Name], your award “[title]” is due by COB [date].';
+  const mustache = 'Dear {{granteeName}}, your award “{{proposalTitle}}” is due by COB {{dueDate}}.';
+  const args = {
+    piName: 'Ada Lovelace',
+    title: 'Analytical Engine',
+    baseDate: new Date('2026-06-20T12:00:00Z'),
+  };
+  expect(fillInviteBody(mustache, args)).toBe(fillInviteBody(legacy, args));
+});
+
+test('leaves legacy and mustache tokens in place when their value is missing (no throw)', () => {
   const out = fillInviteBody('Hi [Name], re [title].', { baseDate: new Date('2026-06-20T12:00:00Z') });
   expect(out).toBe('Hi [Name], re [title].');
+  const mustache = fillInviteBody('Hi {{granteeName}}, re {{proposalTitle}}.', { baseDate: new Date('2026-06-20T12:00:00Z') });
+  expect(mustache).toBe('Hi {{granteeName}}, re {{proposalTitle}}.');
+});
+
+test('fills grantee invite subject placeholders in both syntaxes', () => {
+  expect(fillInviteSubject('Abstract for [title]', { title: 'Quantum Widgets' }))
+    .toBe('Abstract for Quantum Widgets');
+  expect(fillInviteSubject('Abstract for {{proposalTitle}}', { title: 'Quantum Widgets' }))
+    .toBe('Abstract for Quantum Widgets');
+  expect(fillInviteSubject('Abstract for {{proposalTitle}}', {}))
+    .toBe('Abstract for {{proposalTitle}}');
 });
 
 test('tolerates an empty/undefined template', () => {

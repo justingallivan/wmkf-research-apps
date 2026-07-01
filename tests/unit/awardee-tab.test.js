@@ -151,6 +151,23 @@ test('full flow: generate then send → status Invited + confirmation', async ()
   });
 });
 
+test('resolves grantee invite subject tokens in compose state and send payload', async () => {
+  wireFetch({
+    emailDefaults: defaultEmailDefaults({ subject: 'Abstract for {{proposalTitle}}' }),
+  });
+  render(<AwardeeTab requestId={REQ} context={{ ...CYCLE_CTX, title: 'Quantum Widgets' }} />);
+  await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveValue('Abstract for Quantum Widgets'));
+
+  fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'Legacy [title]' } });
+  fireEvent.click(screen.getByRole('button', { name: /generate abstract/i }));
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toBeInTheDocument());
+
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await waitFor(() => expect(screen.getByText(/invitation sent/i)).toBeInTheDocument());
+  const sendCall = global.fetch.mock.calls.find(([u]) => String(u).includes('/send-invite'));
+  expect(JSON.parse(sendCall[1].body).subject).toBe('Legacy Quantum Widgets');
+});
+
 test('a generation error surfaces and leaves Send disabled', async () => {
   wireFetch({ generateOk: false });
   render(<AwardeeTab requestId={REQ} />);
@@ -213,7 +230,7 @@ test('default invitation copy is the PD-voice template (subject + body)', async 
   await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj,/));
   const body = screen.getByLabelText('Email body').value;
   expect(body).toMatch(/^Dear Professor Raj,/);
-  expect(body).toContain('post an abstract on the Foundation’s website describing your award entitled “[title]”');
+  expect(body).toContain('post an abstract on the Foundation’s website describing your award entitled “{{proposalTitle}}”');
   expect(body).toContain('lightly edited to conform to the style that the Foundation uses in its publications');
   expect(body).toMatch(/no later than COB [A-Z][a-z]+ \d{1,2}, \d{4}/);
   expect(body).toContain('we will assume that we have your concurrence to post the draft as written');
@@ -481,14 +498,14 @@ test('reset BEFORE recipients load still fills [Name] when they arrive (#2)', as
     throw new Error(`unexpected fetch ${u}`);
   });
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
-  // Recipients not resolved yet → [Name] placeholder still present.
-  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/Dear Professor \[Name\],/));
+  // Recipients not resolved yet → {{granteeName}} placeholder still present.
+  await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/Dear Professor {{granteeName}},/));
 
   fireEvent.click(screen.getByRole('button', { name: /reset to default/i }));
-  expect(screen.getByLabelText('Email body').value).toMatch(/Dear Professor \[Name\],/);
+  expect(screen.getByLabelText('Email body').value).toMatch(/Dear Professor {{granteeName}},/);
 
   resolveRecipients();
-  // After recipients land, the reset (foundation, not "edited") refills [Name].
+  // After recipients land, the reset (foundation, not "edited") refills {{granteeName}}.
   await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj,/));
 });
 
