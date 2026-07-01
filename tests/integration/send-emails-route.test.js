@@ -256,6 +256,25 @@ describe('send-emails — reviewer portal HTML links', () => {
     expect(htmlBodySent()).toContain('<a href="https://example.org/info">https://example.org/info</a>');
     expect(htmlBodySent()).not.toContain('Start Review');
   });
+
+  test('a thankyou body with an external-review URL renders a plain link, not a button', async () => {
+    // thankyou has no configured label → resolver returns '' → button suppressed.
+    // The URL must still render (as a plain link), never be dropped or shown as a CTA.
+    await run({
+      drafts: [{
+        suggestionId: SUG_1,
+        subject: 'Thank you',
+        body: 'Thanks! Your secure link if needed:\nhttps://reviews.wmkeck.org/external/review/token.value',
+      }],
+      templateType: 'thankyou',
+    });
+
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(htmlBodySent()).toContain('<a href="https://reviews.wmkeck.org/external/review/token.value">https://reviews.wmkeck.org/external/review/token.value</a>');
+    expect(htmlBodySent()).not.toContain('<table role="presentation"');
+    expect(htmlBodySent()).not.toContain('Start Review');
+    expect(htmlBodySent()).not.toContain('Respond to Invitation');
+  });
 });
 
 describe('send-emails — capture delivery mode', () => {

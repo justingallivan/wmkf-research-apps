@@ -130,11 +130,16 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
     leaves the raw link, so the PD preview shows the link, not the button). Its text is
     read per `templateType` from admin setting `email.reviewer_<type>.button_label`
     (`invitation`→"Respond to Invitation", `materials`→"Start Review", `followup`→"Go to
-    Review"; `thankyou` has no link/button), seeded + editable in the same Email Defaults
-    panel as subject/body. Admin-default only (NO per-PD override — the button is
-    server-generated). Blank/unavailable falls back to a non-empty stage default in
+    Review"), seeded + editable in the same Email Defaults panel as subject/body.
+    Admin-default only (NO per-PD override — the button is server-generated) and
+    HTML-escaped at the interpolation site (S311 review — stored setting, not a literal).
+    Blank/unavailable for a stage WITH a fallback → non-empty stage default in
     `send-emails.js` `DEFAULT_REVIEW_BUTTON_LABELS` (a button must never render empty),
-    which is a deliberate contrast with subject/body's blank-renders-blank rule.
+    a deliberate contrast with subject/body's blank-renders-blank rule. A stage with NO
+    fallback entry (`thankyou`) resolves to '' → the button is SUPPRESSED: if such a body
+    ever contains a review link (the editor advertises `{{externalLink}}` for all types),
+    it renders as a plain link, never a CTA button and never dropped (`plainTextToHtml`
+    gates on `isExternalReviewUrl(url) && reviewButtonLabel`).
   (The `hold` + `finalize` templates were **REMOVED in S279** along with the rest of
   the hold path — see `project-reviewer-hold-step-decouple`.)
 - All four templates are sendable: `invitation` (first contact, via ReviewerInvitePanel →

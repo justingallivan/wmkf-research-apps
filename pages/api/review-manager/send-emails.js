@@ -706,7 +706,10 @@ export function plainTextToHtml(text, { programDirectorContact, reviewButtonLabe
   while ((match = urlPattern.exec(normalized)) !== null) {
     const url = match[0];
     html += plainTextFragmentToHtml(normalized.slice(cursor, match.index));
-    html += isExternalReviewUrl(url)
+    // Only external-review URLs render as the styled CTA button, and only when a
+    // stage label resolved (empty label — e.g. `thankyou` — falls through to a plain
+    // link so the URL is preserved, never a button and never dropped).
+    html += isExternalReviewUrl(url) && reviewButtonLabel
       ? reviewPortalButtonHtml(url, { programDirectorContact, label: reviewButtonLabel })
       : `<a href="${escapeAttribute(url)}">${escapeHtml(url)}</a>`;
     cursor = match.index + url.length;
@@ -751,16 +754,21 @@ function isExternalReviewUrl(url) {
 // source of truth. Unlike subject/body (blank renders blank, by design), a blank
 // button label would render an empty button in the SENT email — which the PD never
 // previews — so we deliberately fall back to a non-empty, stage-appropriate label.
+// A templateType with NO entry here (e.g. `thankyou`) resolves to '' → NO button:
+// if such a body ever contains a review link, it renders as a plain link, never a
+// CTA button (see plainTextToHtml). `thankyou` has no {{externalLink}} in its seed,
+// but the template editor advertises the token for it, so this path is reachable.
 const DEFAULT_REVIEW_BUTTON_LABELS = {
   invitation: 'Respond to Invitation',
   materials: 'Start Review',
   followup: 'Go to Review',
-  thankyou: 'Start Review', // no {{externalLink}} today; harmless if ever added
 };
 
 // Resolve the button label once per send batch (templateType is batch-level).
+// Returns '' for a type with no configured/fallback label → the caller suppresses
+// the button entirely rather than rendering an empty or mis-staged one.
 async function resolveReviewButtonLabel(templateType) {
-  const fallback = DEFAULT_REVIEW_BUTTON_LABELS[templateType] || 'Start Review';
+  const fallback = DEFAULT_REVIEW_BUTTON_LABELS[templateType] || '';
   try {
     const result = await getSettingStrict(`email.reviewer_${templateType}.button_label`);
     const value = result?.found ? String(result.value ?? '').trim() : '';
@@ -779,7 +787,7 @@ function reviewPortalButtonHtml(url, { programDirectorContact, label = 'Start Re
     '<tr>',
     '<td align="center" valign="middle" bgcolor="#234c8c" style="border-radius:4px;text-align:center;mso-padding-alt:12px 18px;">',
     `<a href="${href}" style="display:inline-block;min-width:132px;padding:12px 18px;font-family:Arial,sans-serif;font-size:15px;line-height:20px;color:#ffffff;text-decoration:none;font-weight:600;text-align:center;">`,
-    `<span style="color:#ffffff;text-decoration:none;">${label}</span>`,
+    `<span style="color:#ffffff;text-decoration:none;">${escapeHtml(label)}</span>`,
     '</a>',
     '</td>',
     '</tr>',
