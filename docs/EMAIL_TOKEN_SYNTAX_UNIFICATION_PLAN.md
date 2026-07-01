@@ -1,143 +1,212 @@
-# Email Template Token-Syntax Unification Plan
+# Email Template Token-Syntax Unification Plan v2
 
-**Created:** 2026-07-01 (S311)
-**Status:** DRAFT — pending Codex review + owner approval. No code written yet.
-**Goal:** One token syntax — mustache `{{token}}` — across ALL admin-editable email
-templates (reviewer + grantee), replacing the legacy `[bracket]` syntax used by the
-transactional/automated emails.
-**Decisions locked by owner (S311):** (1) standardize on `{{}}`; (2) scope = all email
-templates, not just reviewer; (3) draft plan → Codex review → implement after approval.
+**Created:** 2026-07-01 (S311)  
+**Status:** v2.1 — Claude-reviewed against source (2026-07-01), two strengthenings folded in (whole-token/longest-first matching guard; `fillInviteBody` missing-data fallback spec). Owner-confirmed the grantee-invite-subject decision = IMPLEMENT resolution. Implementation-ready; no product code or migration has been run.  
+**Owner decisions:** standardize on mustache `{{token}}`; cover all admin-editable reviewer + grantee email templates; plan first, implementation later.  
+**Goal:** Replace legacy `[bracket]` tokens with mustache `{{token}}` in admin-editable email templates while preserving live stored copy exactly except for token spelling.
 
-## 1. Why (the historical split)
+## 1. Corrected Runtime Model
 
-There are two independent token-substitution engines, split by send pipeline:
+There are two token engines and three legacy resolver families.
 
-| System | Syntax | Templates | Resolver |
+| Surface | Current syntax | Storage | Runtime resolver |
 |---|---|---|---|
-| A (newer, central) | `{{token}}` | reviewer `invitation`, `materials`, `followup`, `thankyou` | `replacePlaceholders` (`lib/utils/email-generator.js:156`) via `render-emails.js` → `send-emails.js` |
-| B (older, transactional) | `[token]` | reviewer `acceptance`, `withdraw`, `reminder_respond_by`, `reminder_review_due`; grantee `invite`, `reminder` | ad-hoc per-file token maps (`applyPlaceholders`) with string-literal keys |
+| System A reviewer composed emails: invitation, materials, followup, thankyou | Mustache `{{token}}` | Admin defaults in `wmkf_appsystemsetting`; optional per-PD JSON override in `wmkf_appuserpreferences` key `reviewer_email_templates` | `replacePlaceholders` in `lib/utils/email-generator.js`, called by reviewer render/send routes |
+| System B reviewer transactional emails: acceptance, withdraw, respond-by reminder, review-due reminder | Legacy brackets | Admin defaults in `wmkf_appsystemsetting` | `pages/api/external/review/[token]/respond.js`, `lib/external/reviewer-withdraw-email.js`, `lib/external/reviewer-reminder-email.js` |
+| System B grantee invite | Legacy brackets | Admin default in `wmkf_appsystemsetting`; per-PD body override in `wmkf_appuserpreferences` key `grantee_invite_body` | Client-side `fillInviteBody` in `shared/config/granteeInviteEmail.js`; server route only wraps final body HTML |
+| System B grantee reminder | Legacy brackets | Admin default in `wmkf_appsystemsetting` | `lib/external/grantee-invite-email.js` via the reminder cron |
 
-System B resolvers live in [VERIFIED via source this session]:
-`lib/external/reviewer-reminder-email.js` (both reminders),
-`lib/external/reviewer-withdraw-email.js` (withdraw),
-`lib/external/grantee-invite-email.js` (BOTH grantee invite AND grantee reminder —
-`renderGranteeReminderHtml`, imported at `grantee-deliverable-reminders.js:13`), and
-`pages/api/external/review/[token]/respond.js` (acceptance). Note `applyPlaceholders`
-is **not shared** — it is duplicated as a private function in each of the three
-`lib/external/*.js` files (`reviewer-reminder-email.js:31`,
-`reviewer-withdraw-email.js:16`, `grantee-invite-email.js:68`). All System-B
-templates are admin-editable in `/admin` → Email Defaults, stored in Dataverse
-`wmkf_appsystemsetting`, seeded from `lib/seed/email-defaults/{reviewer-actions,
-reviewer-reminders,grantee-invite,grantee-reminder}.js`.
+Verified source facts:
 
-System B also has **intra-bracket** inconsistency this cleanup fixes: `[reviewerName]`
-(acceptance) vs `[Reviewer Name]` (withdraw/reminders); `[reviewDueDate]` (acceptance)
-vs `[review due date]` (review-due reminder).
+- [VERIFIED via `shared/config/granteeInviteEmail.js:33-37`] `fillInviteBody` currently replaces `[Name]`, `[title]`, and whole phrase `COB [date]`.
+- [VERIFIED via `shared/components/workbench/AwardeeTab.js:83-87`] the grantee invite body uses the per-PD `grantee_invite_body` preference when present, otherwise the admin default.
+- [VERIFIED via `shared/components/workbench/AwardeeTab.js:206-210`] the Workbench derives the body client-side with `fillInviteBody`.
+- [VERIFIED via `shared/components/workbench/AwardeeTab.js:255-257`] the Workbench sends raw `subject` and already-composed `bodyText` to the send route.
+- [VERIFIED via `pages/api/workbench/grantee-deliverables/send-invite.js:123-132`] the send route appends the server-owned signature and renders HTML, but does not resolve subject/body tokens.
+- [VERIFIED via `shared/config/reviewerFinderPreferences.js:46-52`] `grantee_invite_body` is a per-user preference stored in `wmkf_appuserpreferences`.
+- [VERIFIED via `pages/profile-settings.js:238-245`] Profile Settings writes `grantee_invite_body`.
+- [VERIFIED via `pages/profile-settings.js:389-394`] Profile Settings currently instructs PDs to keep bracket placeholders.
 
-## 2. Preflight finding (VERIFIED 2026-07-01 via live read-only probe)
+Implementation invariant: deploy tolerant resolvers before mutating stored data. During the transition, every live send path must resolve both old and new syntax so no real email can ship unresolved literal tokens because of deploy/data ordering.
 
-Read every System-B stored value in Dataverse and diffed against its seed
-(`scratchpad/preflight-token-syntax.mjs`):
+## 2. Complete Canonical Token Map
 
-- **All 6 subjects: MATCH seed.**
-- **All 6 bodies: DIFFER from seed** by ~3–12 chars — and the diffs are **real,
-  intentional admin copy edits**, not whitespace. Examples:
-  - `email.reviewer_acceptance.body`: prod = "A calendar reminder for the review
-    deadline is attached for your convenience." (seed = "…attached when a review due
-    date is available."), and prod drops a redundant "Thank you," sign-off.
-  - `email.grantee_invite.body`: prod drops the seed's trailing "Thank you," (the
-    signature block closes the letter).
-- Every stored body uses the **same bracket token set** as its seed (no unknown/custom
-  tokens).
+Canonical tokens should use System A names where semantics match. Distinct phrase-valued tokens stay distinct from bare-title tokens.
 
-**Consequence — the load-bearing constraint:** a plain re-baseline from the seed files
-would OVERWRITE live, intentional admin copy. The migration MUST **preserve each stored
-value's copy verbatim and only swap the token syntax** (`[X]` → `{{X}}`) in place.
+| Legacy bracket token | Canonical mustache token | Meaning and resolver notes | Collision / compatibility notes |
+|---|---|---|---|
+| `[reviewerName]` | `{{reviewerName}}` | Reviewer display name. Acceptance resolver currently supports this. | Distinct from System A `{{greeting}}`; no collision. |
+| `[Reviewer Name]` | `{{reviewerName}}` | Reviewer display name. Reminder and withdraw resolvers currently support this casing. | Legacy alias must remain during dual-syntax soak. |
+| `[greeting]` | `{{greeting}}` | Full withdraw greeting, e.g. `Dear Name:`. | Name collides intentionally with System A `{{greeting}}`; same semantic category, but value format differs by email family. Document per resolver. |
+| `[title]` in acceptance | `{{proposalTitle}}` | Bare proposal title. | Matches System A `{{proposalTitle}}`. |
+| `[title]` in grantee invite/reminder | `{{proposalTitle}}` | Bare award/proposal title. | Matches System A `{{proposalTitle}}`. |
+| `[title]` in withdraw | `{{proposalClause}}` | Current withdraw resolver maps `[title]` to the same full clause as `[proposal]`. | Legacy alias only; do not advertise for new copy. |
+| `[proposal]` | `{{proposalClause}}` | Full clause such as `the proposal "X"` or a neutral fallback. | Do not collapse into `{{proposalTitle}}`; phrase semantics differ. |
+| `[proposal title clause]` | `{{proposalClause}}` | Legacy phrase-token alias supported by reminder and withdraw resolvers. | Must stay during dual-syntax soak. |
+| `[reviewDueDate]` | `{{reviewDueDate}}` | Acceptance due-date sentence today, not just a date: `Your review is due on ...` or fallback sentence. | Name collides with System A `{{reviewDueDate}}`, which is date-like in reviewer composed templates. For acceptance either keep sentence semantics and document resolver-local behavior, or introduce `{{reviewDueSentence}}`. Recommendation: use `{{reviewDueDate}}` for minimal migration, with tests documenting sentence output. |
+| `[review due date]` | `{{reviewDueDate}}` | Review-due reminder formatted date. | Same canonical spelling; resolver-local value is date-only. |
+| `[Program Director signature]` | `{{signature}}` | Program Director signature text. | Matches System A `{{signature}}`. |
+| `[signature]` | `{{signature}}` | Withdraw legacy alias for signature. | Must stay during dual-syntax soak. |
+| `[Name]` | `{{granteeName}}` | Grantee surname in grantee invite/reminder copy. | Distinct from reviewer name tokens. |
+| `COB [date]` | `COB {{dueDate}}` | Whole legacy phrase currently resolves to `COB <date>`. New `{{dueDate}}` is date-only. | This avoids `COB COB ...` and preserves current phrase semantics. Do not migrate to bare `{{dueDate}}` unless surrounding copy is also edited. |
+| `[requestNumber]` | `{{requestNumber}}` | Internal request number strip token in acceptance confirmation. Current value is always empty. | Keep both aliases resolving to empty during dual-syntax soak; never expose request number externally. Do not advertise this token. |
 
-> Separately noted (OUT OF SCOPE): the seed files have drifted from prod copy. That is a
-> pre-existing condition; this task does not reconcile copy, only token syntax. Flag for a
-> future seed re-baseline decision.
+COB decision: migrate the literal phrase `COB [date]` to `COB {{dueDate}}`; `{{dueDate}}` must be date-only. [VERIFIED via `shared/config/granteeInviteEmail.js:37`] the client invite currently matches `COB [date]`, and [VERIFIED via `lib/external/grantee-invite-email.js:53-61` and `:81-84`] the reminder helper creates a `COB ...` deadline and replaces the whole phrase.
 
-## 3. Canonical token map (`[bracket]` → `{{mustache}}`)
+## 3. Complete Implementation Site List
 
-Unify to the existing System-A token names where the meaning matches; keep distinct
-where semantics differ.
+Resolvers to update for dual syntax:
 
-| Legacy bracket token(s) | New mustache token | Notes |
-|---|---|---|
-| `[Program Director signature]` | `{{signature}}` | Same as System A's existing token. |
-| `[reviewerName]`, `[Reviewer Name]` | `{{reviewerName}}` | Collapses the two casings. |
-| `[title]` | `{{proposalTitle}}` | Same as System A. Award/proposal title. |
-| `[reviewDueDate]`, `[review due date]` | `{{reviewDueDate}}` | Collapses the two spellings. Same as System A. |
-| `[proposal]` | `{{proposalClause}}` | **Distinct from `{{proposalTitle}}`** — resolves to a full clause ("the proposal 'X'", with a fallback phrase when untitled). New name to avoid implying it's the bare title. |
-| `[Name]` (grantee) | `{{granteeName}}` | Grantee's name. |
-| `[date]` (grantee, "COB [date]") | `{{dueDate}}` | Deliverable due date. |
+- `shared/config/granteeInviteEmail.js` — add `{{granteeName}}`, `{{proposalTitle}}`, and `COB {{dueDate}}` support to `fillInviteBody`. Keep `[Name]`, `[title]`, and `COB [date]` until cleanup. This is the missing client-side grantee invite resolver. **Missing-data fallback (preserve current behavior):** today `fillInviteBody` re-inserts the LITERAL token when data is absent (`.replaceAll('[Name]', surnameFromName(piName) || '[Name]')`, `granteeInviteEmail.js:35`). The dual-syntax version must mirror this per-token — a missing `{{granteeName}}` leaves `{{granteeName}}` (its own mustache form), a missing `{{proposalTitle}}` leaves `{{proposalTitle}}` — so absent-data behavior is unchanged and never silently blanks. Add a unit test asserting the missing-data fallback for both syntaxes.
+- `lib/external/grantee-invite-email.js` — update grantee reminder placeholder map for `{{granteeName}}`, `{{proposalTitle}}`, `COB {{dueDate}}`, and `{{signature}}`; keep legacy aliases.
+- `lib/external/reviewer-reminder-email.js` — update respond-by and review-due maps for `{{reviewerName}}`, `{{proposalClause}}`, `{{reviewDueDate}}`, and `{{signature}}`; keep `[proposal title clause]`.
+- `lib/external/reviewer-withdraw-email.js` — update withdraw map for `{{reviewerName}}`, `{{greeting}}`, `{{proposalClause}}`, and `{{signature}}`; keep `[greeting]`, `[signature]`, `[proposal title clause]`, and other legacy aliases.
+- `pages/api/external/review/[token]/respond.js` — update acceptance confirmation map for `{{reviewerName}}`, `{{proposalTitle}}`, `{{reviewDueDate}}`, `{{signature}}`, and `{{requestNumber}}`; keep legacy aliases.
 
-Open question for review: whether to fold `[proposal]` clause + `{{proposalTitle}}`
-into one, or keep the clause helper. Recommendation: keep distinct (`{{proposalClause}}`)
-— the clause carries fallback wording the bare title can't.
+Subject-resolution decision:
 
-## 4. Transition safety — dual-syntax resolver window
+- DECISION (owner-confirmed 2026-07-01): implement grantee invite subject resolution in the Workbench/send path, not by dropping the token hint.
+- Rationale: [VERIFIED via `shared/config/editableTextDefaults.js:16-20`] the admin hint advertises a grantee invite subject placeholder today, but [VERIFIED via `shared/components/workbench/AwardeeTab.js:122-130` and `:255-257`] the subject is copied to state and sent raw, and [VERIFIED via `pages/api/workbench/grantee-deliverables/send-invite.js:130-132`] the server sends it unchanged. Keeping a placeholder hint without resolution is a live product bug. The implementation should add subject resolution for both `[title]` and `{{proposalTitle}}` before preview/send, ideally next to `fillInviteBody` as a small shared grantee invite composer.
+- Scope: grantee invite subject only. Grantee reminder subject currently has no placeholders advertised [VERIFIED via `shared/config/editableTextDefaults.js:163-167`] and is sent as stored by the cron [VERIFIED via `pages/api/cron/grantee-deliverable-reminders.js:218-220`].
 
-Neither "flip resolver first" nor "migrate data first" is safe alone: each leaves a
-window where a stored value's syntax doesn't match the deployed resolver → the literal
-token text ships in a real email. So:
+Admin hints and user-facing copy to update:
 
-**Step A (deploy, no behavior change).** Make every System-B resolver map accept BOTH
-the legacy bracket key AND the new mustache key for each token (dual entries in the
-`applyPlaceholders` maps). Stored values are still `[X]`; they resolve exactly as today.
-There is precedent for this exact pattern already in the code
-(`reviewer-reminder-email.js` keeps a `'[proposal title clause]'` legacy dual-key).
+- `shared/config/editableTextDefaults.js` — update placeholders and descriptions for every System B admin-editable subject/body entry: grantee invite, grantee reminder, reviewer acceptance, reviewer withdraw, reviewer respond-by reminder, reviewer review-due reminder.
+- `pages/profile-settings.js` — update the Request Abstract Email instructions from `[Name]`, `[title]`, `COB [date]` to `{{granteeName}}`, `{{proposalTitle}}`, `COB {{dueDate}}`.
 
-**Step B (data migration).** Run `scripts/migrate-email-token-syntax.mjs` (new): for
-each of the 12 System-B keys, read the stored value, mechanically replace bracket tokens
-with mustache per §3 (order-independent, whole-token match), and write back. Dry-run
-first (prints before/after token diff, asserts copy is otherwise byte-identical), then
-`--execute`. The dual-syntax resolver (Step A) keeps resolving throughout.
+Seed/default files to update after resolver deployment:
 
-**Step C (flip seeds + hints).** Rewrite the 4 System-B seed files and the
-`editableTextDefaults.js` `placeholders` arrays (12 keys) to mustache, so fresh installs
-and the admin panel hints are consistent. (Seeds are create-only init data; this does not
-touch prod values — those were handled in Step B.)
+- `lib/seed/email-defaults/reviewer-actions.js`
+- `lib/seed/email-defaults/reviewer-reminders.js`
+- `lib/seed/email-defaults/grantee-invite.js`
+- `lib/seed/email-defaults/grantee-reminder.js`
+- `lib/seed/email-defaults/reviewer-templates.js` is already mustache System A seed copy [VERIFIED via `lib/seed/email-defaults/reviewer-templates.js:14-19`] and should not be rewritten except if tests need fixture normalization.
 
-**Step D (later, optional cleanup).** After a soak period, drop the legacy bracket half
-of the dual-syntax maps. Tracked as a follow-up, not part of this change.
+Named-source discrepancy: `lib/external/reviewer-invite-email.js` and `pages/api/workbench/reviewer/respond.js` were requested as likely files, but this checkout does not contain them. The acceptance resolver is in `pages/api/external/review/[token]/respond.js`; reviewer invitation System A rendering uses the existing `replacePlaceholders` path.
 
-## 5. File-by-file change list
+## 4. Data Migration Plan
 
-- `lib/external/reviewer-reminder-email.js` — dual-syntax map (Step A).
-- `lib/external/reviewer-withdraw-email.js` — dual-syntax map.
-- `lib/external/grantee-invite-email.js` — dual-syntax map; covers BOTH grantee
-  invite and grantee reminder (`renderGranteeReminderHtml`), so one file, one map.
-- `pages/api/external/review/[token]/respond.js` — dual-syntax map (acceptance).
-- `lib/seed/email-defaults/reviewer-actions.js`, `reviewer-reminders.js`,
-  `grantee-invite.js`, `grantee-reminder.js` — seed bodies/subjects → mustache (Step C).
-- `shared/config/editableTextDefaults.js` — `placeholders` arrays for the 12 keys → mustache (Step C).
-- `scripts/migrate-email-token-syntax.mjs` — NEW data-migration script (Step B).
-- Docs/wiki: `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` email-templates
-  section; any placeholder references in runbooks.
+Live probe ground truth to preserve:
 
-## 6. Tests
+- [VERIFIED via provided live probe, 2026-07-01] Admin layer: exactly 12 System B `wmkf_appsystemsetting` keys are in scope; all 6 subjects match seed; all 6 bodies differ from seed via intentional admin edits but use the same bracket token set.
+- [VERIFIED via provided live probe, 2026-07-01] Per-user layer: exactly 2 `wmkf_appuserpreferences` rows with key `grantee_invite_body` contain `[Name]`, `[title]`, and `[date]` bracket syntax; owner ids are `29b0de0d` and `b53a3bf8`.
+- [VERIFIED via provided live probe, 2026-07-01] `reviewer_email_templates` has 1 row and is already all-mustache; legacy keys `reviewer_finder_email_template` and `email_reviewer_template` have zero rows; `email_signature` rows have no tokens.
 
-- Unit: each System-B render function resolves BOTH `[X]` and `{{X}}` inputs to the same
-  output (proves dual-syntax + no regression), and leaves unknown tokens untouched.
-- Unit/integration: the migration script's token-swap on a fixture body changes ONLY the
-  tokens (copy byte-identical otherwise).
-- Existing System-B email tests updated to mustache fixtures once Step C lands.
-- Full `npm test` green before each commit.
+Admin migration:
 
-## 7. Sequencing & rollback
+- Add a one-off script, e.g. `scripts/migrate-email-token-syntax.mjs`, but do not run it until dual-syntax code is deployed.
+- Enumerate the 12 System B keys explicitly:
+  - `email.grantee_invite.subject`
+  - `email.grantee_invite.body`
+  - `email.grantee_reminder.subject`
+  - `email.grantee_reminder.body`
+  - `email.reviewer_acceptance.subject`
+  - `email.reviewer_acceptance.body`
+  - `email.reviewer_withdraw.subject`
+  - `email.reviewer_withdraw.body`
+  - `email.reviewer_reminder_respond_by.subject`
+  - `email.reviewer_reminder_respond_by.body`
+  - `email.reviewer_reminder_review_due.subject`
+  - `email.reviewer_reminder_review_due.body`
+- For each stored value, replace only complete legacy tokens/phrases from the canonical map. Preserve all other bytes, including whitespace, punctuation, line endings, and intentional live copy edits.
+- **Whole-token, longest-first matching (REQUIRED — substring-collision guard).** A shorter bracket token can be a substring of a longer phrase — notably `[date]` ⊂ `COB [date]`. Replacement MUST match whole delimited tokens and process the map **longest-key-first**, so `COB [date]` is consumed before any bare `[date]` rule could fire (there is no bare `[date]` rule in the map — do not add one). This rule also applies to the dual-syntax RESOLVERS, not just the migration script: the existing bracket resolvers use naive insertion-order `String.split(token).join(value)` (`reviewer-withdraw-email.js:16-22`), so when legacy + mustache aliases coexist, order the map longest-first and never let a token that is a prefix of another be processed first. Note (advantage of the target state): once values are mustache, `{{}}` delimiting eliminates this class of collision — a shorter `{{x}}` cannot be a substring of a longer `{{xy}}` — so the hazard exists only for the legacy-bracket half during the soak window.
+- Dry-run output must show key, token diff, and before/after token inventory. It must fail if any unknown bracket token remains or if non-token copy changes.
+- Copy-preservation assertion: after replacing canonical tokens back to their legacy equivalents, the dry-run result must equal the original byte-for-byte. For `COB [date]`, reverse `COB {{dueDate}}` to `COB [date]`.
 
-Commit per step (A, B, C) so each is independently revertable. Step A is a pure superset
-(no behavior change) → safe to deploy alone. Step B is data-only, reversible via the same
-script run backward (or Dataverse audit / re-seed). Step C is code/init-data only. If any
-step regresses, revert that commit; the dual-syntax resolver means a partial state (some
-stored values migrated, some not) still resolves correctly.
+Per-user migration:
 
-## 8. Blast radius / risk
+- The same script must enumerate `wmkf_appuserpreferences` where preference key equals `grantee_invite_body`.
+- In dry-run, print the owner/profile id and token inventory for all matching rows. The expected execution set is exactly 2 rows from the live probe; if the count differs, stop and require a fresh read-only probe before execution.
+- Write only rows whose value changes after token replacement. Preserve copy bytes outside tokens using the same reverse-substitution assertion.
+- No per-user grantee invite subject key exists per live probe, so subject migration is admin-only. Future subject resolution handles admin default and any manually edited compose-state subject at send time.
 
-- Colleague-facing outbound email copy — a mis-migrated token ships a literal `{{x}}` or
-  `[x]` in a real email. Mitigated by dual-syntax resolver + dry-run + copy-byte-identical
-  assertion + unit tests asserting both syntaxes resolve.
-- No schema change, no new route. Reads/writes only existing `wmkf_appsystemsetting` keys.
-- Superuser-only settings write path unchanged.
+No migration is needed for `reviewer_email_templates` because the only live row is already mustache, and no legacy reviewer single-template rows exist.
+
+## 5. Dual-Syntax Transition and No-Unresolved-Token Proof
+
+Sequence safety:
+
+1. Deploy dual-syntax resolvers and grantee invite subject resolution first. Stored values are still brackets, so behavior remains compatible.
+2. Run dry-run migration for admin and per-user layers. Do not write if unknown tokens, count drift, or copy-preservation assertions fail.
+3. Execute migration only after dry-run passes.
+4. Update seeds and UI hints in the same code rollout as, or after, the tolerant resolvers. Fresh installs and admin/user instructions then advertise only mustache.
+5. Keep legacy aliases through a soak period. Cleanup is a separate follow-up after read-only probes show no bracket tokens remain in `wmkf_appsystemsetting` System B keys and `wmkf_appuserpreferences.grantee_invite_body`.
+
+No ordering/partial-failure window:
+
+- If code deploys before data migration, bracket templates still resolve because every resolver keeps legacy aliases.
+- If data migration partially succeeds, migrated mustache rows resolve and unmigrated bracket rows resolve because every resolver is dual-syntax.
+- If a PD has an open Workbench tab with an old bracket body, send still resolves because `fillInviteBody` remains dual-syntax for newly derived bodies and the server-side send route does not depend on template syntax after body composition.
+- If a PD has an open Profile Settings tab and saves bracket syntax during the transition, the Workbench still resolves it because `grantee_invite_body` remains dual-syntax until cleanup.
+- The acceptance `[requestNumber]` strip remains active for both `[requestNumber]` and `{{requestNumber}}`, resolving to empty so the internal number never leaks.
+
+Cleanup prerequisites:
+
+- A read-only probe confirms zero legacy bracket tokens in the 12 admin keys and zero legacy bracket tokens in all `grantee_invite_body` preference rows.
+- Profile Settings and admin hints have shown only mustache for at least one soak period.
+- Tests for mustache-only resolvers are added or updated in the cleanup PR.
+
+## 6. Test Plan
+
+Resolver parity tests:
+
+- `fillInviteBody` resolves legacy and mustache grantee invite bodies identically: `[Name]` equals `{{granteeName}}`; `[title]` equals `{{proposalTitle}}`; `COB [date]` equals `COB {{dueDate}}`.
+- Grantee reminder builder resolves both syntaxes identically and keeps `{{dueDate}}` date-only while surrounding copy supplies `COB`.
+- Reviewer reminder builders resolve `[Reviewer Name]`, `[proposal]`, `[proposal title clause]`, `[review due date]`, `[Program Director signature]` and their canonical mustache forms.
+- Reviewer withdraw builder resolves all current legacy aliases: `[Reviewer Name]`, `[reviewerName]`, `[greeting]`, `[proposal]`, `[proposal title clause]`, `[title]`, `[Program Director signature]`, `[signature]`, plus canonical forms.
+- Acceptance confirmation resolves `[reviewerName]`, `[title]`, `[reviewDueDate]`, `[Program Director signature]`, `[requestNumber]`, plus canonical forms. Assert request number resolves to empty.
+- Grantee invite subject resolution test proves `[title]` and `{{proposalTitle}}` both render to the same subject, and unknown tokens are left untouched or surfaced according to the implementation's chosen validation rule.
+
+Migration tests:
+
+- Fixture each of the 12 admin keys with live-like copy and assert token-swap changes only canonical tokens.
+- Fixture the 2 per-user `grantee_invite_body` rows and assert copy-preservation via reverse substitution.
+- Negative fixture with an unknown bracket token must fail dry-run without writing.
+- Count-guard test for per-user migration: expected live count mismatch stops execution unless an explicit override is passed after a new probe.
+
+Integration/route tests:
+
+- Workbench grantee invite compose path uses per-PD override before admin default and resolves mustache placeholders.
+- Send/preview routes still append server-owned signature and do not require body tokens to be present after client composition.
+- Grantee reminder cron renders a mustache migrated body without literal `{{...}}` in the HTML.
+- Acceptance confirmation, reviewer withdraw, and reviewer reminders render migrated mustache templates without literal unresolved tokens.
+
+Gates:
+
+- Run the narrow unit/integration tests for the touched resolver and migration script surfaces.
+- Run the relevant project gates from `docs/CI_GATES_REFERENCE.md` for changed source files. Because this v2 task is document-only, no gates are run now.
+
+## 7. Sequencing, Rollback, and Blast Radius
+
+Recommended implementation sequence:
+
+1. Code commit: add dual-syntax resolver support and grantee invite subject resolution. Include resolver parity tests.
+2. Code commit: update admin hints, Profile Settings instructions, and seed files to mustache. Include fixture tests for advertised tokens.
+3. Script commit: add the dry-run-first migration script covering admin and per-user layers.
+4. Deploy code with dual-syntax support.
+5. Run migration script dry-run. Review token inventories and copy-preservation assertions.
+6. Run migration script execute mode only after dry-run passes.
+7. Run a read-only post-migration probe to confirm no legacy tokens remain in the 12 admin keys and the 2 per-user `grantee_invite_body` rows.
+8. After soak, plan a separate cleanup to remove bracket aliases.
+
+Rollback:
+
+- Code rollback is safe while data is partially migrated only if the previous deployed version is dual-syntax. Do not roll back to bracket-only code after data migration unless data is also reverted.
+- Data rollback can be done by the migration script in reverse or from Dataverse audit/backups. Reverse mode must preserve copy bytes and only swap mustache tokens back to legacy forms.
+- If migration execution fails mid-run, leave dual-syntax code deployed, fix the script/data issue, rerun dry-run, then execute only changed rows.
+
+Blast radius:
+
+- External outbound emails to reviewers and grantees can expose literal tokens if resolver coverage is incomplete.
+- Stored admin and per-user copy can be damaged if migration rewrites more than tokens.
+- No schema change is planned. No product migration is to run as part of this document authoring task.
+- Existing route security, sender resolution, magic-link minting, and signature appending are out of behavioral scope except where subject/body token resolution is explicitly added.
+
+## 8. Prior Findings Reconciliation
+
+- ADDRESSED — BLOCKER 1: Section 1 adds `fillInviteBody` as the third resolver family with source evidence; Sections 3, 5, and 6 require dual-syntax support and tests for it.
+- ADDRESSED — BLOCKER 2: Sections 1 and 4 add the `wmkf_appuserpreferences.grantee_invite_body` layer and require migration of the exactly 2 live rows; Section 5 keeps dual syntax for future/stray saved preferences through soak.
+- ADDRESSED — SHOULD-FIX COB token: Section 2 defines `COB [date]` to `COB {{dueDate}}` with date-only `{{dueDate}}`; Sections 4 and 6 require migration and tests for that exact phrase.
+- ADDRESSED — SHOULD-FIX grantee invite subject: Section 3 marks the subject behavior as a decision point and chooses to implement subject resolution rather than drop the hint.
+- ADDRESSED — SHOULD-FIX omitted live tokens: Section 2 includes `[proposal title clause]`, `[greeting]`, `[signature]`, and `[requestNumber]`; Sections 3 and 6 require resolver support and tests.
+- ADDRESSED — NIT Profile Settings instructions: Section 3 includes the `pages/profile-settings.js` instruction update from bracket syntax to mustache.
