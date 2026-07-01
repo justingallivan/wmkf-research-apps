@@ -291,7 +291,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
           <p className="font-medium text-gray-900">
             {allowResend ? 'Re-invite reviewers' : 'Invite reviewers'} ({candidates.length})
@@ -363,8 +363,8 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                             onChange={(e) => updateEdit(d.suggestionId, 'subject', e.target.value)}
                           />
                           <textarea
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1 font-mono"
-                            rows={9}
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1 font-mono resize-y min-h-[16rem]"
+                            rows={16}
                             value={d.body}
                             onChange={(e) => updateEdit(d.suggestionId, 'body', e.target.value)}
                           />
