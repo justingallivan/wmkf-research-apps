@@ -389,7 +389,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-900">
                   <p className="font-medium">Captured {capturedSent.length} invitation email{capturedSent.length === 1 ? '' : 's'} for rehearsal.</p>
                   <p className="mt-1 text-xs text-blue-800">
-                    No Dynamics email was sent. Review the generated artifact below, then use its Start Review link for the reviewer-side test.
+                    No Dynamics email was sent. Review the generated artifact below, then use its accept/decline link for the reviewer-side test.
                   </p>
                 </div>
               ) : (

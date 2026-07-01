@@ -44,7 +44,7 @@ beforeEach(() => {
             candidateName: 'Dr. Test Reviewer',
             to: 'reviewer@example.org',
             subject: 'Invitation',
-            htmlBody: '<table><tr><td><a href="https://reviews.wmkeck.org/external/review/token.value">Start Review</a></td></tr></table>',
+            htmlBody: '<table><tr><td><a href="https://reviews.wmkeck.org/external/review/token.value">Respond to Invitation</a></td></tr></table>',
           },
         }],
         failed: [],
@@ -79,7 +79,7 @@ describe('InviteEmailModal capture-mode result display', () => {
     await waitFor(() => expect(screen.getByText(/captured 1 invitation email for rehearsal/i)).toBeInTheDocument());
     expect(screen.getByText(/no dynamics email was sent/i)).toBeInTheDocument();
     expect(screen.getByText(/Dr\. Test Reviewer <reviewer@example\.org>/)).toBeInTheDocument();
-    expect(screen.getByDisplayValue(/Start Review/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/Respond to Invitation/)).toBeInTheDocument();
 
     const sendCall = global.fetch.mock.calls.find(([url]) => url === '/api/review-manager/send-emails');
     expect(JSON.parse(sendCall[1].body)).toMatchObject({

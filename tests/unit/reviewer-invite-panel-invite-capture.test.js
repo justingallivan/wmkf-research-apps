@@ -73,7 +73,7 @@ beforeEach(() => {
             candidateName: 'Dr. Test Reviewer',
             to: 'reviewer@example.org',
             subject: 'Invitation',
-            htmlBody: '<a href="https://reviews.wmkeck.org/external/review/token.value">Start Review</a>',
+            htmlBody: '<a href="https://reviews.wmkeck.org/external/review/token.value">Respond to Invitation</a>',
           },
         }],
         failed: [],
@@ -118,7 +118,7 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
 
     await waitFor(() => expect(screen.getByText(/captured 1 invitation email for rehearsal/i)).toBeInTheDocument());
     expect(screen.getByText(/no dynamics email was sent/i)).toBeInTheDocument();
-    expect(screen.getByDisplayValue(/Start Review/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/Respond to Invitation/)).toBeInTheDocument();
     expect(onRefresh).toHaveBeenCalled();
     expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('This sends a real email with an accept/decline link and cannot be undone.'));
 

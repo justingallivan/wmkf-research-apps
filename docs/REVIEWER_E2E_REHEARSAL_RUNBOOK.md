@@ -57,7 +57,7 @@ Expected:
 - The modal previews the rendered invitation.
 - Sending in capture mode shows "Captured ... invitation email(s) for rehearsal."
 - The result says no Dynamics email was sent.
-- The captured artifact includes the HTML body with the `Start Review` link.
+- The captured artifact includes the HTML body with the `Respond to Invitation` link (the invitation-stage button label; `materials`/`followup` use "Start Review"/"Go to Review").
 - The send route returns captured email artifacts and does not call Dynamics.
 
 Run the reviewer portal browser rehearsal:
@@ -74,7 +74,7 @@ npx playwright test \
 Expected:
 
 - Stage 2a accept UX works, including policy acknowledgment gates.
-- A captured `Start Review` button opens the real external reviewer portal page.
+- A captured `Respond to Invitation` button opens the real external reviewer portal page.
 - Reviewer accept posts the expected payload.
 - Stage 2b return flow shows materials, accepts a review file, collects structured ratings, and posts multipart upload data to a browser mock instead of SharePoint/Dataverse.
 - The Program Director reviewer-engagement rehearsal drives the real Workbench Reviewers tab through captured invite, campaign-settings edit, accepted-reviewer release, and "no longer needed" withdraw flows with all data routes mocked in the browser.
@@ -127,7 +127,7 @@ For a capture-mode rehearsal against local/live APIs instead of browser route mo
    - recipient
    - subject
    - HTML body
-   - `Start Review` button/link
+   - `Respond to Invitation` button/link (invitation-stage label)
    - fallback full URL
 
 Expected: no real Dynamics email is sent. The captured artifact is the testable email output.
@@ -217,7 +217,7 @@ should delete that contact manually before reusing the same smoke email.
 
 Use the captured artifact from the director-side rehearsal:
 
-1. Copy the `Start Review` link from the captured HTML.
+1. Copy the `Respond to Invitation` link from the captured HTML.
 2. Open it in a browser.
 3. Confirm the domain shown in the address bar is the intended reviewer domain.
 4. Accept the invitation.

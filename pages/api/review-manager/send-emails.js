@@ -56,6 +56,7 @@ import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-sug
 import * as contactAdapter from '../../../lib/dataverse/adapters/contact';
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
 import { backPropReviewerOrcidToContact } from '../../../lib/services/backprop-reviewer-orcid';
+import { getSettingStrict } from '../../../lib/services/settings-service';
 import { shouldSkipDuplicateInvitation, sendAllowsAttachments, isKnownTemplateType, recipientMayReceiveAttachments, emailConfidence } from '../../../lib/utils/reviewer-invite';
 
 const limiter = nextRateLimiter({ max: 10 });
@@ -149,6 +150,9 @@ export default async function handler(req, res) {
       sendEvent('error', { message: `Unknown templateType: ${templateType}` });
       return res.end();
     }
+    // Stage-aware secure-link button label (admin-editable per templateType, blank →
+    // stage default). Resolved once here since templateType is batch-level.
+    const reviewButtonLabel = await resolveReviewButtonLabel(templateType);
     let deliveryMode;
     try {
       deliveryMode = getReviewerEmailDeliveryMode();
@@ -441,7 +445,7 @@ export default async function handler(req, res) {
       try {
         const emailPayload = {
           subject: draft.subject,
-          body: plainTextToHtml(draft.body, { programDirectorContact }),
+          body: plainTextToHtml(draft.body, { programDirectorContact, reviewButtonLabel }),
           from: fromEmail,
           to: email,
           regardingId: regardingId || undefined,
@@ -691,7 +695,7 @@ async function loadCycleConfigs(cycleCodes) {
   return out;
 }
 
-export function plainTextToHtml(text, { programDirectorContact } = {}) {
+export function plainTextToHtml(text, { programDirectorContact, reviewButtonLabel } = {}) {
   if (!text) return '';
   const normalized = normalizeEmailPlainText(String(text));
   const urlPattern = /(https?:\/\/[^\s<]+)/g;
@@ -703,7 +707,7 @@ export function plainTextToHtml(text, { programDirectorContact } = {}) {
     const url = match[0];
     html += plainTextFragmentToHtml(normalized.slice(cursor, match.index));
     html += isExternalReviewUrl(url)
-      ? reviewPortalButtonHtml(url, { programDirectorContact })
+      ? reviewPortalButtonHtml(url, { programDirectorContact, label: reviewButtonLabel })
       : `<a href="${escapeAttribute(url)}">${escapeHtml(url)}</a>`;
     cursor = match.index + url.length;
   }
@@ -741,9 +745,33 @@ function isExternalReviewUrl(url) {
   return /\/external\/review\/[A-Za-z0-9._~-]+/.test(url);
 }
 
-function reviewPortalButtonHtml(url, { programDirectorContact } = {}) {
+// Stage-aware fallback labels for the secure-link button, keyed by templateType.
+// These are the LAST resort when the admin `email.reviewer_<type>.button_label`
+// setting is blank/unavailable — the DB (seeded from the same wording) is the
+// source of truth. Unlike subject/body (blank renders blank, by design), a blank
+// button label would render an empty button in the SENT email — which the PD never
+// previews — so we deliberately fall back to a non-empty, stage-appropriate label.
+const DEFAULT_REVIEW_BUTTON_LABELS = {
+  invitation: 'Respond to Invitation',
+  materials: 'Start Review',
+  followup: 'Go to Review',
+  thankyou: 'Start Review', // no {{externalLink}} today; harmless if ever added
+};
+
+// Resolve the button label once per send batch (templateType is batch-level).
+async function resolveReviewButtonLabel(templateType) {
+  const fallback = DEFAULT_REVIEW_BUTTON_LABELS[templateType] || 'Start Review';
+  try {
+    const result = await getSettingStrict(`email.reviewer_${templateType}.button_label`);
+    const value = result?.found ? String(result.value ?? '').trim() : '';
+    return value || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function reviewPortalButtonHtml(url, { programDirectorContact, label = 'Start Review' } = {}) {
   const href = escapeAttribute(url);
-  const label = 'Start Review';
   const displayUrl = escapeHtml(url);
   const contactLine = reviewerPortalContactLine(programDirectorContact);
   return [

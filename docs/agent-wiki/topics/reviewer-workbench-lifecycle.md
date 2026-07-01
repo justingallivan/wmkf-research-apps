@@ -124,6 +124,17 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
   - **Recovery of a fat-fingered blank** is parked for Connor: enable Dataverse
     table-level auditing on `wmkf_appsystemsetting` — see
     `project-dataverse-settings-audit-enablement`.
+  - **Secure-link button label is stage-aware (S311).** The blue call-to-action button
+    is generated at SEND time by `send-emails.js` (`reviewPortalButtonHtml`, triggered
+    when a body contains a `/external/review/` URL) — NOT in the preview (`render-emails`
+    leaves the raw link, so the PD preview shows the link, not the button). Its text is
+    read per `templateType` from admin setting `email.reviewer_<type>.button_label`
+    (`invitation`→"Respond to Invitation", `materials`→"Start Review", `followup`→"Go to
+    Review"; `thankyou` has no link/button), seeded + editable in the same Email Defaults
+    panel as subject/body. Admin-default only (NO per-PD override — the button is
+    server-generated). Blank/unavailable falls back to a non-empty stage default in
+    `send-emails.js` `DEFAULT_REVIEW_BUTTON_LABELS` (a button must never render empty),
+    which is a deliberate contrast with subject/body's blank-renders-blank rule.
   (The `hold` + `finalize` templates were **REMOVED in S279** along with the rest of
   the hold path — see `project-reviewer-hold-step-decouple`.)
 - All four templates are sendable: `invitation` (first contact, via ReviewerInvitePanel →

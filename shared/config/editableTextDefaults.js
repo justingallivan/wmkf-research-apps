@@ -97,6 +97,13 @@ export const EDITABLE_TEXT_DEFAULTS = [
     placeholders: ['{{greeting}}', '{{proposalDetails}}', '{{proposalAbstract}}', '{{externalLink}}', '{{respondBy}}', '{{proposalDelivery}}', '{{reviewDue}}', '{{customField:honorarium}}', '{{signature}}'],
   },
   {
+    key: 'email.reviewer_invitation.button_label',
+    label: 'Reviewer invitation button label',
+    description: 'Text on the secure-link button in the invitation email — the accept/decline stage, so not "Start Review". Blank falls back to a stage default.',
+    multiline: false,
+    placeholders: [],
+  },
+  {
     key: 'email.reviewer_materials.subject',
     label: 'Reviewer materials subject',
     description: 'Default subject line for the post-accept review-materials email. Mustache {{tokens}}.',
@@ -111,6 +118,13 @@ export const EDITABLE_TEXT_DEFAULTS = [
     placeholders: ['{{greeting}}', '{{proposalTitle}}', '{{piInstitution}}', '{{externalLink}}', '{{reviewDueDate}}', '{{signature}}'],
   },
   {
+    key: 'email.reviewer_materials.button_label',
+    label: 'Reviewer materials button label',
+    description: 'Text on the secure-link button in the post-accept materials email (the reviewer starts the review here). Blank falls back to a stage default.',
+    multiline: false,
+    placeholders: [],
+  },
+  {
     key: 'email.reviewer_followup.subject',
     label: 'Reviewer follow-up subject',
     description: 'Default subject line for the reviewer follow-up reminder email. Mustache {{tokens}}.',
@@ -123,6 +137,13 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default body for the reviewer follow-up reminder email.',
     multiline: true,
     placeholders: ['{{greeting}}', '{{proposalTitle}}', '{{externalLink}}', '{{reviewDueDate}}', '{{signature}}'],
+  },
+  {
+    key: 'email.reviewer_followup.button_label',
+    label: 'Reviewer follow-up button label',
+    description: 'Text on the secure-link button in the follow-up reminder email (reviewer has accepted and received materials). Blank falls back to a stage default.',
+    multiline: false,
+    placeholders: [],
   },
   {
     key: 'email.reviewer_thankyou.subject',

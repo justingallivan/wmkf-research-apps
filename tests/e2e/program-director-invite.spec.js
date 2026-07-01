@@ -307,7 +307,7 @@ async function installInviteMocks(context, baseURL, {
           htmlBody: [
             '<main>',
             '<p>The W. M. Keck Foundation invites you to serve as a peer reviewer.</p>',
-            `<table role="presentation"><tr><td><a href="${reviewerUrl}">Start Review</a></td></tr></table>`,
+            `<table role="presentation"><tr><td><a href="${reviewerUrl}">Respond to Invitation</a></td></tr></table>`,
             `<p>If the button does not work, copy and paste this link: <a href="${reviewerUrl}">${reviewerUrl}</a></p>`,
             '</main>',
           ].join(''),
@@ -358,7 +358,7 @@ test.describe('Program Director reviewer invitation flow', () => {
     await page.getByRole('button', { name: 'Send 1 invitation' }).click();
 
     await expect(page.getByText(/captured 1 invitation email for rehearsal/i)).toBeVisible();
-    await expect(page.locator('textarea[readonly]')).toHaveValue(/Start Review/);
+    await expect(page.locator('textarea[readonly]')).toHaveValue(/Respond to Invitation/);
     expect(sentBodies).toHaveLength(1);
     expect(sentBodies[0]).toMatchObject({
       templateType: 'invitation',

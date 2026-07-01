@@ -346,7 +346,7 @@ async function installMocks(context) {
           htmlBody: [
             '<main>',
             '<p>The W. M. Keck Foundation invites you to serve as a peer reviewer.</p>',
-            `<table role="presentation"><tr><td><a href="${reviewerUrl}">Start Review</a></td></tr></table>`,
+            `<table role="presentation"><tr><td><a href="${reviewerUrl}">Respond to Invitation</a></td></tr></table>`,
             `<p>If the button does not work, copy and paste this link: <a href="${reviewerUrl}">${reviewerUrl}</a></p>`,
             '</main>',
           ].join(''),

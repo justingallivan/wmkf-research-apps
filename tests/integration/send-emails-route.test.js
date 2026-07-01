@@ -47,6 +47,17 @@ const mockSetContactLink = jest.fn(async () => {});
 jest.mock('../../lib/dataverse/adapters/contact', () => ({ findOrCreateByEmail: (...a) => mockFindOrCreateByEmail(...a) }));
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({ setContactLink: (...a) => mockSetContactLink(...a) }));
 jest.mock('../../lib/services/backprop-reviewer-orcid', () => ({ backPropReviewerOrcidToContact: jest.fn(async () => ({ action: 'noop' })) }));
+// Stage-aware secure-link button label: send-emails reads email.reviewer_<type>.button_label.
+jest.mock('../../lib/services/settings-service', () => ({
+  getSettingStrict: jest.fn(async (key) => {
+    const labels = {
+      'email.reviewer_invitation.button_label': 'Respond to Invitation',
+      'email.reviewer_materials.button_label': 'Start Review',
+      'email.reviewer_followup.button_label': 'Go to Review',
+    };
+    return key in labels ? { found: true, value: labels[key] } : { found: false, value: null };
+  }),
+}));
 jest.mock('../../lib/services/grant-cycles-dataverse', () => ({ findByShortCode: jest.fn(async () => CYCLE_CONFIG) }));
 jest.mock('../../lib/utils/cycle-code', () => ({ meetingDateToCycleCode: jest.fn(() => CYCLE_CODE) }));
 jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn(), isAllowedUrl: jest.fn(() => false) }));
@@ -192,7 +203,9 @@ describe('send-emails — reviewer portal HTML links', () => {
     });
 
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-    expect(htmlBodySent()).toContain('Start Review');
+    // Invitation stage → commit-appropriate label, not "Start Review".
+    expect(htmlBodySent()).toContain('Respond to Invitation');
+    expect(htmlBodySent()).not.toContain('Start Review');
     expect(htmlBodySent()).toContain(
       'This secure link is unique to you and was sent by W.M. Keck Foundation Program Director Dr. Program Director pd@wmkeck.org. Please contact them with any questions.'
     );
@@ -282,7 +295,7 @@ describe('send-emails — capture delivery mode', () => {
       subject: 'Invitation',
       from: 'staff@wmkeck.org',
       to: 'rev@example.org',
-      htmlBody: expect.stringContaining('Start Review'),
+      htmlBody: expect.stringContaining('Respond to Invitation'),
     });
     expect(r.sent[0].capturedEmail.htmlBody).toContain('https://reviews.wmkeck.org/external/review/token.value');
   });
