@@ -2,7 +2,7 @@
  * CandidateEditModal — edit a saved candidate's person/researcher details.
  *
  * Click a candidate's name on the Candidates tab to open this; corrects the
- * name, affiliation, email, website, and h-index. The common case is fixing an
+ * name, affiliation, email, and website. The common case is fixing an
  * email that resolved to an assistant/department address rather than the
  * reviewer themselves (so the invitation reaches the right inbox).
  *
@@ -69,7 +69,7 @@ function defaultFieldChoices(plan, conflictValue) {
 }
 
 export default function CandidateEditModal({ candidate, onClose, onSaved, onApply, onConfirm, confirmMode = false, nameEditable = true }) {
-  const [formData, setFormData] = useState({ name: '', affiliation: '', email: '', website: '', hIndex: '', academicRank: '', primaryDepartment: '', mainInstitution: '' });
+  const [formData, setFormData] = useState({ name: '', affiliation: '', email: '', website: '', academicRank: '', primaryDepartment: '', mainInstitution: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
   // confirmMode only: the PD must tick "I've verified this is the correct person"
@@ -97,7 +97,6 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
         affiliation: candidate.affiliation || '',
         email: candidate.email || '',
         website: candidate.website || '',
-        hIndex: candidate.hIndex ?? '',
         academicRank: candidate.academicRank || '',
         primaryDepartment: candidate.primaryDepartment || '',
         mainInstitution: candidate.mainInstitution || '',
@@ -151,9 +150,6 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
       if (formData.affiliation !== (candidate.affiliation || '')) updates.affiliation = formData.affiliation;
       if (formData.email !== (candidate.email || '')) updates.email = formData.email;
       if (formData.website !== (candidate.website || '')) updates.website = formData.website;
-      if (String(formData.hIndex) !== String(candidate.hIndex ?? '')) {
-        updates.hIndex = formData.hIndex === '' ? null : parseInt(formData.hIndex, 10);
-      }
       // S308 board-writeup identity (saved-candidate edit only — hidden in local/confirm
       // modes, so these never differ there). Only changed fields are sent.
       if (formData.academicRank !== (candidate.academicRank || '')) updates.academicRank = formData.academicRank;
@@ -454,22 +450,6 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
               placeholder="https://..."
             />
           </div>
-
-          {/* h-index is hidden in confirm mode — a PD-confirmed row deliberately
-              carries NO auto-fetched bibliometrics (they may be a namesake's). */}
-          {!confirmMode && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">h-index</label>
-              <input
-                type="number"
-                value={formData.hIndex}
-                onChange={(e) => setFormData({ ...formData, hIndex: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                min="0"
-                placeholder="e.g., 25"
-              />
-            </div>
-          )}
 
           {/* Board-writeup identity (S308) — only on the saved-candidate edit (not
               the pre-save Find card / confirm flow). These are the reviewer-confirmed
