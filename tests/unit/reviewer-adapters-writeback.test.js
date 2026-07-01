@@ -11,7 +11,11 @@
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { setMatchReason, ensureStaffManualCandidate, APPLICANT_DISPOSITION_EXCLUDED } from '../../lib/dataverse/adapters/reviewer-suggestion.js';
 import { upsertByPotentialReviewer, updateById as updateResearcherById } from '../../lib/dataverse/adapters/researcher.js';
-import { create as createPotentialReviewer } from '../../lib/dataverse/adapters/potential-reviewer.js';
+import {
+  create as createPotentialReviewer,
+  update as updatePotentialReviewer,
+  upsertByEmail as upsertPotentialReviewerByEmail,
+} from '../../lib/dataverse/adapters/potential-reviewer.js';
 
 function err412() { const e = new Error('Precondition Failed'); e.status = 412; return e; }
 
@@ -244,5 +248,37 @@ describe('researcher.upsertByPotentialReviewer — writes bibliometrics onto the
     update.mockClear();
     await upsertByPotentialReviewer('pr-3', { email: 'x@y.edu', emailSource: 'serp_search' });
     expect(update.mock.calls[0][2].wmkf_emailsource).toBeUndefined(); // non-manual: fill-only, not overwritten
+  });
+});
+
+// wmkf_name is stored raw (Dynamics does not recompute it), so the adapter must
+// normalize whitespace on every write or padded/double-spaced values persist
+// (agent-wiki dataverse-dynamics note; the " Test 3 Reviewer " prod finding).
+describe('potential-reviewer.wmkf_name whitespace normalization', () => {
+  test('create trims ends and collapses internal runs', async () => {
+    const create = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({ wmkf_potentialreviewersid: 'pr-1' });
+
+    await createPotentialReviewer({ name: ' Test 3 Reviewer ' });
+    expect(create.mock.calls[0][1].wmkf_name).toBe('Test 3 Reviewer');
+    // first/last still come clean from splitName
+    expect(create.mock.calls[0][1].wmkf_firstname).toBe('Test');
+    expect(create.mock.calls[0][1].wmkf_lastname).toBe('3 Reviewer');
+
+    create.mockClear();
+    await createPotentialReviewer({ name: 'Yongmin  Liu' }); // double internal space
+    expect(create.mock.calls[0][1].wmkf_name).toBe('Yongmin Liu');
+  });
+
+  test('upsertByEmail (create branch) normalizes wmkf_name', async () => {
+    const create = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({ wmkf_potentialreviewersid: 'pr-2' });
+    await upsertPotentialReviewerByEmail({ name: '  Jane   Doe  ', email: null });
+    expect(create.mock.calls[0][1].wmkf_name).toBe('Jane Doe');
+  });
+
+  test('update normalizes wmkf_name (empty existing → written clean)', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({}); // no existing value → a real diff
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    await updatePotentialReviewer('pr-3', { name: ' Test 3 Reviewer ' });
+    expect(update.mock.calls[0][2].wmkf_name).toBe('Test 3 Reviewer');
   });
 });
