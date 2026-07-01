@@ -32,5 +32,14 @@ Ready in ~30s. Justin flagged it: "you're waiting on a signal that never comes."
   reason to keep sleeping to the cap.
 - Do NOT build a poll loop around `grep "<deployment-hash>"` of `vercel ls` — that's the fragile
   pattern that fails.
-- Better still: a `git push` to the default branch auto-deploys; a single `vercel inspect` after a
-  short pause usually suffices — don't over-poll.
+- Better still: a `git push` to the default branch USUALLY auto-deploys; a single `vercel inspect`
+  after a short pause usually suffices — don't over-poll.
+- **Caveat (S311, 2026-07-01): the git→Vercel webhook can silently NOT fire.** A push to `main`
+  landed on origin but triggered NO build (newest deployment stayed ~1h old, nothing Building/
+  Queued). Git integration WAS connected (deploys carry the `…-git-main-…` alias; `vercel git
+  connect/disconnect` exist) and `vercel.json` had no ignore rule — it was a transient missed
+  webhook. So after a push, if `vercel ls`/`inspect` shows no new deployment for your commit,
+  don't assume it's still building — RECOVER by triggering it manually: `vercel --prod` (builds+
+  deploys the clean local checkout = the pushed commit; run by the user in-session — the auto-mode
+  classifier blocks agent-initiated prod deploys). The Git settings live under Vercel → Settings →
+  **Build and Deployment** (Vercel folded the old standalone "Git" page in there).
