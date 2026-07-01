@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-27
+last_verified: 2026-07-01
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -158,6 +158,27 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 
 ## Operating Notes
 
+- **Name-based dedup collapses reviewers who share a NORMALIZED name — a recurring "missing reviewers" trap (S312).**
+  Two shared normalizers both lowercase and strip everything non-alpha via
+  `.replace(/[^a-z\s]/g, '')` — **which deletes digits**: `normalizeReviewerName`
+  (`lib/utils/reviewer-name-match.js:33`) and `normalizeName`
+  (`lib/utils/name-normalization.js:18`). That normalized key is the dedup identity
+  everywhere reviewers are collapsed: the durable roster's unique index
+  `(request_id, normalized_name)` (`lib/services/reviewer-roster-store.js:5,76,83` —
+  computed via `normalizeReviewerName`; colliding rows upsert into ONE), display
+  `dedupeByName` → `candKey` → `normalizeReviewerName` (`ReviewerSearchSection.js:94,100`),
+  the `/discover` server dedup, and `DeduplicationService` (`deduplication-service.js:112`,
+  its own copy of the same regex). Consequences to watch for when "not all reviewers
+  show" in the Find tab: (a) **test data** — names differing only by a trailing digit
+  (`tester2/3/4/5 testing` → all normalize to `tester testing`) collapse to one row;
+  use alphabetically-distinct test names. (b) **real same-name reviewers** — two
+  genuine "John Smith"s collapse to one surfaced/rostered row. The underlying person
+  records + `disposition=recommended` junction rows are NOT lost — the collapse is only
+  in the dedup/roster surface. A real fix (dedup on name + an identity anchor like
+  ORCID/email rather than name alone) is a larger design change; the digit-strip itself
+  is load-bearing (stable keying for the roster unique index, the person
+  `normalizedName` column written at `enrich-recommended.js:404`, and excluded-name
+  matching) — do not casually change it.
 - Roster reload must preserve fields that keep deferred/unresolved/conflicted rows non-selectable.
 - Cross-run dedup is durable; do not casually drop carryover.
 - Reviewer removal/reset behavior often spans UI state, roster store, and Dataverse suggestion state.
