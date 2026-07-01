@@ -47,23 +47,18 @@ agent-initiated prod deploys/migrations.
    After confidence, a cleanup PR should drop the legacy `[bracket]` aliases so only mustache
    remains. Do NOT remove them before this is greenlit — they're intentional, not dead code.
    Evidence: `docs/EMAIL_TOKEN_SYNTAX_UNIFICATION_PLAN.md` §5; `[[project-email-template-token-syntax]]`.
-2. **GitHub→Vercel auto-deploy webhook is flaky.** S311: a push to `main` did NOT trigger a
-   build (missed webhook); recovered via `vercel --prod`. Integration IS connected. Worth a
-   look at Vercel → Settings → Build and Deployment (Production Branch = `main`? Ignored Build
-   Step off?). Until fixed, verify each deploy with `vercel inspect` and manually `vercel --prod`
-   if no build appears. Evidence: `[[feedback-deployment-monitoring-use-inspect]]` (S311 caveat).
-3. **Surface the 3 board-identity fields on Track Reviewers (read-only) + Excel export.**
+2. **Surface the 3 board-identity fields on Track Reviewers (read-only) + Excel export.**
    Carried S308→S311, still NOT built. my-candidates DTO emits
    `academicRank`/`primaryDepartment`/`mainInstitution` (`my-candidates.js:214-216`) and
    `CandidateEditModal` edits them, but Track Reviewers cards + the workbook don't show them.
    Evidence: `docs/REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md` §C step 9.
-4. **Optional invite-modal follow-up: collapse the campaign-timeline block** into a
+3. **Optional invite-modal follow-up: collapse the campaign-timeline block** into a
    `<details>` for more message-body room. Offered S310, not greenlit. Low effort.
    Evidence: `shared/components/reviewers/InviteEmailModal.js` (timeline block ~L294-319).
-5. **Reviewer nice-to-haves #4 & #5 unbuilt.** #4 reviewer-memory flag + searchable notes;
+4. **Reviewer nice-to-haves #4 & #5 unbuilt.** #4 reviewer-memory flag + searchable notes;
    #5 controlled expertise-tag taxonomy / editable tags (free-text export shipped S308).
    Evidence: `docs/REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md` §4, §5.
-6. **Optional `wmkf_firstname` trailing-whitespace second pass.** Low-priority hygiene; the
+5. **Optional `wmkf_firstname` trailing-whitespace second pass.** Low-priority hygiene; the
    `wmkf_name` cleanup did NOT cover it. Evidence: `docs/agent-wiki/topics/dataverse-dynamics.md`.
 
 ### Owner Decision Needed
