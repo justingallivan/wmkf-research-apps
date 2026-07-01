@@ -179,6 +179,26 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
   is load-bearing (stable keying for the roster unique index, the person
   `normalizedName` column written at `enrich-recommended.js:404`, and excluded-name
   matching) — do not casually change it.
+- **Editing/renaming an applicant reviewer after the FIRST enrichment silently won't reflect — the durable roster cache blocks re-enrichment (S312).**
+  Auto-enrichment of applicant-recommended reviewers is cache-gated:
+  `hasValidApplicantEnrichmentCache` (`shared/components/reviewers/reviewer-search-logic.js:123`)
+  returns true if ANY active roster row for this request carries
+  `enrichedProposalKey === proposalKey` and `isApplicantRecommended`, and the effect
+  then short-circuits to `recPhase='done'` WITHOUT re-running enrichment
+  (`ReviewerSearchSection.js:805-808`). Because the roster is durable Postgres
+  (`reviewer_find_roster`, keyed `(request_id, normalized_name)`), once a PD has
+  enriched once, later fixes to the underlying `wmkf_potentialreviewerses` person
+  records — renames, added affiliation/email — are NEVER re-surfaced: the finder keeps
+  serving the stale cached rows. There is no UI to force a re-run (the cache reads
+  "done", so the error-only "Try again" button never appears). This is what makes the
+  digit-collapse above un-self-healing: renaming the colliding people didn't help until
+  the stale rows were cleared. Manual fix (prod Postgres write): delete this request's
+  applicant rows so the cache invalidates and the next Find-tab load re-enriches —
+  `DELETE FROM reviewer_find_roster WHERE request_id = '<akoya_requestid>' AND
+  source_kind = 'applicant_suggested';` (leaves the legit proposal_named /
+  literature_retrieved search rows intact). Real fix (backlog): invalidate or re-enrich
+  applicant roster rows when the source person record changes, or expose a manual
+  "re-enrich recommended" control.
 - Roster reload must preserve fields that keep deferred/unresolved/conflicted rows non-selectable.
 - Cross-run dedup is durable; do not casually drop carryover.
 - Reviewer removal/reset behavior often spans UI state, roster store, and Dataverse suggestion state.
