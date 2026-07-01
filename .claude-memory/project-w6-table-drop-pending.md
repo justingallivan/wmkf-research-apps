@@ -26,9 +26,7 @@ Do not:
 
 Ground truth: `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` (post-pilot row §801), `docs/atlas/postgres-researchers.md`, `docs/atlas/postgres-other-reviewer-tables.md`. Related: [[project-reviewer-postgres-to-dataverse-migration]].
 
-**Trigger:** any session that starts on or after **2026-07-01**, while these tables still exist in Postgres.
-
-If the current date is past that threshold and the tables still exist, surface this as a P0 start-of-session item alongside the rest of the `/start` digest. Do NOT silently proceed with other work — the user is likely expecting this to come up.
+**Trigger — SATISFIED / DO NOT RE-FIRE.** The original trigger was "any session on/after 2026-07-01 **while these tables still exist in Postgres**." The tables no longer exist — they were dropped 2026-06-04 (S219) via migration 018, so the "still exist" precondition is false and the trigger is closed. A stale calendar reminder for 2026-07-01 may still fire externally; if it does, this is already DONE — do NOT surface it as a P0 item or run the historical checklist below. (If you hit this and want to confirm: `ls lib/db/migrations/018_drop_reviewer_finder_postgres_tables.sql` and the DROPPED banners in `docs/atlas/postgres-researchers.md` / `postgres-reviewer-suggestions.md`.)
 
 **Why deferred (decided 2026-05-12, Session 147):** Plan §799 originally specified a dry-run cleanup cron + restore script. Codex recommended deferring per the Wave 1 precedent — Wave 1's drain-only tables (`system_settings`, `user_app_access`, `user_preferences`) were dropped with a one-shot DELETE on 2026-05-12 without ceremony, and it worked. Building a cron that sits in dry-run during an active pilot is maintained surface for noise nobody reads. The actual deletion path is short enough to write at table-drop time with the row format in front of you.
 
