@@ -50,6 +50,16 @@ const FIELD_LABELS = {
 const fieldLabel = (f) => FIELD_LABELS[f] || f;
 const showValue = (v) => (isSet(v) ? String(v) : '—');
 
+// Main institution mirrors the reviewer accept-form prefill (context.js
+// buildStage2aPrefill): fall back to the enrichment affiliation when the
+// dedicated wmkf_maininstitution column is empty, so staff see the same value
+// the reviewer will (Affiliation is wmkf_primaryaffiliation ‖ organizationname
+// in the DTO). Used as BOTH the prefill and the change-comparison baseline, so
+// merely opening + saving never writes the affiliation into the dedicated
+// column — only a genuine staff edit persists.
+const mainInstitutionFallback = (candidate) =>
+  (candidate?.mainInstitution || candidate?.affiliation || '');
+
 // Orientation-aware default for the merge field picker (S289 chunk-4 §Field-picker).
 // All fields default to 'keeper'; the EMAIL field defaults to whichever side
 // currently OWNS the conflict-target value (the address the staffer was setting),
@@ -99,7 +109,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
         website: candidate.website || '',
         academicRank: candidate.academicRank || '',
         primaryDepartment: candidate.primaryDepartment || '',
-        mainInstitution: candidate.mainInstitution || '',
+        mainInstitution: mainInstitutionFallback(candidate),
       });
       setError(null);
       setIdentityConfirmed(false);
@@ -154,7 +164,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
       // modes, so these never differ there). Only changed fields are sent.
       if (formData.academicRank !== (candidate.academicRank || '')) updates.academicRank = formData.academicRank;
       if (formData.primaryDepartment !== (candidate.primaryDepartment || '')) updates.primaryDepartment = formData.primaryDepartment;
-      if (formData.mainInstitution !== (candidate.mainInstitution || '')) updates.mainInstitution = formData.mainInstitution;
+      if (formData.mainInstitution !== mainInstitutionFallback(candidate)) updates.mainInstitution = formData.mainInstitution;
 
       if (Object.keys(updates).length === 0) {
         onClose();
