@@ -93,6 +93,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [edits, setEdits] = useState({}); // suggestionId -> { subject?, body? } user overrides
   const [timing, setTiming] = useState({ respondOffsetDays: 7, proposalSendDate: '', reviewDueDate: '' });
   const [template, setTemplate] = useState(EMPTY_TEMPLATES.invitation); // resolved invitation template (admin default + per-PD override), loaded on open
+  const [templateLoaded, setTemplateLoaded] = useState(false); // gate the first render until the template load settles (see renderPreviews) — the initial `template` is the EMPTY skeleton
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState({ current: 0, total: 0, message: 'Rendering previews…' });
   const [results, setResults] = useState({ sent: [], failed: [], skipped: [] });
@@ -141,6 +142,13 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
         const tpl = await loadEmailTemplates();
         if (!cancelled && tpl?.invitation) setTemplate(tpl.invitation);
       } catch { /* falls back to the default invitation template */ }
+      finally {
+        // Mark the load settled (success or failure) so renderPreviews can fire.
+        // Until this flips, the first render is suppressed — otherwise it POSTs the
+        // EMPTY skeleton template and render-emails 400s ("template with subject and
+        // body is required"), flashing that error until the real template lands.
+        if (!cancelled) setTemplateLoaded(true);
+      }
     })();
     return () => { cancelled = true; };
   }, [requestId]);
@@ -151,6 +159,11 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   // overwrite a newer one's drafts.
   const renderGenRef = useRef(0);
   const renderPreviews = useCallback(async () => {
+    // Wait for the template load to settle before the first render — rendering with
+    // the initial EMPTY skeleton trips the render-emails 400 guard and flashes it
+    // until the real template lands. Once loaded, the effect re-fires (templateLoaded
+    // is in the deps below) with the resolved template.
+    if (!templateLoaded) return;
     const gen = ++renderGenRef.current;
     setError(null); setRawDrafts([]);
     setProgress({ current: 0, total: suggestionIds.length, message: 'Rendering previews…' });
@@ -173,7 +186,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
       if (gen !== renderGenRef.current) return;
       setError(e.message);
     }
-  }, [suggestionIds, settings.signature, template]);
+  }, [suggestionIds, settings.signature, template, templateLoaded]);
 
   // Render previews on open and again if the loaded template differs from the
   // default (renderPreviews identity changes when `template` updates).
