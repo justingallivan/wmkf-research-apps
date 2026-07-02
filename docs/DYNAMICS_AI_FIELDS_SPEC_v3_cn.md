@@ -50,7 +50,7 @@ One row per AI processing run. Serves as an audit trail and replay cache. Both V
 | `wmkf_ai_rawoutput` | Multi-line text (JSON) | Full structured payload from Claude |
 | `wmkf_ai_notes` | Multi-line text | Failure messages, retry context |
 
-**Dynamics Explorer note:** This table should be excluded from search results and schema suggestions in the chat tool. It's an operational log, not business data. Justin will handle this on the app side once the table exists.
+**Dynamics Explorer note:** This table is excluded from search results and schema suggestions in the chat tool. It's an operational log, not business data; `pages/api/dynamics-explorer/chat.js` denies direct schema requests for `wmkf_ai_run` and strips returned `wmkf_ai_run` search hits before the tool result is sent back to Claude.
 
 ---
 

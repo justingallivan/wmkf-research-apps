@@ -11,6 +11,7 @@ const mockQueryRecords = jest.fn();
 const mockCountRecords = jest.fn();
 const mockAggregateRecords = jest.fn();
 const mockQueryAllRecords = jest.fn();
+const mockSearchRecords = jest.fn();
 const mockResolveEntitySetName = jest.fn();
 const mockGetEntityAttributes = jest.fn();
 const mockBuildResolvedTaxonomyPromptBlock = jest.fn(() => Promise.resolve('resolved taxonomy'));
@@ -70,6 +71,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({
     countRecords: (...args) => mockCountRecords(...args),
     aggregateRecords: (...args) => mockAggregateRecords(...args),
     queryAllRecords: (...args) => mockQueryAllRecords(...args),
+    searchRecords: (...args) => mockSearchRecords(...args),
     getEntityAttributes: (...args) => mockGetEntityAttributes(...args),
   },
 }));
@@ -136,6 +138,11 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
       ],
       count: 1,
       totalCount: 1,
+    });
+    mockSearchRecords.mockResolvedValue({
+      results: [],
+      totalCount: 0,
+      queryContext: {},
     });
 
     mockStream
@@ -361,6 +368,48 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     // path (they were replaced by the resolved-taxonomy block in A2).
     expect(toolResult).not.toContain('100000001');
     expect(toolResult).toContain('SERVER-SIDE RESOLVED TAXONOMY');
+  });
+
+  test('describe_table denies the operational AI run table before live metadata fetch', async () => {
+    mockGetEntityAttributes.mockClear();
+    mockStream
+      .mockReset()
+      .mockResolvedValueOnce({
+        content: [
+          {
+            type: 'tool_use',
+            id: 'tool-1',
+            name: 'describe_table',
+            input: { table_name: 'wmkf_ai_run', full: true },
+          },
+        ],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      })
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'Denied.' }],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      });
+
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'describe ai run fields' }] },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(mockGetEntityAttributes).not.toHaveBeenCalled();
+    const secondCall = mockStream.mock.calls[1][0];
+    const toolResultMessage = secondCall.messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    );
+    const toolResult = toolResultMessage.content[0].content;
+    expect(toolResult).toContain('DENIED');
+    expect(toolResult).toContain('operational AI audit log');
   });
 
   test('describe_table full:true omits field-restricted live metadata', async () => {
@@ -607,5 +656,62 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     expect(toolResult).toContain('DENIED');
     expect(toolResult).toContain('wmkf_secret');
     expect(toolResult).toContain('restricted');
+  });
+
+  test('search strips operational AI run hits returned by Dataverse Search', async () => {
+    mockSearchRecords.mockResolvedValueOnce({
+      results: [
+        {
+          entity: 'wmkf_ai_run',
+          objectId: 'run-1',
+          attributes: { wmkf_ai_rawoutput: 'SHOULD_NOT_REACH_CLAUDE' },
+          highlights: { wmkf_ai_rawoutput: ['SHOULD_NOT_REACH_CLAUDE'] },
+        },
+        {
+          entity: 'akoya_request',
+          objectId: 'req-1',
+          attributes: {
+            akoya_requestnum: '1001234',
+            akoya_applicantidname: 'Visible University',
+            akoya_title: 'Visible grant',
+          },
+          highlights: { akoya_title: ['Visible grant'] },
+        },
+      ],
+      totalCount: 2,
+      queryContext: {},
+    });
+    mockStream
+      .mockReset()
+      .mockResolvedValueOnce({
+        content: [
+          { type: 'tool_use', id: 'tool-1', name: 'search', input: { search: 'summary' } },
+        ],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      })
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'Found visible result.' }],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      });
+
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'search summary' }] },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    const toolResult = mockStream.mock.calls[1][0].messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    ).content[0].content;
+    expect(toolResult).toContain('Visible University');
+    expect(toolResult).toContain('Visible grant');
+    expect(toolResult).not.toContain('wmkf_ai_run');
+    expect(toolResult).not.toContain('SHOULD_NOT_REACH_CLAUDE');
   });
 });

@@ -275,7 +275,7 @@ Every Execution writes one `wmkf_ai_run` row with, at minimum:
 | `wmkf_ai_rawoutput` | Claude response according to `rawOutputRetention` (`full`, `hash`, or `none`) |
 | `wmkf_ai_request` | Lookup to `akoya_request` (if applicable) |
 | `wmkf_ai_notes` | Input/output token counts + cache hit counts + any error summary |
-| `wmkf_ai_rundatetime` | Set by caller or default to now |
+| `createdon` | Built-in Dataverse creation timestamp for the run row. Do not write vestigial `wmkf_ai_rundatetime`. |
 
 ---
 

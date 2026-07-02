@@ -63,6 +63,7 @@ const MAX_RESULT_CHARS = 16000;
 // the AI export pass. Generous — a 15-record batch of serialized rows — but
 // finite so a runaway payload cannot ride through unbounded.
 const DYNEXP_EXPORT_MAX_CHARS = 500_000;
+const OPERATIONAL_LOG_TABLES = new Set(['wmkf_ai_run', 'wmkf_ai_runs']);
 
 // Per-tool char limits — composite tools return compact text and need more room
 const TOOL_CHAR_LIMITS = {
@@ -477,6 +478,10 @@ function applyActiveOnlyFilter(userFilter, includeInactive) {
   return userFilter ? `(${userFilter}) and ${active}` : active;
 }
 
+function isOperationalLogTable(tableName) {
+  return OPERATIONAL_LOG_TABLES.has(String(tableName || '').trim().toLowerCase());
+}
+
 async function executeTool(name, input, sendEvent, userProfileId, restrictions = []) {
   switch (name) {
     case 'search':
@@ -585,6 +590,12 @@ async function executeTool(name, input, sendEvent, userProfileId, restrictions =
 }
 
 async function validateEffectiveODataCall(name, input, restrictions) {
+  if (isOperationalLogTable(input?.table_name)) {
+    return {
+      reject: 'DENIED: wmkf_ai_run is an operational AI audit log, not business data. '
+        + 'Dynamics Explorer does not expose it through natural-language queries.',
+    };
+  }
   return await validateODataCall(name, input, {
     tableAnnotations: TABLE_ANNOTATIONS,
     getEntityAttributes: tableName => DynamicsService.getEntityAttributes(tableName),
@@ -776,6 +787,12 @@ async function describeTable({ table_name, full = false }, restrictions = []) {
       tables: tables.join('\n'),
       count: tables.length,
       note: 'All annotated tables listed above. Call with a specific table_name for field details, including live Dataverse fields.',
+    };
+  }
+  if (isOperationalLogTable(table_name)) {
+    return {
+      error: 'DENIED: wmkf_ai_run is an operational AI audit log, not business data. '
+        + 'Dynamics Explorer does not expose it through schema suggestions.',
     };
   }
 
@@ -2339,12 +2356,25 @@ async function findReportsDue({ date_from, date_to, include_inactive }) {
  * Full-text search across all indexed Dynamics tables.
  */
 async function searchRecords({ search, entities, top }) {
+  const requestedEntities = Array.isArray(entities)
+    ? entities.filter(entity => !isOperationalLogTable(entity))
+    : entities;
+  if (Array.isArray(entities) && requestedEntities.length === 0) {
+    return {
+      totalCount: 0,
+      query: search,
+      message: 'No results found. Operational AI audit logs are not exposed in Dynamics Explorer.',
+    };
+  }
+
   const result = await DynamicsService.searchRecords(search, {
-    entities,
+    entities: requestedEntities,
     top: top || 20,
   });
+  const visibleResults = result.results.filter(r => !isOperationalLogTable(r.entity));
+  const hiddenResultCount = result.results.length - visibleResults.length;
 
-  if (!result.results.length) {
+  if (!visibleResults.length) {
     return {
       totalCount: 0,
       query: result.queryContext?.alteredquery || search,
@@ -2354,7 +2384,7 @@ async function searchRecords({ search, entities, top }) {
 
   // Group results by entity for readable output
   const byEntity = {};
-  for (const r of result.results) {
+  for (const r of visibleResults) {
     if (!byEntity[r.entity]) byEntity[r.entity] = [];
     byEntity[r.entity].push(r);
   }
@@ -2401,9 +2431,9 @@ async function searchRecords({ search, entities, top }) {
   }
 
   return {
-    totalCount: result.totalCount,
+    totalCount: hiddenResultCount > 0 ? visibleResults.length : result.totalCount,
     query: result.queryContext?.alteredquery || search,
-    nextStepHint: (!entities?.length || entities.includes('akoya_request'))
+    nextStepHint: (!requestedEntities?.length || requestedEntities.includes('akoya_request'))
       ? 'If the user asked for files/documents and a listed request looks plausible, call list_documents with that request number now instead of running more broad searches.'
       : undefined,
     results: sections.join('\n\n'),

@@ -43,7 +43,7 @@
 - `wmkf_ai_Request@odata.bind` → `akoya_request` (which grant request was processed)
 Both written by `execute-prompt.js` `writeRunRow()`. Migration plans touching either entity must preserve these foreign keys.
 
-**Migration disposition:** stays in Dataverse. No Postgres counterpart. Per `project_dynamics_ai_writeback.md`: Justin owes the Dynamics Explorer schema-curation pass to **exclude `wmkf_ai_run` from search results + schema suggestions** — it's an operational log, not business data.
+**Migration disposition:** stays in Dataverse. No Postgres counterpart. Dynamics Explorer treats `wmkf_ai_run` as an operational log, not business data: `pages/api/dynamics-explorer/chat.js` denies direct schema requests for the table and strips `wmkf_ai_run` hits from Dataverse Search results before tool output reaches Claude.
 
 ## `wmkf_ai_prompt` (11 rows)
 
