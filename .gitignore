@@ -56,6 +56,8 @@ outputs/
 # Cron scheduler runtime state (session-scoped)
 .claude/scheduled_tasks.json
 .claude/scheduled_tasks.lock
+# Per-machine git worktrees created by the harness (e.g. parked reusable worktrees)
+.claude/worktrees/
 # Smoke-test helper state (live prod GUIDs + tester email — never commit)
 scripts/.smoke-test-candidate.json
 scripts/.grantee-smoke-deliverable.json

@@ -1,142 +1,142 @@
-# Session 314 Prompt: (open — pick from Next Items)
+# Session 315 Prompt: (open — pick from Next Items)
 
-## Session 313 Summary
+## Session 314 Summary
 
-Docs/memory hygiene session. No feature or app code shipped. Restored MEMORY.md router
-headroom (it was ~364 B from the hard cap and nagging every startup) and refocused the
-stale ground-truth remediation doc. A worktree was opened for Codex to do the memory work,
-but the `codex:codex-rescue` sandbox could not write the sibling worktree dir, so the edits
-fell to Claude in-checkout (new durable fact captured).
+Two parallel streams on `main`, disjoint file sets, merged cleanly:
+- **Claude (isolated worktree):** designed + drafted the **honorarium portal-creation
+  strategy** for the no-BILL cycle — our app becomes the sole creator of reviewer
+  honorarium `akoya_request`s. Verified against live prod Dataverse (read probes + one
+  authorized `$1` sentinel create/read/delete, cleaned up + confirmed gone in AkoyaGO).
+- **Codex (main tree):** continued **memory hygiene** — code-grounded the reviewer-identity
+  memories, built a memory cleanup queue + Dynamics memory trim package with audit docs,
+  reconciled the Dynamics AI-run docs / Explorer guard, and touched
+  `pages/api/dynamics-explorer/chat.js`. *(Summarized secondhand from commits + the
+  `docs/audits/*-2026-07-02.md` files, not from Codex's session context — read those for
+  detail.)*
 
-### What Was Completed
+### What Was Completed (Claude — honorarium)
 
-1. **Memory-router hygiene** (`e4a53538`, merged `1093492d`). `.claude-memory/MEMORY.md`
-   was 11,924 / 12,288 B — within ~364 B of the hard cap and tripping the per-session
-   pressure warning. Consolidated same-target/same-domain router lines (Dataverse-dynamics
-   2→1, security-auth 2→1, strategy-roadmap 2→1 folding in Virtual Review Panel;
-   prompt-executor+governance and finance-honoraria+honorarium-landscape merged) and
-   trimmed redundant parentheticals whose detail already lives in the pointed-to
-   leaf/wiki/build-plan files. **Result: 11,255 B / 100 lines (was 11,924 / 105) — 669 B
-   cut, under the 11,264 B early-warning band.** No slugs dropped; `check:memory-router`
-   confirms all links resolve. Byte budget is a property of the router file ONLY — leaf→wiki
-   moves don't help it, so the fix was purely shrinking MEMORY.md.
-2. **New durable fact captured** in `reference-codex-rescue-plan-task-runs-readonly.md`:
-   the `codex:codex-rescue` sandbox's writable root is the MAIN checkout, so it CANNOT
-   write to a sibling git worktree dir (`../WMKF_Apps-codex` → "Operation not permitted").
-   The `parallel-agent-worktree` pattern therefore does NOT work through the rescue agent —
-   launch Codex natively in the worktree, or do the edits in-checkout.
-3. **Refocused `docs/CLAUDE_REMEDIATION_PLAN.md`** (`fc3d3e9a`, pushed). The doc (created
-   S136, 2026-05-07) still read as a mid-crisis plan to BUILD the Atlas + its CI gate +
-   the CLAUDE.md rules — all shipped weeks ago — fronted by a large S136 re-litigation
-   table. Rewrote (175→58 lines): enduring ground-truth operating rules up front
-   (probe-before-plan + labels, no-"is-X"-without-checking, commit probe scripts, memory
-   hygiene, adjacent-context survey, active doubt, stale-page re-probe), a "Build-out status
-   (shipped)" table, and a condensed dated historical origin note (full log in git history).
-   Verified first that CLAUDE.md Rule #1 still *defers* to this doc and most of its rules
-   live ONLY here — so it was rewritten, not retired. File path + headings unchanged → the
-   ~18 inbound references still resolve.
+1. **New strategy doc `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`** — the source of
+   truth. Portal is sole creator via the existing `ensureHonorariumOnboarding` pipeline
+   with BILL deferred; reviewers no longer self-register through GoApply. Covers the
+   verified create-body spec (set vs. auto-populated), the config flip, contact linkage,
+   proposal linkage (Options A/C), and a schema-change tracker for Connor.
+2. **Drafted create-body changes** (`lib/bill/honorarium-onboard-orchestrator.js`,
+   `lib/bill/honorarium-discriminators.js`, `tests/unit/honorarium-onboard-orchestrator.test.js`;
+   33/33 green). Fixed a **latent nav-casing bug** (`akoya_ProgramId`→`akoya_programid`,
+   `akoya_PrimaryContactId`→`akoya_primarycontactid`) that would have 400'd the first real
+   create; added the missing fields (all-three amounts, `akoya_requesttype`=Scholarship,
+   derived `akoya_fiscalyear`, reminder-flags-off, proposal-referencing `akoya_title`);
+   left `akoya_requestsource`/`akoya_requeststatus` to verified auto-population.
+   **⚠️ DRAFT, config-gated, NOT live — nothing creates until the env flip.**
+
+### Commits (Session 314, `0ec28d33..cd82c405`)
+- `cd82c405` — Draft: honorarium create-body changes (Claude)
+- `05d0a3f5` — Proposal-linkage design + schema tracker (Claude)
+- `258341db` — Contact-linkage note (Claude)
+- `0294d7f1` — Honorarium strategy doc (Claude)
+- `de58be96` `1036c07c` `711f459e` `054ea96c` `1ab9c0ed` `4af56809` — memory hygiene / Dynamics (Codex)
 
 ### Worktree state
-- `../WMKF_Apps-codex` is **parked** on `codex/parked` at `1093492d` (kept with its
-  `node_modules` + symlinks for reuse). `codex/memory-hygiene` branch deleted post-merge.
-
-### Commits
-- `e4a53538` — Memory hygiene: restore MEMORY.md router headroom (S313)
-- `fc3d3e9a` — Refocus CLAUDE_REMEDIATION_PLAN on live rules; mark build-out shipped
-- `1093492d` — Merge memory hygiene (no-ff)
+- **`.claude/worktrees/claude-parked`** on `claude/parked` at `cd82c405` — **parked for
+  reuse** with `node_modules` + symlinks (`.env.local`, `.agents/skills`, harness memory
+  slug). To reuse next Claude session: reset to `main` and branch fresh.
+- `../WMKF_Apps-codex` parked on `codex/parked` at `1093492d` (Codex's).
 
 ## Next Items
 
-### Verify Before Acting
+### Verified Open (honorarium — this session)
 
-1. **Confirm 1003125 now shows all 5 renamed applicant reviewers.** The roster cache was
-   cleared in S312; the fix still needs a real check. Have Duncan **reload the Find tab** on
-   1003125 (proposal must be loaded) — expect Kevin Turing / Kyle Worming / Shultzie Spore /
-   Harry Ewing / William Harrison in the Applicant-suggested section (distinct names → no
-   collapse). Evidence: S312 roster delete; `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`.
-2. **Other D26 requests may have been missed by the triage backfill** (like 1003125 was).
-   Offered but NOT run: a read-only sweep of D26 `akoya_requests` that are `triage=null` and
-   not `Phase II Pending` (invisible on the dashboard). Evidence: `pages/api/workbench/dashboard.js:166`.
+1. **Config flip to turn honorarium creation on.** `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §2.
+   Set the 3 discriminator GUIDs, unset `HONORARIUM_ONBOARDING_DEFERRED`, set
+   `BILL_ONBOARDING_DEFERRED=true`, set `honorarium.default_amount`. Code draft is ready
+   and gate-clean; this is the go-live gate.
+2. **Connor — GoApply-linkage question** (doc §7). **Sent 2026-07-01, awaiting reply.**
+   Does any payment/folio/Ops view require the `akoya_goapplyapplication/phase/submitter`
+   lookups (absent on app-created rows)?
+3. **Connor — honorarium→proposal self-lookup schema change** (doc §8/§9). Proposed
+   `wmkf_relatedproposal` (`akoya_request → akoya_request`); Connor OK in principle, tracked
+   in doc §9 for his end-of-work update. Once added: uncomment the TODO in the orchestrator
+   create body and **confirm the exact nav-property casing from live metadata** first.
+4. **Memory reconcile (hand to Codex).** `[[project-honorarium-payment-landscape]]` and
+   `docs/agent-wiki/topics/finance-honoraria.md` still describe the pre-decision
+   "capture-only / BILL-not-integrating" state — reconcile to reference the new strategy
+   doc + the "app is sole creator" decision. Claude deferred all durable-memory writes this
+   session (Codex owns memory hygiene).
 
-### Verified Open
+### Verify Before Acting (carried from S313 — re-verify before acting)
 
-1. **Applicant-suggested roster cache-staleness gap (product fix).** Editing/renaming an
-   applicant reviewer after the first enrichment silently won't reflect — the durable roster
-   cache blocks re-enrichment and there's no UI to force it. Real fix: invalidate/re-enrich
-   applicant roster rows when the source person record changes, or expose a manual "re-enrich
-   recommended" control. Evidence: `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`
-   (Operating Notes, S312); `reviewer-search-logic.js:123`.
+1. **Confirm 1003125 shows all 5 renamed applicant reviewers** after the S312 roster cache
+   clear. Have Duncan reload the Find tab. Evidence:
+   `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`.
+2. **Other D26 requests may have been missed by the triage backfill.** Offered, not run: a
+   read-only sweep of D26 `akoya_requests` that are `triage=null` and not `Phase II Pending`.
+   Evidence: `pages/api/workbench/dashboard.js:166`.
+
+### Verified Open (carried from S313)
+
+1. **Applicant-suggested roster cache-staleness (product fix).** Editing an applicant
+   reviewer after first enrichment won't reflect. Evidence:
+   `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`; `reviewer-search-logic.js:123`.
 2. **Reviewer-materials attach-and-verify build (option 2).** Design captured (`a84e5f8b`),
-   not built: staff "attach reviewer materials" action backed by a Dataverse link entity +
-   queryable "materials attached ✓" state; keep the folder-walk as a transition fallback.
-   Evidence: `docs/agent-wiki/topics/external-reviewer-portal.md` (design-direction note).
-3. **Bracket-alias cleanup PR (email templates).** S311 left the System-B resolvers
-   DUAL-SYNTAX (accept `[x]` and `{{x}}`) for a soak. After confidence, drop the legacy
-   `[bracket]` aliases. Do NOT remove before greenlit — intentional, not dead code. Verified
-   S312: 0 per-user prefs still carry brackets (`scripts/probe-user-email-token-syntax.mjs`).
-   Evidence: `docs/EMAIL_TOKEN_SYNTAX_UNIFICATION_PLAN.md` §5; `[[project-email-template-token-syntax]]`.
-4. **Surface the 3 board-identity fields on Track Reviewers (read-only) + Excel export.**
-   Carried S308→S313, still NOT built. `my-candidates` DTO emits
-   `academicRank`/`primaryDepartment`/`mainInstitution` (`my-candidates.js:214-216`) and
-   `CandidateEditModal` edits them, but Track Reviewers cards + the workbook don't show them.
-   Evidence: `docs/REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md` §C step 9.
-5. **Optional invite-modal follow-up: collapse the campaign-timeline block** into a
-   `<details>` for more message-body room. Offered S310, not greenlit. Low effort.
-   Evidence: `shared/components/reviewers/InviteEmailModal.js` (timeline block ~L294-319).
+   not built. Evidence: `docs/agent-wiki/topics/external-reviewer-portal.md`.
+3. **Bracket-alias cleanup PR (email templates).** Drop legacy `[bracket]` aliases after
+   soak — do NOT remove before greenlit. Evidence:
+   `docs/EMAIL_TOKEN_SYNTAX_UNIFICATION_PLAN.md` §5; `[[project-email-template-token-syntax]]`.
+4. **Surface 3 board-identity fields on Track Reviewers (read-only) + Excel export.**
+   Carried S308→S314, not built. Evidence:
+   `docs/REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md` §C step 9.
+5. **Invite-modal: collapse campaign-timeline block into `<details>`.** Low effort, not
+   greenlit. Evidence: `shared/components/reviewers/InviteEmailModal.js` (~L294-319).
 6. **Reviewer nice-to-haves #4 & #5 unbuilt.** #4 reviewer-memory flag + searchable notes;
-   #5 controlled expertise-tag taxonomy / editable tags (free-text export shipped S308).
-   Evidence: `docs/REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md` §4, §5.
-7. **Optional `wmkf_firstname` trailing-whitespace second pass.** Low-priority hygiene; the
-   `wmkf_name` cleanup did NOT cover it. Note: the 1003125 test reviewers have leading/trailing
-   spaces in `wmkf_name` (e.g. `" Kevin Turing "`) — cosmetic (normalization trims). Evidence:
+   #5 controlled expertise-tag taxonomy. Evidence:
+   `docs/REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md` §4, §5.
+7. **Optional `wmkf_firstname` trailing-whitespace pass.** Low-priority hygiene. Evidence:
    `docs/agent-wiki/topics/dataverse-dynamics.md`.
 
-### Owner Decision Needed
+### Owner Decision Needed (carried from S313)
 
-1. **Writeup-generator tab + reviewer-database browse.** On the docket (S308); board-identity
-   fields feed them. Needs scope/prioritization. Evidence: `.claude-memory/project-workbench-consolidation-rollout.md`.
-2. **Remit-flag on review-completion** — wire `wmkf_authorizationtoremitpaymentflag` on submit?
-   Carried S304/S305. Evidence: `.claude-memory/project-honorarium-payment-landscape.md`.
+1. **Writeup-generator tab + reviewer-database browse.** Needs scope/prioritization.
+   Evidence: `.claude-memory/project-workbench-consolidation-rollout.md`.
+2. **Remit-flag on review-completion** — wire `wmkf_authorizationtoremitpaymentflag` on
+   submit? Now intersects the honorarium strategy (doc §3b tracks the flag). Evidence:
+   `.claude-memory/project-honorarium-payment-landscape.md`.
 
-### Parked
+### Parked (carried from S313)
 
-1. **Honorarium payment pipeline enablement.** Capture-only in prod (S309):
-   `HONORARIUM_ONBOARDING_DEFERRED` + 3 discriminator GUIDs absent force `isCaptureOnly()`.
-   Re-open trigger: leadership decision. Evidence: `lib/bill/honorarium-onboard-orchestrator.js:47-56`.
+1. **Honorarium payment pipeline enablement.** Capture-only in prod
+   (`HONORARIUM_ONBOARDING_DEFERRED` + 3 GUIDs absent). Re-open trigger: leadership decision.
+   Note: the S314 strategy addresses request *creation*, not payment — payment stays
+   offline. Evidence: `lib/bill/honorarium-onboard-orchestrator.js`; doc §1.
 2. Longer carried list (BILL API access, PNI self-report, workbench access boundaries,
-   applicant-exclusion, Dataverse settings audit, nomenclature/app-sunset sweep).
-   Re-open trigger: owner prioritization. Evidence: `.claude-memory/MEMORY.md` router.
+   applicant-exclusion, Dataverse settings audit, nomenclature/app-sunset sweep). Re-open
+   trigger: owner prioritization. Evidence: `.claude-memory/MEMORY.md` router.
 
-### Do Not Reopen Without New Decision
+### Do Not Reopen Without New Decision (carried from S313)
 
-1. **The digit-stripping name normalization is load-bearing (S312).** `normalizeReviewerName`
-   / `normalizeName` strip non-alpha incl. digits by design (stable keying for the roster
-   unique index, the person `normalizedName` column, excluded-name matching). Don't "fix" the
-   regex; a real same-name-collision fix means keying dedup on name + an identity anchor.
-   Evidence: `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` (Operating Notes).
-2. **thankyou email has NO secure-link button (S311).** No fallback label → button suppressed
-   (a body with a review link renders a plain link). Intentional. Evidence:
-   `pages/api/review-manager/send-emails.js` `DEFAULT_REVIEW_BUTTON_LABELS`; `3817944e`.
-3. **`{{proposalTitle}}` vs `{{proposalClause}}` are distinct (S311).** Bare title vs full
-   null-safe clause. Don't "consolidate." Evidence: `[[project-email-template-token-syntax]]`.
-4. **Email template dual-syntax `[bracket]` aliases are intentional (S311), not dead code.**
-   Don't remove until the cleanup PR (Verified Open #3) is greenlit.
-5. **h-index is NOT staff-editable in edit modals (S310).** Server route still accepts `hIndex`
-   from other callers — intentional. Evidence: `CandidateEditModal.js`; `204086ec`.
+1. **Digit-stripping name normalization is load-bearing (S312).** Evidence:
+   `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`.
+2. **thankyou email has NO secure-link button (S311).** Intentional. Evidence:
+   `pages/api/review-manager/send-emails.js`; `3817944e`.
+3. **`{{proposalTitle}}` vs `{{proposalClause}}` are distinct (S311).** Evidence:
+   `[[project-email-template-token-syntax]]`.
+4. **Email template dual-syntax `[bracket]` aliases are intentional (S311).**
+5. **h-index is NOT staff-editable in edit modals (S310).** Evidence:
+   `CandidateEditModal.js`; `204086ec`.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `.claude-memory/MEMORY.md` | Router; 11,255 B, ~1KB headroom. Byte budget is the router file only — route new domain detail to `docs/agent-wiki/topics/`, not new router lines. |
-| `docs/CLAUDE_REMEDIATION_PLAN.md` | Ground-truth operating rules (rewritten S313); CLAUDE.md Rule #1 defers here. |
-| `.claude-memory/reference-codex-rescue-plan-task-runs-readonly.md` | codex:codex-rescue sandbox limits — read-only-at-launch + can't write sibling worktree dirs. |
-| `pages/api/workbench/dashboard.js` | PD dashboard feed; visibility = `Phase II Pending` OR `triage=Advancing` (`:166`). |
-| `shared/components/reviewers/reviewer-search-logic.js` | `hasValidApplicantEnrichmentCache` (`:123`); `normalizeReviewerName` re-export. |
-| `lib/services/reviewer-roster-store.js` | Durable `reviewer_find_roster` (Postgres), keyed `(request_id, normalized_name)`. |
+| `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` | Honorarium portal-creation source of truth (S314): create-body spec, config flip, schema tracker, open Connor items. |
+| `lib/bill/honorarium-onboard-orchestrator.js` | Drafted create body (nav-casing fix + fields). Config-gated; not live. |
+| `lib/bill/honorarium-discriminators.js` | Discriminator GUIDs + new `HONORARIUM_AKOYA_REQUEST_TYPE_SCHOLARSHIP`, optional `HONORARIUM_CURRENCY_ID`. |
+| `docs/audits/*-2026-07-02.md` | Codex's S314 memory-hygiene audit trail. |
+| `.claude/worktrees/claude-parked` | Parked reusable Claude worktree (node_modules + symlinks). |
 
 ## Testing
 
 ```bash
-npm test   # full suite (283 suites / 3571 tests green as of S311; only docs/memory changes since)
+npm test   # full suite; honorarium orchestrator unit suite 33/33 green as of S314
+npx jest tests/unit/honorarium-onboard-orchestrator.test.js
 ```
