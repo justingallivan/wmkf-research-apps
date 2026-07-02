@@ -203,26 +203,27 @@ than write a malformed row (do not silently omit).
 
 ## 6. Rollout
 
-- **Before using the backfill, patch two script-readiness gaps.** The portal accept
-  path requires `line1`, `city`, `postalCode`, `country`, and `phone` on fresh
-  non-opt-out accepts, but the backfill currently only skips when the reconstructed
-  contact address has zero fields. It must apply the same completeness check before
-  minting a request from a historical contact row, because the original contact
-  address PATCH was best-effort/non-fatal. `[VERIFIED via source 2026-07-01]`
-- The backfill's `REQUEST_SELECT` must include `akoya_title` before execution, so
-  `deriveHonorariumTitle(request)` can produce
-  `"Reviewer honorarium — <proposal title> (#num)"` for backfilled rows. The live
-  portal token verifier already selects `akoya_title`; the backfill reload shape
-  currently selects only `akoya_requestid`, `akoya_requestnum`, and
-  `wmkf_meetingdate`. `[VERIFIED via source 2026-07-01]`
+- **The two script-readiness hardening edits are LANDED (S316, 2026-07-02).**
+  `[VERIFIED via source 2026-07-02]`
+  - **Required-address completeness.** The portal accept path requires `line1`,
+    `city`, `postalCode`, `country`, and `phone` on fresh non-opt-out accepts. Both
+    that guard and the backfill now share one presence check,
+    `missingRequiredAddressFields` in `lib/external/required-address.js`; the backfill
+    skips (leaving the row eligible) unless the reconstructed contact address passes
+    it, not just when it is entirely empty — the accept-time contact-address PATCH was
+    best-effort/non-fatal, so historical rows can be partial.
+  - **Proposal title.** The backfill's `REQUEST_SELECT` now includes `akoya_title`, so
+    `deriveHonorariumTitle(request)` produces
+    `"Reviewer honorarium — <proposal title> (#num)"` for backfilled rows, matching the
+    live portal token verifier.
+  - Coverage: `tests/unit/required-address.test.js` (shared check, incl. the partial-address
+    case) and `tests/unit/respond-required-address.test.js` (route re-export).
 - Reviewers who accepted while capture-only was on will **not** re-accept, so their
   honoraria were never minted. After the config flip, mint them with
-  `scripts/backfill-honorarium-capture-only.mjs --cycle <CODE>`, but only after the
-  two hardening edits above are landed and tested. The script is
-  dry-run by default, cycle-scoped, idempotent, must skip rows missing required
-  captured payment-contact fields, refuses to run while
-  `HONORARIUM_ONBOARDING_DEFERRED=true` or the discriminator GUIDs are incomplete,
-  and drives the same
+  `scripts/backfill-honorarium-capture-only.mjs --cycle <CODE>`. The script is
+  dry-run by default, cycle-scoped, idempotent, skips rows missing required captured
+  payment-contact fields, refuses to run while `HONORARIUM_ONBOARDING_DEFERRED=true`
+  or the discriminator GUIDs are incomplete, and drives the same
   `ensureHonorariumOnboarding()` path rather than duplicating create logic.
   `[VERIFIED via source]`
 

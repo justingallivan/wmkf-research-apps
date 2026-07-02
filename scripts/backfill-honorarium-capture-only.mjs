@@ -103,7 +103,11 @@ const SUGGESTION_SELECT = [
   'wmkf_reviewerfirstname', 'wmkf_reviewerlastname', 'wmkf_revieweremail',
   '_wmkf_honorariumrequest_value', '_wmkf_potentialreviewer_value', '_wmkf_request_value',
 ].join(',');
-const REQUEST_SELECT = ['akoya_requestid', 'akoya_requestnum', 'wmkf_meetingdate'].join(',');
+// akoya_title is required so ensureHonorariumOnboarding's deriveHonorariumTitle()
+// produces the same "Reviewer honorarium — <proposal title> (#num)" it does in the
+// portal path; the live token verifier (lib/external/verify-suggestion-token.js)
+// selects it too. Without it, backfilled honoraria fall back to a generic title.
+const REQUEST_SELECT = ['akoya_requestid', 'akoya_requestnum', 'akoya_title', 'wmkf_meetingdate'].join(',');
 const REVIEWER_SELECT = [
   'wmkf_potentialreviewersid', 'wmkf_name', 'wmkf_emailaddress',
   'wmkf_firstname', 'wmkf_lastname', 'wmkf_orcid', 'wmkf_identitystatus',
@@ -121,6 +125,7 @@ const { ensureHonorariumOnboarding } = await import('../lib/bill/honorarium-onbo
 const { honorariumDiscriminatorsConfigured } = await import('../lib/bill/honorarium-discriminators.js');
 const { notExcludedFilter } = await import('../lib/dataverse/adapters/reviewer-suggestion.js');
 const { cycleCodeToOdataFilter, cycleCodeToLabel } = await import('../lib/utils/cycle-code.js');
+const { missingRequiredAddressFields } = await import('../lib/external/required-address.js');
 
 // Scope the backfill to one cycle by filtering on the suggestion's request
 // meeting date (single-valued nav property). Validated up front — an unparseable
@@ -235,13 +240,15 @@ async function main() {
     const lbl = `${label(suggestion, request, reviewer)}  [${id.slice(0, 8)}]`;
 
     // Reconstruct the captured mailing address from the contact. A non-opted-out
-    // accept REQUIRED a full address (server 422) and the orchestrator wrote it to
-    // the contact, so every eligible row SHOULD have one. If it's missing — no
-    // linked contact, a transient contact-read failure, or an empty reconstructed
-    // address — SKIP rather than mint a honorarium with no payment address: doing
-    // so would link the suggestion, drop it from the eligible set, and strand it
-    // with no usable address / no BILL counterpart (Codex S274 P1). A skipped row
-    // stays eligible and is retried on a later run.
+    // accept REQUIRED a full address (server 422 via missingRequiredAddressFields)
+    // and the orchestrator wrote it to the contact, so every eligible row SHOULD
+    // have a complete one. But the accept-time contact-address PATCH was
+    // best-effort/non-fatal, so a historical row may have a partial address. SKIP
+    // unless the reconstructed address passes the SAME completeness check fresh
+    // accept enforces — minting from an incomplete address would link the
+    // suggestion, drop it from the eligible set, and strand a honorarium with no
+    // payable mailing address / no BILL counterpart (Codex S274 P1). A skipped row
+    // stays eligible and is retried on a later run once the contact is fixed.
     const contactId = reviewer?._wmkf_contact_value || null;
     let contact = null;
     let contactReadError = null;
@@ -253,12 +260,14 @@ async function main() {
       }
     }
     const address = addressFromContact(contact);
+    const missingAddress = missingRequiredAddressFields(address);
 
-    if (Object.keys(address).length === 0) {
+    if (missingAddress.length) {
       results.skipped += 1;
       const why = !contactId ? 'no linked contact'
         : contactReadError ? `contact read failed (${contactReadError})`
-          : 'no captured address on contact';
+          : Object.keys(address).length === 0 ? 'no captured address on contact'
+            : `incomplete captured address (missing: ${missingAddress.join(', ')})`;
       console.warn(`  ⤬ SKIP — ${lbl}  (${why}); left eligible for a later run`);
       continue;
     }
@@ -294,7 +303,7 @@ async function main() {
 
   if (!EXECUTE) {
     const wouldOnboard = toProcess.length - results.skipped;
-    console.log(`\nDry run — ${wouldOnboard} suggestion(s) would be onboarded, ${results.skipped} skipped (no captured address). Re-run with --execute to apply.`);
+    console.log(`\nDry run — ${wouldOnboard} suggestion(s) would be onboarded, ${results.skipped} skipped (no/incomplete captured address). Re-run with --execute to apply.`);
     if (results.skipped > 0) process.exitCode = 1;
     return;
   }
@@ -302,7 +311,7 @@ async function main() {
   console.log('\n=== summary ===');
   console.log(`  created : ${results.onboarded}`);
   console.log(`  reused  : ${results.reused}`);
-  console.log(`  skipped : ${results.skipped}  (no captured address — still eligible)`);
+  console.log(`  skipped : ${results.skipped}  (no/incomplete captured address — still eligible)`);
   console.log(`  deferred: ${results.deferred}`);
   console.log(`  failed  : ${results.failed}`);
   // `created`/`reused` mean the honorarium akoya_request exists; BILL vendor

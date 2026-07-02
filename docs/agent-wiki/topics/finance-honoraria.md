@@ -87,11 +87,12 @@ Reviewers who accepted while capture-only was on won't re-accept, so once the
 pipeline is live, mint their missing records with
 `scripts/backfill-honorarium-capture-only.mjs --cycle <CODE>` (dry-run by default;
 cycle-scoped so it can't sweep older cohorts; drives the same idempotent
-`ensureHonorariumOnboarding`; refuses to run while still deferred). Before executing
-the backfill, harden it to apply the same required-address completeness check as
-the fresh accept path and to include `akoya_title` in its request reload, so
-historical rows do not mint with partial stale contact addresses or generic
-proposal titles.
+`ensureHonorariumOnboarding`; refuses to run while still deferred). The two
+readiness hardening edits are LANDED (S316): the backfill applies the same
+required-address completeness check as fresh accept — the shared
+`missingRequiredAddressFields` in `lib/external/required-address.js` — and includes
+`akoya_title` in its request reload, so historical rows can no longer mint with
+partial stale contact addresses or generic proposal titles.
 
 ## Standard Probe
 

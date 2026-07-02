@@ -38,6 +38,7 @@
 import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
 import { applyStage2aResponse } from '../../../../../lib/dataverse/adapters/reviewer-suggestion';
 import { getActivePolicies } from '../../../../../lib/external/policy-fetcher';
+import { missingRequiredAddressFields } from '../../../../../lib/external/required-address';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 import { ensureHonorariumOnboarding } from '../../../../../lib/bill/honorarium-onboard-orchestrator';
@@ -116,17 +117,14 @@ function validateAddress(address) {
   return null;
 }
 
-// Payment-contact fields a reviewer MUST supply when taking the honorarium —
-// mirrors REQUIRED_ADDRESS_FIELDS in Stage2aView (line2/state stay optional).
-// Enforced server-side on a non-opted-out FRESH accept (below) so manual payment
-// this cycle always has a mailing address + phone, even on a non-form (direct)
-// POST that bypasses the client's own completeness check. `validateAddress` above
-// still owns shape/length/country-code validity; this owns presence.
-const REQUIRED_ADDRESS_FIELDS = ['line1', 'city', 'postalCode', 'country', 'phone'];
-export function missingRequiredAddressFields(address) {
-  const a = address && typeof address === 'object' && !Array.isArray(address) ? address : {};
-  return REQUIRED_ADDRESS_FIELDS.filter((k) => !String(a[k] ?? '').trim());
-}
+// Payment-contact presence check now lives in a shared module so the fresh-accept
+// guard (below) and the capture-only backfill enforce the SAME completeness. Enforced
+// server-side on a non-opted-out FRESH accept so manual payment this cycle always has
+// a mailing address + phone, even on a non-form (direct) POST that bypasses the
+// client's own check. `validateAddress` above still owns shape/length/country-code
+// validity; this owns presence. Re-exported so existing importers/tests keep resolving
+// it from this route.
+export { missingRequiredAddressFields };
 const REVIEW_STATUS_MATERIALS_SENT = 100000001;
 const RESPONSE_TYPE_WITHDRAWN_SUFFICIENT = 100000003;
 
