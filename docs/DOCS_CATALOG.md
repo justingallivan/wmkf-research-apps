@@ -276,6 +276,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
+| [REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md](REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md) | spec | active |  | Design for making reviewer Stage 2a accept return quickly without losing required address, identity, email, quota, or alert side effects. | 2026-07-02 |
 | [REVIEWER_ANALYZE_CONTRACT_SPEC.md](REVIEWER_ANALYZE_CONTRACT_SPEC.md) | source-of-truth | canonical | yes | REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md §4.4/§5/§7. Labels: [VERIFIED] (read from source this session), [PROPOSED], [OPEN] (decide with reviewer). | 2026-07-02 |
 | [REVIEWER_ARCHITECTURE.md](REVIEWER_ARCHITECTURE.md) | spec | active |  | Plus, when a potential reviewer is first invited:. | 2026-07-02 |
 | [REVIEWER_BILL_HARDENING_FINDINGS.md](REVIEWER_BILL_HARDENING_FINDINGS.md) | audit | historical |  | - contactEdits validation (was P3): respond.js now bounds each field's length + checks email shape, returning a clean 400 instead of a Dataverse 500. | 2026-07-02 |
@@ -302,6 +303,7 @@ related:
 | [REVIEWER_MERGE_DESIGN.md](REVIEWER_MERGE_DESIGN.md) | spec | active |  | Chunks 1–3 (adapters, lib/services/reviewer-merge.js, the pages/api/reviewer-finder/merge-candidates route) are committed and tested. | 2026-07-02 |
 | [REVIEWER_ONBOARDING_FLOW_MOCKUP.md](REVIEWER_ONBOARDING_FLOW_MOCKUP.md) | spec | active |  | What a potential reviewer sees at each stage of the invitation → accept/decline → confirmation journey, as built in the reviewer portal... | 2026-07-02 |
 | [REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md](REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md) | plan | active |  | Target environment: Prod (Dataverse Wave 2 schema is live). | 2026-07-02 |
+| [REVIEWER_QUOTA_PD_EMAIL_PLAN.md](REVIEWER_QUOTA_PD_EMAIL_PLAN.md) | plan | active |  | Make the existing reviewer quota threshold alert send an actual email to the lead Program Director. |  |
 | [REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md](REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md) | plan | active |  | 3. Editor = full WYSIWYG (tiptap) → HTML, sanitized server-side with sanitize-html. Each narrative answer is stored twice: sanitized HTML (rich... | 2026-07-02 |
 | [REVIEWER_SELF_REPORT_ORCID_E2E_HANDOFF.md](REVIEWER_SELF_REPORT_ORCID_E2E_HANDOFF.md) | plan | historical |  | Audience: Codex, taking over development of the e2e test suite for this feature. | 2026-07-02 |
 | [REVIEWER_STAGE_2A_BUILD_PLAN.md](REVIEWER_STAGE_2A_BUILD_PLAN.md) | plan | active |  | Date: 2026-05-09 (build); 2026-05-12 (status banner refresh). | 2026-07-02 |
