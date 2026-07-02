@@ -25,6 +25,14 @@ write the files…"), NOT a resume of a plan-only agent. Don't lead a build prom
 "plan only / no code / review." If you deliberately want a plan first, expect to spawn a
 second fresh agent for the build. Verified config is fine for writes
 (`~/.codex/config.toml`: `sandbox_mode = "workspace-write"`, `approval_policy = "never"`) —
-the read-only state came from the task framing, not a broken config. See
+the read-only state came from the task framing, not a broken config.
+
+**Second trap — sibling worktree not writable (hit S313):** even a fresh build-framed
+rescue agent has its writable root fixed to the MAIN repo checkout. It CANNOT write to a
+sibling git worktree dir (e.g. `../WMKF_Apps-codex`) — `touch` there returns "Operation
+not permitted" and no edits/commits are possible, though reads and gates still run. So
+the `parallel-agent-worktree` skill pattern does NOT work through `codex:codex-rescue`: to run
+Codex in a worktree, launch the Codex CLI natively in that directory; otherwise do the
+worktree edits in-checkout (Claude) or work on a branch in the main checkout. See
 [[reference-codex-rescue-pkill-overstep]] for the related "don't trust the rescue
 wrapper's self-report" lesson.
