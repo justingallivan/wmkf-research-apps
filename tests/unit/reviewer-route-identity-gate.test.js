@@ -747,6 +747,28 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBeNull();
     expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1].emailSource).toBeNull();
   });
+
+  test('rejects an anti-scrape MUNGED email even when enrichment blessed it', async () => {
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [{
+          name: 'Dr Munged',
+          email: 'pollina@nospam.wustl.edu',
+          emailSource: 'serp_search',
+          contactEnrichment: { emailPersistAllowed: true, affiliationPersistAllowed: true },
+        }],
+      },
+    };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.savedCount).toBe(1); // row still saves, just without the junk email
+    expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBeNull();
+    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1].emailSource).toBeNull();
+  });
 });
 
 // ── /api/workbench/enrich-recommended ─────────────────────────────────────────

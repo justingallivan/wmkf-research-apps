@@ -22,6 +22,7 @@ import NotificationService from '../../../lib/services/notification-service';
 import { saveSourceListForCandidate, withReviewerProvenance, buildReviewerProvenance, isIdentityReviewExemptProvenance } from '../../../lib/utils/reviewer-provenance';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { stampSuggestionAnchor } from '../../../lib/services/reviewer-roster-store';
+import { isAntiScrapeMunge } from '../../../lib/utils/reviewer-vetted-email';
 
 function fieldPersistFlag(candidate, enrichment, flagName) {
   if (candidate?.[flagName] === false || enrichment?.[flagName] === false) return false;
@@ -224,6 +225,15 @@ export default async function handler(req, res) {
             candidateEmail = affiliationEmail;
             candidateEmailSource = 'affiliation';
           }
+        }
+        // Reject anti-scrape MUNGED addresses (e.g. name@nospam.uni.edu) that paid
+        // search can capture verbatim — undeliverable and not auto-de-mungeable. Mirrors
+        // the shared `pickVettedEmail` gate the automated paths (A reconciler / B1 promote)
+        // use, closing the same class on this interactive save path. Enrichment-/auto-sourced
+        // only — a PD's hand-typed contact (pdConfirmed) is the human's call. Nulling the
+        // email also nulls its persisted source (the researcher upsert gates source on email).
+        if (candidateEmail && !pdConfirmed && isAntiScrapeMunge(candidateEmail)) {
+          candidateEmail = null;
         }
         // Enrichment stores the ORCID iD as `orcidId` (not `orcid`); read that key
         // so a candidate carrying only contactEnrichment doesn't drop a real ORCID.
