@@ -11,7 +11,7 @@ related:
   - scripts/probe-akoya-folio-casing.js
   - docs/DYNAMICS_SCHEMA_ANNOTATION.md
   - pages/api/dynamics-explorer/chat.js
-  - scripts/dynamics-schema-diff.json
+  - scripts/dynamics-schema-diff.js
 ---
 
 # Dynamics Explorer — Path A Plan: Live Ground Truth
