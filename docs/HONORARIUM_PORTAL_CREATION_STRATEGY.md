@@ -269,7 +269,7 @@ relationship. `[VERIFIED via entity metadata 2026-07-01]`
 - **Option A — new self-lookup (structured, clickable, queryable). APPROVED
   2026-07-02** — Connor is creating the lookup (to surface it in an AkoyaGO
   dashboard). It is a custom lookup on `akoya_request` targeting `akoya_request`
-  (proposed name `wmkf_relatedproposal` — Connor confirms the final published name).
+  (schema name `wmkf_reviewedproposal`, chosen 2026-07-02).
   Because it is self-referential, the one relationship yields a **Referencing (N:1)**
   nav property — the lookup we write, honorarium → proposal — plus a **Referenced
   (1:N)** collection (proposal → its honoraria, usable for a dashboard subgrid). Our
@@ -296,7 +296,7 @@ link. (The junction stays for its existing idempotency/provenance role, §3c.)
 
 | # | Change | Status | Consumer |
 |---|---|---|---|
-| 1 | New custom lookup on `akoya_request` → `akoya_request` (proposed `wmkf_relatedproposal`): honorarium → parent proposal | **APPROVED 2026-07-02 — Connor creating** (to surface in an AkoyaGO dashboard) | Bind parked in the create body (`honorarium-onboard-orchestrator.js` §8/§9 TODO); wire it once Connor's published name + Referencing nav-property casing are confirmed from live metadata. Populates the FK on app-created rows; not surfaced in our app UI (documented in finance-honoraria wiki) |
+| 1 | New custom lookup on `akoya_request` → `akoya_request`, schema name `wmkf_reviewedproposal`: honorarium → parent proposal | **APPROVED 2026-07-02 — Connor creating** (to surface in an AkoyaGO dashboard) | Bind parked in the create body (`honorarium-onboard-orchestrator.js` §8/§9 TODO); wire it once Connor publishes and the Referencing nav-property casing is confirmed from live metadata. Populates the FK on app-created rows; not surfaced in our app UI (documented in finance-honoraria wiki) |
 
 Add rows here as further Dataverse schema changes arise this cycle.
 

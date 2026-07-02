@@ -101,7 +101,7 @@ A honorarium and a proposal are both `akoya_request` rows, and there is no nativ
 self-referential lookup on `akoya_request` (verified: 65 lookup fields, none targets
 `akoya_request`). To give each app-created honorarium a structured, queryable link to
 the proposal it reviews, Connor is creating a custom self-lookup on `akoya_request` →
-`akoya_request` (proposed `wmkf_relatedproposal`; final name is Connor's, to be
+`akoya_request` (schema name `wmkf_reviewedproposal`, chosen 2026-07-02, to be
 surfaced in an AkoyaGO dashboard). Being self-referential, it exposes a Referencing
 (N:1) nav property (the one our create binds, honorarium → proposal) and a Referenced
 (1:N) collection (proposal → its honoraria). **Status:** the bind is parked as a TODO
