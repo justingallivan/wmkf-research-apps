@@ -62,6 +62,10 @@
       "schedule": "0 10 * * *"
     },
     {
+      "path": "/api/cron/reviewer-email-reconcile",
+      "schedule": "0 4 * * *"
+    },
+    {
       "path": "/api/cron/auth-bypass-check",
       "schedule": "30 7 * * *"
     },
