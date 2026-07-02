@@ -1,173 +1,135 @@
-# Session 317 Prompt: Housekeeping + debugging (user-directed)
+# Session 318 Prompt: Reviewer email-persist follow-through (deploy/schedule decisions)
 
-## Session 316 Summary
+## Session 317 Summary
 
-Shipped the reviewer honorarium **no-BILL go-live**: honorarium `akoya_request`
-rows are now minted in Production when a non-opt-out reviewer accepts (payment still
-offline). Also hardened the capture-only backfill, created the honorarium→proposal
-self-lookup, resolved a Connor open item, and fixed a red CI gate. Justin flagged the
-next session is **housekeeping + debugging** (specific targets TBD by Justin).
+Debugged and fixed the colleague-reported bug where reviewers reach the workbench
+**Invite Reviewers** tab with **no email** ("no email — can't invite") even though the
+system had found their address. Diagnosed the root causes with live Dataverse +
+Postgres + audit-trail probes, recovered the affected reviewers by hand, then shipped
+three code fixes (B1 + A + a shared munge guard) and a Tier-0 rescue. Codex reviewed
+the designs and implemented the Find-row anchoring fix (I reviewed it). **All work is
+committed to local `main` but NOT pushed/deployed, and the reconciler cron is NOT
+scheduled** — deploy + schedule are open decisions for §Owner Decision.
 
 ### What Was Completed
 
-1. **No-BILL honorarium creation GO-LIVE (Production).**
-   - Set the 3 discriminator GUIDs on Production; removed `HONORARIUM_ONBOARDING_DEFERRED`
-     from Production (kept `true` on Preview → preview stays capture-only, also has no
-     GUIDs); kept `BILL_ONBOARDING_DEFERRED=true`; redeployed prod
-     (`dpl_CqnqfG6mp3U9FkLuvzWsuzmnUfc1`, aliased reviews/applications.wmkeck.org).
-   - Verified live via matching deployment id. Rollback = re-add
-     `HONORARIUM_ONBOARDING_DEFERRED=true` to Production + redeploy.
+1. **Diagnosis (root causes of "no email on Invite tab").**
+   Three distinct causes, evidence-backed: (a) **save/enrichment ordering** — the vetted
+   email lands in the Postgres roster (`emailPersistAllowed=true`) but not Dataverse
+   (Find saved before a later run found it; applicant promote never persisted it);
+   (b) **enrichment coverage miss** ("cause #2") — enrichment completes but no tier
+   surfaces an email that exists (8 prominent PIs in 90d); (c) **orphaned-in-affiliation**
+   — the email sits in the PubMed affiliation string, never extracted. Plus a
+   duplicate-person / name-normalization contributor (Hamit/Harmit). `wmkf_lastchecked`
+   is stamped on every upsert; only `wmkf_metricsupdatedat`/`hIndex` prove enrichment ran.
 
-2. **`wmkf_reviewedproposal` self-lookup created + wired.**
-   - Self-referential lookup on `akoya_request` created via the Dataverse Web API
-     (Default Solution; cascade Delete=RemoveLink). Referencing nav property
-     `wmkf_ReviewedProposal` (read back from metadata, `$expand`-confirmed).
-   - Create body binds it so app-created honoraria populate the FK for Connor's AkoyaGO
-     dashboard. Meeting date + fiscal year cue from the parent proposal.
+2. **Data recovery — 7 reviewers (this session, prod writes).** req 1003020: Akbarian
+   (write), Walsh (repoint to email-bearing dup + deactivate empty). Across 4 more
+   requests: Phadnis, Crair (write); Shatz, Malik (repoint); Kottos (restore
+   email-bearing suggestion + remove empty dup). Malik name typo `Hamit`→`Harmit` fixed.
 
-3. **Capture-only backfill hardened (Codex-reviewed).**
-   - Extracted the accept-path address contract (presence + validity) into
-     `lib/external/required-address.js`, shared by `respond.js` and the backfill; added
-     `akoya_title` to the reload. Codex P0: backfill had enforced presence only, not
-     country-ISO2 validity. Verified the backfill run is **unneeded** (read-only sweep:
-     4 window candidates, all test rows).
+3. **Tier-0 affiliation-email rescue (`c1b1de17`).** save-candidates extracts an email
+   embedded in the persisted affiliation when enrichment captured none (rare orphaned case).
 
-4. **Other:** resolved the Connor GoApply-linkage open item (no action needed); pinned
-   United States to the top of the reviewer country picker; fixed the red
-   `check:docs-catalog` gate (a `.json`→`.js` frontmatter typo).
+4. **B1 — applicant-promote persists the vetted enriched email (`f7896676`).**
+   `promote-applicant-reviewer` reads the roster blob server-side keyed by
+   `requestId+suggestionId` and persists the email through the shared gate. (Codex
+   design-reviewed.)
 
-### Commits
-- `f340e776` — Record capture-only backfill is unneeded (verified only test rows)
-- `1291b0fb` — Record no-BILL honorarium creation go-live (Production, 2026-07-02)
-- `a3d83a8d` — Create wmkf_reviewedproposal self-lookup + wire honorarium→proposal bind
-- `559e2aee` — Lock self-lookup name to wmkf_reviewedproposal
-- `75cd7569` — Approve honorarium→proposal self-lookup; document, keep bind parked
-- `2301b34c` — Resolve GoApply-linkage Connor open item (§7)
-- `add00163` — Reviewer accept form: pin United States to top of country picker
-- `46575e8c` — Backfill: enforce address VALIDITY too, not just presence (Codex P0)
-- `76a721a1` — Harden honorarium capture-only backfill before go-live
-- `c94c109e` — Fix docs-catalog gate: related path .json → .js typo
+5. **A — reconciliation backstop cron (`e4c35bc2`, `deccd733`).**
+   `/api/cron/reviewer-email-reconcile` sweeps roster-has-email/Dataverse-empty rows:
+   WRITE ownerless, REPOINT single active keeper (collision-guarded), ALERT ambiguous.
+   Initial A scanned 0 (Find rows carry no `suggestionId`); fixed by stamping the id
+   anchor onto the roster at save time + a backfill script. Codex implemented, I reviewed.
+
+6. **Anti-scrape munge guard (`deccd733`, `16873593`).** The dry-run caught that the
+   reconciler would auto-persist a junk `pollina@nospam.wustl.edu`; added
+   `isAntiScrapeMunge` to the shared `pickVettedEmail` gate + save-candidates, closing the
+   class across all three persist paths (save/B1/A).
+
+### Commits (this session)
+- `16873593` — Reject anti-scrape munged emails on save-candidates too
+- `deccd733` — A follow-up: anchor Find roster rows + reject munged emails
+- `e4c35bc2` — A: reviewer email reconciliation backstop cron
+- `f7896676` — B1: applicant-promote persists the vetted enriched email
+- `ade31b0d` — S317 no-email incidence probes + roster-email recovery (multi-request)
+- `0a324d64` — Walsh-repoint deactivation runnable standalone
+- `5251fb68` — S317 reviewer-email diagnostic + data-fix scripts (req 1003020)
+- `c1b1de17` — Rescue affiliation-embedded reviewer emails at save (Tier-0)
 
 ## Next Items
 
-### User-Directed (Session 317 focus)
+### Owner Decision Needed
 
-1. **Housekeeping + debugging — targets TBD by Justin.**
-   Justin will bring the specific housekeeping/debugging items. Ask what to focus on
-   before assuming; the items below are the standing backlog, not a directive.
+1. **Deploy the reviewer-email fixes.** `main` auto-deploys on push. Pushing these 8
+   commits makes B1 (promote persists enriched email), the Tier-0 rescue, the munge
+   guards, and the A cron route go LIVE. All tested; A's cron is inert until scheduled.
+   Evidence: commits above; live dry-run shows the reconciler would write 0 (safe).
+   Decision: push now, or hold.
+
+2. **Schedule the reconciler cron.** `/api/cron/reviewer-email-reconcile` is
+   admin-triggerable via `CRON_SECRET` only — no schedule entry. Decide whether to add a
+   daily/weekly schedule. Evidence: `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md` §A.
+
+3. **Merge the Codex `codex/spec-audit` docs branch.** Two design docs
+   (`REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md`, `REVIEWER_QUOTA_PD_EMAIL_PLAN.md`) +
+   catalog, committed on `codex/spec-audit` (`370f3867`) in `../WMKF_Apps-codex`.
+   Docs-only, low-risk; review + `git merge --no-ff codex/spec-audit` when ready.
 
 ### Verified Open
 
-1. **Confirm active-cycle proposals have meeting dates (honorarium go-live follow-up).**
-   Evidence: `lib/bill/honorarium-onboard-orchestrator.js:156-159` — a honorarium is
-   REFUSED (`honorarium_no_meeting_date`) if the parent proposal has no
-   `wmkf_meetingdate`; the accept still succeeds and an alert fires. Now that minting is
-   live, a proposal missing its meeting date silently mints no honorarium for its
-   reviewers. Offered but not run: a read-only check that active-cycle proposals all
-   carry `wmkf_meetingdate`.
+1. **Cause #2 — enrichment email-coverage miss.** 8 prominent PIs (Brody, Stachenfeld,
+   Pardoll, Fawcett, Gage, Lampson, Chanda, Eroglu) have no email because enrichment's
+   tiers didn't surface one that exists. Separate track from the ordering fix. Candidate
+   fix: strengthen discovery (resolved faculty-page tier `_attachEmailFromResolvedPage`,
+   which exists but may be gated). Evidence: `scripts/probe-no-email-breakdown.mjs`.
 
-2. **Continue memory-hygiene cleanup queue.**
-   Evidence: `docs/audits/memory-cleanup-queue-2026-07-02.md`. Pick the next bounded
-   package (Dynamics/Power Tools first targets already done in S315 `d9d5f614`). This is
-   housekeeping and fits the S317 focus.
-
-### Owner Decision Needed
-
-1. **Writeup-generator tab + reviewer-database browse.**
-   Evidence: `.claude-memory/project-workbench-consolidation-rollout.md`. Needs product
-   prioritization before implementation.
-
-2. **Remit flag on review completion.**
-   Evidence: `.claude-memory/project-honorarium-payment-landscape.md`;
-   `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §3b. Decide whether review submit / PD
-   completion should wire `wmkf_authorizationtoremitpaymentflag`; payment stays offline.
-
-3. **`wmkf_reviewedproposal` solution placement (Connor).**
-   Evidence: `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §8/§9. The field lives in the
-   Default Solution; Connor may add the component to `wmkfResearchReviewAppSuite` if his
-   ALM wants it bundled (non-destructive; no code impact).
+2. **B2 — enrichment-timeout partial-return (DEFERRED).** `enrichCandidates` throws on
+   abort, discarding all computed enrichment; `/enrich-contacts` sends only an error.
+   Returning the partial array (merged by index) preserves it. Deferred pending frequency
+   data. Evidence: `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md` §B2; Codex-confirmed.
 
 ### Verify Before Acting
 
-1. **Confirm request 1003125 shows all 5 renamed applicant reviewers.**
-   Evidence: `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`. Preflight: have
-   Duncan reload the Find tab or run a read-only live check before treating roster cache
-   staleness as still present.
-
-2. **D26 triage-null sweep.**
-   Evidence: `pages/api/workbench/dashboard.js` (D26 dashboard filter). Offered but not
-   run: a read-only sweep of D26 `akoya_requests` where triage is null and status is not
-   Phase II Pending. Re-derive the query before running.
-
-3. **Applicant-suggested roster cache-staleness product fix.**
-   Evidence: `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`;
-   `reviewer-search-logic.js:123`. Re-read current roster/enrichment code before
-   implementing; do not assume the S313 finding is still live.
-
-4. **Optional: clean up 4 honorarium test suggestion rows.**
-   Evidence: S316 read-only sweep (`Gallivan_test`, `Gallivantingaround`, two empty
-   no-name/no-email rows in the capture-only window). Harmless (no meeting date/address →
-   never mint), but could be deleted for tidiness. Confirm they are tests before any
-   delete.
-
-### Parked
-
-1. **Reviewer-materials attach-and-verify build (option 2).** Evidence:
-   `docs/agent-wiki/topics/external-reviewer-portal.md`; design commit `a84e5f8b`.
-   Re-open: owner asks to build it.
-2. **Email template bracket-alias cleanup.** Evidence:
-   `docs/EMAIL_TOKEN_SYNTAX_UNIFICATION_PLAN.md` §5. Re-open: soak explicitly greenlit.
-3. **Track Reviewers board-identity fields + Excel export.** Evidence:
-   `docs/REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md` §C step 9. Re-open: owner
-   prioritizes the read-only surface/export.
-4. **Invite-modal campaign timeline collapse.** Evidence:
-   `shared/components/reviewers/InviteEmailModal.js`. Re-open: owner greenlights.
-5. **Reviewer nice-to-haves #4 and #5.** Evidence:
-   `docs/REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md` §4/§5.
-6. **Full BILL payment pipeline enablement.** Evidence:
-   `lib/bill/honorarium-onboard-orchestrator.js`;
-   `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §1. Re-open: leadership decides to enable
-   person-payee/BILL onboarding. This cycle is request-creation only; payment offline.
+1. **The 53 roster rows Codex backfilled (prod) are benign, not a todo.** Codex executed
+   `scripts/backfill-reviewer-roster-suggestion-anchors.mjs --execute` (stamped
+   `suggestionId` onto 53 Find roster rows; id-anchors only, no Dataverse/email writes).
+   The reconciler dry-run over them = **0 would-write** (all already have emails or
+   gate-reject). Do NOT re-run recovery for these; re-run `scripts/dryrun-reviewer-email-reconcile.mjs`
+   to confirm current state before acting.
 
 ### Do Not Reopen Without New Decision
 
-1. **No-BILL honorarium creation is LIVE (2026-07-02).** Evidence: `1291b0fb`;
-   `docs/CREDENTIALS_RUNBOOK.md`; `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §2. Do not
-   re-flip without a rollback decision.
-2. **Capture-only backfill is unneeded (only test rows).** Evidence: `f340e776`;
-   `.claude-memory/project-honorarium-payment-landscape.md`. Do not carry the backfill
-   run forward as an open task.
-3. **GoApply-linkage Connor item resolved; self-lookup created.** Evidence: `2301b34c`,
-   `a3d83a8d`; `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §7/§8/§9.
-4. **Digit-stripping name normalization is load-bearing.** Evidence:
-   `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`.
-5. **`{{proposalTitle}}` and `{{proposalClause}}` are distinct; `[bracket]` aliases are
-   intentional.** Evidence: `.claude-memory/project-email-template-token-syntax.md`.
-6. **h-index is not staff-editable in reviewer edit modals.** Evidence:
-   `CandidateEditModal.js`; commit `204086ec`.
+1. **B1 + A + Tier-0 + munge guard are SHIPPED (committed).** Evidence: commits above;
+   `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md`. Do not re-implement.
+2. **The 7 recovered reviewers are fixed.** Evidence: §Data recovery; verified via
+   `scripts/probe-req-1003020-reviewer-emails.mjs`.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` | Honorarium plan — §2 live config, §6 backfill (unneeded), §8/§9 self-lookup. |
-| `lib/bill/honorarium-onboard-orchestrator.js` | Honorarium create body; meeting date/fiscal year from parent; `wmkf_ReviewedProposal` bind. |
-| `lib/external/required-address.js` | Shared payment-address presence + validity check (accept guard + backfill). |
-| `docs/CREDENTIALS_RUNBOOK.md` | Honorarium env flags + the 2026-07-02 go-live record. |
-| `scripts/backfill-honorarium-capture-only.mjs` | Capture-only backfill (verified unneeded this cycle). |
-| `docs/audits/memory-cleanup-queue-2026-07-02.md` | Remaining memory-hygiene cleanup queue. |
+| `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md` | The fix plan — B1/A shipped, B2 deferred, cause #2 separate. |
+| `lib/utils/reviewer-vetted-email.js` | Shared persist gate `pickVettedEmail` + `isAntiScrapeMunge` (used by save/B1/A). |
+| `pages/api/workbench/promote-applicant-reviewer.js` | B1 — server-side roster read + gated email persist. |
+| `pages/api/cron/reviewer-email-reconcile.js` | A — the backstop cron (verifyCronSecret; ?dryRun=1). |
+| `lib/services/reviewer-email-reconciler.js` | A — per-row write/repoint/alert logic. |
+| `lib/services/reviewer-roster-store.js` | `findCandidateBySuggestion`, `findReconcilableCandidates`, `stampSuggestionAnchor`. |
+| `pages/api/reviewer-finder/save-candidates.js` | Tier-0 rescue + save-time anchor stamp + munge guard. |
+| `scripts/dryrun-reviewer-email-reconcile.mjs` | READ-ONLY: what the reconciler would do against live data. |
+| `scripts/backfill-reviewer-roster-suggestion-anchors.mjs` | One-time (already run): stamp suggestionId onto Find rows. |
 
 ## Testing
 
 ```bash
-# Honorarium orchestrator + address contract
-npx jest tests/unit/honorarium-onboard-orchestrator.test.js tests/unit/required-address.test.js tests/unit/respond-required-address.test.js tests/integration/external-review-routes.test.js --runInBand
+# Reviewer email-persist unit suites
+npx jest tests/unit/reviewer-vetted-email.test.js tests/unit/reviewer-email-reconciler.test.js \
+  tests/unit/promote-applicant-reviewer-contact.test.js tests/unit/reviewer-route-identity-gate.test.js \
+  tests/unit/reviewer-roster-store.test.js --runInBand
 
-# Durable docs / memory gates
-npm run check:docs-catalog
-npm run check:doc-symbol-refs
-npm run check:build-claim-freshness
-npm run check:fact-consistency
-npm run check:memory-router
-npm run check:agent-wiki
+# Live dry-run of the reconciler (read-only, no writes)
+node scripts/dryrun-reviewer-email-reconcile.mjs
+
+# Gates touched this session
+npm run check:api-routes && npm run check:agent-wiki && npm run check:docs-catalog && npm run check:fact-consistency
 ```
