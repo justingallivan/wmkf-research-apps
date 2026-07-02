@@ -74,12 +74,13 @@ name, NOT client-supplied) and persists the email through the same gates
 Tests: `tests/unit/promote-applicant-reviewer-contact.test.js` (B1 describe). Matrix
 updated + `check:api-routes` green.
 
-## A — Backstop reconciliation — SHIPPED
+## A — Backstop reconciliation — SHIPPED; Find path anchor fix added
 
 Cron `/api/cron/reviewer-email-reconcile` (`verifyCronSecret`) →
 `lib/services/reviewer-email-reconciler.js` automates this session's manual recovery
-for BOTH paths, path-agnostic off the roster blob + linked suggestion. All
-Codex-named changes folded in:
+off the roster blob + linked suggestion. The reconciler itself is intentionally
+id-anchored, not name-matching: it scans only roster blobs that already carry
+`candidate.suggestionId`. All Codex-named changes folded in:
 
 - **Data source:** `reviewer-roster-store.findReconcilableCandidates(limit)` — a NEW
   query over `status IN ('active','saved')` with a `suggestionId` + persistable-email
@@ -97,10 +98,22 @@ Codex-named changes folded in:
 - **Safety:** best-effort per row (a row error is recorded, non-fatal); `?dryRun=1`
   mutates nothing; `?maxBatch=N` (default 200) bounds the scan.
 
-Tests: `tests/unit/reviewer-email-reconciler.test.js` (11 cases). Ports the proven
+Tests: `tests/unit/reviewer-email-reconciler.test.js` (12 cases). Ports the proven
 one-off scripts (`scripts/fix-roster-email-recovery.mjs`,
 `scripts/fix-walsh-repoint-1003020.mjs`). Matrix + `check:api-routes` +
 `CANONICAL_COUNTS` (api-route-file-count 137→138) refreshed.
+
+**Find-path anchor gap fixed after initial Fix A review.** Find-discovered roster
+rows are first recorded at search time, before `save-candidates` creates/reuses the
+Dataverse suggestion, so their pruned blobs historically had `suggestionId:null`.
+That meant the reconciler correctly refused to scan them. `save-candidates` now
+stamps `suggestionId` plus `potentialReviewerId` back onto the matching roster row
+after `potentialReviewerAdapter.upsertByEmail` and `reviewerSuggestionAdapter.upsert`
+succeed; the roster update is best-effort and non-fatal. Existing Find rows are
+handled by `scripts/backfill-reviewer-roster-suggestion-anchors.mjs`, dry-run by
+default, which stamps only when exactly one selected suggestion on the same request
+matches the roster row's normalized name. This creates the missing exact-id anchor
+without loosening the reconciler's `suggestionId IS NOT NULL` filter.
 
 ## B2 — Timeout partial-return + save-gate — DEFERRED
 

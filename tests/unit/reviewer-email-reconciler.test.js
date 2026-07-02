@@ -80,6 +80,18 @@ test('WRITE: ownerless vetted email → written to the person with vetted source
   expect(researcherAdapter.updateById).toHaveBeenCalledWith(PERSON, { emailSource: 'claude_search' }, expect.anything());
 });
 
+test('Find-row anchor: reconciles a roster candidate stamped with suggestionId after save-candidates', async () => {
+  seed(vettedCandidate({
+    name: 'Dr Find Saved',
+    potentialReviewerId: PERSON,
+    source: 'claude_search',
+  }));
+  const r = await reconcileReviewerEmails({});
+  expect(suggestionAdapter.findById).toHaveBeenCalledWith(SUG);
+  expect(r.scanned).toBe(1);
+  expect(r.written).toEqual([{ requestId: REQ, suggestionId: SUG, personId: PERSON, email: 'jun.ye@colorado.edu' }]);
+});
+
 test('REPOINT: single active keeper with no colliding suggestion → repointed', async () => {
   seed(vettedCandidate());
   potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue({ one: true, id: KEEPER, row: { statecode: 0 } });

@@ -21,6 +21,7 @@ import { lookupReviewerIdentity } from '../../../lib/services/reviewer-identity-
 import NotificationService from '../../../lib/services/notification-service';
 import { saveSourceListForCandidate, withReviewerProvenance, buildReviewerProvenance, isIdentityReviewExemptProvenance } from '../../../lib/utils/reviewer-provenance';
 import { ContactParser } from '../../../lib/utils/contact-parser';
+import { stampSuggestionAnchor } from '../../../lib/services/reviewer-roster-store';
 
 function fieldPersistFlag(candidate, enrichment, flagName) {
   if (candidate?.[flagName] === false || enrichment?.[flagName] === false) return false;
@@ -396,7 +397,7 @@ export default async function handler(req, res) {
           }
         }
 
-        await reviewerSuggestionAdapter.upsert({
+        const suggestionResult = await reviewerSuggestionAdapter.upsert({
           potentialReviewerId,
           requestId,
           suggestionLabel: proposalTitle ? `${proposalTitle} — ${candidate.name}` : null,
@@ -408,6 +409,15 @@ export default async function handler(req, res) {
           selected: true,
           summaryBlobUrl: summaryBlobUrl || null,
         }, { actingUserSystemId });
+
+        try {
+          await stampSuggestionAnchor(requestId, candidate.name, {
+            suggestionId: suggestionResult?.id,
+            potentialReviewerId,
+          });
+        } catch (stampErr) {
+          console.warn('[save-candidates] roster suggestion anchor stamp failed (non-fatal):', stampErr?.message || stampErr);
+        }
 
         savedCount++;
         savedNames.push(candidate.name);

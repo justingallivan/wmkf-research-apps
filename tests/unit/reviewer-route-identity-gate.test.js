@@ -59,6 +59,7 @@ jest.mock('../../lib/services/contact-enrichment-service', () => ({
 }));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: jest.fn(async () => 1),
+  stampSuggestionAnchor: jest.fn(async () => ({ updated: 1 })),
 }));
 jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: jest.fn(async () => ({ outcome: 'none' })),
@@ -104,6 +105,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     reviewerSuggestionAdapter.upsert.mockResolvedValue({ id: 'S1' });
+    rosterStore.stampSuggestionAnchor.mockResolvedValue({ updated: 1 });
     lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
     NotificationService.notify.mockResolvedValue({ id: 'alert-1' });
   });
@@ -154,6 +156,51 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(res.statusCode).toBe(200);
     expect(reviewerSuggestionAdapter.upsert.mock.calls[0][0].relevanceScore).toBe(41);
     expect(reviewerSuggestionAdapter.upsert.mock.calls[1][0].relevanceScore).toBe(87);
+  });
+
+  test('stamps the roster row with suggestion/person ids after save using the candidate name key', async () => {
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [{ name: 'Dr. Anchor Row', contactEnrichment: enrichmentFor({ status: 'probable' }) }],
+      },
+    };
+    const res = mockRes();
+    potentialReviewerAdapter.upsertByEmail.mockResolvedValueOnce({ id: 'PID-ANCHOR' });
+    reviewerSuggestionAdapter.upsert.mockResolvedValueOnce({ id: 'SUG-ANCHOR' });
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(rosterStore.stampSuggestionAnchor).toHaveBeenCalledWith('REQ-1', 'Dr. Anchor Row', {
+      suggestionId: 'SUG-ANCHOR',
+      potentialReviewerId: 'PID-ANCHOR',
+    });
+  });
+
+  test('roster anchor stamp failure is non-fatal after Dataverse save succeeds', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    rosterStore.stampSuggestionAnchor.mockRejectedValueOnce(new Error('postgres down'));
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [{ name: 'Dr. Non Fatal', contactEnrichment: enrichmentFor({ status: 'probable' }) }],
+      },
+    };
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.savedCount).toBe(1);
+    expect(warn).toHaveBeenCalledWith(
+      '[save-candidates] roster suggestion anchor stamp failed (non-fatal):',
+      'postgres down',
+    );
+    warn.mockRestore();
   });
 
   test('no verdict (resolver absent) → fail-open persist, no decision/clear', async () => {

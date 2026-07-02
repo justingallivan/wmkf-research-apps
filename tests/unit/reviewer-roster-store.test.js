@@ -110,3 +110,31 @@ describe('markSaved', () => {
     expect(sql).not.toHaveBeenCalled();
   });
 });
+
+describe('stampSuggestionAnchor', () => {
+  test('updates the candidate JSON by request + normalized name with suggestion/person ids', async () => {
+    sql.mockResolvedValueOnce({ rows: [{ id: 123 }], rowCount: 1 });
+    const out = await store.stampSuggestionAnchor(REQ, 'Prof. Anchor Name', {
+      suggestionId: 'SUG-1',
+      potentialReviewerId: 'PID-1',
+    });
+
+    expect(out).toEqual({ updated: 1 });
+    const text = queryTextOf(0);
+    expect(text).toMatch(/UPDATE reviewer_find_roster/);
+    expect(text).toMatch(/candidate = candidate \|\|/);
+    expect(text).toMatch(/request_id =/);
+    expect(text).toMatch(/normalized_name =/);
+    expect(allInterpolations()).toEqual(expect.arrayContaining([
+      REQ,
+      'anchor name',
+      JSON.stringify({ suggestionId: 'SUG-1', potentialReviewerId: 'PID-1' }),
+    ]));
+  });
+
+  test('missing suggestionId or normalized name is a no-op', async () => {
+    await expect(store.stampSuggestionAnchor(REQ, 'No Id', {})).resolves.toEqual({ updated: 0 });
+    await expect(store.stampSuggestionAnchor(REQ, '', { suggestionId: 'SUG-1' })).resolves.toEqual({ updated: 0 });
+    expect(sql).not.toHaveBeenCalled();
+  });
+});
