@@ -85,7 +85,7 @@ terms occur frequently. Start with the first 10:
 | `project-reviewer-apps-redesign-direction.md` | active | Very large active file with many done/planned/shipped markers |
 | `project-bill-honorarium-integration.md` | active | Large active file; payment workflow risk |
 | `project-reviewer-finder-next-topics.md` | active | "Next topics" files often rot |
-| `project-reviewer-postgres-to-dataverse-migration.md` | active | Migration appears finished; likely overlaps Atlas |
+| `project-reviewer-postgres-to-dataverse-migration.md` | closed 2026-07-02 | Code-grounded triage demoted it; live routing now uses narrower reviewer Dataverse/appresearcher memories plus source/Atlas |
 | `project-dataverse-power-tools.md` | active | Large Dataverse memory with old verification basis |
 | `project-nomenclature-and-app-sunset-sweep.md` | active | Cleanup/sunset domain has high stale-risk |
 | `project-dynamics-explorer-reuse-power-tools.md` | active | Large Dynamics memory with old verification basis |
@@ -151,7 +151,7 @@ future task; otherwise close/historical or supersede to current plans/wiki.
 
 Read and classify:
 
-- `project-reviewer-postgres-to-dataverse-migration.md`
+- `project-reviewer-postgres-to-dataverse-migration.md` - triaged/demoted 2026-07-02
 - `reviewer-identity-fragmentation.md`
 - `project-reviewer-finder-dataverse-entry-path.md`
 - `project-appresearcher-collapse-post-pilot.md`

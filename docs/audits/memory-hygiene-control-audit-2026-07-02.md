@@ -217,7 +217,7 @@ are most likely to be influential and stale:
 | File | Current risk |
 |---|---|
 | `.claude-memory/project-dataverse-power-tools.md` | Large active file; last verified from memory-content, not re-probed |
-| `.claude-memory/project-reviewer-postgres-to-dataverse-migration.md` | Large active migration memory; likely overlaps Atlas |
+| `.claude-memory/project-reviewer-postgres-to-dataverse-migration.md` | Triaged 2026-07-02: demoted from active to closed; current routing delegated to narrower reviewer Dataverse/appresearcher memories plus source/Atlas |
 | `.claude-memory/project-dynamics-explorer-reuse-power-tools.md` | Large active Dynamics memory; live behavior likely belongs in source/probes/wiki |
 | `.claude-memory/dataverse-export-floor-scoping.md` | Large active Dataverse memory; should defer structural claims to Atlas/probes |
 | `.claude-memory/reviewer-identity-fragmentation.md` | Large active reviewer identity memory; likely overlaps wiki and current source |

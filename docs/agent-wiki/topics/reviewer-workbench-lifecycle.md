@@ -67,7 +67,7 @@ The "X" on an Invite Reviewers panel (`ReviewerInvitePanel`) card is a **soft-de
 - Address collection: `project-reviewer-address-collection-provisional`.
 - Referral capture: `project-reviewer-referral-capture`.
 - Find roster and dedup: `project-reviewer-find-roster`.
-- Data model/migration: `project-reviewer-postgres-to-dataverse-migration`, `project-reviewer-finder-dataverse-entry-path`, `project-appresearcher-collapse-post-pilot`.
+- Data model/migration: `project-reviewer-finder-dataverse-entry-path`, `project-appresearcher-collapse-post-pilot`. Historical S136 migration rationale is in closed memory `project-reviewer-postgres-to-dataverse-migration`.
 - Count/history/excluded invariants: `project-reviewer-count-invariant`, `project-reviewer-history-data-quality`, `project-excluded-reviewers-often-in-pool`.
 
 ## Applicant-Suggested Reviewer Flow (S263/S264)

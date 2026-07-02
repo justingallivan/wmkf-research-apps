@@ -1,27 +1,31 @@
 ---
 name: Reviewer Postgres → Dataverse migration plan locked (S136)
-description: Migration scope, model decisions, and feature scope locked 2026-05-06. Most "migration" is drain, not move. Match-on-discovery + history badges are first-class scope.
+description: Historical migration rationale from 2026-05-06. Current reviewer API/data-model routing lives in narrower memories, source, and Atlas.
 type: project
 originSessionId: 064dffdf-ba31-44c3-81f2-73bf4d3b908f
-status: active
+status: closed
 scope: reviewer
-last_verified: 2026-05-14 via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-07-02 via code-grounded memory triage; demoted because live state is covered by source/Atlas plus narrower active memories
 ---
 
 ## Recall Rule
 
-Read this when: working on the reviewer Postgres→Dataverse migration, the 1:1 model, or match-on-discovery / history badges.
+Read this only when: you need historical rationale for the S136 reviewer Postgres-to-Dataverse migration plan or its locked decisions. For current reviewer-finder API routing, read [[project-reviewer-finder-dataverse-entry-path]]. For current bibliometric-field placement, read [[project-appresearcher-collapse-post-pilot]]. For current table/entity ownership, read the Atlas/source files named below.
 
 Do:
-- Treat the migration as SHIPPED (W3–W6, 2026-05-12); most Postgres tables drain, only `grant_cycles` migrated.
-- Read `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` (not the stale Wave 1 doc); re-run `scripts/audit-postgres-state.js` before any further migration work.
-- Use engagement-history (`wmkf_appreviewersuggestion` linked via `wmkf_potentialreviewer.wmkf_contact`) as per-contact reviewer history.
+- Treat this file as a closed historical bundle, not the live task router.
+- Use source/Atlas for current state: `pages/api/reviewer-finder/save-candidates.js`, `pages/api/reviewer-finder/grant-cycles.js`, `lib/services/grant-cycles-dataverse.js`, `lib/db/migrations/018_drop_reviewer_finder_postgres_tables.sql`, `docs/atlas/dataverse-wmkf-potentialreviewers.md`, and `docs/atlas/dataverse-wmkf-apppublication-and-appgrantcycle.md`.
+- Use engagement-history (`wmkf_appreviewersuggestion` linked via `wmkf_potentialreviewer.wmkf_contact`) as the durable reviewer-history model.
 
 Do not:
-- Re-litigate locked decisions (1:1 model, no new role child entity, `wmkf_app<name>` naming, no denormalized reviewer flag).
-- Drop Postgres reviewer tables ad hoc. (The 5-table reviewer-finder drain set — researchers, researcher_keywords, publications, proposal_searches, reviewer_suggestions — was DROPPED 2026-06-04 via migration 018; see [[project-w6-table-drop-closed]]. `search_cache` stays — it has live callers. This rule now protects only `grant_cycles` and any future drain tables.)
+- Route new work here as if the migration is still active.
+- Re-litigate locked decisions that are already represented in source/Atlas (no denormalized reviewer flag, `wmkf_app<name>` naming, engagement-history over a role flag).
+- Treat the S136 1:1 sidecar language as current. `wmkf_appresearcher` was collapsed onto `wmkf_potentialreviewers` and dropped S213; see [[project-appresearcher-collapse-post-pilot]].
+- Drop Postgres tables from this memory alone. The 5-table reviewer-finder drain set was DROPPED 2026-06-04 via migration 018; `search_cache` stays; `grant_cycles` remains a separate drain/destructive-carryover concern.
 
-Ground truth: `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`, `scripts/audit-postgres-state.js`, `lib/dataverse/adapters/`, [[project-appresearcher-collapse-post-pilot]], [[project-w6-table-drop-closed]], [[project-system-model]].
+Ground truth: current source and Atlas first; historical plan context in `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`, [[project-reviewer-finder-dataverse-entry-path]], [[project-appresearcher-collapse-post-pilot]], [[project-w6-table-drop-closed]], [[project-system-model]].
+
+**Closed 2026-07-02:** Code-grounded triage found this file no longer earns active-router status. The live API entry-path guardrail is [[project-reviewer-finder-dataverse-entry-path]], the live bibliometric/entity-collapse guardrail is [[project-appresearcher-collapse-post-pilot]], and the W6 drop closeout is [[project-w6-table-drop-closed]]. This file remains for S136 historical rationale and migration-decision archaeology.
 
 **Status as of 2026-05-06 (S136)**: Plan rewritten against ground truth. Authoritative doc: `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`. (The reviewer migration shipped W3–W6 2026-05-12; the "mid-June 2026 pilot deadline" rationale is superseded — that intake pilot was cancelled, see [[project-system-model]].)
 

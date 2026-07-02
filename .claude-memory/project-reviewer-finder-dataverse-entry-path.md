@@ -5,7 +5,7 @@ type: project
 originSessionId: 97cd3044-49bb-4f67-b000-5d32980d6faa
 status: active
 scope: reviewer
-last_verified: 2026-06-16 via standalone page retirement + prior live Postgres probe/migration 018 verification
+last_verified: 2026-07-02 via code-grounded memory triage: page/route absence checks, save-candidates/grant-cycles source headers, migration 018, and migration 020 roster non-regression note
 ---
 
 ## Recall Rule
