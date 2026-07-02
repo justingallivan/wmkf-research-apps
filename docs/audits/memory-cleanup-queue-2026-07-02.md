@@ -47,6 +47,7 @@ Do not re-triage these unless new source evidence appears.
 | Reviewer Postgres-to-Dataverse cluster | Complete; large migration memory demoted, narrower memories retained | `docs/audits/memory-code-grounded-triage-batch-1-2026-07-02.md` |
 | Reviewer identity cluster | Complete; old phase memory demoted, current resolver/backprop guardrails retained | `docs/audits/memory-code-grounded-triage-batch-2-2026-07-02.md` |
 | Dynamics / Power Tools cluster | Audit complete, memory edits blocked by active Claude worktree | `docs/audits/memory-code-grounded-triage-batch-3-2026-07-02.md` and `docs/audits/memory-trim-package-dynamics-power-tools-2026-07-02.md` |
+| Deferred / todo intake and cleanup files | Audit complete; memory edits blocked by active Claude worktree | `docs/audits/memory-pending-triage-batch-b-2026-07-02.md` |
 
 ## Ready When Claude Clears
 
@@ -65,15 +66,17 @@ Do not perform these edits while another agent owns `.claude-memory`.
 
 ### Batch B - Deferred / Todo Intake And Cleanup Files
 
+Status: audit-classified. Do not re-triage unless new source evidence appears.
+
 These were already queued in the pending/finished-work triage plan. They are good small candidates because their filenames suggest carryover, but they are not as sprawling as the largest active memories.
 
-| File | Why it is queued | Required verification |
+| File | Classification | Next action |
 |---|---|---|
-| `.claude-memory/project-intake-portal-ui-todo.md` | Filename says todo; may contain old UI carryover | Read full file, grep direct references, verify live UI/source before closing or keeping active. |
-| `.claude-memory/project-intake-portal-virus-scan-e2e-deferred.md` | Filename says deferred; likely platform/IT-dependent | Read full file, verify source/docs for current scan path and owner-deferred state. |
-| `.claude-memory/project-deferred-code-cleanup.md` | Filename says deferred; router currently points to it | Read full file, verify any named cleanup targets still exist before changing status. |
+| `.claude-memory/project-intake-portal-ui-todo.md` | `ACTIVE_NEEDS_PROBE` | Keep active; source confirms the `/apply` sign-out loop risk, but Azure user-flow settings and browser logout behavior need portal/browser verification before memory edit. |
+| `.claude-memory/project-intake-portal-virus-scan-e2e-deferred.md` | `ACTIVE_NEEDS_LIVE_E2E` | Keep active; source/tests cover the infected branch, but the deployed applicant-session EICAR upload remains the residual go-live gate. |
+| `.claude-memory/project-deferred-code-cleanup.md` | `KEEP_ACTIVE` | Keep active as the destructive-cleanup registry; its named guard still exists and is still called. |
 
-Expected result: either `KEEP_ACTIVE` with a crisp recall rule, `ACTIVE_NEEDS_PROBE`, or `CLOSE_HISTORICAL`. Do not delete in this batch.
+Evidence: `docs/audits/memory-pending-triage-batch-b-2026-07-02.md`. Do not delete in this batch.
 
 ### Batch C - Oversized Active Planning Files
 
@@ -119,7 +122,7 @@ Keep this advisory at first. Do not make it fail-closed until the existing activ
 
 ## Suggested Next Move
 
-If Claude is still active, do Batch B as another doc-only package or read-only audit. If Claude has cleared `.claude-memory`, apply the two ready trim edits from the Dynamics / Power Tools package first.
+If Claude is still active, do Batch C as another doc-only package or read-only audit. If Claude has cleared `.claude-memory`, apply the two ready trim edits from the Dynamics / Power Tools package first.
 
 ## Verification For Queue-Only Doc Changes
 
