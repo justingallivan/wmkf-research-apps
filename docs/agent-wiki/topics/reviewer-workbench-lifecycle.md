@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-01
+last_verified: 2026-07-02
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -159,6 +159,23 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 
 ## Operating Notes
 
+- **Save-time Tier-0 affiliation-email rescue — "reviewer has no email on the Invite tab" trap (S317).**
+  When contact enrichment RUNS but does not COMPLETE (a partial / timed-out run — the person
+  record carries `wmkf_lastchecked` but no `wmkf_metricsupdatedat`/`wmkf_hindex`), a
+  PubMed-style affiliation that embeds the reviewer's own corresponding address
+  ("… Boston Children's Hospital. christopher.walsh@childrens.harvard.edu.") used to be saved
+  with the email ORPHANED inside `wmkf_primaryaffiliation` and an EMPTY `wmkf_emailaddress`
+  ("no email — can't invite" on the Invite Reviewers tab), because enrichment's own Tier-0
+  extraction (`contact-enrichment-service.js:439-450`) never ran to completion.
+  `save-candidates.js` now re-applies that extraction as a last step: if no email was captured
+  and the affiliation being persisted contains one (`ContactParser.extractPrimaryEmail`), it is
+  stored as `emailSource='affiliation'` — a grounded, name-adjacent address that enrichment
+  trusts unconditionally (Tier 0 returns before domain validation, so it is immune to the
+  paid-search domain-contradiction drop). Same safety envelope as the normal email persist:
+  skipped for a contact-blocked (unresolved cited/PI-named) row and for PD-confirmed rows, and
+  only when the affiliation itself is allowed to persist; it only fills a GAP, never overrides a
+  captured email. Diagnosed live on request 1003020 (Walsh, Akbarian). Tests:
+  `tests/unit/reviewer-route-identity-gate.test.js` ("Tier-0 affiliation-email rescue").
 - **Name-based dedup collapses reviewers who share a NORMALIZED name — a recurring "missing reviewers" trap (S312).**
   Two shared normalizers both lowercase and strip everything non-alpha via
   `.replace(/[^a-z\s]/g, '')` — **which deletes digits**: `normalizeReviewerName`

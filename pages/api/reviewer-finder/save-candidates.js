@@ -187,7 +187,7 @@ export default async function handler(req, res) {
         // server-side rather than trusting the client's `emailSource`. Otherwise a
         // forged/stale payload could send emailSource:'orcid' (or another high-confidence
         // source) and mark this email trusted, skipping confirm-before-invite at send.
-        const candidateEmailSource = pdConfirmed ? 'manual' : (candidate.emailSource || enrichment.emailSource || null);
+        let candidateEmailSource = pdConfirmed ? 'manual' : (candidate.emailSource || enrichment.emailSource || null);
         const candidateWebsiteSource = pdConfirmed ? 'manual' : (candidate.websiteSource || enrichment.websiteSource || null);
         // PD-confirmed: persist the hand-typed contact directly (it's stamped 'manual'
         // client-side → confirm-before-invite still fires at send). Otherwise the normal
@@ -199,8 +199,31 @@ export default async function handler(req, res) {
         // NEVER the enrichment fallback. The enrichment email/website are the very values
         // the PD is overriding; if the PD blanks one, it must persist as null, not silently
         // fall back to the wrong auto-suggested value.
-        const candidateEmail = emailAllowed ? (pdConfirmed ? (candidate.email || null) : (candidate.email || enrichment.email || null)) : null;
+        let candidateEmail = emailAllowed ? (pdConfirmed ? (candidate.email || null) : (candidate.email || enrichment.email || null)) : null;
         const candidateAffiliation = affiliationAllowed ? (pdConfirmed ? (candidate.affiliation || null) : (candidate.affiliation || enrichment.affiliation || null)) : null;
+
+        // Tier-0 affiliation-email rescue (S317). When contact enrichment ran but did NOT
+        // capture an email (a partial / timed-out run — verified live for req 1003020:
+        // `wmkf_lastchecked` set but `wmkf_metricsupdatedat`/`hIndex` empty), a PubMed-style
+        // affiliation that embeds the reviewer's own corresponding address
+        // ("… Boston Children's Hospital. christopher.walsh@childrens.harvard.edu.") would
+        // otherwise be persisted with the email ORPHANED inside the affiliation string and
+        // an empty email field ("no email — can't invite"). Mirror enrichment Tier 0
+        // (contact-enrichment-service.js:439-450): extract the embedded email and persist it
+        // as `affiliation`-sourced — a grounded, name-adjacent address that enrichment itself
+        // trusts unconditionally (Tier 0 returns before domain validation, so it is immune to
+        // the paid-search domain-contradiction drop). Same safety envelope as the normal email
+        // persist: skipped for a contact-blocked (unresolved cited/PI-named) row and for
+        // PD-confirmed rows (whose contact is PD-typed only), and only when the affiliation is
+        // itself allowed to persist (candidateAffiliation non-null). Only fills a GAP — never
+        // overrides an email the normal path already captured.
+        if (!candidateEmail && !pdConfirmed && !contactBlocked && candidateAffiliation) {
+          const affiliationEmail = ContactParser.extractPrimaryEmail(candidateAffiliation);
+          if (affiliationEmail) {
+            candidateEmail = affiliationEmail;
+            candidateEmailSource = 'affiliation';
+          }
+        }
         // Enrichment stores the ORCID iD as `orcidId` (not `orcid`); read that key
         // so a candidate carrying only contactEnrichment doesn't drop a real ORCID.
         const candidateOrcid = contactBlocked ? null : (candidate.orcid || enrichment.orcidId || null);

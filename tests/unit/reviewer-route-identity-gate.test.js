@@ -626,6 +626,80 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
       errors: [{ name: 'Failing Candidate', error: 'Dataverse write failed' }],
     });
   });
+
+  // ── S317: Tier-0 affiliation-email rescue ──────────────────────────────────
+  // When enrichment ran but did not capture an email (partial/timed-out run) and the
+  // affiliation string embeds the reviewer's own address, save extracts it as
+  // `affiliation`-sourced instead of orphaning it in the affiliation field.
+  test('rescues an email embedded in the affiliation when none was captured', async () => {
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [{
+          name: 'Christopher Walsh',
+          affiliation: "Division of Genetics and Genomics, Boston Children's Hospital, Boston, MA, USA. christopher.walsh@childrens.harvard.edu.",
+          // enrichment ran but produced no email (mirrors the live req-1003020 rows)
+          contactEnrichment: { emailPersistAllowed: false, affiliationPersistAllowed: true },
+        }],
+      },
+    };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.savedCount).toBe(1);
+    // Email is extracted from the affiliation and persisted...
+    expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBe('christopher.walsh@childrens.harvard.edu');
+    // ...stamped as affiliation-sourced (trusted; not 'manual'/paid-search).
+    const researcherPayload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
+    expect(researcherPayload.email).toBe('christopher.walsh@childrens.harvard.edu');
+    expect(researcherPayload.emailSource).toBe('affiliation');
+    // The identity lookup also sees the rescued email.
+    expect(lookupReviewerIdentity).toHaveBeenCalledWith(expect.objectContaining({ email: 'christopher.walsh@childrens.harvard.edu' }));
+  });
+
+  test('does NOT override an email the normal path already captured', async () => {
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [{
+          name: 'Dr Both',
+          email: 'primary@uni.edu',
+          emailSource: 'pubmed',
+          affiliation: 'Dept of Things, Uni. other@uni.edu.',
+          contactEnrichment: { emailPersistAllowed: true, affiliationPersistAllowed: true },
+        }],
+      },
+    };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBe('primary@uni.edu');
+    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1].emailSource).toBe('pubmed');
+  });
+
+  test('no rescue when the affiliation has no email (email stays null)', async () => {
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [{
+          name: 'Dr NoEmail',
+          affiliation: 'Department of Neuroscience, Stanford University, CA, USA',
+          contactEnrichment: { emailPersistAllowed: false, affiliationPersistAllowed: true },
+        }],
+      },
+    };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBeNull();
+    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1].emailSource).toBeNull();
+  });
 });
 
 // ── /api/workbench/enrich-recommended ─────────────────────────────────────────
