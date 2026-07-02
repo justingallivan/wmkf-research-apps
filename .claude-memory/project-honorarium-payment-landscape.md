@@ -35,6 +35,9 @@ BILL tail deferred (`BILL_ONBOARDING_DEFERRED=true`). Reviewers no longer
 self-register through GoApply for this path. This does not change the payment
 finding below: individual honoraria still have no AkoyaGO/BILL payment substrate
 and remain offline/check-paid until the person-payee tail is separately solved.
+Go-live still needs the env flip plus deploy/restart; historical capture-only
+backfill must first be hardened for required address completeness and proposal
+title reload per `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §6.
 
 ## Historical GoApply-created cohort chain (all [VERIFIED via probe] unless noted)
 
