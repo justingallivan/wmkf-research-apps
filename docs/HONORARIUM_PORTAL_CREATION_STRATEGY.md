@@ -3,7 +3,7 @@ title: "Honorarium Portal-Creation Strategy (no-BILL cycle)"
 domain: finance-honoraria
 kind: plan
 status: active
-summary: "Config-gated draft implementation exists; go-live awaits env flip/deploy, backfill hardening, and Connor open items."
+summary: "Config-gated draft exists; backfill hardening + GoApply-linkage item done; go-live awaits env flip/deploy and the proposal self-lookup schema change."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -233,14 +233,21 @@ than write a malformed row (do not silently omit).
 
 ## 7. Open items (Connor)
 
-- **GoApply linkage lookups** — `_akoya_goapplyapplication_value`,
-  `_akoya_goapplyphase_value`, `_akoya_goapplysubmitter_value` are present on every
-  GoApply-created honorarium (n=87) and are **structurally absent** on
-  app-created rows (there is no GoApply application). Note `_akoya_goapplysettings_value`
-  *does* auto-populate on our create; the other three do not. **Does any payment,
-  folio, or Ops dashboard/report require these three lookups?** If a view filters
-  honoraria by GoApply application, app-created rows would be invisible to it.
-  `[SENT to Connor 2026-07-01 — awaiting reply]`
+- **GoApply linkage lookups — RESOLVED, no action needed.**
+  `_akoya_goapplyapplication_value`, `_akoya_goapplyphase_value`,
+  `_akoya_goapplysubmitter_value` are present on every GoApply-created honorarium
+  (n=87) and are **structurally absent** on app-created rows (there is no GoApply
+  application). Note `_akoya_goapplysettings_value` *does* auto-populate on our
+  create; the other three do not. **Connor confirmed (verbal, 2026-07-02) that
+  GoApply does not set any fields when a reviewer is added beyond the ones we set
+  ourselves** — those three lookups are intrinsic to a GoApply-origin row (they
+  point back to the GoApply application it came from), not attributes anything
+  requires. Corroborated on our side: no production code reads them —
+  `_akoya_goapplyapplication_value` / `_akoya_goapplyphase_value` have zero repo
+  references, and `_akoya_goapplysubmitter_value` appears only in read-only probe
+  scripts (`scripts/probe-akoya-reviewer-*.js`), never in `lib/`, `pages/`, or
+  `shared/`. `[VERIFIED via source 2026-07-02 + Connor verbal]` So app-created rows
+  being absent the three lookups is acceptable; no backfill or replication.
 - **New proposal-linkage relationship** — see §8. Connor is fine with the schema
   change in principle; tracked in §9 for the end-of-work update.
 
