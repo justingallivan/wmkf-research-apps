@@ -188,11 +188,12 @@ address.
    reviewer's contact + mailing address are still captured, but no `akoya_request`
    is minted and **no per-reviewer `honorarium_onboard_failed` email fires** (a
    single non-emailing `honorarium_capture_only` notice is recorded instead). So
-   smoke reviewers no longer need to opt out to avoid alert spam. To finish the
-   pipeline before broad live reviewer testing: run
+   smoke reviewers no longer need to opt out to avoid alert spam. For the
+   2026-07-01 no-BILL creation path, run
    `scripts/probe-honorarium-discriminators.js` against the target Dataverse
    environment, set those Vercel env vars (and clear any
-   `HONORARIUM_ONBOARDING_DEFERRED`), which re-enables honorarium-record creation.
+   `HONORARIUM_ONBOARDING_DEFERRED`), and keep `BILL_ONBOARDING_DEFERRED=true`.
+   That re-enables honorarium-record creation without firing BILL onboarding.
 
 5. Clean up the smoke candidate:
 

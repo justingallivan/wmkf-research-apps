@@ -1,16 +1,16 @@
 ---
 name: Reviewer honorarium onboarding (portal-integrated)
-description: Reviewer portal accept-action can create the honorarium akoya_request + trigger BILL.com onboarding inline, but current capture-only deferral stops before honorarium request creation when `HONORARIUM_ONBOARDING_DEFERRED` is true or discriminator GUIDs are missing. `BILL_ONBOARDING_DEFERRED` gates the later BILL step only if an honorarium request exists; mailing-address(+phone) capture still runs.
+description: Reviewer portal accept-action can create the honorarium akoya_request and can trigger BILL.com onboarding inline. For the 2026 no-BILL cycle, the current go-live plan is request creation ON (`HONORARIUM_ONBOARDING_DEFERRED` unset + discriminator GUIDs set) with BILL OFF (`BILL_ONBOARDING_DEFERRED=true`). Capture-only remains the safety/off mode when the honorarium flag is true or GUIDs are missing.
 metadata:
   type: project
   status: active
   scope: bill
-  last_verified: 2026-06-09 — code re-grounded (chunk 5 shipped; deferral gate added)
+  last_verified: 2026-07-02 against `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` and source
 ---
 
 ## Recall Rule
 
-Read this when: touching reviewer honorarium onboarding, the BILL.com integration, the Stage 2a accept path, or honorarium `akoya_request` creation.
+Read this when: touching reviewer honorarium onboarding, the BILL.com integration, the Stage 2a accept path, or honorarium `akoya_request` creation. For current no-BILL-cycle request creation, read `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` first.
 
 Do:
 - Treat the architecture as portal-integrated (Stage 2a accept extension), not PA-triggered.
@@ -20,17 +20,17 @@ Do:
 Do not:
 - Reintroduce PA-trigger / shared-secret (Q3) framing — that path is closed.
 - Use `wmkf_honorariumforrequest` — it's a dead variant.
-- Rebuild shipped chunks (lib/bill primitives, chunk-4 orchestrator, chunk-5 address UI, webhook scaffold/dedupe/logging). Chunk 5 (address UI) SHIPPED (commits `96baeb2` + `b4c91f0`); webhook event-dispatch + Dataverse PATCH remain pending 7b. Remaining gaps are 7b plus e2e against the BILL sandbox (chunk 8, blocked on Steph) — moot for THIS cycle (see deferral below).
-- **DON'T re-enable BILL this cycle.** Leadership deferred automated bill.com onboarding to NEXT cycle (2026-06-09). The gate is on; flipping it back on is a next-cycle action, not a "finish the integration" task.
+- Rebuild shipped chunks (lib/bill primitives, chunk-4 orchestrator, chunk-5 address UI, webhook scaffold/dedupe/logging). Chunk 5 (address UI) SHIPPED (commits `96baeb2` + `b4c91f0`); webhook event-dispatch + Dataverse PATCH remain pending 7b. Remaining BILL gaps are 7b plus e2e against the BILL sandbox (chunk 8, blocked on Steph) — moot for the no-BILL creation cycle.
+- **Do not re-enable BILL this cycle.** Leadership deferred automated bill.com onboarding to NEXT cycle (2026-06-09). Request creation is now a separate go-live lever: configure the honorarium GUIDs and unset `HONORARIUM_ONBOARDING_DEFERRED`, but keep `BILL_ONBOARDING_DEFERRED=true`.
 
-**⚠️ CURRENT-CYCLE STATUS (2026-06-09; static code refreshed 2026-06-23): automated BILL onboarding DEFERRED by leadership.** Re-enable NEXT cycle. Implemented as reversible gates, NOT a teardown — no BILL code removed:
-- `lib/bill/honorarium-onboard-orchestrator.js` short-circuits to capture-only before honorarium request creation when `HONORARIUM_ONBOARDING_DEFERRED=true` or required discriminator GUIDs are missing; mailing-address PATCH still runs.
-- `lib/bill/onboard-reviewer-service.js` short-circuits to `status: 'deferred'` (no BILL call, **no alert**) when `process.env.BILL_ONBOARDING_DEFERRED === 'true'`, but that is the later BILL-only gate if an honorarium request exists. Distinct from `alert_only` ("BILL not wired yet, onboard by hand"); deferred = no BILL onboarding at all this cycle, payment handled manually offline.
+**Current no-BILL-cycle status (2026-07-01 decision; source checked 2026-07-02): automated BILL onboarding DEFERRED, honorarium request creation planned ON.** Implemented as reversible gates, NOT a teardown — no BILL code removed:
+- `lib/bill/honorarium-onboard-orchestrator.js` still short-circuits to capture-only before honorarium request creation when `HONORARIUM_ONBOARDING_DEFERRED=true` or required discriminator GUIDs are missing; mailing-address PATCH still runs. This is the safety/off state.
+- The target config for the no-BILL creation cycle is to set `HONORARIUM_PROGRAM_ID`, `HONORARIUM_GRANTPROGRAM_ID`, `HONORARIUM_TYPE_ID`, unset `HONORARIUM_ONBOARDING_DEFERRED`, set `honorarium.default_amount`, and keep `BILL_ONBOARDING_DEFERRED=true`. Then `ensureHonorariumOnboarding()` mints the honorarium request at Stage 2a accept while `onboardReviewer()` returns `status: 'deferred'` (no BILL call, no alert).
 - **Phone now required + collected** in the Stage 2a payment-address card (`shared/components/external/Stage2aView.js`), validated server-side (`respond.js` `ADDRESS_MAX.phone`), persisted to `contact.address1_telephone1` (orchestrator `patchContactAddress`), and carried as `reviewerPhone` on the BILL payload next cycle (orchestrator reads `body.address.phone`).
-- **Re-enable next cycle:** unset `HONORARIUM_ONBOARDING_DEFERRED` and `BILL_ONBOARDING_DEFERRED`, set BILL creds + option-set values, flip `BILL_ENABLED=true`. Confirm `HONORARIUM_*_ID` discriminator GUIDs are set (honorarium-create needs them regardless of BILL).
+- **Re-enable full BILL next cycle:** keep the honorarium discriminator GUIDs configured, unset `BILL_ONBOARDING_DEFERRED`, set BILL creds + option-set values, and flip `BILL_ENABLED=true`.
 - Shipped on branch `feat/reviewer-onboarding-no-bill-this-cycle`.
 
-Ground truth: `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`, `docs/BILL_CHUNK_4_DESIGN.md`, `docs/BILL_LIB_DESIGN.md`; `lib/bill/*`. Related: [[akoya-payment-field-semantics]], [[akoya-request-honorarium-nomenclature]], [[project-external-reviewer-file-access]].
+Ground truth: `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`, `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`, `docs/BILL_CHUNK_4_DESIGN.md`, `docs/BILL_LIB_DESIGN.md`; `lib/bill/*`. Related: [[akoya-payment-field-semantics]], [[akoya-request-honorarium-nomenclature]], [[project-external-reviewer-file-access]].
 
 **Status (S188, 2026-05-25):** Design doc at `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`. **Architecture pivoted from PA-triggered backend-only to portal-integrated** after discovering Stage 2a accept endpoint is already shipped (since 2026-05-09) and only needs extension. No GOapply replacement work needed.
 

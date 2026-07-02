@@ -106,9 +106,11 @@ and runs inside `bypassDynamicsRestrictions`.
   must replicate all three (see §7).
 - **External routes are public** (allowlisted in `proxy.js`), so the reviewer form works
   even with auth on.
-- **Honorarium runs on accept unless opted out**, and creates a BILL vendor + a honorarium
-  `akoya_request` (chunk-4). For a clean capture-only test, **opt out** (and pre-promote
-  the contact in setup). For the #2-interaction test, leave it on.
+- **Honorarium runs on accept unless opted out.** In capture-only/off mode it patches
+  contact/address only; in the 2026-07-01 no-BILL creation posture it creates the
+  honorarium `akoya_request` while `BILL_ONBOARDING_DEFERRED=true` skips the BILL
+  vendor tail. For a clean no-honorarium test, **opt out** (and pre-promote the
+  contact in setup). For the #2-interaction test, leave it on.
 - Primitives to reuse: `mintAndStore`/`revoke`/`buildExternalUrl` (`lib/external/token-lifecycle.js`),
   `reviewer-suggestion.upsert` (`:222`), `potential-reviewer.upsertByEmail`/`setContactLink`,
   `contact.findOrCreateByEmail`/`setOrcidIfAbsent`, `normalizeOrcid` (`lib/utils/orcid-normalize.js`).

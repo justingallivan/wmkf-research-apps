@@ -145,7 +145,8 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 - All four templates are sendable: `invitation` (first contact, via ReviewerInvitePanel →
   `InviteEmailModal`, hardcoded `templateType:'invitation'`) and
   `materials`/`followup`/`thankyou` (via `ReviewerManagePanel`). The reviewer onboards
-  (COI/AI acks + capture-only honorarium/address) at the single Accept on the portal;
+  (COI/AI acks + honorarium/address; honorarium request creation is config-gated
+  and BILL remains deferred this cycle) at the single Accept on the portal;
   an acceptance-confirmation email with a review-due `.ics` ships from `respond.js` on
   first accept. There is no hold/agree-in-principle view.
 - The invitation default now surfaces proposal context for **early COI flagging**:

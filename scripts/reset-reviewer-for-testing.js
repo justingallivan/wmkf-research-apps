@@ -12,8 +12,9 @@
  *   4. PATCH the person row to clear the 3 board-identity fields (rank/dept/institution).
  * Leaves the core person + contact identity (name/email) intact so it's reusable.
  * Clears the honorarium-request LOOKUP on the suggestion (so a live-mode test row
- * isn't treated as already-onboarded) but does NOT delete an akoya_request row —
- * accept is capture-only in prod, so normally there is none.
+ * isn't treated as already-onboarded) but does NOT delete an akoya_request row.
+ * Capture-only runs have none; no-BILL creation runs need separate honorarium-row
+ * cleanup if a real request was minted.
  *
  * Target:  --email <addr> --requestNumber <num>   (or --suggestionId <guid>)
  * DRY-RUN by default; --commit to write. Idempotent. Refuses ambiguous targets,

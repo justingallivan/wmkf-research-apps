@@ -1,33 +1,47 @@
 ---
-name: Reviewer honorarium onboarding→payment reality (current-state, reverse-engineered)
-description: How reviewer honoraria actually get onboarded and (don't) get paid today, reverse-engineered from live Dataverse probes 2026-06-27. Core finding for Steph/Ops "mimic Rosie's grant flow" ask: the AkoyaGO payment engine has NEVER paid an individual (0/9,151 disbursements) — it is rail-agnostic but payee-bound to institutions. The gap is the vendor+payment tail, not onboarding.
+name: Reviewer honorarium onboarding/payment reality (current-state, reverse-engineered)
+description: How reviewer honoraria get created and still do not get paid through AkoyaGO/BILL. Core finding for Steph/Ops "mimic Rosie's grant flow" ask: the AkoyaGO payment engine has NEVER paid an individual (0/9,151 disbursements) - it is rail-agnostic but payee-bound to institutions. As of the 2026-07-01 no-BILL-cycle decision, our portal is the planned sole creator of reviewer honorarium akoya_request rows, but the vendor+payment tail remains deferred/offline.
 metadata:
   type: project
   status: active
   scope: bill
-  last_verified: 2026-06-28 — Threads 1+2 resolved (classification=fixed template, automatable; approval-flags NOT dead); core 0/9,151 finding 2026-06-27
+  last_verified: 2026-07-02 against `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`; payment probes remain 2026-06-27/28 and were not re-run
 ---
 
 ## Recall Rule
 
 Read this when: responding to Ops/Steph about paying reviewers, designing or
 scoping any honorarium-payment path, or weighing "mimic Rosie's grant→BILL
-workflow for honoraria." Pairs with [[akoya-payment-field-semantics]] (field
-detail), [[akoya-request-honorarium-nomenclature]] (person-vs-institution
-discriminators), [[project-bill-honorarium-integration]] (the deferred portal
-build). Numbers below are live-probed 2026-06-27; re-probe before treating as
+workflow for honoraria." Pairs with `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`
+(current no-BILL creation plan), [[akoya-payment-field-semantics]] (field detail),
+[[akoya-request-honorarium-nomenclature]] (person-vs-institution discriminators),
+and [[project-bill-honorarium-integration]] (portal-integrated pipeline). Payment
+numbers below are live-probed 2026-06-27/28; re-probe before treating them as
 current next cycle.
 
 ## The ask (context)
 Steph (Director of Ops) confirmed BILL is NOT integrating with the reviewer
-module this cycle, but wants Ops to "mimic the existing Akoya→BILL grant-payment
+module this cycle, but wanted Ops to "mimic the existing Akoya->BILL grant-payment
 workflow Rosie runs" so reviewer honoraria can be pulled into BILL, vendor'd, and
-paid — minus the BILL→Akoya payment-status feedback loop. Rosie = payments
+paid - minus the BILL->Akoya payment-status feedback loop. Rosie = payments
 operator. Connor/Sarah = AkoyaGO admins (Connor backend, Sarah frontend+staff;
 Sarah Hibler is internal and does folio releases). "BCO"/Bromelkamp = the AkoyaGO
 vendor.
 
-## Reverse-engineered current-state chain (all [VERIFIED via probe] unless noted)
+**2026-07-01 update:** onboarding/request creation and payment are now separated.
+For reviewers who come through our portal, the portal is the planned sole creator
+of the honorarium `akoya_request` via `ensureHonorariumOnboarding()` with the
+BILL tail deferred (`BILL_ONBOARDING_DEFERRED=true`). Reviewers no longer
+self-register through GoApply for this path. This does not change the payment
+finding below: individual honoraria still have no AkoyaGO/BILL payment substrate
+and remain offline/check-paid until the person-payee tail is separately solved.
+
+## Historical GoApply-created cohort chain (all [VERIFIED via probe] unless noted)
+
+This describes the pre-portal GoApply cohort that existed before the 2026-07-01
+no-BILL creation decision. Keep it as payment-landscape evidence and comparison
+data; do not treat it as the forward reviewer path for portal-created rows.
+
 ```
 1. Staff (Rosie, [INFERRED — upstream in GoApply, not in Dataverse]) invites each
    reviewer into GoApply.            ← 87/87 honoraria have a per-reviewer
@@ -118,11 +132,12 @@ vendor.
   Hibler), then BILL/Bromelkamp executes money-out.
 
 ## Portal connection
-The front-of-funnel manual step (staff invites reviewers into GoApply → they
-self-register) is exactly what the reviewer portal's Review-Manager invite →
-magic-link → Stage 2a accept flow already automates ([[project-bill-honorarium-integration]],
-[[project-reviewer-hold-step-decouple]]). So onboarding is a solved problem on the
-portal side; the unsolved part is the vendor+payment tail for an individual payee.
+The front-of-funnel manual step (staff invites reviewers into GoApply and they
+self-register) is replaced for portal reviewers by Review-Manager invite ->
+magic-link -> Stage 2a accept. The 2026-07-01 strategy turns this from
+"capture-only address collection" into app-created honorarium request creation
+with the BILL tail deferred. So request creation is now the portal-side work; the
+unsolved part remains the vendor+payment tail for an individual payee.
 
 ## Scoping: capturing PNIs without BILL API access (S298, Justin)
 Goal: capture each reviewer's **PNI** (BILL Payment Network ID — the unique key) so
@@ -195,10 +210,12 @@ against #1002238's PAID child #0024011). Audit via RetrieveRecordChangeHistory
 (bulk `audits` query is blocked — app user lacks ReadAuditSummary).
 
 ## Open threads (session tasks)
-1. (done 2026-06-28) Connor's classification = a FIXED TEMPLATE, fully automatable —
-   Individual / Honorarium / Research Reviewer / $250 flat / cycle meeting-date; no
-   per-reviewer judgment. Only signal an automation needs is "this synced request is a
-   reviewer honorarium" (GoApply source). See chain step 4 + the probe.
+1. (done 2026-06-28; superseded as forward path 2026-07-01) Connor's classification
+   of GoApply-created rows = a FIXED TEMPLATE, fully automatable - Individual /
+   Honorarium / Research Reviewer / $250 flat / cycle meeting-date; no per-reviewer
+   judgment. The forward portal path now writes the template directly at create
+   time instead of detecting a GoApply-synced request. See
+   `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`.
 2. (done 2026-06-28) Approval fields are NOT dead org-wide — 3 of 4 populated on
    grants (303/323/611), only `wmkf_controllerapproved` unused; 0 on honorarium-type.
    REFUTES the earlier "all dead" read. See the Approvals section.

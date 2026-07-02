@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-22
+last_verified: 2026-07-02
 stale_after_days: 90
 owner: finance-ops
 source_files:
@@ -10,6 +10,7 @@ source_files:
 canonical_docs:
   - docs/APPLICATION_STATE_ATLAS.md
   - docs/atlas/
+  - docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md
 watch_paths:
   - pages/api/external/review/**
   - pages/api/review-manager/**
@@ -33,22 +34,33 @@ source, Atlas, and the Power Automate owner before testing against production.
 - Firm data constraint: `project-no-banking-pii-in-dataverse`.
 - External accept automation hazard: `project-reviewer-accept-prod-automation`.
 
-## Capture-only (deferred) honorarium onboarding
+## Honorarium Request Creation And BILL Deferral
 
-**Prod state (2026-06-22):** `HONORARIUM_ONBOARDING_DEFERRED=true` is now SET in
-Production (the three discriminator GUIDs remain unset), so reviewer accept is
-capture-only by **explicit** lock this cycle — addresses captured for manual
-checks, no Bill.com payment can fire. See `docs/CREDENTIALS_RUNBOOK.md` →
-Operational Flags. This is the safety lock for the reviewer onboarding-at-accept
-cycle (`project-reviewer-hold-step-decouple`).
+**Current plan (2026-07-01 decision):** full BILL.com onboarding remains deferred,
+but the portal is now the planned sole creator of reviewer honorarium
+`akoya_request` rows for reviewers who come through it. Use
+`docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` as the current source of truth for
+the no-BILL cycle. The clean go-live posture is:
 
-Two independent deferral gates sit on the post-accept honorarium pipeline; both
-capture the reviewer's contact + mailing address upstream and pay manually:
+- set the three honorarium discriminator GUIDs;
+- unset `HONORARIUM_ONBOARDING_DEFERRED` so `ensureHonorariumOnboarding()` mints
+  the honorarium request;
+- set `BILL_ONBOARDING_DEFERRED=true` so `onboardReviewer()` silently skips BILL;
+- keep payment offline by check until the person-payee/BILL tail is separately
+  approved and verified.
+
+The 2026-06-22 production lock was capture-only:
+`HONORARIUM_ONBOARDING_DEFERRED=true` with the discriminator GUIDs unset. Treat
+that as the safety/off state before the config flip, not the target operating
+state for the no-BILL creation cycle.
+
+Two independent deferral gates sit on the post-accept honorarium pipeline:
 
 - **`HONORARIUM_ONBOARDING_DEFERRED=true`** (or discriminator GUIDs unset) →
   `ensureHonorariumOnboarding()` returns `status: 'deferred'` **before** minting
-  the `akoya_request` or calling BILL. It does NOT throw. `respond.js` picks the
-  alert posture from the deferred result, in priority order:
+  the `akoya_request` or calling BILL. It captures the contact + mailing address
+  upstream and does not throw. `respond.js` picks the alert posture from the
+  deferred result, in priority order:
   - `addressCaptureError` set (the address PATCH failed → no downstream copy) →
     emailing **warning** `honorarium_capture_failed`, deduped per suggestion, on
     every accept until resolved (keeps address-copy failure visible — Codex S274 P1).
@@ -57,15 +69,16 @@ capture the reviewer's contact + mailing address upstream and pay manually:
     deduped to one recurring alert (Codex S274 P2).
   - otherwise → ONE non-emailing `honorarium_capture_only` notice (`info`,
     `emailAdmins:false`) per fresh accept.
-  Use when the payment pipeline isn't built yet but you still want address+choice.
-  Note: the explicit flag is checked FIRST, so re-enabling creation needs all three
-  GUIDs **and** the flag unset.
+  Use only for capture-only/off mode. Note: the explicit flag is checked FIRST,
+  so enabling request creation needs all three GUIDs **and** the flag unset.
 - **`BILL_ONBOARDING_DEFERRED=true`** → one step LATER: the `akoya_request` IS
-  created, but `onboardReviewer()` returns `status: 'deferred'` (no BILL, no alert).
+  created, but `onboardReviewer()` returns `status: 'deferred'` (no BILL, no
+  alert). This is the target no-BILL creation posture.
 
-Both are reversible env gates (configure GUIDs / set `BILL_ENABLED=true`, unset the
-flag). Source: `lib/bill/honorarium-onboard-orchestrator.js`,
-`lib/bill/onboard-reviewer-service.js`; design banners in
+Both are reversible env gates. Source:
+`lib/bill/honorarium-onboard-orchestrator.js`,
+`lib/bill/onboard-reviewer-service.js`; current strategy:
+`docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`; older design banners:
 `docs/BILL_CHUNK_4_DESIGN.md` + `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`.
 
 Reviewers who accepted while capture-only was on won't re-accept, so once the

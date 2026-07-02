@@ -71,7 +71,8 @@ Claude config sync, and environment-specific operating notes.
   board-identity fields. Parent PATCH runs BEFORE the child deletes (crash-safe order).
   Guards: refuses applicant-disposition rows and any reviewer whose name lacks "test"
   (override `--force`). Dry-run by default; `--commit` writes. Codex-reviewed (3 rounds).
-  No `akoya_request` teardown — accept is capture-only in prod.
+  No `akoya_request` teardown — in capture-only mode there is none; in the
+  no-BILL creation posture, any minted honorarium request needs separate cleanup.
 
 ## Commit Guards & Triggers
 

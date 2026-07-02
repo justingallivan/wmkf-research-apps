@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-hold-step-decouple
-description: Reviewer invite→accept direction (REVISED S279, supersedes the S256 deferral plan). Collapse invite→hold→finalize→accept into ONE final Accept that onboards up front — COI/AI acks + honorarium opt-in/address via the existing capture-only path (NO Bill.com) — and sends an acceptance-confirmation email carrying an .ics save-the-date (review due date). Proposal/materials are delivered separately when ready. Post-accept exit is out-of-band (personal email to PD → renegotiate due date → manual Remove that also resets engagement flags). No separate willing/held or finalize reviewer step.
+description: Reviewer invite-to-accept direction (REVISED S279, supersedes the S256 deferral plan). Collapse invite-to-hold-to-finalize-to-accept into ONE final Accept that onboards up front: COI/AI acks plus honorarium opt-in/address. As of the 2026-07-01 no-BILL decision, the forward plan is app-created honorarium request with BILL deferred; capture-only remains the safety/off mode. Proposal/materials are delivered separately when ready. Post-accept exit is out-of-band (personal email to PD, renegotiate due date, or manual Remove that also resets engagement flags). No separate willing/held or finalize reviewer step.
 metadata:
   type: project
   status: active
   scope: reviewer-finder
-  last_verified: 2026-06-22 (S279) — direction revised + confirmed by Justin; honorarium capture-only path and Remove-button behavior re-verified in code
+  last_verified: 2026-07-02 against honorarium strategy doc; accept-flow direction still from S279
 ---
 
 ## Recall Rule
@@ -23,19 +23,20 @@ model is dropped.
 
 **The single Accept (the only reviewer decision):**
 - "Yes, I'll review" + COI/AI acknowledgements + honorarium opt-in.
-- If honorarium wanted → collect mailing address. Runs the EXISTING capture-only path
-  (`ensureHonorariumOnboarding` with `isDeferred()` true): ensures the contact + PATCHes the address,
-  then STOPS — does NOT create the honorarium `akoya_request` and does NOT call BILL. So accepting does
-  NOT fire the Connor-gated "Bill.com - Push Payments" automation. The contact-address PATCH DOES still
-  fire `AkoyaGo.Sync_BusinessCentral` (benign — the address landing in accounting, which is what makes
-  it usable for mailing a check, as last cycle). [VERIFIED S279 — `lib/bill/honorarium-onboard-orchestrator.js:53-134`]
-- Explicit safety lock (2026-06-22): `HONORARIUM_ONBOARDING_DEFERRED=true` is now SET in prod Vercel,
-  AND the 3 discriminator GUIDs are unset — so capture-only is enforced by the flag, not just incidental.
-  No Bill.com payment can fire this cycle. Verified via `vercel env ls` (no `HONORARIUM_*` GUIDs set).
-  Documented in `docs/CREDENTIALS_RUNBOOK.md` (Operational Flags) + the finance-honoraria wiki topic.
-- "Partial now, full later": address captured now; to go live on Bill.com later, configure the 3
-  discriminator GUIDs AND unset `HONORARIUM_ONBOARDING_DEFERRED` — the full create+onboard tail then
-  runs on a later accept (reversible, by design).
+- If honorarium wanted -> collect mailing address. As of the 2026-07-01
+  no-BILL-cycle decision, the forward target is to run `ensureHonorariumOnboarding`
+  with the three discriminator GUIDs set and `HONORARIUM_ONBOARDING_DEFERRED`
+  unset, so accepting creates the honorarium `akoya_request` directly while
+  `BILL_ONBOARDING_DEFERRED=true` keeps BILL/payment offline. See
+  `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`.
+- Capture-only remains the safety/off mode: `HONORARIUM_ONBOARDING_DEFERRED=true`
+  or missing discriminator GUIDs makes `ensureHonorariumOnboarding()` ensure the
+  contact + PATCH the address, then stop before creating the honorarium request
+  or calling BILL. This was the explicit 2026-06-22 production lock before the
+  no-BILL creation decision.
+- Full BILL onboarding is still later: after the no-BILL creation cycle, keeping
+  the honorarium GUIDs configured but unsetting `BILL_ONBOARDING_DEFERRED` and
+  setting BILL credentials re-enables the BILL tail.
 - Reviewer receives an acceptance-confirmation email carrying an `.ics` save-the-date keyed to
   `wmkf_reviewduedate` (`lib/external/calendar-invite.js`, rewired off the removed hold template;
   rekey `meetingDate` → `reviewDueDate`). This reviewer-facing confirmation now sends on fresh accept;
@@ -65,10 +66,10 @@ the `wmkf_heldat` column are KEPT for read-safety; a historical `held` row route
 so the acceptance-confirmation email also carries the materials link and the separate `materials` send
 folds in. The `.ics` already lives on that email, so nothing moves.
 
-**Docs reconciled (S279 /sweep):** `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`
+**Docs reconciled (S279 /sweep; honorarium sub-state refreshed 2026-07-02):** `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`
 (four templates, no hold view), `docs/REVIEWER_ENGAGEMENT_SPEC.md` (hold path removed),
 `docs/REVIEWER_HOLD_STEP_BUILD_PLAN.md` (RETIRED banner). `docs/CREDENTIALS_RUNBOOK.md` +
-`docs/agent-wiki/topics/finance-honoraria.md` carry the capture-only lock (Chunk C).
+`docs/agent-wiki/topics/finance-honoraria.md` carry the honorarium gate posture.
 
 ## SUPERSEDED — original S256 plan (kept for context only)
 

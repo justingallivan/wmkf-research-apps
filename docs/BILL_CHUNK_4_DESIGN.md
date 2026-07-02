@@ -1,8 +1,8 @@
 # BILL Chunk 4 Design — respond.js accept-path extension + amount-as-setting + Full-real-fix hardening
 
 **Status:** draft for pre-impl Codex review (S199, 2026-05-29)
-**⚠️ Current-cycle (2026-06-09):** automated BILL onboarding DEFERRED — `onboardReviewer()` short-circuits to `status: 'deferred'` (no BILL, NO alert) when `BILL_ONBOARDING_DEFERRED=true`. The `alert_only` references below are the BILL-disabled fallback, superseded by the deferral gate this cycle; address+phone are now server-enforced (`422 payment_contact_required`). Parent doc's current-cycle update is authoritative.
-**⚠️ Current-cycle (2026-06-21): honorarium-create itself is also deferrable (capture-only).** `ensureHonorariumOnboarding()` now short-circuits to `status: 'deferred'` AFTER capturing contact + mailing address but BEFORE minting the `akoya_request` or calling BILL — when `HONORARIUM_ONBOARDING_DEFERRED=true` OR the discriminator GUIDs (`HONORARIUM_PROGRAM_ID` / `HONORARIUM_GRANTPROGRAM_ID` / `HONORARIUM_TYPE_ID`) are unset. It does NOT throw, so `respond.js` fires NO per-reviewer warning email — instead it records ONE non-emailing `honorarium_capture_only` notice (severity `info`, `emailAdmins:false`) on a fresh accept. Use this when the honorarium payment pipeline isn't built yet but you still want to capture reviewer address + choice. Reversible: configure the GUIDs / unset the flag and the full create+onboard tail runs unchanged on a later accept (or a backfill). When this gate is OFF, the chunk-4 accept path creates the honorarium + PATCHes address/phone as designed below.
+**⚠️ Current-cycle (2026-07-01):** automated BILL onboarding remains DEFERRED — `onboardReviewer()` short-circuits to `status: 'deferred'` (no BILL, NO alert) when `BILL_ONBOARDING_DEFERRED=true`. The no-BILL target is now app-created honorarium requests: configure the three honorarium discriminator GUIDs, unset `HONORARIUM_ONBOARDING_DEFERRED`, set `honorarium.default_amount`, and keep `BILL_ONBOARDING_DEFERRED=true`. Parent doc plus `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` are authoritative.
+**⚠️ Capture-only/off mode (2026-06-21):** `ensureHonorariumOnboarding()` short-circuits to `status: 'deferred'` AFTER capturing contact + mailing address but BEFORE minting the `akoya_request` or calling BILL when `HONORARIUM_ONBOARDING_DEFERRED=true` OR the discriminator GUIDs are unset. It does NOT throw, so `respond.js` fires NO per-reviewer warning email — instead it records ONE non-emailing `honorarium_capture_only` notice (severity `info`, `emailAdmins:false`) on a fresh accept. Use this as the safety lock, not as the target state for the no-BILL creation cycle.
 **Parent:** `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md` (umbrella plan, Connor sign-off 2026-05-26)
 **Hardening source:** `docs/REVIEWER_BILL_HARDENING_FINDINGS.md` (S198 deep-pass; 3 money-adjacent P1s)
 **Sibling shipped chunks:** 1 (junction lookup `wmkf_HonorariumRequest`), 2-3 (`lib/bill/`), 6 (`/api/bill/onboard-reviewer` + service), 7a (webhook scaffold)
@@ -51,6 +51,12 @@ Sequence inside the orchestrator:
 4. **Call `/api/bill/onboard-reviewer`** (HMAC-signed via `signInternalCall`) with `{ honorariumRequestId, reviewerContactId, reviewerName, reviewerEmail, reviewerPhone, address }`. Fire-and-await; the endpoint always 200s with the outcome in `status`. Record the status; never fail the accept on it. When `BILL_ENABLED=false` (sandbox not provisioned) the endpoint returns `alert_only` and ops onboards manually — so this chunk is shippable before the BILL sandbox lands.
 
 ### Honorarium `akoya_request` create body
+
+> **Superseded for current go-live (2026-07-01):** the live-probed create-body
+> contract is now `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §3-§5. The sketch
+> below predates the nav-property casing fix and the added amount/type/reminder/
+> fiscal-year fields; do not copy it into implementation.
+
 ```js
 {
   akoya_requestid: <pre-generated GUID>,
