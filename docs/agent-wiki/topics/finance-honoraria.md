@@ -40,7 +40,9 @@ source, Atlas, and the Power Automate owner before testing against production.
 but the portal is now the planned sole creator of reviewer honorarium
 `akoya_request` rows for reviewers who come through it. Use
 `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` as the current source of truth for
-the no-BILL cycle. The clean go-live posture is:
+the no-BILL cycle. **This posture WENT LIVE in Production 2026-07-02** (GUIDs set,
+`HONORARIUM_ONBOARDING_DEFERRED` removed from Production / kept `true` on Preview,
+BILL still deferred, prod redeployed). The clean go-live posture is:
 
 - set the three honorarium discriminator GUIDs;
 - unset `HONORARIUM_ONBOARDING_DEFERRED` so `ensureHonorariumOnboarding()` mints

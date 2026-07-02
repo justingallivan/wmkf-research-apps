@@ -3,7 +3,7 @@ title: "Honorarium Portal-Creation Strategy (no-BILL cycle)"
 domain: finance-honoraria
 kind: plan
 status: active
-summary: "Config-gated draft exists; backfill hardening, GoApply-linkage, and the proposal self-lookup are done; go-live awaits env flip/deploy."
+summary: "No-BILL honorarium creation went LIVE in Production 2026-07-02 (BILL still deferred); self-lookup + backfill hardening done; capture-only backfill pending."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -55,14 +55,16 @@ date noted · `[DECISION]` = settled by Justin/Connor · `[OPEN]` = needs Connor
 ## 2. Config flip (turn creation on, keep BILL off)
 
 The pipeline has two independent gates. The clean "create the request, skip BILL"
-state is:
+state is **LIVE in Production as of 2026-07-02** (redeploy
+`dpl_CqnqfG6mp3U9FkLuvzWsuzmnUfc1`, aliased to reviews.wmkeck.org +
+applications.wmkeck.org):
 
 | Setting | Value | Effect |
 |---|---|---|
 | `HONORARIUM_PROGRAM_ID` | `7e744a42-37eb-f011-8543-6045bd02b4cc` (Research Reviewer) | discriminator |
 | `HONORARIUM_GRANTPROGRAM_ID` | `60ef7626-38eb-f011-8543-6045bd02b4cc` (Honorarium) | discriminator |
 | `HONORARIUM_TYPE_ID` | `4bab15c9-38eb-f011-8543-6045bd02b4cc` (Individual) | discriminator |
-| `HONORARIUM_ONBOARDING_DEFERRED` | **unset** (prod was locked to `true` as of 2026-07-01; re-verify before flip) | allows the create to run |
+| `HONORARIUM_ONBOARDING_DEFERRED` | **unset in Production 2026-07-02 (GO-LIVE)**; kept `true` on Preview (preview stays capture-only) | allows the create to run |
 | `BILL_ONBOARDING_DEFERRED` | **`true`** | skips the BILL call silently — no BILL, no per-reviewer alert (`onboard-reviewer-service.js:86`) |
 | `wmkf_appsystemsettings` key `honorarium.default_amount` | e.g. `250` | stamped amount; confirmed-absent key falls back to `$250`, malformed/unavailable setting throws (`lib/services/honorarium-config.js`) |
 
