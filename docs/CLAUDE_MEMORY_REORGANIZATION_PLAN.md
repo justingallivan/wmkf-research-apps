@@ -216,9 +216,6 @@ Replace `.claude-memory/MEMORY.md` with a compact router shaped like this.
 - Dev environment: project-dev-environment.md; project-vercel-sensitive-env-pull-empty.md; env-broken-git-autogc.md; local-jest-build-environment.md
 - Strategy/roadmap: project-system-model.md; project-strategy-direction.md; project-app-roadmap-2026-04-25.md
 
-## User Context
-- Power Automate familiarity: user-powerautomate.md
-
 ## Archive
 - Closed shipped work: project-closed-work-archive.md
 ```

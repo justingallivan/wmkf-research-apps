@@ -52,8 +52,5 @@
 - Grantee and email templates: project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md
 - Deferred cleanup / dead-code session: project-deferred-code-cleanup.md
 
-## User Context
-- Power Automate familiarity: user-powerautomate.md
-
 ## Archive
 - Closed & shipped work index: project-closed-work-archive.md

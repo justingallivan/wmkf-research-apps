@@ -69,7 +69,7 @@ After consolidating prose in `.claude-memory/MEMORY.md` without deleting any
 leaf memory files:
 
 ```text
-MEMORY.md: 6,010 bytes / 60 lines / 39 router entries
+MEMORY.md: 5,941 bytes / 57 lines / 38 router entries
 ```
 
 Post-Slice 1 section costs:
@@ -93,12 +93,12 @@ Measured with the same read-only inventory:
 
 | Metric | Count |
 |---|---:|
-| `.claude-memory/*.md` files excluding `MEMORY.md` | 192 |
-| Active | 180 |
+| `.claude-memory/*.md` files excluding `MEMORY.md` | 191 |
+| Active | 179 |
 | Stale | 2 |
 | Closed | 9 |
 | Superseded | 1 |
-| Active with `unknown` or `not re-probed` in `last_verified` | 103 |
+| Active with `unknown` or `not re-probed` in `last_verified` | 102 |
 | Active without `## Recall Rule` | 34 |
 
 This is the largest hygiene risk. A green router gate proves structure, not
@@ -138,12 +138,12 @@ The router is under the `12KB` hard cap but above the `11KB` warning band. The
 largest cost centers are `Task Routing`, `Working Norms`, and `Always-Read
 Guardrails`.
 
-Status: addressed by Slice 1 on 2026-07-02. The router is now `6,010` bytes /
-`60` lines. Continue to enforce the same shape.
+Status: addressed by Slice 1 on 2026-07-02. The router is now `5,941` bytes /
+`57` lines. Continue to enforce the same shape.
 
 ### P1 - Active memory status is overused
 
-`180` of `192` leaf memory files are active, but `103` active files carry an
+`179` of `191` leaf memory files are active, but `102` active files carry an
 unknown or not-reprobed verification basis. That makes "active" too weak as a
 retrieval signal.
 
@@ -190,7 +190,7 @@ The leaf memory keeps the rationale; the router should not.
 ### Slice 1 - Router diet
 
 Status: complete on 2026-07-02. `.claude-memory/MEMORY.md` was reduced from
-`11,255` bytes / `100` lines to `6,010` bytes / `60` lines.
+`11,255` bytes / `100` lines to `5,941` bytes / `57` lines.
 
 Recommended edits:
 
@@ -305,7 +305,7 @@ Only after the report is stable should any part of it become fail-closed.
 
 - Do not delete memory files in the first cleanup pass.
 - Do not move app structural truth from Atlas into wiki or memory.
-- Do not re-probe all `103` questionable active memories before triage.
+- Do not re-probe all `102` questionable active memories before triage.
 - Do not make `MEMORY.md` a compressed encyclopedia. A shorter dense router is
   still the wrong shape.
 - Do not treat this point-in-time report as future truth without re-running the

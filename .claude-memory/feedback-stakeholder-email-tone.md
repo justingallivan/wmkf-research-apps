@@ -21,7 +21,7 @@ Do not:
 - Use insider jargon ("semantically load-bearing", "intake-portal drain", "source-of-truth picklist") as framing.
 - Assume code paths/table names help unless they are the literal answer-target the recipient must act on.
 
-Ground truth: historical-only (lesson, not live state). Related: [[user-powerautomate]].
+Ground truth: historical-only (lesson, not live state).
 
 Drafts of emails to non-engineers regularly fall into codebase-shape jargon
 that doesn't help the reader. S183: the Connor Q1-Q4 draft used phrases
@@ -51,4 +51,3 @@ recipient can use. The writer feels more rigorous; the reader feels lost.
 - Sarah: form-design lens, no system context — frame everything in
   applicant-experience terms.
 - DFT: IT-ops lens, no app context — frame in M365 admin-console terms.
-- Connects to [[user-powerautomate]] (per-stakeholder calibration).

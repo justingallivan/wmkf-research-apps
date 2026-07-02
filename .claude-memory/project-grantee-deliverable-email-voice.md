@@ -57,4 +57,4 @@ PD-signed, and deadline-driven; a generic Foundation sign-off and portal mechani
 in the body read wrong to a grantee. **How to apply:** preserve the editable
 `email.grantee_invite.*` defaults and `fillInviteBody` placeholder behavior in the
 PD-voice structure above; keep the message staff-editable. Related:
-[[feedback-stakeholder-email-tone]], [[user-powerautomate]].
+[[feedback-stakeholder-email-tone]].
