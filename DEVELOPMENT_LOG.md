@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Reviewer honorarium request creation went live in production, no-BILL (Session 316)
+
+**Milestone:** The reviewer honorarium pipeline now **mints real honorarium `akoya_request` rows in production** when a non-opt-out reviewer accepts — the "no-BILL" cycle (request creation on, Bill.com payment still deferred). This flips on a pipeline that had been capture-only since 2026-06-22.
+
+**Sessions:** 316. Field creation + env flip done live this session (Dataverse Web API / Vercel CLI); Codex-reviewed the backfill hardening (caught a P0).
+
+**Ship state:**
+- **Go-live** — set the 3 discriminator GUIDs on Production, removed `HONORARIUM_ONBOARDING_DEFERRED` from Production (kept `true` on Preview → preview stays capture-only), kept `BILL_ONBOARDING_DEFERRED=true`, redeployed prod (`dpl_CqnqfG6mp3U…`, aliased reviews/applications.wmkeck.org). New accepts mint; payment stays offline/by-check.
+- **New schema** — created a self-referential lookup `wmkf_reviewedproposal` on `akoya_request` (honorarium → parent proposal) via the Web API; the create binds it (`wmkf_ReviewedProposal@odata.bind`) so app-created honoraria feed Connor's AkoyaGO dashboard. Meeting date + fiscal year cue from the parent proposal (`orchestrator:156/180/181`); no parent meeting date → create refused (accept still succeeds).
+- **Backfill hardening** — extracted the accept-path address contract (presence **and** validity) into `lib/external/required-address.js`, shared by the fresh-accept guard and the capture-only backfill; added `akoya_title`. Codex P0: the backfill had enforced only presence, not country-ISO2 validity.
+- **Backfill run: unneeded** — read-only sweep found only 4 capture-only-window candidates, all test rows; no real cohort.
+
+**Why it matters:** reviewer honoraria are now first-class Dataverse records created at accept time, linked to and dated from their proposal — the substrate Ops needs, without turning on payment. Full BILL payment enablement stays a separate, leadership-gated step.
+
+**Pointers:** `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` (§2 live, §6 backfill, §8/§9 self-lookup); `docs/CREDENTIALS_RUNBOOK.md` honorarium flags; commits `76a721a1`, `46575e8c`, `a3d83a8d`, `1291b0fb`, `f340e776`.
+
 ## June 2026 — Reviewer rating columns retired; ratings live solely in the answer snapshot (Session 305)
 
 **Milestone:** The three legacy parent rating columns on `wmkf_appreviewersuggestion` (`wmkf_reviewerimpact` / `wmkf_reviewerrisk` / `wmkf_revieweroverallrating`) are **gone** — dropped from Dataverse. Review ratings now live in exactly one place, the `wmkf_appreviewanswer` snapshot. This closes the staff-editable-review-questions epic (Phases A–E).
