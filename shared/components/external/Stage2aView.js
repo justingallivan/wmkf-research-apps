@@ -596,6 +596,14 @@ function AddressCard({ address, errors, onUpdate, disabled, prefilled }) {
   );
 }
 
+// >95% of our reviewers are US-based, so pin the United States to the top of the
+// country picker (above a separator) rather than making everyone scroll to "U".
+// COUNTRIES itself stays alphabetical — this only affects the picker's render order,
+// not the stored value (still an ISO alpha-2 code) or the lookup maps.
+const PICKER_PRIORITY_CODES = ['US'];
+const PICKER_PRIORITY = COUNTRIES.filter((c) => PICKER_PRIORITY_CODES.includes(c.code));
+const PICKER_REST = COUNTRIES.filter((c) => !PICKER_PRIORITY_CODES.includes(c.code));
+
 function CountrySelect({ value, onChange, disabled, error }) {
   const errorId = error ? 'country-error' : undefined;
   return (
@@ -616,7 +624,11 @@ function CountrySelect({ value, onChange, disabled, error }) {
         }`}
       >
         <option value="">Select a country…</option>
-        {COUNTRIES.map((c) => (
+        {PICKER_PRIORITY.map((c) => (
+          <option key={c.code} value={c.code}>{c.name}</option>
+        ))}
+        <option value="" disabled>──────────</option>
+        {PICKER_REST.map((c) => (
           <option key={c.code} value={c.code}>{c.name}</option>
         ))}
       </select>
