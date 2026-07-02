@@ -95,6 +95,24 @@ required-address completeness AND validity checks as fresh accept — the shared
 reload, so historical rows can no longer mint with partial/unnormalized stale
 contact addresses (e.g. a full-name country) or generic proposal titles.
 
+### Honorarium → proposal self-lookup (approved 2026-07-02, not yet wired)
+
+A honorarium and a proposal are both `akoya_request` rows, and there is no native
+self-referential lookup on `akoya_request` (verified: 65 lookup fields, none targets
+`akoya_request`). To give each app-created honorarium a structured, queryable link to
+the proposal it reviews, Connor is creating a custom self-lookup on `akoya_request` →
+`akoya_request` (proposed `wmkf_relatedproposal`; final name is Connor's, to be
+surfaced in an AkoyaGO dashboard). Being self-referential, it exposes a Referencing
+(N:1) nav property (the one our create binds, honorarium → proposal) and a Referenced
+(1:N) collection (proposal → its honoraria). **Status:** the bind is parked as a TODO
+in `lib/bill/honorarium-onboard-orchestrator.js` (create body) — wire it only after
+Connor publishes and the exact Referencing nav-property casing is confirmed from live
+metadata (`0x80060888` on wrong casing). Our app populates the FK on create but does
+NOT surface the field in its own UI yet. Until the lookup lands, the proposal is still
+conveyed by the honorarium title (Option C) and derivable via the
+`wmkf_appreviewersuggestion` junction (`wmkf_HonorariumRequest` + `wmkf_Request`).
+Detail: `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §8/§9.
+
 ## Standard Probe
 
 ```bash
