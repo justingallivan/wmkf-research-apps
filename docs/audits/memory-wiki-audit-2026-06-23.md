@@ -305,9 +305,9 @@ These claims are plausibly important but depend on live Dataverse, Postgres, Ver
 | `.claude-memory/project-vercel-sensitive-env-pull-empty.md` | 0 | 0 | 0 | 0 |
 | `.claude-memory/project-virtual-review-panel.md` | 15 | 0 | 0 | 0 |
 | `.claude-memory/project-virus-scanning-it-context.md` | 2 | 0 | 0 | 0 |
-| `.claude-memory/project-w6-table-drop-pending.md` | 13 | 0 | 0 | 0 |
+| `.claude-memory/project-w6-table-drop-closed.md` | 13 | 0 | 0 | 0 |
 | `.claude-memory/project-wave1-onboarding.md` | 7 | 0 | 0 | 0 |
-| `.claude-memory/project-wave1-pending.md` | 8 | 0 | 0 | 0 |
+| `.claude-memory/project-wave1-closeout-role-tail.md` | 8 | 0 | 0 | 0 |
 | `.claude-memory/project-workbench-consolidation-rollout.md` | 2 | 0 | 0 | 0 |
 | `.claude-memory/reference-dataverse-audit-trail-actor-detection.md` | 1 | 0 | 0 | 0 |
 | `.claude-memory/reference-vercel-sensitive-env-unreadable.md` | 0 | 0 | 0 | 0 |

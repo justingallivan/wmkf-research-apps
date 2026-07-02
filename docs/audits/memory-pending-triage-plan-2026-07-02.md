@@ -1,8 +1,8 @@
 # Memory Pending/Finished-Work Triage Plan - 2026-07-02
 
-Status: plan only. Do not treat any candidate below as stale, closed, or safe to
-delete until the candidate file has been read in full and its references have
-been checked.
+Status: Batch A completed 2026-07-02; later batches remain plan only. Do not
+treat any remaining candidate below as stale, closed, or safe to delete until the
+candidate file has been read in full and its references have been checked.
 
 Repo HEAD when drafted: `138cb6f96b7b177956e17c0c2bc570291b3784f2`
 
@@ -69,8 +69,8 @@ The initial filename scan found these 11 files:
 | `project-intake-portal-ui-todo.md` | active | Filename says todo |
 | `project-intake-portal-virus-scan-e2e-deferred.md` | active | Filename says deferred |
 | `project-reviewer-web-discovery-abandoned.md` | active | Filename says abandoned while status is active |
-| `project-w6-table-drop-pending.md` | closed | Filename says pending but status says closed/done |
-| `project-wave1-pending.md` | closed | Filename says pending but status says closed/done |
+| `project-w6-table-drop-closed.md` | closed | Batch A renamed from pending title |
+| `project-wave1-closeout-role-tail.md` | active | Batch A renamed from pending title; migration closed, role tail needs probe |
 
 Do not process `project-closed-work-archive.md` as a normal candidate unless a
 direct stale claim is found; it is allowed to contain historical closed work.
@@ -127,8 +127,8 @@ rg -n 'candidate-slug|candidate-file.md' .claude-memory docs CLAUDE.md SESSION_P
 
 Read and classify:
 
-- `project-w6-table-drop-pending.md`
-- `project-wave1-pending.md`
+- `project-w6-table-drop-closed.md`
+- `project-wave1-closeout-role-tail.md`
 - `project-dynamics-feedback-admin-shipped.md`
 - `project-reviewer-web-discovery-abandoned.md`
 - `project-applicant-exclusion-policy-pending.md`

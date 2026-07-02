@@ -1,5 +1,5 @@
 ---
-name: w6-table-drop-pending
+name: project-w6-table-drop-closed
 description: "CLOSED — the reviewer-finder Postgres drain tables (researchers, researcher_keywords, publications, proposal_searches, + reviewer_suggestions) were DROPPED 2026-06-04 via tracked migration 018, ahead of the original ≥2026-07-01 trigger. search_cache kept. Historical checklist retained below; no longer actionable."
 metadata: 
   node_type: memory

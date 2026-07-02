@@ -16,13 +16,13 @@ Do:
 - Treat the Dataverse-native API entry path as DONE (save-candidates shipped W3–W6, 2026-05-12); don't rebuild it.
 - Treat the standalone Reviewer Finder page as retired S261; Workbench reviewer components are now the staff UI.
 - Use the verification commands in the body to re-confirm status if needed.
-- Treat the 5 reviewer-finder Postgres tables as GONE — DROPPED 2026-06-04 via migration 018 ([[project-w6-table-drop-pending]], now closed).
+- Treat the 5 reviewer-finder Postgres tables as GONE — DROPPED 2026-06-04 via migration 018 ([[project-w6-table-drop-closed]]).
 
 Do not:
 - Reference `researchers`/`researcher_keywords`/`publications`/`proposal_searches`/`reviewer_suggestions` as live Postgres tables — they no longer exist (only `search_cache` survives).
 - Assume `researchers.js`/`extract-summary.js` still exist (deleted W5/W6).
 
-Ground truth: `shared/components/reviewers/ReviewerFindPanel.js`, `pages/api/reviewer-finder/save-candidates.js`, `docs/atlas/postgres-researchers.md`, `docs/atlas/postgres-other-reviewer-tables.md`, [[project-w6-table-drop-pending]].
+Ground truth: `shared/components/reviewers/ReviewerFindPanel.js`, `pages/api/reviewer-finder/save-candidates.js`, `docs/atlas/postgres-researchers.md`, `docs/atlas/postgres-other-reviewer-tables.md`, [[project-w6-table-drop-closed]].
 
 **Status: SHIPPED, then UI rehomed.** Both pieces of the original direction landed before 2026-05-03; the standalone page was later retired S261 after the Workbench superseded it:
 
@@ -36,7 +36,7 @@ Ground truth: `shared/components/reviewers/ReviewerFindPanel.js`, `pages/api/rev
 - `pages/api/reviewer-finder/generate-emails.js` — zero `@vercel/postgres` imports (verified 2026-05-14).
 - `pages/api/reviewer-finder/my-proposals.js` — Dataverse-only, builds OData filter on `akoya_request`.
 
-**How to apply:** when planning reviewer-finder API work, do not rebuild save-candidates writeback — it's done. The standalone page is retired; use Workbench reviewer components for staff UI context. The reviewer-finder Postgres tables (`researchers`, `researcher_keywords`, `publications`, `proposal_searches`, `reviewer_suggestions`) were DROPPED 2026-06-04 via migration `018_drop_reviewer_finder_postgres_tables.sql` (done early at Justin's direction; see `project-w6-table-drop-pending.md`, now closed). `search_cache` was kept (live literature-search cache). Don't reference the dropped tables as live.
+**How to apply:** when planning reviewer-finder API work, do not rebuild save-candidates writeback — it's done. The standalone page is retired; use Workbench reviewer components for staff UI context. The reviewer-finder Postgres tables (`researchers`, `researcher_keywords`, `publications`, `proposal_searches`, `reviewer_suggestions`) were DROPPED 2026-06-04 via migration `018_drop_reviewer_finder_postgres_tables.sql` (done early at Justin's direction; see `project-w6-table-drop-closed.md`). `search_cache` was kept (live literature-search cache). Don't reference the dropped tables as live.
 - **Identity bridge (`user_profiles` → `systemuser`)** — the original direction listed this as a prerequisite. It's working in prod (the picker uses it via `program-director-resolver.js`), but the broader identity-reconciliation TODO in `project-dynamics-identity-reconciliation.md` covers attribution on Dataverse writes and joined reporting, which is a different scope and still open.
 
 **Verification commands** (if status ever needs to be re-confirmed):

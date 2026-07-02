@@ -22,7 +22,7 @@ Do not:
 - Join applicants on `akoya_primarycontactid` (=liaison); the PI is `wmkf_projectleader`.
 - Run `--execute` table-drops autonomously — always grep live callers + back up first (as the W6 drop did: migration 018, 2026-06-04, with JSONL+Blob backup).
 
-Ground truth: `docs/atlas/postgres-researchers.md`, `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` (rev3); probe scripts (artifacts gitignored). Related: [[project-w6-table-drop-pending]], [[project-no-banking-pii-in-dataverse]], [[project-reviewer-identity-resolution-phase1]], [[project-institution-foundation-liaison]].
+Ground truth: `docs/atlas/postgres-researchers.md`, `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` (rev3); probe scripts (artifacts gitignored). Related: [[project-w6-table-drop-closed]], [[project-no-banking-pii-in-dataverse]], [[project-reviewer-identity-resolution-phase1]], [[project-institution-foundation-liaison]].
 
 This is the referent of every `see memory project_reviewer_identity_fragmentation`
 citation (`docs/DATAVERSE_POWER_TOOLS_DESIGN.md:344`, SESSION_PROMPT C–F list).
@@ -57,7 +57,7 @@ no shared key**:
 3. **The honorarium `akoya_request` row itself** — reviewer activity/payment
    buried in the grants entity (polymorphic reuse).
 4. **Postgres `researchers`** — *was* the Reviewer Finder pool; DROPPED 2026-06-04
-   (migration 018, see [[project-w6-table-drop-pending]]). Pool identity now lives
+   (migration 018, see [[project-w6-table-drop-closed]]). Pool identity now lives
    only in Dataverse `wmkf_potentialreviewer`.
 
 Email is the only natural join and it is fragile. The design doc labels this

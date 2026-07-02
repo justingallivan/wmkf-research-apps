@@ -79,7 +79,7 @@ Net: this becomes a **clean cutover** — add fields → repoint callers → re-
 ### Other local dependencies to update before deleting the adapter (Codex #10)
 Not prod callers, but they reference the sidecar/adapter and must be reconciled before `researcher.js` is deleted:
 - `scripts/smoke-test-candidate.mjs` — queries `wmkf_appresearchers` in its teardown (deletes the bibliometric sidecar by `_wmkf_potentialreviewer_value`); post-collapse there's no sidecar to delete.
-- `scripts/backfill-postgres-to-dataverse.js` — imports the researcher adapter (S196 also flagged; verify its Postgres source state at execution per `project-w6-table-drop-pending`).
+- `scripts/backfill-postgres-to-dataverse.js` — imports the researcher adapter (S196 also flagged; verify its Postgres source state at execution per `project-w6-table-drop-closed`).
 - `shared/components/reviewers/CandidateEditModal.js` — doc-comment/contract reference (no live query, but reconcile the comment).
 - `tests/unit/adapters-caller-id.test.js` and `tests/unit/reviewer-adapters-writeback.test.js` — exercise the researcher adapter; update/retire when the adapter is folded in.
 

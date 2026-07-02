@@ -19,9 +19,9 @@ Do:
 
 Do not:
 - Re-litigate locked decisions (1:1 model, no new role child entity, `wmkf_app<name>` naming, no denormalized reviewer flag).
-- Drop Postgres reviewer tables ad hoc. (The 5-table reviewer-finder drain set — researchers, researcher_keywords, publications, proposal_searches, reviewer_suggestions — was DROPPED 2026-06-04 via migration 018; see [[project-w6-table-drop-pending]]. `search_cache` stays — it has live callers. This rule now protects only `grant_cycles` and any future drain tables.)
+- Drop Postgres reviewer tables ad hoc. (The 5-table reviewer-finder drain set — researchers, researcher_keywords, publications, proposal_searches, reviewer_suggestions — was DROPPED 2026-06-04 via migration 018; see [[project-w6-table-drop-closed]]. `search_cache` stays — it has live callers. This rule now protects only `grant_cycles` and any future drain tables.)
 
-Ground truth: `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`, `scripts/audit-postgres-state.js`, `lib/dataverse/adapters/`, [[project-appresearcher-collapse-post-pilot]], [[project-w6-table-drop-pending]], [[project-system-model]].
+Ground truth: `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`, `scripts/audit-postgres-state.js`, `lib/dataverse/adapters/`, [[project-appresearcher-collapse-post-pilot]], [[project-w6-table-drop-closed]], [[project-system-model]].
 
 **Status as of 2026-05-06 (S136)**: Plan rewritten against ground truth. Authoritative doc: `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`. (The reviewer migration shipped W3–W6 2026-05-12; the "mid-June 2026 pilot deadline" rationale is superseded — that intake pilot was cancelled, see [[project-system-model]].)
 
@@ -100,7 +100,7 @@ Plan was updated against live data, not assumptions. Key findings:
 - Treat the Wave 1 doc's "Wave 2 — preview spec" as historical. Live model differs structurally (1:1 vs. pool) and naming-wise (no underscore). Read `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` instead.
 - When working on Reviewer Finder code: confirm live state matches what the plan doc says. If something on the Postgres-only list got migrated independently, update both this memory and the plan.
 - Don't propose adding a `wmkf_iscontactreviewer` boolean or similar denormalized role flag. Decision is engaged-slot-history; flags lose data the history preserves.
-- The 5-table reviewer-finder drain set was DROPPED 2026-06-04 via migration `018_drop_reviewer_finder_postgres_tables.sql` (done early, ahead of the ≥2026-07-01 trigger, at Justin's direction) — see `project-w6-table-drop-pending.md`. Don't propose re-creating them or dropping `search_cache` (live cache) or `grant_cycles` (still draining) ad hoc.
+- The 5-table reviewer-finder drain set was DROPPED 2026-06-04 via migration `018_drop_reviewer_finder_postgres_tables.sql` (done early, ahead of the ≥2026-07-01 trigger, at Justin's direction) — see `project-w6-table-drop-closed.md`. Don't propose re-creating them or dropping `search_cache` (live cache) or `grant_cycles` (still draining) ad hoc.
 - **Re-run `scripts/audit-postgres-state.js` before any migration work begins** to confirm state hasn't drifted from S136 ground truth.
 
 ## RR program code (probed S136)

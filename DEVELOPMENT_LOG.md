@@ -459,7 +459,7 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 **Why it matters:** Reviewer state now lives in exactly one store (Dataverse), ending the Postgres drain era; ORCID — the cross-system join key — covers 1,773 of the pool. The guardrails target a recurring "patch the flagged line, leave residuals elsewhere" failure that cost this session 3 review rounds.
 
-**Pointers:** `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`, `docs/atlas/` (reconciled), `.claude-memory/project-w6-table-drop-pending.md` (closed); commits `c734356` `e6a339d` `4fc5194` `1385a65`.
+**Pointers:** `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`, `docs/atlas/` (reconciled), `.claude-memory/project-w6-table-drop-closed.md`; commits `c734356` `e6a339d` `4fc5194` `1385a65`.
 
 ---
 
@@ -733,7 +733,7 @@ The pre-Session 84 chronological per-session log (everything after the September
 - `lib/services/{settings,app-access,database}-service.js` (dispatcher defaults flipped)
 - `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` (Wave 2 build plan, READY FOR BUILD)
 - `.claude-memory/feedback_thoroughness_default.md` (workflow-default rule)
-- `.claude-memory/project_wave1_pending.md` (rewritten — closeout state)
+- `.claude-memory/project-wave1-closeout-role-tail.md` (Wave 1 closeout plus app-user role-tail probe note)
 - Codex review chains: Wave 1 drop preflight `a2e4e5b555a27c543`; Wave 1 doc consistency `a1479a23e17078149`; Wave 2 plan 9-pass `ab6caaf4234c8afd8` → `aecc59a2cd3e8f1a1`
 
 ## May 2026 — AI-config admin surface + policy editor (Session 145)

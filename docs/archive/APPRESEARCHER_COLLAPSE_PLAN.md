@@ -51,7 +51,7 @@ Lower-priority than the live app callers but need to be reconciled. Most are smo
 | File | Role | Likely disposition |
 |---|---|---|
 | `scripts/audit-dataverse-state.js` | Standalone audit (NOT a CI gate per package.json — round-3 correction) lists `wmkf_appresearchers` as a tracked entity set (line 92) | Update: remove the entry when entity is dropped |
-| `scripts/backfill-postgres-to-dataverse.js` | Wave 2 backfill (Postgres → Dataverse) | Decide at execution time. Its actual Postgres source tables are `reviewer_suggestions`, `researchers`, `researcher_keywords`, and `grant_cycles` (not `publications`). Relevant reviewer drain tables are **drain-only**, not yet dropped (per `project-w6-table-drop-pending`; drop trigger ≥ 2026-07-01). If those sources have been dropped by the time this collapse executes, retire the script. Otherwise, leave alone — its source still exists. |
+| `scripts/backfill-postgres-to-dataverse.js` | Wave 2 backfill (Postgres → Dataverse) | Decide at execution time. Its actual Postgres source tables are `reviewer_suggestions`, `researchers`, `researcher_keywords`, and `grant_cycles` (not `publications`). Relevant reviewer drain tables are **drain-only**, not yet dropped (per `project-w6-table-drop-closed`; drop trigger ≥ 2026-07-01). If those sources have been dropped by the time this collapse executes, retire the script. Otherwise, leave alone — its source still exists. |
 | `scripts/check-doc-currency.js` | Doc-convention check; references appresearcher naming (line 50) | Update reference |
 | `scripts/check-drain-table-mentions.js` | CI gate; mentions appresearcher as a source of truth (line 11) | Update reference |
 | `scripts/probe-bill-vendor-fields.js` | BILL field probe; appresearcher in its `TABLES` list (line 75) | Update list |
@@ -254,7 +254,7 @@ Two scripts in this set ARE CI gates with `npm run` targets that block PRs (veri
 - `scripts/probe-bill-vendor-fields.js` — drop `wmkf_appresearcher` from the `TABLES` list (line 75)
 
 **Retire (purpose obsolete):**
-- `scripts/backfill-postgres-to-dataverse.js` — this script reads `reviewer_suggestions`, `researchers`, `researcher_keywords`, and `grant_cycles` (not `publications`). Relevant reviewer drain tables are not yet dropped — drop is post-pilot per `project-w6-table-drop-pending` and `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`. This collapse may or may not coincide with the W6 table drop. If those source tables have been dropped by then, retire this script; if not, leave alone. **Decision deferred to execution time.** Round-2 framing that the source was "already dropped" was wrong.
+- `scripts/backfill-postgres-to-dataverse.js` — this script reads `reviewer_suggestions`, `researchers`, `researcher_keywords`, and `grant_cycles` (not `publications`). Relevant reviewer drain tables are not yet dropped — drop is post-pilot per `project-w6-table-drop-closed` and `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md`. This collapse may or may not coincide with the W6 table drop. If those source tables have been dropped by then, retire this script; if not, leave alone. **Decision deferred to execution time.** Round-2 framing that the source was "already dropped" was wrong.
 - `scripts/wave2-reshape-drop.js` — Wave 2 reshape utility, purpose served. Delete file.
 - `scripts/smoke-find-by-name.js`, `scripts/smoke-recent-suggestions.js` — Re-evaluate: if still actively used, update to query the new combined entity; if abandoned, delete.
 

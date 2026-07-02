@@ -21,7 +21,7 @@ Do not:
 - Build a separate panel/app/script — the /admin dashboard already handles grant-more-apps.
 - Treat the Wave 1 prerequisite as unmet — flags flipped 2026-05-03, tables dropped 2026-05-12.
 
-Ground truth: `pages/api/auth/[...nextauth].js`, `lib/services/dataverse-identity-map.js`, `lib/dataverse/role-apply.js`. Related: [[project-wave1-pending]].
+Ground truth: `pages/api/auth/[...nextauth].js`, `lib/services/dataverse-identity-map.js`, `lib/dataverse/role-apply.js`. Related: [[project-wave1-closeout-role-tail]].
 
 Once `WAVE1_BACKEND_APP_ACCESS=dataverse` is flipped in prod, new staff onboarding should be automated — not a panel, not a separate app, not a script. Justin approved this direction 2026-04-24 ("I'm not super worried about Dataverse being reachable on sign-in").
 

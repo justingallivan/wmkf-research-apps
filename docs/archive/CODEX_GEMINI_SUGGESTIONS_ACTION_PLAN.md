@@ -12,7 +12,7 @@
 - Keep changes small enough to review independently.
 - If a concurrent agent is editing `pages/phase-ii-writeup.js`, coordinate before touching it; that file is the main conflict hotspot.
 - Preserve unrelated user or agent changes in the worktree.
-- **W6 coordination (important):** when Phase 4 touches `lib/services/database-service.js`, it is comment cleanup ONLY. Do not delete or alter any Postgres SQL. The W6 Postgres table-drop is deferred to a post-pilot one-shot DELETE (≥ 2026-07-01) per memory entry `[[w6-table-drop-pending]]` and `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` post-pilot row. Stale researcher comments are dead text, not pending work.
+- **W6 coordination (important):** when Phase 4 touches `lib/services/database-service.js`, it is comment cleanup ONLY. Do not delete or alter any Postgres SQL. The W6 Postgres table-drop is deferred to a post-pilot one-shot DELETE (≥ 2026-07-01) per memory entry `[[project-w6-table-drop-closed]]` and `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` post-pilot row. Stale researcher comments are dead text, not pending work.
 
 ## Explicit non-goals
 
@@ -36,7 +36,7 @@ Before any code changes:
    - `npm run check:doc-currency`
    - `npm run check:doc-currency:self-test`
    - `npm run check:api-routes`
-3. Read `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` post-pilot row + memory entry `[[w6-table-drop-pending]]` so you understand why the database-service comments matter (and why they're not pending work).
+3. Read `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` post-pilot row + memory entry `[[project-w6-table-drop-closed]]` so you understand why the database-service comments matter (and why they're not pending work).
 
 A red gate is a P0 blocker — do not start a phase on a red gate.
 

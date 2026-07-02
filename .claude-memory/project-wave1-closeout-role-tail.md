@@ -1,13 +1,13 @@
 ---
-name: wave-1-closeout
-description: "Wave 1 Postgres → Dataverse migration CLOSED 2026-05-12. Tables dropped, dispatcher defaults flipped, docs updated. One deferred tail item: elevation revert on prod app user."
+name: project-wave1-closeout-role-tail
+description: "Wave 1 Postgres → Dataverse migration CLOSED 2026-05-12. Tables dropped, dispatcher defaults flipped, docs updated. Active tail: app-user temp-role revert needs a fresh role probe before action."
 metadata: 
   node_type: memory
   type: project
   originSessionId: e2f71cb4-b29c-4510-b8fe-1da4a49ec6ee
-  status: closed
+  status: active
   scope: dataverse
-  last_verified: 2026-06-04 via live Postgres probe (system_settings/user_app_access/user_preferences all ABSENT = dropped)
+  last_verified: 2026-06-04 via live Postgres probe for dropped tables; app-user role tail not re-probed in Batch A
 ---
 
 ## Recall Rule
@@ -16,7 +16,8 @@ Read this when: anything touches the Wave 1 Postgres→Dataverse migration, the 
 
 Do:
 - Treat Wave 1 as DONE — don't re-litigate the flag flip, the drop, or the table list.
-- Leave the temp role elevations (`WMKF AI Elevated TEMP` + `System Customizer`) on the prod app user through the pilot; revert only per `docs/WAVE1_REVERT_TEMP_ELEVATIONS.md` once the portal schema settles.
+- Treat the Wave 1 migration itself as closed.
+- Before acting on the temp role elevations (`WMKF AI Elevated TEMP` + `System Customizer`), run the role probe in `docs/WAVE1_REVERT_TEMP_ELEVATIONS.md`; this Batch A triage did not re-probe live Dataverse role state.
 - Remember dispatcher Postgres branches were deleted; `WAVE1_BACKEND_*=postgres` now throws at cold-start by design.
 
 Do not:
@@ -38,14 +39,14 @@ Wave 1 closed out cleanly on **2026-05-12**.
 
 **Single deferred item: revert temp role elevations on prod app user.**
 
-- App user `# WMK: Research Review App Suite` (`systemuserid 53e97fb3-a006-f111-8406-000d3a352682`) still has `WMKF AI Elevated TEMP` + `System Customizer` attached.
+- As of the prior role-state note, app user `# WMK: Research Review App Suite` (`systemuserid 53e97fb3-a006-f111-8406-000d3a352682`) had `WMKF AI Elevated TEMP` + `System Customizer` attached. Treat this as `ACTIVE_NEEDS_PROBE`, not confirmed-current, until the role-check command in `docs/WAVE1_REVERT_TEMP_ELEVATIONS.md` is rerun.
 - **Why deferred** (Justin's policy call 2026-05-11): keep elevations on through the intake-portal pilot iteration. We're actively creating new entities/fields under Connor's delegated authority (`project_dataverse_creator_privileges`, summary-after model). Reverting now and re-adding for every batch is more friction than the marginal security gain.
 - **When to revert:** once the pilot's `wmkf_portal_*` schema settles (probably after the first real submission cycle, mid-to-late June 2026). At that point follow `docs/WAVE1_REVERT_TEMP_ELEVATIONS.md` and ask Connor about the `akoyaGO Team User (no accounting)` vs. `akoyaGO Read Only access` role-name discrepancy.
 
 **How to apply:**
 - Wave 1 is **done** — don't re-litigate the flag flip, the drop, or the table list in future sessions.
 - Dispatcher Postgres branches in `lib/services/{settings,app-access,database}-service.js` were deleted (commits `cd735c0` + `5c366fc`, 2026-05-26). Each service now has an `assertWave1*Backend()` module-load guard: setting any `WAVE1_BACKEND_*=postgres` throws at cold-start with an actionable message (matching the `lib/services/grant-cycles-dataverse.js` W3 pattern).
-- If a future Wave-2 or pilot-portal schema-apply script runs, it uses the *still-present* elevations on the app user. No action needed unless someone has reverted them in the meantime — verify with the role-check command in `docs/WAVE1_REVERT_TEMP_ELEVATIONS.md` § Verification.
+- If a future Wave-2 or pilot-portal schema-apply script runs, do not assume the elevations are still present from this memory. Verify with the role-check command in `docs/WAVE1_REVERT_TEMP_ELEVATIONS.md` § Verification.
 - Recovery story: Neon PITR window is 7 days, so until ~2026-05-19, a snapshot restore is feasible if Dataverse fails catastrophically. After that, no recovery — but the prod system has been on Dataverse for 9+ days at that point.
 
 **Related memories:** [[project-wave1-onboarding]] (next phase; not yet built).

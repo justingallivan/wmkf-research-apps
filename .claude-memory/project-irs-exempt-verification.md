@@ -56,4 +56,4 @@ Ground truth: `lib/db/migrations/008_irs_exempt_orgs.sql`, `lib/services/irs-bmf
 - **PA timing decision still owed.** When does PA fire the verification — on `account` create, on submit, or on `'Phase II Pending'` flip? Connor's call; sub-question under intake portal Track 1B (`docs/archive/INTAKE_PORTAL_MEETING_AGENDA_2026-05-13.md`).
 - **EIN form field on the intake form.** Required so the `account` row gets the EIN at submission time. Add to Sarah's field inventory at the 2026-05-13 meeting.
 
-Related: [[project-w6-table-drop-pending]] (other Postgres reference-data work), [[project-reviewer-postgres-to-dataverse-migration]] (the strategic reframing this verification path benefits from).
+Related: [[project-w6-table-drop-closed]] (other Postgres reference-data work), [[project-reviewer-postgres-to-dataverse-migration]] (the strategic reframing this verification path benefits from).
