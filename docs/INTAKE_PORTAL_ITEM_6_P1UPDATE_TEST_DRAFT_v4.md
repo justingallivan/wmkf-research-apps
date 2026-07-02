@@ -1,6 +1,6 @@
 # DRAFT — UNAUTHORIZED / UNLANDED — for Codex review only (S163, 2026-05-18)
 
-> **⚠️ Superseded — history only.** Canonical Item 6 / slice-0 status (is the deploy cleared? the P1-Update gate? waiver + Connor status?) lives in **`INTAKE_PORTAL_ITEM_6_STATUS.md`**. Superseded by v5 / `INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md`; do not infer current state from this file.
+> **⚠️ Superseded — history only.** Canonical Item 6 / slice-0 status (is the deploy cleared? the P1-Update gate? waiver + Connor status?) lives in **`INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`**. Superseded by v5 / `INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md`; do not infer current state from this file.
 
 ## v3 -> v4 review deltas
 
@@ -9,7 +9,7 @@
 3. §5.16 verdict wording is aligned to those scope boundaries while preserving the hard rules: real path required for VERIFIED, deterministic Web API evidence required, and every required state-change `SdkMessage` must be exactly `Update`.
 
 This file is a staging artifact for review. Nothing here is landed in the
-authoritative docs (`INTAKE_PORTAL_ITEM_6_DISCUSSION.md`,
+authoritative docs (`INTAKE_PORTAL_BUDGET_AGGREGATE_RECOMPUTE_DECISION.md`,
 `INTAKE_PORTAL_ITEM_6_MAKER_PORTAL_TESTS.md`, `INTAKE_PORTAL_DESIGN.md`) and
 the waiver is **not** authorized.
 

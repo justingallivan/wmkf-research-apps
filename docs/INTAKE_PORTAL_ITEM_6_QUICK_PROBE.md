@@ -1,6 +1,6 @@
 # Intake Portal Item 6 -- Quick Power Automate Probe
 
-> **⚠️ Superseded — history only.** This probe describes the dead delete-driven **Option A**. The live model is **deactivate-not-delete**; the single open pre-deploy gate is **P1-Update**. Canonical status (is slice-0 cleared? waiver + Connor status?): **`INTAKE_PORTAL_ITEM_6_STATUS.md`**. Do not run this probe as the current test — see `INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md`.
+> **⚠️ Superseded — history only.** This probe describes the dead delete-driven **Option A**. The live model is **deactivate-not-delete**; the single open pre-deploy gate is **P1-Update**. Canonical status (is slice-0 cleared? waiver + Connor status?): **`INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`**. Do not run this probe as the current test — see `INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md`.
 
 **Purpose:** Fast-path test for Connor to prove or disprove the Option A mechanics with one diagnostic flow, then one filtered replay.
 

@@ -1,6 +1,6 @@
 # DRAFT — UNAUTHORIZED / UNLANDED — Connor send-candidate v5 (S163, 2026-05-18)
 
-> **Canonical status:** **`INTAKE_PORTAL_ITEM_6_STATUS.md`**. This file is retained for the full §5 procedures and the **waiver Artifact 1** (UNAUTHORIZED until Justin signs it). Current state — the P1-Update gate, waiver status, Connor status — is tracked in STATUS, not here. The condensed handout actually sent to Connor is `INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md`.
+> **Canonical status:** **`INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`**. This file is retained for the full §5 procedures and the **waiver Artifact 1** (UNAUTHORIZED until Justin signs it). Current state — the P1-Update gate, waiver status, Connor status — is tracked in STATUS, not here. The condensed handout actually sent to Connor is `INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md`.
 
 ## v3 -> v4 review deltas
 
@@ -18,7 +18,7 @@ The CORE pre-deploy gate is now exactly: §5.4/§5.5 (flow saves) + §5.7 (gate-
 7. §5.16 verdict + §5.0 scope table + §5.17 effort updated to match: §5.9/§5.11/§5.12 are evidence/record-and-escalate, §5.13 conditional; only the core set above plus the hard `SdkMessage`/attribution/real-path rules gate VERIFIED.
 
 This file is a staging artifact for review. Nothing here is landed in the
-authoritative docs (`INTAKE_PORTAL_ITEM_6_DISCUSSION.md`,
+authoritative docs (`INTAKE_PORTAL_BUDGET_AGGREGATE_RECOMPUTE_DECISION.md`,
 `INTAKE_PORTAL_ITEM_6_MAKER_PORTAL_TESTS.md`, `INTAKE_PORTAL_DESIGN.md`) and
 the waiver is **not** authorized.
 

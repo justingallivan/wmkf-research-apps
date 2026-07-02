@@ -58,7 +58,7 @@ intake-to-Dataverse mapping.
 ## Operating Notes
 
 - Virus-scan E2E was deferred and must run before the next cycle.
-- Budget/roster drain reconciliation deactivates obsolete child rows (`statecode`), never hard-deletes removed lines; recompute over active children only. Current pointers: `docs/INTAKE_PORTAL_ITEM_6_STATUS.md` and `lib/dataverse/schema/wave4/wmkf_proposalbudgetline.json`.
+- Budget/roster drain reconciliation deactivates obsolete child rows (`statecode`), never hard-deletes removed lines; recompute over active children only. Current pointers: `docs/INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md` and `lib/dataverse/schema/wave4/wmkf_proposalbudgetline.json`.
 - Pilot decisions and UI TODOs should be read before re-deciding settled questions.
 
 ## Standard Probe

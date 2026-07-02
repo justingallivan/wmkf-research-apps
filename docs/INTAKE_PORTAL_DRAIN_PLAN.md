@@ -803,7 +803,7 @@ Sent as one batched ask; doesn't block scaffolding through `dynamics_patched`.
 
 ### Q1 — Source picklist field for portal-submitted single-phase requests
 
-**Background:** `akoya_request.akoya_requeststatus` is a **derived** string rollup per `INTAKE_PORTAL_ITEM_6_STATUS.md:103-119`. Source-of-truth picklists are `wmkf_phaseistatus` (S/T: `wmkf_PhaseIStatus`) and `wmkf_phaseiistatus` (S/T: `wmkf_PhaseIIStatus`). Single-phase has no Phase I/II distinction.
+**Background:** `akoya_request.akoya_requeststatus` is a **derived** string rollup per `INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md:108-122`. Source-of-truth picklists are `wmkf_phaseistatus` (S/T: `wmkf_PhaseIStatus`) and `wmkf_phaseiistatus` (S/T: `wmkf_PhaseIIStatus`). Single-phase has no Phase I/II distinction.
 
 **We need from you, all four:**
 1. **Field logical name** the drain should PATCH
@@ -848,8 +848,8 @@ Sent as one batched ask; doesn't block scaffolding through `dynamics_patched`.
 | Doc | What needs updating |
 |---|---|
 | `docs/INTAKE_PORTAL_DESIGN.md` | "Phase II only" framing; request-picker flow at 189–211; lifecycle/aggregate sections at 432–434; planned `wmkf_phaseiisubmittedat`/`by` fields at 627 |
-| `docs/INTAKE_PORTAL_ITEM_6_STATUS.md` | (a) The recompute lifecycle-gate value (depends on Q1); P4 narrative; (b) §1 deploy banner — currently says "pending Justin's explicit go-ahead"; reflect that deploy happened S178; §5 deploy-sequence is now retrospective |
-| `docs/INTAKE_PORTAL_ITEM_6_DISCUSSION.md` | §0 gate value; trigger-filter expression literal |
+| `docs/INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md` | (a) The recompute lifecycle-gate value (depends on Q1); P4 narrative; (b) §1 deploy banner — currently says "pending Justin's explicit go-ahead"; reflect that deploy happened S178; §5 deploy-sequence is now retrospective |
+| `docs/INTAKE_PORTAL_BUDGET_AGGREGATE_RECOMPUTE_DECISION.md` | §0 gate value; trigger-filter expression literal |
 | `docs/atlas/dataverse-wmkf-proposalbudgetline.md` | Recompute description still mentions Phase II; update to Q1-answer value |
 | `docs/atlas/dataverse-wmkf-apprequestperson.md` | Still says "NOT yet deployed"; update to deployed-S178 |
 | `docs/BUDGET_FORM_SPEC.md` | "Phase II" mentions; `form_key` likely becomes `research-2026-XX` |

@@ -634,7 +634,7 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 **Why it matters:** Slice-0 is the schema foundation for the entire intake portal — months of pre-deploy gating around Connor's PA-flow Option-A vs. Option-B work converged on this deploy. The architecture pivot saved building Phase-II-attach infrastructure that would be stale forever after this cycle. The drain plan (v3) is the canonical build plan for the next several sessions.
 
-**Pointers:** `docs/INTAKE_PORTAL_DRAIN_PLAN.md`; `docs/INTAKE_PORTAL_ITEM_6_STATUS.md`; `lib/dataverse/schema/wave4*`. Commits `279d556` (pre-deploy schema edits) · `7cec6da` (deploy) · `545aaed` (memory reconcile) · `1ee0fd3` (drain plan v3).
+**Pointers:** `docs/INTAKE_PORTAL_DRAIN_PLAN.md`; `docs/INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`; `lib/dataverse/schema/wave4*`. Commits `279d556` (pre-deploy schema edits) · `7cec6da` (deploy) · `545aaed` (memory reconcile) · `1ee0fd3` (drain plan v3).
 
 ---
 

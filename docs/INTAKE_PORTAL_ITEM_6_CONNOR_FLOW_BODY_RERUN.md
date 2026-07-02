@@ -1,6 +1,6 @@
 # Connor — Option A′ Flow-Body-Conditional Re-Run
 
-> **Canonical status:** `INTAKE_PORTAL_ITEM_6_STATUS.md`. The original core-gate
+> **Canonical status:** `INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`. The original core-gate
 > (`INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md`) returned **FAIL** on Step 8
 > (2026-05-20): trigger-level `Filter rows` with lookup-traversal Picklist
 > equality "saves but does not evaluate at runtime." That closed the P1-Update

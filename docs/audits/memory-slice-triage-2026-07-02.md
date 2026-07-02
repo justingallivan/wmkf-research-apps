@@ -22,7 +22,7 @@ Inspected the four `.claude-memory/` files with `slice` in the filename:
 
 ## Current Invariant
 
-The current, non-historical rule is: intake budget/roster drain reconciliation deactivates obsolete child rows (`statecode`) and recomputes over active children only; it does not hard-delete removed lines. Current pointers are `docs/agent-wiki/topics/intake-portal.md`, `docs/INTAKE_PORTAL_ITEM_6_STATUS.md`, and `lib/dataverse/schema/wave4/wmkf_proposalbudgetline.json`.
+The current, non-historical rule is: intake budget/roster drain reconciliation deactivates obsolete child rows (`statecode`) and recomputes over active children only; it does not hard-delete removed lines. Current pointers are `docs/agent-wiki/topics/intake-portal.md`, `docs/INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`, and `lib/dataverse/schema/wave4/wmkf_proposalbudgetline.json`.
 
 ## Verification Notes
 

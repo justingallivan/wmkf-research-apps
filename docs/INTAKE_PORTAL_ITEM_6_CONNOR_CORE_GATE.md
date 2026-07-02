@@ -1,6 +1,6 @@
 # Connor — P1-Update Core Gate Test
 
-> **Canonical status:** **`INTAKE_PORTAL_ITEM_6_STATUS.md`** — current state: this handout was **sent to Connor (S165, 2026-05-19); AWAITING his Step 11 evidence + Step 12 verdict; the slice-0 gate is still OPEN.** This doc is authoritative only for the test mechanics and the Step 11/12 acceptance literals; do not read deploy-cleared state from it.
+> **Canonical status:** **`INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`** — current state: this handout was **sent to Connor (S165, 2026-05-19); AWAITING his Step 11 evidence + Step 12 verdict; the slice-0 gate is still OPEN.** This doc is authoritative only for the test mechanics and the Step 11/12 acceptance literals; do not read deploy-cleared state from it.
 
 Condensed from `INTAKE_PORTAL_ITEM_6_P1UPDATE_TEST_DRAFT_v5.md` — the **core gate only** (the minimal set that decides the slice-0 schema deploy). The mechanical parts (PATCH bodies, filter expressions, trigger/flow config, observation rules, pass/fail criteria) are reproduced verbatim from v5; surrounding prose is condensed. Evidence-only sections (reactivation §5.9, rapid-stress §5.11, transition-timing §5.12, UI realism §5.14) are intentionally omitted; they do not gate the decision.
 

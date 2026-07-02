@@ -1,15 +1,18 @@
-# Intake Portal Item 6 / slice-0 — CANONICAL STATUS
+# Intake Portal Budget/Roster Reconciliation — Canonical Status
 
-> **This is the single status entry point for Item 6 and the slice-0 schema deploy.**
-> Every other `INTAKE_PORTAL_ITEM_6_*` doc is detail or history and points here.
-> If this page disagrees with another Item 6 doc about **current state**, this page
-> wins. For the **locked design decision** (why deactivate-not-delete, the A+B
-> hybrid, the four preconditions), `INTAKE_PORTAL_ITEM_6_DISCUSSION.md` §0 is
-> authoritative and this page only summarizes it.
+> **This is the single status entry point for intake portal budget/roster
+> reconciliation, the slice-0 schema deploy, and the related PA recompute flow.**
+> Historical `INTAKE_PORTAL_ITEM_6_*` docs are detail or history and should point
+> here for current state. If this page disagrees with an Item 6 doc about
+> **current state**, this page wins. For the **locked design decision** (why
+> deactivate-not-delete, the A+B hybrid, the four preconditions),
+> `INTAKE_PORTAL_BUDGET_AGGREGATE_RECOMPUTE_DECISION.md` §0 is authoritative and
+> this page only summarizes it.
 
 **Last updated:** S169, 2026-05-20.
-**Maintenance rule:** when Item 6 state changes (Connor replies, a waiver is
-signed, the deploy runs), update *this page first*, then the detail docs.
+**Maintenance rule:** when budget/roster reconciliation or PA recompute state
+changes (Connor replies, a waiver is signed, the deploy runs), update *this
+page first*, then the detail docs.
 
 ---
 
@@ -120,7 +123,8 @@ but the gate routing (FAIL) is the same either way.
 
 ### The mechanism decision (mostly resolved; pilot path locked)
 
-Three candidates against the documented `DISCUSSION.md §0` A+B hybrid:
+Three candidates against the documented
+`INTAKE_PORTAL_BUDGET_AGGREGATE_RECOMPUTE_DECISION.md` §0 A+B hybrid:
 
 - **Option A** (original — trigger-level `Filter rows` on lookup-traversal
   Picklist): **REJECTED** by P1-Update FAIL. Do not revive without a new test
@@ -135,7 +139,7 @@ Three candidates against the documented `DISCUSSION.md §0` A+B hybrid:
   list returns C1+C3, C2 absent). Full result in
   `INTAKE_PORTAL_ITEM_6_CONNOR_FLOW_BODY_RERUN.md`. **Pilot path locked on A′.**
 - **Option B** (`$batch` + change sets in `lib/services/dynamics-service.js`,
-  per `DISCUSSION.md §0`): ships portal-wide as drain-side hardening
+  per `INTAKE_PORTAL_BUDGET_AGGREGATE_RECOMPUTE_DECISION.md` §0): ships portal-wide as drain-side hardening
   regardless of A/A′. Connor's firing-rate quantification (below) confirms B
   is the right transition before full Phase I rollout, consistent with the
   documented A+B hybrid plan.
@@ -234,7 +238,8 @@ Triggered by Justin's explicit in-session go-ahead. P1-Update gate is closed
    baseline timestamps, raw trigger-output snippets, parent-lookup field
    evidence — the audit-trail items absorbed into P4 from the proxy run).
 9. Turn the production A′ flow on for pilot scale.
-10. Plan Option B (`$batch` drain hardening) per `DISCUSSION.md §0` and
+10. Plan Option B (`$batch` drain hardening) per
+    `INTAKE_PORTAL_BUDGET_AGGREGATE_RECOMPUTE_DECISION.md` §0 and
     Connor's firing-rate recommendation: A′→B transition before full Phase I
     rollout. Schedule alongside broader-rollout decisions.
 
@@ -242,18 +247,18 @@ Specs are READY at `lib/dataverse/schema/wave4*/` — **do NOT re-author them.**
 
 ---
 
-## 6. Item 6 document map (what each doc is for)
+## 6. Budget/roster reconciliation document map
 
 | Doc | Role | Authoritative for |
 |---|---|---|
-| **`INTAKE_PORTAL_ITEM_6_STATUS.md`** (this) | **Canonical status dashboard** | **Current state: is slice-0 cleared, gate, waiver/Connor status** |
-| `INTAKE_PORTAL_ITEM_6_DISCUSSION.md` §0 | Locked decision record | The *design decision* (deactivate-not-delete, A+B hybrid, the 4 preconditions) |
+| **`INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`** (this) | **Canonical status dashboard** | **Current state: is slice-0 cleared, gate, waiver/Connor status** |
+| `INTAKE_PORTAL_BUDGET_AGGREGATE_RECOMPUTE_DECISION.md` §0 | Locked decision record | The *design decision* (deactivate-not-delete, A+B hybrid, the 4 preconditions) |
 | `INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md` | Original test handout (sent S165; result returned S169) | Step 1–12 test mechanics + Step 11/12 acceptance literals; historical for the *trigger-Filter-rows* mechanism (now FAILed) |
 | `INTAKE_PORTAL_ITEM_6_CONNOR_FLOW_BODY_RERUN.md` | **S169** — Option A′ Steps 7′+9′ re-run (handout + Connor result; PASS 2026-05-20) | The flow-body-conditional mechanism gate (cleared at pilot scale on proxy; P4 real-schema repeat carries the full artifact set) |
 | `INTAKE_PORTAL_ITEM_6_CONNOR_EMAIL.md` | Cover email (uncommitted, local) | — (regenerate from CORE_GATE if missing) |
 | `INTAKE_PORTAL_ITEM_6_P1UPDATE_TEST_DRAFT_v5.md` | Full runbook + waiver Artifact 1 (no longer needed) | The waiver text (Artifact 1, UNAUTHORIZED — superseded by FAIL closing the gate) + full §5 procedures |
 | `INTAKE_PORTAL_ITEM_6_P1UPDATE_TEST_DRAFT{,_v2,_v3,_v4}.md` | Superseded review drafts | History only — superseded by v5 / CORE_GATE |
-| `INTAKE_PORTAL_ITEM_6_MAKER_PORTAL_TESTS.md` | Pre-deactivate (2026-05-14) test runbook | History; §3 Candidates A–E still referenced by `DISCUSSION.md` §0 |
+| `INTAKE_PORTAL_ITEM_6_MAKER_PORTAL_TESTS.md` | Pre-deactivate (2026-05-14) test runbook | History; §3 Candidates A–E still referenced by `INTAKE_PORTAL_BUDGET_AGGREGATE_RECOMPUTE_DECISION.md` §0 |
 | `INTAKE_PORTAL_ITEM_6_QUICK_PROBE.md` | Pre-deactivate fast probe (Option A) | History only — Option A (delete-driven) is dead |
 
 Verdict-checker / acceptance detail also lives in memory

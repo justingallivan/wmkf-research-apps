@@ -1,11 +1,11 @@
 # Intake Portal Item 6 -- Maker Portal Tests
 
-> **⚠️ Pre-deactivate (2026-05-14) — history.** Predates Connor's deactivate-not-delete ruling; superseded for live test mechanics by `INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md`. Retained because **§3 Candidates A–E** are still referenced by `INTAKE_PORTAL_ITEM_6_DISCUSSION.md` §0. Canonical status (is slice-0 cleared? the P1-Update gate? waiver + Connor status?): **`INTAKE_PORTAL_ITEM_6_STATUS.md`**.
+> **⚠️ Pre-deactivate (2026-05-14) — history.** Predates Connor's deactivate-not-delete ruling; superseded for live test mechanics by `INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md`. Retained because **§3 Candidates A–E** are still referenced by `INTAKE_PORTAL_BUDGET_AGGREGATE_RECOMPUTE_DECISION.md` §0. Canonical status (is slice-0 cleared? the P1-Update gate? waiver + Connor status?): **`INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`**.
 
 **Status:** draft test runbook for Connor, 2026-05-14.
 
 **Related docs:**
-- `docs/INTAKE_PORTAL_ITEM_6_DISCUSSION.md` -- decision summary, Option A/B/C paths, verification-tag convention.
+- `docs/INTAKE_PORTAL_BUDGET_AGGREGATE_RECOMPUTE_DECISION.md` -- decision summary, Option A/B/C paths, verification-tag convention.
 - `docs/BUDGET_FORM_SPEC.md` -- v3 budget schema, aggregate fields, drain ordering.
 
 **Verification tags used here:**
@@ -691,7 +691,7 @@ Option A preconditions are:
 
 ## 6. What Happens After The Tests
 
-Map the results to the three paths from `docs/INTAKE_PORTAL_ITEM_6_DISCUSSION.md`.
+Map the results to the three paths from `docs/INTAKE_PORTAL_BUDGET_AGGREGATE_RECOMPUTE_DECISION.md`.
 
 ### Path 1 -- A+B hybrid confirmed
 
