@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: S217 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-02 via code-grounded memory triage for current resolver/backprop/dropped-table routing; original 5/87 fragmentation sample remains historical probe evidence
 ---
 
 ## Recall Rule
@@ -15,14 +15,14 @@ Read this when: designing reviewer identity resolution / de-duplication, cross-s
 Do:
 - Treat the Reviewer Manager→Dataverse engineering migration as DONE (W5/W6) — stop if told to "do" it.
 - Cite this memory for the fragmentation finding (sample-based flag, 5/87, not a census); don't re-derive from scratch.
-- Treat de-fragmentation as a FLOW problem — propagate ORCID forward (intake, applicant-suggested capture) rather than a one-shot collapse; reuse existing identity machinery.
+- Treat de-fragmentation as a FLOW problem — propagate ORCID forward (intake, applicant-suggested capture) rather than a one-shot collapse; reuse the shipped resolver/backprop machinery.
 
 Do not:
 - Store remittance/banking PII in Dataverse — onboard reviewers at bill.com, keep only status + the join pointer.
 - Join applicants on `akoya_primarycontactid` (=liaison); the PI is `wmkf_projectleader`.
 - Run `--execute` table-drops autonomously — always grep live callers + back up first (as the W6 drop did: migration 018, 2026-06-04, with JSONL+Blob backup).
 
-Ground truth: `docs/atlas/postgres-researchers.md`, `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` (rev3); probe scripts (artifacts gitignored). Related: [[project-w6-table-drop-closed]], [[project-no-banking-pii-in-dataverse]], [[project-reviewer-identity-resolution-phase1]], [[project-institution-foundation-liaison]].
+Ground truth: `docs/atlas/postgres-researchers.md`, `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` (rev3), `lib/services/backprop-reviewer-orcid.js`, `lib/dataverse/adapters/contact.js`; probe scripts (artifacts gitignored). Related: [[project-w6-table-drop-closed]], [[project-no-banking-pii-in-dataverse]], [[project-reviewer-identity-resolution-phase1]], [[project-institution-foundation-liaison]].
 
 This is the referent of every `see memory project_reviewer_identity_fragmentation`
 citation (`docs/DATAVERSE_POWER_TOOLS_DESIGN.md:344`, SESSION_PROMPT C–F list).
@@ -30,9 +30,8 @@ citation (`docs/DATAVERSE_POWER_TOOLS_DESIGN.md:344`, SESSION_PROMPT C–F list)
 **The engineering migration is DONE — do not treat "Reviewer Manager→Dataverse"
 as live build work.** Per `docs/atlas/postgres-researchers.md` (W6 update
 2026-05-12, re-verified S164 2026-05-18): Review Manager + Reviewer Finder API
-surfaces carry zero Postgres SQL — fully on `lib/dataverse/adapters/{reviewer-suggestion,potential-reviewer,contact,researcher}`
-+ `grant-cycles-dataverse`. Postgres `researchers` / `reviewer_suggestions` /
-`grant_cycles` are **drain-only since W5/W6**. External-reviewer token
+surfaces carry zero reviewer-domain Postgres SQL — fully on `lib/dataverse/adapters/{reviewer-suggestion,potential-reviewer,contact,researcher}`
++ `grant-cycles-dataverse` (excluding the shared auth/profile tables and later operational roster state). Postgres `researchers` / `reviewer_suggestions` were drained and then **DROPPED 2026-06-04** via migration 018; `grant_cycles` is the separate Dataverse-primary drain concern. External-reviewer token
 hash/issue/expire/revoke live on the Dataverse `wmkf_appreviewersuggestion` row,
 not Postgres. The only Postgres touch in the request path is the shared
 cross-app auth gate (`requireAppAccess` → `user_profiles` + `dynamics_user_roles`),

@@ -220,7 +220,7 @@ are most likely to be influential and stale:
 | `.claude-memory/project-reviewer-postgres-to-dataverse-migration.md` | Triaged 2026-07-02: demoted from active to closed; current routing delegated to narrower reviewer Dataverse/appresearcher memories plus source/Atlas |
 | `.claude-memory/project-dynamics-explorer-reuse-power-tools.md` | Large active Dynamics memory; live behavior likely belongs in source/probes/wiki |
 | `.claude-memory/dataverse-export-floor-scoping.md` | Large active Dataverse memory; should defer structural claims to Atlas/probes |
-| `.claude-memory/reviewer-identity-fragmentation.md` | Large active reviewer identity memory; likely overlaps wiki and current source |
+| `.claude-memory/reviewer-identity-fragmentation.md` | Triaged 2026-07-02: kept active as cross-store fragmentation/ORCID-flow guardrail; demoted overlapping old identity-resolution plan instead |
 | `.claude-memory/project-dynamics-ai-writeback.md` | Large active Dynamics writeback memory; high risk if stale |
 | `.claude-memory/slice0-deactivate-not-delete-recalc.md` | Demoted 2026-07-02; live invariant moved to intake wiki + schema comments |
 

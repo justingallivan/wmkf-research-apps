@@ -152,7 +152,7 @@ future task; otherwise close/historical or supersede to current plans/wiki.
 Read and classify:
 
 - `project-reviewer-postgres-to-dataverse-migration.md` - triaged/demoted 2026-07-02
-- `reviewer-identity-fragmentation.md`
+- `reviewer-identity-fragmentation.md` - triaged/kept active 2026-07-02
 - `project-reviewer-finder-dataverse-entry-path.md`
 - `project-appresearcher-collapse-post-pilot.md`
 

@@ -204,7 +204,7 @@ Replace `.claude-memory/MEMORY.md` with a compact router shaped like this.
 
 ## Task Routing
 - Reviewer workbench/lifecycle: project-reviewer-apps-redesign-direction.md; project-reviewer-workbench-invite-workflow.md
-- Reviewer identity/ORCID: project-reviewer-identity-resolution.md; project-reviewer-identity-resolution-phase1.md; project-reviewer-self-report-orcid-sticky-confirmed.md
+- Reviewer identity/ORCID: project-reviewer-identity-resolution-phase1.md; reviewer-identity-fragmentation.md; project-reviewer-self-report-orcid-sticky-confirmed.md. Historical rationale: project-reviewer-identity-resolution.md.
 - Reviewer data migration: project-reviewer-postgres-to-dataverse-migration.md; project-reviewer-finder-dataverse-entry-path.md
 - Intake portal: project-intake-portal-skinny-scope.md; project-intake-portal-reviewer-capture.md; project-intake-portal-virus-scan-e2e-deferred.md
 - Dataverse schema/probes: project-dataverse-schema-deploy-gotchas.md; project-dataverse-odata-null-filter.md; project-living-taxonomy-principle.md
