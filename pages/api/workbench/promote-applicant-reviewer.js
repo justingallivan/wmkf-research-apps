@@ -17,6 +17,7 @@ import { APPLICANT_DISPOSITION_MAP } from '../../../lib/dataverse/adapters/revie
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
 import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
 import { translateDuplicateKeyError } from '../../../lib/dataverse/duplicate-key';
+import { findCandidateBySuggestion } from '../../../lib/services/reviewer-roster-store';
 
 // Persist the PD's hand-corrections (the ONLY fields the client marked manual) to
 // the suggestion's OWN person record, then report what landed. Mirrors the
@@ -76,6 +77,70 @@ async function writePromotedContact(personId, contact, { actingUserSystemId }) {
   return { savedFields, contactError: null };
 }
 
+// B1 (S317): recover the VETTED enrichment email that `enrich-recommended` wrote to
+// the durable roster but never to Dataverse (its writeback via
+// `researcherAdapter.upsertByPotentialReviewer` has no email param — researcher.js:94),
+// so an applicant reviewer promoted WITHOUT a manual correction used to land on the
+// Invite tab with an empty `wmkf_emailaddress`. The email is read SERVER-SIDE from the
+// roster keyed by the server-derived `requestId + suggestionId` (an exact id anchor —
+// never a client-supplied value, never a normalized name), so no new trust boundary.
+// Persisted through the SAME envelope save-candidates uses: only when enrichment marked
+// it persistable (`emailPersistAllowed===true` — enrichment sets this false on any
+// identity/domain abstain) and identity is not unresolved, and ONLY when the person has
+// no email yet (idempotent; never overrides a manual correction or a prior address). The
+// source is forced to the roster's VETTED provenance server-side, not 'manual'. A
+// duplicate-email collision is non-fatal (mirrors the manual path) → reported, promotion
+// stands. Returns { savedField, contactError }.
+async function backfillEnrichedEmail(requestId, suggestionId, personId, { actingUserSystemId }) {
+  if (!personId) return { savedField: false, contactError: null };
+  let candidate = null;
+  try {
+    candidate = await findCandidateBySuggestion(requestId, suggestionId);
+  } catch (err) {
+    console.error('promote-applicant-reviewer roster read failed (non-fatal):', err);
+    return { savedField: false, contactError: null };
+  }
+  if (!candidate) return { savedField: false, contactError: null };
+
+  const enr = candidate.contactEnrichment || {};
+  const email = (typeof candidate.email === 'string' && candidate.email.trim())
+    || (typeof enr.email === 'string' && enr.email.trim()) || '';
+  const persistOk = candidate.emailPersistAllowed === true || enr.emailPersistAllowed === true;
+  // Mirror save-candidates' identity block: an unresolved / needs-review row never
+  // persists contact (it could be a namesake). enrichment also drives persistOk=false
+  // here, but gate explicitly too — belt and suspenders on the safety invariant.
+  const identityUnresolved = candidate.needsIdentification === true
+    || candidate.identityStatus === 'unresolved'
+    || candidate.verificationStatus === 'unresolved';
+  if (!email || !persistOk || identityUnresolved) return { savedField: false, contactError: null };
+
+  // Idempotency: only write when the person currently has NO email — never clobber a
+  // manual correction (already handled above) or a pre-existing address.
+  let current = null;
+  try {
+    current = await potentialReviewerAdapter.getById(personId);
+  } catch (err) {
+    console.error('promote-applicant-reviewer person read failed (non-fatal):', err);
+    return { savedField: false, contactError: null };
+  }
+  if (current && current.wmkf_emailaddress) return { savedField: false, contactError: null };
+
+  const source = (typeof candidate.emailSource === 'string' && candidate.emailSource)
+    || (typeof enr.emailSource === 'string' && enr.emailSource) || null;
+  try {
+    await potentialReviewerAdapter.update(personId, { email }, { actingUserSystemId });
+    if (source) await researcherAdapter.updateById(personId, { emailSource: source }, { actingUserSystemId });
+    return { savedField: true, contactError: null };
+  } catch (err) {
+    const translated = translateDuplicateKeyError(err);
+    if (translated) {
+      return { savedField: false, contactError: { code: 'email_conflict', field: 'wmkf_emailaddress', value: translated.value || email, message: 'That email is already used by another reviewer record — resolve it on the Invite Reviewers tab.' } };
+    }
+    console.error('promote-applicant-reviewer enriched-email write failed (non-fatal):', err);
+    return { savedField: false, contactError: null };
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -123,12 +188,33 @@ export default async function handler(req, res) {
         { actingUserSystemId },
       );
 
+      // B1: if the PD did NOT hand-correct an email, backfill the vetted enrichment
+      // email from the roster (server-side, id-anchored). Gate on whether a manual
+      // email was ATTEMPTED, not just whether one persisted: a manual email that
+      // COLLIDED (409, not in savedFields) is an explicit PD choice that must route to
+      // the Invite-tab merge — never get silently overwritten by the enrichment email.
+      const manualEmailAttempted = typeof req.body?.contact?.email === 'string'
+        && req.body.contact.email.trim().length > 0;
+      let backfillError = null;
+      if (!manualEmailAttempted && !savedFields.includes('email')) {
+        const { savedField, contactError: bfError } = await backfillEnrichedEmail(
+          requestGuid,
+          suggestionGuid,
+          row._wmkf_potentialreviewer_value,
+          { actingUserSystemId },
+        );
+        if (savedField) savedFields.push('email');
+        backfillError = bfError;
+      }
+
+      // Prefer the manual-write error (the PD's explicit action) over the backfill's.
+      const finalContactError = contactError || backfillError;
       return res.status(200).json({
         success: true,
         suggestionId: suggestionGuid,
         savedFields,
-        partialSuccess: !!contactError,
-        contactError,
+        partialSuccess: !!finalContactError,
+        contactError: finalContactError,
       });
     } catch (err) {
       if (/applicant-excluded/i.test(err?.message || '')) {

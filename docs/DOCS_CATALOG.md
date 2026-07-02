@@ -241,6 +241,12 @@ related:
 | [REVIEWER_TIMEOUT_BUDGET_PLAN.md](REVIEWER_TIMEOUT_BUDGET_PLAN.md) | plan | active |  | Status: IMPLEMENTED — pre-impl Codex design review + post-impl Codex review (findings #1–#5 fixed, see \"Post-impl\" below). 1943 tests + 10 gates +... | 2026-07-02 |
 | [REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md](REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md) | plan | active |  | Planning only. No feature code, migrations, API routes, or schema files were created for this pass. | 2026-07-02 |
 
+## reviewers
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [REVIEWER_EMAIL_PERSIST_FIX_PLAN.md](REVIEWER_EMAIL_PERSIST_FIX_PLAN.md) | plan | active |  | Reviewer Invite-tab no-email fix: B1 (applicant-promote persists vetted email) SHIPPED; A (reconciliation backstop) DESIGNED; B2 (partial-return) DEFERRED. | 2026-07-02 |
+
 ## security-auth
 
 | File | Kind | Status | Canonical | Summary | Cataloged |

@@ -25,17 +25,23 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   __esModule: true,
   update: jest.fn(async () => undefined),
+  getById: jest.fn(async () => ({})), // no existing email by default
 }));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   __esModule: true,
   updateById: jest.fn(async () => undefined),
 }));
 jest.mock('../../lib/dataverse/duplicate-key', () => ({ translateDuplicateKeyError: jest.fn() }));
+jest.mock('../../lib/services/reviewer-roster-store', () => ({
+  __esModule: true,
+  findCandidateBySuggestion: jest.fn(async () => null), // no roster row by default → no backfill
+}));
 
 const suggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const { translateDuplicateKeyError } = require('../../lib/dataverse/duplicate-key');
+const { findCandidateBySuggestion } = require('../../lib/services/reviewer-roster-store');
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const SUGGESTION_ID = '33333333-3333-3333-3333-333333333333';
@@ -155,5 +161,128 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
     expect(res.statusCode).toBe(404);
     expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
+  });
+});
+
+// B1 (S317): promote must also persist the VETTED enrichment email that
+// enrich-recommended wrote to the roster but not to Dataverse — read server-side by
+// requestId+suggestionId (id anchor), gated exactly like save-candidates, idempotent.
+describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
+  let handler;
+  beforeAll(() => { handler = require('../../pages/api/workbench/promote-applicant-reviewer').default; });
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Restore clean adapter defaults — clearAllMocks clears calls but NOT the throwing
+    // mockImplementation the describe-1 collision test installs, which would leak here.
+    potentialReviewerAdapter.update.mockResolvedValue(undefined);
+    researcherAdapter.updateById.mockResolvedValue(undefined);
+    suggestionAdapter.findById.mockResolvedValue({
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_request_value: REQUEST_ID,
+      _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_applicantdisposition: 100000000,
+    });
+    potentialReviewerAdapter.getById.mockResolvedValue({}); // person has no email
+  });
+
+  const promote = async () => {
+    const req = { method: 'POST', body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID } }; // NO manual contact
+    const res = mockRes();
+    await handler(req, res);
+    return res;
+  };
+
+  test('backfills a vetted roster email, stamping the roster source (NOT manual)', async () => {
+    findCandidateBySuggestion.mockResolvedValue({
+      suggestionId: SUGGESTION_ID,
+      email: 'kaang@snu.ac.kr',
+      emailSource: 'claude_search',
+      emailPersistAllowed: true,
+    });
+    const res = await promote();
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.savedFields).toContain('email');
+    expect(res.body.partialSuccess).toBe(false);
+    // Read is id-anchored on requestId + suggestionId.
+    expect(findCandidateBySuggestion).toHaveBeenCalledWith(REQUEST_ID, SUGGESTION_ID);
+    // Email written to the suggestion's OWN person.
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'kaang@snu.ac.kr' }, expect.anything());
+    // Source forced from the vetted roster provenance — NOT 'manual'.
+    expect(researcherAdapter.updateById).toHaveBeenCalledWith(PERSON_ID, { emailSource: 'claude_search' }, expect.anything());
+  });
+
+  test('does NOT backfill when emailPersistAllowed is not true', async () => {
+    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'x@y.edu', emailSource: 'serp_search', emailPersistAllowed: false });
+    const res = await promote();
+    expect(res.body.savedFields).not.toContain('email');
+    expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
+  });
+
+  test('does NOT backfill an identity-unresolved candidate even if persistOk', async () => {
+    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'x@y.edu', emailSource: 'affiliation', emailPersistAllowed: true, needsIdentification: true });
+    const res = await promote();
+    expect(res.body.savedFields).not.toContain('email');
+    expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
+  });
+
+  test('idempotent: does NOT override a person that already has an email', async () => {
+    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'roster@y.edu', emailSource: 'claude_search', emailPersistAllowed: true });
+    potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_emailaddress: 'existing@y.edu' });
+    const res = await promote();
+    expect(res.body.savedFields).not.toContain('email');
+    expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
+  });
+
+  test('a manual email wins: backfill is skipped entirely (roster not read)', async () => {
+    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'roster@y.edu', emailSource: 'claude_search', emailPersistAllowed: true });
+    const req = { method: 'POST', body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, contact: { email: 'manual@y.edu' } } };
+    const res = mockRes();
+    await handler(req, res);
+    // Manual email persisted; roster never consulted.
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { email: 'manual@y.edu' }, expect.anything());
+    expect(researcherAdapter.updateById).toHaveBeenCalledWith(PERSON_ID, { emailSource: 'manual' }, expect.anything());
+    expect(findCandidateBySuggestion).not.toHaveBeenCalled();
+  });
+
+  test('duplicate-email collision on backfill is non-fatal (promoted + contactError)', async () => {
+    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'dup@y.edu', emailSource: 'serp_search', emailPersistAllowed: true });
+    potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
+      if (updates && 'email' in updates) throw new Error('alt-key duplicate');
+      return undefined;
+    });
+    translateDuplicateKeyError.mockReturnValue({ field: 'wmkf_emailaddress', value: 'dup@y.edu' });
+    const res = await promote();
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.partialSuccess).toBe(true);
+    expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'dup@y.edu' });
+    expect(res.body.savedFields).not.toContain('email');
+    // Promotion still stuck.
+    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(SUGGESTION_ID, { selected: true }, expect.anything());
+  });
+
+  test('no roster row (legacy / no id anchor): plain promote, no write', async () => {
+    findCandidateBySuggestion.mockResolvedValue(null);
+    const res = await promote();
+    expect(res.body.savedFields).toEqual([]);
+    expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
+  });
+
+  test('a manual email that COLLIDES is not silently overwritten by the roster email', async () => {
+    // PD typed a conflicting email; the manual write 409s → not in savedFields.
+    findCandidateBySuggestion.mockResolvedValue({ suggestionId: SUGGESTION_ID, email: 'roster@y.edu', emailSource: 'claude_search', emailPersistAllowed: true });
+    potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
+      if (updates && 'email' in updates) throw new Error('alt-key duplicate');
+      return undefined;
+    });
+    translateDuplicateKeyError.mockReturnValue({ field: 'wmkf_emailaddress', value: 'manual@y.edu' });
+    const req = { method: 'POST', body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, contact: { email: 'manual@y.edu' } } };
+    const res = mockRes();
+    await handler(req, res);
+    // The PD's explicit choice routes to merge — backfill must NOT run.
+    expect(findCandidateBySuggestion).not.toHaveBeenCalled();
+    expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'manual@y.edu' });
+    expect(res.body.savedFields).not.toContain('email');
   });
 });
