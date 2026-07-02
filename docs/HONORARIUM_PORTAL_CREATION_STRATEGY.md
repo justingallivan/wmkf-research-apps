@@ -3,7 +3,7 @@ title: "Honorarium Portal-Creation Strategy (no-BILL cycle)"
 domain: finance-honoraria
 kind: plan
 status: active
-summary: "Config-gated draft exists; backfill hardening + GoApply-linkage item done; go-live awaits env flip/deploy and the proposal self-lookup schema change."
+summary: "Config-gated draft exists; backfill hardening, GoApply-linkage, and the proposal self-lookup are done; go-live awaits env flip/deploy."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -266,20 +266,28 @@ relationship. `[VERIFIED via entity metadata 2026-07-01]`
 
 **Build both:**
 
-- **Option A — new self-lookup (structured, clickable, queryable). APPROVED
-  2026-07-02** — Connor is creating the lookup (to surface it in an AkoyaGO
-  dashboard). It is a custom lookup on `akoya_request` targeting `akoya_request`
-  (schema name `wmkf_reviewedproposal`, chosen 2026-07-02).
-  Because it is self-referential, the one relationship yields a **Referencing (N:1)**
-  nav property — the lookup we write, honorarium → proposal — plus a **Referenced
-  (1:N)** collection (proposal → its honoraria, usable for a dashboard subgrid). Our
-  create body binds the Referencing side via
-  `<navprop>@odata.bind → /akoya_requests(<proposalId>)` so **app-created honoraria
-  populate the field and feed Connor's dashboard**. We do NOT surface it in our own
-  app UI yet — documented in the finance-honoraria wiki for later use. **Blocked on:**
-  (1) Connor's published field name, (2) the exact Referencing nav-property
-  name/casing confirmed from live metadata before binding — see the nav-casing hazard
-  in §4 (`0x80060888` on wrong casing). `[PLANNED — approved 2026-07-02]`
+- **Option A — new self-lookup (structured, clickable, queryable). DONE 2026-07-02.**
+  `[VERIFIED via live metadata create + read-back 2026-07-02]` A custom self-lookup
+  on `akoya_request` → `akoya_request` was created via the Dataverse Web API
+  (`RelationshipDefinitions`, into the Default Solution; default publisher prefix is
+  `wmkf`). Names read back from the relationship metadata (authoritative — not
+  guessed):
+  - lookup logical name / `ReferencingAttribute`: **`wmkf_reviewedproposal`**
+  - **Referencing** nav property (honorarium → proposal, the one we bind):
+    **`wmkf_ReviewedProposal`** — casing confirmed by a read-only `$expand` (200)
+  - **Referenced** collection nav (proposal → its honoraria, for a dashboard subgrid):
+    `wmkf_akoya_request_reviewedproposal`
+  - relationship schema name: `wmkf_akoya_request_reviewedproposal`; cascade
+    `Delete = RemoveLink` (referential — deleting a proposal only clears the link).
+
+  The create body now binds it: `'wmkf_ReviewedProposal@odata.bind':
+  /akoya_requests(<proposalId>)`, guarded on `request.akoya_requestid`
+  (`lib/bill/honorarium-onboard-orchestrator.js`). So app-created honoraria populate
+  the FK and feed Connor's AkoyaGO dashboard. We do NOT surface it in our own app UI
+  (documented in the finance-honoraria wiki). The bind is metadata-verified; it is
+  first exercised by a live create at go-live (pipeline still deferred). The field
+  lives in the Default Solution — Connor can add the component to
+  `wmkfResearchReviewAppSuite` if his ALM wants it bundled (non-destructive).
 - **Option C — proposal-referencing title (immediate, no schema change).** The draft
   create body now overrides `akoya_title` (a plain writable string, §3b) at create
   with `"Reviewer honorarium — <proposal title> (#num)"`, capped to the column
@@ -296,7 +304,7 @@ link. (The junction stays for its existing idempotency/provenance role, §3c.)
 
 | # | Change | Status | Consumer |
 |---|---|---|---|
-| 1 | New custom lookup on `akoya_request` → `akoya_request`, schema name `wmkf_reviewedproposal`: honorarium → parent proposal | **APPROVED 2026-07-02 — Connor creating** (to surface in an AkoyaGO dashboard) | Bind parked in the create body (`honorarium-onboard-orchestrator.js` §8/§9 TODO); wire it once Connor publishes and the Referencing nav-property casing is confirmed from live metadata. Populates the FK on app-created rows; not surfaced in our app UI (documented in finance-honoraria wiki) |
+| 1 | Self-lookup on `akoya_request` → `akoya_request`, logical name `wmkf_reviewedproposal` (rel. `wmkf_akoya_request_reviewedproposal`, cascade Delete=RemoveLink): honorarium → parent proposal | **DONE 2026-07-02** — created via Web API into Default Solution; surfaced in an AkoyaGO dashboard by Connor | Bind wired in the create body (`honorarium-onboard-orchestrator.js`, nav property `wmkf_ReviewedProposal`); populates the FK on app-created rows. Not surfaced in our app UI (documented in finance-honoraria wiki). Connor may add the component to `wmkfResearchReviewAppSuite` if desired |
 
 Add rows here as further Dataverse schema changes arise this cycle.
 

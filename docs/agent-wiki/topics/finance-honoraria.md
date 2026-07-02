@@ -95,20 +95,27 @@ required-address completeness AND validity checks as fresh accept — the shared
 reload, so historical rows can no longer mint with partial/unnormalized stale
 contact addresses (e.g. a full-name country) or generic proposal titles.
 
-### Honorarium → proposal self-lookup (approved 2026-07-02, not yet wired)
+### Honorarium → proposal self-lookup (DONE 2026-07-02)
 
-A honorarium and a proposal are both `akoya_request` rows, and there is no native
-self-referential lookup on `akoya_request` (verified: 65 lookup fields, none targets
-`akoya_request`). To give each app-created honorarium a structured, queryable link to
-the proposal it reviews, Connor is creating a custom self-lookup on `akoya_request` →
-`akoya_request` (schema name `wmkf_reviewedproposal`, chosen 2026-07-02, to be
-surfaced in an AkoyaGO dashboard). Being self-referential, it exposes a Referencing
-(N:1) nav property (the one our create binds, honorarium → proposal) and a Referenced
-(1:N) collection (proposal → its honoraria). **Status:** the bind is parked as a TODO
-in `lib/bill/honorarium-onboard-orchestrator.js` (create body) — wire it only after
-Connor publishes and the exact Referencing nav-property casing is confirmed from live
-metadata (`0x80060888` on wrong casing). Our app populates the FK on create but does
-NOT surface the field in its own UI yet. Until the lookup lands, the proposal is still
+A honorarium and a proposal are both `akoya_request` rows, and `akoya_request` had no
+native self-referential lookup (65 lookup fields, none targeted `akoya_request`). To
+give each app-created honorarium a structured, queryable link to the proposal it
+reviews, a custom self-lookup on `akoya_request` → `akoya_request` was created via the
+Dataverse Web API on 2026-07-02 (into the Default Solution; default publisher prefix
+is `wmkf`). Authoritative names read back from the relationship metadata:
+- lookup logical name: **`wmkf_reviewedproposal`**
+- **Referencing** nav property (honorarium → proposal, the one our create binds):
+  **`wmkf_ReviewedProposal`** (casing confirmed by a read-only `$expand`, 200)
+- **Referenced** collection nav (proposal → its honoraria, for a dashboard subgrid):
+  `wmkf_akoya_request_reviewedproposal`
+- cascade `Delete = RemoveLink` (referential — deleting a proposal only clears the link)
+
+The create body in `lib/bill/honorarium-onboard-orchestrator.js` binds it
+(`'wmkf_ReviewedProposal@odata.bind': /akoya_requests(<proposalId>)`, guarded on
+`request.akoya_requestid`). The bind is metadata-verified; it is first exercised by a
+live create at go-live (pipeline still deferred). Our app populates the FK but does
+NOT surface the field in its own UI. Connor surfaces it in an AkoyaGO dashboard and
+may add the component to `wmkfResearchReviewAppSuite`. The proposal is also still
 conveyed by the honorarium title (Option C) and derivable via the
 `wmkf_appreviewersuggestion` junction (`wmkf_HonorariumRequest` + `wmkf_Request`).
 Detail: `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §8/§9.

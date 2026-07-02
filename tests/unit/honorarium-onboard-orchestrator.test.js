@@ -83,6 +83,9 @@ describe('ensureHonorariumOnboarding', () => {
     expect(createArg.wmkf_reviewduereminderenabled).toBe(false);
     // Proposal-referencing title (Option C), not the plugin "Grant to <name>".
     expect(createArg.akoya_title).toBe('Reviewer honorarium — proposal (#REQ-001)');
+    // Structured honorarium→proposal link (Option A): self-lookup wmkf_reviewedproposal
+    // bound to the parent proposal via the metadata-confirmed nav property.
+    expect(createArg['wmkf_ReviewedProposal@odata.bind']).toBe('/akoya_requests(req-1)');
     // Currency bind omitted when HONORARIUM_CURRENCY_ID is unset (org default applies).
     expect(createArg['transactioncurrencyid@odata.bind']).toBeUndefined();
     expect(deps.suggestions.setHonorariumRequest).toHaveBeenCalledWith(SUGGESTION_ID, `det-${SUGGESTION_ID}`);
