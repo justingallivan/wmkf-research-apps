@@ -69,7 +69,7 @@ After consolidating prose in `.claude-memory/MEMORY.md` without deleting any
 leaf memory files:
 
 ```text
-MEMORY.md: 6,065 bytes / 61 lines / 40 router entries
+MEMORY.md: 6,010 bytes / 60 lines / 39 router entries
 ```
 
 Post-Slice 1 section costs:
@@ -138,8 +138,8 @@ The router is under the `12KB` hard cap but above the `11KB` warning band. The
 largest cost centers are `Task Routing`, `Working Norms`, and `Always-Read
 Guardrails`.
 
-Status: addressed by Slice 1 on 2026-07-02. The router is now `6,065` bytes /
-`61` lines. Continue to enforce the same shape.
+Status: addressed by Slice 1 on 2026-07-02. The router is now `6,010` bytes /
+`60` lines. Continue to enforce the same shape.
 
 ### P1 - Active memory status is overused
 
@@ -190,7 +190,7 @@ The leaf memory keeps the rationale; the router should not.
 ### Slice 1 - Router diet
 
 Status: complete on 2026-07-02. `.claude-memory/MEMORY.md` was reduced from
-`11,255` bytes / `100` lines to `6,065` bytes / `61` lines.
+`11,255` bytes / `100` lines to `6,010` bytes / `60` lines.
 
 Recommended edits:
 
