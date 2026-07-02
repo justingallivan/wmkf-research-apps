@@ -1,58 +1,55 @@
 ---
 name: project-dynamics-explorer-reuse-power-tools
-description: Dynamics Explorer fails due to hand-transcribed schema + trust-the-hardcoded-GUIDs heuristics; Dataverse Power Tools assets are the principled fix
+description: Compact guardrail for extending Dynamics Explorer with existing Power Tools taxonomy, validation, and count infrastructure.
 metadata:
   type: project
   status: active
   scope: dynamics
-  last_verified: S209 via memory-content (not re-probed 2026-06-04)
+  last_verified: 2026-07-02 against repository source/docs, not live Dataverse
 ---
+
+# Dynamics Explorer Reuse / Power Tools
 
 ## Recall Rule
 
-Read this when: improving Dynamics Explorer reliability (schema accuracy, counts, taxonomy, OData validity) or considering reuse of `lib/services/dataverse-export/` assets.
+Read this when changing Dynamics Explorer schema discovery, OData validation, counts, taxonomy, table routing, tool serialization, or when considering reuse of Dataverse Power Tools assets. This memory is a guardrail; source, tests, docs, and fresh probes are authoritative.
 
-Do:
-- Treat Path A as COMPLETE (Slices A1–A5 + OData pre-flight validator shipped S200–S202) — extend, don't rebuild.
-- Reuse the Power Tools assets where applicable: `fetch-client.js` (paging + 429 + true aggregate count), `live-taxonomy.js` (live option-set resolution), `constants.js` (probe ground-truth), `scripts/dynamics-schema-diff.js`.
-- Remember live-taxonomy/fetch-client BYPASS `checkRestriction` — keep the whitelist + restriction guard at the injection gate.
+## Do
 
-Do not:
-- Re-derive Explorer schema from hand-transcribed `TABLE_ANNOTATIONS`; prefer live discovery.
-- Use OData `$count` for counts (broken both ways) — use `$apply=...aggregate(...countdistinct)`.
+- Treat the Path A Explorer reliability work as implemented in source and extend it rather than rebuilding parallel behavior.
+- Verify current behavior in `lib/services/dynamics-explorer-taxonomy.js`, `lib/services/dynamics-odata-validator.js`, `lib/services/dynamics-service.js`, `pages/api/dynamics-explorer/chat.js`, and the related tests before making claims.
+- Reuse Power Tools assets where they fit, especially taxonomy/constants and FetchXML export helpers. Confirm the caller has the same query shape before reusing a helper.
+- Preserve restriction guards at the Explorer injection boundary because lower-level taxonomy and FetchXML helpers can bypass `checkRestriction`.
+- Keep operational log tables such as `wmkf_ai_run` out of Explorer user-facing schema/query paths unless source/docs deliberately change that policy.
+- Treat real soak as pending unless current traffic/probe evidence says otherwise.
 
-Ground truth: `docs/DYNAMICS_EXPLORER_PATH_A_PLAN.md`, `docs/DYNAMICS_EXPLORER_ODATA_VALIDATOR_DESIGN.md`, `lib/services/dataverse-export/`, `lib/services/dynamics-explorer-taxonomy.js`, `lib/services/dynamics-odata-validator.js`. Shipped state — only remaining open item is a real soak pending traffic. See [[project-dataverse-power-tools]], [[project-dynamics-explorer-details]], [[project-dynamics-explorer-schema-diff]], [[akoya-payment-field-semantics]].
+## Do Not
 
-> **STATUS (S209): Path A COMPLETE — keep as do-not-rebuild guard.** Slice 1 (A1 live schema + A2 cached taxonomy) + the OData pre-flight validator + A3/A4/A5 all SHIPPED (S200–S202; see the dated sections below). The early-body "assessment / deferred / measure-first" narrative is chronological history — the tail (last section) is the live state. Only remaining open item: a **real soak pending meaningful traffic** (blocked on volume, not effort). The `akoya_folio` "drift" is RESOLVED (S202) and consistent with [[akoya-payment-field-semantics]].
+- Do not rederive Explorer schema from hand-transcribed static annotations when live discovery is available.
+- Do not reintroduce OData `$count` for large-table counts; verify the current count helper shape in source.
+- Do not treat old analysis in this memory as current failure distribution. Re-run the relevant probe or analyze script.
+- Do not paste chronological slice history, old validator rollout notes, old error-distribution notes, old probe summaries, or commit/session ledgers back into active memory.
 
-**Assessment (S200, two-agent codebase map).** Dynamics Explorer fails frequently because its schema understanding is **hand-transcribed, not discovered**: `TABLE_ANNOTATIONS` (`shared/config/prompts/dynamics-explorer.js`) covers 23 tables and only **82 of 579** `akoya_request` attributes (`scripts/dynamics-schema-diff.json`). The LLM `describe_table` path reads that static set, even though `lib/services/dynamics-service.js:269-398` ALREADY has live `getEntityAttributes`/`getEntityRelationships` (unused by the agent). On top sit fragile heuristics the prompt tells the model to trust over live data: hardcoded program GUIDs (`dynamics-explorer.js:564-569`), hardcoded option-set codes (incl. the `wmkf_request_type eq 100000001` default gating most queries), most-active-account disambiguation guess (`chat.js:780-808`), and an error-as-tool-result loop (`chat.js:201-208`) that hides wrong-field failures by burning rounds.
+## Current Source-Backed Guardrails
 
-**Reusable Power Tools assets** (`lib/services/dataverse-export/`, built prior session, headless jest-covered — exact case count unverified here):
-- `fetch-client.js` — most liftable; correct FetchXML paging-cookie pagination + 429 backoff + `fetchXmlAggregateCount` (TRUE total). Fixes Explorer's 5,000-cap undercount (`queryAllRecords` has the exact bug).
-- `live-taxonomy.js` — live programs/types/statuses + generic `picklistOptions()` option-set resolver via EntityDefinitions metadata. Replaces stale hardcoded GUIDs/codes.
-- `constants.js` — encoded probe ground-truth: era cutover 2023-12-03, status→class map, and per-program PI/primary-contact/donor footguns (reference knowledge to replace Explorer's `_note` guesses). See [[project-institution-foundation-liaison]], [[akoya-temporal-axis-encodings]].
-- `scripts/dynamics-schema-diff.js` + `.json` — already catalogs Explorer's missing fields.
-- Pattern: validate→compile→appliedRules + fail-loud UNCLASSIFIED sentinels ([[project-living-taxonomy-principle]]).
+- [VERIFIED via repo source 2026-07-02] `pages/api/dynamics-explorer/chat.js` imports `buildResolvedTaxonomyPromptBlock` and `validateODataCall`, and `count_records` calls `DynamicsService.countRecords`.
+- [VERIFIED via repo source 2026-07-02] `DynamicsService.countRecords` uses `$apply=...countdistinct` on the primary key instead of Dataverse `/$count`.
+- [VERIFIED via repo source 2026-07-02] `buildResolvedTaxonomyPromptBlock` filters taxonomy sources against active table-level restrictions before injection.
+- [VERIFIED via repo source/tests 2026-07-02] Explorer denies direct `wmkf_ai_run` schema access and strips `wmkf_ai_run` Dataverse Search hits before returning tool results.
 
-**Design fork:** (A) keep Explorer agentic, feed it better/live ground truth (incremental, lower-risk) vs (B) add a deterministic structured-query tool backed by `compiler.js` for common axes + free-OData long-tail (higher reliability). Not exclusive — A is the foundation.
+## Ground Truth
 
-**Drift found:** prompt `akoya_folio` casing guidance (`dynamics-explorer.js:123`, "use contains() for Paid/PAID") contradicts [[akoya-payment-field-semantics]] (`akoya_folio="PAID"`). File says "10 tools" but 11 exist. **[RESOLVED S202]** — folio drift fixed in prompt + `TABLE_ANNOTATIONS` + `docs/DYNAMICS_SCHEMA_ANNOTATION.md`; live probe (`scripts/probe-akoya-folio-casing.js`, 2026-05-30) found the "casing inconsistency" claim was FALSE (only "PAID" stored, no mixed-case "Paid") and Dataverse `eq` is case-insensitive, so `akoya_folio eq 'PAID'` is exact + casing-proof (prefer over `contains()`).
+- `docs/DYNAMICS_EXPLORER_PATH_A_PLAN.md`
+- `docs/DYNAMICS_EXPLORER_ODATA_VALIDATOR_DESIGN.md`
+- `pages/api/dynamics-explorer/chat.js`
+- `shared/config/prompts/dynamics-explorer.js`
+- `lib/services/dynamics-explorer-taxonomy.js`
+- `lib/services/dynamics-odata-validator.js`
+- `lib/services/dynamics-service.js`
+- `tests/integration/dynamics-explorer-tool-serialization.test.js`
+- `tests/unit/dynamics-explorer-prompt.test.js`
+- `docs/agent-wiki/topics/dataverse-dynamics.md`
 
-**Path A plan written + Codex-reviewed (S200):** `docs/DYNAMICS_EXPLORER_PATH_A_PLAN.md`. 5 phases (A1 live schema into describe_table+inline tables, A2 cached live taxonomy resolution, A3 robust counts DEFERRED on an OData→FetchXML shim, A4 constants.js guardrails by-reference, A5 fail-loud w/ typed-errors prereq). Slice 1 = A1+A2. Codex caught 3 false API claims in draft (now fixed): `picklistOptions` NOT exported from live-taxonomy.js, live-taxonomy has NO cache, `count_records` uses `/$count` (throws on complex filters) not `@odata.count` (the 5000 silent cap is in queryRecords). Reuse gotchas: fetch-client needs FetchXML input (Explorer emits OData $filter); live-taxonomy + fetch-client BYPASS checkRestriction (security policy needed); token budget tight (12k describe_table cap, 2048 maxTokens, 5 inline schemas).
+## History
 
-Codex's `1a20a3a` already fixed the contact→requests role bug (ORs 11 grantee role fields) + added anti-confabulation prompt rules — but per-bug hand-patching (hardcoded the 11-field list).
-
-**Codex round 2** returned NO-GO (A1b + A2-security were left as "decide in review" → they gate implementation). Both now decided per Codex rec: A1b = soften the inline "query directly" rule so the model calls describe_table for non-curated fields (don't bloat the inline prompt); A2 security = whitelist a fixed taxonomy surface (akoya_programs/wmkf_grantprograms/wmkf_types/wmkf_request_type/distinct akoya_requeststatus) + a restriction guard at the injection gate (since live-taxonomy/fetch-client bypass checkRestriction). Also added: `describe_table({full:true})` schema+handler change, a concrete prompt-injection contract (fixed key→value table, shape-validated, malformed labels dropped — system prompt is NOT untrusted-wrapped), and an optional countdistinct-on-PK interim for counts. **Slice 1 (A1+A2) now specified, ready to implement pending green-light.**
-
-**Slice 1 (A1+A2) IMPLEMENTED + reviewed (S200, commit 12f7a51).** Codex implemented; Claude reviewed (verified integration points match live-taxonomy.js, ran suite+gates independently) and fixed one in-scope gap: the inline option-set sanitizers were applied only in buildInlineSchemas, so `describe_table('akoya_request')` still leaked the raw hardcoded `100000001` codes → exported `formatInlineFieldDescription`/`formatInlineRule`, applied them in describeTable, added a guard assertion. New: `lib/services/dynamics-explorer-taxonomy.js` (6h-cached fail-loud resolver, whitelist + restriction gate + GUID/int/label validation + size cap). Suite 1516 green. Fail-loud tradeoff noted: a taxonomy-fetch failure fails the whole chat request (no graceful degrade) — acceptable given 6h cache. Out-of-A2-scope codes still hardcoded: wmkf_contingencystatus, wmkf_reporttype. A3/A4/A5 not built.
-
-**Measure-first pivot (S200):** `scripts/analyze-dynamics-explorer-failures.js` over 1467 prod tool calls showed the dominant failure is NOT missing schema — it's the model emitting **invalid OData** (392 errored calls): hallucinated field/entity names (akoya_name vs akoya_requestnum, akoya_proposal), request-number-where-GUID-required, year()/month()/day(), _formatted-in-filter, contains-on-lookup, fiscalyear format guessing. No active restrictions in prod (so the restriction hardening was defensive). This reprioritized A3/A4/A5 → an **OData pre-flight validator**.
-
-**OData validator SHIPPED + reviewed (S200, commit aa93d5a).** `lib/services/dynamics-odata-validator.js`: tolerant tokenizer (reject only high-confidence; unknown shapes pass through) validating field/entity names against live `getEntityAttributes`, restricted-field enforcement in filter/orderby (closes the checkRestriction gap — it doesn't inspect those), request-number-as-GUID detection, unsupported-construct rejects with precise hints. NO auto-correct (unquoted GUIDs are VALID — server uses them; Codex review caught this, would've been harmful). Validates EFFECTIVE post-sanitize query; distinct ODATA_VALIDATOR_REJECT log marker for soak measurement; in-flight schema-cache coalescing. Design+2 Codex reviews in `docs/DYNAMICS_EXPLORER_ODATA_VALIDATOR_DESIGN.md`. Watch-item: unknown-table reject false-rejects valid non-annotated tables (low risk; logged).
-
-**A3+A4+A5 SHIPPED (S202, 2026-05-30).** User chose to build over the measure-first deferral after the soak re-run showed frozen data (1471 vs 1467 calls / 392 vs 392 errors since S200 — +4/+0), but the error *shape* (fiscalyear 88, akoya_grant 30, date-fns 27) still mapped 1:1 to A3/A4/A5. A live probe (`scripts/probe-akoya-folio-casing.js`) reshaped the work:
-- **A3 (counts)** — `/$count` is broken BOTH ways (caps at 5000 unfiltered AND throws Edm.Int32 on any filter), so `DynamicsService.countRecords` was REPLACED (not a narrow interim) with `$apply=filter(...)/aggregate(<pk> with countdistinct as value)`; PK from new `getPrimaryIdAttribute` (PrimaryIdAttribute metadata). True counts 9120/22580 past the 5000 cap. Fails loud past the 50k `$apply` ceiling → the >50k unbounded count is the still-deferred FetchXML/paging tail.
-- **A4 (guardrails+folio)** — `buildDomainGuardrails()` injects probe-verified anti-confabulation block (liaison≠PI, PI program-conditional, createdon≠business-date, status classes); lists derived BY REFERENCE from `constants.js`. Folio drift resolved (see above).
-- **A5 (fail-loud errors)** — `classifyToolError` turns a Dynamics unknown-field/entity 400 into a typed result (closest valid names + describe_table pointer), with Edm.Int32 false-positive guard.
-
-Suite 1544 green, lint 0 errors, all gates green. Codex post-impl review folded 1 MEDIUM (systemuser count regression) + 1 LOW (A5 entity-set-alias enrichment) with regression tests. Plan doc `docs/DYNAMICS_EXPLORER_PATH_A_PLAN.md` updated. **Next:** real soak still pending meaningful traffic (the only Explorer item left that's blocked on volume, not effort). See [[project-dataverse-power-tools]], [[project-dynamics-explorer-details]], [[project-dynamics-explorer-schema-diff]].
+The long Slice A1-A5 chronology was intentionally demoted out of active recall on 2026-07-02 per `docs/audits/memory-trim-package-dynamics-power-tools-2026-07-02.md`. Recover historical narrative from git/audit docs; keep this file small.

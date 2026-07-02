@@ -101,7 +101,7 @@ const ALLOWLIST_FILES = new Set([
   'docs/W4_ANOMALY_TRIAGE.md',
   // Memory entries SPECIFICALLY about the migration itself.
   '.claude-memory/project-reviewer-postgres-to-dataverse-migration.md',
-  '.claude-memory/project-w6-table-drop-pending.md',
+  '.claude-memory/project-w6-table-drop-closed.md',
   '.claude-memory/project-reviewer-finder-dataverse-entry-path.md',
   '.claude-memory/reviewer-identity-fragmentation.md',
   '.claude-memory/project-intake-portal-pilot-decisions-2026-05-06.md',
