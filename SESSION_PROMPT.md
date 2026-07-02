@@ -7,12 +7,11 @@ Two parallel streams on `main`, disjoint file sets, merged cleanly:
   strategy** for the no-BILL cycle — our app becomes the sole creator of reviewer
   honorarium `akoya_request`s. Verified against live prod Dataverse (read probes + one
   authorized `$1` sentinel create/read/delete, cleaned up + confirmed gone in AkoyaGO).
-- **Codex (main tree):** continued **memory hygiene** — code-grounded the reviewer-identity
-  memories, built a memory cleanup queue + Dynamics memory trim package with audit docs,
-  reconciled the Dynamics AI-run docs / Explorer guard, and touched
-  `pages/api/dynamics-explorer/chat.js`. *(Summarized secondhand from commits + the
-  `docs/audits/*-2026-07-02.md` files, not from Codex's session context — read those for
-  detail.)*
+- **Codex (main tree):** continued **memory hygiene** — reduced router pressure,
+  triaged pending/slice memories, code-grounded reviewer migration + identity memories,
+  audited Dynamics/Power Tools and Batch B cleanup candidates, built the cleanup queue +
+  Dynamics trim package, and reconciled the Dynamics AI-run docs / Explorer guard in
+  `pages/api/dynamics-explorer/chat.js`. See `docs/audits/*-2026-07-02.md`.
 
 ### What Was Completed (Claude — honorarium)
 
@@ -63,6 +62,17 @@ Two parallel streams on `main`, disjoint file sets, merged cleanly:
    "capture-only / BILL-not-integrating" state — reconcile to reference the new strategy
    doc + the "app is sole creator" decision. Claude deferred all durable-memory writes this
    session (Codex owns memory hygiene).
+
+### Verified Open (memory hygiene — Codex)
+
+1. **Apply ready Dynamics memory trims now that Claude is parked.** Evidence:
+   `docs/audits/memory-cleanup-queue-2026-07-02.md` and
+   `docs/audits/memory-trim-package-dynamics-power-tools-2026-07-02.md`. First targets:
+   `.claude-memory/project-dataverse-power-tools.md` and
+   `.claude-memory/project-dynamics-explorer-reuse-power-tools.md`.
+2. **Continue cleanup queue with Batch C or honorarium-memory reconcile.** Evidence:
+   `docs/audits/memory-cleanup-queue-2026-07-02.md`; honorarium-specific reconcile is
+   item 4 above.
 
 ### Verify Before Acting (carried from S313 — re-verify before acting)
 
