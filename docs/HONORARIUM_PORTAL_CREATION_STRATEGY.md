@@ -106,6 +106,30 @@ probe 2026-07-01]`
 so retries / repeat accepts never double-mint. With GoApply out of the reviewer
 path there is no cross-source duplication either. `[VERIFIED via source]`
 
+### 3d. Contact linkage (the person is *linked*, not copied)
+
+The request is bound to the **actual person `contact` record** via a lookup
+relationship — it is **not** populated from a copy of the contact's data.
+`[VERIFIED via source + test create 2026-07-01]`
+
+- `ensureContact()` (orchestrator step 1) resolves the real person: existing
+  contact by email → by ORCID → else create new (with duplicate-risk alerts). It
+  returns that contact's GUID.
+- The create body binds it as a lookup: `akoya_primarycontactid@odata.bind →
+  /contacts(<contactId>)`, surfacing on the request as the
+  `_akoya_primarycontactid_value` lookup (as on Amy's row and the test row).
+- The request row itself carries only the honorarium template fields (program /
+  type / amount / dates) **plus the pointer to the person**. Name / email / ORCID
+  are **not** stamped onto the request — they stay on the contact and are reached
+  through the lookup. Editing the person later updates the linked contact; the
+  request keeps pointing at it (no stale copy on the request).
+- **Address goes to the *contact*, not the request:** step 2 PATCHes
+  `contact.address1_*`. Address data lands on the person record, referenced (not
+  duplicated) by the request.
+- **One denormalized exception:** the auto-generated `akoya_title` ("Grant to
+  \<name>") — an Akoya plugin copies the contact's name into that title string.
+  That is plugin behavior, not our create body.
+
 ---
 
 ## 4. 🔴 Latent bug to fix in the build (nav-property casing)
