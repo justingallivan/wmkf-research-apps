@@ -65,10 +65,26 @@ describe('ensureHonorariumOnboarding', () => {
     expect(deps.contacts.findOrCreateByEmail).not.toHaveBeenCalled();
     const createArg = deps.dynamics.createRecord.mock.calls[0][1];
     expect(createArg.akoya_requestid).toBe(`det-${SUGGESTION_ID}`);
+    // Amount stamped on all three money fields the GoApply cohort carries.
     expect(createArg.akoya_recommendedamount).toBe(250);
-    expect(createArg['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-1)');
+    expect(createArg.akoya_request).toBe(250);
+    expect(createArg.wmkf_invitedamount).toBe(250);
+    // Nav-property casing (lowercase) — the prior PascalCase was rejected 400.
+    expect(createArg['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-1)');
+    expect(createArg['akoya_programid@odata.bind']).toBe('/akoya_programs(00000000-0000-0000-0000-0000000000aa)');
+    // Both request-type fields: native Akoya "Scholarship" + wmkf "Individual".
+    expect(createArg.akoya_requesttype).toBe(100000001);
     expect(createArg.wmkf_request_type).toBe(682090001);
     expect(createArg.wmkf_meetingdate).toBe('2026-06-04T00:00:00Z');
+    // Fiscal year derived from the parent proposal's meeting date (UTC).
+    expect(createArg.akoya_fiscalyear).toBe('June 2026');
+    // Reminder flags forced off (bare create would default them true).
+    expect(createArg.wmkf_respondreminderenabled).toBe(false);
+    expect(createArg.wmkf_reviewduereminderenabled).toBe(false);
+    // Proposal-referencing title (Option C), not the plugin "Grant to <name>".
+    expect(createArg.akoya_title).toBe('Reviewer honorarium — proposal (#REQ-001)');
+    // Currency bind omitted when HONORARIUM_CURRENCY_ID is unset (org default applies).
+    expect(createArg['transactioncurrencyid@odata.bind']).toBeUndefined();
     expect(deps.suggestions.setHonorariumRequest).toHaveBeenCalledWith(SUGGESTION_ID, `det-${SUGGESTION_ID}`);
     expect(deps.onboard).toHaveBeenCalledWith(expect.objectContaining({
       honorariumRequestId: `det-${SUGGESTION_ID}`,
@@ -82,13 +98,37 @@ describe('ensureHonorariumOnboarding', () => {
     expect(res.created).toBe(true);
   });
 
+  it('parent request has no meeting date → throws (no malformed row) and does NOT create', async () => {
+    const deps = makeDeps();
+    const args = baseArgs({ request: { wmkf_meetingdate: null } });
+    await expect(ensureHonorariumOnboarding(args, deps)).rejects.toMatchObject({ code: 'honorarium_no_meeting_date' });
+    expect(deps.dynamics.createRecord).not.toHaveBeenCalled();
+    expect(deps.suggestions.setHonorariumRequest).not.toHaveBeenCalled();
+  });
+
+  it('binds transactioncurrencyid when HONORARIUM_CURRENCY_ID is configured', async () => {
+    const prev = process.env.HONORARIUM_CURRENCY_ID;
+    process.env.HONORARIUM_CURRENCY_ID = '00000000-0000-0000-0000-0000000000dd';
+    jest.resetModules();
+    const { ensureHonorariumOnboarding: withCurrency } = require('../../lib/bill/honorarium-onboard-orchestrator');
+    try {
+      const deps = makeDeps();
+      await withCurrency(baseArgs(), deps);
+      expect(deps.dynamics.createRecord.mock.calls[0][1]['transactioncurrencyid@odata.bind'])
+        .toBe('/transactioncurrencies(00000000-0000-0000-0000-0000000000dd)');
+    } finally {
+      restoreEnv('HONORARIUM_CURRENCY_ID', prev);
+      jest.resetModules();
+    }
+  });
+
   it('contact absent → promotes (find-or-create + setContactLink) and uses the new id', async () => {
     const deps = makeDeps();
     const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_potentialreviewersid: 'pr-1', wmkf_emailaddress: 'jane@uni.edu', wmkf_name: 'Jane' } });
     await ensureHonorariumOnboarding(args, deps);
     expect(deps.contacts.findOrCreateByEmail).toHaveBeenCalledWith(expect.objectContaining({ email: 'jane@uni.edu' }), { actingUserSystemId: undefined });
     expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-new', { actingUserSystemId: undefined });
-    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-new)');
+    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-new)');
   });
 
   it('contact absent, email matches an existing contact → links it; no create, cross-checks ORCID when present', async () => {
@@ -99,7 +139,7 @@ describe('ensureHonorariumOnboarding', () => {
     expect(deps.contacts.findByOrcidCandidates).toHaveBeenCalledWith('0000-0002-1825-0097');
     expect(deps.contacts.findOrCreateByEmail).not.toHaveBeenCalled();
     expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-email', { actingUserSystemId: undefined });
-    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-email)');
+    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
   });
 
   it('email hit + ORCID uniquely matches a different contact → warns but links and binds the email contact', async () => {
@@ -128,7 +168,7 @@ describe('ensureHonorariumOnboarding', () => {
       }),
     }));
     expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-email', { actingUserSystemId: undefined });
-    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-email)');
+    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
   });
 
   it('email hit + ORCID uniquely matches the same contact → no split warning', async () => {
@@ -142,7 +182,7 @@ describe('ensureHonorariumOnboarding', () => {
     await ensureHonorariumOnboarding(args, deps);
 
     expect(deps.notify).not.toHaveBeenCalled();
-    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-email)');
+    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
   });
 
   it('email hit + ORCID lookup throws → proceeds with the email contact', async () => {
@@ -159,7 +199,7 @@ describe('ensureHonorariumOnboarding', () => {
 
       expect(res.honorariumRequestId).toBe(`det-${SUGGESTION_ID}`);
       expect(deps.notify).not.toHaveBeenCalled();
-      expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-email)');
+      expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
     } finally {
       warn.mockRestore();
     }
@@ -180,7 +220,7 @@ describe('ensureHonorariumOnboarding', () => {
 
       expect(deps.notify).toHaveBeenCalledWith(expect.objectContaining({ type: 'contact_orcid_email_split' }));
       expect(res.honorariumRequestId).toBe(`det-${SUGGESTION_ID}`);
-      expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-email)');
+      expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
     } finally {
       warn.mockRestore();
     }
@@ -201,7 +241,7 @@ describe('ensureHonorariumOnboarding', () => {
 
     expect(res.created).toBe(true);
     expect(deps.contacts.findByEmail).toHaveBeenCalledWith('payee@new.edu');
-    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-email)');
+    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
     const contactUpdates = deps.dynamics.updateRecord.mock.calls.filter((call) => call[0] === 'contacts');
     expect(contactUpdates.length).toBeGreaterThan(0);
     expect(contactUpdates.some((call) => Object.prototype.hasOwnProperty.call(call[2], 'emailaddress1'))).toBe(false);
@@ -219,7 +259,7 @@ describe('ensureHonorariumOnboarding', () => {
     expect(deps.contacts.findByOrcidCandidates).toHaveBeenCalledWith('0000-0002-1825-0097');
     expect(deps.contacts.findOrCreateByEmail).not.toHaveBeenCalled(); // the bug fix: no duplicate
     expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-orcid', { actingUserSystemId: undefined });
-    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-orcid)');
+    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-orcid)');
   });
 
   it('email misses and ORCID is ambiguous → creates a new contact + logs a server warning (durable staff-review surface deferred), never blocks', async () => {
@@ -302,7 +342,7 @@ describe('ensureHonorariumOnboarding', () => {
       const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_potentialreviewersid: 'pr-1', wmkf_emailaddress: 'jane@uni.edu', wmkf_name: 'Jane' } });
       await ensureHonorariumOnboarding(args, deps);
       // Authoritative live link wins over the contact we picked by email.
-      expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-live)');
+      expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-live)');
     } finally {
       warn.mockRestore();
     }
@@ -317,7 +357,7 @@ describe('ensureHonorariumOnboarding', () => {
       });
       const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_potentialreviewersid: 'pr-1', wmkf_emailaddress: 'jane@uni.edu', wmkf_name: 'Jane' } });
       const res = await ensureHonorariumOnboarding(args, deps);
-      expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_PrimaryContactId@odata.bind']).toBe('/contacts(contact-email)');
+      expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
       expect(res.honorariumRequestId).toBe(`det-${SUGGESTION_ID}`);
     } finally {
       warn.mockRestore();
