@@ -3,7 +3,7 @@ title: "Honorarium Portal-Creation Strategy (no-BILL cycle)"
 domain: finance-honoraria
 kind: plan
 status: active
-summary: "Status: Design — verified against live prod Dataverse, not yet built."
+summary: "Config-gated draft implementation exists; go-live awaits env flip and Connor schema/open-item decisions."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,7 +16,8 @@ related:
 
 # Honorarium Portal-Creation Strategy (no-BILL cycle)
 
-**Status:** Design — verified against live prod Dataverse, not yet built.
+**Status:** Go-live plan + config-gated draft implementation — verified against live
+prod Dataverse; not live until the env/config flip.
 **Date:** 2026-07-01 · **Context:** Justin + Connor decision; Claude session 314.
 **Scope:** How reviewer honorarium `akoya_request` records get created when full
 BILL.com integration is deferred and reviewers no longer self-register through
@@ -34,10 +35,13 @@ date noted · `[DECISION]` = settled by Justin/Connor · `[OPEN]` = needs Connor
   through GoApply separately. The portal is the **sole** creator for reviewers who
   come through it, so there is no GoApply/AkoyaGO-sync duplication to reconcile.
   `[DECISION]`
-- Mechanism = the **already-built** post-accept pipeline
-  `ensureHonorariumOnboarding()` (`lib/bill/honorarium-onboard-orchestrator.js`),
-  run at Stage 2a accept, with the **BILL tail deferred**. It creates the
-  `akoya_request`; it does **not** attempt payment. `[VERIFIED via source]`
+- Mechanism = the post-accept pipeline `ensureHonorariumOnboarding()`
+  (`lib/bill/honorarium-onboard-orchestrator.js`), run at Stage 2a accept, with
+  the **BILL tail deferred**. As of commit `cd82c405`, the create-body draft is
+  implemented and unit-tested behind config gates; it creates the `akoya_request`
+  only after `HONORARIUM_ONBOARDING_DEFERRED` is unset and all discriminator GUIDs
+  are configured. It does **not** attempt payment while `BILL_ONBOARDING_DEFERRED`
+  remains `true`. `[VERIFIED via source]`
 - **Payment is out of scope.** Individuals still cannot be paid through the
   AkoyaGO payment engine — per the 2026-06-27 landscape probe, 0 of 9,151 completed
   disbursements had ever gone to a person (**prior finding, not re-verified this
@@ -58,9 +62,9 @@ state is:
 | `HONORARIUM_PROGRAM_ID` | `7e744a42-37eb-f011-8543-6045bd02b4cc` (Research Reviewer) | discriminator |
 | `HONORARIUM_GRANTPROGRAM_ID` | `60ef7626-38eb-f011-8543-6045bd02b4cc` (Honorarium) | discriminator |
 | `HONORARIUM_TYPE_ID` | `4bab15c9-38eb-f011-8543-6045bd02b4cc` (Individual) | discriminator |
-| `HONORARIUM_ONBOARDING_DEFERRED` | **unset** (currently `true` in prod) | allows the create to run |
+| `HONORARIUM_ONBOARDING_DEFERRED` | **unset** (prod was locked to `true` as of 2026-07-01; re-verify before flip) | allows the create to run |
 | `BILL_ONBOARDING_DEFERRED` | **`true`** | skips the BILL call silently — no BILL, no per-reviewer alert (`onboard-reviewer-service.js:86`) |
-| `wmkf_appsystemsettings` key `honorarium.default_amount` | e.g. `250` | the stamped amount (falls back to `$250` if unset — `lib/services/honorarium-config.js`) |
+| `wmkf_appsystemsettings` key `honorarium.default_amount` | e.g. `250` | stamped amount; confirmed-absent key falls back to `$250`, malformed/unavailable setting throws (`lib/services/honorarium-config.js`) |
 
 - GUIDs above were read from the live prod record (Amy Gladfelter honorarium
   `#1002764`); confirm with `scripts/probe-honorarium-discriminators.js` before
@@ -80,23 +84,28 @@ both (verified 404, and confirmed absent in AkoyaGO by Connor/Justin).
 
 ### 3a. Fields we MUST set (auto-default is absent or wrong)
 
+Implementation status: the config-gated draft create body in
+`lib/bill/honorarium-onboard-orchestrator.js` now sets these fields except the new
+proposal self-lookup, which waits on Connor's schema change in §8/§9. `[VERIFIED
+via source 2026-07-01]`
+
 | Field | Value | Note |
 |---|---|---|
 | `akoya_programid@odata.bind` | Research Reviewer program | **see nav-casing fix §4** |
 | `wmkf_GrantProgram@odata.bind` | Honorarium | |
 | `wmkf_Type@odata.bind` | Individual | |
 | `akoya_primarycontactid@odata.bind` | reviewer contact | **see nav-casing fix §4** |
-| `transactioncurrencyid@odata.bind` | US Dollar (`0bc77bca-2c7b-ee11-8179-00224802aaea`) | drives the `*_base` amounts + `exchangerate` |
-| `akoya_request` | admin amount | **missing today** — currency field |
-| `wmkf_invitedamount` | admin amount | **missing today** |
-| `akoya_recommendedamount` | admin amount | already set |
-| `wmkf_request_type` | `682090001` (Individual) | already set; does **not** auto-default |
-| `akoya_requesttype` | `100000001` (Scholarship) | **missing today**; auto-defaults to the WRONG value `100000000` |
-| `wmkf_meetingdate` | parent proposal's meeting date | already set (conditional) |
-| `akoya_fiscalyear` | derived — see §5 | **missing today**; does **not** auto-derive |
-| `wmkf_respondreminderenabled` | `false` | **missing today**; auto-defaults `true` (GoApply rows are off) |
-| `wmkf_reviewduereminderenabled` | `false` | **missing today**; auto-defaults `true` |
-| _proposal-linkage lookup_ (new — see §8) | parent proposal (`request.akoya_requestid`) | **needs schema change**; bind once Connor adds the relationship |
+| `transactioncurrencyid@odata.bind` | Optional explicit US Dollar bind (`0bc77bca-2c7b-ee11-8179-00224802aaea`) | drives the `*_base` amounts + `exchangerate`; draft code binds only when `HONORARIUM_CURRENCY_ID` is configured, otherwise Dataverse applies org default currency |
+| `akoya_request` | admin amount | draft now sets; minimal create leaves absent |
+| `wmkf_invitedamount` | admin amount | draft now sets; cohort carries same value |
+| `akoya_recommendedamount` | admin amount | already set before S314; still set |
+| `wmkf_request_type` | `682090001` (Individual) | already set before S314; does **not** auto-default |
+| `akoya_requesttype` | `100000001` (Scholarship) | draft now sets; bare create auto-defaults to WRONG value `100000000` |
+| `wmkf_meetingdate` | parent proposal's meeting date | draft sets when parent date exists; guard/alert when missing |
+| `akoya_fiscalyear` | derived — see §5 | draft now derives; minimal create does **not** auto-derive |
+| `wmkf_respondreminderenabled` | `false` | draft now forces off; bare create auto-defaults `true` (GoApply rows are off) |
+| `wmkf_reviewduereminderenabled` | `false` | draft now forces off; bare create auto-defaults `true` |
+| _proposal-linkage lookup_ (new — see §8) | parent proposal (`request.akoya_requestid`) | **needs schema change**; TODO remains in code until Connor adds the relationship and we verify nav-property casing |
 
 Amounts: stamp all **three** amount fields from the single admin-panel amount
 (`getHonorariumAmount()`); the cohort carries the same value on all three —
@@ -113,9 +122,9 @@ probe 2026-07-01]`
 - `statecode/statuscode` (Active), `akoya_paid` (0), `wmkf_typeforrollup`
   (Individual), `akoya_requestnum` (auto-number), all `*_base` amounts,
   `exchangerate` → auto. `[VERIFIED]`
-- `akoya_title` → auto-generates as `"Grant to <contact>"`. We will **override** it
-  with a proposal-referencing title at create (Option C, §8) — plain writable
-  string, no schema change.
+- `akoya_title` → auto-generates as `"Grant to <contact>"`. The draft create body
+  now **overrides** it with a proposal-referencing title at create (Option C, §8)
+  — plain writable string, no schema change. `[VERIFIED via source]`
 
 ### 3c. Idempotency (already handled)
 
@@ -151,20 +160,21 @@ relationship — it is **not** populated from a copy of the contact's data.
 
 ---
 
-## 4. 🔴 Latent bug to fix in the build (nav-property casing)
+## 4. Nav-property casing bug fixed in the draft create body
 
-The current create body uses `akoya_ProgramId` and `akoya_PrimaryContactId`
-(`honorarium-onboard-orchestrator.js:151,154`). Dataverse **rejects** that casing
-with a `400` ("undeclared property … only has property annotations"). The real
-single-valued navigation properties are lowercase:
+The pre-S314 create body used `akoya_ProgramId` and `akoya_PrimaryContactId`.
+Dataverse **rejects** that casing with a `400` ("undeclared property … only has
+property annotations"). The real single-valued navigation properties are
+lowercase, and the draft implementation now uses them:
 
 - `akoya_ProgramId@odata.bind` → **`akoya_programid@odata.bind`**
 - `akoya_PrimaryContactId@odata.bind` → **`akoya_primarycontactid@odata.bind`**
 - (`wmkf_GrantProgram`, `wmkf_Type` are correct as-is.)
 
-This was never caught because the path has been deferred in prod and its unit tests
-inject a fake `dynamics`. **It would fail the first real create.** `[VERIFIED via
-prod 400 → corrected create succeeded 2026-07-01]`
+This was never caught earlier because the path has been deferred in prod and its
+unit tests inject a fake `dynamics`. It would have failed the first real create;
+commit `cd82c405` fixes the draft body and adds assertions for the lowercase bind
+names. `[VERIFIED via prod 400 → corrected create succeeded 2026-07-01 + source]`
 
 ---
 
@@ -191,10 +201,12 @@ than write a malformed row (do not silently omit).
 
 - Reviewers who accepted while capture-only was on will **not** re-accept, so their
   honoraria were never minted. After the config flip, mint them with
-  `scripts/backfill-honorarium-capture-only.mjs --cycle <CODE>`. Per
-  `docs/agent-wiki/topics/finance-honoraria.md` this is dry-run by default,
-  cycle-scoped, idempotent, and skips rows with no captured address — **confirm the
-  flags against the script source before running** (script not re-read this session).
+  `scripts/backfill-honorarium-capture-only.mjs --cycle <CODE>`. The script is
+  dry-run by default, cycle-scoped, idempotent, skips rows with no captured
+  address, refuses to run while `HONORARIUM_ONBOARDING_DEFERRED=true` or the
+  discriminator GUIDs are incomplete, and drives the same
+  `ensureHonorariumOnboarding()` path rather than duplicating create logic.
+  `[VERIFIED via source]`
 
 ---
 
@@ -232,10 +244,11 @@ relationship. `[VERIFIED via entity metadata 2026-07-01]`
   binds it to the parent proposal via `<navprop>@odata.bind → /akoya_requests(<proposalId>)`.
   **Confirm the exact navigation-property name/casing from metadata after Connor
   creates it** — see the nav-casing hazard in §4.
-- **Option C — proposal-referencing title (immediate, no schema change).** Override
-  `akoya_title` (a plain writable string, §3b) at create with e.g.
-  `"Reviewer honorarium — <proposal title / #num>"`. Human-visible on the record now,
-  even before A lands; not structured/queryable — A is the queryable link.
+- **Option C — proposal-referencing title (immediate, no schema change).** The draft
+  create body now overrides `akoya_title` (a plain writable string, §3b) at create
+  with `"Reviewer honorarium — <proposal title> (#num)"`, capped to the column
+  length. Human-visible on the record now, even before A lands; not
+  structured/queryable — A is the queryable link.
 
 **Option B is obviated.** The proposal↔honorarium link is already *derivable* via the
 `wmkf_HonorariumRequest` suggestion junction, but A supersedes it as the surfaced
@@ -247,7 +260,7 @@ link. (The junction stays for its existing idempotency/provenance role, §3c.)
 
 | # | Change | Status | Consumer |
 |---|---|---|---|
-| 1 | New custom lookup on `akoya_request` → `akoya_request` (proposed `wmkf_relatedproposal`): honorarium → parent proposal | requested / Connor OK in principle | our create body binds it (§8 Option A) |
+| 1 | New custom lookup on `akoya_request` → `akoya_request` (proposed `wmkf_relatedproposal`): honorarium → parent proposal | requested / Connor OK in principle | TODO is parked in the draft create body; bind after Connor creates it and nav-property casing is verified (§8 Option A) |
 
 Add rows here as further Dataverse schema changes arise this cycle.
 
