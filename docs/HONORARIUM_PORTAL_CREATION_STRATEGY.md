@@ -80,6 +80,7 @@ both (verified 404, and confirmed absent in AkoyaGO by Connor/Justin).
 | `akoya_fiscalyear` | derived — see §5 | **missing today**; does **not** auto-derive |
 | `wmkf_respondreminderenabled` | `false` | **missing today**; auto-defaults `true` (GoApply rows are off) |
 | `wmkf_reviewduereminderenabled` | `false` | **missing today**; auto-defaults `true` |
+| _proposal-linkage lookup_ (new — see §8) | parent proposal (`request.akoya_requestid`) | **needs schema change**; bind once Connor adds the relationship |
 
 Amounts: stamp all **three** amount fields from the single admin-panel amount
 (`getHonorariumAmount()`); the cohort carries the same value on all three —
@@ -96,8 +97,9 @@ probe 2026-07-01]`
 - `statecode/statuscode` (Active), `akoya_paid` (0), `wmkf_typeforrollup`
   (Individual), `akoya_requestnum` (auto-number), all `*_base` amounts,
   `exchangerate` → auto. `[VERIFIED]`
-- `akoya_title` → auto-generates as `"Grant to <contact>"`. Cosmetic; Amy's row had
-  no title. Optionally stamp a honorarium-appropriate title later — low priority.
+- `akoya_title` → auto-generates as `"Grant to <contact>"`. We will **override** it
+  with a proposal-referencing title at create (Option C, §8) — plain writable
+  string, no schema change.
 
 ### 3c. Idempotency (already handled)
 
@@ -126,9 +128,10 @@ relationship — it is **not** populated from a copy of the contact's data.
 - **Address goes to the *contact*, not the request:** step 2 PATCHes
   `contact.address1_*`. Address data lands on the person record, referenced (not
   duplicated) by the request.
-- **One denormalized exception:** the auto-generated `akoya_title` ("Grant to
-  \<name>") — an Akoya plugin copies the contact's name into that title string.
-  That is plugin behavior, not our create body.
+- **Title:** left to the plugin, `akoya_title` would denormalize the contact's name
+  ("Grant to \<name>"). Under Option C (§8) we instead **override** it with a
+  proposal-referencing string, so the title reflects the proposal rather than
+  copying the person.
 
 ---
 
@@ -179,7 +182,7 @@ than write a malformed row (do not silently omit).
 
 ---
 
-## 7. Open item (Connor)
+## 7. Open items (Connor)
 
 - **GoApply linkage lookups** — `_akoya_goapplyapplication_value`,
   `_akoya_goapplyphase_value`, `_akoya_goapplysubmitter_value` are present on every
@@ -188,11 +191,53 @@ than write a malformed row (do not silently omit).
   *does* auto-populate on our create; the other three do not. **Does any payment,
   folio, or Ops dashboard/report require these three lookups?** If a view filters
   honoraria by GoApply application, app-created rows would be invisible to it.
-  `[OPEN — Connor]`
+  `[SENT to Connor 2026-07-01 — awaiting reply]`
+- **New proposal-linkage relationship** — see §8. Connor is fine with the schema
+  change in principle; tracked in §9 for the end-of-work update.
 
 ---
 
-## 8. Provenance
+## 8. Proposal linkage (capability unique to the app path)
+
+GoApply onboarding is **blind to the parent request**: reviewers just start a new
+request with no notion of which proposal it responds to. Our create runs *with* the
+proposal (`request.akoya_requestid`) in context, so we can make the honorarium
+self-explanatory. `[VERIFIED: request = the proposal's akoya_request, respond.js:380,581]`
+
+**Finding:** `akoya_request` has 65 lookup fields but **none is self-referential**
+(no field targets `akoya_request`), so a direct honorarium→proposal link needs a new
+relationship. `[VERIFIED via entity metadata 2026-07-01]`
+
+**Build both:**
+
+- **Option A — new self-lookup (structured, clickable, queryable).** Connor adds a
+  custom lookup on `akoya_request` targeting `akoya_request` (proposed name
+  `wmkf_relatedproposal` — Connor confirms the final schema name). Our create body
+  binds it to the parent proposal via `<navprop>@odata.bind → /akoya_requests(<proposalId>)`.
+  **Confirm the exact navigation-property name/casing from metadata after Connor
+  creates it** — see the nav-casing hazard in §4.
+- **Option C — proposal-referencing title (immediate, no schema change).** Override
+  `akoya_title` (a plain writable string, §3b) at create with e.g.
+  `"Reviewer honorarium — <proposal title / #num>"`. Human-visible on the record now,
+  even before A lands; not structured/queryable — A is the queryable link.
+
+**Option B is obviated.** The proposal↔honorarium link is already *derivable* via the
+`wmkf_HonorariumRequest` suggestion junction, but A supersedes it as the surfaced
+link. (The junction stays for its existing idempotency/provenance role, §3c.)
+
+---
+
+## 9. Schema changes to track (for Connor end-of-work update)
+
+| # | Change | Status | Consumer |
+|---|---|---|---|
+| 1 | New custom lookup on `akoya_request` → `akoya_request` (proposed `wmkf_relatedproposal`): honorarium → parent proposal | requested / Connor OK in principle | our create body binds it (§8 Option A) |
+
+Add rows here as further Dataverse schema changes arise this cycle.
+
+---
+
+## 10. Provenance
 
 - Source: `lib/bill/honorarium-onboard-orchestrator.js`,
   `lib/bill/onboard-reviewer-service.js`, `lib/bill/honorarium-discriminators.js`,
