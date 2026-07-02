@@ -87,6 +87,17 @@ assert(
   settings.hooks.PreToolUse.some((entry) =>
     entry.hooks.some((hook) => hook.command.includes('agent-wiki-reminder.js'))),
 );
+assert(
+  'docs-catalog format hook is wired',
+  settings.hooks.PreToolUse.some((entry) =>
+    entry.hooks.some((hook) => hook.command.includes('docs-catalog-format-guard.js'))),
+);
+assert(
+  'docs-catalog commit guard is wired',
+  settings.hooks.PreToolUse.some((entry) =>
+    entry.matcher === 'Bash' &&
+    entry.hooks.some((hook) => hook.command.includes('docs-catalog-commit-guard.js'))),
+);
 assert('agent-wiki gate script exists', fs.existsSync(path.join(repoRoot, 'scripts', 'check-agent-wiki.js')));
 
 const guardResult = require('child_process').spawnSync(

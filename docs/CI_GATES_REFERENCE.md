@@ -61,6 +61,8 @@ Requires every top-level `docs/*.md` file to carry catalog frontmatter and requi
 - Optional relationships: `related`, `supersedes`, and `superseded_by` must be lists of existing repo paths when present.
 - The `cataloged` date means the inventory metadata was generated or refreshed. It is not a claim that every factual assertion inside the doc was re-verified.
 - Scope is intentionally top-level `docs/*.md`; topic subdirectories continue to use their own gates, especially `check:agent-wiki`.
+- Hook assist: `.claude/hooks/docs-catalog-format-guard.js` blocks new top-level docs written without valid catalog frontmatter and advises on edits that remove or change catalog metadata.
+- Commit control: `.claude/hooks/docs-catalog-commit-guard.js` runs `check:docs-catalog` on `git commit` only when staged paths touch top-level docs or the catalog tooling/config. If it blocks, fix frontmatter and run `npm run generate:docs-catalog`.
 
 ### `check:prompt-storage-mentions` — stale `wmkf_prompt_template` claims (S167) <!-- prompt-storage:ignore reason=self-referential-gate-description -->
 

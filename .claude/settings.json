@@ -72,6 +72,17 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/docs-catalog-format-guard.js\"",
+            "timeout": 10,
+            "statusMessage": "docs-catalog format check"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/design-doc-assertion-guard.js\" 2>/dev/null || true",
             "timeout": 10,
             "statusMessage": "design-doc assertion check"
@@ -114,6 +125,12 @@
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/trust-boundary-guid-commit-guard.js\"",
             "timeout": 30,
             "statusMessage": "trust-boundary-guid (commit guard)"
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/docs-catalog-commit-guard.js\"",
+            "timeout": 30,
+            "statusMessage": "docs-catalog (commit guard)"
           },
           {
             "type": "command",
