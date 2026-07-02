@@ -205,13 +205,15 @@ than write a malformed row (do not silently omit).
 
 - **The two script-readiness hardening edits are LANDED (S316, 2026-07-02).**
   `[VERIFIED via source 2026-07-02]`
-  - **Required-address completeness.** The portal accept path requires `line1`,
-    `city`, `postalCode`, `country`, and `phone` on fresh non-opt-out accepts. Both
-    that guard and the backfill now share one presence check,
-    `missingRequiredAddressFields` in `lib/external/required-address.js`; the backfill
-    skips (leaving the row eligible) unless the reconstructed contact address passes
-    it, not just when it is entirely empty — the accept-time contact-address PATCH was
-    best-effort/non-fatal, so historical rows can be partial.
+  - **Required-address completeness AND validity.** The portal accept path enforces
+    two gates on a fresh non-opt-out accept: `validateAddress` (shape/length/country-
+    ISO2 → 400) then presence of `line1`/`city`/`postalCode`/`country`/`phone` → 422.
+    Both gates now live in `lib/external/required-address.js`, and the backfill shares
+    both — it skips (leaving the row eligible) unless the reconstructed contact address
+    passes each, not just when it is entirely empty. This matters because the accept-
+    time contact-address PATCH was best-effort/non-fatal, so a historical contact can
+    be partial OR hold an unnormalized value (e.g. `country = "United States"` instead
+    of `"US"`) that fresh accept would reject and BILL/manual payment could not use.
   - **Proposal title.** The backfill's `REQUEST_SELECT` now includes `akoya_title`, so
     `deriveHonorariumTitle(request)` produces
     `"Reviewer honorarium — <proposal title> (#num)"` for backfilled rows, matching the

@@ -89,10 +89,11 @@ pipeline is live, mint their missing records with
 cycle-scoped so it can't sweep older cohorts; drives the same idempotent
 `ensureHonorariumOnboarding`; refuses to run while still deferred). The two
 readiness hardening edits are LANDED (S316): the backfill applies the same
-required-address completeness check as fresh accept — the shared
-`missingRequiredAddressFields` in `lib/external/required-address.js` — and includes
-`akoya_title` in its request reload, so historical rows can no longer mint with
-partial stale contact addresses or generic proposal titles.
+required-address completeness AND validity checks as fresh accept — the shared
+`missingRequiredAddressFields` + `validateAddress` in
+`lib/external/required-address.js` — and includes `akoya_title` in its request
+reload, so historical rows can no longer mint with partial/unnormalized stale
+contact addresses (e.g. a full-name country) or generic proposal titles.
 
 ## Standard Probe
 

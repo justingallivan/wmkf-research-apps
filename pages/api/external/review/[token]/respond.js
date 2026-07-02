@@ -38,7 +38,7 @@
 import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
 import { applyStage2aResponse } from '../../../../../lib/dataverse/adapters/reviewer-suggestion';
 import { getActivePolicies } from '../../../../../lib/external/policy-fetcher';
-import { missingRequiredAddressFields } from '../../../../../lib/external/required-address';
+import { missingRequiredAddressFields, validateAddress } from '../../../../../lib/external/required-address';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 import { ensureHonorariumOnboarding } from '../../../../../lib/bill/honorarium-onboard-orchestrator';
@@ -93,38 +93,15 @@ function validateContactEdits(edits) {
   return null;
 }
 
-// Reviewer mailing-address caps (chunk-4). Address is PATCHed to contact.address1_*
-// (phone → address1_telephone1) and fed to BILL vendor onboarding. `validateAddress`
-// owns SHAPE/LENGTH/country-code validity only — it stays lenient on emptiness (a
-// malformed/oversized field returns a clean 400; an absent/empty field passes here).
-// PRESENCE of the full payment-contact set (mailing address + phone) is enforced
-// separately on a non-opted-out accept by missingRequiredAddressFields below (422),
-// so manual honorarium payment this cycle always has a contact address + phone.
-const ADDRESS_MAX = { line1: 200, line2: 200, city: 100, state: 100, postalCode: 20, country: 2, phone: 40 };
-function validateAddress(address) {
-  if (address === undefined || address === null) return null;
-  if (typeof address !== 'object' || Array.isArray(address)) return { reason: 'invalid_address' };
-  for (const [k, v] of Object.entries(address)) {
-    if (!(k in ADDRESS_MAX)) return { reason: 'unknown_address_field', field: k };
-    if (v === null || v === undefined || v === '') continue;
-    if (typeof v !== 'string') return { reason: 'invalid_address_field', field: k };
-    if (v.length > ADDRESS_MAX[k]) return { reason: 'address_field_too_long', field: k };
-  }
-  const c = address.country;
-  if (c !== undefined && c !== null && c !== '' && c.length !== 2) {
-    return { reason: 'invalid_country', field: 'country' };
-  }
-  return null;
-}
-
-// Payment-contact presence check now lives in a shared module so the fresh-accept
-// guard (below) and the capture-only backfill enforce the SAME completeness. Enforced
-// server-side on a non-opted-out FRESH accept so manual payment this cycle always has
-// a mailing address + phone, even on a non-form (direct) POST that bypasses the
-// client's own check. `validateAddress` above still owns shape/length/country-code
-// validity; this owns presence. Re-exported so existing importers/tests keep resolving
-// it from this route.
-export { missingRequiredAddressFields };
+// Mailing-address VALIDITY (`validateAddress`, shape/length/country-ISO2 → 400) and
+// PRESENCE (`missingRequiredAddressFields`, full payment-contact set → 422) both now
+// live in lib/external/required-address.js so the fresh-accept guard (below) and the
+// capture-only backfill enforce the SAME two-part contract — the backfill mints from
+// reconstructed historical contacts and must reject the same addresses this route
+// does. `validateAddress` stays lenient on emptiness (an absent field passes it and
+// is owned by the presence check). Re-exported so existing importers/tests keep
+// resolving them from this route.
+export { missingRequiredAddressFields, validateAddress };
 const REVIEW_STATUS_MATERIALS_SENT = 100000001;
 const RESPONSE_TYPE_WITHDRAWN_SUFFICIENT = 100000003;
 

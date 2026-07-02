@@ -8,7 +8,11 @@
  * manually this cycle (BILL onboarding deferred). Tested here at the shared source —
  * no route mocks needed since the module is dependency-free.
  */
-import { missingRequiredAddressFields, REQUIRED_ADDRESS_FIELDS } from '../../lib/external/required-address';
+import {
+  missingRequiredAddressFields,
+  REQUIRED_ADDRESS_FIELDS,
+  validateAddress,
+} from '../../lib/external/required-address';
 
 const ALL = ['line1', 'city', 'postalCode', 'country', 'phone'];
 
@@ -58,5 +62,48 @@ describe('required-address shared presence check', () => {
   it('treats a non-object address as fully missing', () => {
     expect(missingRequiredAddressFields('nope')).toEqual(ALL);
     expect(missingRequiredAddressFields(['x'])).toEqual(ALL);
+  });
+});
+
+describe('validateAddress shape/length/country validity check', () => {
+  const complete = {
+    line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100',
+  };
+
+  it('accepts a well-formed address (null = no error)', () => {
+    expect(validateAddress(complete)).toBeNull();
+    expect(validateAddress(undefined)).toBeNull();
+    expect(validateAddress(null)).toBeNull();
+  });
+
+  // The exact gap the backfill now guards: a legacy contact whose country is the
+  // full name, not an ISO2 code. Fresh accept 400s this; the backfill must skip it.
+  // A full name (>2 chars) trips the length cap first — a shorter non-ISO2 value
+  // (1 char) trips the dedicated country-code branch. Both are rejections.
+  it('rejects a non-ISO2 country (full name trips the length cap)', () => {
+    expect(validateAddress({ ...complete, country: 'United States' }))
+      .toEqual({ reason: 'address_field_too_long', field: 'country' });
+  });
+
+  it('rejects a non-ISO2 country that is within the length cap', () => {
+    expect(validateAddress({ ...complete, country: 'U' }))
+      .toEqual({ reason: 'invalid_country', field: 'country' });
+  });
+
+  it('rejects an over-length field', () => {
+    expect(validateAddress({ ...complete, postalCode: '9'.repeat(21) }))
+      .toEqual({ reason: 'address_field_too_long', field: 'postalCode' });
+  });
+
+  it('rejects an unknown field and a non-string value', () => {
+    expect(validateAddress({ ...complete, bogus: 'x' }))
+      .toEqual({ reason: 'unknown_address_field', field: 'bogus' });
+    expect(validateAddress({ ...complete, city: 5 }))
+      .toEqual({ reason: 'invalid_address_field', field: 'city' });
+  });
+
+  it('stays lenient on emptiness (presence is a separate check)', () => {
+    // Empty country passes validity; the presence check owns "required".
+    expect(validateAddress({ ...complete, country: '' })).toBeNull();
   });
 });

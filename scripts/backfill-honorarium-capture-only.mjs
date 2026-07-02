@@ -125,7 +125,7 @@ const { ensureHonorariumOnboarding } = await import('../lib/bill/honorarium-onbo
 const { honorariumDiscriminatorsConfigured } = await import('../lib/bill/honorarium-discriminators.js');
 const { notExcludedFilter } = await import('../lib/dataverse/adapters/reviewer-suggestion.js');
 const { cycleCodeToOdataFilter, cycleCodeToLabel } = await import('../lib/utils/cycle-code.js');
-const { missingRequiredAddressFields } = await import('../lib/external/required-address.js');
+const { missingRequiredAddressFields, validateAddress } = await import('../lib/external/required-address.js');
 
 // Scope the backfill to one cycle by filtering on the suggestion's request
 // meeting date (single-valued nav property). Validated up front — an unparseable
@@ -260,14 +260,21 @@ async function main() {
       }
     }
     const address = addressFromContact(contact);
+    // Mirror BOTH halves of the fresh-accept contract: validity (shape/length/
+    // country-ISO2 — respond.js 400s here) AND presence (required set — 422). A
+    // legacy contact can hold an unnormalized country like "United States" that
+    // fresh accept would reject; minting from it would strand an honorarium whose
+    // address the BILL tail (and manual payment) can't use.
+    const addrErr = validateAddress(address);
     const missingAddress = missingRequiredAddressFields(address);
 
-    if (missingAddress.length) {
+    if (addrErr || missingAddress.length) {
       results.skipped += 1;
       const why = !contactId ? 'no linked contact'
         : contactReadError ? `contact read failed (${contactReadError})`
-          : Object.keys(address).length === 0 ? 'no captured address on contact'
-            : `incomplete captured address (missing: ${missingAddress.join(', ')})`;
+          : addrErr ? `invalid captured address (${addrErr.reason}${addrErr.field ? `: ${addrErr.field}` : ''})`
+            : Object.keys(address).length === 0 ? 'no captured address on contact'
+              : `incomplete captured address (missing: ${missingAddress.join(', ')})`;
       console.warn(`  ⤬ SKIP — ${lbl}  (${why}); left eligible for a later run`);
       continue;
     }

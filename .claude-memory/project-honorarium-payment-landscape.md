@@ -36,8 +36,8 @@ self-register through GoApply for this path. This does not change the payment
 finding below: individual honoraria still have no AkoyaGO/BILL payment substrate
 and remain offline/check-paid until the person-payee tail is separately solved.
 Go-live still needs the env flip plus deploy/restart. The historical capture-only
-backfill hardening (required-address completeness + `akoya_title` reload) is LANDED
-(S316) per `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §6.
+backfill hardening (required-address completeness + validity + `akoya_title` reload)
+is LANDED (S316) per `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §6.
 
 ## Historical GoApply-created cohort chain (all [VERIFIED via probe] unless noted)
 
