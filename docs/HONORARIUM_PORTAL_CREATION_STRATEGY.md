@@ -3,7 +3,7 @@ title: "Honorarium Portal-Creation Strategy (no-BILL cycle)"
 domain: finance-honoraria
 kind: plan
 status: active
-summary: "Config-gated draft implementation exists; go-live awaits env flip and Connor schema/open-item decisions."
+summary: "Config-gated draft implementation exists; go-live awaits env flip/deploy, backfill hardening, and Connor open items."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -17,7 +17,7 @@ related:
 # Honorarium Portal-Creation Strategy (no-BILL cycle)
 
 **Status:** Go-live plan + config-gated draft implementation — verified against live
-prod Dataverse; not live until the env/config flip.
+prod Dataverse; not live until the env/config flip plus deployment/restart.
 **Date:** 2026-07-01 · **Context:** Justin + Connor decision; Claude session 314.
 **Scope:** How reviewer honorarium `akoya_request` records get created when full
 BILL.com integration is deferred and reviewers no longer self-register through
@@ -69,6 +69,10 @@ state is:
 - GUIDs above were read from the live prod record (Amy Gladfelter honorarium
   `#1002764`); confirm with `scripts/probe-honorarium-discriminators.js` before
   setting. `[VERIFIED via probe 2026-07-01]`
+- The discriminator env vars are read into module constants at import time
+  (`lib/bill/honorarium-discriminators.js`), so the web app must run a deployment
+  built after the env update (or an equivalent runtime restart) before the flip is
+  live. Do not treat "Vercel env changed" as sufficient by itself. `[VERIFIED via source]`
 - Do **not** simply leave BILL disabled without `BILL_ONBOARDING_DEFERRED=true`:
   the `BILL_ENABLED !== 'true'` path fires an `alert_only` "onboard manually"
   notification per reviewer (`onboard-reviewer-service.js:90`). `[VERIFIED via source]`
@@ -199,12 +203,26 @@ than write a malformed row (do not silently omit).
 
 ## 6. Rollout
 
+- **Before using the backfill, patch two script-readiness gaps.** The portal accept
+  path requires `line1`, `city`, `postalCode`, `country`, and `phone` on fresh
+  non-opt-out accepts, but the backfill currently only skips when the reconstructed
+  contact address has zero fields. It must apply the same completeness check before
+  minting a request from a historical contact row, because the original contact
+  address PATCH was best-effort/non-fatal. `[VERIFIED via source 2026-07-01]`
+- The backfill's `REQUEST_SELECT` must include `akoya_title` before execution, so
+  `deriveHonorariumTitle(request)` can produce
+  `"Reviewer honorarium — <proposal title> (#num)"` for backfilled rows. The live
+  portal token verifier already selects `akoya_title`; the backfill reload shape
+  currently selects only `akoya_requestid`, `akoya_requestnum`, and
+  `wmkf_meetingdate`. `[VERIFIED via source 2026-07-01]`
 - Reviewers who accepted while capture-only was on will **not** re-accept, so their
   honoraria were never minted. After the config flip, mint them with
-  `scripts/backfill-honorarium-capture-only.mjs --cycle <CODE>`. The script is
-  dry-run by default, cycle-scoped, idempotent, skips rows with no captured
-  address, refuses to run while `HONORARIUM_ONBOARDING_DEFERRED=true` or the
-  discriminator GUIDs are incomplete, and drives the same
+  `scripts/backfill-honorarium-capture-only.mjs --cycle <CODE>`, but only after the
+  two hardening edits above are landed and tested. The script is
+  dry-run by default, cycle-scoped, idempotent, must skip rows missing required
+  captured payment-contact fields, refuses to run while
+  `HONORARIUM_ONBOARDING_DEFERRED=true` or the discriminator GUIDs are incomplete,
+  and drives the same
   `ensureHonorariumOnboarding()` path rather than duplicating create logic.
   `[VERIFIED via source]`
 

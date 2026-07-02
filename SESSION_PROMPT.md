@@ -27,7 +27,8 @@ Two parallel streams on `main`, disjoint file sets, merged cleanly:
    create; added the missing fields (all-three amounts, `akoya_requesttype`=Scholarship,
    derived `akoya_fiscalyear`, reminder-flags-off, proposal-referencing `akoya_title`);
    left `akoya_requestsource`/`akoya_requeststatus` to verified auto-population.
-   **⚠️ DRAFT, config-gated, NOT live — nothing creates until the env flip.**
+   **⚠️ DRAFT, config-gated, NOT live — nothing creates until the env flip plus
+   deployment/restart.**
 
 ### Commits (Session 314, `0ec28d33..cd82c405`)
 - `cd82c405` — Draft: honorarium create-body changes (Claude)
@@ -48,8 +49,13 @@ Two parallel streams on `main`, disjoint file sets, merged cleanly:
 
 1. **Config flip to turn honorarium creation on.** `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §2.
    Set the 3 discriminator GUIDs, unset `HONORARIUM_ONBOARDING_DEFERRED`, set
-   `BILL_ONBOARDING_DEFERRED=true`, set `honorarium.default_amount`. Code draft is ready
-   and gate-clean; this is the go-live gate.
+   `BILL_ONBOARDING_DEFERRED=true`, set `honorarium.default_amount`, then deploy/restart
+   so the module-load env constants take effect. Code draft is ready for live accepts after
+   that gate; do not execute the historical backfill until item 1a lands.
+1a. **Backfill hardening before execution.** Patch
+   `scripts/backfill-honorarium-capture-only.mjs` to enforce the same required-address
+   completeness check as the fresh accept path and to include `akoya_title` in
+   `REQUEST_SELECT`, then dry-run the target cycle before `--execute`.
 2. **Connor — GoApply-linkage question** (doc §7). **Sent 2026-07-01, awaiting reply.**
    Does any payment/folio/Ops view require the `akoya_goapplyapplication/phase/submitter`
    lookups (absent on app-created rows)?
