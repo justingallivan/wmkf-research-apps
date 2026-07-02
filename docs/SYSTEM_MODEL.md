@@ -1,3 +1,19 @@
+---
+title: WMKF System Model
+domain: architecture
+kind: source-of-truth
+status: canonical
+summary: "The model has one organizing principle, two orthogonal axes, and a small set of layers. Get those and the rest follows."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/SYSTEM_OVERVIEW.md
+  - docs/STRATEGY.md
+  - docs/APPLICATION_STATE_ATLAS.md
+  - docs/atlas/
+---
+
 # WMKF System Model
 
 **Status:** Canonical conceptual model, v2 (synthesized S197, 2026-05-28, after an outside-review

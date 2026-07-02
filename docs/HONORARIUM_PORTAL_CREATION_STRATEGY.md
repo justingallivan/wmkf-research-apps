@@ -1,3 +1,19 @@
+---
+title: "Honorarium Portal-Creation Strategy (no-BILL cycle)"
+domain: finance-honoraria
+kind: plan
+status: active
+summary: "Status: Design — verified against live prod Dataverse, not yet built."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/bill/honorarium-onboard-orchestrator.js
+  - lib/services/honorarium-config.js
+  - scripts/probe-honorarium-discriminators.js
+  - scripts/backfill-honorarium-capture-only.mjs
+---
+
 # Honorarium Portal-Creation Strategy (no-BILL cycle)
 
 **Status:** Design — verified against live prod Dataverse, not yet built.

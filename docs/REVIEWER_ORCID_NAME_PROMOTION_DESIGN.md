@@ -1,3 +1,17 @@
+---
+title: "Reviewer Identity: ORCID-Name-Confirmed Promotion — Design Plan (rev 2)"
+domain: reviewer-identity
+kind: spec
+status: active
+summary: "- (C) Identity note. Add orcid_name_confirmed to buildIdentityNote() corroboration list (evidence.js:421-436), e.g. \"ORCID profile name\"."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/reviewer-identity-evidence.js
+  - lib/services/reviewer-identity-resolver.js
+---
+
 # Reviewer Identity: ORCID-Name-Confirmed Promotion — Design Plan (rev 2)
 
 **Status:** APPROVED for implementation (rev 2 — Codex design review #1 folded in)

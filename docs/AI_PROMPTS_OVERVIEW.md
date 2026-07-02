@@ -1,3 +1,14 @@
+---
+title: How We Use AI Across Our Apps
+domain: prompt-executor
+kind: spec
+status: active
+summary: "Every app sends Claude specific instructions — a \"prompt\" — that tells it exactly what to produce, in what format, and under what rules. This..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # How We Use AI Across Our Apps
 
 Every app sends Claude specific instructions — a "prompt" — that tells it exactly what to produce, in what format, and under what rules. This document describes what each app asks the AI to do in plain language.

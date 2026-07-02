@@ -1,3 +1,14 @@
+---
+title: "DFT email — SharePoint / M365 malware scanning posture (DRAFT — S183, 2026-05-24)"
+domain: security-auth
+kind: draft
+status: draft
+summary: "Send-ready. Specific asks with reply template; questions are answerable from Microsoft 365 admin center without needing context on our application..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # DFT email — SharePoint / M365 malware scanning posture (DRAFT — S183, 2026-05-24)
 
 Send-ready. Specific asks with reply template; questions are answerable from

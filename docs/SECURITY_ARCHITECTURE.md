@@ -1,3 +1,19 @@
+---
+title: "Security Architecture & Data Flow Report"
+domain: security-auth
+kind: spec
+status: active
+summary: "Prepared for: IT Security Review Application: Document Processing Multi-App System Date: March 2026 (last significant update); status banner..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/
+  - lib/utils/auth.js
+  - shared/config/appRegistry.js
+  - lib/services/dynamics-service.js
+---
+
 # Security Architecture & Data Flow Report
 
 **Prepared for:** IT Security Review

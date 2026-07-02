@@ -1,3 +1,18 @@
+---
+title: "Reviewer Invite-Confidence + Manual-Confirm Gate (Slice G-opt1) — Design"
+domain: reviewer-workbench
+kind: spec
+status: active
+summary: "State labels: [VERIFIED] = read in source this session; [ASSUMED] = inference."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md
+  - lib/utils/reviewer-invite.js
+  - pages/api/reviewer-finder/my-candidates.js
+---
+
 # Reviewer Invite-Confidence + Manual-Confirm Gate (Slice G-opt1) — Design
 
 Date: 2026-06-08 (S235)

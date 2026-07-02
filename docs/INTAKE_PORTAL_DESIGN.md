@@ -1,3 +1,19 @@
+---
+title: "WMKF Grant Intake Portal — Design Document"
+domain: intake-portal
+kind: spec
+status: active
+summary: "1. Long-term target: full GOapply replacement across all funding lines, on a 12-18 month horizon."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/SYSTEM_MODEL.md
+  - docs/INTAKE_PORTAL_DRAIN_PLAN.md
+  - docs/BUDGET_FORM_SPEC.md
+  - docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md
+---
+
 # WMKF Grant Intake Portal — Design Document
 
 **Status:** ⚠️ **SUPERSEDED PLAN — retained as design reference.** This document describes the cancelled **June 2026 Phase II Research intake pilot**. The live direction is a **single Phase I intake for the next cycle** (one applicant submission entered as Phase I; "Phase II" is an internal status flip with no separate submission) — see `docs/SYSTEM_MODEL.md` and `docs/INTAKE_PORTAL_DRAIN_PLAN.md` for current state. The detailed design below has NOT been rewritten to the new model; treat it as a record of the earlier pilot pending the next-cycle form redesign. The budget-form scoping in `docs/BUDGET_FORM_SPEC.md` carries forward. Foundation pieces remain valid: **Entra External ID foundation SHIPPED S129** (tenant provisioned, `entra-external` NextAuth provider, `/apply` route round-trip verified). Sarah is back from conference travel. Remaining work is iterative pilot build: form field inventory with Sarah, structured-tables persistence pattern (defer or implement), `wmkf_portalmembership` entity creation under delegated authority (`project_dataverse_creator_privileges`, summary-after model), virus scanning wiring, PA trigger confirmation. See "Open questions / open work" for full list.

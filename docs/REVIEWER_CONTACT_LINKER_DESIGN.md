@@ -1,3 +1,19 @@
+---
+title: "Reviewer ↔ Contact linker & consistency — design notes (v0, not built)"
+domain: reviewer-workbench
+kind: spec
+status: active
+summary: "1. wmkf_potentialreviewers ↔ wmkf_potentialreviewers — duplicate reviewer rows (the misspelled-duplicate bug). Being fixed now..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_MERGE_DESIGN.md
+  - docs/CONNOR_CONTACT_MERGE_AND_REVIEWER_LINKING.md
+  - scripts/probe-pr-contact-email-overlap.js
+  - scripts/probe-contact-dedup.js
+---
+
 # Reviewer ↔ Contact linker & consistency — design notes (v0, not built)
 
 status: PLANNED (not built) — design capture 2026-06-25 (S289)

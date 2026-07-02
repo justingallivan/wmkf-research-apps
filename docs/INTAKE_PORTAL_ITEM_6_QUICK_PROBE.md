@@ -1,3 +1,16 @@
+---
+title: Intake Portal Item 6 -- Quick Power Automate Probe
+domain: intake-portal
+kind: history
+status: historical
+summary: "Purpose: Fast-path test for Connor to prove or disprove the Option A mechanics with one diagnostic flow, then one filtered replay."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/INTAKE_PORTAL_ITEM_6_MAKER_PORTAL_TESTS.md
+---
+
 # Intake Portal Item 6 -- Quick Power Automate Probe
 
 > **⚠️ Superseded — history only.** This probe describes the dead delete-driven **Option A**. The live model is **deactivate-not-delete**; the single open pre-deploy gate is **P1-Update**. Canonical status (is slice-0 cleared? waiver + Connor status?): **`INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`**. Do not run this probe as the current test — see `INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md`.

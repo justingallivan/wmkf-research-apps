@@ -1,3 +1,19 @@
+---
+title: "Reviewer Finder — Live Enforcement Contracts"
+domain: reviewer-identity
+kind: source-of-truth
+status: canonical
+summary: "Status: MAINTAINED current-state reference (owns the live behavioral guarantees below)."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_FINDER.md
+  - docs/agent-wiki/topics/reviewer-identity.md
+  - pages/api/reviewer-finder/save-candidates.js
+  - pages/api/review-manager/send-emails.js
+---
+
 # Reviewer Finder — Live Enforcement Contracts
 
 **Status:** MAINTAINED current-state reference (owns the live behavioral guarantees below).

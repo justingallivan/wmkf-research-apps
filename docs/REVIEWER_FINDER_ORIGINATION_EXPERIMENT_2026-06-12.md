@@ -1,3 +1,19 @@
+---
+title: "Reviewer Finder Origination — Forward Sniff-Test Experiment (Result)"
+domain: reviewer-identity
+kind: history
+status: active
+summary: "docs/REVIEWER_FINDER_ORIGINATION_PLAN.md §4, for the D26 Phase-I cohort and the *minimal* grounded arm only (see §3 Scope)."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_FINDER_ORIGINATION_PLAN.md
+  - scripts/probe-grounded-origination.mjs
+  - scripts/origination-sniff-sources.mjs
+  - scripts/origination-sniff-tally.mjs
+---
+
 # Reviewer Finder Origination — Forward Sniff-Test Experiment (Result)
 
 Date: 2026-06-12 (S246)

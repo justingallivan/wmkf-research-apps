@@ -1,3 +1,19 @@
+---
+title: Reviewer Workbench Manual Reviewer Add Design
+domain: reviewer-workbench
+kind: spec
+status: active
+summary: Status: Phase 1 durable manual add shipped 2026-06-09. Manual enrichment and web-suggestion integration remain deferred. Live-state claims are...
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - shared/components/reviewers/ReviewerSearchSection.js
+  - pages/api/workbench/applicant-reviewers.js
+  - lib/dataverse/adapters/reviewer-suggestion.js
+  - pages/api/workbench/enrich-recommended.js
+---
+
 # Reviewer Workbench Manual Reviewer Add Design
 
 > **Status:** Phase 1 durable manual add shipped 2026-06-09. Manual enrichment

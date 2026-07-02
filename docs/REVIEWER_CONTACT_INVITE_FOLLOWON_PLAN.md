@@ -1,3 +1,19 @@
+---
+title: "Reviewer Follow-on Plan: Deferred-Candidate Gating (Fix E) + Invite-Confidence + Faculty-Page Email Recovery"
+domain: reviewer-workbench
+kind: plan
+status: active
+summary: "Date: 2026-06-08 corrections folded in (see \"## R. Codex review corrections\")."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/CLAUDE_REMEDIATION_PLAN.md
+  - pages/api/review-manager/send-emails.js
+  - lib/utils/safe-fetch.js
+  - pages/api/reviewer-finder/my-candidates.js
+---
+
 # Reviewer Follow-on Plan: Deferred-Candidate Gating (Fix E) + Invite-Confidence + Faculty-Page Email Recovery
 
 Date: 2026-06-08

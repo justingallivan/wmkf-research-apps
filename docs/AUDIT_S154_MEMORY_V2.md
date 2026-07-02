@@ -1,3 +1,19 @@
+---
+title: "Memory Audit V2 — Session 154 (Lane 3, redone)"
+domain: general
+kind: audit
+status: historical
+summary: "Date: 2026-05-14 Scope: Same as V1 — every file under .claude-memory/ (64 files)."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/atlas/postgres-researchers.md
+  - docs/atlas/postgres-other-reviewer-tables.md
+  - docs/EXECUTOR_CONTRACT.md
+  - shared/config/appRegistry.js
+---
+
 # Memory Audit V2 — Session 154 (Lane 3, redone)
 
 **Date:** 2026-05-14

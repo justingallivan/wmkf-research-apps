@@ -1,3 +1,19 @@
+---
+title: "Plan: Grantee Deliverable Package table + automatic reminders (S271)"
+domain: grantee-portal
+kind: plan
+status: active
+summary: "- The 14-day-to-respond / remind-at-day-12 cadence needs an anchor: when was the invite sent? Nothing records that today."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/probe-grantee-deliverable-data.mjs
+  - lib/external/grantee-token-lifecycle.js
+  - lib/external/verify-grantee-token.js
+  - lib/services/grantee-document-assembly.js
+---
+
 # Plan: Grantee Deliverable Package table + automatic reminders (S271)
 
 > **Status: IMPLEMENTED (Codex `1f3ba1cb`) + schema applied to PROD (S271).** Codex pre-impl review

@@ -1,3 +1,19 @@
+---
+title: "Retrospective Analysis — Long-Term Plan"
+domain: docs-governance
+kind: audit
+status: historical
+summary: "Created: 2026-04-22 (Session 106, from Connor + Justin conversation) Status: Planning — no code yet."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/utils/sharepoint-buckets.js
+  - docs/WORKFLOW_CHAINING_DESIGN.md
+  - docs/PDF_INPUT_FOR_BACKEND.md
+  - docs/PROMPT_STORAGE_DESIGN.md
+---
+
 # Retrospective Analysis — Long-Term Plan
 
 **Created:** 2026-04-22 (Session 106, from Connor + Justin conversation)

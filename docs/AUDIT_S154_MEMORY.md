@@ -1,3 +1,19 @@
+---
+title: "Memory Audit — Session 154 (Lane 3)"
+domain: general
+kind: audit
+status: historical
+summary: "Date: 2026-05-14 Scope: Every file under .claude-memory/ (1 index + 11 feedback + 51 project + 1 user = 64 files). All read in full. Claims..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - shared/config/appRegistry.js
+  - pages/api/
+  - docs/AI_PROMPTS_DETAILED.md
+  - docs/SYSTEM_OVERVIEW.md
+---
+
 # Memory Audit — Session 154 (Lane 3)
 
 **Date:** 2026-05-14

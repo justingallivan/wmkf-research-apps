@@ -1,3 +1,19 @@
+---
+title: "Staff-Editable Review Questions — Build Plan"
+domain: architecture
+kind: plan
+status: active
+summary: "Today [VERIFIED via source, S303] lib/external/review-form-schema.js exports a hardcoded reviewFormSchema.fields array, statically imported by 8..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - pages/api/admin/review-questions.js
+  - lib/external/review-form-schema.js
+  - shared/components/external/ReviewFormFields.js
+  - shared/components/external/ReviewAuthoringForm.js
+---
+
 # Staff-Editable Review Questions — Build Plan
 
 **Status:** IN PROGRESS — scoped + Codex-reviewed S303 (2026-06-29) from `REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md` §0 #6 (the deferred staff-editable-questions phase, now eligible because the authoring flow shipped). **Phase A COMPLETE + LIVE IN PROD S303** — entity created + seeded (12 rows), `getActiveQuestionSet()` read-back verified end-to-end against prod; Codex-reviewed, P1/P2 fixes folded in (commits `f06316bb`, `d6b4d69c`). **Phase B COMPLETE** — B1 server (S303: submit/draft/context routes + `build-review-submission` read `getActiveQuestionSet()`) and B2 client (S304: `ReviewAuthoringForm` renders from the `context` set, type-aware draft reconciliation, `setVersion` echo + `set_changed` reload, real-build E2E green). The live reviewer authoring flow now renders end-to-end from the Dataverse `wmkf_reviewquestion` set (behavior-identical — seeded set == static schema). **Phase C COMPLETE (S304)** — superuser editor (`/admin` → `ReviewQuestionsSection` → `pages/api/admin/review-questions.js`): atomic-changeset save, pure diff module, Postgres audit (migration 022 **applied to prod S304**), key-immutability, optimistic-lock, drag-reorder; unit/integration/RTL green. **Phases D–E not started.** Codex design-review findings folded in (see §11); the Phase-A P0 (missing `primaryNameAttribute`) is resolved in §2. Owner decisions captured below (S303). **Phase B Codex-reviewed S304** (no P0; two P1s — version-hash audit gap + set_changed draft flush — fixed + regression-tested, §11).

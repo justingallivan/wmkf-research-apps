@@ -1,6 +1,20 @@
 ---
+title: Third-Party LLM Audit Follow-Up Prompt
+domain: security-auth
+kind: audit
+status: draft
+summary: Severity: P0/P1/P2/P3 Prior-report status: unchanged / narrowed / expanded / retracted / split.
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/dynamics-service.js
+  - docs/atlas/postgres-other-reviewer-tables.md
+  - docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md
+  - shared/config/appRegistry.js
 fact_consistency: point-in-time
 ---
+
 # Third-Party LLM Audit Follow-Up Prompt
 
 Use this prompt as a response request to the third-party LLM after its `AUDIT_REPORT_2026_05_26.md` review. The goal is to make it correct its prior mistakes, re-verify high-impact claims, and produce a tighter amended report.

@@ -1,3 +1,19 @@
+---
+title: "Intake Admin — Membership Approval Build Plan"
+domain: intake-portal
+kind: plan
+status: active
+summary: "Predecessor: docs/INTAKE_PORTAL_DESIGN.md (schema + Option A decision near line 557, captured 2026-05-13)."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/INTAKE_PORTAL_DESIGN.md
+  - shared/config/appRegistry.js
+  - docs/atlas/dataverse-wmkf-portalmembership.md
+  - pages/api/cron/
+---
+
 # Intake Admin — Membership Approval Build Plan
 
 **Status:** Draft v4 (2026-05-13). Revised against three Codex review passes (`INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN_CODEX_REVIEW.md` + `_V2.md` + `_V3.md`). v4 closes the last 2 MOD + 2 LOW + 1 NIT findings: prior-decision persisted as a Dataverse field (no inference), §9 disposition table promoted to entry point, `noFallback` threading specified end-to-end, status codes split (403 for unmapped staff, 503 for env misconfig), and `getRecord` named consistently. Ready to build once `wmkf_portalmembership` exists in Dataverse (slice 0).

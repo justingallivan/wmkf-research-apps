@@ -1,3 +1,19 @@
+---
+title: Reviewer Finder - Sparse Proposal Anchor Strategy
+domain: reviewer-identity
+kind: plan
+status: active
+summary: "An anchor is an evidence item extracted from or derived from the proposal. It may seed work resolution, literature expansion, identity resolution,..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md
+  - docs/REVIEWER_PROVENANCE_MODEL.md
+  - scripts/probe-grounded-origination.mjs
+  - scripts/probe-applicant-trail-origination.mjs
+---
+
 # Reviewer Finder - Sparse Proposal Anchor Strategy
 
 Status: **Strategy / validated direction** (not yet built). This document captures the

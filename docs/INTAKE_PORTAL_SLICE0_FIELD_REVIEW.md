@@ -1,3 +1,19 @@
+---
+title: "Slice-0 Schema — Field Review for Connor"
+domain: intake-portal
+kind: audit
+status: active
+summary: "Plus: option-set extension on wmkf_apprequestperson.wmkf_role (existing 2 values → 5; ships via standalone idempotent script, not as a wave entry)."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/dataverse/schema/wave4
+  - docs/INTAKE_PORTAL_SCHEMA_CHANGES.md
+  - scripts/probe-apprequestperson-role-data.js
+  - lib/dataverse/schema/wave4/wmkf_proposalbudgetline.json
+---
+
 # Slice-0 Schema — Field Review for Connor
 
 Pre-deploy review. Lists every field/entity that will be created on `--execute`, grouped by entity. Pulled verbatim from the deploy specs at `lib/dataverse/schema/wave4*/`. Reserved integer values are locked (per `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` 2026-05-14 entry) — flag anything you want changed BEFORE deploy.

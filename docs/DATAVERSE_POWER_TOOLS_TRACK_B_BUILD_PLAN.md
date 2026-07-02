@@ -1,3 +1,19 @@
+---
+title: "Dataverse Power Tools — Track B (Bulk Export) Build Plan"
+domain: dataverse
+kind: plan
+status: active
+summary: "Out (explicitly, by design — not omissions): - Track A (\"Find & fix\" edits) — separate app, separate build, write-path-gated."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/dataverse-export/
+  - pages/api/dataverse-export/
+  - pages/dataverse-bulk-export.js
+  - docs/DATAVERSE_POWER_TOOLS_DESIGN.md
+---
+
 # Dataverse Power Tools — Track B (Bulk Export) Build Plan
 
 **Status:** S161 — **Phase 1 (deterministic spine) + Phase 2 (API + builder UI) IMPLEMENTED — Track B is user-reachable end-to-end.** Phase 1 = `lib/services/dataverse-export/` (constants · compiler · fetch-client · disclosure · workbook), headless-tested + Codex-converged (S160, commits `4bfd7db`/`cb662cd`). Phase 2 = `pages/api/dataverse-export/{metadata,preview,run,download}.js` + stateless confirm-token (S160, twice Codex-converged) and the forced-fan-out builder UI `pages/dataverse-bulk-export.js` (S161) over the stable `/preview`→`/run`→`/download` seam. **§10 owns the phase ledger (now: Phase 1 + 2 DONE; Phase 3 preset library is non-v1-core).** Plan history: S159 — Phase-1-ready post three design-level Codex cold rounds (v1 5 P0/10 P1; confirm 3 gaps+2 drifts; final 1 residual). v1-core engineering decisions are resolved here, not deferred. Authored against the converged design in `docs/DATAVERSE_POWER_TOOLS_DESIGN.md` — that doc's **"Residuals — AUTHORITATIVE LIST"** owns scoping/status; this doc owns *engineering*. Do not restate status divergently here; where this plan needs a semantic determination it **binds to** the design doc by reference and names the must-not-drop specifics, it does not re-derive or restate divergently.

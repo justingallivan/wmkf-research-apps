@@ -1,3 +1,19 @@
+---
+title: Claude Memory Reorganization Plan
+domain: agent-harness
+kind: plan
+status: active
+summary: The problem is not absence of memory. The problem is density and retrieval.
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/APPLICATION_STATE_ATLAS.md
+  - docs/atlas/
+  - docs/AUDIT_S154_MEMORY.md
+  - docs/AUDIT_S154_MEMORY_CODEX.md
+---
+
 # Claude Memory Reorganization Plan
 
 **Created:** 2026-06-04  

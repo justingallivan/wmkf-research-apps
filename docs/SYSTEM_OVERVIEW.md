@@ -1,3 +1,14 @@
+---
+title: "Keck Foundation Research Tools — System Overview"
+domain: architecture
+kind: spec
+status: historical
+summary: "_Concept Evaluator was retired 2026-04-25 (Session 110) — page/API/prompt archived to /_archived. Removed from this suite list; retained only as..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # Keck Foundation Research Tools — System Overview
 
 *February 2026 | v1.0*

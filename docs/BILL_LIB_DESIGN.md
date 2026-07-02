@@ -1,3 +1,19 @@
+---
+title: "`lib/bill.js` — Design (v3)"
+domain: finance-honoraria
+kind: spec
+status: active
+summary: "WebFetch of developer.bill.com (notably developer.bill.com/llms.txt) surfaced several discrepancies vs. the original BILL_integration_handoff.md:."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md
+  - lib/services/llm-client.js
+  - lib/utils/safe-fetch.js
+  - pages/api/webhooks/bill.js
+---
+
 # `lib/bill.js` — Design (v3)
 
 **Author:** Justin Gallivan

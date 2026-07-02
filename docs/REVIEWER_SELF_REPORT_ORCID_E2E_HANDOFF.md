@@ -1,3 +1,19 @@
+---
+title: "Handoff: e2e testing for reviewer self-reported ORCID capture (PR4)"
+domain: reviewer-workbench
+kind: plan
+status: historical
+summary: "Audience: Codex, taking over development of the e2e test suite for this feature."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md
+  - shared/components/external/Stage2aView.js
+  - "pages/api/external/review/[token]/context.js"
+  - "pages/api/external/review/[token]/respond.js"
+---
+
 # Handoff: e2e testing for reviewer self-reported ORCID capture (PR4)
 
 **Audience:** Codex, taking over development of the e2e test suite for this feature.

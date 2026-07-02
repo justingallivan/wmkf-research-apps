@@ -1,3 +1,14 @@
+---
+title: "Security Fortress & Identity Diagram"
+domain: architecture
+kind: spec
+status: active
+summary: "This flowchart demonstrates the \"Fail-Closed\" security architecture mandated by the project guidelines, highlighting the specific restriction..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # Security Fortress & Identity Diagram
 
 This flowchart demonstrates the "Fail-Closed" security architecture mandated by the project guidelines, highlighting the specific restriction scopes and sanitization methods.

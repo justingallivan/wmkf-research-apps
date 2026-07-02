@@ -1,3 +1,19 @@
+---
+title: Dynamics Identity Reconciliation Plan
+domain: dataverse
+kind: plan
+status: active
+summary: "Owner: Justin (app side), Connor (Dynamics side — Delegate role granted) Last updated: 2026-05-12 (status banner refresh; original plan dated..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/probe-impersonation-resmoke.js
+  - scripts/probe-impersonation-as-user.js
+  - docs/REQUEST_WORKBENCH_BUILD_PLAN.md
+  - scripts/setup-database.js
+---
+
 # Dynamics Identity Reconciliation Plan
 
 **Status:** **SHIPPED S127–S129.** DB bridge live, `MSCRMCallerID` impersonation contract implemented with privilege intersection, adapter chain in place, token lifecycle wired. Preview flag flipped + smoked 2026-05-05. Connor granted Delegate role to app user 2026-05-06; impersonation re-smoke PASS for Justin and cnoda (`scripts/probe-impersonation-resmoke.js`, `scripts/probe-impersonation-as-user.js`). Remaining: full `/phase-i-dynamics overwrite=true` run on req 1002379, then flip prod env flag `DYNAMICS_IMPERSONATION_ENABLED=true`. **DEFERRED (S207, 2026-05-31): the prod flip is explicitly punted to a future session — it is an environment-wide change (affects *all* app-driven Dynamics writes), so it needs its own privilege audit across every write path + the outstanding smoke, decoupled from any one feature. Surfaced while scoping the Request Workbench (`docs/REQUEST_WORKBENCH_BUILD_PLAN.md`), which decided to proceed with service-account attribution on Dataverse field/file writes for v1 rather than gate on this flip.** This doc remains as the architectural reference; treat the implementation sections below as historical.

@@ -1,3 +1,19 @@
+---
+title: "Resolved-Page Email Tier — Design Plan (rev 3)"
+domain: email
+kind: spec
+status: active
+summary: "- Private-IP block covers IPv6 (::, 0.0.0.0, IPv4-mapped incl. hex-form, fe80::/10, AAAA records); the dns.lookup→connect TOCTOU window is CLOSED..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/utils/safe-fetch.js
+  - lib/services/contact-enrichment-service.js
+  - lib/utils/contact-parser.js
+  - lib/utils/reviewer-invite.js
+---
+
 # Resolved-Page Email Tier — Design Plan (rev 3)
 
 **Status:** APPROVED for implementation (rev 3 after Codex review #2 — GO-WITH-CHANGES items folded in)

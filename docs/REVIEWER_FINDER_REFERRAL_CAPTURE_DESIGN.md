@@ -1,3 +1,16 @@
+---
+title: "Reviewer-Finder Referral Capture — Design (S249)"
+domain: reviewer-identity
+kind: spec
+status: active
+summary: "The \"hard part\" the memory flags — free-text → canonical-person resolution with abstain-or-confirm safety — is already solved by the S236..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - pages/api/workbench/manual-reviewer.js
+---
+
 # Reviewer-Finder Referral Capture — Design (S249)
 
 > **Status:** APPROVED S249 (Justin) — building. Decisions: **D1** match-reason text

@@ -1,3 +1,19 @@
+---
+title: Nomenclature Glossary
+domain: architecture
+kind: source-of-truth
+status: canonical
+summary: Strategy and classification framework: docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md.
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - shared/config/appRegistry.js
+  - docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md
+  - "pages/workbench/[requestId].js"
+  - shared/config/reviewerFinderPreferences.js
+---
+
 # Nomenclature Glossary
 
 Canonical, human-readable glossary for confusing or overloaded names across the

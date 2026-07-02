@@ -1,3 +1,19 @@
+---
+title: "Dataverse Power Tools — Scoping & Design"
+domain: dataverse
+kind: spec
+status: active
+summary: 1. Staff who must keep the database current need to find a specific record and edit a field.
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - pages/api/dynamics-explorer/chat.js
+  - lib/services/dynamics-service.js
+  - docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md
+  - scripts/probe-dataverse-audit-capability.js
+---
+
 # Dataverse Power Tools — Scoping & Design
 
 **Status (2026-05-15, Session 156):** Track A and Track B designs **converged at the scoping level**. This is NOT yet a build plan. Per the project ground-truth rule, implementation is gated on explicit follow-ups recorded under "Gated next steps." This doc has been reconciled against an independent Codex source review (see "Codex review reconciliation"). **Read the two Track B design invariants — "Living taxonomy" (snapshots are dated evidence, not spec; read taxonomies live) and "Process is program-scoped" (process findings are per-program, predominantly research; never whole-entity) — before treating any value/count or process claim in this doc as general.**

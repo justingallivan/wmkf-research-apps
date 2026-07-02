@@ -1,3 +1,19 @@
+---
+title: "External Reviewer Intake — Implementation Plan"
+domain: architecture
+kind: plan
+status: active
+summary: "Related docs: - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md — file storage model (Connor-shareable) - Memory:..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
+  - lib/services/review-upload.js
+  - "pages/api/external/review/[token]/upload.js"
+  - pages/api/review-manager/upload-review.js
+---
+
 # External Reviewer Intake — Implementation Plan
 
 **Status:** **SHIPPED 2026-05-03** (per memory `project_external_reviewer_file_access`). Token primitive, `/external/*` endpoints, SharePoint upload, event-driven token expiry all live. Reused as the architectural pattern for the intake portal. This doc remains as design reference; treat as historical for the shipped scope.

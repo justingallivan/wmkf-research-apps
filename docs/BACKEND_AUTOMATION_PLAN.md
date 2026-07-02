@@ -1,3 +1,19 @@
+---
+title: Long-Term Plan: Event-Driven Backend Automation via PowerAutomate
+domain: general
+kind: plan
+status: active
+summary: "Status: Planning — architecture finalized Session 94, ready to begin implementation."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/GRANT_CYCLE_LIFECYCLE.md
+  - lib/services/execute-prompt.js
+  - docs/PROMPT_STORAGE_DESIGN.md
+  - docs/WORKFLOW_CHAINING_DESIGN.md
+---
+
 # Long-Term Plan: Event-Driven Backend Automation via PowerAutomate
 
 **Status:** Planning — architecture finalized Session 94, ready to begin implementation.

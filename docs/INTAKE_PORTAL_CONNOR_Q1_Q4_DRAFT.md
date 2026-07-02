@@ -1,3 +1,16 @@
+---
+title: "Connor email — 4 questions on the portal-to-AkoyaGO handoff (DRAFT — S183, 2026-05-24)"
+domain: intake-portal
+kind: draft
+status: draft
+summary: "Status: Connor sign-off received in S189 walkthrough 2026-05-26. Answers folded inline under each question. Email never sent — superseded by live..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/probe-picklist.js
+---
+
 # Connor email — 4 questions on the portal-to-AkoyaGO handoff (DRAFT — S183, 2026-05-24)
 
 **Status:** Connor sign-off received in S189 walkthrough 2026-05-26. Answers folded inline under each question. Email never sent — superseded by live walkthrough.

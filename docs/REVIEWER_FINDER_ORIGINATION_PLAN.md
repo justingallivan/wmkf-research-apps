@@ -1,3 +1,19 @@
+---
+title: Reviewer Finder Origination Plan
+domain: reviewer-identity
+kind: plan
+status: active
+summary: Supersedes: docs/archive/REVIEWER_FINDER_ORIGINATION_EVIDENCE_2026-06-12.md section 6.
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md
+  - docs/archive/REVIEWER_FINDER_ORIGINATION_EVIDENCE_2026-06-12.md
+  - lib/services/discovery-service.js
+  - pages/api/reviewer-finder/save-candidates.js
+---
+
 # Reviewer Finder Origination Plan
 
 Date: 2026-06-12

@@ -10,7 +10,30 @@
 
 const CANONICAL_COUNTS_REL = 'docs/CANONICAL_COUNTS.md';
 
-function renderCanonicalCountsDoc(facts) {
+const { parseFrontmatter, renderFrontmatter } = require('./docs-catalog');
+
+function canonicalCountsFrontmatter(existingText) {
+  const existing = existingText ? (parseFrontmatter(existingText).data || {}) : {};
+  const data = {
+    ...existing,
+    title: 'Canonical Counts',
+    domain: 'docs-governance',
+    kind: 'source-of-truth',
+    status: 'canonical',
+    summary: 'Generated source of truth for code-derived scalar counts used by documentation gates.',
+    canonical: true,
+    cataloged: existing.cataloged || existing.last_verified || new Date().toISOString().slice(0, 10),
+    owner: existing.owner || 'product-engineering',
+    related: existing.related || [
+      'scripts/lib/canonical-facts.js',
+      'docs/CI_GATES_REFERENCE.md',
+    ],
+  };
+  delete data.last_verified;
+  return renderFrontmatter(data);
+}
+
+function renderCanonicalCountsDoc(facts, options = {}) {
   const lines = [];
   lines.push('# Canonical Counts');
   lines.push('');
@@ -32,7 +55,7 @@ function renderCanonicalCountsDoc(facts) {
     lines.push(`- **Derive:** ${fact.derivePath}`);
     lines.push('');
   }
-  return lines.join('\n');
+  return `${canonicalCountsFrontmatter(options.existingText)}${lines.join('\n')}`;
 }
 
 module.exports = {

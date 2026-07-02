@@ -1,3 +1,18 @@
+---
+title: "Reviewer Architecture — Mental Model"
+domain: reviewer-workbench
+kind: spec
+status: active
+summary: "Plus, when a potential reviewer is first invited:."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md
+  - docs/REVIEWER_DATA_MODEL.md
+  - docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md
+---
+
 # Reviewer Architecture — Mental Model
 
 > **⚠ SUPERSEDED IN PART (S213, 2026-06-02): now TWO core tables, not three.** The `wmkf_appresearcher` bibliometric sidecar was collapsed onto `wmkf_potentialreviewers` and **dropped** — h-index/citations/affiliation/ORCID/Scholar now live directly on the person row, written by `adapters/researcher.js` (repointed to the person). Everywhere below shows a 1:1 `wmkf_appresearcher` sidecar; **read it as folded into `wmkf_potentialreviewers`**. The "Why three tables" rationale (avoid churning identity on metric refresh) didn't survive scrutiny — see `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md` and the "What changed" note in `docs/REVIEWER_DATA_MODEL.md`. The diagrams/steps below are kept as the historical 3-table mental model.

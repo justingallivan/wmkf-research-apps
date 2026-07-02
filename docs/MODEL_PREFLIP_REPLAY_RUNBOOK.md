@@ -1,3 +1,19 @@
+---
+title: Model Pre-Flip Replay Runbook
+domain: prompt-executor
+kind: runbook
+status: active
+summary: "Use this before changing reviewer-affecting Claude model routing, including advancing the reviewer-finder tier fallback or removing a concrete pin."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/model-capabilities.js
+  - lib/utils/model-pricing.js
+  - tests/unit/llm-client.test.js
+  - tests/unit/admin-models.test.js
+---
+
 # Model Pre-Flip Replay Runbook
 
 Use this before changing reviewer-affecting Claude model routing, including

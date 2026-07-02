@@ -1,3 +1,19 @@
+---
+title: "Chunk 5 Design — POST /api/intake/draft/attach"
+domain: intake-portal
+kind: spec
+status: active
+summary: "Largest endpoint of the build (~5 distinct outcome branches)."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/INTAKE_ATTACH_BUILD_SCOPING.md
+  - docs/INTAKE_PORTAL_DRAIN_PLAN.md
+  - tests/unit/intake-attach-endpoint.test.js
+  - docs/API_ROUTE_SECURITY_MATRIX.md
+---
+
 # Chunk 5 Design — POST /api/intake/draft/attach
 
 Pre-implementation design for chunk 5 of the S184 build. Subordinate

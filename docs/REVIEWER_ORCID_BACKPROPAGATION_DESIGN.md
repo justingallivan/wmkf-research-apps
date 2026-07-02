@@ -1,3 +1,19 @@
+---
+title: "Reviewer ORCID Back-Propagation Design (S216)"
+domain: reviewer-identity
+kind: spec
+status: active
+summary: "Author: S216. Depends on: S214/S215 identity resolver + ORCID backfill (docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md, memory..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/backprop-reviewer-orcid.js
+  - scripts/backfill-contact-orcid.js
+  - docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md
+  - scripts/probe-orcid-cross-store-matches.js
+---
+
 # Reviewer ORCID Back-Propagation Design (S216)
 
 **Status:** **SHIPPED** (updated S253, 2026-06-13) — was "DESIGN rev3, build-ready for PR1". Both

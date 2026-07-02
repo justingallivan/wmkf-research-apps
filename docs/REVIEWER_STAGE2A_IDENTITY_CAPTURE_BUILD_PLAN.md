@@ -1,3 +1,19 @@
+---
+title: "Reviewer Board-Writeup Identity Capture — Build Plan (PERSON-SCOPE)"
+domain: reviewer-workbench
+kind: plan
+status: active
+summary: "(engagement-scope v1, then person-scope v2). Supersedes the engagement-scope v1 (storage changed from per-request to person-level per owner..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/capture-self-reported-orcid.js
+  - pages/api/reviewer-finder/my-candidates.js
+  - shared/components/external/Stage2aView.js
+  - "pages/api/external/review/[token]/respond.js"
+---
+
 # Reviewer Board-Writeup Identity Capture — Build Plan (PERSON-SCOPE)
 
 Status: **DESIGN LOCKED — implementing S308.** Two Codex design passes complete

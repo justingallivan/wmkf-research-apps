@@ -1,3 +1,19 @@
+---
+title: "Reviewer Engagement Spec — Model B (accept-now) + reminders, quota, token TTL"
+domain: reviewer-workbench
+kind: source-of-truth
+status: canonical
+summary: "A PD action that emails the proposal/materials to the ACCEPTED reviewers. It is a clean wrapper over the existing manual Materials send — NOT a..."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - pages/api/review-manager/campaign-config.js
+  - lib/external/reviewer-token-ttl.js
+  - lib/services/review-upload.js
+  - pages/api/cron/reviewer-reminders.js
+---
+
 # Reviewer Engagement Spec — Model B (accept-now) + reminders, quota, token TTL
 
 **Status:** IMPLEMENTED — **all four phases LIVE (S275).** [VERIFIED via source] Phase 1 `pages/api/review-manager/campaign-config.js`; Phase 2 `lib/external/reviewer-token-ttl.js` (via `render-emails.js`) + `materials_not_sent` guard in `lib/services/review-upload.js`; Phase 3 `pages/api/cron/reviewer-reminders.js` + `lib/services/reviewer-reminder-sweep.js`; Phase 4 `lib/services/reviewer-quota.js` (`maybeNotifyQuotaReached` in `respond.js`) + `pages/api/review-manager/withdraw-sufficient.js`. Schema provisioned in prod (§4, 2026-06-21). The original Codex sanity pass (S275, commit `18933df3`) folded its P1/P2 findings in before build (phase reorder so token cap ships with Release; quota count-after-write + If-Match concurrency; `materials_sent` guard; reminder-marker clear on Re-invite; expired-link copy/UI). S277: the manual "Re-invite already-invited" UI affordance was removed (§3.E). Supersedes the interpretation snapshot in `REVIEWER_ENGAGEMENT_PLAN_INTERPRETATION.md`.

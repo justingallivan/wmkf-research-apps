@@ -1,3 +1,19 @@
+---
+title: "D26 Reviewer-Finding Pipeline — Flowchart & Status"
+domain: reviewer-identity
+kind: spec
+status: active
+summary: "Legend — 🟩 green = exists/shipped · 🟨 amber = needs building/fixing · 🟪 purple = open policy decision · ⬛ gray/dashed-X = off / abandoned /..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_FINDER_ORIGINATION_PLAN.md
+  - docs/REVIEWER_FINDER_ORIGINATION_EXPERIMENT_2026-06-12.md
+  - docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md
+  - docs/agent-wiki/topics/reviewer-origination.md
+---
+
 # D26 Reviewer-Finding Pipeline — Flowchart & Status
 
 Date: 2026-06-12

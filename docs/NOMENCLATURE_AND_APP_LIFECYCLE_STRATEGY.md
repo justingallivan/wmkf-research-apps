@@ -1,3 +1,19 @@
+---
+title: "Nomenclature & App-Lifecycle Cleanup — Strategy"
+domain: architecture
+kind: source-of-truth
+status: canonical
+summary: "History left three *different* kinds of legacy naming, and they look alike until you trace callers:."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - shared/config/appRegistry.js
+  - lib/services/
+  - "pages/workbench/[requestId].js"
+  - shared/components/Layout.js
+---
+
 # Nomenclature & App-Lifecycle Cleanup — Strategy
 
 Status: **STRATEGY / PLAN — all phases EXECUTED S291–S292 (see inline `DONE` markers).**

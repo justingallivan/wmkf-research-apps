@@ -1,3 +1,19 @@
+---
+title: "Security Role Config — Wave 1 Tables"
+domain: security-auth
+kind: history
+status: active
+summary: "For: Connor Environment: WM Keck Sandbox (https://orgd9e66399.crm.dynamics.com) first, then prod when we cut over Status: Schema is live in..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/dataverse/client.js
+  - scripts/apply-dataverse-schema.js
+  - scripts/apply-security-role.js
+  - docs/POSTGRES_TO_DATAVERSE_MIGRATION.md
+---
+
 # Security Role Config — Wave 1 Tables
 
 **For:** Connor

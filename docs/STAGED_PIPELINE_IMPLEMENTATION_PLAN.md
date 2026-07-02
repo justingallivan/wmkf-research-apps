@@ -1,3 +1,19 @@
+---
+title: "Staged Proposal Review Pipeline — App Implementation Plan"
+domain: prompt-executor
+kind: plan
+status: active
+summary: "1. Fit Screener — Standalone Stage 1 tool. Upload a proposal, get pass/flag/decline-recommend result. Single Haiku call, fast and cheap. Useful..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/STAGED_REVIEW_PIPELINE.md
+  - scripts/setup-database.js
+  - shared/config/prompts/virtual-review-panel.js
+  - lib/services/panel-review-service.js
+---
+
 # Staged Proposal Review Pipeline — App Implementation Plan
 
 > **Status (2026-05-08):** Not yet started. Plan is dormant pending cycle-redesign signal from Sarah/Connor. Don't start the V25 migration or build the Fit Screener until the redesigned cycle's shape (single-package vs. retained Phase I/II split, target volume) is locked — design assumptions below could shift.

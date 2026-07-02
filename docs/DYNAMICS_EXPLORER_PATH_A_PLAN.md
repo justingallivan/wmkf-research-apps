@@ -1,3 +1,19 @@
+---
+title: "Dynamics Explorer — Path A Plan: Live Ground Truth"
+domain: dataverse
+kind: plan
+status: active
+summary: "Dynamics Explorer fails frequently because its schema knowledge is hand-transcribed, and the prompt instructs the model to trust baked-in..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/probe-akoya-folio-casing.js
+  - docs/DYNAMICS_SCHEMA_ANNOTATION.md
+  - pages/api/dynamics-explorer/chat.js
+  - scripts/dynamics-schema-diff.json
+---
+
 # Dynamics Explorer — Path A Plan: Live Ground Truth
 
 **Status:** Codex-reviewed ×2 + folded; **Slice 1 (A1+A2) IMPLEMENTED + reviewed (S200, 2026-05-29)**; **A3 + A4 + A5 IMPLEMENTED (S202, 2026-05-30)** — built on a deliberate override of the measure-first guardrail (the S200 soak data was frozen: +4 tool calls / +0 errors since the deploy, so no fresh signal, but the error *shape* still mapped 1:1 to A3/A4/A5). A live probe (`scripts/probe-akoya-folio-casing.js`) reshaped the work: `/$count` is broken in BOTH directions (caps at 5000 unfiltered AND throws Edm.Int32 on any filter), so A3 became a full countdistinct-on-PK replacement (not a narrow interim); and the prompt's `akoya_folio` "casing inconsistency" claim was FALSE (only "PAID" exists; Dataverse `eq` is case-insensitive). Suite 1544 green, lint 0 errors, all gates green. Codex post-impl review (S202) returned 1 MEDIUM (systemuser count regression — annotated table missing from `KNOWN_ENTITY_SETS`, PK unresolved) + 1 LOW (A5 enrichment skipped for entity-set aliases); both folded (dual-keyed `primaryIdMap` + logical-name normalization in `classifyToolError`) with regression tests.

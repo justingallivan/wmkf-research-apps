@@ -1,3 +1,19 @@
+---
+title: "Reviewer \"Hold Step\" Build Plan"
+domain: reviewer-workbench
+kind: plan
+status: active
+summary: "## ⚠️ RETIRED (S279) — this plan describes a feature that has been REMOVED."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_ENGAGEMENT_SPEC.md
+  - docs/REVIEWER_STAGE_2A_BUILD_PLAN.md
+  - "pages/api/external/review/[token]/respond.js"
+  - lib/dataverse/adapters/reviewer-suggestion.js
+---
+
 # Reviewer "Hold Step" Build Plan
 
 > ## ⚠️ RETIRED (S279) — this plan describes a feature that has been REMOVED.

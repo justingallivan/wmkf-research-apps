@@ -1,3 +1,19 @@
+---
+title: Model-Change Strategy
+domain: prompt-executor
+kind: plan
+status: active
+summary: "Guiding principle: model drift must fail LOUD in CI, never silently in prod."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/llm-client.js
+  - lib/services/model-capabilities.js
+  - lib/services/model-review-validation.js
+  - lib/services/model-resolver.js
+---
+
 # Model-Change Strategy
 
 **Status: PARTIALLY IMPLEMENTED (S286/S287, 2026-06-25).** This documents a durable

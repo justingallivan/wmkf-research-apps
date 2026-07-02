@@ -1,3 +1,14 @@
+---
+title: "AI Prompts — Detailed Reference"
+domain: prompt-executor
+kind: source-of-truth
+status: canonical
+summary: "This document contains the actual text of every prompt we send to Claude, with code removed and dynamic placeholders described in plain English...."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # AI Prompts — Detailed Reference
 
 This document contains the actual text of every prompt we send to Claude, with code removed and dynamic placeholders described in plain English. Each section shows what we ask Claude to do and the rules it must follow.

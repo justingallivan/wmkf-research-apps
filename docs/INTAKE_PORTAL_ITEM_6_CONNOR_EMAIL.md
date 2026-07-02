@@ -1,3 +1,14 @@
+---
+title: "Connor email — P1-Update core-gate test (DRAFT, not yet sent — S163, 2026-05-18)"
+domain: intake-portal
+kind: draft
+status: draft
+summary: "Send-ready. Consistent with the committed handout INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md and the locked Select-columns=blank decision. Attach..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # Connor email — P1-Update core-gate test (DRAFT, not yet sent — S163, 2026-05-18)
 
 Send-ready. Consistent with the committed handout `INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md` and the locked Select-columns=`blank` decision. Attach that handout when sending.

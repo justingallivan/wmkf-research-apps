@@ -1,3 +1,17 @@
+---
+title: "Review — Reviewer Contact Leads / Scout Layer Spec"
+domain: reviewer-workbench
+kind: audit
+status: active
+summary: "[VERIFIED via lib/services/contact-enrichment-service.js:487] hasIdentityAnchor = !!effectiveInstitution || this._hasOrcidAnchor(...) — i.e. the..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_CONTACT_LEADS_SPEC.md
+  - lib/services/contact-enrichment-service.js
+---
+
 # Review — Reviewer Contact Leads / Scout Layer Spec
 
 Reviewer: Claude (Opus 4.8)

@@ -1,3 +1,19 @@
+---
+title: "Reviewer Identity Resolver — Phase 2 design (v3)"
+domain: reviewer-identity
+kind: spec
+status: active
+summary: "- confirmed is explicitly NOT reachable in PR1 (needs the deferred faculty-page + publication-cluster evidence). PR1 tops out at probable."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_IDENTITY_RESOLUTION_PLAN.md
+  - lib/services/reviewer-identity-resolver.js
+  - lib/services/contact-enrichment-service.js
+  - lib/services/serp-contact-service.js
+---
+
 # Reviewer Identity Resolver — Phase 2 design (v3)
 
 **Status:** **PR1 SHIPPED (S214)** + **S215 extension SHIPPED** (institution-corroborated ORCID = strong anchor, §3.1). The v3 design (S214, 2026-06-02) resolved the PR1-blocking inconsistencies Codex flagged in v2; PR1 then landed (resolver + write-gates + clear-on-downgrade). S215 fixed the ORCID `family-names` parser bug that had blocked all ORCID capture and added the corroborated-ORCID strong-anchor rule (§3.1). Later PRs (PubMed-cluster + faculty-page → `confirmed`; Postgres leads table; Perplexity Search-API) remain unbuilt.

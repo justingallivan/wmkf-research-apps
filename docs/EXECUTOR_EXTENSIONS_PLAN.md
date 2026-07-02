@@ -1,3 +1,17 @@
+---
+title: "Executor Extensions Plan (post-cycle)"
+domain: prompt-executor
+kind: plan
+status: active
+summary: "Status: Design sketch (Session 110, 2026-04-25). Not yet implemented."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/execute-prompt.js
+  - scripts/probe-picklist.js
+---
+
 # Executor Extensions Plan (post-cycle)
 
 **Status:** Design sketch (Session 110, 2026-04-25). Not yet implemented.

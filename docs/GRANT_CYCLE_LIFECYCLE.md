@@ -1,3 +1,19 @@
+---
+title: Grant Cycle Lifecycle
+domain: architecture
+kind: source-of-truth
+status: canonical
+summary: "Status: Mixed — some AI fields and post-approval flows are live; PA-orchestrated flows are still pending. See \"What's live now (2026-05-08)\" below."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/atlas/dataverse-akoya-request.md
+  - lib/services/execute-prompt.js
+  - scripts/test-echo-parity.js
+  - docs/POSTGRES_TO_DATAVERSE_MIGRATION.md
+---
+
 # Grant Cycle Lifecycle
 
 **Status:** Mixed — some AI fields and post-approval flows are live; PA-orchestrated flows are still pending. See "What's live now (2026-05-08)" below.

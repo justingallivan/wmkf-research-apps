@@ -1,3 +1,19 @@
+---
+title: "Where We're Headed"
+domain: architecture
+kind: plan
+status: active
+summary: "Last updated: 2026-05-08 (previously 2026-03-12) — living document, updated as things evolve."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/SYSTEM_MODEL.md
+  - docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md
+  - lib/utils/sharepoint-buckets.js
+  - scripts/probe-sharepoint-write.js
+---
+
 # Where We're Headed
 
 **Last updated: 2026-05-08** (previously 2026-03-12) — living document, updated as things evolve.

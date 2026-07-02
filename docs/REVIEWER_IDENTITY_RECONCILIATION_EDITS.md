@@ -1,3 +1,19 @@
+---
+title: Reviewer Identity Reconciliation Edits
+domain: reviewer-identity
+kind: history
+status: active
+summary: Related write-up: docs/REVIEWER_IDENTITY_STRATEGY_EVALUATION.md.
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_IDENTITY_STRATEGY_EVALUATION.md
+  - docs/REVIEWER_TRACK_B_IDENTITY_SPEC.md
+  - docs/REVIEWER_IDENTITY_RESOLUTION_PLAN.md
+  - lib/services/reviewer-work-author-resolver.js
+---
+
 # Reviewer Identity Reconciliation Edits
 
 Date: 2026-06-08

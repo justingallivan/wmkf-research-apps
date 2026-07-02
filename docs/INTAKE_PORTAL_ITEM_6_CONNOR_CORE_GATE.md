@@ -1,3 +1,14 @@
+---
+title: "Connor — P1-Update Core Gate Test"
+domain: intake-portal
+kind: history
+status: historical
+summary: "1. Confirm maker-portal access to the sandbox environment, not production."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # Connor — P1-Update Core Gate Test
 
 > **Canonical status:** **`INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`** — current state: this handout was **sent to Connor (S165, 2026-05-19); AWAITING his Step 11 evidence + Step 12 verdict; the slice-0 gate is still OPEN.** This doc is authoritative only for the test mechanics and the Step 11/12 acceptance literals; do not read deploy-cleared state from it.

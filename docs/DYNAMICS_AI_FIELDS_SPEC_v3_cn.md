@@ -1,3 +1,19 @@
+---
+title: "Dynamics Custom Fields for AI Output — Implementation Spec"
+domain: dataverse
+kind: spec
+status: active
+summary: "Date: 2026-04-14 Based on: Justin's v2 spec (input/DYNAMICS_AI_FIELDS_SPEC.md)."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/INTAKE_PORTAL_SCHEMA_CHANGES.md
+  - pages/api/dynamics-explorer/chat.js
+  - scripts/test-dynamics-email.js
+  - pages/api/grant-reporting/extract.js
+---
+
 # Dynamics Custom Fields for AI Output — Implementation Spec
 
 **Author:** Connor

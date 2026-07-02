@@ -1,3 +1,19 @@
+---
+title: "Reviewer Postgres → Dataverse Migration Plan (Wave 2)"
+domain: reviewer-workbench
+kind: plan
+status: active
+summary: "Target environment: Prod (Dataverse Wave 2 schema is live)."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md
+  - docs/SYSTEM_MODEL.md
+  - docs/APPLICATION_STATE_ATLAS.md
+  - docs/atlas/
+---
+
 # Reviewer Postgres → Dataverse Migration Plan (Wave 2)
 
 > **⚠ S213 (2026-06-02): the `wmkf_appresearcher` sidecar described throughout this doc as a Dataverse write target was COLLAPSED onto `wmkf_potentialreviewers` and DROPPED.** Anywhere below that says "write/upsert to `wmkf_appresearcher`," read it as "write the bibliometric fields directly on `wmkf_potentialreviewer`." Do NOT re-create the sidecar pattern in any remaining/future work here. As-executed record: `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md`.

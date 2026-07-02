@@ -1,3 +1,19 @@
+---
+title: "Reviewer Finder — Rescue Dossier (fresh-eyes brief)"
+domain: reviewer-identity
+kind: history
+status: active
+summary: "3. Tell us if there's a materially simpler approach we've talked ourselves out of."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md
+  - pages/api/reviewer-finder/analyze.js
+  - lib/services/claude-reviewer-service.js
+  - shared/config/prompts/reviewer-finder.js
+---
+
 # Reviewer Finder — Rescue Dossier (fresh-eyes brief)
 
 > **Why this document exists.** We (the operator + Claude + Codex) have iterated on the

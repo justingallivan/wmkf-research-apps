@@ -1,3 +1,19 @@
+---
+title: Docs Staleness Audit - 2026-06-28
+domain: docs-governance
+kind: audit
+status: historical
+summary: "- For ARCHIVE items with inbound references, prefer adding or tightening a top-of-file Status: historical banner in place unless Justin also wants..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/archive/
+  - docs/API_ROUTE_SECURITY_MATRIX.md
+  - docs/APPLICATION_STATE_ATLAS.md
+  - docs/AI_DATA_FLOW_MATRIX.md
+---
+
 # Docs Staleness Audit - 2026-06-28
 
 > **Action taken 2026-06-28:** all recommendations executed. The 2 DELETEs removed

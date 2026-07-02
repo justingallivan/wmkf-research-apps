@@ -1,3 +1,19 @@
+---
+title: "Plan: Unified per-user email signature (profile-settings) (S271)"
+domain: email
+kind: plan
+status: active
+summary: "- The grantee invite/reminder need a signature; titles are NOT in Dataverse, so the signature must come from a per-user store with a sensible..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/dataverse-prefs-service.js
+  - lib/services/database-service.js
+  - scripts/setup-database.js
+  - shared/config/reviewerFinderPreferences.js
+---
+
 # Plan: Unified per-user email signature (profile-settings) (S271)
 
 > **Status: PLAN v3 — Codex reviews #1 + #2 folded; READY FOR IMPLEMENTATION (Codex implements, Claude

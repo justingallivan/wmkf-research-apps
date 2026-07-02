@@ -1,3 +1,19 @@
+---
+title: "Reviewer Finder — Structured-ORCID PI Identity Wire-In (Design / Pre-Impl)"
+domain: reviewer-identity
+kind: plan
+status: active
+summary: "Author: Claude (S240, 2026-06-10). Canonical strategy: docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md §12 (esp. §12.2, §12.8)."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/proposal-pi-identity.js
+  - pages/api/reviewer-finder/discover.js
+  - docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
+  - docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md
+---
+
 # Reviewer Finder — Structured-ORCID PI Identity Wire-In (Design / Pre-Impl)
 
 > Status (updated S253, 2026-06-13): **SHIPPED.** The structured-ORCID PI wire-in described here

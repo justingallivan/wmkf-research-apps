@@ -1,3 +1,19 @@
+---
+title: Ground-Truth Operating Rules
+domain: agent-harness
+kind: source-of-truth
+status: canonical
+summary: "Audience: future-Claude (and current-Claude when this drifts). Justin can read it, but it is written for the agent to consult before data-layer,..."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/APPLICATION_STATE_ATLAS.md
+  - docs/atlas/
+  - scripts/check-application-state-atlas.js
+  - docs/POSTGRES_TO_DATAVERSE_MIGRATION.md
+---
+
 # Ground-Truth Operating Rules
 
 **Origin:** 2026-05-07 (S136), as the "Remediation Plan — Closing the Ground-Truth Gap."

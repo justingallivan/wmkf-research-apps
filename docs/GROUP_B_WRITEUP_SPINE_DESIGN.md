@@ -1,3 +1,19 @@
+---
+title: "Group B — Writeup Spine: Design Proposal"
+domain: architecture
+kind: spec
+status: active
+summary: "Audience: Justin + Connor Status: Design — not yet built; pending Connor's input on Dataverse schema and PA flow Date: 2026-06-16."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/probe-graph-write-access.mjs
+  - shared/config/prompts/phase-i-writeup.js
+  - shared/config/prompts/proposal-summarizer.js
+  - pages/api/workbench/resolve-request.js
+---
+
 # Group B — Writeup Spine: Design Proposal
 
 **Audience:** Justin + Connor  

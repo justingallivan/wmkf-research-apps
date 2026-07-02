@@ -1,3 +1,16 @@
+---
+title: "WMKF Apps — Custom Dataverse Schema Inventory"
+domain: dataverse
+kind: source-of-truth
+status: active
+summary: "For: Connor (Dataverse admin) From: WMKF Apps team Date: 2026-06-24."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/dataverse/schema/
+---
+
 # WMKF Apps — Custom Dataverse Schema Inventory
 
 **For:** Connor (Dataverse admin)

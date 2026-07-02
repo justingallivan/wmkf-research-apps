@@ -1,3 +1,19 @@
+---
+title: "Dynamics Explorer — Schema Annotation Reference"
+domain: dataverse
+kind: source-of-truth
+status: active
+summary: "Scope (clarified 2026-05-08). This doc records the field annotations baked into the Dynamics Explorer chat tool's TABLE_ANNOTATIONS — what the..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/APPLICATION_STATE_ATLAS.md
+  - docs/atlas/dataverse-akoya-request.md
+  - scripts/dynamics-schema-diff.js
+  - shared/config/prompts/dynamics-explorer.js
+---
+
 # Dynamics Explorer — Schema Annotation Reference
 
 > **Scope (clarified 2026-05-08).** This doc records the field annotations baked into the **Dynamics Explorer** chat tool's `TABLE_ANNOTATIONS` — what the Explorer's LLM "knows" about each table. It is not a full schema dump.

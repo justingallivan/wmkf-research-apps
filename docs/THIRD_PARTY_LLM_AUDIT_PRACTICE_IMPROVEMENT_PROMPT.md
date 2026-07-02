@@ -1,3 +1,16 @@
+---
+title: Third-Party LLM Audit Practice Improvement Prompt
+domain: security-auth
+kind: audit
+status: draft
+summary: Use this prompt to help the third-party LLM improve its audit methodology after reviewing its original and amended reports.
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/
+---
+
 # Third-Party LLM Audit Practice Improvement Prompt
 
 Use this prompt to help the third-party LLM improve its audit methodology after reviewing its original and amended reports.

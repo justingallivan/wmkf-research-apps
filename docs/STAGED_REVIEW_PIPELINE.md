@@ -1,3 +1,16 @@
+---
+title: Staged LLM-Assisted Proposal Review Pipeline
+domain: prompt-executor
+kind: history
+status: active
+summary: Proposals flow through stages sequentially. Staff review is required before any proposal is declined at Stage 1. Stages 2 and 3 produce inputs for...
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/STAGED_PIPELINE_IMPLEMENTATION_PLAN.md
+---
+
 # Staged LLM-Assisted Proposal Review Pipeline
 ## W. M. Keck Foundation — New Cycle Design
 

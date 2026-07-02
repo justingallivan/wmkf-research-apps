@@ -1,3 +1,18 @@
+---
+title: "Chunk 3 Design — IntakeDraftService pending helpers"
+domain: intake-portal
+kind: spec
+status: active
+summary: "The pending-entry JSON object stored in pending_attachments[] is fixed by /upload-token:."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/intake-draft-service.js
+  - docs/INTAKE_ATTACH_BUILD_SCOPING.md
+  - tests/unit/intake-draft-service-pending.test.js
+---
+
 # Chunk 3 Design — IntakeDraftService pending helpers
 
 Pre-implementation design for the five helpers chunk 3 adds to

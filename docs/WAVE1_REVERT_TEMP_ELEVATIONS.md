@@ -1,3 +1,19 @@
+---
+title: "Wave 1 — Revert Temp Elevations (future session)"
+domain: security-auth
+kind: history
+status: active
+summary: "Purpose: Remove the elevated privileges the app user needed for the prod cutover, leaving it with the minimal permanent surface."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/apply-security-role.js
+  - docs/WAVE1_PROD_RUNBOOK.md
+  - docs/archive/WAVE1_PROD_PRIVILEGE_REQUEST.md
+  - docs/archive/WAVE1_PROD_PRIVILEGE_REQUEST_2.md
+---
+
 # Wave 1 — Revert Temp Elevations (future session)
 
 **Purpose:** Remove the elevated privileges the app user needed for the prod cutover, leaving it with the minimal permanent surface.

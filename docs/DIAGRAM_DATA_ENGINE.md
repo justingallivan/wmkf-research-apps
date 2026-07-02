@@ -1,3 +1,14 @@
+---
+title: "Data Engine Diagram (OData & Reconciliation)"
+domain: architecture
+kind: spec
+status: active
+summary: "This pipeline visualization focuses on the internal data complexities, specifically the OData parser and identity merging required for Dataverse."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # Data Engine Diagram (OData & Reconciliation)
 
 This pipeline visualization focuses on the internal data complexities, specifically the OData parser and identity merging required for Dataverse.

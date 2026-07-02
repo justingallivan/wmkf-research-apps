@@ -1,3 +1,14 @@
+---
+title: System Landscape Diagram
+domain: architecture
+kind: spec
+status: active
+summary: "This diagram illustrates the Next.js API acting as the central orchestration layer between the Microsoft ecosystem, external academic/government..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # System Landscape Diagram
 
 This diagram illustrates the Next.js API acting as the central orchestration layer between the Microsoft ecosystem, external academic/government APIs, and the AI engine.

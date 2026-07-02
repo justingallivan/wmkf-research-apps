@@ -1,3 +1,19 @@
+---
+title: Reviewer Identity Strategy Evaluation
+domain: reviewer-identity
+kind: decision
+status: active
+summary: "Scope: strategy-level evaluation of reviewer identity/contact enrichment failures for request 1002794, grounded in HEAD versions of:."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/contact-enrichment-service.js
+  - lib/services/serp-contact-service.js
+  - lib/services/discovery-service.js
+  - lib/services/reviewer-work-author-resolver.js
+---
+
 # Reviewer Identity Strategy Evaluation
 
 Date: 2026-06-08

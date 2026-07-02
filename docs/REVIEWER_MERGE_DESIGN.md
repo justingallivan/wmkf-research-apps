@@ -1,3 +1,19 @@
+---
+title: "Reviewer Record Merge — Build Plan & Design (v1)"
+domain: reviewer-workbench
+kind: spec
+status: active
+summary: "Chunks 1–3 (adapters, lib/services/reviewer-merge.js, the pages/api/reviewer-finder/merge-candidates route) are committed and tested."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/probe-merge-altkey-ordering.mjs
+  - scripts/probe-akoya-potentialreviewer-slot-navprops.mjs
+  - lib/services/reviewer-merge.js
+  - tests/unit/candidate-edit-modal-merge.test.js
+---
+
 # Reviewer Record Merge — Build Plan & Design (v1)
 
 status: v1 backend BUILT (chunks 1–3, S289 2026-06-25, Codex post-impl folded); UI merge mode BUILT (chunk 4, S290 2026-06-25, 2 Codex pre-impl + 1 post-impl passes folded, 13 tests green); ordering probe BUILT + PROD-CONFIRMED (chunk 5, S290, `scripts/probe-merge-altkey-ordering.mjs`; `--run` settled O8 — sub-probes A/B/C all pass — and caught + fixed a real prod bug in the 409 `conflictingRecordId` derivation, commit a19b934f); applicant-slot repoint BUILT (S307 2026-06-29, Codex pre-impl folded — the v1 `loser_in_applicant_slot` BLOCK was LIFTED: executeMerge Step 5 now repoints `wmkf_potentialreviewer1..5` loser→keeper, clearing keeper-duplicate slots, with a provenance-gated junction collision-union; nav props verified via `scripts/probe-akoya-potentialreviewer-slot-navprops.mjs`)

@@ -1,3 +1,16 @@
+---
+title: "Claude Skill Remediation Plan — Whole-Flow Verification"
+domain: agent-harness
+kind: plan
+status: active
+summary: Created: 2026-06-05 Audience: Future Claude / skill authors / reviewers Scope: Improve Claude-authored skills and operating checklists so they...
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/CLAUDE_REMEDIATION_PLAN.md
+---
+
 # Claude Skill Remediation Plan — Whole-Flow Verification
 
 **Created:** 2026-06-05

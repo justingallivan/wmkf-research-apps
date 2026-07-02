@@ -1,3 +1,17 @@
+---
+title: Canonical Counts
+domain: docs-governance
+kind: source-of-truth
+status: canonical
+summary: Generated source of truth for code-derived scalar counts used by documentation gates.
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/lib/canonical-facts.js
+  - docs/CI_GATES_REFERENCE.md
+---
+
 # Canonical Counts
 
 > **Auto-generated.** Do not hand-edit.

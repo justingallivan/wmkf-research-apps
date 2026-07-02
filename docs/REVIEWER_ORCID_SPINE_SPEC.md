@@ -1,3 +1,19 @@
+---
+title: "Reviewer Finder — OpenAlex+ORCID Identity Spine (Track-A verifier) — SPEC"
+domain: reviewer-identity
+kind: spec
+status: active
+summary: "- [NEW] lib/services/openalex-service.js — author search only (presence + ORCID discovery + institution + topics). NEVER trusted for..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/discovery-service.js
+  - lib/services/openalex-service.js
+  - lib/services/orcid-service.js
+  - lib/services/reviewer-identity-resolver.js
+---
+
 # Reviewer Finder — OpenAlex+ORCID Identity Spine (Track-A verifier) — SPEC
 
 Status: **Implemented for the PubMed-skip slice**. Implements the "smallest valuable slice" of

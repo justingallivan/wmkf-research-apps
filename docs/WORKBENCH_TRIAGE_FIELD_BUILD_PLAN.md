@@ -1,3 +1,19 @@
+---
+title: "Workbench Triage Field — build plan (S260)"
+domain: architecture
+kind: plan
+status: active
+summary: "v4 (2026-06-15): Codex review round 3 folded in."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REQUEST_WORKBENCH_BUILD_PLAN.md
+  - docs/REQUEST_WORKBENCH_SCOPING.md
+  - shared/config/d26Allowlist.js
+  - shared/config/triageStatus.js
+---
+
 # Workbench Triage Field — build plan (S260)
 
 > **Status:** Stages 0–4 BUILT + DEPLOYED (S261, 2026-06-15) — field live in prod, D26 backfill applied

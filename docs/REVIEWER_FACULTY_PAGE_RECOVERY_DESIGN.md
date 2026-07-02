@@ -1,3 +1,19 @@
+---
+title: "Reviewer Faculty-Page Email Recovery (Slice F) — Design"
+domain: reviewer-workbench
+kind: spec
+status: active
+summary: "State labels: [VERIFIED] = read in source this session; [ASSUMED] = inference."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md
+  - docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
+  - docs/REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md
+  - lib/utils/safe-fetch.js
+---
+
 # Reviewer Faculty-Page Email Recovery (Slice F) — Design
 
 Date: 2026-06-08 (S235); **SUPERSEDED 2026-06-17 (S265)**

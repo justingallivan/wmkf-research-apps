@@ -1,3 +1,19 @@
+---
+title: "Reviewer Lifecycle Automation — Proposal for Staff Review"
+domain: reviewer-workbench
+kind: source-of-truth
+status: canonical
+summary: "Originally written as a forward-looking proposal; large parts have shipped. Quick reality check:."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md
+  - lib/services/review-upload.js
+  - docs/atlas/dataverse-akoya-request.md
+  - docs/atlas/dataverse-wmkf-appreviewersuggestion.md
+---
+
 # Reviewer Lifecycle Automation — Proposal for Staff Review
 
 ## Status (as of 2026-05-08)

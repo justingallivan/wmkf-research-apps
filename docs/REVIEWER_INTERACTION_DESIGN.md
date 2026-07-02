@@ -1,3 +1,16 @@
+---
+title: "Reviewer Interaction Design — Brief"
+domain: reviewer-workbench
+kind: spec
+status: active
+summary: Audience for downstream artifacts: Program Directors. Management is not the primary audience.
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - pages/api/review-manager/render-emails.js
+---
+
 # Reviewer Interaction Design — Brief
 
 **Status:** Design brief, pre-build. Captures decisions from a Session 133 design conversation. Scope is the full reviewer journey for external Phase II reviewers, from invitation through post-submission. The artifact is intended as the seed for a PD-facing read-ahead document and slide deck for a staff feedback meeting.

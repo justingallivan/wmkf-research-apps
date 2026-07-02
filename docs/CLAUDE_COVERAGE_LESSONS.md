@@ -1,3 +1,19 @@
+---
+title: "Coverage Lessons — patterns I keep missing in coverage tools"
+domain: agent-harness
+kind: plan
+status: historical
+summary: "Created: 2026-05-07 (S137) after a Codex stress-test cycle where each round caught a slightly different syntactic pattern the previous round..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/check-application-state-atlas.js
+  - lib/services/execute-prompt.js
+  - pages/api/dynamics-explorer/chat.js
+  - lib/services/dataverse-app-access-service.js
+---
+
 # Coverage Lessons — patterns I keep missing in coverage tools
 
 **Created:** 2026-05-07 (S137) after a Codex stress-test cycle where each round caught a slightly different syntactic pattern the previous round didn't search for.

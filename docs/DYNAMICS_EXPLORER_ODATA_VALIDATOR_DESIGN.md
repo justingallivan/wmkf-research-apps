@@ -1,3 +1,17 @@
+---
+title: "Dynamics Explorer — OData Pre-flight Validator (design)"
+domain: dataverse
+kind: spec
+status: active
+summary: "Status: DRAFT, Codex-reviewed + folded (S200, 2026-05-29). Pre-implementation design, grounded in production failure data."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/analyze-dynamics-explorer-failures.js
+  - lib/services/dataverse-export/compiler.js
+---
+
 # Dynamics Explorer — OData Pre-flight Validator (design)
 
 **Status:** DRAFT, Codex-reviewed + folded (S200, 2026-05-29). Pre-implementation design, grounded in production failure data.

@@ -1,3 +1,19 @@
+---
+title: "Postgres → Dataverse Migration Map"
+domain: dataverse
+kind: plan
+status: active
+summary: "Target environment: Prod (akoyago.crm.dynamics.com). Sandbox path was used during Wave 1 staging; Wave 1 cutover to prod 2026-04-24, drop 2026-05-12."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/APPLICATION_STATE_ATLAS.md
+  - docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md
+  - docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md
+  - docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md
+---
+
 # Postgres → Dataverse Migration Map
 
 **Created:** 2026-04-22 (Session 106)

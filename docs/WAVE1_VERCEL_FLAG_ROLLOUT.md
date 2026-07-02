@@ -1,3 +1,19 @@
+---
+title: "Wave 1 — Vercel Flag Rollout (HISTORICAL — closed 2026-05-12)"
+domain: security-auth
+kind: plan
+status: active
+summary: "Status: ✅ CLOSED 2026-05-12. This runbook is preserved as the historical record of how the flags were flipped and the trailing-newline gotcha that..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/db/migrations/007_drop_wave1_tables.sql
+  - lib/services/
+  - lib/utils/auth.js
+  - docs/archive/
+---
+
 # Wave 1 — Vercel Flag Rollout (HISTORICAL — closed 2026-05-12)
 
 **Status:** ✅ **CLOSED 2026-05-12.** This runbook is preserved as the historical record of how the flags were flipped and the trailing-newline gotcha that was caught + corrected. Do not follow it as a live procedure.

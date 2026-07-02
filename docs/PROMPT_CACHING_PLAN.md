@@ -1,3 +1,19 @@
+---
+title: Prompt Caching Plan
+domain: prompt-executor
+kind: draft
+status: draft
+summary: "Created: 2026-04-17 (Session 103) Last updated: 2026-04-22 (Session 106) — audit via count_tokens across all apps confirmed the 2048 floor Status:..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - pages/api/dynamics-explorer/chat.js
+  - scripts/ab-phase-i-prompts.js
+  - lib/services/multi-llm-service.js
+  - pages/api/expertise-finder/match.js
+---
+
 # Prompt Caching Plan
 
 **Created:** 2026-04-17 (Session 103)

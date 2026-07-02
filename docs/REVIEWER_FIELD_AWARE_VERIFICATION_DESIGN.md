@@ -1,3 +1,19 @@
+---
+title: "Field-Aware Track-A Verification Routing — Design Spec"
+domain: reviewer-workbench
+kind: spec
+status: active
+summary: "- The verifier is gated only by the PubMed checkbox, not by field: pubMedVerificationContract(options) returns { enabled: false } iff..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/discovery-service.js
+  - tests/unit/reviewer-identity-resolver.test.js
+  - docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md
+  - lib/utils/reviewer-provenance.js
+---
+
 # Field-Aware Track-A Verification Routing — Design Spec
 
 > **Status:** **IMPLEMENTED & SHIPPED S236** through the full Codex loop (design

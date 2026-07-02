@@ -1,3 +1,19 @@
+---
+title: "Contacts dedup ↔ reviewer linking — notes + questions for Connor"
+domain: general
+kind: history
+status: active
+summary: "Date: 2026-06-25 (S289). Author: Justin + Claude. Status: discussion / questions."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/probe-contact-dedup.js
+  - scripts/probe-pr-contact-email-overlap.js
+  - scripts/probe-reviewer-duplicates.js
+  - docs/REVIEWER_MERGE_DESIGN.md
+---
+
 # Contacts dedup ↔ reviewer linking — notes + questions for Connor
 
 Date: 2026-06-25 (S289). Author: Justin + Claude. Status: discussion / questions.

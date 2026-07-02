@@ -1,3 +1,19 @@
+---
+title: "Reviewer Search Time-Budget Plan (S223)"
+domain: reviewer-workbench
+kind: plan
+status: active
+summary: "Status: IMPLEMENTED — pre-impl Codex design review + post-impl Codex review (findings #1–#5 fixed, see \"Post-impl\" below). 1943 tests + 10 gates +..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/honorarium-config.js
+  - lib/services/reviewer-time-budget.js
+  - pages/api/reviewer-finder/
+  - pages/api/workbench/enrich-recommended.js
+---
+
 # Reviewer Search Time-Budget Plan (S223)
 
 **Status:** IMPLEMENTED — pre-impl Codex design review + **post-impl Codex review (findings #1–#5 fixed, see "Post-impl" below)**. 1943 tests + 10 gates + lint green.

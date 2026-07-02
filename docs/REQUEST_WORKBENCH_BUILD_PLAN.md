@@ -1,3 +1,19 @@
+---
+title: "Request Workbench (D26 reviewer dashboard) — build plan"
+domain: architecture
+kind: plan
+status: active
+summary: "- Build the full Workbench, not just the allowlist unblock."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REQUEST_WORKBENCH_SCOPING.md
+  - docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md
+  - pages/api/reviewer-finder/my-proposals.js
+  - docs/AUDIT_S154_MEMORY.md
+---
+
 # Request Workbench (D26 reviewer dashboard) — build plan
 
 > **Status:** Implementation plan, drafted 2026-05-31 (Session 207). Complements the shareable scoping doc `docs/REQUEST_WORKBENCH_SCOPING.md` (the *what/why*) with the *how* — file paths, signatures, phasing. Pre-implementation; **for Codex review before any code is written.** Live-state claims are marked verified where probed.

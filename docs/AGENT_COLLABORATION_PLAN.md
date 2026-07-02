@@ -1,3 +1,16 @@
+---
+title: Multi-Agent Collaboration Plan
+domain: agent-harness
+kind: plan
+status: active
+summary: "Status: Draft operating contract Purpose: Keep Justin, Claude, and Codex from stepping on each other's work while using the same repo across..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/API_ROUTE_SECURITY_MATRIX.md
+---
+
 # Multi-Agent Collaboration Plan
 
 **Status:** Draft operating contract  

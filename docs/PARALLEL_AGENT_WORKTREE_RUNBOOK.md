@@ -1,3 +1,19 @@
+---
+title: Parallel Agent Worktree Runbook
+domain: docs-governance
+kind: runbook
+status: active
+summary: "- Yellow: same feature, different layers → implementer/reviewer split."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/AGENT_COLLABORATION_PLAN.md
+  - pages/admin.js
+  - shared/components/admin/
+  - shared/components/Layout.js
+---
+
 # Parallel Agent Worktree Runbook
 
 **Purpose:** Run Claude and Codex (or two agents) on this repo **simultaneously**

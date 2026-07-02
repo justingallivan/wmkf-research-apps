@@ -1,3 +1,14 @@
+---
+title: "Reviewer Identity Spine: trust ORCID-employment over OpenAlex institution drift — Design"
+domain: reviewer-identity
+kind: spec
+status: active
+summary: "2. Promotion rule (reviewer-identity-resolver.js classifySpineEvidence): strong orcid_employment_corroborated + topic_match + spine.forenameAgrees..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # Reviewer Identity Spine: trust ORCID-employment over OpenAlex institution drift — Design
 
 Date: 2026-06-08 (S235)

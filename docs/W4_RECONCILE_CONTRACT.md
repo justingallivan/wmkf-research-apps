@@ -1,3 +1,19 @@
+---
+title: "W4 Reconcile Contract — `scripts/reconcile-reviewer-migration.js`"
+domain: dataverse
+kind: source-of-truth
+status: canonical
+summary: "Designed-on-paper before building (Codex S147 pre-W4 review Q1 BLOCKER: the identity contract must be unambiguous before code lands)."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/reconcile-reviewer-migration.js
+  - docs/W4_ANOMALY_TRIAGE.md
+  - lib/services/review-upload.js
+  - lib/dataverse/client.js
+---
+
 # W4 Reconcile Contract — `scripts/reconcile-reviewer-migration.js`
 
 **Day 1 deliverable. Date:** 2026-05-12.

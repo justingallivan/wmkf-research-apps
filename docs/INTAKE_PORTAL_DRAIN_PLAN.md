@@ -1,3 +1,19 @@
+---
+title: "Intake Portal — Postgres → Dataverse Drain Plan (v7)"
+domain: intake-portal
+kind: plan
+status: active
+summary: "- BLOCKER fix: request_created state now has explicit duplicate-PK recovery: on collision, GET the parent row, persist akoya_requestnum, then..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/dataverse/schema/wave4/wmkf_portalmembership.json
+  - scripts/extend-apprequestperson-role-picklist.mjs
+  - lib/db/migrations/011_submission_jobs_states.sql
+  - scripts/setup-database.js
+---
+
 # Intake Portal — Postgres → Dataverse Drain Plan (v7)
 
 **Status:** S179 v7 (2026-05-22). Codex round-7 findings folded in (5 findings: 0 BLOCKER / 5 MOD/GAPS / 0 LOW — narrow delta sanity check). Rounds 8 + 9 reviewed the P0 build commit + the round-8 fold; round-9 caught 2 small doc-drift items (P0 SQL snippet had stale non-idempotent forms; no migration-apply runbook). Both folded into this v7. Build-ready.

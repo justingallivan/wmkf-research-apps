@@ -1,3 +1,19 @@
+---
+title: "Intake Attach Endpoint — Build Scoping (S184)"
+domain: intake-portal
+kind: plan
+status: active
+summary: shared/forms/phase-ii-research-2026-06/schema.js is the only live form schema. Shape:.
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - shared/forms/phase-ii-research-2026-06/schema.js
+  - lib/utils/file-magic.js
+  - lib/services/intake-draft-service.js
+  - pages/api/upload-handler.js
+---
+
 # Intake Attach Endpoint — Build Scoping (S184)
 
 Scoping pass before implementing the three-call dance for applicant

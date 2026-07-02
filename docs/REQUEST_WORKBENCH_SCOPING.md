@@ -1,3 +1,19 @@
+---
+title: "Request Workbench & Cycle Dashboards — Scoping"
+domain: architecture
+kind: plan
+status: active
+summary: Per-PD navigation model for the grant lifecycle: the D26 patch and the J27 build.
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/mockups/lifecycle-ui-mockup.html
+  - docs/REQUEST_WORKBENCH_BUILD_PLAN.md
+  - lib/external
+  - pages/api/reviewer-finder/my-proposals.js
+---
+
 # Request Workbench & Cycle Dashboards — Scoping
 
 **Per-PD navigation model for the grant lifecycle: the D26 patch and the J27 build.**

@@ -1,3 +1,19 @@
+---
+title: "Wave 1 Production Cutover — Runbook for Connor (HISTORICAL — applied 2026-04-24)"
+domain: security-auth
+kind: runbook
+status: active
+summary: "Wave 1 of the Postgres → Dataverse migration has been applied end-to-end in sandbox (orgd9e66399) and verified at every layer:."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/db/migrations/007_drop_wave1_tables.sql
+  - scripts/apply-dataverse-schema.js
+  - scripts/smoke-test-wave1.js
+  - scripts/apply-security-role.js
+---
+
 # Wave 1 Production Cutover — Runbook for Connor (HISTORICAL — applied 2026-04-24)
 
 **Status:** ✅ Cutover applied 2026-04-24. Flag flip 2026-05-03. Postgres tables dropped 2026-05-12 via `lib/db/migrations/007_drop_wave1_tables.sql`. This runbook is the historical record of the cutover-day commands; verification queries against the dropped Postgres tables will fail. Do not run as a live procedure.

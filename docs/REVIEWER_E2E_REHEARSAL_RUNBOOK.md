@@ -1,3 +1,19 @@
+---
+title: Reviewer End-to-End Rehearsal Runbook
+domain: reviewer-workbench
+kind: runbook
+status: active
+summary: "Purpose: rehearse the reviewer invitation and return flow without sending real Dynamics email, without writing test review files to SharePoint,..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/CREDENTIALS_RUNBOOK.md
+  - tests/unit/reviewer-invite-panel-invite-capture.test.js
+  - tests/unit/invite-email-modal-capture.test.js
+  - tests/integration/send-emails-route.test.js
+---
+
 # Reviewer End-to-End Rehearsal Runbook
 
 Date: 2026-06-21

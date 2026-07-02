@@ -1,3 +1,19 @@
+---
+title: Email Template Token-Syntax Unification Plan v2
+domain: email
+kind: plan
+status: active
+summary: "- Verify: post-migration dry-run reports adminChanged=0 preferenceChanged=0 — zero bracket tokens remain in any stored value."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/migrate-email-token-syntax.mjs
+  - scripts/seed-email-defaults.mjs
+  - lib/utils/email-generator.js
+  - "pages/api/external/review/[token]/respond.js"
+---
+
 # Email Template Token-Syntax Unification Plan v2
 
 **Created:** 2026-07-01 (S311)  

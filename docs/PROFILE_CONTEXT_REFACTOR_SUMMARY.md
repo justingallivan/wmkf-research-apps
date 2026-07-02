@@ -1,3 +1,14 @@
+---
+title: ProfileContext Atomic Consistency Refactor Summary
+domain: docs-governance
+kind: plan
+status: historical
+summary: Refactored ProfileContext.js to use useReducer with a unified session state.
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # ProfileContext Atomic Consistency Refactor Summary
 
 ## Overview

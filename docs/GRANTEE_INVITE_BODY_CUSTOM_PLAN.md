@@ -1,3 +1,19 @@
+---
+title: "Per-PD Custom Grantee-Invitation Email Body + Edit Affordance (S272)"
+domain: grantee-portal
+kind: plan
+status: active
+summary: "This mirrors the S271 unified-signature pattern (one per-user Dataverse preference, edited in Profile Settings) — see..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - shared/config/granteeInviteEmail.js
+  - docs/UNIFIED_EMAIL_SIGNATURE_PLAN.md
+  - lib/services/email-signature.js
+  - lib/seed/email-defaults/grantee-invite.js
+---
+
 # Per-PD Custom Grantee-Invitation Email Body + Edit Affordance (S272)
 
 **Status:** IMPLEMENTED (commit 56da01e3) + post-impl fixes shipped: compose-state model (#1/#2), review-round-2 boundary fixes (NI-4 initial-profile-resolution, NI-5 cross-request leak), and #5 (per-key save rollback) + #6 (`replaceAll`) — see §11. No grantee-invite open items remain; the only red suites are pre-existing and unrelated (`bill`, `discovery-verification-status`).

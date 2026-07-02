@@ -1,3 +1,19 @@
+---
+title: EXECUTIVE SUMMARY
+domain: general
+kind: audit
+status: historical
+summary: "Independent audit performed against all 64 memory files under .claude-memory/ (MEMORY.md plus 63 individual .md files). I did not read..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/AUDIT_S154_MEMORY.md
+  - pages/api/reviewer-finder/save-candidates.js
+  - pages/api/reviewer-finder/grant-cycles.js
+  - docs/APPLICATION_STATE_ATLAS.md
+---
+
 # EXECUTIVE SUMMARY
 
 Independent audit performed against all 64 memory files under `.claude-memory/` (`MEMORY.md` plus 63 individual `.md` files). I did not read `docs/AUDIT_S154_MEMORY.md`.

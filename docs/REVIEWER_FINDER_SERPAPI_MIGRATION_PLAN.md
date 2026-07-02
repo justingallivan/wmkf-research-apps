@@ -1,3 +1,19 @@
+---
+title: "Reviewer-Finder SerpAPI → Free-Stack Migration Plan"
+domain: reviewer-identity
+kind: plan
+status: active
+summary: "Source memories: project-serpapi-capability-erosion, project-serpapi-budget-latency."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/reviewer-identity-resolver.js
+  - lib/services/reviewer-identity-evidence.js
+  - lib/services/contact-enrichment-service.js
+  - lib/services/openalex-service.js
+---
+
 # Reviewer-Finder SerpAPI → Free-Stack Migration Plan
 
 > **Status:** **COMPLETE** — Slices 1a + 1b + 2 SHIPPED (S250–S251). The reviewer-finder metrics +

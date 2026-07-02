@@ -1,3 +1,19 @@
+---
+title: Reviewer Data Model
+domain: reviewer-workbench
+kind: source-of-truth
+status: canonical
+summary: "Visual orientation for the reviewer-domain Dataverse entities and how they connect. Use this when you're not sure which entity holds which piece..."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_INTERACTION_DESIGN.md
+  - docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md
+  - docs/archive/APPRESEARCHER_COLLAPSE_PLAN.md
+  - docs/atlas/dataverse-wmkf-appreviewersuggestion.md
+---
+
 # Reviewer Data Model
 
 Visual orientation for the reviewer-domain Dataverse entities and how they connect. Use this when you're not sure which entity holds which piece of data, or when a piece of reviewer data is created.

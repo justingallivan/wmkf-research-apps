@@ -1,3 +1,19 @@
+---
+title: Reviewer Finder Documentation
+domain: reviewer-identity
+kind: source-of-truth
+status: canonical
+summary: The Reviewer Finder is the flagship application for finding and contacting expert reviewers for grant proposals.
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md
+  - docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md
+  - shared/config/reviewerFinderPreferences.js
+  - docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md
+---
+
 # Reviewer Finder Documentation
 
 The Reviewer Finder is the flagship application for finding and contacting expert reviewers for grant proposals.

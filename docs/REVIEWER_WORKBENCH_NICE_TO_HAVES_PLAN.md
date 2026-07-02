@@ -1,3 +1,19 @@
+---
+title: Reviewer Workbench Nice-to-Haves Plan
+domain: reviewer-workbench
+kind: plan
+status: active
+summary: "Planning only. No feature code, migrations, API routes, or schema files were created for this pass."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/agent-wiki/index.md
+  - docs/APPLICATION_STATE_ATLAS.md
+  - docs/atlas/dataverse-wmkf-potentialreviewers.md
+  - lib/dataverse/adapters/potential-reviewer.js
+---
+
 # Reviewer Workbench Nice-to-Haves Plan
 
 Planning only. No feature code, migrations, API routes, or schema files were created for this pass.

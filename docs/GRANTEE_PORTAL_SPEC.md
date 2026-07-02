@@ -1,3 +1,19 @@
+---
+title: "Grantee Deliverables Portal — Spec"
+domain: grantee-portal
+kind: spec
+status: active
+summary: "S269 added the edited-title generator + server-side document-assembly design (below + build-plan chunks 7–8, pending Codex pre-impl review); the..."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/atlas/dataverse-akoya-request.md
+  - lib/dataverse/schema-apply.js
+  - "pages/workbench/[requestId].js"
+  - lib/services/review-upload.js
+---
+
 # Grantee Deliverables Portal — Spec
 
 Status: **PORTAL BUILT + SHIPPED (S268); EDITED-TITLE + ASSEMBLY DESIGNED (S269).** Owner-confirmed

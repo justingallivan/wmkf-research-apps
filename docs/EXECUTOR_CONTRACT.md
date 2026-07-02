@@ -1,3 +1,19 @@
+---
+title: Executor Contract
+domain: prompt-executor
+kind: source-of-truth
+status: canonical
+summary: "The Executor is the function invoker. The prompt row is the function definition. Chains and triggers are the Flow's job, not the Executor's."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/execute-prompt.js
+  - docs/PROMPT_STORAGE_DESIGN.md
+  - docs/BACKEND_AUTOMATION_PLAN.md
+  - docs/WORKFLOW_CHAINING_DESIGN.md
+---
+
 # Executor Contract
 
 **Status:** SHIPPED on the Vercel side — this doc describes the contract that `lib/services/execute-prompt.js` implements in production today (consumed by `/api/phase-i-dynamics/summarize-v2`). PowerAutomate implementation is Connor's; pacing tracked outside this doc. The original "May 1 2026 cycle target" framing is historical; that target has passed.

@@ -1,3 +1,19 @@
+---
+title: "Intake Portal & Pilot Schema Changes — Audit Catalog"
+domain: intake-portal
+kind: history
+status: active
+summary: "Conventions: - One section per change batch, newest first."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md
+  - lib/dataverse/schema/wave6/03_wmkf_potentialreviewers_identity.json
+  - lib/services/reviewer-identity-resolver.js
+  - lib/dataverse/schema/wave6/
+---
+
 # Intake Portal & Pilot Schema Changes — Audit Catalog
 
 Per `project_dataverse_creator_privileges.md` (2026-05-06), Connor delegated entity/field creation authority to Justin/Claude for pilot-scope work under a summary-after model. This file is the running catalog of every Dataverse change made under that delegation.

@@ -1,3 +1,14 @@
+---
+title: "BILL.com Honorarium Integration — Claude Code Handoff"
+domain: finance-honoraria
+kind: history
+status: active
+summary: "The project was approved after an Ops Team review meeting (May 2026)."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # BILL.com Honorarium Integration — Claude Code Handoff
 
 ## Project Overview

@@ -1,3 +1,14 @@
+---
+title: "Wishlist & Brainstorming"
+domain: docs-governance
+kind: plan
+status: draft
+summary: "Working collection of ideas, observations, and future directions for the app suite. Not commitments — just things we've thought about and want to..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # Wishlist & Brainstorming
 
 Working collection of ideas, observations, and future directions for the app suite. Not commitments — just things we've thought about and want to keep track of.

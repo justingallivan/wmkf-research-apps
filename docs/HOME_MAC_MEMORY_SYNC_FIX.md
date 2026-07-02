@@ -1,3 +1,14 @@
+---
+title: "iCloud Migration + Home Mac Setup"
+domain: docs-governance
+kind: history
+status: historical
+summary: "Written 2026-05-14. One-time procedure to move the project into iCloud Drive so it syncs automatically between Macs, including .env.local and..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # iCloud Migration + Home Mac Setup
 
 **Written 2026-05-14.** One-time procedure to move the project into iCloud Drive so it syncs automatically between Macs, including `.env.local` and Claude Code memory.

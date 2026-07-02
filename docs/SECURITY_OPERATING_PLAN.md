@@ -1,3 +1,19 @@
+---
+title: Security Operating Plan
+domain: security-auth
+kind: runbook
+status: canonical
+summary: "- docs/API_ROUTE_SECURITY_MATRIX.md — who can call each API route and what boundary protects it."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/API_ROUTE_SECURITY_MATRIX.md
+  - docs/AI_DATA_FLOW_MATRIX.md
+  - pages/api/
+  - docs/archive/SECURITY_OPERATING_PLAN_ALIGNMENT_BRIEF.md
+---
+
 # Security Operating Plan
 
 Last updated: 2026-05-05

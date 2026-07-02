@@ -1,3 +1,19 @@
+---
+title: API Route Security Matrix
+domain: security-auth
+kind: source-of-truth
+status: canonical
+summary: This document is the living authorization inventory for pages/api. It is meant to do two jobs:.
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - pages/api
+  - lib/db/schema.sql
+  - lib/utils/auth.js
+  - docs/REVIEWER_TIMEOUT_BUDGET_PLAN.md
+---
+
 # API Route Security Matrix
 
 Last updated: 2026-06-25

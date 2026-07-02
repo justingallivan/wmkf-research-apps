@@ -1,3 +1,14 @@
+---
+title: "Connor — Option A′ Flow-Body-Conditional Re-Run"
+domain: intake-portal
+kind: history
+status: historical
+summary: "Scope: ~20–30 minutes. Two tests + one quantification."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # Connor — Option A′ Flow-Body-Conditional Re-Run
 
 > **Canonical status:** `INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`. The original core-gate

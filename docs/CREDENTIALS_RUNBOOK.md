@@ -1,3 +1,19 @@
+---
+title: Credentials Runbook
+domain: security-auth
+kind: runbook
+status: canonical
+summary: "*Quick reference for managing environment variables, rotating secrets, and diagnosing auth failures.*."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/utils/auth.js
+  - lib/services/external-token.js
+  - docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md
+  - shared/config/baseConfig.js
+---
+
 # Credentials Runbook
 
 *Quick reference for managing environment variables, rotating secrets, and diagnosing auth failures.*

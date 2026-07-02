@@ -1,3 +1,19 @@
+---
+title: Proposal Context Extraction Plan
+domain: general
+kind: plan
+status: active
+summary: "Created: 2026-04-17 (Session 103) Status: Planning — relevant to single-phase cycle (two cycles out)."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/PROMPT_CACHING_PLAN.md
+  - docs/WORKFLOW_CHAINING_DESIGN.md
+  - docs/PROMPT_STORAGE_DESIGN.md
+  - docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md
+---
+
 # Proposal Context Extraction Plan
 
 **Created:** 2026-04-17 (Session 103)

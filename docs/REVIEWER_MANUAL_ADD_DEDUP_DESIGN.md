@@ -1,3 +1,19 @@
+---
+title: Reviewer Manual-Add Cross-Store De-duplication Design
+domain: reviewer-workbench
+kind: spec
+status: active
+summary: "Original status: PROPOSED (S237), rev3 — second Codex pre-impl pass folded (NF1–NF3)."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - pages/api/workbench/reviewer-lookup.js
+  - pages/api/workbench/manual-reviewer.js
+  - lib/services/reviewer-identity-lookup.js
+  - docs/REVIEWER_MANUAL_ADD_DESIGN.md
+---
+
 # Reviewer Manual-Add Cross-Store De-duplication Design
 
 > **Status (updated S253, 2026-06-13): SHIPPED.** Cross-store dedup is live in the Workbench

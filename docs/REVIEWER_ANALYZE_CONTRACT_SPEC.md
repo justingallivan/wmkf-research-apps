@@ -1,3 +1,19 @@
+---
+title: "Implementation Spec — Reviewer Analyze Reliability Contract (slice)"
+domain: reviewer-workbench
+kind: source-of-truth
+status: canonical
+summary: "REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md §4.4/§5/§7. Labels: [VERIFIED] (read from source this session), [PROPOSED], [OPEN] (decide with reviewer)."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/claude-reviewer-service.js
+  - shared/config/prompts/reviewer-finder.js
+  - pages/api/reviewer-finder/analyze.js
+  - pages/api/workbench/enrich-recommended.js
+---
+
 # Implementation Spec — Reviewer Analyze Reliability Contract (slice)
 
 Status: **SPEC, IN IMPLEMENTATION.** Per-slice implementation spec derived from

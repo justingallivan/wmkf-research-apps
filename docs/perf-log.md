@@ -1,3 +1,16 @@
+---
+title: Dataverse perf log
+domain: docs-governance
+kind: history
+status: historical
+summary: "Dated benchmark entries appended by scripts/acceptance-w4.js and similar acceptance scripts. P95 thresholds are environmental and not gated; these..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/acceptance-w4.js
+---
+
 # Dataverse perf log
 
 Dated benchmark entries appended by `scripts/acceptance-w4.js` and similar acceptance scripts. P95 thresholds are environmental and not gated; these entries support trend tracking.

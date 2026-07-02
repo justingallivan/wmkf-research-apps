@@ -1,3 +1,19 @@
+---
+title: "Intake Portal Budget Aggregate Recompute — Decision Record"
+domain: intake-portal
+kind: decision
+status: active
+summary: "Q2 answer: \"Yes, with the narrow exception language.\" → Boundary-rule exception accepted with the three non-negotiable preconditions documented in..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/dynamics-service.js
+  - docs/INTAKE_PORTAL_ITEM_6_MAKER_PORTAL_TESTS.md
+  - docs/INTAKE_PORTAL_DESIGN.md
+  - docs/BUDGET_FORM_SPEC.md
+---
+
 # Intake Portal Budget Aggregate Recompute — Decision Record
 
 > **Status entry point:** for *current* budget/roster reconciliation, slice-0

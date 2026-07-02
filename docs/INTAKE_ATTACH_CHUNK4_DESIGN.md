@@ -1,3 +1,19 @@
+---
+title: "Chunk 4 Design — POST /api/intake/draft/upload-token"
+domain: intake-portal
+kind: spec
+status: active
+summary: "Adds the FIRST endpoint of the three-call dance. The browser PUT (step 2) and /attach (step 3) come in chunk 5."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/INTAKE_ATTACH_BUILD_SCOPING.md
+  - docs/INTAKE_PORTAL_DRAIN_PLAN.md
+  - pages/api/intake/draft.js
+  - pages/api/intake/draft/upload-token.js
+---
+
 # Chunk 4 Design — POST /api/intake/draft/upload-token
 
 Pre-implementation design for chunk 4 of the S184 build. Subordinate

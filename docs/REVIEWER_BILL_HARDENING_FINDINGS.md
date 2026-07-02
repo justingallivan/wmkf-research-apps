@@ -1,6 +1,20 @@
 ---
+title: "Reviewer / BILL deep-pass hardening findings — 2026-05-29"
+domain: reviewer-workbench
+kind: audit
+status: historical
+summary: "- contactEdits validation (was P3): respond.js now bounds each field's length + checks email shape, returning a clean 400 instead of a Dataverse 500."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - "pages/api/external/review/[token]/respond.js"
+  - lib/bill/onboard-reviewer-service.js
+  - lib/external/rate-limit.js
+  - lib/bill/internal-call-auth.js
 fact_consistency: point-in-time
 ---
+
 # Reviewer / BILL deep-pass hardening findings — 2026-05-29
 
 Output of the S198 "likely under-covered" deep read of the external-reviewer

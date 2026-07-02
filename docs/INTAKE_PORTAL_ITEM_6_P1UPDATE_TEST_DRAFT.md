@@ -1,3 +1,16 @@
+---
+title: "DRAFT — UNAUTHORIZED / UNLANDED — for Codex review only (S163, 2026-05-18)"
+domain: intake-portal
+kind: draft
+status: draft
+summary: "1. The P1-Update pre-deploy waiver text (would land as a DRAFT — UNAUTHORIZED block in INTAKE_PORTAL_BUDGET_AGGREGATE_RECOMPUTE_DECISION.md §0)."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/probe-slice0-attr-collision.mjs
+---
+
 # DRAFT — UNAUTHORIZED / UNLANDED — for Codex review only (S163, 2026-05-18)
 
 > **⚠️ Superseded — history only.** Canonical Item 6 / slice-0 status (is the deploy cleared? the P1-Update gate? waiver + Connor status?) lives in **`INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`**. Superseded by v5 / `INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md`; do not infer current state from this file.

@@ -1,3 +1,14 @@
+---
+title: Agent Harness Style Guide
+domain: agent-harness
+kind: spec
+status: active
+summary: "This guide keeps agent-facing instructions precise, confident, and low-noise."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # Agent Harness Style Guide
 
 This guide keeps agent-facing instructions precise, confident, and low-noise.

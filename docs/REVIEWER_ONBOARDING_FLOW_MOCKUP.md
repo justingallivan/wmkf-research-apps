@@ -1,3 +1,19 @@
+---
+title: "Reviewer Onboarding — Process Flow & Screen Mockups"
+domain: reviewer-workbench
+kind: spec
+status: active
+summary: "What a potential reviewer sees at each stage of the invitation → accept/decline → confirmation journey, as built in the reviewer portal..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - "pages/external/review/[token].js"
+  - shared/components/external/
+  - "pages/api/external/review/[token]/respond.js"
+  - lib/bill/honorarium-onboard-orchestrator.js
+---
+
 # Reviewer Onboarding — Process Flow & Screen Mockups
 
 > What a potential reviewer sees at each stage of the invitation → accept/decline → confirmation

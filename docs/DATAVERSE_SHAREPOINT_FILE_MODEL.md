@@ -1,3 +1,16 @@
+---
+title: Dataverse / SharePoint File Storage Model
+domain: dataverse
+kind: source-of-truth
+status: active
+summary: "How files are stored and linked in the AkoyaGO + Dynamics environment, and how new document flows (reviewer uploads, etc.) fit into the existing..."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/probe-sharepoint-write.js
+---
+
 # Dataverse / SharePoint File Storage Model
 
 How files are stored and linked in the AkoyaGO + Dynamics environment, and how

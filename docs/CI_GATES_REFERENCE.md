@@ -1,3 +1,19 @@
+---
+title: CI Gates Reference
+domain: docs-governance
+kind: runbook
+status: canonical
+summary: "Mechanics, exemption rules, and operating contracts for the project's CI gates. CLAUDE.md keeps the rule (\"red gates are P0\") and the gate-name..."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/atlas/
+  - docs/APPLICATION_STATE_ATLAS.md
+  - pages/api/
+  - lib/dataverse/
+---
+
 # CI Gates Reference
 
 Mechanics, exemption rules, and operating contracts for the project's CI gates. CLAUDE.md keeps the rule ("red gates are P0") and the gate-name list; this doc holds the per-gate detail.
@@ -35,6 +51,16 @@ The mandatory fan-in for code-derived scalars that get denormalized across docs 
 - Exemption: same-line, fact-bound structured marker only. Example: `<!-- fact-consistency:ignore fact=app-definition-count as-of=2026-05-19 -->`. Session tags or loose words like "prior" are NOT exemptions. Multiple markers may appear on one line (one per fact id).
 - **Operating rule:** run before claiming any fact-level doc/memory fix "done." Do not emit "DONE"/"✅" markers for such work until green.
 - Bounded slice by design — only crisply derivable, drift-prone scalars. Not a complete semantic-drift solution.
+
+### `check:docs-catalog` — top-level docs inventory
+
+Requires every top-level `docs/*.md` file to carry catalog frontmatter and requires `docs/DOCS_CATALOG.md` to match the generated inventory from `npm run generate:docs-catalog`.
+
+- Required frontmatter: `title`, `domain`, `kind`, `status`, and `summary`.
+- Controlled values: `kind` must be one of the script-defined document types; `status` must be one of the script-defined lifecycle states; `domain` must be a lowercase slug.
+- Optional relationships: `related`, `supersedes`, and `superseded_by` must be lists of existing repo paths when present.
+- The `cataloged` date means the inventory metadata was generated or refreshed. It is not a claim that every factual assertion inside the doc was re-verified.
+- Scope is intentionally top-level `docs/*.md`; topic subdirectories continue to use their own gates, especially `check:agent-wiki`.
 
 ### `check:prompt-storage-mentions` — stale `wmkf_prompt_template` claims (S167) <!-- prompt-storage:ignore reason=self-referential-gate-description -->
 

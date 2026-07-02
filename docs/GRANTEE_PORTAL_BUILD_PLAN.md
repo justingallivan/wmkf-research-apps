@@ -1,3 +1,19 @@
+---
+title: "Grantee Deliverables Portal — Build Plan"
+domain: grantee-portal
+kind: plan
+status: active
+summary: "- Option A — Stateless signed JWT (no new fields). Mint a short-expiry HS256 token via the shared external-token.js primitive; verify is..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/GRANTEE_PORTAL_SPEC.md
+  - lib/services/external-token.js
+  - lib/external/rate-limit.js
+  - lib/services/cloudmersive-scan.js
+---
+
 # Grantee Deliverables Portal — Build Plan
 
 Status: **IN PROGRESS (S268; chunks 7–8 designed S269, pending Codex pre-impl review).** Implementation plan for the portal whose design is resolved in

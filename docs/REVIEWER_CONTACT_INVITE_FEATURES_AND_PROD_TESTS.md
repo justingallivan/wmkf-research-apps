@@ -1,3 +1,19 @@
+---
+title: "Reviewer Contact / Identity / Invite Hardening — Features & Prod Validation Plan"
+domain: reviewer-workbench
+kind: history
+status: active
+summary: "Date: 2026-06-08 Sessions covered: S234 (contact-enrichment anchoring) and S235 (Slices E, G, F)."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/contact-enrichment-service.js
+  - pages/api/reviewer-finder/save-candidates.js
+  - shared/components/reviewers/reviewer-search-logic.js
+  - tests/unit/reviewer-search-logic.test.js
+---
+
 # Reviewer Contact / Identity / Invite Hardening — Features & Prod Validation Plan
 
 Date: 2026-06-08

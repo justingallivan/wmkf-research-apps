@@ -1,3 +1,18 @@
+---
+title: "Workflow Chaining & Token Efficiency (Design Principle)"
+domain: prompt-executor
+kind: spec
+status: active
+summary: "Status: Design principle — extracted from Session 100 discussion of prompt storage migration."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/PROMPT_STORAGE_DESIGN.md
+  - docs/BACKEND_AUTOMATION_PLAN.md
+  - docs/GRANT_CYCLE_LIFECYCLE.md
+---
+
 # Workflow Chaining & Token Efficiency (Design Principle)
 
 **Status:** Design principle — extracted from Session 100 discussion of prompt storage migration.

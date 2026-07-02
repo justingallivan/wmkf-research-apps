@@ -1,3 +1,16 @@
+---
+title: PDF Export Architecture
+domain: architecture
+kind: history
+status: active
+summary: This document describes the PDF export system and how to add it to other apps in the suite.
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - shared/utils/pdf-export.js
+---
+
 # PDF Export Architecture
 
 This document describes the PDF export system and how to add it to other apps in the suite.

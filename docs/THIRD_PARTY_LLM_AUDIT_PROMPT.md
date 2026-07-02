@@ -1,3 +1,17 @@
+---
+title: Third-Party LLM Full-Repository Audit Prompt
+domain: security-auth
+kind: audit
+status: draft
+summary: "Use this prompt with a third-party LLM that has full repository access. The goal is to produce a verified, actionable audit report, not a..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/atlas/
+  - lib/utils/auth.js
+---
+
 # Third-Party LLM Full-Repository Audit Prompt
 
 Use this prompt with a third-party LLM that has full repository access. The goal is to produce a verified, actionable audit report, not a high-level summary.

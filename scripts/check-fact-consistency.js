@@ -151,8 +151,9 @@ function assertPatternFixtures(facts) {
 }
 
 function assertCanonicalCountsInSync(facts) {
-  const expected = renderCanonicalCountsDoc(facts);
   const fullPath = path.join(repoRoot, CANONICAL_COUNTS_REL);
+  const existingText = fs.existsSync(fullPath) ? fs.readFileSync(fullPath, 'utf8') : '';
+  const expected = renderCanonicalCountsDoc(facts, { existingText });
   if (WRITE) {
     fs.writeFileSync(fullPath, expected);
     return { regenerated: true };
@@ -160,7 +161,7 @@ function assertCanonicalCountsInSync(facts) {
   if (!fs.existsSync(fullPath)) {
     return { regenerated: false, error: `${CANONICAL_COUNTS_REL} is missing. Run \`npm run check:fact-consistency -- --write\` to generate it.` };
   }
-  const actual = fs.readFileSync(fullPath, 'utf8');
+  const actual = existingText;
   if (actual !== expected) {
     return { regenerated: false, error: `${CANONICAL_COUNTS_REL} is out of sync with the live registry. Run \`npm run check:fact-consistency -- --write\` to refresh it.` };
   }

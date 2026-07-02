@@ -1,3 +1,19 @@
+---
+title: "Prompt Storage Design (In Progress)"
+domain: prompt-executor
+kind: draft
+status: draft
+summary: "- Session 110 (2026-04-25): body of this doc rewritten in place to use the live field names. References below now match wmkf_ai_* directly; no..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/EXECUTOR_CONTRACT.md
+  - docs/BACKEND_AUTOMATION_PLAN.md
+  - docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md
+  - docs/WORKFLOW_CHAINING_DESIGN.md
+---
+
 # Prompt Storage Design (In Progress)
 
 **Status:** Design conversation started 2026-04-14 (Session 99), extended in Sessions 100–103. Session 103 (2026-04-17) shipped a **working prototype** via the Phase I Dynamics test endpoint — see "Session 103 prototype findings" below. Session 109 (2026-04-24) reconciled this design with Connor's built-out schema and produced a phased delivery plan.

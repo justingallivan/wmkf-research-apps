@@ -1,3 +1,19 @@
+---
+title: "Reviewer Finder — Prompt Decomposition & Grounded Field-Review Design"
+domain: reviewer-identity
+kind: draft
+status: draft
+summary: "Claims are labelled [VERIFIED via source], [PROPOSED], or [OPEN]."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md
+  - docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md
+  - docs/EXECUTOR_CONTRACT.md
+  - docs/PROMPT_STORAGE_DESIGN.md
+---
+
 # Reviewer Finder — Prompt Decomposition & Grounded Field-Review Design
 
 > **Status:** DESIGN, pre-implementation (2026-06-11, Session 244). For Codex

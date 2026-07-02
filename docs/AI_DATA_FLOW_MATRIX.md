@@ -1,3 +1,19 @@
+---
+title: AI Data Flow Matrix
+domain: prompt-executor
+kind: audit
+status: active
+summary: "It complements docs/API_ROUTE_SECURITY_MATRIX.md: that document answers \"who can call this route,\" while this one answers \"what the code sends or..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/API_ROUTE_SECURITY_MATRIX.md
+  - lib/utils/ai-payload-boundary.js
+  - lib/services/execute-prompt.js
+  - docs/EXECUTOR_CONTRACT.md
+---
+
 # AI Data Flow Matrix
 
 Last updated: 2026-06-11

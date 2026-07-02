@@ -1,3 +1,14 @@
+---
+title: "Email Notifications — Unified Notification Service"
+domain: email
+kind: plan
+status: draft
+summary: "System-alert emails are wired to the Dynamics email transport (DynamicsService.createAndSendEmail). When NOTIFICATION_EMAIL_FROM is set, the..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # Email Notifications — Unified Notification Service
 
 ## Current Status (as of 2026-05-23)

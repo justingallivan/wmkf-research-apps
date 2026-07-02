@@ -1,3 +1,17 @@
+---
+title: "DRAFT — UNAUTHORIZED / UNLANDED — for Codex review only (S163, 2026-05-18)"
+domain: intake-portal
+kind: draft
+status: draft
+summary: "If P1-Update later fails maker-portal validation: drain implements Option B $batch; PA recompute (Option A) is abandoned for the deactivation..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/probe-slice0-attr-collision.mjs
+  - docs/INTAKE_PORTAL_ITEM_6_MAKER_PORTAL_TESTS.md
+---
+
 # DRAFT — UNAUTHORIZED / UNLANDED — for Codex review only (S163, 2026-05-18)
 
 > **⚠️ Superseded — history only.** Canonical Item 6 / slice-0 status (is the deploy cleared? the P1-Update gate? waiver + Connor status?) lives in **`INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`**. Superseded by v5 / `INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md`; do not infer current state from this file.

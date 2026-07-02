@@ -1,3 +1,19 @@
+---
+title: "Reviewer Web-Grounded Discovery (Perplexity Track C) — Build Plan"
+domain: reviewer-identity
+kind: plan
+status: active
+summary: "- *Probe (not in the app):* scripts/probe-perplexity-reviewer-agent.mjs — one sonar-pro chat call that BOTH searches and reasons, returning..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/probe-perplexity-reviewer-agent.mjs
+  - scripts/probe-perplexity-search.mjs
+  - docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md
+  - lib/utils/safe-fetch.js
+---
+
 # Reviewer Web-Grounded Discovery (Perplexity Track C) — Build Plan
 
 > ## 🛑 OUTCOME (S230, 2026-06-06): EVALUATED → ABANDONED

@@ -1,3 +1,19 @@
+---
+title: Reviewer Contact Leads / Scout Layer Spec
+domain: reviewer-workbench
+kind: spec
+status: active
+summary: "Drafted: 2026-06-18 Scope: Reviewer Finder contact recall and staff workflow. This is a product/architecture spec, not an implementation record."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/discovery-service.js
+  - shared/config/prompts/reviewer-finder.js
+  - lib/services/contact-enrichment-service.js
+  - pages/api/reviewer-finder/save-candidates.js
+---
+
 # Reviewer Contact Leads / Scout Layer Spec
 
 Status: **PROPOSED DRAFT for Justin + Claude review**  

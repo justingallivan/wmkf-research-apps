@@ -1,3 +1,19 @@
+---
+title: "WMKF Research Phase II — Budget Form: UI/UX & Data Spec"
+domain: intake-portal
+kind: spec
+status: active
+summary: A single dropdown at the top of the form. Its value controls which year columns are revealed throughout the rest of the form.
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN.md
+  - docs/SYSTEM_MODEL.md
+  - docs/INTAKE_PORTAL_DESIGN.md
+  - lib/services/intake-audit-service.js
+---
+
 # WMKF Research Phase II — Budget Form: UI/UX & Data Spec
 
 **Status:** v3 draft (2026-05-14, S149 — schema review w/ Connor). v2 had Other Sources as a separate `wmkf_proposalcostshare` entity; v3 **re-overturns that** — cost-share lives back in `wmkf_proposalbudgetline` via three new `wmkf_category` enum values (`WaivedIndirect`, `WaivedTuition`, `OtherCostShare`). Driver: human-legibility schema principle (memory `feedback_human_legibility_schema_principle`) — non-technical staff browse Dataverse, fewer obscure tables wins, accept the forever-filter cost on aggregate queries. v3 also (a) replaces the proposed `wmkf_totalwmkfrequested` / `wmkf_projectyears` / `wmkf_totalprojectcost` fields with existing `akoya_request` (Money) / `wmkf_numberofyearsoffunding` (Picklist 1–5) / `akoya_expenses` (Money) — verified via live Dataverse probe — and (b) extends `wmkf_apprequestperson` (S139 junction, 5,561 rows) instead of creating a new `wmkf_proposalroster` entity. v2-era references to `wmkf_proposalcostshare` and `wmkf_proposalroster` in this doc are superseded; the v3 sections below are authoritative. Companion build plan: `docs/INTAKE_ADMIN_MEMBERSHIPS_BUILD_PLAN.md` (different slice — membership approval).

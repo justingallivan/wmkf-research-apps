@@ -1,3 +1,18 @@
+---
+title: "W4 Anomaly Triage — `reviewer_suggestions` PG↔DV"
+domain: dataverse
+kind: history
+status: active
+summary: "Parity script: scripts/backfill-reviewer-suggestions-parity.js Rerun timestamp: 2026-05-12T22:02:01Z (this session)."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/backfill-reviewer-suggestions-parity.js
+  - scripts/backfill-reviewer-suggestions-to-dataverse.js
+  - scripts/reconcile-reviewer-migration.js
+---
+
 # W4 Anomaly Triage — `reviewer_suggestions` PG↔DV
 
 **Day 1 deliverable. Date:** 2026-05-12.

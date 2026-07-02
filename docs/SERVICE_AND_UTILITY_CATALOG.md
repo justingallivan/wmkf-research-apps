@@ -1,3 +1,19 @@
+---
+title: "Service & Utility Catalog"
+domain: docs-governance
+kind: source-of-truth
+status: canonical
+summary: "If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your..."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/services/
+  - lib/external/
+  - lib/bill/
+  - lib/utils/
+---
+
 # Service & Utility Catalog
 
 One-line lookup index for files under `lib/services/`, `lib/external/`, `lib/bill/`, and `lib/utils/`. **Source-file headers are authoritative** for per-file contracts, safety posture, storage source-of-truth, and migration/drop history — this doc points there, it doesn't replace them.

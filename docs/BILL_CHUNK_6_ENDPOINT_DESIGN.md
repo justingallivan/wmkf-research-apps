@@ -1,3 +1,19 @@
+---
+title: "BILL Chunk 6 Design — `/api/bill/onboard-reviewer` Endpoint"
+domain: finance-honoraria
+kind: spec
+status: active
+summary: "Always 200 on auth+validation success. Outcome lives in the body."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md
+  - docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md
+  - lib/bill/
+  - pages/api/webhooks/bill.js
+---
+
 # BILL Chunk 6 Design — `/api/bill/onboard-reviewer` Endpoint
 
 **Status:** draft for pre-impl Codex review

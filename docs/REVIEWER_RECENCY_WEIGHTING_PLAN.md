@@ -1,3 +1,19 @@
+---
+title: "Reviewer Recency-Weighting Plan (S223, Topic #2)"
+domain: reviewer-identity
+kind: plan
+status: active
+summary: "Owner task: Topic #2 from project-reviewer-finder-next-topics. Decisions locked with Justin S223 (see..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/utils/relevance-score.js
+  - lib/services/discovery-service.js
+  - lib/services/contact-enrichment-service.js
+  - lib/services/orcid-service.js
+---
+
 # Reviewer Recency-Weighting Plan (S223, Topic #2)
 
 **Status:** SHIPPED — pieces 1–2 (ranking rebalance + recency-weighted PubMed affiliation) committed S223 (`c694bcb`); pieces 3–6 (current-affiliation pinning: ORCID always-fetch-profile, Scholar author block, identity-gated `_finalize` override, UI provenance) built + Codex-confirmed S224. Two Codex post-impl rounds (HIGH: ORCID ended-employment fallback; MEDIUM: Scholar no-metrics-table author-block loss) — both fixed and re-confirmed READY TO SHIP.

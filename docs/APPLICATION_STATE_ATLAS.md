@@ -1,3 +1,19 @@
+---
+title: Application State Atlas
+domain: dataverse
+kind: source-of-truth
+status: canonical
+summary: "Created: 2026-05-07 (S137, Phase 1 of docs/CLAUDE_REMEDIATION_PLAN.md) Probe scripts: scripts/audit-postgres-state.js,..."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/CLAUDE_REMEDIATION_PLAN.md
+  - scripts/audit-postgres-state.js
+  - scripts/audit-dataverse-state.js
+  - docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md
+---
+
 # Application State Atlas
 
 <!-- drain-table:file-purpose=atlas-state-page -->

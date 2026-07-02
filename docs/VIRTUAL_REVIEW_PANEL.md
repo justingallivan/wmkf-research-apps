@@ -1,3 +1,19 @@
+---
+title: Virtual Review Panel
+domain: prompt-executor
+kind: spec
+status: active
+summary: Thin design / operations reference for the Virtual Review Panel app. Created S191 to receive content extracted from CLAUDE.md so the table-row...
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - shared/config/appRegistry.js
+  - pages/virtual-review-panel.js
+  - lib/services/panel-review-service.js
+  - lib/services/multi-llm-service.js
+---
+
 # Virtual Review Panel
 
 Thin design / operations reference for the Virtual Review Panel app. Created S191 to receive content extracted from CLAUDE.md so the table-row trim wouldn't drop load-bearing facts (notably the access posture).

@@ -1,3 +1,19 @@
+---
+title: "Reviewer Candidate Data-Quality Fixes — Design Plan"
+domain: reviewer-workbench
+kind: spec
+status: active
+summary: "Trigger: Markus Kitzler-Zeiler surfaced as \"Prof.\" (he is not — seniorityEstimate: Mid-career) with a website pointing at a co-author's paper PDF..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/utils/contact-parser.js
+  - lib/services/serp-contact-service.js
+  - lib/services/contact-enrichment-service.js
+  - shared/components/reviewers/reviewer-search-logic.js
+---
+
 # Reviewer Candidate Data-Quality Fixes — Design Plan
 
 **Status:** IMPLEMENTED (S266). Codex design review verdict was **GO-WITH-CHANGES** (4 changes,

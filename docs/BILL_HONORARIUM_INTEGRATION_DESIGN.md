@@ -1,3 +1,19 @@
+---
+title: "Reviewer Honorarium Onboarding — Design Doc for Connor"
+domain: finance-honoraria
+kind: spec
+status: active
+summary: "Target: Ready by 2026-06-10 for the cycle whose reviewer invitations go out ≥ 2026-06-17."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md
+  - docs/BILL_integration_handoff.md
+  - "pages/external/review/[token].js"
+  - "pages/api/external/review/[token]/respond.js"
+---
+
 # Reviewer Honorarium Onboarding — Design Doc for Connor
 
 **Author:** Justin Gallivan

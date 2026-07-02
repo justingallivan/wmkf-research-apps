@@ -1,3 +1,17 @@
+---
+title: "DRAFT — UNAUTHORIZED / UNLANDED — Connor send-candidate v5 (S163, 2026-05-18)"
+domain: intake-portal
+kind: draft
+status: draft
+summary: "The CORE pre-deploy gate is now exactly: §5.4/§5.5 (flow saves) + §5.7 (gate-FALSE) + §5.8 (gate-TRUE) + §5.10 (active-subset input), on the real..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/probe-slice0-attr-collision.mjs
+  - docs/INTAKE_PORTAL_ITEM_6_MAKER_PORTAL_TESTS.md
+---
+
 # DRAFT — UNAUTHORIZED / UNLANDED — Connor send-candidate v5 (S163, 2026-05-18)
 
 > **Canonical status:** **`INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md`**. This file is retained for the full §5 procedures and the **waiver Artifact 1** (UNAUTHORIZED until Justin signs it). Current state — the P1-Update gate, waiver status, Connor status — is tracked in STATUS, not here. The condensed handout actually sent to Connor is `INTAKE_PORTAL_ITEM_6_CONNOR_CORE_GATE.md`.

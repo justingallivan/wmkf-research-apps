@@ -1,3 +1,19 @@
+---
+title: "PDF Input to Claude — Findings for Backend Architecture"
+domain: architecture
+kind: history
+status: active
+summary: "2. PDF prompt-caching cuts subsequent calls by 90% and is verified working. The staged 3-pass pipeline drops from $0.39 → $0.20 per proposal and..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/find-2025-phase-i.js
+  - scripts/list-all-pdfs-for-candidates.js
+  - scripts/compare-phase-i-v1-v2.js
+  - scripts/test-files-api.js
+---
+
 # PDF Input to Claude — Findings for Backend Architecture
 
 **Audience:** Connor (backend / PowerAutomate work)

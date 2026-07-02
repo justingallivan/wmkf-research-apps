@@ -1,3 +1,19 @@
+---
+title: "Chunk 6 Design — Orphan-sweep cron + submit-side A1 guard"
+domain: intake-portal
+kind: spec
+status: active
+summary: "Final chunk of the S184 build. Two pieces, paired in a single commit because the contract amendments are intertwined."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - pages/api/intake/submit.js
+  - pages/api/cron/maintenance.js
+  - lib/services/maintenance-service.js
+  - tests/unit/intake-pending-sweep.test.js
+---
+
 # Chunk 6 Design — Orphan-sweep cron + submit-side A1 guard
 
 Final chunk of the S184 build. Two pieces, paired in a single commit

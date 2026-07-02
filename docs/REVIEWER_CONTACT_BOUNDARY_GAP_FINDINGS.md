@@ -1,3 +1,19 @@
+---
+title: "Reviewer ↔ CRM-Contact Boundary Gap — Findings & Design Stub"
+domain: reviewer-workbench
+kind: audit
+status: historical
+summary: "These are all targeted flows, not a general sync of reviewer-corrected name/email/affiliation back to CRM contact."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_MERGE_DESIGN.md
+  - pages/api/reviewer-finder/save-candidates.js
+  - pages/api/reviewer-finder/discover.js
+  - lib/services/deduplication-service.js
+---
+
 # Reviewer ↔ CRM-Contact Boundary Gap — Findings & Design Stub
 
 Status: **FINDINGS / DESIGN STUB. One increment SHIPPED (2026-06-26): the

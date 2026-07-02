@@ -1,3 +1,19 @@
+---
+title: "Reviewer Finder — Canonical Design Doc"
+domain: reviewer-identity
+kind: source-of-truth
+status: canonical
+summary: "- Part B — Field Primer + Prompt Decomposition (was REVIEWER_FINDER_PROMPT_DECOMPOSITION_DESIGN.md): the async-precomputed field primer and its..."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md
+  - pages/api/reviewer-finder/analyze.js
+  - pages/api/reviewer-finder/discover.js
+  - shared/config/prompts/reviewer-finder.js
+---
+
 # Reviewer Finder — Canonical Design Doc
 
 > **STATUS BANNER (S248): Track B is ARCHIVED OFF.** `DiscoveryService.TRACK_B_ENABLED=false`

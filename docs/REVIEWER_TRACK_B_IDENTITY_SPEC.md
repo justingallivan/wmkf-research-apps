@@ -1,3 +1,18 @@
+---
+title: "Reviewer Finder — Track-B Identity Discipline (work→author resolution + enrichment anchoring) — SPEC (Fix C)"
+domain: reviewer-identity
+kind: spec
+status: active
+summary: "Original status: PROPOSED. Builds on the shipped S232 ORCID spine (Track A), the S233 honorific + topic-threshold fixes (Fixes 1/2), and the S233..."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
+  - docs/REVIEWER_FINDER.md
+  - lib/services/reviewer-work-author-resolver.js
+---
+
 # Reviewer Finder — Track-B Identity Discipline (work→author resolution + enrichment anchoring) — SPEC (Fix C)
 
 Status (updated S253, 2026-06-13): **PARTIALLY OVERTAKEN — read as historical.** The

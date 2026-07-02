@@ -1,3 +1,19 @@
+---
+title: "Codex review prompt — pre-commit self-review hook strategy + implementation"
+domain: agent-harness
+kind: draft
+status: draft
+summary: "✅ COMPLETED (S259, 2026-06-15). This review was run, relayed verbatim, and acted on."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/agent-wiki/topics/security-auth.md
+  - pages/api/workbench/resolve-request.js
+  - pages/api
+  - lib/db/
+---
+
 # Codex review prompt — pre-commit self-review hook strategy + implementation
 
 > **✅ COMPLETED (S259, 2026-06-15).** This review was run, relayed verbatim, and acted on.

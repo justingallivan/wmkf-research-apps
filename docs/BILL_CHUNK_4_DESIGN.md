@@ -1,3 +1,19 @@
+---
+title: "BILL Chunk 4 Design — respond.js accept-path extension + amount-as-setting + Full-real-fix hardening"
+domain: finance-honoraria
+kind: spec
+status: active
+summary: "This chunk has three threads, decided with the user S199:."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md
+  - docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md
+  - docs/REVIEWER_BILL_HARDENING_FINDINGS.md
+  - lib/bill/
+---
+
 # BILL Chunk 4 Design — respond.js accept-path extension + amount-as-setting + Full-real-fix hardening
 
 **Status:** draft for pre-impl Codex review (S199, 2026-05-29)

@@ -1,3 +1,17 @@
+---
+title: Reviewer Engagement Plan Interpretation
+domain: reviewer-workbench
+kind: decision
+status: active
+summary: "⚠️ SUPERSEDED (S277) — historical pre-implementation snapshot. Do not treat node labels as current state."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_ENGAGEMENT_SPEC.md
+  - pages/api/cron/
+---
+
 # Reviewer Engagement Plan Interpretation
 
 > **⚠️ SUPERSEDED (S277) — historical pre-implementation snapshot. Do not treat node labels as current state.**

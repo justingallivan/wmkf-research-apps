@@ -1,3 +1,16 @@
+---
+title: "Reviewer Materials — SharePoint Folder Convention"
+domain: reviewer-workbench
+kind: source-of-truth
+status: canonical
+summary: "Audience: Connor (PowerAutomate / file generation owner) Status: Agreed 2026-05-01. Code aligned to these names."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
+---
+
 # Reviewer Materials — SharePoint Folder Convention
 
 **Audience:** Connor (PowerAutomate / file generation owner)

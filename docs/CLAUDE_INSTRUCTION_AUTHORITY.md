@@ -1,3 +1,16 @@
+---
+title: Claude Instruction Authority Registry
+domain: agent-harness
+kind: source-of-truth
+status: canonical
+summary: Status: Active Last verified: 2026-06-05 Purpose: Identify the authoritative definition and enforcement mirror for must-follow agent instructions.
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/setup-database.js
+---
+
 # Claude Instruction Authority Registry
 
 **Status:** Active  

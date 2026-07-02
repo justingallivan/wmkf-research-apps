@@ -1,3 +1,19 @@
+---
+title: Authentication Setup Guide
+domain: security-auth
+kind: runbook
+status: active
+summary: "This guide explains how to configure Azure AD (Microsoft Entra ID) authentication to restrict app access to your organization only."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - lib/utils/auth.js
+  - "pages/api/auth/[...nextauth].js"
+  - lib/utils/auth-policy.js
+  - pages/api/auth/status.js
+---
+
 # Authentication Setup Guide
 
 This guide explains how to configure Azure AD (Microsoft Entra ID) authentication to restrict app access to your organization only.

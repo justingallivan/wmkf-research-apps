@@ -1,3 +1,14 @@
+---
+title: "Behavioral Flow Diagram (AI Pipeline)"
+domain: architecture
+kind: spec
+status: active
+summary: "This sequence diagram traces a concrete execution path (e.g., /api/process-phase-i), showing how services interact during an AI analysis task."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # Behavioral Flow Diagram (AI Pipeline)
 
 This sequence diagram traces a concrete execution path (e.g., `/api/process-phase-i`), showing how services interact during an AI analysis task.

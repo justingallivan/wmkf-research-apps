@@ -1,3 +1,19 @@
+---
+title: "Reviewer Finder — COI Chunk 2: institution COI + advisory retirement (Design / Pre-Impl)"
+domain: reviewer-identity
+kind: spec
+status: active
+summary: "Author: Claude (S240, 2026-06-10). Builds on Chunk 1 (shipped, b19b3b9)."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
+  - docs/REVIEWER_FINDER_PI_IDENTITY_WIREIN_PLAN.md
+  - lib/utils/prompt-validators.js
+  - shared/components/reviewers/ReviewerSearchSection.js
+---
+
 # Reviewer Finder — COI Chunk 2: institution COI + advisory retirement (Design / Pre-Impl)
 
 > Status (updated S254, 2026-06-13): **SHIPPED (both chunks).** Change A — institution COI = HARD

@@ -1,3 +1,14 @@
+---
+title: "Reviewer Finder — what \"Claude-suggested\" means in the provenance model"
+domain: reviewer-identity
+kind: source-of-truth
+status: canonical
+summary: "In the old model there was a binary axis: a candidate was either a *Claude suggestion* or a *database discovery*, and being Claude-suggested..."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+---
+
 # Reviewer Finder — what "Claude-suggested" means in the provenance model
 
 Status: explains the **Session 232 provenance-DTO migration** (sequencing step 1 of

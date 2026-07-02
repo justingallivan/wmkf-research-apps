@@ -1,3 +1,19 @@
+---
+title: "Intake Portal Budget/Roster Reconciliation — Canonical Status"
+domain: intake-portal
+kind: status
+status: canonical
+summary: "This is the single status entry point for intake portal budget/roster reconciliation, the slice-0 schema deploy, and the related PA recompute flow."
+canonical: true
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - scripts/probe-akoya-phaseii-status-field.js
+  - lib/services/dynamics-service.js
+  - scripts/probe-apprequestperson-role-data.js
+  - scripts/probe-slice0-attr-collision.mjs
+---
+
 # Intake Portal Budget/Roster Reconciliation — Canonical Status
 
 > **This is the single status entry point for intake portal budget/roster

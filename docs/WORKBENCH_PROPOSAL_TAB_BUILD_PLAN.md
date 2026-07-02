@@ -1,3 +1,19 @@
+---
+title: "Request Workbench — Proposal Tab + Field Primer persistence (build plan)"
+domain: architecture
+kind: plan
+status: active
+summary: "Status: spec / pre-design (S258, 2026-06-14). Input to the Codex design loop."
+canonical: false
+cataloged: 2026-07-02
+owner: product-engineering
+related:
+  - "pages/workbench/[requestId].js"
+  - lib/services/field-primer-service.js
+  - docs/atlas/dataverse-akoya-request.md
+  - docs/mockups/lifecycle-ui-mockup.html
+---
+
 # Request Workbench — Proposal Tab + Field Primer persistence (build plan)
 
 **Status:** spec / pre-design (S258, 2026-06-14). Input to the Codex design loop.
