@@ -47,7 +47,13 @@ async function patch(token, urlPath, body) {
 
   // 1. The suggestion on this request pointing at the EMPTY record.
   const sug = await get(token, `/wmkf_appreviewersuggestions?$select=wmkf_appreviewersuggestionid,wmkf_selected&$filter=_wmkf_request_value eq ${REQ_GUID} and _wmkf_potentialreviewer_value eq ${EMPTY}&$top=5`);
-  if (!sug.value?.length) { console.log('No suggestion on 1003020 points at the empty record — nothing to do (already repointed?).'); return; }
+  if (!sug.value?.length) {
+    console.log('No suggestion on 1003020 points at the empty record — repoint already done.');
+    // Allow the deactivation step to run standalone after a prior repoint.
+    if (EXECUTE && process.argv.includes('--deactivate')) { await deactivateEmpty(token); }
+    else console.log('(pass --execute --deactivate to deactivate the orphaned empty record.)');
+    return;
+  }
   if (sug.value.length > 1) { console.log(`ABORT: expected 1 suggestion, found ${sug.value.length}.`); return; }
   const suggestionId = sug.value[0].wmkf_appreviewersuggestionid;
   console.log(`Suggestion to repoint: ${suggestionId} (selected=${sug.value[0].wmkf_selected})`);
@@ -78,15 +84,19 @@ async function patch(token, urlPath, body) {
 
   // 6. Report the empty duplicate's state. Deactivation is a SEPARATE, explicitly-
   //    flagged step (--deactivate) so the default write is only the authorized repoint.
+  if (process.argv.includes('--deactivate')) await deactivateEmpty(token);
+  else console.log('(pass --deactivate to also deactivate the now-orphaned empty record.)');
+})().catch((e) => { console.error('FIX ERROR:', e.message); process.exit(1); });
+
+// Deactivate the empty duplicate iff it is genuinely orphaned (no suggestions of its
+// own, no contact link). Fail-closed: refuses if any reference remains.
+async function deactivateEmpty(token) {
   const remaining = await get(token, `/wmkf_appreviewersuggestions?$select=wmkf_appreviewersuggestionid&$filter=_wmkf_potentialreviewer_value eq ${EMPTY}&$top=5`);
   const emptyRec = await get(token, `/wmkf_potentialreviewerses(${EMPTY})?$select=_wmkf_contact_value,statecode`);
   const orphaned = (remaining.value?.length || 0) === 0 && !emptyRec._wmkf_contact_value;
   console.log(`Empty duplicate ${EMPTY}: remaining suggestions=${remaining.value?.length || 0}, contactLinked=${!!emptyRec._wmkf_contact_value}, statecode=${emptyRec.statecode}.`);
-  if (process.argv.includes('--deactivate')) {
-    if (!orphaned) { console.log('Not deactivating: record still has references.'); return; }
-    const de = await patch(token, `/wmkf_potentialreviewerses(${EMPTY})`, { statecode: 1, statuscode: 2 });
-    console.log(de.ok ? `Deactivated empty duplicate ${EMPTY}.` : `Deactivate failed (${de.status}): ${JSON.stringify(de.body).slice(0, 200)}`);
-  } else if (orphaned) {
-    console.log('Empty duplicate is now orphaned (no suggestions, no contact link) — re-run with --deactivate to deactivate it.');
-  }
-})().catch((e) => { console.error('FIX ERROR:', e.message); process.exit(1); });
+  if (Number(emptyRec.statecode) === 1) { console.log('Already inactive — nothing to do.'); return; }
+  if (!orphaned) { console.log('ABORT deactivate: record still has references.'); return; }
+  const de = await patch(token, `/wmkf_potentialreviewerses(${EMPTY})`, { statecode: 1, statuscode: 2 });
+  console.log(de.ok ? `Deactivated empty duplicate ${EMPTY}.` : `Deactivate failed (${de.status}): ${JSON.stringify(de.body).slice(0, 200)}`);
+}
