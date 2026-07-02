@@ -3,7 +3,7 @@ title: "Honorarium Portal-Creation Strategy (no-BILL cycle)"
 domain: finance-honoraria
 kind: plan
 status: active
-summary: "No-BILL honorarium creation went LIVE in Production 2026-07-02 (BILL still deferred); self-lookup + backfill hardening done; capture-only backfill pending."
+summary: "No-BILL honorarium creation LIVE in Production 2026-07-02 (BILL deferred); self-lookup + backfill hardening done; capture-only backfill unneeded."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -223,13 +223,18 @@ than write a malformed row (do not silently omit).
   - Coverage: `tests/unit/required-address.test.js` (shared check, incl. the partial-address
     case) and `tests/unit/respond-required-address.test.js` (route re-export).
 - Reviewers who accepted while capture-only was on will **not** re-accept, so their
-  honoraria were never minted. After the config flip, mint them with
-  `scripts/backfill-honorarium-capture-only.mjs --cycle <CODE>`. The script is
-  dry-run by default, cycle-scoped, idempotent, skips rows missing required captured
-  payment-contact fields, refuses to run while `HONORARIUM_ONBOARDING_DEFERRED=true`
-  or the discriminator GUIDs are incomplete, and drives the same
-  `ensureHonorariumOnboarding()` path rather than duplicating create logic.
-  `[VERIFIED via source]`
+  honoraria were never minted. The mechanism exists —
+  `scripts/backfill-honorarium-capture-only.mjs --cycle <CODE>` (dry-run by default,
+  cycle-scoped, idempotent, skips rows missing required captured payment-contact
+  fields, refuses to run while `HONORARIUM_ONBOARDING_DEFERRED=true` or the
+  discriminator GUIDs are incomplete, drives the same `ensureHonorariumOnboarding()`
+  path). `[VERIFIED via source]` — **but running it is NOT needed.** A read-only
+  eligibility sweep 2026-07-02 found only 4 candidates in the capture-only window
+  (modified since 2026-06-22) and all were test rows (`Gallivan_test`,
+  `Gallivantingaround`, two empty no-name/no-email rows with no linked request). No
+  real reviewers accepted while capture-only was on. (25 rows are eligible across ALL
+  cycles, but those are pre-feature historical accepts the cycle-scoping deliberately
+  excludes — never run a blanket `--execute`.) `[VERIFIED via read-only sweep 2026-07-02]`
 
 ---
 

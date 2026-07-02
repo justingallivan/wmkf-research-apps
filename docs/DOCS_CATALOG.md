@@ -104,7 +104,7 @@ related:
 | [BILL_HONORARIUM_INTEGRATION_DESIGN.md](BILL_HONORARIUM_INTEGRATION_DESIGN.md) | spec | active |  | Target: Ready by 2026-06-10 for the cycle whose reviewer invitations go out ≥ 2026-06-17. | 2026-07-02 |
 | [BILL_integration_handoff.md](BILL_integration_handoff.md) | history | active |  | The project was approved after an Ops Team review meeting (May 2026). | 2026-07-02 |
 | [BILL_LIB_DESIGN.md](BILL_LIB_DESIGN.md) | spec | active |  | WebFetch of developer.bill.com (notably developer.bill.com/llms.txt) surfaced several discrepancies vs. the original BILL_integration_handoff.md:. | 2026-07-02 |
-| [HONORARIUM_PORTAL_CREATION_STRATEGY.md](HONORARIUM_PORTAL_CREATION_STRATEGY.md) | plan | active |  | No-BILL honorarium creation went LIVE in Production 2026-07-02 (BILL still deferred); self-lookup + backfill hardening done; capture-only backfill pending. | 2026-07-02 |
+| [HONORARIUM_PORTAL_CREATION_STRATEGY.md](HONORARIUM_PORTAL_CREATION_STRATEGY.md) | plan | active |  | No-BILL honorarium creation LIVE in Production 2026-07-02 (BILL deferred); self-lookup + backfill hardening done; capture-only backfill unneeded. | 2026-07-02 |
 
 ## general
 

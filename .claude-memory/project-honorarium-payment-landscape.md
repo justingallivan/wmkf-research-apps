@@ -40,8 +40,13 @@ No-BILL creation WENT LIVE in Production 2026-07-02: discriminator GUIDs set,
 `BILL_ONBOARDING_DEFERRED=true` retained, prod redeployed. The historical
 capture-only backfill hardening (required-address completeness + validity +
 `akoya_title` reload) is LANDED (S316) per
-`docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §6; the capture-only backfill run
-itself is still pending a target cycle.
+`docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` §6. The capture-only backfill run is
+NOT needed: a read-only eligibility sweep 2026-07-02 found only 4 candidates in the
+capture-only window (since 2026-06-22) and all were test rows (`Gallivan_test`,
+`Gallivantingaround`, two empty no-name/no-email rows with no linked request) — no
+real reviewers accepted while capture-only was on. (25 rows are eligible across ALL
+cycles, but those are pre-feature historical accepts the cycle-scoping deliberately
+excludes; never run a blanket `--execute`.)
 
 ## Historical GoApply-created cohort chain (all [VERIFIED via probe] unless noted)
 
