@@ -51,14 +51,14 @@ intake-to-Dataverse mapping.
 - Reviewer capture and field capture: `project-intake-portal-reviewer-capture`, `project-machine-legible-form-capture`.
 - Document-capture → Dataverse-table direction (intake is the natural producer; J27): `project-j27-doc-capture-evolution`.
 - External ID, institution match, creator privileges: `project-intake-portal-external-id-foundation`, `project-intake-portal-institution-match`, `project-dataverse-creator-privileges`.
-- Slice-0 behavior and UI TODOs: `slice0-deactivate-not-delete-recalc`, `project-intake-portal-ui-todo`.
+- Intake UI TODOs: `project-intake-portal-ui-todo`.
 - Virus scan and Cloudmersive: `project-intake-portal-virus-scan-e2e-deferred`, `project-virus-scanning-it-context`, `project-cloudmersive-advanced-endpoint`.
 - Cross-topic hard constraint: `project-no-banking-pii-in-dataverse`.
 
 ## Operating Notes
 
 - Virus-scan E2E was deferred and must run before the next cycle.
-- Slice-0 deactivates and recalculates; it does not hard-delete removed lines.
+- Budget/roster drain reconciliation deactivates obsolete child rows (`statecode`), never hard-deletes removed lines; recompute over active children only. Current pointers: `docs/INTAKE_PORTAL_ITEM_6_STATUS.md` and `lib/dataverse/schema/wave4/wmkf_proposalbudgetline.json`.
 - Pilot decisions and UI TODOs should be read before re-deciding settled questions.
 
 ## Standard Probe

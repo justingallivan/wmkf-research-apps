@@ -222,7 +222,7 @@ are most likely to be influential and stale:
 | `.claude-memory/dataverse-export-floor-scoping.md` | Large active Dataverse memory; should defer structural claims to Atlas/probes |
 | `.claude-memory/reviewer-identity-fragmentation.md` | Large active reviewer identity memory; likely overlaps wiki and current source |
 | `.claude-memory/project-dynamics-ai-writeback.md` | Large active Dynamics writeback memory; high risk if stale |
-| `.claude-memory/slice0-deactivate-not-delete-recalc.md` | Old slice memory; likely historical unless still load-bearing |
+| `.claude-memory/slice0-deactivate-not-delete-recalc.md` | Demoted 2026-07-02; live invariant moved to intake wiki + schema comments |
 
 For each file, choose exactly one:
 

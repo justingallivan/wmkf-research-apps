@@ -39,6 +39,7 @@ These items are **done, closed, or point-in-time** and no longer earn a slot in 
 - **Slice-0 role probe — VERIFIED S179** — `probe-apprequestperson-role-data.js` + `extend-apprequestperson-role-picklist.mjs` (idempotent); data clear, picklist already expanded in prod. [[project-slice0-role-probe]].
 - **Slice-0 scope = 4 items not 3** — carryover dropped `wmkf_portal_membership`; trust the 2026-05-14 SCHEMA_CHANGES catalog, wave dir = wave4. [[project-slice0-scope]].
 - **Slice-0 timeline posture** — 2026-05-19/05-15 dates are SOFT with slack; report gating factually, no "overdue/at-risk" urgency. [[project-slice0-timeline-posture]].
+- **Slice-0 Item 6 deactivate-not-delete rationale** — historical record for the parent/child rollup decision; current invariant now lives in the intake wiki + schema comments. [[slice0-deactivate-not-delete-recalc]].
 - **D26 reviewer-inputs probe (S209)** — 35 D26 reqs: 0 existing candidates (Manage tabs empty), 5/5 legacy slots (~175 recs), excluded text mostly N/A. Was Phase-3 ground truth; Phase 3 (Find tab) has since shipped. [[project-d26-reviewer-inputs-probe]].
 
-The durable slice-0 invariant (deactivate-not-delete roster rollup) stays in the live index — [[slice0-deactivate-not-delete-recalc]].
+The durable slice-0 invariant (deactivate-not-delete roster rollup) now lives in `docs/agent-wiki/topics/intake-portal.md` and `lib/dataverse/schema/wave4/wmkf_proposalbudgetline.json`; the memory entry above is historical.
