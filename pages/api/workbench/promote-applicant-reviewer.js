@@ -18,6 +18,7 @@ import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/poten
 import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
 import { translateDuplicateKeyError } from '../../../lib/dataverse/duplicate-key';
 import { findCandidateBySuggestion } from '../../../lib/services/reviewer-roster-store';
+import { pickVettedEmail } from '../../../lib/utils/reviewer-vetted-email';
 
 // Persist the PD's hand-corrections (the ONLY fields the client marked manual) to
 // the suggestion's OWN person record, then report what landed. Mirrors the
@@ -102,17 +103,11 @@ async function backfillEnrichedEmail(requestId, suggestionId, personId, { acting
   }
   if (!candidate) return { savedField: false, contactError: null };
 
-  const enr = candidate.contactEnrichment || {};
-  const email = (typeof candidate.email === 'string' && candidate.email.trim())
-    || (typeof enr.email === 'string' && enr.email.trim()) || '';
-  const persistOk = candidate.emailPersistAllowed === true || enr.emailPersistAllowed === true;
-  // Mirror save-candidates' identity block: an unresolved / needs-review row never
-  // persists contact (it could be a namesake). enrichment also drives persistOk=false
-  // here, but gate explicitly too — belt and suspenders on the safety invariant.
-  const identityUnresolved = candidate.needsIdentification === true
-    || candidate.identityStatus === 'unresolved'
-    || candidate.verificationStatus === 'unresolved';
-  if (!email || !persistOk || identityUnresolved) return { savedField: false, contactError: null };
+  // Shared persist gate (mirrors save-candidates): vetted, persistable, resolved
+  // identity. Null → not persistable, skip.
+  const vetted = pickVettedEmail(candidate);
+  if (!vetted) return { savedField: false, contactError: null };
+  const { email, source } = vetted;
 
   // Idempotency: only write when the person currently has NO email — never clobber a
   // manual correction (already handled above) or a pre-existing address.
@@ -125,8 +120,6 @@ async function backfillEnrichedEmail(requestId, suggestionId, personId, { acting
   }
   if (current && current.wmkf_emailaddress) return { savedField: false, contactError: null };
 
-  const source = (typeof candidate.emailSource === 'string' && candidate.emailSource)
-    || (typeof enr.emailSource === 'string' && enr.emailSource) || null;
   try {
     await potentialReviewerAdapter.update(personId, { email }, { actingUserSystemId });
     if (source) await researcherAdapter.updateById(personId, { emailSource: source }, { actingUserSystemId });

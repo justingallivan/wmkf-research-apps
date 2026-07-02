@@ -245,7 +245,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [REVIEWER_EMAIL_PERSIST_FIX_PLAN.md](REVIEWER_EMAIL_PERSIST_FIX_PLAN.md) | plan | active |  | Reviewer Invite-tab no-email fix: B1 (applicant-promote persists vetted email) SHIPPED; A (reconciliation backstop) DESIGNED; B2 (partial-return) DEFERRED. | 2026-07-02 |
+| [REVIEWER_EMAIL_PERSIST_FIX_PLAN.md](REVIEWER_EMAIL_PERSIST_FIX_PLAN.md) | plan | active |  | Reviewer Invite-tab no-email fix: B1 (applicant-promote persists vetted email) + A (reconciliation cron backstop) SHIPPED; B2 (partial-return) DEFERRED. | 2026-07-02 |
 
 ## security-auth
 

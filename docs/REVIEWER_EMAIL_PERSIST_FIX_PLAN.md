@@ -3,7 +3,7 @@ title: "Reviewer Email-Persist Fix Plan (S317)"
 domain: reviewers
 kind: plan
 status: active
-summary: "Reviewer Invite-tab no-email fix: B1 (applicant-promote persists vetted email) SHIPPED; A (reconciliation backstop) DESIGNED; B2 (partial-return) DEFERRED."
+summary: "Reviewer Invite-tab no-email fix: B1 (applicant-promote persists vetted email) + A (reconciliation cron backstop) SHIPPED; B2 (partial-return) DEFERRED."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -74,29 +74,33 @@ name, NOT client-supplied) and persists the email through the same gates
 Tests: `tests/unit/promote-applicant-reviewer-contact.test.js` (B1 describe). Matrix
 updated + `check:api-routes` green.
 
-## A — Backstop reconciliation — DESIGNED
+## A — Backstop reconciliation — SHIPPED
 
-A cron/admin sweep that automates this session's manual recovery for BOTH paths.
-Codex-named changes vs the first draft:
+Cron `/api/cron/reviewer-email-reconcile` (`verifyCronSecret`) →
+`lib/services/reviewer-email-reconciler.js` automates this session's manual recovery
+for BOTH paths, path-agnostic off the roster blob + linked suggestion. All
+Codex-named changes folded in:
 
-- **Data source:** `listForRequest` returns only active/excluded/allNames, NOT the
-  saved candidate blobs [VERIFIED via lib/services/reviewer-roster-store.js:186-203];
-  A needs a NEW store query over `status='saved'` (and active), returning the blob.
-- **Anchor:** match roster→suggestion on `candidate.suggestionId` (id anchor), never
-  the normalized name (folds Hamit/Harmit) [VERIFIED via reviewer-name-match.js
-  normalizer]. For rows without a `suggestionId`, skip or alert — never guess.
-- **Repoint guard:** `(person, request)` uniqueness is load-bearing; the guard must
-  reject a keeper that has ANY suggestion on the request, selected or not
-  [VERIFIED via lib/dataverse/adapters/reviewer-suggestion.js:242 —
-  findByPotentialReviewerAndRequest has no selected filter].
-- **Idempotency:** re-read Dataverse live before writing (the roster lags in both
-  directions — Silva was roster-empty/Dataverse-had-it).
-- **Actions:** ownerless email → write; single sibling owner + no colliding
-  suggestion → repoint; else → alert for manual merge.
+- **Data source:** `reviewer-roster-store.findReconcilableCandidates(limit)` — a NEW
+  query over `status IN ('active','saved')` with a `suggestionId` + persistable-email
+  DB pre-filter (`listForRequest` returns no saved blobs). The vetted gate
+  (`pickVettedEmail`, shared with B1) is authoritative.
+- **Anchor:** id-anchored on `candidate.suggestionId`; rows without it are excluded by
+  the query — never a normalized-name match.
+- **Repoint guard:** `findByPotentialReviewerAndRequest(keeperId, requestId)` rejects a
+  keeper with ANY suggestion on the request (selected or not) → ALERT instead.
+- **Idempotency:** every mutation is gated by LIVE Dataverse reads — `getById`
+  (email-empty) and `findByEmailCandidates` (ownership) — never the roster blob.
+- **Actions:** ownerless → `update` + vetted `emailSource`; single ACTIVE keeper +
+  no collision → `repointToPotentialReviewer`; ambiguous / inactive / colliding →
+  `NotificationService` alert (`reviewer_email_reconcile_needs_merge`).
+- **Safety:** best-effort per row (a row error is recorded, non-fatal); `?dryRun=1`
+  mutates nothing; `?maxBatch=N` (default 200) bounds the scan.
 
-Ships as a registered, gated route (`check:api-routes`). The one-off session scripts
-(`scripts/fix-roster-email-recovery.mjs`, `scripts/fix-walsh-repoint-1003020.mjs`)
-are the proven procedure to port.
+Tests: `tests/unit/reviewer-email-reconciler.test.js` (11 cases). Ports the proven
+one-off scripts (`scripts/fix-roster-email-recovery.mjs`,
+`scripts/fix-walsh-repoint-1003020.mjs`). Matrix + `check:api-routes` +
+`CANONICAL_COUNTS` (api-route-file-count 137→138) refreshed.
 
 ## B2 — Timeout partial-return + save-gate — DEFERRED
 
