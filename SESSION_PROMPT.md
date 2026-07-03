@@ -33,8 +33,9 @@ session can resume. All work committed and pushed to `main`.
    PD paste externally-referred names guaranteed into results, tagged via the existing
    `referred` kind (label "Externally-Referred") vs the existing applicant lane
    ("Applicant-Referred"); folded-in layout; seed-only. Plan + verbatim Codex review live in
-   `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md`. **Build never ran** — Codex's sandbox
-   couldn't write the worktree (writable_roots blocker).
+   `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md`. **Build ran later** (Codex, on
+   `codex/referral-seeding-build`); as of S320 it is BUILT + pushed to origin but NOT merged
+   to `main` and has an OPEN pre-merge fix — see Parked item 1 below.
 
 5. **Analyze-prompt metadata-redundancy issue documented.** The analyze PART 1 re-extracts
    title/PI/co-PIs/institution/program/abstract that `akoya_request` already owns — historical
@@ -62,12 +63,15 @@ session can resume. All work committed and pushed to `main`.
 
 ### Parked (each its own future session)
 
-1. **Referral-seeding build.** Plan LOCKED + Codex-reviewed; build NOT started.
-   Evidence: `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md` §"Build status & how to resume".
-   Blocker: Codex `~/.codex/config.toml` `writable_roots` lacks `../WMKF_Apps-codex`.
-   Resume paths (pick one): add the worktree to `writable_roots` + re-run Codex; or Claude
-   builds in the worktree + Codex reviews; or build in the main checkout. Do NOT re-run the
-   Codex plan review — it's preserved verbatim in the doc appendix.
+1. **Referral-seeding build — BUILT, not merged, has an OPEN pre-merge fix (updated S320).**
+   The build now EXISTS on `origin/codex/referral-seeding-build` (pushed S320; was previously
+   local-only). Tests pass (108). NOT merged to `main`, so NOT live in production yet.
+   **Before merging, close the pre-merge blocker:** a seed⇄discovery name collision resolves
+   by relevance score, not provenance, so a referred person can lose the Externally-Referred
+   badge/referrer if the discovery copy outranks the seed (no duplicate row/save — client
+   `dedupeByName` collapses them; labeling defect, not data corruption).
+   Evidence + scoped fix + acceptance criteria: `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md`
+   §"⚠️ PRE-MERGE FIX REQUIRED". Do NOT re-run the Codex plan review — preserved in the appendix.
 
 2. **Analyze-prompt / program-area real fix.** The deployed clamp is a band-aid.
    Evidence: `docs/REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md`.
