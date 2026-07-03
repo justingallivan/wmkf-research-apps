@@ -51,6 +51,7 @@
 - Proposal docs / phasing / Phase I-II: project-j27-doc-capture-evolution.md; project-grant-phasing-evolution.md; project-phaseistatus-decision-lifecycle.md
 - Grantee and email templates: project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md
 - Deferred cleanup / dead-code session: project-deferred-code-cleanup.md
+- Parked: spec-audit design-docs recovery (work computer, ~2026-07-08): project-spec-audit-docs-recovery-parked.md
 
 ## Archive
 - Closed & shipped work index: project-closed-work-archive.md

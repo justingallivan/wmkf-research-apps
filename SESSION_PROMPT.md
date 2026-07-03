@@ -61,20 +61,23 @@ scheduled** — deploy + schedule are open decisions for §Owner Decision.
 
 ### Owner Decision Needed
 
-1. **Deploy the reviewer-email fixes.** `main` auto-deploys on push. Pushing these 8
-   commits makes B1 (promote persists enriched email), the Tier-0 rescue, the munge
-   guards, and the A cron route go LIVE. All tested; A's cron is inert until scheduled.
-   Evidence: commits above; live dry-run shows the reconciler would write 0 (safe).
-   Decision: push now, or hold.
+1. **Deploy the reviewer-email fixes — DONE (S318).** The 8 S317 commits are on
+   `origin/main` (auto-deployed); B1, the Tier-0 rescue, and the munge guards are LIVE.
 
-2. **Schedule the reconciler cron.** `/api/cron/reviewer-email-reconcile` is
-   admin-triggerable via `CRON_SECRET` only — no schedule entry. Decide whether to add a
-   daily/weekly schedule. Evidence: `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md` §A.
+2. **Schedule the reconciler cron — DONE (S318).** Added
+   `/api/cron/reviewer-email-reconcile` at `0 4 * * *` (daily, 4am UTC) to `vercel.json`;
+   committed `7212a5e2` and pushed to `main` (schedule deploys on push). Live dry-run
+   showed 0 would-write, so the daily sweep is safe/self-limiting.
 
-3. **Merge the Codex `codex/spec-audit` docs branch.** Two design docs
-   (`REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md`, `REVIEWER_QUOTA_PD_EMAIL_PLAN.md`) +
-   catalog, committed on `codex/spec-audit` (`370f3867`) in `../WMKF_Apps-codex`.
-   Docs-only, low-risk; review + `git merge --no-ff codex/spec-audit` when ready.
+3. **Merge the Codex `codex/spec-audit` docs branch — PARKED, branch is not on this
+   machine.** Two design docs (`REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md`,
+   `REVIEWER_QUOTA_PD_EMAIL_PLAN.md`) + catalog. S318 verified the branch, commit
+   `370f3867`, and both docs are absent from this checkout (refs, `reflog --all`,
+   `ls-remote origin`, all `fsck` dangling commits) — the work was committed on the
+   user's **work computer** and never pushed. User is gated from that machine until
+   ~2026-07-08. Recovery + do-not-reconstruct instructions:
+   `.claude-memory/project-spec-audit-docs-recovery-parked.md`. Do NOT re-run the
+   local/origin search before the branch is pushed.
 
 ### Verified Open
 
