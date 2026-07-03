@@ -496,6 +496,7 @@ export default function ReviewerSearchSection({
   const noSourcesSelected = !Object.values(searchSources).some(Boolean);
   const [reviewerCount, setReviewerCount] = useState(DEFAULT_REVIEWER_COUNT); // how many candidates Claude is asked to suggest (recall lever; see reviewerFinderPreferences)
   const [additionalNotes, setAdditionalNotes] = useState(''); // optional extra instructions for Claude
+  const [sortMode, setSortMode] = useState('relevance'); // 'relevance' (confidence rank, default) | 'alpha' (by name, within each provenance group)
   const [exporting, setExporting] = useState(false); // Excel export in flight
   const [exportError, setExportError] = useState(null); // export-specific error (own surface; does not disturb search `error`/`phase`)
   const exportingRef = useRef(false);
@@ -1235,26 +1236,34 @@ export default function ReviewerSearchSection({
   // The two selectable sections are VIEWS over displayCandidates; selection is
   // keyed by candKey(c) (stable normalized name), so a roster splice can't
   // corrupt it (S224 — replaces the former flat-index invariant).
+  // Default order is confidence/relevance rank (server-ranked, preserved). The
+  // alpha toggle re-sorts WITHIN each provenance group by display name so the
+  // grouping (cited vs literature vs applicant) — which carries meaning — stays
+  // intact while a specific name is easy to find. Non-mutating (copy before sort).
+  const sortForDisplay = (items) =>
+    sortMode === 'alpha'
+      ? [...items].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }))
+      : items;
   const provenanceSections = [
     {
       key: 'cited_or_proposal_named',
       title: 'Cited / proposal-named',
-      items: displayCandidates.filter((c) => provenanceGroupOf(c) === 'cited_or_proposal_named'),
+      items: sortForDisplay(displayCandidates.filter((c) => provenanceGroupOf(c) === 'cited_or_proposal_named')),
     },
     {
       key: 'literature_retrieved',
       title: 'Literature-retrieved',
-      items: displayCandidates.filter((c) => provenanceGroupOf(c) === 'literature_retrieved'),
+      items: sortForDisplay(displayCandidates.filter((c) => provenanceGroupOf(c) === 'literature_retrieved')),
     },
     {
       key: 'applicant_suggested',
       title: 'Applicant-suggested',
-      items: displayCandidates.filter((c) => provenanceGroupOf(c) === 'applicant_suggested'),
+      items: sortForDisplay(displayCandidates.filter((c) => provenanceGroupOf(c) === 'applicant_suggested')),
     },
     {
       key: 'needs_identity_review',
       title: 'Needs identity review',
-      items: displayCandidates.filter((c) => provenanceGroupOf(c) === 'needs_identity_review'),
+      items: sortForDisplay(displayCandidates.filter((c) => provenanceGroupOf(c) === 'needs_identity_review')),
     },
   ].filter((section) => section.items.length > 0);
 
@@ -1432,9 +1441,31 @@ export default function ReviewerSearchSection({
                           {displayCandidates.length} candidate{displayCandidates.length === 1 ? '' : 's'} for this request
                           {selected.size > 0 && <> · {selected.size} selected</>}
                         </p>
-                        <button type="button" onClick={toggleAll} className="text-xs text-blue-600 underline">
-                          {allSelected ? 'Clear all' : 'Select all'}
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex items-center rounded border border-gray-200 overflow-hidden text-xs" role="group" aria-label="Sort order">
+                            <button
+                              type="button"
+                              onClick={() => setSortMode('relevance')}
+                              aria-pressed={sortMode === 'relevance'}
+                              className={`px-2 py-0.5 ${sortMode === 'relevance' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                              title="Order by confidence / relevance rank (default)"
+                            >
+                              Rank
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSortMode('alpha')}
+                              aria-pressed={sortMode === 'alpha'}
+                              className={`px-2 py-0.5 border-l border-gray-200 ${sortMode === 'alpha' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                              title="Order alphabetically by name within each group"
+                            >
+                              A–Z
+                            </button>
+                          </span>
+                          <button type="button" onClick={toggleAll} className="text-xs text-blue-600 underline">
+                            {allSelected ? 'Clear all' : 'Select all'}
+                          </button>
+                        </div>
                       </div>
                       <div className="max-h-[32rem] overflow-y-auto space-y-4 pr-1">
                         {provenanceSections.map((section) => {
