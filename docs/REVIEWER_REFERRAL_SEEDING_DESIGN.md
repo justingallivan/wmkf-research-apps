@@ -3,7 +3,7 @@ title: "Reviewer Referral Seeding & Provenance Design"
 domain: reviewers
 kind: plan
 status: draft
-summary: "Guarantee consultant-referred names into the reviewer pool via a code-owned seed path; tag them 'Referral' (reuse existing referred provenance kind)."
+summary: "Guarantee externally-referred names into the reviewer pool via a code-owned seed path; two labels (Externally-Referred / Applicant-Referred) on existing kinds."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -22,12 +22,18 @@ related:
 report on req 1002926 (see "Origin" below). Decide the remaining open questions
 before implementing.
 
-**Resolved decision (S318):** the tag is **"Referral"**, implemented by **reusing the
-existing `referred` provenance kind** — NOT a new `pd_preferred` kind. A consultant/
-colleague recommending a name is a referral; the `referred` kind is already grounded,
-never-dropped, and ranking-bonused. The referrer's name (e.g. "Doug N") rides along as
-detail via the existing `referredBy`. This drops the provenance-enum change entirely
-(no `status-enum-parity` churn). Sections below reflect this.
+**Resolved decision (S318):** distinguish **two** referral lanes, each on an
+**existing** provenance kind — NO new enum:
+- **Externally-Referred** = the `referred` kind — names from consultants/colleagues (and
+  contacted-reviewer referrals). This is what the new seed field feeds. Already grounded,
+  never-dropped, ranking-bonused; the referrer ("Doug N") rides along via `referredBy`.
+- **Applicant-Referred** = the existing `applicant_suggested` kind — names the *applicant*
+  put forward in their proposal. Already has its own pipeline (enrich-recommended,
+  promote-applicant-reviewer) and, deliberately, is **not auto-selected** (defaults to
+  needing PD promotion) — the right posture for a possibly-biased applicant pick.
+
+The change is purely a **display relabel** of both kinds (see §A) plus the seed field;
+the applicant lane already exists end-to-end. No `status-enum-parity` churn.
 
 ## Origin (the report)
 
@@ -63,34 +69,42 @@ subject to discovery economics at all.
 
 ## Design principle
 
-Separate **discovery** (find unknown reviewers) from **known-name entry** (the PD
-already has these people, referred by consultants/colleagues). Referred names enter
-through a dedicated, code-owned seed path that:
+Separate **discovery** (find unknown reviewers) from **known-name entry** (names the PD
+already has, referred by consultants/colleagues). Externally-referred names enter through
+a dedicated, code-owned seed path that:
 - **always surfaces them** (own results group, never crowded out),
 - **enriches/verifies for contact but never silently drops** (consistent with the
   established recall-over-precision posture: "surface, don't silently drop"),
-- **tags provenance `referred`** (display label **"Referral"**) so they are labeled,
-  ranked with the grounded bonus, and persisted with that origin.
+- **tags provenance** so they are labeled (**"Externally-Referred"** for the seed lane;
+  the parallel **"Applicant-Referred"** lane is the pre-existing `applicant_suggested`
+  kind), ranked appropriately, and persisted with that origin.
 
 ## Proposed changes (seams)
 
-### A. Reuse the existing `referred` provenance kind (no new enum)
-`lib/utils/reviewer-provenance.js` already has everything needed — no enum change:
-- `PROVENANCE_KINDS.REFERRED` exists, is in `GROUNDED_RANKING_BONUS_KINDS` (ranks above
-  literature-retrieved), and has the `REFERRED_BY` seed role.
-- **Only change:** relabel the display in `provenanceLabelForCandidate` from
-  `Referred by ${referredBy}` / `Referred` to **`Referral · ${referredBy}`** / `Referral`.
-  This relabels **all** referred rows (contacted-reviewer referrals too) — an
-  intentional, consistent umbrella. Treated as **selectable-with-verify** and
-  **never auto-excluded** (already true for `referred`).
+### A. Relabel two existing provenance kinds (no new enum)
+`lib/utils/reviewer-provenance.js` already has both kinds — no enum change:
+- `REFERRED` — in `GROUNDED_RANKING_BONUS_KINDS`, `REFERRED_BY` seed role; the **seed
+  lane** (consultants/colleagues + contacted-reviewer referrals).
+- `APPLICANT_SUGGESTED` — own group, deliberately **NOT** in the grounded-bonus set and
+  **not auto-selected** (defaults to needing PD promotion) [VERIFIED via
+  reviewer-provenance.js:34-38 (bonus set) + ReviewerSearchSection.js:1012 +
+  isApplicantOriginCandidate]; the **applicant lane**.
+- **Only change: relabel the display** in `provenanceLabelForCandidate`:
+  - `REFERRED`: `Referred by ${referredBy}` / `Referred` → **`Externally-Referred ·
+    ${referredBy}`** / `Externally-Referred`. Relabels all referred rows (contacted-reviewer
+    referrals too) — intentional umbrella.
+  - `APPLICANT_SUGGESTED`: `Applicant-suggested` → **`Applicant-Referred`**.
+  No behavior change beyond the label; both kinds keep their existing selection/ranking.
 
 ### B. Structured input (distinct from freeform notes)
 `shared/components/reviewers/ReviewerSearchSection.js`:
-- New "Reviewers referred to you" textarea, **separate** from `additionalNotes`
-  (keep notes for actual instructions). One entry per line, tolerant format:
+- New "Externally-referred reviewers" textarea (consultants/colleagues — **not** the
+  applicant), **separate** from `additionalNotes` (keep notes for actual instructions).
+  One entry per line, tolerant format:
   `Name <tab/comma> optional email <tab/comma> optional affiliation/URL`.
 - Parse to `referredSeeds: [{ name, email?, affiliation?, url?, referredBy? }]`; POST to
-  the find flow alongside `additionalNotes`.
+  the find flow alongside `additionalNotes`. (Applicant picks need no input here — they
+  arrive through the existing applicant-suggested pipeline.)
 
 ### C. Guaranteed seed injection (the code guarantee)
 `pages/api/reviewer-finder/analyze.js` + `discover.js`:
@@ -98,21 +112,23 @@ through a dedicated, code-owned seed path that:
   (`seedRole: 'referred_by'`) **before** the count-capped merge, so it is never
   crowded out.
 - Run the normal contact/identity **enrichment** on seeds, but **surface-don't-drop**:
-  a seed that can't be confidently resolved routes to a "Referral — confirm identity"
-  affordance (reuse the existing `needs_identity_review` confirm flow), it is *not*
-  discarded.
+  a seed that can't be confidently resolved routes to an "Externally-Referred — confirm
+  identity" affordance (reuse the existing `needs_identity_review` confirm flow), it is
+  *not* discarded.
 - Optionally still pass the names to Claude's analyze as trusted context so it can add
   *related* peers — but the guarantee comes from the seed path, not the prompt.
 
 ### D. Display + persistence (mostly already exists)
-- `provenanceGroupOf` currently routes `referred` into the **`cited_or_proposal_named`**
-  group [VERIFIED via lib/utils/reviewer-provenance.js: REFERRED is identity-review-exempt
-  → returns `cited_or_proposal_named`]. To give referrals their **own "Referrals" section**
-  at the top (so the PD sees their list distinctly), split them out in the
-  `provenanceSections` array in `ReviewerSearchSection.js` (a small change; mirrors the
-  section work already shipped for the sort toggle). If a separate section isn't wanted,
-  they already appear in the top "Cited / proposal-named" section with the "Referral" badge.
-- Persistence needs **no new mapping**: `save-candidates.js` writes the source list via
+- **Externally-Referred section:** `provenanceGroupOf` currently routes `referred` into
+  the **`cited_or_proposal_named`** group [VERIFIED via reviewer-provenance.js: REFERRED
+  is identity-review-exempt → returns `cited_or_proposal_named`]. To give it its **own
+  "Externally-Referred" section** at the top, split it out in the `provenanceSections`
+  array in `ReviewerSearchSection.js` (small change; mirrors the sort-toggle section work).
+- **Applicant-Referred section already exists:** `provenanceGroupOf` routes
+  `applicant_suggested` to its own `applicant_suggested` group [VERIFIED via
+  reviewer-provenance.js:231], which already renders as its own section — only the label
+  changes.
+- **Persistence needs no new mapping:** `save-candidates.js` writes the source list via
   `saveSourceListForCandidate(candidate)` and `referred` already flows through [VERIFIED
   via save-candidates.js:252,418 + the live req-1002926 probe: the manual Hafezi row
   persisted `wmkf_sources = "staff_manual,referred"`]. Origin reaches Dataverse + the
@@ -124,18 +140,20 @@ For names the PD *already has*, the manual **Add or Refer a Reviewer** panel wor
 now: enter the person and put the PD's name in **"Referred by"** — that tags the row
 `referred` (a grounded, never-dropped signal) and the note field holds the webpage.
 This works one-at-a-time but has no **bulk paste**, and (pre-relabel) shows "Referred
-by X" rather than "Referral". (This is what the PD effectively did for Hafezi; the
-dedup correctly reused the existing person — no duplicate was created.) The build below
-adds the bulk field + the guarantee on top of this same `referred` mechanism.
+by X" rather than "Externally-Referred". (This is what the PD effectively did for Hafezi;
+the dedup correctly reused the existing person — no duplicate was created.) The build
+below adds the bulk field + the guarantee on top of this same `referred` mechanism.
 
 ## Open questions (decide before build)
 
-1. ~~New kind vs. reuse `referred`?~~ **RESOLVED (S318): reuse `referred`, label
-   "Referral"** (see top). No new enum, no `status-enum-parity` churn.
-2. **Own "Referrals" section, or fold into the existing top group?** Referred rows
-   currently render inside "Cited / proposal-named". A dedicated section makes the PD's
-   list scannable but needs the small `provenanceSections` split in §D. *Recommendation:
-   dedicated section — the whole point is seeing your referred list at a glance.*
+1. ~~New kind vs. reuse existing?~~ **RESOLVED (S318): two lanes on two existing kinds —
+   `referred` → "Externally-Referred", `applicant_suggested` → "Applicant-Referred"**
+   (see top). No new enum, no `status-enum-parity` churn.
+2. **Own "Externally-Referred" section, or fold into the existing top group?** Referred
+   rows currently render inside "Cited / proposal-named". A dedicated section makes the
+   consultant list scannable but needs the small `provenanceSections` split in §D.
+   (Applicant-Referred already has its own section.) *Recommendation: dedicated section —
+   the whole point is seeing your referred list at a glance.*
 3. **Bypass Claude entirely for seeds, or also feed analyze?** *Recommendation: seed
    directly (the guarantee) AND pass as trusted context (bonus related peers).*
 4. **Bulk paste format** — freeform lines (tolerant parse) vs. a stricter CSV. Start
@@ -146,7 +164,7 @@ adds the bulk field + the guarantee on top of this same `referred` mechanism.
 
 ## Effort / risk
 
-- **Effort:** small-to-medium. One relabel (`provenanceLabelForCandidate`) + one UI
+- **Effort:** small-to-medium. Two label changes (`provenanceLabelForCandidate`) + one UI
   input + a seed-merge in the find flow + an optional section split. **No new provenance
   kind, no new persistence mapping, no new table, no new route.**
 - **Risk:** low. The `referred` kind, its grounded ranking, and its persistence already
