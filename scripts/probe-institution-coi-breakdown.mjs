@@ -10,9 +10,8 @@
  *     never selected) with the matcher's own {piInstitution, reviewerInstitution}.
  *   - CAN: cross-signal disagreement (ORCID vs OpenAlex vs discovery affiliation)
  *     as a mis-map proxy across the whole roster population.
- *   - CANNOT: candidates hard-dropped at DISCOVERY (filterConflicts in discover.js /
- *     DiscoveryService) — they never reach the roster; that invisibility is itself
- *     a finding.
+ *   - CAN after Contract 5 Phase A: discovery-time hard drops recorded as
+ *     reviewer_find_roster.status='coi_dropped'.
  *
  * Postgres is read-only; no Dynamics calls needed.
  * Usage: node scripts/probe-institution-coi-breakdown.mjs [days=120]
@@ -30,16 +29,15 @@ const sinceIso = new Date(Date.now() - DAYS * 86400_000).toISOString();
 
 const { DeduplicationService } = await import('../lib/services/deduplication-service.js');
 const { sql } = await import('@vercel/postgres');
-const M = (a, b) => DeduplicationService.institutionsMatch(
-  DeduplicationService.normalizeInstitution(a), DeduplicationService.normalizeInstitution(b));
+const M = (a, b) => DeduplicationService.institutionsMatchForCOI(a, b);
 
 const res = await sql.query(
-  `SELECT request_id, display_name, source_kind, candidate FROM reviewer_find_roster WHERE first_seen_at >= $1`,
+  `SELECT request_id, display_name, status, source_kind, candidate FROM reviewer_find_roster WHERE first_seen_at >= $1`,
   [sinceIso]
 );
 
-let total = 0, coiFlagged = 0;
-const coiRows = [], disagree = [], openalexPinned = [];
+let total = 0, coiFlagged = 0, coiDropped = 0;
+const coiRows = [], coiDropRows = [], disagree = [], openalexPinned = [];
 for (const row of res.rows) {
   total++;
   const c = row.candidate || {}; const enr = c.contactEnrichment || {};
@@ -55,6 +53,19 @@ for (const row of res.rows) {
     if (orcidAff && !M(orcidAff, oaAff || aff)) {
       disagree.push({ name: row.display_name, orcidAff, oaAff: oaAff || aff });
     }
+  }
+
+  if (row.status === 'coi_dropped') {
+    coiDropped++;
+    const det = c.institutionCOIDetails || {};
+    coiDropRows.push({
+      name: row.display_name,
+      sourceKind: row.source_kind,
+      pi: det.piInstitution || null,
+      revInst: det.reviewerInstitution || c.affiliation || null,
+      matchSource: det.matchSource || null,
+      dropStage: det.dropStage || null,
+    });
   }
 
   if (!c.hasInstitutionCOI) continue;
@@ -75,11 +86,17 @@ for (const row of res.rows) {
 }
 
 console.log(`Window: last ${DAYS}d (since ${sinceIso.slice(0, 10)})`);
-console.log(`Roster candidates: ${total}; hasInstitutionCOI flagged: ${coiFlagged}`);
+console.log(`Roster candidates: ${total}; hasInstitutionCOI flagged: ${coiFlagged}; discovery COI drop ledger: ${coiDropped}`);
 console.log(`OpenAlex-pinned affiliations: ${openalexPinned.length}; ORCID-contradicted (mis-map proxy): ${disagree.length}`);
 if (disagree.length) {
   console.log('\nORCID-vs-OpenAlex affiliation disagreements (mis-map proxy cases):');
   for (const d of disagree.slice(0, 15)) console.log(`  - ${d.name}: orcid="${d.orcidAff}" vs openalex="${d.oaAff}"`);
+}
+if (coiDropRows.length) {
+  console.log('\nDiscovery-time COI drop ledger rows:');
+  for (const r of coiDropRows) {
+    console.log(`  - ${r.name} [${r.sourceKind || '?'}] matched PI="${r.pi}" via reviewerInst="${r.revInst}" (stage=${r.dropStage || 'n/a'}; source=${r.matchSource || 'n/a'})`);
+  }
 }
 if (coiRows.length) {
   console.log('\nCOI-flagged rows (affiliation-signal corroboration):');

@@ -25,14 +25,37 @@ import { partitionByExcluded } from '../../../lib/utils/reviewer-name-match';
 import { lookupReviewerIdentity } from '../../../lib/services/reviewer-identity-lookup';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { resolveProposalPI, excludePiIdentity, appendPiName, piInstitutions } from '../../../lib/services/proposal-pi-identity';
+import { recordCoiDropped } from '../../../lib/services/reviewer-roster-store';
+import { pruneCandidateForRoster } from '../../../shared/components/reviewers/reviewer-search-logic';
 
 const limiter = nextRateLimiter({ max: 10 });
+const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Enable verbose logging only in development with DEBUG_REVIEWER_FINDER env var
 const DEBUG = process.env.DEBUG_REVIEWER_FINDER === 'true';
 
 function withProvenanceList(candidates) {
   return (Array.isArray(candidates) ? candidates : []).map((candidate) => withReviewerProvenance(candidate));
+}
+
+async function recordInstitutionCoiDrops(requestId, candidates, { dropStage, matchSource }) {
+  if (!requestId || !GUID_RE.test(String(requestId)) || !Array.isArray(candidates) || candidates.length === 0) return 0;
+  try {
+    const pruned = candidates
+      .map((candidate) => pruneCandidateForRoster({
+        ...candidate,
+        institutionCOIDetails: {
+          ...(candidate.institutionCOIDetails || {}),
+          dropStage,
+          matchSource,
+        },
+      }))
+      .filter((candidate) => candidate && candidate.name);
+    return await recordCoiDropped(requestId, pruned, { dropStage, matchSource });
+  } catch (error) {
+    console.error('[Discover API] institution COI drop ledger write failed (non-fatal):', error.message);
+    return 0;
+  }
 }
 
 export const config = {
@@ -206,6 +229,11 @@ export default async function handler(req, res) {
       }
     });
 
+    await recordInstitutionCoiDrops(requestId, discoveryResults.coiDropped, {
+      dropStage: 'track_b_discovery',
+      matchSource: 'discovery-service.filterConflicts',
+    });
+
     // Cross-run dedup + applicant/staff exclusions (S224) — EXACT normalized-name
     // filter applied to verified + unverified + discovered NOW, before the
     // per-candidate `generateDiscoveredReasoning` Claude call below, so already-
@@ -310,13 +338,17 @@ export default async function handler(req, res) {
 
     if (coiInstitutions && (Array.isArray(coiInstitutions) ? coiInstitutions.length : true)) {
       const beforeInst = verifiedWithCOI.length;
-      const keptInst = DeduplicationService.filterConflicts(verifiedWithCOI, coiInstitutions);
+      const instPartition = DeduplicationService.partitionConflicts(verifiedWithCOI, coiInstitutions);
+      const keptInst = instPartition.filtered;
       const droppedInst = beforeInst - keptInst.length;
       if (droppedInst > 0) {
-        const droppedNames = verifiedWithCOI
-          .filter(c => !keptInst.some(k => k === c))
+        const droppedNames = instPartition.institutionConflicts
           .map(c => c.name)
           .filter(Boolean);
+        await recordInstitutionCoiDrops(requestId, instPartition.institutionConflicts, {
+          dropStage: 'track_a_verified',
+          matchSource: 'discover.filterConflicts',
+        });
         sendEvent('progress', {
           stage: 'coi_check',
           status: 'institution_coi_excluded',
@@ -403,11 +435,16 @@ export default async function handler(req, res) {
       }
 
       if (coiInstitutions && (Array.isArray(coiInstitutions) ? coiInstitutions.length : true) && referredCandidates.length > 0) {
-        const keptInst = DeduplicationService.filterConflicts(referredCandidates, coiInstitutions);
+        const instPartition = DeduplicationService.partitionConflicts(referredCandidates, coiInstitutions);
+        const keptInst = instPartition.filtered;
         const keptSet = new Set(keptInst);
         for (const seed of referredCandidates) {
           if (!keptSet.has(seed)) blockedReferredSeeds.push(blockReferredSeed(seed, 'institution_coi'));
         }
+        await recordInstitutionCoiDrops(requestId, instPartition.institutionConflicts, {
+          dropStage: 'referred_seed',
+          matchSource: 'discover.referred.filterConflicts',
+        });
         referredCandidates = keptInst;
       }
 

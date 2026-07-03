@@ -256,6 +256,13 @@ export function pruneCandidateForRoster(c) {
     if (c[name] === true || e[name] === true) return true;
     return undefined;
   };
+  const currentOrcidAffiliation = Array.isArray(e.tierResults?.orcid?.affiliations)
+    ? e.tierResults.orcid.affiliations.find((aff) => aff?.current === true)
+    : null;
+  const currentOrcidInstitutionRor = currentOrcidAffiliation
+    && String(currentOrcidAffiliation.disambiguationSource || '').toUpperCase() === 'ROR'
+    ? currentOrcidAffiliation.disambiguatedOrganizationId || null
+    : null;
   // Capture the identity-resolver verdict NOW (before it's dropped) as safe
   // boolean persist-permission flags, so a candidate saved AFTER a roster reload
   // (when contactEnrichment.identity / tierResults are gone) still honors the
@@ -292,6 +299,9 @@ export function pruneCandidateForRoster(c) {
       googleScholarUrl: e.googleScholarUrl || null,
       googleScholarId: e.googleScholarId || null,
       affiliationSource: e.affiliationSource || null,
+      openAlexInstitutionId: e.openAlexInstitutionId || null,
+      openAlexInstitutionRor: e.openAlexInstitutionRor || null,
+      orcidInstitutionRor: e.orcidInstitutionRor || currentOrcidInstitutionRor || null,
       priorAffiliation: e.priorAffiliation || null,
       hIndex: e.hIndex ?? null,
       totalCitations: e.totalCitations ?? null,

@@ -128,7 +128,11 @@ describe('resolveProposalPI', () => {
       contact: { fullname: 'Wen Li', wmkf_orcid: ORCID, emailaddress1: 'wen.li@WAYNE.edu' },
     });
     OpenAlexService.getAuthorByOrcid.mockResolvedValue({
-      openAlexId: 'https://openalex.org/A5060668110', displayName: 'Wen Li', lastKnownInstitution: 'Wayne State University',
+      openAlexId: 'https://openalex.org/A5060668110',
+      displayName: 'Wen Li',
+      lastKnownInstitution: 'Wayne State University',
+      lastKnownInstitutionId: 'https://openalex.org/I123',
+      lastKnownInstitutionRor: 'https://ror.org/00abc1234',
     });
     const out = await resolveProposalPI(GUID);
     expect(out).toEqual({
@@ -138,7 +142,10 @@ describe('resolveProposalPI', () => {
       canonicalName: 'Wen Li',
       contactName: 'Wen Li',
       currentAffiliation: null, // no ORCID creds in test env → getProfile not called
+      currentAffiliationRor: null,
       lastKnownInstitution: 'Wayne State University',
+      lastKnownInstitutionId: 'https://openalex.org/I123',
+      lastKnownInstitutionRor: 'https://ror.org/00abc1234',
       institution: 'Wayne State University', // currentAffiliation || lastKnown
       emailDomain: 'wayne.edu',
     });
@@ -236,17 +243,28 @@ describe('resolveProposalPI', () => {
 
 describe('piInstitutions (union)', () => {
   test('unions ORCID-current + OpenAlex-last-known + LLM authorInstitution, deduped', () => {
-    const pi = { resolved: true, currentAffiliation: 'Wayne State University', lastKnownInstitution: 'Yantai University' };
+    const pi = {
+      resolved: true,
+      currentAffiliation: 'Wayne State University',
+      currentAffiliationRor: 'https://ror.org/01',
+      lastKnownInstitution: 'Yantai University',
+      lastKnownInstitutionId: 'https://openalex.org/I99',
+      lastKnownInstitutionRor: 'https://ror.org/02',
+    };
     expect(piInstitutions(pi, 'Wayne State Univ.')).toEqual(
       // 'Wayne State University' and 'Wayne State Univ.' are distinct raw strings (norm only
       // collapses case/space), so both survive — over-inclusion is acceptable for a hard drop.
-      ['Wayne State University', 'Yantai University', 'Wayne State Univ.']
+      [
+        { name: 'Wayne State University', ror: 'https://ror.org/01' },
+        { name: 'Yantai University', openAlexId: 'https://openalex.org/I99', ror: 'https://ror.org/02' },
+        'Wayne State Univ.',
+      ]
     );
   });
 
   test('dedupes case/space-insensitively', () => {
     const pi = { resolved: true, currentAffiliation: 'MIT', lastKnownInstitution: 'mit ' };
-    expect(piInstitutions(pi, 'MIT')).toEqual(['MIT']);
+    expect(piInstitutions(pi, 'MIT')).toEqual([{ name: 'MIT', ror: null }]);
   });
 
   test('unresolved PI → only the LLM institution', () => {

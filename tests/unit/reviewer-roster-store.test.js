@@ -34,12 +34,13 @@ describe('listForRequest', () => {
       { status: 'active', display_name: 'Ann Lee', candidate: { name: 'Ann Lee' } },
       { status: 'excluded', display_name: 'Bob Roe', candidate: { name: 'Bob Roe' } },
       { status: 'saved', display_name: 'Cy Poe', candidate: { name: 'Cy Poe' } },
+      { status: 'coi_dropped', display_name: 'Dee Coe', candidate: { name: 'Dee Coe', hasInstitutionCOI: true } },
     ] });
     const out = await store.listForRequest(REQ);
     expect(out.active.map((c) => c.name)).toEqual(['Ann Lee']);
     expect(out.excluded.map((c) => c.name)).toEqual(['Bob Roe']);
-    // allNames is the cross-run dedup union — must include saved + excluded too.
-    expect(out.allNames).toEqual(['Ann Lee', 'Bob Roe', 'Cy Poe']);
+    // allNames is the cross-run dedup union — must include saved + excluded + coi_dropped too.
+    expect(out.allNames).toEqual(['Ann Lee', 'Bob Roe', 'Cy Poe', 'Dee Coe']);
   });
 });
 
@@ -56,11 +57,46 @@ describe('recordSurfaced', () => {
 
   test('the conflict update guards against downgrading excluded/saved (never-downgrade)', async () => {
     await store.recordSurfaced(REQ, [{ name: 'Ann Lee' }]);
-    // The INSERT ... ON CONFLICT DO UPDATE must only run WHERE status='active'.
+    // The INSERT ... ON CONFLICT DO UPDATE must only run WHERE status='active',
+    // so excluded/saved/coi_dropped can never be reactivated by a surfaced record.
     const insertCall = sql.mock.calls.findIndex((c) =>
       Array.isArray(c[0]) && c[0].join(' ').includes('INSERT INTO reviewer_find_roster'));
     expect(insertCall).toBeGreaterThanOrEqual(0);
     expect(queryTextOf(insertCall)).toMatch(/status = 'active'/);
+  });
+});
+
+describe('recordCoiDropped', () => {
+  test('upserts named institution-COI drops as non-selectable coi_dropped ledger rows', async () => {
+    const n = await store.recordCoiDropped(REQ, [
+      {
+        name: 'Dr. Dee Coe',
+        affiliation: 'University of Michigan',
+        institutionCOIDetails: {
+          piInstitution: 'University of Michigan',
+          reviewerInstitution: 'University of Michigan',
+        },
+      },
+      { name: '' },
+    ], { dropStage: 'track_a_verified', matchSource: 'test' });
+
+    expect(n).toBe(1);
+    const text = queryTextOf(0);
+    expect(text).toMatch(/INSERT INTO reviewer_find_roster/);
+    expect(text).toMatch(/'coi_dropped'/);
+    expect(text).toMatch(/status = 'coi_dropped'/);
+    expect(allInterpolations()).toEqual(expect.arrayContaining(['dee coe']));
+    const blob = JSON.parse(allInterpolations().find((value) => typeof value === 'string' && value.includes('track_a_verified')));
+    expect(blob).toMatchObject({
+      name: 'Dr. Dee Coe',
+      hasInstitutionCOI: true,
+      institutionCOIDetails: {
+        piInstitution: 'University of Michigan',
+        reviewerInstitution: 'University of Michigan',
+        dropStage: 'track_a_verified',
+        matchSource: 'test',
+      },
+    });
   });
 });
 
@@ -100,7 +136,7 @@ describe('markSaved', () => {
     const text = queryTextOf(0);
     expect(text).toMatch(/INSERT INTO reviewer_find_roster/); // upsert, not bare UPDATE → eviction-tolerant
     expect(text).toMatch(/status = 'saved'/);
-    expect(text).toMatch(/status <> 'excluded'/);
+    expect(text).toMatch(/status IN \('active', 'saved'\)/);
     expect(allInterpolations()).toEqual(expect.arrayContaining(['ann lee', 'bob roe']));
   });
 

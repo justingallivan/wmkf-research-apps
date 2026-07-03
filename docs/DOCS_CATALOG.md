@@ -173,6 +173,12 @@ related:
 | [VIRTUAL_REVIEW_PANEL.md](VIRTUAL_REVIEW_PANEL.md) | spec | active | yes | Thin design / operations reference for the Virtual Review Panel app. Created S191 to receive content extracted from CLAUDE.md so the table-row... | 2026-07-02 |
 | [WORKFLOW_CHAINING_DESIGN.md](WORKFLOW_CHAINING_DESIGN.md) | spec | active | yes | Status: Design principle — extracted from Session 100 discussion of prompt storage migration. | 2026-07-02 |
 
+## reviewer-finder
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [REVIEWER_COI_PRECISION_PLAN.md](REVIEWER_COI_PRECISION_PLAN.md) | plan | active |  | Make institution-COI drops observable, then tighten the COI matcher without changing save policy. | 2026-07-03 |
+
 ## reviewer-identity
 
 | File | Kind | Status | Canonical | Summary | Cataloged |

@@ -19,7 +19,7 @@ related:
 **Status:** MAINTAINED current-state reference (owns the live behavioral guarantees below).
 **Owner:** reviewer-finder.
 **Created:** 2026-06-13 (S253).
-**Last verified:** 2026-07-03 (S321) — contracts 3 and 7 re-verified against the S321 gating-redesign implementation; others last traced 2026-06-13 (S253). See `[VERIFIED]` tags per section.
+**Last verified:** 2026-07-03 (S321 + Contract 5 follow-up) — contracts 3, 5, and 7 re-verified against the S321 gating-redesign implementation and institution-COI precision follow-up; others last traced 2026-06-13 (S253). See `[VERIFIED]` tags per section.
 
 > **What this doc is.** The single maintained home for the Reviewer Finder feature's
 > *live* fail-closed enforcement contracts — the hard blocks, force-nulls, and
@@ -159,15 +159,23 @@ contradiction only; returns false if either name is initial-only).
 
 ---
 
-## 5. S240 current-institution COI — hard drop + durable gate `[VERIFIED 2026-06-13]`
+## 5. S240 current-institution COI — hard drop + durable gate `[VERIFIED 2026-07-03]`
 
 **Contract.** Current same-institution affiliation (reviewer at a proposal-PI institution) is a
 foundation POLICY conflict, **hard-dropped on BOTH discovery tracks** and **hard-rejected again at
 the durable save boundary**. Matched against the UNION of `piInstitutions(pi, authorInstitution)`
 (ORCID-current + OpenAlex last-known + LLM).
 
-- **Discovery.** Track A via `filterConflicts` in `discover.js`; Track B via `filterConflicts`
-  inside `DiscoveryService.discover()`.
+- **Discovery.** Track A via `partitionConflicts` / `filterConflicts` in `discover.js`; Track B via
+  the same COI partition inside `DiscoveryService.discover()`. Dropped candidates are also written
+  to Postgres `reviewer_find_roster` as `status='coi_dropped'` by `recordCoiDropped` when a valid
+  request id is present. That ledger is observability-only: it stays out of active/excluded render
+  buckets and cannot be selected, recovered, promoted, or saved from the Find UI.
+- **Matcher precision.** The COI path uses `DeduplicationService.institutionsMatchForCOI`, not the
+  looser generic `institutionsMatch`. COI matching now compares shared OpenAlex/ROR institution ids
+  first when both sides carry ids, keeps exact-normalized / abbreviation-expanded / exact key-word
+  equality, and uses only narrow same-system campus qualifier containment. It does not use bare
+  substring containment or broad subset matching for COI.
 - **Save (authoritative).** `save-candidates.js:150-160` HARD-REJECTS a row with
   `hasInstitutionCOI` OR a post-enrichment `contactEnrichment.coiRecomputed && hasInstitutionCOI`,
   incrementing `rejectedInstitutionCOI` (`:116`). Enrichment runs AFTER the discovery drop and can
@@ -181,7 +189,9 @@ the durable save boundary**. Matched against the UNION of `piInstitutions(pi, au
   (`enrich-contacts.js`) paths.
 
 **Enforcement points.** `save-candidates.js:116, 150-160, 305-316` · `discover.js`
-(`filterConflicts`) · `DiscoveryService.discover()` (`filterConflicts`).
+(`partitionConflicts` + `recordCoiDropped`) · `DiscoveryService.discover()` (`partitionConflicts`) ·
+`lib/services/deduplication-service.js` (`institutionsMatchForCOI`) ·
+`lib/services/reviewer-roster-store.js` (`recordCoiDropped`).
 
 > **This contract previously had no documentary home outside the agent wiki** — the
 > `rejectedInstitutionCOI` durable gate appeared in zero non-wiki docs before this reference
@@ -298,7 +308,7 @@ exported `:568`). **Audit:** `tests/unit/reviewer-identity-evidence.test.js`
 | 2 | PI-named/cited/referred exemption + force-null | `save-candidates.js:79-82,172-191` (kinds: `reviewer-provenance.js` `isIdentityReviewExemptProvenance`) |
 | 3 | Invite-confidence allowlist | `reviewer-invite.js:70-88` + `send-emails.js:292-294` |
 | 4 | Structured-PI fail-open/augment-only | `proposal-pi-identity.js:125+` + `reviewer-identity-evidence.js:316-321` |
-| 5 | S240 institution COI hard drop | `save-candidates.js:116,150-160` + `discover.js`/`DiscoveryService` `filterConflicts` |
+| 5 | S240 institution COI hard drop | `save-candidates.js:116,150-160` + `discover.js`/`DiscoveryService` `partitionConflicts` + `reviewer-roster-store.js` `recordCoiDropped` |
 | 6 | OpenAlex bibliometrics/verified-domain | `contact-enrichment-service.js:676-790` |
 | 7 | Faculty-page: default zero-SSRF; opt-in guarded fetch (flag) | `my-candidates.js:189` + `ReviewerInvitePanel.js:275-287` (default) · `safe-fetch.js` `safeFetchInstitutionPage` + `contact-enrichment-service.js:934` (opt-in) |
 | 8 | Work-grounding rescue | `reviewer-identity-evidence.js:212-271` |
