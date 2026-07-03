@@ -10,20 +10,12 @@ Wrap up the current session by updating documentation and syncing to remote.
 
 ## Step 1: Review the Session
 
-Check git log and status to see what was accomplished:
-```bash
-git log --oneline -10  # Find commits made this session
-git status             # Check for uncommitted changes
-git diff --stat        # If there are staged/unstaged changes
-```
+Check `git log --oneline -10` and `git status` to see what this session produced.
 
 ## Step 2: Commit Any Remaining Changes
 
-If there are uncommitted changes:
-1. Review what's changed with `git diff`
-2. Stage relevant files with `git add <files>`
-3. Commit with a descriptive message
-4. Do NOT leave uncommitted changes - they may cause issues on another machine
+Review and commit any uncommitted changes with a descriptive message. Do NOT leave
+uncommitted changes — they may cause issues on another machine.
 
 ## Step 3: Update Documentation
 

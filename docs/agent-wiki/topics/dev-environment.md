@@ -76,17 +76,26 @@ Claude config sync, and environment-specific operating notes.
 
 ## Commit Guards & Triggers
 
-Three `PreToolUse(Bash)` hooks fire on `git commit` (wired in `.claude/settings.json`):
+Four `PreToolUse(Bash)` hooks fire on `git commit` (wired in `.claude/settings.json`):
 
 - **`enum-parity-commit-guard.js`** — BLOCKS (exit 2) on status/enum producer↔consumer
   drift (`check:status-enum-parity`).
 - **`trust-boundary-guid-commit-guard.js`** — BLOCKS (exit 2) when a client-supplied id
   reaches a Dataverse selector without a GUID guard (`check:trust-boundary-guid`). See
   `security-auth.md` → "Trust-Boundary GUID Validation".
+- **`docs-catalog-commit-guard.js`** — BLOCKS (exit 2) when staged docs-catalog surface
+  changes leave `docs/DOCS_CATALOG.md` stale/invalid (`check:docs-catalog`).
 - **`pre-commit-self-review.js`** — ADVISORY (injects a staged-diff-tailored checklist,
   never blocks). It keeps the fan-out and verify-claims checklist visible during commits.
 
-All three share ONE trigger, **`.claude/hooks/lib/git-commit-detect.js`** (`isGitCommit` /
+**Staging-gap rule (S322):** PreToolUse runs BEFORE the command, so a compound
+`git add X && git commit` has an empty index when the hook fires. Any commit hook that
+tailors to staged paths must also parse path-like tokens from the command string —
+`docs-catalog-commit-guard.js` and `pre-commit-self-review.js` do this (fixed S322 after
+two stale-catalog commits evaded the docs-catalog guard). A new path-dependent commit
+hook must copy that pattern, not the bare `git diff --cached` read.
+
+All four share ONE trigger, **`.claude/hooks/lib/git-commit-detect.js`** (`isGitCommit` /
 `isAmend`) — a single source of truth so the trigger cannot drift across the siblings (the
 fan-out lesson applied to the hooks themselves; see `feedback-symbol-consumer-fanout`).
 Tested by `.claude/hooks/lib/git-commit-detect.test.js` (plain `node`, no jest; run it

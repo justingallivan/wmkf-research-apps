@@ -5,7 +5,7 @@ metadata:
   type: feedback
   status: active
   scope: docs
-  last_verified: 2026-06-04 (S219) — reinforced with the read-WHOLE-file lesson + PreToolUse hook
+  last_verified: 2026-07-03 (S322) — mechanical delivery moved from the dedicated PreToolUse hook to the durable-docs path rule (hook retired as duplicate)
 ---
 
 ## Recall Trigger
@@ -33,7 +33,12 @@ current-state claim.
 
 ## Related Rules
 
-- Hook: `.claude/hooks/doc-edit-reconcile-reminder.js`.
+- Mechanical delivery: `.claude/rules/durable-docs.md` (path-scoped rule injected
+  on every Read of docs/**, .claude-memory/**, CLAUDE.md, SESSION_PROMPT.md; every
+  Edit requires a prior Read, so coverage matches the retired hook). The dedicated
+  `doc-edit-reconcile-reminder.js` PreToolUse hook was retired S322 (2026-07-03) as
+  a duplicate of that rule — if whole-file-reconcile misses recur, reinstating the
+  hook is the historically proven lever (see rationale sidecar).
 - Skill: `.claude/skills/sweep/SKILL.md`.
 - Related memories: `feedback-apply-reconcile-to-fix-work.md`,
   `feedback-red-gates-are-p0.md`, `feedback-surface-full-review-findings.md`.

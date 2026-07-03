@@ -10,29 +10,12 @@ Start a new coding session with proper git sync and context loading.
 
 ## Step 1: Git Housekeeping
 
-Before reading any files, ensure the repository is in sync:
+Before reading any files, sync the repo: `git rev-parse HEAD` (fails → repo may be
+corrupted, see CLAUDE.md for recovery), `git fetch origin && git status`, pull if
+behind (`git pull origin main`; merge conflicts → stop and alert the user).
 
-1. **Verify repo health** - Quick sanity check:
-   ```bash
-   git rev-parse HEAD
-   ```
-   If this fails, the repo may be corrupted (see CLAUDE.md for recovery steps).
-
-2. **Fetch remote changes** - Check if other machines pushed updates:
-   ```bash
-   git fetch origin
-   git status
-   ```
-
-3. **Pull if behind** - If local is behind remote, pull first:
-   ```bash
-   git pull origin main
-   ```
-   Do NOT proceed with work if there are merge conflicts - alert the user.
-
-4. **Check for stale changes** - If there are uncommitted changes, warn the user:
-   - These may be leftover from a previous session
-   - Ask if they should be committed, stashed, or discarded
+If there are uncommitted changes, warn the user — they may be leftover from a
+previous session; ask whether to commit, stash, or discard them.
 
 ## Step 1.5: Verify the memory store is consolidated
 
@@ -100,6 +83,7 @@ npm run check:atlas && npm run check:atlas:self-test                           #
 npm run check:doc-currency && npm run check:doc-currency:self-test             # doc-currency drift (was red & unnoticed ~8 sessions)
 npm run check:fact-consistency && npm run check:fact-consistency:self-test     # registered scalar drift across docs/memory
 npm run check:canonical-pointers && npm run check:canonical-pointers:self-test # anchor rot in CANONICAL_COUNTS pointers
+npm run check:docs-catalog                                                     # generated docs/DOCS_CATALOG.md in sync with top-level docs frontmatter (no self-test)
 npm run check:drain-table-mentions && npm run check:drain-table-mentions:self-test       # stale "lives in PG" claims for drain tables
 npm run check:prompt-storage-mentions && npm run check:prompt-storage-mentions:self-test # stale wmkf_prompt_template refs (was red & unnoticed ~1 session)
 npm run check:doc-symbol-refs && npm run check:doc-symbol-refs:self-test           # dangling repo path refs in memory/wiki (renamed/removed code, docs lag); primary trigger is CI-on-push
@@ -119,7 +103,7 @@ npm run check:harness-framing && npm run check:harness-framing:self-test        
 npm run check:memory-drift:no-write                                            # advisory: memory↔code drift (read-only)
 ```
 
-**This list is the full set as of 2026-06-26. Before running, `grep '"check:' package.json` — if a `check:*` script exists that is NOT above (and is not a `:self-test` of one already listed), run it too and add it here.** That keeps the list from silently going stale as gates are added. Skip silently only if NONE of these scripts is defined (not every project has them); do not skip a gate that IS defined.
+**This list is the full set as of 2026-07-03. Before running, `grep '"check:' package.json` — if a `check:*` script exists that is NOT above (and is not a `:self-test` of one already listed), run it too and add it here.** That keeps the list from silently going stale as gates are added. Skip silently only if NONE of these scripts is defined (not every project has them); do not skip a gate that IS defined.
 
 **If any gate is red:** report it as the FIRST thing in the Step 4 summary, before recapping the previous session. A red gate is a P0 blocker for any new feature work in the affected area (data layer for `check:atlas`, API routes for `check:api-routes`, docs/memory drift for the rest), regardless of which session caused it. Treat fixing it as a candidate first task, not a side-note.
 
