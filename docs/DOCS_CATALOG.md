@@ -29,6 +29,7 @@ related:
 | [CLAUDE_REMEDIATION_PLAN.md](CLAUDE_REMEDIATION_PLAN.md) | source-of-truth | canonical | yes | Audience: future-Claude (and current-Claude when this drifts). Justin can read it, but it is written for the agent to consult before data-layer,... | 2026-07-02 |
 | [CLAUDE_SKILL_REMEDIATION_PLAN.md](CLAUDE_SKILL_REMEDIATION_PLAN.md) | plan | active |  | Created: 2026-06-05 Audience: Future Claude / skill authors / reviewers Scope: Improve Claude-authored skills and operating checklists so they... | 2026-07-02 |
 | [CODEX_REVIEW_PROMPT_hook-self-review.md](CODEX_REVIEW_PROMPT_hook-self-review.md) | draft | draft |  | ✅ COMPLETED (S259, 2026-06-15). This review was run, relayed verbatim, and acted on. | 2026-07-02 |
+| [HARNESS_INSTRUCTION_AUDIT_S322.md](HARNESS_INSTRUCTION_AUDIT_S322.md) | audit | active |  | Classification of all 16 hooks, 6 skills, and settings wiring as still-needed / redundant / harmful, with a ranked removal list and risk notes. No deletions. |  |
 
 ## architecture
 
