@@ -3,12 +3,12 @@ title: Agent Instruction File Audit (S322)
 domain: agent-harness
 kind: audit
 status: active
-summary: Audit of CLAUDE.md, AGENTS.md, and .claude/rules/ for size, duplication, unread content, broken imports, and lint restatement. Findings + ready diffs.
+summary: Audit of CLAUDE.md, AGENTS.md, and .claude/rules/ for size, duplication, unread content, broken imports, and lint restatement. Findings + outcomes.
 ---
 
 # Agent Instruction File Audit — Session 322 (2026-07-03)
 
-Audit-only report; no instruction file was modified. Every claim below is grounded in a tool result from the S322 session, quoted with file:line. Evidence anchor: commit `16185334`. A future LLM applying the diffs must follow the **Application protocol** at the end.
+Audit-only report; no instruction file was modified during the original audit. Subsequent owner decisions are recorded as outcome notes below. Every original claim below is grounded in a tool result from the S322 session, quoted with file:line. Evidence anchor: commit `16185334`. A future LLM applying any remaining recommendation must follow the **Application protocol** at the end.
 
 ## Inventory [VERIFIED via ls/wc/readlink this session]
 
@@ -47,6 +47,8 @@ Partial duplicates — **keep, no diff proposed** (each adds unique, path-specif
 
 **Caveat for the applier:** the restatement at point-of-edit may be deliberate defense-in-depth (CLAUDE.md content can be summarized away in long sessions). This is a **needs-owner-confirmation** consolidation, not a mechanical cleanup. If approved, apply:
 
+**Outcome 2026-07-03:** owner approved F1 only; the three rule edits below were applied in commit `95c0e024`.
+
 ```diff
 --- a/.claude/rules/api-routes.md
 +++ b/.claude/rules/api-routes.md
@@ -81,18 +83,7 @@ Partial duplicates — **keep, no diff proposed** (each adds unique, path-specif
 
 `.claude/rules/llm-and-prompts.md:7` includes `- "pages/api/**"`, so the LLM-surface rule loads for **all 138** API route files, though only **18** import `execute-prompt` or `llm-client` [VERIFIED via `grep -rln "execute-prompt\|llm-client" pages/api` → 18 files; `find pages/api -name '*.js'` → 138]. It also fully overlaps `.claude/rules/api-routes.md:3` (same glob), so every API-file read loads both rules.
 
-**Tradeoff the owner must decide:** removing the glob means the rule no longer fires when editing the 18 LLM-calling routes (path rules match the file being read, not its imports). Options: (a) keep as-is and accept the noise — it is one short paragraph; (b) remove the glob and rely on `lib/services/*prompt*` / `shared/config/prompts/**` matches; (c) enumerate the 18 routes explicitly (brittle as routes are added). If (b) is chosen:
-
-```diff
---- a/.claude/rules/llm-and-prompts.md
-+++ b/.claude/rules/llm-and-prompts.md
-@@ -4,7 +4,6 @@
-   - "lib/services/execute-prompt.js"
-   - "lib/services/*prompt*"
-   - "shared/config/prompts/**"
--  - "pages/api/**"
- ---
-```
+**Outcome 2026-07-03:** owner rejected the removal path after review. This finding is **deprecated / do not apply**: keep the broad `pages/api/**` glob unless a future instruction-loader mechanism can match import dependencies or another guard proves the LLM/prompt rule still loads for all API routes that call `execute-prompt` or `llm-client`. The rejected option was to remove the `pages/api/**` path and rely on service/prompt-file matches; that is unsafe for route-local edits because path rules match the file being read, not its imports. Explicitly enumerating the 18 route files remains brittle as routes are added.
 
 ### Checks with no findings (verified clean)
 
@@ -104,7 +95,7 @@ Partial duplicates — **keep, no diff proposed** (each adds unique, path-specif
 
 ## Application protocol (for the LLM applying fixes)
 
-1. F1 and F2 are **needs-owner-confirmation** — get an explicit go-ahead per finding before applying; the duplication may be deliberate reinforcement.
+1. F1 is already applied (commit `95c0e024`). F2 is **closed rejected / do not apply**; do not remove `pages/api/**` from `.claude/rules/llm-and-prompts.md` unless the owner reopens it with new evidence that route-local LLM guidance still loads.
 2. Re-verify each quoted line against the live file first (`grep -n`) — this report is a snapshot at commit `16185334`.
 3. After any edit to `CLAUDE.md` or `.claude/rules/`: run `npm run check:agent-invariants`, `npm run check:instruction-architecture`, and `npm run check:harness-framing && npm run check:harness-framing:self-test` sequentially (CLAUDE.md "Development" + gate list in `.claude/skills/start`).
 4. Never sever the `AGENTS.md` → `CLAUDE.md` symlink or run `migrate-to-codex` (CLAUDE.md header).

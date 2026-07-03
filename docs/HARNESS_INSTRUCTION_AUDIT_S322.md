@@ -72,7 +72,7 @@ Explicitly **not** on the list: every blocking guard, both claim-verification ho
 ## Outcome — applied 2026-07-03 (owner-approved, same session)
 
 - **Applied:** removal 1 (`doc-edit-reconcile-reminder.js` deleted, settings entry removed); removal 2 (`memory-placement-reminder.js` deleted, settings entry removed); removal 3 for start/stop only (generic git blocks condensed; parallel-agent-worktree kept per corrected classification above); re-scope 4 (`subagent_type` now authoritative — verified silent on a non-codex agent mentioning Codex, firing on `codex:codex-rescue`, and firing via fallback when the field is absent); the commit-guard timing fix in both `docs-catalog-commit-guard.js` and `pre-commit-self-review.js` (command-token fallback; the docs-catalog guard was functionally re-tested and now blocks a compound `git add && git commit` against a stale catalog, exit 2); `check:docs-catalog` added to start's gate list (list re-dated 2026-07-03); freshness caveat added to contract-reconcile's audit-5 gate list.
-- **Deliberately not applied:** removal 5 (`pre-commit-self-review.js` kept per risk note 3 — its timing gap was fixed instead); the companion doc's F1/F2 consolidations (`docs/AGENT_INSTRUCTION_AUDIT_S322.md`) remain owner-pending.
+- **Deliberately not applied:** removal 5 (`pre-commit-self-review.js` kept per risk note 3 — its timing gap was fixed instead). In the companion doc, F1 was owner-approved and applied; F2 was reviewed, rejected as unsafe to remove, and deprecated (`docs/AGENT_INSTRUCTION_AUDIT_S322.md`).
 
 ## Application protocol
 

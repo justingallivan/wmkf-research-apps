@@ -20,8 +20,8 @@ were caught wrong during main-session re-verification and corrected in place
 2. **Agent-instruction file audit** (`docs/AGENT_INSTRUCTION_AUDIT_S322.md`, `e6d109ce`).
    Architecture clean: no oversize files, no contradictions, no @-imports, no lint
    restatement. F1 (3 safety-invariant restatements in rules files) + F2 (over-broad
-   `pages/api/**` glob in llm-and-prompts rule) — F1 applied this session; F2 reviewed
-   and intentionally left unchanged.
+   `pages/api/**` glob in llm-and-prompts rule) — F1 applied this session; F2 reviewed,
+   rejected as unsafe to remove, and deprecated in the audit doc.
 
 3. **Harness instruction audit + APPLIED** (`docs/HARNESS_INSTRUCTION_AUDIT_S322.md`,
    `84207bcb`; applied in `b7b77836` + `a5213b1e`):
@@ -81,11 +81,12 @@ were caught wrong during main-session re-verification and corrected in place
    `:self-test` script names for drain-table and prompt-storage gates; `.env.example`
    no longer lists dead `NOTIFICATION_EMAIL_TO` and points recipients to `/admin` →
    Alert Recipients.
-2. **Instruction-audit F1 applied; F2 kept unchanged.**
+2. **Instruction-audit F1 applied; F2 closed rejected.**
    The three duplicate safety-invariant restatements in `.claude/rules/` now point back
    to CLAUDE.md's Universal Safety Invariants. The `llm-and-prompts.md` `pages/api/**`
    glob was reviewed and intentionally left in place so LLM/prompt guidance still loads
-   on API route call sites.
+   on API route call sites; `docs/AGENT_INSTRUCTION_AUDIT_S322.md` now marks the removal
+   option deprecated / do not apply.
 
 ### Owner Decision Needed
 
@@ -123,7 +124,10 @@ were caught wrong during main-session re-verification and corrected in place
    the reinstatement lever is recorded in `feedback-reconcile-dont-append-docs.md`.
 2. **`pre-commit-self-review.js` deliberately KEPT** (risk note 3 of the harness audit);
    its staging gap was fixed instead.
-3. **Cause #2 RESOLVED / COI Phase C shipped / `REVIEWER_PAGE_EMAIL_TIER_ENABLED` ON in
+3. **Instruction-audit F2 rejected** — do not remove `pages/api/**` from
+   `.claude/rules/llm-and-prompts.md` without new evidence that route-local LLM guidance
+   still loads for API routes calling `execute-prompt` or `llm-client`.
+4. **Cause #2 RESOLVED / COI Phase C shipped / `REVIEWER_PAGE_EMAIL_TIER_ENABLED` ON in
    prod / invite send-gate predicate unchanged** — all carry forward from S321 verbatim
    (evidence in `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md`, `docs/REVIEWER_COI_PRECISION_PLAN.md`).
 
@@ -132,7 +136,7 @@ were caught wrong during main-session re-verification and corrected in place
 | File | Purpose |
 |------|---------|
 | `docs/DEAD_CODE_DELETION_MANIFEST.md` | Deletion candidates by confidence + execution protocol. |
-| `docs/AGENT_INSTRUCTION_AUDIT_S322.md` | CLAUDE.md/rules audit; F1 applied, F2 reviewed and kept unchanged. |
+| `docs/AGENT_INSTRUCTION_AUDIT_S322.md` | CLAUDE.md/rules audit; F1 applied, F2 closed rejected/deprecated. |
 | `docs/HARNESS_INSTRUCTION_AUDIT_S322.md` | Hook/skill classification + applied-outcome record. |
 | `docs/DOCS_DRIFT_AUDIT_S322.md` | Drift table + docs patch (mechanical part apply-ready). |
 | `.claude/hooks/docs-catalog-commit-guard.js` | Now parses command path tokens (staging-gap fix). |

@@ -22,7 +22,7 @@ related:
 |---|---|---|---|---|---|
 | [AGENT_COLLABORATION_PLAN.md](AGENT_COLLABORATION_PLAN.md) | plan | active |  | Status: Draft operating contract Purpose: Keep Justin, Claude, and Codex from stepping on each other's work while using the same repo across... | 2026-07-02 |
 | [AGENT_HARNESS_STYLE_GUIDE.md](AGENT_HARNESS_STYLE_GUIDE.md) | spec | active |  | This guide keeps agent-facing instructions precise, confident, and low-noise. | 2026-07-02 |
-| [AGENT_INSTRUCTION_AUDIT_S322.md](AGENT_INSTRUCTION_AUDIT_S322.md) | audit | active |  | Audit of CLAUDE.md, AGENTS.md, and .claude/rules/ for size, duplication, unread content, broken imports, and lint restatement. Findings + ready diffs. |  |
+| [AGENT_INSTRUCTION_AUDIT_S322.md](AGENT_INSTRUCTION_AUDIT_S322.md) | audit | active |  | Audit of CLAUDE.md, AGENTS.md, and .claude/rules/ for size, duplication, unread content, broken imports, and lint restatement. Findings + outcomes. |  |
 | [CLAUDE_COVERAGE_LESSONS.md](CLAUDE_COVERAGE_LESSONS.md) | plan | historical |  | Created: 2026-05-07 (S137) after a Codex stress-test cycle where each round caught a slightly different syntactic pattern the previous round... | 2026-07-02 |
 | [CLAUDE_INSTRUCTION_AUTHORITY.md](CLAUDE_INSTRUCTION_AUTHORITY.md) | source-of-truth | canonical | yes | Status: Active Last verified: 2026-06-05 Purpose: Identify the authoritative definition and enforcement mirror for must-follow agent instructions. | 2026-07-02 |
 | [CLAUDE_MEMORY_REORGANIZATION_PLAN.md](CLAUDE_MEMORY_REORGANIZATION_PLAN.md) | plan | active |  | The problem is not absence of memory. The problem is density and retrieval. | 2026-07-02 |
