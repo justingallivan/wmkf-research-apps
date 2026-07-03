@@ -342,7 +342,15 @@ contested-vs-rejected lead split.
 - **Contract 5 COI mis-drop (flagged, out of scope).** An OpenAlex affiliation
   mis-map can wrongly hard-drop a correct *candidate* via the lexical COI match —
   the candidate-level analog of Cause #2 case 2, with no lead trail at all.
-  Deserves its own probe + follow-up.
+  **Probed S321** (`scripts/probe-institution-coi-breakdown.mjs`, 120d): 0 roster
+  rows COI-flagged and 0 live ORCID-vs-OpenAlex contradictions in the pinned
+  population — but discovery-time drops never reach the roster (structurally
+  unmeasurable today), and the matcher's curated false-positive suite matched
+  **7/10 distinct-institution pairs** (containment + subset rules:
+  Miami/UMiami, NYU/CUNY, Columbia/UBC, UMD/UMBC…). Follow-up plan: (A) durable
+  drop trail first, (B) matcher precision for the COI path + FP suite as a unit
+  test, (C) provenance-gated hard drop (single-source lexical match →
+  flag-not-drop) — C is an owner policy decision.
 - **Anchored-vindication false-positives.** The anchored set can still be wrong if
   the underlying *identity resolution* is wrong (a `probable` verdict binding the
   wrong person also poisons `verifiedInstitutionDomain` today — not a new
