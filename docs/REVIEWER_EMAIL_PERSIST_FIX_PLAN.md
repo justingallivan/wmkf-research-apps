@@ -3,7 +3,7 @@ title: "Reviewer Email-Persist Fix Plan (S317)"
 domain: reviewers
 kind: plan
 status: active
-summary: "Reviewer Invite-tab no-email fix: B1 (applicant-promote persists vetted email) + A (reconciliation cron backstop) SHIPPED; B2 (partial-return) DEFERRED."
+summary: "Reviewer Invite-tab no-email fixes: B1 applicant email persist, A reconciliation cron, and B2 Find enrichment timeout partial-return shipped."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -115,17 +115,31 @@ default, which stamps only when exactly one selected suggestion on the same requ
 matches the roster row's normalized name. This creates the missing exact-id anchor
 without loosening the reconciler's `suggestionId IS NOT NULL` filter.
 
-## B2 — Timeout partial-return + save-gate — DEFERRED
+## B2 — Timeout partial-return + save-gate — SHIPPED
 
-`enrichCandidates` throws on abort before returning partial results
-[VERIFIED via lib/services/contact-enrichment-service.js:1247]; `/enrich-contacts`
-then emits an error, not partial `complete` results
-[VERIFIED via pages/api/reviewer-finder/enrich-contacts.js:195]. Returning the
-partial array (merged by index) would preserve computed enrichment.
+`enrichCandidates` keeps fail-stop abort behavior by default, but now has an
+explicit `returnPartialOnAbort` opt-in for callers that can consume a completed
+prefix safely. With that option enabled, a deadline abort after at least one
+candidate completed returns only the already-finalized rows, plus
+`partial:true` / `timeout:true` / completed-vs-requested metadata and a partial
+contact-audit histogram. Already-aborted-before-work and no-completed-row aborts
+still throw.
 
-**Deferred** pending frequency data. Scope boundary (Codex): A recovers only emails
-that REACHED the roster — it does **not** cover a timeout that discarded enrichment
-entirely, which is B2's class. Do not claim A covers timeout-discard damage.
+`/api/reviewer-finder/enrich-contacts` is the only opt-in route in this slice. It
+still runs the same route-level PI-institution COI recompute over the returned
+rows, then emits a normal SSE `type:'complete'` frame with the partial metadata.
+The existing client complete-frame path merges those rows onto the original
+candidate list and leaves missing candidates un-enriched, so completed enrichment
+can reach `save-candidates` instead of being discarded. The save gate itself is
+unchanged: vetted enrichment fields still pass through the existing
+`save-candidates` persistence rules. `/api/workbench/enrich-recommended` is
+intentionally **not** opted in because it owns a separate id-keyed writeback flow
+and should retain fail-stop timeout behavior until designed separately.
+
+Tests: `tests/unit/contact-enrichment-abort.test.js` (default throw, opt-in
+completed-prefix return, in-flight abort excludes the half-finished row) and
+`tests/unit/reviewer-enrich-contacts-route.test.js` (route passes
+`returnPartialOnAbort:true` and streams partial `complete` metadata).
 
 ## Cause #2 (separate track)
 

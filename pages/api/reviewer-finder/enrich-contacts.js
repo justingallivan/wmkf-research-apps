@@ -116,6 +116,7 @@ export default async function handler(req, res) {
       useSerpSearch: options.useSerpSearch === true,
       signal: deadlineController.signal,
       deadlineAt,
+      returnPartialOnAbort: true,
       onProgress: (progress) => {
         sendEvent({
           type: 'progress',
@@ -190,6 +191,10 @@ export default async function handler(req, res) {
       type: 'complete',
       results: results.enriched,
       stats: results.stats,
+      partial: !!results.partial,
+      timeout: !!results.timeout,
+      completedCount: results.completedCount,
+      requestedCount: results.requestedCount,
     });
 
   } catch (error) {
