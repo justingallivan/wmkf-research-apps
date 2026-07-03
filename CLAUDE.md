@@ -81,6 +81,9 @@ shared/            Shared components, config, prompts, and utilities
 lib/               Services, Dataverse adapters, database, and core utilities
 scripts/           Setup, probes, gates, and operational utilities
 docs/              Canonical architecture, plans, runbooks, Atlas, and guides
+modules/           Self-contained sub-projects with their own local instructions
+outputs/           Generated reports, decks, and analysis artifacts
+_archived/         Retired apps/pages moved out of the live tree
 .claude/rules/      Path-scoped conventions
 .claude/skills/     Multi-step workflows shared with Codex through .agents/skills
 .claude-memory/     Rationale, preferences, history, and task router

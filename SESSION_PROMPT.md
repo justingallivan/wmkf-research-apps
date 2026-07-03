@@ -1,4 +1,4 @@
-# Session 323 Prompt: Act on S322 audit decisions (or pick up B2 / Atlas counts)
+# Session 323 Prompt: Act on remaining S322 audit decisions (or pick up B2)
 
 ## Session 322 Summary
 
@@ -64,12 +64,7 @@ were caught wrong during main-session re-verification and corrected in place
 
 ### Verified Open
 
-1. **Atlas row-count refresh (the only red gate).**
-   Evidence: `check:memory-drift:no-write` red at S322 start and unaddressed:
-   `wmkf_app_reviewer_suggestion`/`wmkf_appreviewersuggestions` atlas=336 live=621;
-   `wmkf_potentialreviewerses` atlas=331 live=4393. Organic growth, not breakage.
-   Small doc reconcile; follow `.claude/rules/durable-docs.md`.
-2. **B2 — enrichment-timeout partial-return.**
+1. **B2 — enrichment-timeout partial-return.**
    Evidence: `lib/services/contact-enrichment-service.js:1356` (S321 anchor; file
    untouched in S322 but re-confirm the line), `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md`
    §B2. Last open item on the reviewer-email reliability track.
@@ -87,16 +82,19 @@ were caught wrong during main-session re-verification and corrected in place
    glob was reviewed and intentionally left in place so LLM/prompt guidance still loads
    on API route call sites; `docs/AGENT_INSTRUCTION_AUDIT_S322.md` now marks the removal
    option deprecated / do not apply.
+3. **Env-var doc triage + CLAUDE.md tree additions.**
+   `docs/CREDENTIALS_RUNBOOK.md` now documents BILL runtime credentials/HMACs,
+   option-set values, reviewer page-email recovery, intake drain tuning, and related
+   legacy/config env knobs; `.env.example` has local placeholders for the toggles an
+   operator would plausibly set; `CLAUDE.md` now lists `modules/`, `outputs/`, and
+   `_archived/`.
 
 ### Owner Decision Needed
 
 1. **Dead-code deletion pass** — approve the SAFE bucket and/or triage the NEEDS-OWNER
    bucket. Evidence: `docs/DEAD_CODE_DELETION_MANIFEST.md` (execution protocol inside;
    re-run caller checks live before deleting — anchors are at `7d3be6a1`).
-2. **Env-var doc triage + CLAUDE.md tree additions.** Evidence:
-   `docs/DOCS_DRIFT_AUDIT_S322.md` items 4-5, 7 (which vars belong in `.env.example`;
-   whether `modules/`/`outputs/`/`_archived/` are deliberately untreed).
-3. **Whether to delete merged remote Codex branches** (carryover S320; verify merged first).
+2. **Whether to delete merged remote Codex branches** (carryover S320; verify merged first).
    Evidence: `git ls-remote --heads origin codex/referral-seeding-build codex/program-area-normalization`.
 
 ### Measure Later (time-driven, not work-driven)
@@ -138,7 +136,7 @@ were caught wrong during main-session re-verification and corrected in place
 | `docs/DEAD_CODE_DELETION_MANIFEST.md` | Deletion candidates by confidence + execution protocol. |
 | `docs/AGENT_INSTRUCTION_AUDIT_S322.md` | CLAUDE.md/rules audit; F1 applied, F2 closed rejected/deprecated. |
 | `docs/HARNESS_INSTRUCTION_AUDIT_S322.md` | Hook/skill classification + applied-outcome record. |
-| `docs/DOCS_DRIFT_AUDIT_S322.md` | Drift table + docs patch (mechanical part apply-ready). |
+| `docs/DOCS_DRIFT_AUDIT_S322.md` | Drift table + applied outcome notes for docs/env/tree cleanup. |
 | `.claude/hooks/docs-catalog-commit-guard.js` | Now parses command path tokens (staging-gap fix). |
 | `.claude/hooks/pre-commit-self-review.js` | Same staging-gap fix; checklist tailoring restored for compound commits. |
 | `.claude/hooks/codex-verbatim-reminder.js` | subagent_type-authoritative scoping. |
@@ -149,6 +147,6 @@ were caught wrong during main-session re-verification and corrected in place
 ```bash
 npm test   # full suite; known-red baseline: bill, discovery-verification-status, stage2a (30 tests)
 node .claude/hooks/lib/git-commit-detect.test.js   # commit-hook trigger matrix (plain node)
-npm run check:memory-drift:no-write                # expect RED until Atlas row counts refreshed
+npm run check:memory-drift:no-write                # clean after Atlas row-count refresh
 # gate list: .claude/skills/start/SKILL.md (full set as of 2026-07-03, incl. check:docs-catalog)
 ```

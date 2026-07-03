@@ -134,6 +134,23 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 
 Prefer the admin dashboard (`/admin` → Models tab) for non-static overrides — env var values are baked into the deployment until next redeploy. The admin Models API rejects unreviewed concrete Claude ids before writing Dataverse; env overrides rely on the pre-deploy check above.
 
+### Optional — BILL.com Honorarium Integration
+
+Automated BILL onboarding is disabled unless `BILL_ENABLED=true`; the current no-BILL grant-cycle posture keeps `BILL_ONBOARDING_DEFERRED=true`, which returns `status: 'deferred'` before any BILL call. To enable BILL, provision the runtime credentials, webhook HMAC, internal-call HMAC, and Dataverse option-set values together, then redeploy.
+
+| Variable | Purpose | Default / Notes |
+|----------|---------|-----------------|
+| `BILL_ENABLED` | Master gate for automated BILL onboarding in `lib/bill/onboard-reviewer-service.js`. | unset/`false` → `alert_only` unless `BILL_ONBOARDING_DEFERRED=true` short-circuits first |
+| `BILL_ONBOARDING_DEFERRED` | Cycle-level lock that skips the BILL tail silently after the honorarium request exists. | no-BILL cycle: `true`; unset only when ready to call BILL |
+| `BILL_BASE_URL` | BILL API base URL used by login and API requests. | Required when `BILL_ENABLED=true`; keep to the approved BILL gateway host |
+| `BILL_DEV_KEY` | BILL developer key used for login and request headers. | Required when `BILL_ENABLED=true` |
+| `BILL_USERNAME` / `BILL_PASSWORD` | BILL login credentials for the configured organization. | Required when `BILL_ENABLED=true` |
+| `BILL_ORG_ID` | BILL organization id used during login. | Required when `BILL_ENABLED=true` |
+| `BILL_WEBHOOK_SECRET` | HMAC secret for `/api/webhooks/bill` (`x-bill-sha-signature`). | Required outside development for BILL webhook verification; tracked as `bill_webhook_secret` |
+| `BILL_WEBHOOK_DEBUG` | Logs a redacted raw payload sample for sandbox payload-shape discovery. | unset/`false`; use only in sandbox because BILL payloads contain vendor PII |
+| `BILL_INTEGRATION_SECRET` | Internal HMAC secret for same-deployment calls to `/api/bill/onboard-reviewer`. | Required for the HTTP endpoint; tracked as `bill_integration_secret`; generate with `openssl rand -base64 48` |
+| `BILLCOM_ACCOUNT_YES_VALUE` / `BILLCOM_ACCOUNT_NO_VALUE` / `BILLCOM_ACCOUNT_RECENTLY_CONFIRMED_VALUE` | Dataverse option-set integer values for `wmkf_exisitngbillcomaccount`. | Probe per environment with `node scripts/probe-bill-option-set-values.js`; `YES` and `NO` are required when `BILL_ENABLED=true` |
+
 ### Optional — Operational Flags
 
 | Variable | Purpose | Default |
@@ -143,10 +160,17 @@ Prefer the admin dashboard (`/admin` → Models tab) for non-static overrides �
 | `WAVE1_BACKEND_APP_ACCESS` | Dispatch flag for app-access backend. Default Dataverse since 2026-05-12. | `dataverse` (implicit) |
 | `WAVE1_BACKEND_PREFS` | Dispatch flag for user-preferences backend. Default Dataverse since 2026-05-12. | `dataverse` (implicit) |
 | `DEBUG_REVIEWER_FINDER` | Verbose logging for Reviewer Finder pipeline | unset |
+| `REVIEWER_PAGE_EMAIL_TIER_ENABLED` | Enables the guarded faculty/profile-page email recovery tier in `ContactEnrichmentService._attachEmailFromResolvedPage()`. The tier is SSRF-bound to anchored institution domains and only runs when no trusted email is present. | unset/`false` locally; production enabled 2026-07-03 |
+| `DRAIN_BATCH_SIZE` | Intake drain cron batch size for `/api/cron/drain-submissions`. | `5` |
+| `DRAIN_LOCK_TTL_SECONDS` | Intake drain lease length; cron cadence and retry behavior assume this is much larger than the 2-minute schedule. | `600` |
+| `WAVE2_BACKEND_GRANT_CYCLES` | Legacy migration guard for grant-cycle reads. `postgres` is no longer supported and fails loudly; unset/default is Dataverse. | unset / `dataverse` |
+| `ALLOWED_ORIGINS` | Comma-separated CORS allowlist used by legacy shared config. | unset → `*` |
+| `API_SECRET_KEY` | Legacy client API-key encryption secret in `shared/utils/apiKeyManager.js`; production fails closed if unset on that path. Prefer `USER_PREFS_ENCRYPTION_KEY` for current saved preferences. | unset locally; required only if that legacy path is used in production |
+| `ENABLE_CACHE` / `ENABLE_LOGGING` / `LOG_LEVEL` | Legacy shared-config toggles for cache/log behavior. | cache/logging enabled unless set to `false`; log level `info` |
+| `CLAUDE_API_URL` / `CLAUDE_MODEL` | Legacy base Claude endpoint/model overrides in `shared/config/baseConfig.js`. Prefer canonical `lib/services/llm-client.js` transport and per-app model override rules above. | unset |
 | `VIRUS_SCAN_ENABLED` | App-side Cloudmersive virus scanning on upload surfaces (today: reviewer uploads). Fail-closed when on — see [Virus scanning](#virus-scanning-virus_scan_enabled--cloudmersive_api_key) for the runbook. | unset (scanning skipped) |
 | `CLOUDMERSIVE_API_KEY` | Cloudmersive virus-scan API key. Required when `VIRUS_SCAN_ENABLED=true`. Free tier 800 scans/month. | unset |
 | `HONORARIUM_ONBOARDING_DEFERRED` | Forces reviewer honorarium onboarding to **capture-only**: `ensureHonorariumOnboarding()` captures contact + mailing address then STOPS before minting the honorarium `akoya_request` or calling BILL (`lib/bill/honorarium-onboard-orchestrator.js:54`). Capture-only is *also* implied whenever the discriminator GUIDs (`HONORARIUM_PROGRAM_ID` / `HONORARIUM_GRANTPROGRAM_ID` / `HONORARIUM_TYPE_ID`) are unset — but this flag is the **explicit** lock that still holds if those GUIDs are later configured. **SET to `true` in Production 2026-06-22** as the capture-only lock for the reviewer onboarding-at-accept cycle. **2026-07-01 no-BILL creation plan:** set the three discriminator GUIDs and unset this flag so the portal creates the honorarium request; keep `BILL_ONBOARDING_DEFERRED=true` so no Bill.com payment/onboarding fires. Env-var changes require a deployment/restart built after the update because the discriminator module reads them at load time. To go live on Bill.com later, keep the GUIDs configured and separately unset `BILL_ONBOARDING_DEFERRED` after BILL credentials and option-set values are ready. **GO-LIVE 2026-07-02:** the three discriminator GUIDs were set in **Production**, this flag was **removed from Production** (kept `true` on **Preview**, which also has no GUIDs, so preview stays capture-only), `BILL_ONBOARDING_DEFERRED=true` retained, and prod was redeployed (`dpl_CqnqfG6mp3U9FkLuvzWsuzmnUfc1`) so the module constants took effect — no-BILL honorarium creation is live. | **Production: unset 2026-07-02 (live)**; Preview: `true` (capture-only) |
-| `BILL_ONBOARDING_DEFERRED` | Forces the BILL tail to skip silently after an honorarium request exists: `onboardReviewer()` returns `status: 'deferred'` with no BILL call and no per-reviewer alert. This is the target setting for the 2026-07-01 no-BILL honorarium creation cycle. Distinct from `BILL_ENABLED=false`, which falls through to the older `alert_only` posture. | unset (no-BILL cycle: `true`) |
 
 ### Optional — Notifications & Spend Alerts
 

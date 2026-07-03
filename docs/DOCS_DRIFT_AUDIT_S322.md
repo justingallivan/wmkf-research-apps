@@ -30,7 +30,9 @@ Audit-only; nothing was changed. Method: three code-first read-only scans (setup
 
 ## Proposed docs patch
 
-Items 1-3 are mechanical and safe. Items 4-5's `.env.example` additions and item 7's tree additions are included but **need owner confirmation** (which vars belong in the local-dev contract, and whether `outputs/`/`_archived/` are deliberately untreed).
+At audit time, items 1-3 were mechanical and safe; items 4-5's `.env.example` additions and item 7's tree additions needed owner confirmation (which vars belong in the local-dev contract, and whether `outputs/`/`_archived/` are deliberately untreed).
+
+**Outcome 2026-07-03:** items 1-3 were applied mechanically. Items 4-5 and 7 were later owner-approved and applied with triage rather than a blanket env dump: BILL runtime credentials/HMACs and option-set values are now documented in `docs/CREDENTIALS_RUNBOOK.md`; local toggles/placeholders for reviewer page-email recovery, intake drain tuning, and BILL disabled-mode setup are in `.env.example`; `CLAUDE.md` now lists `modules/`, `outputs/`, and `_archived/`. `MOCK_MODE` was not promoted to a supported env contract because `docs/DEAD_CODE_DELETION_MANIFEST.md` marks it as computed with no live readers.
 
 ```diff
 --- a/README.md
@@ -95,5 +97,5 @@ Items 1-3 are mechanical and safe. Items 4-5's `.env.example` additions and item
 
 1. Re-verify each quoted line live before applying (snapshot at `1ccb837a`).
 2. README/CI_GATES fixes are safe to apply directly; run `npm run check:doc-currency` and `npm run check:docs-catalog` after (and `npm run generate:docs-catalog` if frontmatter changes).
-3. `.env.example` and CLAUDE.md changes need owner confirmation first; a CLAUDE.md edit additionally requires `npm run check:agent-invariants` and `npm run check:instruction-architecture`.
-4. Item 5's full undocumented-var list should be triaged once (runtime contract vs internal tuning) — the runbook is the right home for anything secret-shaped; `.env.example` for local-dev-relevant toggles only.
+3. `.env.example` and CLAUDE.md changes were owner-approved and applied 2026-07-03. Future CLAUDE.md edits still require `npm run check:agent-invariants` and `npm run check:instruction-architecture`.
+4. Item 5's undocumented-var list was triaged 2026-07-03 (runtime contract vs internal tuning): the runbook is the home for secret-shaped and operator-only variables; `.env.example` carries local-dev-relevant toggles/placeholders only.
