@@ -50,7 +50,7 @@ tenants, the three-layer defense-in-depth) is in `docs/AUTHENTICATION_SETUP.md`.
 
 Quick local start:
 1. Register an app in the Azure Portal and obtain client/secret/tenant IDs.
-2. Copy `.env.local.example` to `.env.local` and fill in the values, including
+2. Copy `.env.example` to `.env.local` and fill in the values, including
    `NEXTAUTH_URL` and `NEXTAUTH_SECRET` (`openssl rand -base64 32`).
 3. `npm run dev` — sign-in appears where required.
 

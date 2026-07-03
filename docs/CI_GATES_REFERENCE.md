@@ -198,8 +198,8 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:atlas` | `check:atlas:self-test` — exercises every Atlas pattern from `docs/CLAUDE_COVERAGE_LESSONS.md`. |
 | `check:doc-currency` | `check:doc-currency:self-test` — exercises every `DRIFT_PATTERNS` entry (positive + negation-guard fixtures). |
 | `check:fact-consistency` | `check:fact-consistency:self-test` — exercises every `CANONICAL_FACTS` entry (known-miss positives + negation + structured-exemption fixtures + independent derive cross-check). |
-| `check:drain-table-mentions` | `check:drain-table-mentions-self-test` |
-| `check:prompt-storage-mentions` | `check:prompt-storage-mentions-self-test` |
+| `check:drain-table-mentions` | `check:drain-table-mentions:self-test` |
+| `check:prompt-storage-mentions` | `check:prompt-storage-mentions:self-test` |
 | `check:doc-symbol-refs` | `check:doc-symbol-refs:self-test` — positive (dangling), negative (existing/annotated/marker/glob/ellipsis/relative/URL/gitignored), and live-baseline-clean fixtures. |
 | `check:build-claim-freshness` | `check:build-claim-freshness:self-test` — positive (pending construction on an existing path: before/after/colon/to-be-created), negative (pending on absent path, plain ref, done-marker, "now lives at", bare-planned label, multi-path, ignore-marker, gitignored), and live-baseline-clean fixtures. |
 | `check:canonical-pointers` | `check:canonical-pointers-self-test` |
@@ -227,8 +227,8 @@ Several self-tests write synthetic fixtures into paths that the main gate also s
 - `check:atlas` then `check:atlas:self-test` (never in parallel)
 - `check:fact-consistency` then `check:fact-consistency:self-test` (same hazard)
 - `check:canonical-pointers` then `check:canonical-pointers:self-test` (same hazard)
-- `check:drain-table-mentions` then `check:drain-table-mentions-self-test` (same hazard)
-- `check:prompt-storage-mentions` then `check:prompt-storage-mentions-self-test` (same hazard)
+- `check:drain-table-mentions` then `check:drain-table-mentions:self-test` (same hazard)
+- `check:prompt-storage-mentions` then `check:prompt-storage-mentions:self-test` (same hazard)
 - `check:doc-symbol-refs` then `check:doc-symbol-refs:self-test` (self-test writes fixtures into `docs/agent-wiki/`, which the gate scans)
 - `check:build-claim-freshness` then `check:build-claim-freshness:self-test` (self-test writes fixtures into `docs/agent-wiki/`, which the gate scans)
 - `check:model-registry` then `check:model-registry:self-test`

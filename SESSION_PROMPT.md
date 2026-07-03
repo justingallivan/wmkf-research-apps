@@ -68,14 +68,18 @@ were caught wrong during main-session re-verification and corrected in place
    `wmkf_app_reviewer_suggestion`/`wmkf_appreviewersuggestions` atlas=336 live=621;
    `wmkf_potentialreviewerses` atlas=331 live=4393. Organic growth, not breakage.
    Small doc reconcile; follow `.claude/rules/durable-docs.md`.
-2. **Apply mechanical docs-drift fixes (items 1-3).**
-   Evidence: apply-ready diffs in `docs/DOCS_DRIFT_AUDIT_S322.md` (README `.env.example`
-   step, 4× CI_GATES_REFERENCE script names, `NOTIFICATION_EMAIL_TO` removal). Re-verify
-   quoted lines live first.
-3. **B2 — enrichment-timeout partial-return.**
+2. **B2 — enrichment-timeout partial-return.**
    Evidence: `lib/services/contact-enrichment-service.js:1356` (S321 anchor; file
    untouched in S322 but re-confirm the line), `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md`
    §B2. Last open item on the reviewer-email reliability track.
+
+### Completed This Session
+
+1. **Mechanical docs-drift fixes (S322 audit items 1-3).**
+   README now points to `.env.example`; `docs/CI_GATES_REFERENCE.md` uses the live
+   `:self-test` script names for drain-table and prompt-storage gates; `.env.example`
+   no longer lists dead `NOTIFICATION_EMAIL_TO` and points recipients to `/admin` →
+   Alert Recipients.
 
 ### Owner Decision Needed
 
