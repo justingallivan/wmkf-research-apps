@@ -283,6 +283,61 @@ lint, and production build.
 The S318 Codex plan review remains preserved verbatim in the appendix; the historical
 post-filter seam there is superseded by §C.
 
+## ⚠️ PRE-MERGE FIX REQUIRED — seed⇄discovery collision loses the referral badge (S320 audit)
+
+**Status: OPEN — must be fixed before merging `codex/referral-seeding-build` to `main`.**
+Found by a code audit of the built branch (S320). Not a data-corruption bug; a
+labeling/attribution defect. Whoever merges this feature (Claude or Codex, any machine)
+owns closing this first.
+
+### The defect
+When a seeded referral name **and** a candidate that discovery independently finds in the
+same run **normalize to the same name**, the survivor shown to the user is chosen by
+**relevance score, not by provenance**:
+- Server (`/discover`) prepends seeds to `verifiedWithCOI` and does **not** dedup them
+  against this run's own discovery output; `DiscoveryService.rankAllCandidates` →
+  `rankByRelevance` only scores + sorts (no dedup). So the emitted `ranked` array can
+  carry two rows for the same person [VERIFIED: `discover.js` seed-merge line
+  `verifiedWithCOI = [...referredCandidates, ...verifiedWithCOI]`; `relevance-score.js`
+  `rankByRelevance` sort-only].
+- Client (`ReviewerSearchSection.js`) collapses them via `dedupeByName`
+  (`normalizeReviewerName`, **first-occurrence wins**) when building `displayCandidates` —
+  so there is **no duplicate card and no duplicate save** [VERIFIED: `dedupeByName` +
+  `displayCandidates = dedupeByName([...recCandidates, ...candidates, ...displayRosterActive])`].
+- **BUT** first-occurrence = highest relevance score, not the referred copy. `referred`
+  gets a +25 grounded bonus (`GROUNDED_RANKING_BONUS_KINDS` includes `REFERRED`), so the
+  seed *usually* wins — **not always**. If the discovery copy outranks it, the surviving
+  row shows as an ordinary discovered candidate: **no "Externally-Referred" badge, no
+  `referredBy` attribution**, even though staff explicitly referred that person. The
+  surface promise ("clearly badged as externally-referred") silently fails for exactly the
+  prominent names most likely to be found both ways.
+
+### The fix (scoped)
+Make the collision resolve by **provenance preference, not relevance order**: when two
+candidates share a `normalizeReviewerName` key, keep/merge so the surviving row carries the
+`referred` provenance kind and its `referredBy`. Options, cheapest first:
+1. **Client merge (smallest):** change `dedupeByName` (or a seed-aware wrapper used only
+   for `displayCandidates`) so that on a key collision it prefers the `referred`-kind copy,
+   or grafts `provenance.kind='referred'` + `referredBy` + the Externally-Referred badge
+   onto whichever copy it keeps. Add a unit test: two same-name candidates (one `referred`
+   seed, one discovered) → survivor is badged Externally-Referred with the referrer.
+2. **Server merge (more robust):** dedup seeds against `verifiedWithCOI`/`enhancedDiscovered`
+   inside `/discover` *before* ranking — if a discovery candidate already matches a seed by
+   normalized name, merge the `referred` provenance + `referredBy` onto it instead of adding
+   a second row. Preferred if you also want the server `ranked` payload itself clean.
+
+### Acceptance criteria
+- A seeded name that discovery also finds appears **once**, badged **Externally-Referred**
+  with the referrer, regardless of relevance order.
+- No regression to the existing name-only unresolved-seed contact-null safety.
+- New unit test covering the collision (both orderings: seed-higher and discovery-higher).
+
+### Known limitation (NOT a blocker — note only)
+`dedupeByName` is exact-normalized-name. If the referrer hand-types a variant the system
+normalizes differently ("R. Smith" vs "Robert Smith"), the two won't collapse → two rows
+for one human. Pre-existing, system-wide limitation of name-key dedup; seeding is a new way
+to trigger it. Do not expand scope to fix name-fuzzing here.
+
 ## Appendix: Codex plan-review findings (verbatim, S318) — RESCUED / PARTLY SUPERSEDED
 
 Preserved so a future session doesn't re-run the review. S319 re-review supersedes the
