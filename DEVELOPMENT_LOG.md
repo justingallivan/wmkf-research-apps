@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Reviewer gating redesign shipped: contested-email lane, COI precision + drop ledger, faculty-page tier live (Session 321)
+
+**Milestone:** The reviewer-finder's silent-discard gates became visible, staff-adjudicable states — in production, with the faculty-page email fetch tier enabled — closing the Cause #2 email-coverage miss and the Contract 5 COI mis-drop exposure in one arc.
+
+**Sessions:** 321 (S320 diagnosed Cause #2 and briefed the review). Claude led strategy + verification; Codex adversarially reviewed (2 blockers → rev 2) and built; Claude took over two stalled Codex runs.
+
+**Ship state:**
+- **Contested-email lane** — the domain guard and name-mismatch heuristic now contest (`search_contested`, LOW → per-recipient confirm) instead of nulling; identity-anchored ORCID/OpenAlex domain vindication auto-recovers; send/save gates unchanged or stronger (`29c6748c`).
+- **Per-recipient invite confirm** — the batch LOW `window.confirm` became per-recipient checkboxes; only ticked ids reach `confirmedLowConfidenceIds`.
+- **COI precision + observability** — `institutionsMatchForCOI` (ID-first; 7/10→0/10 curated false positives), durable `coi_dropped` roster ledger (migration 023), and owner-approved Phase C flag-not-drop for the narrow contradicted-single-source case (`2a244b9d`, `dae623c5`).
+- **`REVIEWER_PAGE_EMAIL_TIER_ENABLED` enabled in prod** by the owner, now bound to the identity-anchored domain set (`f65123fb`).
+
+**Why it matters:** measured recall losses (4/5 correct emails discarded by gates; leaky COI matcher with invisible drops) are converted into staff-visible one-click decisions without opening any wrong-person send path — the send-time confidence gate remains the fail-closed backstop.
+
+**Pointers:** `docs/REVIEWER_GATING_STRATEGY_REDESIGN.md`, `docs/REVIEWER_COI_PRECISION_PLAN.md`, `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`; commits `b6b23720`, `fe48ff0e`, `29c6748c`, `16441575`, `2a244b9d`, `dae623c5`, `f65123fb`.
+
 ## July 2026 - Reviewer finder referral seeding and Dataverse-grounded analyze shipped (Session 319)
 
 **Milestone:** Reviewer Find now supports externally referred seed names and no longer asks Claude to infer request identity metadata that Dataverse already owns in normal request-backed analysis.
