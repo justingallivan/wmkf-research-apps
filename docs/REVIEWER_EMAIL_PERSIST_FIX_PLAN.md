@@ -129,6 +129,14 @@ entirely, which is B2's class. Do not claim A covers timeout-discard damage.
 
 ## Cause #2 (separate track)
 
-Enrichment completes but no tier surfaces an email that exists (8 prominent PIs in
-90d). Not addressed here; needs a stronger discovery step (e.g. the resolved
-faculty-page email tier). Tracked separately.
+Enrichment completes but no invitable email is surfaced. An earlier 90d probe
+counted 8 prominent PIs; an S320 re-measure over 120d found 5 true Cause #2 cases
+(482 selected, 11 no-email) [VERIFIED via scripts/probe-no-email-breakdown.mjs + live
+OpenAlex probes, S320]. **Corrected root cause:** it is NOT primarily a weak
+discovery step — in 4 of 5, a *correct* institutional email was found and then
+discarded by a gate (`verified_domain_contradiction` trusting a single OpenAlex
+last-known-institution domain; `name_mismatch` on the correct domain). The resolved
+faculty-page fetch tier cannot rescue the domain-contradiction cases (its fetch is
+bound to the same wrong domain). Now handed to a fresh reviewing LLM — see
+`docs/REVIEWER_GATING_STRATEGY_REVIEW_PROMPT.md` (expected output
+`docs/REVIEWER_GATING_STRATEGY_REDESIGN.md`). Tracked separately.
