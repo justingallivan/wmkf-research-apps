@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-24
+last_verified: 2026-07-02
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -191,6 +191,19 @@ bare keyword→author lane is what underperformed.
 - **Applicant exclusion breadth is an open policy decision** — one vague
   overlapping-program line can over-prune the peer set. Memory
   `project-applicant-exclusion-policy-pending`.
+- **The find "notes" field (`additionalNotes`) is NOT a name-inclusion guarantee (S318).**
+  It IS injected into the analyze prompt as `ADDITIONAL CONTEXT FROM USER`
+  (`shared/config/prompts/reviewer-finder.js`, `reviewer-prompt-composer.js`), but three
+  code-owned mechanisms downstream defeat a prompt-only "use these names" instruction:
+  the fixed target count (`DEFAULT_REVIEWER_COUNT`), the appended anti-fabrication
+  `ANALYZE_INTEGRITY_BLOCK` (return FEWER rather than include an unresolvable name), and
+  discover-stage verification/ranking. A PD pasting a known-names list into notes will get
+  only *some* back — expected, not a bug. Guaranteeing PD-recommended names must be a
+  **code-owned seed path**, not prompt wording. Design (draft, not built):
+  `docs/REVIEWER_PD_PREFERENCE_SEEDING_DESIGN.md`.
+- **Results list has a Rank⇄A–Z sort toggle (S318, shipped).** Default is
+  confidence/relevance rank; A–Z sorts by name *within* each provenance group (grouping
+  preserved). `ReviewerSearchSection.js` `sortMode`.
 - **Suggestion data is cleaned at ONE chokepoint — `DiscoveryService.normalizeSuggestionSource` (S266).**
   An unverified honorific is stripped from the display name (`stripHonorifics`) and a
   non-page website (e.g. a co-author's paper PDF) is nulled (`sanitizeWebsiteForCandidate`),
