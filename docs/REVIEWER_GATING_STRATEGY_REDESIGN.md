@@ -33,7 +33,8 @@ backstop.
 **IMPLEMENTED (S321, same day).** Phases 0–3 of §4 plus §3.5's code change shipped
 (Codex built from this rev-2 plan after its re-review; Claude completed
 verification and fixes when the Codex run stalled). `REVIEWER_PAGE_EMAIL_TIER_ENABLED`
-default untouched — Phase 4 flag enablement remains an owner decision. Deviations
+default untouched in code; the owner ENABLED the flag in Production 2026-07-03
+(same day), completing Phase 4. Deviations
 from the plan as written, all verified against the shipped code:
 
 - `resolveIdentity` moved EARLIER in `_finalize` (before domain-evidence
@@ -278,8 +279,8 @@ private-IP block, IP-pinning dispatcher) exactly as the single domain does today
 With the flag ON, case 5 (captured faculty page never fetched) → fetched when its
 host is within an anchored domain → page-grounded `institution_page` email (HIGH,
 existing evidence standard) → **recovered**. Whether to enable
-`REVIEWER_PAGE_EMAIL_TIER_ENABLED` in prod remains the owner's call (its current
-prod value is unread — treat as unknown); with the flag OFF, case 5 keeps today's
+`REVIEWER_PAGE_EMAIL_TIER_ENABLED` in prod was the owner's call — **enabled
+2026-07-03** after this redesign shipped; with the flag OFF, case 5 keeps today's
 manual lane (faculty-page link + staff entry). Structurally the tier stays an
 opt-in tier — page-grounding-as-core-adjudication is not needed once §3.1–3.3
 land, and keeping the fetch behind the flag preserves the zero-SSRF default.
