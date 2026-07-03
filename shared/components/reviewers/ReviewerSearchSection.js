@@ -51,6 +51,7 @@ import {
   hasValidApplicantEnrichmentCache,
   normalizeReviewerName,
   pruneCandidateForRoster,
+  dedupeByNamePreferReferred,
 } from './reviewer-search-logic';
 import { rankByRelevance } from '../../../lib/utils/relevance-score';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
@@ -103,17 +104,11 @@ function candKey(c) {
 }
 
 // Dedupe a candidate list by normalized name; first occurrence wins (so a
-// freshly-enriched run candidate beats its pruned roster copy).
+// freshly-enriched run candidate beats its pruned roster copy). On a collision it
+// grafts referral provenance onto the survivor (S320) so a seeded Externally-Referred
+// reviewer that discovery also finds never loses its badge/referrer to relevance order.
 function dedupeByName(list) {
-  const seen = new Set();
-  const out = [];
-  for (const c of (Array.isArray(list) ? list : [])) {
-    const k = candKey(c);
-    if (!k || seen.has(k)) continue;
-    seen.add(k);
-    out.push(c);
-  }
-  return out;
+  return dedupeByNamePreferReferred(list, candKey);
 }
 
 function isApplicantOriginCandidate(c) {

@@ -113,6 +113,89 @@ export function parseReferredSeeds(text, referredBy = '') {
 }
 
 /**
+ * Referral-preserving collision merge (S320 pre-merge fix). When a seeded
+ * externally-referred reviewer and a candidate discovery independently finds
+ * normalize to the SAME name, `dedupeByName` keeps the first occurrence — which is
+ * relevance-order, NOT provenance. Without this, if the discovery copy outranks the
+ * seed the survivor loses its `referred` provenance (Externally-Referred badge +
+ * `referredBy`). This grafts the referral labeling onto the kept survivor so the
+ * badge/referrer survive regardless of ranking order.
+ *
+ * Deliberately conservative:
+ * - Only fires when the DROPPED copy is `referred` and the kept one is a plain
+ *   discovery/literature kind. It never touches `applicant_suggested` survivors
+ *   (that lane has its own promote-by-suggestionId save path), and is a no-op when
+ *   the survivor is already `referred`.
+ * - Grafts ONLY provenance/label fields (`referred` source, `referredBy`, and the
+ *   durable `Referred by …` match-reason prefix that `my-candidates` reload parses).
+ *   It does NOT copy contact/identity/bibliometrics across copies, so the
+ *   unresolved/name-only referred-seed contact-null safety is preserved — the
+ *   survivor keeps its own resolution status.
+ */
+export function mergeReferredProvenance(keep, incoming) {
+  if (!keep || !incoming) return keep;
+  const keepKind = provenanceKindOf(keep);
+  const incomingReferred = provenanceKindOf(incoming) === PROVENANCE_KINDS.REFERRED;
+  const keepReferred = keepKind === PROVENANCE_KINDS.REFERRED;
+  const keepApplicant = keepKind === PROVENANCE_KINDS.APPLICANT_SUGGESTED;
+  if (!incomingReferred || keepReferred || keepApplicant) return keep;
+
+  const referredBy = incoming.referredBy
+    || incoming.provenance?.referredBy
+    || keep.referredBy
+    || null;
+  const sources = Array.from(new Set([
+    ...(Array.isArray(keep.sources) ? keep.sources : []),
+    'referred',
+  ]));
+  let reasoning = keep.reasoning || keep.generatedReasoning || '';
+  // Durable-string contract: my-candidates reload reconstructs `referredBy` from a
+  // leading "Referred by {name}." in wmkf_matchreason. Prepend it (once) so a
+  // grafted survivor round-trips the referrer, matching a native referred seed.
+  if (referredBy && !/^Referred by /i.test(reasoning)) {
+    reasoning = `Referred by ${referredBy}. ${reasoning}`.trim();
+  }
+  const upgraded = {
+    ...keep,
+    sources,
+    reasoning,
+    referredBy: referredBy || null,
+    isReferredSeed: true,
+  };
+  // force past buildReviewerProvenance's pre-built-provenance short-circuit so the
+  // kind is re-derived to `referred` (keep already carries a literature provenance).
+  upgraded.provenance = buildReviewerProvenance(upgraded, {
+    force: true,
+    kind: PROVENANCE_KINDS.REFERRED,
+    referredBy,
+  });
+  return upgraded;
+}
+
+/**
+ * Dedupe candidates by a name key, first-occurrence wins, but on a collision graft
+ * referral provenance onto the survivor via {@link mergeReferredProvenance}. Shared
+ * by the panel's `dedupeByName` so the visible + savable list can never drop a
+ * seeded referral's Externally-Referred badge when discovery also finds the person.
+ */
+export function dedupeByNamePreferReferred(list, keyFn) {
+  const posByKey = new Map();
+  const out = [];
+  for (const c of (Array.isArray(list) ? list : [])) {
+    const k = keyFn(c);
+    if (!k) continue;
+    if (posByKey.has(k)) {
+      const pos = posByKey.get(k);
+      out[pos] = mergeReferredProvenance(out[pos], c);
+      continue;
+    }
+    posByKey.set(k, out.length);
+    out.push(c);
+  }
+  return out;
+}
+
+/**
  * Drop any candidate whose name normalizes to an excluded name. Exact (not fuzzy)
  * normalized match so it never over-filters. This is what makes the panel's
  * "applicant-excluded names are blocked from the results" claim TRUE — /discover
