@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-01T04:16:13.646Z",
+  "generated": "2026-07-03T19:45:28.601Z",
   "summary": {
     "total_claims": 157,
     "stale": 38,
@@ -42,9 +42,82 @@
   "drift_buckets": {
     "spec_without_entity": [],
     "entity_without_atlas": [],
-    "stale_row_count": [],
+    "stale_row_count": [
+      {
+        "entity": "wmkf_ai_prompt",
+        "atlas_claim": 11,
+        "live_count": 15,
+        "source_file": "docs/atlas/dataverse-wmkf-ai-run-and-prompt.md"
+      },
+      {
+        "entity": "wmkf_ai_prompts",
+        "atlas_claim": 11,
+        "live_count": 15,
+        "source_file": "docs/atlas/dataverse-wmkf-ai-run-and-prompt.md"
+      },
+      {
+        "entity": "wmkf_ai_run",
+        "atlas_claim": 329,
+        "live_count": 343,
+        "source_file": "docs/atlas/dataverse-wmkf-ai-run-and-prompt.md"
+      },
+      {
+        "entity": "wmkf_ai_runs",
+        "atlas_claim": 329,
+        "live_count": 343,
+        "source_file": "docs/atlas/dataverse-wmkf-ai-run-and-prompt.md"
+      },
+      {
+        "entity": "wmkf_app_reviewer_suggestion",
+        "atlas_claim": 336,
+        "live_count": 621,
+        "source_file": "docs/atlas/postgres-reviewer-suggestions.md"
+      },
+      {
+        "entity": "wmkf_appreviewersuggestions",
+        "atlas_claim": 336,
+        "live_count": 621,
+        "source_file": "docs/atlas/postgres-reviewer-suggestions.md"
+      },
+      {
+        "entity": "wmkf_potentialreviewerses",
+        "atlas_claim": 331,
+        "live_count": 4393,
+        "source_file": "docs/atlas/postgres-researchers.md"
+      }
+    ],
     "doc_label_collision": [],
     "postgres_table_mismatch": [
+      {
+        "table": "researchers",
+        "in_schema_as_code": true,
+        "deployed": false,
+        "declared_in": "schema_sql+setup_database"
+      },
+      {
+        "table": "publications",
+        "in_schema_as_code": true,
+        "deployed": false,
+        "declared_in": "schema_sql+setup_database"
+      },
+      {
+        "table": "researcher_keywords",
+        "in_schema_as_code": true,
+        "deployed": false,
+        "declared_in": "schema_sql+setup_database"
+      },
+      {
+        "table": "reviewer_suggestions",
+        "in_schema_as_code": true,
+        "deployed": false,
+        "declared_in": "schema_sql+setup_database"
+      },
+      {
+        "table": "proposal_searches",
+        "in_schema_as_code": true,
+        "deployed": false,
+        "declared_in": "schema_sql+setup_database"
+      },
       {
         "table": "schema_migrations",
         "in_schema_as_code": false,
