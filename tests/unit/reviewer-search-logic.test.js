@@ -6,12 +6,64 @@ import {
   asPercent,
   normalizeReviewerName,
   parseExcludeList,
+  parseReferredSeeds,
   filterExcluded,
   hasValidApplicantEnrichmentCache,
   pruneCandidateForRoster,
   sanitizeInstitutionCOIDetails,
 } from '../../shared/components/reviewers/reviewer-search-logic.js';
 const { PROVENANCE_KINDS, provenanceGroupOf } = require('../../lib/utils/reviewer-provenance');
+
+describe('parseReferredSeeds', () => {
+  test('parses one-per-line referred reviewer seeds with referrer context', () => {
+    expect(parseReferredSeeds(
+      [
+        'Jane Smith, jane@example.edu, University of Example https://example.edu/jane',
+        'Dr. Amir Khan | amir@uni.edu | Uni Lab',
+        'Jane Smith, jane@example.edu',
+      ].join('\n'),
+      'Dr. Abby Doyle'
+    )).toEqual([
+      {
+        name: 'Jane Smith',
+        email: 'jane@example.edu',
+        affiliation: 'University of Example',
+        url: 'https://example.edu/jane',
+        referredBy: 'Dr. Abby Doyle',
+      },
+      {
+        name: 'Dr. Amir Khan',
+        email: 'amir@uni.edu',
+        affiliation: 'Uni Lab',
+        referredBy: 'Dr. Abby Doyle',
+      },
+    ]);
+  });
+});
+
+describe('pruneCandidateForRoster — referred seed anchors survive reload', () => {
+  test('keeps server-derived seed anchor fields for save-time revalidation', () => {
+    const pruned = pruneCandidateForRoster({
+      name: 'Jane Smith',
+      source: 'referred',
+      isReferredSeed: true,
+      referredBy: 'Dr. Abby Doyle',
+      seedResolvedPotentialReviewerId: 'PID-SEED',
+      seedResolvedContactId: 'CONTACT-SEED',
+      seedIdentityMatchKey: 'email',
+      seedIdentityNameConsistent: true,
+      provenance: { kind: 'referred', seedRole: 'referred_by', sources: [], groundingWorkIds: [], referredBy: 'Dr. Abby Doyle' },
+    });
+    expect(pruned).toEqual(expect.objectContaining({
+      isReferredSeed: true,
+      referredBy: 'Dr. Abby Doyle',
+      seedResolvedPotentialReviewerId: 'PID-SEED',
+      seedResolvedContactId: 'CONTACT-SEED',
+      seedIdentityMatchKey: 'email',
+      seedIdentityNameConsistent: true,
+    }));
+  });
+});
 
 describe('sanitizeInstitutionCOIDetails (S240)', () => {
   test('strips legacy .historical, keeps piInstitution + reviewerInstitution', () => {

@@ -3,7 +3,7 @@ title: "Reviewer Referral Seeding & Provenance Plan"
 domain: reviewers
 kind: plan
 status: active
-summary: "Locked build plan: guarantee externally-referred seed names into the reviewer pool (seed-only, folded-in); relabel two existing kinds, no new enum."
+summary: "Implemented build plan: guarantee externally-referred seed names into the reviewer pool (seed-only, folded-in); relabel two existing kinds, no new enum."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -18,12 +18,10 @@ related:
 
 # Reviewer Referral Seeding & Provenance Plan
 
-**Status: LOCKED — build NOT started (parked S318 for a future session; S319 safety
+**Status: IMPLEMENTED (Codex build on `codex/referral-seeding-build`; S319 safety
 review folded in).** All design questions resolved (see §Locked decisions);
-Codex-reviewed, then re-reviewed against live filter/save contracts. The Codex build was
-blocked by an environment issue (sandbox writable-roots) — see **§Build status & how to
-resume** and pick a path there before implementing. Written in response to a PD report on
-req 1002926 (see §Origin). **Codex plan review incorporated (S318):** 6 claims
+Codex-reviewed, then re-reviewed against live filter/save contracts. Written in response
+to a PD report on req 1002926 (see §Origin). **Codex plan review incorporated (S318):** 6 claims
 CONFIRMED, 1 REFUTED (no post-discovery count cap), 3 RISKs folded in. **S319 correction:**
 the originally proposed post-filter `verifiedWithCOI` seam was unsafe because it bypassed
 proposal-author / institution-COI / coauthor filters; §C now requires a seed safety pass
@@ -118,7 +116,7 @@ ranking.
   companion optional "Referred by" field that applies to the pasted batch. One entry per
   line, tolerant parse to `referredSeeds: [{ name, email?, affiliation?, url?, referredBy? }]`.
 - POST `referredSeeds` to the find flow alongside `additionalNotes`. Applicant picks need
-  no input here — they arrive through the existing applicant-suggested pipeline.
+  no input here — they arrive through the existing applicant-referred pipeline.
 
 ### C. Guaranteed seed injection — `pages/api/reviewer-finder/discover.js`
 - **Injection seam (corrected — Codex REFUTED the count-cap framing).** There is **no
@@ -260,34 +258,30 @@ is what the PD did for Hafezi; dedup correctly reused the existing person — no
   `check:docs-catalog`, and `check:agent-wiki && check:agent-wiki:self-test`. No
   `status-enum-parity` change.
 
-## Build status & how to resume (S318 handoff)
+## Build status
 
-**State: plan LOCKED, build NOT started.** The design is S319-corrected and ready to
-build from §Implementation sequence. The S318 Codex findings are preserved in the appendix,
-but the historical post-filter seam there is superseded by §C. No code has been written.
+**State: implemented on `codex/referral-seeding-build`.** The build follows the
+S319-corrected guardrails in §A/§C/§D: seed safety pass before ranking, anchored reuse
+for confident identity matches, and display-vs-durable-string split.
 
-**Why the build didn't happen — an environment blocker, not a plan problem.** The build
-was handed to Codex in the worktree `../WMKF_Apps-codex` (branch `codex/referral-seeding`,
-off origin/main). Codex's sandbox is `workspace-write` scoped to the main repo; its
-`~/.codex/config.toml` has `writable_roots = ["/Users/gallivan/Code/WMKF_Apps/.git"]` —
-which does NOT include the sibling worktree. Every write there was denied ("writing
-outside of the project"). Codex made **zero** changes; the worktree branch has **0
-commits** over origin/main (only an untracked `.codex/`).
+Implemented surfaces:
+- `ReviewerSearchSection` parses a separate externally-referred seed field and sends
+  `referredSeeds` only to `/discover`, not `/analyze`.
+- `/discover` sanitizes seeds, blocks exact excluded / already-surfaced seeds, runs the
+  same proposal-author and institution-COI filters before ranking, and returns
+  `blockedReferredSeeds` for non-silent omissions.
+- `save-candidates` revalidates server-derived seed anchors with a fresh identity lookup
+  before reusing an existing potential reviewer; name-only/unvalidated referred rows keep
+  the existing contact-null safety behavior.
+- Display labels now read `Externally-Referred` / `Applicant-Referred`; durable
+  `wmkf_matchreason` still uses the `Referred by ...` prefix for reload parsing.
 
-**To resume — pick one:**
-1. **Let Codex build in the worktree:** add `"/Users/gallivan/Code/WMKF_Apps-codex"` to
-   `writable_roots` in `~/.codex/config.toml` (precedent: the `.git` root was added the
-   same way — see `config.toml.bak-pre-gitwritable`), refresh the branch
-   (`git -C ../WMKF_Apps-codex checkout -B codex/referral-seeding origin/main`), then
-   re-run the Codex build against the §Implementation sequence + guardrails below.
-2. **Claude builds in the worktree (Claude can write there), Codex reviews** — no config
-   change; flips the roles.
-3. Build in the main checkout on a fresh branch (Codex's workspace is writable there).
+Verification run: focused Jest coverage for search parsing/provenance/export/save anchor
+reuse, API route matrix + self-test, Atlas + self-test, doc catalog/symbol/freshness gates,
+lint, and production build.
 
-**Do not re-run the S318 Codex plan review** — it's captured verbatim in the appendix.
-Use the S319-corrected guardrails in §A/§C/§D as authoritative: seed safety pass before
-ranking, anchored reuse for confident identity matches, and display-vs-durable-string
-split. Keep the branch off `main` and merge only after review (main auto-deploys).
+The S318 Codex plan review remains preserved verbatim in the appendix; the historical
+post-filter seam there is superseded by §C.
 
 ## Appendix: Codex plan-review findings (verbatim, S318) — RESCUED / PARTLY SUPERSEDED
 

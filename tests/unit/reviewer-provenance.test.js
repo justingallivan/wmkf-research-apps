@@ -135,8 +135,8 @@ describe('referred provenance (S249)', () => {
   });
 
   test('the card label names the referrer', () => {
-    expect(provenanceLabelForCandidate(referred())).toBe('Referred by Dr. Abby Doyle');
-    expect(provenanceLabelForCandidate({ name: 'Y', referredBy: '', provenanceKind: 'referred' })).toBe('Referred');
+    expect(provenanceLabelForCandidate(referred())).toBe('Externally-Referred · Dr. Abby Doyle');
+    expect(provenanceLabelForCandidate({ name: 'Y', referredBy: '', provenanceKind: 'referred' })).toBe('Externally-Referred');
   });
 
   test('referredBy survives a roster round-trip (provenance object reload)', () => {

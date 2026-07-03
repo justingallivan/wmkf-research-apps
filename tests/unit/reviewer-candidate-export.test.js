@@ -61,7 +61,7 @@ describe('whySelected / sourceLabel', () => {
     expect(whySelected({ isApplicantRecommended: true })).toBe('Named by the applicant');
   });
   it('labels applicant rows even without a provenance object', () => {
-    expect(sourceLabel({ isApplicantRecommended: true })).toBe('Applicant-suggested');
+    expect(sourceLabel({ isApplicantRecommended: true })).toBe('Applicant-Referred');
   });
 });
 

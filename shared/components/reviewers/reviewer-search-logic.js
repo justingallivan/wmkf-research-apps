@@ -10,6 +10,7 @@ import { normalizeReviewerName as _normalizeReviewerName, partitionByExcluded } 
 import { mayPersistIdentity } from '../../../lib/services/reviewer-identity-resolver';
 import { buildReviewerProvenance, PROVENANCE_KINDS, provenanceKindOf, sanitizeInstitutionCOIDetails as _sanitizeInstitutionCOIDetails } from '../../../lib/utils/reviewer-provenance';
 import { ContactParser } from '../../../lib/utils/contact-parser';
+import { parseReferredSeeds as _parseReferredSeeds } from '../../../lib/utils/reviewer-referral-seeds';
 
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen
@@ -105,6 +106,10 @@ export function parseExcludeList(text) {
     .split(/[,\n]/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+export function parseReferredSeeds(text, referredBy = '') {
+  return _parseReferredSeeds(text, referredBy);
 }
 
 /**
@@ -227,6 +232,12 @@ export function pruneCandidateForRoster(c) {
     source: c.source || null,
     sources: Array.isArray(c.sources) ? c.sources : [],
     provenance,
+    isReferredSeed: !!c.isReferredSeed,
+    referredBy: c.referredBy || c.provenance?.referredBy || null,
+    seedResolvedPotentialReviewerId: c.seedResolvedPotentialReviewerId || null,
+    seedResolvedContactId: c.seedResolvedContactId || null,
+    seedIdentityMatchKey: c.seedIdentityMatchKey || null,
+    seedIdentityNameConsistent: c.seedIdentityNameConsistent === false ? false : (c.seedIdentityNameConsistent === true ? true : null),
     isApplicantRecommended: !!c.isApplicantRecommended,
     enrichedProposalKey: c.enrichedProposalKey || null,
     suggestionId: c.suggestionId || null,

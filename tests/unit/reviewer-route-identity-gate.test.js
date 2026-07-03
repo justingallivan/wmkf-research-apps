@@ -179,6 +179,57 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     });
   });
 
+  test('validated referred seed anchor reuses the existing potential reviewer instead of email-upserting', async () => {
+    potentialReviewerAdapter.getById.mockResolvedValueOnce({
+      wmkf_potentialreviewersid: 'PID-SEED',
+      wmkf_emailaddress: 'seed@example.edu',
+      _wmkf_contact_value: 'CONTACT-SEED',
+    });
+    lookupReviewerIdentity.mockResolvedValueOnce({
+      outcome: 'confident',
+      match: {
+        reviewerId: 'PID-SEED',
+        contactId: 'CONTACT-SEED',
+        matchKey: 'email',
+        nameConsistent: true,
+        context: { email: 'seed@example.edu' },
+      },
+    });
+    reviewerSuggestionAdapter.upsert.mockResolvedValueOnce({ id: 'SUG-SEED' });
+
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [{
+          name: 'Seed Existing',
+          email: 'seed@example.edu',
+          source: 'referred',
+          referredBy: 'Dr. Abby Doyle',
+          reasoning: 'Referred by Dr. Abby Doyle.',
+          seedResolvedPotentialReviewerId: 'PID-SEED',
+          seedResolvedContactId: 'CONTACT-SEED',
+          provenance: { kind: 'referred', seedRole: 'referred_by', sources: [], groundingWorkIds: [], referredBy: 'Dr. Abby Doyle' },
+        }],
+      },
+    };
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][0]).toBe('PID-SEED');
+    expect(reviewerSuggestionAdapter.upsert.mock.calls[0][0]).toEqual(expect.objectContaining({
+      potentialReviewerId: 'PID-SEED',
+      matchReason: 'Referred by Dr. Abby Doyle.',
+    }));
+    expect(rosterStore.stampSuggestionAnchor).toHaveBeenCalledWith('REQ-1', 'Seed Existing', {
+      suggestionId: 'SUG-SEED',
+      potentialReviewerId: 'PID-SEED',
+    });
+  });
+
   test('roster anchor stamp failure is non-fatal after Dataverse save succeeds', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     rosterStore.stampSuggestionAnchor.mockRejectedValueOnce(new Error('postgres down'));
