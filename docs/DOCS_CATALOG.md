@@ -22,6 +22,7 @@ related:
 |---|---|---|---|---|---|
 | [AGENT_COLLABORATION_PLAN.md](AGENT_COLLABORATION_PLAN.md) | plan | active |  | Status: Draft operating contract Purpose: Keep Justin, Claude, and Codex from stepping on each other's work while using the same repo across... | 2026-07-02 |
 | [AGENT_HARNESS_STYLE_GUIDE.md](AGENT_HARNESS_STYLE_GUIDE.md) | spec | active |  | This guide keeps agent-facing instructions precise, confident, and low-noise. | 2026-07-02 |
+| [AGENT_INSTRUCTION_AUDIT_S322.md](AGENT_INSTRUCTION_AUDIT_S322.md) | audit | active |  | Audit of CLAUDE.md, AGENTS.md, and .claude/rules/ for size, duplication, unread content, broken imports, and lint restatement. Findings + ready diffs. |  |
 | [CLAUDE_COVERAGE_LESSONS.md](CLAUDE_COVERAGE_LESSONS.md) | plan | historical |  | Created: 2026-05-07 (S137) after a Codex stress-test cycle where each round caught a slightly different syntactic pattern the previous round... | 2026-07-02 |
 | [CLAUDE_INSTRUCTION_AUTHORITY.md](CLAUDE_INSTRUCTION_AUTHORITY.md) | source-of-truth | canonical | yes | Status: Active Last verified: 2026-06-05 Purpose: Identify the authoritative definition and enforcement mirror for must-follow agent instructions. | 2026-07-02 |
 | [CLAUDE_MEMORY_REORGANIZATION_PLAN.md](CLAUDE_MEMORY_REORGANIZATION_PLAN.md) | plan | active |  | The problem is not absence of memory. The problem is density and retrieval. | 2026-07-02 |
@@ -172,6 +173,12 @@ related:
 | [STAGED_REVIEW_PIPELINE.md](STAGED_REVIEW_PIPELINE.md) | history | active |  | Proposals flow through stages sequentially. Staff review is required before any proposal is declined at Stage 1. Stages 2 and 3 produce inputs for... | 2026-07-02 |
 | [VIRTUAL_REVIEW_PANEL.md](VIRTUAL_REVIEW_PANEL.md) | spec | active | yes | Thin design / operations reference for the Virtual Review Panel app. Created S191 to receive content extracted from CLAUDE.md so the table-row... | 2026-07-02 |
 | [WORKFLOW_CHAINING_DESIGN.md](WORKFLOW_CHAINING_DESIGN.md) | spec | active | yes | Status: Design principle — extracted from Session 100 discussion of prompt storage migration. | 2026-07-02 |
+
+## repo-hygiene
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [DEAD_CODE_DELETION_MANIFEST.md](DEAD_CODE_DELETION_MANIFEST.md) | audit | active |  | Dead exports, orphan files, unwired routes, one-way flags, and unreferenced scripts as of 7d3be6a1, grouped by deletion confidence. Nothing deleted yet. |  |
 
 ## reviewer-finder
 
