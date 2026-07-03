@@ -246,7 +246,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [REVIEWER_EMAIL_PERSIST_FIX_PLAN.md](REVIEWER_EMAIL_PERSIST_FIX_PLAN.md) | plan | active |  | Reviewer Invite-tab no-email fix: B1 (applicant-promote persists vetted email) + A (reconciliation cron backstop) SHIPPED; B2 (partial-return) DEFERRED. | 2026-07-02 |
-| [REVIEWER_PD_PREFERENCE_SEEDING_DESIGN.md](REVIEWER_PD_PREFERENCE_SEEDING_DESIGN.md) | plan | draft |  | Guarantee PD-recommended names into the reviewer-finder pool and tag them PD-preferred — via a code-owned seed path, not prompt wording. | 2026-07-02 |
+| [REVIEWER_REFERRAL_SEEDING_DESIGN.md](REVIEWER_REFERRAL_SEEDING_DESIGN.md) | plan | draft |  | Guarantee consultant-referred names into the reviewer pool via a code-owned seed path; tag them 'Referral' (reuse existing referred provenance kind). | 2026-07-02 |
 
 ## security-auth
 

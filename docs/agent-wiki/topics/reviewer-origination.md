@@ -198,9 +198,10 @@ bare keyword→author lane is what underperformed.
   the fixed target count (`DEFAULT_REVIEWER_COUNT`), the appended anti-fabrication
   `ANALYZE_INTEGRITY_BLOCK` (return FEWER rather than include an unresolvable name), and
   discover-stage verification/ranking. A PD pasting a known-names list into notes will get
-  only *some* back — expected, not a bug. Guaranteeing PD-recommended names must be a
-  **code-owned seed path**, not prompt wording. Design (draft, not built):
-  `docs/REVIEWER_PD_PREFERENCE_SEEDING_DESIGN.md`.
+  only *some* back — expected, not a bug. Guaranteeing referred/PD-recommended names must
+  be a **code-owned seed path**, not prompt wording. Design (draft, not built; tag =
+  "Referral", reuses the existing `referred` provenance kind):
+  `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md`.
 - **Results list has a Rank⇄A–Z sort toggle (S318, shipped).** Default is
   confidence/relevance rank; A–Z sorts by name *within* each provenance group (grouping
   preserved). `ReviewerSearchSection.js` `sortMode`.
