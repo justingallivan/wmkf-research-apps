@@ -30,6 +30,18 @@ wrong person; the safe default for uncertainty is **surface for one-click staff
 confirm**, not silent drop. The send-time confirm gate (Contract 3) is the true
 backstop.
 
+**Revision 2 (same day).** An adversarial Codex review of revision 1 (commit
+`b6b23720`) found two blockers, both variants of one flaw: revision 1's
+vindication accepted *non-identity-proven* affiliation signals (notably
+`candidate.affiliation`, which `groupByNameSimilarity`/`selectBest` in
+`lib/services/deduplication-service.js:46,197` can graft from a name-similar
+different author) as grounds to restore an email to HIGH-eligible trust or to
+widen the fetch-tier SSRF allowlist. This revision splits vindication into two
+provenance tiers (§3.1): only **identity-anchored, ID-resolved** domains can fully
+recover an email or admit a fetch; everything else routes to the contested
+(LOW → confirm) lane. It also folds in the review's three mechanics findings
+(adapter source-overwrite, save-gate default shape, `getInstitution` API surface).
+
 ## 1. Verdict on the strategy
 
 **The gate *policies* are individually defensible; the system over-gates because two
@@ -51,7 +63,7 @@ stage/order? (c) right input?
 | Contract 6 — OpenAlex verified-domain sourcing (`contact-enrichment-service.js:864–874`) | ✓ | ✓ | ✗ | **Sourcing is fine; single-domain *trust* is the defect.** `verifiedInstitutionDomain` is one eTLD+1 from the OpenAlex author's last-known institution — a real researcher has several valid affiliations, and OpenAlex mis-maps (both observed live, Cause #2 cases 1–2). Fan-out is fully contained: the field's only product-code consumers are the two email guards below (grep-verified this session; never persisted, never read by save or COI). |
 | Email guard A — `_validateEmailAgainstVerifiedDomain` (`contact-enrichment-service.js:300–338`) | ✓ | ✓ (runs once, end of pipeline, `:1135`) | ✗ | **Wrong input + wrong discard destination.** Validates against the single Contract-6 domain, ignoring the affiliation signals the pipeline already collected (`candidate.affiliation`, `ce.orcidAffiliation`, `ce.openAlexAffiliation`). On contradiction it nulls the email into a *rejected* lead (`:326–337`) — technically visible, practically a dead end (collapsed behind a "weak/rejected" toggle, `ContactLeads.js`). Redesign §3.1–3.2. |
 | Email guard B — `isNameConsistentEmail` hard reject (`contact-parser.js:232–299`; fired at `contact-enrichment-service.js:635`, `:696–711`) | ~ (right for *unanchored* results) | ✗ | ✗ (as a *hard* signal) | **Mis-sequenced and over-weighted.** Fires inline per-tier, BEFORE `verifiedInstitutionDomain` exists (set later in `_finalize` at `:874`) — so the evidence that vindicates a truncated-surname/initials address on the person's own domain is structurally unavailable when the gate fires. The code already states the correct principle for the page tier: domain+page grounding is "the trust gate — NOT isNameConsistentEmail" (`:997–1001`). Generalize it. Redesign §3.3. |
-| Contract 7 — resolved-page fetch tier (`contact-enrichment-service.js:1064–1117`, flag-gated) | ✓ | ✓ (in `_finalize`, before guard A) | ✗ | **Right shape, same wrong input.** SSRF-bound to the single `verifiedInstitutionDomain` (`:1068–1069`, `:1081`), so it inherits Contract 6's defect: for Cause #2 cases 1–2 it would refuse the correct page even if enabled. Bind it to the validated domain *set* instead (§3.5). Default-off flag state in prod is an owner decision, unchanged here. |
+| Contract 7 — resolved-page fetch tier (`contact-enrichment-service.js:1064–1117`, flag-gated) | ✓ | ✓ (in `_finalize`, before guard A) | ✗ | **Right shape, same wrong input.** SSRF-bound to the single `verifiedInstitutionDomain` (`:1068–1069`, `:1081`), so it inherits Contract 6's defect: for Cause #2 cases 1–2 it would refuse the correct page even if enabled. Bind it to the identity-anchored domain set instead (§3.5). Default-off flag state in prod is an owner decision, unchanged here. |
 
 Adjacent contracts (assess-only per the brief §5) — verified live this session:
 
@@ -109,9 +121,22 @@ construction at every downstream boundary:
   `reviewer-invite.js:110`). Add an explicit branch with a human-readable reason
   ("Found by search but contradicts the candidate's OpenAlex institution — confirm
   before sending"), but the default is already refuse-without-confirm.
-- Save time: `contactFieldAllowed` (`save-candidates.js:37–43`) honors
-  `emailPersistAllowed=true`, which the contested path sets; `contactStatus` stays
-  null (not `'unresolved'`), so the row saves with the email attached.
+- Save time: the contested path sets `emailPersistAllowed=true` and `contactStatus`
+  stays null (not `'unresolved'`), so the row saves with the email attached via the
+  explicit-flag branch of `contactFieldAllowed` (`save-candidates.js:37–43`). NOTE
+  (Codex R1 finding 4): that gate's *default* branch is denylist-shaped —
+  `!paidSearchSource(source)` allows any unknown source — so the fail-closed story
+  must be made true, not assumed: add `search_contested` to `paidSearchSource()`
+  (and the mirrored `_fieldPersistAllowed` default in
+  `contact-enrichment-service.js:117–122`) so a contested email persists ONLY via
+  the explicit flag, never the default.
+- Existing-row overwrite (Codex R1 finding 3): the researcher adapter's biblio/
+  contact merge is fill-if-empty for most fields and force-overwrites
+  `wmkf_emailsource` only for `'manual'` (`lib/dataverse/adapters/researcher.js:147–158`).
+  A contested email landing on a person row that carries a stale high-trust source
+  would otherwise send at HIGH off the stale source (`send-emails.js:196–198` reads
+  the live row). `search_contested` must join `'manual'` in the
+  authoritative-overwrite set — same rationale, same mechanism.
 - UI: the contested email renders in the contact slot with an amber "confirm before
   invite" pill (reusing the Contract-2 pill pattern), NOT buried in the
   rejected-leads toggle.
@@ -121,38 +146,61 @@ result is a different person) are **excluded** from the contested lane and remai
 rejected leads: there the evidence says wrong-person, and surfacing it as
 near-invitable would invite rubber-stamping.
 
-### 3.1 Guard A input: validate against the affiliation-signal *set*
+### 3.1 Guard A input: two-tier vindication by signal provenance
 
-`_validateEmailAgainstVerifiedDomain` gains a vindication step before it contests.
-On a mismatch with `verifiedInstitutionDomain`, resolve domains for the candidate's
-*other* affiliation signals — `candidate.affiliation` (discovery), `ce.orcidAffiliation`
-— via `OpenAlexService` institution search (free; lazy: only on contradiction, ≤2
-lookups), and accept the email if its domain label-boundary-matches ANY of the set,
-using the existing `_normalizeDomain`/relatedness logic (`:302–311`).
+`_validateEmailAgainstVerifiedDomain` gains a vindication step before it contests —
+but (Codex R1 blockers 1–2) the vindicating signal's *provenance* decides the
+outcome, because not all affiliation signals are identity-proven:
+`candidate.affiliation` can be grafted from a name-similar different author by the
+dedup merge (`groupByNameSimilarity` / `selectBest`,
+`lib/services/deduplication-service.js:46,197`), so it must never restore an email
+to HIGH-eligible trust. Two domain sets:
 
-- Case 1 (dual affiliation: OpenAlex pinned `hhmi.org`, email `…@princeton.edu`,
-  discovery affiliation Princeton) → vindicated → **recovered**, source stays
-  `claude_search`/`serp_search` (HIGH at send only on a confirmed/probable identity,
-  unchanged Contract-3 semantics).
-- Case 2 (OpenAlex mis-map to `calu.edu`, email `…@seas.upenn.edu`, discovery
-  affiliation UPenn) → vindicated → **recovered**.
-- Still-contradicted after the set check → **contested state** (§3 mechanism), not
-  null. Compensating control: LOW at send → per-recipient confirm (§3.4); the lead
-  trail is still recorded for audit.
+- **Anchored set** (identity-proven, ID-resolved only): `verifiedInstitutionDomain`
+  (`:874`) plus domains resolved from the ORCID record's employment organizations —
+  via their **disambiguated-organization identifiers (ROR)** →
+  `OpenAlexService.getInstitution` (which accepts only an OpenAlex ID or ROR,
+  `lib/services/openalex-service.js:445–460`; no name search exists, deliberately —
+  name→institution resolution is itself the mis-map vector). Only computed when the
+  identity is confirmed/probable. Implementation task: `orcid-service.js:273–280`
+  currently extracts only `organization.name`; the disambiguated-organization ID
+  must be threaded through (the ORCID API supplies it per employment
+  [ASSUMED for coverage — records without one simply contribute no anchored
+  domain]).
+- **Plausible set** (anchored set + name-resolved): additionally, domains resolved
+  from the discovery/ORCID affiliation *name strings* via a new
+  `institutions?search=` lookup (top hit, strong display-name match required). Used
+  ONLY to choose between contested and rejected-lead — never for full keep, never
+  for the fetch allowlist — so a mis-resolution's worst case is a wrong *lane*
+  (contested instead of rejected, still LOW → per-recipient confirm), never a send.
 
-Direction-of-risk note: a vindication signal can only *keep* an email that today is
-dropped; it never rejects anything the current guard accepts. The failure mode of a
-bad vindication (e.g. OpenAlex resolving the discovery-affiliation string to the
-namesake's institution) yields a contested-or-kept search email that still cannot be
-sent without a confirmed identity or staff confirm — the same protection the
-`olga.smirnova` keep-bias case relies on today (`:294–299`).
+Outcomes on a `verifiedInstitutionDomain` mismatch:
+
+- Email domain matches the **anchored set** → vindicated → **recovered**; source
+  stays `claude_search`/`serp_search` (HIGH at send only on a confirmed/probable
+  identity — the same evidence standard as today's single-domain match, because the
+  vindicating domain is identity-anchored to the same standard).
+- Email domain matches only the **plausible set** → **contested state** (§3
+  mechanism): surfaced, LOW, per-recipient confirm.
+- Matches neither → **contested state** as well (§3.2) — the guard's own domain may
+  be the wrong one (case 2's `calu.edu` mis-map), so a contradiction alone no
+  longer justifies silent burial; the lead trail is still recorded for audit.
+
+Case walkthrough: case 1 (real dual affiliation, OpenAlex pinned `hhmi.org`, email
+`…@princeton.edu`) → **recovered** iff the ORCID record carries the Princeton
+employment with a ROR (the expected shape for a dual affiliation), else
+surfaced-for-confirm. Case 2 (OpenAlex mis-mapped to `calu.edu`, email
+`…@seas.upenn.edu`) → discovery affiliation is NOT identity-proven →
+**surfaced-for-confirm**, not auto-recovered. Both clear the brief's
+recover-or-surface bar.
 
 ### 3.2 Guard A consequence: contest, don't null
 
-Even with §3.1, some correct emails will fail the set check (institution not in
-OpenAlex, new affiliation). Change the contradiction consequence from
-null-plus-rejected-lead (`:326–337`) to the contested state. The wrong-person harm
-is unchanged — contested cannot send without confirm — while staff see the
+Even with §3.1, some correct emails will match neither set (institution not in
+OpenAlex, new affiliation, no ORCID record). Change the contradiction consequence
+from null-plus-rejected-lead (`:326–337`) to the contested state. The wrong-person
+harm is unchanged — contested cannot send without confirm (and the §3 mechanics
+make that fail-closed at save and on existing rows too) — while staff see the
 best-guess address in one click instead of re-finding it by hand.
 
 ### 3.3 Guard B: domain grounding trumps the local-part heuristic; re-adjudicate at `_finalize`
@@ -161,8 +209,10 @@ Keep the inline per-tier null exactly as-is (it enables the tier-4 retry and the
 `rejectedEmail` capture, `:709–711`). Add one step in `_finalize`, after
 `_attachOpenAlexMetrics` and the §3.1 domain-set construction: if no email
 survived and a tier carries `emailRejectedReason='name_mismatch'` with a preserved
-`rejectedEmail` whose domain matches the validated domain set → promote it to the
-**contested state** (zero new network; the value is already on the object).
+`rejectedEmail` whose domain matches the **plausible set** (the broad set is safe
+here because the destination is only ever contested/LOW, never full trust) →
+promote it to the **contested state** (no new fetch of the email itself; the value
+is already on the object).
 
 - Cases 3–4 (truncated surname / initials+number on the person's own institutional
   domain) → **surfaced-for-confirm**.
@@ -186,19 +236,24 @@ recomputed server-side, `send-emails.js:374–392`) already supports this — it
 UI-only change, and it converts the brief's "one-click staff confirm" from a batch
 rubber-stamp into an actual per-person adjudication.
 
-### 3.5 Contract 7: bind the fetch tier to the validated domain set
+### 3.5 Contract 7: bind the fetch tier to the ANCHORED domain set only
 
 `_attachEmailFromResolvedPage` swaps its single `verifiedInstitutionDomain` bound
-(`:1068–1069`, `:1081`) for the §3.1 domain set — still a strict allowlist into the
-unchanged `safeFetchInstitutionPage` SSRF mechanism (HTTPS-only, exact-or-subdomain
-host, private-IP block, IP-pinning dispatcher), just allowing N verified
-institutional domains instead of 1. With the flag ON, case 5 (captured faculty page
-never fetched) → fetched → page-grounded `institution_page` email (HIGH, by the
-existing `_selectGroundedEmail` evidence standard) → **recovered**. Whether to
-enable `REVIEWER_PAGE_EMAIL_TIER_ENABLED` in prod remains the owner's call (its
-current prod value is unread — treat as unknown); with the flag OFF, case 5 keeps
-today's manual lane (faculty-page link + staff entry). Structurally the tier stays
-an opt-in tier — page-grounding-as-core-adjudication is not needed once §3.1–3.3
+(`:1068–1069`, `:1081`) for the §3.1 **anchored set only** — never the plausible
+set. Rationale (Codex R1 blocker 2): a page email earns unconditional HIGH trust
+(`institution_page`, `reviewer-invite.js:82`), and `_selectGroundedEmail`'s
+grounding is name-adjacency/owner-slug (`:988–1024`) — namesakes share names by
+definition, so page grounding cannot discriminate the namesake failure mode; only
+the *domain's* identity anchoring can. Each anchored domain enters the unchanged
+`safeFetchInstitutionPage` SSRF mechanism (HTTPS-only, exact-or-subdomain host,
+private-IP block, IP-pinning dispatcher) exactly as the single domain does today.
+With the flag ON, case 5 (captured faculty page never fetched) → fetched when its
+host is within an anchored domain → page-grounded `institution_page` email (HIGH,
+existing evidence standard) → **recovered**. Whether to enable
+`REVIEWER_PAGE_EMAIL_TIER_ENABLED` in prod remains the owner's call (its current
+prod value is unread — treat as unknown); with the flag OFF, case 5 keeps today's
+manual lane (faculty-page link + staff entry). Structurally the tier stays an
+opt-in tier — page-grounding-as-core-adjudication is not needed once §3.1–3.3
 land, and keeping the fetch behind the flag preserves the zero-SSRF default.
 
 ## 4. Migration / rollout
@@ -207,15 +262,21 @@ Incremental, each phase shippable alone, always behind the unchanged send-time
 backstop:
 
 1. **Phase 0 — plumbing (no behavior change).** `search_contested` recognized by
-   `emailConfidence` with an explicit LOW reason; contested-state fields threaded
-   through save (`save-candidates.js` contact gating) and roster DTO
-   (`pruneCandidateForRoster` — note it currently drops `verifiedInstitutionDomain`,
+   `emailConfidence` with an explicit LOW reason; added to `paidSearchSource()` /
+   the `_fieldPersistAllowed` default denylist (so persistence is explicit-flag
+   only); added to the researcher adapter's authoritative-overwrite set alongside
+   `'manual'` (`researcher.js:147–158`) so it displaces a stale trusted source on
+   existing rows; contested-state fields threaded through save
+   (`save-candidates.js` contact gating) and roster DTO (`pruneCandidateForRoster`
+   — note it currently drops `verifiedInstitutionDomain`,
    `reviewer-search-logic.js:~250`; the contested marker must survive the roster
-   round-trip). Unit tests: contested is LOW at send; contested persists; contested
-   never enters `HIGH_TRUST_EMAIL_SOURCES`.
+   round-trip). ORCID disambiguated-organization ID threaded through
+   `orcid-service.js:273–280` (currently name-only). Unit tests: contested is LOW
+   at send; contested persists only via the explicit flag; contested overwrites a
+   stale source; contested never enters `HIGH_TRUST_EMAIL_SOURCES`.
 2. **Phase 1 — §3.4 per-recipient confirm UI.** Ships first: it hardens the lane
    everything else routes into.
-3. **Phase 2 — §3.1 + §3.2** (domain-set vindication; contest-don't-null).
+3. **Phase 2 — §3.1 + §3.2** (two-tier vindication; contest-don't-null).
 4. **Phase 3 — §3.3** (name-mismatch re-adjudication at `_finalize`).
 5. **Phase 4 — §3.5** (fetch tier domain-set bound); flag enablement as a separate
    owner decision.
@@ -254,9 +315,15 @@ contested-vs-rejected lead split.
   mis-map can wrongly hard-drop a correct *candidate* via the lexical COI match —
   the candidate-level analog of Cause #2 case 2, with no lead trail at all.
   Deserves its own probe + follow-up.
-- **Vindication false-positives** (§3.1 direction-of-risk note): bounded by the
-  send gate; a wrongly-vindicated email still needs a confirmed identity or staff
-  confirm to send.
+- **Anchored-vindication false-positives.** The anchored set can still be wrong if
+  the underlying *identity resolution* is wrong (a `probable` verdict binding the
+  wrong person also poisons `verifiedInstitutionDomain` today — not a new
+  exposure, but vindication widens what that wrong identity can bless). Bounded by
+  the unchanged resolver evidence standards and the per-recipient confirm for
+  everything non-anchored.
+- **Plausible-set mis-resolution** (`institutions?search=` top-hit wrong): worst
+  case is lane mis-assignment — contested instead of rejected-lead or vice versa —
+  never a send; the contested lane itself is LOW → per-recipient confirm.
 - **Case 5 with the flag off** stays manual — an accepted recall gap until the
   owner enables the tier.
 
@@ -264,15 +331,18 @@ contested-vs-rejected lead split.
 
 | # | Case | Proposed-pipeline outcome |
 |---|---|---|
-| 1 | Correct `…@princeton.edu`; OpenAlex pinned other real affiliation (`hhmi.org`) | §3.1 domain-set vindication (discovery/ORCID affiliation → `princeton.edu`) → **recovered** (search source; HIGH at send iff identity confirmed/probable, else LOW→confirm) |
-| 2 | Correct `…@seas.upenn.edu`; OpenAlex mis-mapped to `calu.edu` | §3.1 vindication (discovery affiliation → `upenn.edu`; label-boundary subdomain match) → **recovered** |
-| 3 | Truncated-surname local part on the correct med-center domain | §3.3 `_finalize` re-adjudication: domain ∈ validated set → **surfaced-for-confirm** (contested, LOW, per-recipient confirm) |
+| 1 | Correct `…@princeton.edu`; OpenAlex pinned other real affiliation (`hhmi.org`) | §3.1 **anchored** vindication iff the ORCID record lists the Princeton employment with a disambiguated org ID (expected for a real dual affiliation) → **recovered** (search source; HIGH at send iff identity confirmed/probable). No ORCID org ID → **surfaced-for-confirm** (contested) |
+| 2 | Correct `…@seas.upenn.edu`; OpenAlex mis-mapped to `calu.edu` | Discovery affiliation is not identity-proven (dedup-merge risk) → **plausible**-set match only → **surfaced-for-confirm** (contested, LOW, per-recipient confirm) |
+| 3 | Truncated-surname local part on the correct med-center domain | §3.3 `_finalize` re-adjudication: domain ∈ plausible set → **surfaced-for-confirm** (contested, LOW, per-recipient confirm) |
 | 4 | Initials+number local part on correct `columbia.edu` | Same as 3 → **surfaced-for-confirm** |
-| 5 | No email extracted; captured faculty page never fetched | §3.5 with flag ON → fetched, page-grounded → **recovered** (`institution_page`, HIGH). Flag OFF → today's manual lane (link + staff entry), surfaced but not one-click — recorded as the accepted gap |
+| 5 | No email extracted; captured faculty page never fetched | §3.5 with flag ON → fetched iff host within the **anchored** set → page-grounded → **recovered** (`institution_page`, HIGH). Flag OFF → today's manual lane (link + staff entry), surfaced but not one-click — recorded as the accepted gap |
 
-**No new send path:** every recovery either keeps a search source (send-gated on
-confirmed/probable identity exactly as today), lands in the contested state (LOW →
-per-recipient confirm), or earns `institution_page` under the unchanged
-page-grounding evidence standard. Nothing added bypasses `emailConfidence` or the
-`confirmedLowConfidenceIds` allowlist; the confirm lane itself gets *stronger*
-(§3.4).
+**No new send path:** full recovery requires an identity-anchored, ID-resolved
+domain — the same evidence standard that lets today's guard confirm an email on a
+domain match — so anchored vindication extends coverage (multiple anchored
+affiliations instead of one) without lowering the trust bar. Everything
+non-anchored lands in the contested state (LOW → per-recipient confirm), and
+`institution_page` HIGH is only mintable from pages on anchored domains under the
+unchanged page-grounding evidence standard. Nothing added bypasses
+`emailConfidence` or the `confirmedLowConfidenceIds` allowlist; the confirm lane
+itself gets *stronger* (§3.4).
