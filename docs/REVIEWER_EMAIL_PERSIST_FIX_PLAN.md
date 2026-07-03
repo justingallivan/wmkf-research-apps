@@ -3,7 +3,7 @@ title: "Reviewer Email-Persist Fix Plan (S317)"
 domain: reviewers
 kind: plan
 status: active
-summary: "Reviewer Invite-tab no-email fixes: B1 applicant email persist, A reconciliation cron, and B2 Find enrichment timeout partial-return shipped."
+summary: "Reviewer Invite-tab no-email fixes shipped; unbuilt follow-ups in this plan are closed-deprecated, not active work."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -19,7 +19,12 @@ related:
 Fixes reviewers landing on the workbench **Invite Reviewers** tab with an empty
 email when the enrichment-discovered address existed but never reached Dataverse.
 Design reviewed by Codex (adversarial pass, S317); the named changes below are
-folded in. Status labels: **SHIPPED** / **DESIGNED** / **DEFERRED**.
+folded in. Status labels: **SHIPPED** / **CLOSED-DEPRECATED**.
+
+**Closeout (2026-07-03):** B1, A, and B2 are shipped. Any remaining work that was
+only a measurement/reconsideration tail in this plan is **CLOSED-DEPRECATED** here:
+do not keep carrying it as a housekeeping item. If new production evidence shows
+another email-persist gap, open a fresh scoped plan with current probes.
 
 ## Problem
 
@@ -134,14 +139,16 @@ can reach `save-candidates` instead of being discarded. The save gate itself is
 unchanged: vetted enrichment fields still pass through the existing
 `save-candidates` persistence rules. `/api/workbench/enrich-recommended` is
 intentionally **not** opted in because it owns a separate id-keyed writeback flow
-and should retain fail-stop timeout behavior until designed separately.
+and should retain fail-stop timeout behavior. A Workbench partial-return variant is
+**CLOSED-DEPRECATED in this plan**; reopen only with a new design for that route's
+id-keyed writeback contract.
 
 Tests: `tests/unit/contact-enrichment-abort.test.js` (default throw, opt-in
 completed-prefix return, in-flight abort excludes the half-finished row) and
 `tests/unit/reviewer-enrich-contacts-route.test.js` (route passes
 `returnPartialOnAbort:true` and streams partial `complete` metadata).
 
-## Cause #2 (separate track)
+## Cause #2 (separate track) — RESOLVED; re-measure tail CLOSED-DEPRECATED
 
 Enrichment completes but no invitable email is surfaced. An earlier 90d probe
 counted 8 prominent PIs; an S320 re-measure over 120d found 5 true Cause #2 cases
@@ -156,5 +163,10 @@ was bound to the same wrong domain). **RESOLVED (S321):** the strategy review ra
 `docs/REVIEWER_GATING_STRATEGY_REDESIGN.md`, revision 2 after an adversarial Codex
 round) and the redesign is IMPLEMENTED — two-tier domain vindication, the
 `search_contested` LOW-confirm lane, per-recipient invite confirm, and the fetch
-tier re-bound to the anchored domain set. Re-measure with
-`scripts/probe-no-email-breakdown.mjs` after the next enrichment cycles.
+tier re-bound to the anchored domain set.
+
+The earlier "re-measure after the next enrichment cycles" tail is
+**CLOSED-DEPRECATED** for this plan. Keep `scripts/probe-no-email-breakdown.mjs`
+as a diagnostic tool, but do not carry a standing housekeeping task here unless a
+fresh incident or owner request reopens measurement with a concrete cohort and
+decision threshold.
