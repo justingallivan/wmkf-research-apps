@@ -10,4 +10,4 @@ paths:
 
 # Database And Migrations
 
-`scripts/setup-database.js` bootstraps an empty database only. Existing environments use `node scripts/apply-migrations.js`. New durable schema needs a numbered migration, regenerated manifest, matching fresh-install shape where applicable, Atlas coverage, tests, and sequential relevant gates. Probe live state before destructive work and label unverified claims.
+New durable schema needs a numbered migration, regenerated manifest, matching fresh-install shape where applicable, Atlas coverage, tests, and sequential relevant gates (migration-vs-fresh-install invariant: CLAUDE.md Universal Safety Invariants). Probe live state before destructive work and label unverified claims.

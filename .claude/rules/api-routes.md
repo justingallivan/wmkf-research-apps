@@ -8,4 +8,4 @@ paths:
 
 # API Routes And Authentication
 
-Use `requireAppAccess(req, res, ...appKeys)` for app routes, authenticated-context identity for user-scoped operations, and the documented infrastructure/cron/external-token guard for exceptions. Never accept a profile ID from request input when authenticated context supplies it. Register every new route in `docs/API_ROUTE_SECURITY_MATRIX.md`; run `npm run check:api-routes`. Preserve SSE framing for streaming routes.
+Use `requireAppAccess(req, res, ...appKeys)` for app routes, authenticated-context identity for user-scoped operations, and the documented infrastructure/cron/external-token guard for exceptions (identity invariant: CLAUDE.md Universal Safety Invariants). Register every new route in `docs/API_ROUTE_SECURITY_MATRIX.md`; run `npm run check:api-routes`. Preserve SSE framing for streaming routes.

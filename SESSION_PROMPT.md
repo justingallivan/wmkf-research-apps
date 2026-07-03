@@ -20,7 +20,8 @@ were caught wrong during main-session re-verification and corrected in place
 2. **Agent-instruction file audit** (`docs/AGENT_INSTRUCTION_AUDIT_S322.md`, `e6d109ce`).
    Architecture clean: no oversize files, no contradictions, no @-imports, no lint
    restatement. F1 (3 safety-invariant restatements in rules files) + F2 (over-broad
-   `pages/api/**` glob in llm-and-prompts rule) — apply-ready diffs, owner-pending.
+   `pages/api/**` glob in llm-and-prompts rule) — F1 applied this session; F2 reviewed
+   and intentionally left unchanged.
 
 3. **Harness instruction audit + APPLIED** (`docs/HARNESS_INSTRUCTION_AUDIT_S322.md`,
    `84207bcb`; applied in `b7b77836` + `a5213b1e`):
@@ -80,18 +81,21 @@ were caught wrong during main-session re-verification and corrected in place
    `:self-test` script names for drain-table and prompt-storage gates; `.env.example`
    no longer lists dead `NOTIFICATION_EMAIL_TO` and points recipients to `/admin` →
    Alert Recipients.
+2. **Instruction-audit F1 applied; F2 kept unchanged.**
+   The three duplicate safety-invariant restatements in `.claude/rules/` now point back
+   to CLAUDE.md's Universal Safety Invariants. The `llm-and-prompts.md` `pages/api/**`
+   glob was reviewed and intentionally left in place so LLM/prompt guidance still loads
+   on API route call sites.
 
 ### Owner Decision Needed
 
 1. **Dead-code deletion pass** — approve the SAFE bucket and/or triage the NEEDS-OWNER
    bucket. Evidence: `docs/DEAD_CODE_DELETION_MANIFEST.md` (execution protocol inside;
    re-run caller checks live before deleting — anchors are at `7d3be6a1`).
-2. **Instruction-audit F1/F2 consolidations.** Evidence: diffs in
-   `docs/AGENT_INSTRUCTION_AUDIT_S322.md`; duplication may be deliberate reinforcement.
-3. **Env-var doc triage + CLAUDE.md tree additions.** Evidence:
+2. **Env-var doc triage + CLAUDE.md tree additions.** Evidence:
    `docs/DOCS_DRIFT_AUDIT_S322.md` items 4-5, 7 (which vars belong in `.env.example`;
    whether `modules/`/`outputs/`/`_archived/` are deliberately untreed).
-4. **Whether to delete merged remote Codex branches** (carryover S320; verify merged first).
+3. **Whether to delete merged remote Codex branches** (carryover S320; verify merged first).
    Evidence: `git ls-remote --heads origin codex/referral-seeding-build codex/program-area-normalization`.
 
 ### Measure Later (time-driven, not work-driven)
@@ -128,7 +132,7 @@ were caught wrong during main-session re-verification and corrected in place
 | File | Purpose |
 |------|---------|
 | `docs/DEAD_CODE_DELETION_MANIFEST.md` | Deletion candidates by confidence + execution protocol. |
-| `docs/AGENT_INSTRUCTION_AUDIT_S322.md` | CLAUDE.md/rules audit; F1/F2 diffs owner-pending. |
+| `docs/AGENT_INSTRUCTION_AUDIT_S322.md` | CLAUDE.md/rules audit; F1 applied, F2 reviewed and kept unchanged. |
 | `docs/HARNESS_INSTRUCTION_AUDIT_S322.md` | Hook/skill classification + applied-outcome record. |
 | `docs/DOCS_DRIFT_AUDIT_S322.md` | Drift table + docs patch (mechanical part apply-ready). |
 | `.claude/hooks/docs-catalog-commit-guard.js` | Now parses command path tokens (staging-gap fix). |

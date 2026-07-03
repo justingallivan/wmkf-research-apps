@@ -8,4 +8,4 @@ paths:
 
 # Intake And Upload Safety
 
-Intake private Blob operations use `INTAKE_BLOB_RW_TOKEN`, never the shared Blob token. Preserve the three-call attachment contract, server-managed pending attachments, fail-closed virus scanning when enabled, and maintenance cleanup. Consult `docs/INTAKE_PORTAL_DRAIN_PLAN.md` and the relevant attach design before changing these paths.
+Preserve the three-call attachment contract, server-managed pending attachments, fail-closed virus scanning when enabled, and maintenance cleanup (Blob token invariant: CLAUDE.md Universal Safety Invariants). Consult `docs/INTAKE_PORTAL_DRAIN_PLAN.md` and the relevant attach design before changing these paths.
