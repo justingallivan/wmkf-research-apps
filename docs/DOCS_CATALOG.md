@@ -180,6 +180,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [DEAD_CODE_DELETION_MANIFEST.md](DEAD_CODE_DELETION_MANIFEST.md) | audit | active |  | Dead exports, orphan files, unwired routes, one-way flags, and unreferenced scripts as of 7d3be6a1, grouped by deletion confidence. Nothing deleted yet. |  |
+| [DOCS_DRIFT_AUDIT_S322.md](DOCS_DRIFT_AUDIT_S322.md) | audit | active |  | Fresh code-first comparison of README, CLAUDE.md, and docs/ claims against actual behavior. Drift table with evidence plus a proposed docs patch. No edits. |  |
 
 ## reviewer-finder
 
