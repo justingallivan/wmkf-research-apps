@@ -19,8 +19,10 @@ related:
 # Reviewer Referral Seeding & Provenance Plan
 
 **Status: LOCKED — ready to build (S318).** All design questions resolved (see §Locked
-decisions). Written in response to a PD report on req 1002926 (see §Origin). Pending a
-Codex plan review before implementation.
+decisions). Written in response to a PD report on req 1002926 (see §Origin). **Codex
+plan review incorporated (S318):** 6 claims CONFIRMED, 1 REFUTED (no post-discovery
+count cap — corrected injection seam in §C), 3 RISKs folded in (bulk-dedup policy §C,
+display-vs-durable-string split §A, relabel consumer fan-out §A).
 
 ## Locked decisions
 
@@ -79,11 +81,23 @@ referred names are *already known* and should not be subject to discovery econom
 ## Build (seams + sequence)
 
 ### A. Relabel two existing provenance kinds — `lib/utils/reviewer-provenance.js`
-No enum change. In `provenanceLabelForCandidate`:
+No enum change. In `provenanceLabelForCandidate` (the **display** surface):
 - `REFERRED`: `Referred by ${referredBy}` / `Referred` → **`Externally-Referred ·
   ${referredBy}`** / `Externally-Referred`. Relabels ALL referred rows (contacted-reviewer
   referrals too) — intentional umbrella.
 - `APPLICANT_SUGGESTED`: `Applicant-suggested` → **`Applicant-Referred`**.
+
+**CRITICAL — display label ≠ durable string (Codex risk).** The relabel touches the
+**display** only. The persisted `wmkf_matchreason` prefix **must stay `Referred by …`**:
+`my-candidates.js` reparses `^Referred by …` on reload to reconstruct `referredBy` when
+`wmkf_sources` includes `referred` [Codex: my-candidates.js:199,203]. Do NOT change the
+persisted prefix or the reload parser — only the badge/label the UI renders.
+
+**Consumer fan-out to update in the same change (Codex):** these assert/emit the old
+label strings and must move with the relabel —
+- `tests/unit/reviewer-provenance.test.js:137` (exact label assertion),
+- `tests/unit/reviewer-candidate-export.test.js:63` (export string),
+- `ReviewerSearchSection.js:1260` (UI/export fallback string).
 No behavior change beyond the label; both kinds keep their existing grouping/selection/
 ranking.
 
@@ -94,27 +108,42 @@ ranking.
 - POST `referredSeeds` to the find flow alongside `additionalNotes`. Applicant picks need
   no input here — they arrive through the existing applicant-suggested pipeline.
 
-### C. Guaranteed seed injection — the find flow (`analyze.js` / `discover.js`)
-- **Dedup first:** match each seed against existing roster rows / suggestions using the
-  SAME lookup the manual **Add or Refer** panel uses (reuse it — do not hand-roll a name
-  match), so a seed that is already a candidate updates rather than duplicating (avoids
-  the recurring duplicate-person hazard).
-- **Inject before the count cap:** add each surviving seed to the candidate pool with
-  `provenance.kind = 'referred'` (`seedRole: 'referred_by'`, carry `referredBy` if given)
-  **before** the `DEFAULT_REVIEWER_COUNT` merge, so it can never be crowded out.
-  **[LOCATE — not yet traced this session]** the exact injection seam: analyze emits
-  suggestions → discover verifies/ranks → the per-request pool is assembled somewhere in
-  that chain; the seed merge must land where it survives the cap and reaches
-  `displayCandidates`/save. Pinning this seam is the first implementation task (and a key
-  thing for the plan review to confirm).
-- **Enrich, never drop:** run the normal contact/identity enrichment on seeds. Because
-  `referred` is **identity-review-exempt** [VERIFIED via reviewer-provenance.js:212-218,
-  225-226], a seed routes to `cited_or_proposal_named` (selectable-with-verify) **even
-  when unresolved** — it is NOT sent to `needs_identity_review`. A bare/unresolved seed
-  therefore stays visible and selectable with the "verify identity" affordance; the SAVE
-  path force-nulls its contact/bibliometrics until identity is confirmed/probable
-  (`save-candidates` anchor-or-abstain), so it cannot carry a wrong email.
-- **Seed-only:** do NOT add seed names to the analyze prompt.
+### C. Guaranteed seed injection — `pages/api/reviewer-finder/discover.js`
+- **Injection seam (corrected — Codex REFUTED the count-cap framing).** There is **no
+  post-discovery `DEFAULT_REVIEWER_COUNT` pool cap** to inject before — the count is a
+  Stage-1 prompt/validation input and `rankAllCandidates` combines/ranks without slicing
+  [Codex: discovery-service.js:2309]. The guarantee comes from injecting seeds into the
+  **ranked** set, not from beating a cap. **Exact seam (Codex):** in `/discover`, after
+  verification/COI filtering and before the result frame, merge seeds into
+  `verifiedWithCOI` before `combinedResults` / `rankAllCandidates`
+  [Codex: discover.js:436, discover.js:491] so they reach `data.ranked` → enrichment →
+  `setCandidates` → `save-candidates` [Codex: ReviewerSearchSection.js:669, 1025].
+  **Do NOT put seeds into `analysisResult.reviewerSuggestions`** — unresolved Track-A
+  items land in `unverified`, which `rankAllCandidates` excludes, so they'd never reach
+  `displayCandidates` [Codex: discovery-service.js:478, 2310].
+- Tag each injected seed `provenance.kind = 'referred'` (`seedRole: 'referred_by'`, carry
+  `referredBy` if given).
+- **Bulk-dedup policy (corrected — Codex risk).** The server-side identity lookup
+  `lookupReviewerIdentity` exists but is **interactive**: it can return `candidates`
+  requiring a staff choice, and the manual Add form stops for that confirmation
+  [Codex: reviewer-identity-lookup.js:242, ReviewerFindPanel.js:288]. A bulk paste cannot
+  stop per-name, so the policy is:
+  - **Confident single match** → reuse that person (merge into the existing candidate/
+    suggestion; no duplicate).
+  - **Ambiguous (`candidates`) / conflict / no match** → inject as an **unresolved**
+    `referred` row (do NOT auto-merge a guess). It surfaces selectable-with-verify (next
+    bullet); the PD resolves identity in-panel with the existing affordance. This keeps
+    the guarantee (never dropped) without risking a wrong-person merge.
+- **Enrich, never drop.** Because `referred` is **identity-review-exempt** [VERIFIED via
+  reviewer-provenance.js:212-218, 225-226; Codex-confirmed], a seed routes to
+  `cited_or_proposal_named` (selectable-with-verify) **even when unresolved** — NOT to
+  `needs_identity_review`. A bare/unresolved seed stays visible and selectable with the
+  "verify identity" affordance; the SAVE path force-nulls its contact/bibliometrics until
+  identity is confirmed/probable (`save-candidates` anchor-or-abstain), so it cannot carry
+  a wrong email.
+- **Seed-only.** Do NOT add seed names to the analyze prompt. (Codex confirmed Find
+  currently sends only `blobUrl`/`excludedNames`/`reviewerCount`/`additionalNotes` to
+  `/analyze` — keep it that way.)
 
 ### D. Display + persistence — mostly already exists
 - **Folded-in section:** `provenanceGroupOf` already routes `referred` into
@@ -132,19 +161,29 @@ ranking.
   Invite tab + Excel export as-is.
 
 ### Implementation sequence
-1. **Labels (A)** — relabel both kinds in `provenanceLabelForCandidate`; unit-test the
-   label function for `referred` (with/without `referredBy`) and `applicant_suggested`.
-2. **Section title (D)** — retitle the grounded `provenanceSections` entry.
-3. **Input (B)** — add the textarea + `referredSeeds` state + line parser; POST it.
-4. **Seed injection (C)** — dedup (reuse manual-Add lookup) → inject as `referred` before
-   the count cap → enrich → rely on existing exempt routing + save force-null.
+1. **Labels (A)** — relabel both kinds in `provenanceLabelForCandidate` (DISPLAY only);
+   leave the durable `wmkf_matchreason` "Referred by …" prefix and the `my-candidates`
+   reload parser UNCHANGED. Update the three old-label consumers listed in §A (two tests +
+   the `ReviewerSearchSection.js:1260` fallback string). Unit-test the label function for
+   `referred` (with/without `referredBy`) and `applicant_suggested`.
+2. **Section title (D)** — retitle the grounded `provenanceSections` entry to
+   "Cited, named & referred".
+3. **Input (B)** — add the textarea + `referredSeeds` state + line parser; POST alongside
+   `additionalNotes`. (Seed-only: do NOT add to the `/analyze` body.)
+4. **Seed injection (C)** — in `/discover`, dedup each seed via `lookupReviewerIdentity`
+   (confident match → reuse; ambiguous/conflict/none → inject unresolved), merge survivors
+   into `verifiedWithCOI` **before** `rankAllCandidates` (NOT into
+   `analysisResult.reviewerSuggestions`), tagged `referred` — then rely on existing exempt
+   routing + save force-null.
 5. **Docs/gates** — update `reviewer-workbench-lifecycle` + `reviewer-origination` wiki;
    run lint/build + `check:agent-wiki`. (No `status-enum-parity` change.)
 
 ### Test plan
 - **Unit:** `provenanceLabelForCandidate` (both relabels); the seed line parser
-  (name-only, name+email, name+email+url, junk line); dedup collapses a seed that matches
-  an existing suggestion.
+  (name-only, name+email, name+email+url, junk line); dedup — a seed with a confident
+  match reuses the person, an ambiguous match injects unresolved (no auto-merge).
+- **Regression:** `my-candidates` reload still reconstructs `referredBy` from the
+  unchanged `Referred by …` prefix (durable string not relabeled).
 - **Integration:** seed 3 names (2 resolvable, 1 bare) → all 3 surface in the grounded
   group, tagged Externally-Referred; the bare one is selectable-with-verify and NOT
   dropped; saving the bare one force-nulls contact until identity is confirmed; the
@@ -164,8 +203,12 @@ is what the PD did for Hafezi; dedup correctly reused the existing person — no
 - **Effort:** small. Two label changes + one section retitle + one UI input + a seed-merge
   in the find flow. **No new provenance kind, no new persistence mapping, no
   `provenanceSections` split, no new table, no new route.**
-- **Risk:** low. The `referred` kind — its grounded ranking, exempt routing, save
-  force-null, and persistence — already exists and is live (the manual Add-or-Refer path).
-  Main care point: the seed **dedup** must reuse the manual-Add lookup to avoid the
-  duplicate-person hazard; the injection point must be **before** the count cap.
+- **Risk:** low-moderate (raised slightly by the Codex review). The `referred` kind — its
+  grounded ranking, exempt routing, save force-null, and persistence — already exists and
+  is live (the manual Add-or-Refer path). Care points: (1) inject into `verifiedWithCOI`
+  before `rankAllCandidates`, NOT into `reviewerSuggestions` (else seeds never reach
+  `ranked`); (2) the bulk **dedup** must handle `lookupReviewerIdentity`'s interactive
+  ambiguous/conflict outcomes non-interactively (inject-unresolved, never auto-merge a
+  guess); (3) relabel the DISPLAY only — leave the durable `wmkf_matchreason` "Referred
+  by …" prefix + reload parser intact; move the three old-label consumers (§A).
 - **Gates:** `check:agent-wiki`, plus lint/build. No `status-enum-parity` change.
