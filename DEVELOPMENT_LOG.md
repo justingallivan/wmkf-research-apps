@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 - Reviewer finder referral seeding and Dataverse-grounded analyze shipped (Session 319)
+
+**Milestone:** Reviewer Find now supports externally referred seed names and no longer asks Claude to infer request identity metadata that Dataverse already owns in normal request-backed analysis.
+
+**Sessions:** 318-319 plus S320 reconciliation. Codex built/refined; Claude independently verified the merge state; final branch collision was reconciled on `main`.
+
+**Ship state:**
+- **Referral seeding** - PD-entered external referrals are guaranteed into the Find pool, labeled "Externally-Referred"; applicant referrals retain their separate label. Same-name seed/discovery collisions preserve referred provenance in display and reloadable roster persistence (`b997cf37`, `ff54c60c`).
+- **Dataverse-grounded analyze** - `/api/reviewer-finder/analyze` requires `requestId`, loads trusted request metadata, slims prompt PART 1, and overlays Dataverse title/PI/Co-PI/institution/abstract/program context onto `proposalInfo` (`83b585b4`).
+- **Merge state** - program-area and referral features landed through two-parent merges (`a4a47bc9`, `4f31f045`) and docs were reconciled at `a4668068`; live read-only probe confirmed context resolution for requests `1002916` and `1002926`; `npm run build` passed.
+
+**Why it matters:** closes the program-area save-crash class caused by asking the LLM to infer known metadata, while giving PDs a deterministic way to include externally referred reviewers without losing provenance.
+
+**Pointers:** `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md`, `docs/REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md`, `docs/agent-wiki/topics/reviewer-origination.md`; commits `83b585b4`, `b997cf37`, `ff54c60c`, `a4a47bc9`, `4f31f045`, `a4668068`.
+
 ## July 2026 — Reviewer honorarium request creation went live in production, no-BILL (Session 316)
 
 **Milestone:** The reviewer honorarium pipeline now **mints real honorarium `akoya_request` rows in production** when a non-opt-out reviewer accepts — the "no-BILL" cycle (request creation on, Bill.com payment still deferred). This flips on a pipeline that had been capture-only since 2026-06-22.

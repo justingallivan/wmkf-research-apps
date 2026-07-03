@@ -1,124 +1,166 @@
-# Session 319 Prompt: Reviewer-finder polish shipped; referral + program-area features merged
+# Session 320 Prompt: Clean main after reviewer merge; pick the next real follow-up
 
-## Session 318 Summary
+## Session 319 Summary
 
-Closed out the S317 reviewer-email deploy/schedule decisions, shipped two small
-reviewer-finder improvements, hotfixed a production save crash, and ran a full
-design→plan→Codex-review cycle for a new "referral seeding" feature. S320 reconciliation
-then merged the referral-seeding build and the analyze-prompt metadata/program-area fix
-after closing the referral seed⇄discovery attribution blocker.
+This session closed the reviewer-feature branch tangle and left the repo clean on
+`main`. Codex and Claude first collided in the same checkout; the work was
+reconciled into dedicated worktrees, independently verified, merged, pushed, and
+build-tested. The important outcome: reviewer referral seeding and the
+Dataverse-grounded reviewer analyze metadata fix are both on `origin/main`.
 
 ### What Was Completed
 
-1. **Reviewer-email deploy/schedule closed out (S317 carryover).** The S317 fixes were
-   already on `origin/main` (auto-deployed — the "not pushed" claim was stale). Scheduled
-   the reconciler cron daily `0 4 * * *` (`7212a5e2`); live dry-run = 0 would-write.
+1. **Branch reconciliation completed.**
+   - Primary checkout `/Users/gallivan/Code/WMKF_Apps` is clean on `main`.
+   - `origin/main` is `a4668068`.
+   - `origin/codex/referral-seeding-build` is `ff54c60c`.
+   - `origin/codex/program-area-normalization` is `83b585b4`.
+   - Both feature branches landed through real two-parent merges:
+     `a4a47bc9` (program-area) and `4f31f045` (referral).
 
-2. **Reviewer-finder Rank⇄A–Z sort toggle (`44fc26b1`, deployed).** Results list can sort
-   by name within each provenance group; default stays confidence rank. Selection is keyed
-   by normalized name so reordering is safe.
+2. **Reviewer referral seeding shipped.**
+   - PDs can paste externally referred names into the Find flow.
+   - The UI labels external referrals as "Externally-Referred" and keeps the
+     existing applicant lane as "Applicant-Referred".
+   - `b997cf37` preserves referred provenance when a seed and discovery result
+     normalize to the same name.
+   - `ff54c60c` fixed the remaining persistence gap: the background Find-roster
+     write now receives the same deduped, referral-preserving survivor list that
+     the UI displays, so reload does not drop the badge/referrer.
 
-3. **Program-area save-crash investigation + Dataverse metadata fix.** Boss hit a
-   Dataverse 400 promoting 5 reviewers for req 1002916 (`wmkf_programarea` > 100). Root
-   cause verified: the old analyze prompt asked the LLM to infer request metadata that
-   Dataverse already owns, and an intermittent overlong `PROGRAM_AREA` line flowed into a
-   100-char field. Current fix on `codex/program-area-normalization`: analyze POST carries
-   `requestId`; `/api/reviewer-finder/analyze` now requires `requestId` and loads trusted
-   request metadata from Dataverse; `composeAnalyzePrompt()` slims metadata inference for
-   request-backed analysis without sending program area to the model; `ClaudeReviewerService`
-   overlays Dataverse metadata onto `proposalInfo`; and
-   `normalizeSuggestionProgramArea()` drops overlong/placeholder values instead of
-   truncating them. Confirmed **no duplicate Hafezi** was created on req 1002926 (dedup
-   worked; a separate colleague report).
+3. **Reviewer analyze no longer asks the LLM to infer Dataverse-owned request metadata in normal request-backed flow.**
+   - `/api/reviewer-finder/analyze` now requires `requestId`.
+   - It loads trusted title, PI, Co-PIs, institution, abstract, and program
+     metadata from Dataverse before calling Claude.
+   - `composeAnalyzePrompt()` slims PART 1 when request context exists and does
+     not include `PROGRAM_AREA` in the model task.
+   - `ClaudeReviewerService` overlays trusted Dataverse metadata onto
+     `proposalInfo`, while `normalizeSuggestionProgramArea()` protects the save
+     path from overlong/placeholder values.
+   - Live read-only probe confirmed request context resolves for boss-flow
+     requests `1002916` and `1002926`.
 
-4. **Referral-seeding feature: design → plan → build → attribution fix.** Lets a
-   PD paste externally-referred names guaranteed into results, tagged via the existing
-   `referred` kind (label "Externally-Referred") vs the existing applicant lane
-   ("Applicant-Referred"); folded-in layout; seed-only. Build branch
-   `codex/referral-seeding-build` was merged after `b997cf37` fixed same-name
-   seed⇄discovery collisions and `ff54c60c` applied the same referral-preserving dedupe
-   before the reloadable Find-roster write.
+4. **Docs and agent handoff reconciled.**
+   - `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md` now marks the S320 pre-merge
+     attribution blocker resolved and documents the exact normalized-name
+     limitation.
+   - `docs/REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md` remains the audit pointer
+     for the historical metadata-overload problem.
+   - `docs/agent-wiki/topics/reviewer-origination.md` reflects the shipped
+     referral-seeding behavior.
+   - Separate worktrees exist so Claude/Codex do not need to share the primary
+     checkout.
 
-5. **Analyze-prompt metadata-redundancy issue documented.** The analyze PART 1 re-extracts
-   title/PI/co-PIs/institution/program/abstract that `akoya_request` already owns — historical
-   (finder predates the Dataverse-native entry path). `docs/REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md`.
+### Commits
 
-6. **Housekeeping.** Worktree skill now pushes the feature branch before parking/teardown
-   (`e1484402`); spec-audit docs recovery parked (`c960a3e4` +
-   `.claude-memory/project-spec-audit-docs-recovery-parked.md`); Codex worktree reset to
-   `codex/parked`.
-
-### Commits (this session)
-- `2c716f92` — Park referral-seeding build + analyze-prompt issue for future sessions
-- `0aa7c1d1` — Fix reviewer-suggestion save 400: clamp wmkf_programarea to 100 chars
-- `90f2e72d` — Fold Codex plan-review fixes into referral-seeding plan
-- `e6fcbc67` — Lock referral-seeding plan (seed-only, folded-in)
-- `e59a8922` — Split referral into Externally-Referred vs Applicant-Referred
-- `fd405b96` — Referral seeding: tag "Referral", reuse existing referred kind
-- `21543384` — PD-preference seeding design + notes-not-a-guarantee finding
-- `44fc26b1` — reviewer-finder: add Rank/A–Z sort toggle
-- `e1484402` — worktree: push feature branch before parking/teardown
-- `c960a3e4` — Reconcile S318 handoff: cron scheduled, spec-audit docs parked
-- `7212a5e2` — Schedule reviewer-email-reconcile cron daily (0 4 UTC)
+- `a4668068` - docs: reconcile reviewer feature merge status
+- `4f31f045` - merge: referral seeding reviewer workflow
+- `a4a47bc9` - merge: program-area reviewer metadata normalization
+- `ff54c60c` - fix(referral-seeding): dedupe surfaced referral roster rows
+- `b997cf37` - fix(referral-seeding): preserve Externally-Referred badge on seed<->discovery collision
+- `83b585b4` - Source reviewer analyze metadata from Dataverse
+- `695b6784` - docs: reconcile referral-seeding status before final attribution fix
+- `a9da0268` - docs: flag pre-merge fix for referral seed<->discovery collision (S320 audit)
+- `70ee3f2d` - Build reviewer referral seeding
+- `da95457e` - Correct referral seeding implementation plan
 
 ## Next Items
 
-### Parked (each its own future session)
+### Verified Open
 
-1. **Spec-audit docs recovery.** Two design docs live only on the user's work computer,
-   unpushed. Evidence: `.claude-memory/project-spec-audit-docs-recovery-parked.md`.
-   Re-open when the user is back at that machine (~2026-07-08): `git push origin
-   codex/spec-audit` from there, then fetch + merge here. Do NOT re-search local/origin.
+1. **Cause #2 - enrichment email-coverage miss.**
+   Evidence: `SESSION_PROMPT.md` S319 carryover plus `scripts/probe-no-email-breakdown.mjs`.
+   Eight prominent PIs have findable emails that enrichment did not surface.
+   Candidate area: the resolved faculty-page tier `_attachEmailFromResolvedPage`.
 
-### Verified Open (S317 carryover — untouched this session)
+2. **B2 - enrichment-timeout partial-return.**
+   Evidence: `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md` section B2.
+   `enrichCandidates` throws on abort and discards enrichment already computed.
+   Treat as deferred reviewer-email reliability work, not part of the referral
+   or program-area merge.
 
-1. **Cause #2 — enrichment email-coverage miss.** 8 prominent PIs have findable emails
-   enrichment didn't surface. Evidence: `scripts/probe-no-email-breakdown.mjs`. Candidate:
-   the resolved faculty-page tier `_attachEmailFromResolvedPage`.
+### Owner Decision Needed
 
-2. **B2 — enrichment-timeout partial-return (DEFERRED).** `enrichCandidates` throws on abort,
-   discarding computed enrichment. Evidence: `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md` §B2.
+1. **Whether to delete merged remote feature branches.**
+   Evidence: `git ls-remote --heads origin main codex/referral-seeding-build codex/program-area-normalization`.
+   Both feature branches are merged and preserved on origin. Keeping them is
+   harmless; deleting them is optional cleanup.
+
+### Parked
+
+1. **Spec-audit docs recovery.**
+   Evidence: `.claude-memory/project-spec-audit-docs-recovery-parked.md`.
+   Two design docs live only on the user's work computer, unpushed. Re-open when
+   the user is back at that machine around 2026-07-08: push `codex/spec-audit`
+   from there, then fetch/review/merge here. Do not re-search local/origin first.
 
 ### Verify Before Acting
 
-1. **The 53 roster rows Codex backfilled (S317, prod) are benign, not a todo.** Re-run
-   `scripts/dryrun-reviewer-email-reconcile.mjs` to confirm 0-would-write before any recovery.
+1. **Reviewer-finder metadata prompt assumptions.**
+   Evidence currently available: live read-only probe for requests `1002916` and
+   `1002926`, plus `pages/api/reviewer-finder/analyze.js` requiring `requestId`.
+   If touching this path, re-check the caller -> route -> `loadReviewerRequestContext`
+   chain before claiming the LLM is or is not asked to infer request metadata.
+
+2. **The 53 roster rows Codex backfilled in S317 are benign, not a todo.**
+   Evidence currently available: prior S317/S318 dry-run handoff.
+   Re-run `scripts/dryrun-reviewer-email-reconcile.mjs` and confirm 0-would-write
+   before any recovery work.
 
 ### Do Not Reopen Without New Decision
 
-1. **Shipped this session:** reviewer-email cron scheduled (`7212a5e2`), Rank/A–Z sort toggle
-   (`44fc26b1`), program-area clamp (`0aa7c1d1`), then S320 referral seeding +
-   request-backed program-area metadata normalization. All merged to `main`.
-2. **No duplicate Hafezi on req 1002926.** Verified: one record, correctly reused (dedup
-   worked). Do not re-run recovery.
-3. **S317 reviewer-email fixes (B1/A/Tier-0/munge) SHIPPED + LIVE.** Evidence: S318 summary
-   above; `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md`. The 7 recovered reviewers are fixed.
+1. **Claude/Codex branch collision.**
+   Evidence: `main` is clean at `a4668068`, both features are merged, and
+   dedicated worktrees exist. Do not unwind or re-merge these branches.
+
+2. **Referral seed<->discovery attribution blocker.**
+   Evidence: `b997cf37`, `ff54c60c`, and
+   `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md`. The known remaining limitation is
+   exact normalized-name matching only ("R. Smith" vs "Robert Smith" can still
+   produce two rows); do not expand to fuzzy matching without a new decision.
+
+3. **Program-area save crash / request-backed metadata redundancy.**
+   Evidence: `83b585b4`, live request-context probe for `1002916`/`1002926`, and
+   `docs/REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md`. Normal Workbench analyze
+   flow now requires request context.
+
+4. **No duplicate Hafezi on request 1002926.**
+   Evidence: prior S319 verification found one correctly reused record. Do not
+   re-run recovery without a new symptom.
+
+5. **S317 reviewer-email fixes and cron are shipped.**
+   Evidence: prior commits `7212a5e2` and S319 summary. The open work is Cause #2
+   and B2 only.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md` | Referral-seeding: implemented plan + resolved S320 seed⇄discovery attribution fix. |
-| `docs/REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md` | Program-area crash + request-required Dataverse metadata fix. |
-| `lib/services/reviewer-request-context.js` | Trusted request metadata loader/overlay for reviewer analyze. |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | `normalizeSuggestionProgramArea`; `upsert`/`ensureApplicantRecommended`/`updateLifecycle`. |
-| `shared/config/prompts/reviewer-finder.js` | Analyze prompt template + `parseAnalysisResponse` (PROGRAM_AREA single-line capture). |
-| `shared/components/reviewers/ReviewerSearchSection.js` | Reviewer-finder UI; `sortMode` (Rank/A–Z toggle). |
-| `vercel.json` | Cron schedules incl. `/api/cron/reviewer-email-reconcile` (`0 4 * * *`). |
-| `.claude-memory/project-spec-audit-docs-recovery-parked.md` | Spec-audit docs recovery (work computer, ~2026-07-08). |
+| `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md` | Implemented referral-seeding plan, resolved attribution fix, exact-name limitation. |
+| `docs/REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md` | Historical LLM metadata-overload audit and Dataverse-backed fix. |
+| `shared/components/reviewers/ReviewerSearchSection.js` | Find flow UI; sends `requestId`, referral seeds, display/roster dedupe. |
+| `shared/components/reviewers/reviewer-search-logic.js` | Referral-preserving normalized-name dedupe helper. |
+| `lib/services/reviewer-request-context.js` | Trusted Dataverse request metadata loader and result overlay. |
+| `lib/services/reviewer-prompt-composer.js` | Analyze prompt slimming when trusted request metadata exists. |
+| `lib/services/claude-reviewer-service.js` | Reviewer analyze service; passes request context into prompt composition and overlays metadata. |
+| `lib/dataverse/adapters/reviewer-suggestion.js` | `normalizeSuggestionProgramArea()` and reviewer suggestion persistence. |
+| `.claude-memory/project-spec-audit-docs-recovery-parked.md` | Parked spec-audit recovery instructions for the work computer. |
 
 ## Testing
 
 ```bash
-# Program-area normalization + Dataverse metadata tests
-npx jest tests/unit/reviewer-suggestion-programarea-normalize.test.js tests/unit/reviewer-request-context.test.js tests/unit/claude-reviewer-service.test.js --runInBand
+# Final merged-main verification already run in S319/S320 reconciliation:
+npm run build
+npm run check:agent-invariants
 
-# Referral seeding / provenance / save-anchor tests
-npx jest tests/unit/reviewer-search-logic.test.js tests/unit/reviewer-provenance.test.js tests/unit/reviewer-candidate-export.test.js tests/unit/reviewer-route-identity-gate.test.js --runInBand
+# Combined reviewer/program-area/referral unit coverage:
+npx jest tests/unit/reviewer-suggestion-programarea-normalize.test.js tests/unit/reviewer-request-context.test.js tests/unit/claude-reviewer-service.test.js tests/unit/reviewer-analyze-route.test.js tests/unit/reviewer-prompt-composer.test.js tests/unit/reviewer-search-logic.test.js tests/unit/reviewer-provenance.test.js tests/unit/reviewer-candidate-export.test.js tests/unit/reviewer-route-identity-gate.test.js --runInBand
 
-# Reviewer-finder component lint (sort toggle)
-npx eslint shared/components/reviewers/ReviewerSearchSection.js
-
-# Doc gates touched this session
-npm run check:docs-catalog && npm run check:doc-symbol-refs && npm run check:agent-wiki
+# Relevant doc/gate surfaces:
+npm run check:docs-catalog
+npm run check:agent-wiki && npm run check:agent-wiki:self-test
+npm run check:api-routes && npm run check:api-routes:self-test
+npm run check:doc-symbol-refs && npm run check:doc-symbol-refs:self-test
+npm run check:atlas && npm run check:atlas:self-test
+npm run check:fact-consistency && npm run check:fact-consistency:self-test
 ```
