@@ -18,22 +18,26 @@ related:
 
 # Reviewer Referral Seeding & Provenance Plan
 
-**Status: LOCKED — build NOT started (parked S318 for a future session).** All design
-questions resolved (see §Locked decisions); Codex-reviewed. The Codex build was blocked
-by an environment issue (sandbox writable-roots) — see **§Build status & how to resume**
-and pick a path there before implementing. Written in response to a PD report on req
-1002926 (see §Origin). **Codex plan review incorporated (S318):** 6 claims CONFIRMED,
-1 REFUTED (no post-discovery count cap — corrected injection seam in §C), 3 RISKs folded
-in (bulk-dedup policy §C, display-vs-durable-string split §A, relabel consumer fan-out
-§A); the review is preserved verbatim in the appendix.
+**Status: LOCKED — build NOT started (parked S318 for a future session; S319 safety
+review folded in).** All design questions resolved (see §Locked decisions);
+Codex-reviewed, then re-reviewed against live filter/save contracts. The Codex build was
+blocked by an environment issue (sandbox writable-roots) — see **§Build status & how to
+resume** and pick a path there before implementing. Written in response to a PD report on
+req 1002926 (see §Origin). **Codex plan review incorporated (S318):** 6 claims
+CONFIRMED, 1 REFUTED (no post-discovery count cap), 3 RISKs folded in. **S319 correction:**
+the originally proposed post-filter `verifiedWithCOI` seam was unsafe because it bypassed
+proposal-author / institution-COI / coauthor filters; §C now requires a seed safety pass
+before ranking plus an explicit materialization contract for person reuse.
 
 ## Locked decisions
 
 1. **Two referral lanes on two EXISTING provenance kinds — no new enum.**
    - **Externally-Referred** = the `referred` kind — names from consultants/colleagues
      (and contacted-reviewer referrals). This is what the new seed field feeds. Already
-     grounded, never-dropped, ranking-bonused; the referrer ("Doug N") rides along via
-     `referredBy`.
+     grounded and ranking-bonused. The UI must never silently omit a seed: policy-clean
+     seeds surface as selectable referred rows; proposal-author / institution-COI seeds
+     surface as blocked-with-reason, not savable. The referrer ("Doug N") rides along via
+     `referredBy` and the durable `wmkf_matchreason` prefix.
    - **Applicant-Referred** = the existing `applicant_suggested` kind — names the
      *applicant* put forward. Already end-to-end; deliberately **not auto-selected**
      (defaults to needing PD promotion) — the right posture for a possibly-biased pick.
@@ -45,10 +49,12 @@ in (bulk-dedup policy §C, display-vs-durable-string split §A, relabel consumer
    **NOT** added to Claude's analyze prompt. Discovery stays an independent second
    opinion. (A future "also use these to find related reviewers" checkbox is possible but
    out of scope.)
-4. **Bare names: surface-with-verify, never dropped.** A seed with no email / unresolved
-   identity still appears (selectable) in the grounded group with the existing "verify
-   identity" affordance; the save path force-nulls its contact until identity is
-   confirmed/probable, so it can never carry a wrong email (see §C for the mechanism).
+4. **Bare names: surface-with-verify unless a policy conflict blocks them.** A seed with
+   no email / unresolved identity still appears (selectable) in the grounded group with
+   the existing "verify identity" affordance; the save path force-nulls its contact until
+   identity is confirmed/probable, so it can never carry a wrong email (see §C for the
+   mechanism). A seed matching the PI/co-PI or current PI institution is not dropped
+   silently, but it is not selectable/savable.
 5. **Bulk paste format:** tolerant freeform lines (`Name`, optional email, optional
    affiliation/URL). Names-only is the common case.
 
@@ -77,9 +83,11 @@ guarantee:
 3. **Discover-stage verification** (`discover.js`) re-checks each name against real
    publication profiles and ranks it; unresolved names rank low or fall away.
 
-**Conclusion: the guarantee must live in code (a seed path that bypasses the count cap
-and the drop), not prompt wording.** The finder is a discovery + verification engine;
-referred names are *already known* and should not be subject to discovery economics.
+**Conclusion: the guarantee must live in code, not prompt wording.** The finder is a
+discovery + verification engine; referred names are *already known* and should not be
+subject to discovery economics. The guarantee is visibility, not policy bypass: every
+seed must either surface as a selectable referred row or surface as blocked with a named
+policy reason.
 
 ## Build (seams + sequence)
 
@@ -106,8 +114,9 @@ ranking.
 
 ### B. Structured input — `shared/components/reviewers/ReviewerSearchSection.js`
 - New "Externally-referred reviewers" textarea (consultants/colleagues — **not** the
-  applicant), **separate** from `additionalNotes` (notes stays for instructions). One
-  entry per line, tolerant parse to `referredSeeds: [{ name, email?, affiliation?, url? }]`.
+  applicant), **separate** from `additionalNotes` (notes stays for instructions). Add a
+  companion optional "Referred by" field that applies to the pasted batch. One entry per
+  line, tolerant parse to `referredSeeds: [{ name, email?, affiliation?, url?, referredBy? }]`.
 - POST `referredSeeds` to the find flow alongside `additionalNotes`. Applicant picks need
   no input here — they arrive through the existing applicant-suggested pipeline.
 
@@ -116,23 +125,40 @@ ranking.
   post-discovery `DEFAULT_REVIEWER_COUNT` pool cap** to inject before — the count is a
   Stage-1 prompt/validation input and `rankAllCandidates` combines/ranks without slicing
   [Codex: discovery-service.js:2309]. The guarantee comes from injecting seeds into the
-  **ranked** set, not from beating a cap. **Exact seam (Codex):** in `/discover`, after
-  verification/COI filtering and before the result frame, merge seeds into
-  `verifiedWithCOI` before `combinedResults` / `rankAllCandidates`
-  [Codex: discover.js:436, discover.js:491] so they reach `data.ranked` → enrichment →
-  `setCandidates` → `save-candidates` [Codex: ReviewerSearchSection.js:669, 1025].
+  **ranked** set, not from beating a cap. **S319 correction:** do **not** simply merge
+  seeds into `verifiedWithCOI` after the existing filter block. In live `discover.js`, the
+  proposal-author filter, institution-COI hard drop, and coauthor check have already run
+  before `combinedResults` / `rankAllCandidates` (`discover.js:273`, `:308`, `:334`,
+  `:436`). A post-filter merge would bypass safety checks.
+  - Build `seedCandidates` after `proposalAuthors` / `piIdentity` / `piInsts` are known.
+  - Run the same proposal-author fuzzy filter and institution-COI policy against seeds
+    before ranking. Policy-conflict seeds go to a `blockedReferredSeeds` response list
+    with `{ name, reason }`; they do not enter `ranked` or `save-candidates`.
+  - Run coauthor checking for policy-clean seeds when the PubMed coauthor contract is
+    enabled, or mark the same coauthor fields the normal verified path uses so the row is
+    visible with the existing warning rather than silently bypassing it.
+  - Only after that safety pass, merge **policy-clean** seeds into `verifiedWithCOI`
+    immediately before `combinedResults` / `rankAllCandidates` so they reach `data.ranked`
+    → enrichment → `setCandidates` → `save-candidates`.
   **Do NOT put seeds into `analysisResult.reviewerSuggestions`** — unresolved Track-A
   items land in `unverified`, which `rankAllCandidates` excludes, so they'd never reach
   `displayCandidates` [Codex: discovery-service.js:478, 2310].
 - Tag each injected seed `provenance.kind = 'referred'` (`seedRole: 'referred_by'`, carry
-  `referredBy` if given).
-- **Bulk-dedup policy (corrected — Codex risk).** The server-side identity lookup
+  `referredBy` if given). Also set a durable save reason string for seeds:
+  `reasoning = "Referred by {referredBy}."` when a referrer is present, otherwise
+  `"Externally referred by staff."`. This preserves the `my-candidates` reload parser
+  contract for `referredBy` without relabeling `wmkf_matchreason`.
+- **Bulk-dedup / materialization policy (corrected — Codex risk + S319).** The server-side identity lookup
   `lookupReviewerIdentity` exists but is **interactive**: it can return `candidates`
   requiring a staff choice, and the manual Add form stops for that confirmation
   [Codex: reviewer-identity-lookup.js:242, ReviewerFindPanel.js:288]. A bulk paste cannot
   stop per-name, so the policy is:
-  - **Confident single match** → reuse that person (merge into the existing candidate/
-    suggestion; no duplicate).
+  - **Confident single match** → carry a server-derived `seedResolvedPotentialReviewerId`
+    / `seedResolvedContactId` marker through the seed DTO. The later persistence step must
+    reuse that anchored person (or a server re-lookup of the same confident identity)
+    instead of falling through to `save-candidates`' existing name/email upsert. Without
+    this explicit materialization path, name-only seeds can still duplicate because
+    `save-candidates` currently calls `upsertByEmail`, which creates on missing email.
   - **Ambiguous (`candidates`) / conflict / no match** → inject as an **unresolved**
     `referred` row (do NOT auto-merge a guess). It surfaces selectable-with-verify (next
     bullet); the PD resolves identity in-panel with the existing affordance. This keeps
@@ -157,11 +183,15 @@ ranking.
 - **Applicant-Referred section already exists:** `provenanceGroupOf` routes
   `applicant_suggested` to its own group [VERIFIED via reviewer-provenance.js:231] which
   renders as its own section — only the label changes.
-- **Persistence: no new mapping.** `save-candidates.js` writes the source list via
-  `saveSourceListForCandidate(candidate)` and `referred` already flows through [VERIFIED
-  via save-candidates.js:252,418 + the live req-1002926 probe: the manual Hafezi row
-  persisted `wmkf_sources = "staff_manual,referred"`]. Origin reaches Dataverse + the
-  Invite tab + Excel export as-is.
+- **Persistence: existing source mapping, new seed materializer.** `save-candidates.js`
+  writes the source list via `saveSourceListForCandidate(candidate)` and `referred`
+  already flows through [VERIFIED via save-candidates.js:252,418 + the live req-1002926
+  probe: the manual Hafezi row persisted `wmkf_sources = "staff_manual,referred"`].
+  However, seed rows need an explicit materialization seam before Dataverse write:
+  confident identity matches must reuse the server-anchored potential reviewer, while
+  unresolved seeds may use the existing save path as name-only referred rows with contact
+  force-nulled. Origin reaches Dataverse + the Invite tab + Excel export as-is only after
+  this reuse path is implemented.
 
 ### Implementation sequence
 1. **Labels (A)** — relabel both kinds in `provenanceLabelForCandidate` (DISPLAY only);
@@ -173,26 +203,38 @@ ranking.
    "Cited, named & referred".
 3. **Input (B)** — add the textarea + `referredSeeds` state + line parser; POST alongside
    `additionalNotes`. (Seed-only: do NOT add to the `/analyze` body.)
-4. **Seed injection (C)** — in `/discover`, dedup each seed via `lookupReviewerIdentity`
-   (confident match → reuse; ambiguous/conflict/none → inject unresolved), merge survivors
-   into `verifiedWithCOI` **before** `rankAllCandidates` (NOT into
-   `analysisResult.reviewerSuggestions`), tagged `referred` — then rely on existing exempt
-   routing + save force-null.
-5. **Docs/gates** — update `reviewer-workbench-lifecycle` + `reviewer-origination` wiki;
-   run lint/build + `check:agent-wiki`. (No `status-enum-parity` change.)
+4. **Seed injection + safety pass (C)** — in `/discover`, parse/clean seeds, run
+   `lookupReviewerIdentity`, then run proposal-author / institution-COI / coauthor safety
+   checks before ranking. Return blocked policy-conflict seeds separately with names and
+   reasons. Merge only policy-clean seeds into `verifiedWithCOI` **before**
+   `rankAllCandidates` (NOT into `analysisResult.reviewerSuggestions`), tagged `referred`
+   with the durable `reasoning` string above.
+5. **Seed materializer (D)** — before saving, implement the anchored reuse path for
+   confident matches. Either extend `save-candidates` to accept only server-derived seed
+   anchors and re-validate them before write, or add a small server-side helper used by
+   save that mirrors `manual-reviewer`'s `ensureStaffManualCandidate` behavior. This is
+   required for the "confident match → no duplicate" claim.
+6. **Docs/gates** — update `reviewer-workbench-lifecycle` + `reviewer-origination` wiki;
+   run lint/build plus `check:api-routes && check:api-routes:self-test`,
+   `check:docs-catalog`, and `check:agent-wiki && check:agent-wiki:self-test`. (No
+   `status-enum-parity` change.)
 
 ### Test plan
 - **Unit:** `provenanceLabelForCandidate` (both relabels); the seed line parser
-  (name-only, name+email, name+email+url, junk line); dedup — a seed with a confident
-  match reuses the person, an ambiguous match injects unresolved (no auto-merge).
+  (name-only, name+email, name+email+url, junk line, batch-level `referredBy`); dedup /
+  materialization — a seed with a confident match reuses the anchored person, an ambiguous
+  match injects unresolved (no auto-merge).
 - **Regression:** `my-candidates` reload still reconstructs `referredBy` from the
-  unchanged `Referred by …` prefix (durable string not relabeled).
+  unchanged `Referred by …` prefix (durable string not relabeled); a bulk seed with a
+  batch referrer persists the same prefix.
 - **Integration:** seed 3 names (2 resolvable, 1 bare) → all 3 surface in the grounded
   group, tagged Externally-Referred; the bare one is selectable-with-verify and NOT
-  dropped; saving the bare one force-nulls contact until identity is confirmed; the
-  Claude analyze prompt is byte-unchanged (seed-only).
+  dropped; saving the bare one force-nulls contact until identity is confirmed; a seed
+  matching the PI/co-PI or PI institution surfaces in the blocked list and is not savable;
+  the Claude analyze prompt is byte-unchanged (seed-only).
 - **Verify (drive it):** run a find with seeds; confirm the folded section, the badges,
-  save → `wmkf_sources` carries `referred`, Excel shows Externally-Referred.
+  blocked-seed summary, save → `wmkf_sources` carries `referred`, Excel shows
+  Externally-Referred.
 
 ## Interim path available today (no build)
 
@@ -203,23 +245,26 @@ is what the PD did for Hafezi; dedup correctly reused the existing person — no
 
 ## Effort / risk
 
-- **Effort:** small. Two label changes + one section retitle + one UI input + a seed-merge
-  in the find flow. **No new provenance kind, no new persistence mapping, no
-  `provenanceSections` split, no new table, no new route.**
-- **Risk:** low-moderate (raised slightly by the Codex review). The `referred` kind — its
-  grounded ranking, exempt routing, save force-null, and persistence — already exists and
-  is live (the manual Add-or-Refer path). Care points: (1) inject into `verifiedWithCOI`
-  before `rankAllCandidates`, NOT into `reviewerSuggestions` (else seeds never reach
-  `ranked`); (2) the bulk **dedup** must handle `lookupReviewerIdentity`'s interactive
-  ambiguous/conflict outcomes non-interactively (inject-unresolved, never auto-merge a
-  guess); (3) relabel the DISPLAY only — leave the durable `wmkf_matchreason` "Referred
-  by …" prefix + reload parser intact; move the three old-label consumers (§A).
-- **Gates:** `check:agent-wiki`, plus lint/build. No `status-enum-parity` change.
+- **Effort:** medium-small. Two label changes + one section retitle + one UI input + a
+  seed safety/materialization helper in the find/save flow. **No new provenance kind, no
+  new table, no new route, no `provenanceSections` split.**
+- **Risk:** moderate. The `referred` kind — its grounded ranking, exempt routing, save
+  force-null, and persistence — already exists and is live (the manual Add-or-Refer path).
+  Care points: (1) run seed safety checks before ranking; do not post-merge seeds after
+  `/discover` has already filtered normal candidates; (2) the bulk **dedup** must handle
+  `lookupReviewerIdentity`'s interactive ambiguous/conflict outcomes non-interactively
+  (inject-unresolved, never auto-merge a guess) and must enforce anchored reuse for
+  confident matches; (3) relabel the DISPLAY only — leave the durable `wmkf_matchreason`
+  "Referred by …" prefix + reload parser intact; move the three old-label consumers (§A).
+- **Gates:** lint/build, `check:api-routes && check:api-routes:self-test`,
+  `check:docs-catalog`, and `check:agent-wiki && check:agent-wiki:self-test`. No
+  `status-enum-parity` change.
 
 ## Build status & how to resume (S318 handoff)
 
-**State: plan LOCKED, build NOT started.** The design is final and Codex-reviewed
-(findings in the appendix, already folded into §A–§D). No code has been written.
+**State: plan LOCKED, build NOT started.** The design is S319-corrected and ready to
+build from §Implementation sequence. The S318 Codex findings are preserved in the appendix,
+but the historical post-filter seam there is superseded by §C. No code has been written.
 
 **Why the build didn't happen — an environment blocker, not a plan problem.** The build
 was handed to Codex in the worktree `../WMKF_Apps-codex` (branch `codex/referral-seeding`,
@@ -239,15 +284,16 @@ commits** over origin/main (only an untracked `.codex/`).
    change; flips the roles.
 3. Build in the main checkout on a fresh branch (Codex's workspace is writable there).
 
-**Do not re-run the Codex plan review** — it's captured verbatim in the appendix and the
-fixes are already in this doc. The implementation guardrails (injection seam, bulk-dedup
-policy, display-vs-durable-string split) in §A/§C are the load-bearing corrections; honor
-them exactly. Keep the branch off `main` and merge only after review (main auto-deploys).
+**Do not re-run the S318 Codex plan review** — it's captured verbatim in the appendix.
+Use the S319-corrected guardrails in §A/§C/§D as authoritative: seed safety pass before
+ranking, anchored reuse for confident identity matches, and display-vs-durable-string
+split. Keep the branch off `main` and merge only after review (main auto-deploys).
 
-## Appendix: Codex plan-review findings (verbatim, S318) — RESCUED
+## Appendix: Codex plan-review findings (verbatim, S318) — RESCUED / PARTLY SUPERSEDED
 
-Preserved so a future session doesn't re-run the review. Codex read the committed plan
-against live source and returned:
+Preserved so a future session doesn't re-run the review. S319 re-review supersedes the
+`verifiedWithCOI` post-filter seam below: use §C, not the historical appendix line, for
+implementation. Codex read the committed plan against live source and returned:
 
 - CONFIRMED — Provenance relabel is enum-neutral: `referred` and `applicant_suggested` already exist in `PROVENANCE_KINDS`, while `provenanceLabelForCandidate` is the string-only display surface. `lib/utils/reviewer-provenance.js:9`, `:249`.
 - CONFIRMED — `referred` behavior is already grounded/exempt: it gets ranking bonus, routes through `isIdentityReviewExemptProvenance`, and groups as `cited_or_proposal_named` before unresolved identity gates run. `reviewer-provenance.js:34`, `:212`, `:221`.
