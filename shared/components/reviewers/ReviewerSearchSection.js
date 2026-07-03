@@ -726,8 +726,9 @@ export default function ReviewerSearchSection({
       if (offTopic.length > 0) {
         enriched = [...enriched.filter((c) => !c.aiFlaggedNotRelevant), ...offTopic];
       }
+      const dedupedEnriched = dedupeByName(enriched);
 
-      setCandidates(enriched);
+      setCandidates(dedupedEnriched);
       setUnverified(unverifiedKept.map((c) => withReviewerProvenance(c)));
       setBlockedReferredSeeds(blockedReferredRaw);
       if (enrichFailed) {
@@ -740,9 +741,9 @@ export default function ReviewerSearchSection({
       // it as deduped — a slow POST must not clobber a newer search's roster
       // (S224). Verified (Claude) + database discoveries only; unverified stay
       // ephemeral. A failure degrades to "no dedup this run", never a broken panel.
-      if (enriched.length > 0 && requestId) {
+      if (dedupedEnriched.length > 0 && requestId) {
         try {
-          const pruned = enriched.map(pruneCandidateForRoster);
+          const pruned = dedupedEnriched.map(pruneCandidateForRoster);
           const rRes = await fetch('/api/workbench/reviewer-roster', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -753,7 +754,7 @@ export default function ReviewerSearchSection({
             // Merge into the existing active roster (prior runs persist), pruned
             // DTOs deduped by normalized name.
             setRosterActive((prev) => dedupeByName([...pruned, ...prev]));
-            setRosterNames((prev) => Array.from(new Set([...prev, ...enriched.map((c) => c.name)])));
+            setRosterNames((prev) => Array.from(new Set([...prev, ...dedupedEnriched.map((c) => c.name)])));
             setRosterNote(null);
           } else {
             setRosterNote("Couldn't save this search to the request — these candidates may re-appear on a future search.");
