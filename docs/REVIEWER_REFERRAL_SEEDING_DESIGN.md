@@ -280,15 +280,20 @@ Verification run: focused Jest coverage for search parsing/provenance/export/sav
 reuse, API route matrix + self-test, Atlas + self-test, doc catalog/symbol/freshness gates,
 lint, and production build.
 
+S320 pre-merge collision fix: `b997cf37` made candidate dedupe preserve `referred`
+provenance and `referredBy` for seed/discovery same-name collisions in both relevance
+orderings. Follow-up `ff54c60c` applies that same referral-preserving dedupe before the
+background Find-roster write, so reloadable roster rows do not lose the
+Externally-Referred badge/referrer either.
+
 The S318 Codex plan review remains preserved verbatim in the appendix; the historical
 post-filter seam there is superseded by §C.
 
-## ⚠️ PRE-MERGE FIX REQUIRED — seed⇄discovery collision loses the referral badge (S320 audit)
+## S320 pre-merge fix resolved — seed⇄discovery collision preserves referral attribution
 
-**Status: OPEN — must be fixed before merging `codex/referral-seeding-build` to `main`.**
-Found by a code audit of the built branch (S320). Not a data-corruption bug; a
-labeling/attribution defect. Whoever merges this feature (Claude or Codex, any machine)
-owns closing this first.
+**Status: RESOLVED before merge.** Found by a code audit of the built branch (S320). It
+was not a data-corruption bug; it was a labeling/attribution defect. Closed by
+`b997cf37` plus `ff54c60c`.
 
 ### The defect
 When a seeded referral name **and** a candidate that discovery independently finds in the
@@ -312,25 +317,24 @@ same run **normalize to the same name**, the survivor shown to the user is chose
   surface promise ("clearly badged as externally-referred") silently fails for exactly the
   prominent names most likely to be found both ways.
 
-### The fix (scoped)
-Make the collision resolve by **provenance preference, not relevance order**: when two
-candidates share a `normalizeReviewerName` key, keep/merge so the surviving row carries the
-`referred` provenance kind and its `referredBy`. Options, cheapest first:
-1. **Client merge (smallest):** change `dedupeByName` (or a seed-aware wrapper used only
-   for `displayCandidates`) so that on a key collision it prefers the `referred`-kind copy,
-   or grafts `provenance.kind='referred'` + `referredBy` + the Externally-Referred badge
-   onto whichever copy it keeps. Add a unit test: two same-name candidates (one `referred`
-   seed, one discovered) → survivor is badged Externally-Referred with the referrer.
-2. **Server merge (more robust):** dedup seeds against `verifiedWithCOI`/`enhancedDiscovered`
-   inside `/discover` *before* ranking — if a discovery candidate already matches a seed by
-   normalized name, merge the `referred` provenance + `referredBy` onto it instead of adding
-   a second row. Preferred if you also want the server `ranked` payload itself clean.
+### The fix
+The collision now resolves by **provenance preference, not relevance order**. When two
+candidates share a `normalizeReviewerName` key, `dedupeByName` delegates to
+`dedupeByNamePreferReferred`, which grafts `referred` provenance, `referredBy`, and the
+durable `Referred by ...` match-reason prefix onto the survivor. The helper deliberately
+does not copy contact or identity fields across copies, preserving name-only referred-seed
+contact-null safety. The deduped candidate list is also the list sent to
+`/api/workbench/reviewer-roster`, so the active roster reload path keeps the same
+Externally-Referred attribution.
 
 ### Acceptance criteria
 - A seeded name that discovery also finds appears **once**, badged **Externally-Referred**
   with the referrer, regardless of relevance order.
+- The roster persistence path uses the same deduped survivor, so reload does not drop the
+  badge/referrer.
 - No regression to the existing name-only unresolved-seed contact-null safety.
-- New unit test covering the collision (both orderings: seed-higher and discovery-higher).
+- Unit tests cover the collision in both orderings plus no false promotion of
+  applicant-referred and non-referred candidates.
 
 ### Known limitation (NOT a blocker — note only)
 `dedupeByName` is exact-normalized-name. If the referrer hand-types a variant the system

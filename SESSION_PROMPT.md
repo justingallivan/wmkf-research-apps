@@ -1,13 +1,12 @@
-# Session 319 Prompt: Reviewer-finder polish shipped; two projects parked for dedicated sessions
+# Session 319 Prompt: Reviewer-finder polish shipped; referral + program-area features merged
 
 ## Session 318 Summary
 
 Closed out the S317 reviewer-email deploy/schedule decisions, shipped two small
 reviewer-finder improvements, hotfixed a production save crash, and ran a full
-design→plan→Codex-review cycle for a new "referral seeding" feature — then **parked two
-threads that ballooned into their own projects** (referral-seeding build; the
-analyze-prompt metadata/program-area fix), each captured in a durable doc so a cold
-session can resume. All work committed and pushed to `main`.
+design→plan→Codex-review cycle for a new "referral seeding" feature. S320 reconciliation
+then merged the referral-seeding build and the analyze-prompt metadata/program-area fix
+after closing the referral seed⇄discovery attribution blocker.
 
 ### What Was Completed
 
@@ -32,13 +31,13 @@ session can resume. All work committed and pushed to `main`.
    truncating them. Confirmed **no duplicate Hafezi** was created on req 1002926 (dedup
    worked; a separate colleague report).
 
-4. **Referral-seeding feature: design → plan → Codex review, LOCKED, build PARKED.** Lets a
+4. **Referral-seeding feature: design → plan → build → attribution fix.** Lets a
    PD paste externally-referred names guaranteed into results, tagged via the existing
    `referred` kind (label "Externally-Referred") vs the existing applicant lane
-   ("Applicant-Referred"); folded-in layout; seed-only. Plan + verbatim Codex review live in
-   `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md`. **Build ran later** (Codex, on
-   `codex/referral-seeding-build`); as of S320 it is BUILT + pushed to origin but NOT merged
-   to `main` and has an OPEN pre-merge fix — see Parked item 1 below.
+   ("Applicant-Referred"); folded-in layout; seed-only. Build branch
+   `codex/referral-seeding-build` was merged after `b997cf37` fixed same-name
+   seed⇄discovery collisions and `ff54c60c` applied the same referral-preserving dedupe
+   before the reloadable Find-roster write.
 
 5. **Analyze-prompt metadata-redundancy issue documented.** The analyze PART 1 re-extracts
    title/PI/co-PIs/institution/program/abstract that `akoya_request` already owns — historical
@@ -66,34 +65,10 @@ session can resume. All work committed and pushed to `main`.
 
 ### Parked (each its own future session)
 
-1. **Referral-seeding build — BUILT, not merged, has an OPEN pre-merge fix (updated S320).**
-   The build now EXISTS on `origin/codex/referral-seeding-build` (pushed S320; was previously
-   local-only). Tests pass (108). NOT merged to `main`, so NOT live in production yet.
-   **Before merging, close the pre-merge blocker:** a seed⇄discovery name collision resolves
-   by relevance score, not provenance, so a referred person can lose the Externally-Referred
-   badge/referrer if the discovery copy outranks the seed (no duplicate row/save — client
-   `dedupeByName` collapses them; labeling defect, not data corruption).
-   Evidence + scoped fix + acceptance criteria: `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md`
-   §"⚠️ PRE-MERGE FIX REQUIRED". Do NOT re-run the Codex plan review — preserved in the appendix.
-
-2. **Analyze-prompt / program-area real fix.** The deployed clamp is a band-aid.
-   Evidence: `docs/REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md`.
-   Two directions: (a) minimal — normalize `programArea` to valid values / null (replaces
-   the clamp); (b) refactor — source title/PI/co-PIs/institution/program/abstract from
-   `akoya_request`, slim the analyze prompt to science + reviewer generation (bigger; touches
-   COI inputs; wants a Codex design pass).
-
-3. **Spec-audit docs recovery.** Two design docs live only on the user's work computer,
+1. **Spec-audit docs recovery.** Two design docs live only on the user's work computer,
    unpushed. Evidence: `.claude-memory/project-spec-audit-docs-recovery-parked.md`.
    Re-open when the user is back at that machine (~2026-07-08): `git push origin
    codex/spec-audit` from there, then fetch + merge here. Do NOT re-search local/origin.
-
-### Owner Decision Needed
-
-1. **Program-area clamp: keep the band-aid, or upgrade to normalize now?** Truncate→normalize
-   (coerce non-matching → null) is a tiny change that stops prod storing truncated garbage,
-   without reopening the bigger refactor. Evidence: `docs/REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md`
-   §"Deployed band-aid".
 
 ### Verified Open (S317 carryover — untouched this session)
 
@@ -112,7 +87,8 @@ session can resume. All work committed and pushed to `main`.
 ### Do Not Reopen Without New Decision
 
 1. **Shipped this session:** reviewer-email cron scheduled (`7212a5e2`), Rank/A–Z sort toggle
-   (`44fc26b1`), program-area clamp (`0aa7c1d1`). All deployed.
+   (`44fc26b1`), program-area clamp (`0aa7c1d1`), then S320 referral seeding +
+   request-backed program-area metadata normalization. All merged to `main`.
 2. **No duplicate Hafezi on req 1002926.** Verified: one record, correctly reused (dedup
    worked). Do not re-run recovery.
 3. **S317 reviewer-email fixes (B1/A/Tier-0/munge) SHIPPED + LIVE.** Evidence: S318 summary
@@ -122,7 +98,7 @@ session can resume. All work committed and pushed to `main`.
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md` | Referral-seeding: locked plan + verbatim Codex review + resume steps. |
+| `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md` | Referral-seeding: implemented plan + resolved S320 seed⇄discovery attribution fix. |
 | `docs/REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md` | Program-area crash + request-required Dataverse metadata fix. |
 | `lib/services/reviewer-request-context.js` | Trusted request metadata loader/overlay for reviewer analyze. |
 | `lib/dataverse/adapters/reviewer-suggestion.js` | `normalizeSuggestionProgramArea`; `upsert`/`ensureApplicantRecommended`/`updateLifecycle`. |
@@ -136,6 +112,9 @@ session can resume. All work committed and pushed to `main`.
 ```bash
 # Program-area normalization + Dataverse metadata tests
 npx jest tests/unit/reviewer-suggestion-programarea-normalize.test.js tests/unit/reviewer-request-context.test.js tests/unit/claude-reviewer-service.test.js --runInBand
+
+# Referral seeding / provenance / save-anchor tests
+npx jest tests/unit/reviewer-search-logic.test.js tests/unit/reviewer-provenance.test.js tests/unit/reviewer-candidate-export.test.js tests/unit/reviewer-route-identity-gate.test.js --runInBand
 
 # Reviewer-finder component lint (sort toggle)
 npx eslint shared/components/reviewers/ReviewerSearchSection.js

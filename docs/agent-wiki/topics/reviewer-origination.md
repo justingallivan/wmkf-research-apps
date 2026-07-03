@@ -198,10 +198,11 @@ bare keyword→author lane is what underperformed.
   the fixed target count (`DEFAULT_REVIEWER_COUNT`), the appended anti-fabrication
   `ANALYZE_INTEGRITY_BLOCK` (return FEWER rather than include an unresolvable name), and
   discover-stage verification/ranking. A PD pasting a known-names list into notes will get
-  only *some* back — expected, not a bug. Guaranteeing referred/PD-recommended names must
-  be a **code-owned seed path**, not prompt wording. Plan (LOCKED, not yet built;
-  seed-only, folded-in; two labels on existing kinds — `referred` → "Externally-Referred",
-  `applicant_suggested` → "Applicant-Referred", no new enum):
+  only *some* back — expected, not a bug. Guaranteeing referred/PD-recommended names is now
+  a **code-owned seed path**, not prompt wording: seed-only, folded-in; two labels on
+  existing kinds — `referred` → "Externally-Referred", `applicant_suggested` →
+  "Applicant-Referred", no new enum. S320 also preserves referred provenance/referrer on
+  same-normalized-name seed⇄discovery collisions before display and roster persistence:
   `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md`.
 - **Results list has a Rank⇄A–Z sort toggle (S318, shipped).** Default is
   confidence/relevance rank; A–Z sorts by name *within* each provenance group (grouping
