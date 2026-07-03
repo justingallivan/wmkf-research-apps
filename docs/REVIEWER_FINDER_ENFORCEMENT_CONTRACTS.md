@@ -19,7 +19,7 @@ related:
 **Status:** MAINTAINED current-state reference (owns the live behavioral guarantees below).
 **Owner:** reviewer-finder.
 **Created:** 2026-06-13 (S253).
-**Last verified:** 2026-07-03 (S321 + Contract 5 follow-up) — contracts 3, 5, and 7 re-verified against the S321 gating-redesign implementation and institution-COI precision follow-up; others last traced 2026-06-13 (S253). See `[VERIFIED]` tags per section.
+**Last verified:** 2026-07-03 (S321 + Contract 5 follow-up through Phase C) — contracts 3, 5, and 7 re-verified against the S321 gating-redesign implementation and institution-COI precision/flag-not-drop follow-up; others last traced 2026-06-13 (S253). See `[VERIFIED]` tags per section.
 
 > **What this doc is.** The single maintained home for the Reviewer Finder feature's
 > *live* fail-closed enforcement contracts — the hard blocks, force-nulls, and
@@ -159,18 +159,26 @@ contradiction only; returns false if either name is initial-only).
 
 ---
 
-## 5. S240 current-institution COI — hard drop + durable gate `[VERIFIED 2026-07-03]`
+## 5. S240 current-institution COI — default hard drop + durable gate `[VERIFIED 2026-07-03]`
 
 **Contract.** Current same-institution affiliation (reviewer at a proposal-PI institution) is a
-foundation POLICY conflict, **hard-dropped on BOTH discovery tracks** and **hard-rejected again at
-the durable save boundary**. Matched against the UNION of `piInstitutions(pi, authorInstitution)`
-(ORCID-current + OpenAlex last-known + LLM).
+foundation POLICY conflict, **hard-dropped by default on BOTH discovery tracks** and
+**hard-rejected again at the durable save boundary**. Matched against the UNION of
+`piInstitutions(pi, authorInstitution)` (ORCID-current + OpenAlex last-known + LLM).
 
 - **Discovery.** Track A via `partitionConflicts` / `filterConflicts` in `discover.js`; Track B via
-  the same COI partition inside `DiscoveryService.discover()`. Dropped candidates are also written
-  to Postgres `reviewer_find_roster` as `status='coi_dropped'` by `recordCoiDropped` when a valid
-  request id is present. That ledger is observability-only: it stays out of active/excluded render
-  buckets and cannot be selected, recovered, promoted, or saved from the Find UI.
+  the same COI partition inside `DiscoveryService.discover()`. Hard-dropped candidates are also
+  written to Postgres `reviewer_find_roster` as `status='coi_dropped'` by `recordCoiDropped` when a
+  valid request id is present. That ledger is observability-only: it stays out of active/excluded
+  render buckets and cannot be selected, recovered, promoted, or saved from the Find UI.
+- **Approved Phase C exception.** `partitionConflicts` may return a same-institution row as a
+  visible read-only flag instead of a ledger drop ONLY when exactly one low-trust affiliation string
+  (`openalex_current`, `pubmed_recency`, or legacy `scholar_current`) matches a PI institution AND
+  an independent current-affiliation signal contradicts it. Matching OpenAlex/ROR institution ids,
+  high-trust current affiliation (`orcid_current` / manual current source), multiple matching
+  signals, or insufficient evidence all stay hard-dropped. Flagged rows carry
+  `hasInstitutionCOI=true` with `institutionCOIDetails.dropDecision='flagged'`; they are not
+  selectable in the Find UI and are still rejected by the save route.
 - **Matcher precision.** The COI path uses `DeduplicationService.institutionsMatchForCOI`, not the
   looser generic `institutionsMatch`. COI matching now compares shared OpenAlex/ROR institution ids
   first when both sides carry ids, keeps exact-normalized / abbreviation-expanded / exact key-word
@@ -180,8 +188,8 @@ the durable save boundary**. Matched against the UNION of `piInstitutions(pi, au
   `hasInstitutionCOI` OR a post-enrichment `contactEnrichment.coiRecomputed && hasInstitutionCOI`,
   incrementing `rejectedInstitutionCOI` (`:116`). Enrichment runs AFTER the discovery drop and can
   promote a current affiliation matching a PI institution, so the durable boundary re-checks —
-  independent of whether the client promoted the flag. 422 if the whole batch is COI/unresolved
-  (`:305-316`).
+  independent of whether the client promoted the flag. Phase C does NOT add a waiver or override.
+  422 if the whole batch is COI/unresolved (`:305-316`).
 - **Retired.** Historical / former-shared institution COI is RETIRED — `markInstitutionCOI` is
   current-affiliation only; `institutionCOIDetails.historical` is gone. `affiliationHistory` is
   still produced but COI-inert (deferred dead-code). The SOFT flag survives only on the
@@ -308,7 +316,7 @@ exported `:568`). **Audit:** `tests/unit/reviewer-identity-evidence.test.js`
 | 2 | PI-named/cited/referred exemption + force-null | `save-candidates.js:79-82,172-191` (kinds: `reviewer-provenance.js` `isIdentityReviewExemptProvenance`) |
 | 3 | Invite-confidence allowlist | `reviewer-invite.js:70-88` + `send-emails.js:292-294` |
 | 4 | Structured-PI fail-open/augment-only | `proposal-pi-identity.js:125+` + `reviewer-identity-evidence.js:316-321` |
-| 5 | S240 institution COI hard drop | `save-candidates.js:116,150-160` + `discover.js`/`DiscoveryService` `partitionConflicts` + `reviewer-roster-store.js` `recordCoiDropped` |
+| 5 | S240 institution COI default hard drop + flagged exception | `save-candidates.js:116,150-160` + `discover.js`/`DiscoveryService` `partitionConflicts` + `reviewer-roster-store.js` `recordCoiDropped` |
 | 6 | OpenAlex bibliometrics/verified-domain | `contact-enrichment-service.js:676-790` |
 | 7 | Faculty-page: default zero-SSRF; opt-in guarded fetch (flag) | `my-candidates.js:189` + `ReviewerInvitePanel.js:275-287` (default) · `safe-fetch.js` `safeFetchInstitutionPage` + `contact-enrichment-service.js:934` (opt-in) |
 | 8 | Work-grounding rescue | `reviewer-identity-evidence.js:212-271` |

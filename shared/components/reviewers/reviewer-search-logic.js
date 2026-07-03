@@ -8,7 +8,7 @@
 // implementation. Re-exported below so existing client imports keep working.
 import { normalizeReviewerName as _normalizeReviewerName, partitionByExcluded } from '../../../lib/utils/reviewer-name-match';
 import { mayPersistIdentity } from '../../../lib/services/reviewer-identity-resolver';
-import { buildReviewerProvenance, PROVENANCE_KINDS, provenanceKindOf, sanitizeInstitutionCOIDetails as _sanitizeInstitutionCOIDetails } from '../../../lib/utils/reviewer-provenance';
+import { buildReviewerProvenance, PROVENANCE_KINDS, provenanceGroupOf, provenanceKindOf, sanitizeInstitutionCOIDetails as _sanitizeInstitutionCOIDetails } from '../../../lib/utils/reviewer-provenance';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { parseReferredSeeds as _parseReferredSeeds } from '../../../lib/utils/reviewer-referral-seeds';
 
@@ -32,6 +32,10 @@ import { parseReferredSeeds as _parseReferredSeeds } from '../../../lib/utils/re
 // Re-export the canonical sanitizer (lib/utils/reviewer-provenance) so existing
 // client imports keep working while server (roster-store) + client share ONE impl.
 export const sanitizeInstitutionCOIDetails = _sanitizeInstitutionCOIDetails;
+
+export function isCandidateSelectable(c) {
+  return (provenanceGroupOf(c) !== 'needs_identity_review' || c?.pdIdentityConfirmed === true) && !c?.hasInstitutionCOI;
+}
 
 export function mergeEnrichment(candidates, enrichmentResults) {
   if (!Array.isArray(candidates)) return [];

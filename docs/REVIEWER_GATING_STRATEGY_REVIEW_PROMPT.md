@@ -148,7 +148,9 @@ guards:
 2. PI-named / cited / referred exemption + contact force-null.
 3. Slice-G invite-confidence allowlist (`send-emails.js`).
 4. Structured-PI identity (fail-open, augment-only).
-5. S240 institution-COI hard drop (+ durable re-reject at save).
+5. S240 institution-COI default hard drop (+ durable re-reject at save), with the
+   2026-07-03 Phase-C read-only flag exception for single low-trust contradicted
+   strings.
 6. OpenAlex bibliometrics + verified-domain (the domain source behind guard #1/#2 above).
 7. Faculty-page recovery fetch tier — **default OFF** behind
    `REVIEWER_PAGE_EMAIL_TIER_ENABLED` (design: `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`).

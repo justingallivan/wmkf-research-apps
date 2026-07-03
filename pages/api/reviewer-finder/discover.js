@@ -231,7 +231,7 @@ export default async function handler(req, res) {
 
     await recordInstitutionCoiDrops(requestId, discoveryResults.coiDropped, {
       dropStage: 'track_b_discovery',
-      matchSource: 'discovery-service.filterConflicts',
+      matchSource: 'discovery-service.partitionConflicts',
     });
 
     // Cross-run dedup + applicant/staff exclusions (S224) — EXACT normalized-name
@@ -327,11 +327,11 @@ export default async function handler(req, res) {
       }
     }
 
-    // Institution COI = HARD DROP (S240 Chunk 2a, both tracks). Current same-institution
-    // is a foundation policy conflict, so Track A (Claude-suggested) candidates at any PI
-    // institution are removed from the selectable pool, not just flagged — matched against
-    // the PI-institution UNION (structured-preferred, LLM fallback). Track B was already
-    // dropped inside DiscoveryService.discover(). A PD-facing excluded summary is emitted.
+    // Institution COI = default hard drop with the approved Phase-C read-only
+    // flag exception. Current same-institution remains a foundation policy conflict;
+    // partitionConflicts only flags when a single low-trust match is contradicted by
+    // current-affiliation evidence. Track B already ran the same partition inside
+    // DiscoveryService.discover(). A PD-facing excluded summary is emitted for hard drops.
     const authorInstitution = analysisResult.proposalInfo?.authorInstitution;
     const coiInstitutions = (Array.isArray(piInsts) && piInsts.length) ? piInsts : authorInstitution;
     let verifiedWithCOI = verifiedCandidates;
@@ -347,12 +347,19 @@ export default async function handler(req, res) {
           .filter(Boolean);
         await recordInstitutionCoiDrops(requestId, instPartition.institutionConflicts, {
           dropStage: 'track_a_verified',
-          matchSource: 'discover.filterConflicts',
+          matchSource: 'discover.partitionConflicts',
         });
         sendEvent('progress', {
           stage: 'coi_check',
           status: 'institution_coi_excluded',
           message: `Excluded ${droppedInst} Claude-suggested candidate(s) at the PI's institution: ${droppedNames.join(', ')}`
+        });
+      }
+      if (instPartition.institutionFlagged.length > 0) {
+        sendEvent('progress', {
+          stage: 'coi_check',
+          status: 'institution_coi_flagged',
+          message: `${instPartition.institutionFlagged.length} Claude-suggested candidate(s) have low-trust institution COI evidence contradicted by current-affiliation evidence — surfaced read-only`
         });
       }
       verifiedWithCOI = keptInst;
@@ -437,13 +444,13 @@ export default async function handler(req, res) {
       if (coiInstitutions && (Array.isArray(coiInstitutions) ? coiInstitutions.length : true) && referredCandidates.length > 0) {
         const instPartition = DeduplicationService.partitionConflicts(referredCandidates, coiInstitutions);
         const keptInst = instPartition.filtered;
-        const keptSet = new Set(keptInst);
+        const keptNames = new Set(keptInst.map((candidate) => String(candidate.name || '').toLowerCase()));
         for (const seed of referredCandidates) {
-          if (!keptSet.has(seed)) blockedReferredSeeds.push(blockReferredSeed(seed, 'institution_coi'));
+          if (!keptNames.has(String(seed.name || '').toLowerCase())) blockedReferredSeeds.push(blockReferredSeed(seed, 'institution_coi'));
         }
         await recordInstitutionCoiDrops(requestId, instPartition.institutionConflicts, {
           dropStage: 'referred_seed',
-          matchSource: 'discover.referred.filterConflicts',
+          matchSource: 'discover.referred.partitionConflicts',
         });
         referredCandidates = keptInst;
       }
@@ -538,10 +545,8 @@ export default async function handler(req, res) {
       }
     }
 
-    // Discovered (Track B) candidates were ALREADY hard-dropped on the PI-institution
-    // union inside DiscoveryService.discover() (filterConflicts), so no institution-COI
-    // pass is needed here (S240 Chunk 2a — the former markInstitutionCOI soft flag was
-    // removed; current same-institution is a hard drop, not a flag).
+    // Discovered (Track B) candidates already ran the PI-institution policy partition
+    // inside DiscoveryService.discover(), so no second institution-COI pass is needed here.
 
     // Combine and rank all candidates
     const proposalKeywords = analysisResult.proposalInfo?.keywords?.split(',').map(k => k.trim()) || [];

@@ -100,7 +100,7 @@ Analyzes a proposal and suggests approximately 12 **peer reviewer candidates**, 
 - Seniority level
 - Reasoning for why they are a good fit (scientific fitness only)
 
-Conflict-of-interest screening is deterministic and server-side (same-institution hard drop, graded co-author overlap), not part of the model's output — the `POTENTIAL_CONCERNS` advisory was retired (S254). Candidates should span seniority levels and all disciplines covered by the proposal.
+Conflict-of-interest screening is deterministic and server-side (same-institution default hard drop with a narrow read-only contradicted-evidence flag, graded co-author overlap), not part of the model's output — the `POTENTIAL_CONCERNS` advisory was retired (S254). Candidates should span seniority levels and all disciplines covered by the proposal.
 
 ### Reviewer Invitation Emails
 

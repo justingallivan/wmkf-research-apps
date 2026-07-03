@@ -3,7 +3,7 @@ title: Reviewer Institution COI Precision Plan
 domain: reviewer-finder
 kind: plan
 status: active
-summary: "Make institution-COI drops observable, then tighten the COI matcher without changing save policy."
+summary: "Institution-COI ledger, precision matcher, and provenance-gated flag-not-drop policy."
 canonical: false
 cataloged: 2026-07-03
 owner: product-engineering
@@ -18,13 +18,13 @@ related:
 
 ## Scope
 
-This is the Contract 5 follow-up for the reviewer-finder institution-COI gate. Phase A and Phase B are implementation scope. Phase C is policy/spec only and must not be enabled in this change.
+This is the Contract 5 follow-up for the reviewer-finder institution-COI gate. Phases A, B, and C are implemented. Phase C was originally spec-only; the owner subsequently approved the provenance-gated flag-not-drop policy.
 
 ## Evidence
 
 - [VERIFIED via `docs/REVIEWER_GATING_STRATEGY_REDESIGN.md`] S321 found that discovery-time institution-COI drops are structurally invisible because dropped candidates never reach `reviewer_find_roster`; the 120-day probe saw 520 roster candidates, 0 top-level `hasInstitutionCOI`, and 0 ORCID-vs-OpenAlex contradictions, while the offline matcher suite false-positived on 7/10 distinct-institution pairs and missed 0/3 same-institution pairs.
-- [VERIFIED via `pages/api/reviewer-finder/discover.js:302`] Track A hard-drops institution-COI candidates with `DeduplicationService.filterConflicts` before the response is returned. The referred-seed path uses the same helper before referred candidates are appended to the selectable set.
-- [VERIFIED via `lib/services/discovery-service.js:272`] Track B hard-drops institution-COI candidates inside `DiscoveryService.discover` before `discover.js` sees them.
+- [VERIFIED via `pages/api/reviewer-finder/discover.js`] Track A and referred-seed discovery call `DeduplicationService.partitionConflicts` before the response is returned. Corroborated or insufficient-evidence institution COI is hard-dropped; approved Phase C low-trust contradicted matches are returned flagged and read-only.
+- [VERIFIED via `lib/services/discovery-service.js`] Track B calls `DeduplicationService.partitionConflicts` inside `DiscoveryService.discover`, returning hard-dropped and flagged COI buckets to `discover.js`.
 - [VERIFIED via `pages/api/reviewer-finder/save-candidates.js:198`] The save route still rejects top-level or post-enrichment institution COI, increments `rejectedInstitutionCOI`, and writes no Dataverse rows.
 - [VERIFIED via `lib/services/deduplication-service.js:271`] `markInstitutionCOI` already produces the compact soft-flag DTO `{ hasInstitutionCOI, institutionCOIDetails: { piInstitution, reviewerInstitution } }` used by enrichment/recommended paths.
 - [VERIFIED via `lib/services/reviewer-roster-store.js:210`] The roster read path renders only `status='active'` as selectable and `status='excluded'` as recoverable. Other statuses still contribute to `allNames`, the cross-run dedup union.
@@ -83,17 +83,33 @@ Tests:
 - Add id-first tests: equal OpenAlex/ROR ids match even when names differ; conflicting ids do not match even when names would otherwise match; one-sided ids fall back to name rules.
 - Existing current-only institution COI tests continue to pass.
 
-## Phase C - Provenance-Gated Flag-Not-Drop Spec Only
+## Phase C - Provenance-Gated Flag-Not-Drop Implemented
 
-Do not build Phase C in this change.
+Owner decision: approved 2026-07-03. Phase C changes discovery visibility only; it does not add any save override.
 
-Spec: after Phase A has durable evidence and Phase B reduces obvious false positives, the owner can decide whether some low-corroboration institution matches should become non-selectable flags instead of hard drops. The likely shape is provenance gated:
+Implemented policy:
 
-- hard-drop when same-institution is corroborated by high-trust current affiliation or matching institution ids,
-- flag-not-drop when the match comes from a single stale/OpenAlex-only affiliation string and contradicting ORCID/current-affiliation evidence exists,
-- keep the save route fail-closed unless the owner approves an explicit staff override workflow.
+- Hard-drop remains the default.
+- Hard-drop when the same-institution match is corroborated by matching OpenAlex/ROR institution ids.
+- Hard-drop when the match is from a high-trust current-affiliation source (`orcid_current` / equivalent manual current source).
+- Flag-not-drop only when exactly one low-trust affiliation string (`openalex_current`, `pubmed_recency`, or legacy `scholar_current`) matches a PI institution and an independent current-affiliation signal contradicts it.
+- Insufficient evidence to judge remains hard-dropped.
+- Flagged rows carry `hasInstitutionCOI: true` and `institutionCOIDetails.dropDecision: 'flagged'`, are returned in the normal active candidate flow, render read-only, and remain save-rejected by `save-candidates.js`.
+- Hard-dropped rows carry `institutionCOIDetails.dropDecision: 'dropped'` and continue to write the `coi_dropped` ledger. Flagged rows are not ledger rows because they are visible active roster rows.
 
-Phase C needs a policy decision because it changes which candidates become visible to staff, not just how observability and precision work.
+Evidence availability by drop site:
+
+- Track A verified PubMed suggestions run before contact enrichment. Most candidates have only a publication-derived `affiliation` with `affiliationSource` absent or `pubmed_recency`; ORCID-current affiliation and institution ids are usually absent. Result: most institution matches still hard-drop because contradictory current evidence is unavailable.
+- Track A spine-routed suggestions can carry OpenAlex author ids and ORCID identity state, but currently do not reliably carry current ORCID institution ids into the candidate affiliation object. Result: hard-drop unless a real contradictory current affiliation is present on the candidate.
+- Referred seeds run before enrichment. They carry staff-entered affiliation and possibly identity-status anchors from email/ORCID lookup, but no guaranteed current-affiliation source or institution ids. Result: hard-drop unless the seed object already carries contradictory current evidence.
+- Track B is currently dormant (`TRACK_B_ENABLED=false`). If re-enabled, it runs before contact enrichment; discovery affiliations are literature-derived and generally lack current-affiliation contradiction. Result: hard-drop by default, with flagged rows only when contradictory current evidence exists in the candidate object.
+- Post-enrichment `markInstitutionCOI` remains a soft flag path; save remains the authoritative fail-closed gate.
+
+Future work not approved:
+
+- No staff override/waiver workflow.
+- No Dataverse persistence of an institution-COI waiver.
+- No broad relaxation for stale or single-source matches without contradictory current evidence.
 
 ## Rollout
 
@@ -101,6 +117,7 @@ Phase C needs a policy decision because it changes which candidates become visib
 - No env flags are introduced or toggled.
 - Phase A is safe to roll out independently: it records already-dropped rows only.
 - Phase B changes the COI predicate, so deploy with the unit matcher suite and probe output reviewed. Re-run the 120-day probe after enough searches accumulate ledger rows.
+- Phase C changes discovery visibility only for contradicted low-trust COI matches. Review probe output for the flagged-vs-dropped split after enough active roster rows accumulate.
 
 ## Non-Goals
 
@@ -108,7 +125,7 @@ Phase C needs a policy decision because it changes which candidates become visib
 - No change to the save route's institution-COI rejection policy.
 - No changes to `lib/fundingApis.js` or `lib/services/dataverse-export/disclosure.js` matchers.
 - No broad reviewer-finder gate redesign beyond Contract 5.
-- No Phase C behavior change.
+- No staff override/waiver workflow for institution COI.
 
 ## Residual Risks
 
@@ -117,6 +134,8 @@ Phase C needs a policy decision because it changes which candidates become visib
 - Institution ids are sparse in current PI/candidate DTOs. The id-first branch improves precision when ids are present but most comparisons still use names.
 - Campus-qualifier handling is intentionally narrow; some true same-institution variants may still be missed until real ledger examples justify adding aliases.
 - Phase A records candidate blobs after pruning, so raw provider payloads remain unavailable for forensic review by design.
+- Phase C can only flag rows when contradictory current evidence is already present at the discovery decision point; it deliberately does not fetch or manufacture new evidence during the partition.
+- A flagged row remains blocked from selection and save; the UX cost is staff seeing a read-only warning row that cannot be acted on until a future approved waiver path exists.
 
 ## Self-Adversarial Review
 
@@ -131,3 +150,4 @@ Material deviations from the initial trace:
 
 - The roster status column is not only present; it is CHECK-constrained. This makes a migration required for the requested distinct status.
 - Track B is currently code-dormant (`TRACK_B_ENABLED=false`), but the drop path still exists and will be instrumented so the contract remains correct if Track B is re-enabled.
+- Phase C was built after the original plan because the owner approved the policy change. The plan now records the implemented scope and keeps staff override as future work.

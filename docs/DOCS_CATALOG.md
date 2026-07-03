@@ -177,7 +177,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [REVIEWER_COI_PRECISION_PLAN.md](REVIEWER_COI_PRECISION_PLAN.md) | plan | active |  | Make institution-COI drops observable, then tighten the COI matcher without changing save policy. | 2026-07-03 |
+| [REVIEWER_COI_PRECISION_PLAN.md](REVIEWER_COI_PRECISION_PLAN.md) | plan | active |  | Institution-COI ledger, precision matcher, and provenance-gated flag-not-drop policy. | 2026-07-03 |
 
 ## reviewer-identity
 

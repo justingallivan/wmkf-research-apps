@@ -34,7 +34,9 @@ NOT over-read into "reviewer quality doesn't matter" — the selection bias forb
   absorbs a weak reviewer (discounted by staff); it cannot recover a sub-community the
   system never surfaced. So don't silently drop on the retrieval pool.
 - **COI = surface-not-gate**, except the permanent *policy* conflicts (proposal-authors,
-  same-institution — those are correct hard drops per foundation policy). Reviewers
+  corroborated/current same-institution — default hard drop per foundation policy, with the
+  approved Contract 5 Phase C read-only exception for a single low-trust match contradicted
+  by current-affiliation evidence). Reviewers
   over-recuse, so system over-exclusion is the expensive error. Grade by detection
   precision: hard-flag obvious/high-precision COI, soft-flag inferred/borderline.
 

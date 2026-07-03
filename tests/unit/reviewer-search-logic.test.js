@@ -9,6 +9,7 @@ import {
   parseReferredSeeds,
   filterExcluded,
   hasValidApplicantEnrichmentCache,
+  isCandidateSelectable,
   pruneCandidateForRoster,
   sanitizeInstitutionCOIDetails,
   mergeReferredProvenance,
@@ -73,6 +74,24 @@ describe('sanitizeInstitutionCOIDetails (S240)', () => {
     expect(sanitizeInstitutionCOIDetails({ piInstitution: 'JHU', reviewerInstitution: 'JHU', historical: true }))
       .toEqual({ piInstitution: 'JHU', reviewerInstitution: 'JHU' });
   });
+  test('keeps bounded Phase-C decision metadata', () => {
+    expect(sanitizeInstitutionCOIDetails({
+      piInstitution: 'MIT',
+      reviewerInstitution: 'MIT',
+      dropDecision: 'flagged',
+      corroborationReason: 'single_low_trust_affiliation_contradicted_by_current_affiliation',
+      matchedAffiliationSource: 'openalex_current',
+      contradictoryAffiliationSource: 'orcid_current',
+      historical: true,
+    })).toEqual({
+      piInstitution: 'MIT',
+      reviewerInstitution: 'MIT',
+      dropDecision: 'flagged',
+      corroborationReason: 'single_low_trust_affiliation_contradicted_by_current_affiliation',
+      matchedAffiliationSource: 'openalex_current',
+      contradictoryAffiliationSource: 'orcid_current',
+    });
+  });
   test('null / empty / non-object → null', () => {
     expect(sanitizeInstitutionCOIDetails(null)).toBeNull();
     expect(sanitizeInstitutionCOIDetails({})).toBeNull();
@@ -88,6 +107,57 @@ describe('pruneCandidateForRoster — institutionCOIDetails (S240)', () => {
     });
     expect(out.institutionCOIDetails).toEqual({ piInstitution: 'MIT', reviewerInstitution: 'MIT' });
     expect(out.institutionCOIDetails).not.toHaveProperty('historical');
+  });
+
+  test('persists Phase-C flag-not-drop detail metadata', () => {
+    const out = pruneCandidateForRoster({
+      name: 'Dr P',
+      hasInstitutionCOI: true,
+      institutionCOIDetails: {
+        piInstitution: 'MIT',
+        reviewerInstitution: 'MIT',
+        dropDecision: 'flagged',
+        corroborationReason: 'single_low_trust_affiliation_contradicted_by_current_affiliation',
+        matchedAffiliationSource: 'openalex_current',
+        contradictoryAffiliationSource: 'orcid_current',
+      },
+    });
+    expect(out.institutionCOIDetails).toEqual({
+      piInstitution: 'MIT',
+      reviewerInstitution: 'MIT',
+      dropDecision: 'flagged',
+      corroborationReason: 'single_low_trust_affiliation_contradicted_by_current_affiliation',
+      matchedAffiliationSource: 'openalex_current',
+      contradictoryAffiliationSource: 'orcid_current',
+    });
+  });
+});
+
+describe('isCandidateSelectable', () => {
+  test('institution-COI flagged rows are read-only even when identity is otherwise selectable', () => {
+    expect(isCandidateSelectable({
+      name: 'Flagged',
+      hasInstitutionCOI: true,
+      institutionCOIDetails: { dropDecision: 'flagged', piInstitution: 'MIT', reviewerInstitution: 'MIT' },
+      provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
+    })).toBe(false);
+  });
+
+  test('PD identity confirmation does not waive institution COI', () => {
+    expect(isCandidateSelectable({
+      name: 'Flagged',
+      pdIdentityConfirmed: true,
+      hasInstitutionCOI: true,
+      provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
+    })).toBe(false);
+  });
+
+  test('resolved non-COI rows remain selectable', () => {
+    expect(isCandidateSelectable({
+      name: 'Clean',
+      hasInstitutionCOI: false,
+      provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
+    })).toBe(true);
   });
 });
 

@@ -58,7 +58,9 @@ emit PD-unverifiable soft flags.** Four changes:
 
 ## 2. Decisions (Justin S240) — supersede the earlier framing
 
-- **D1 — current same-institution is a HARD DROP on BOTH tracks** (Codex Q1; Justin). Track B
+- **D1 — current same-institution is a HARD DROP on BOTH tracks** (Codex Q1; Justin; superseded
+  only by the 2026-07-03 Phase-C read-only flag exception for single low-trust contradicted
+  strings). Track B
   already hard-drops via `filterConflicts`; Track A (Claude-suggested) must too. The `markInstitutionCOI`
   *soft flag* therefore collapses for the normal search — replaced by a hard drop + a
   PD-facing excluded-count/names summary in the SSE progress. (Exception: the applicant-RECOMMENDED

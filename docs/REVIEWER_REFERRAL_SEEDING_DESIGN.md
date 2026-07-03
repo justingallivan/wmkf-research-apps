@@ -125,13 +125,14 @@ ranking.
   [Codex: discovery-service.js:2309]. The guarantee comes from injecting seeds into the
   **ranked** set, not from beating a cap. **S319 correction:** do **not** simply merge
   seeds into `verifiedWithCOI` after the existing filter block. In live `discover.js`, the
-  proposal-author filter, institution-COI hard drop, and coauthor check have already run
+  proposal-author filter, institution-COI policy partition, and coauthor check have already run
   before `combinedResults` / `rankAllCandidates` (`discover.js:273`, `:308`, `:334`,
   `:436`). A post-filter merge would bypass safety checks.
   - Build `seedCandidates` after `proposalAuthors` / `piIdentity` / `piInsts` are known.
   - Run the same proposal-author fuzzy filter and institution-COI policy against seeds
-    before ranking. Policy-conflict seeds go to a `blockedReferredSeeds` response list
-    with `{ name, reason }`; they do not enter `ranked` or `save-candidates`.
+    before ranking. Hard-dropped policy-conflict seeds go to a `blockedReferredSeeds`
+    response list with `{ name, reason }`; approved Phase-C contradicted low-trust
+    institution matches can enter `ranked` as read-only flags and remain save-rejected.
   - Run coauthor checking for policy-clean seeds when the PubMed coauthor contract is
     enabled, or mark the same coauthor fields the normal verified path uses so the row is
     visible with the existing warning rather than silently bypassing it.
@@ -268,8 +269,8 @@ Implemented surfaces:
 - `ReviewerSearchSection` parses a separate externally-referred seed field and sends
   `referredSeeds` only to `/discover`, not `/analyze`.
 - `/discover` sanitizes seeds, blocks exact excluded / already-surfaced seeds, runs the
-  same proposal-author and institution-COI filters before ranking, and returns
-  `blockedReferredSeeds` for non-silent omissions.
+  same proposal-author and institution-COI policy partition before ranking, and returns
+  `blockedReferredSeeds` for non-silent hard omissions.
 - `save-candidates` revalidates server-derived seed anchors with a fresh identity lookup
   before reusing an existing potential reviewer; name-only/unvalidated referred rows keep
   the existing contact-null safety behavior.

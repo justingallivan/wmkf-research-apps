@@ -254,6 +254,37 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     warn.mockRestore();
   });
 
+  test('institution-COI flagged rows are rejected at the save gate', async () => {
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [{
+          name: 'Dr Institution COI',
+          email: 'coi@example.edu',
+          hasInstitutionCOI: true,
+          institutionCOIDetails: {
+            piInstitution: 'MIT',
+            reviewerInstitution: 'MIT',
+            dropDecision: 'flagged',
+          },
+        }],
+      },
+    };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({
+      success: false,
+      savedCount: 0,
+      rejectedInstitutionCOI: 1,
+      errors: [{ name: 'Dr Institution COI', code: 'institution_coi' }],
+    });
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+  });
+
   test('no verdict (resolver absent) → fail-open persist, no decision/clear', async () => {
     await run(null);
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];

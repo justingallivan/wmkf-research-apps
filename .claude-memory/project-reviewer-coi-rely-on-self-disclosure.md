@@ -1,12 +1,12 @@
 ---
 name: project-reviewer-coi-rely-on-self-disclosure
-description: "Reviewer COI philosophy (Justin S240): the system HARD-ACTS only on self-evident POLICY conflicts (proposal authors + CURRENT same-institution); rely on reviewer SELF-DISCLOSURE for relationship/inferred conflicts. Do NOT emit PD-unverifiable soft flags — PDs won't verify them and the product's whole point is to REDUCE manual searching, so an unverifiable flag adds the cost it's meant to remove. HISTORICAL/former-shared institution does NOT count. Narrows S229 'default to RENDER'."
+description: "Reviewer COI philosophy (Justin S240 + approved Contract 5 Phase C): hard-act on self-evident POLICY conflicts (proposal authors + corroborated CURRENT same-institution); rely on reviewer SELF-DISCLOSURE for relationship/inferred conflicts. The only approved institution soft flag is a read-only, unsaveable row for a single low-trust affiliation match contradicted by current-affiliation evidence. HISTORICAL/former-shared institution does NOT count."
 metadata:
   node_type: memory
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-06-10 via Justin (S240 design dialogue)
+  last_verified: 2026-07-03 via Contract 5 Phase C owner approval
 ---
 
 ## Recall Rule
@@ -15,12 +15,16 @@ co-author COI, the model `POTENTIAL_CONCERNS` advisory, or "should we warn the P
 
 ## The principle (Justin, S240)
 - **Hard-act only on self-evident POLICY conflicts** the PD does not need to verify: proposal authors
-  (PI + co-Is) and **CURRENT** same-institution. These stay hard drops (foundation policy — also the
-  S238 exception in [[project-reviewer-recall-over-precision]]).
+  (PI + co-Is) and corroborated **CURRENT** same-institution. These stay hard drops (foundation policy
+  — also the S238 exception in [[project-reviewer-recall-over-precision]]).
+- **Approved narrow exception (Contract 5 Phase C, 2026-07-03):** a current-institution match from exactly
+  one low-trust affiliation string may surface as a read-only, unsaveable flag when independent current
+  affiliation evidence contradicts it. This is not a waiver: `hasInstitutionCOI` remains true, the Find UI
+  keeps it unselectable, and `save-candidates` rejects it.
 - **Rely on reviewer self-disclosure for relationship/inferred conflicts.** Reviewers reliably disclose
   ("Professor X was my former colleague and we're ongoing friends") and reviewers over-recuse. The
   accept/decline flow is where these surface.
-- **Do NOT emit PD-unverifiable soft flags.** A flag the PD can't/won't check ("potential conflict —
+- **Do NOT emit other PD-unverifiable soft flags.** A flag the PD can't/won't check ("potential conflict —
   former shared institution") *looks* helpful but, per Justin, PDs don't verify whether the flag is
   wrong → it just adds manual-search burden, which is the exact cost the product exists to remove. An
   unverifiable flag is net-negative, not neutral.
@@ -28,9 +32,11 @@ co-author COI, the model `POTENTIAL_CONCERNS` advisory, or "should we warn the P
 
 ## Build status (S240)
 **Chunk 2a = SHIPPED to prod (S240, `fcbb258`): institution COI.** Current same-institution
-is now a HARD DROP on both tracks against the PI-institution UNION; historical/former-shared COI
+became a HARD DROP on both tracks against the PI-institution UNION; historical/former-shared COI
 RETIRED; authoritative save-gate in `save-candidates`; canonical institution maps in the agent-wiki
-`reviewer-identity` topic + `docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`. **Chunk 2b = SHIPPED (S254):
+`reviewer-identity` topic + `docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`. **Contract 5 Phase C =
+APPROVED/IMPLEMENTED 2026-07-03:** default hard drop remains, but single low-trust matches contradicted
+by current-affiliation evidence surface as read-only, unsaveable flags. **Chunk 2b = SHIPPED (S254):
 retired the AI `POTENTIAL_CONCERNS` advisory** — removed from prompt/validator/repair/render/persist;
 the parser keeps `POTENTIAL_CONCERNS` only as a REASONING terminator (parse-and-discard) so a lingering
 emission can't bleed into reasoning; prod Dataverse `analyze` reseed (`--execute --only=analyze`) is

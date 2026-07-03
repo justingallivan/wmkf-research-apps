@@ -36,7 +36,7 @@ const res = await sql.query(
   [sinceIso]
 );
 
-let total = 0, coiFlagged = 0, coiDropped = 0;
+let total = 0, coiFlagged = 0, coiFlaggedVisible = 0, coiDropped = 0;
 const coiRows = [], coiDropRows = [], disagree = [], openalexPinned = [];
 for (const row of res.rows) {
   total++;
@@ -65,11 +65,16 @@ for (const row of res.rows) {
       revInst: det.reviewerInstitution || c.affiliation || null,
       matchSource: det.matchSource || null,
       dropStage: det.dropStage || null,
+      decision: det.dropDecision || 'dropped',
+      reason: det.corroborationReason || null,
+      matchedSource: det.matchedAffiliationSource || null,
+      contradictedBy: det.contradictoryAffiliationSource || null,
     });
   }
 
   if (!c.hasInstitutionCOI) continue;
   coiFlagged++;
+  if (row.status !== 'coi_dropped') coiFlaggedVisible++;
   const det = c.institutionCOIDetails || {};
   const pi = det.piInstitution || null;
   const revInst = det.reviewerInstitution || null;
@@ -80,13 +85,18 @@ for (const row of res.rows) {
   coiRows.push({
     name: row.display_name, sourceKind: row.source_kind, pi, revInst,
     affSource, present, agreeing,
+    status: row.status,
+    decision: det.dropDecision || null,
+    reason: det.corroborationReason || null,
+    matchedSource: det.matchedAffiliationSource || null,
+    contradictedBy: det.contradictoryAffiliationSource || null,
     singleSource: agreeing.length <= 1 && present.length <= 1,
     contradicted: present.length > 1 && agreeing.length < present.length,
   });
 }
 
 console.log(`Window: last ${DAYS}d (since ${sinceIso.slice(0, 10)})`);
-console.log(`Roster candidates: ${total}; hasInstitutionCOI flagged: ${coiFlagged}; discovery COI drop ledger: ${coiDropped}`);
+console.log(`Roster candidates: ${total}; visible hasInstitutionCOI flagged: ${coiFlaggedVisible}; all hasInstitutionCOI blobs: ${coiFlagged}; discovery COI drop ledger: ${coiDropped}`);
 console.log(`OpenAlex-pinned affiliations: ${openalexPinned.length}; ORCID-contradicted (mis-map proxy): ${disagree.length}`);
 if (disagree.length) {
   console.log('\nORCID-vs-OpenAlex affiliation disagreements (mis-map proxy cases):');
@@ -95,13 +105,13 @@ if (disagree.length) {
 if (coiDropRows.length) {
   console.log('\nDiscovery-time COI drop ledger rows:');
   for (const r of coiDropRows) {
-    console.log(`  - ${r.name} [${r.sourceKind || '?'}] matched PI="${r.pi}" via reviewerInst="${r.revInst}" (stage=${r.dropStage || 'n/a'}; source=${r.matchSource || 'n/a'})`);
+    console.log(`  - ${r.name} [${r.sourceKind || '?'}] matched PI="${r.pi}" via reviewerInst="${r.revInst}" (decision=${r.decision}; reason=${r.reason || 'n/a'}; matchedSource=${r.matchedSource || 'n/a'}; contradictedBy=${r.contradictedBy || 'n/a'}; stage=${r.dropStage || 'n/a'}; source=${r.matchSource || 'n/a'})`);
   }
 }
 if (coiRows.length) {
   console.log('\nCOI-flagged rows (affiliation-signal corroboration):');
   for (const r of coiRows) {
-    console.log(`  - ${r.name} [${r.sourceKind || '?'}] matched PI="${r.pi}" via reviewerInst="${r.revInst}" (affSource=${r.affSource || 'n/a'}; signals present=${r.present.join('/') || 'none'}; agreeing=${r.agreeing.join('/') || 'none'})${r.contradicted ? '  ⚠ CONTRADICTED' : ''}${r.singleSource ? '  ⚠ SINGLE-SOURCE' : ''}`);
+    console.log(`  - ${r.name} [${r.status}/${r.sourceKind || '?'}] matched PI="${r.pi}" via reviewerInst="${r.revInst}" (decision=${r.decision || 'n/a'}; reason=${r.reason || 'n/a'}; matchedSource=${r.matchedSource || r.affSource || 'n/a'}; contradictedBy=${r.contradictedBy || 'n/a'}; signals present=${r.present.join('/') || 'none'}; agreeing=${r.agreeing.join('/') || 'none'})${r.contradicted ? '  ⚠ CONTRADICTED' : ''}${r.singleSource ? '  ⚠ SINGLE-SOURCE' : ''}`);
   }
 }
 

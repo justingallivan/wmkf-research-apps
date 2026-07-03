@@ -195,11 +195,11 @@ export default async function handler(req, res) {
           continue;
         }
 
-        // S240 Chunk 2a: current same-institution is a HARD policy conflict. Discovery
-        // already drops same-institution candidates; one that reaches save with
-        // hasInstitutionCOI=true is a POST-ENRICHMENT discovery (a promoted current
-        // affiliation that matches a PI institution). Reject it here — the authoritative
-        // gate — so it can never be saved even if a stale client kept it selected.
+        // S240: current same-institution is a HARD policy conflict at save. Discovery
+        // hard-drops by default but Phase C can surface a contradicted low-trust match
+        // as a read-only flag; post-enrichment can also promote a current affiliation
+        // that matches a PI institution. Reject any hasInstitutionCOI row here — the
+        // authoritative gate — so it can never be saved even if a stale client selected it.
         // (Applicant-RECOMMENDED reviewers save via the recommended junction, not this
         // route, so their flag-not-drop behavior is unaffected.)
         // Read BOTH the top-level flag AND the post-enrichment recompute, so the gate

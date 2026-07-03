@@ -98,4 +98,89 @@ describe('partitionConflicts — ledger details', () => {
       },
     });
   });
+
+  test('corroborated institution id match stays hard-dropped', () => {
+    const out = DeduplicationService.partitionConflicts(
+      [{
+        name: 'ID Match',
+        affiliation: 'MIT',
+        affiliationSource: 'openalex_current',
+        openAlexInstitutionId: 'https://openalex.org/I63966007',
+      }],
+      [{ name: 'Massachusetts Institute of Technology', openAlexId: 'I63966007' }],
+    );
+
+    expect(out.filtered).toHaveLength(0);
+    expect(out.institutionFlagged).toHaveLength(0);
+    expect(out.institutionConflicts[0].institutionCOIDetails).toMatchObject({
+      dropDecision: 'dropped',
+      corroborationReason: 'matching_institution_id',
+      matchedAffiliationSource: 'openalex_current',
+    });
+  });
+
+  test('high-trust current affiliation match stays hard-dropped', () => {
+    const out = DeduplicationService.partitionConflicts(
+      [{
+        name: 'ORCID Current',
+        affiliation: 'Massachusetts Institute of Technology',
+        affiliationSource: 'orcid_current',
+      }],
+      ['MIT'],
+    );
+
+    expect(out.filtered).toHaveLength(0);
+    expect(out.institutionConflicts[0].institutionCOIDetails).toMatchObject({
+      dropDecision: 'dropped',
+      corroborationReason: 'high_trust_current_affiliation',
+      matchedAffiliationSource: 'orcid_current',
+    });
+  });
+
+  test('single low-trust match contradicted by current ORCID evidence is flagged, not dropped', () => {
+    const out = DeduplicationService.partitionConflicts(
+      [{
+        name: 'Contradicted Low Trust',
+        affiliation: 'Massachusetts Institute of Technology',
+        affiliationSource: 'openalex_current',
+        contactEnrichment: {
+          orcidAffiliation: 'Stanford University',
+        },
+      }],
+      ['MIT'],
+    );
+
+    expect(out.institutionConflicts).toHaveLength(0);
+    expect(out.institutionFlagged).toHaveLength(1);
+    expect(out.filtered).toHaveLength(1);
+    expect(out.filtered[0]).toMatchObject({
+      name: 'Contradicted Low Trust',
+      hasInstitutionCOI: true,
+      institutionCOIDetails: {
+        dropDecision: 'flagged',
+        corroborationReason: 'single_low_trust_affiliation_contradicted_by_current_affiliation',
+        matchedAffiliationSource: 'openalex_current',
+        contradictoryAffiliationSource: 'orcid_current',
+      },
+    });
+  });
+
+  test('single low-trust match without contradictory current evidence stays hard-dropped', () => {
+    const out = DeduplicationService.partitionConflicts(
+      [{
+        name: 'Low Trust Only',
+        affiliation: 'Massachusetts Institute of Technology',
+        affiliationSource: 'pubmed_recency',
+      }],
+      ['MIT'],
+    );
+
+    expect(out.filtered).toHaveLength(0);
+    expect(out.institutionFlagged).toHaveLength(0);
+    expect(out.institutionConflicts[0].institutionCOIDetails).toMatchObject({
+      dropDecision: 'dropped',
+      corroborationReason: 'insufficient_contradictory_current_evidence',
+      matchedAffiliationSource: 'pubmed_recency',
+    });
+  });
 });

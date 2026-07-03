@@ -49,6 +49,7 @@ import {
   parseReferredSeeds,
   filterExcluded,
   hasValidApplicantEnrichmentCache,
+  isCandidateSelectable,
   normalizeReviewerName,
   pruneCandidateForRoster,
   dedupeByNamePreferReferred,
@@ -158,6 +159,8 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
   const hasExpertiseMismatch = !!c.expertiseMismatch;
   const hasAnyMismatch = hasInstitutionMismatch || hasExpertiseMismatch;
   const hasInstitutionCOI = !!c.hasInstitutionCOI;
+  const institutionCOIDecision = c.institutionCOIDetails?.dropDecision || null;
+  const isFlaggedInstitutionCOI = hasInstitutionCOI && institutionCOIDecision === 'flagged';
   const hasCoauthorCOI = !!c.hasCoauthorCOI;
   // S238 graded coauthor COI: 'likely' (strong tie) reads as a real conflict (red);
   // 'possible' (1..threshold-1 shared papers) may be incidental and reads softer (amber).
@@ -165,8 +168,11 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
   const coauthorStrength = c.coauthorCOIStrength || (hasCoauthorCOI ? 'likely' : null);
   const hasStrongCoauthorCOI = coauthorStrength === 'likely';
   const hasPossibleCoauthorCOI = coauthorStrength === 'possible';
-  // Only a strong (likely) coauthor tie or an institution COI drives the red treatment.
-  const hasAnyCOI = hasInstitutionCOI || hasStrongCoauthorCOI;
+  // Only a strong (likely) coauthor tie or corroborated institution COI drives
+  // the red treatment. Phase-C flagged institution COI is still read-only and
+  // save-rejected, but shown amber because independent current evidence
+  // contradicts the low-trust match that triggered it.
+  const hasAnyCOI = (hasInstitutionCOI && !isFlaggedInstitutionCOI) || hasStrongCoauthorCOI;
   const reason = c.reasoning || c.generatedReasoning || null;
   const provenanceLabel = provenanceLabelForCandidate(c);
   const pubs = Array.isArray(c.publications) ? c.publications : [];
@@ -242,8 +248,11 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
           )}
 
           {hasInstitutionCOI && (
-            <div className="mt-2 p-2 bg-red-50 border border-red-300 rounded text-xs text-red-800">
-              <span className="font-medium">🏛️ Institution COI:</span> Same institution as proposal PI
+            <div className={`mt-2 p-2 border rounded text-xs ${isFlaggedInstitutionCOI ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-red-50 border-red-300 text-red-800'}`}>
+              <span className="font-medium">🏛️ Institution COI:</span>{' '}
+              {isFlaggedInstitutionCOI
+                ? 'Read-only: low-trust institution match contradicted by current-affiliation evidence'
+                : 'Same institution as proposal PI'}
               {c.institutionCOIDetails?.reviewerInstitution && <span className="ml-1">({c.institutionCOIDetails.reviewerInstitution})</span>}
             </div>
           )}
@@ -864,8 +873,7 @@ export default function ReviewerSearchSection({
   // A PD identity override (pdIdentityConfirmed) makes an otherwise unverifiable
   // needs-identity-review row selectable — the PD vouched for who it is. Institution
   // COI is NOT waived by it (a real policy conflict, independent of identity).
-  const isSelectable = (c) => (provenanceGroupOf(c) !== 'needs_identity_review' || c.pdIdentityConfirmed === true) && !c.hasInstitutionCOI;
-  const selectableCandidates = displayCandidates.filter(isSelectable);
+  const selectableCandidates = displayCandidates.filter(isCandidateSelectable);
 
   // A Claude suggestion the server couldn't verify can ALSO surface — and verify —
   // from a database search, in this run or a prior one (it then lives in
@@ -1027,7 +1035,7 @@ export default function ReviewerSearchSection({
     // can't be checked, but this guarantees one never reaches save-candidates even if
     // a stale `selected` entry survives a reclassification (defense-in-depth; the
     // server 422s these anyway).
-    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isSelectable(c));
+    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isCandidateSelectable(c));
     if (chosen.length === 0) return;
     savingRef.current = true;
     setPhase('saving');
@@ -1199,7 +1207,7 @@ export default function ReviewerSearchSection({
   // request metadata (number/institution/PI) authoritatively by requestId.
   const exportSelected = useCallback(async () => {
     if (exportingRef.current) return;
-    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isSelectable(c));
+    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isCandidateSelectable(c));
     if (chosen.length === 0) return;
     exportingRef.current = true;
     setExporting(true);
@@ -1562,7 +1570,7 @@ export default function ReviewerSearchSection({
                                 // A PD-confirmed needs-review row flips to a normal selectable
                                 // card; unconfirmed ones stay read-only but get the "confirm
                                 // identity" affordance so a PD can rescue a real reviewer.
-                                const selectableNow = isSelectable(c);
+                                const selectableNow = isCandidateSelectable(c);
                                 if (selectableNow && !readOnlySection) {
                                   return <CandidateCard key={candKey(c)} candidate={c} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} onEdit={setEditingContact} canManage={canManage} />;
                                 }
