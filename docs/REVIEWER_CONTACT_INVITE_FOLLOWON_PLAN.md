@@ -186,7 +186,8 @@ endpoint staff trigger for a specific candidate (cheaper, avoids fetching for th
 
 > **Status (S235): IMPLEMENTED** on branch `reviewer-slice-g-invite-confidence` (design +
 > impl notes in `docs/REVIEWER_INVITE_CONFIDENCE_DESIGN.md`). G-opt1 + manual-confirm; no
-> schema change; warning + one-click "confirm & send"; server-enforced
+> schema change; warning + one-click "confirm & send" (S321: acknowledgement became a
+> per-recipient checkbox list); server-enforced
 > recipient-specific `confirmedLowConfidenceIds` allowlist, scoped to
 > `templateType==='invitation'`. The summary below is the original plan-level sketch — the
 > design doc is authoritative.

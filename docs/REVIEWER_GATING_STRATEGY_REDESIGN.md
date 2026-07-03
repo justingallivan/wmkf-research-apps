@@ -30,6 +30,34 @@ wrong person; the safe default for uncertainty is **surface for one-click staff
 confirm**, not silent drop. The send-time confirm gate (Contract 3) is the true
 backstop.
 
+**IMPLEMENTED (S321, same day).** Phases 0–3 of §4 plus §3.5's code change shipped
+(Codex built from this rev-2 plan after its re-review; Claude completed
+verification and fixes when the Codex run stalled). `REVIEWER_PAGE_EMAIL_TIER_ENABLED`
+default untouched — Phase 4 flag enablement remains an owner decision. Deviations
+from the plan as written, all verified against the shipped code:
+
+- `resolveIdentity` moved EARLIER in `_finalize` (before domain-evidence
+  construction and the page tier) so ORCID-ROR domains are gated on the verdict.
+  Safe: `evidenceFromEnrichment` (`lib/services/reviewer-identity-resolver.js:45–78`)
+  reads only `tierResults.orcid/openalex_author/scholar_profile` + the affiliation
+  hypothesis — all attached before the new position.
+- The fetch tier falls back to the single `verifiedInstitutionDomain` when the
+  anchored set is empty (`contact-enrichment-service.js:1171–1174`) — today's
+  bound, not a widening.
+- With NO domain evidence at all (neither set populated), guard A leaves a search
+  email untouched (`:437`), preserving today's trust-the-scoped-search posture.
+- The batch irreversible-send `window.confirm` is retained in `InviteEmailModal`
+  (Codex's build removed it; restored) alongside the new per-recipient checkboxes,
+  and only the ticked suggestionIds are sent as `confirmedLowConfidenceIds`.
+- `OpenAlexService.searchInstitutions` (`institutions?search=`) was added for the
+  plausible set; `getInstitution` (ID/ROR) remains the only anchored-set resolver.
+
+Live-contract restatements reconciled in `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`
+(Contracts 3/7), the reviewer-identity + reviewer-workbench-lifecycle wiki topics,
+`docs/REVIEWER_CONTACT_LEADS_SPEC.md`, `docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md`,
+`docs/REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md`, `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`
+(§3 S321 note), and `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md` (Cause #2 marked resolved).
+
 **Revision 2 (same day).** An adversarial Codex review of revision 1 (commit
 `b6b23720`) found two blockers, both variants of one flaw: revision 1's
 vindication accepted *non-identity-proven* affiliation signals (notably

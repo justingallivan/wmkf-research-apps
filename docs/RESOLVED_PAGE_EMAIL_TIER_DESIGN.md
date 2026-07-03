@@ -84,6 +84,17 @@ the other tiers; recovering multi-domain-institution cases in v1 (§10); replaci
 
 ## 3. SSRF (the hard part) — extend `safe-fetch.js`
 
+> **S321 update (gating redesign):** the live bound is now the identity-anchored
+> institution-domain **set** (`ce.anchoredInstitutionDomains` — OpenAlex verified
+> domain + ORCID disambiguated-org RORs resolved via `getInstitution`, only on a
+> confirmed/probable identity), falling back to the single
+> `verifiedInstitutionDomain` when the set is empty. Same per-domain
+> `safeFetchInstitutionPage` mechanism, N anchored domains instead of 1; the
+> name-resolved "plausible" domains are deliberately EXCLUDED from the fetch bound.
+> See `docs/REVIEWER_GATING_STRATEGY_REDESIGN.md` §3.5 and Contract 7 in
+> `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`. The single-domain description
+> below is the original v1 design.
+
 Faculty pages are on arbitrary university hosts; they cannot go in the static `ALLOWED_HOSTS`.
 Resolution: **bind the fetch to the candidate's already-verified institution domain**
 (`ce.verifiedInstitutionDomain`, sourced from the OpenAlex author's institution homepage eTLD+1 via

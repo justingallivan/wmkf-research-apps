@@ -213,6 +213,30 @@ describe('OpenAlexService.getAuthorByOrcid (S240)', () => {
   });
 });
 
+describe('OpenAlexService institution lookup', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('searchInstitutions maps top-level search results to homepage domains', async () => {
+    safeFetch.mockResolvedValue(jsonResponse({
+      results: [{
+        id: 'https://openalex.org/I123',
+        display_name: 'Princeton University',
+        ror: 'https://ror.org/00hx57361',
+        homepage_url: 'https://www.princeton.edu/',
+      }],
+    }));
+    const out = await OpenAlexService.searchInstitutions('Princeton University', { limit: 1 });
+    expect(out).toEqual([expect.objectContaining({
+      displayName: 'Princeton University',
+      ror: 'https://ror.org/00hx57361',
+      domain: 'princeton.edu',
+    })]);
+    expect(safeFetch.mock.calls[0][0]).toMatch(/api\.openalex\.org\/institutions\?search=Princeton\+University/);
+  });
+});
+
 describe('OpenAlexService.getRichestAuthorByOrcid (S266 — ORCID author-split)', () => {
   beforeEach(() => {
     jest.clearAllMocks();

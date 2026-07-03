@@ -9,6 +9,7 @@
  */
 
 const { ContactEnrichmentService } = require('../../lib/services/contact-enrichment-service');
+const { OpenAlexService } = require('../../lib/services/openalex-service');
 
 describe('_addContactLead — quarantine guarantee', () => {
   test('force-sets persistable:false even if the caller passes true', () => {
@@ -37,21 +38,23 @@ describe('_addContactLead — quarantine guarantee', () => {
 });
 
 describe('_validateEmailAgainstVerifiedDomain — withheld_by_gate capture', () => {
-  test('captures the wrong-domain email + page as rejected leads before nulling', () => {
+  test('contests a wrong-domain search email instead of nulling it', () => {
     const ce = {
       email: 'someone@ifmo.ru', emailSource: 'serp_search', emailPersistAllowed: true,
       website: null, websiteSource: null, facultyPageUrl: 'https://ifmo.ru/people/someone',
-      websitePersistAllowed: true, verifiedInstitutionDomain: 'mbi-berlin.de', contactLeads: [],
+      websitePersistAllowed: true, verifiedInstitutionDomain: 'mbi-berlin.de',
+      anchoredInstitutionDomains: ['mbi-berlin.de'],
+      plausibleInstitutionDomains: ['mbi-berlin.de'],
+      contactLeads: [],
     };
     ContactEnrichmentService._validateEmailAgainstVerifiedDomain(ce);
-    // existing behavior preserved: email dropped, persist flags off
-    expect(ce.email).toBeNull();
-    expect(ce.emailPersistAllowed).toBe(false);
-    expect(ce.contactStatusReason).toBe('verified_domain_contradiction');
-    // new: quarantined leads
-    const emailLead = ce.contactLeads.find((l) => l.type === 'email');
-    expect(emailLead).toMatchObject({ value: 'someone@ifmo.ru', confidence: 'rejected', rejectedReason: 'verified_domain_contradiction', persistable: false });
-    expect(ce.contactLeads.find((l) => l.type === 'faculty_page')).toBeTruthy();
+    expect(ce.email).toBe('someone@ifmo.ru');
+    expect(ce.emailSource).toBe('search_contested');
+    expect(ce.emailPersistAllowed).toBe(true);
+    expect(ce.websitePersistAllowed).toBe(false);
+    expect(ce.contactStatus).toBeNull();
+    expect(ce.contactStatusReason).toBe('verified_domain_contradiction_contested');
+    expect(ce.contactLeads).toHaveLength(0);
   });
 
   test('a domain-MATCHED email is NOT turned into a lead (stays the primary contact)', () => {
@@ -67,6 +70,108 @@ describe('_validateEmailAgainstVerifiedDomain — withheld_by_gate capture', () 
     ContactEnrichmentService._validateEmailAgainstVerifiedDomain(ce);
     expect(ce.email).toBe('x@personal.com');
     expect(ce.contactLeads).toHaveLength(0);
+  });
+
+  test('anchored domain match recovers a search email without contesting', () => {
+    const ce = {
+      email: 'person@princeton.edu',
+      emailSource: 'claude_search',
+      emailPersistAllowed: false,
+      verifiedInstitutionDomain: 'hhmi.org',
+      anchoredInstitutionDomains: ['hhmi.org', 'princeton.edu'],
+      plausibleInstitutionDomains: ['hhmi.org', 'princeton.edu'],
+      contactLeads: [],
+    };
+    ContactEnrichmentService._validateEmailAgainstVerifiedDomain(ce);
+    expect(ce.emailSource).toBe('claude_search');
+    expect(ce.emailPersistAllowed).toBe(true);
+    expect(ce.contactStatusReason).toBeFalsy();
+  });
+
+  test('plausible-only domain match stays contested, not recovered', () => {
+    const ce = {
+      email: 'person@upenn.edu',
+      emailSource: 'serp_search',
+      emailPersistAllowed: true,
+      verifiedInstitutionDomain: 'calu.edu',
+      anchoredInstitutionDomains: ['calu.edu'],
+      plausibleInstitutionDomains: ['calu.edu', 'upenn.edu'],
+      contactLeads: [],
+    };
+    ContactEnrichmentService._validateEmailAgainstVerifiedDomain(ce);
+    expect(ce.email).toBe('person@upenn.edu');
+    expect(ce.emailSource).toBe('search_contested');
+    expect(ce.contactStatusReason).toBe('verified_domain_plausible_contested');
+  });
+});
+
+describe('_readjudicateNameMismatchRejectedEmail — contested recovery', () => {
+  test('promotes a preserved name-mismatch email only when its domain is plausible', () => {
+    const ce = {
+      email: null,
+      emailPersistAllowed: false,
+      plausibleInstitutionDomains: ['columbia.edu'],
+      contactLeads: [],
+      tierResults: { serp_search: { emailRejectedReason: 'name_mismatch', rejectedEmail: 'abc123@columbia.edu' } },
+    };
+    ContactEnrichmentService._readjudicateNameMismatchRejectedEmail(ce);
+    expect(ce.email).toBe('abc123@columbia.edu');
+    expect(ce.emailSource).toBe('search_contested');
+    expect(ce.emailPersistAllowed).toBe(true);
+    expect(ce.contactStatusReason).toBe('name_mismatch_plausible_contested');
+  });
+
+  test('leaves an ungrounded name-mismatch email in rejected-lead handling', () => {
+    const ce = {
+      email: null,
+      plausibleInstitutionDomains: ['columbia.edu'],
+      contactLeads: [],
+      tierResults: { serp_search: { emailRejectedReason: 'name_mismatch', rejectedEmail: 'abc123@example.net' } },
+    };
+    ContactEnrichmentService._readjudicateNameMismatchRejectedEmail(ce);
+    expect(ce.email).toBeNull();
+  });
+});
+
+describe('_buildInstitutionDomainEvidence — anchored vs plausible sets', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  test('threads ORCID ROR domains into anchored set only on a trusted identity', async () => {
+    jest.spyOn(OpenAlexService, 'getInstitution').mockResolvedValue({ domain: 'princeton.edu' });
+    jest.spyOn(OpenAlexService, 'searchInstitutions').mockResolvedValue([]);
+    const result = {
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        verifiedInstitutionDomain: 'hhmi.org',
+        tierResults: {
+          orcid: {
+            affiliations: [{
+              current: true,
+              disambiguatedOrganizationId: 'https://ror.org/00hx57361',
+              disambiguationSource: 'ROR',
+            }],
+          },
+        },
+      },
+    };
+    await ContactEnrichmentService._buildInstitutionDomainEvidence({ affiliation: 'Princeton University' }, result);
+    expect(result.contactEnrichment.anchoredInstitutionDomains).toEqual(expect.arrayContaining(['hhmi.org', 'princeton.edu']));
+    expect(OpenAlexService.getInstitution).toHaveBeenCalledWith('https://ror.org/00hx57361', expect.any(Object));
+  });
+
+  test('name-resolved institution domains are plausible only, never anchored', async () => {
+    jest.spyOn(OpenAlexService, 'getInstitution').mockResolvedValue({ domain: 'princeton.edu' });
+    jest.spyOn(OpenAlexService, 'searchInstitutions').mockResolvedValue([{ displayName: 'University of Pennsylvania', domain: 'upenn.edu' }]);
+    const result = {
+      contactEnrichment: {
+        identity: { status: 'probable' },
+        verifiedInstitutionDomain: 'calu.edu',
+        tierResults: { orcid: { affiliations: [] } },
+      },
+    };
+    await ContactEnrichmentService._buildInstitutionDomainEvidence({ affiliation: 'University of Pennsylvania' }, result);
+    expect(result.contactEnrichment.anchoredInstitutionDomains).toEqual(['calu.edu']);
+    expect(result.contactEnrichment.plausibleInstitutionDomains).toEqual(expect.arrayContaining(['calu.edu', 'upenn.edu']));
   });
 });
 

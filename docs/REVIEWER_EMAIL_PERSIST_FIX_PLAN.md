@@ -136,7 +136,11 @@ OpenAlex probes, S320]. **Corrected root cause:** it is NOT primarily a weak
 discovery step — in 4 of 5, a *correct* institutional email was found and then
 discarded by a gate (`verified_domain_contradiction` trusting a single OpenAlex
 last-known-institution domain; `name_mismatch` on the correct domain). The resolved
-faculty-page fetch tier cannot rescue the domain-contradiction cases (its fetch is
-bound to the same wrong domain). Now handed to a fresh reviewing LLM — see
-`docs/REVIEWER_GATING_STRATEGY_REVIEW_PROMPT.md` (expected output
-`docs/REVIEWER_GATING_STRATEGY_REDESIGN.md`). Tracked separately.
+faculty-page fetch tier could not rescue the domain-contradiction cases (its fetch
+was bound to the same wrong domain). **RESOLVED (S321):** the strategy review ran
+(`docs/REVIEWER_GATING_STRATEGY_REVIEW_PROMPT.md` →
+`docs/REVIEWER_GATING_STRATEGY_REDESIGN.md`, revision 2 after an adversarial Codex
+round) and the redesign is IMPLEMENTED — two-tier domain vindication, the
+`search_contested` LOW-confirm lane, per-recipient invite confirm, and the fetch
+tier re-bound to the anchored domain set. Re-measure with
+`scripts/probe-no-email-breakdown.mjs` after the next enrichment cycles.

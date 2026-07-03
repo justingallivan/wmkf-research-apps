@@ -19,7 +19,7 @@ related:
 **Status:** MAINTAINED current-state reference (owns the live behavioral guarantees below).
 **Owner:** reviewer-finder.
 **Created:** 2026-06-13 (S253).
-**Last verified:** 2026-06-13 (S253) — all 8 contracts traced to live source; see `[VERIFIED]` tags per section.
+**Last verified:** 2026-07-03 (S321) — contracts 3 and 7 re-verified against the S321 gating-redesign implementation; others last traced 2026-06-13 (S253). See `[VERIFIED]` tags per section.
 
 > **What this doc is.** The single maintained home for the Reviewer Finder feature's
 > *live* fail-closed enforcement contracts — the hard blocks, force-nulls, and
@@ -113,8 +113,9 @@ preview cannot ride on another row's confirmation.
 
 - **HIGH** = email source `orcid`/`pubmed`/`institution_page`, or `serp_search`/`claude_search`
   on a `confirmed`/`probable` identity.
-- **LOW** = `manual`, `affiliation`, unknown/null source, or a search email on an unconfirmed
-  identity.
+- **LOW** = `manual`, `affiliation`, `search_contested` (a search email the domain guard
+  contested — S321 gating redesign), unknown/null source, or a search email on an unconfirmed
+  identity. `search_contested` stays LOW even on a `confirmed` identity.
 - **Scope.** Gated to `templateType==='invitation'` only. Post-acceptance materials / followup /
   thankyou are NOT gated.
 
@@ -122,8 +123,14 @@ preview cannot ride on another row's confirmation.
 `pages/api/review-manager/send-emails.js:120-124` (allowlist captured as a Set) ·
 `send-emails.js:292-294` (per-recipient check, skip reason `email_unconfirmed`). `render-emails.js`
 stamps `emailConfidence` per draft (the modal DTO is too thin to compute it); `InviteEmailModal`
-shows the warning + one-click "confirm & send". Manual email edits (`my-candidates.js`) stamp
-`emailSource='manual'` so staff-typed addresses read LOW.
+requires a **per-recipient checkbox** for each LOW address (name + address + reason; send button
+disabled until every one is ticked, and only the ticked suggestionIds are sent as
+`confirmedLowConfidenceIds` — S321, replacing the earlier one-click batch confirm), plus a batch
+irreversible-send `window.confirm`. Manual email edits (`my-candidates.js`) stamp
+`emailSource='manual'` so staff-typed addresses read LOW. The researcher adapter treats `manual`
+AND `search_contested` as authoritative overwrites of `wmkf_emailsource` (fill-only for other
+sources) so a downgraded address can never read HIGH off a stale source
+(`lib/dataverse/adapters/researcher.js:151-156`).
 
 **Why.** The API is the enforced boundary — the modal acknowledgement alone is not trusted.
 
@@ -230,10 +237,21 @@ TOCTOU), per-hop redirect re-validation, content-type + 512 KB + timeout caps. T
 Do NOT enable without that mechanism intact; multi-domain institutions (e.g. Kansas State `ksu.edu` vs
 OpenAlex `k-state.edu`) are an intentional v1 gap (the fetch is refused, not relaxed).
 
-**Related verified-domain guard.** Where a verified domain IS known (from OpenAlex institution
-lookup), `_validateEmailAgainstVerifiedDomain` (`contact-enrichment-service.js:223`, sourced at
-`:770`) drops a SEARCH-sourced email to null when its domain contradicts `verifiedInstitutionDomain`
-— preventing namesake-collapse. ORCID/PubMed/affiliation emails outrank the heuristic.
+**Related verified-domain guard (S321 gating redesign — contests, no longer drops).**
+`_validateEmailAgainstVerifiedDomain` (`contact-enrichment-service.js:419`) now validates against
+**two domain sets** built in `_finalize` by `_buildInstitutionDomainEvidence` (`:255`):
+*anchored* (identity-proven, ID-resolved: `verifiedInstitutionDomain` + ORCID
+disambiguated-organization RORs → `OpenAlexService.getInstitution`, only on a confirmed/probable
+identity) and *plausible* (anchored + name-resolved via `OpenAlexService.searchInstitutions`,
+lane-routing only). An anchored match confirms persistence; a SEARCH-sourced contradiction is
+re-stamped `emailSource='search_contested'` (`_markEmailContested`, `:303`) — kept, persisted,
+LOW at send per Contract 3, staff-confirmed per recipient — instead of nulled into a rejected
+lead. A `name_mismatch`-rejected email whose domain is plausible is likewise promoted to
+contested in `_finalize` (`_readjudicateNameMismatchRejectedEmail`, `:312`).
+ORCID/PubMed/affiliation emails still outrank the heuristic. The opt-in fetch tier above is
+SSRF-bound to the **anchored** set only (fallback: the single `verifiedInstitutionDomain` when
+the anchored set is empty — today's bound). Design + review history:
+`docs/REVIEWER_GATING_STRATEGY_REDESIGN.md`.
 
 **Enforcement points.** Default no-fetch/manual-link boundary: `pages/api/reviewer-finder/my-candidates.js:189`
 (returns `facultyPageUrl`, no fetch) · `shared/components/reviewers/ReviewerInvitePanel.js:275-287` (staff-facing

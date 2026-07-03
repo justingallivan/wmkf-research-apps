@@ -329,13 +329,23 @@ function CandidateCard({ candidate, checked, onToggle, readOnly = false, onExclu
           {!identityUnverified && (email || website || orcidUrl) && (
             <div className="mt-2 flex items-center flex-wrap gap-2 text-xs">
               {email && (
-                <a
-                  href={`mailto:${email}`}
-                  className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
-                  title={`Email (from ${enr.emailSource || 'enrichment'}${enr.emailYear ? `, ${enr.emailYear}` : ''})`}
-                >
-                  📧 {email}
-                </a>
+                <>
+                  <a
+                    href={`mailto:${email}`}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
+                    title={`Email (from ${enr.emailSource || 'enrichment'}${enr.emailYear ? `, ${enr.emailYear}` : ''})`}
+                  >
+                    📧 {email}
+                  </a>
+                  {enr.emailSource === 'search_contested' && (
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-800 rounded border border-amber-200"
+                      title={enr.contactStatusReason || 'Confirm before inviting'}
+                    >
+                      ⚠ Confirm before invite
+                    </span>
+                  )}
+                </>
               )}
               {website && (
                 <a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded hover:bg-green-100" title="Faculty / personal website">

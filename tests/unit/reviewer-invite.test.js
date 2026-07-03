@@ -92,9 +92,18 @@ describe('emailConfidence — Slice G invite-confidence gate', () => {
   test('manually-entered, unknown, and missing sources are LOW', () => {
     expect(emailConfidence({ wmkf_emailsource: 'manual' }).level).toBe('low');
     expect(emailConfidence({ wmkf_emailsource: 'manual', wmkf_identitystatus: 'confirmed' }).level).toBe('low');
+    expect(emailConfidence({ wmkf_emailsource: 'search_contested', wmkf_identitystatus: 'confirmed' })).toMatchObject({
+      level: 'low',
+      reason: expect.stringContaining('confirmation'),
+    });
     expect(emailConfidence({ wmkf_emailsource: null }).level).toBe('low');
     expect(emailConfidence({}).level).toBe('low');
     expect(emailConfidence({ wmkf_emailsource: 'something_new' }).level).toBe('low');
+  });
+
+  test('name-resolved/discovery-tier contested source never inherits anchored search HIGH', () => {
+    expect(emailConfidence({ emailSource: 'search_contested', identityStatus: 'confirmed' }).level).toBe('low');
+    expect(emailConfidence({ emailSource: 'search_contested', identityStatus: 'probable' }).level).toBe('low');
   });
 
   test('accepts the normalized (camelCase) shape too', () => {

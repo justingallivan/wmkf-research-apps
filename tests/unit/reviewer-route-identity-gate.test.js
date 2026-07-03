@@ -820,6 +820,54 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBeNull();
     expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1].emailSource).toBeNull();
   });
+
+  test('search_contested email persists only via explicit emailPersistAllowed flag', async () => {
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [{
+          name: 'Dr Contested',
+          email: 'maybe@plausible.edu',
+          emailSource: 'search_contested',
+          contactEnrichment: {
+            email: 'maybe@plausible.edu',
+            emailSource: 'search_contested',
+            emailPersistAllowed: true,
+            affiliationPersistAllowed: true,
+          },
+        }],
+      },
+    };
+    const res = mockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBe('maybe@plausible.edu');
+    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1]).toMatchObject({
+      email: 'maybe@plausible.edu',
+      emailSource: 'search_contested',
+    });
+  });
+
+  test('search_contested source is default-denied when emailPersistAllowed is missing', async () => {
+    const req = {
+      method: 'POST',
+      body: {
+        requestId: 'REQ-1',
+        candidates: [{
+          name: 'Dr Contested Default Deny',
+          email: 'maybe@plausible.edu',
+          emailSource: 'search_contested',
+          contactEnrichment: { affiliationPersistAllowed: true },
+        }],
+      },
+    };
+    const res = mockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBeNull();
+    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1].emailSource).toBeNull();
+  });
 });
 
 // ── /api/workbench/enrich-recommended ─────────────────────────────────────────

@@ -42,7 +42,8 @@ already persists `facultyPageUrl`, so just surface it to staff. **Chosen + IMPLE
   page in a new tab) so staff read the reviewer's real address and enter it via the existing
   Edit flow (`CandidateEditModal` → `my-candidates` PATCH).
 - That manual entry already stamps `emailSource='manual'` (Slice G 3a) → the address is
-  LOW-confidence → the Slice-G invite gate shows the warning + one-click "confirm & send".
+  LOW-confidence → the Slice-G invite gate requires staff confirmation (S321: a
+  per-recipient checkbox per LOW address, replacing the original one-click batch confirm).
 
 So the full loop — *no email → open the right page → enter the address → confirmed-before-
 invite* — is delivered with **no server fetch, no SSRF surface, no new dependency**, reusing

@@ -31,7 +31,7 @@ function fieldPersistFlag(candidate, enrichment, flagName) {
 }
 
 function paidSearchSource(source) {
-  return source === 'claude_search' || source === 'serp_search';
+  return source === 'claude_search' || source === 'serp_search' || source === 'search_contested';
 }
 
 function contactFieldAllowed(candidate, enrichment, flagName, source) {

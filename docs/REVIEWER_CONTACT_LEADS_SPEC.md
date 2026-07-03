@@ -325,7 +325,7 @@ Acceptance:
 each lead (`ContactLeads` `onUse`, threaded `CandidateCard` → `ReviewerSearchSection.useLead`,
 gated on `canManage`). It promotes in place rather than via a separate edit modal (the find
 card has none): it stamps `emailSource:'manual'` (`websiteSource:'manual'` for a page), clears
-the contact-layer abstain that withheld the value (e.g. `verified_domain_contradiction`) so
+the contact-layer abstain that withheld the value so
 save can persist it, and auto-selects the row. Provenance persists via `save-candidates`, and
 the live invite gate `emailConfidence` (`lib/utils/reviewer-invite.js`) classifies `manual` as
 **low** — so a promoted lead still hits the confirm-before-send flow (`send-emails` refuses a

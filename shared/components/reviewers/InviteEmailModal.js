@@ -97,6 +97,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState({ current: 0, total: 0, message: 'Rendering previews…' });
   const [results, setResults] = useState({ sent: [], failed: [], skipped: [] });
+  const [confirmedLowConfidenceIds, setConfirmedLowConfidenceIds] = useState({});
 
   // Stable across renders (candidates is a fresh array each parent render, so a
   // raw .map() would give renderPreviews a new identity every render and the
@@ -217,6 +218,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   // are still sendable, but staff must consciously confirm before inviting (guards the S234
   // wrong-address mistake). The server (send-emails) independently re-derives + enforces this.
   const lowConfidenceSendable = sendable.filter((d) => d.emailConfidence?.level === 'low');
+  const allLowConfidenceConfirmed = lowConfidenceSendable.every((d) => confirmedLowConfidenceIds[d.suggestionId] === true);
 
   const persistTiming = useCallback(async () => {
     try {
@@ -230,17 +232,17 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
 
   const handleSend = async () => {
     if (sendable.length === 0) { setError('No recipients with an email to send to.'); return; }
-    // Slice G — when any recipient is LOW-confidence, the confirm dialog names them so the
-    // staff acknowledgement is conscious (the one-click "confirm & send"). Proceeding sets
-    // confirmedLowConfidence, which the server requires before it will send to a LOW address.
-    const baseMsg = `Send ${sendable.length} invitation${sendable.length === 1 ? '' : 's'} now via Dynamics? `
-      + 'This sends a real email with an accept/decline link and cannot be undone.';
-    const lowMsg = lowConfidenceSendable.length > 0
-      ? `\n\n⚠ ${lowConfidenceSendable.length} address${lowConfidenceSendable.length === 1 ? '' : 'es'} could NOT be verified against the reviewer’s identity:\n`
-        + lowConfidenceSendable.map((d) => `  • ${d.candidateName || '(unnamed)'} <${d.candidateEmail}>`).join('\n')
-        + '\n\nConfirm you’ve checked these addresses before inviting.'
-      : '';
-    const ok = window.confirm(baseMsg + lowMsg);
+    if (lowConfidenceSendable.length > 0 && !allLowConfidenceConfirmed) {
+      setError('Confirm each low-confidence address before sending.');
+      return;
+    }
+    // Irreversible-action confirm for EVERY send. Low-confidence acknowledgement
+    // is the per-recipient checkbox list above (not this dialog) — this guards the
+    // batch itself, since a real email cannot be unsent.
+    const ok = window.confirm(
+      `Send ${sendable.length} invitation${sendable.length === 1 ? '' : 's'} now via Dynamics? `
+      + 'This sends a real email with an accept/decline link and cannot be undone.'
+    );
     if (!ok) return;
     setStep('sending');
     setProgress({ current: 0, total: sendable.length, message: 'Sending…' });
@@ -269,7 +271,12 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
           // above (which named them). Recipient-specific, not a batch boolean: the server only
           // honors the override for these exact suggestionIds, so a row that became LOW after
           // preview (and was never shown/confirmed) is still refused (`email_unconfirmed`).
-          confirmedLowConfidenceIds: lowConfidenceSendable.map((d) => d.suggestionId),
+          // Only the rows the staffer actually ticked — never the whole LOW list —
+          // so a regression in the send-button disable logic cannot smuggle an
+          // unconfirmed address through as confirmed.
+          confirmedLowConfidenceIds: lowConfidenceSendable
+            .filter((d) => confirmedLowConfidenceIds[d.suggestionId] === true)
+            .map((d) => d.suggestionId),
         }),
       });
       let final = null;
@@ -372,6 +379,31 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                       )}
                     </div>
                   ))}
+                  {lowConfidenceSendable.length > 0 && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                      <p className="text-sm font-medium text-amber-900">Confirm low-confidence addresses</p>
+                      <div className="mt-2 space-y-2">
+                        {lowConfidenceSendable.map((d) => (
+                          <label key={d.suggestionId} className="flex items-start gap-2 text-xs text-amber-900">
+                            <input
+                              type="checkbox"
+                              checked={confirmedLowConfidenceIds[d.suggestionId] === true}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setConfirmedLowConfidenceIds((prev) => ({ ...prev, [d.suggestionId]: checked }));
+                              }}
+                              className="mt-0.5 h-4 w-4 rounded border-amber-300 text-amber-700"
+                            />
+                            <span>
+                              <span className="font-medium">{d.candidateName || '(unnamed)'}</span>
+                              {' '}<span>{d.candidateEmail}</span>
+                              {d.emailConfidence?.reason ? <span className="block text-amber-800">{d.emailConfidence.reason}</span> : null}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -436,7 +468,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
               <button
                 type="button"
                 onClick={handleSend}
-                disabled={sendable.length === 0}
+                disabled={sendable.length === 0 || (lowConfidenceSendable.length > 0 && !allLowConfidenceConfirmed)}
                 className={`px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed ${
                   lowConfidenceSendable.length > 0 ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-900 hover:bg-gray-800'
                 }`}

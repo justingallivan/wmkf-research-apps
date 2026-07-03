@@ -106,6 +106,30 @@ describe('ORCIDService.getProfile — currentAffiliation strictly current (Codex
     const profile = await ORCIDService.getProfile('0000-0000-0000-0100', 'c', 's');
     expect(profile.currentAffiliation).toBe('Current University');
   });
+
+  test('threads current employment disambiguated organization IDs for anchored domain resolution', async () => {
+    jest.spyOn(ORCIDService, 'getAccessToken').mockResolvedValue('tok');
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => recordPayload({
+        organization: {
+          name: 'Princeton University',
+          'disambiguated-organization': {
+            'disambiguated-organization-identifier': 'https://ror.org/00hx57361',
+            'disambiguation-source': 'ROR',
+          },
+        },
+      }),
+    });
+    const profile = await ORCIDService.getProfile('0000-0000-0000-0101', 'c', 's');
+    expect(profile.affiliations[0]).toMatchObject({
+      organization: 'Princeton University',
+      disambiguatedOrganizationId: 'https://ror.org/00hx57361',
+      disambiguationSource: 'ROR',
+      current: true,
+    });
+    expect(profile.currentAffiliationDisambiguatedOrganizationId).toBe('https://ror.org/00hx57361');
+  });
 });
 
 describe('ContactEnrichmentService — identity-gated affiliation override (#15)', () => {
@@ -455,12 +479,13 @@ describe('ContactEnrichmentService._validateEmailAgainstVerifiedDomain — verif
     expect(ce.emailPersistAllowed).toBe(true);
   });
 
-  test('DROPS a namesake email that contradicts the verified domain (ifmo vs mbiberlin)', () => {
+  test('CONTESTS a search email that contradicts the verified domain (ifmo vs mbiberlin)', () => {
     const ce = run('olga.smirnova@metalab.ifmo.ru', 'mbiberlin.de');
-    expect(ce.email).toBeNull();
-    expect(ce.website).toBeNull();
-    expect(ce.emailPersistAllowed).toBe(false);
-    expect(ce.contactStatusReason).toBe('verified_domain_contradiction');
+    expect(ce.email).toBe('olga.smirnova@metalab.ifmo.ru');
+    expect(ce.emailSource).toBe('search_contested');
+    expect(ce.emailPersistAllowed).toBe(true);
+    expect(ce.websitePersistAllowed).toBe(false);
+    expect(ce.contactStatusReason).toBe('verified_domain_contradiction_contested');
   });
 
   test('NO-OP when there is no verified domain (trusts the institution-scoped search)', () => {
@@ -469,15 +494,17 @@ describe('ContactEnrichmentService._validateEmailAgainstVerifiedDomain — verif
     expect(ce.emailPersistAllowed).toBe(true);
   });
 
-  test('boundary match only — does NOT treat summit.edu as matching verified mit.edu (drops the namesake)', () => {
+  test('boundary match only — does NOT treat summit.edu as matching verified mit.edu (contests the namesake)', () => {
     const ce = run('prof@summit.edu', 'mit.edu');
-    expect(ce.email).toBeNull();
-    expect(ce.contactStatusReason).toBe('verified_domain_contradiction');
+    expect(ce.email).toBe('prof@summit.edu');
+    expect(ce.emailSource).toBe('search_contested');
+    expect(ce.contactStatusReason).toBe('verified_domain_contradiction_contested');
   });
 
   test('boundary match only — does NOT treat notred.ac.uk.evil as matching verified ed.ac.uk', () => {
     const ce = run('x@notred.ac.uk.evil', 'ed.ac.uk');
-    expect(ce.email).toBeNull();
+    expect(ce.email).toBe('x@notred.ac.uk.evil');
+    expect(ce.emailSource).toBe('search_contested');
   });
 
   test('NEVER drops a researcher-maintained ORCID email on a verified-domain mismatch (trusted source)', () => {
