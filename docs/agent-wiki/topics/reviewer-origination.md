@@ -206,6 +206,14 @@ bare keyword→author lane is what underperformed.
 - **Results list has a Rank⇄A–Z sort toggle (S318, shipped).** Default is
   confidence/relevance rank; A–Z sorts by name *within* each provenance group (grouping
   preserved). `ReviewerSearchSection.js` `sortMode`.
+- **Analyze PART 1 re-extracts request metadata Dataverse already owns (OPEN, S318).**
+  Title/PI/Co-PIs/institution/program/abstract are all authoritative on `akoya_request`,
+  yet the LLM re-derives them from the PDF (historical: the finder predates the
+  Dataverse-native entry path). This caused a prod save crash — an over-long LLM
+  `PROGRAM_AREA` 400s the 100-char `wmkf_programarea` field. A truncating clamp is
+  deployed as a band-aid (`reviewer-suggestion.js clampProgramArea`, `0aa7c1d1`); the real
+  fix (normalize, and/or source metadata from the request) is parked. Full context +
+  file:line pointers: `docs/REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md`.
 - **Suggestion data is cleaned at ONE chokepoint — `DiscoveryService.normalizeSuggestionSource` (S266).**
   An unverified honorific is stripped from the display name (`stripHonorifics`) and a
   non-page website (e.g. a co-author's paper PDF) is nulled (`sanitizeWebsiteForCandidate`),

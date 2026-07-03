@@ -18,11 +18,14 @@ related:
 
 # Reviewer Referral Seeding & Provenance Plan
 
-**Status: LOCKED — ready to build (S318).** All design questions resolved (see §Locked
-decisions). Written in response to a PD report on req 1002926 (see §Origin). **Codex
-plan review incorporated (S318):** 6 claims CONFIRMED, 1 REFUTED (no post-discovery
-count cap — corrected injection seam in §C), 3 RISKs folded in (bulk-dedup policy §C,
-display-vs-durable-string split §A, relabel consumer fan-out §A).
+**Status: LOCKED — build NOT started (parked S318 for a future session).** All design
+questions resolved (see §Locked decisions); Codex-reviewed. The Codex build was blocked
+by an environment issue (sandbox writable-roots) — see **§Build status & how to resume**
+and pick a path there before implementing. Written in response to a PD report on req
+1002926 (see §Origin). **Codex plan review incorporated (S318):** 6 claims CONFIRMED,
+1 REFUTED (no post-discovery count cap — corrected injection seam in §C), 3 RISKs folded
+in (bulk-dedup policy §C, display-vs-durable-string split §A, relabel consumer fan-out
+§A); the review is preserved verbatim in the appendix.
 
 ## Locked decisions
 
@@ -212,3 +215,49 @@ is what the PD did for Hafezi; dedup correctly reused the existing person — no
   guess); (3) relabel the DISPLAY only — leave the durable `wmkf_matchreason` "Referred
   by …" prefix + reload parser intact; move the three old-label consumers (§A).
 - **Gates:** `check:agent-wiki`, plus lint/build. No `status-enum-parity` change.
+
+## Build status & how to resume (S318 handoff)
+
+**State: plan LOCKED, build NOT started.** The design is final and Codex-reviewed
+(findings in the appendix, already folded into §A–§D). No code has been written.
+
+**Why the build didn't happen — an environment blocker, not a plan problem.** The build
+was handed to Codex in the worktree `../WMKF_Apps-codex` (branch `codex/referral-seeding`,
+off origin/main). Codex's sandbox is `workspace-write` scoped to the main repo; its
+`~/.codex/config.toml` has `writable_roots = ["/Users/gallivan/Code/WMKF_Apps/.git"]` —
+which does NOT include the sibling worktree. Every write there was denied ("writing
+outside of the project"). Codex made **zero** changes; the worktree branch has **0
+commits** over origin/main (only an untracked `.codex/`).
+
+**To resume — pick one:**
+1. **Let Codex build in the worktree:** add `"/Users/gallivan/Code/WMKF_Apps-codex"` to
+   `writable_roots` in `~/.codex/config.toml` (precedent: the `.git` root was added the
+   same way — see `config.toml.bak-pre-gitwritable`), refresh the branch
+   (`git -C ../WMKF_Apps-codex checkout -B codex/referral-seeding origin/main`), then
+   re-run the Codex build against the §Implementation sequence + guardrails below.
+2. **Claude builds in the worktree (Claude can write there), Codex reviews** — no config
+   change; flips the roles.
+3. Build in the main checkout on a fresh branch (Codex's workspace is writable there).
+
+**Do not re-run the Codex plan review** — it's captured verbatim in the appendix and the
+fixes are already in this doc. The implementation guardrails (injection seam, bulk-dedup
+policy, display-vs-durable-string split) in §A/§C are the load-bearing corrections; honor
+them exactly. Keep the branch off `main` and merge only after review (main auto-deploys).
+
+## Appendix: Codex plan-review findings (verbatim, S318) — RESCUED
+
+Preserved so a future session doesn't re-run the review. Codex read the committed plan
+against live source and returned:
+
+- CONFIRMED — Provenance relabel is enum-neutral: `referred` and `applicant_suggested` already exist in `PROVENANCE_KINDS`, while `provenanceLabelForCandidate` is the string-only display surface. `lib/utils/reviewer-provenance.js:9`, `:249`.
+- CONFIRMED — `referred` behavior is already grounded/exempt: it gets ranking bonus, routes through `isIdentityReviewExemptProvenance`, and groups as `cited_or_proposal_named` before unresolved identity gates run. `reviewer-provenance.js:34`, `:212`, `:221`.
+- CONFIRMED — Unresolved `referred` rows are selectable-with-verify and save-time contact-null: UI selectability is group-based, save skips hard reject for exempt kinds and blocks contact fields unless identity is resolved. `ReviewerSearchSection.js:837`, `save-candidates.js:60`, `:83`.
+- CONFIRMED — `save-candidates` persists `referred` with no new mapping: `saveSourceListForCandidate` includes `provenance.kind`, save joins it into `sources`, adapter writes `wmkf_sources`. `reviewer-provenance.js:191`, `save-candidates.js:252`, `reviewer-suggestion.js:421`.
+- CONFIRMED — Folded-in layout holds: `referred` maps to `cited_or_proposal_named`, rendered as one section; applicant-suggested remains separate. `reviewer-provenance.js:225`, `ReviewerSearchSection.js:1247`.
+- REFUTED — There is NO post-discovery `DEFAULT_REVIEWER_COUNT` pool cap to merge before; the count is Stage-1 prompt/validation, and `rankAllCandidates` combines/ranks without slicing. `reviewerFinderPreferences.js:20`, `analyze.js:184`, `discovery-service.js:2309`.
+- RISK — Seed injection must NOT go into `analysisResult.reviewerSuggestions`: unresolved Track-A items land in `unverified`, which `rankAllCandidates` excludes; client `displayCandidates` comes from `ranked`. `discovery-service.js:478`, `:2310`, `ReviewerSearchSection.js:643`.
+- CONFIRMED — Exact viable seam is `/discover` after verification/filtering, before the `ranked` frame: merge seeds into `verifiedWithCOI` before `combinedResults`/`rankAllCandidates` so they reach `data.ranked`, enrichment, `setCandidates`, `save-candidates`. `discover.js:436`, `:491`, `ReviewerSearchSection.js:669`, `:1025`.
+- RISK — The manual-Add lookup exists server-side but is an interactive identity preflight: `lookupReviewerIdentity` can return `candidates` needing staff choice; the manual form stops for confirmation. Bulk seed flow needs an explicit policy for ambiguous/conflict outcomes. `reviewer-identity-lookup.js:242`, `ReviewerFindPanel.js:288`.
+- RISK — Relabel fan-out is broader than `provenanceLabelForCandidate`: exact tests + a UI/export fallback string still assert/display `Referred`/`Applicant-suggested`. `tests/unit/reviewer-provenance.test.js:137`, `tests/unit/reviewer-candidate-export.test.js:63`, `ReviewerSearchSection.js:1260`.
+- RISK — Do not relabel the durable `wmkf_matchreason` prefix without changing reload parsing: `my-candidates` reconstructs `referredBy` by matching `^Referred by …` when `wmkf_sources` includes `referred`. `my-candidates.js:199`, `:203`.
+- CONFIRMED — Seed-only is not currently wired into the analyze prompt path: Find sends only `blobUrl`/`excludedNames`/`reviewerCount`/`additionalNotes` to `/analyze`; the composer only interpolates those. `ReviewerSearchSection.js:592`, `analyze.js:87`, `reviewer-prompt-composer.js:25`.
