@@ -3,7 +3,7 @@ title: "Reviewer Analyze Prompt — Metadata Redundancy & Program-Area Crash"
 domain: reviewers
 kind: audit
 status: active
-summary: "The reviewer-finder analyze prompt re-extracts request metadata Dataverse already holds; an over-long LLM program area 400s the save. Fix directions inside."
+summary: "Reviewer analyze now sources request metadata from Dataverse and normalizes program-area writes instead of trusting LLM metadata extraction."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -18,11 +18,13 @@ related:
 
 # Reviewer Analyze Prompt — Metadata Redundancy & Program-Area Crash
 
-**Status: OPEN — parked S318 for a dedicated session.** Two linked problems surfaced
-while diagnosing a production save failure. The immediate crash has a **band-aid already
-deployed** (see §Deployed band-aid); the real fix is a design change deferred here.
-Everything below is verified against source / live data / logs so the next session can
-act without re-probing.
+**Status: FIXED in `codex/program-area-normalization` (2026-07-03).** Two linked
+problems surfaced while diagnosing a production save failure. The original immediate
+band-aid truncated overlong LLM output; the current fix requires `requestId`, sources
+administrative proposal metadata from Dataverse, slims the analyze prompt to scientific
+context + reviewer suggestions, and normalizes `wmkf_programarea` writes so
+overlong/placeholder values are dropped rather than truncated. Program area remains an
+app-owned Dataverse value for save compatibility; it is not sent to the model.
 
 ## Symptom (production, verified in logs)
 
@@ -72,7 +74,7 @@ Dataverse error is logged (`save-candidates.js:435` logs `candidateError.message
 single-line parse captures it → 100-char field 400s. The defect is that unvalidated LLM
 output is fed straight into a controlled-vocabulary field.
 
-## Deployed band-aid (already in prod)
+## Historical band-aid (replaced by the current fix)
 
 Commit `0aa7c1d1` added `clampProgramArea()` in `reviewer-suggestion.js` and applied it
 at all five `wmkf_programarea` write sites. It **truncates** an over-long value to 100 so
@@ -80,7 +82,12 @@ the save no longer 400s. This unblocks the user but **stores truncated garbage**
 field for such proposals. It is a stopgap, not the fix — remove/replace it when the real
 fix lands. (It does NOT touch the durable `wmkf_matchreason` prefix or anything else.)
 
-## The deeper issue — the prompt re-derives metadata Dataverse already owns
+Current code replaces that stopgap with `normalizeSuggestionProgramArea()` in
+`lib/dataverse/adapters/reviewer-suggestion.js`. The normalizer preserves short request
+labels, maps the old prompt labels to canonical Dataverse labels, and returns `null` for
+overlong or placeholder values.
+
+## The deeper issue — the prompt re-derived metadata Dataverse already owns
 
 The analyze prompt's PART 1 makes the LLM extract, from the PDF, fields that are already
 **authoritative structured data** on the `akoya_request` record — verified against the
@@ -112,20 +119,24 @@ What the LLM is genuinely still needed for: understanding the science
 suggestions (PART 2). (Some AI fields like `wmkf_ai_keywords`/`wmkf_ai_methodologies`
 exist on the request too but may not always be populated.)
 
-## Fix directions (for the dedicated session to choose)
+## Implemented fix
 
-1. **Minimal — normalize, don't truncate.** At the save/analyze boundary, coerce
-   `programArea` to one of the valid values or `null` (never free text). Kills the crash
-   class deterministically and lets us drop the truncating clamp. Small, self-contained.
-2. **Right — source PART 1 metadata from the request.** Pull Title / PI / Co-PIs /
-   institution / program / abstract from `akoya_request` (the finder already has the
-   `requestId`), and slim the analyze prompt to the science-understanding + PART 2
-   reviewer generation the LLM is uniquely for. Kills the crash class, improves COI
-   accuracy, shrinks the prompt. Bigger — it changes the analyze contract and the COI
-   screening inputs, so it wants its own scoping and probably a Codex design pass.
-
-Recommendation: do #1 as the immediate correct fix (replacing the clamp) regardless, then
-evaluate #2 as the strategic refactor.
+1. `ReviewerSearchSection` now includes `requestId` in the analyze POST body; the analyze
+   route now fails early if it is missing.
+2. `/api/reviewer-finder/analyze` loads trusted request metadata through
+   `loadReviewerRequestContext()` before calling Claude.
+3. `reviewer-request-context.js` reads title / PI / Co-PIs / institution / program /
+   abstract from Dataverse. Program uses `akoya_programid` first, then older fallback
+   fields, but is only overlaid into `proposalInfo` for downstream save compatibility;
+   Co-PIs come from `wmkf_apprequestperson`.
+4. `composeAnalyzePrompt()` prepends a trusted metadata block and slims stale prompt
+   bodies for request-backed analysis, so Dataverse/user prompt rows cannot keep asking
+   the model to infer TITLE / PI / Co-PIs / institution / abstract. Program area is omitted
+   from the prompt entirely.
+5. `ClaudeReviewerService.analyzeProposal()` overlays the trusted metadata after parsing,
+   preserving the existing `proposalInfo` shape for discovery, enrichment, and save.
+6. `reviewer-suggestion.js` uses `normalizeSuggestionProgramArea()` instead of truncation
+   across create/update/fill/bulk lifecycle paths.
 
 ## Pointers (so the next session needn't re-probe)
 
@@ -134,8 +145,10 @@ evaluate #2 as the strategic refactor.
 - Prompt resolution (Dataverse override): `lib/services/prompt-store.js`
   (`wmkf_ai_prompts`, filter `wmkf_ai_promptname eq 'reviewer-finder.analyze' and
   wmkf_ai_iscurrent eq true`), `lib/services/reviewer-prompt-resolver.js`.
-- Write chokepoint + the clamp: `lib/dataverse/adapters/reviewer-suggestion.js`
-  (`clampProgramArea`, `upsert`, `ensureApplicantRecommended`).
+- Trusted request metadata: `lib/services/reviewer-request-context.js`.
+- Write chokepoint + normalizer: `lib/dataverse/adapters/reviewer-suggestion.js`
+  (`normalizeSuggestionProgramArea`, `upsert`, `ensureApplicantRecommended`,
+  `updateLifecycle`).
 - Request field inventory: `docs/atlas/dataverse-akoya-request.md`.
 - Running the analyze standalone under node is blocked by extensionless imports (Next
   resolves them; raw node can't) — reproduce via the inlined-prompt approach or drive the

@@ -77,6 +77,31 @@ describe('composeAnalyzePrompt repair ordering', () => {
   });
 });
 
+describe('composeAnalyzePrompt with trusted request metadata', () => {
+  it('removes legacy metadata inference and keeps program area out of the prompt', () => {
+    const out = composeAnalyzePrompt({
+      body: ANALYZE_USER_PROMPT_TEMPLATE,
+      proposalText: WRAPPED,
+      nonces: [NONCE],
+      requestContext: {
+        title: 'Dataverse Title',
+        programArea: 'Medical Research',
+        principalInvestigator: 'Dr. PI',
+        coInvestigators: 'None',
+        coInvestigatorCount: '0',
+        authorInstitution: 'Applicant University',
+      },
+    });
+
+    expect(out).toContain('TRUSTED REQUEST METADATA');
+    expect(out).toContain('TITLE: Dataverse Title');
+    expect(out).toContain('PRIMARY_RESEARCH_AREA: [Main scientific discipline]');
+    expect(out).not.toContain('TITLE: [Complete proposal title]');
+    expect(out).not.toContain('PROGRAM_AREA');
+    expect(out).not.toContain('Medical Research');
+  });
+});
+
 describe('default reviewer count is the single shared constant (S249: 12→15)', () => {
   it('DEFAULT_REVIEWER_COUNT is 15 (recall lever)', () => {
     expect(DEFAULT_REVIEWER_COUNT).toBe(15);

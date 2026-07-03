@@ -641,8 +641,8 @@ This app runs five stages. The initial analysis is similar to the Concept Evalua
 
 > You are an expert at identifying qualified peer reviewers for scientific research proposals. Analyze this proposal and provide structured output for a reviewer discovery system.
 >
-> **PART 1: PROPOSAL METADATA**
-> Extract: title, program area (Science and Engineering or Medical Research), principal investigator, co-investigators with count, author institution, primary research area, secondary areas, key methodologies, keywords (5-8 terms), abstract.
+> **PART 1: SCIENTIFIC ANALYSIS**
+> Extract: primary research area, secondary areas, key methodologies, and keywords (5-8 terms). Request-backed reviewer analysis requires `requestId`; title, PI, co-investigators, author institution, and abstract are supplied from Dataverse rather than inferred from the PDF. Program area is app-owned Dataverse metadata and is not sent to the model.
 >
 > **PART 2: REVIEWER SUGGESTIONS**
 > Suggest [~12] potential expert reviewers. For each, provide detailed reasoning.
@@ -658,7 +658,6 @@ This app runs five stages. The initial analysis is similar to the Concept Evalua
 > - 2-4 specific areas of expertise
 > - Seniority level (Early-career / Mid-career / Senior)
 > - 2-3 sentences explaining WHY they are qualified for THIS proposal
-> - Any conflict of interest concerns
 > - Source ("Mentioned in proposal", "References", "Known expert", "Field leader")
 >
 > _(PART 3 "DATABASE SEARCH QUERIES" was removed S253 — it only fed Track B, archived off S248. Stage 1 now returns the two parts above.)_

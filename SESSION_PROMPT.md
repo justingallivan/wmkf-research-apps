@@ -19,14 +19,17 @@ session can resume. All work committed and pushed to `main`.
    by name within each provenance group; default stays confidence rank. Selection is keyed
    by normalized name so reordering is safe.
 
-3. **Program-area save-crash hotfix (`0aa7c1d1`, deployed) + full investigation.** Boss
-   hit a Dataverse 400 promoting 5 reviewers for req 1002916 (`wmkf_programarea` > 100).
-   Root cause verified: correct field (String/100, deliberate short-label) + correct prompt
-   (constrains to 2 Keck values) + **intermittent LLM constraint-violation** (emits a long
-   descriptive line when the proposal has no "Program:" field) → single-line parser captures
-   it → 400. Deployed `clampProgramArea()` as a **band-aid** (truncates to 100). Reproduced
-   via the real analyze on 1002916's proposal — the model returned "Not specified" (crash
-   did NOT reproduce). Confirmed **no duplicate Hafezi** was created on req 1002926 (dedup
+3. **Program-area save-crash investigation + Dataverse metadata fix.** Boss hit a
+   Dataverse 400 promoting 5 reviewers for req 1002916 (`wmkf_programarea` > 100). Root
+   cause verified: the old analyze prompt asked the LLM to infer request metadata that
+   Dataverse already owns, and an intermittent overlong `PROGRAM_AREA` line flowed into a
+   100-char field. Current fix on `codex/program-area-normalization`: analyze POST carries
+   `requestId`; `/api/reviewer-finder/analyze` now requires `requestId` and loads trusted
+   request metadata from Dataverse; `composeAnalyzePrompt()` slims metadata inference for
+   request-backed analysis without sending program area to the model; `ClaudeReviewerService`
+   overlays Dataverse metadata onto `proposalInfo`; and
+   `normalizeSuggestionProgramArea()` drops overlong/placeholder values instead of
+   truncating them. Confirmed **no duplicate Hafezi** was created on req 1002926 (dedup
    worked; a separate colleague report).
 
 4. **Referral-seeding feature: design → plan → Codex review, LOCKED, build PARKED.** Lets a
@@ -116,8 +119,9 @@ session can resume. All work committed and pushed to `main`.
 | File | Purpose |
 |------|---------|
 | `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md` | Referral-seeding: locked plan + verbatim Codex review + resume steps. |
-| `docs/REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md` | Program-area crash + metadata-redundancy design issue + fix directions. |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | `clampProgramArea` band-aid (all 5 write sites); `upsert`/`ensureApplicantRecommended`. |
+| `docs/REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md` | Program-area crash + request-required Dataverse metadata fix. |
+| `lib/services/reviewer-request-context.js` | Trusted request metadata loader/overlay for reviewer analyze. |
+| `lib/dataverse/adapters/reviewer-suggestion.js` | `normalizeSuggestionProgramArea`; `upsert`/`ensureApplicantRecommended`/`updateLifecycle`. |
 | `shared/config/prompts/reviewer-finder.js` | Analyze prompt template + `parseAnalysisResponse` (PROGRAM_AREA single-line capture). |
 | `shared/components/reviewers/ReviewerSearchSection.js` | Reviewer-finder UI; `sortMode` (Rank/A–Z toggle). |
 | `vercel.json` | Cron schedules incl. `/api/cron/reviewer-email-reconcile` (`0 4 * * *`). |
@@ -126,8 +130,8 @@ session can resume. All work committed and pushed to `main`.
 ## Testing
 
 ```bash
-# Program-area clamp unit test
-npx jest tests/unit/reviewer-suggestion-programarea-clamp.test.js --runInBand
+# Program-area normalization + Dataverse metadata tests
+npx jest tests/unit/reviewer-suggestion-programarea-normalize.test.js tests/unit/reviewer-request-context.test.js tests/unit/claude-reviewer-service.test.js --runInBand
 
 # Reviewer-finder component lint (sort toggle)
 npx eslint shared/components/reviewers/ReviewerSearchSection.js

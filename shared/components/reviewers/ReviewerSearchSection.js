@@ -592,7 +592,13 @@ export default function ReviewerSearchSection({
       const aRes = await fetch('/api/reviewer-finder/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ blobUrl, excludedNames: effectiveExcluded, reviewerCount, additionalNotes: additionalNotes.trim() || undefined }),
+        body: JSON.stringify({
+          blobUrl,
+          requestId: requestId || null,
+          excludedNames: effectiveExcluded,
+          reviewerCount,
+          additionalNotes: additionalNotes.trim() || undefined,
+        }),
       });
       let analysisResult = null;
       let streamError = null;

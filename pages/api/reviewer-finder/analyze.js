@@ -20,6 +20,8 @@ import { ClaudeReviewerService } from '../../../lib/services/claude-reviewer-ser
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { DEFAULT_REVIEWER_COUNT } from '../../../shared/config/reviewerFinderPreferences';
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
+import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { loadReviewerRequestContext } from '../../../lib/services/reviewer-request-context';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -84,11 +86,17 @@ export default async function handler(req, res) {
   let budgetSeconds = null;
 
   try {
-    const { proposalText, blobUrl, additionalNotes, excludedNames, reviewerCount, summaryPages } = req.body;
+    const { proposalText, blobUrl, additionalNotes, excludedNames, reviewerCount, summaryPages, requestId } = req.body;
+    const trimmedRequestId = String(requestId || '').trim();
 
     const apiKey = process.env.CLAUDE_API_KEY;
     if (!apiKey) {
       sendEvent('error', { message: 'Claude API key not configured on server' });
+      return res.end();
+    }
+
+    if (!trimmedRequestId) {
+      sendEvent('error', { message: 'requestId is required for reviewer analysis' });
       return res.end();
     }
 
@@ -165,6 +173,26 @@ export default async function handler(req, res) {
       return res.end();
     }
 
+    let requestContext = null;
+    sendEvent('progress', {
+      stage: 'metadata',
+      message: 'Loading request metadata from Dataverse...',
+    });
+    try {
+      requestContext = await bypassDynamicsRestrictions('reviewer-finder-analyze-request-context', () =>
+        loadReviewerRequestContext(trimmedRequestId));
+      sendEvent('progress', {
+        stage: 'metadata',
+        message: 'Using Dataverse request metadata for proposal identity fields.',
+      });
+    } catch (err) {
+      if (err?.statusCode === 400 || err?.statusCode === 404) {
+        sendEvent('error', { message: err.message });
+        return res.end();
+      }
+      throw err;
+    }
+
     // Start the search time-budget clock now (after the upload/PDF prep, which
     // is bounded by maxDuration but not the LLM budget).
     budgetSeconds = await getReviewerTimeBudgetSeconds();
@@ -188,6 +216,7 @@ export default async function handler(req, res) {
       userProfileId,
       signal: deadlineController.signal,
       deadlineAt,
+      requestContext,
       onProgress: (progress) => {
         sendEvent('progress', progress);
       }

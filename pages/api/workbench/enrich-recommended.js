@@ -48,6 +48,7 @@ import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
 import { mayPersistIdentity, RESOLVER_SOURCED_FIELDS } from '../../../lib/services/reviewer-identity-resolver';
 import { backPropReviewerOrcidToContact } from '../../../lib/services/backprop-reviewer-orcid';
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
+import { loadReviewerRequestContext } from '../../../lib/services/reviewer-request-context';
 import { pruneCandidateForRoster } from '../../../shared/components/reviewers/reviewer-search-logic';
 import { recordSurfaced } from '../../../lib/services/reviewer-roster-store';
 
@@ -165,12 +166,14 @@ export default async function handler(req, res) {
           sendEvent('error', { message: 'Proposal text is too short or empty to analyze.' });
           return;
         }
+        const requestContext = await loadReviewerRequestContext(requestId);
         const analysis = await ClaudeReviewerService.analyzeProposal(text, apiKey, {
           reviewerCount: 1, // we don't use the suggestions here, only proposalInfo
           analysisPurpose: 'proposal_info',
           userProfileId: access.profileId,
           signal: deadlineController.signal,
           deadlineAt,
+          requestContext,
           onProgress: (p) => sendEvent('progress', p),
         });
         proposalInfo = analysis?.proposalInfo || null;
