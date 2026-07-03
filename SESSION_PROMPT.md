@@ -1,5 +1,14 @@
 # Session 320 Prompt: Clean main after reviewer merge; pick the next real follow-up
 
+## ⇒ In flight: delegated reviewer-gating strategy review
+
+A fresh reviewing LLM (repo access) has been briefed to evaluate whether the
+reviewer-finder fail-closed gate system over-gates or fires gates at the wrong
+stage/input, and to produce a redesign design doc. **The brief is
+`docs/REVIEWER_GATING_STRATEGY_REVIEW_PROMPT.md` — start there.** Its expected
+output is `docs/REVIEWER_GATING_STRATEGY_REDESIGN.md` (not yet written). This grew
+out of the S320 Cause #2 deep-diagnosis below.
+
 ## Session 319 Summary
 
 This session closed the reviewer-feature branch tangle and left the repo clean on
@@ -68,10 +77,20 @@ Dataverse-grounded reviewer analyze metadata fix are both on `origin/main`.
 
 ### Verified Open
 
-1. **Cause #2 - enrichment email-coverage miss.**
-   Evidence: `SESSION_PROMPT.md` S319 carryover plus `scripts/probe-no-email-breakdown.mjs`.
-   Eight prominent PIs have findable emails that enrichment did not surface.
-   Candidate area: the resolved faculty-page tier `_attachEmailFromResolvedPage`.
+1. **Cause #2 - enrichment email-coverage miss (deep-diagnosed S320; now delegated).**
+   Evidence: `scripts/probe-no-email-breakdown.mjs` (120d: 482 selected, 11 no-email,
+   5 true Cause #2) plus live OpenAlex domain probes run S320. **Corrected finding:**
+   the resolved faculty-page tier is NOT the main lever. In 4 of 5 cases a *correct*
+   institutional email was found and discarded by a gate — two by
+   `verified_domain_contradiction` (`_validateEmailAgainstVerifiedDomain`) trusting a
+   single OpenAlex last-known-institution domain that was a legit secondary
+   affiliation (`hhmi.org` vs `princeton.edu`) or an OpenAlex mis-map
+   (`calu.edu` vs `upenn.edu`); two by `isNameConsistentEmail` `name_mismatch` on the
+   correct domain; one never-fetched page. The fetch tier
+   (`_attachEmailFromResolvedPage`, `REVIEWER_PAGE_EMAIL_TIER_ENABLED` default OFF)
+   cannot rescue the domain-contradiction cases — its fetch is bound to the same wrong
+   domain. **Now handed to a fresh reviewing LLM — see the in-flight pointer at the top
+   of this file and `docs/REVIEWER_GATING_STRATEGY_REVIEW_PROMPT.md`.**
 
 2. **B2 - enrichment-timeout partial-return.**
    Evidence: `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md` section B2.
