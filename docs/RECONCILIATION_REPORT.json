@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-03T19:45:28.601Z",
+  "generated": "2026-07-03T22:03:36.237Z",
   "summary": {
     "total_claims": 157,
     "stale": 38,
@@ -66,24 +66,6 @@
         "atlas_claim": 329,
         "live_count": 343,
         "source_file": "docs/atlas/dataverse-wmkf-ai-run-and-prompt.md"
-      },
-      {
-        "entity": "wmkf_app_reviewer_suggestion",
-        "atlas_claim": 336,
-        "live_count": 621,
-        "source_file": "docs/atlas/postgres-reviewer-suggestions.md"
-      },
-      {
-        "entity": "wmkf_appreviewersuggestions",
-        "atlas_claim": 336,
-        "live_count": 621,
-        "source_file": "docs/atlas/postgres-reviewer-suggestions.md"
-      },
-      {
-        "entity": "wmkf_potentialreviewerses",
-        "atlas_claim": 331,
-        "live_count": 4393,
-        "source_file": "docs/atlas/postgres-researchers.md"
       }
     ],
     "doc_label_collision": [],

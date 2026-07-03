@@ -2,8 +2,8 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed + live metadata probe: 77 `wmkf_`-prefixed attrs, 108 total) — prior 2026-05-09 (Stage 2a additions) / 2026-05-07 via `scripts/audit-dataverse-state.js` + EntityDefinitions metadata probe
-**Live row count:** 336
+**Last verified:** 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed + live metadata probe: 77 `wmkf_`-prefixed attrs, 108 total) — prior 2026-05-09 (Stage 2a additions) / 2026-05-07 via `scripts/audit-dataverse-state.js` + EntityDefinitions metadata probe. Row count re-probed 2026-07-03 via `scripts/reconcile-memory-claims.js`.
+**Live row count:** 621
 **Entity set:** `wmkf_appreviewersuggestions`
 **Adapter:** `lib/dataverse/adapters/reviewer-suggestion.js`
 **Extension manifests:** base entity in `lib/dataverse/schema/wave2/wmkf_app_reviewer_suggestion.json`; extensions in `lib/dataverse/schema/wave2-existing/wmkf_appreviewersuggestion-extensions.json` (S128–S130 additions) + `lib/dataverse/schema/wave3/04_wmkf_appreviewersuggestion_stage2a.json` (S143 Stage 2a slice 1 additions) + `lib/dataverse/schema/wave5/01_wmkf_appreviewersuggestion_workbench.json` (S196 Workbench prep) + `lib/dataverse/schema/wave6/01_wmkf_appreviewersuggestion_applicant_disposition.json` (S208 applicant disposition). Relevance-score range widen artifact: `scripts/widen-relevancescore-max.mjs`.
@@ -11,7 +11,7 @@
 
 ## Source of truth
 
-**Active.** Per-(reviewer, request) suggestion + outreach lifecycle. Reviewer Finder writes here on save-candidates; Review Manager updates lifecycle here on send/receive/thank-you. Postgres `reviewer_suggestions` (337 rows) is the legacy mirror — ~97.6% parity per S136 probe.
+**Active.** Per-(reviewer, request) suggestion + outreach lifecycle. Reviewer Finder writes here on save-candidates; Review Manager updates lifecycle here on send/receive/thank-you. Postgres `reviewer_suggestions` was the 337-row legacy mirror before its 2026-06-04 drop; the ~97.6% parity figure is an S136 historical probe.
 
 ## Schema (52 documented custom attrs as of 2026-05-09; +`wmkf_completedat` (S196) +`wmkf_applicantdisposition` (S208) added since — live probe 2026-05-31 shows 77 `wmkf_`-prefixed attrs incl. virtual `*name` denorms)
 
