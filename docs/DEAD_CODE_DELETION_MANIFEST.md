@@ -3,77 +3,24 @@ title: Dead-Code Deletion Manifest (S322 sweep)
 domain: repo-hygiene
 kind: audit
 status: active
-summary: Dead exports, orphan files, unwired routes, one-way flags, and unreferenced scripts as of 7d3be6a1, grouped by deletion confidence. Nothing deleted yet.
+summary: SAFE dead-code bucket applied 2026-07-03; owner-confirmation deletion candidates remain parked for explicit approval.
 ---
 
 # Dead-Code Deletion Manifest
 
 - **Date:** 2026-07-03 (Session 322)
 - **Evidence anchor:** repo state at commit `7d3be6a1`. All "last commit referencing" claims and grep results are snapshots as of that commit — **re-run caller checks at execution time before deleting anything** (CLAUDE.md rule 2, destructive carryover).
-- **Method:** four parallel read-only scans (dead exports, page/route reachability, feature flags, scripts/config) over `lib/ shared/ pages/ tests/ scripts/` plus root config. Every export-level SAFE claim below was additionally re-verified in the S322 main session with repo-wide word-boundary greps (including `.mjs`/`.json`) after one scan false positive was caught (see Keep). Nothing has been deleted.
+- **Method:** four parallel read-only scans (dead exports, page/route reachability, feature flags, scripts/config) over `lib/ shared/ pages/ tests/ scripts/` plus root config. Every export-level SAFE claim was additionally re-verified in the S322 main session with repo-wide word-boundary greps (including `.mjs`/`.json`) after one scan false positive was caught (see Keep).
 - **Evidence labels:** [VERIFIED session-grep] = re-checked directly in the S322 main session; [VERIFIED scan] = confirmed by the S322 read-only scan agents (grep + git evidence in their reports) but not independently re-run in the main session.
-- **Status:** manifest only. No entry is green-lit until its pre-flight caller check is re-run live.
+- **Status:** SAFE bucket applied 2026-07-03 after live caller checks. The owner-confirmation bucket below remains read-only until explicitly approved.
 
-## SAFE — zero references anywhere
+## APPLIED — SAFE bucket deleted 2026-07-03
 
-### Whole files
-
-| Candidate | Evidence |
-|---|---|
-| `lib/services/anthropic-admin.js` | Last commit `0eec2836` 2026-05-23; only mention is one `docs/archive/` doc; 0 code/test refs [VERIFIED session-grep] |
-| `shared/api/handlers/responseStreamer.js` | Last commit `f47a21be` 2026-02-23; 0 refs by path or name repo-wide [VERIFIED session-grep] |
-
-### Dead exports — each re-verified at exactly 1 occurrence repo-wide (its definition) [VERIFIED session-grep]
-
-| Symbol | Last commit referencing [VERIFIED scan] |
-|---|---|
-| `lib/utils/auth.js:getAuthenticatedProfileId` | `7de98a54` 2026-01-18 |
-| `lib/utils/auth.js:optionalAuth` | `5f3464a9` 2026-02-13 |
-| `shared/context/ProfileContext.js:useProfileId` | `943cb657` 2026-01-18 |
-| `shared/components/RequireAuth.js:useRequireAuth` | `7e066560` 2026-01-21 |
-| `shared/api/middleware/rateLimiter.js:rateLimiters`, `:resetRateLimit`, `:getRateLimitStatus` | `6cffcf34` 2025-09-25 |
-| `shared/config/appRegistry.js:ALWAYS_ACCESSIBLE` | `d07687aa` 2026-02-20; not consumed by the string-keyed lifecycle registry |
-| `lib/bill/option-set-values.js:BILLCOM_ACCOUNT_RECENTLY_CONFIRMED` | `6e709cbb` 2026-05-26 |
-| `lib/utils/pdf-page-splitter.js:getPdfPageCount` | `2f2f07cf` 2026-01-16 |
-| `lib/services/email-signature.js:EMAIL_SIGNATURE_FOUNDATION_LINE` | `f3f46a01` 2026-06-20 |
-| `shared/config/reviewerFinderPreferences.js:resolveStoredCycle`, `:formatCycleForStorage` | `9114adeb` 2026-06-21 |
-| `shared/components/reviewers/ReviewerManagePanel.js:StatusSummary` | `94bbbce4` 2026-06-16 |
-| `shared/config/prompts/reviewer-finder.js:validateAnalysisResult` | `de698339` 2026-06-07 |
-| `shared/config/prompts/virtual-review-panel.js:REVIEWER_FORM_QUESTIONS` | `00c930c3` 2026-04-01 |
-| `shared/config/prompts/peer-reviewer.js:formatPeerReviewSummary` | `6cffcf34` 2025-09-25 |
-
-### Dead config
-
-| Candidate | Evidence |
-|---|---|
-| `MOCK_MODE` computation in `shared/config/baseConfig.js:161` | `6cffcf34` 2025-09-25; computed but zero readers of `.MOCK_MODE` anywhere [VERIFIED session-grep] |
-
-### One-off scripts, work already executed, referenced nowhere [VERIFIED scan]
-
-Filename grepped across `package.json`, `docs/`, `.claude/`, `.github/`, `vercel.json`, and all other scripts; none has any runbook/SESSION_PROMPT reference. Safe from a build/runtime standpoint; git-recoverable after deletion.
-
-| Candidate | Last commit |
-|---|---|
-| `scripts/fix-chris-chang-suggestion.js` | `ec63fd9f` 2026-05-20 |
-| `scripts/fix-req-1003020-orphaned-emails.mjs` | `5251fb68` 2026-07-02 |
-| `scripts/probe-req-1003020-contact-link.mjs` | `5251fb68` 2026-07-02 |
-| `scripts/probe-req-1003020-email-modtimes.mjs` | `5251fb68` 2026-07-02 |
-| `scripts/probe-req-1003020-reviewer-emails.mjs` | `5251fb68` 2026-07-02 |
-| `scripts/probe-req-1003020-roster-email.mjs` | `5251fb68` 2026-07-02 |
-| `scripts/probe-walsh-akbarian-enrichment.mjs` | `5251fb68` 2026-07-02 |
-| `scripts/probe-walsh-duplicate.mjs` | `5251fb68` 2026-07-02 |
-| `scripts/probe-silva-audit-history.mjs` | `5251fb68` 2026-07-02 |
-| `scripts/probe-rudenko-email-trace.js` | `ca5e54f1` 2026-06-17 |
-| `scripts/probe-req-1002788-identity-state.js` | `5693a801` 2026-06-03 |
-| `scripts/wave2-remove-formfield.js` | `852bd1a1` 2026-04-29 (wave2 removal complete) |
-| `scripts/probe-akoya-underinclusion-4.js` | `82850fb8` 2026-05-17 |
-| `scripts/probe-akoya-usc-primarycontact.js` | `82850fb8` 2026-05-17 |
-| `scripts/probe-akoya-org-disambiguation.js` | `5e5666d2` 2026-05-17 |
-| `scripts/probe-akoya-pi-fields.js` | `2bff193e` 2026-05-17 |
-| `scripts/probe-akoya-program-research-reviewer.js` | `09e81fdb` 2026-05-16 |
-| `scripts/probe-akoya-program-rollup-medical-research.js` | `747f06ae` 2026-05-16 |
-| `scripts/probe-akoya-purpose-dist.js` | `2207f92a` 2026-05-17 |
-| `scripts/probe-akoya-reviewer-billcom-rows.js` | `4103af79` 2026-05-16 |
+After the mandated live caller checks were re-run, the zero-reference SAFE cluster
+was removed: two orphan helper files, the dead exported symbols, the unsupported
+`MOCK_MODE` environment computation, and 20 one-off probe/fix scripts. Active docs,
+the BILL option-set probe/test, and `.env.example` were reconciled so the deleted
+symbols and unsupported env variable no longer appear as live contracts.
 
 ## NEEDS-OWNER-CONFIRMATION
 

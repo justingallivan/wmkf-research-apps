@@ -30,44 +30,6 @@ export function createRateLimiter(options = {}) {
 }
 
 /**
- * Create rate limiter for different tiers
- */
-export const rateLimiters = {
-  // Standard rate limit for general API calls
-  standard: createRateLimiter({
-    windowMs: 60 * 1000,
-    max: BASE_CONFIG.RATE_LIMITS.REQUESTS_PER_MINUTE
-  }),
-
-  // Strict rate limit for expensive operations
-  strict: createRateLimiter({
-    windowMs: 60 * 1000,
-    max: 10,
-    message: 'Too many requests for this resource. Please wait before trying again.'
-  }),
-
-  // Hourly rate limit
-  hourly: createRateLimiter({
-    windowMs: 60 * 60 * 1000,
-    max: BASE_CONFIG.RATE_LIMITS.REQUESTS_PER_HOUR
-  }),
-
-  // File upload rate limit
-  upload: createRateLimiter({
-    windowMs: 60 * 1000,
-    max: 30,
-    message: 'Too many file uploads. Please wait before uploading more files.'
-  }),
-
-  // AI processing rate limit
-  aiProcessing: createRateLimiter({
-    windowMs: 60 * 1000,
-    max: 20,
-    message: 'AI processing limit reached. Please wait before submitting more requests.'
-  })
-};
-
-/**
  * Custom rate limiter for Next.js API routes
  * @param {Object} options - Rate limiter options
  * @returns {Function} - Middleware function for Next.js
@@ -157,35 +119,4 @@ function cleanupStore(windowStart) {
       rateLimitStore.set(key, validRequests);
     }
   }
-}
-
-/**
- * Reset rate limits for a specific identifier
- * @param {string} identifier - Identifier to reset
- */
-export function resetRateLimit(identifier) {
-  rateLimitStore.delete(identifier);
-}
-
-/**
- * Get current rate limit status for an identifier
- * @param {string} identifier - Identifier to check
- * @param {Object} options - Rate limit options
- * @returns {Object} - Current status
- */
-export function getRateLimitStatus(identifier, options = {}) {
-  const windowMs = options.windowMs || 60 * 1000;
-  const max = options.max || BASE_CONFIG.RATE_LIMITS.REQUESTS_PER_MINUTE;
-  const now = Date.now();
-  const windowStart = now - windowMs;
-
-  const requests = rateLimitStore.get(identifier) || [];
-  const recentRequests = requests.filter(time => time > windowStart);
-
-  return {
-    limit: max,
-    remaining: Math.max(0, max - recentRequests.length),
-    reset: new Date(now + windowMs).toISOString(),
-    used: recentRequests.length
-  };
 }

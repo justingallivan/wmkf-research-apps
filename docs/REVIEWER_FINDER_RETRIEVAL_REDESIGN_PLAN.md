@@ -134,10 +134,10 @@ matters: **gate on exact identity first; disambiguate among real matches second.
   proposal's named competitors (protein design 10/12, neuroscience 9/12,
   geobiology 8/12) — evidence that parametric generation surfaces the obvious
   senior/named people rather than independent active reviewers.
-- `[VERIFIED]` `validateAnalysisResult` only warns (no count/dup/truncation
-  enforcement, no retry) (`shared/config/prompts/reviewer-finder.js:478`;
-  `claude-reviewer-service.js:203-233` returns `success:true` with the
-  validation attached even when `valid:false`).
+- `[VERIFIED]` the legacy analyze validator only warned (no count/dup/truncation
+  enforcement, no retry); it was later superseded by `validateReviewerAnalysis`.
+  At the time of this probe, `claude-reviewer-service.js:203-233` returned
+  `success:true` with validation attached even when `valid:false`.
 - **Sampling note:** **4 of 15 random draws (~1 in 4)** were
   **non-research/capital grants** (no reviewers needed) — must be filtered
   upstream. (Small sample; treat as a signal to filter, not a population rate.)

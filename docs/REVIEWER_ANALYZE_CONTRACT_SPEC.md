@@ -45,11 +45,12 @@ JSON/no-generation rewrite is deferred to the retrieval-first phase.
 
 ## Current behavior (pre-refinement; historical) `[HISTORICAL]`
 - `ClaudeReviewerService.analyzeProposal` (`lib/services/claude-reviewer-service.js`)
-  makes ONE LLM call, parses delimiter/markdown text via `parseAnalysisResponse`,
-  calls `validateAnalysisResult`, and **returns `success:true` with the validation
-  object attached even when `valid:false`** (`:203-233`). No retry.
-- `validateAnalysisResult` (`shared/config/prompts/reviewer-finder.js:478`) only
-  warns on: missing title, zero suggestions, zero queries.
+  made ONE LLM call, parsed delimiter/markdown text via `parseAnalysisResponse`,
+  called the legacy analysis validator, and **returned `success:true` with the
+  validation object attached even when `valid:false`** (`:203-233`). No retry.
+- The legacy validator only warned on missing title and zero suggestions. It was
+  superseded by `validateReviewerAnalysis()` and removed during the 2026-07-03
+  SAFE dead-code pass.
 - `_callLLM` returns `{text, model, usedFallback}` and **discards `stopReason`**,
   though `LLMClient` exposes it (`llm-client.js:366,385,504`,
   `stop_reason`/stream `delta.stop_reason`). `MAX_TOKENS=4096`.
@@ -72,9 +73,8 @@ JSON/no-generation rewrite is deferred to the retrieval-first phase.
 `_callLLM` returns `stopReason` (from `client.complete()`); `analyzeProposal`
 threads it so validation can detect truncation (`stopReason === 'max_tokens'`).
 
-### 2. Strengthen `validateAnalysisResult` with a mode-aware validator
-Keep `validateAnalysisResult(result)` exported for back-compat. Add a richer
-mode-aware validator with inputs:
+### 2. Use the mode-aware validator
+Use `validateReviewerAnalysis(result, opts)` as the mode-aware validator with inputs:
 `{ reviewerCount, stopReason, excludedNames, analysisPurpose }`. It produces
 `{ valid, issues:[{code,message,severity}], sanitizedResult, severity }`.
 Checks:

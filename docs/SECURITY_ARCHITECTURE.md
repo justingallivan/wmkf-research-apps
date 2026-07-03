@@ -669,7 +669,6 @@ Authentication is enforced at three levels — the server-side proxy, API route 
 | `requireAppAccess(req, res, ...appKeys)` | CSRF origin check + auth + profile + `is_active` check + app grant (OR logic). Returns `{ profileId, session }` or sends 401/403. App grants are cached in-memory (2-min TTL); `is_active` and the superuser role are read fresh every request (never cached). Disabled accounts blocked before superuser bypass. | App-specific API endpoints |
 | `requireAuthWithProfile(req, res)` | Auth + linked profile + `is_active` check (direct DB query, fail-open). Returns `profileId` or sends 401/403. Blocks request-body `profileId` injection in production. | User-scoped infrastructure (admin, preferences, app-access) |
 | `requireAuth(req, res)` | CSRF origin check + auth. Returns session or sends 401. | System endpoints (health, file upload, blob proxy) |
-| `optionalAuth(req, res)` | Returns session or null; no error response. | Public-optional routes |
 | `clearAppAccessCache([profileId])` | Invalidates cached app access; called on grant/revoke changes. | App access management endpoints |
 
 **Layer 3: Client-Side Guards**
@@ -1157,13 +1156,13 @@ All new server-side outbound HTTP requests should use `safeFetch` from `lib/util
 
 #### M5: CORS Wildcard on SSE Streaming Routes
 
-**Finding:** Server-Sent Events (SSE) streaming responses set `Access-Control-Allow-Origin: *` in the response handler (`shared/api/handlers/responseStreamer.js`). The `BASE_CONFIG.SECURITY.ALLOWED_ORIGINS` also defaults to `['*']` if the `ALLOWED_ORIGINS` env var is not set.
+**Finding:** Server-Sent Events (SSE) streaming responses set `Access-Control-Allow-Origin: *` in the legacy shared response handler. The `BASE_CONFIG.SECURITY.ALLOWED_ORIGINS` also defaults to `['*']` if the `ALLOWED_ORIGINS` env var is not set.
 
-**Location:** `shared/api/handlers/responseStreamer.js`, `shared/config/baseConfig.js`
+**Location:** Legacy shared SSE helper (removed 2026-07-03), `shared/config/baseConfig.js`
 
 **Risk:** Overly permissive CORS allows any origin to make requests to API endpoints. While authentication still provides access control, a browser-based attack from a malicious site could make API calls on behalf of authenticated users.
 
-**Status: REMEDIATED.** The `Access-Control-Allow-Origin: *` header was removed from `next.config.js` global headers and 10 inline SSE endpoints (Session 62), and from the shared `ResponseStreamer` class (Session 66). All SSE requests are same-origin and do not require CORS headers.
+**Status: REMEDIATED.** The `Access-Control-Allow-Origin: *` header was removed from `next.config.js` global headers and 10 inline SSE endpoints (Session 62), then from the legacy shared SSE helper (Session 66). The unused helper was deleted in the 2026-07-03 SAFE dead-code pass. All SSE requests are same-origin and do not require CORS headers.
 
 #### M6: Internal Error Messages Leaked to Clients
 

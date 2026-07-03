@@ -161,9 +161,6 @@ export const APP_REGISTRY = [
 /** All app keys for convenience */
 export const ALL_APP_KEYS = APP_REGISTRY.map(app => app.key);
 
-/** Paths that are always accessible (no app grant required) */
-export const ALWAYS_ACCESSIBLE = ['/', '/admin', '/guide', '/profile-settings', '/auth/signin', '/auth/error'];
-
 /** App keys granted to new users by default */
 export const DEFAULT_APP_GRANTS = ['dynamics-explorer'];
 

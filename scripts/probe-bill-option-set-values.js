@@ -5,7 +5,6 @@
  * `wmkf_exisitngbillcomaccount` so they can be set as env vars:
  *   BILLCOM_ACCOUNT_YES_VALUE
  *   BILLCOM_ACCOUNT_NO_VALUE
- *   BILLCOM_ACCOUNT_RECENTLY_CONFIRMED_VALUE
  *
  * Usage:
  *   node --env-file=.env.local scripts/probe-bill-option-set-values.js
@@ -51,7 +50,6 @@ async function main() {
     let envName = null;
     if (/^yes$/i.test(label)) envName = 'BILLCOM_ACCOUNT_YES_VALUE';
     else if (/^no$/i.test(label)) envName = 'BILLCOM_ACCOUNT_NO_VALUE';
-    else if (/recently\s*confirmed/i.test(label)) envName = 'BILLCOM_ACCOUNT_RECENTLY_CONFIRMED_VALUE';
     if (envName) console.log(`  ${envName}=${opt.Value}`);
   }
 }

@@ -1,4 +1,4 @@
-# Session 323 Prompt: Act on remaining S322 audit decisions (or pick up B2)
+# Session 323 Prompt: Act on remaining S322 audit decisions
 
 ## Session 322 Summary
 
@@ -13,7 +13,8 @@ were caught wrong during main-session re-verification and corrected in place
 1. **Dead-code deletion manifest** (`docs/DEAD_CODE_DELETION_MANIFEST.md`, `16185334`).
    Four parallel scans + hand re-verification. SAFE bucket: 2 orphan files, ~20 dead
    exports, `MOCK_MODE` config, 20 one-off scripts. NEEDS-OWNER: 3 unwired API routes,
-   D26 retire-together cluster, 4 one-way flags, 27 weaker scripts. Nothing deleted.
+   D26 retire-together cluster, 4 one-way flags, 27 weaker scripts. SAFE bucket deleted
+   on 2026-07-03 after live caller checks.
    Caught scan false positive: `lib/seed/email-defaults/reviewer-reminders.js` is live
    (imported at `scripts/seed-email-defaults.mjs:23`).
 
@@ -62,13 +63,6 @@ were caught wrong during main-session re-verification and corrected in place
 
 ## Next Items
 
-### Verified Open
-
-1. **B2 — enrichment-timeout partial-return.**
-   Evidence: `lib/services/contact-enrichment-service.js:1356` (S321 anchor; file
-   untouched in S322 but re-confirm the line), `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md`
-   §B2. Last open item on the reviewer-email reliability track.
-
 ### Completed This Session
 
 1. **Mechanical docs-drift fixes (S322 audit items 1-3).**
@@ -88,20 +82,26 @@ were caught wrong during main-session re-verification and corrected in place
    legacy/config env knobs; `.env.example` has local placeholders for the toggles an
    operator would plausibly set; `CLAUDE.md` now lists `modules/`, `outputs/`, and
    `_archived/`.
+4. **B2 enrichment-timeout partial-return shipped and plan tails deprecated.**
+   `ContactEnrichmentService.enrichCandidates()` now has opt-in
+   `returnPartialOnAbort`; `/api/reviewer-finder/enrich-contacts` opts in and streams
+   completed-prefix results as a partial `complete` SSE frame. The reviewer email
+   persist plan now marks remaining measurement/reconsideration tails
+   CLOSED-DEPRECATED; do not keep carrying the no-email re-measure as housekeeping.
+5. **SAFE dead-code bucket deleted after live caller checks.**
+   Removed the two orphan files, dead exports, dead `MOCK_MODE` computation, and 20
+   one-off scripts from `docs/DEAD_CODE_DELETION_MANIFEST.md`; reconciled active docs
+   and env/test/probe references so deleted helpers and unsupported env vars no
+   longer appear as live contracts.
 
 ### Owner Decision Needed
 
-1. **Dead-code deletion pass** — approve the SAFE bucket and/or triage the NEEDS-OWNER
-   bucket. Evidence: `docs/DEAD_CODE_DELETION_MANIFEST.md` (execution protocol inside;
-   re-run caller checks live before deleting — anchors are at `7d3be6a1`).
-2. **Whether to delete merged remote Codex branches** (carryover S320; verify merged first).
+1. **Whether to delete merged remote Codex branches** (carryover S320; verify merged first).
    Evidence: `git ls-remote --heads origin codex/referral-seeding-build codex/program-area-normalization`.
 
 ### Measure Later (time-driven, not work-driven)
 
-1. **`scripts/probe-no-email-breakdown.mjs 120`** after a few weeks of enrichment cycles
-   (email-gate redesign shipped S321; flag ON since 2026-07-03).
-2. **`scripts/probe-institution-coi-breakdown.mjs 120`** once `coi_dropped` ledger rows
+1. **`scripts/probe-institution-coi-breakdown.mjs 120`** once `coi_dropped` ledger rows
    accumulate (validates Phase C thresholds).
 
 ### Parked

@@ -187,25 +187,6 @@ export function TokenActionsMenu({ reviewer, onRegenerate, onRevoke, onMarkRecei
   );
 }
 
-// ─── Status Summary Chips ───────────────────────────────────────────────────
-
-export function StatusSummary({ statusSummary }) {
-  if (!statusSummary || Object.keys(statusSummary).length === 0) return null;
-  return (
-    <div className="flex flex-wrap gap-1">
-      {STATUS_PIPELINE.map(s => {
-        const count = statusSummary[s.key];
-        if (!count) return null;
-        return (
-          <span key={s.key} className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${s.color}`}>
-            {count} {s.label.toLowerCase()}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
 // ─── Email Modal ────────────────────────────────────────────────────────────
 
 const EMAIL_FIELDS_STORAGE_KEY = 'review_manager_email_fields';

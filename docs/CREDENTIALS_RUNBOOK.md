@@ -149,7 +149,7 @@ Automated BILL onboarding is disabled unless `BILL_ENABLED=true`; the current no
 | `BILL_WEBHOOK_SECRET` | HMAC secret for `/api/webhooks/bill` (`x-bill-sha-signature`). | Required outside development for BILL webhook verification; tracked as `bill_webhook_secret` |
 | `BILL_WEBHOOK_DEBUG` | Logs a redacted raw payload sample for sandbox payload-shape discovery. | unset/`false`; use only in sandbox because BILL payloads contain vendor PII |
 | `BILL_INTEGRATION_SECRET` | Internal HMAC secret for same-deployment calls to `/api/bill/onboard-reviewer`. | Required for the HTTP endpoint; tracked as `bill_integration_secret`; generate with `openssl rand -base64 48` |
-| `BILLCOM_ACCOUNT_YES_VALUE` / `BILLCOM_ACCOUNT_NO_VALUE` / `BILLCOM_ACCOUNT_RECENTLY_CONFIRMED_VALUE` | Dataverse option-set integer values for `wmkf_exisitngbillcomaccount`. | Probe per environment with `node scripts/probe-bill-option-set-values.js`; `YES` and `NO` are required when `BILL_ENABLED=true` |
+| `BILLCOM_ACCOUNT_YES_VALUE` / `BILLCOM_ACCOUNT_NO_VALUE` | Dataverse option-set integer values for `wmkf_exisitngbillcomaccount`. | Probe per environment with `node scripts/probe-bill-option-set-values.js`; required when `BILL_ENABLED=true` |
 
 ### Optional — Operational Flags
 

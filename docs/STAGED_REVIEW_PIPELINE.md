@@ -197,7 +197,7 @@ Each model receives:
 Each model completes the WMKF reviewer form with:
 - `keyUncertaintyResolution` field: what single piece of information would most change this assessment?
 - `proposalClassification` field: confirm or refine classification
-- All existing fields from `REVIEWER_FORM_QUESTIONS`
+- All existing fields from the Virtual Review Panel structured-review prompt
 
 #### Devil's Advocate Pass (single additional call)
 One model (rotate between runs to avoid systematic bias) is prompted adversarially:

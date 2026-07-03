@@ -536,8 +536,4 @@ export function useProfile() {
   return context;
 }
 
-export function useProfileId() {
-  return useProfile().profileId;
-}
-
 export default ProfileContext;

@@ -133,17 +133,3 @@ export default function RequireAuth({ children }) {
   // Authenticated and profile linked - render children
   return children;
 }
-
-/**
- * Hook for checking authentication in API routes
- * Use getServerSession from next-auth/next instead for server-side auth checks
- */
-export function useRequireAuth() {
-  const { data: session, status } = useSession();
-  return {
-    session,
-    isLoading: status === 'loading',
-    isAuthenticated: status === 'authenticated',
-    profileId: session?.user?.profileId,
-  };
-}

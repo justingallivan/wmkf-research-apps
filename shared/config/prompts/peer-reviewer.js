@@ -177,25 +177,3 @@ export function extractReviewerInfo(reviewText) {
   
   return info;
 }
-
-/**
- * Format peer review summary with metadata
- * @param {string} summary - The raw summary text
- * @param {number} reviewCount - Number of reviews analyzed
- * @returns {string} - Formatted markdown summary
- */
-export function formatPeerReviewSummary(summary, reviewCount) {
-  const date = new Date().toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'long',
-    day: 'numeric'
-  });
-  
-  let formatted = `# Peer Review Analysis\n`;
-  formatted += `**Analysis Date:** ${date}\n`;
-  formatted += `**Number of Reviews:** ${reviewCount}\n\n`;
-  formatted += '---\n\n';
-  formatted += summary;
-  
-  return formatted;
-}

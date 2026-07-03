@@ -157,18 +157,15 @@ export function getEnvironmentConfig() {
   const envConfigs = {
     development: {
       DEBUG: true,
-      VERBOSE_ERRORS: true,
-      MOCK_MODE: process.env.MOCK_MODE === 'true'
+      VERBOSE_ERRORS: true
     },
     production: {
       DEBUG: false,
-      VERBOSE_ERRORS: false,
-      MOCK_MODE: false
+      VERBOSE_ERRORS: false
     },
     test: {
       DEBUG: true,
-      VERBOSE_ERRORS: true,
-      MOCK_MODE: true
+      VERBOSE_ERRORS: true
     }
   };
 

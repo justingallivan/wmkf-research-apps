@@ -65,55 +65,6 @@ export const STORAGE_KEYS = {
 };
 
 /**
- * Resolve a stored cycle preference value (either legacy integer-shape from
- * pre-W3 Postgres `grant_cycles.id` OR new shortcode-shape like `"J26"`)
- * against a list of cycle objects.
- *
- * Returns:
- *   { cycle, needsWriteback }
- *     cycle           — the matched cycle object, or null if neither shape resolves
- *     needsWriteback  — true if the stored value was in the legacy integer shape
- *                       AND a matching cycle was found. Callers should
- *                       opportunistically rewrite storage to the shortcode shape
- *                       (`cycle.shortCode`) on next access.
- *
- * Tolerant-reader pattern for the preference-shape migration documented in
- * `docs/REVIEWER_POSTGRES_TO_DATAVERSE_PLAN.md` § "Rollout-safety policy for
- * the preference-shape migration". The tolerant branch is intended to be
- * removed ≥1 week post-deploy once telemetry confirms no integer-shaped
- * values remain in stored prefs.
- */
-export function resolveStoredCycle(storedValue, allCycles) {
-  if (storedValue === null || storedValue === undefined || storedValue === '') {
-    return { cycle: null, needsWriteback: false };
-  }
-  if (!Array.isArray(allCycles) || allCycles.length === 0) {
-    return { cycle: null, needsWriteback: false };
-  }
-
-  const raw = String(storedValue).trim();
-  if (!raw) return { cycle: null, needsWriteback: false };
-  const asInt = parseInt(raw, 10);
-  const isPureInteger = !Number.isNaN(asInt) && String(asInt) === raw;
-
-  if (isPureInteger) {
-    const cycle = allCycles.find(c => c.id === asInt);
-    return { cycle: cycle || null, needsWriteback: !!cycle };
-  }
-
-  const cycle = allCycles.find(c => c.shortCode === raw);
-  return { cycle: cycle || null, needsWriteback: false };
-}
-
-/**
- * Format a cycle for storage in the preference. Always returns the shortcode
- * string. Writers must call this — never store `cycle.id` directly.
- */
-export function formatCycleForStorage(cycle) {
-  return cycle?.shortCode || '';
-}
-
-/**
  * Default values for settings
  */
 export const DEFAULT_VALUES = {

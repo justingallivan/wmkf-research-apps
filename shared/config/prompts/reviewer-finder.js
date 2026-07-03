@@ -553,17 +553,3 @@ export function validateReviewerAnalysis(result, opts = {}) {
     placeholderCount: placeholderSuggestions.length,
   };
 }
-
-/**
- * Validation helper - check if analysis result is usable
- */
-export function validateAnalysisResult(result) {
-  const issues = [];
-  if (!result.proposalInfo?.title) issues.push('Missing proposal title');
-  if (!result.reviewerSuggestions || result.reviewerSuggestions.length === 0) issues.push('No reviewer suggestions generated');
-
-  return {
-    valid: issues.length === 0,
-    issues
-  };
-}
