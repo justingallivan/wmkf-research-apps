@@ -29,11 +29,16 @@ process.stdin.on('end', () => {
     if (tool !== 'Task' && tool !== 'Agent') return;
 
     // Confirm this was a Codex subagent (subagent_type 'codex:*'), not some other
-    // Task/Agent invocation. Check the structured field, fall back to a substring
-    // scan of the whole tool_input so a renamed field still trips it.
+    // Task/Agent invocation. When the structured field is present it is
+    // authoritative — a non-codex subagent whose prompt merely MENTIONS Codex must
+    // not trip this (S322: it fired on a plain inventory agent via the old
+    // whole-input substring scan). The substring fallback survives only for the
+    // renamed/missing-field case it was built for.
     const ti = data.tool_input || {};
-    const subagent = typeof ti.subagent_type === 'string' ? ti.subagent_type : '';
-    const looksCodex = /codex/i.test(subagent) || /codex/i.test(JSON.stringify(ti));
+    const hasSubagentField = typeof ti.subagent_type === 'string' && ti.subagent_type.length > 0;
+    const looksCodex = hasSubagentField
+      ? /codex/i.test(ti.subagent_type)
+      : /codex/i.test(JSON.stringify(ti));
     if (!looksCodex) return;
 
     const msg =

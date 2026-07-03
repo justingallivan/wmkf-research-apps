@@ -38,6 +38,15 @@ process.stdin.on('end', () => {
       staged = execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: root, stdio: ['ignore', 'pipe', 'ignore'] })
         .toString().split('\n').map((s) => s.trim()).filter(Boolean);
     } catch { return; }
+    if (staged.length === 0) {
+      // PreToolUse runs before the command, so a compound `git add X && git commit`
+      // has an empty index here (S322). Fall back to path-like tokens in the
+      // command so the checklist still tailors to the surface being committed.
+      staged = cmd
+        .split(/\s+/)
+        .map((t) => t.replace(/^["']+|["']+$/g, ''))
+        .filter((t) => /^[\w.@-]+(\/[\w.@-]+)*\.\w+$/.test(t) || /^[\w.@-]+\//.test(t));
+    }
     if (staged.length === 0) return;
 
     const isApi = staged.some((f) => /^pages\/api\/.*\.[jt]sx?$/.test(f));

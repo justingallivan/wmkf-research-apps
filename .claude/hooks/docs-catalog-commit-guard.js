@@ -21,6 +21,18 @@ function stagedPaths(root) {
   return out.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
 }
 
+// PreToolUse fires BEFORE the Bash command runs, so in a compound
+// `git add X && git commit` nothing is staged yet and the index read alone
+// misses X (S322: two stale-catalog commits passed this way). Path-like tokens
+// from the command string close that gap; the union keeps the plain
+// `git add` -> separate `git commit` flow covered by the index as before.
+function pathsFromCommand(cmd) {
+  return String(cmd)
+    .split(/\s+/)
+    .map((t) => t.replace(/^["']+|["']+$/g, ''))
+    .filter((t) => /^[\w.@-]+(\/[\w.@-]+)*\.\w+$/.test(t) || /^[\w.@-]+\//.test(t));
+}
+
 function touchesCatalogSurface(rel) {
   if (/^docs\/[^/]+\.md$/.test(rel)) return true;
   if (rel === 'package.json') return true;
@@ -46,7 +58,8 @@ process.stdin.on('end', () => {
     if (!isGitCommit(cmd)) return;
 
     const root = path.resolve(data.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd());
-    const relevant = stagedPaths(root).filter(touchesCatalogSurface);
+    const candidates = new Set([...stagedPaths(root), ...pathsFromCommand(cmd)]);
+    const relevant = [...candidates].filter(touchesCatalogSurface);
     if (!relevant.length) return;
 
     try {
