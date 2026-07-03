@@ -220,6 +220,55 @@ describe('ClaudeReviewerService.analyzeProposal payload boundary', () => {
     expect(ClaudeReviewerService._callLLM).toHaveBeenCalledTimes(1);
   });
 
+  test('request context slims metadata inference and overwrites parsed proposalInfo', async () => {
+    let sentPrompt = '';
+    ClaudeReviewerService._callLLM = jest.fn(async ({ prompt }) => {
+      sentPrompt = prompt;
+      return {
+        text: analysisResponse({
+          title: 'LLM Title',
+          reviewers: [reviewer('Dr. One Reviewer')],
+        }),
+        usedFallback: false,
+        model: 'claude-test',
+        stopReason: 'end_turn',
+      };
+    });
+
+    const result = await ClaudeReviewerService.analyzeProposal('A useful proposal body'.repeat(20), 'sk-ant-test', {
+      reviewerCount: 1,
+      requestContext: {
+        title: 'Dataverse Title',
+        programArea: 'Medical Research',
+        principalInvestigator: 'Dr. Real PI',
+        proposalAuthors: 'Dr. Real PI',
+        coInvestigators: 'Dr. Co One, Dr. Co Two',
+        coInvestigatorCount: '2',
+        authorInstitution: 'Real University',
+        abstract: 'Dataverse abstract.',
+      },
+    });
+
+    expect(result.success).toBe(true);
+    expect(sentPrompt).toContain('TRUSTED REQUEST METADATA');
+    expect(sentPrompt).toContain('TITLE: Dataverse Title');
+    expect(sentPrompt).not.toContain('PROGRAM_AREA');
+    expect(sentPrompt).not.toContain('Medical Research');
+    expect(sentPrompt).not.toContain('TITLE: [Complete proposal title]');
+    expect(sentPrompt).not.toContain('PROGRAM_AREA: [The Keck Foundation program');
+    expect(sentPrompt).toContain('PRIMARY_RESEARCH_AREA: [Main scientific discipline]');
+    expect(result.proposalInfo).toMatchObject({
+      title: 'Dataverse Title',
+      programArea: 'Medical Research',
+      principalInvestigator: 'Dr. Real PI',
+      proposalAuthors: 'Dr. Real PI',
+      coInvestigators: 'Dr. Co One, Dr. Co Two',
+      coInvestigatorCount: '2',
+      authorInstitution: 'Real University',
+      abstract: 'Dataverse abstract.',
+    });
+  });
+
   test('duplicate reviewer names are flagged via the shared normalizer', () => {
     const validation = validateReviewerAnalysis({
       proposalInfo: { title: 'Example' },

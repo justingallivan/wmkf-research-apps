@@ -245,7 +245,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md](REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md) | audit | active |  | The reviewer-finder analyze prompt re-extracts request metadata Dataverse already holds; an over-long LLM program area 400s the save. Fix directions inside. | 2026-07-02 |
+| [REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md](REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md) | audit | active |  | Reviewer analyze now sources request metadata from Dataverse and normalizes program-area writes instead of trusting LLM metadata extraction. | 2026-07-02 |
 | [REVIEWER_EMAIL_PERSIST_FIX_PLAN.md](REVIEWER_EMAIL_PERSIST_FIX_PLAN.md) | plan | active |  | Reviewer Invite-tab no-email fix: B1 (applicant-promote persists vetted email) + A (reconciliation cron backstop) SHIPPED; B2 (partial-return) DEFERRED. | 2026-07-02 |
 | [REVIEWER_REFERRAL_SEEDING_DESIGN.md](REVIEWER_REFERRAL_SEEDING_DESIGN.md) | plan | active |  | Locked build plan: guarantee externally-referred seed names into the reviewer pool (seed-only, folded-in); relabel two existing kinds, no new enum. | 2026-07-02 |
 

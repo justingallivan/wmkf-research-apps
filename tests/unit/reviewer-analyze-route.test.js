@@ -19,11 +19,24 @@ jest.mock('../../lib/services/claude-reviewer-service', () => ({
     analyzeProposal: jest.fn(),
   },
 }));
+jest.mock('../../lib/services/reviewer-request-context', () => ({
+  loadReviewerRequestContext: jest.fn(async () => ({
+    title: 'Dataverse Title',
+    programArea: 'Science and Engineering Research',
+    principalInvestigator: 'Dr. PI',
+    proposalAuthors: 'Dr. PI',
+    coInvestigators: 'None',
+    coInvestigatorCount: '0',
+    authorInstitution: 'Applicant University',
+    abstract: 'Dataverse abstract',
+  })),
+}));
 jest.mock('@vercel/blob', () => ({
   put: jest.fn(),
 }));
 
 const { ClaudeReviewerService } = require('../../lib/services/claude-reviewer-service');
+const { loadReviewerRequestContext } = require('../../lib/services/reviewer-request-context');
 
 function mockRes() {
   const res = {};
@@ -40,6 +53,7 @@ function mockRes() {
 describe('/api/reviewer-finder/analyze', () => {
   let handler;
   const oldApiKey = process.env.CLAUDE_API_KEY;
+  const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 
   beforeAll(() => {
     handler = require('../../pages/api/reviewer-finder/analyze').default;
@@ -72,6 +86,7 @@ describe('/api/reviewer-finder/analyze', () => {
     const req = {
       method: 'POST',
       body: {
+        requestId: REQUEST_ID,
         proposalText: 'This proposal has enough text for analysis. '.repeat(10),
         reviewerCount: 6,
       },
@@ -86,5 +101,25 @@ describe('/api/reviewer-finder/analyze', () => {
     expect(stream).toContain('"retryable":true');
     expect(stream).not.toContain('event: result\n');
     expect(stream).not.toContain('event: complete\n');
+    expect(loadReviewerRequestContext).toHaveBeenCalledWith(REQUEST_ID);
+  });
+
+  test('missing requestId emits an SSE error without calling Claude', async () => {
+    const req = {
+      method: 'POST',
+      body: {
+        proposalText: 'This proposal has enough text for analysis. '.repeat(10),
+        reviewerCount: 6,
+      },
+    };
+    const res = mockRes();
+
+    await handler(req, res);
+
+    const stream = res.write.mock.calls.map(call => call[0]).join('');
+    expect(stream).toContain('event: error\n');
+    expect(stream).toContain('requestId is required for reviewer analysis');
+    expect(ClaudeReviewerService.analyzeProposal).not.toHaveBeenCalled();
+    expect(loadReviewerRequestContext).not.toHaveBeenCalled();
   });
 });

@@ -206,14 +206,16 @@ bare keyword→author lane is what underperformed.
 - **Results list has a Rank⇄A–Z sort toggle (S318, shipped).** Default is
   confidence/relevance rank; A–Z sorts by name *within* each provenance group (grouping
   preserved). `ReviewerSearchSection.js` `sortMode`.
-- **Analyze PART 1 re-extracts request metadata Dataverse already owns (OPEN, S318).**
-  Title/PI/Co-PIs/institution/program/abstract are all authoritative on `akoya_request`,
-  yet the LLM re-derives them from the PDF (historical: the finder predates the
-  Dataverse-native entry path). This caused a prod save crash — an over-long LLM
-  `PROGRAM_AREA` 400s the 100-char `wmkf_programarea` field. A truncating clamp is
-  deployed as a band-aid (`reviewer-suggestion.js clampProgramArea`, `0aa7c1d1`); the real
-  fix (normalize, and/or source metadata from the request) is parked. Full context +
-  file:line pointers: `docs/REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md`.
+- **Analyze request metadata now comes from Dataverse; `requestId` is required (S319).**
+  Title/PI/Co-PIs/institution/abstract are authoritative on `akoya_request`, so the analyze
+  route loads them via `reviewer-request-context.js`, the prompt is slimmed to scientific
+  context + reviewer suggestions, and parsed `proposalInfo` is overlaid with trusted
+  metadata before consumers see it. Program area remains app-owned Dataverse metadata for
+  downstream save compatibility, but is omitted from the prompt entirely. The old
+  `PROGRAM_AREA` crash class is also closed at the write boundary:
+  `normalizeSuggestionProgramArea()` preserves short labels and drops overlong/placeholder
+  values instead of truncating them. Full context:
+  `docs/REVIEWER_ANALYZE_PROMPT_METADATA_ISSUE.md`.
 - **Suggestion data is cleaned at ONE chokepoint — `DiscoveryService.normalizeSuggestionSource` (S266).**
   An unverified honorific is stripped from the display name (`stripHonorifics`) and a
   non-page website (e.g. a co-author's paper PDF) is nulled (`sanitizeWebsiteForCandidate`),
