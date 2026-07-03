@@ -93,11 +93,10 @@ were caught wrong during main-session re-verification and corrected in place
    one-off scripts from `docs/DEAD_CODE_DELETION_MANIFEST.md`; reconciled active docs
    and env/test/probe references so deleted helpers and unsupported env vars no
    longer appear as live contracts.
-
-### Owner Decision Needed
-
-1. **Whether to delete merged remote Codex branches** (carryover S320; verify merged first).
-   Evidence: `git ls-remote --heads origin codex/referral-seeding-build codex/program-area-normalization`.
+6. **Merged remote Codex branches deleted.**
+   Live `git ls-remote` confirmed `codex/referral-seeding-build` and
+   `codex/program-area-normalization` existed; both tips were verified ancestors of
+   `main`, then deleted from origin. Follow-up `git ls-remote` returned no heads.
 
 ### Measure Later (time-driven, not work-driven)
 
