@@ -199,9 +199,10 @@ bare keyword→author lane is what underperformed.
   `ANALYZE_INTEGRITY_BLOCK` (return FEWER rather than include an unresolvable name), and
   discover-stage verification/ranking. A PD pasting a known-names list into notes will get
   only *some* back — expected, not a bug. Guaranteeing referred/PD-recommended names must
-  be a **code-owned seed path**, not prompt wording. Design (draft, not built; two labels
-  on existing kinds — `referred` → "Externally-Referred", `applicant_suggested` →
-  "Applicant-Referred", no new enum): `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md`.
+  be a **code-owned seed path**, not prompt wording. Plan (LOCKED, not yet built;
+  seed-only, folded-in; two labels on existing kinds — `referred` → "Externally-Referred",
+  `applicant_suggested` → "Applicant-Referred", no new enum):
+  `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md`.
 - **Results list has a Rank⇄A–Z sort toggle (S318, shipped).** Default is
   confidence/relevance rank; A–Z sorts by name *within* each provenance group (grouping
   preserved). `ReviewerSearchSection.js` `sortMode`.

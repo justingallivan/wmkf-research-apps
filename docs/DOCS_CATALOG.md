@@ -246,7 +246,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [REVIEWER_EMAIL_PERSIST_FIX_PLAN.md](REVIEWER_EMAIL_PERSIST_FIX_PLAN.md) | plan | active |  | Reviewer Invite-tab no-email fix: B1 (applicant-promote persists vetted email) + A (reconciliation cron backstop) SHIPPED; B2 (partial-return) DEFERRED. | 2026-07-02 |
-| [REVIEWER_REFERRAL_SEEDING_DESIGN.md](REVIEWER_REFERRAL_SEEDING_DESIGN.md) | plan | draft |  | Guarantee externally-referred names into the reviewer pool via a code-owned seed path; two labels (Externally-Referred / Applicant-Referred) on existing kinds. | 2026-07-02 |
+| [REVIEWER_REFERRAL_SEEDING_DESIGN.md](REVIEWER_REFERRAL_SEEDING_DESIGN.md) | plan | active |  | Locked build plan: guarantee externally-referred seed names into the reviewer pool (seed-only, folded-in); relabel two existing kinds, no new enum. | 2026-07-02 |
 
 ## security-auth
 
