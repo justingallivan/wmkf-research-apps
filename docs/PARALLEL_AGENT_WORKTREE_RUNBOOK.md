@@ -113,7 +113,10 @@ Give Codex a self-contained brief. The S298 template that worked:
     hard-fails on that.
   - Register + gate any new API route (`docs/API_ROUTE_SECURITY_MATRIX.md` +
     `npm run check:api-routes`) — but prefer not adding one if avoidable.
-  - Commit to the branch with descriptive messages; **do not push to `main`.**
+  - Commit to the branch with descriptive messages, and **push the branch itself**
+    (`git push -u origin codex/<slug>`) — pushing a *feature* branch is safe and does
+    NOT deploy (only `main` deploys); it makes the work recoverable from any machine.
+    **Do not push to `main`.**
 
 ## Step 5 — Work in parallel
 
@@ -160,6 +163,17 @@ git push                                        # triggers Vercel deploy
 vercel inspect <url>                            # confirm deploy (don't poll-grep `vercel ls`)
 ```
 
+**Before disposing, push the branch if it isn't fully on `origin`.** Both options
+below move off (or delete) `codex/<slug>`; a commit that was never pushed and isn't
+merged to `main` then survives **only in this machine's `.git`** and is unrecoverable
+elsewhere (S318: a parked docs branch stranded on one computer). Guard:
+```bash
+git -C ../WMKF_Apps-codex log --oneline @{upstream}..HEAD 2>/dev/null   # unpushed commits?
+git -C ../WMKF_Apps-codex push -u origin codex/<slug>                   # push if any (or no upstream)
+```
+This is mandatory when the branch is **parked for later** review rather than merged
+now — the merge is otherwise the only thing that preserves it.
+
 **Then dispose of the worktree — two options:**
 
 *Keep & reuse (preferred for a recurring workflow).* Leave the directory in place
@@ -186,6 +200,8 @@ git branch -d codex/<slug>
 - **`.codex/`** (the agent's own session dir) is untracked and **blocks
   `git worktree remove`** → use `--force`.
 - **`main` auto-deploys** → keep work on the branch; merge is the deliberate deploy.
+- **Unpushed, unmerged branch lives only on its machine** → push the feature branch
+  (safe; doesn't deploy) before parking/teardown, especially when parked for later.
 - **Cloud-synced folders** corrupt `.git` → keep repo + worktrees out of them.
 - **Disjoint surfaces are the real safety** — the worktree isolates the *working
   directory*, but two branches editing the same file still conflict at merge.

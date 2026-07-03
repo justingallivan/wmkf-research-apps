@@ -80,7 +80,10 @@ Give a self-contained brief. Template that worked in S298:
     hard-fails on fabricated literals.
   - Register + gate any new API route (`docs/API_ROUTE_SECURITY_MATRIX.md` +
     `npm run check:api-routes`) — but prefer not adding one if avoidable.
-  - Commit to the branch with descriptive messages; **do not push to `main`.**
+  - Commit to the branch with descriptive messages, and **push the branch itself**
+    (`git push -u origin codex/<task-slug>`) — pushing a *feature* branch is safe and
+    does NOT deploy (only `main` deploys). This is what makes the work recoverable
+    from any machine. **Do not push to `main`.**
 
 ## Step 4 — During parallel work
 
@@ -121,6 +124,19 @@ git push                                  # triggers Vercel deploy
 vercel inspect <url>                      # confirm deploy (don't poll-grep `vercel ls`)
 ```
 
+**Before disposing, push the branch if it isn't fully on `origin`.** Both options
+below move off (or delete) `codex/<task-slug>`; a commit that was never pushed and
+isn't merged to `main` then survives **only on this machine's `.git`** and is
+unrecoverable elsewhere (S318: a parked docs branch stranded on one computer). Guard:
+
+```bash
+git -C ../<repo>-codex log --oneline @{upstream}..HEAD 2>/dev/null   # unpushed commits?
+git -C ../<repo>-codex push -u origin codex/<task-slug>              # push if any (or no upstream)
+```
+
+Always do this when the branch is being **parked for later** (reviewed/merged another
+day) rather than merged now — the merge itself is what would otherwise preserve it.
+
 **Dispose of the worktree — two options:**
 
 *Keep & reuse (preferred for a recurring workflow)* — leave the directory with its
@@ -144,5 +160,8 @@ git branch -d codex/<task-slug>
 - `.codex/` (the agent's session dir) is untracked and blocks `git worktree remove`
   → use `--force`.
 - `main` auto-deploys → keep work on the branch; the merge is the deliberate deploy.
+- An unpushed, unmerged branch lives only in the machine that made it → **push the
+  feature branch** (safe; doesn't deploy) before parking/teardown, especially when
+  the work is parked for later review rather than merged now.
 - Disjoint surfaces are the real safety; the worktree only isolates the working
   directory, not merge-time overlap on the same file.
