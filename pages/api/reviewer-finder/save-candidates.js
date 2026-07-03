@@ -85,6 +85,49 @@ function contactBlockedForUnresolvedExempt(candidate, enrichment) {
     && !hasResolvedIdentity(candidate, enrichment);
 }
 
+function sameId(a, b) {
+  return !!a && !!b && String(a).toLowerCase() === String(b).toLowerCase();
+}
+
+async function resolveValidatedReferredSeedAnchor(candidate, enrichment) {
+  const provenance = buildReviewerProvenance(candidate);
+  if (provenance.kind !== 'referred') return null;
+  const potentialReviewerId = typeof candidate.seedResolvedPotentialReviewerId === 'string'
+    ? candidate.seedResolvedPotentialReviewerId.trim()
+    : '';
+  if (!potentialReviewerId) return null;
+
+  const email = candidate.email || enrichment?.email || null;
+  const orcid = candidate.orcid || enrichment?.orcidId || enrichment?.orcid || null;
+  if (!email && !orcid) return null;
+
+  let current = null;
+  try {
+    current = await potentialReviewerAdapter.getById(potentialReviewerId);
+  } catch {
+    return null;
+  }
+  if (!current) return null;
+
+  const lookup = await lookupReviewerIdentity({
+    name: candidate.name,
+    email,
+    orcid,
+  });
+  if (
+    lookup?.outcome === 'confident'
+    && sameId(lookup.match?.reviewerId, potentialReviewerId)
+    && (lookup.match?.matchKey === 'email' || lookup.match?.matchKey === 'orcid')
+  ) {
+    return {
+      potentialReviewerId,
+      contactId: lookup.match?.contactId || current._wmkf_contact_value || null,
+      lookup,
+    };
+  }
+  return null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -182,9 +225,17 @@ export default async function handler(req, res) {
           .trim();
 
         const enrichment = candidate.contactEnrichment || {};
+        let validatedSeedAnchor = null;
+        if (!pdConfirmed) {
+          try {
+            validatedSeedAnchor = await resolveValidatedReferredSeedAnchor(candidate, enrichment);
+          } catch (anchorErr) {
+            console.warn('[save-candidates] referred seed anchor validation failed (non-fatal):', anchorErr?.message || anchorErr);
+          }
+        }
         // Codex HIGH: an unresolved cited/PI-named row saves as a name row only — force ALL
         // contact + identity-derived fields to null (it could be a namesake of the named person).
-        const contactBlocked = !pdConfirmed && contactBlockedForUnresolvedExempt(candidate, enrichment);
+        const contactBlocked = !pdConfirmed && !validatedSeedAnchor && contactBlockedForUnresolvedExempt(candidate, enrichment);
         // PD-confirmed contact is hand-entered by definition — FORCE source 'manual'
         // server-side rather than trusting the client's `emailSource`. Otherwise a
         // forged/stale payload could send emailSource:'orcid' (or another high-confidence
@@ -305,25 +356,27 @@ export default async function handler(req, res) {
           || candidate.scholarPersistAllowed === false;
         const effectiveLookupOrcid = (pdConfirmed || blockByIdentity) ? null : candidateOrcid;
 
-        let contactMatch = null;
+        let contactMatch = validatedSeedAnchor?.lookup || null;
         try {
-          contactMatch = await lookupReviewerIdentity({
-            name: candidate.name,
-            email: candidateEmail || null,
-            orcid: effectiveLookupOrcid || null,
-          });
+          if (!contactMatch) {
+            contactMatch = await lookupReviewerIdentity({
+              name: candidate.name,
+              email: candidateEmail || null,
+              orcid: effectiveLookupOrcid || null,
+            });
+          }
         } catch (lookupErr) {
           console.warn('[save-candidates] reviewer identity lookup failed (non-fatal):', lookupErr?.message || lookupErr);
         }
 
-        const { id: potentialReviewerId } = await potentialReviewerAdapter.upsertByEmail({
+        const potentialReviewerId = validatedSeedAnchor?.potentialReviewerId || (await potentialReviewerAdapter.upsertByEmail({
           name: candidate.name,
           email: candidateEmail,
           affiliation: candidateAffiliation,
           expertise: gatedExpertiseForDv,
           // Proposal-scoped reasoning is retained even when contact/profile fields are blocked.
           whyChosen: matchReason || null,
-        }, { actingUserSystemId });
+        }, { actingUserSystemId })).id;
 
         if (
           contactMatch?.outcome === 'confident'

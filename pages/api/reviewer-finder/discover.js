@@ -20,6 +20,9 @@ import { loadModelOverrides } from '../../../lib/services/model-override-loader'
 import { deriveProposalAuthorNames } from '../../../lib/utils/proposal-authors';
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
 import { withReviewerProvenance } from '../../../lib/utils/reviewer-provenance';
+import { sanitizeReferredSeeds, buildReferredSeedCandidate, blockReferredSeed } from '../../../lib/utils/reviewer-referral-seeds';
+import { partitionByExcluded } from '../../../lib/utils/reviewer-name-match';
+import { lookupReviewerIdentity } from '../../../lib/services/reviewer-identity-lookup';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { resolveProposalPI, excludePiIdentity, appendPiName, piInstitutions } from '../../../lib/services/proposal-pi-identity';
 
@@ -93,7 +96,8 @@ export default async function handler(req, res) {
       // resolve the proposal PI from Dataverse (Project Leader → contact wmkf_orcid
       // → exact OpenAlex author) instead of trusting the LLM-extracted name. Optional
       // — absent or malformed → the route behaves exactly as before (fail-open).
-      requestId = null
+      requestId = null,
+      referredSeeds = []
     } = req.body;
 
     const apiKey = process.env.CLAUDE_API_KEY;
@@ -116,6 +120,8 @@ export default async function handler(req, res) {
       searchChemrxiv = true,
       generateReasoning = true
     } = options;
+    const cleanReferredSeeds = sanitizeReferredSeeds(referredSeeds);
+    const blockedReferredSeeds = [];
 
     if (DEBUG) {
       console.log('[Discover API] Received analysisResult:', {
@@ -207,7 +213,6 @@ export default async function handler(req, res) {
     // pass from the fuzzy `DeduplicationService.filterProposalAuthors` author COI
     // filter (which still runs below) — exact here, fuzzy there, by design.
     if (Array.isArray(excludedNames) && excludedNames.length > 0) {
-      const { partitionByExcluded } = require('../../../lib/utils/reviewer-name-match');
       const before = discoveryResults.verified.length + discoveryResults.unverified.length + discoveryResults.discovered.length;
       discoveryResults.verified = partitionByExcluded(discoveryResults.verified, excludedNames).kept;
       discoveryResults.unverified = partitionByExcluded(discoveryResults.unverified, excludedNames).kept;
@@ -354,6 +359,77 @@ export default async function handler(req, res) {
       }
     }
 
+    if (cleanReferredSeeds.length > 0) {
+      let seedsForLookup = cleanReferredSeeds;
+      if (Array.isArray(excludedNames) && excludedNames.length > 0) {
+        const partitioned = partitionByExcluded(seedsForLookup, excludedNames);
+        for (const seed of partitioned.removed) {
+          blockedReferredSeeds.push(blockReferredSeed(seed, 'already_surfaced_or_excluded'));
+        }
+        seedsForLookup = partitioned.kept;
+      }
+
+      let referredCandidates = [];
+      if (seedsForLookup.length > 0) {
+        referredCandidates = await bypassDynamicsRestrictions(
+          'reviewer-discover-referred-seeds',
+          async () => {
+            const built = [];
+            for (const seed of seedsForLookup) {
+              let lookup = null;
+              try {
+                lookup = await lookupReviewerIdentity({
+                  name: seed.name,
+                  email: seed.email || null,
+                  orcid: null,
+                });
+              } catch (lookupErr) {
+                console.warn('[Discover API] referred seed identity lookup failed (non-fatal):', lookupErr?.message || lookupErr);
+                lookup = { outcome: 'none' };
+              }
+              built.push(buildReferredSeedCandidate(seed, lookup));
+            }
+            return built;
+          }
+        );
+      }
+
+      if (proposalAuthors.length > 0 && referredCandidates.length > 0) {
+        const seedAuthorFilter = DeduplicationService.filterProposalAuthors(referredCandidates, proposalAuthors);
+        for (const seed of seedAuthorFilter.excluded) {
+          blockedReferredSeeds.push(blockReferredSeed(seed, 'proposal_author', seed.excludedReason || null));
+        }
+        referredCandidates = seedAuthorFilter.filtered;
+      }
+
+      if (coiInstitutions && (Array.isArray(coiInstitutions) ? coiInstitutions.length : true) && referredCandidates.length > 0) {
+        const keptInst = DeduplicationService.filterConflicts(referredCandidates, coiInstitutions);
+        const keptSet = new Set(keptInst);
+        for (const seed of referredCandidates) {
+          if (!keptSet.has(seed)) blockedReferredSeeds.push(blockReferredSeed(seed, 'institution_coi'));
+        }
+        referredCandidates = keptInst;
+      }
+
+      const pubmedVerificationContract = DiscoveryService.pubMedVerificationContract({ searchPubmed, proposalInfo: analysisResult.proposalInfo });
+      if (pubmedVerificationContract.enabled && proposalAuthors.length > 0 && referredCandidates.length > 0) {
+        referredCandidates = await DiscoveryService.checkCoauthorshipsForCandidates(
+          referredCandidates,
+          proposalAuthors,
+          (progress) => sendEvent('progress', progress)
+        );
+      }
+
+      if (referredCandidates.length > 0 || blockedReferredSeeds.length > 0) {
+        sendEvent('progress', {
+          stage: 'referred_seeds',
+          status: 'complete',
+          message: `Processed ${cleanReferredSeeds.length} externally referred reviewer seed(s): ${referredCandidates.length} surfaced, ${blockedReferredSeeds.length} blocked`
+        });
+      }
+      verifiedWithCOI = [...referredCandidates, ...verifiedWithCOI];
+    }
+
     sendEvent('progress', {
       stage: 'discovery',
       status: 'discovered',
@@ -493,6 +569,7 @@ export default async function handler(req, res) {
       unverified: unverifiedWithProvenance,
       discovered: enhancedDiscovered,
       ranked: rankedWithProvenance,
+      blockedReferredSeeds,
       stats: discoveryResults.stats
     });
 

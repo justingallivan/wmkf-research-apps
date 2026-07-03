@@ -6,12 +6,67 @@ import {
   asPercent,
   normalizeReviewerName,
   parseExcludeList,
+  parseReferredSeeds,
   filterExcluded,
   hasValidApplicantEnrichmentCache,
   pruneCandidateForRoster,
   sanitizeInstitutionCOIDetails,
+  mergeReferredProvenance,
+  dedupeByNamePreferReferred,
 } from '../../shared/components/reviewers/reviewer-search-logic.js';
-const { PROVENANCE_KINDS, provenanceGroupOf } = require('../../lib/utils/reviewer-provenance');
+const { PROVENANCE_KINDS, provenanceGroupOf, provenanceKindOf, provenanceLabelForCandidate } = require('../../lib/utils/reviewer-provenance');
+const { normalizeReviewerName: normName } = require('../../lib/utils/reviewer-name-match');
+
+describe('parseReferredSeeds', () => {
+  test('parses one-per-line referred reviewer seeds with referrer context', () => {
+    expect(parseReferredSeeds(
+      [
+        'Jane Smith, jane@example.edu, University of Example https://example.edu/jane',
+        'Dr. Amir Khan | amir@uni.edu | Uni Lab',
+        'Jane Smith, jane@example.edu',
+      ].join('\n'),
+      'Dr. Abby Doyle'
+    )).toEqual([
+      {
+        name: 'Jane Smith',
+        email: 'jane@example.edu',
+        affiliation: 'University of Example',
+        url: 'https://example.edu/jane',
+        referredBy: 'Dr. Abby Doyle',
+      },
+      {
+        name: 'Dr. Amir Khan',
+        email: 'amir@uni.edu',
+        affiliation: 'Uni Lab',
+        referredBy: 'Dr. Abby Doyle',
+      },
+    ]);
+  });
+});
+
+describe('pruneCandidateForRoster — referred seed anchors survive reload', () => {
+  test('keeps server-derived seed anchor fields for save-time revalidation', () => {
+    const pruned = pruneCandidateForRoster({
+      name: 'Jane Smith',
+      source: 'referred',
+      isReferredSeed: true,
+      referredBy: 'Dr. Abby Doyle',
+      seedResolvedPotentialReviewerId: 'PID-SEED',
+      seedResolvedContactId: 'CONTACT-SEED',
+      seedIdentityMatchKey: 'email',
+      seedIdentityNameConsistent: true,
+      provenance: { kind: 'referred', seedRole: 'referred_by', sources: [], groundingWorkIds: [], referredBy: 'Dr. Abby Doyle' },
+    });
+    expect(pruned).toEqual(expect.objectContaining({
+      isReferredSeed: true,
+      referredBy: 'Dr. Abby Doyle',
+      seedResolvedPotentialReviewerId: 'PID-SEED',
+      seedResolvedContactId: 'CONTACT-SEED',
+      seedIdentityMatchKey: 'email',
+      seedIdentityNameConsistent: true,
+    }));
+  });
+});
 
 describe('sanitizeInstitutionCOIDetails (S240)', () => {
   test('strips legacy .historical, keeps piInstitution + reviewerInstitution', () => {
@@ -448,5 +503,91 @@ describe('pruneCandidateForRoster — S238 graded-COI + warning markers survive 
     expect(pruned.coauthorCOIStrength).toBeNull();
     expect(pruned.aiFlaggedNotRelevant).toBe(false);
     expect(pruned.lowPublicationCount).toBe(false);
+  });
+});
+
+describe('dedupeByNamePreferReferred — seed⇄discovery collision keeps the Externally-Referred badge (S320)', () => {
+  const keyFn = (c) => normName(c.name);
+  const seed = () => ({
+    name: 'Jane Smith',
+    referredBy: 'Doug Nadel',
+    source: 'referred',
+    sources: ['referred'],
+    reasoning: 'Referred by Doug Nadel.',
+    isReferredSeed: true,
+  });
+  const discovery = () => ({
+    name: 'Jane Smith',
+    email: 'jane@uni.edu',
+    affiliation: 'University of Example',
+    sources: ['pubmed'],
+    reasoning: 'Strong methods overlap with the proposal.',
+    verificationStatus: 'verified',
+  });
+
+  test('discovery ranked HIGHER (first): survivor is badged Externally-Referred and retains referredBy', () => {
+    const out = dedupeByNamePreferReferred([discovery(), seed()], keyFn);
+    expect(out).toHaveLength(1);
+    const s = out[0];
+    expect(provenanceKindOf(s)).toBe(PROVENANCE_KINDS.REFERRED);
+    expect(provenanceGroupOf(s)).toBe('cited_or_proposal_named');
+    expect(s.referredBy).toBe('Doug Nadel');
+    expect(provenanceLabelForCandidate(s)).toBe('Externally-Referred · Doug Nadel');
+    // survivor keeps its OWN (verified discovery) contact — nothing lost
+    expect(s.email).toBe('jane@uni.edu');
+    // durable string so my-candidates reload reconstructs the referrer
+    expect(s.reasoning).toMatch(/^Referred by Doug Nadel\./);
+    // referred persists into wmkf_sources
+    expect(s.sources).toContain('referred');
+    expect(s.sources).toContain('pubmed');
+  });
+
+  test('seed ranked HIGHER (first): survivor stays referred; discovery contact is NOT grafted onto the bare seed', () => {
+    const out = dedupeByNamePreferReferred([seed(), discovery()], keyFn);
+    expect(out).toHaveLength(1);
+    const s = out[0];
+    expect(provenanceKindOf(s)).toBe(PROVENANCE_KINDS.REFERRED);
+    expect(s.referredBy).toBe('Doug Nadel');
+    // name-only safety: the unresolved seed does NOT absorb discovery's email
+    expect(s.email).toBeUndefined();
+  });
+
+  test('no duplicate row: exactly one survivor either way', () => {
+    expect(dedupeByNamePreferReferred([discovery(), seed()], keyFn)).toHaveLength(1);
+    expect(dedupeByNamePreferReferred([seed(), discovery()], keyFn)).toHaveLength(1);
+  });
+
+  test('two non-referred same-name candidates: first wins, unchanged (no false promotion)', () => {
+    const a = { name: 'Bob Lee', sources: ['pubmed'], email: 'bob@a.edu' };
+    const b = { name: 'Bob Lee', sources: ['arxiv'], email: 'bob@b.edu' };
+    const out = dedupeByNamePreferReferred([a, b], keyFn);
+    expect(out).toHaveLength(1);
+    expect(out[0].email).toBe('bob@a.edu');
+    expect(provenanceKindOf(out[0])).not.toBe(PROVENANCE_KINDS.REFERRED);
+  });
+
+  test('applicant-suggested survivor is NOT flipped to referred (promote-by-suggestionId path preserved)', () => {
+    const applicant = { name: 'Jane Smith', isApplicantRecommended: true, suggestionId: 'sug-1', email: 'jane@app.edu' };
+    const out = dedupeByNamePreferReferred([applicant, seed()], keyFn);
+    expect(out).toHaveLength(1);
+    expect(provenanceKindOf(out[0])).toBe(PROVENANCE_KINDS.APPLICANT_SUGGESTED);
+    expect(out[0].suggestionId).toBe('sug-1');
+  });
+});
+
+describe('mergeReferredProvenance — unit safety', () => {
+  test('does not copy contact/identity from the dropped referred copy onto the survivor', () => {
+    const keep = { name: 'X Person', sources: ['pubmed'] }; // no email
+    const incoming = { name: 'X Person', referredBy: 'Doug', source: 'referred', sources: ['referred'], email: 'leak@evil.edu' };
+    const merged = mergeReferredProvenance(keep, incoming);
+    expect(merged.email).toBeUndefined();
+    expect(provenanceKindOf(merged)).toBe(PROVENANCE_KINDS.REFERRED);
+    expect(merged.referredBy).toBe('Doug');
+  });
+
+  test('no-op when incoming is not referred', () => {
+    const keep = { name: 'X', sources: ['pubmed'], email: 'x@a.edu' };
+    const incoming = { name: 'X', sources: ['arxiv'], email: 'x@b.edu' };
+    expect(mergeReferredProvenance(keep, incoming)).toBe(keep);
   });
 });

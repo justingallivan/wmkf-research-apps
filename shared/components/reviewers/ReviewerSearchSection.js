@@ -46,10 +46,12 @@ import CandidateEditModal from './CandidateEditModal';
 import {
   mergeEnrichment,
   parseExcludeList,
+  parseReferredSeeds,
   filterExcluded,
   hasValidApplicantEnrichmentCache,
   normalizeReviewerName,
   pruneCandidateForRoster,
+  dedupeByNamePreferReferred,
 } from './reviewer-search-logic';
 import { rankByRelevance } from '../../../lib/utils/relevance-score';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
@@ -71,6 +73,12 @@ const SEARCH_SOURCES = [
   { key: 'biorxiv', label: 'BioRxiv', icon: '🧬', desc: 'Life sciences' },
   { key: 'chemrxiv', label: 'ChemRxiv', icon: '🧪', desc: 'Chemistry' },
 ];
+
+const BLOCKED_REFERRAL_REASON = {
+  already_surfaced_or_excluded: 'already surfaced or excluded',
+  proposal_author: 'proposal author',
+  institution_coi: 'PI institution conflict',
+};
 
 function Spinner() {
   return <div className="w-5 h-5 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />;
@@ -96,17 +104,11 @@ function candKey(c) {
 }
 
 // Dedupe a candidate list by normalized name; first occurrence wins (so a
-// freshly-enriched run candidate beats its pruned roster copy).
+// freshly-enriched run candidate beats its pruned roster copy). On a collision it
+// grafts referral provenance onto the survivor (S320) so a seeded Externally-Referred
+// reviewer that discovery also finds never loses its badge/referrer to relevance order.
 function dedupeByName(list) {
-  const seen = new Set();
-  const out = [];
-  for (const c of (Array.isArray(list) ? list : [])) {
-    const k = candKey(c);
-    if (!k || seen.has(k)) continue;
-    seen.add(k);
-    out.push(c);
-  }
-  return out;
+  return dedupeByNamePreferReferred(list, candKey);
 }
 
 function isApplicantOriginCandidate(c) {
@@ -496,6 +498,9 @@ export default function ReviewerSearchSection({
   const noSourcesSelected = !Object.values(searchSources).some(Boolean);
   const [reviewerCount, setReviewerCount] = useState(DEFAULT_REVIEWER_COUNT); // how many candidates Claude is asked to suggest (recall lever; see reviewerFinderPreferences)
   const [additionalNotes, setAdditionalNotes] = useState(''); // optional extra instructions for Claude
+  const [referredSeedsText, setReferredSeedsText] = useState('');
+  const [referredBy, setReferredBy] = useState('');
+  const [blockedReferredSeeds, setBlockedReferredSeeds] = useState([]);
   const [sortMode, setSortMode] = useState('relevance'); // 'relevance' (confidence rank, default) | 'alpha' (by name, within each provenance group)
   const [exporting, setExporting] = useState(false); // Excel export in flight
   const [exportError, setExportError] = useState(null); // export-specific error (own surface; does not disturb search `error`/`phase`)
@@ -533,6 +538,9 @@ export default function ReviewerSearchSection({
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
     setReviewerCount(DEFAULT_REVIEWER_COUNT);
     setAdditionalNotes('');
+    setReferredSeedsText('');
+    setReferredBy('');
+    setBlockedReferredSeeds([]);
     setRecPhase('idle'); setRecCandidates([]); setRecProgress([]); setRecError(null);
     excludeEditedRef.current = false;
     setExcludeText((excludedNames || []).join(', '));
@@ -583,9 +591,10 @@ export default function ReviewerSearchSection({
       ...rosterNames,
       ...(savedPoolNames || []),
     ]));
+    const referredSeeds = parseReferredSeeds(referredSeedsText, referredBy);
     setPhase('running');
     setError(null); setErrorMeta(null); setProgress([]); setCandidates([]); setUnverified([]); setSelected(new Set());
-    setSavedMsg(null); setEnrichNote(null); setAnalysis(null); setExcludedRemoved(0); setExportError(null);
+    setSavedMsg(null); setEnrichNote(null); setAnalysis(null); setExcludedRemoved(0); setExportError(null); setBlockedReferredSeeds([]);
     try {
       // 1. Analyze the proposal (Claude). excludedNames soft-blocks Claude's own
       //    suggestions; we still hard-filter discovery results below.
@@ -637,6 +646,7 @@ export default function ReviewerSearchSection({
           // a re-run doesn't re-spend reasoning tokens (S224). Client filterExcluded
           // below stays as defense-in-depth.
           excludedNames: effectiveExcluded,
+          referredSeeds,
           options: {
             searchPubmed: searchSources.pubmed,
             searchArxiv: searchSources.arxiv,
@@ -648,6 +658,7 @@ export default function ReviewerSearchSection({
       });
       let ranked = null;
       let unverifiedRaw = null;
+      let blockedReferredRaw = [];
       streamError = null;
       await readSseStream(dRes, ({ event, data }) => {
         if (event === 'error') { streamError = data?.message || 'Discovery failed'; return; }
@@ -655,6 +666,7 @@ export default function ReviewerSearchSection({
         if (data?.message) pushProgress(data.message);
         if (data?.ranked) ranked = data.ranked;
         if (data?.unverified) unverifiedRaw = data.unverified;
+        if (Array.isArray(data?.blockedReferredSeeds)) blockedReferredRaw = data.blockedReferredSeeds;
       });
       if (streamError) throw new Error(streamError);
       if (!ranked) throw new Error('Discovery returned no candidates.');
@@ -720,9 +732,11 @@ export default function ReviewerSearchSection({
       if (offTopic.length > 0) {
         enriched = [...enriched.filter((c) => !c.aiFlaggedNotRelevant), ...offTopic];
       }
+      const dedupedEnriched = dedupeByName(enriched);
 
-      setCandidates(enriched);
+      setCandidates(dedupedEnriched);
       setUnverified(unverifiedKept.map((c) => withReviewerProvenance(c)));
+      setBlockedReferredSeeds(blockedReferredRaw);
       if (enrichFailed) {
         setEnrichNote('Contact lookup was incomplete — some cards may be missing emails or citation metrics.');
       }
@@ -733,9 +747,9 @@ export default function ReviewerSearchSection({
       // it as deduped — a slow POST must not clobber a newer search's roster
       // (S224). Verified (Claude) + database discoveries only; unverified stay
       // ephemeral. A failure degrades to "no dedup this run", never a broken panel.
-      if (enriched.length > 0 && requestId) {
+      if (dedupedEnriched.length > 0 && requestId) {
         try {
-          const pruned = enriched.map(pruneCandidateForRoster);
+          const pruned = dedupedEnriched.map(pruneCandidateForRoster);
           const rRes = await fetch('/api/workbench/reviewer-roster', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -746,7 +760,7 @@ export default function ReviewerSearchSection({
             // Merge into the existing active roster (prior runs persist), pruned
             // DTOs deduped by normalized name.
             setRosterActive((prev) => dedupeByName([...pruned, ...prev]));
-            setRosterNames((prev) => Array.from(new Set([...prev, ...enriched.map((c) => c.name)])));
+            setRosterNames((prev) => Array.from(new Set([...prev, ...dedupedEnriched.map((c) => c.name)])));
             setRosterNote(null);
           } else {
             setRosterNote("Couldn't save this search to the request — these candidates may re-appear on a future search.");
@@ -764,7 +778,7 @@ export default function ReviewerSearchSection({
     } finally {
       runningRef.current = false;
     }
-  }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, searchSources, noSourcesSelected, reviewerCount, additionalNotes, pushProgress]);
+  }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, pushProgress]);
 
   // Run the applicant-recommended reviewers through the full verify→COI→enrich
   // pipeline (server-side) and write the enrichment back to their existing rows.
@@ -821,7 +835,7 @@ export default function ReviewerSearchSection({
   // The selectable list = the durable active roster ∪ this run's results, deduped
   // by normalized name (run results win — freshest enrichment). Renders + ranks
   // independent of `phase` so the roster shows on reload without a fresh search.
-  // recCandidates (enriched applicant-suggested) prepend so fresh enrichment wins
+  // recCandidates (enriched applicant-referred) prepend so fresh enrichment wins
   // over any stale roster copy of the same person.
   const displayRosterActive = rosterActive.filter((c) => (
     !isApplicantOriginCandidate(c) || (!!proposalKey && c.enrichedProposalKey === proposalKey)
@@ -1017,7 +1031,7 @@ export default function ReviewerSearchSection({
       for (const c of chosen) {
         if (provenanceKindOf(c) === PROVENANCE_KINDS.APPLICANT_SUGGESTED) {
           if (c.suggestionId) applicantChosen.push(c);
-          else failures.push({ name: c.name || 'Applicant-suggested reviewer', error: 'missing suggestionId' });
+          else failures.push({ name: c.name || 'Applicant-referred reviewer', error: 'missing suggestionId' });
         } else {
           toSave.push(c);
         }
@@ -1061,7 +1075,7 @@ export default function ReviewerSearchSection({
       const promotedNames = [];
       const contactConflicts = [];
       if (applicantChosen.length > 0) {
-        pushProgress(`Promoting ${applicantChosen.length} applicant-suggested reviewer(s)…`);
+        pushProgress(`Promoting ${applicantChosen.length} applicant-referred reviewer(s)…`);
         const results = await Promise.all(applicantChosen.map(async (c) => {
           try {
             // Carry the PD's hand-corrections (ONLY the fields marked manual) so the
@@ -1099,7 +1113,7 @@ export default function ReviewerSearchSection({
             promotedNames.push(result.candidate.name);
             if (result.contactError) contactConflicts.push(result.candidate.name || 'a reviewer');
           } else {
-            failures.push({ name: result.candidate.name || 'Applicant-suggested reviewer', error: result.error });
+            failures.push({ name: result.candidate.name || 'Applicant-referred reviewer', error: result.error });
           }
         }
       }
@@ -1112,7 +1126,7 @@ export default function ReviewerSearchSection({
 
       const messageParts = [];
       if (saved > 0) messageParts.push(`Saved ${saved} of ${toSave.length} to this request's candidate pool.`);
-      if (promoted > 0) messageParts.push(`Promoted ${promoted} of ${applicantChosen.length} applicant-suggested reviewer${applicantChosen.length === 1 ? '' : 's'}.`);
+      if (promoted > 0) messageParts.push(`Promoted ${promoted} of ${applicantChosen.length} applicant-referred reviewer${applicantChosen.length === 1 ? '' : 's'}.`);
       if (contactConflicts.length > 0) {
         messageParts.push(`Couldn't save the corrected email for ${contactConflicts.join(', ')} — that address is already used by another reviewer record. Open them on the Invite Reviewers tab to merge or re-enter it.`);
       }
@@ -1156,7 +1170,7 @@ export default function ReviewerSearchSection({
               body: JSON.stringify({ requestId, action: 'saved', names: promotedNames }),
             });
           } catch {
-            setRosterNote("Couldn't mark promoted applicant-suggested reviewers as saved in the Find roster — they may reappear after reload.");
+            setRosterNote("Couldn't mark promoted applicant-referred reviewers as saved in the Find roster — they may reappear after reload.");
           }
         }
       }
@@ -1253,7 +1267,7 @@ export default function ReviewerSearchSection({
   const provenanceSections = [
     {
       key: 'cited_or_proposal_named',
-      title: 'Cited / proposal-named',
+      title: 'Cited / proposal-named / externally-referred',
       items: sortForDisplay(displayCandidates.filter((c) => provenanceGroupOf(c) === 'cited_or_proposal_named')),
     },
     {
@@ -1263,7 +1277,7 @@ export default function ReviewerSearchSection({
     },
     {
       key: 'applicant_suggested',
-      title: 'Applicant-suggested',
+      title: 'Applicant-referred',
       items: sortForDisplay(displayCandidates.filter((c) => provenanceGroupOf(c) === 'applicant_suggested')),
     },
     {
@@ -1372,6 +1386,34 @@ export default function ReviewerSearchSection({
                   placeholder="e.g. prioritize clinical trialists; avoid industry-affiliated reviewers"
                 />
               </div>
+              <div className="grid gap-2 sm:grid-cols-[1fr_220px]">
+                <div>
+                  <label htmlFor="referred-seeds" className="block text-xs text-gray-500 mb-1">
+                    Externally-referred reviewers (optional):
+                  </label>
+                  <textarea
+                    id="referred-seeds"
+                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
+                    rows={2}
+                    value={referredSeedsText}
+                    onChange={(e) => setReferredSeedsText(e.target.value)}
+                    placeholder="e.g. Jane Smith, jane@uni.edu, University of Example"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="referred-by" className="block text-xs text-gray-500 mb-1">
+                    Referred by (optional):
+                  </label>
+                  <input
+                    id="referred-by"
+                    type="text"
+                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
+                    value={referredBy}
+                    onChange={(e) => setReferredBy(e.target.value)}
+                    placeholder="Reviewer name"
+                  />
+                </div>
+              </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">
                   Exclude these reviewers (one per line or comma-separated){exclusionsUnavailable ? ' — applicant list unavailable, add any by hand' : ''}:
@@ -1435,6 +1477,18 @@ export default function ReviewerSearchSection({
                 <p className="text-xs text-gray-500">
                   {excludedRemoved} already-surfaced or excluded {excludedRemoved === 1 ? 'reviewer was' : 'reviewers were'} filtered out of the results.
                 </p>
+              )}
+              {blockedReferredSeeds.length > 0 && (
+                <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
+                  <p className="font-medium">Externally-referred reviewer{blockedReferredSeeds.length === 1 ? '' : 's'} blocked</p>
+                  <ul className="mt-1 text-xs space-y-0.5">
+                    {blockedReferredSeeds.map((seed, idx) => (
+                      <li key={`${seed.name || 'seed'}-${idx}`}>
+                        {seed.name || 'Unnamed referral'}: {BLOCKED_REFERRAL_REASON[seed.reason] || seed.reason || 'not selectable'}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
               {displayCandidates.length === 0 && rosterExcluded.length === 0 && unverifiedToShow.length === 0 ? (
                 <p className="text-sm text-gray-600">No candidates were found for this proposal.</p>
@@ -1600,14 +1654,14 @@ export default function ReviewerSearchSection({
         verify card (state + handlers live in ReviewerFindPanel). */}
     {manualAddSlot}
 
-    {/* Applicant-suggested reviewer status card — ingestion + enrichment state.
-        Enriched candidates surface in the Applicant-suggested provenance section
+    {/* Applicant-referred reviewer status card — ingestion + enrichment state.
+        Enriched candidates surface in the Applicant-referred provenance section
         of the main candidate list above; this card is a status surface only.
         Enrichment fires automatically when both the proposal and the ingested
         recommendations are ready (no manual trigger required). */}
     <Card hover={false}>
       <div className="flex items-center justify-between mb-2">
-        <p className="font-medium text-gray-900">Applicant-suggested reviewers</p>
+        <p className="font-medium text-gray-900">Applicant-referred reviewers</p>
         {(ingestLoading || recPhase === 'running') && <Spinner />}
       </div>
 
@@ -1640,12 +1694,12 @@ export default function ReviewerSearchSection({
           )}
           {recPhase === 'idle' && !blobUrl && recCount > 0 && (
             <p className="text-sm text-gray-500">
-              {recCount} applicant-suggested reviewer{recCount === 1 ? '' : 's'} ingested — waiting for the proposal to load before verifying.
+              {recCount} applicant-referred reviewer{recCount === 1 ? '' : 's'} ingested — waiting for the proposal to load before verifying.
             </p>
           )}
           {recPhase === 'running' && (
             <div className="space-y-2">
-              <p className="text-sm text-gray-600">Verifying applicant-suggested reviewers — this can take a minute or two, please keep this tab open.</p>
+              <p className="text-sm text-gray-600">Verifying applicant-referred reviewers — this can take a minute or two, please keep this tab open.</p>
               <ul className="text-xs text-gray-500 space-y-0.5">
                 {recProgress.map((m, i) => <li key={i}>{m}</li>)}
               </ul>
@@ -1654,11 +1708,11 @@ export default function ReviewerSearchSection({
           {recPhase === 'done' && (
             <p className="text-sm text-gray-600">
               {recVerifiedCount === 0 && recIdentityReviewCount === 0
-                ? 'No applicant-suggested reviewers could be verified.'
+                ? 'No applicant-referred reviewers could be verified.'
                 : <>
                     {recVerifiedCount > 0
-                      ? `${recVerifiedCount} applicant-suggested reviewer${recVerifiedCount === 1 ? '' : 's'} verified — see the Applicant-suggested section above`
-                      : 'No reviewers added to the Applicant-suggested section'}
+                      ? `${recVerifiedCount} applicant-referred reviewer${recVerifiedCount === 1 ? '' : 's'} verified — see the Applicant-referred section above`
+                      : 'No reviewers added to the Applicant-referred section'}
                     {recIdentityReviewCount > 0 && <>; {recIdentityReviewCount} could not be confirmed — see the Identity review section</>}.
                   </>
               }
