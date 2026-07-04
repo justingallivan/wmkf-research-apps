@@ -10,7 +10,7 @@
 import { jest } from '@jest/globals';
 import { mintToken } from '../../lib/services/external-token.js';
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
-import { verifySuggestionToken } from '../../lib/external/verify-suggestion-token.js';
+import { verifySuggestionToken, tokenHasOp } from '../../lib/external/verify-suggestion-token.js';
 
 const SECRET = 'test-secret-32-chars-min-aaaaaaaaaaaa';
 const SUGGESTION_ID = '11111111-1111-1111-1111-111111111111';
@@ -195,5 +195,24 @@ describe('verifySuggestionToken', () => {
     );
     const result = await verifySuggestionToken(jwt);
     expect(result).toEqual({ ok: false, reason: 'not_found' });
+  });
+});
+
+describe('tokenHasOp', () => {
+  it('returns true when the ops array includes the op', () => {
+    expect(tokenHasOp({ payload: { ops: ['download_proposal', 'upload_review'] } }, 'download_proposal')).toBe(true);
+  });
+
+  it('returns false when the ops array lacks the op', () => {
+    expect(tokenHasOp({ payload: { ops: ['upload_review'] } }, 'download_proposal')).toBe(false);
+  });
+
+  it('fails closed on missing or malformed ops / payload / verified', () => {
+    expect(tokenHasOp({ payload: {} }, 'download_proposal')).toBe(false);
+    expect(tokenHasOp({ payload: { ops: 'download_proposal' } }, 'download_proposal')).toBe(false);
+    expect(tokenHasOp({ payload: { ops: null } }, 'download_proposal')).toBe(false);
+    expect(tokenHasOp({}, 'download_proposal')).toBe(false);
+    expect(tokenHasOp(null, 'download_proposal')).toBe(false);
+    expect(tokenHasOp(undefined, 'download_proposal')).toBe(false);
   });
 });

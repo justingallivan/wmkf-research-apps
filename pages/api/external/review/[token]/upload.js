@@ -9,7 +9,7 @@
  */
 
 import Busboy from 'busboy';
-import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
+import { verifySuggestionToken, tokenHasOp } from '../../../../../lib/external/verify-suggestion-token';
 import { writeReviewFiles } from '../../../../../lib/services/review-upload';
 import { respondForFailedReviewUpload } from '../../../../../lib/utils/review-upload-response';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
@@ -44,6 +44,13 @@ export default async function handler(req, res) {
         ok: false,
         reason: verified.reason,
       });
+    }
+
+    // Fail closed on the token's ops claim: a token minted without
+    // 'upload_review' (or with a missing/malformed ops array) must not be able
+    // to write a review file, even if the row/hash/expiry checks above passed.
+    if (!tokenHasOp(verified, 'upload_review')) {
+      return res.status(403).json({ ok: false, reason: 'op_not_permitted' });
     }
 
     // Finality guard (Codex P0-1): the reviewer-token upload path is hidden from

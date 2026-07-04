@@ -33,7 +33,7 @@
  *   500      internal (pg failure)
  */
 
-import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
+import { verifySuggestionToken, tokenHasOp } from '../../../../../lib/external/verify-suggestion-token';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 import ReviewDraftService from '../../../../../lib/services/review-draft-service';
 import { getActiveQuestionSet } from '../../../../../lib/external/review-question-fetcher';
@@ -103,6 +103,14 @@ export default async function handler(req, res) {
         ok: false,
         reason: verified.reason,
       });
+    }
+
+    // Fail closed on the token's ops claim: draft autosave is review-authoring
+    // surface, so a token minted without 'upload_review' (or with a missing/
+    // malformed ops array) may neither read nor write the draft — the guard
+    // sits before the GET/PUT branch so it covers both methods.
+    if (!tokenHasOp(verified, 'upload_review')) {
+      return res.status(403).json({ ok: false, reason: 'op_not_permitted' });
     }
 
     const { suggestion } = verified;

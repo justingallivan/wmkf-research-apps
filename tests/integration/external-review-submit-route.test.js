@@ -16,6 +16,12 @@ import ReviewDraftService from '../../lib/services/review-draft-service';
 
 jest.mock('../../lib/external/verify-suggestion-token', () => ({
   verifySuggestionToken: jest.fn(),
+  // Inline twin of the real tokenHasOp (fail-closed on missing/malformed ops).
+  // Not jest.requireActual: loading the real module pulls in jose's ESM build,
+  // which this jest environment cannot parse (see project-jsdom-serverless-esm-incompat).
+  // The real predicate is unit-tested in tests/unit/verify-suggestion-token.test.js.
+  tokenHasOp: (verified, op) =>
+    Array.isArray(verified?.payload?.ops) && verified.payload.ops.includes(op),
 }));
 jest.mock('../../lib/external/rate-limit', () => ({
   checkRateLimit: jest.fn(async () => ({ ok: true })),
@@ -86,7 +92,11 @@ beforeAll(async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   checkRateLimit.mockResolvedValue({ ok: true });
-  verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion() });
+  verifySuggestionToken.mockResolvedValue({
+    ok: true,
+    suggestion: suggestion(),
+    payload: { ops: ['download_proposal', 'upload_review'] },
+  });
   DynamicsService.resolveEntitySetName.mockResolvedValue('wmkf_appreviewanswers');
   DynamicsService.executeChangeset.mockResolvedValue({ ok: true, operations: [] });
   DynamicsService.getRecord.mockResolvedValue({ _etag: 'W/"fresh"' });
@@ -129,6 +139,31 @@ describe('shared guards', () => {
     await handler(req, res);
     expect(res.statusCode).toBe(404);
   });
+
+  it('403s when the verified token ops does not include upload_review', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ok: true,
+      suggestion: suggestion(),
+      payload: { ops: ['download_proposal'] },
+    });
+    const { req, res } = post({ answers: validAnswers() });
+    await handler(req, res);
+    expect(res.statusCode).toBe(403);
+    expect(res._data).toMatchObject({ ok: false, reason: 'op_not_permitted' });
+    expect(DynamicsService.executeChangeset).not.toHaveBeenCalled();
+  });
+
+  it('403s when the verified token has a missing/malformed ops array', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ok: true,
+      suggestion: suggestion(),
+      payload: {},
+    });
+    const { req, res } = post({ answers: validAnswers() });
+    await handler(req, res);
+    expect(res.statusCode).toBe(403);
+    expect(res._data).toMatchObject({ ok: false, reason: 'op_not_permitted' });
+  });
 });
 
 describe('finality + stage gates', () => {
@@ -136,6 +171,7 @@ describe('finality + stage gates', () => {
     verifySuggestionToken.mockResolvedValue({
       ok: true,
       suggestion: suggestion({ wmkf_reviewreceivedat: '2026-06-01T00:00:00Z' }),
+      payload: { ops: ['download_proposal', 'upload_review'] },
     });
     const { req, res } = post({ answers: validAnswers() });
     await handler(req, res);
@@ -148,6 +184,7 @@ describe('finality + stage gates', () => {
     verifySuggestionToken.mockResolvedValue({
       ok: true,
       suggestion: suggestion({ wmkf_reviewstatus: 100000000, wmkf_accepted: false }),
+      payload: { ops: ['download_proposal', 'upload_review'] },
     });
     const { req, res } = post({ answers: validAnswers() });
     await handler(req, res);
@@ -285,7 +322,7 @@ describe('concurrency + failure mapping', () => {
 
 describe('fail-closed on missing parent etag (Codex P1)', () => {
   it('re-reads for a fresh etag when the verified suggestion lacks one, then writes guarded', async () => {
-    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion({ _etag: undefined }) });
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion({ _etag: undefined }), payload: { ops: ['download_proposal', 'upload_review'] } });
     DynamicsService.getRecord.mockResolvedValue({ _etag: 'W/"reread"' });
     const { req, res } = post({ answers: validAnswers() });
     await handler(req, res);
@@ -299,7 +336,7 @@ describe('fail-closed on missing parent etag (Codex P1)', () => {
   });
 
   it('409 conflict (and no write) when no etag can be obtained even after a re-read', async () => {
-    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion({ _etag: undefined }) });
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion({ _etag: undefined }), payload: { ops: ['download_proposal', 'upload_review'] } });
     DynamicsService.getRecord.mockResolvedValue({}); // no _etag, no receivedat
     const { req, res } = post({ answers: validAnswers() });
     await handler(req, res);
@@ -314,7 +351,7 @@ describe('fail-closed on missing parent etag (Codex P1)', () => {
     // _etag absent at verify time → fallback re-read; that re-read must ALSO
     // re-check finality, or a racing submit that committed in between would hand
     // us a fresh (non-stale) etag and we'd overwrite the submitted review.
-    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion({ _etag: undefined }) });
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion({ _etag: undefined }), payload: { ops: ['download_proposal', 'upload_review'] } });
     DynamicsService.getRecord.mockResolvedValue({ _etag: 'W/"fresh"', wmkf_reviewreceivedat: '2026-06-28T11:59:00Z' });
     const { req, res } = post({ answers: validAnswers() });
     await handler(req, res);
@@ -326,7 +363,7 @@ describe('fail-closed on missing parent etag (Codex P1)', () => {
   });
 
   it('re-read selects both the etag and receivedat (so the finality re-check is possible)', async () => {
-    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion({ _etag: undefined }) });
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion({ _etag: undefined }), payload: { ops: ['download_proposal', 'upload_review'] } });
     DynamicsService.getRecord.mockResolvedValue({ _etag: 'W/"reread"' });
     const { req, res } = post({ answers: validAnswers() });
     await handler(req, res);

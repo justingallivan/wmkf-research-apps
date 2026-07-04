@@ -14,6 +14,12 @@ import ReviewDraftService from '../../lib/services/review-draft-service';
 
 jest.mock('../../lib/external/verify-suggestion-token', () => ({
   verifySuggestionToken: jest.fn(),
+  // Inline twin of the real tokenHasOp (fail-closed on missing/malformed ops).
+  // Not jest.requireActual: loading the real module pulls in jose's ESM build,
+  // which this jest environment cannot parse (see project-jsdom-serverless-esm-incompat).
+  // The real predicate is unit-tested in tests/unit/verify-suggestion-token.test.js.
+  tokenHasOp: (verified, op) =>
+    Array.isArray(verified?.payload?.ops) && verified.payload.ops.includes(op),
 }));
 jest.mock('../../lib/external/rate-limit', () => ({
   checkRateLimit: jest.fn(async () => ({ ok: true })),
@@ -34,6 +40,7 @@ jest.mock('../../lib/external/review-question-fetcher', () => {
 });
 
 const SUGGESTION_ID = '550e8400-e29b-41d4-a716-446655440000';
+const DEFAULT_PAYLOAD = { ops: ['download_proposal', 'upload_review'] };
 
 function suggestion(overrides = {}) {
   return {
@@ -91,11 +98,45 @@ describe('shared guards', () => {
     await handler(req, res);
     expect(res.statusCode).toBe(404);
   });
+
+  it('403s GET and PUT when the verified token ops does not include upload_review', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ok: true,
+      suggestion: suggestion(),
+      payload: { ops: ['download_proposal'] },
+    });
+    for (const opts of [
+      { method: 'GET', query: { token: 't' } },
+      { method: 'PUT', query: { token: 't' }, body: { draftJson: { impact: 3 } } },
+    ]) {
+      const req = createMockReq(opts);
+      const res = createMockRes();
+      await handler(req, res);
+      expect(res.statusCode).toBe(403);
+      expect(res._data).toMatchObject({ ok: false, reason: 'op_not_permitted' });
+    }
+    expect(ReviewDraftService.getBySuggestion).not.toHaveBeenCalled();
+    expect(ReviewDraftService.upsertDraftJson).not.toHaveBeenCalled();
+  });
+
+  it('403s when the verified token has a missing/malformed ops array', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ok: true,
+      suggestion: suggestion(),
+      payload: {},
+    });
+    const req = createMockReq({ method: 'GET', query: { token: 't' } });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(403);
+    expect(res._data).toMatchObject({ ok: false, reason: 'op_not_permitted' });
+    expect(ReviewDraftService.getBySuggestion).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET', () => {
   it('returns the saved draft in the authoring stage', async () => {
-    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion() });
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion(), payload: DEFAULT_PAYLOAD });
     ReviewDraftService.getBySuggestion.mockResolvedValue({ draft_json: { impact: 3 } });
     const req = createMockReq({ method: 'GET', query: { token: 't' } });
     const res = createMockRes();
@@ -105,7 +146,7 @@ describe('GET', () => {
   });
 
   it('returns null draft when none saved', async () => {
-    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion() });
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion(), payload: DEFAULT_PAYLOAD });
     ReviewDraftService.getBySuggestion.mockResolvedValue(null);
     const req = createMockReq({ method: 'GET', query: { token: 't' } });
     const res = createMockRes();
@@ -117,6 +158,7 @@ describe('GET', () => {
     verifySuggestionToken.mockResolvedValue({
       ok: true,
       suggestion: suggestion({ wmkf_reviewreceivedat: '2026-01-01T00:00:00Z' }),
+      payload: DEFAULT_PAYLOAD,
     });
     const req = createMockReq({ method: 'GET', query: { token: 't' } });
     const res = createMockRes();
@@ -128,7 +170,7 @@ describe('GET', () => {
 
 describe('PUT (autosave)', () => {
   it('400s when draftJson is missing or not an object', async () => {
-    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion() });
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion(), payload: DEFAULT_PAYLOAD });
     for (const body of [{}, { draftJson: 'x' }, { draftJson: [] }, { draftJson: null }]) {
       const req = createMockReq({ method: 'PUT', query: { token: 't' }, body });
       const res = createMockRes();
@@ -139,7 +181,7 @@ describe('PUT (autosave)', () => {
   });
 
   it('saves a sanitized, whitelisted draft in the authoring stage', async () => {
-    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion() });
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion(), payload: DEFAULT_PAYLOAD });
     ReviewDraftService.upsertDraftJson.mockResolvedValue({ id: 9, updated_at: 'TS' });
     const req = createMockReq({
       method: 'PUT',
@@ -158,7 +200,7 @@ describe('PUT (autosave)', () => {
   });
 
   it('persists a richtext answer ONLY as sanitized HTML', async () => {
-    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion() });
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion(), payload: DEFAULT_PAYLOAD });
     ReviewDraftService.upsertDraftJson.mockResolvedValue({ id: 12, updated_at: 'TS' });
     const req = createMockReq({
       method: 'PUT',
@@ -174,7 +216,7 @@ describe('PUT (autosave)', () => {
   });
 
   it('400 answer_too_long when a richtext answer exceeds maxLength (no write)', async () => {
-    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion() });
+    verifySuggestionToken.mockResolvedValue({ ok: true, suggestion: suggestion(), payload: DEFAULT_PAYLOAD });
     // q2 maxLength is 50000; a plain string longer than that sanitizes to >50000 chars.
     const huge = 'a'.repeat(50001);
     const req = createMockReq({
@@ -192,6 +234,7 @@ describe('PUT (autosave)', () => {
     verifySuggestionToken.mockResolvedValue({
       ok: true,
       suggestion: suggestion({ wmkf_reviewreceivedat: '2026-01-01T00:00:00Z' }),
+      payload: DEFAULT_PAYLOAD,
     });
     const req = createMockReq({
       method: 'PUT', query: { token: 't' }, body: { draftJson: { impact: 3 } },
@@ -207,6 +250,7 @@ describe('PUT (autosave)', () => {
     verifySuggestionToken.mockResolvedValue({
       ok: true,
       suggestion: suggestion({ wmkf_reviewstatus: null, wmkf_accepted: false }),
+      payload: DEFAULT_PAYLOAD,
     });
     const req = createMockReq({
       method: 'PUT', query: { token: 't' }, body: { draftJson: { impact: 3 } },

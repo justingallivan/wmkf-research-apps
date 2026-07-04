@@ -34,7 +34,7 @@
  *   500  internal
  */
 
-import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
+import { verifySuggestionToken, tokenHasOp } from '../../../../../lib/external/verify-suggestion-token';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 import { DynamicsService } from '../../../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
@@ -95,6 +95,13 @@ export default async function handler(req, res) {
         ok: false,
         reason: verified.reason,
       });
+    }
+
+    // Fail closed on the token's ops claim: a token minted without
+    // 'upload_review' (or with a missing/malformed ops array) must not be able
+    // to submit a review, even if the row/hash/expiry checks above passed.
+    if (!tokenHasOp(verified, 'upload_review')) {
+      return res.status(403).json({ ok: false, reason: 'op_not_permitted' });
     }
 
     const { suggestion } = verified;

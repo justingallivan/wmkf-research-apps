@@ -11,7 +11,7 @@
  * for files outside the request's document graph.
  */
 
-import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
+import { verifySuggestionToken, tokenHasOp } from '../../../../../lib/external/verify-suggestion-token';
 import { GraphService } from '../../../../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../../../../lib/utils/sharepoint-buckets';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
@@ -42,6 +42,13 @@ export default async function handler(req, res) {
         ok: false,
         reason: verified.reason,
       });
+    }
+
+    // Fail closed on the token's ops claim: a token minted without
+    // 'download_proposal' (or with a missing/malformed ops array) must not be
+    // able to stream files, even if the row/hash/expiry checks above passed.
+    if (!tokenHasOp(verified, 'download_proposal')) {
+      return res.status(403).json({ ok: false, reason: 'op_not_permitted' });
     }
 
     const { request } = verified;

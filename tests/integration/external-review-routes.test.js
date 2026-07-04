@@ -27,6 +27,12 @@ import {
 
 jest.mock('../../lib/external/verify-suggestion-token', () => ({
   verifySuggestionToken: jest.fn(),
+  // Inline twin of the real tokenHasOp (fail-closed on missing/malformed ops).
+  // Not jest.requireActual: loading the real module pulls in jose's ESM build,
+  // which this jest environment cannot parse (see project-jsdom-serverless-esm-incompat).
+  // The real predicate is unit-tested in tests/unit/verify-suggestion-token.test.js.
+  tokenHasOp: (verified, op) =>
+    Array.isArray(verified?.payload?.ops) && verified.payload.ops.includes(op),
 }));
 
 jest.mock('../../lib/services/dynamics-service', () => ({
@@ -124,6 +130,7 @@ jest.mock('../../lib/external/calendar-invite', () => ({
 
 const verifiedSuggestion = {
   ok: true,
+  payload: { ops: ['download_proposal', 'upload_review'] },
   suggestion: {
     wmkf_appreviewersuggestionid: 'suggestion-1',
     _etag: 'W/"1001"',
@@ -336,6 +343,42 @@ describe('/api/external/review/[token]/proposal', () => {
     expect(GraphService.downloadFile).not.toHaveBeenCalled();
   });
 
+  it('403s when the verified token ops does not include download_proposal', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ...verifiedSuggestion,
+      payload: { ops: ['upload_review'] },
+    });
+    const req = createMockReq({
+      method: 'GET',
+      query: { token: 'good-token', fileId: 'allowed-file', library: 'akoya_request' },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'op_not_permitted' });
+    expect(GraphService.downloadFile).not.toHaveBeenCalled();
+  });
+
+  it('403s when the verified token has a missing/malformed ops array', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ...verifiedSuggestion,
+      payload: {},
+    });
+    const req = createMockReq({
+      method: 'GET',
+      query: { token: 'good-token', fileId: 'allowed-file', library: 'akoya_request' },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'op_not_permitted' });
+    expect(GraphService.downloadFile).not.toHaveBeenCalled();
+  });
+
   it('rejects a valid token when the requested file is outside reviewer materials', async () => {
     verifySuggestionToken.mockResolvedValue(verifiedSuggestion);
     getRequestSharePointBuckets.mockResolvedValue([
@@ -420,6 +463,27 @@ describe('/api/external/review/[token]/upload', () => {
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'expired' });
+    expect(req.pipe).not.toHaveBeenCalled();
+    expect(writeReviewFiles).not.toHaveBeenCalled();
+  });
+
+  it('403s when the verified token ops does not include upload_review', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ...verifiedSuggestion,
+      payload: { ops: ['download_proposal'] },
+    });
+    const req = createMockReq({
+      method: 'POST',
+      query: { token: 'good-token' },
+      headers: { 'content-type': 'multipart/form-data; boundary=test' },
+    });
+    req.pipe = jest.fn();
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'op_not_permitted' });
     expect(req.pipe).not.toHaveBeenCalled();
     expect(writeReviewFiles).not.toHaveBeenCalled();
   });
