@@ -62,6 +62,10 @@
       "schedule": "0 10 * * *"
     },
     {
+      "path": "/api/cron/send-review-thankyous",
+      "schedule": "30 10 * * *"
+    },
+    {
       "path": "/api/cron/reviewer-email-reconcile",
       "schedule": "0 4 * * *"
     },

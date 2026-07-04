@@ -130,6 +130,33 @@ manual and cron sends share one fire-once marker and can never double-send.
 Unlike the cron, a manual re-send when the marker is already set IS allowed
 (staff-initiated); a claim conflict (412) returns an error without sending.
 
+**Thank-you sweep (automated):** `/api/cron/send-review-thankyous` (daily,
+`30 10 * * *` — offset from the 10:00 reminder cron) →
+`lib/services/reviewer-thankyou-sweep.js#sweepReviewThankYous`. Eligibility keys
+on `wmkf_reviewreceivedat ne null and wmkf_thankyousentat eq null` (NOT the
+`wmkf_reviewstatus` picklist — the submit route stamps status `100000003` at
+submission, so the received-at timestamp is the durable "review is in" signal).
+Structure + idempotency mirror the reminder sweep: fetch rows WITH `_etag`, fail
+closed if missing, claim `wmkf_thankyousentat` via If-Match BEFORE send (412 →
+`claimFailed`, skip), and a post-claim send failure is logged (`sendFailed`)
+without marker rollback or retry (at-most-once — owner-approved
+acceptance-confirmation posture). It reuses the reminder sweep's exported
+`loadRequestContext`/`loadReviewer` for the PD sender + signature + reviewer
+email, and renders the seeded `thankyou` template via
+`reviewer-reminder-email.js#renderThankYou`. It sends the email as the PD
+(`createAndSendEmail`, `noFallback:true`) with a **courtesy DOCX copy of the
+reviewer's own review** attached as real file bytes (`activitymimeattachments`,
+never Blob-staged): `composeSingleReviewCopy` (pure, in
+`shared/utils/review-report.js`, reusing the `htmlToBlocks` tokenizer) →
+`generateSingleReviewCopyDocx` (server-side `import('docx')`, returns a Buffer,
+in `shared/utils/review-report-docx.js`), over the answer snapshot read through
+the hoisted `lib/services/review-answers.js#fetchAnswersBySuggestion` (shared with
+the Reviews-tab GET). The attachment is NON-FATAL — a compose/render failure
+still sends the thank-you without the DOCX and counts `attachmentFailed`. The
+`wmkf_thankyousentat` marker is shared with the manual `thankyou` send
+(`send-emails.js`), so a manually-thanked reviewer is naturally skipped and the
+manual modal's deliberate re-send is unchanged. Knobs: `?maxBatch=N`, `?dryRun=1`.
+
 **Phase 2 DEPLOYED (S326; unit-tested; populated Compare view NOT browser-verifiable until the first portal submission — zero exist, portal built ahead of the D26 cycle; correct zero-submission absence drive-verified):** schema-free
 comparison matrix. `shared/utils/review-matrix.js#deriveReviewMatrix(reviewers,
 liveQuestions)` is a pure, DOM/React/Dataverse-free derivation over each

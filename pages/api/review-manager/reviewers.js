@@ -32,21 +32,11 @@ import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-conte
 import { resolveByEmail as resolvePD } from '../../../lib/services/program-director-resolver';
 import { meetingDateToCycleCode, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
-import { sanitizeReviewHtml } from '../../../lib/external/sanitize-review-html';
 import { ratingsFromAnswers } from '../../../lib/external/review-answer-snapshot';
 import { getActiveQuestionSet } from '../../../lib/external/review-question-fetcher';
-
-// Answer-snapshot child columns read back for the workbench Reviews tab (Phase 4).
-const ANSWER_FIELDS = [
-  'wmkf_questionkey',
-  'wmkf_questionorder',
-  'wmkf_questiontext',
-  'wmkf_questiontype',
-  'wmkf_answerhtml',
-  'wmkf_answertext',
-  'wmkf_answervalue',
-  '_wmkf_appreviewersuggestion_value',
-];
+// Answer-snapshot reader hoisted to a shared module (also used by the thank-you
+// sweep) — `fetchAnswersBySuggestion` was previously defined route-local here.
+import { fetchAnswersBySuggestion } from '../../../lib/services/review-answers';
 
 const REQUEST_FIELDS = [
   'akoya_requestid',
@@ -479,61 +469,6 @@ async function fetchLiveQuestions() {
     console.error('Review Manager GET: live question set fetch failed, falling back to snapshot-order-only:', error);
     return null;
   }
-}
-
-/**
- * Read the answer-snapshot child rows for submitted reviewers (Phase 4, plan §6).
- * A SEPARATE keyed query per the design (no 1:N child-expand precedent on the
- * suggestion adapter) — `_wmkf_appreviewersuggestion_value eq <id>`, ordered by
- * question order. Paginated (queryAllRecords) so a reviewer's ~11 rows × a chunk
- * of suggestions can't hit the 100-row top cap. answerHtml is RE-SANITIZED here
- * (defense in depth — stored content is sanitized on write, but the read is the
- * last server step before staff render via dangerouslySetInnerHTML).
- *
- * @returns {Promise<Record<string, Array<{questionKey,questionOrder,questionText,questionType,answerHtml,answerText,answerValue}>>>}
- *   keyed by suggestion GUID; each list ordered by questionOrder.
- */
-async function fetchAnswersBySuggestion(suggestionIds) {
-  if (!suggestionIds?.length) return {};
-  const out = {};
-  const CHUNK = 20; // bound OR-chain URL length; pagination handles row volume
-  for (let i = 0; i < suggestionIds.length; i += CHUNK) {
-    const chunk = suggestionIds.slice(i, i + CHUNK);
-    const orChain = chunk.map((id) => `_wmkf_appreviewersuggestion_value eq ${id}`).join(' or ');
-    const { records, capped } = await DynamicsService.queryAllRecords('wmkf_appreviewanswers', {
-      select: ANSWER_FIELDS.join(','),
-      filter: orChain,
-      orderby: 'wmkf_questionorder',
-    });
-    // Fail loud rather than silently drop answers. With ~11 rows/reviewer and a
-    // chunk of 20, this is far under the 5000 cap — capped here means the volume
-    // assumption broke (e.g. a far larger question set), and a partial snapshot
-    // must not pass for a complete one.
-    if (capped) {
-      throw new Error(
-        `fetchAnswersBySuggestion: queryAllRecords truncated at the 5000-row cap for ${chunk.length} suggestion(s) — answer snapshot would be incomplete.`,
-      );
-    }
-    for (const a of records) {
-      const sid = a._wmkf_appreviewersuggestion_value;
-      if (!sid) continue;
-      (out[sid] ||= []).push({
-        questionKey: a.wmkf_questionkey || null,
-        questionOrder: a.wmkf_questionorder ?? null,
-        questionText: a.wmkf_questiontext || '',
-        questionType: a.wmkf_questiontype || '',
-        answerHtml: a.wmkf_answerhtml ? sanitizeReviewHtml(a.wmkf_answerhtml) : '',
-        answerText: a.wmkf_answertext || '',
-        answerValue: a.wmkf_answervalue ?? null,
-      });
-    }
-  }
-  // Defensive: guarantee per-reviewer questionOrder ordering even if a future
-  // read spans pages/chunks for the same suggestion.
-  for (const sid of Object.keys(out)) {
-    out[sid].sort((x, y) => (x.questionOrder ?? 0) - (y.questionOrder ?? 0));
-  }
-  return out;
 }
 
 // S213 appresearcher collapse: bibliometrics now live on the person, not the

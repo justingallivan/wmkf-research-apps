@@ -356,3 +356,78 @@ export function composeReviewReport({
 
   return { header, summary, ratingsTable, narrativeSections, synthesisSection };
 }
+
+/**
+ * composeSingleReviewCopy — pure composer for a SINGLE reviewer's own review,
+ * used by the thank-you sweep (`lib/services/reviewer-thankyou-sweep.js`) to
+ * build the courtesy DOCX copy attached to the thank-you email. Same purity
+ * contract as `composeReviewReport` (no DOM/React/network); reuses the
+ * `htmlToBlocks` tokenizer above for richtext answers so no HTML re-parsing
+ * happens in the renderer.
+ *
+ * Input `answers` is the report-ready per-suggestion shape from
+ * `fetchAnswersBySuggestion` (lib/services/review-answers.js): an ordered array
+ * of `{questionKey, questionOrder, questionText, questionType, answerHtml,
+ * answerText, answerValue}`. Each answer becomes one section:
+ *   - richtext → `blocks` (htmlToBlocks(answerHtml)); `answerLabel` null.
+ *   - picklist/other → `answerLabel` (answerText, else stringified answerValue,
+ *     else null); `blocks` [].
+ * `state` is 'answered' when the answer has content, else 'empty'.
+ *
+ * @param {Object} params
+ * @param {string|null} [params.reviewerName]
+ * @param {string|null} [params.requestNumber]
+ * @param {string|null} [params.requestTitle]
+ * @param {string} params.generatedAtIso - caller-supplied (keeps this pure).
+ * @param {Array<{questionText:string, questionType:string, answerHtml:string,
+ *   answerText:string, answerValue:(number|null)}>} params.answers
+ * @returns {{
+ *   header: {reviewerName:(string|null), requestNumber:(string|null),
+ *     requestTitle:(string|null), generatedAtIso:string},
+ *   sections: Array<{questionText:string, questionType:string,
+ *     state:('answered'|'empty'), answerLabel:(string|null), blocks:Array}>,
+ * }}
+ */
+export function composeSingleReviewCopy({
+  reviewerName = null,
+  requestNumber = null,
+  requestTitle = null,
+  generatedAtIso,
+  answers = [],
+}) {
+  const safeAnswers = Array.isArray(answers) ? answers : [];
+
+  const sections = safeAnswers.map((a) => {
+    const isRichtext = a.questionType === 'richtext';
+    if (isRichtext) {
+      const blocks = htmlToBlocks(a.answerHtml);
+      return {
+        questionText: a.questionText || '',
+        questionType: 'richtext',
+        state: blocks.length > 0 ? 'answered' : 'empty',
+        answerLabel: null,
+        blocks,
+      };
+    }
+    const label = (a.answerText && a.answerText.trim().length > 0)
+      ? a.answerText
+      : (Number.isFinite(a.answerValue) ? String(a.answerValue) : null);
+    return {
+      questionText: a.questionText || '',
+      questionType: a.questionType || 'picklist',
+      state: label != null ? 'answered' : 'empty',
+      answerLabel: label,
+      blocks: [],
+    };
+  });
+
+  return {
+    header: {
+      reviewerName,
+      requestNumber,
+      requestTitle,
+      generatedAtIso,
+    },
+    sections,
+  };
+}

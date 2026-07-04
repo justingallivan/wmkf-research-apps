@@ -307,3 +307,150 @@ export async function generateReviewReportDocx(report) {
 
   return Packer.toBlob(doc);
 }
+
+/**
+ * generateSingleReviewCopyDocx — server-side DOCX renderer for the courtesy copy
+ * of a SINGLE reviewer's own review, attached to the thank-you email by
+ * `lib/services/reviewer-thankyou-sweep.js`.
+ *
+ * Same `import('docx')` + block/run conventions as `generateReviewReportDocx`
+ * above, but:
+ *   - consumes the `composeSingleReviewCopy` shape (header + flat sections), and
+ *   - returns a Node **Buffer** (Packer.toBuffer) rather than a Blob — the cron
+ *     has no browser download; `DynamicsService.addEmailAttachment` takes the
+ *     bytes directly.
+ *
+ * @param {ReturnType<import('./review-report').composeSingleReviewCopy>} copy
+ * @returns {Promise<Buffer>}
+ */
+export async function generateSingleReviewCopyDocx(copy) {
+  const {
+    Document, Packer, Paragraph, TextRun,
+    AlignmentType, HeadingLevel,
+  } = await import('docx');
+
+  const FONT = 'Calibri';
+  const BODY_SIZE = 22; // 11pt
+
+  function bodyRun(text, opts = {}) {
+    return new TextRun({ text, size: BODY_SIZE, font: FONT, ...opts });
+  }
+
+  // A run's text may contain an embedded "\n" from a <br>; docx needs an explicit
+  // line Break between segments rather than a literal newline character.
+  function runsToTextRuns(runs) {
+    const out = [];
+    for (const run of runs) {
+      const segments = run.text.split('\n');
+      segments.forEach((seg, idx) => {
+        if (idx > 0) out.push(new TextRun({ break: 1, size: BODY_SIZE, font: FONT }));
+        if (seg.length === 0) return;
+        out.push(new TextRun({
+          text: seg,
+          size: BODY_SIZE,
+          font: FONT,
+          bold: !!run.bold,
+          italics: !!run.italic,
+          style: run.href ? 'Hyperlink' : undefined,
+        }));
+      });
+    }
+    return out.length > 0 ? out : [bodyRun('')];
+  }
+
+  function blockToParagraph(block) {
+    const common = { spacing: { after: 120 }, children: runsToTextRuns(block.runs) };
+    switch (block.type) {
+      case 'heading2':
+        return new Paragraph({ ...common, heading: HeadingLevel.HEADING_3 });
+      case 'heading3':
+        return new Paragraph({ ...common, heading: HeadingLevel.HEADING_4 });
+      case 'blockquote':
+        return new Paragraph({
+          spacing: { after: 120 },
+          indent: { left: 360 },
+          children: runsToTextRuns(block.runs.map((r) => ({ ...r, italic: true }))),
+        });
+      case 'list-item':
+        return new Paragraph({
+          ...common,
+          bullet: block.ordered ? undefined : { level: 0 },
+          numbering: block.ordered ? { reference: 'single-review-numbered', level: 0 } : undefined,
+        });
+      case 'paragraph':
+      default:
+        return new Paragraph(common);
+    }
+  }
+
+  const { header } = copy;
+  const generatedLabel = (() => {
+    const d = new Date(header.generatedAtIso);
+    return Number.isNaN(d.getTime()) ? header.generatedAtIso : d.toLocaleString();
+  })();
+
+  const children = [
+    new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      children: [new TextRun({
+        text: header.requestTitle || `Request ${header.requestNumber || ''}`.trim() || 'Review',
+        size: 32,
+        font: FONT,
+        bold: true,
+      })],
+    }),
+    new Paragraph({
+      spacing: { after: 200 },
+      children: [
+        bodyRun(
+          [
+            header.requestNumber ? `Request ${header.requestNumber}` : null,
+            header.reviewerName ? `Reviewer: ${header.reviewerName}` : null,
+          ].filter(Boolean).join('  •  '),
+          { color: '666666' },
+        ),
+      ],
+    }),
+    new Paragraph({
+      spacing: { after: 300 },
+      children: [bodyRun(`Your submitted review • generated ${generatedLabel}`, { italics: true, color: '888888' })],
+    }),
+  ];
+
+  for (const section of copy.sections) {
+    children.push(new Paragraph({
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 260, after: 100 },
+      children: [new TextRun({ text: section.questionText || 'Question', size: 26, font: FONT, bold: true })],
+    }));
+    if (section.state === 'empty') {
+      children.push(new Paragraph({ spacing: { after: 120 }, children: [bodyRun('No answer provided', { italics: true, color: '999999' })] }));
+      continue;
+    }
+    if (section.questionType === 'richtext') {
+      for (const block of section.blocks) children.push(blockToParagraph(block));
+    } else {
+      children.push(new Paragraph({ spacing: { after: 120 }, children: [bodyRun(section.answerLabel)] }));
+    }
+  }
+
+  const doc = new Document({
+    styles: {
+      default: {
+        document: { run: { size: BODY_SIZE, font: FONT }, paragraph: { spacing: { after: 120 } } },
+      },
+    },
+    numbering: {
+      config: [{
+        reference: 'single-review-numbered',
+        levels: [{ level: 0, format: 'decimal', text: '%1.', alignment: AlignmentType.LEFT }],
+      }],
+    },
+    sections: [{
+      properties: { page: { margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
+      children,
+    }],
+  });
+
+  return Packer.toBuffer(doc);
+}
