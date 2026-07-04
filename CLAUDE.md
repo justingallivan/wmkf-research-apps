@@ -89,3 +89,9 @@ _archived/         Retired apps/pages moved out of the live tree
 .claude-memory/     Rationale, preferences, history, and task router
 tests/              Unit and integration tests
 ```
+
+<!-- rtk-instructions v2 -->
+## RTK (Rust Token Killer)
+
+Prefix every shell command with `rtk`, including each command inside `&&` chains (`rtk git add . && rtk git commit …`). Commands without a dedicated filter pass through unchanged, so `rtk` is always safe; the Claude Code Bash hook also rewrites commands automatically. Meta commands: `rtk gain [--history]` (savings stats), `rtk discover` (missed opportunities), `rtk proxy <cmd>` (run unfiltered for debugging). Full per-command filter reference: `rtk --help`.
+<!-- /rtk-instructions -->
