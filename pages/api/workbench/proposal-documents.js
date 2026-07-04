@@ -10,7 +10,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
 import { listProposalDocuments } from '../../../lib/services/workbench-proposal-documents';
@@ -34,9 +34,7 @@ export default async function handler(req, res) {
     try {
       let rec;
       try {
-        rec = await DynamicsService.getRecord('akoya_requests', requestId, {
-          select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate',
-        });
+        rec = await grantRequestAdapter.getById(requestId, { select: grantRequestAdapter.SELECT_PROFILES.DOCUMENT_SCOPE });
       } catch {
         return res.status(404).json({ error: `No request found for ${requestId}` });
       }
