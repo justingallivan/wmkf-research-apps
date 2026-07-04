@@ -14,10 +14,14 @@ S329: Stage 0's self-test fixture used the synthetic entity name
 main for THREE pushes before it was noticed — the touched-surface gate
 selection ("this is a scripts/ probe, not data-layer") skipped atlas each time.
 
-**Why:** scanner gates (atlas, drain-table-mentions, prompt-storage-mentions,
-secret-scan, doc-symbol-refs) sweep broad path sets; a NEW script with
-synthetic entity/table/secret-shaped fixture strings is inside their blast
-radius regardless of what surface the script itself belongs to.
+**Why:** scanner gates sweep paths regardless of what surface a script
+"belongs" to. Verified scopes (S329): `check:atlas` scans code incl.
+`scripts/` for entity-set strings (the gate that fired); `check:secret-scan`
+scans ALL tracked files (`git ls-files`); `check:doc-symbol-refs` resolves
+`scripts/...` path refs written in memory/wiki text. (`drain-table-mentions`
+and `prompt-storage-mentions` scan only `docs/` + `.claude-memory/` — md
+surfaces, not scripts.) A NEW script with synthetic entity- or secret-shaped
+fixture strings is inside the first two gates' blast radius.
 
 **How to apply:** when a commit ADDS or edits a gate script or its self-test
 fixtures, run the full `check:*` suite (or at minimum every scanner gate)
