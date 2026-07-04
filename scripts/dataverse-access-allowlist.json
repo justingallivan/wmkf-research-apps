@@ -73,20 +73,6 @@
       "count": 1
     },
     {
-      "file": "lib/external/token-lifecycle.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "wmkf_appreviewersuggestions",
-      "count": 1
-    },
-    {
-      "file": "lib/external/token-lifecycle.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "wmkf_appreviewersuggestions",
-      "count": 3
-    },
-    {
       "file": "lib/external/verify-grantee-token.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
