@@ -344,7 +344,11 @@ test.describe('Program Director reviewer invitation flow', () => {
     await page.getByLabel('Select Dr. Capture Candidate').check();
     await page.getByRole('button', { name: /send invitation \(1\)/i }).click();
 
-    await expect(page.getByText('Invite reviewers (1)')).toBeVisible();
+    // exact:true (case-sensitive, whole-string) targets the modal title
+    // "Invite reviewers (1)" only; without it, getByText also matches the
+    // Workbench sub-tab header "Invite Reviewers (1)" (ReviewerInvitePanel)
+    // behind the modal → strict-mode violation.
+    await expect(page.getByText('Invite reviewers (1)', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Days to respond')).toHaveValue('10');
     await expect(page.getByLabel('Review due date')).toHaveValue('2026-07-22');
     await page.getByLabel('Days to respond').fill('10');

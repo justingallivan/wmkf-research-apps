@@ -284,3 +284,9 @@ related:
 | [WAVE1_REVERT_TEMP_ELEVATIONS.md](WAVE1_REVERT_TEMP_ELEVATIONS.md) | history | active |  | Purpose: Remove the elevated privileges the app user needed for the prod cutover, leaving it with the minimal permanent surface. | 2026-07-02 |
 | [WAVE1_VERCEL_FLAG_ROLLOUT.md](WAVE1_VERCEL_FLAG_ROLLOUT.md) | plan | active |  | Status: ✅ CLOSED 2026-05-12. This runbook is preserved as the historical record of how the flags were flipped and the trailing-newline gotcha that... | 2026-07-02 |
 
+## testing
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [E2E_REVIEWER_REBASELINE_HANDOFF.md](E2E_REVIEWER_REBASELINE_HANDOFF.md) | plan | active |  | E2E red 2+ days: 8/23 fail, all reviewer invite/accept. One safe selector bug fixed; rest parked (6/8 overlap Codex's active accept-flow rewrite). | 2026-07-04 |
+
