@@ -4,8 +4,9 @@
  * AI synthesis of a proposal's SUBMITTED peer reviews (workbench Reviews tab
  * Phase 4, docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md). Composes a plain-text
  * digest of every submitted reviewer's answers (reviewer name/affiliation +
- * each question's text + answerText — never answerHtml, which is untrusted
- * rich text not needed for the synthesis) and runs it through the shared
+ * each question's key/type/text + answerValue/answerText - never answerHtml,
+ * which is untrusted rich text not needed for the synthesis) and runs it
+ * through the shared
  * Executor (`lib/services/execute-prompt.js`) against the
  * `review-synthesis.generate` prompt, which writes the result to
  * `akoya_request.wmkf_reviewsynthesisjson`.
@@ -44,13 +45,14 @@ const ANSWER_FIELDS = [
   'wmkf_questionorder',
   'wmkf_questiontext',
   'wmkf_questiontype',
+  'wmkf_answervalue',
   'wmkf_answertext',
   '_wmkf_appreviewersuggestion_value',
 ];
 
 /**
- * Read the answer-snapshot rows (answerText only — the digest never touches
- * answerHtml) for a set of submitted suggestions. Same keyed-child query
+ * Read the answer-snapshot rows (plain metadata + answerText only; the digest
+ * never touches answerHtml) for a set of submitted suggestions. Same keyed-child query
  * pattern as `pages/api/review-manager/reviewers.js#fetchAnswersBySuggestion`,
  * kept local rather than extracted since that route's helper isn't exported.
  */
@@ -75,8 +77,11 @@ async function fetchAnswerTextsBySuggestion(suggestionIds) {
       const sid = a._wmkf_appreviewersuggestion_value;
       if (!sid) continue;
       (out[sid] ||= []).push({
+        questionKey: a.wmkf_questionkey || '',
         questionOrder: a.wmkf_questionorder ?? 0,
         questionText: a.wmkf_questiontext || '',
+        questionType: a.wmkf_questiontype || '',
+        answerValue: a.wmkf_answervalue ?? null,
         answerText: a.wmkf_answertext || '',
       });
     }
@@ -89,17 +94,32 @@ async function fetchAnswerTextsBySuggestion(suggestionIds) {
 
 /**
  * Plain-text digest of every submitted reviewer's answers — reviewer name/
- * affiliation heading, then each question's text + answerText. This is the
- * text that reaches the LLM as the `reviews_digest` untrusted override
- * variable (see shared/config/prompts/review-synthesis.js).
+ * affiliation heading, then each question's stable key/type/text plus answer
+ * value/text. This is the text that reaches the LLM as the `reviews_digest`
+ * untrusted override variable (see shared/config/prompts/review-synthesis.js).
  */
+function hasAnswerValue(a) {
+  return a.answerValue !== null && a.answerValue !== undefined && a.answerValue !== '';
+}
+
+function formatAnswerForDigest(a) {
+  const lines = [
+    `Question key: ${a.questionKey || 'unknown'}`,
+    `Question type: ${a.questionType || 'unknown'}`,
+    `Question text: ${a.questionText || ''}`,
+  ];
+  if (hasAnswerValue(a)) lines.push(`Answer value: ${a.answerValue}`);
+  lines.push(`Answer text: ${a.answerText || ''}`);
+  return lines.join('\n');
+}
+
 function buildReviewsDigest(reviewers) {
   return reviewers
     .map((r) => {
       const heading = `Reviewer: ${r.name || 'Unnamed reviewer'}${r.affiliation ? ` (${r.affiliation})` : ''}`;
       const body = (r.answers || [])
-        .filter((a) => a.answerText && a.answerText.trim().length > 0)
-        .map((a) => `Q: ${a.questionText}\nA: ${a.answerText}`)
+        .filter((a) => (a.answerText && a.answerText.trim().length > 0) || hasAnswerValue(a))
+        .map(formatAnswerForDigest)
         .join('\n\n');
       return `${heading}\n${body}`;
     })
@@ -201,6 +221,17 @@ export default async function handler(req, res) {
       }
 
       const write = result.writeResults?.results?.find((r) => r.output === 'synthesis');
+      if (!write?.ok) {
+        const reason = write?.reason || 'writeback_failed';
+        const status = reason === 'concurrent_edit' ? 409 : 502;
+        return res.status(status).json({
+          ok: false,
+          reason,
+          runId: result.runId,
+          writtenToDynamics: false,
+        });
+      }
+
       return res.status(200).json({
         ok: true,
         synthesis: result.parsed?.synthesis || null,

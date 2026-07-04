@@ -4,9 +4,10 @@
  *
  * Covers: requestId GUID rejection, zero-submitted-reviews 409 (no LLM call),
  * already-populated + no overwrite → 409 without calling the LLM, overwrite
- * flag → forceOverwrite passed through to executePrompt, and digest
- * composition (reviewer name/affiliation + question text/answerText, no
- * answerHtml). executePrompt and all Dataverse calls are mocked.
+ * flag → forceOverwrite passed through to executePrompt, writeback failures
+ * surfaced to the client, and digest composition (reviewer name/affiliation +
+ * question key/type/text + answerValue/answerText, no answerHtml).
+ * executePrompt and all Dataverse calls are mocked.
  */
 
 import { createMockReq, createMockRes } from '../helpers/auth-mock';
@@ -52,15 +53,23 @@ beforeEach(() => {
     records: [
       {
         _wmkf_appreviewersuggestion_value: SUGGESTION_ID,
+        wmkf_questionkey: 'impact',
         wmkf_questionorder: 1,
         wmkf_questiontext: 'Rate the impact.',
+        wmkf_questiontype: 'picklist',
+        wmkf_answervalue: 4,
         wmkf_answertext: 'High',
+        wmkf_answerhtml: '<p>High</p>',
       },
       {
         _wmkf_appreviewersuggestion_value: SUGGESTION_ID,
+        wmkf_questionkey: 'strengths',
         wmkf_questionorder: 2,
         wmkf_questiontext: 'Describe strengths.',
+        wmkf_questiontype: 'richtext',
+        wmkf_answervalue: null,
         wmkf_answertext: 'Strong methodology.',
+        wmkf_answerhtml: '<p>Strong methodology.</p>',
       },
     ],
     capped: false,
@@ -142,13 +151,22 @@ test('overwrite:true bypasses the already-exists gate and passes forceOverwrite 
   expect(call.forceOverwrite).toBe(true);
   expect(call.runSource).toBe('Vercel Interactive');
 
-  // Digest composition: reviewer name/affiliation + question text/answerText,
-  // no answerHtml anywhere in the payload sent to the LLM.
-  expect(call.overrideVariables.reviews_digest).toContain('Dr. Reviewer');
-  expect(call.overrideVariables.reviews_digest).toContain('Test University');
-  expect(call.overrideVariables.reviews_digest).toContain('Rate the impact.');
-  expect(call.overrideVariables.reviews_digest).toContain('High');
-  expect(call.overrideVariables.reviews_digest).toContain('Strong methodology.');
+  expect(DynamicsService.queryAllRecords.mock.calls[0][1].select).toContain('wmkf_answervalue');
+
+  const digest = call.overrideVariables.reviews_digest;
+  // Digest composition: reviewer name/affiliation + question metadata +
+  // answerValue/answerText, no answerHtml anywhere in the payload sent to the LLM.
+  expect(digest).toContain('Dr. Reviewer');
+  expect(digest).toContain('Test University');
+  expect(digest).toContain('Question key: impact');
+  expect(digest).toContain('Question type: picklist');
+  expect(digest).toContain('Question text: Rate the impact.');
+  expect(digest).toContain('Answer value: 4');
+  expect(digest).toContain('Answer text: High');
+  expect(digest).toContain('Question key: strengths');
+  expect(digest).toContain('Question type: richtext');
+  expect(digest).toContain('Answer text: Strong methodology.');
+  expect(digest).not.toContain('<p>');
 });
 
 test('no prior synthesis (empty memo) proceeds without overwrite flag', async () => {
@@ -175,4 +193,37 @@ test('no prior synthesis (empty memo) proceeds without overwrite flag', async ()
   expect(res.statusCode).toBe(200);
   expect(executePrompt).toHaveBeenCalledTimes(1);
   expect(executePrompt.mock.calls[0][0].forceOverwrite).toBe(false);
+});
+
+test.each([
+  ['writeback_failed', 502],
+  ['concurrent_edit', 409],
+])('Executor synthesis write failure (%s) returns %i instead of ok:true', async (reason, expectedStatus) => {
+  suggestionAdapter.findByRequest.mockResolvedValue([
+    {
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_accepted: true,
+      wmkf_reviewreceivedat: '2026-06-01T00:00:00Z',
+      wmkf_revieweraffiliation: 'Test University',
+    },
+  ]);
+  DynamicsService.getRecord.mockResolvedValue({ wmkf_reviewsynthesisjson: null });
+  executePrompt.mockResolvedValue({
+    blocked: false,
+    parsed: { synthesis: { consensus: [], disagreements: [], keyConcerns: [], ratingSummaries: [], overall: '' } },
+    runId: 'run-write-failed',
+    writeResults: { allOk: false, results: [{ output: 'synthesis', ok: false, reason }] },
+  });
+
+  const { req, res } = post({ requestId: REQUEST_ID });
+  await handler(req, res);
+
+  expect(res.statusCode).toBe(expectedStatus);
+  expect(res._data).toMatchObject({
+    ok: false,
+    reason,
+    runId: 'run-write-failed',
+    writtenToDynamics: false,
+  });
 });

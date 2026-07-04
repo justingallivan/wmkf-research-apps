@@ -182,6 +182,12 @@ related:
 | [DEAD_CODE_DELETION_MANIFEST.md](DEAD_CODE_DELETION_MANIFEST.md) | audit | active |  | SAFE dead-code bucket applied 2026-07-03; owner-confirmation deletion candidates remain parked for explicit approval. |  |
 | [DOCS_DRIFT_AUDIT_S322.md](DOCS_DRIFT_AUDIT_S322.md) | audit | active |  | Fresh code-first comparison of README, CLAUDE.md, and docs/ claims against actual behavior. Drift table with evidence plus a proposed docs patch. No edits. |  |
 
+## review-manager
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [SESSION_326_REVIEW_FOLLOWUP_REPORT_2026-07-04.md](SESSION_326_REVIEW_FOLLOWUP_REPORT_2026-07-04.md) | audit | active |  | Follow-up remediation report for Session 326 Reviews tab synthesis findings, verification, and remaining next steps. |  |
+
 ## reviewer-finder
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
