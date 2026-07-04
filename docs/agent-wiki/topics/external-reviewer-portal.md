@@ -164,6 +164,16 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   collected here (the CRM `nickname` field is untouched, not blanked). Net: Academic rank now feeds
   the CRM job title; Main institution now feeds the COI mismatch check.
   Full decision record: `docs/REVIEWER_CONTACT_BOUNDARY_GAP_FINDINGS.md` §"Increment 2a".
+- **Host hazard (S326): staff sign-in does not exist on the external hosts.**
+  `reviews.wmkeck.org` / `grantees.` / `submissions.` are token-access external
+  hosts — not Azure sign-in redirect URIs; their `/auth/signin` page is a dead
+  end by design (owner-stated S326). Any staff-UI browser drive/E2E/manual check
+  (workbench, admin) must use `https://applications.wmkeck.org`. Four S326
+  browser-drive attempts were lost misreading this as a session problem. Detail:
+  `.claude-memory/project-branded-domains.md`. Also S326: zero reviews have ever
+  been submitted through the portal (built ahead of the D26 cycle), so populated
+  review-consumption UI needs a staged submission — the S308 token procedure
+  below is the recipe.
 - **Smoke-testing the live prod accept form (S308 procedure).** To get a working
   magic link for a test reviewer WITHOUT sending an email: hit `POST /api/review-manager/
   regenerate-token { suggestionId }` from an authenticated STAFF session — it mints the

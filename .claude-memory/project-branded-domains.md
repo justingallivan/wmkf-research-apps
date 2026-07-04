@@ -16,6 +16,21 @@ outside reviewer/grantee looks like phishing. Staff-facing app auth is a
 separate migration because `NEXTAUTH_URL` drives OAuth callbacks and staff API
 Origin/Referer checks.
 
+## HAZARD — staff sign-in exists ONLY on applications.wmkeck.org (S326)
+
+`reviews.wmkeck.org` (and `grantees.`/`submissions.`) are EXTERNAL-facing hosts:
+token/magic-link access only, no staff users, and NOT registered as Azure
+sign-in redirect URIs (owner-stated S326; consistent with the registration's
+redirect-URI list below, which contains only the applications.wmkeck.org callback). The `/auth/signin` page a staff URL renders there is a
+dead end BY DESIGN — "Sign in with Microsoft" cannot complete on that host.
+Any browser-drive/E2E/manual check of staff UI (workbench, admin) MUST target
+`https://applications.wmkeck.org`. S326 lost four browser-drive attempts to
+agents treating the reviews-host sign-in page as a session problem; it is a
+host-selection problem. Also from S326: the portal is being built AHEAD of the
+D26 cycle — zero reviews have ever been submitted through it, so populated
+review-consumption UI (Compare/Export) cannot be verified against real data
+until the first real or staged submission.
+
 ## State (2026-06-23)
 
 - **`reviews.wmkeck.org`** — attached/aliased in Vercel and serving the external
