@@ -59,13 +59,6 @@
       "count": 3
     },
     {
-      "file": "lib/external/verify-grantee-token.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "lib/external/verify-suggestion-token.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
@@ -423,13 +416,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/reviewer-request-context.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "lib/services/reviewer-rollup.js",
       "kind": "import",
       "clientMethod": "DynamicsService.queryAllRecords",
@@ -668,13 +654,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/grant-reporting/lookup-grant.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/phase-i-dynamics/summarize.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
@@ -742,13 +721,6 @@
       "kind": "import:changeset-op:PATCH",
       "clientMethod": "DynamicsService.executeChangeset",
       "entity": "wmkf_appreviewersuggestions",
-      "count": 1
-    },
-    {
-      "file": "pages/api/review-manager/materials-preflight.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
       "count": 1
     },
     {
@@ -920,13 +892,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/reviewer-finder/load-proposal.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/reviewer-finder/my-candidates.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
@@ -983,18 +948,11 @@
       "count": 1
     },
     {
-      "file": "pages/api/workbench/applicant-reviewers.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/workbench/dashboard.js",
       "kind": "import",
       "clientMethod": "DynamicsService.queryAllRecords",
       "entity": "akoya_requests",
-      "count": 2
+      "count": 1
     },
     {
       "file": "pages/api/workbench/grantee-deliverables/abstract.js",

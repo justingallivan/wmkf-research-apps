@@ -40,10 +40,10 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { GraphService } from '../../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../../lib/utils/sharepoint-buckets';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
 
 // Lookup is generic (request lookup + SharePoint doc listing) — any app that
 // needs to target an akoya_request by request number can reuse this endpoint.
@@ -87,9 +87,8 @@ export default async function handler(req, res) {
   // ─── Step 1: Dynamics lookup ─────────────────────────────────────────────
   let record = null;
   try {
-    const result = await DynamicsService.queryRecords('akoya_requests', {
+    const result = await grantRequestAdapter.findByRequestNumber(trimmed, {
       select: HEADER_FIELDS,
-      filter: `akoya_requestnum eq '${escapeOData(trimmed)}'`,
       top: 1,
     });
     record = result.records[0] || null;
@@ -140,10 +139,6 @@ export default async function handler(req, res) {
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
-
-function escapeOData(value) {
-  return value.replace(/'/g, "''");
-}
 
 function emptyHeader() {
   return {

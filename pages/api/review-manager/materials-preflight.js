@@ -18,9 +18,9 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { listReviewerMaterials } from '../../../lib/external/reviewer-materials';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -38,8 +38,8 @@ export default async function handler(req, res) {
 
   try {
     const request = await bypassDynamicsRestrictions('review-manager-materials-preflight', () =>
-      DynamicsService.getRecord('akoya_requests', requestId, {
-        select: 'akoya_requestid,akoya_requestnum',
+      grantRequestAdapter.getById(requestId, {
+        select: grantRequestAdapter.SELECT_PROFILES.IDENTITY,
       }),
     );
     if (!request?.akoya_requestid || !request?.akoya_requestnum) {

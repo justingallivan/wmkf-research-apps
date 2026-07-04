@@ -26,10 +26,10 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
 import * as reviewerSuggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
 import { extractExcludedReviewers } from '../../../lib/services/reviewer-exclusion-parser';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 
@@ -85,7 +85,7 @@ export default async function handler(req, res) {
     try {
       let request;
       try {
-        request = await DynamicsService.getRecord('akoya_requests', requestId, { select: REQUEST_SELECT });
+        request = await grantRequestAdapter.getById(requestId, { select: REQUEST_SELECT });
       } catch {
         request = null;
       }

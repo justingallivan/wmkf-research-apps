@@ -39,6 +39,7 @@ import { TRIAGE_STATUS } from '../../../shared/config/triageStatus';
 // Reviewer rollup + work-remaining derivation are shared with the per-request
 // Overview tab (via /api/workbench/reviewer-rollup); single source of truth.
 import { fetchReviewerRollup, deriveWorkRemaining, REVIEWERS_NEEDED } from '../../../lib/services/reviewer-rollup';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
 
 const PROPOSAL_SELECT = [
   'akoya_requestid',
@@ -102,12 +103,7 @@ export default async function handler(req, res) {
  * list — which keeps this query cheap (PD-scoped, not a full-table scan).
  */
 async function listCycles(res, pd) {
-  const filter = `_wmkf_programdirector_value eq ${pd.systemuserid} and wmkf_meetingdate ne null`;
-  const { records } = await DynamicsService.queryAllRecords('akoya_requests', {
-    select: 'akoya_requestid,wmkf_meetingdate',
-    filter,
-    orderby: 'wmkf_meetingdate desc',
-  });
+  const { records } = await grantRequestAdapter.findMeetingDatesByProgramDirector(pd.systemuserid);
 
   const seen = new Map(); // code → { code, label, year, month, count }
   for (const r of records) {

@@ -19,11 +19,11 @@
 import { put } from '@vercel/blob';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { GraphService } from '../../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../../lib/utils/sharepoint-buckets';
 import { classifyFile } from '../grant-reporting/lookup-grant';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '1mb' } },
@@ -76,8 +76,8 @@ export default async function handler(req, res) {
   return bypassDynamicsRestrictions('reviewer-finder-load-proposal', async () => {
   try {
     // 1. Resolve request_number for SharePoint folder lookup.
-    const request = await DynamicsService.getRecord('akoya_requests', requestId, {
-      select: 'akoya_requestid,akoya_requestnum',
+    const request = await grantRequestAdapter.getById(requestId, {
+      select: grantRequestAdapter.SELECT_PROFILES.IDENTITY,
     });
     if (!request || !request.akoya_requestnum) {
       return res.status(404).json({ error: `Request ${requestId} not found or missing request number.` });
