@@ -45,13 +45,6 @@
       "count": 1
     },
     {
-      "file": "lib/external/policy-fetcher.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "wmkf_policies",
-      "count": 1
-    },
-    {
       "file": "lib/external/review-answer-snapshot.js",
       "kind": "import",
       "clientMethod": "DynamicsService.queryAllRecords",
