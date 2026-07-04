@@ -55,6 +55,12 @@ related:
 | [WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md](WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md) | plan | active |  | Status: spec / pre-design (S258, 2026-06-14). Input to the Codex design loop. | 2026-07-02 |
 | [WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md](WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md) | plan | active |  | v4 (2026-06-15): Codex review round 3 folded in. | 2026-07-02 |
 
+## data-layer
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [DATA_ACCESS_LAYER_MIGRATION_PLAN.md](DATA_ACCESS_LAYER_MIGRATION_PLAN.md) | plan | active |  | Ratchet-gated migration of ~86 raw DynamicsService caller files into per-entity adapters; ends with fail-closed restriction context. Approved S328. | 2026-07-04 |
+
 ## dataverse
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
