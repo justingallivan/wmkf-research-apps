@@ -290,34 +290,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/prompt-seed.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.createRecord",
-      "entity": "wmkf_ai_prompts",
-      "count": 1
-    },
-    {
-      "file": "lib/services/prompt-seed.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "wmkf_ai_prompts",
-      "count": 1
-    },
-    {
-      "file": "lib/services/prompt-seed.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "wmkf_ai_prompts",
-      "count": 1
-    },
-    {
-      "file": "lib/services/prompt-seed.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "wmkf_ai_prompts",
-      "count": 1
-    },
-    {
       "file": "lib/services/prompt-store.js",
       "kind": "import",
       "clientMethod": "DynamicsService.queryRecords",
