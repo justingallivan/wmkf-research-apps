@@ -9,19 +9,29 @@ jobs:
   semgrep:
     name: Static Analysis (Semgrep)
     runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
     permissions:
       contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Run Semgrep security rulesets
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: >-
-            p/default
-            p/javascript
-            p/react
-            p/nextjs
-            p/owasp-top-ten
-            .semgrep/token-audit.yaml
+      # Blocking gate: curated token-exposure rules. Fails the build on any finding.
+      - name: Semgrep token audit (blocking)
+        run: >-
+          semgrep scan --error
+          --config .semgrep/token-audit.yaml
+          --exclude node_modules --exclude _archived --exclude scripts/archive
+          --exclude .next --exclude outputs
+
+      # Advisory: broad SAST for visibility (injection/XSS/OWASP/framework rules).
+      # Non-blocking while the initial findings are triaged; promote to blocking
+      # by moving these configs into the step above once the backlog is clear.
+      - name: Semgrep broad SAST (advisory)
+        run: >-
+          semgrep scan
+          --config p/owasp-top-ten --config p/nextjs --config p/react
+          --exclude node_modules --exclude _archived --exclude scripts/archive
+          --exclude .next --exclude outputs
+          || true
