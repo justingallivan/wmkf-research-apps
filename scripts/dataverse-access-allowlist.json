@@ -283,13 +283,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/proposal-participants.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "wmkf_apprequestpersons",
-      "count": 1
-    },
-    {
       "file": "lib/services/proposal-pi-identity.js",
       "kind": "require",
       "clientMethod": "DynamicsService.getRecord",
