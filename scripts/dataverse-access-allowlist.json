@@ -850,13 +850,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/review-manager/download-review.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "wmkf_appreviewersuggestions",
-      "count": 1
-    },
-    {
       "file": "pages/api/review-manager/mark-received-no-file.js",
       "kind": "import",
       "clientMethod": "DynamicsService.resolveEntitySetName",
