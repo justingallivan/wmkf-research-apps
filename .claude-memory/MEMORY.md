@@ -53,7 +53,7 @@
 - Deferred cleanup / dead-code session: project-deferred-code-cleanup.md
 - Parked: spec-audit design-docs recovery (work computer, ~2026-07-08): project-spec-audit-docs-recovery-parked.md
 - Private-repo CI (why CodeQL gone, Semgrep split, Pro needed for branch protection): project-private-repo-ci-visibility.md
-- Parked: E2E reviewer suite re-baseline (8/23 red, after Codex accept rewrite): project-e2e-reviewer-rebaseline-parked.md
+- E2E reviewer suite re-baseline (RESOLVED 2026-07-04, 23/23 green; client-UX drift lesson): project-e2e-reviewer-rebaseline-parked.md
 
 ## Archive
 - Closed & shipped work index: project-closed-work-archive.md

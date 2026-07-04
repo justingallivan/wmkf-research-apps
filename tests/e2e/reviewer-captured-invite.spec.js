@@ -18,6 +18,14 @@ async function acknowledgeBothPolicies(page) {
   }
 }
 
+// Board-writeup academic identity (S308) is required before the accept POST fires
+// (Stage2aView.handleAccept); the fixture leaves it blank, so fill it first.
+async function completeBoardIdentity(page) {
+  await page.getByLabel('Academic rank').fill('Professor');
+  await page.getByLabel('Primary department').fill('Department of Chemistry');
+  await page.getByLabel('Main institution').fill('Example University');
+}
+
 test.describe('Reviewer captured invite rehearsal', () => {
   test('captured Respond to Invitation button opens the portal and reviewer accepts', async ({ page }, testInfo) => {
     const { respondCalls } = await mockPortal(page, { context: buildContext() });
@@ -48,6 +56,7 @@ test.describe('Reviewer captured invite rehearsal', () => {
     await expect(page.getByText('A Study of Test-Driven Reviewer Onboarding')).toBeVisible();
 
     await acknowledgeBothPolicies(page);
+    await completeBoardIdentity(page);
     await page.getByRole('button', { name: 'Accept and continue' }).click();
 
     await expect.poll(() => respondCalls.length).toBe(1);

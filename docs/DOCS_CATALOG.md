@@ -288,5 +288,5 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [E2E_REVIEWER_REBASELINE_HANDOFF.md](E2E_REVIEWER_REBASELINE_HANDOFF.md) | plan | active |  | E2E red 2+ days: 8/23 fail, all reviewer invite/accept. One safe selector bug fixed; rest parked (6/8 overlap Codex's active accept-flow rewrite). | 2026-07-04 |
+| [E2E_REVIEWER_REBASELINE_HANDOFF.md](E2E_REVIEWER_REBASELINE_HANDOFF.md) | history | historical |  | RESOLVED 2026-07-04: reviewer E2E re-baselined to the landed accept flow — 23/23 green. Cause: S308 board-identity + no-email/low-confidence UX drift. | 2026-07-04 |
 

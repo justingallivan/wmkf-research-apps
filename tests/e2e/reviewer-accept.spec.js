@@ -22,6 +22,16 @@ async function acknowledgeBothPolicies(page) {
   }
 }
 
+// Board-writeup academic identity (S308) is required on every accept, independent
+// of the honorarium choice (Stage2aView.handleAccept gates the POST on it). The
+// fixture prefill leaves these blank — rank always starts blank in prod — so a
+// spec that accepts must fill them first or the /respond POST never fires.
+async function completeBoardIdentity(page) {
+  await page.getByLabel('Academic rank').fill('Professor');
+  await page.getByLabel('Primary department').fill('Department of Chemistry');
+  await page.getByLabel('Main institution').fill('Example University');
+}
+
 test.describe('Reviewer Stage 2a accept flow', () => {
   test('renders the invitation from mocked context (proposal + prefill + address card)', async ({ page }) => {
     await mockPortal(page, { context: buildContext() });
@@ -43,6 +53,7 @@ test.describe('Reviewer Stage 2a accept flow', () => {
     expect(respondCalls).toHaveLength(0);
 
     await acknowledgeBothPolicies(page);
+    await completeBoardIdentity(page);
     await expect(accept).toBeEnabled();
     await accept.click();
     await expect.poll(() => respondCalls.length).toBe(1);
@@ -67,6 +78,7 @@ test.describe('Reviewer Stage 2a accept flow', () => {
     await page.goto(portalUrl());
 
     await acknowledgeBothPolicies(page);
+    await completeBoardIdentity(page);
     await page.getByRole('button', { name: 'Accept and continue' }).click();
 
     await expect(page.getByText(/complete your mailing address/i)).toBeVisible();
@@ -88,6 +100,7 @@ test.describe('Reviewer Stage 2a accept flow', () => {
     await page.goto(portalUrl());
 
     await acknowledgeBothPolicies(page);
+    await completeBoardIdentity(page);
     await page.getByRole('checkbox').check(); // "I'd prefer to decline the honorarium."
     await page.getByRole('button', { name: 'Accept and continue' }).click();
 
@@ -148,6 +161,7 @@ test.describe('Reviewer Stage 2a accept flow', () => {
     await page.goto(portalUrl());
 
     await acknowledgeBothPolicies(page);
+    await completeBoardIdentity(page);
     await page.getByRole('button', { name: 'Accept and continue' }).click();
 
     await expect.poll(() => respondCalls.length).toBe(1);
@@ -176,6 +190,7 @@ test.describe('Reviewer Stage 2a accept flow', () => {
     await page.goto(portalUrl());
 
     await acknowledgeBothPolicies(page);
+    await completeBoardIdentity(page);
     await page.getByRole('button', { name: 'Accept and continue' }).click();
 
     await expect.poll(() => respondCalls.length).toBe(1);

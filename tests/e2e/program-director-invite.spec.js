@@ -385,7 +385,7 @@ test.describe('Program Director reviewer invitation flow', () => {
     await expect(reviewerPage.getByRole('button', { name: 'Accept and continue' })).toBeVisible();
   });
 
-  test('batch preview handles low-confidence email and no-email rows', async ({ page, context }, testInfo) => {
+  test('batch preview flags low-confidence email and blocks no-email rows', async ({ page, context }, testInfo) => {
     const baseURL = testInfo.project.use.baseURL || 'http://localhost:3100';
     await installStaffSession(context, baseURL);
     const low = makeCandidate({
@@ -402,16 +402,30 @@ test.describe('Program Director reviewer invitation flow', () => {
     const { sentBodies } = await installInviteMocks(context, baseURL, { candidates: [low, missingEmail] });
 
     await page.goto(workbenchUrl(baseURL));
+
+    // A no-email candidate can't be invited: ReviewerInvitePanel disables its
+    // Select checkbox and shows an inline "no email — can't invite" note (it now
+    // blocks selection rather than accepting the row and skipping it in preview).
+    await expect(page.getByLabel('Select Dr. Missing Email')).toBeDisabled();
+    await expect(page.getByText(/no email.*can.t invite/i)).toBeVisible();
+
+    // The low-confidence (unverified-email) candidate is still invitable → count 1.
     await page.getByLabel('Select Dr. Low Confidence').check();
-    await page.getByLabel('Select Dr. Missing Email').check();
-    await page.getByRole('button', { name: /send invitation \(2\)/i }).click();
+    await page.getByRole('button', { name: /send invitation \(1\)/i }).click();
 
-    await expect(page.getByText(/this address wasn’t verified/i)).toBeVisible();
-    await expect(page.getByText(/Skipped \(no email address\)/i)).toBeVisible();
+    // Batch preview flags the unverified address; the no-email row never reaches it.
+    await expect(page.getByText(/this address wasn.t verified/i)).toBeVisible();
 
+    // Send is gated until each low-confidence address is explicitly confirmed. The
+    // confirm checkbox's accessible name starts with the candidate name; anchor to
+    // avoid the panel's "Select Dr. Low Confidence" checkbox behind the modal.
+    await page.getByRole('checkbox', { name: /^Dr\. Low Confidence/ }).check();
+
+    // With the low-confidence address acknowledged in-modal, the final send shows
+    // the generic Dynamics confirm (the per-address "could NOT be verified" warning
+    // now lives on the checkbox above, not in this dialog).
     page.once('dialog', async (dialog) => {
-      expect(dialog.message()).toContain(TEST_EMAIL);
-      expect(dialog.message()).toContain('could NOT be verified');
+      expect(dialog.message()).toContain('Send 1 invitation now via Dynamics?');
       await dialog.accept();
     });
     await page.getByRole('button', { name: 'Confirm & send 1 invitation' }).click();
