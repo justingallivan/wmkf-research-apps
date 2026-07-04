@@ -563,13 +563,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/admin/prompts/index.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "wmkf_ai_prompts",
-      "count": 2
-    },
-    {
       "file": "pages/api/admin/review-questions.js",
       "kind": "import",
       "clientMethod": "DynamicsService.queryRecords",

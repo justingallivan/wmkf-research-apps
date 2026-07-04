@@ -11,22 +11,14 @@
  * unfiltered-query record cap and the `ne null` filter gotcha; they're merged so
  * a name with a current row is represented by it, and a name with only
  * non-current rows surfaces its latest version flagged as a draft.
+ *
+ * Reads are delegated to the wmkf_ai_prompts adapter
+ * (`lib/dataverse/adapters/ai-prompt.js#listCurrent`/`listNonCurrent`), which
+ * mirrors this route's query shape verbatim (Stage-3 conversion, S329 plan).
  */
 import { requireSuperuser } from '../../../../lib/utils/auth';
-import { DynamicsService } from '../../../../lib/services/dynamics-service';
+import * as aiPrompt from '../../../../lib/dataverse/adapters/ai-prompt';
 import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
-
-const PROMPTS_ENTITY = 'wmkf_ai_prompts';
-const SELECT = [
-  'wmkf_ai_promptid', 'wmkf_ai_promptname', 'wmkf_promptversion', 'wmkf_ai_iscurrent',
-  'wmkf_ai_promptstatus', 'wmkf_ai_systemprompt', 'wmkf_ai_promptbody',
-  'wmkf_ai_promptvariables', 'wmkf_ai_promptoutputschema', 'wmkf_ai_model',
-  'wmkf_ai_temperature', 'wmkf_ai_maxtokens',
-  // Provenance (S269): createdon = version created, publisheddatetime = domain
-  // publish time, modifiedon = last Dataverse touch, _modifiedby_value(_formatted)
-  // = who/what (seed runs as the app identity; admin publish as the superuser).
-  'createdon', 'modifiedon', '_modifiedby_value', 'wmkf_ai_publisheddatetime',
-].join(',');
 
 function mapRow(r, { hasCurrent }) {
   return {
@@ -61,12 +53,8 @@ export default async function handler(req, res) {
   try {
     return await bypassDynamicsRestrictions('admin-prompts-list', async () => {
       const [currentRes, nonCurrentRes] = await Promise.all([
-        DynamicsService.queryRecords(PROMPTS_ENTITY, {
-          select: SELECT, filter: 'wmkf_ai_iscurrent eq true', orderby: 'wmkf_ai_promptname asc', top: 200,
-        }),
-        DynamicsService.queryRecords(PROMPTS_ENTITY, {
-          select: SELECT, filter: 'wmkf_ai_iscurrent eq false', orderby: 'wmkf_promptversion desc', top: 200,
-        }),
+        aiPrompt.listCurrent(),
+        aiPrompt.listNonCurrent(),
       ]);
 
       const byName = new Map();
