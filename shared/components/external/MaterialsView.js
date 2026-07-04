@@ -26,7 +26,7 @@ export default function MaterialsView({ data, token }) {
         {submitted ? 'Review submitted' : 'Submit your review'}
       </h2>
       <ProposalCard data={data} />
-      <FilesCard data={data} token={token} />
+      <FilesCard data={data} token={token} submitted={submitted} />
       {submitted ? <SubmittedNotice data={data} /> : <ReviewAuthoringForm data={data} token={token} />}
     </div>
   );
@@ -59,8 +59,12 @@ function ProposalCard({ data }) {
   );
 }
 
-function FilesCard({ data, token }) {
+function FilesCard({ data, token, submitted }) {
   if (!data.files || data.files.length === 0) {
+    // After submission the "hasn't shared materials yet — contact us" prompt
+    // is stale noise next to the Review-received notice; the reviewer no
+    // longer needs materials. Files that DO exist stay downloadable below.
+    if (submitted) return null;
     return (
       <div className="bg-white rounded-2xl border border-gray-200 p-6">
         <h3 className="text-base font-semibold text-gray-900">Proposal materials</h3>
