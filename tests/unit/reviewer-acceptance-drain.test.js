@@ -45,7 +45,7 @@ function request(overrides = {}) {
   };
 }
 
-function job({ isAcceptRepeat = false, optedOut = false, status = 'queued', steps = {}, createdAt } = {}) {
+function job({ isAcceptRepeat = false, optedOut = false, status = 'queued', steps = {}, createdAt, acceptedAt = '2026-07-01T10:00:00.000Z' } = {}) {
   const suggestion = acceptedSuggestion({ wmkf_honorariumoptout: optedOut });
   return {
     id: 77,
@@ -54,10 +54,11 @@ function job({ isAcceptRepeat = false, optedOut = false, status = 'queued', step
     attempts: 0,
     suggestion_id: SUGGESTION_ID,
     created_at: createdAt || new Date().toISOString(),
+    accepted_at: acceptedAt,
     steps,
     payload: {
       schemaVersion: 1,
-      acceptedAt: '2026-07-01T10:00:00.000Z',
+      acceptedAt,
       isAcceptRepeat,
       optedOut,
       acceptOrcidRaw: '0000-0002-1825-0097',
@@ -164,6 +165,32 @@ describe('processReviewerAcceptanceJob', () => {
     });
 
     expect(d.jobs.cancelReviewerAcceptanceJob).not.toHaveBeenCalled();
+    expect(d.ensureHonorarium).not.toHaveBeenCalled();
+    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
+  });
+
+  it('processes a queued job when Dataverse truncates the same accepted second', async () => {
+    const d = deps(acceptedSuggestion({ wmkf_responsereceivedat: '2026-07-01T10:00:00Z' }));
+    const result = await processReviewerAcceptanceJob(job({ acceptedAt: '2026-07-01T10:00:00.347Z' }), d);
+
+    expect(result.status).toBe('completed');
+    expect(d.jobs.cancelReviewerAcceptanceJob).not.toHaveBeenCalled();
+    expect(d.ensureHonorarium).toHaveBeenCalled();
+    expect(d.sendAcceptanceEmail).toHaveBeenCalled();
+    expect(d.jobs.completeReviewerAcceptanceJob).toHaveBeenCalledWith(77, expect.any(String));
+  });
+
+  it('cancels a queued sibling job whose acceptedAt does not match Dataverse', async () => {
+    const d = deps(acceptedSuggestion({ wmkf_responsereceivedat: '2026-07-01T10:00:05.000Z' }));
+    const result = await processReviewerAcceptanceJob(job({ status: 'queued' }), d);
+
+    expect(result).toMatchObject({ status: 'cancelled', reason: 'accepted_timestamp_mismatch' });
+    expect(d.jobs.cancelReviewerAcceptanceJob).toHaveBeenCalledWith(
+      77,
+      expect.stringContaining('accepted_timestamp_mismatch'),
+      { leaseToken: expect.any(String) },
+    );
     expect(d.ensureHonorarium).not.toHaveBeenCalled();
     expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
