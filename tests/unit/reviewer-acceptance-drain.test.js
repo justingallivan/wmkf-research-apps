@@ -154,6 +154,75 @@ describe('processReviewerAcceptanceJob', () => {
     expect(d.ensureHonorarium).not.toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
+
+  it('retries a recent sibling job whose acceptedAt does not match Dataverse', async () => {
+    const d = deps(acceptedSuggestion({ wmkf_responsereceivedat: '2026-07-01T10:00:05.000Z' }));
+
+    await expect(processReviewerAcceptanceJob(job({ status: 'accept_pending' }), d)).rejects.toMatchObject({
+      message: 'accepted_timestamp_mismatch',
+      retryable: true,
+    });
+
+    expect(d.jobs.cancelReviewerAcceptanceJob).not.toHaveBeenCalled();
+    expect(d.ensureHonorarium).not.toHaveBeenCalled();
+    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
+  });
+
+  it('cancels a stale sibling job whose acceptedAt does not match Dataverse', async () => {
+    const stale = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    const d = deps(acceptedSuggestion({ wmkf_responsereceivedat: '2026-07-01T10:00:05.000Z' }));
+    const result = await processReviewerAcceptanceJob(job({ status: 'accept_pending', createdAt: stale }), d);
+
+    expect(result).toMatchObject({ status: 'cancelled', reason: 'accepted_timestamp_mismatch' });
+    expect(d.jobs.cancelReviewerAcceptanceJob).toHaveBeenCalledWith(
+      77,
+      expect.stringContaining('accepted_timestamp_mismatch'),
+      { leaseToken: expect.any(String) },
+    );
+    expect(d.ensureHonorarium).not.toHaveBeenCalled();
+    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
+  });
+
+  it('keeps honorarium exceptions retryable after running remaining follow-up', async () => {
+    const d = deps();
+    d.ensureHonorarium.mockRejectedValueOnce(new Error('BILL down'));
+
+    await expect(processReviewerAcceptanceJob(job(), d)).rejects.toMatchObject({
+      message: expect.stringContaining('honorarium_onboarding_retry_required'),
+      retryable: true,
+      delaySeconds: 300,
+    });
+
+    expect(d.captureOrcid).toHaveBeenCalled();
+    expect(d.captureIdentity).toHaveBeenCalled();
+    expect(d.syncNameTitle).toHaveBeenCalled();
+    expect(d.sendAcceptanceEmail).toHaveBeenCalled();
+    expect(d.quota).toHaveBeenCalled();
+    expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
+  });
+
+  it('keeps capture-only address failures retryable after notifying staff', async () => {
+    const d = deps();
+    d.ensureHonorarium.mockResolvedValueOnce({
+      status: 'deferred',
+      contactId: 'contact-1',
+      addressCaptureError: 'Dataverse contact PATCH failed',
+    });
+
+    await expect(processReviewerAcceptanceJob(job(), d)).rejects.toMatchObject({
+      message: expect.stringContaining('address_capture_failed'),
+      retryable: true,
+    });
+
+    expect(d.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'honorarium_capture_failed',
+      autoResolveKey: `honorarium_capture_failed:${SUGGESTION_ID}`,
+    }));
+    expect(d.sendAcceptanceEmail).toHaveBeenCalled();
+    expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
+  });
 });
 
 describe('drainReviewerAcceptanceJobs', () => {
