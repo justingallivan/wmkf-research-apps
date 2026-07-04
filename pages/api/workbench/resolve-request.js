@@ -9,7 +9,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
 import { fetchCoPIs } from '../../../lib/services/proposal-participants';
@@ -73,17 +73,12 @@ export default async function handler(req, res) {
       let r = null;
       if (requestId) {
         try {
-          r = await DynamicsService.getRecord('akoya_requests', requestId, { select: SELECT });
+          r = await grantRequestAdapter.getById(requestId, { select: SELECT });
         } catch (e) {
           r = null; // fall through to 404
         }
       } else {
-        const safe = requestNumber.replace(/'/g, "''");
-        const { records } = await DynamicsService.queryRecords('akoya_requests', {
-          select: SELECT,
-          filter: `akoya_requestnum eq '${safe}'`,
-          top: 1,
-        });
+        const { records } = await grantRequestAdapter.findByRequestNumber(requestNumber, { select: SELECT, top: 1 });
         r = records[0];
       }
       if (!r) {

@@ -1221,20 +1221,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/workbench/resolve-request.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/workbench/resolve-request.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/workbench/triage.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
