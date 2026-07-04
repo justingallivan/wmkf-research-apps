@@ -248,6 +248,12 @@ function roundOrNull(n) {
  * @param {string} params.generatedAtIso - ISO timestamp for the header;
  *   caller-supplied (not `Date.now()` internally) to keep this module pure
  *   and deterministic for tests.
+ * @param {Object|null} [params.synthesis] - the stored/generated AI review
+ *   synthesis (workbench Reviews tab Phase 4, `wmkf_reviewsynthesisjson`
+ *   parsed shape: `{consensus, disagreements, keyConcerns, ratingSummaries,
+ *   overall}`). Included in the composed report ONLY when passed — omitting
+ *   it (or passing null/undefined) keeps the report byte-identical to a
+ *   Phase-3-only export (no synthesis section rendered).
  * @returns {{
  *   header: {requestNumber:(string|null), requestTitle:(string|null),
  *     piName:(string|null), institution:(string|null), generatedAtIso:string,
@@ -271,6 +277,7 @@ export function composeReviewReport({
   institution = null,
   matrix,
   generatedAtIso,
+  synthesis = null,
 }) {
   const safeMatrix = matrix && Array.isArray(matrix.questions) && Array.isArray(matrix.reviewers)
     ? matrix
@@ -334,5 +341,18 @@ export function composeReviewReport({
     })),
   }));
 
-  return { header, summary, ratingsTable, narrativeSections };
+  // Phase 4: optional synthesis section. Only present when a synthesis object
+  // was passed in (plain object with the LLM-authored arrays/strings — never
+  // HTML, so renderers use plain text, no htmlToBlocks tokenization needed).
+  const synthesisSection = synthesis && typeof synthesis === 'object'
+    ? {
+      consensus: Array.isArray(synthesis.consensus) ? synthesis.consensus : [],
+      disagreements: Array.isArray(synthesis.disagreements) ? synthesis.disagreements : [],
+      keyConcerns: Array.isArray(synthesis.keyConcerns) ? synthesis.keyConcerns : [],
+      ratingSummaries: Array.isArray(synthesis.ratingSummaries) ? synthesis.ratingSummaries : [],
+      overall: typeof synthesis.overall === 'string' ? synthesis.overall : '',
+    }
+    : null;
+
+  return { header, summary, ratingsTable, narrativeSections, synthesisSection };
 }

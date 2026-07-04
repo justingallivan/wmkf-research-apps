@@ -60,6 +60,8 @@ const REQUEST_FIELDS = [
   '_wmkf_grantprogram_value',
   '_wmkf_programareaserved_value',
   '_wmkf_programdirector_value',
+  // Phase 4: stored AI synthesis of submitted reviews (fail-soft JSON parse below).
+  'wmkf_reviewsynthesisjson',
 ];
 
 // Legacy review_status optionset → string (mirror of REVIEW_STATUS_MAP).
@@ -111,6 +113,48 @@ function projectRequest(r) {
     grantProgram: r._wmkf_grantprogram_value_formatted || null,
     programArea: r._wmkf_programareaserved_value_formatted || null,
     organizationName: r.wmkf_organizationname || null,
+    reviewSynthesisJson: r.wmkf_reviewsynthesisjson || null,
+  };
+}
+
+/**
+ * Fail-soft parse of the stored AI review synthesis (Phase 4). Never throws —
+ * a malformed/legacy value degrades to null rather than 500ing the whole DTO.
+ *
+ * Shape-sanitized, not just JSON-parsed: the Executor's validationSchema bounds
+ * what IT writes, but the column is hand-editable in Dynamics and intended for
+ * Power Automate later, so this read is the trust boundary for the tab. Every
+ * value the client renders as a React child is guaranteed a string here (a
+ * non-string array item would otherwise crash the component tree). Tolerates
+ * both the bare synthesis object and a {synthesis: {...}} envelope.
+ */
+function parseReviewSynthesis(raw) {
+  if (!raw || typeof raw !== 'string' || raw.trim().length === 0) return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const s = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? ((parsed.synthesis && typeof parsed.synthesis === 'object' && !Array.isArray(parsed.synthesis))
+      ? parsed.synthesis
+      : parsed)
+    : null;
+  if (!s) return null;
+  const strArray = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []);
+  return {
+    consensus: strArray(s.consensus),
+    disagreements: strArray(s.disagreements),
+    keyConcerns: strArray(s.keyConcerns),
+    ratingSummaries: (Array.isArray(s.ratingSummaries) ? s.ratingSummaries : [])
+      .filter((rs) => rs && typeof rs === 'object' && !Array.isArray(rs))
+      .map((rs) => ({
+        questionKey: typeof rs.questionKey === 'string' ? rs.questionKey : '',
+        questionText: typeof rs.questionText === 'string' ? rs.questionText : '',
+        summary: typeof rs.summary === 'string' ? rs.summary : '',
+      })),
+    overall: typeof s.overall === 'string' ? s.overall : '',
   };
 }
 
@@ -208,6 +252,7 @@ async function handleGet(req, res, access) {
           grantCycleCode: request.cycleCode,
           cycleLabel: request.cycleLabel,
           meetingDate: request.meetingDate,
+          reviewSynthesis: parseReviewSynthesis(request.reviewSynthesisJson),
           reviewers: [],
         };
       }

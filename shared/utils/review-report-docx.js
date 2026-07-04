@@ -127,6 +127,48 @@ export async function generateReviewReportDocx(report) {
     summaryChildren.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: summaryRows }));
   }
 
+  // --- Synthesis (Phase 4, optional — omitted entirely when not passed) ---
+  const synthesisChildren = [];
+  if (report.synthesisSection) {
+    const s = report.synthesisSection;
+    synthesisChildren.push(new Paragraph({
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 300, after: 120 },
+      children: [new TextRun({ text: 'AI Synthesis', size: 26, font: FONT, bold: true })],
+    }));
+    function bulletList(title, items) {
+      if (!items || items.length === 0) return;
+      synthesisChildren.push(new Paragraph({
+        spacing: { before: 160, after: 60 },
+        children: [bodyRun(title, { bold: true })],
+      }));
+      for (const item of items) {
+        synthesisChildren.push(new Paragraph({ bullet: { level: 0 }, spacing: { after: 60 }, children: [bodyRun(item)] }));
+      }
+    }
+    bulletList('Consensus', s.consensus);
+    bulletList('Disagreements', s.disagreements);
+    bulletList('Key concerns', s.keyConcerns);
+    if (s.ratingSummaries.length > 0) {
+      synthesisChildren.push(new Paragraph({
+        spacing: { before: 160, after: 60 },
+        children: [bodyRun('Rating summaries', { bold: true })],
+      }));
+      for (const rs of s.ratingSummaries) {
+        synthesisChildren.push(new Paragraph({
+          spacing: { after: 60 },
+          children: [bodyRun(`${rs.questionText || rs.questionKey}: `, { bold: true }), bodyRun(rs.summary || '')],
+        }));
+      }
+    }
+    if (s.overall) {
+      synthesisChildren.push(new Paragraph({
+        spacing: { before: 160, after: 120 },
+        children: [bodyRun('Overall: ', { bold: true }), bodyRun(s.overall)],
+      }));
+    }
+  }
+
   // --- Ratings table (same rows/columns as the Compare grid) ---
   const ratingsChildren = [];
   if (report.ratingsTable.rows.length > 0) {
@@ -256,6 +298,7 @@ export async function generateReviewReportDocx(report) {
       children: [
         ...headerChildren,
         ...summaryChildren,
+        ...synthesisChildren,
         ...ratingsChildren,
         ...narrativeChildren,
       ],

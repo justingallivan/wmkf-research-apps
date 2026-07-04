@@ -21,7 +21,21 @@ on exact SHAs through `e6991f35`). Browser-drive S326 on applications.wmkeck.org
 PASSED all zero-submission-era checks: tab render, Outstanding rows against live
 acceptance data (disabled-nudge tooltip confirmed via accessible name), correct
 ABSENCE of Compare/Export with zero submissions, clean console, request-switch
-stale-guard. Phase 4 still PLANNED.**
+stale-guard.**
+
+**Phase 4 BUILT (this session) — pending schema provisioning + prompt seed +
+first-submission verification.** Code is in place (prompt config, route, DTO
+extension, ReviewsTab Synthesis card, export section, unit tests) but is NOT
+LIVE: the `wmkf_reviewsynthesisjson` column
+(`lib/dataverse/schema/wave11-review-synthesis/`) has not been applied to any
+Dataverse environment, and the `review-synthesis.generate` prompt
+(`scripts/seed-review-synthesis-prompt.js`) has not been seeded. Both are
+PREPARED artifacts only — deploying the reading/writing code path before the
+schema wave is applied would 400 on the not-yet-created column (wave10
+precedent). Same D26 verification-boundary caveat as Phases 2-3 applies here
+too: the synthesis flow cannot be browser-verified against a real submitted
+review until schema + prompt are provisioned and at least one review is
+submitted; unit tests (mocked Executor/Dataverse) are the only coverage today.
 
 **Verification boundary (owner context, S326): the portal is being built AHEAD
 of the December-2026 cycle — no reviewer has ever submitted through it, so the
@@ -153,14 +167,37 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   stands in as the best-available PI identity rather than extending the
   route.
 
-### Phase 4 — AI synthesis
-- New registered prompt (prompt governance applies) executed via
-  `lib/services/execute-prompt.js` with an `akoya_request` output column (name
-  decided at build time); exemplar caller:
+### Phase 4 — AI synthesis (BUILT this session — pending provisioning, see status banner)
+- Tier-1 prompt `review-synthesis.generate` (`shared/config/prompts/review-synthesis.js`,
+  create-only seed `scripts/seed-review-synthesis-prompt.js`, mirroring the two
+  grantee seeds' governance — NOT yet run against any live environment).
+  All-override; the untrusted variable is `reviews_digest` — reviewer
+  `answerText` (never `answerHtml`) composed server-side into a plain digest —
+  declared `untrusted: true` so the Executor wraps it + injects the A7
+  preamble. Output: strict JSON, single output `synthesis` →
+  `akoya_request.wmkf_reviewsynthesisjson`, `guard: 'always-overwrite'`; a
+  `validationSchema` (`lib/utils/ai-output-schema.js`) bounds/strips the parsed
+  shape before the writeback.
+- New memo column `wmkf_reviewsynthesisjson` on `akoya_request`
+  (`lib/dataverse/schema/wave11-review-synthesis/`) — PREPARED, not applied to
+  any environment.
+- Route `POST /api/review-manager/synthesize-reviews`
+  (`requireAppAccess('review-manager', 'reviewers')`, requestId GUID-validated):
+  409 `no_submitted_reviews` on zero submitted reviews (no LLM call); since the
+  prompt's output guard is `always-overwrite`, regeneration gating lives at
+  this route instead — 409 `already_exists` when a synthesis is already stored
+  and `overwrite` was not passed. Exemplar caller followed:
   `pages/api/phase-i-dynamics/summarize-v2.js:71-89`.
-- Reviewer answer HTML enters the prompt as untrusted content (existing wrapping
-  convention).
-- Rendered in the tab; optional export section via Phase 3's composition module.
+- `GET /api/review-manager/reviewers` DTO extended with `proposal.reviewSynthesis`
+  (fail-soft JSON parse of `wmkf_reviewsynthesisjson`, added to the
+  `fetchRequestByIdOrNumber` request-row select).
+- `ReviewsTab`'s Synthesis card (renders only when ≥1 review is submitted):
+  stored synthesis sections or a "Generate synthesis" / "Regenerate" action;
+  plain-text rendering only (LLM output; no `dangerouslySetInnerHTML`).
+- `shared/utils/review-report.js#composeReviewReport` accepts an optional
+  `synthesis` param → `synthesisSection` on the composed report, additive in
+  both the DOCX and PDF renderers; `ExportMenu` passes
+  `proposal.reviewSynthesis` through.
 
 ## Verification per phase
 

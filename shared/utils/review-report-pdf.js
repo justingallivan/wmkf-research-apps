@@ -71,6 +71,33 @@ export async function generateReviewReportPdf(report) {
     builder.addKeyValue(label, `avg ${avg} · spread ${spread} · ${q.answeredCount}/${q.totalReviewers} answered`);
   }
 
+  // --- Synthesis (Phase 4, optional — omitted entirely when not passed) ---
+  if (report.synthesisSection) {
+    const s = report.synthesisSection;
+    builder.addSection('AI Synthesis');
+    if (s.consensus.length > 0) {
+      builder.addKeyValue('Consensus', '');
+      builder.addBulletList(s.consensus);
+    }
+    if (s.disagreements.length > 0) {
+      builder.addKeyValue('Disagreements', '');
+      builder.addBulletList(s.disagreements);
+    }
+    if (s.keyConcerns.length > 0) {
+      builder.addKeyValue('Key concerns', '');
+      builder.addBulletList(s.keyConcerns);
+    }
+    if (s.ratingSummaries.length > 0) {
+      builder.addSection('Rating summaries', 2);
+      for (const rs of s.ratingSummaries) {
+        builder.addKeyValue(rs.questionText || rs.questionKey, rs.summary || '');
+      }
+    }
+    if (s.overall) {
+      builder.addKeyValue('Overall', s.overall);
+    }
+  }
+
   // --- Ratings table (rendered as key/value rows per reviewer — pdf-lib has
   // no built-in table primitive; PDFReportBuilder doesn't provide one either,
   // so this mirrors the addKeyValue pattern used elsewhere in the builder). ---

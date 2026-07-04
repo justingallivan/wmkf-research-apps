@@ -275,6 +275,9 @@ function ExportMenu({ proposal, submitted, liveQuestions }) {
       institution: proposal?.proposalInstitution ?? null,
       matrix,
       generatedAtIso: new Date().toISOString(),
+      // Phase 4: include the stored AI synthesis when present (additive —
+      // omitting it keeps the export byte-identical to the Phase 3 shape).
+      synthesis: proposal?.reviewSynthesis ?? null,
     });
   }, [proposal, submitted, liveQuestions]);
 
@@ -340,6 +343,110 @@ function CompareView({ submitted, liveQuestions }) {
       <CompareRatingsGrid matrix={matrix} />
       <CompareNarrativeBrowser matrix={matrix} />
     </div>
+  );
+}
+
+// AI synthesis of submitted reviews (Phase 4). Rendered ONLY when at least one
+// review is submitted (caller gates this). Values are LLM output — rendered
+// as plain text nodes (NO dangerouslySetInnerHTML) per the plan's rendering
+// contract. `synthesis` is the stored `proposal.reviewSynthesis` (fail-soft
+// parsed server-side, or null when never generated / parse failed).
+function SynthesisCard({ requestId, synthesis, onUpdated }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const generate = useCallback(async (overwrite) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/review-manager/synthesize-reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, overwrite: !!overwrite }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setError(
+          data.reason === 'no_submitted_reviews'
+            ? 'No submitted reviews to synthesize.'
+            : data.reason === 'already_exists'
+              ? 'A synthesis already exists — use Regenerate to replace it.'
+              : (data.reason || 'Failed to generate synthesis.'),
+        );
+        return;
+      }
+      if (onUpdated) onUpdated();
+    } catch (e) {
+      setError(e.message || 'Failed to generate synthesis.');
+    } finally {
+      setBusy(false);
+    }
+  }, [requestId, onUpdated]);
+
+  return (
+    <Card hover={false}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-gray-900">AI Synthesis</p>
+        <button
+          type="button"
+          onClick={() => generate(!!synthesis)}
+          disabled={busy}
+          className="text-xs text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {busy ? 'Generating…' : synthesis ? 'Regenerate' : 'Generate synthesis'}
+        </button>
+      </div>
+      {error && <p className="text-xs text-amber-600 mt-2">{error}</p>}
+      {!synthesis ? (
+        <p className="text-sm text-gray-500 mt-2">No synthesis generated yet.</p>
+      ) : (
+        <div className="mt-3 space-y-3 text-sm">
+          {synthesis.consensus?.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-gray-700">Consensus</div>
+              <ul className="list-disc list-inside text-gray-800 mt-1 space-y-0.5">
+                {synthesis.consensus.map((item, i) => <li key={i}>{item}</li>)}
+              </ul>
+            </div>
+          )}
+          {synthesis.disagreements?.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-gray-700">Disagreements</div>
+              <ul className="list-disc list-inside text-gray-800 mt-1 space-y-0.5">
+                {synthesis.disagreements.map((item, i) => <li key={i}>{item}</li>)}
+              </ul>
+            </div>
+          )}
+          {synthesis.keyConcerns?.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-gray-700">Key concerns</div>
+              <ul className="list-disc list-inside text-gray-800 mt-1 space-y-0.5">
+                {synthesis.keyConcerns.map((item, i) => <li key={i}>{item}</li>)}
+              </ul>
+            </div>
+          )}
+          {synthesis.ratingSummaries?.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-gray-700">Rating summaries</div>
+              <div className="mt-1 space-y-1">
+                {synthesis.ratingSummaries.map((rs, i) => (
+                  <div key={rs.questionKey || i}>
+                    <span className="font-medium text-gray-900">{rs.questionText || rs.questionKey}: </span>
+                    <span className="text-gray-800">{rs.summary}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {synthesis.overall && (
+            <div>
+              <div className="text-xs font-semibold text-gray-700">Overall</div>
+              <p className="text-gray-800 mt-1">{synthesis.overall}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -568,6 +675,7 @@ export default function ReviewsTab({ requestId }) {
               <CompareView submitted={submitted} liveQuestions={liveQuestions} />
             </Card>
           )}
+          <SynthesisCard requestId={requestId} synthesis={proposal?.reviewSynthesis ?? null} onUpdated={load} />
         </>
       )}
     </div>

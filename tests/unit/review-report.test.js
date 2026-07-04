@@ -235,4 +235,36 @@ describe('composeReviewReport', () => {
     const matrix = deriveReviewMatrix(reviewers, null);
     expect(() => composeReviewReport({ matrix, generatedAtIso: '2026-07-03T00:00:00.000Z' })).not.toThrow();
   });
+
+  // Phase 4 (AI synthesis) — additive, optional section.
+  test('omitting synthesis (default) leaves synthesisSection null', () => {
+    const matrix = deriveReviewMatrix([], null);
+    const report = composeReviewReport({ matrix, generatedAtIso: '2026-07-03T00:00:00.000Z' });
+    expect(report.synthesisSection).toBeNull();
+  });
+
+  test('passing synthesis produces a normalized synthesisSection', () => {
+    const matrix = deriveReviewMatrix([], null);
+    const synthesis = {
+      consensus: ['Strong methodology'],
+      disagreements: ['Impact rating split'],
+      keyConcerns: ['Budget seems high'],
+      ratingSummaries: [{ questionKey: 'impact', questionText: 'Rate impact', summary: 'Mostly high scores' }],
+      overall: 'Reviewers are largely positive.',
+    };
+    const report = composeReviewReport({ matrix, generatedAtIso: '2026-07-03T00:00:00.000Z', synthesis });
+    expect(report.synthesisSection).toEqual(synthesis);
+  });
+
+  test('a malformed synthesis (non-array fields, missing overall) is normalized rather than thrown', () => {
+    const matrix = deriveReviewMatrix([], null);
+    const report = composeReviewReport({
+      matrix,
+      generatedAtIso: '2026-07-03T00:00:00.000Z',
+      synthesis: { consensus: 'not an array', overall: 42 },
+    });
+    expect(report.synthesisSection).toEqual({
+      consensus: [], disagreements: [], keyConcerns: [], ratingSummaries: [], overall: '',
+    });
+  });
 });

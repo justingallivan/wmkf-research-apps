@@ -185,10 +185,31 @@ number/title/institution/PI) uses whatever `proposals[0]` already carries
 DTO has no dedicated `piName` field, so `proposalAuthors` (project
 leader/applicant) stands in as the best-available PI identity.
 
-**Still PLANNED:** Executor-based AI synthesis (Phase 4) — plan and
-owner-confirmed design decisions live in
-`docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`. Update that plan's status (and
-this paragraph) as that phase ships.
+**Phase 4 BUILT (2026-07-03) — pending schema provisioning + prompt seed + first-submission verification:**
+Executor-based AI synthesis of a proposal's submitted reviews. New Tier-1
+prompt `review-synthesis.generate` (`shared/config/prompts/review-synthesis.js`,
+create-only seed `scripts/seed-review-synthesis-prompt.js` — NOT yet run
+against any environment); all-override, single untrusted variable
+`reviews_digest` (reviewer `answerText`, never `answerHtml`, composed
+server-side into a plain digest) so the Executor wraps it + injects the A7
+preamble. Output is strict JSON (single output `synthesis`, `validationSchema`
+bounds/strips the parsed shape) written to a new memo column
+`akoya_request.wmkf_reviewsynthesisjson` with `guard: 'always-overwrite'` —
+schema-as-code PREPARED, NOT YET APPLIED at
+`lib/dataverse/schema/wave11-review-synthesis/`. `POST
+/api/review-manager/synthesize-reviews` (`requireAppAccess('review-manager',
+'reviewers')`, requestId GUID-validated) returns 409 `no_submitted_reviews`
+with zero submitted reviews (no LLM call); since the guard is
+always-overwrite, regeneration gating is enforced at THIS route instead — 409
+`already_exists` unless `overwrite: true` is passed. `GET
+/api/review-manager/reviewers` now projects `proposal.reviewSynthesis`
+(fail-soft JSON parse). `ReviewsTab` renders a Synthesis card (only when ≥1
+review is submitted) with a Generate/Regenerate action, plain-text only (no
+`dangerouslySetInnerHTML`); `composeReviewReport` accepts an optional
+`synthesis` param rendered additively in both export formats. Same
+verification boundary as Phases 2-3: unit-tested only until the schema wave +
+prompt seed are applied to an environment and a real review is synthesized.
+Plan doc: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 ## Email templates (admin org default + per-PD override)
 

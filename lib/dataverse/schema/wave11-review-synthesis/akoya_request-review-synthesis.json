@@ -1,0 +1,15 @@
+{
+  "name": "akoya_request-review-synthesis",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "_comment": "Workbench Reviews tab Phase 4 (docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md): AI synthesis of a proposal's submitted peer reviews, written by the Executor (lib/services/execute-prompt.js) via pages/api/review-manager/synthesize-reviews.js. ONE JSON Memo column holding the whole synthesis object ({consensus, disagreements, keyConcerns, ratingSummaries, overall}) rather than discrete fields — the shape is LLM-authored prose/lists, not server-filterable structured config (contrast wave7-reviewer-engagement, which is discrete BECAUSE the reminder cron $filters on it). PREPARED, NOT YET PROVISIONED as of 2026-07-03 — do not deploy without explicit review; the code path that writes/reads this column must NOT deploy to prod before this wave is applied (selecting a not-yet-created column hard-400s, matching the wave10 precedent). Deploy: node scripts/apply-dataverse-schema.js --target=prod --wave=11-review-synthesis --execute.",
+  "attributes": [
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ReviewSynthesisJson",
+      "displayName": "Review Synthesis (JSON)",
+      "description": "AI-generated synthesis of this proposal's submitted peer reviews: {consensus: string[], disagreements: string[], keyConcerns: string[], ratingSummaries: [{questionKey, questionText, summary}], overall: string}. Regenerated on demand by staff (workbench Reviews tab 'Generate synthesis' / 'Regenerate' action) — always-overwrite target; the calling route, not a Dataverse guard, decides whether an existing value may be replaced.",
+      "maxLength": 20000
+    }
+  ]
+}

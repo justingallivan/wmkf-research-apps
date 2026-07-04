@@ -386,6 +386,21 @@ const SURFACES = [
     promptFiles: ['shared/config/prompts/grantee-title.js'],
     callSiteFiles: ['lib/services/execute-prompt.js'],
   },
+  {
+    // Executor-driven (review-synthesis.generate, via
+    // pages/api/review-manager/synthesize-reviews.js). Hardening lives in
+    // execute-prompt.js: wrapUntrustedContent + buildUntrustedContentPreamble
+    // injected for the untrusted reviews_digest variable (reviewer-authored
+    // narrative answers, composed server-side). The prompt code file carries
+    // no markers of its own; registered here so the unregistered-prompt-file
+    // check tracks it. callSiteFiles MUST include execute-prompt.js or the
+    // marker checks fail.
+    id: 'review-synthesis-generate',
+    inv: 28,
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/review-synthesis.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the
