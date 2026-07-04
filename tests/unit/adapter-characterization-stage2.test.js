@@ -14,6 +14,7 @@ import * as contact from '../../lib/dataverse/adapters/contact.js';
 import * as pr from '../../lib/dataverse/adapters/potential-reviewer.js';
 import * as researcher from '../../lib/dataverse/adapters/researcher.js';
 import * as suggestion from '../../lib/dataverse/adapters/reviewer-suggestion.js';
+import { selectFields } from '../../lib/dataverse/core/entity-registry.js';
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -29,6 +30,19 @@ const PR_SELECT =
 const GUID_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const GUID_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const PD_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+
+// PD-scope request $select strings (Codex S329 review: pin select/top too, not
+// just filters). findAcceptedByPD adds wmkf_organizationname — a real, deliberate
+// divergence between the two request queries.
+const PD_REQUEST_SELECT =
+  'akoya_requestid,akoya_requestnum,akoya_title,wmkf_meetingdate,wmkf_abstract,' +
+  '_akoya_applicantid_value,_wmkf_projectleader_value,_wmkf_grantprogram_value,' +
+  '_wmkf_programareaserved_value';
+const PD_ACCEPTED_REQUEST_SELECT =
+  'akoya_requestid,akoya_requestnum,akoya_title,wmkf_meetingdate,wmkf_abstract,' +
+  'wmkf_organizationname,_akoya_applicantid_value,_wmkf_projectleader_value,' +
+  '_wmkf_grantprogram_value,_wmkf_programareaserved_value';
+const SUGGESTION_SELECT = selectFields('wmkf_appreviewersuggestions').join(',');
 
 // ───────────────────────── contact ─────────────────────────
 
@@ -160,16 +174,19 @@ describe('reviewer-suggestion.findByPD (characterization)', () => {
     // Step 1: request scope by PD.
     expect(qAll).toHaveBeenCalledTimes(1);
     expect(qAll.mock.calls[0][0]).toBe('akoya_requests');
+    expect(qAll.mock.calls[0][1].select).toBe(PD_REQUEST_SELECT);
     expect(qAll.mock.calls[0][1].filter).toBe(`_wmkf_programdirector_value eq ${PD_ID}`);
 
     // Step 2: suggestions for those requests, selected + not-excluded.
     expect(q).toHaveBeenCalledTimes(1);
     expect(q.mock.calls[0][0]).toBe('wmkf_appreviewersuggestions');
+    expect(q.mock.calls[0][1].select).toBe(SUGGESTION_SELECT);
     expect(q.mock.calls[0][1].filter).toBe(
       `(_wmkf_request_value eq ${GUID_A}) and wmkf_selected eq true and ` +
         '(wmkf_applicantdisposition eq null or wmkf_applicantdisposition ne 100000001)',
     );
     expect(q.mock.calls[0][1].orderby).toBe('createdon desc');
+    expect(q.mock.calls[0][1].top).toBe(500);
 
     expect(out.suggestions).toEqual([{ wmkf_appreviewersuggestionid: GUID_B }]);
     expect(out.requestById[GUID_A]).toMatchObject({ requestId: GUID_A, requestNumber: 'REQ-1' });
@@ -189,6 +206,27 @@ describe('reviewer-suggestion.findByPD (characterization)', () => {
     expect(out).toEqual({ suggestions: [], requestById: {} });
     expect(q).not.toHaveBeenCalled();
   });
+
+  test('edge: selectedOnly:false drops the wmkf_selected clause but keeps notExcluded', async () => {
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [{ akoya_requestid: GUID_A, akoya_requestnum: 'REQ-1' }],
+    });
+    const q = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+    await suggestion.findByPD(PD_ID, { selectedOnly: false });
+    expect(q.mock.calls[0][1].filter).toBe(
+      `(_wmkf_request_value eq ${GUID_A}) and ` +
+        '(wmkf_applicantdisposition eq null or wmkf_applicantdisposition ne 100000001)',
+    );
+  });
+
+  test('edge: cycleCode J26 appends the June-2026 wmkf_meetingdate window to the request filter', async () => {
+    const qAll = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [] });
+    await suggestion.findByPD(PD_ID, { cycleCode: 'J26' });
+    expect(qAll.mock.calls[0][1].filter).toBe(
+      `_wmkf_programdirector_value eq ${PD_ID} and ` +
+        'wmkf_meetingdate ge 2026-06-01T00:00:00Z and wmkf_meetingdate lt 2026-07-01T00:00:00Z',
+    );
+  });
 });
 
 describe('reviewer-suggestion.findAcceptedByPD (characterization)', () => {
@@ -202,10 +240,14 @@ describe('reviewer-suggestion.findAcceptedByPD (characterization)', () => {
 
     const out = await suggestion.findAcceptedByPD(PD_ID);
 
+    expect(q.mock.calls[0][0]).toBe('wmkf_appreviewersuggestions');
+    expect(q.mock.calls[0][1].select).toBe(SUGGESTION_SELECT);
     expect(q.mock.calls[0][1].filter).toBe(
       `(_wmkf_request_value eq ${GUID_A}) and wmkf_selected eq true and wmkf_accepted eq true and ` +
         '(wmkf_applicantdisposition eq null or wmkf_applicantdisposition ne 100000001)',
     );
+    expect(q.mock.calls[0][1].orderby).toBe('createdon desc');
+    expect(q.mock.calls[0][1].top).toBe(500);
     expect(out.suggestions).toEqual([{ wmkf_appreviewersuggestionid: GUID_B }]);
   });
 
