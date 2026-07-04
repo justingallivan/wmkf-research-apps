@@ -33,9 +33,9 @@
 import { randomUUID } from 'crypto';
 import { sql } from '@vercel/postgres';
 import { requireSuperuser } from '../../../lib/utils/auth';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { validatePolicyMarkdown } from '../../../shared/utils/policy-markdown-server';
+import * as policy from '../../../lib/dataverse/adapters/policy.js';
 
 // Server-side allowlist. Other slots remain invisible until staff are ready;
 // expanding the allowlist is a deliberate code change, not a UI config.
@@ -48,9 +48,6 @@ const POLICY_VERSION_STATUS = Object.freeze({
   ACTIVE:  { statecode: 0, statuscode: 1 },
   RETIRED: { statecode: 1, statuscode: 2 },
 });
-
-const POLICY_ENTITY = 'wmkf_policies';
-const POLICY_VERSION_ENTITY = 'wmkf_policyversions';
 
 // Input limits — generous but bounded.
 const MAX_LABEL_LEN = 50;
@@ -97,11 +94,7 @@ async function handleGet(req, res) {
 }
 
 async function loadSlotState(slotCode) {
-  const parents = await DynamicsService.queryRecords(POLICY_ENTITY, {
-    select: 'wmkf_policyid,wmkf_code,wmkf_displayname,_wmkf_activeversion_value',
-    filter: `wmkf_code eq '${escapeOData(slotCode)}'`,
-    top: 2,
-  });
+  const parents = await policy.querySlotByCode(slotCode);
   const parentRecords = parents.records || [];
 
   if (parentRecords.length === 0) {
@@ -121,18 +114,11 @@ async function loadSlotState(slotCode) {
 
   const parent = parentRecords[0];
   // Fetch parent again as a single record so we get an ETag annotation.
-  const parentRow = await DynamicsService.getRecord(POLICY_ENTITY, parent.wmkf_policyid, {
-    select: 'wmkf_policyid,wmkf_code,wmkf_displayname,_wmkf_activeversion_value',
-  });
+  const parentRow = await policy.getSlotForAdmin(parent.wmkf_policyid);
 
   const activeVersionId = parent._wmkf_activeversion_value || null;
 
-  const versionsQuery = await DynamicsService.queryRecords(POLICY_VERSION_ENTITY, {
-    select: 'wmkf_policyversionid,wmkf_versionlabel,wmkf_policytitle,wmkf_policybody,wmkf_effectivedate,statecode,statuscode',
-    filter: `_wmkf_policy_value eq ${parent.wmkf_policyid}`,
-    orderby: 'createdon desc',
-    top: 50,
-  });
+  const versionsQuery = await policy.queryVersionsByPolicy(parent.wmkf_policyid);
   const versions = (versionsQuery.records || []).map(v => {
     const isActive = v.wmkf_policyversionid === activeVersionId;
     const isRetired = v.statecode === POLICY_VERSION_STATUS.RETIRED.statecode;
@@ -286,11 +272,7 @@ async function runPublish({ slotCode, versionLabel, title, body, effectiveDate, 
   const priorActiveId = slotState.activeVersion?.id || null;
 
   // Idempotency lookup by (parentId, versionLabel)
-  const existing = await DynamicsService.queryRecords(POLICY_VERSION_ENTITY, {
-    select: 'wmkf_policyversionid,wmkf_versionlabel,wmkf_policytitle,wmkf_policybody,wmkf_effectivedate,statecode,statuscode',
-    filter: `_wmkf_policy_value eq ${parentId} and wmkf_versionlabel eq '${escapeOData(versionLabel)}'`,
-    top: 2,
-  });
+  const existing = await policy.queryVersionByLabel(parentId, versionLabel);
   const existingRecords = existing.records || [];
   const existingRow = existingRecords[0] || null;
 
@@ -361,13 +343,7 @@ async function runPublish({ slotCode, versionLabel, title, body, effectiveDate, 
   // Branch A — create child, then flip + retire
   let childId = null;
   try {
-    const created = await DynamicsService.createRecord(POLICY_VERSION_ENTITY, {
-      wmkf_versionlabel: versionLabel,
-      wmkf_policytitle: title,
-      wmkf_policybody: body,
-      wmkf_effectivedate: effectiveDate,
-      'wmkf_Policy@odata.bind': `/${POLICY_ENTITY}(${parentId})`,
-    });
+    const created = await policy.createVersion(parentId, { versionLabel, title, body, effectiveDate });
     childId = created.wmkf_policyversionid;
   } catch (err) {
     // Duplicate-key violation = a concurrent publish raced us to step 1.
@@ -391,16 +367,12 @@ async function flipAndRetire({ parentId, childId, priorActiveId, parentEtag, mod
   // the client passed. (Codex round-3 finding #7.)
   let etag = parentEtag;
   if (mode === 'resume') {
-    const parentRow = await DynamicsService.getRecord(POLICY_ENTITY, parentId, {
-      select: 'wmkf_policyid',
-    });
+    const parentRow = await policy.getSlotEtagRow(parentId);
     etag = parentRow._etag;
   }
 
   try {
-    await DynamicsService.updateRecord(POLICY_ENTITY, parentId, {
-      'wmkf_ActiveVersion@odata.bind': `/${POLICY_VERSION_ENTITY}(${childId})`,
-    }, { ifMatch: etag });
+    await policy.setActiveVersion(parentId, childId, { ifMatch: etag });
   } catch (err) {
     if (err.status === 412) {
       // Concurrency conflict. The newly-created child is now an orphan.
@@ -430,7 +402,7 @@ async function flipAndRetire({ parentId, childId, priorActiveId, parentEtag, mod
   let priorRetired = false;
   if (priorActiveId) {
     try {
-      await DynamicsService.updateRecord(POLICY_VERSION_ENTITY, priorActiveId, {
+      await policy.updateVersionState(priorActiveId, {
         statecode: POLICY_VERSION_STATUS.RETIRED.statecode,
         statuscode: POLICY_VERSION_STATUS.RETIRED.statuscode,
       });
@@ -455,7 +427,7 @@ async function flipAndRetire({ parentId, childId, priorActiveId, parentEtag, mod
 
 async function reverseLookupSlotCode(parentId) {
   // For freshState surfacing on concurrency_conflict. Cheap.
-  const r = await DynamicsService.getRecord(POLICY_ENTITY, parentId, { select: 'wmkf_code' });
+  const r = await policy.getSlotCodeRow(parentId);
   return r.wmkf_code || null;
 }
 
@@ -568,10 +540,6 @@ function failure(status, message, details = null) {
     warnings: [],
     details: details ? { ...details, message } : { message },
   };
-}
-
-function escapeOData(s) {
-  return String(s).replace(/'/g, "''");
 }
 
 function excerpt(s, n) {
