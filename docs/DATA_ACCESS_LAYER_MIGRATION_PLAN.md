@@ -24,9 +24,9 @@ restriction context folds INTO the layer as a deliberate late stage;
 delivery = ratchet + gate (freeze new raw usage immediately, convert
 opportunistically + occasional dedicated sessions).
 
-**Execution status: Stages 0–1 COMPLETE (S329, 2026-07-04).** Census probe,
-line-tolerant ratchet allowlist, self-tests, and CI registration committed.
-Stage 2 in progress (worktree build). Stages 3–8 have not run.
+**Execution status: Stages 0–2 COMPLETE (S329, 2026-07-04).** Census probe,
+line-tolerant ratchet allowlist + CI gate, and the `lib/dataverse/core/`
+toolkit (all 4 adapters converted) are committed. Stages 3–8 have not run.
 
 ## Why (baseline evidence)
 
@@ -394,6 +394,22 @@ Drift found → this doc is edited BEFORE the next stage starts.
   node scripts/check-dataverse-access-layer-self-test.js --mode stale-entry]`
   `[VERIFIED 2026-07-04 via
   node scripts/check-dataverse-access-layer-self-test.js --mode new-unresolved]`.
+
+- 2026-07-04 (S329): **Stage 2 executed** (Opus worktree build, Claude review,
+  merge `316797fc`). New `lib/dataverse/core/`: `odata.js` (escape/eq/eqRaw/
+  eqGuid/startsWith/contains/and/or/select; `eqGuid` throws on non-GUID per the
+  trust-boundary convention), `entity-registry.js` (`entitySet()` throws on any
+  name outside the 18 Stage-0 census buckets — the S328 guessed-name 404s are
+  now unrepresentable; canonical primary SELECTs for the 3 adapter entities,
+  byte-equal to the originals), `errors.js` (`adapterError` business-error
+  shape; transport errors still propagate unwrapped). All 4 adapters converted,
+  tests-first: 43 new tests (23 toolkit + 20 characterization) written before
+  conversion and passing unchanged after. Deliberate scope keeps: suggestion
+  filter strings stay local (GUID/numeric comparisons, no escaping primitive
+  applies); specialized SELECT projections (merge/biblio) stay in their
+  adapters; existing custom guard messages not swapped for `eqGuid`. Merged
+  state: full suite 3879/3880 (pricing-canary pre-existing), build clean,
+  ratchet + trust-boundary-guid green.
 
 ## Appendix A — Baseline census
 

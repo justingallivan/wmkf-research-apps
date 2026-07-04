@@ -56,6 +56,15 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 
 ## Operating Notes
 
+- **Data-access layer migration is live (S329): `lib/dataverse/core/` exists
+  and a CI ratchet freezes raw usage.** `entity-registry.js` `entitySet()`
+  throws on any entity-set name outside the Stage-0 census (never guess names —
+  the S328 `wmkf_prompts`/`wmkf_aiprompts` 404s are the motivating case);
+  `odata.js` owns escape/eq/eqGuid filter builders; all 4 adapters consume
+  them. Any NEW raw `DynamicsService` call (direct, aliased, or via
+  `executeChangeset`) in `pages/`+`lib/`+`shared/` fails
+  `check:dataverse-access-layer` until it moves behind an adapter or the
+  allowlist shrinks. Plan + stage log: `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`.
 - OData null filters do not behave like SQL.
 - The sandbox is not drop-in prod parity.
 - Do not rebuild Explorer behavior when the Power Tools surface should be reused.
