@@ -1144,13 +1144,6 @@
       "count": 2
     },
     {
-      "file": "pages/api/workbench/export-candidates.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/workbench/grantee-deliverables/abstract.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
