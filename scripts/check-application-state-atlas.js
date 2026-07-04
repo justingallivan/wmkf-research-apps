@@ -69,6 +69,9 @@ const ALLOWED_UNDOCUMENTED_ENTITIES = new Set([
 
   // Activity entities — used only by email-attachment paths:
   'activitymimeattachments', // SendEmail attachment binding (lib/services/dynamics-service.js)
+
+  // Synthetic test-fixture names — never real entity sets:
+  'should_not_count', // check-dataverse-access-layer-self-test.js exempt-path negative assertion
 ]);
 
 function walk(dir) {
