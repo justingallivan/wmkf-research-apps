@@ -1,72 +1,54 @@
-# Session 324 Prompt: Clean main handoff; only parked/time-driven follow-ups
+# Session 325 Prompt: Clean main after pricing-refresh build repair
 
-## Session 323 Summary
+## Session 324 Summary
 
-Session 323 closed the remaining S322 housekeeping work and the last reviewer-email
-tail. The work stayed evidence-first: every deletion/retirement was checked against live
-callers before acting, stale plan tails were explicitly deprecated instead of carried
-forward, and the session ended with only time-driven or parked follow-ups.
+Session 324 started from a clean `main` handoff, ran the full `/start` gate set,
+then handled a failed Vercel build from the previous push. The failure was a real
+build break caused by S323 housekeeping deleting a live service dependency for
+the monthly Anthropic pricing drift cron. The fix was committed, built locally
+outside the sandbox, and pushed to `origin/main`.
 
 ### What Was Completed
 
-1. **Reviewer Atlas count refresh.**
-   The reviewer Atlas row-count claim was refreshed before the housekeeping work
-   resumed, keeping the durable docs aligned with live state.
+1. **Startup gates passed cleanly.**
+   - `git fetch origin` and status showed `main` aligned with `origin/main`.
+   - Memory and Codex skills symlinks were valid.
+   - Every `check:*` startup gate and paired self-test from `/start` passed,
+     including `check:memory-drift:no-write`.
 
-2. **S322 docs-drift audit applied.**
-   README now points to `.env.example`; `docs/CI_GATES_REFERENCE.md` uses the live
-   `:self-test` script names for the drain-table and prompt-storage gates; and
-   `.env.example` no longer lists the dead `NOTIFICATION_EMAIL_TO` placeholder.
+2. **Vercel build failure diagnosed.**
+   - Attached Vercel log for commit `d51fc03` failed at
+     `pages/api/cron/pricing-refresh.js` with
+     `Module not found: Can't resolve '../../../lib/services/anthropic-admin'`.
+   - Live source/doc checks showed `/api/cron/pricing-refresh` is still a live
+     Vercel cron route (`vercel.json`, `docs/API_ROUTE_SECURITY_MATRIX.md`,
+     `docs/CREDENTIALS_RUNBOOK.md`, `docs/atlas/postgres-infra-tables.md`).
+   - Git history showed `lib/services/anthropic-admin.js` was deleted by
+     `8811051e chore: apply housekeeping cleanup`.
 
-3. **Instruction-audit F1 applied; F2 rejected and deprecated.**
-   The duplicate safety-invariant restatements in `.claude/rules/` now point back
-   to CLAUDE.md. The proposed `pages/api/**` removal from
-   `.claude/rules/llm-and-prompts.md` was reviewed, rejected as unsafe, and marked
-   deprecated/do-not-apply in `docs/AGENT_INSTRUCTION_AUDIT_S322.md`.
+3. **Anthropic Admin pricing client restored.**
+   - Restored `lib/services/anthropic-admin.js` as the thin
+     `/v1/organizations/cost_report` client expected by `pricing-refresh`.
+   - Updated `docs/DEAD_CODE_DELETION_MANIFEST.md` to record the correction:
+     the file was not safe dead code because the live cron imports it.
+   - Pushed `5f2c6807` to `origin/main`; `git status` is clean and synced.
 
-4. **Env-var docs and project tree reconciled.**
-   `docs/CREDENTIALS_RUNBOOK.md` now documents BILL runtime credentials/HMACs,
-   option-set values, reviewer page-email recovery, intake drain tuning, and
-   related legacy/config env knobs. `.env.example` has local placeholders for the
-   toggles an operator would plausibly set, and `CLAUDE.md` lists `modules/`,
-   `outputs/`, and `_archived/`.
-
-5. **B2 enrichment-timeout partial-return shipped.**
-   `ContactEnrichmentService.enrichCandidates()` now has opt-in
-   `returnPartialOnAbort`; `/api/reviewer-finder/enrich-contacts` opts in and
-   streams completed-prefix results as a partial `complete` SSE frame when the
-   admin deadline aborts the tail. This closes the reviewer-email B2 reliability
-   item.
-
-6. **Reviewer-email stale tails deprecated.**
-   `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md` marks the remaining measurement /
-   reconsideration tails CLOSED-DEPRECATED; do not keep carrying the no-email
-   re-measure as housekeeping.
-
-7. **SAFE dead-code bucket deleted after live caller checks.**
-   Removed the two orphan files, dead exports, dead `MOCK_MODE` computation, and
-   20 one-off scripts from `docs/DEAD_CODE_DELETION_MANIFEST.md`. Active docs,
-   `.env.example`, the BILL option-set probe/test, and `docs/DOCS_CATALOG.md`
-   were reconciled so deleted helpers and unsupported env vars no longer appear
-   as live contracts.
-
-8. **Merged remote Codex branches deleted.**
-   Live `git ls-remote` confirmed `codex/referral-seeding-build` and
-   `codex/program-area-normalization` existed; both tips were verified as
-   ancestors of `main`, then deleted from origin. Follow-up `git ls-remote`
-   returned no heads.
+4. **Codex local permission posture tuned outside the repo.**
+   - With owner permission, edited `/Users/gallivan/.codex/config.toml` to keep
+     `workspace-write` but use `approval_policy = "on-request"`,
+     `approvals_reviewer = "user"`, and `network_access = true`.
+   - Removed the ineffective `.git` `writable_roots` attempt.
+   - Appended user-level exec rules in
+     `/Users/gallivan/.codex/rules/default.rules`: routine
+     `git fetch/status/rev-parse/rev-list/log/add/commit/push origin main` and
+     `npm run build` allow; `rm`, `git reset`, and `git checkout` prompt.
+   - Verified rules with `codex execpolicy check`. Restart Codex / start a new
+     thread for these settings to fully apply; this thread still ran under the
+     old managed sandbox.
 
 ### Commits
 
-- `6fd49af7` docs: refresh reviewer atlas row counts
-- `e12199fe` docs: apply mechanical drift fixes
-- `95c0e024` docs: consolidate duplicate rule invariants
-- `9f19dabd` docs: close rejected instruction audit item
-- `0b90b4b7` docs: document env triage and project tree
-- `a1682b8b` fix reviewer enrichment timeout partial return
-- `d4b37c51` docs: close reviewer email plan tails
-- `8811051e` chore: apply housekeeping cleanup
-- `18010652` docs: close remote branch cleanup item
+- `5f2c6807` fix: restore Anthropic admin pricing client
 
 ## Next Items
 
@@ -78,10 +60,14 @@ None at stop. There is no immediate actionable housekeeping item left in
 ### Measure Later
 
 1. **Institution-COI ledger calibration.**
-   Evidence: `scripts/probe-institution-coi-breakdown.mjs` exists; current prompt
-   carried this as time-driven only.
-   Run `scripts/probe-institution-coi-breakdown.mjs 120` once enough `coi_dropped`
-   ledger rows have accumulated to validate Phase C thresholds.
+   Evidence: `scripts/probe-institution-coi-breakdown.mjs` exists and documents
+   the read-only `coi_dropped` ledger measurement path.
+   Run `scripts/probe-institution-coi-breakdown.mjs 120` once enough
+   `coi_dropped` ledger rows have accumulated to validate Phase C thresholds.
+
+### Owner Decision Needed
+
+None at stop.
 
 ### Parked
 
@@ -99,30 +85,45 @@ None at stop. There is no immediate actionable housekeeping item left in
    Evidence: `docs/DEAD_CODE_DELETION_MANIFEST.md`,
    `docs/AGENT_INSTRUCTION_AUDIT_S322.md`,
    `docs/HARNESS_INSTRUCTION_AUDIT_S322.md`, and
-   `docs/DOCS_DRIFT_AUDIT_S322.md` all describe snapshot findings.
-   Re-run live caller/source checks before applying any remaining suggestion from
-   those docs, especially destructive/delete/retire work.
+   `docs/DOCS_DRIFT_AUDIT_S322.md` all describe snapshot findings. This session
+   proved the risk: `lib/services/anthropic-admin.js` had been deleted as an
+   orphan but was still imported by the live `pricing-refresh` cron.
+   Re-run live caller/source checks before applying any remaining suggestion
+   from those docs, especially destructive/delete/retire work.
+
+2. **Codex permission changes need a fresh Codex process/thread.**
+   Evidence: `/Users/gallivan/.codex/config.toml` and
+   `/Users/gallivan/.codex/rules/default.rules` were edited outside the repo and
+   validated with `codex execpolicy check`.
+   If a future thread still reports `approvals_reviewer = "auto_review"` or
+   `.git` read-only despite the rules, inspect managed requirements; local config
+   may be overridden.
 
 ### Do Not Reopen Without New Decision
 
-1. **Two advisory hooks remain retired by owner approval.**
+1. **Do not delete `lib/services/anthropic-admin.js` as dead code.**
+   Evidence: `pages/api/cron/pricing-refresh.js` imports it, the Vercel build
+   failed without it, and `docs/DEAD_CODE_DELETION_MANIFEST.md` now records the
+   correction.
+
+2. **Two advisory hooks remain retired by owner approval.**
    Evidence: `docs/HARNESS_INSTRUCTION_AUDIT_S322.md` and
    `docs/agent-wiki/topics/dev-environment.md`.
    Do not resurrect `doc-edit-reconcile-reminder.js` or
    `memory-placement-reminder.js` without evidence of recurrence.
 
-2. **`pre-commit-self-review.js` deliberately kept.**
+3. **`pre-commit-self-review.js` deliberately kept.**
    Evidence: `docs/HARNESS_INSTRUCTION_AUDIT_S322.md` risk note and the S323
    staging-gap fix commits.
    Do not remove it as duplicate hook hygiene without a new decision.
 
-3. **Instruction-audit F2 remains rejected.**
+4. **Instruction-audit F2 remains rejected.**
    Evidence: `docs/AGENT_INSTRUCTION_AUDIT_S322.md`.
    Do not remove `pages/api/**` from `.claude/rules/llm-and-prompts.md` unless
    new evidence proves API-route LLM guidance still loads for routes calling
    `execute-prompt` or `llm-client`.
 
-4. **Reviewer-email tails are closed/deprecated.**
+5. **Reviewer-email tails are closed/deprecated.**
    Evidence: `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md` and commits
    `a1682b8b` / `d4b37c51`.
    Do not reopen the no-email re-measure or send-gate predicate work without a
@@ -133,27 +134,39 @@ None at stop. There is no immediate actionable housekeeping item left in
 | File | Purpose |
 |------|---------|
 | `SESSION_PROMPT.md` | Current handoff and verified carryovers. |
-| `docs/DEAD_CODE_DELETION_MANIFEST.md` | SAFE bucket applied; owner-confirmation deletion candidates remain parked. |
-| `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md` | Reviewer-email reliability plan; B2 shipped and leftover tails deprecated. |
-| `lib/services/contact-enrichment-service.js` | `returnPartialOnAbort` implementation for enrichment timeout partial return. |
-| `pages/api/reviewer-finder/enrich-contacts.js` | SSE route that opts into partial-return behavior. |
+| `lib/services/anthropic-admin.js` | Anthropic Admin API cost-report client used by `pricing-refresh`. |
+| `pages/api/cron/pricing-refresh.js` | Live monthly pricing drift cron that imports the admin client. |
+| `docs/DEAD_CODE_DELETION_MANIFEST.md` | S322 cleanup manifest; now records the `anthropic-admin` restore correction. |
+| `/Users/gallivan/.codex/config.toml` | Local Codex permission settings edited outside the repo. |
+| `/Users/gallivan/.codex/rules/default.rules` | Local Codex exec rules edited outside the repo. |
 | `.claude-memory/project-spec-audit-docs-recovery-parked.md` | Parked work-computer-only spec-audit recovery instructions. |
 | `scripts/probe-institution-coi-breakdown.mjs` | Future institution-COI threshold calibration probe. |
 
 ## Testing
 
 ```bash
-npm run check:docs-catalog
+npm run build
+npx eslint lib/services/anthropic-admin.js pages/api/cron/pricing-refresh.js
+npm run check:api-routes
+npm run check:api-routes:self-test
 npm run check:doc-symbol-refs
 npm run check:doc-symbol-refs:self-test
-npm run check:agent-invariants
-npx jest tests/unit/bill-onboard-reviewer.test.js --runInBand
-npx eslint lib/bill/option-set-values.js lib/services/email-signature.js lib/utils/auth.js lib/utils/pdf-page-splitter.js scripts/probe-bill-option-set-values.js shared/api/middleware/rateLimiter.js shared/components/RequireAuth.js shared/components/reviewers/ReviewerManagePanel.js shared/config/appRegistry.js shared/config/baseConfig.js shared/config/prompts/peer-reviewer.js shared/config/prompts/reviewer-finder.js shared/config/prompts/virtual-review-panel.js shared/config/reviewerFinderPreferences.js shared/context/ProfileContext.js tests/unit/bill-onboard-reviewer.test.js
-git ls-remote --heads origin codex/referral-seeding-build codex/program-area-normalization
+npm run check:build-claim-freshness
+npm run check:build-claim-freshness:self-test
+npm run check:docs-catalog
+npm run check:fact-consistency
+npm run check:fact-consistency:self-test
+npm run check:secret-scan
+npm run check:secret-scan:self-test
+codex execpolicy check --pretty --rules /Users/gallivan/.codex/rules/default.rules -- git push origin main
+codex execpolicy check --pretty --rules /Users/gallivan/.codex/rules/default.rules -- npm run build
+codex execpolicy check --pretty --rules /Users/gallivan/.codex/rules/default.rules -- rm -rf /tmp/example
+codex execpolicy check --pretty --rules /Users/gallivan/.codex/rules/default.rules -- git reset --hard HEAD~1
 ```
 
 Notes:
-- Focused ESLint over touched live JS exited 0 with existing React Compiler
-  warnings only.
-- Full `npm run lint` remains red on the existing broad React Compiler baseline,
-  including `.claude/worktrees`; this was not introduced by S323 cleanup.
+- The first two sandboxed `npm run build` attempts stalled in the current
+  thread's old sandbox during Turbopack's optimized build phase; the approved
+  unsandboxed `npm run build` completed successfully in 6.8s.
+- `codex execpolicy check` emitted a harmless PATH warning in the old sandbox
+  but returned the expected allow/prompt decisions.

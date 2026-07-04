@@ -10,6 +10,20 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Pricing-refresh build incident repaired after cleanup false-positive (Session 324)
+
+**Milestone:** A production Vercel build failure from the S323 cleanup was traced to deleting the live Anthropic Admin API client used by the monthly pricing drift cron, then repaired and pushed.
+
+**Sessions:** 324. Codex diagnosed from the Vercel build log, verified the live cron/documentation contract, restored the service, and corrected the deletion manifest.
+
+**Ship state:**
+- `lib/services/anthropic-admin.js` is restored as the `/v1/organizations/cost_report` client imported by `/api/cron/pricing-refresh`; `docs/DEAD_CODE_DELETION_MANIFEST.md` now records the false-positive deletion.
+- `npm run build` passed after restore; `main` was pushed at `5f2c6807`.
+
+**Why it matters:** the S322/S323 dead-code audit now has a concrete correction path documented, and the pricing drift guardrail deploys again instead of failing at module resolution.
+
+**Pointers:** `lib/services/anthropic-admin.js`, `pages/api/cron/pricing-refresh.js`, `docs/DEAD_CODE_DELETION_MANIFEST.md`; commit `5f2c6807`.
+
 ## July 2026 — Reviewer gating redesign shipped: contested-email lane, COI precision + drop ledger, faculty-page tier live (Session 321)
 
 **Milestone:** The reviewer-finder's silent-discard gates became visible, staff-adjudicable states — in production, with the faculty-page email fetch tier enabled — closing the Cause #2 email-coverage miss and the Contract 5 COI mis-drop exposure in one arc.
