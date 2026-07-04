@@ -10,6 +10,18 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Reviews-tab consumption suite live: outstanding/nudge, compare, export, AI synthesis (Session 326)
+
+**Milestone:** The staff-facing side of the reviewer portal shipped to production in one session — all four planned phases — ahead of the first D26 review submissions.
+**Sessions:** 326.
+**Ship state:**
+- Outstanding tracking + manual review-due nudge (shared fire-once marker with the cron; drive-verified against live acceptance data).
+- Schema-free comparison matrix + client-side DOCX/PDF panel-prep export (pure derivation/composition modules = future Power Automate/server seam).
+- AI synthesis via Tier-1 prompt `review-synthesis.generate` (seeded v1) → new prod Dataverse column `akoya_request.wmkf_reviewsynthesisjson` (wave11); untrusted-wrapped input, strict-JSON bounded output.
+- Verification boundary: zero portal submissions exist yet — populated views are unit-proven, runtime debut at first (or staged) submission.
+**Why it matters:** Staff/PDs now have the full receive-review workflow (monitor → nudge → compare → export → synthesize) waiting for the D26 cycle, and the deploy-order lesson (Dataverse column before code) plus the staff-host hazard are recorded.
+**Pointers:** `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`; commits `b107b940`, `ceeac840`, `e6991f35`, `fc9ab2c7`, `cbc3f571`.
+
 ## July 2026 — Reviewer acceptance fast-response drain shipped (Session 325)
 
 **Milestone:** External reviewer accept clicks now return after durable job staging + Dataverse accept commit, instead of waiting on honorarium/contact/email/quota side effects.

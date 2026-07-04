@@ -1,86 +1,119 @@
-# Session 326 Prompt: Reviewer acceptance drain deploy follow-through
+# Session 327 Prompt: Reviews-tab consumption suite live; first-submission verification ahead
 
-## Session 325 Summary
+## Session 326 Summary
 
-Session 325 combined repo housekeeping, CI repair, reviewer E2E re-baselining,
-and the reviewer acceptance fast-response build. The major product change is that
-external reviewer accept clicks no longer wait on the slow honorarium/email/contact
-tail: the route stages a durable Postgres job, commits the Dataverse accept, and a
-cron drain retries the follow-up work.
+Session 326 planned and shipped the entire **workbench Reviews-tab consumption
+build-out** (4 phases, all deployed to production), verified the S325 drain
+deployment, and ran a browser drive against live data. The portal is being
+built AHEAD of the December-2026 review cycle — zero reviews have ever been
+submitted through it (owner-stated), which bounds what could be runtime-verified.
 
 ### What Was Completed
 
-1. **Private-repo CI posture repaired.**
-   - Dropped CodeQL after confirming private-repo visibility/branch-protection
-     constraints; broadened Semgrep instead.
-   - Split Semgrep into blocking and advisory coverage, then fixed the no-op
-     workflow so the broadened rules actually run.
+1. **Plan + assessment.** Verified the reviewer submission pipeline is complete/live
+   and the gap was staff consumption. Wrote `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`
+   (4 phases, owner-confirmed decisions: schema-free rendering, live-question-set
+   ordering, client-side export with Dataverse-data Power-Automate seam, sweep-shared
+   nudge machinery).
 
-2. **Reviewer E2E suite re-baselined to the landed accept flow.**
-   - Fixed a strict-mode locator issue on the invite modal title.
-   - Re-baselined the reviewer suite to the current one-accept flow; 23/23 passed.
-   - Parked the E2E re-baseline context in memory for later retrieval.
+2. **Phase 1 — Outstanding tracking + manual nudge (LIVE, drive-verified).**
+   DTO adds `submitted`/`daysSinceMaterialsSent`; Outstanding section in
+   `ReviewsTab`; new POST `/api/review-manager/send-review-reminder` →
+   `lib/services/reviewer-manual-reminder.js`, reusing the review-due cron's
+   claim-before-send (shared `wmkf_remindersentat`+`wmkf_remindercount` marker —
+   manual+cron can never double-send; manual re-send allowed by design).
 
-3. **Reviewer acceptance fast-response drain shipped.**
-   - Added `reviewer_acceptance_jobs` via migration `024_reviewer_acceptance_jobs.sql`.
-   - Refactored `/api/external/review/[token]/respond` so fresh accept stages the
-     durable job, commits `wmkf_appreviewersuggestion`, then returns quickly.
-   - Added `/api/cron/drain-reviewer-acceptances`, scheduled every 2 minutes, to
-     re-read Dataverse and run honorarium/contact capture, ORCID, board identity,
-     name/title sync, mismatch alerts, acceptance confirmation email, and quota
-     notification.
-   - Dataverse remains authoritative for accepted/declined state; Postgres is a
-     retry ledger for post-accept side effects only.
+3. **Phase 2 — Schema-free comparison matrix (LIVE).** "Compare" toggle: ratings
+   grid (average/spread, labels from each snapshot row's own `answerText`) +
+   per-question narrative browser. Pure derivation in `shared/utils/review-matrix.js`;
+   `liveQuestions` rides the reviewers GET fail-soft. Retired keys badged "Prior
+   cycle"; "not asked" distinct from empty. Plus a stale-response guard on the
+   tab's load fetch (monotonic fetch-id).
 
-4. **Second-eyes findings fixed.**
-   - Claude reviewed `a3103b3c`; Codex fixed stale sibling-job dedupe and made
-     honorarium/address-capture failures retryable.
-   - Claude reviewed `1be33e0b`; Codex verified live Dataverse timestamp precision
-     and added tests for same-second truncation and queued sibling cancellation.
+4. **Phase 3 — Panel-prep export (LIVE).** Pure `composeReviewReport` +
+   `htmlToBlocks` tokenizer (sanitizer-allowlist grammar only) → client-side DOCX
+   (full fidelity) + PDF (inline formatting flattened, documented). Also fixed a
+   Phase 1 regression (outstanding/submitted filters now share the
+   `reviewReceivedAt` signal — lists structurally disjoint).
 
-5. **Migration 024 applied and verified.**
-   - `npm run apply:migrations` applied `024_reviewer_acceptance_jobs.sql` against
-     the configured Postgres database.
-   - Verified `schema_migrations` has `024_reviewer_acceptance_jobs.sql` and
-     `public.reviewer_acceptance_jobs` exists with expected columns/indexes.
+5. **Phase 4 — AI synthesis (LIVE; awaiting first submission to exercise).**
+   Tier-1 prompt `review-synthesis.generate` seeded v1 (create-only bootstrap);
+   `reviews_digest` declared untrusted (Executor wraps, caps at 60k with visible
+   truncation marker); strict-JSON output validated/bounded → NEW prod Dataverse
+   column `akoya_request.wmkf_reviewsynthesisjson` (wave11 applied 2026-07-03,
+   live-probed). POST `/api/review-manager/synthesize-reviews` (409
+   `no_submitted_reviews` before any LLM call; regeneration via explicit
+   `overwrite`). Shape-sanitizing DTO parse guarantees the card renders only
+   strings. Deploy order mattered: column BEFORE code (unprovisioned-column
+   selects hard-400).
+
+6. **S325 carryover #1 CLOSED.** Drain deployment verified: prod build on exact
+   SHA; `/api/cron/drain-reviewer-acceptances` live (fail-closed 401 without
+   cron secret).
+
+7. **Browser drive (PASS, zero-submission era).** On `applications.wmkeck.org`
+   against live data: tab render, Outstanding rows (disabled-nudge tooltip via
+   accessible name), both empty states, correct ABSENCE of Compare/Export with
+   zero submissions, clean console, request-switch stale-guard. Lesson recorded:
+   staff sign-in exists ONLY on applications.wmkeck.org — the external hosts'
+   /auth/signin is a dead end by design (memory `project-branded-domains.md`
+   HAZARD section + portal wiki topic).
+
+8. **Evaluator handoff log** for a companion LLM: `outputs/SESSION_326_REVIEW_HANDOFF.md`
+   (~3,930 lines, Parts 1-5 with full diffs and per-phase skepticism targets).
+   ⚠️ `outputs/` is gitignored — this file exists ONLY on the home machine.
 
 ### Commits
 
-- `180e9046` ci: drop CodeQL (private-repo blocked), broaden Semgrep to full SAST
-- `198fbd97` ci: actually run broadened Semgrep rules (fix no-op), split blocking vs advisory
-- `a3103b3c` Add reviewer acceptance fast-response drain
-- `d0f02b58` test(e2e): fix strict-mode locator on invite modal title; park reviewer E2E re-baseline
-- `07d8c216` chore(memory): record private-repo CI decision and parked E2E re-baseline
-- `4ca4c6b3` test(e2e): re-baseline reviewer suite to landed accept flow - 23/23 green
-- `18dd4840` fix(ci): green the Tests job - memory-router frontmatter + stale country-count assertion
-- `1be33e0b` Harden reviewer acceptance drain retries
-- `efe386ae` Cover reviewer acceptance timestamp precision
+- `a5b83349` docs: Reviews tab consumption build-out plan
+- `ce83023e` docs: wire plan into wiki; pin nudge marker semantics
+- `5ad9d99a` memory: campaign-settings UX revisit note (owner ask)
+- `b107b940` feat: Phase 1 — outstanding tracking + manual review-due nudge
+- `ceeac840` feat: Phase 2 — schema-free comparison matrix
+- `b103f84a` fix: stale-response guard on ReviewsTab load
+- `e6991f35` feat: Phase 3 — panel-prep export (DOCX/PDF) + Phase 1 regression fix
+- `1f69966f` docs: browser-drive results + D26 verification boundary
+- `5a613c58` docs+memory: host hazard (staff sign-in only on applications.wmkeck.org)
+- `fc9ab2c7` feat: Phase 4 — AI synthesis (schema+seed were pending at commit time)
+- `cbc3f571` docs: Phase 4 go-live executed (wave11 provisioned, deployed, prompt seeded)
 
 ## Next Items
 
 ### Verified Open
 
-1. **Verify the deployment for the pushed reviewer acceptance drain.**
-   Evidence: local `main` was ahead of `origin/main` by 2 before `/stop`; migration
-   `024` is already applied and verified locally via `schema_migrations` +
-   `to_regclass('public.reviewer_acceptance_jobs')`.
-   After push/deploy, confirm Vercel built the current `main` head and that
-   `/api/cron/drain-reviewer-acceptances` is present in the route list/logs.
+1. **Staged test submission to verify the populated consumption suite end-to-end.**
+   Evidence: zero portal submissions exist (owner-stated S326; route 409s
+   `no_submitted_reviews`); recipe documented in
+   `docs/agent-wiki/topics/external-reviewer-portal.md` (S308 `regenerate-token`
+   procedure — mint a magic link for a test reviewer without email, opt out of
+   honorarium, fill + submit the live form). This is the one action that
+   runtime-proves Compare, Export, and Synthesis at once, ahead of real D26 reviews.
 
-2. **Monitor first live reviewer accept through the new queue.**
-   Evidence: `lib/services/reviewer-acceptance-drain.js` now owns the slow tail,
-   and `docs/API_ROUTE_SECURITY_MATRIX.md`/`docs/atlas/postgres-infra-tables.md`
-   document the route/table contract.
-   After the next real reviewer accept, inspect `reviewer_acceptance_jobs` for a
-   completed row or a retryable failure before assuming the tail is healthy.
+2. **Monitor first live reviewer accept through the S325 drain queue** (carryover,
+   second half). Evidence: cron route verified live this session; no accept
+   observed yet. Inspect `reviewer_acceptance_jobs` for a completed row or a
+   retryable failure after the next real accept.
+
+3. **Triage the companion-LLM evaluation** of `outputs/SESSION_326_REVIEW_HANDOFF.md`
+   when the owner runs it. Evidence: log finished at Part 5 this session; findings
+   in review-matrix/review-report/synthesis are "least field-tested" by design.
+   NOTE: the log file is local to the home machine (outputs/ gitignored).
+
+4. **Campaign-settings UX revisit** (owner ask, S326). Evidence:
+   `.claude-memory/project-campaign-settings-ux-revisit.md` — low prominence +
+   set-once defaults should carry forward without per-flow re-confirmation.
+   Preflight: verify which send flows actually re-ask before scoping.
+
+5. **`AwardeeTab.js` unguarded id-keyed fetch** (same stale-response pattern fixed
+   in ReviewsTab `b103f84a`). Evidence: grep this session found it as the only
+   remaining sibling. One-line fix whenever that tab is next touched.
 
 ### Measure Later
 
-1. **Institution-COI ledger calibration.**
-   Evidence: `scripts/probe-institution-coi-breakdown.mjs` exists and documents
-   the read-only `coi_dropped` ledger measurement path.
-   Run `scripts/probe-institution-coi-breakdown.mjs 120` once enough
-   `coi_dropped` ledger rows have accumulated to validate Phase C thresholds.
+1. **Institution-COI ledger calibration.** Evidence:
+   `scripts/probe-institution-coi-breakdown.mjs` documents the read-only
+   measurement. Run with enough accumulated `coi_dropped` rows to validate
+   Phase C thresholds. (Unchanged from S325.)
 
 ### Owner Decision Needed
 
@@ -88,96 +121,70 @@ None at stop.
 
 ### Parked
 
-1. **Spec-audit docs recovery on the work computer.**
-   Evidence: `.claude-memory/project-spec-audit-docs-recovery-parked.md`.
-   Re-open around 2026-07-08 on the work computer. Do not re-search local/origin
-   first, and do not reconstruct the docs from scratch here. The recovery target
-   is the unpushed `codex/spec-audit` work containing
-   `REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md` and
-   `REVIEWER_QUOTA_PD_EMAIL_PLAN.md`.
+1. **Spec-audit docs recovery on the work computer** (~2026-07-08). Evidence:
+   `.claude-memory/project-spec-audit-docs-recovery-parked.md`. Do not re-search
+   local/origin; target is unpushed `codex/spec-audit` work.
 
 ### Verify Before Acting
 
 1. **Do not apply old S322 cleanup suggestions without fresh caller checks.**
-   Evidence: `docs/DEAD_CODE_DELETION_MANIFEST.md` was already corrected once
-   after `lib/services/anthropic-admin.js` proved live via the pricing-refresh
-   cron. Re-run source/caller checks before any delete/retire work inherited from
-   S322 audit docs.
+   Evidence: `docs/DEAD_CODE_DELETION_MANIFEST.md` correction history.
 
-2. **Reviewer acceptance confirmation email remains at-most-once by design.**
-   Evidence: Claude flagged retry-on-send-failure as a tradeoff; Codex left the
-   pre-send `claimedAt` guard in `lib/services/reviewer-acceptance-drain.js` to
-   avoid duplicate reviewer-facing emails after uncertain send failures.
-   Do not change to retry-on-failure without an explicit product/ops decision.
+2. **Acceptance confirmation email remains at-most-once by design** — do not
+   change to retry-on-failure without a product/ops decision. Evidence:
+   `lib/services/reviewer-acceptance-drain.js` pre-send `claimedAt` guard.
+
+3. **Synthesis concurrent-generate race is ACCEPTED, not a bug.** Two concurrent
+   Generate clicks can both run the LLM; last write wins on the column
+   (staff-initiated, no side effects beyond tokens). Evidence: route header in
+   `pages/api/review-manager/synthesize-reviews.js` + handoff log Part 5. Do not
+   "fix" without an owner ask.
 
 ### Do Not Reopen Without New Decision
 
-1. **Do not re-add CodeQL as a required private-repo gate.**
-   Evidence: commits `180e9046` and `198fbd97` record the private-repo constraint
-   and Semgrep replacement/split. Revisit only if GitHub plan/visibility changes.
-
-2. **Do not delete `lib/services/anthropic-admin.js` as dead code.**
-   Evidence: `pages/api/cron/pricing-refresh.js` imports it, the Vercel build
-   failed without it, and `docs/DEAD_CODE_DELETION_MANIFEST.md` records the
-   false-positive cleanup correction.
-
-3. **Two advisory hooks remain retired by owner approval.**
-   Evidence: `docs/HARNESS_INSTRUCTION_AUDIT_S322.md` and
-   `docs/agent-wiki/topics/dev-environment.md`.
-   Do not resurrect `doc-edit-reconcile-reminder.js` or
-   `memory-placement-reminder.js` without evidence of recurrence.
-
-4. **`pre-commit-self-review.js` deliberately kept.**
-   Evidence: `docs/HARNESS_INSTRUCTION_AUDIT_S322.md` risk note and the S323
-   staging-gap fix commits.
-   Do not remove it as duplicate hook hygiene without a new decision.
+1. **Do not re-add CodeQL as a required private-repo gate.** Evidence: `180e9046`,
+   `198fbd97`.
+2. **Do not delete `lib/services/anthropic-admin.js` as dead code.** Evidence:
+   pricing-refresh cron imports it.
+3. **Two advisory hooks remain retired by owner approval**
+   (`doc-edit-reconcile-reminder.js`, `memory-placement-reminder.js`). Evidence:
+   `docs/HARNESS_INSTRUCTION_AUDIT_S322.md`.
+4. **`pre-commit-self-review.js` deliberately kept.** Evidence: same audit doc.
+5. **Client-side export (no server export route / no roll-up column) until a
+   Power Automate flow exists to consume one.** Evidence: plan doc governing
+   decision 4 (owner decision S326); the pure composition module is the seam.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `SESSION_PROMPT.md` | Current handoff and verified carryovers. |
-| `pages/api/external/review/[token]/respond.js` | Token-scoped accept/decline route; fresh accept stages the PG job and commits Dataverse. |
-| `lib/services/reviewer-acceptance-job-service.js` | Postgres job enqueue/claim/failure/complete service for reviewer accept follow-up. |
-| `lib/services/reviewer-acceptance-drain.js` | Cron worker logic for post-accept side effects and retry/cancel rules. |
-| `lib/services/reviewer-acceptance-email.js` | Acceptance confirmation email rendering/sending helper. |
-| `pages/api/cron/drain-reviewer-acceptances.js` | Cron route for draining reviewer acceptance jobs. |
-| `lib/db/migrations/024_reviewer_acceptance_jobs.sql` | Existing-DB migration for the job ledger. |
-| `tests/unit/reviewer-acceptance-drain.test.js` | Retry/dedupe/timestamp precision coverage for the drain. |
-| `tests/integration/external-review-routes.test.js` | Route contract tests for staging, accept commit, conflict, and ambiguous failure paths. |
-| `.github/workflows/semgrep.yml` | Broad advisory Semgrep workflow from the private-repo CI change. |
-| `.github/workflows/semgrep-blocking.yml` | Blocking Semgrep workflow replacing unavailable CodeQL coverage. |
+| `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md` | The 4-phase plan; all phases DEPLOYED; verification-boundary + status source of truth. |
+| `shared/components/workbench/ReviewsTab.js` | The tab: Outstanding, Cards/Compare, Export, Synthesis card. |
+| `lib/services/reviewer-manual-reminder.js` | Manual nudge service (shared marker claim-before-send). |
+| `shared/utils/review-matrix.js` | Pure schema-free matrix derivation (Phase 2; consumed by Phase 3). |
+| `shared/utils/review-report.js` (+`-docx.js`, `-pdf.js`) | Pure report composition + HTML tokenizer; client-side renderers. |
+| `pages/api/review-manager/synthesize-reviews.js` | Synthesis route (409 on zero submissions; overwrite-gated regeneration). |
+| `shared/config/prompts/review-synthesis.js` | Prompt source of truth (untrusted variable decl + output/validation schemas). |
+| `scripts/seed-review-synthesis-prompt.js` | Create-only seed; v1 SEEDED in prod 2026-07-03. |
+| `lib/dataverse/schema/wave11-review-synthesis/` | Schema-as-code for `wmkf_reviewsynthesisjson`; APPLIED to prod 2026-07-03. |
+| `pages/api/review-manager/reviewers.js` | DTO: outstanding fields, liveQuestions (fail-soft), shape-sanitized reviewSynthesis. |
+| `outputs/SESSION_326_REVIEW_HANDOFF.md` | Companion-LLM evaluation log (LOCAL ONLY — outputs/ gitignored). |
 
 ## Testing
 
 ```bash
-npm test -- tests/integration/external-review-routes.test.js tests/unit/reviewer-acceptance-drain.test.js tests/unit/reviewer-acceptance-job-service.test.js tests/unit/email-token-resolvers.test.js
-npm test -- tests/unit/reviewer-acceptance-drain.test.js tests/unit/reviewer-acceptance-job-service.test.js tests/integration/external-review-routes.test.js
-npm run check:migrations-manifest
-npm run check:api-routes
-npm run check:api-routes:self-test
-npm run check:atlas
-npm run check:atlas:self-test
-npm run check:doc-symbol-refs
-npm run check:doc-symbol-refs:self-test
-npm run check:agent-wiki
-npm run check:agent-wiki:self-test
-npm run check:fact-consistency
-npm run check:fact-consistency:self-test
-npm run check:doc-currency
-npm run check:doc-currency:self-test
-npm run check:route-lifecycle-auth
-npm run check:route-lifecycle-auth:self-test
-npm run check:build-claim-freshness
-npm run check:build-claim-freshness:self-test
+npm test -- tests/unit/reviewer-manual-reminder.test.js tests/unit/review-matrix.test.js tests/unit/review-report.test.js tests/unit/synthesize-reviews.test.js tests/unit/review-manager-reviewers-synthesis-dto.test.js tests/unit/reviews-tab.test.js
+npm run check:api-routes && npm run check:api-routes:self-test
+npm run check:route-lifecycle-auth && npm run check:route-lifecycle-auth:self-test
+npm run check:prompt-injection-tagging && npm run check:prompt-injection-tagging:self-test
+npm run check:trust-boundary-guid && npm run check:trust-boundary-guid:self-test
 npm run build
-npm run apply:migrations
 ```
 
-Live/read-only probes run during the session:
-- Dataverse `wmkf_responsereceivedat` precision probe showed second precision
-  values such as `2026-07-02T17:56:44Z`, supporting the drain's ±1000ms
-  same-second tolerance.
-- Postgres verification after `npm run apply:migrations` confirmed
-  `schema_migrations.name = '024_reviewer_acceptance_jobs.sql'` and
-  `to_regclass('public.reviewer_acceptance_jobs') = 'reviewer_acceptance_jobs'`.
+Live probes run this session (read-only unless noted):
+- Vercel API: production deployments READY on exact SHAs `b107b940`…`fc9ab2c7`.
+- `/api/cron/drain-reviewer-acceptances` → 401 (fail-closed, route live).
+- Prod Dataverse `$select=wmkf_reviewsynthesisjson` → HTTP 200 (column live;
+  WRITE: created via wave11 `--execute`).
+- Prompt seed `--execute` (WRITE): `review-synthesis.generate` v1, exactly one
+  current row verified.
