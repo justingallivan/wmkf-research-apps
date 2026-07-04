@@ -255,6 +255,7 @@ related:
 | [REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md](REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md) | plan | active |  | (engagement-scope v1, then person-scope v2). Supersedes the engagement-scope v1 (storage changed from per-request to person-level per owner... | 2026-07-02 |
 | [REVIEWER_TIMEOUT_BUDGET_PLAN.md](REVIEWER_TIMEOUT_BUDGET_PLAN.md) | plan | active |  | Status: IMPLEMENTED — pre-impl Codex design review + post-impl Codex review (findings #1–#5 fixed, see \"Post-impl\" below). 1943 tests + 10 gates +... | 2026-07-02 |
 | [REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md](REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md) | plan | active |  | Planning only. No feature code, migrations, API routes, or schema files were created for this pass. | 2026-07-02 |
+| [WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md](WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md) | plan | active |  | Four-phase Reviews tab build-out: outstanding tracking + nudge, schema-free comparison matrix, panel-prep export, AI synthesis. Consumption side only. | 2026-07-03 |
 
 ## reviewers
 
