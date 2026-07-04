@@ -12,15 +12,20 @@ summary: SAFE dead-code bucket applied 2026-07-03; owner-confirmation deletion c
 - **Evidence anchor:** repo state at commit `7d3be6a1`. All "last commit referencing" claims and grep results are snapshots as of that commit — **re-run caller checks at execution time before deleting anything** (CLAUDE.md rule 2, destructive carryover).
 - **Method:** four parallel read-only scans (dead exports, page/route reachability, feature flags, scripts/config) over `lib/ shared/ pages/ tests/ scripts/` plus root config. Every export-level SAFE claim was additionally re-verified in the S322 main session with repo-wide word-boundary greps (including `.mjs`/`.json`) after one scan false positive was caught (see Keep).
 - **Evidence labels:** [VERIFIED session-grep] = re-checked directly in the S322 main session; [VERIFIED scan] = confirmed by the S322 read-only scan agents (grep + git evidence in their reports) but not independently re-run in the main session.
-- **Status:** SAFE bucket applied 2026-07-03 after live caller checks. The owner-confirmation bucket below remains read-only until explicitly approved.
+- **Status:** SAFE bucket applied 2026-07-03 after live caller checks, with one correction on 2026-07-03: `lib/services/anthropic-admin.js` was restored because `/api/cron/pricing-refresh` still imports it. The owner-confirmation bucket below remains read-only until explicitly approved.
 
 ## APPLIED — SAFE bucket deleted 2026-07-03
 
 After the mandated live caller checks were re-run, the zero-reference SAFE cluster
-was removed: two orphan helper files, the dead exported symbols, the unsupported
+was removed: the remaining orphan helper file, the dead exported symbols, the unsupported
 `MOCK_MODE` environment computation, and 20 one-off probe/fix scripts. Active docs,
 the BILL option-set probe/test, and `.env.example` were reconciled so the deleted
 symbols and unsupported env variable no longer appear as live contracts.
+
+Correction: `lib/services/anthropic-admin.js` was originally included in this
+deletion pass, but `/api/cron/pricing-refresh` is a live Vercel cron route and
+imports that service. The file was restored on 2026-07-03 to repair the
+production build.
 
 ## NEEDS-OWNER-CONFIRMATION
 
