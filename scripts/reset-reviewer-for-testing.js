@@ -21,8 +21,14 @@
  * applicant-disposition rows, and reviewers whose name lacks "test" (override
  * with --force). Parent PATCH runs before the child deletes (crash-safe order).
  *
+ * Optional: --clear-synthesis also clears (with --commit) the AI review
+ * synthesis memo, `akoya_request.wmkf_reviewsynthesisjson`, on the
+ * suggestion's parent request — so a synthesis rehearsal can be re-run from
+ * scratch. Absent this flag, behavior is unchanged from before it existed.
+ *
  *   node scripts/reset-reviewer-for-testing.js --email x@y.org --requestNumber 1002788
  *   node scripts/reset-reviewer-for-testing.js --email x@y.org --requestNumber 1002788 --commit
+ *   node scripts/reset-reviewer-for-testing.js --email x@y.org --requestNumber 1002788 --clear-synthesis --commit
  */
 
 import { readFileSync, existsSync } from 'fs';
@@ -41,6 +47,7 @@ if (existsSync(envPath)) {
 function arg(name) { const i = process.argv.indexOf(`--${name}`); return i >= 0 ? process.argv[i + 1] : undefined; }
 const COMMIT = process.argv.includes('--commit');
 const FORCE = process.argv.includes('--force'); // override the test-row heuristic
+const CLEAR_SYNTHESIS = process.argv.includes('--clear-synthesis');
 const EMAIL = arg('email');
 const REQUEST_NUMBER = arg('requestNumber');
 const SUGGESTION_ID = arg('suggestionId');
@@ -54,6 +61,7 @@ const ReviewDraftService = draftMod.default || draftMod;
 
 const SUGG_ENTITY = 'wmkf_appreviewersuggestions';
 const PERSON_ENTITY = 'wmkf_potentialreviewerses';
+const REQUESTS_ENTITY = 'akoya_requests';
 const isGuid = (s) => typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 
 // Pristine suggestion state: selected + not-yet-invited, everything downstream cleared.
@@ -161,11 +169,24 @@ await bypassDynamicsRestrictions('reset-reviewer-for-testing', async () => {
   });
   console.log(`Review-answer rows to delete: ${answers.length}`);
 
+  // ── Optional: AI review-synthesis memo on the parent request ──
+  const requestId = suggestion._wmkf_request_value;
+  let synthesisBefore = null;
+  if (CLEAR_SYNTHESIS) {
+    const requestRow = await DynamicsService.getRecord(REQUESTS_ENTITY, requestId, {
+      select: 'wmkf_reviewsynthesisjson',
+    }).catch(() => null);
+    synthesisBefore = requestRow?.wmkf_reviewsynthesisjson ?? null;
+  }
+
   if (!COMMIT) {
     console.log(`Review draft: would delete via ReviewDraftService.deleteBySuggestion`);
     console.log(`Suggestion PATCH: ${Object.keys(RESET_PATCH).length} field(s) → pristine (selected:true, invited:false)`);
     console.log(`Honorarium lookup: would clear via disassociate (${HONORARIUM_NAV_PROP}/$ref DELETE)`);
     console.log(`Person PATCH: clear ${Object.keys(PERSON_PATCH).join(', ')}`);
+    if (CLEAR_SYNTHESIS) {
+      console.log(`Synthesis: request ${requestId} wmkf_reviewsynthesisjson is currently ${synthesisBefore ? `POPULATED (${synthesisBefore.length} chars)` : 'empty'} — would PATCH to null`);
+    }
     console.log('\nDRY-RUN complete. Re-run with --commit to apply.');
     return;
   }
@@ -195,6 +216,11 @@ await bypassDynamicsRestrictions('reset-reviewer-for-testing', async () => {
     console.warn(`  draft delete non-fatal: ${e.message || e}`); return null;
   });
   console.log(`Draft deleted: ${draftDeleted ?? 'n/a'}`);
+
+  if (CLEAR_SYNTHESIS) {
+    await DynamicsService.updateRecord(REQUESTS_ENTITY, requestId, { wmkf_reviewsynthesisjson: null });
+    console.log(`Synthesis cleared on request ${requestId} (was ${synthesisBefore ? 'populated' : 'already empty'}).`);
+  }
 
   console.log('\nDone. Reviewer is back in Invite Reviewers (selected, uninvited) — start the E2E from the PD side.');
 });
