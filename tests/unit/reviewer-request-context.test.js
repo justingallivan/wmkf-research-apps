@@ -2,12 +2,29 @@
  * @jest-environment node
  */
 
+const getRecord = jest.fn();
+jest.mock('../../lib/services/dynamics-service.js', () => ({
+  DynamicsService: { getRecord: (...a) => getRecord(...a) },
+}));
+
+const fetchCoPIs = jest.fn(async () => []);
+jest.mock('../../lib/services/proposal-participants.js', () => ({
+  fetchCoPIs: (...a) => fetchCoPIs(...a),
+}));
+
 import {
   formatTrustedRequestMetadata,
   loadReviewerRequestContext,
   mergeRequestContextIntoAnalysisResult,
   projectReviewerRequestContext,
 } from '../../lib/services/reviewer-request-context.js';
+
+const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  fetchCoPIs.mockResolvedValue([]);
+});
 
 describe('reviewer request context', () => {
   test('projects Dataverse request metadata into the stable proposalInfo fields', () => {
@@ -69,6 +86,42 @@ describe('reviewer request context', () => {
       statusCode: 400,
       message: 'requestId is required for reviewer analysis',
     });
+  });
+
+  test('golden path: loads the akoya_request row and projects trusted context', async () => {
+    getRecord.mockResolvedValue({
+      akoya_requestid: REQUEST_ID,
+      akoya_title: 'Request Title',
+      wmkf_abstract: 'Request abstract',
+      _akoya_applicantid_value_formatted: 'Applicant University',
+      _wmkf_projectleader_value_formatted: 'Dr. PI',
+      _akoya_programid_value_formatted: 'Science and Engineering Research',
+    });
+    fetchCoPIs.mockResolvedValue(['Dr. Co A']);
+
+    const context = await loadReviewerRequestContext(REQUEST_ID);
+
+    expect(getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, expect.objectContaining({
+      select: expect.stringContaining('akoya_requestid'),
+    }));
+    expect(fetchCoPIs).toHaveBeenCalledWith(REQUEST_ID);
+    expect(context).toMatchObject({
+      requestId: REQUEST_ID,
+      title: 'Request Title',
+      programArea: 'Science and Engineering Research',
+      principalInvestigator: 'Dr. PI',
+      coInvestigators: 'Dr. Co A',
+      abstract: 'Request abstract',
+    });
+  });
+
+  test('request not found → 404', async () => {
+    getRecord.mockResolvedValue(null);
+    await expect(loadReviewerRequestContext(REQUEST_ID)).rejects.toMatchObject({
+      statusCode: 404,
+      message: `Request ${REQUEST_ID} was not found`,
+    });
+    expect(fetchCoPIs).not.toHaveBeenCalled();
   });
 
   test('omits program area from the trusted prompt block', () => {
