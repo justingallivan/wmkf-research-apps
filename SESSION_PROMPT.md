@@ -1,61 +1,78 @@
-# Session 325 Prompt: Clean main after pricing-refresh build repair
+# Session 326 Prompt: Reviewer acceptance drain deploy follow-through
 
-## Session 324 Summary
+## Session 325 Summary
 
-Session 324 started from a clean `main` handoff, ran the full `/start` gate set,
-then handled a failed Vercel build from the previous push. The failure was a real
-build break caused by S323 housekeeping deleting a live service dependency for
-the monthly Anthropic pricing drift cron. The fix was committed, built locally
-outside the sandbox, and pushed to `origin/main`.
+Session 325 combined repo housekeeping, CI repair, reviewer E2E re-baselining,
+and the reviewer acceptance fast-response build. The major product change is that
+external reviewer accept clicks no longer wait on the slow honorarium/email/contact
+tail: the route stages a durable Postgres job, commits the Dataverse accept, and a
+cron drain retries the follow-up work.
 
 ### What Was Completed
 
-1. **Startup gates passed cleanly.**
-   - `git fetch origin` and status showed `main` aligned with `origin/main`.
-   - Memory and Codex skills symlinks were valid.
-   - Every `check:*` startup gate and paired self-test from `/start` passed,
-     including `check:memory-drift:no-write`.
+1. **Private-repo CI posture repaired.**
+   - Dropped CodeQL after confirming private-repo visibility/branch-protection
+     constraints; broadened Semgrep instead.
+   - Split Semgrep into blocking and advisory coverage, then fixed the no-op
+     workflow so the broadened rules actually run.
 
-2. **Vercel build failure diagnosed.**
-   - Attached Vercel log for commit `d51fc03` failed at
-     `pages/api/cron/pricing-refresh.js` with
-     `Module not found: Can't resolve '../../../lib/services/anthropic-admin'`.
-   - Live source/doc checks showed `/api/cron/pricing-refresh` is still a live
-     Vercel cron route (`vercel.json`, `docs/API_ROUTE_SECURITY_MATRIX.md`,
-     `docs/CREDENTIALS_RUNBOOK.md`, `docs/atlas/postgres-infra-tables.md`).
-   - Git history showed `lib/services/anthropic-admin.js` was deleted by
-     `8811051e chore: apply housekeeping cleanup`.
+2. **Reviewer E2E suite re-baselined to the landed accept flow.**
+   - Fixed a strict-mode locator issue on the invite modal title.
+   - Re-baselined the reviewer suite to the current one-accept flow; 23/23 passed.
+   - Parked the E2E re-baseline context in memory for later retrieval.
 
-3. **Anthropic Admin pricing client restored.**
-   - Restored `lib/services/anthropic-admin.js` as the thin
-     `/v1/organizations/cost_report` client expected by `pricing-refresh`.
-   - Updated `docs/DEAD_CODE_DELETION_MANIFEST.md` to record the correction:
-     the file was not safe dead code because the live cron imports it.
-   - Pushed `5f2c6807` to `origin/main`; `git status` is clean and synced.
+3. **Reviewer acceptance fast-response drain shipped.**
+   - Added `reviewer_acceptance_jobs` via migration `024_reviewer_acceptance_jobs.sql`.
+   - Refactored `/api/external/review/[token]/respond` so fresh accept stages the
+     durable job, commits `wmkf_appreviewersuggestion`, then returns quickly.
+   - Added `/api/cron/drain-reviewer-acceptances`, scheduled every 2 minutes, to
+     re-read Dataverse and run honorarium/contact capture, ORCID, board identity,
+     name/title sync, mismatch alerts, acceptance confirmation email, and quota
+     notification.
+   - Dataverse remains authoritative for accepted/declined state; Postgres is a
+     retry ledger for post-accept side effects only.
 
-4. **Codex local permission posture tuned outside the repo.**
-   - With owner permission, edited `/Users/gallivan/.codex/config.toml` to keep
-     `workspace-write` but use `approval_policy = "on-request"`,
-     `approvals_reviewer = "user"`, and `network_access = true`.
-   - Removed the ineffective `.git` `writable_roots` attempt.
-   - Appended user-level exec rules in
-     `/Users/gallivan/.codex/rules/default.rules`: routine
-     `git fetch/status/rev-parse/rev-list/log/add/commit/push origin main` and
-     `npm run build` allow; `rm`, `git reset`, and `git checkout` prompt.
-   - Verified rules with `codex execpolicy check`. Restart Codex / start a new
-     thread for these settings to fully apply; this thread still ran under the
-     old managed sandbox.
+4. **Second-eyes findings fixed.**
+   - Claude reviewed `a3103b3c`; Codex fixed stale sibling-job dedupe and made
+     honorarium/address-capture failures retryable.
+   - Claude reviewed `1be33e0b`; Codex verified live Dataverse timestamp precision
+     and added tests for same-second truncation and queued sibling cancellation.
+
+5. **Migration 024 applied and verified.**
+   - `npm run apply:migrations` applied `024_reviewer_acceptance_jobs.sql` against
+     the configured Postgres database.
+   - Verified `schema_migrations` has `024_reviewer_acceptance_jobs.sql` and
+     `public.reviewer_acceptance_jobs` exists with expected columns/indexes.
 
 ### Commits
 
-- `5f2c6807` fix: restore Anthropic admin pricing client
+- `180e9046` ci: drop CodeQL (private-repo blocked), broaden Semgrep to full SAST
+- `198fbd97` ci: actually run broadened Semgrep rules (fix no-op), split blocking vs advisory
+- `a3103b3c` Add reviewer acceptance fast-response drain
+- `d0f02b58` test(e2e): fix strict-mode locator on invite modal title; park reviewer E2E re-baseline
+- `07d8c216` chore(memory): record private-repo CI decision and parked E2E re-baseline
+- `4ca4c6b3` test(e2e): re-baseline reviewer suite to landed accept flow - 23/23 green
+- `18dd4840` fix(ci): green the Tests job - memory-router frontmatter + stale country-count assertion
+- `1be33e0b` Harden reviewer acceptance drain retries
+- `efe386ae` Cover reviewer acceptance timestamp precision
 
 ## Next Items
 
 ### Verified Open
 
-None at stop. There is no immediate actionable housekeeping item left in
-`SESSION_PROMPT.md`.
+1. **Verify the deployment for the pushed reviewer acceptance drain.**
+   Evidence: local `main` was ahead of `origin/main` by 2 before `/stop`; migration
+   `024` is already applied and verified locally via `schema_migrations` +
+   `to_regclass('public.reviewer_acceptance_jobs')`.
+   After push/deploy, confirm Vercel built the current `main` head and that
+   `/api/cron/drain-reviewer-acceptances` is present in the route list/logs.
+
+2. **Monitor first live reviewer accept through the new queue.**
+   Evidence: `lib/services/reviewer-acceptance-drain.js` now owns the slow tail,
+   and `docs/API_ROUTE_SECURITY_MATRIX.md`/`docs/atlas/postgres-infra-tables.md`
+   document the route/table contract.
+   After the next real reviewer accept, inspect `reviewer_acceptance_jobs` for a
+   completed row or a retryable failure before assuming the tail is healthy.
 
 ### Measure Later
 
@@ -81,92 +98,86 @@ None at stop.
 
 ### Verify Before Acting
 
-1. **S322 audit docs are snapshots, not fresh truth.**
-   Evidence: `docs/DEAD_CODE_DELETION_MANIFEST.md`,
-   `docs/AGENT_INSTRUCTION_AUDIT_S322.md`,
-   `docs/HARNESS_INSTRUCTION_AUDIT_S322.md`, and
-   `docs/DOCS_DRIFT_AUDIT_S322.md` all describe snapshot findings. This session
-   proved the risk: `lib/services/anthropic-admin.js` had been deleted as an
-   orphan but was still imported by the live `pricing-refresh` cron.
-   Re-run live caller/source checks before applying any remaining suggestion
-   from those docs, especially destructive/delete/retire work.
+1. **Do not apply old S322 cleanup suggestions without fresh caller checks.**
+   Evidence: `docs/DEAD_CODE_DELETION_MANIFEST.md` was already corrected once
+   after `lib/services/anthropic-admin.js` proved live via the pricing-refresh
+   cron. Re-run source/caller checks before any delete/retire work inherited from
+   S322 audit docs.
 
-2. **Codex permission changes need a fresh Codex process/thread.**
-   Evidence: `/Users/gallivan/.codex/config.toml` and
-   `/Users/gallivan/.codex/rules/default.rules` were edited outside the repo and
-   validated with `codex execpolicy check`.
-   If a future thread still reports `approvals_reviewer = "auto_review"` or
-   `.git` read-only despite the rules, inspect managed requirements; local config
-   may be overridden.
+2. **Reviewer acceptance confirmation email remains at-most-once by design.**
+   Evidence: Claude flagged retry-on-send-failure as a tradeoff; Codex left the
+   pre-send `claimedAt` guard in `lib/services/reviewer-acceptance-drain.js` to
+   avoid duplicate reviewer-facing emails after uncertain send failures.
+   Do not change to retry-on-failure without an explicit product/ops decision.
 
 ### Do Not Reopen Without New Decision
 
-1. **Do not delete `lib/services/anthropic-admin.js` as dead code.**
-   Evidence: `pages/api/cron/pricing-refresh.js` imports it, the Vercel build
-   failed without it, and `docs/DEAD_CODE_DELETION_MANIFEST.md` now records the
-   correction.
+1. **Do not re-add CodeQL as a required private-repo gate.**
+   Evidence: commits `180e9046` and `198fbd97` record the private-repo constraint
+   and Semgrep replacement/split. Revisit only if GitHub plan/visibility changes.
 
-2. **Two advisory hooks remain retired by owner approval.**
+2. **Do not delete `lib/services/anthropic-admin.js` as dead code.**
+   Evidence: `pages/api/cron/pricing-refresh.js` imports it, the Vercel build
+   failed without it, and `docs/DEAD_CODE_DELETION_MANIFEST.md` records the
+   false-positive cleanup correction.
+
+3. **Two advisory hooks remain retired by owner approval.**
    Evidence: `docs/HARNESS_INSTRUCTION_AUDIT_S322.md` and
    `docs/agent-wiki/topics/dev-environment.md`.
    Do not resurrect `doc-edit-reconcile-reminder.js` or
    `memory-placement-reminder.js` without evidence of recurrence.
 
-3. **`pre-commit-self-review.js` deliberately kept.**
+4. **`pre-commit-self-review.js` deliberately kept.**
    Evidence: `docs/HARNESS_INSTRUCTION_AUDIT_S322.md` risk note and the S323
    staging-gap fix commits.
    Do not remove it as duplicate hook hygiene without a new decision.
-
-4. **Instruction-audit F2 remains rejected.**
-   Evidence: `docs/AGENT_INSTRUCTION_AUDIT_S322.md`.
-   Do not remove `pages/api/**` from `.claude/rules/llm-and-prompts.md` unless
-   new evidence proves API-route LLM guidance still loads for routes calling
-   `execute-prompt` or `llm-client`.
-
-5. **Reviewer-email tails are closed/deprecated.**
-   Evidence: `docs/REVIEWER_EMAIL_PERSIST_FIX_PLAN.md` and commits
-   `a1682b8b` / `d4b37c51`.
-   Do not reopen the no-email re-measure or send-gate predicate work without a
-   new product decision.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
 | `SESSION_PROMPT.md` | Current handoff and verified carryovers. |
-| `lib/services/anthropic-admin.js` | Anthropic Admin API cost-report client used by `pricing-refresh`. |
-| `pages/api/cron/pricing-refresh.js` | Live monthly pricing drift cron that imports the admin client. |
-| `docs/DEAD_CODE_DELETION_MANIFEST.md` | S322 cleanup manifest; now records the `anthropic-admin` restore correction. |
-| `/Users/gallivan/.codex/config.toml` | Local Codex permission settings edited outside the repo. |
-| `/Users/gallivan/.codex/rules/default.rules` | Local Codex exec rules edited outside the repo. |
-| `.claude-memory/project-spec-audit-docs-recovery-parked.md` | Parked work-computer-only spec-audit recovery instructions. |
-| `scripts/probe-institution-coi-breakdown.mjs` | Future institution-COI threshold calibration probe. |
+| `pages/api/external/review/[token]/respond.js` | Token-scoped accept/decline route; fresh accept stages the PG job and commits Dataverse. |
+| `lib/services/reviewer-acceptance-job-service.js` | Postgres job enqueue/claim/failure/complete service for reviewer accept follow-up. |
+| `lib/services/reviewer-acceptance-drain.js` | Cron worker logic for post-accept side effects and retry/cancel rules. |
+| `lib/services/reviewer-acceptance-email.js` | Acceptance confirmation email rendering/sending helper. |
+| `pages/api/cron/drain-reviewer-acceptances.js` | Cron route for draining reviewer acceptance jobs. |
+| `lib/db/migrations/024_reviewer_acceptance_jobs.sql` | Existing-DB migration for the job ledger. |
+| `tests/unit/reviewer-acceptance-drain.test.js` | Retry/dedupe/timestamp precision coverage for the drain. |
+| `tests/integration/external-review-routes.test.js` | Route contract tests for staging, accept commit, conflict, and ambiguous failure paths. |
+| `.github/workflows/semgrep.yml` | Broad advisory Semgrep workflow from the private-repo CI change. |
+| `.github/workflows/semgrep-blocking.yml` | Blocking Semgrep workflow replacing unavailable CodeQL coverage. |
 
 ## Testing
 
 ```bash
-npm run build
-npx eslint lib/services/anthropic-admin.js pages/api/cron/pricing-refresh.js
+npm test -- tests/integration/external-review-routes.test.js tests/unit/reviewer-acceptance-drain.test.js tests/unit/reviewer-acceptance-job-service.test.js tests/unit/email-token-resolvers.test.js
+npm test -- tests/unit/reviewer-acceptance-drain.test.js tests/unit/reviewer-acceptance-job-service.test.js tests/integration/external-review-routes.test.js
+npm run check:migrations-manifest
 npm run check:api-routes
 npm run check:api-routes:self-test
+npm run check:atlas
+npm run check:atlas:self-test
 npm run check:doc-symbol-refs
 npm run check:doc-symbol-refs:self-test
-npm run check:build-claim-freshness
-npm run check:build-claim-freshness:self-test
-npm run check:docs-catalog
+npm run check:agent-wiki
+npm run check:agent-wiki:self-test
 npm run check:fact-consistency
 npm run check:fact-consistency:self-test
-npm run check:secret-scan
-npm run check:secret-scan:self-test
-codex execpolicy check --pretty --rules /Users/gallivan/.codex/rules/default.rules -- git push origin main
-codex execpolicy check --pretty --rules /Users/gallivan/.codex/rules/default.rules -- npm run build
-codex execpolicy check --pretty --rules /Users/gallivan/.codex/rules/default.rules -- rm -rf /tmp/example
-codex execpolicy check --pretty --rules /Users/gallivan/.codex/rules/default.rules -- git reset --hard HEAD~1
+npm run check:doc-currency
+npm run check:doc-currency:self-test
+npm run check:route-lifecycle-auth
+npm run check:route-lifecycle-auth:self-test
+npm run check:build-claim-freshness
+npm run check:build-claim-freshness:self-test
+npm run build
+npm run apply:migrations
 ```
 
-Notes:
-- The first two sandboxed `npm run build` attempts stalled in the current
-  thread's old sandbox during Turbopack's optimized build phase; the approved
-  unsandboxed `npm run build` completed successfully in 6.8s.
-- `codex execpolicy check` emitted a harmless PATH warning in the old sandbox
-  but returned the expected allow/prompt decisions.
+Live/read-only probes run during the session:
+- Dataverse `wmkf_responsereceivedat` precision probe showed second precision
+  values such as `2026-07-02T17:56:44Z`, supporting the drain's ±1000ms
+  same-second tolerance.
+- Postgres verification after `npm run apply:migrations` confirmed
+  `schema_migrations.name = '024_reviewer_acceptance_jobs.sql'` and
+  `to_regclass('public.reviewer_acceptance_jobs') = 'reviewer_acceptance_jobs'`.

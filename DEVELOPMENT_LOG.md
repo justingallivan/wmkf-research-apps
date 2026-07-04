@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Reviewer acceptance fast-response drain shipped (Session 325)
+
+**Milestone:** External reviewer accept clicks now return after durable job staging + Dataverse accept commit, instead of waiting on honorarium/contact/email/quota side effects.
+
+**Sessions:** 325. Codex designed/built the Postgres-backed drain, Claude reviewed twice, Codex fixed sibling-job dedupe/retry semantics, and migration `024` was applied to the configured Postgres database.
+
+**Ship state:**
+- New `reviewer_acceptance_jobs` ledger + `/api/cron/drain-reviewer-acceptances` move the formerly-inline accept tail into a retryable cron drain while keeping Dataverse `wmkf_appreviewersuggestion` authoritative.
+- Fresh accept gates 200 on job staging + Dataverse PATCH; repeat accept requeues follow-up without restamping; stale sibling jobs cancel before duplicate confirmation email.
+- `024_reviewer_acceptance_jobs.sql` applied and verified (`schema_migrations` row + `public.reviewer_acceptance_jobs` table).
+
+**Why it matters:** reviewers should no longer sit through the 30-second slow tail after clicking accept, while staff-facing honorarium/contact side effects remain durable, retryable, and observable.
+
+**Pointers:** `docs/atlas/postgres-infra-tables.md`, `docs/API_ROUTE_SECURITY_MATRIX.md`; commits `a3103b3c`, `1be33e0b`, `efe386ae`.
+
 ## July 2026 — Pricing-refresh build incident repaired after cleanup false-positive (Session 324)
 
 **Milestone:** A production Vercel build failure from the S323 cleanup was traced to deleting the live Anthropic Admin API client used by the monthly pricing drift cron, then repaired and pushed.
