@@ -90,7 +90,10 @@ const recordData = {
   // and reasoning about agreement/disagreement — Sonnet, not Haiku.
   wmkf_ai_model: 'sonnet',
   wmkf_ai_temperature: 0.2,
-  wmkf_ai_maxtokens: 2000,
+  // max_tokens is a hard cap on thinking + response combined. Sonnet 5 runs
+  // adaptive thinking by default, so the original 2000 truncated the JSON
+  // mid-stream ("Unexpected end of JSON input", S328 rehearsal).
+  wmkf_ai_maxtokens: 8000,
   wmkf_ai_promptstatus: PROMPTSTATUS_PUBLISHED,
   // wmkf_ai_iscurrent / wmkf_promptversion / wmkf_ai_publisheddatetime are set by
   // seedPromptRow (create-only + version-preserving force) — not here.
