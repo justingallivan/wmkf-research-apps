@@ -24,12 +24,11 @@ restriction context folds INTO the layer as a deliberate late stage;
 delivery = ratchet + gate (freeze new raw usage immediately, convert
 opportunistically + occasional dedicated sessions).
 
-**Execution status: Stages 0–2 COMPLETE; Wave 3 + Wave 5 adapter foundations
-BUILT (S329, 2026-07-04).** Census probe, line-tolerant ratchet allowlist + CI
-gate, `lib/dataverse/core/` toolkit (4 original adapters converted), and 5 new
-adapters (policy, review-question, ai-prompt, review-answer + core/changeset,
-grant-request reads) are committed. NO callers converted yet — the allowlist
-still holds the full baseline; conversion waves 3–6 and Stages 7–8 remain.
+**Execution status: Stages 0–2 COMPLETE; conversion batch 1 MERGED (S329,
+2026-07-04).** Census probe, ratchet gate, core toolkit, 11 adapters, and 33
+converted caller files (7 parallel clusters). Allowlist 181 → 132 count-keys.
+Remaining: the sequential tail (akoya writes, cross-entity files, unresolved
+census entries, documented business-filter skips), then Stages 7–8.
 
 ## Why (baseline evidence)
 
@@ -432,6 +431,22 @@ Drift found → this doc is edited BEFORE the next stage starts.
   resolution replaces runtime `resolveEntitySetName` in the answer path;
   `readRatingsBySuggestion` carries no bypass wrapper; policy
   `queryActiveSlotByCode` escapes `wmkf_code` (was raw-interpolated).
+
+- 2026-07-04 (S329): **Conversion batch 1 merged** (7 parallel Sonnet worktree
+  clusters, serial Claude merges `6b67ace8`…`abc66f78`). 33 caller files
+  converted per the Stage 3–6 recipe `[VERIFIED via git diff --name-only
+  53ca8f7e..abc66f78]` (tests-before where coverage was absent — 23 new test
+  files, adapter-method tests included); adapter layer grew to 11
+  (`system-user.js`, `app-request-person.js` new; `contact.js` +6 bridge
+  methods; `reviewer-suggestion.js` +9 mirrored methods). Allowlist 181 → 132;
+  gate green after every merge (conflicts resolved by regenerating the
+  allowlist from the live census via `buildAllowlist` — the gate itself is the
+  parity proof). Merged state: full suite 4056/4056, build clean. Documented
+  skips → sequential tail: `expertise-finder/proposals.js`,
+  `grantee-deliverables/awardees.js`, `grantee-deliverables/cycle-export.js`,
+  `dashboard.js#listProposals` (caller-owned business filters per the
+  grant-request adapter design note), plus all akoya write files, cross-entity
+  files, and unresolved census entries.
 
 ## Appendix A — Baseline census
 
