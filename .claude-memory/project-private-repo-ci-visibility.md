@@ -4,6 +4,7 @@ description: Why CodeQL was removed and Semgrep broadened after the repo went pr
 metadata: 
   node_type: memory
   type: project
+  status: active
   originSessionId: 6fc5f954-97c9-44ce-9593-d2aa5dce023e
 ---
 

@@ -4,6 +4,7 @@ description: RESOLVED 2026-07-04 — reviewer E2E re-baselined to the landed acc
 metadata:
   node_type: memory
   type: project
+  status: active
   originSessionId: 6fc5f954-97c9-44ce-9593-d2aa5dce023e
 ---
 

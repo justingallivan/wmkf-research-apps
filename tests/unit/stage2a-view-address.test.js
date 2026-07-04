@@ -9,6 +9,7 @@
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import Stage2aView, { missingAddressFields, buildAddressPayload } from '../../shared/components/external/Stage2aView';
+import { COUNTRIES } from '../../shared/config/countries';
 
 function makeData(overrides = {}) {
   const prefill = {
@@ -86,8 +87,11 @@ describe('Stage2aView payment-address card', () => {
   it('renders the full country list (territories selectable, not a curated subset)', () => {
     renderView(makeData());
     const select = screen.getByRole('combobox');
-    // 249 countries + the "Select a country…" placeholder.
-    expect(select.querySelectorAll('option').length).toBe(250);
+    // Every ISO country renders as a selectable option — not a curated subset. The
+    // two non-country <option>s are chrome (the "Select a country…" placeholder and
+    // a disabled divider under the pinned US entry), both with an empty value.
+    const countryOptions = [...select.querySelectorAll('option')].filter((o) => o.value !== '');
+    expect(countryOptions).toHaveLength(COUNTRIES.length);
     // A previously-omitted territory is present.
     expect(screen.getByRole('option', { name: 'Puerto Rico' })).toBeInTheDocument();
   });
