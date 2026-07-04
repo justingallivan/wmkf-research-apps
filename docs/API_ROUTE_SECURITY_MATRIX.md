@@ -214,7 +214,7 @@ There are no open findings from the initial matrix pass as of this update. New f
 
 ### Weekly review
 
-- Review Dependabot, CodeQL, Trivy, and Gitleaks results.
+- Review Dependabot, Semgrep, Trivy, and Gitleaks results.
 - Review health, secret, spend, and cron alerts.
 - Review any owner questions or ambiguous matrix rows that were raised during PR review.
 

@@ -6,8 +6,8 @@ on:
     branches: [main]
 
 jobs:
-  semgrep-token-audit:
-    name: Token Exposure Scan
+  semgrep:
+    name: Static Analysis (Semgrep)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -15,7 +15,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Run Semgrep token audit rules
+      - name: Run Semgrep security rulesets
         uses: returntocorp/semgrep-action@v1
         with:
-          config: .semgrep/token-audit.yaml
+          config: >-
+            p/default
+            p/javascript
+            p/react
+            p/nextjs
+            p/owasp-top-ten
+            .semgrep/token-audit.yaml
