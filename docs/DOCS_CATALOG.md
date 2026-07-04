@@ -59,7 +59,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [DATA_ACCESS_LAYER_MIGRATION_PLAN.md](DATA_ACCESS_LAYER_MIGRATION_PLAN.md) | plan | active |  | Ratchet-gated migration of ~86 raw DynamicsService caller files into per-entity adapters; ends with fail-closed restriction context. Approved S328. | 2026-07-04 |
+| [DATA_ACCESS_LAYER_MIGRATION_PLAN.md](DATA_ACCESS_LAYER_MIGRATION_PLAN.md) | plan | active |  | Ratchet-gated migration of raw/aliased DynamicsService callers into per-entity adapters; ends fail-closed. Approved S328; amended after S329 Codex review. | 2026-07-04 |
 
 ## dataverse
 

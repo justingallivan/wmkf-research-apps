@@ -3,7 +3,7 @@ title: "Dataverse Data-Access Layer — Staged Migration Plan"
 domain: data-layer
 kind: plan
 status: active
-summary: "Ratchet-gated migration of ~86 raw DynamicsService caller files into per-entity adapters; ends with fail-closed restriction context. Approved S328."
+summary: "Ratchet-gated migration of raw/aliased DynamicsService callers into per-entity adapters; ends fail-closed. Approved S328; amended after S329 Codex review."
 canonical: false
 cataloged: 2026-07-04
 owner: product-engineering
@@ -29,9 +29,11 @@ has run.
 
 ## Why (baseline evidence)
 
-All counts `[VERIFIED 2026-07-04 via session greps; units noted per claim; the
-complement (adapters/transport/exempt tools) was excluded from each count]`.
-Stage 0 replaces these literal greps with a constant-resolving census.
+All literal counts `[VERIFIED 2026-07-04 via session greps; units noted per
+claim; the complement (adapters/transport/exempt tools) was excluded from each
+count]`. Stage 0 replaces these literal greps with an alias-aware,
+constant-resolving census because literal `DynamicsService.` calls are a floor,
+not the full migration surface.
 
 - **86 files** across `pages/`, `lib/`, `shared/` call `DynamicsService.`
   directly, excluding the service itself, `lib/dataverse/adapters/`, and the
@@ -47,6 +49,15 @@ Stage 0 replaces these literal greps with a constant-resolving census.
   adapters/exempt files. Literal counts UNDERCOUNT overall usage because some
   callers pass constants (e.g. `SUGGESTION_SET`, `PROMPTS_ENTITY`); the
   Stage-0 inventory script must resolve constants, not grep literals.
+- Literal `DynamicsService.` counts also UNDERCOUNT usage because live code
+  injects the service behind aliases: `dynamics = DynamicsService` in BILL
+  onboarding and honorarium orchestration `[VERIFIED via
+  lib/bill/onboard-reviewer-service.js:71]` `[VERIFIED via
+  lib/bill/honorarium-onboard-orchestrator.js:68]`, and `dyn =
+  deps.dynamics || DynamicsService` in reviewer merge `[VERIFIED via
+  lib/services/reviewer-merge.js:202]` `[VERIFIED via
+  lib/services/reviewer-merge.js:322]`. Stage 0 must trace those aliases and
+  injected default clients before any baseline is accepted.
 - Recurring failure modes this layer removes: guessed entity-set names (two
   404s in S328 alone: `wmkf_prompts`, `wmkf_aiprompts`), per-route SELECT
   drift, per-route GUID validation, forgotten restriction wrappers. Three CI
@@ -86,37 +97,70 @@ Stage 0 replaces these literal greps with a constant-resolving census.
 
 - `pages/dynamics-explorer.js` + its API routes; `pages/dataverse-bulk-export.js`
   + its API routes (entity-generic by design).
+- `lib/services/dataverse-export/` is part of the Dataverse Bulk Export
+  exemption, not an application data-access layer. It uses raw token/fetch
+  helpers for the entity-generic tool `[VERIFIED via
+  lib/services/dataverse-export/fetch-client.js:205]` `[VERIFIED via
+  lib/services/dataverse-export/fetch-client.js:335]` and is imported by the
+  exempt export API routes `[VERIFIED via
+  pages/api/dataverse-export/metadata.js:15]` `[VERIFIED via
+  pages/api/dataverse-export/run.js:21]`.
 - `lib/services/dynamics-service.js` itself (the transport).
+- `lib/dataverse/core/` and `lib/dataverse/adapters/` are the only application
+  DAL internals that may compose entity CRUD after Stage 8. Current adapters
+  already call the transport directly `[VERIFIED via
+  lib/dataverse/adapters/contact.js:58]` `[VERIFIED via
+  lib/dataverse/adapters/contact.js:83]` `[VERIFIED via
+  lib/dataverse/adapters/reviewer-suggestion.js:192]` `[VERIFIED via
+  lib/dataverse/adapters/reviewer-suggestion.js:1022]`; the final gate must
+  permit these internal calls while banning application raw usage.
 - Non-entity transport concerns stay on DynamicsService: `createAndSendEmail`,
-  `addEmailAttachment`, `executeChangeset` plumbing, `resolveEntitySetName`.
-  Adapters COMPOSE these; they are not CRUD to wrap.
+  `addEmailAttachment`, and `resolveEntitySetName`. `executeChangeset` stays as
+  batch transport only, but it is NOT a permanent application escape hatch:
+  before Stage 7, all entity-changing `$batch` usage must move behind a DAL/core
+  changeset helper or an explicitly exempt power-tool path. Live
+  `executeChangeset` accepts POST/PATCH/DELETE operation URLs `[VERIFIED via
+  lib/services/dynamics-service.js:1026]`, so leaving it public to routes would
+  bypass the Stage-7 raw-CRUD invariant.
 - `scripts/` (probes/one-offs): advisory-only in the gate, never blocking.
 
 ---
 
 ## Stage 0 — Inventory probe + baseline (no behavior change)
 
-**Goal:** a committed, re-runnable census attributing every raw call site to
-(file, entity, method), resolving in-file constants to entity-set strings.
+**Goal:** a committed, re-runnable census attributing every raw transport use
+to (file, entity, method, call identity), resolving in-file constants and
+service aliases to entity-set strings.
 
 **Tests before:** none beyond the probe's own self-test fixture.
 
 **Work:**
 1. `scripts/check-dataverse-access-layer.js` — walks `pages/` + `lib/` +
-   `shared/` (minus exemptions), finds `DynamicsService.<method>(` call sites,
-   resolves first-arg constants within the file, emits
-   `{file, entity, method, line}` JSON + per-entity rollup. `--report`
-   prints; default mode compares against
+   `shared/` (minus exemptions and DAL internals), parses JS/TS modules, finds:
+   direct `DynamicsService.<method>(...)`; imported/required aliases; defaulted
+   dependency aliases such as `const { dynamics = DynamicsService } = deps`;
+   variables such as `const dyn = deps.dynamics || DynamicsService`; and method
+   calls on those aliases (`dynamics.updateRecord(...)`, `dyn.disassociate(...)`,
+   etc.). The probe resolves first-arg constants within the file, tags unresolved
+   dynamic clients as `entity: "unresolved"`, and emits
+   `{file, entity, method, line, callIdentity}` JSON + per-entity rollup.
+   `--report` prints; default mode compares against
    `scripts/dataverse-access-allowlist.json` (created Stage 1) and exits 0
    silently when that file is absent.
-2. Self-test with synthetic fixtures (violating file, constant-resolved file,
+2. The probe must treat `executeChangeset` specially: parse each operation URL
+   built in the same file when possible, attribute entity-changing operations to
+   their entity sets, and mark unparseable operation arrays as `entity:
+   "changeset-unresolved"` so the allowlist cannot hide a batch escape hatch.
+3. Self-test with synthetic fixtures (violating file, constant-resolved file,
+   alias/default-dependency file, aliased method call, changeset operation URL,
    exempt file) following the `check:*` self-test pattern in
    `docs/CI_GATES_REFERENCE.md`.
-3. Append the census output as Appendix A of this doc (per-entity counts).
+4. Append the census output as Appendix A of this doc (per-entity counts).
 
 **Verify:** probe totals reconcile with the baseline greps above (explain any
-delta — constant resolution will push counts UP); full suite + build green
-(nothing behavioral touched); commit probe + self-test.
+delta — constant and alias resolution may push counts UP, while exemption
+precision may move tool-helper files out of the application surface); full
+suite + build green (nothing behavioral touched); commit probe + self-test.
 
 ## Stage 1 — Ratchet gate (freeze new raw usage)
 
@@ -125,13 +169,16 @@ delta — constant resolution will push counts UP); full suite + build green
 **Tests before:** Stage 0 self-test green.
 
 **Work:**
-1. `scripts/dataverse-access-allowlist.json` = exact Stage-0 census (file →
-   entity/method list). Gate `npm run check:dataverse-access-layer` fails on
-   (a) any raw call site NOT in the allowlist, (b) any allowlist entry whose
-   file no longer has raw calls (forces shrink — no zombie entries).
+1. `scripts/dataverse-access-allowlist.json` = exact Stage-0 census keyed by
+   call identity (`file`, `line` or stable AST path, `method`, `entity`, and
+   alias/direct/changeset kind). Gate `npm run check:dataverse-access-layer`
+   fails on (a) any raw call identity NOT in the allowlist, including new raw
+   calls added to a legacy file, (b) any allowlist entry whose call identity no
+   longer exists (forces shrink — no zombie entries), and (c) any unresolved
+   alias/changeset entry added after Stage 0.
 2. Register in `package.json`, the CI workflow, `docs/CI_GATES_REFERENCE.md`,
    and the `/start` skill's gate list.
-3. Self-test: fixtures proving both failure modes fire.
+3. Self-test: fixtures proving all three failure modes fire.
 
 **Verify:** gate green at baseline; deliberately add a raw call in a scratch
 file → gate red → remove; full suite + build green.
@@ -181,8 +228,18 @@ Per-file recipe (the loop a cheaper model executes):
 
 - **Wave 3 — bypass repairs + small entities.** The raw
   `wmkf_appreviewersuggestions` call sites (adapter already exists);
-  `wmkf_appreviewanswers` (reader already hoisted to
-  `lib/services/review-answers.js` in S328 — wrap as adapter);
+  `wmkf_appreviewanswers` as a full read/write adapter, not just the hoisted
+  reader. The reader is `lib/services/review-answers.js` `[VERIFIED via
+  lib/services/review-answers.js:1]`; the write surface includes answer
+  snapshot URL/body helpers `[VERIFIED via
+  lib/external/review-answer-snapshot.js:1]` `[VERIFIED via
+  lib/external/review-answer-snapshot.js:91]` and changeset writers in external
+  review submit, staff upload, and mark-received-no-file `[VERIFIED via
+  pages/api/external/review/[token]/submit.js:190]` `[VERIFIED via
+  lib/services/review-upload.js:250]` `[VERIFIED via
+  pages/api/review-manager/mark-received-no-file.js:94]`. This adapter must own
+  the alternate-key upsert URL/body contract and expose a DAL/core batch helper
+  for atomic parent+answer writes before any caller moves.
   `wmkf_ai_prompts` (new adapter absorbing `lib/services/prompt-store.js`
   queries + `pages/api/admin/prompts/*`); `wmkf_policies`,
   `wmkf_reviewquestions`, `wmkf_appsystemsettings`. Exit: those entities'
@@ -211,22 +268,45 @@ S328.**
 **Preconditions:** allowlist contains ONLY exempt files; Waves 3–6 complete.
 
 **Tests before (write first):**
-- Fail-closed unit tests: raw entity CRUD on DynamicsService without
-  restriction context THROWS (new mode); adapters succeed (they acquire
-  context internally); exempt tools still function via their explicit wrapper.
-- An integration canary proving a converted route works with its route-level
-  `bypassDynamicsRestrictions` wrapper REMOVED.
+- Fail-closed unit tests: raw entity CRUD on DynamicsService without an
+  authorized DAL context THROWS; adapters succeed only when called under a
+  trusted entry-point context; exempt tools still function via their explicit
+  wrapper.
+- Batch tests: route/service code cannot call `DynamicsService.executeChangeset`
+  directly for entity-changing operations; the DAL/core changeset helper parses
+  or receives every operation entity and enforces the same authorized context.
+- Integration canaries proving converted routes work after their raw
+  `bypassDynamicsRestrictions` wrappers are removed ONLY where the route first
+  establishes an explicit trusted DAL context after auth. Current routes place
+  auth before bypass `[VERIFIED via pages/api/admin/prompts/index.js:58]`
+  `[VERIFIED via pages/api/admin/prompts/index.js:62]` `[VERIFIED via
+  pages/api/reviewer-finder/my-proposals.js:38]` `[VERIFIED via
+  pages/api/reviewer-finder/my-proposals.js:49]`; Stage 7 must preserve that
+  entry-point auth-to-context ordering.
 
 **Work (in order, each step green):**
-1. Adapters acquire restriction context internally (one shared helper in
-   `lib/dataverse/core/`).
-2. DynamicsService gains fail-closed enforcement for entity CRUD (transport
-   methods exempt), behind a temporary env flag: ON in dev/test, OFF in prod
-   for one deploy cycle; flip prod ON after a clean cycle; then delete the
-   flag.
-3. Mechanically strip now-redundant route-level wrappers (one file per commit,
-   full suite green each).
-4. Reconcile docs: CLAUDE.md Universal Safety Invariants wording,
+1. Add a shared `lib/dataverse/core/context.js` helper that entry points call
+   only after route auth / cron auth / token verification. It returns a scoped
+   trusted DAL context token or runs a callback; adapters require that context
+   and fail closed without it. Do not let adapters silently bypass restrictions
+   for arbitrary library callers.
+2. Move entity-changing batch work behind `lib/dataverse/core/changeset.js`.
+   That helper composes `DynamicsService.executeChangeset`, validates each
+   operation entity, rejects unresolved entities outside explicit exempt paths,
+   and requires the same trusted DAL context as normal adapter CRUD.
+3. DynamicsService gains fail-closed enforcement for entity CRUD and direct
+   entity-changing `executeChangeset` use outside DAL/core/exempt tools, behind
+   a temporary env flag: ON in dev/test, OFF in prod for one deploy cycle; flip
+   prod ON after a clean cycle; then delete the flag.
+4. Mechanically strip now-redundant route-level `bypassDynamicsRestrictions`
+   wrappers only after replacing them with the explicit post-auth DAL context
+   helper (one file per commit, full suite green each). Leaf helpers that
+   currently document caller-owned context, such as `prompt-store` and
+   `program-director-resolver` `[VERIFIED via lib/services/prompt-store.js:14]`
+   `[VERIFIED via lib/services/program-director-resolver.js:31]`, must keep that
+   trust-boundary shape or move behind an adapter method that still requires the
+   caller's trusted context.
+5. Reconcile docs: CLAUDE.md Universal Safety Invariants wording,
    `docs/SECURITY_ARCHITECTURE.md`, agent-wiki topics, this doc — full
    fact-level reconciliation (`/sweep`), not appends.
 
@@ -235,9 +315,13 @@ one high-traffic route per app after each deploy step.
 
 ## Stage 8 — Ratchet becomes law; close out
 
-- Allowlist file deleted; the gate hardcodes the permanent exemptions and
-  fails on ANY other raw call site.
-- Appendix A regenerated as the final census (exemptions only).
+- Allowlist file deleted; the gate hardcodes the permanent exemptions plus the
+  approved DAL internals (`lib/dataverse/core/`, `lib/dataverse/adapters/`) and
+  fails on ANY raw transport use outside those zones. The gate remains
+  alias-aware and changeset-aware so legacy aliases cannot become a new escape
+  hatch.
+- Appendix A regenerated as the final census (permanent exemptions + approved
+  DAL internals only).
 - `DEVELOPMENT_LOG.md` milestone; Atlas + agent-wiki reconciliation; this
   doc's `status:` → `superseded` by the closing report.
 
@@ -268,6 +352,15 @@ Drift found → this doc is edited BEFORE the next stage starts.
   in package.json; the CLAUDE.md invariant Stage 7 changes is at CLAUDE.md
   "Universal Safety Invariants" ("Use explicit Dynamics restriction context;
   preserve fail-closed auth and restriction behavior") — the go/no-go stands.
+- 2026-07-04 (S329): second adversarial review (Codex, fresh thread) refuted
+  the ORIGINAL probe/gate design: 2 P0 (literal-grep census misses aliased
+  writers, e.g. `dynamics`/`dyn` injection in BILL onboarding and reviewer
+  merge; `executeChangeset` exemption was a raw-CRUD backdoor under Stage 7)
+  + 4 P1 (Bulk Export helper subtree unexempted; Stage 8 wording banned the
+  adapters themselves; Wave 3 missed the answer-snapshot write surface;
+  Stage 7 risked erasing caller-owned auth-to-context ordering). Plan amended
+  in place (Codex patch, Claude-verified citations); execution still NOT
+  started.
 
 ## Appendix A — Baseline census
 
