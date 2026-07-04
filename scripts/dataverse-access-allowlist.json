@@ -290,13 +290,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/prompt-store.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "wmkf_ai_prompts",
-      "count": 1
-    },
-    {
       "file": "lib/services/proposal-participants.js",
       "kind": "import",
       "clientMethod": "DynamicsService.queryRecords",
