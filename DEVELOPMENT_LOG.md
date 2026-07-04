@@ -10,6 +10,19 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## July 2026 — Reviewer pipeline browser-proven end-to-end; release flow hardened; thank-you automation (Session 328)
+
+**Milestone:** The first live review traveled the whole pipeline — invite → accept → drain-queue confirmation → portal submit → Compare/Export/AI synthesis — in an owner-driven staged rehearsal that surfaced and same-day-fixed two production blockers and four UX/correctness gaps.
+**Sessions:** 328.
+**Ship state:**
+- Synthesis unblocked in prod: `claude-sonnet-5` registered in the model capability/pricing registry; prompt maxtokens 2000→8000 (Sonnet 5 thinking counts against the cap).
+- Release flow: portal-link-only by default (attachment behind admin toggle — kills the public-Blob copy of proposals), selection-aware Release button, empty-materials preflight warning, token `ops` claim now enforced fail-closed on all portal routes.
+- Submit now advances `wmkf_reviewstatus` → Review Received atomically; submitted view drops the stale "no materials" card.
+- New daily thank-you sweep (claim-before-send, at-most-once) emailing the reviewer a server-rendered DOCX copy of their own review as real bytes.
+- Dataverse data-access layer migration plan authored + adversarially verified (execution not started).
+**Why it matters:** D26 reviewers can now be invited with confidence — every leg of the reviewer journey has been exercised against production, not just unit-proven.
+**Pointers:** `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`; commits `23e65f71`…`a2131328`; rehearsal tooling `scripts/probe-review-rehearsal-state.mjs`, `scripts/reset-reviewer-for-testing.js --clear-synthesis`.
+
 ## July 2026 — Reviews-tab consumption suite live: outstanding/nudge, compare, export, AI synthesis (Session 326)
 
 **Milestone:** The staff-facing side of the reviewer portal shipped to production in one session — all four planned phases — ahead of the first D26 review submissions.

@@ -1,203 +1,211 @@
-# Session 328 Prompt: Review-synthesis follow-up shipped; staged live rehearsal remains
+# Session 329 Prompt: Verify thank-you cron proof, clean up rehearsal data, schedule data-layer Stage 0
 
-## Session 327 Summary
+## Session 328 Summary
 
-Session 327 completed the adversarial review of the Session 326 Reviews-tab
-handoff, fixed the two concrete Phase 4 synthesis defects found by that review,
-and left a durable follow-up report in `docs/`. The companion-LLM evaluation
-item from Session 327 is DONE, not an open carryover.
-
-No `CLAUDE.md` or `DEVELOPMENT_LOG.md` change was needed: this session did not
-add a new app, schema, script, convention, or milestone beyond the already logged
-Session 326 Reviews-tab consumption milestone.
+Session 328 executed the staged review-submission rehearsal end-to-end with the
+owner driving the browser (request 1002788, reviewer "Test Case"
+rarebit.skits-6f@icloud.com). The rehearsal proved the full pipeline live —
+invite → accept → S325 drain-queue confirmation (1 job, completed, 0 retries)
+→ portal submit (11 answer rows) → Reviews tab Compare/Export → AI synthesis
+(1,709-char JSON persisted) — and surfaced two production blockers plus four
+UX/correctness gaps, all fixed and deployed same-session. Two new features
+shipped (thank-you sweep, materials preflight guard) and the Dataverse
+data-access layer migration plan was authored, adversarially verified, and
+committed (execution NOT started).
 
 ### What Was Completed
 
-1. **Adversarial review of Session 326 handoff**
-   - Reviewed `outputs/SESSION_326_REVIEW_HANDOFF.md` (local-only; `outputs/`
-     is gitignored) against live source and focused tests.
-   - Found two P1 synthesis issues and two P2 manual-reminder issues.
-   - Verified the original Phase 4 route/prompt mismatch before editing.
+1. **Rehearsal tooling + execution**
+   - `scripts/probe-review-rehearsal-state.mjs` (read-only before/after
+     snapshot) and `reset-reviewer-for-testing.js --clear-synthesis`.
+   - Rehearsal executed; S325 drain carryover CLOSED (verified completed job).
 
-2. **Phase 4 synthesis hardening**
-   - `pages/api/review-manager/synthesize-reviews.js` now carries
-     `wmkf_questionkey`, `wmkf_questiontype`, and `wmkf_answervalue` into the
-     plain-text `reviews_digest` sent to `review-synthesis.generate`.
-   - `wmkf_answerhtml` remains excluded from the LLM payload.
-   - The route now fails closed when the Executor generated output but did not
-     persist the `synthesis` output: `concurrent_edit` -> HTTP 409; other
-     writeback failures -> HTTP 502.
+2. **Production blockers found by the rehearsal (fixed + deployed)**
+   - `claude-sonnet-5` was unregistered → Executor fail-closed 500. Registered
+     in `model-capabilities.js` + `model-pricing.js` ($3/$15, 1M/128K).
+   - Synthesis prompt `wmkf_ai_maxtokens` 2000 → truncated JSON under
+     Sonnet 5 default adaptive thinking. Seed + live row (owner-approved
+     PATCH) now 8000.
 
-3. **Regression tests + durable report**
-   - `tests/unit/synthesize-reviews.test.js` now asserts question metadata,
-     answer values, no HTML leakage, and failed-writeback status behavior.
-   - Added `docs/SESSION_326_REVIEW_FOLLOWUP_REPORT_2026-07-04.md`.
-   - Regenerated `docs/DOCS_CATALOG.md`.
+3. **Release-flow overhaul (owner decisions)**
+   - Release emails default to the tokenized portal link; email attachment
+     behind new admin setting `reviewer.release.attach_proposal_email`
+     (default OFF, fails closed; admin card added). Kills the public-Blob
+     proposal copy in the default path.
+   - Release button respects checkbox selection (subset of accepted).
+   - Materials preflight guard: new GET `/api/review-manager/materials-preflight`
+     shares the portal's `isReviewerMaterial` filter (hoisted
+     `listReviewerMaterials`); empty folder → amber banner + "Release anyway?".
 
-4. **Stop-handoff repo hygiene**
-   - Added `.codegraph/` to root `.gitignore` so the local CodeGraph database
-     and WAL files do not dirty stop/start handoffs.
+4. **Portal/lifecycle correctness**
+   - Token `ops` claim enforced fail-closed on proposal/upload/submit/draft
+     routes (`tokenHasOp`; behavioral no-op for all minted tokens).
+   - Submit changeset now advances `wmkf_reviewstatus` → 100000003
+     (Review Received) atomically; Track badge + work-remaining follow.
+   - Submitted portal view hides the empty "hasn't shared materials" card.
+
+5. **Thank-you sweep (new automation)**
+   - `lib/services/reviewer-thankyou-sweep.js` + cron
+     `/api/cron/send-review-thankyous` (vercel.json `30 10 * * *`).
+     Claim-before-send on `wmkf_thankyousentat` (at-most-once); DOCX courtesy
+     copy of the reviewer's own review attached as real bytes
+     (activitymimeattachments, never Blob); attachment failure degrades to
+     plain send. `fetchAnswersBySuggestion` hoisted to
+     `lib/services/review-answers.js` (re-sanitization preserved).
+
+6. **Data-access layer migration plan (docs only)**
+   - `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`: 9 stages, ratchet+gate,
+     restriction-context fold-in gated on owner go/no-go. Baselines
+     complement-derived + fresh-context verified (0 refuted). NOT started.
 
 ### Commits
 
-- `f7b5a7fc` - fix(workbench): harden review synthesis handoff findings
-- `bc8bc8de` - chore: ignore local CodeGraph index
+- `467d3b1b` scripts: rehearsal cleanup + snapshot tooling
+- `23e65f71` fix(models): register claude-sonnet-5
+- `f57b37d4` fix(prompts): review-synthesis maxtokens 2000→8000
+- `19e3cd3d` fix(reviewers): Release button respects selection
+- `9a776b8e` fix(external): enforce token ops claim (fail closed)
+- `8de6487d` feat(reviewers): link-first release + attachment admin toggle
+- `31b71770` fix(portal): hide empty materials card after submission
+- `cd7f908e` fix(external): submit advances wmkf_reviewstatus
+- `51573c79` feat(reviewers): thank-you sweep + DOCX courtesy copy
+- `03a26842` feat(reviewers): materials preflight guard
+- `a2131328` docs: data-access layer migration plan
 
 ## Next Items
 
 ### Verified Open
 
-1. **Run a staged/manual review-submission rehearsal with owner-approved test data.**
-   Evidence: `docs/SESSION_326_REVIEW_FOLLOWUP_REPORT_2026-07-04.md` records
-   this as the remaining full-flow verification; Session 326 had zero real portal
-   submissions, so populated Compare/Export/Synthesis paths remain unit-proven
-   but not browser-proven against real Dataverse answer rows.
-   Description: choose a safe test request + reviewer identity, mint a review
-   link without sending email, submit the live form, then verify Reviews tab
-   Compare, Export, and Synthesis from browser -> API -> Dataverse -> UI. This
-   creates live state and should not be improvised without the owner's chosen
-   test target.
+1. **Verify the first thank-you cron run, then clean up the rehearsal data.**
+   Evidence: cron `30 10 * * *` in vercel.json (`51573c79`). [VERIFIED
+   2026-07-04 via live probe] exactly 2 suggestions system-wide have
+   `wmkf_reviewreceivedat` set; the older (6ad328b4…, received 2026-05-27)
+   already has `wmkf_thankyousentat` set so is NOT eligible — the Test Case
+   row (1e9815ea…) is the only sweep-eligible row.
+   Steps: after the first run post-deploy, check rarebit.skits-6f@icloud.com
+   for the thank-you + DOCX attachment; check the maintenance run record and
+   `wmkf_thankyousentat` via
+   `node scripts/probe-review-rehearsal-state.mjs --requestNumber 1002788 --email rarebit.skits-6f@icloud.com`.
+   THEN clean up:
+   `node scripts/reset-reviewer-for-testing.js --email rarebit.skits-6f@icloud.com --requestNumber 1002788 --clear-synthesis --commit`
+   and re-probe to confirm pristine. Cleanup before the cron proof loses the
+   free E2E test — owner agreed to let the cron fire first.
 
-2. **Monitor the first real reviewer accept through the S325 drain queue.**
-   Evidence: read-only stop probe on 2026-07-04 returned
-   `{ "totals": [], "recent": [] }` from `reviewer_acceptance_jobs`; the drain
-   route was previously verified live/fail-closed in Session 326.
-   Description: after the next real accept, inspect `reviewer_acceptance_jobs`
-   for a completed row or retryable failure before declaring the S325 carryover
-   closed.
+2. **Owner browser spot-check of the new release flow.**
+   Evidence: `8de6487d` + `03a26842` deployed; unit-proven, not browser-driven.
+   Check: release modal shows portal-link note (no file picker); on 1002788
+   specifically, the empty-materials amber warning + "Release anyway?" confirm
+   (its Reviewer_Downloads folder is genuinely empty).
 
 ### Owner Decision Needed
 
-1. **Decide whether to harden the manual review-due reminder P2 findings now.**
-   Evidence: `lib/services/reviewer-manual-reminder.js:106-107` maps claim
-   failures to `conflict` and passes send failure `errors`; `pages/api/review-manager/send-review-reminder.js:63-65`
-   echoes `result.errors`; `lib/services/reviewer-reminder-sweep.js:301-305`
-   records low-level error messages.
-   Decision needed: fix immediately, or defer until the Outstanding/manual nudge
-   surface is next touched. Recommended fix shape: do not echo low-level send
-   messages to the client, and distinguish claim-update failures from true user
-   conflicts.
+1. **Schedule data-access migration Stage 0 (census probe + baseline).**
+   Evidence: `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` (owner approved
+   scope/cadence S328; execution not started). Stage 0/1 are docs+gate only,
+   zero behavior change — good filler for any session.
 
-2. **Decide whether synthesis output quality needs a replay fixture before the staged rehearsal.**
-   Evidence: `docs/SESSION_326_REVIEW_FOLLOWUP_REPORT_2026-07-04.md` remaining
-   step #3. The payload now includes rating metadata, but the prompt has not
-   been replayed against a representative populated review fixture.
-   Decision needed: add a non-live replay fixture now, or let the staged/manual
-   review submission be the next proof point.
+2. **Manual review-due reminder P2 hardening** (carried from S327).
+   Evidence: `lib/services/reviewer-manual-reminder.js:106-107`,
+   `pages/api/review-manager/send-review-reminder.js:63-65` (echoes low-level
+   `result.errors`), `lib/services/reviewer-reminder-sweep.js:301-305`.
+   Decide: fix now or when the surface is next touched.
+
+3. **Campaign-settings UX revisit** (owner ask S326).
+   Evidence: `.claude-memory/project-campaign-settings-ux-revisit.md`
+   [OWNER-REPORTED, not source-verified]. Preflight per that memory before
+   scoping.
+
+4. **Review rendition formatting pass** (owner ask S328).
+   Evidence: `.claude-memory/project-review-output-formatting.md`. Courtesy
+   copy ships first-pass; staff DOCX/PDF also to be restyled — one effort over
+   the shared `composeReviewReport` seam. Owner schedules.
 
 ### Parked
 
-1. **Spec-audit docs recovery on the work computer** (~2026-07-08).
+1. **Spec-audit docs recovery** (work computer only, ~2026-07-08).
    Evidence: `.claude-memory/project-spec-audit-docs-recovery-parked.md`.
-   Re-open trigger: only on the work computer, find/push the unpushed
-   `codex/spec-audit` branch or dangling commit. Do not reconstruct the docs
-   from scratch here.
 
 2. **Institution-COI ledger calibration.**
-   Evidence: `scripts/probe-institution-coi-breakdown.mjs` and prior Session 325
-   carryover. Re-open trigger: enough accumulated `coi_dropped` rows exist to
-   make the threshold measurement meaningful.
+   Evidence: `scripts/probe-institution-coi-breakdown.mjs`; needs accumulated
+   `coi_dropped` rows.
 
 ### Verify Before Acting
 
-1. **Campaign-settings UX revisit is owner-reported but not source-verified.**
-   Evidence: `.claude-memory/project-campaign-settings-ux-revisit.md`.
-   Required preflight: trace `CampaignConfigModal`, `/api/review-manager/campaign-config`,
-   `send-emails.js`, `ReviewerManagePanel`, and related invite/reminder flows to
-   confirm which flows actually re-ask or fail to reuse saved config before
-   scoping a UI-only vs persistence/default-store fix.
+1. **Track badge on the TEST row stays "Materials Sent" until cleanup** — the
+   status-transition fix (`cd7f908e`) is forward-only. Not a bug; do not
+   "fix" it; cleanup resets the row.
 
-2. **AwardeeTab stale-response carryover is narrow, not tab-wide.**
-   Evidence: `shared/components/workbench/AwardeeTab.js:137-172` already guards
-   recipients/abstract loads with `currentRequestIdRef`; `copyWebsiteHtml()` at
-   `shared/components/workbench/AwardeeTab.js:302-318` still updates state after
-   a request-keyed fetch without a post-fetch request check.
-   Required preflight: if touching `AwardeeTab`, add or verify the same stale
-   response guard around the website-HTML copy path.
+2. **AwardeeTab stale-response guard** is narrow: only `copyWebsiteHtml()`
+   (`shared/components/workbench/AwardeeTab.js:302-318`) lacks the
+   request-check. Only if touching AwardeeTab.
 
-3. **Do not apply old S322 cleanup suggestions without fresh caller checks.**
-   Evidence: `docs/DEAD_CODE_DELETION_MANIFEST.md` correction history.
-   Required preflight: grep live callers and read likely load-bearing paths
-   before any delete/drop/archive action.
+3. **Old S322 cleanup suggestions**: grep live callers first
+   (`docs/DEAD_CODE_DELETION_MANIFEST.md` correction history).
 
-4. **Acceptance confirmation email remains at-most-once by design.**
-   Evidence: `lib/services/reviewer-acceptance-drain.js` pre-send `claimedAt`
-   guard from S325.
-   Required preflight: get product/ops approval before changing to
-   retry-on-failure semantics.
+4. **At-most-once email semantics are owner-approved design** for BOTH the
+   acceptance confirmation (S325) AND the new thank-you sweep (S328).
+   Product/ops approval required before retry-on-failure.
 
-5. **Synthesis concurrent-generate race remains accepted unless owner changes the contract.**
-   Evidence: Session 326 handoff accepted two concurrent staff Generate clicks
-   as possible token duplication with last-write-wins; Session 327 only fixed
-   writeback failure reporting and digest metadata.
-   Required preflight: do not add locking/rate-limiting without an owner ask.
+5. **Synthesis concurrent-generate race remains accepted** (S326 contract;
+   S327/S328 did not change it). No locking without an owner ask.
 
 ### Do Not Reopen Without New Decision
 
-1. **Companion-LLM evaluation triage is done.**
-   Evidence: `f7b5a7fc` and
-   `docs/SESSION_326_REVIEW_FOLLOWUP_REPORT_2026-07-04.md`.
-
-2. **Do not re-add CodeQL as a required private-repo gate.**
-   Evidence: `180e9046`, `198fbd97`.
-
-3. **Do not delete `lib/services/anthropic-admin.js` as dead code.**
-   Evidence: pricing-refresh cron imports it.
-
-4. **Two advisory hooks remain retired by owner approval**
-   (`doc-edit-reconcile-reminder.js`, `memory-placement-reminder.js`).
-   Evidence: `docs/HARNESS_INSTRUCTION_AUDIT_S322.md`.
-
-5. **`pre-commit-self-review.js` deliberately kept.**
-   Evidence: `docs/HARNESS_INSTRUCTION_AUDIT_S322.md`.
-
-6. **Client-side export remains the decision until a Power Automate flow exists.**
-   Evidence: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md` decision 4; pure
-   `shared/utils/review-report.js` composition remains the seam.
+1. **S325 drain-queue monitoring is CLOSED** — first accept verified completed
+   (S328 probe: 1 job, completed, 0 retries, confirmation sent).
+2. **Synthesis replay fixture is MOOT** — rehearsal produced real synthesis
+   output; owner decision #2 from S327 answered by events.
+3. **review-synthesis.generate IS visible/editable in /admin → Prompt
+   Templates** (locale sort puts it after reviewer-finder entries; verified by
+   owner S328).
+4. **Do not re-add CodeQL** (`180e9046`, `198fbd97`).
+5. **Do not delete `lib/services/anthropic-admin.js`** (pricing cron imports).
+6. **Two advisory hooks remain retired; `pre-commit-self-review.js` kept**
+   (`docs/HARNESS_INSTRUCTION_AUDIT_S322.md`).
+7. **Client-side export remains the decision** until a Power Automate flow
+   exists (`docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md` decision 4).
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/SESSION_326_REVIEW_FOLLOWUP_REPORT_2026-07-04.md` | Durable report of Session 327 fixes, verification, and remaining next steps. |
-| `pages/api/review-manager/synthesize-reviews.js` | Phase 4 synthesis route; digest metadata + fail-closed writeback behavior live in this file. |
-| `tests/unit/synthesize-reviews.test.js` | Focused regression coverage for digest shape and writeback failure status handling. |
-| `shared/config/prompts/review-synthesis.js` | Prompt contract that consumes `reviews_digest` and requires `ratingSummaries`. |
-| `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md` | Session 326 Reviews-tab buildout plan and verification boundary. |
-| `shared/components/workbench/ReviewsTab.js` | Staff Reviews tab: Outstanding, Compare, Export, Synthesis. |
-| `lib/services/reviewer-manual-reminder.js` | Manual nudge service; residual P2 hardening item. |
-| `lib/services/reviewer-reminder-sweep.js` | Shared cron/manual reminder send helper; source of claim/send error semantics. |
-| `pages/api/review-manager/send-review-reminder.js` | Manual reminder API route; currently echoes `result.errors` on failure. |
-| `shared/components/workbench/AwardeeTab.js` | Narrow verify-first stale-response item for website HTML copy action. |
-| `.gitignore` | Now ignores `.codegraph/` local index files. |
+| `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` | Staged data-layer migration plan; Stage 0 not started. |
+| `lib/services/reviewer-thankyou-sweep.js` | Thank-you sweep (claim-before-send, DOCX attachment). |
+| `pages/api/cron/send-review-thankyous.js` | Cron route (10:30 daily, vercel.json). |
+| `lib/services/review-answers.js` | Shared answer-snapshot reader (re-sanitizing). |
+| `shared/utils/review-report.js` / `review-report-docx.js` | Report composition + `composeSingleReviewCopy` / server DOCX. |
+| `pages/api/review-manager/materials-preflight.js` | Reviewer-visible file count for release warning. |
+| `pages/api/review-manager/release-settings.js` | Attach-proposal-email admin setting (GET/PUT). |
+| `lib/external/reviewer-materials.js` | `listReviewerMaterials` — ONE filter for portal + preflight. |
+| `lib/external/verify-suggestion-token.js` | `tokenHasOp` ops-claim predicate. |
+| `lib/external/build-review-submission.js` | Submit parentPatch (now sets reviewstatus 100000003). |
+| `scripts/probe-review-rehearsal-state.mjs` | Read-only rehearsal state probe. |
+| `scripts/reset-reviewer-for-testing.js` | Cleanup incl. `--clear-synthesis`. |
 
 ## Testing
 
 ```bash
-npm test -- tests/unit/synthesize-reviews.test.js tests/unit/review-synthesis-prompt-config.test.js
-npm run check:api-routes
-npm run check:api-routes:self-test
-npm run check:prompt-injection-tagging
-npm run check:prompt-injection-tagging:self-test
-npm run check:trust-boundary-guid
-npm run check:trust-boundary-guid:self-test
-npm run generate:docs-catalog
-npm run check:docs-catalog
-npm run check:doc-symbol-refs
-npm run check:doc-symbol-refs:self-test
-npm run check:doc-currency
-npm run check:doc-currency:self-test
-npm run check:fact-consistency
-npm run check:fact-consistency:self-test
-npm run check:build-claim-freshness
-npm run check:build-claim-freshness:self-test
-git diff --check
+# Rehearsal state / cleanup
+node scripts/probe-review-rehearsal-state.mjs --requestNumber 1002788 --email rarebit.skits-6f@icloud.com
+node scripts/reset-reviewer-for-testing.js --email rarebit.skits-6f@icloud.com --requestNumber 1002788 --clear-synthesis   # add --commit to apply
+
+# This session's suites
+npx jest tests/unit/reviewer-thankyou-sweep.test.js tests/unit/review-single-review-copy.test.js \
+  tests/unit/send-review-thankyous-cron.test.js tests/unit/materials-preflight.test.js \
+  tests/unit/reviewer-manage-proposal-attachment.test.js tests/unit/build-review-submission.test.js \
+  tests/unit/materials-view-files-card.test.js tests/unit/verify-suggestion-token.test.js \
+  tests/integration/external-review-routes.test.js tests/integration/external-review-submit-route.test.js \
+  tests/integration/external-review-draft-route.test.js
+
+# Gates for these surfaces
+npm run check:api-routes && npm run check:api-routes:self-test
+npm run check:trust-boundary-guid && npm run check:route-lifecycle-auth
+npm run check:model-registry && npm run check:status-enum-parity
 ```
 
 Notes:
-- `npm run check:docs-catalog:self-test` is not a package script in this repo.
-- Full `npm run build` was not rerun in Session 327; Session 327 touched one API
-  route, one focused unit test, one report, the generated docs catalog, and
-  `.gitignore`.
-- Read-only stop probe: `reviewer_acceptance_jobs` totals/recent rows were empty
-  on 2026-07-04.
+- Known pre-existing red: `tests/unit/pricing-canary.test.js` (verified failing
+  identically on unmodified main during S328; unrelated to this session).
+- Full `npm run build` was exercised via the 5 production deploys this session
+  (all READY); the last local full-suite run was 3835/3836 (the pricing-canary
+  pre-existing failure).
