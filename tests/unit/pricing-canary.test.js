@@ -24,6 +24,14 @@ import handler, {
   classifyRegistryCoverage,
   findUnreviewedLiveClaudeModels,
 } from '../../pages/api/cron/pricing-canary';
+import { LAST_CAPABILITY_REVIEWED_AT } from '../../lib/services/model-capabilities';
+
+// The handler filters models created on/before LAST_CAPABILITY_REVIEWED_AT, so a
+// hardcoded created_at rots as the registry review date advances (S329: the
+// 2026-07-01 fixture went stale when S328 bumped the review date to 2026-07-04).
+const AFTER_REVIEW_AT = new Date(
+  Date.parse(`${LAST_CAPABILITY_REVIEWED_AT}T00:00:00Z`) + 24 * 60 * 60 * 1000,
+).toISOString();
 import NotificationService from '../../lib/services/notification-service';
 import AlertService from '../../lib/services/alert-service';
 import MaintenanceService from '../../lib/services/maintenance-service';
@@ -91,7 +99,7 @@ describe('pricing-canary model registry discovery', () => {
       status: 200,
       json: async () => ({
         data: [
-          { id: 'claude-sonnet-4-7-20260701', display_name: 'Sonnet 4.7', created_at: '2026-07-01T00:00:00Z' },
+          { id: 'claude-sonnet-4-7-20260701', display_name: 'Sonnet 4.7', created_at: AFTER_REVIEW_AT },
         ],
       }),
     });
@@ -128,7 +136,7 @@ describe('pricing-canary model registry discovery', () => {
       status: 200,
       json: async () => ({
         data: [
-          { id: 'claude-sonnet-4-6-20260701', display_name: 'Sonnet 4.6', created_at: '2026-07-01T00:00:00Z' },
+          { id: 'claude-sonnet-4-6-20260701', display_name: 'Sonnet 4.6', created_at: AFTER_REVIEW_AT },
         ],
       }),
     });
