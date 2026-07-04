@@ -360,13 +360,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/reviewer-acceptance-email.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "systemusers",
-      "count": 1
-    },
-    {
       "file": "lib/services/reviewer-manual-reminder.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
