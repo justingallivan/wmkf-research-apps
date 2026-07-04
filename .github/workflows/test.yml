@@ -34,6 +34,8 @@ jobs:
       - run: npm run check:build-claim-freshness:self-test
       - run: npm run check:model-override-warming
       - run: npm run check:model-override-warming:self-test
+      - run: npm run check:dataverse-access-layer
+      - run: npm run check:dataverse-access-layer:self-test
       - run: npm run check:route-lifecycle-auth
       - run: npm run check:route-lifecycle-auth:self-test
       - run: npm run check:secret-scan

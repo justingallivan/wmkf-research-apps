@@ -5,6 +5,8 @@
  * Scans application code for DynamicsService transport calls, including local
  * aliases and injectable clients that default to DynamicsService. In default
  * mode the script is silent when the Stage-1 allowlist does not exist.
+ * When the allowlist exists, comparison is line-tolerant: entries are counted by
+ * file + access kind + client method + entity instead of by source line.
  */
 
 const fs = require('fs');
@@ -120,7 +122,7 @@ function usage() {
     'Default mode compares the current census against scripts/dataverse-access-allowlist.json.',
     'If that allowlist is absent, default mode exits 0 silently.',
     '--report prints a per-entity rollup.',
-    '--json prints the raw {file, entity, method, line, callIdentity} entries.',
+    '--json prints the raw {file, entity, method, line, kind, clientMethod, callIdentity} entries.',
   ].join('\n');
 }
 
@@ -687,6 +689,26 @@ function makeIdentity({ rel, line, client, kind, method, entity, suffix }) {
   return suffix ? `${base}:${suffix}:${entity}` : `${base}:${entity}`;
 }
 
+function makeEntry({ rel, entity, method, line, client, kind, comparisonKind, suffix }) {
+  return {
+    file: rel,
+    entity,
+    method,
+    line,
+    kind: comparisonKind || kind,
+    clientMethod: `${client}.${method}`,
+    callIdentity: makeIdentity({
+      rel,
+      line,
+      client,
+      kind,
+      method,
+      entity,
+      suffix,
+    }),
+  };
+}
+
 function analyzeFile(root, fullPath) {
   const rel = toRel(root, fullPath);
   const source = fs.readFileSync(fullPath, 'utf8');
@@ -714,59 +736,43 @@ function analyzeFile(root, fullPath) {
         const urlNode = objectPropertyValue(op, 'url');
         const operationMethod = resolveString(objectPropertyValue(op, 'method'), ctx) || 'operation';
         const entity = parseEntityFromUrlExpression(urlNode, ctx) || 'changeset-unresolved';
-        entries.push({
-          file: rel,
+        entries.push(makeEntry({
+          rel,
           entity,
           method,
           line,
-          callIdentity: makeIdentity({
-            rel,
-            line,
-            client: dyn.client,
-            kind: dyn.kind,
-            method,
-            entity,
-            suffix: `op${index + 1}:${operationMethod}`,
-          }),
-        });
+          client: dyn.client,
+          kind: dyn.kind,
+          comparisonKind: `${dyn.kind}:changeset-op:${operationMethod}`,
+          suffix: `op${index + 1}:${operationMethod}`,
+        }));
         emitted = true;
       });
       if (!emitted || unresolved) {
         const entity = 'changeset-unresolved';
-        entries.push({
-          file: rel,
+        entries.push(makeEntry({
+          rel,
           entity,
           method,
           line,
-          callIdentity: makeIdentity({
-            rel,
-            line,
-            client: dyn.client,
-            kind: dyn.kind,
-            method,
-            entity,
-            suffix: 'unresolved',
-          }),
-        });
+          client: dyn.client,
+          kind: dyn.kind,
+          comparisonKind: `${dyn.kind}:changeset-unresolved`,
+          suffix: 'unresolved',
+        }));
       }
       return;
     }
 
     const entity = resolveEntityForCall(method, node.arguments || [], ctx);
-    entries.push({
-      file: rel,
+    entries.push(makeEntry({
+      rel,
       entity,
       method,
       line,
-      callIdentity: makeIdentity({
-        rel,
-        line,
-        client: dyn.client,
-        kind: dyn.kind,
-        method,
-        entity,
-      }),
-    });
+      client: dyn.client,
+      kind: dyn.kind,
+    }));
   });
 
   return entries;
@@ -832,28 +838,137 @@ function allowlistEntries(data) {
   throw new Error('dataverse-access-allowlist.json must be an array or { "entries": [...] }');
 }
 
+function comparisonParts(entry) {
+  const clientMethod = entry.clientMethod || entry['client.method'];
+  if (!entry.file || !entry.kind || !clientMethod || !entry.entity) {
+    throw new Error('dataverse access entries must include file, kind, clientMethod, and entity');
+  }
+  return {
+    file: entry.file,
+    kind: entry.kind,
+    clientMethod,
+    entity: entry.entity,
+  };
+}
+
+function comparisonKey(parts) {
+  return `${parts.file}\u001f${parts.kind}\u001f${parts.clientMethod}\u001f${parts.entity}`;
+}
+
+function sortComparisonRows(rows) {
+  return rows.sort((a, b) => (
+    a.file.localeCompare(b.file)
+    || a.kind.localeCompare(b.kind)
+    || a.clientMethod.localeCompare(b.clientMethod)
+    || a.entity.localeCompare(b.entity)
+  ));
+}
+
+function buildAllowlist(entries) {
+  const byKey = new Map();
+  for (const entry of entries) {
+    const parts = comparisonParts(entry);
+    const key = comparisonKey(parts);
+    if (!byKey.has(key)) byKey.set(key, { ...parts, count: 0 });
+    byKey.get(key).count += 1;
+  }
+  return sortComparisonRows([...byKey.values()]);
+}
+
+function countCurrentEntries(entries) {
+  const byKey = new Map();
+  for (const entry of entries) {
+    const parts = comparisonParts(entry);
+    const key = comparisonKey(parts);
+    if (!byKey.has(key)) byKey.set(key, { ...parts, count: 0, lines: [] });
+    const row = byKey.get(key);
+    row.count += 1;
+    if (Number.isInteger(entry.line) && entry.line > 0) row.lines.push(entry.line);
+  }
+  for (const row of byKey.values()) row.lines.sort((a, b) => a - b);
+  return byKey;
+}
+
+function countAllowedEntries(entries) {
+  const byKey = new Map();
+  for (const entry of entries) {
+    const parts = comparisonParts(entry);
+    const key = comparisonKey(parts);
+    const count = entry.count == null ? 1 : Number(entry.count);
+    if (!Number.isInteger(count) || count < 1) {
+      throw new Error(`invalid dataverse allowlist count for ${parts.file}: ${entry.count}`);
+    }
+    if (!byKey.has(key)) byKey.set(key, { ...parts, count: 0 });
+    byKey.get(key).count += count;
+  }
+  return byKey;
+}
+
+function isUnresolvedEntity(entity) {
+  return entity === 'unresolved' || entity === 'changeset-unresolved';
+}
+
+function formatComparisonRow(row) {
+  return `${row.file} | ${row.kind} | ${row.clientMethod} | ${row.entity}`;
+}
+
+function formatCountDetail(row, allowedCount) {
+  const lines = row.lines && row.lines.length ? `; lines ${row.lines.join(', ')}` : '';
+  return `current ${row.count}, allowlist ${allowedCount}${lines}`;
+}
+
 function compareAllowlist(root, entries) {
   const allowlistPath = path.join(root, ALLOWLIST_REL);
   if (!fs.existsSync(allowlistPath)) return 0;
 
   const allowed = allowlistEntries(JSON.parse(fs.readFileSync(allowlistPath, 'utf8')));
-  const currentKeys = new Set(entries.map((entry) => entry.callIdentity));
-  const allowedKeys = new Set(allowed.map((entry) => entry.callIdentity));
-  const extra = [...currentKeys].filter((key) => !allowedKeys.has(key)).sort();
-  const missing = [...allowedKeys].filter((key) => !currentKeys.has(key)).sort();
+  const currentCounts = countCurrentEntries(entries);
+  const allowedCounts = countAllowedEntries(allowed);
+  const extra = [];
+  const stale = [];
 
-  if (extra.length === 0 && missing.length === 0) return 0;
+  for (const [key, row] of currentCounts.entries()) {
+    const allowedRow = allowedCounts.get(key);
+    if (!allowedRow) {
+      extra.push({ ...row, allowedCount: 0, reason: 'new-key' });
+    } else if (row.count > allowedRow.count) {
+      extra.push({ ...row, allowedCount: allowedRow.count, reason: 'count-exceeds' });
+    }
+  }
+
+  for (const [key, row] of allowedCounts.entries()) {
+    const currentRow = currentCounts.get(key);
+    const currentCount = currentRow ? currentRow.count : 0;
+    if (currentCount < row.count) stale.push({ ...row, currentCount });
+  }
+
+  sortComparisonRows(extra);
+  sortComparisonRows(stale);
+  const newUnresolved = extra.filter((row) => row.reason === 'new-key' && isUnresolvedEntity(row.entity));
+
+  if (extra.length === 0 && stale.length === 0) return 0;
 
   console.error('dataverse-access-layer DRIFT:');
   if (extra.length) {
-    console.error(`  raw calls not in allowlist (${extra.length}):`);
-    for (const key of extra.slice(0, 50)) console.error(`    + ${key}`);
+    console.error(`  raw access keys not in allowlist or above allowed count (${extra.length}):`);
+    for (const row of extra.slice(0, 50)) {
+      console.error(`    + ${formatComparisonRow(row)} (${formatCountDetail(row, row.allowedCount)})`);
+    }
     if (extra.length > 50) console.error(`    ... ${extra.length - 50} more`);
   }
-  if (missing.length) {
-    console.error(`  allowlist entries no longer present (${missing.length}):`);
-    for (const key of missing.slice(0, 50)) console.error(`    - ${key}`);
-    if (missing.length > 50) console.error(`    ... ${missing.length - 50} more`);
+  if (stale.length) {
+    console.error(`  allowlist entries above current census; shrink required (${stale.length}):`);
+    for (const row of stale.slice(0, 50)) {
+      console.error(`    - ${formatComparisonRow(row)} (current ${row.currentCount}, allowlist ${row.count})`);
+    }
+    if (stale.length > 50) console.error(`    ... ${stale.length - 50} more`);
+  }
+  if (newUnresolved.length) {
+    console.error(`  new unresolved raw access keys not in Stage-0 allowlist (${newUnresolved.length}):`);
+    for (const row of newUnresolved.slice(0, 50)) {
+      console.error(`    ? ${formatComparisonRow(row)} (${formatCountDetail(row, row.allowedCount)})`);
+    }
+    if (newUnresolved.length > 50) console.error(`    ... ${newUnresolved.length - 50} more`);
   }
   return 1;
 }
@@ -888,6 +1003,7 @@ if (require.main === module) {
 module.exports = {
   collectCensus,
   buildRollup,
+  buildAllowlist,
   formatReport,
   parseEntityFromUrlText,
 };

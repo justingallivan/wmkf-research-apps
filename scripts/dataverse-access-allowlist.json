@@ -1,0 +1,1273 @@
+{
+  "description": "Line-tolerant Stage-1 Dataverse raw-access allowlist generated from the Stage-0 census. Comparison keys are file + kind + clientMethod + entity with an occurrence count; source lines are intentionally excluded.",
+  "generatedFrom": "node scripts/check-dataverse-access-layer.js --json",
+  "entries": [
+    {
+      "file": "lib/bill/honorarium-onboard-orchestrator.js",
+      "kind": "fallback-alias",
+      "clientMethod": "dynamics.createRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/bill/honorarium-onboard-orchestrator.js",
+      "kind": "fallback-alias",
+      "clientMethod": "dynamics.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/bill/honorarium-onboard-orchestrator.js",
+      "kind": "fallback-alias",
+      "clientMethod": "dynamics.updateRecord",
+      "entity": "contacts",
+      "count": 1
+    },
+    {
+      "file": "lib/bill/onboard-reviewer-service.js",
+      "kind": "fallback-alias",
+      "clientMethod": "dynamics.getRecord",
+      "entity": "contacts",
+      "count": 1
+    },
+    {
+      "file": "lib/bill/onboard-reviewer-service.js",
+      "kind": "fallback-alias",
+      "clientMethod": "dynamics.updateRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/bill/onboard-reviewer-service.js",
+      "kind": "fallback-alias",
+      "clientMethod": "dynamics.updateRecord",
+      "entity": "contacts",
+      "count": 1
+    },
+    {
+      "file": "lib/external/policy-fetcher.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "wmkf_policies",
+      "count": 1
+    },
+    {
+      "file": "lib/external/review-answer-snapshot.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "wmkf_appreviewanswers",
+      "count": 1
+    },
+    {
+      "file": "lib/external/review-answer-snapshot.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.resolveEntitySetName",
+      "entity": "wmkf_appreviewanswers",
+      "count": 1
+    },
+    {
+      "file": "lib/external/review-question-fetcher.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "wmkf_reviewquestions",
+      "count": 1
+    },
+    {
+      "file": "lib/external/token-lifecycle.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "lib/external/token-lifecycle.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 3
+    },
+    {
+      "file": "lib/external/verify-grantee-token.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/external/verify-suggestion-token.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "lib/services/alert-reviewer-affiliation-mismatch.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "contacts",
+      "count": 1
+    },
+    {
+      "file": "lib/services/contact-bridge-service.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createRecord",
+      "entity": "contacts",
+      "count": 1
+    },
+    {
+      "file": "lib/services/contact-bridge-service.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getEntityKey",
+      "entity": "contacts",
+      "count": 1
+    },
+    {
+      "file": "lib/services/contact-bridge-service.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "contacts",
+      "count": 2
+    },
+    {
+      "file": "lib/services/contact-bridge-service.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "contacts",
+      "count": 1
+    },
+    {
+      "file": "lib/services/dynamics-explorer-taxonomy.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.resolveLogicalName",
+      "entity": "unresolved",
+      "count": 1
+    },
+    {
+      "file": "lib/services/dynamics-identity-service.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "systemusers",
+      "count": 1
+    },
+    {
+      "file": "lib/services/email-signature.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/services/email-signature.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "systemusers",
+      "count": 1
+    },
+    {
+      "file": "lib/services/execute-prompt.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createRecord",
+      "entity": "wmkf_ai_runs",
+      "count": 1
+    },
+    {
+      "file": "lib/services/execute-prompt.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 2
+    },
+    {
+      "file": "lib/services/execute-prompt.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/services/grantee-deliverable-record.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createRecord",
+      "entity": "wmkf_granteedeliverables",
+      "count": 1
+    },
+    {
+      "file": "lib/services/grantee-deliverable-record.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "wmkf_granteedeliverables",
+      "count": 1
+    },
+    {
+      "file": "lib/services/grantee-deliverable-record.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "wmkf_granteedeliverables",
+      "count": 1
+    },
+    {
+      "file": "lib/services/grantee-document-assembly.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "accounts",
+      "count": 1
+    },
+    {
+      "file": "lib/services/grantee-document-assembly.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/services/grantee-upload.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/services/maintenance-service.js",
+      "kind": "require",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "wmkf_appgrantcycles",
+      "count": 1
+    },
+    {
+      "file": "lib/services/maintenance-service.js",
+      "kind": "require",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "lib/services/maintenance-service.js",
+      "kind": "require",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/services/membership-service.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "wmkf_portalmemberships",
+      "count": 1
+    },
+    {
+      "file": "lib/services/notification-service.js",
+      "kind": "require",
+      "clientMethod": "DynamicsService.createAndSendEmail",
+      "entity": "non-entity-transport",
+      "count": 1
+    },
+    {
+      "file": "lib/services/program-director-resolver.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/services/program-director-resolver.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "systemusers",
+      "count": 1
+    },
+    {
+      "file": "lib/services/program-director-resolver.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "systemusers",
+      "count": 1
+    },
+    {
+      "file": "lib/services/prompt-resolver.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "unresolved",
+      "count": 1
+    },
+    {
+      "file": "lib/services/prompt-seed.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createRecord",
+      "entity": "wmkf_ai_prompts",
+      "count": 1
+    },
+    {
+      "file": "lib/services/prompt-seed.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "wmkf_ai_prompts",
+      "count": 1
+    },
+    {
+      "file": "lib/services/prompt-seed.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "wmkf_ai_prompts",
+      "count": 1
+    },
+    {
+      "file": "lib/services/prompt-seed.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "wmkf_ai_prompts",
+      "count": 1
+    },
+    {
+      "file": "lib/services/prompt-store.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "wmkf_ai_prompts",
+      "count": 1
+    },
+    {
+      "file": "lib/services/proposal-participants.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "wmkf_apprequestpersons",
+      "count": 1
+    },
+    {
+      "file": "lib/services/proposal-pi-identity.js",
+      "kind": "require",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/services/proposal-pi-identity.js",
+      "kind": "require",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "contacts",
+      "count": 1
+    },
+    {
+      "file": "lib/services/review-answers.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "wmkf_appreviewanswers",
+      "count": 1
+    },
+    {
+      "file": "lib/services/review-upload.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 2
+    },
+    {
+      "file": "lib/services/review-upload.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.resolveEntitySetName",
+      "entity": "wmkf_appreviewanswers",
+      "count": 1
+    },
+    {
+      "file": "lib/services/review-upload.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "lib/services/review-upload.js",
+      "kind": "import:changeset-op:PATCH",
+      "clientMethod": "DynamicsService.executeChangeset",
+      "entity": "wmkf_appreviewanswers",
+      "count": 1
+    },
+    {
+      "file": "lib/services/review-upload.js",
+      "kind": "import:changeset-op:PATCH",
+      "clientMethod": "DynamicsService.executeChangeset",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-acceptance-drain.js",
+      "kind": "fallback-alias",
+      "clientMethod": "dynamics.getRecord",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-acceptance-email.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createAndSendEmail",
+      "entity": "non-entity-transport",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-acceptance-email.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "systemusers",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-manual-reminder.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "unresolved",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-merge.js",
+      "kind": "fallback-alias",
+      "clientMethod": "dyn.disassociate",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-merge.js",
+      "kind": "fallback-alias",
+      "clientMethod": "dyn.queryAllRecords",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-merge.js",
+      "kind": "fallback-alias",
+      "clientMethod": "dyn.updateRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-quota.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 2
+    },
+    {
+      "file": "lib/services/reviewer-quota.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-reminder-sweep.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createAndSendEmail",
+      "entity": "non-entity-transport",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-reminder-sweep.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-reminder-sweep.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "systemusers",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-reminder-sweep.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "wmkf_potentialreviewerses",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-reminder-sweep.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 2
+    },
+    {
+      "file": "lib/services/reviewer-reminder-sweep.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-request-context.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-rollup.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-suggestion-sweep.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-suggestion-sweep.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-suggestion-sweep.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-thankyou-sweep.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createAndSendEmail",
+      "entity": "non-entity-transport",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-thankyou-sweep.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "unresolved",
+      "count": 1
+    },
+    {
+      "file": "lib/services/reviewer-thankyou-sweep.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "unresolved",
+      "count": 1
+    },
+    {
+      "file": "lib/utils/sharepoint-buckets.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "sharepointdocumentlocations",
+      "count": 2
+    },
+    {
+      "file": "pages/api/admin/policies.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createRecord",
+      "entity": "wmkf_policyversions",
+      "count": 1
+    },
+    {
+      "file": "pages/api/admin/policies.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "wmkf_policies",
+      "count": 3
+    },
+    {
+      "file": "pages/api/admin/policies.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "wmkf_policies",
+      "count": 1
+    },
+    {
+      "file": "pages/api/admin/policies.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "wmkf_policyversions",
+      "count": 2
+    },
+    {
+      "file": "pages/api/admin/policies.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "wmkf_policies",
+      "count": 1
+    },
+    {
+      "file": "pages/api/admin/policies.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "wmkf_policyversions",
+      "count": 1
+    },
+    {
+      "file": "pages/api/admin/prompts/[name].js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createRecord",
+      "entity": "wmkf_ai_prompts",
+      "count": 1
+    },
+    {
+      "file": "pages/api/admin/prompts/[name].js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "wmkf_ai_prompts",
+      "count": 2
+    },
+    {
+      "file": "pages/api/admin/prompts/[name].js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "wmkf_ai_prompts",
+      "count": 3
+    },
+    {
+      "file": "pages/api/admin/prompts/[name].js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "wmkf_ai_prompts",
+      "count": 2
+    },
+    {
+      "file": "pages/api/admin/prompts/index.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "wmkf_ai_prompts",
+      "count": 2
+    },
+    {
+      "file": "pages/api/admin/review-questions.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "unresolved",
+      "count": 1
+    },
+    {
+      "file": "pages/api/admin/review-questions.js",
+      "kind": "import:changeset-unresolved",
+      "clientMethod": "DynamicsService.executeChangeset",
+      "entity": "changeset-unresolved",
+      "count": 1
+    },
+    {
+      "file": "pages/api/cron/drain-submissions.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/cron/drain-submissions.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createRecord",
+      "entity": "wmkf_proposalbudgetlines",
+      "count": 1
+    },
+    {
+      "file": "pages/api/cron/drain-submissions.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/cron/generate-grantee-titles.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/cron/generate-grantee-titles.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/cron/generate-grantee-titles.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/cron/grantee-deliverable-reminders.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createAndSendEmail",
+      "entity": "non-entity-transport",
+      "count": 1
+    },
+    {
+      "file": "pages/api/cron/grantee-deliverable-reminders.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/cron/grantee-deliverable-reminders.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "contacts",
+      "count": 1
+    },
+    {
+      "file": "pages/api/cron/grantee-deliverable-reminders.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "systemusers",
+      "count": 1
+    },
+    {
+      "file": "pages/api/cron/grantee-deliverable-reminders.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "unresolved",
+      "count": 1
+    },
+    {
+      "file": "pages/api/cron/grantee-deliverable-reminders.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "unresolved",
+      "count": 2
+    },
+    {
+      "file": "pages/api/expertise-finder/batch-match.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "sharepointdocumentlocations",
+      "count": 2
+    },
+    {
+      "file": "pages/api/expertise-finder/proposals.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/external/review/[token]/context.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "contacts",
+      "count": 1
+    },
+    {
+      "file": "pages/api/external/review/[token]/context.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "pages/api/external/review/[token]/context.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "pages/api/external/review/[token]/submit.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "pages/api/external/review/[token]/submit.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.resolveEntitySetName",
+      "entity": "wmkf_appreviewanswers",
+      "count": 1
+    },
+    {
+      "file": "pages/api/external/review/[token]/submit.js",
+      "kind": "import:changeset-op:PATCH",
+      "clientMethod": "DynamicsService.executeChangeset",
+      "entity": "wmkf_appreviewanswers",
+      "count": 1
+    },
+    {
+      "file": "pages/api/external/review/[token]/submit.js",
+      "kind": "import:changeset-op:PATCH",
+      "clientMethod": "DynamicsService.executeChangeset",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "pages/api/field-primer/generate.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 3
+    },
+    {
+      "file": "pages/api/field-primer/generate.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "akoya_requests",
+      "count": 3
+    },
+    {
+      "file": "pages/api/grant-reporting/extract.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.logAiRun",
+      "entity": "non-entity-transport",
+      "count": 1
+    },
+    {
+      "file": "pages/api/grant-reporting/lookup-grant.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/phase-i-dynamics/summarize.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/phase-i-dynamics/summarize.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.logAiRun",
+      "entity": "non-entity-transport",
+      "count": 1
+    },
+    {
+      "file": "pages/api/phase-i-dynamics/summarize.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/campaign-config.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 2
+    },
+    {
+      "file": "pages/api/review-manager/campaign-config.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/download-review.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/mark-received-no-file.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.resolveEntitySetName",
+      "entity": "wmkf_appreviewanswers",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/mark-received-no-file.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/mark-received-no-file.js",
+      "kind": "import:changeset-op:PATCH",
+      "clientMethod": "DynamicsService.executeChangeset",
+      "entity": "wmkf_appreviewanswers",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/mark-received-no-file.js",
+      "kind": "import:changeset-op:PATCH",
+      "clientMethod": "DynamicsService.executeChangeset",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/materials-preflight.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/regenerate-token.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/render-emails.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/render-emails.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "wmkf_potentialreviewerses",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/reviewers.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/reviewers.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/reviewers.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "wmkf_potentialreviewerses",
+      "count": 2
+    },
+    {
+      "file": "pages/api/review-manager/send-emails.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createAndSendEmail",
+      "entity": "non-entity-transport",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/send-emails.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/send-emails.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "systemusers",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/send-emails.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "wmkf_potentialreviewerses",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/send-emails.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/synthesize-reviews.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/synthesize-reviews.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "wmkf_appreviewanswers",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/synthesize-reviews.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "wmkf_potentialreviewerses",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/withdraw-sufficient.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createAndSendEmail",
+      "entity": "non-entity-transport",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/withdraw-sufficient.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/withdraw-sufficient.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "systemusers",
+      "count": 1
+    },
+    {
+      "file": "pages/api/review-manager/withdraw-sufficient.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "wmkf_potentialreviewerses",
+      "count": 1
+    },
+    {
+      "file": "pages/api/reviewer-finder/contact-history.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/reviewer-finder/contact-history.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "wmkf_apprequestpersons",
+      "count": 1
+    },
+    {
+      "file": "pages/api/reviewer-finder/contact-history.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/reviewer-finder/generate-emails.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/reviewer-finder/generate-emails.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "wmkf_apprequestpersons",
+      "count": 1
+    },
+    {
+      "file": "pages/api/reviewer-finder/generate-emails.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "pages/api/reviewer-finder/load-proposal.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/reviewer-finder/my-candidates.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/reviewer-finder/my-candidates.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "accounts",
+      "count": 1
+    },
+    {
+      "file": "pages/api/reviewer-finder/my-candidates.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/reviewer-finder/my-candidates.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "wmkf_potentialreviewerses",
+      "count": 2
+    },
+    {
+      "file": "pages/api/reviewer-finder/my-proposals.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "akoya_requests",
+      "count": 2
+    },
+    {
+      "file": "pages/api/reviewer-finder/my-proposals.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "wmkf_appreviewersuggestions",
+      "count": 1
+    },
+    {
+      "file": "pages/api/test-email.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createAndSendEmail",
+      "entity": "non-entity-transport",
+      "count": 1
+    },
+    {
+      "file": "pages/api/test-email.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createEmailActivity",
+      "entity": "non-entity-transport",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/applicant-reviewers.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/dashboard.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "akoya_requests",
+      "count": 2
+    },
+    {
+      "file": "pages/api/workbench/download-proposal-document.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/export-candidates.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/grantee-deliverables/abstract.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 3
+    },
+    {
+      "file": "pages/api/workbench/grantee-deliverables/abstract.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/grantee-deliverables/awardees.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/grantee-deliverables/cycle-export.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryAllRecords",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/grantee-deliverables/generate.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 2
+    },
+    {
+      "file": "pages/api/workbench/grantee-deliverables/generate.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/grantee-deliverables/recipients.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/grantee-deliverables/recipients.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "contacts",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/grantee-deliverables/send-invite.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.createAndSendEmail",
+      "entity": "non-entity-transport",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/grantee-deliverables/send-invite.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/manual-reviewer.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/proposal-documents.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/resolve-request.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/resolve-request.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.queryRecords",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/triage.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.getRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    },
+    {
+      "file": "pages/api/workbench/triage.js",
+      "kind": "import",
+      "clientMethod": "DynamicsService.updateRecord",
+      "entity": "akoya_requests",
+      "count": 1
+    }
+  ]
+}

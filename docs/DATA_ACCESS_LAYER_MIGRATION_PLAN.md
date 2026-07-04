@@ -24,9 +24,9 @@ restriction context folds INTO the layer as a deliberate late stage;
 delivery = ratchet + gate (freeze new raw usage immediately, convert
 opportunistically + occasional dedicated sessions).
 
-**Execution status: Stage 0 COMPLETE (S329, 2026-07-04).** Census probe +
-self-test committed; Appendix A holds the baseline census. Stages 1–8 have not
-run.
+**Execution status: Stages 0–1 COMPLETE (S329, 2026-07-04).** Census probe,
+line-tolerant ratchet allowlist, self-tests, and CI registration committed.
+Stage 2 in progress (worktree build). Stages 3–8 have not run.
 
 ## Why (baseline evidence)
 
@@ -170,13 +170,16 @@ suite + build green (nothing behavioral touched); commit probe + self-test.
 **Tests before:** Stage 0 self-test green.
 
 **Work:**
-1. `scripts/dataverse-access-allowlist.json` = exact Stage-0 census keyed by
-   call identity (`file`, `line` or stable AST path, `method`, `entity`, and
-   alias/direct/changeset kind). Gate `npm run check:dataverse-access-layer`
-   fails on (a) any raw call identity NOT in the allowlist, including new raw
-   calls added to a legacy file, (b) any allowlist entry whose call identity no
-   longer exists (forces shrink — no zombie entries), and (c) any unresolved
-   alias/changeset entry added after Stage 0.
+1. `scripts/dataverse-access-allowlist.json` = exact Stage-0 census collapsed
+   into line-tolerant count keys: `file`, alias/direct/changeset `kind`,
+   `clientMethod`, `entity`, and `count`. Gate
+   `npm run check:dataverse-access-layer` fails on (a) any raw access key NOT in
+   the allowlist, or any current count above the allowed count, including new
+   raw calls added to a legacy file, (b) any allowlist count above the current
+   census count or a vanished key (forces shrink — no zombie entries), and (c)
+   any unresolved alias/changeset key added after Stage 0. Rationale: source
+   lines are intentionally omitted so unrelated edits in legacy files do not
+   break the ratchet and invite blind regeneration.
 2. Register in `package.json`, the CI workflow, `docs/CI_GATES_REFERENCE.md`,
    and the `/start` skill's gate list.
 3. Self-test: fixtures proving all three failure modes fire.
@@ -373,6 +376,24 @@ Drift found → this doc is edited BEFORE the next stage starts.
   with Stage-0 exemptions. Full suite 3836/3837 (pricing-canary pre-existing
   red), build clean. The allowlist drift-comparison path ships untested until
   Stage 1's self-test per plan staging.
+- 2026-07-04 (S329): **Stage 1 executed** (Codex build, Claude review).
+  `scripts/dataverse-access-allowlist.json` generated from the current census:
+  181 line-tolerant allowlist keys covering 211 raw access entries.
+  `scripts/check-dataverse-access-layer.js` now preserves line numbers in
+  `--json` output while default-mode comparison uses
+  `file` + `kind` + `clientMethod` + `entity` counts. Self-test fixtures prove
+  green baseline plus count-exceeds, stale-entry/count-below, and new-unresolved
+  red modes. CI, `docs/CI_GATES_REFERENCE.md`, and `/start` gate-list
+  registration added; `package.json` scripts were already present from Stage 0.
+  Baseline gate and self-test green `[VERIFIED 2026-07-04 via
+  npm run check:dataverse-access-layer]` `[VERIFIED 2026-07-04 via
+  npm run check:dataverse-access-layer:self-test]`; targeted red modes green
+  `[VERIFIED 2026-07-04 via
+  node scripts/check-dataverse-access-layer-self-test.js --mode count-exceeds]`
+  `[VERIFIED 2026-07-04 via
+  node scripts/check-dataverse-access-layer-self-test.js --mode stale-entry]`
+  `[VERIFIED 2026-07-04 via
+  node scripts/check-dataverse-access-layer-self-test.js --mode new-unresolved]`.
 
 ## Appendix A — Baseline census
 

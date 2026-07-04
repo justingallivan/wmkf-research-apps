@@ -28,6 +28,8 @@ A red gate in this set on `main` blocks new commits to the affected surface. Est
 | `check:atlas:self-test` | Every Atlas detection pattern from `docs/CLAUDE_COVERAGE_LESSONS.md` exercised against synthetic fixtures. | Same scope as `:atlas` — silent detector regressions would be invisible without it. |
 | `check:api-routes` | API route files under `pages/api/**` must appear in `docs/API_ROUTE_SECURITY_MATRIX.md`. Hard-fails on missing-from-matrix; **warns** (non-fatal) on routes with no recognized guard token. Recognized guards include session guards (`requireAppAccess`, etc.), the cron/suggestion-token helpers, and (2026-06-11) HMAC helpers `verifyInternalCall`/`verifyBillWebhook` — the HMAC exemption applies only when the route's matrix row also documents a shared-secret/HMAC boundary, so an undocumented HMAC-token route still warns. Paths overridable via `API_ROUTE_GATE_API_ROOT`/`API_ROUTE_GATE_MATRIX_PATH` (used by the self-test). | PRs touching `pages/api/**` without a matrix update. |
 | `check:api-routes:self-test` | Drives the gate against synthetic fixture routes + matrix: HMAC-documented → no warn; HMAC-undocumented → warn; known guard → no warn; intentional `None` → no warn; no-guard → warn; missing-from-matrix → hard-fail. | Silent regressions in guard recognition or the missing-route hard-fail. |
+| `check:dataverse-access-layer` | Babel-AST census of raw `DynamicsService` calls in application code, including import/require aliases, defaulted dependency aliases, and `executeChangeset` operation URLs, compared against `scripts/dataverse-access-allowlist.json`. | New raw Dataverse transport use outside the approved legacy baseline; stale allowlist entries must shrink as callers move behind adapters. |
+| `check:dataverse-access-layer:self-test` | Synthetic fixture tree proving direct calls, constants, aliases, changesets, exemptions, green allowlist baseline, count-exceeds, stale-entry, and new-unresolved failures. | Silent regressions in the Stage-1 ratchet or its line-tolerant count-key comparison. |
 
 The fix is always to make the gate green. Adding to `ALLOWED_UNDOCUMENTED_*` requires a written justification and is a last resort, not a default. The rule applies regardless of which session caused the red state: "not my regression" is not a valid reason to proceed past it.
 
@@ -39,7 +41,24 @@ If `npm run build` fails with that sandbox/port-binding signature, immediately r
 
 If a retry reports "Another next build process is already running" after an interrupted attempt, check for a live `next build` / `npm run build` process first. Do not delete `.next`, kill broad process patterns, or clean build artifacts unless the live process check proves the warning is stale and the operator approves the cleanup.
 
-## Drift gates (also fail-loud, not in the P0 set above)
+## Gate details
+
+### `check:dataverse-access-layer` — raw Dataverse access ratchet (S329)
+
+Freezes the Stage-0 raw `DynamicsService` census while the Dataverse data-access
+layer migration proceeds. The gate scans `pages/`, `lib/`, and `shared/` but
+exempts the entity-generic power tools, the transport itself, and DAL internals
+listed in `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`.
+
+- Allowlist: `scripts/dataverse-access-allowlist.json`.
+- Comparison key: line-tolerant `{file, kind, clientMethod, entity}` with a
+  `count`; source line numbers remain in `--json` output for human diagnosis but
+  do not participate in default-mode comparison.
+- Fails when a current key is absent from the allowlist, a current count exceeds
+  its allowed count, an allowlist count exceeds the current census, or a new
+  `unresolved` / `changeset-unresolved` key appears outside the Stage-0
+  baseline.
+- Self-test: `npm run check:dataverse-access-layer:self-test`.
 
 ### `check:fact-consistency` — registered scalar drift
 
@@ -208,6 +227,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:harness-framing` | `check:harness-framing:self-test` |
 | `check:status-enum-parity` | `check:status-enum-parity:self-test` |
 | `check:trust-boundary-guid` | `check:trust-boundary-guid:self-test` |
+| `check:dataverse-access-layer` | `check:dataverse-access-layer:self-test` — green baseline plus count-exceeds, stale-entry, and new-unresolved red fixtures. |
 | `check:secret-scan` | `check:secret-scan:self-test` |
 
 **When external review catches a structural pattern an existing gate missed, the order is mandatory:**
@@ -233,4 +253,5 @@ Several self-tests write synthetic fixtures into paths that the main gate also s
 - `check:build-claim-freshness` then `check:build-claim-freshness:self-test` (self-test writes fixtures into `docs/agent-wiki/`, which the gate scans)
 - `check:model-registry` then `check:model-registry:self-test`
 - `check:agent-wiki` then `check:agent-wiki:self-test`
+- `check:dataverse-access-layer` then `check:dataverse-access-layer:self-test`
 - `check:secret-scan` then `check:secret-scan:self-test`
