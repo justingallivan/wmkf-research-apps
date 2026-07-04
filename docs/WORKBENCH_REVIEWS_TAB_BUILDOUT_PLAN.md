@@ -16,9 +16,19 @@ related:
 
 # Workbench Reviews Tab — Consumption Build-Out Plan
 
-**Status: Phase 1, Phase 2, and Phase 3 BUILT (S326, 2026-07-03) —
-unit/integration-tested and gated; not yet deployed or E2E-driven. Phase 4
-still PLANNED.**
+**Status: Phases 1-3 BUILT + DEPLOYED (S326, 2026-07-03; prod deploys verified
+on exact SHAs through `e6991f35`). Browser-drive S326 on applications.wmkeck.org
+PASSED all zero-submission-era checks: tab render, Outstanding rows against live
+acceptance data (disabled-nudge tooltip confirmed via accessible name), correct
+ABSENCE of Compare/Export with zero submissions, clean console, request-switch
+stale-guard. Phase 4 still PLANNED.**
+
+**Verification boundary (owner context, S326): the portal is being built AHEAD
+of the December-2026 cycle — no reviewer has ever submitted through it, so the
+populated Compare grid, narrative browser, and DOCX/PDF exports CANNOT be
+browser-verified against real data yet. They are covered by unit tests only.
+Verify them at the first real submission, or sooner via a staged test
+submission (token-invite on a sandbox request through the live authoring form).**
 
 ## Context
 

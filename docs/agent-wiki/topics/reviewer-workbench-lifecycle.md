@@ -109,7 +109,7 @@ Submitted reviewers still render as a read-only per-reviewer card list
 (ratings decoded via the static schema, richtext narrative answers, SharePoint
 download). Panel-prep roll-up/export now exists client-side (Phase 3, below).
 
-**Phase 1 BUILT (S326; tested + gated, pending deploy/E2E):** outstanding tracking + manual nudge. The DTO
+**Phase 1 LIVE (S326; deployed, browser-drive-verified against live acceptance data):** outstanding tracking + manual nudge. The DTO
 (`reviewers.js` GET) adds `submitted` (accepted-reviewer submission status),
 `daysSinceMaterialsSent` (derived from `wmkf_materialssentat`, null until
 materials are sent), and passes through `reminderSentAt`/`reminderCount`
@@ -130,7 +130,7 @@ manual and cron sends share one fire-once marker and can never double-send.
 Unlike the cron, a manual re-send when the marker is already set IS allowed
 (staff-initiated); a claim conflict (412) returns an error without sending.
 
-**Phase 2 BUILT (S326; tested + gated, pending deploy/E2E):** schema-free
+**Phase 2 DEPLOYED (S326; unit-tested; populated Compare view NOT browser-verifiable until the first portal submission — zero exist, portal built ahead of the D26 cycle; correct zero-submission absence drive-verified):** schema-free
 comparison matrix. `shared/utils/review-matrix.js#deriveReviewMatrix(reviewers,
 liveQuestions)` is a pure, DOM/React/Dataverse-free derivation over each
 reviewer's `answers[]` — union of question keys, ordered by the LIVE question
@@ -157,7 +157,7 @@ stacked with attribution, rendered the same way the Cards view's
 text wins (documented in the module header) when the key isn't live; live text
 always wins when it is.
 
-**Phase 3 BUILT (S326; unit-tested + gated, pending deploy/E2E):** panel-prep
+**Phase 3 DEPLOYED (S326; unit-tested; same verification boundary as Phase 2 — export unverifiable against real data until the first portal submission; correct absence drive-verified):** panel-prep
 roll-up/export. `shared/utils/review-report.js#composeReviewReport(...)` is a
 pure, DOM/React/Dataverse-free composition over a `deriveReviewMatrix` result
 (consumed, not re-derived) plus proposal identity — header, summary
