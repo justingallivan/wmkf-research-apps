@@ -74,6 +74,13 @@ Claude config sync, and environment-specific operating notes.
   No `akoya_request` teardown — in capture-only mode there is none; in the
   no-BILL creation posture, any minted honorarium request needs separate cleanup.
 
+- **Never run `rtk init` in this repo.** It replaces the condensed RTK block in
+  root `CLAUDE.md` (between the `<!-- rtk-instructions v2 -->` markers) with a
+  ~139-line command reference, pushing the file past the 200-line
+  `check:instruction-architecture` gate. [VERIFIED 2026-07-04 via scratchpad
+  replay of `rtk init` against the marker block.] The rtk Bash hook in
+  `.claude/settings.json` and `.rtk/filters.toml` are the tracked setup.
+
 ## Commit Guards & Triggers
 
 Four `PreToolUse(Bash)` hooks fire on `git commit` (wired in `.claude/settings.json`):

@@ -90,6 +90,9 @@ _archived/         Retired apps/pages moved out of the live tree
 tests/              Unit and integration tests
 ```
 
+<!-- Do NOT run `rtk init` in this repo: it overwrites the condensed block below
+     with a ~139-line reference, pushing this file past the 200-line
+     check:instruction-architecture gate. [VERIFIED 2026-07-04 via scratchpad test] -->
 <!-- rtk-instructions v2 -->
 ## RTK (Rust Token Killer)
 
