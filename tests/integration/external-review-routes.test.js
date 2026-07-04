@@ -19,11 +19,11 @@ import { GraphService } from '../../lib/services/graph-service';
 import { getRequestSharePointBuckets } from '../../lib/utils/sharepoint-buckets';
 import { writeReviewFiles } from '../../lib/services/review-upload';
 import { applyStage2aResponse } from '../../lib/dataverse/adapters/reviewer-suggestion';
-import { getSettingStrict } from '../../lib/services/settings-service';
 import {
-  REVIEWER_ACCEPTANCE_SEED_BODY,
-  REVIEWER_ACCEPTANCE_SEED_SUBJECT,
-} from '../../lib/seed/email-defaults/reviewer-actions';
+  enqueueReviewerAcceptanceJob,
+  markReviewerAcceptanceJobQueued,
+  cancelReviewerAcceptanceJob,
+} from '../../lib/services/reviewer-acceptance-job-service';
 
 jest.mock('../../lib/external/verify-suggestion-token', () => ({
   verifySuggestionToken: jest.fn(),
@@ -95,12 +95,18 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   applyStage2aResponse: jest.fn(async () => ({})),
 }));
 
+jest.mock('../../lib/services/reviewer-acceptance-job-service', () => ({
+  enqueueReviewerAcceptanceJob: jest.fn(async () => ({ id: 101, acceptance_key: 'acceptance-1', status: 'accept_pending' })),
+  markReviewerAcceptanceJobQueued: jest.fn(async () => ({ id: 101, status: 'queued' })),
+  cancelReviewerAcceptanceJob: jest.fn(async () => ({ id: 101, status: 'cancelled' })),
+}));
+
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
 }));
 
-// Honorarium onboarding (chunk-4) is exercised in its own unit test; here we
-// only assert respond.js invokes it on accept (and not on decline/opt-out).
+// Honorarium onboarding is now drained from reviewer_acceptance_jobs; the route
+// tests assert respond.js does not invoke the slow tail inline.
 jest.mock('../../lib/bill/honorarium-onboard-orchestrator', () => ({
   ensureHonorariumOnboarding: jest.fn().mockResolvedValue({ honorariumRequestId: 'hon-1' }),
 }));
@@ -112,17 +118,9 @@ jest.mock('../../lib/services/notification-service', () => ({
 jest.mock('../../lib/services/email-signature', () => ({
   resolveSignatureForRequest: jest.fn(async () => ({ signature: 'Dr. PD\nProgram Director\nW. M. Keck Foundation' })),
 }));
-jest.mock('../../lib/services/settings-service', () => ({
-  getSettingStrict: jest.fn(),
-}));
 jest.mock('../../lib/external/calendar-invite', () => ({
   buildReviewDueIcs: jest.fn(() => ({ filename: 'keck-review-due.ics', contentType: 'text/calendar', content: Buffer.from('ICS') })),
 }));
-
-const ACCEPTANCE_DEFAULTS = {
-  'email.reviewer_acceptance.subject': REVIEWER_ACCEPTANCE_SEED_SUBJECT,
-  'email.reviewer_acceptance.body': REVIEWER_ACCEPTANCE_SEED_BODY,
-};
 
 const verifiedSuggestion = {
   ok: true,
@@ -161,7 +159,6 @@ const verifiedSuggestion = {
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.NOTIFICATION_EMAIL_FROM = 'notifications@wmkeck.org';
-  getSettingStrict.mockImplementation(async (key) => ({ found: true, value: ACCEPTANCE_DEFAULTS[key] }));
 });
 
 describe('/api/external/review/[token]/context', () => {
@@ -488,7 +485,7 @@ describe('/api/external/review/[token]/respond', () => {
     expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'concurrent_modification' });
   });
 
-  it('accept (fresh, not opted out) runs the honorarium orchestrator with suggestion/request/reviewer/body', async () => {
+  it('accept (fresh, not opted out) stages a durable acceptance job before returning', async () => {
     const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
     ensureHonorariumOnboarding.mockClear();
     verifySuggestionToken.mockResolvedValue(fresh);
@@ -500,10 +497,23 @@ describe('/api/external/review/[token]/respond', () => {
     });
     const res = createMockRes();
     await handler(req, res);
-    expect(applyStage2aResponse).toHaveBeenCalledWith('suggestion-1', expect.objectContaining({ action: 'accept' }), expect.anything());
-    expect(ensureHonorariumOnboarding).toHaveBeenCalledWith(expect.objectContaining({
-      suggestion: fresh.suggestion, request: fresh.request, reviewer: fresh.reviewer,
+    expect(enqueueReviewerAcceptanceJob).toHaveBeenCalledWith(expect.objectContaining({
+      suggestion: fresh.suggestion,
+      request: fresh.request,
+      reviewer: fresh.reviewer,
+      isAcceptRepeat: false,
+      optedOut: false,
+      status: 'accept_pending',
+      acceptedSuggestion: expect.objectContaining({ wmkf_revieweremail: null }),
     }));
+    const stagedAt = enqueueReviewerAcceptanceJob.mock.calls[0][0].acceptedAt;
+    expect(applyStage2aResponse).toHaveBeenCalledWith(
+      'suggestion-1',
+      expect.objectContaining({ action: 'accept', responseReceivedAt: stagedAt }),
+      expect.anything(),
+    );
+    expect(markReviewerAcceptanceJobQueued).toHaveBeenCalledWith(101);
+    expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
@@ -546,7 +556,7 @@ describe('/api/external/review/[token]/respond', () => {
     }));
   });
 
-  it('fresh accept sends acceptance confirmation email with review-due .ics', async () => {
+  it('fresh accept does not send the acceptance confirmation inline', async () => {
     const { buildReviewDueIcs } = require('../../lib/external/calendar-invite');
     DynamicsService.createAndSendEmail.mockClear();
     buildReviewDueIcs.mockClear();
@@ -563,34 +573,15 @@ describe('/api/external/review/[token]/respond', () => {
     const res = createMockRes();
     await handler(req, res);
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(buildReviewDueIcs).toHaveBeenCalledWith({
-      reviewDueDate: '2026-08-15',
-      suggestionId: 'suggestion-1',
-    });
-    expect(DynamicsService.createAndSendEmail).toHaveBeenCalledTimes(1);
-    expect(DynamicsService.createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      subject: 'Review accepted',
-      body: expect.stringContaining('Dear Dr. Reviewer,'),
-      from: 'notifications@wmkeck.org',
-      to: 'reviewer@example.org',
-      regardingId: 'request-1',
-      regardingType: 'akoya_request',
-      attachments: [expect.objectContaining({ filename: 'keck-review-due.ics' })],
+    expect(buildReviewDueIcs).not.toHaveBeenCalled();
+    expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+    expect(enqueueReviewerAcceptanceJob).toHaveBeenCalledWith(expect.objectContaining({
+      isAcceptRepeat: false,
+      request: expect.objectContaining({ wmkf_reviewduedate: '2026-08-15' }),
     }));
-    const email = DynamicsService.createAndSendEmail.mock.calls[0][0];
-    expect(email.body).toContain('Thank you for agreeing to review “Token Scoped Proposal”.');
-    expect(email.body).toContain('Your review is due on August 15, 2026. A calendar reminder is attached when a review due date is available.');
-    expect(email.body).toContain('Proposal materials will be sent separately when they are ready.');
-    // PD-voiced closing: the assigned-PD signature is appended after a "Thank you," line.
-    expect(email.body).toContain('Thank you,');
-    expect(email.body).toContain('Dr. PD<br>Program Director<br>W. M. Keck Foundation');
-    // Request number is internal — must never reach the external reviewer.
-    expect(email.subject).not.toContain('REQ-001');
-    expect(email.body).not.toContain('REQ-001');
-    expect(email.body).toContain('W. M. Keck Foundation');
   });
 
-  it('accept with honorariumOptOut:true does NOT run the orchestrator', async () => {
+  it('accept with honorariumOptOut:true stages an opted-out job and does NOT run the orchestrator inline', async () => {
     const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
     ensureHonorariumOnboarding.mockClear();
     verifySuggestionToken.mockResolvedValue(fresh);
@@ -601,10 +592,14 @@ describe('/api/external/review/[token]/respond', () => {
     const res = createMockRes();
     await handler(req, res);
     expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
+    expect(enqueueReviewerAcceptanceJob).toHaveBeenCalledWith(expect.objectContaining({
+      optedOut: true,
+      status: 'accept_pending',
+    }));
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it('re-accept (already accepted) STILL runs the orchestrator but skips the suggestion PATCH (Codex P1 #2)', async () => {
+  it('re-accept (already accepted) queues follow-up retry but skips the suggestion PATCH (Codex P1 #2)', async () => {
     const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
     ensureHonorariumOnboarding.mockClear();
     applyStage2aResponse.mockClear();
@@ -619,7 +614,12 @@ describe('/api/external/review/[token]/respond', () => {
     const res = createMockRes();
     await handler(req, res);
     expect(applyStage2aResponse).not.toHaveBeenCalled();
-    expect(ensureHonorariumOnboarding).toHaveBeenCalled();
+    expect(enqueueReviewerAcceptanceJob).toHaveBeenCalledWith(expect.objectContaining({
+      isAcceptRepeat: true,
+      status: 'queued',
+    }));
+    expect(markReviewerAcceptanceJobQueued).toHaveBeenCalledWith(101);
+    expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ idempotent: true }));
   });
 
@@ -638,12 +638,13 @@ describe('/api/external/review/[token]/respond', () => {
     });
     const res = createMockRes();
     await handler(req, res);
-    expect(ensureHonorariumOnboarding).toHaveBeenCalled();
+    expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
+    expect(enqueueReviewerAcceptanceJob).toHaveBeenCalledWith(expect.objectContaining({ isAcceptRepeat: true }));
     expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ idempotent: true }));
   });
 
-  it('re-accept honors the PERSISTED opt-out (body omits the flag) — orchestrator NOT run (Codex post-impl F2)', async () => {
+  it('re-accept honors the PERSISTED opt-out in the staged job (body omits the flag) (Codex post-impl F2)', async () => {
     const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
     ensureHonorariumOnboarding.mockClear();
     verifySuggestionToken.mockResolvedValue({
@@ -654,15 +655,15 @@ describe('/api/external/review/[token]/respond', () => {
     const res = createMockRes();
     await handler(req, res);
     expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
+    expect(enqueueReviewerAcceptanceJob).toHaveBeenCalledWith(expect.objectContaining({
+      isAcceptRepeat: true,
+      optedOut: true,
+    }));
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it('orchestrator failure is non-fatal: accept still 200 + alert fired', async () => {
-    const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
-    const NotificationService = require('../../lib/services/notification-service');
-    ensureHonorariumOnboarding.mockClear();
-    NotificationService.notify.mockClear();
-    ensureHonorariumOnboarding.mockRejectedValueOnce(new Error('honorarium boom'));
+  it('queue-marker failure is non-fatal after the acceptance job has been staged', async () => {
+    markReviewerAcceptanceJobQueued.mockRejectedValueOnce(new Error('queue marker down'));
     verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
       method: 'POST', query: { token: 'good-token' }, headers: {},
@@ -671,80 +672,38 @@ describe('/api/external/review/[token]/respond', () => {
     const res = createMockRes();
     await handler(req, res);
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({ type: 'honorarium_onboard_failed' }));
+    expect(enqueueReviewerAcceptanceJob).toHaveBeenCalled();
+    expect(applyStage2aResponse).toHaveBeenCalled();
   });
 
-  it('acceptance-confirmation send failure is non-fatal: accept still 200 + alert fired', async () => {
-    const NotificationService = require('../../lib/services/notification-service');
-    NotificationService.notify.mockClear();
-    DynamicsService.createAndSendEmail.mockRejectedValueOnce(new Error('SMTP down'));
-    verifySuggestionToken.mockResolvedValue({
-      ...fresh,
-      reviewer: { wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'reviewer@example.org' },
-    });
+  it('accept PATCH conflict cancels the staged job and returns 412', async () => {
+    applyStage2aResponse.mockRejectedValueOnce(Object.assign(new Error('Update failed (412)'), { status: 412 }));
+    verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
       method: 'POST', query: { token: 'good-token' }, headers: {},
       body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
     await handler(req, res);
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'reviewer_acceptance_confirmation_failed',
-      severity: 'warning',
-    }));
+    expect(enqueueReviewerAcceptanceJob).toHaveBeenCalled();
+    expect(cancelReviewerAcceptanceJob).toHaveBeenCalledWith(101, 'Update failed (412)');
+    expect(markReviewerAcceptanceJobQueued).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(412);
   });
 
-  it('blank acceptance email default skips the email but keeps accept 200 and alerts', async () => {
-    const NotificationService = require('../../lib/services/notification-service');
-    NotificationService.notify.mockClear();
-    DynamicsService.createAndSendEmail.mockClear();
-    getSettingStrict.mockImplementation(async (key) => ({
-      found: true,
-      value: key === 'email.reviewer_acceptance.body' ? '   ' : ACCEPTANCE_DEFAULTS[key],
-    }));
-    verifySuggestionToken.mockResolvedValue({
-      ...fresh,
-      reviewer: { wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'reviewer@example.org' },
-    });
+  it('accept PATCH transport failure leaves the staged job for drain verification', async () => {
+    applyStage2aResponse.mockRejectedValueOnce(new Error('Dataverse timeout after write'));
+    verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
       method: 'POST', query: { token: 'good-token' }, headers: {},
       body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
     await handler(req, res);
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
-    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'email_default_misconfigured',
-      metadata: expect.objectContaining({ key: 'email.reviewer_acceptance.body', reason: 'blank' }),
-    }));
-  });
-
-  it('unavailable acceptance email default skips the email but keeps accept 200 and alerts', async () => {
-    const NotificationService = require('../../lib/services/notification-service');
-    NotificationService.notify.mockClear();
-    DynamicsService.createAndSendEmail.mockClear();
-    getSettingStrict.mockImplementation(async (key) => {
-      if (key === 'email.reviewer_acceptance.subject') throw new Error('settings down');
-      return { found: true, value: ACCEPTANCE_DEFAULTS[key] };
-    });
-    verifySuggestionToken.mockResolvedValue({
-      ...fresh,
-      reviewer: { wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'reviewer@example.org' },
-    });
-    const req = createMockReq({
-      method: 'POST', query: { token: 'good-token' }, headers: {},
-      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'T', postalCode: '9', country: 'US', phone: '+1 555 0100' } },
-    });
-    const res = createMockRes();
-    await handler(req, res);
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
-    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'email_default_misconfigured',
-      metadata: expect.objectContaining({ key: 'email.reviewer_acceptance.subject', reason: 'unavailable' }),
-    }));
+    expect(enqueueReviewerAcceptanceJob).toHaveBeenCalled();
+    expect(cancelReviewerAcceptanceJob).not.toHaveBeenCalled();
+    expect(markReviewerAcceptanceJobQueued).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(500);
   });
 
   it('decline does NOT run the honorarium orchestrator', async () => {
@@ -862,17 +821,19 @@ describe('/api/external/review/[token]/respond', () => {
     const res = createMockRes();
     await handler(req, res);
     expect(applyStage2aResponse).toHaveBeenCalledWith('suggestion-1', expect.objectContaining({ action: 'accept' }), expect.anything());
-    expect(ensureHonorariumOnboarding).toHaveBeenCalled();
+    expect(enqueueReviewerAcceptanceJob).toHaveBeenCalledWith(expect.objectContaining({ isAcceptRepeat: false }));
+    expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it('REPEAT accept (already accepted) still runs honorarium retry', async () => {
+  it('REPEAT accept (already accepted) still queues honorarium retry', async () => {
     const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
     verifySuggestionToken.mockResolvedValue({ ...fresh, suggestion: { ...fresh.suggestion, wmkf_accepted: true } });
     const req = createMockReq({ method: 'POST', query: { token: 'good-token' }, headers: {}, body: { action: 'accept' } });
     const res = createMockRes();
     await handler(req, res);
-    expect(ensureHonorariumOnboarding).toHaveBeenCalled();
+    expect(enqueueReviewerAcceptanceJob).toHaveBeenCalledWith(expect.objectContaining({ isAcceptRepeat: true }));
+    expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
@@ -899,7 +860,7 @@ describe('/api/external/review/[token]/respond', () => {
   });
 
   // ── Remaining transition-matrix cells (Codex chunk-3 #2) ──
-  it('historical held → accept runs the full accept path (acks/honorarium)', async () => {
+  it('historical held → accept runs the accept write and stages follow-up work', async () => {
     const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
     verifySuggestionToken.mockResolvedValue({
       ...fresh,
@@ -912,7 +873,8 @@ describe('/api/external/review/[token]/respond', () => {
     const res = createMockRes();
     await handler(req, res);
     expect(applyStage2aResponse).toHaveBeenCalledWith('suggestion-1', expect.objectContaining({ action: 'accept' }), expect.anything());
-    expect(ensureHonorariumOnboarding).toHaveBeenCalled();
+    expect(enqueueReviewerAcceptanceJob).toHaveBeenCalledWith(expect.objectContaining({ isAcceptRepeat: false }));
+    expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 

@@ -74,6 +74,10 @@
       "schedule": "*/2 * * * *"
     },
     {
+      "path": "/api/cron/drain-reviewer-acceptances",
+      "schedule": "*/2 * * * *"
+    },
+    {
       "path": "/api/cron/pricing-canary",
       "schedule": "0 10 * * 1"
     },

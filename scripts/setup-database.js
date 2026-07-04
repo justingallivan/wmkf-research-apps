@@ -671,6 +671,51 @@ const v31Statements = [
      ON external_rate_limit(window_start)`,
 ];
 
+// V35: Reviewer acceptance follow-up jobs. Existing databases use
+// migration 024_reviewer_acceptance_jobs.sql; this fresh-install block creates
+// the same table directly.
+const v35Statements = [
+  `CREATE TABLE IF NOT EXISTS reviewer_acceptance_jobs (
+    id              BIGSERIAL PRIMARY KEY,
+    acceptance_key  TEXT NOT NULL UNIQUE,
+    suggestion_id   UUID NOT NULL,
+    request_id      UUID,
+    reviewer_id     UUID,
+    accepted_at     TIMESTAMPTZ NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'accept_pending',
+    payload         JSONB NOT NULL,
+    steps           JSONB NOT NULL DEFAULT '{}'::jsonb,
+    attempts        INTEGER NOT NULL DEFAULT 0,
+    last_error      TEXT,
+    next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    locked_until    TIMESTAMPTZ,
+    lease_token     UUID,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at    TIMESTAMPTZ,
+    CONSTRAINT reviewer_acceptance_jobs_status_check CHECK (status IN (
+      'accept_pending', 'queued', 'completed', 'failed', 'cancelled'
+    )),
+    CONSTRAINT reviewer_acceptance_jobs_attempts_nonneg CHECK (attempts >= 0),
+    CONSTRAINT reviewer_acceptance_jobs_completed_when_terminal CHECK (
+      (status IN ('completed', 'failed', 'cancelled')) = (completed_at IS NOT NULL)
+    )
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_reviewer_acceptance_jobs_suggestion_accepted
+     ON reviewer_acceptance_jobs (suggestion_id, accepted_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_reviewer_acceptance_jobs_ready
+     ON reviewer_acceptance_jobs (next_attempt_at, locked_until, created_at)
+     WHERE status IN ('accept_pending', 'queued')`,
+  `CREATE INDEX IF NOT EXISTS idx_reviewer_acceptance_jobs_suggestion
+     ON reviewer_acceptance_jobs (suggestion_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_reviewer_acceptance_jobs_request
+     ON reviewer_acceptance_jobs (request_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_reviewer_acceptance_jobs_status
+     ON reviewer_acceptance_jobs (status)`,
+  `CREATE INDEX IF NOT EXISTS idx_reviewer_acceptance_jobs_created
+     ON reviewer_acceptance_jobs (created_at DESC)`,
+];
+
 // V32: model pricing audit history (S181).
 // Monthly drift cron (/api/cron/pricing-refresh) writes one row per
 // (model, token_type) per run. Compared against lib/utils/model-pricing.js;
@@ -1565,6 +1610,25 @@ async function runMigration() {
       }
     }
 
+    // Run V35 table creation (Reviewer acceptance follow-up jobs)
+    console.log(`\nApplying v35 schema updates - Reviewer acceptance follow-up jobs (${v35Statements.length} statements)...`);
+    for (let i = 0; i < v35Statements.length; i++) {
+      const statement = v35Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+
+      try {
+        await sql.query(statement);
+        console.log(`[v35-${i + 1}/${v35Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v35-${i + 1}/${v35Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v35-${i + 1}/${v35Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
     // Run V32 table creation (S181: model pricing audit history)
     console.log(`\nApplying v32 schema updates - Model pricing audit (${v32Statements.length} statements)...`);
     for (let i = 0; i < v32Statements.length; i++) {
@@ -1684,7 +1748,9 @@ async function runMigration() {
     console.log('  • user_profiles.dynamics_reconciled_at');
     console.log('\nV30 new tables (Intake Portal submission jobs queue):');
     console.log('  • submission_jobs (async submission queue — idempotency-keyed, drained by cron)');
-    console.log('\nIndexes created: 64 (plus 7 added in V30)');
+    console.log('\nV35 new tables (Reviewer acceptance follow-up jobs):');
+    console.log('  • reviewer_acceptance_jobs (post-accept side-effect queue — drained by cron)');
+    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35)');
 
   } catch (error) {
     console.error('\n✗ Migration failed:', error.message);

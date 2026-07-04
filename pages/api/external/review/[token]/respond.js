@@ -35,31 +35,24 @@
  * through this portal.
  */
 
+import { randomUUID } from 'crypto';
 import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
 import { applyStage2aResponse } from '../../../../../lib/dataverse/adapters/reviewer-suggestion';
 import { getActivePolicies } from '../../../../../lib/external/policy-fetcher';
 import { missingRequiredAddressFields, validateAddress } from '../../../../../lib/external/required-address';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
-import { ensureHonorariumOnboarding } from '../../../../../lib/bill/honorarium-onboard-orchestrator';
 import { captureSelfReportedReviewerOrcid } from '../../../../../lib/services/capture-self-reported-orcid';
-import { captureSelfReportedReviewerIdentity } from '../../../../../lib/services/capture-self-reported-reviewer-identity';
-import { syncReviewerNameTitleToContact } from '../../../../../lib/services/sync-reviewer-name-title-to-contact';
-import { alertReviewerEmailMismatch } from '../../../../../lib/services/alert-reviewer-email-mismatch';
-import { alertReviewerAffiliationMismatch } from '../../../../../lib/services/alert-reviewer-affiliation-mismatch';
-import { normalizeOrcid } from '../../../../../lib/utils/orcid-normalize';
-import { ContactParser } from '../../../../../lib/utils/contact-parser';
-import NotificationService from '../../../../../lib/services/notification-service';
-import { maybeNotifyQuotaReached } from '../../../../../lib/services/reviewer-quota';
-import { DynamicsService } from '../../../../../lib/services/dynamics-service';
-import { buildReviewDueIcs } from '../../../../../lib/external/calendar-invite';
-import { readRequiredEmailDefaults } from '../../../../../lib/services/email-defaults';
-import { renderPlainTextEmailHtml } from '../../../../../lib/external/plain-text-email-html';
-import { resolveSignatureForRequest } from '../../../../../lib/services/email-signature';
+import {
+  enqueueReviewerAcceptanceJob,
+  markReviewerAcceptanceJobQueued,
+  cancelReviewerAcceptanceJob,
+} from '../../../../../lib/services/reviewer-acceptance-job-service';
+import {
+  renderAcceptanceConfirmationEmail,
+} from '../../../../../lib/services/reviewer-acceptance-email';
 
 const STAGE_2A_POLICY_SLOTS = ['reviewer-coi', 'reviewer-ai-use'];
-const ACCEPTANCE_SUBJECT_KEY = 'email.reviewer_acceptance.subject';
-const ACCEPTANCE_BODY_KEY = 'email.reviewer_acceptance.body';
 
 // Per-field caps for reviewer-supplied contact corrections. Dataverse enforces
 // its own column limits (an oversized value would surface as a 500 from the
@@ -105,127 +98,7 @@ export { missingRequiredAddressFields, validateAddress };
 const REVIEW_STATUS_MATERIALS_SENT = 100000001;
 const RESPONSE_TYPE_WITHDRAWN_SUFFICIENT = 100000003;
 
-function formatReviewDueDate(reviewDueDate) {
-  if (!reviewDueDate || typeof reviewDueDate !== 'string') return null;
-  const match = reviewDueDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!match) return null;
-  const [, y, mo, d] = match;
-  const dt = new Date(`${y}-${mo}-${d}T00:00:00Z`);
-  if (Number.isNaN(dt.getTime())) return null;
-  if (dt.getUTCFullYear() !== Number(y) || dt.getUTCMonth() + 1 !== Number(mo) || dt.getUTCDate() !== Number(d)) {
-    return null;
-  }
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'UTC',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(dt);
-}
-
-function applyTemplatePlaceholders(template, replacements) {
-  let text = String(template || '');
-  const entries = Object.entries(replacements).sort((a, b) => b[0].length - a[0].length);
-  for (const [placeholder, value] of entries) {
-    text = text.split(placeholder).join(String(value ?? ''));
-  }
-  return text;
-}
-
-export function renderAcceptanceConfirmationEmail({ subjectTemplate, bodyTemplate, reviewer, request, signatureBlock }) {
-  const reviewerName = ContactParser.normalizeDisplayName(reviewer?.wmkf_name) || 'Reviewer';
-  const title = request?.akoya_title || 'the proposal';
-  const due = formatReviewDueDate(request?.wmkf_reviewduedate);
-  const dueSentence = due
-    ? `Your review is due on ${due}.`
-    : 'We will follow up with the review due date.';
-  // The acceptance confirmation is PD-voiced like the reminder/withdraw emails: the
-  // [Program Director signature] token resolves to the assigned PD's signature block
-  // (falls back to the bare Foundation line when no PD/preference is available).
-  const signature = String(signatureBlock?.signature || signatureBlock?.name || 'W. M. Keck Foundation').trim();
-  // The request number is internal — never surfaced to external reviewers.
-  // Transitional strip: a legacy [requestNumber] token in a pre-fix seeded/edited
-  // value renders EMPTY (never a literal token) until the prod default is re-baselined.
-  const replacements = {
-    '[Program Director signature]': signature,
-    '{{reviewerName}}': reviewerName,
-    '[reviewerName]': reviewerName,
-    '{{proposalTitle}}': title,
-    '[title]': title,
-    '{{reviewDueDate}}': dueSentence,
-    '[reviewDueDate]': dueSentence,
-    '{{signature}}': signature,
-    '{{requestNumber}}': '',
-    '[requestNumber]': '',
-  };
-  const subject = applyTemplatePlaceholders(subjectTemplate, replacements);
-  const bodyText = applyTemplatePlaceholders(bodyTemplate, replacements);
-
-  return { subject, body: renderPlainTextEmailHtml(bodyText) };
-}
-
-async function resolveAcceptanceConfirmationSender(request) {
-  const pdId = request?._wmkf_programdirector_value || null;
-  if (pdId) {
-    try {
-      const pd = await DynamicsService.getRecord('systemusers', pdId, {
-        select: 'systemuserid,internalemailaddress,isdisabled',
-      });
-      if (pd?.isdisabled === false && pd.internalemailaddress) {
-        return {
-          from: pd.internalemailaddress,
-          actingUserSystemId: pd.systemuserid || undefined,
-        };
-      }
-    } catch (e) {
-      console.warn('[external respond] acceptance confirmation PD sender lookup failed (using fallback):', e?.message || e);
-    }
-  }
-  return { from: process.env.NOTIFICATION_EMAIL_FROM || null, actingUserSystemId: undefined };
-}
-
-async function sendAcceptanceConfirmationEmail({ suggestion, request, reviewer }) {
-  const to = reviewer?.wmkf_emailaddress || suggestion?.wmkf_revieweremail || null;
-  const { from, actingUserSystemId } = await resolveAcceptanceConfirmationSender(request);
-  if (!to) {
-    throw new Error('acceptance confirmation recipient email missing');
-  }
-  if (!from) {
-    throw new Error('acceptance confirmation sender email missing');
-  }
-
-  const ics = buildReviewDueIcs({
-    reviewDueDate: request?.wmkf_reviewduedate,
-    suggestionId: suggestion?.wmkf_appreviewersuggestionid,
-  });
-  const emailDefaults = await readRequiredEmailDefaults([ACCEPTANCE_SUBJECT_KEY, ACCEPTANCE_BODY_KEY], {
-    source: 'external/review/respond:acceptance-confirmation',
-  });
-  if (!emailDefaults.ok) {
-    return;
-  }
-  // Same assigned-PD signature the reminder/withdraw emails use (self-falls-back to
-  // the Foundation line when no PD or saved preference resolves).
-  const signatureBlock = await resolveSignatureForRequest(request?.akoya_requestid);
-  const { subject, body } = renderAcceptanceConfirmationEmail({
-    subjectTemplate: emailDefaults.values[ACCEPTANCE_SUBJECT_KEY],
-    bodyTemplate: emailDefaults.values[ACCEPTANCE_BODY_KEY],
-    reviewer,
-    request,
-    signatureBlock,
-  });
-
-  await DynamicsService.createAndSendEmail({
-    subject,
-    body,
-    from,
-    to,
-    regardingId: request?.akoya_requestid || undefined,
-    regardingType: request?.akoya_requestid ? 'akoya_request' : undefined,
-    attachments: ics ? [ics] : [],
-    actingUserSystemId,
-  });
-}
+export { renderAcceptanceConfirmationEmail };
 
 // The reviewer's self-reported ORCID for this response: the value they typed
 // this time (delta) OR the one already persisted on the engagement row (which
@@ -278,57 +151,6 @@ async function captureReviewerSelfReportedOrcid({ reviewer, contactId, rawOrcid 
     );
   } catch (orcidErr) {
     console.warn('[external respond] self-reported ORCID capture failed (non-fatal):', orcidErr?.message || orcidErr);
-  }
-}
-
-// Sync accepted self-reported name/title/nickname onto the linked CRM contact. NON-FATAL:
-// the accept has already committed. The suggestion values passed here are the
-// post-apply durable values: fresh accepts thread applyStage2aResponse's contact
-// edit semantics locally, while repeat accepts use the already-loaded row.
-async function syncReviewerNameTitle({ reviewer, suggestion, contactId }) {
-  try {
-    await bypassDynamicsRestrictions('external-name-title-sync', () =>
-      syncReviewerNameTitleToContact({
-        reviewer,
-        suggestion,
-        contactId: contactId || reviewer?._wmkf_contact_value || null,
-        trusted: true,
-      }),
-    );
-  } catch (nameTitleErr) {
-    console.warn('[external respond] reviewer name/title contact sync failed (non-fatal):', nameTitleErr?.message || nameTitleErr);
-  }
-}
-
-async function alertOnReviewerEmailMismatch({ reviewer, suggestion, contactId, reviewerEmail }) {
-  // NON-FATAL: the accept has already committed; a mismatch-alert failure must
-  // never surface as an error to the reviewer. The service is built to fail-open
-  // internally, but wrap defensively here too (mirrors syncReviewerNameTitle).
-  try {
-    await alertReviewerEmailMismatch({
-      reviewer,
-      contactId: contactId || reviewer?._wmkf_contact_value || null,
-      reviewerEmail,
-      suggestionId: suggestion?.wmkf_appreviewersuggestionid || null,
-    });
-  } catch (mismatchErr) {
-    console.warn('[external respond] reviewer email-mismatch alert failed (non-fatal):', mismatchErr?.message || mismatchErr);
-  }
-}
-
-async function alertOnReviewerAffiliationMismatch({ reviewer, suggestion, contactId, reviewerAffiliation }) {
-  // NON-FATAL: the accept has already committed; a mismatch-alert failure must
-  // never surface as an error to the reviewer. The service is built to fail-open
-  // internally, but wrap defensively here too (mirrors alertOnReviewerEmailMismatch).
-  try {
-    await alertReviewerAffiliationMismatch({
-      reviewer,
-      contactId: contactId || reviewer?._wmkf_contact_value || null,
-      reviewerAffiliation,
-      suggestionId: suggestion?.wmkf_appreviewersuggestionid || null,
-    });
-  } catch (mismatchErr) {
-    console.warn('[external respond] reviewer affiliation-mismatch alert failed (non-fatal):', mismatchErr?.message || mismatchErr);
   }
 }
 
@@ -446,18 +268,17 @@ export default async function handler(req, res) {
     }
 
     // ── Accept ─────────────────────────────────────────────────────────────
-    // A fresh accept stamps the suggestion row; a REPEAT accept (already
-    // accepted, not flipping) skips the stamp but STILL runs the honorarium
-    // step, which may not have completed on the first attempt (Codex pre-impl
-    // P1 #2). The honorarium step is itself idempotent.
+    // Fresh accept writes Dataverse after the durable follow-up job is staged.
+    // Repeat accept skips the suggestion PATCH but still queues the same follow-up
+    // work, because an earlier tail may have failed before honorarium/contact sync.
     const isAcceptRepeat = accepted && !declined;
     let acceptedSuggestion = suggestion;
-    // Opt-out honors BOTH the request body AND the persisted flag (a reviewer who
-    // declined-with-opt-out then returns to accept stays opted out; and a re-accept
-    // whose body omits the flag must not mint a honorarium for someone who opted
-    // out on the original accept — Codex post-impl F2). Computed once here so the
-    // fresh-accept payment-contact guard and the honorarium step below agree.
     const optedOut = body.honorariumOptOut === true || suggestion.wmkf_honorariumoptout === true;
+    const acceptedAt = isAcceptRepeat
+      ? (suggestion.wmkf_responsereceivedat || new Date().toISOString())
+      : new Date().toISOString();
+    const acceptOrcidRaw = selfReportedOrcidOf(body, suggestion);
+    let acks = null;
 
     if (!isAcceptRepeat) {
       const policyAcks = body.policyAcks || {};
@@ -466,27 +287,12 @@ export default async function handler(req, res) {
           return res.status(400).json({ ok: false, reason: 'policy_ack_required', slot });
         }
       }
-      // S308 board-writeup identity: academic rank + primary department + main
-      // institution are REQUIRED at accept (person-level confirmed values for board
-      // write-ups + the reviewer-database surface). The client enforces this too, but
-      // the server is the only guarantee on a public token endpoint. Fresh accept only:
-      // a re-accept already captured them (or is a legacy pre-feature row staff fill in
-      // the workbench — we do NOT retro-require). Trimmed-non-empty, mirroring the
-      // address gate and the existing String(...).trim() validation precedent.
       const boardIdentity = body.boardIdentity || {};
       const missingIdentity = ['academicRank', 'primaryDepartment', 'mainInstitution']
         .filter((k) => !(typeof boardIdentity[k] === 'string' && boardIdentity[k].trim()));
       if (missingIdentity.length) {
         return res.status(400).json({ ok: false, reason: 'board_identity_required', fields: missingIdentity });
       }
-      // A non-opted-out reviewer MUST supply a complete mailing address + phone so
-      // staff can pay the honorarium manually this cycle (BILL onboarding deferred).
-      // The client enforces this too, but the server is the only guarantee on a
-      // public token endpoint — a direct POST could otherwise create a honorarium
-      // with no contact info. Fresh accept only: a re-accept is an idempotent
-      // honorarium retry and must not be re-blocked once the first (guarded) accept
-      // already captured these. validateAddress (above) already rejected a malformed
-      // address with a 400; this rejects an incomplete one with a 422.
       if (!optedOut) {
         const missingAddress = missingRequiredAddressFields(body.address);
         if (missingAddress.length) {
@@ -495,9 +301,6 @@ export default async function handler(req, res) {
             .json({ ok: false, reason: 'payment_contact_required', fields: missingAddress });
         }
       }
-      // Active-child sanity: re-fetch active versions at accept time.
-      // Misconfiguration here is staff error, not user error → 500 with
-      // explicit reason so the page can show "this is on us" + log alert.
       let policies;
       try {
         policies = await getActivePolicies(STAGE_2A_POLICY_SLOTS);
@@ -505,11 +308,30 @@ export default async function handler(req, res) {
         console.error('[external respond] policy sanity failed:', e.message);
         return res.status(500).json({ ok: false, reason: 'policy_misconfigured', message: e.message });
       }
-      const acks = {
-        coiVersionId: policies['reviewer-coi'].activeVersionId,
-        aiUseVersionId: policies['reviewer-ai-use'].activeVersionId,
-        ackedAt: new Date().toISOString(),
+      acks = {
+        coiVersionId: policies['reviewer-coi'].activeVersionId || policies['reviewer-coi'].versionId,
+        aiUseVersionId: policies['reviewer-ai-use'].activeVersionId || policies['reviewer-ai-use'].versionId,
+        ackedAt: acceptedAt,
       };
+      acceptedSuggestion = suggestionWithAppliedContactEdits(suggestion, body);
+    }
+
+    const acceptanceJob = await enqueueReviewerAcceptanceJob({
+      acceptanceKey: randomUUID(),
+      acceptedAt,
+      suggestion,
+      request,
+      reviewer,
+      body,
+      acks,
+      isAcceptRepeat,
+      optedOut,
+      acceptedSuggestion,
+      acceptOrcidRaw,
+      status: isAcceptRepeat ? 'queued' : 'accept_pending',
+    });
+
+    if (!isAcceptRepeat) {
       try {
         await bypassDynamicsRestrictions('external-respond', () =>
           applyStage2aResponse(suggestion.wmkf_appreviewersuggestionid, {
@@ -517,257 +339,35 @@ export default async function handler(req, res) {
             contactEdits: body.contactEdits,
             honorariumOptOut: body.honorariumOptOut === true,
             acks,
+            responseReceivedAt: acceptedAt,
           }, {
-            // Optimistic lock — caller must round-trip the _etag from /context.
+            // Optimistic lock: caller must round-trip the _etag from /context.
             ifMatch: req.headers['if-match'] || undefined,
           }),
         );
       } catch (e) {
         const msg = e.message || '';
         if (e.status === 412 || /\b412\b/.test(msg)) {
+          await cancelReviewerAcceptanceJob(acceptanceJob.id, e?.message || 'accept_patch_conflict').catch((cancelErr) => {
+            console.warn('[external respond] failed to cancel staged acceptance job:', cancelErr?.message || cancelErr);
+          });
           return res.status(412).json({ ok: false, reason: 'concurrent_modification' });
         }
         throw e;
       }
-      acceptedSuggestion = suggestionWithAppliedContactEdits(suggestion, body);
     }
 
-    // Reflect a valid self-reported ORCID onto the in-memory reviewer BEFORE
-    // honorarium (Codex S217 #2), so honorarium's contact back-prop carries the
-    // self-report (highest trust, 'confirmed') rather than a stale resolver iD —
-    // avoiding a needless fill-then-conflict on the contact. If the contact was
-    // already filled with a DIFFERENT corroborated iD in a prior session, the §4
-    // conflict policy still (correctly) surfaces rather than clobbers.
-    const acceptOrcidRaw = selfReportedOrcidOf(body, suggestion);
-    const acceptOrcidNorm = normalizeOrcid(acceptOrcidRaw);
-    if (acceptOrcidNorm.state === 'valid' && reviewer) {
-      reviewer.wmkf_orcid = acceptOrcidNorm.id;
-      reviewer.wmkf_identitystatus = 'confirmed';
-    }
-
-    // ── Honorarium onboarding (NON-FATAL to the accept) ────────────────────
-    // Runs on both fresh accept and re-accept; gated on opt-out (computed above).
-    // Any failure alerts and is left for the resume sweep / a later re-accept — it
-    // never converts a committed accept into a 500.
-    let honContactId = null;
-    if (!optedOut) {
-      try {
-        const honResult = await bypassDynamicsRestrictions('external-honorarium', () =>
-          ensureHonorariumOnboarding({ suggestion, request, reviewer, body }),
-        );
-        honContactId = honResult?.contactId || null;
-
-        // Capture-only mode: the orchestrator captured contact + mailing address
-        // but the honorarium payment record / BILL onboarding is deferred (not
-        // built this cycle). Posture depends on the outcome, in priority order:
-        //   1. address PATCH failed → the one thing capture-only exists to capture
-        //      was LOST and there is no downstream copy → emailing WARNING, deduped
-        //      per suggestion (Codex S274 P1). Fires on re-accepts too: a persistent
-        //      capture failure must keep surfacing until resolved.
-        //   2. partial discriminator config (some-but-not-all GUIDs, no explicit
-        //      defer flag) → likely a botched go-live → emailing WARNING, deduped to
-        //      ONE recurring alert (Codex S274 P2).
-        //   3. clean capture → ONE non-emailing info worklist record, fresh accept
-        //      only (a re-accept is an idempotent retry; don't duplicate the notice).
-        if (honResult?.status === 'deferred') {
-          const suggestionId = suggestion.wmkf_appreviewersuggestionid;
-          let notifyArgs = null;
-          if (honResult.addressCaptureError) {
-            notifyArgs = {
-              type: 'honorarium_capture_failed',
-              severity: 'warning',
-              emailAdmins: true,
-              autoResolveKey: `honorarium_capture_failed:${suggestionId}`,
-              title: 'Reviewer honorarium: mailing address NOT captured',
-              message:
-                'Reviewer accepted with the honorarium pipeline deferred, but writing the ' +
-                'mailing address to the contact failed — staff must capture the payment ' +
-                `address manually. Error: ${honResult.addressCaptureError}`,
-              metadata: {
-                suggestionId,
-                requestNumber: request?.akoya_requestnum || null,
-                contactId: honResult?.contactId || null,
-              },
-              source: 'external/review/respond',
-              category: 'spend',
-            };
-          } else if (honResult.partialDiscriminatorConfig) {
-            notifyArgs = {
-              type: 'honorarium_discriminator_partial_config',
-              severity: 'warning',
-              emailAdmins: true,
-              autoResolveKey: 'honorarium_discriminator_partial_config',
-              title: 'Honorarium discriminators only partially configured',
-              message:
-                'Some but not all of HONORARIUM_PROGRAM_ID / HONORARIUM_GRANTPROGRAM_ID / ' +
-                'HONORARIUM_TYPE_ID are set, and HONORARIUM_ONBOARDING_DEFERRED is not set. ' +
-                'Reviewers are being captured in capture-only mode instead of having ' +
-                'honorarium records created. Set all three GUIDs to go live, or set ' +
-                'HONORARIUM_ONBOARDING_DEFERRED=true to defer intentionally.',
-              metadata: {
-                suggestionId,
-                requestNumber: request?.akoya_requestnum || null,
-              },
-              source: 'external/review/respond',
-              category: 'spend',
-            };
-          } else if (!isAcceptRepeat) {
-            notifyArgs = {
-              type: 'honorarium_capture_only',
-              severity: 'info',
-              emailAdmins: false,
-              title: 'Reviewer honorarium captured (onboarding deferred)',
-              message:
-                'Reviewer accepted and provided payment-contact info; the honorarium ' +
-                'payment record and BILL onboarding are deferred and must be completed ' +
-                'manually once the pipeline is enabled.',
-              metadata: {
-                suggestionId,
-                requestNumber: request?.akoya_requestnum || null,
-                contactId: honResult?.contactId || null,
-              },
-              source: 'external/review/respond',
-              category: 'spend',
-            };
-          }
-          if (notifyArgs) {
-            try {
-              await NotificationService.notify(notifyArgs);
-            } catch (notifyErr) {
-              console.warn('[external respond] honorarium deferred notice failed (non-fatal):', notifyErr?.message || notifyErr);
-            }
-          }
-        }
-      } catch (honErr) {
-        console.error('[external respond] honorarium onboarding failed (non-fatal):', honErr?.message || honErr);
-        try {
-          await NotificationService.notify({
-            type: 'honorarium_onboard_failed',
-            severity: 'warning',
-            emailAdmins: true,
-            title: 'Honorarium onboarding failed after reviewer accept',
-            message: honErr?.message || String(honErr),
-            metadata: {
-              suggestionId: suggestion.wmkf_appreviewersuggestionid,
-              requestNumber: request?.akoya_requestnum || null,
-              code: honErr?.code || null,
-            },
-            source: 'external/review/respond',
-            category: 'spend',
-          });
-        } catch (notifyErr) {
-          console.error('[external respond] honorarium alert failed:', notifyErr?.message || notifyErr);
-        }
-      }
-    }
-
-    // Self-reported ORCID → person + contact (twin of PR3). Uses the just-created
-    // honorarium contact when present, else the invite-time pointer. Runs on fresh
-    // and repeat accepts (idempotent); independent of honorarium opt-out. Sourced
-    // from the typed delta OR the persisted engagement value (confirm-without-edit).
-    await captureReviewerSelfReportedOrcid({ reviewer, contactId: honContactId, rawOrcid: acceptOrcidRaw });
-    // S308 board-writeup identity → person (rank/department/institution). The accept
-    // already committed, so a failure is NON-FATAL — BUT unlike ORCID these fields
-    // have no suggestion-row fallback, so a silent loss of REQUIRED data must alert
-    // (staff repair via the workbench edit, which ships in this same change). Runs on
-    // fresh + repeat accepts; the service no-ops when no values were supplied.
-    try {
-      await bypassDynamicsRestrictions('external-board-identity', () =>
-        captureSelfReportedReviewerIdentity({
-          potentialReviewerId: reviewer?.wmkf_potentialreviewersid || null,
-          academicRank: body?.boardIdentity?.academicRank,
-          primaryDepartment: body?.boardIdentity?.primaryDepartment,
-          mainInstitution: body?.boardIdentity?.mainInstitution,
-        }),
-      );
-    } catch (identityErr) {
-      console.error('[external respond] board-identity capture failed (non-fatal):', identityErr?.message || identityErr);
-      try {
-        await NotificationService.notify({
-          type: 'board_identity_capture_failed',
-          severity: 'warning',
-          emailAdmins: true,
-          title: 'Board-writeup identity capture failed after reviewer accept',
-          message: identityErr?.message || String(identityErr),
-          metadata: {
-            suggestionId: suggestion.wmkf_appreviewersuggestionid,
-            potentialReviewerId: reviewer?.wmkf_potentialreviewersid || null,
-            requestNumber: request?.akoya_requestnum || null,
-          },
-          source: 'external/review/respond',
-          category: 'reviewer',
-        });
-      } catch (notifyErr) {
-        console.error('[external respond] board-identity alert failed:', notifyErr?.message || notifyErr);
-      }
-    }
-    await syncReviewerNameTitle({ reviewer, suggestion: acceptedSuggestion, contactId: honContactId });
-    await alertOnReviewerEmailMismatch({
-      reviewer,
-      suggestion,
-      contactId: honContactId,
-      reviewerEmail: body?.contactEdits?.email || acceptedSuggestion?.wmkf_revieweremail || null,
+    await markReviewerAcceptanceJobQueued(acceptanceJob.id).catch((queueErr) => {
+      // The row is already durable. The drain also claims accept_pending jobs once
+      // Dataverse shows accepted, so a queue-marker blip must not make the reviewer
+      // wait on the slow tail again.
+      console.warn('[external respond] acceptance job queued marker failed (non-fatal):', queueErr?.message || queueErr);
     });
-    await alertOnReviewerAffiliationMismatch({
-      reviewer,
-      suggestion,
-      contactId: honContactId,
-      reviewerAffiliation: body?.contactEdits?.affiliation || acceptedSuggestion?.wmkf_revieweraffiliation || null,
-    });
-
-    // ── Acceptance confirmation email (NON-FATAL; fire-once on fresh accept) ─
-    // No new Dataverse marker: the existing isAcceptRepeat signal enforces first
-    // accept only. A send failure alerts/logs but never turns a committed accept
-    // into a 500 for the reviewer.
-    if (!isAcceptRepeat) {
-      try {
-        await bypassDynamicsRestrictions('external-acceptance-confirmation', () =>
-          sendAcceptanceConfirmationEmail({ suggestion, request, reviewer }),
-        );
-      } catch (emailErr) {
-        console.error('[external respond] acceptance confirmation failed (non-fatal):', emailErr?.message || emailErr);
-        try {
-          await NotificationService.notify({
-            type: 'reviewer_acceptance_confirmation_failed',
-            severity: 'warning',
-            emailAdmins: true,
-            title: 'Reviewer acceptance confirmation email failed',
-            message: emailErr?.message || String(emailErr),
-            metadata: {
-              suggestionId: suggestion.wmkf_appreviewersuggestionid,
-              requestNumber: request?.akoya_requestnum || null,
-              reviewerEmail: reviewer?.wmkf_emailaddress || suggestion?.wmkf_revieweremail || null,
-            },
-            source: 'external/review/respond',
-            category: 'ops',
-          });
-        } catch (notifyErr) {
-          console.error('[external respond] acceptance confirmation alert failed:', notifyErr?.message || notifyErr);
-        }
-      }
-    }
-
-    // ── Quota → notify PD (NON-FATAL; reviewer-engagement Phase 4 §3.C) ──────
-    // Only a FRESH accept changes the accepted count, so a repeat accept can't cross the
-    // threshold. Runs AFTER the accept PATCH committed above (count-after-write, off-by-one
-    // safe). The notify-once gate is a conditional null→set of wmkf_quotanotifiedat inside
-    // the service. Never converts a committed accept into a 500.
-    if (!isAcceptRepeat) {
-      try {
-        await bypassDynamicsRestrictions('external-quota-notify', () =>
-          maybeNotifyQuotaReached({
-            requestId: request?.akoya_requestid,
-            actingUserSystemId: null,
-          }),
-        );
-      } catch (quotaErr) {
-        console.warn('[external respond] quota notify failed (non-fatal):', quotaErr?.message || quotaErr);
-      }
-    }
 
     return res.status(200).json({
       ok: true,
       idempotent: isAcceptRepeat,
+      acceptanceJobId: acceptanceJob.id,
       engagementState: { view: 'accepted-pre-materials', accepted: true, declined: false },
     });
   } catch (e) {

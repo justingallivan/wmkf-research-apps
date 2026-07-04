@@ -98,6 +98,7 @@ Promote any of these to a per-entity page if app code starts writing to it.
 | Integrity Screener | `integrity_screenings`, `screening_dismissals`, `retractions` | same |
 | Virtual Review Panel | `panel_reviews`, `panel_review_items` | same |
 | Intake portal (pre-pilot) | `intake_drafts`, `intake_audit` | same |
+| External reviewer acceptance follow-up | `reviewer_acceptance_jobs` (post-accept side-effect queue; Dataverse suggestion row remains accepted-state source) | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |
 | External reviewer authoring | `review_drafts` (autosave scratchpad; Dataverse `wmkf_appreviewanswer` is the submitted system of record) | [postgres-review-drafts.md](atlas/postgres-review-drafts.md) |
 | Monitoring | `health_check_history`, `system_alerts`, `maintenance_runs`, `api_usage_log` | same |
 | BILL.com | `bill_webhook_events` (webhook dedup), `bill_onboarding_state` (honorarium onboarding durable state) | same |

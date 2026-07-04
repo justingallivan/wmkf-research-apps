@@ -207,7 +207,7 @@
       "referencedEntity": "akoya_request",
       "lookupSchemaName": "wmkf_HonorariumRequest",
       "lookupDisplayName": "Honorarium Request",
-      "lookupDescription": "The honorarium akoya_request this engagement's payout maps to (BILL chunk 1, deployed by Connor 2026-05-28). Set by the portal accept path (chunk 4) after creating the honorarium row; provenance to the grant request is one hop away via wmkf_Request. RequiredLevel=None.",
+      "lookupDescription": "The honorarium akoya_request this engagement's payout maps to (BILL chunk 1, deployed by Connor 2026-05-28). Set by the reviewer acceptance drain (chunk 4) after creating the honorarium row; provenance to the grant request is one hop away via wmkf_Request. RequiredLevel=None.",
       "required": "None"
     }
   ],

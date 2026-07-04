@@ -379,7 +379,7 @@ def build_tech():
         "Page: pages/external/review/[token].js; routes /api/external/review/[token]/{context,respond,upload}.",
         "Token: signed JWT, only its hash stored; re-mints on every email with the link (latest-link-wins).",
         "verify-suggestion-token checks signature/expiry + stored hash + revoked + stored expiry.",
-        "Accept (respond.js): COI + AI acks (400 if missing), address/phone (422 unless opt-out); honorarium creation is config-gated, with BILL deferred this cycle.",
+        "Accept: respond.js stages the fast accept, then the reviewer-acceptance drain runs config-gated honorarium creation; BILL remains deferred this cycle.",
     ])
 
     section_slide(prs, "11", SPINE[10])

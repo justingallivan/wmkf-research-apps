@@ -87,7 +87,7 @@ Resolvers to update for dual syntax:
 - `lib/external/grantee-invite-email.js` — update grantee reminder placeholder map for `{{granteeName}}`, `{{proposalTitle}}`, `COB {{dueDate}}`, and `{{signature}}`; keep legacy aliases.
 - `lib/external/reviewer-reminder-email.js` — update respond-by and review-due maps for `{{reviewerName}}`, `{{proposalClause}}`, `{{reviewDueDate}}`, and `{{signature}}`; keep `[proposal title clause]`.
 - `lib/external/reviewer-withdraw-email.js` — update withdraw map for `{{reviewerName}}`, `{{greeting}}`, `{{proposalClause}}`, and `{{signature}}`; keep `[greeting]`, `[signature]`, `[proposal title clause]`, and other legacy aliases.
-- `pages/api/external/review/[token]/respond.js` — update acceptance confirmation map for `{{reviewerName}}`, `{{proposalTitle}}`, `{{reviewDueDate}}`, `{{signature}}`, and `{{requestNumber}}`; keep legacy aliases.
+- `lib/services/reviewer-acceptance-email.js` — update acceptance confirmation map for `{{reviewerName}}`, `{{proposalTitle}}`, `{{reviewDueDate}}`, `{{signature}}`, and `{{requestNumber}}`; keep legacy aliases.
 
 Subject-resolution decision:
 

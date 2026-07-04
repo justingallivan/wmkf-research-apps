@@ -21,6 +21,7 @@
     "020_reviewer_find_roster.sql",
     "021_review_drafts.sql",
     "022_review_question_audit.sql",
-    "023_reviewer_find_roster_coi_dropped.sql"
+    "023_reviewer_find_roster_coi_dropped.sql",
+    "024_reviewer_acceptance_jobs.sql"
   ]
 }
