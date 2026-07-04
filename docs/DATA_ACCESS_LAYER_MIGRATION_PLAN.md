@@ -42,9 +42,9 @@ not the full migration surface.
 - **86 files** across `pages/`, `lib/`, `shared/` call `DynamicsService.`
   directly, excluding the service itself, `lib/dataverse/adapters/`, and the
   exempt power tools (only 1 of the 86 is under `shared/`).
-- **4 adapter modules** exist (`lib/dataverse/adapters/`: contact,
-  potential-reviewer, researcher, reviewer-suggestion) against ≥15 entity sets
-  in live use.
+- **4 adapter modules** existed at baseline (`lib/dataverse/adapters/`:
+  contact, potential-reviewer, researcher, reviewer-suggestion) against ≥15
+  entity sets in live use. (9 as of the S329 adapter wave — see Stage log.)
 - **39 hand-built OData `filter:` strings** outside adapters/exempt files.
 - **97 files** carry their own `bypassDynamicsRestrictions` wrapper.
 - **18 raw call-site lines** query `'wmkf_appreviewersuggestions'` outside its
