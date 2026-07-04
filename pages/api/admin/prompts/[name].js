@@ -22,23 +22,19 @@
  *      body) → flip the prior row iscurrent=false with If-Match (412 →
  *      concurrency_conflict, new row orphaned) → verify exactly one current.
  *   5. Final audit row (system_alerts on its failure).
+ *
+ * Reads/writes are delegated to the wmkf_ai_prompts adapter
+ * (`lib/dataverse/adapters/ai-prompt.js`), which mirrors this route's call
+ * shapes verbatim (Stage-3 conversion, S329 plan).
  */
 import { randomUUID, createHash } from 'crypto';
 import { sql } from '@vercel/postgres';
 import { requireSuperuser } from '../../../../lib/utils/auth';
-import { DynamicsService } from '../../../../lib/services/dynamics-service';
+import * as aiPrompt from '../../../../lib/dataverse/adapters/ai-prompt';
 import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
 import { validatePromptForSave } from '../../../../lib/utils/prompt-validators';
 import { validateReviewedClaudeModelValue } from '../../../../lib/services/model-review-validation';
 
-const PROMPTS_ENTITY = 'wmkf_ai_prompts';
-const ROW_SELECT = [
-  'wmkf_ai_promptid', 'wmkf_ai_promptname', 'wmkf_promptversion', 'wmkf_ai_iscurrent',
-  'wmkf_ai_promptstatus', 'wmkf_ai_systemprompt', 'wmkf_ai_promptbody',
-  'wmkf_ai_promptvariables', 'wmkf_ai_promptoutputschema', 'wmkf_ai_model',
-  'wmkf_ai_temperature', 'wmkf_ai_maxtokens',
-  'createdon', 'modifiedon', '_modifiedby_value', 'wmkf_ai_publisheddatetime', // provenance (S269)
-].join(',');
 const MAX_BODY_LEN = 64 * 1024;
 
 export default async function handler(req, res) {
@@ -65,12 +61,7 @@ export default async function handler(req, res) {
 // ───────────────────────── GET ─────────────────────────
 
 async function handleGet(res, name) {
-  const all = await DynamicsService.queryRecords(PROMPTS_ENTITY, {
-    select: ROW_SELECT,
-    filter: `wmkf_ai_promptname eq '${escapeOData(name)}'`,
-    orderby: 'wmkf_promptversion desc',
-    top: 50,
-  });
+  const all = await aiPrompt.listVersions(name);
   const rows = all.records || [];
   if (rows.length === 0) return res.status(404).json({ error: `No prompt named "${name}"` });
   const current = rows.find((r) => r.wmkf_ai_iscurrent) || null;
@@ -108,11 +99,7 @@ async function handlePut(req, res, name, profileId) {
   }
 
   // 3. Load current row(s).
-  const cur = await DynamicsService.queryRecords(PROMPTS_ENTITY, {
-    select: ROW_SELECT,
-    filter: `wmkf_ai_promptname eq '${escapeOData(name)}' and wmkf_ai_iscurrent eq true`,
-    top: 3,
-  });
+  const cur = await aiPrompt.queryCurrentRows(name);
   const currentRows = cur.records || [];
 
   if (currentRows.length === 0) {
@@ -165,7 +152,7 @@ async function handlePut(req, res, name, profileId) {
   }
 
   // Fresh ETag for the flip (don't trust a stale client copy).
-  const priorFresh = await DynamicsService.getRecord(PROMPTS_ENTITY, priorId, { select: 'wmkf_ai_promptid' });
+  const priorFresh = await aiPrompt.getIdOnly(priorId);
   const priorEtag = priorFresh._etag || null;
 
   // 5. Create the new version row — clone the prior row's Executor metadata,
@@ -173,7 +160,7 @@ async function handlePut(req, res, name, profileId) {
   let newId = null;
   let outcome;
   try {
-    const created = await DynamicsService.createRecord(PROMPTS_ENTITY, {
+    const created = await aiPrompt.create({
       wmkf_ai_promptname: name,
       wmkf_ai_promptbody: body,
       wmkf_ai_systemprompt: typeof systemPrompt === 'string' ? systemPrompt : (priorRow.wmkf_ai_systemprompt || ''),
@@ -197,7 +184,7 @@ async function handlePut(req, res, name, profileId) {
 
     // 6. Flip the prior row down with If-Match (concurrency guard).
     try {
-      await DynamicsService.updateRecord(PROMPTS_ENTITY, priorId, { wmkf_ai_iscurrent: false }, { ifMatch: priorEtag });
+      await aiPrompt.setIsCurrent(priorId, false, { ifMatch: priorEtag });
     } catch (flipErr) {
       if (flipErr.status === 412) {
         // A concurrent publish flipped/changed the prior row. Our new row is now
@@ -210,11 +197,7 @@ async function handlePut(req, res, name, profileId) {
     }
 
     // 7. Verify exactly one current remains.
-    const after = await DynamicsService.queryRecords(PROMPTS_ENTITY, {
-      select: 'wmkf_ai_promptid,wmkf_promptversion',
-      filter: `wmkf_ai_promptname eq '${escapeOData(name)}' and wmkf_ai_iscurrent eq true`,
-      top: 3,
-    });
+    const after = await aiPrompt.queryCurrentIdVersions(name);
     const currentCount = (after.records || []).length;
     const warnings = currentCount === 1 ? [] : [`invariant_violation_current_count_${currentCount}`];
     outcome = { status: currentCount === 1 ? 'completed' : 'partial', newPromptId: newId, targetVersion, warnings };
@@ -235,8 +218,8 @@ async function flipPriorRows(rows) {
   let allFlipped = true;
   for (const r of rows) {
     try {
-      const fresh = await DynamicsService.getRecord(PROMPTS_ENTITY, r.wmkf_ai_promptid, { select: 'wmkf_ai_promptid' });
-      await DynamicsService.updateRecord(PROMPTS_ENTITY, r.wmkf_ai_promptid, { wmkf_ai_iscurrent: false }, { ifMatch: fresh._etag || undefined });
+      const fresh = await aiPrompt.getIdOnly(r.wmkf_ai_promptid);
+      await aiPrompt.setIsCurrent(r.wmkf_ai_promptid, false, { ifMatch: fresh._etag || undefined });
     } catch (err) {
       allFlipped = false;
       warnings.push(`flip_failed:${r.wmkf_ai_promptid}`);
@@ -334,6 +317,3 @@ function validateReviewedPromptModel(modelId) {
   };
 }
 
-function escapeOData(s) {
-  return String(s).replace(/'/g, "''");
-}
