@@ -197,12 +197,12 @@ describe('aiPrompt.getIdOnly (characterization)', () => {
 // ───────────────── create (admin [name].js:176; seed:101) ───────────────────────
 
 describe('aiPrompt.create (characterization)', () => {
-  test('golden: createRecord with the caller-assembled body verbatim, default opts {}', async () => {
+  test('golden: createRecord with the caller-assembled body verbatim, TWO args when no opts (live mirror)', async () => {
     const c = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({ wmkf_ai_promptid: GUID_A });
     const body = { wmkf_ai_promptname: 'p', wmkf_ai_promptbody: 'x', wmkf_ai_iscurrent: true, wmkf_promptversion: 2 };
     const out = await aiPrompt.create(body);
     expect(out).toEqual({ wmkf_ai_promptid: GUID_A });
-    expect(c).toHaveBeenCalledWith('wmkf_ai_prompts', body, {});
+    expect(c).toHaveBeenCalledWith('wmkf_ai_prompts', body);
   });
   test('forwards opts (e.g. actingUserSystemId) unchanged', async () => {
     const c = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({ wmkf_ai_promptid: GUID_A });
