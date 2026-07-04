@@ -69,6 +69,8 @@ scripts/.merge-probe-412-personrequest.txt
 *.nosync/
 tmp/
 .playwright-mcp/
+# CodeGraph local index (per-machine database/log files)
+.codegraph/
 # Codex CLI artifacts. .agents/ stays ignored (corrupted s/Claude/Codex/ skill
 # mirrors). AGENTS.md is NOT ignored — it is a tracked symlink to CLAUDE.md so
 # Codex loads identical current content (Codex verified: it ingests literal
