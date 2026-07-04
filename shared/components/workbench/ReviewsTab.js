@@ -25,7 +25,7 @@
  * Panel-prep roll-up / export is a deferred add-on, intentionally out of scope.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card } from '../Layout';
 import { labelForReviewRating, reviewRatingShortLabels } from '../../../lib/external/review-form-schema';
 import { deriveReviewMatrix } from '../../utils/review-matrix';
@@ -336,23 +336,32 @@ export default function ReviewsTab({ requestId }) {
   // matrix.
   const [view, setView] = useState('cards');
 
+  // Monotonic fetch id: [requestId].js is a dynamic page, so switching between
+  // two workbench requests re-renders this component rather than remounting it
+  // — without this guard a slow response for the PREVIOUS requestId could land
+  // after the current one and paint the wrong proposal's reviews.
+  const fetchIdRef = useRef(0);
+
   const load = useCallback(async () => {
     if (!requestId) return;
+    const fetchId = ++fetchIdRef.current;
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/review-manager/reviewers?proposalId=${encodeURIComponent(requestId)}`);
       const data = await res.json().catch(() => ({}));
+      if (fetchId !== fetchIdRef.current) return; // stale response — a newer load started
       if (!res.ok || !data.success) {
         throw new Error(data.error || `Failed to load reviews (${res.status})`);
       }
       setProposal((data.proposals && data.proposals[0]) || null);
       setLiveQuestions(data.liveQuestions ?? null);
     } catch (e) {
+      if (fetchId !== fetchIdRef.current) return;
       setError(e.message);
       setProposal(null);
     } finally {
-      setLoading(false);
+      if (fetchId === fetchIdRef.current) setLoading(false);
     }
   }, [requestId]);
 
