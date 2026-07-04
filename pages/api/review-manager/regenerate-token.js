@@ -22,9 +22,8 @@ import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
 import { mintAndStore } from '../../../lib/external/token-lifecycle';
 import ReviewDraftService from '../../../lib/services/review-draft-service';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
-import { APPLICANT_DISPOSITION_EXCLUDED } from '../../../lib/dataverse/adapters/reviewer-suggestion';
+import { APPLICANT_DISPOSITION_EXCLUDED, getForTokenRegeneration } from '../../../lib/dataverse/adapters/reviewer-suggestion';
 
 const DEFAULT_TTL_DAYS = 90;
 
@@ -67,9 +66,7 @@ export default async function handler(req, res) {
     let suggestion;
     try {
       suggestion = await bypassDynamicsRestrictions('regenerate-token-lookup', () =>
-        DynamicsService.getRecord('wmkf_appreviewersuggestions', suggestionId, {
-          select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_applicantdisposition',
-        }),
+        getForTokenRegeneration(suggestionId),
       );
     } catch (e) {
       if (/Get record failed \(404\)/.test(e.message || '')) {
