@@ -85,8 +85,14 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
 
 ### Phase 1 — Outstanding tracking + manual nudge
 - Extend `/api/review-manager/reviewers` DTO with per-reviewer submission status,
-  days since materials sent, and last-reminder timestamp (from the sweep's send
-  record; exact source column to be confirmed at build time [ASSUMED derivable]).
+  days since materials sent, and last-reminder timestamp — source is
+  `wmkf_remindersentat` + `wmkf_remindercount` on the suggestion
+  [VERIFIED via lib/services/reviewer-reminder-sweep.js:174-188,254-255; the cron
+  is fire-once (filters `wmkf_remindersentat eq null`)].
+- Manual-nudge semantics: stamps the SAME marker + increments `wmkf_remindercount`
+  (so cron and manual can never double-send — shared-marker mechanism), but manual
+  re-sends by staff are allowed deliberately; UI shows last-sent date + count so
+  the staffer sees prior nudges before sending again.
 - ReviewsTab: "Outstanding" section above submitted cards; per-reviewer
   "Send reminder now" action posting to a new guarded route
   (`requireAppAccess(..., 'review-manager', ...)` per existing pattern
