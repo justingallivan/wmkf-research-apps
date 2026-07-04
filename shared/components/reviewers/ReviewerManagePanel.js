@@ -1140,6 +1140,7 @@ export default function ReviewerManagePanel({
   const selectedList = reviewers.filter(r => selectedReviewers.has(r.suggestionId));
   const allSelected = reviewers.length > 0 && reviewers.every(r => selectedReviewers.has(r.suggestionId));
   const acceptedReviewers = reviewers.filter(r => r.reviewStatus === 'accepted');
+  const selectedAcceptedList = selectedList.filter(r => r.reviewStatus === 'accepted');
 
   const toggleSelectAll = () => {
     if (allSelected) {
@@ -1323,17 +1324,25 @@ export default function ReviewerManagePanel({
         </div>
         <div className="flex items-center gap-2">
           {/* Release proposal to reviewers (reviewer-engagement §3.A): a one-click
-              materials send to only accepted-awaiting-materials reviewers, even
+              materials send to accepted-awaiting-materials reviewers, even
               though Track Reviewers also shows later lifecycle statuses.
-              Accepted-only is also enforced server-side in send-emails. */}
+              If the user has selected a subset of accepted reviewers (using
+              selectedList's visible+selected semantics, not the raw
+              selectedReviewers set — see Codex S209 note above), release
+              targets only that subset; otherwise it targets all accepted
+              reviewers. Accepted-only is also enforced server-side in
+              send-emails. */}
           {canManage && acceptedReviewers.length > 0 && (
             <Button
               onClick={() => {
-                setSelectedReviewers(new Set(acceptedReviewers.map(r => r.suggestionId)));
+                const releaseTargets = selectedAcceptedList.length > 0
+                  ? selectedAcceptedList
+                  : acceptedReviewers;
+                setSelectedReviewers(new Set(releaseTargets.map(r => r.suggestionId)));
                 setEmailModalOpen(true);
               }}
             >
-              Release proposal to reviewers ({acceptedReviewers.length})
+              Release proposal to reviewers ({selectedAcceptedList.length > 0 ? selectedAcceptedList.length : acceptedReviewers.length})
             </Button>
           )}
           {canManage && selectedList.length > 0 && (

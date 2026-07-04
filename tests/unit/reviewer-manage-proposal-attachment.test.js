@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import ReviewerManagePanel from '../../shared/components/reviewers/ReviewerManagePanel';
 
 const REQUEST_ID = '00000000-0000-0000-0000-000000000001';
@@ -80,7 +80,7 @@ function successProposal(overrides = {}) {
   });
 }
 
-function renderPanel({ proposalResponses = [successProposal()] } = {}) {
+function renderPanel({ proposalResponses = [successProposal()], reviewers: reviewerList = [reviewer] } = {}) {
   const loadProposalResponses = [...proposalResponses];
   global.fetch.mockImplementation(async (url) => {
     if (String(url).startsWith('/api/user-preferences')) return mockJson({});
@@ -95,7 +95,7 @@ function renderPanel({ proposalResponses = [successProposal()] } = {}) {
   return render(
     <ReviewerManagePanel
       proposal={proposal}
-      reviewers={[reviewer]}
+      reviewers={reviewerList}
       settings={{ signature: 'Program Director' }}
     />,
   );
@@ -217,5 +217,60 @@ describe('ReviewerManagePanel proposal attachment in materials EmailModal', () =
       templateType: 'materials',
       attachmentUrls: [],
     });
+  });
+});
+
+describe('ReviewerManagePanel release respects checkbox selection', () => {
+  const acceptedA = { ...reviewer, suggestionId: 'aaaaaaaa-0000-0000-0000-000000000001', name: 'Accepted A', reviewStatus: 'accepted' };
+  const acceptedB = { ...reviewer, suggestionId: 'bbbbbbbb-0000-0000-0000-000000000002', name: 'Accepted B', reviewStatus: 'accepted' };
+  const pendingC = { ...reviewer, suggestionId: 'cccccccc-0000-0000-0000-000000000003', name: 'Pending C', reviewStatus: 'pending' };
+
+  function checkboxForRow(name) {
+    const row = screen.getByText(name).closest('tr');
+    return within(row).getByRole('checkbox');
+  }
+
+  function recipientsSummary() {
+    return screen.getByText(/reviewer(s)? selected/).closest('p');
+  }
+
+  test('selecting one of several accepted reviewers releases only that subset', async () => {
+    renderPanel({ reviewers: [acceptedA, acceptedB] });
+
+    fireEvent.click(checkboxForRow('Accepted A'));
+
+    const releaseButton = screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i });
+    fireEvent.click(releaseButton);
+    await screen.findByText('Proposal document');
+
+    expect(recipientsSummary().textContent).toMatch(/1 reviewer selected/);
+
+    fireEvent.click(screen.getByRole('button', { name: /preview 1 email/i }));
+    await waitFor(() => expect(global.fetch.mock.calls.some(([url]) => url === '/api/review-manager/render-emails')).toBe(true));
+    const renderCall = global.fetch.mock.calls.find(([url]) => url === '/api/review-manager/render-emails');
+    expect(JSON.parse(renderCall[1].body).suggestionIds).toEqual([acceptedA.suggestionId]);
+  });
+
+  test('no selection releases all accepted reviewers', async () => {
+    renderPanel({ reviewers: [acceptedA, acceptedB] });
+
+    const releaseButton = screen.getByRole('button', { name: /release proposal to reviewers \(2\)/i });
+    fireEvent.click(releaseButton);
+    await screen.findByText('Proposal document');
+
+    expect(recipientsSummary().textContent).toMatch(/2 reviewers selected/);
+  });
+
+  test('selecting a non-accepted reviewer alongside an accepted one excludes it from release', async () => {
+    renderPanel({ reviewers: [acceptedA, pendingC] });
+
+    fireEvent.click(checkboxForRow('Accepted A'));
+    fireEvent.click(checkboxForRow('Pending C'));
+
+    const releaseButton = screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i });
+    fireEvent.click(releaseButton);
+    await screen.findByText('Proposal document');
+
+    expect(recipientsSummary().textContent).toMatch(/1 reviewer selected/);
   });
 });
