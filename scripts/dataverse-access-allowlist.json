@@ -542,48 +542,6 @@
       "count": 2
     },
     {
-      "file": "pages/api/admin/policies.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.createRecord",
-      "entity": "wmkf_policyversions",
-      "count": 1
-    },
-    {
-      "file": "pages/api/admin/policies.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "wmkf_policies",
-      "count": 3
-    },
-    {
-      "file": "pages/api/admin/policies.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "wmkf_policies",
-      "count": 1
-    },
-    {
-      "file": "pages/api/admin/policies.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "wmkf_policyversions",
-      "count": 2
-    },
-    {
-      "file": "pages/api/admin/policies.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "wmkf_policies",
-      "count": 1
-    },
-    {
-      "file": "pages/api/admin/policies.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "wmkf_policyversions",
-      "count": 1
-    },
-    {
       "file": "pages/api/admin/prompts/[name].js",
       "kind": "import",
       "clientMethod": "DynamicsService.createRecord",
