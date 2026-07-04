@@ -16,8 +16,9 @@ related:
 
 # Workbench Reviews Tab — Consumption Build-Out Plan
 
-**Status: Phase 1 and Phase 2 BUILT (S326, 2026-07-03) — unit/integration-tested
-and gated; not yet deployed or E2E-driven. Phases 3-4 still PLANNED.**
+**Status: Phase 1, Phase 2, and Phase 3 BUILT (S326, 2026-07-03) —
+unit/integration-tested and gated; not yet deployed or E2E-driven. Phase 4
+still PLANNED.**
 
 ## Context
 
@@ -109,13 +110,38 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
 - Read-only over the existing route (plus live question order from the fetcher).
   No schema changes.
 
-### Phase 3 — Panel-prep roll-up/export
-- Pure composition module (shared, DOM-free): proposal header, ratings matrix,
-  per-reviewer narratives → structured report object.
-- Client-side DOCX (primary) and PDF render via existing utils; "Export all
-  reviews" button in the tab.
-- Hard part: sanitized `answerHtml` → docx structure. Escalate to deep review if
-  naive tag mapping (p/br/b/i/ul/ol/li) proves insufficient.
+### Phase 3 — Panel-prep roll-up/export (BUILT S326)
+- Pure composition module `shared/utils/review-report.js#composeReviewReport`
+  (shared, DOM-free, consumes `deriveReviewMatrix` rather than re-deriving):
+  proposal header, summary (counts + per-rating-question average/spread),
+  ratings table (same rows/columns as the Compare grid), per-richtext-question
+  narrative sections (all reviewers' answers, matrix order, `retired` flag
+  carried through). The sanitizer's allowlist
+  [VERIFIED via lib/external/sanitize-review-html.js:31-38] is simple
+  structural/inline tags only (p, br, strong/b, em/i, ul/ol/li, h2/h3,
+  blockquote, a — no tables/images/spans/divs), so the naive tag-mapping
+  approach anticipated above was sufficient; no deep-review escalation was
+  needed. The same module's `htmlToBlocks(html)` tokenizes that allowlisted
+  grammar into typed blocks/inline runs consumed by both renderers; an
+  unknown/malformed tag degrades to plain text rather than throwing or
+  dropping content.
+- `shared/utils/review-report-docx.js` (dynamic `import('docx')`, full-
+  fidelity: bold/italic/links/lists/headings) and
+  `shared/utils/review-report-pdf.js` (pdf-lib via `PDFReportBuilder`) render
+  the report object; PDF FLATTENS inline bold/italic runs to plain text
+  (`PDFReportBuilder` has no mixed-run text primitive) — documented
+  degradation in that module's header, DOCX is the full-fidelity artifact.
+- "Export: Word (.docx) / PDF" affordance on `ReviewsTab`'s submitted-reviews
+  toolbar (visible once ≥1 review is submitted); composes client-side from
+  already-loaded `submitted`/`liveQuestions` — no new fetch, no new route, no
+  Dataverse roll-up column. Filename: `reviews-<requestNumber>-<yyyymmdd>.ext`.
+- Proposal identity on the export uses whatever `proposals[0]` already
+  carries on the `/api/review-manager/reviewers` DTO — `requestNumber`,
+  `proposalTitle`, `proposalInstitution`, `proposalAuthors`
+  [VERIFIED via pages/api/review-manager/reviewers.js:200-209]. The DTO has no
+  dedicated `piName` field; `proposalAuthors` (project leader/applicant)
+  stands in as the best-available PI identity rather than extending the
+  route.
 
 ### Phase 4 — AI synthesis
 - New registered prompt (prompt governance applies) executed via

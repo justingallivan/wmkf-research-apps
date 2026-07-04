@@ -42,7 +42,7 @@ const REVIEWERS = [
 
 afterEach(() => fetch.mockReset());
 
-test('renders submitted reviews with decoded ratings + download link, hides pending', async () => {
+test('renders submitted reviews with decoded ratings + download link; pending lands in Outstanding', async () => {
   fetch.mockResolvedValue({
     ok: true,
     json: async () => ({ success: true, proposals: [{ proposalId: 'req1', reviewers: REVIEWERS }] }),
@@ -53,10 +53,13 @@ test('renders submitted reviews with decoded ratings + download link, hides pend
   // Count line counts submitted (2) against accepted (3).
   expect(await screen.findByText(/2 of 3 accepted reviewers submitted a review/i)).toBeInTheDocument();
 
-  // Submitted reviewers shown; the pending one is filtered out.
+  // Submitted reviewers shown as cards; the pending one is NOT hidden anymore —
+  // since Phase 1 (outstanding tracking) it renders in the Outstanding section
+  // above the cards, and the two lists are disjoint (keyed on reviewReceivedAt).
   expect(screen.getByText('Dr. Submitted')).toBeInTheDocument();
   expect(screen.getByText('Dr. NoFile')).toBeInTheDocument();
-  expect(screen.queryByText('Dr. Pending')).not.toBeInTheDocument();
+  expect(screen.getByText(/Outstanding \(1\)/)).toBeInTheDocument();
+  expect(screen.getByText('Dr. Pending')).toBeInTheDocument();
 
   // Decoded ratings (not raw numbers).
   expect(screen.getByText('Will rewrite textbooks')).toBeInTheDocument(); // impact 4
@@ -117,4 +120,19 @@ test('shows an empty state when no reviewer has submitted', async () => {
 
   render(<ReviewsTab requestId="req1" />);
   expect(await screen.findByText(/No reviews submitted yet/i)).toBeInTheDocument();
+  // Phase 3: no submitted reviews → no export affordance at all.
+  expect(screen.queryByText('Export:')).not.toBeInTheDocument();
+});
+
+test('Phase 3: the Export affordance appears once a review is submitted', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true, proposals: [{ proposalId: 'req1', reviewers: REVIEWERS }] }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+
+  expect(await screen.findByText('Export:')).toBeInTheDocument();
+  expect(screen.getByText('Word (.docx)')).toBeInTheDocument();
+  expect(screen.getByText('PDF')).toBeInTheDocument();
 });

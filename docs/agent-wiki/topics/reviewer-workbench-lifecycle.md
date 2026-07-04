@@ -107,7 +107,7 @@ by `/api/review-manager/reviewers`; ratings project from the
 `wmkf_appreviewanswer` snapshot via `ratingsFromAnswers` (hardcoded 3-key).
 Submitted reviewers still render as a read-only per-reviewer card list
 (ratings decoded via the static schema, richtext narrative answers, SharePoint
-download). Panel-prep roll-up/export is deferred in-code.
+download). Panel-prep roll-up/export now exists client-side (Phase 3, below).
 
 **Phase 1 BUILT (S326; tested + gated, pending deploy/E2E):** outstanding tracking + manual nudge. The DTO
 (`reviewers.js` GET) adds `submitted` (accepted-reviewer submission status),
@@ -157,11 +157,38 @@ stacked with attribution, rendered the same way the Cards view's
 text wins (documented in the module header) when the key isn't live; live text
 always wins when it is.
 
-**Still PLANNED:** panel-prep export (client-side render, pure composition
-module for a future Power Automate/server seam — Phase 3), and Executor-based
-AI synthesis (Phase 4) — plan and owner-confirmed design decisions live in
+**Phase 3 BUILT (S326; unit-tested + gated, pending deploy/E2E):** panel-prep
+roll-up/export. `shared/utils/review-report.js#composeReviewReport(...)` is a
+pure, DOM/React/Dataverse-free composition over a `deriveReviewMatrix` result
+(consumed, not re-derived) plus proposal identity — header, summary
+(reviews-submitted count + per-rating-question average/spread), a ratings
+table (same rows/columns as the Compare grid), and per-richtext-question
+narrative sections (all reviewers' answers, matrix order, `retired` flag
+carried through). The same module's `htmlToBlocks(html)` is a small pure
+tokenizer scoped to the sanitizer's allowlisted grammar ONLY
+(`lib/external/sanitize-review-html.js` `ALLOWED_TAGS`: p, br, strong/b,
+em/i, ul/ol/li, h2/h3, blockquote, a — no tables/images/spans/divs), producing
+typed blocks with inline runs; an unknown/malformed tag degrades to plain text
+(tag stripped, text kept) rather than throwing or dropping content.
+`shared/utils/review-report-docx.js` (docx, dynamic `import('docx')` per
+`word-export.js` convention) and `shared/utils/review-report-pdf.js` (pdf-lib,
+built on `PDFReportBuilder` from `pdf-export.js`) render that report object;
+PDF FLATTENS inline bold/italic runs to plain text (pdf-lib/`PDFReportBuilder`
+has no mixed-run text primitive) — documented degradation, DOCX is the
+full-fidelity artifact. `ReviewsTab`'s submitted-reviews toolbar gets an
+"Export: Word (.docx) / PDF" affordance (visible only once ≥1 review is
+submitted) that composes client-side from already-loaded `submitted`/
+`liveQuestions` — no new fetch, no new route, no Dataverse roll-up column
+(governing decision 4). Proposal identity on the export (request
+number/title/institution/PI) uses whatever `proposals[0]` already carries
+(`requestNumber`/`proposalTitle`/`proposalInstitution`/`proposalAuthors`) — the
+DTO has no dedicated `piName` field, so `proposalAuthors` (project
+leader/applicant) stands in as the best-available PI identity.
+
+**Still PLANNED:** Executor-based AI synthesis (Phase 4) — plan and
+owner-confirmed design decisions live in
 `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`. Update that plan's status (and
-this paragraph) as further phases ship.
+this paragraph) as that phase ships.
 
 ## Email templates (admin org default + per-PD override)
 

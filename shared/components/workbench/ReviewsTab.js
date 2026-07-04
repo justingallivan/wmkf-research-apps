@@ -22,13 +22,22 @@
  * route's `liveQuestions` (the live admin-panel question set, or null on a
  * fetch failure). "Cards" stays byte-identical to the pre-Phase-2 rendering.
  *
- * Panel-prep roll-up / export is a deferred add-on, intentionally out of scope.
+ * Phase 3 (panel-prep export) adds an "Export" affordance to the submitted-
+ * reviews toolbar: DOCX (via `composeReviewReport` +
+ * `shared/utils/review-report-docx.js`) and PDF (+
+ * `shared/utils/review-report-pdf.js`), composed client-side from the same
+ * already-loaded `submitted`/`liveQuestions` data — no new fetch, no new
+ * route, no Dataverse roll-up column (governing decision 4 in the plan doc).
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card } from '../Layout';
 import { labelForReviewRating, reviewRatingShortLabels } from '../../../lib/external/review-form-schema';
 import { deriveReviewMatrix } from '../../utils/review-matrix';
+import { composeReviewReport } from '../../utils/review-report';
+import { generateReviewReportDocx } from '../../utils/review-report-docx';
+import { generateReviewReportPdf } from '../../utils/review-report-pdf';
+import { downloadPdf } from '../../utils/pdf-export';
 
 function formatDate(iso) {
   if (!iso) return null;
@@ -238,6 +247,89 @@ function CompareNarrativeBrowser({ matrix }) {
   );
 }
 
+// Panel-prep export (Phase 3): composes the same matrix Compare renders into
+// a plain report object (`composeReviewReport`), then hands it to the DOCX or
+// PDF renderer. Proposal identity fields come from whatever `proposals[0]`
+// already carries on the reviewers DTO (proposalTitle/requestNumber/
+// proposalAuthors/proposalInstitution) — there is no dedicated `piName`
+// field, so `proposalAuthors` (project leader/applicant) is used as the best
+// available PI identity.
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+function yyyymmdd(date) {
+  return `${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}`;
+}
+
+function ExportMenu({ proposal, submitted, liveQuestions }) {
+  const [busy, setBusy] = useState(null); // 'docx' | 'pdf' | null
+  const [error, setError] = useState(null);
+
+  const buildReport = useCallback(() => {
+    const matrix = deriveReviewMatrix(submitted, liveQuestions);
+    return composeReviewReport({
+      requestNumber: proposal?.requestNumber ?? null,
+      requestTitle: proposal?.proposalTitle ?? null,
+      piName: proposal?.proposalAuthors ?? null,
+      institution: proposal?.proposalInstitution ?? null,
+      matrix,
+      generatedAtIso: new Date().toISOString(),
+    });
+  }, [proposal, submitted, liveQuestions]);
+
+  const filenameBase = `reviews-${proposal?.requestNumber || proposal?.proposalId || 'export'}-${yyyymmdd(new Date())}`;
+
+  const handleExport = useCallback(async (format) => {
+    setBusy(format);
+    setError(null);
+    try {
+      const report = buildReport();
+      if (format === 'docx') {
+        const blob = await generateReviewReportDocx(report);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${filenameBase}.docx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else {
+        const pdfBytes = await generateReviewReportPdf(report);
+        downloadPdf(pdfBytes, `${filenameBase}.pdf`);
+      }
+    } catch (e) {
+      setError(e.message || `Failed to generate ${format.toUpperCase()}.`);
+    } finally {
+      setBusy(null);
+    }
+  }, [buildReport, filenameBase]);
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-gray-500">Export:</span>
+      <button
+        type="button"
+        onClick={() => handleExport('docx')}
+        disabled={busy !== null}
+        className="text-xs text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {busy === 'docx' ? 'Generating…' : 'Word (.docx)'}
+      </button>
+      <button
+        type="button"
+        onClick={() => handleExport('pdf')}
+        disabled={busy !== null}
+        className="text-xs text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {busy === 'pdf' ? 'Generating…' : 'PDF'}
+      </button>
+      {error && <span className="text-xs text-amber-600">{error}</span>}
+    </div>
+  );
+}
+
 function CompareView({ submitted, liveQuestions }) {
   const matrix = useMemo(() => deriveReviewMatrix(submitted, liveQuestions), [submitted, liveQuestions]);
   if (matrix.questions.length === 0) {
@@ -254,9 +346,12 @@ function CompareView({ submitted, liveQuestions }) {
 // Outstanding = accepted but not yet submitted — including reviewers whose
 // materials haven't gone out yet (their nudge button renders disabled with a
 // tooltip; the send route re-derives eligibility itself, so this is a display
-// filter only).
+// filter only). Keyed on reviewReceivedAt — the SAME signal the submitted-list
+// filter below uses — so the two lists are structurally disjoint (the DTO's
+// `submitted` field is derived from the same column, but sharing one signal
+// here removes the dual-source fragility).
 function isOutstanding(r) {
-  return !r.submitted;
+  return !r.reviewReceivedAt;
 }
 
 function OutstandingRow({ reviewer, requestId, onSent }) {
@@ -442,21 +537,24 @@ export default function ReviewsTab({ requestId }) {
             <p className="text-sm text-gray-500">
               {submitted.length} of {acceptedCount} accepted reviewer{acceptedCount === 1 ? '' : 's'} submitted a review.
             </p>
-            <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden text-xs">
-              <button
-                type="button"
-                onClick={() => setView('cards')}
-                className={`px-3 py-1.5 ${view === 'cards' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-              >
-                Cards
-              </button>
-              <button
-                type="button"
-                onClick={() => setView('compare')}
-                className={`px-3 py-1.5 border-l border-gray-300 ${view === 'compare' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-              >
-                Compare
-              </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <ExportMenu proposal={proposal} submitted={submitted} liveQuestions={liveQuestions} />
+              <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden text-xs">
+                <button
+                  type="button"
+                  onClick={() => setView('cards')}
+                  className={`px-3 py-1.5 ${view === 'cards' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                >
+                  Cards
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView('compare')}
+                  className={`px-3 py-1.5 border-l border-gray-300 ${view === 'compare' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                >
+                  Compare
+                </button>
+              </div>
             </div>
           </div>
           {view === 'cards' ? (
