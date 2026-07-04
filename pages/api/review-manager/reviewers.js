@@ -75,6 +75,15 @@ const REVIEW_STATUS_BY_VALUE = {
 // two can't drift and `held`/`withdrawn_sufficient` are always covered (audit #7).
 const RESPONSE_TYPE_BY_VALUE = suggestionAdapter.RESPONSE_TYPE_BY_VALUE;
 
+// Whole days elapsed since `iso` (floor, never negative). Used for the
+// "days outstanding" figure in the workbench Reviews tab outstanding section.
+function daysSince(iso) {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return null;
+  const days = Math.floor((Date.now() - then) / (24 * 60 * 60 * 1000));
+  return days < 0 ? 0 : days;
+}
+
 function deriveTokenState(s) {
   if (!s.wmkf_externaltokenhash) return 'not_minted';
   if (s.wmkf_externaltokenrevoked === true) return 'revoked';
@@ -220,9 +229,19 @@ async function handleGet(req, res, access) {
           ? RESPONSE_TYPE_BY_VALUE[s.wmkf_responsetype]
           : null,
         materialsSentAt: s.wmkf_materialssentat || null,
+        // Outstanding tracking (workbench Reviews tab Phase 1): whole days since
+        // materials went out, for an accepted-but-not-submitted reviewer. null
+        // when materials haven't been sent yet — "days outstanding" isn't
+        // meaningful before that.
+        daysSinceMaterialsSent: s.wmkf_materialssentat ? daysSince(s.wmkf_materialssentat) : null,
         reminderSentAt: s.wmkf_remindersentat || null,
         reminderCount: s.wmkf_remindercount ?? 0,
         reviewReceivedAt: s.wmkf_reviewreceivedat || null,
+        // Submission status among accepted reviewers (workbench Reviews tab
+        // Phase 1). Same signal ReviewsTab already uses client-side
+        // (reviewReceivedAt truthy), surfaced explicitly for the outstanding
+        // section's filter.
+        submitted: !!s.wmkf_reviewreceivedat,
         reviewFilename: s.wmkf_reviewfilename || null,
         thankyouSentAt: s.wmkf_thankyousentat || null,
         // External magic-link token state. `tokenState` collapses the four

@@ -16,7 +16,8 @@ related:
 
 # Workbench Reviews Tab — Consumption Build-Out Plan
 
-**Status: PLANNED (S326, 2026-07-03). No phase built yet.**
+**Status: Phase 1 BUILT (S326, 2026-07-03) — unit/integration-tested and gated;
+not yet deployed or E2E-driven. Phases 2-4 still PLANNED.**
 
 ## Context
 

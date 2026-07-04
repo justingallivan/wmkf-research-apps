@@ -113,6 +113,78 @@ function NarrativeAnswers({ answers }) {
   );
 }
 
+// Outstanding = accepted but not yet submitted — including reviewers whose
+// materials haven't gone out yet (their nudge button renders disabled with a
+// tooltip; the send route re-derives eligibility itself, so this is a display
+// filter only).
+function isOutstanding(r) {
+  return !r.submitted;
+}
+
+function OutstandingRow({ reviewer, requestId, onSent }) {
+  const [sending, setSending] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const lastReminder = formatDate(reviewer.reminderSentAt);
+  const canSend = !!reviewer.materialsSentAt;
+
+  const handleSend = useCallback(async () => {
+    setSending(true);
+    setFeedback(null);
+    try {
+      const res = await fetch('/api/review-manager/send-review-reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, suggestionId: reviewer.suggestionId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setFeedback({ ok: false, message: data.reason === 'conflict'
+          ? 'Already claimed by another send — refresh to see the latest status.'
+          : (data.reason || 'Failed to send reminder.') });
+        return;
+      }
+      setFeedback({ ok: true, message: 'Reminder sent.' });
+      if (onSent) onSent();
+    } catch (e) {
+      setFeedback({ ok: false, message: e.message || 'Failed to send reminder.' });
+    } finally {
+      setSending(false);
+    }
+  }, [requestId, reviewer.suggestionId, onSent]);
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-gray-100 last:border-b-0">
+      <div className="min-w-0">
+        <div className="font-semibold text-gray-900">{reviewer.name || 'Unnamed reviewer'}</div>
+        {reviewer.affiliation && <div className="text-sm text-gray-600 truncate">{reviewer.affiliation}</div>}
+        <div className="text-xs text-gray-400 mt-0.5">
+          {Number.isInteger(reviewer.daysSinceMaterialsSent)
+            ? `${reviewer.daysSinceMaterialsSent} day${reviewer.daysSinceMaterialsSent === 1 ? '' : 's'} outstanding`
+            : 'Materials not yet sent'}
+          {' · '}
+          {reviewer.reminderCount > 0
+            ? `${reviewer.reminderCount} reminder${reviewer.reminderCount === 1 ? '' : 's'} sent${lastReminder ? ` (last ${lastReminder})` : ''}`
+            : 'No reminders sent yet'}
+        </div>
+        {feedback && (
+          <div className={`text-xs mt-1 ${feedback.ok ? 'text-green-600' : 'text-amber-600'}`}>{feedback.message}</div>
+        )}
+      </div>
+      <div className="shrink-0">
+        <button
+          type="button"
+          onClick={handleSend}
+          disabled={sending || !canSend}
+          title={canSend ? 'Send a review-due reminder now' : 'Materials have not been sent to this reviewer yet'}
+          className="inline-flex items-center gap-1 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {sending ? 'Sending…' : 'Send reminder now'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ReviewsTab({ requestId }) {
   const [proposal, setProposal] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -148,6 +220,12 @@ export default function ReviewsTab({ requestId }) {
   const submitted = reviewers
     .filter((r) => r.reviewReceivedAt)
     .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  // Outstanding tracking (workbench Reviews tab Phase 1): accepted reviewers
+  // who have not submitted, sorted by longest-outstanding first so the
+  // staffer sees who most needs a nudge.
+  const outstanding = reviewers
+    .filter(isOutstanding)
+    .sort((a, b) => (b.daysSinceMaterialsSent ?? -1) - (a.daysSinceMaterialsSent ?? -1));
   const acceptedCount = reviewers.length;
 
   if (loading) {
@@ -166,7 +244,7 @@ export default function ReviewsTab({ requestId }) {
     );
   }
 
-  if (submitted.length === 0) {
+  if (submitted.length === 0 && outstanding.length === 0) {
     return (
       <Card hover={false}>
         <p className="text-sm text-gray-500">
@@ -181,14 +259,39 @@ export default function ReviewsTab({ requestId }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">
-        {submitted.length} of {acceptedCount} accepted reviewer{acceptedCount === 1 ? '' : 's'} submitted a review.
-      </p>
-      <div className="space-y-3">
-        {submitted.map((r) => (
-          <ReviewCard key={r.suggestionId} reviewer={r} />
-        ))}
-      </div>
+      {outstanding.length > 0 && (
+        <Card hover={false}>
+          <p className="text-sm font-semibold text-gray-900 mb-1">
+            Outstanding ({outstanding.length})
+          </p>
+          <p className="text-xs text-gray-500 mb-2">
+            Accepted reviewer{outstanding.length === 1 ? '' : 's'} who {outstanding.length === 1 ? 'has' : 'have'} not yet submitted a review.
+          </p>
+          <div>
+            {outstanding.map((r) => (
+              <OutstandingRow key={r.suggestionId} reviewer={r} requestId={requestId} onSent={load} />
+            ))}
+          </div>
+        </Card>
+      )}
+      {submitted.length === 0 ? (
+        <Card hover={false}>
+          <p className="text-sm text-gray-500">
+            No reviews submitted yet — {acceptedCount} reviewer{acceptedCount === 1 ? '' : 's'} accepted and pending.
+          </p>
+        </Card>
+      ) : (
+        <>
+          <p className="text-sm text-gray-500">
+            {submitted.length} of {acceptedCount} accepted reviewer{acceptedCount === 1 ? '' : 's'} submitted a review.
+          </p>
+          <div className="space-y-3">
+            {submitted.map((r) => (
+              <ReviewCard key={r.suggestionId} reviewer={r} />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -102,17 +102,40 @@ Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmk
 
 ## Reviews tab (workbench consumption of submitted reviews)
 
-The workbench Reviews tab (`shared/components/workbench/ReviewsTab.js`) is a
-read-only per-reviewer card list (ratings decoded via the static schema, richtext
-narrative answers, SharePoint download) fed by `/api/review-manager/reviewers`;
-ratings project from the `wmkf_appreviewanswer` snapshot via `ratingsFromAnswers`
-(hardcoded 3-key). Panel-prep roll-up/export is deferred in-code. **Build-out
-PLANNED (S326, nothing built yet):** outstanding tracking + manual nudge,
-schema-free comparison matrix, panel-prep export (client-side render, pure
-composition module for a future Power Automate/server seam), and Executor-based
-AI synthesis — plan and owner-confirmed design decisions live in
-`docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`. Update that plan's status (and this
-paragraph) as phases ship.
+The workbench Reviews tab (`shared/components/workbench/ReviewsTab.js`) is fed
+by `/api/review-manager/reviewers`; ratings project from the
+`wmkf_appreviewanswer` snapshot via `ratingsFromAnswers` (hardcoded 3-key).
+Submitted reviewers still render as a read-only per-reviewer card list
+(ratings decoded via the static schema, richtext narrative answers, SharePoint
+download). Panel-prep roll-up/export is deferred in-code.
+
+**Phase 1 BUILT (S326; tested + gated, pending deploy/E2E):** outstanding tracking + manual nudge. The DTO
+(`reviewers.js` GET) adds `submitted` (accepted-reviewer submission status),
+`daysSinceMaterialsSent` (derived from `wmkf_materialssentat`, null until
+materials are sent), and passes through `reminderSentAt`/`reminderCount`
+(`wmkf_remindersentat`/`wmkf_remindercount`). `ReviewsTab` renders an
+"Outstanding" section ABOVE the submitted cards for accepted-but-not-submitted
+reviewers, each with a "Send reminder now" button (disabled + tooltip when
+materials haven't been sent). The button posts `{ requestId, suggestionId }` to
+`POST /api/review-manager/send-review-reminder`
+(`requireAppAccess('review-manager', 'reviewers')`, both ids GUID-validated
+before any Dataverse selector), which delegates to
+`lib/services/reviewer-manual-reminder.js#sendManualReviewDueReminder`. That
+service re-derives eligibility from a fresh read (accepted, materials sent or
+under review, review not received, not applicant-excluded via `isExcluded`)
+and reuses `reviewer-reminder-sweep.js`'s exported `loadRequestContext` /
+`loadReviewer` / `sendOneReminder` verbatim — same claim-before-send (If-Match
+on `wmkf_remindersentat`+`wmkf_remindercount`) as the review-due cron, so
+manual and cron sends share one fire-once marker and can never double-send.
+Unlike the cron, a manual re-send when the marker is already set IS allowed
+(staff-initiated); a claim conflict (412) returns an error without sending.
+
+**Still PLANNED:** schema-free comparison matrix (Phase 2), panel-prep export
+(client-side render, pure composition module for a future Power
+Automate/server seam — Phase 3), and Executor-based AI synthesis (Phase 4) —
+plan and owner-confirmed design decisions live in
+`docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`. Update that plan's status (and
+this paragraph) as further phases ship.
 
 ## Email templates (admin org default + per-PD override)
 
