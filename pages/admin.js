@@ -92,6 +92,14 @@ const REVIEWER_TIME_BUDGET_DATAVERSE_FIELDS = [
   ),
 ];
 
+const REVIEWER_RELEASE_ATTACHMENTS_DATAVERSE_FIELDS = [
+  appSystemSettingField(
+    'Attach proposal to release email',
+    'reviewer.release.attach_proposal_email',
+    'Default OFF — the release email is portal-link-only. Read fresh by ReviewerManagePanel every time its email modal opens.',
+  ),
+];
+
 const POLICY_SECTION_DATAVERSE_FIELDS = [
   {
     label: 'Policy slot rows',
@@ -2491,6 +2499,78 @@ function HonorariumAmountSection() {
   );
 }
 
+function ReviewerReleaseAttachmentsSection() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  const [error, setError] = useState(null);
+  const [savedAt, setSavedAt] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/review-manager/release-settings');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed to load');
+      setEnabled(!!data.attachProposalEmail);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const toggle = async () => {
+    const next = !enabled;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/review-manager/release-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attachProposalEmail: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Save failed');
+      setEnabled(!!data.attachProposalEmail);
+      setSavedAt(new Date());
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <p className="text-sm text-gray-500">Loading…</p>;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-gray-600">
+        When ON, the release (materials) email offers the SharePoint proposal auto-attach
+        and manual file uploads as email attachments, in addition to the reviewer&apos;s
+        secure portal link. When OFF (default), the release email is portal-link-only —
+        no attachment is uploaded to Blob or sent. Read live every time the release email
+        modal opens.
+      </p>
+      <label className="flex items-center gap-2 text-sm text-gray-900">
+        <input
+          type="checkbox"
+          checked={enabled}
+          disabled={saving}
+          onChange={toggle}
+          className="h-4 w-4"
+        />
+        Attach proposal/files to the release email (in addition to the portal link)
+      </label>
+      {savedAt && <span className="text-xs text-green-700">Saved</span>}
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 function ReviewerTimeBudgetSection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -2629,6 +2709,13 @@ export default function AdminDashboard() {
           dataverseFields={REVIEWER_TIME_BUDGET_DATAVERSE_FIELDS}
         >
           <ReviewerTimeBudgetSection />
+        </CollapsibleCard>
+        <CollapsibleCard
+          title="Reviewer Release Attachments"
+          subtitle="Portal-link-only by default; enable to also email the proposal/files"
+          dataverseFields={REVIEWER_RELEASE_ATTACHMENTS_DATAVERSE_FIELDS}
+        >
+          <ReviewerReleaseAttachmentsSection />
         </CollapsibleCard>
         <CollapsibleCard title="Policies" dataverseFields={POLICY_SECTION_DATAVERSE_FIELDS}>
           <PoliciesSection />

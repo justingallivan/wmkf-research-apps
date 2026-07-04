@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-01
+last_verified: 2026-07-04
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -27,6 +27,9 @@ source_files:
   - pages/api/review-manager/send-emails.js
   - pages/api/review-manager/regenerate-token.js
   - pages/api/review-manager/revoke-token.js
+  - pages/api/review-manager/release-settings.js
+  - lib/services/reviewer-release-config.js
+  - shared/components/reviewers/ReviewerManagePanel.js
   - lib/utils/reviewer-invite.js
   - lib/utils/sharepoint-buckets.js
   - tests/e2e/reviewer-accept.spec.js
@@ -40,6 +43,7 @@ watch_paths:
   - pages/api/external/review/**
   - pages/api/review-manager/**
   - shared/components/external/**
+  - shared/components/reviewers/**
   - tests/e2e/**
   - playwright.config.js
   - .github/workflows/e2e.yml
@@ -214,6 +218,23 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   `topics/intake-portal.md`) owns the submitted file, the link entry points directly
   at the WMKF-owned file, retiring the folder + PA-flow dependency entirely. Do not
   cite a link table/field as built until this ships.
+
+- **Materials/release email is portal-link-only by default (S327).** The materials
+  template's `{{externalLink}}` placeholder (seeded body,
+  `lib/seed/email-defaults/reviewer-templates.js`) is rendered server-side by
+  `pages/api/review-manager/render-emails.js` into the reviewer's tokenized
+  portal link for every send, regardless of the setting below — so a reviewer
+  can always reach the proposal via their secure link even with no attachment.
+  A single admin-configurable boolean, `reviewer.release.attach_proposal_email`
+  (`wmkf_appsystemsettings`, default `false`, read/write via
+  `pages/api/review-manager/release-settings.js` and
+  `lib/services/reviewer-release-config.js`), controls whether
+  `ReviewerManagePanel`'s EmailModal *additionally* offers the SharePoint
+  proposal auto-attach (Blob upload from `pages/api/reviewer-finder/load-proposal.js`)
+  and the manual attachment file picker, and whether `attachmentUrls` are sent
+  to `send-emails.js` at all. The panel GETs the setting fresh every time the
+  modal opens (no build-time constant); the admin panel's "Reviewer Release
+  Attachments" section (superuser-gated) is the only write path.
 
 ## Durable Memory
 

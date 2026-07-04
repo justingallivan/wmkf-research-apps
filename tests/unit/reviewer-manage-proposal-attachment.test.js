@@ -80,10 +80,15 @@ function successProposal(overrides = {}) {
   });
 }
 
-function renderPanel({ proposalResponses = [successProposal()], reviewers: reviewerList = [reviewer] } = {}) {
+function renderPanel({
+  proposalResponses = [successProposal()],
+  reviewers: reviewerList = [reviewer],
+  attachProposalEmail = true,
+} = {}) {
   const loadProposalResponses = [...proposalResponses];
   global.fetch.mockImplementation(async (url) => {
     if (String(url).startsWith('/api/user-preferences')) return mockJson({});
+    if (url === '/api/review-manager/release-settings') return mockJson({ attachProposalEmail });
     if (url === '/api/reviewer-finder/load-proposal') {
       return loadProposalResponses.shift() || successProposal();
     }
@@ -272,5 +277,63 @@ describe('ReviewerManagePanel release respects checkbox selection', () => {
     await screen.findByText('Proposal document');
 
     expect(recipientsSummary().textContent).toMatch(/1 reviewer selected/);
+  });
+});
+
+describe('ReviewerManagePanel release with attach-proposal-email OFF (default)', () => {
+  async function openReleaseModalOff() {
+    fireEvent.click(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i }));
+    await screen.findByText(/Reviewers access materials via their secure portal link/i);
+  }
+
+  test('does not show the proposal document section or the attachment file picker, and never calls load-proposal', async () => {
+    renderPanel({ attachProposalEmail: false });
+
+    await openReleaseModalOff();
+
+    expect(screen.queryByText('Proposal document')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Attachments \(included in \.eml files\)/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/wrong document\? choose another/i)).not.toBeInTheDocument();
+    expect(global.fetch.mock.calls.some(([url]) => url === '/api/reviewer-finder/load-proposal')).toBe(false);
+  });
+
+  test('sends no attachmentUrls in the send-emails payload', async () => {
+    renderPanel({ attachProposalEmail: false });
+
+    await openReleaseModalOff();
+    await previewAndSend();
+
+    expect(sentPayload()).toMatchObject({
+      templateType: 'materials',
+      attachmentUrls: [],
+    });
+  });
+
+  test('release-settings is re-fetched (read fresh) each time the modal opens', async () => {
+    let attachProposalEmail = false;
+    global.fetch.mockImplementation(async (url) => {
+      if (String(url).startsWith('/api/user-preferences')) return mockJson({});
+      if (url === '/api/review-manager/release-settings') return mockJson({ attachProposalEmail });
+      if (url === '/api/reviewer-finder/load-proposal') return successProposal();
+      if (url === '/api/review-manager/render-emails') return mockJson({ drafts: [draft] });
+      if (url === '/api/review-manager/send-emails') return mockSseResponse();
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    render(
+      <ReviewerManagePanel
+        proposal={proposal}
+        reviewers={[reviewer]}
+        settings={{ signature: 'Program Director' }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i }));
+    await screen.findByText(/Reviewers access materials via their secure portal link/i);
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+    attachProposalEmail = true;
+    fireEvent.click(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i }));
+    await screen.findByText('Proposal document');
   });
 });

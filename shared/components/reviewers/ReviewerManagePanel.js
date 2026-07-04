@@ -224,6 +224,12 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
   const attachments = Array.isArray(attachmentsByType?.[templateType]) ? attachmentsByType[templateType] : [];
   const [proposalDoc, setProposalDoc] = useState(emptyProposalDoc);
   const proposalLoadSeq = useRef(0);
+  // Admin-configurable, default OFF (docs/agent-wiki/topics/external-reviewer-portal.md):
+  // when off, the release email is portal-link-only ({{externalLink}} in the
+  // template) — no proposal auto-attach, no manual file picker, no Blob upload.
+  // Read fresh every time the modal opens (see effect below); never a build-time
+  // constant.
+  const [attachProposalEmailEnabled, setAttachProposalEmailEnabled] = useState(false);
   const setAttachments = (updater) => {
     setAttachmentsByType((prev) => {
       const current = prev[templateType] || [];
@@ -244,6 +250,24 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
       setSentResults({ sent: [], failed: [], skipped: [] });
       setError(null);
     }
+  }, [isOpen]);
+
+  // Read the attach-proposal-email setting fresh every time the modal opens
+  // (never cached/build-time) so an admin toggle takes effect immediately.
+  // Fetch failure degrades to the documented default (OFF/portal-link-only).
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/review-manager/release-settings');
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled) setAttachProposalEmailEnabled(!!(res.ok && data?.attachProposalEmail));
+      } catch (e) {
+        if (!cancelled) setAttachProposalEmailEnabled(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [isOpen]);
 
   const resetProposalDoc = useCallback(() => {
@@ -318,9 +342,11 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
   }, [templateType, resetProposalDoc]);
 
   useEffect(() => {
-    if (!isOpen || templateType !== 'materials' || !requestId) return;
+    // Attach-proposal-email OFF (default): never auto-load/Blob-upload the
+    // proposal from SharePoint — the release email is portal-link-only.
+    if (!isOpen || templateType !== 'materials' || !requestId || !attachProposalEmailEnabled) return;
     loadProposal();
-  }, [isOpen, templateType, requestId, loadProposal]);
+  }, [isOpen, templateType, requestId, attachProposalEmailEnabled, loadProposal]);
 
   // Templates load from the per-user Dataverse store; email-fields + attachments
   // remain per-browser (localStorage) — they're per-send scratch, not templates.
@@ -468,8 +494,12 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
     setSentResults({ sent: [], failed: [], skipped: [] });
 
     try {
-      const manualAttachmentUrls = attachments.map(a => a.url).filter(Boolean);
-      const attachmentUrls = templateType === 'materials' && proposalDoc.blobUrl
+      // Attach-proposal-email OFF (default): never send attachmentUrls — the
+      // release email is portal-link-only ({{externalLink}} in the template).
+      const manualAttachmentUrls = attachProposalEmailEnabled
+        ? attachments.map(a => a.url).filter(Boolean)
+        : [];
+      const attachmentUrls = attachProposalEmailEnabled && templateType === 'materials' && proposalDoc.blobUrl
         ? Array.from(new Set([proposalDoc.blobUrl, ...manualAttachmentUrls]))
         : manualAttachmentUrls;
 
@@ -608,7 +638,15 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                 </div>
               </div>
 
-              {templateType === 'materials' && (
+              {templateType === 'materials' && !attachProposalEmailEnabled && (
+                <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
+                  Reviewers access materials via their secure portal link (included automatically) —
+                  no attachment is sent. An admin can enable email attachments in Admin → Reviewer
+                  Release Attachments.
+                </div>
+              )}
+
+              {templateType === 'materials' && attachProposalEmailEnabled && (
                 <div className="bg-gray-50 rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="font-medium text-gray-900">Proposal document</p>
@@ -662,7 +700,10 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                 </div>
               )}
 
-              {/* Attachments */}
+              {/* Attachments — gated by the admin-configurable attach-proposal-email
+                  setting (default OFF). When off, no file picker is shown, nothing
+                  is uploaded to Blob, and no attachmentUrls are sent. */}
+              {attachProposalEmailEnabled && (
               <div className="bg-gray-50 rounded-lg p-3 space-y-2">
                 <div className="flex justify-between items-center">
                   <p className="text-xs font-medium text-gray-600">Attachments (included in .eml files)</p>
@@ -707,6 +748,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                   </div>
                 )}
               </div>
+              )}
 
               {/* Subject */}
               <div>
