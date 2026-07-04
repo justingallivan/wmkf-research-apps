@@ -130,11 +130,14 @@ describe('buildReviewSubmission — mapping', () => {
     return buildReviewSubmission(v.normalized, { receivedAt: RECEIVED_AT });
   }
 
-  test('parentPatch carries affiliation + receivedat ONLY (ratings are snapshot-only post-Phase-E)', () => {
+  test('parentPatch carries affiliation + receivedat + reviewstatus ONLY (ratings are snapshot-only post-Phase-E)', () => {
     const { parentPatch } = build();
     expect(parentPatch).toEqual({
       wmkf_revieweraffiliation: 'Professor of Physics, Example University',
       wmkf_reviewreceivedat: RECEIVED_AT,
+      // S328: submit advances the lifecycle picklist atomically so the Track
+      // Reviewers badge follows the submission (100000003 = Review Received).
+      wmkf_reviewstatus: 100000003,
     });
     // The rating columns are no longer written.
     expect(parentPatch.wmkf_reviewerimpact).toBeUndefined();
