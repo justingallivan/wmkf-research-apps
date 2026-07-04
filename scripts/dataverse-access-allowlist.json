@@ -52,20 +52,6 @@
       "count": 1
     },
     {
-      "file": "lib/external/review-answer-snapshot.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryAllRecords",
-      "entity": "wmkf_appreviewanswers",
-      "count": 1
-    },
-    {
-      "file": "lib/external/review-answer-snapshot.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.resolveEntitySetName",
-      "entity": "wmkf_appreviewanswers",
-      "count": 1
-    },
-    {
       "file": "lib/external/review-question-fetcher.js",
       "kind": "import",
       "clientMethod": "DynamicsService.queryRecords",
