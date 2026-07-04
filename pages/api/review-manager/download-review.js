@@ -29,7 +29,7 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
+import { getForDownload } from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import { GraphService } from '../../../lib/services/graph-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 
@@ -58,9 +58,7 @@ export default async function handler(req, res) {
     let suggestion;
     try {
       suggestion = await bypassDynamicsRestrictions('download-review-lookup', () =>
-        DynamicsService.getRecord('wmkf_appreviewersuggestions', suggestionId, {
-          select: 'wmkf_appreviewersuggestionid,wmkf_reviewsharepointfolder,wmkf_reviewfilename',
-        }),
+        getForDownload(suggestionId),
       );
     } catch (e) {
       if (/Get record failed \(404\)/.test(e.message || '')) {
