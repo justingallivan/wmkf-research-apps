@@ -23,19 +23,15 @@ acceptance data (disabled-nudge tooltip confirmed via accessible name), correct
 ABSENCE of Compare/Export with zero submissions, clean console, request-switch
 stale-guard.**
 
-**Phase 4 BUILT (this session) — pending schema provisioning + prompt seed +
-first-submission verification.** Code is in place (prompt config, route, DTO
-extension, ReviewsTab Synthesis card, export section, unit tests) but is NOT
-LIVE: the `wmkf_reviewsynthesisjson` column
-(`lib/dataverse/schema/wave11-review-synthesis/`) has not been applied to any
-Dataverse environment, and the `review-synthesis.generate` prompt
-(`scripts/seed-review-synthesis-prompt.js`) has not been seeded. Both are
-PREPARED artifacts only — deploying the reading/writing code path before the
-schema wave is applied would 400 on the not-yet-created column (wave10
-precedent). Same D26 verification-boundary caveat as Phases 2-3 applies here
-too: the synthesis flow cannot be browser-verified against a real submitted
-review until schema + prompt are provisioned and at least one review is
-submitted; unit tests (mocked Executor/Dataverse) are the only coverage today.
+**Phase 4 DEPLOYED (S326, 2026-07-03): full go-live sequence executed in
+order — wave11 column provisioned in prod Dataverse
+(`akoya_request.wmkf_ReviewSynthesisJson`, live-probed selectable HTTP 200),
+code deployed (prod deployment READY on `fc9ab2c7`), and the
+`review-synthesis.generate` prompt seeded as v1 (create-only bootstrap,
+exactly-one-current verified). Same D26 verification-boundary caveat as
+Phases 2-3: the synthesis flow cannot be exercised end-to-end until at least
+one review is submitted (the route correctly 409s `no_submitted_reviews`
+until then); unit tests (mocked Executor/Dataverse) are the coverage today.
 
 **Verification boundary (owner context, S326): the portal is being built AHEAD
 of the December-2026 cycle — no reviewer has ever submitted through it, so the
@@ -179,7 +175,7 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   `validationSchema` (`lib/utils/ai-output-schema.js`) bounds/strips the parsed
   shape before the writeback.
 - New memo column `wmkf_reviewsynthesisjson` on `akoya_request`
-  (`lib/dataverse/schema/wave11-review-synthesis/`) — PREPARED, not applied to
+  (`lib/dataverse/schema/wave11-review-synthesis/`) — APPLIED to prod 2026-07-03, was prepared/not applied to
   any environment.
 - Route `POST /api/review-manager/synthesize-reviews`
   (`requireAppAccess('review-manager', 'reviewers')`, requestId GUID-validated):

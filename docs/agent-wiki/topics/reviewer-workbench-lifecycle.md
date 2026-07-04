@@ -195,7 +195,7 @@ server-side into a plain digest) so the Executor wraps it + injects the A7
 preamble. Output is strict JSON (single output `synthesis`, `validationSchema`
 bounds/strips the parsed shape) written to a new memo column
 `akoya_request.wmkf_reviewsynthesisjson` with `guard: 'always-overwrite'` —
-schema-as-code PREPARED, NOT YET APPLIED at
+schema-as-code APPLIED TO PROD 2026-07-03 (column live-probed) from
 `lib/dataverse/schema/wave11-review-synthesis/`. `POST
 /api/review-manager/synthesize-reviews` (`requireAppAccess('review-manager',
 'reviewers')`, requestId GUID-validated) returns 409 `no_submitted_reviews`
