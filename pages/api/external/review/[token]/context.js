@@ -16,10 +16,8 @@
 
 import { verifySuggestionToken } from '../../../../../lib/external/verify-suggestion-token';
 import { DynamicsService } from '../../../../../lib/services/dynamics-service';
-import { GraphService } from '../../../../../lib/services/graph-service';
-import { getRequestSharePointBuckets } from '../../../../../lib/utils/sharepoint-buckets';
 import { bypassDynamicsRestrictions } from '../../../../../lib/services/dynamics-context';
-import { isReviewerMaterial } from '../../../../../lib/external/reviewer-materials';
+import { listReviewerMaterials } from '../../../../../lib/external/reviewer-materials';
 import { getActivePolicies } from '../../../../../lib/external/policy-fetcher';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 import { normalizeCountryToIso2 } from '../../../../../shared/config/countries';
@@ -121,7 +119,7 @@ export default async function handler(req, res) {
     if (engagementState.view === 'stage2b' || engagementState.view === 'submitted') {
       try {
         files = await bypassDynamicsRestrictions('external-list-files', () =>
-          listProposalFiles(request.akoya_requestid, request.akoya_requestnum),
+          listReviewerMaterials(request.akoya_requestid, request.akoya_requestnum),
         );
       } catch (e) {
         console.error('[external context] file listing failed:', e.message);
@@ -343,44 +341,3 @@ function buildStage2aPrefill(suggestion, reviewer, contact) {
   };
 }
 
-/**
- * Walk every plausible SharePoint bucket for a request and return only
- * files staff has explicitly shared by placing them in a reviewer-
- * materials subfolder (see `lib/external/reviewer-materials.js` for the
- * folder-name policy). If no matching folder exists or it's empty,
- * returns an empty array — the UI surfaces that as "not yet shared,"
- * not "no files exist."
- *
- * Each file carries its `library` so the proposal-download endpoint can
- * resolve back to the right Graph drive without trusting client input.
- */
-async function listProposalFiles(requestId, requestNumber) {
-  const buckets = await getRequestSharePointBuckets(requestId, requestNumber);
-  const out = [];
-  for (const bucket of buckets) {
-    try {
-      const items = await GraphService.listFiles(bucket.library, bucket.folder, {
-        recursive: true,
-        maxDepth: 3,
-      });
-      for (const f of items) {
-        if (!isReviewerMaterial(f.folder || '')) continue;
-        out.push({
-          id: f.id,
-          name: f.name,
-          size: f.size,
-          mimeType: f.mimeType,
-          folder: f.folder,
-          library: bucket.library,
-          source: bucket.source,
-        });
-      }
-    } catch (e) {
-      // Archive libraries 404 frequently — that's expected. Log but continue.
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[external context] bucket ${bucket.library}/${bucket.folder} unavailable: ${e.message}`);
-      }
-    }
-  }
-  return out;
-}

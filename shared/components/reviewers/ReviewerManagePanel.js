@@ -230,6 +230,13 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
   // Read fresh every time the modal opens (see effect below); never a build-time
   // constant.
   const [attachProposalEmailEnabled, setAttachProposalEmailEnabled] = useState(false);
+  // Reviewer-visible SharePoint materials preflight — warns the PD before a
+  // "materials" release when the reviewer-portal download folder is empty.
+  // status: 'idle' | 'checking' | 'ok' | 'unavailable'. 'unavailable' covers
+  // both a non-ok response and a fetch failure — the client can't verify
+  // either way, so it shows a neutral note and does NOT gate the send (an
+  // unreachable check must never block a real release).
+  const [materialsPreflight, setMaterialsPreflight] = useState({ status: 'idle', fileCount: null });
   const setAttachments = (updater) => {
     setAttachmentsByType((prev) => {
       const current = prev[templateType] || [];
@@ -269,6 +276,32 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
     })();
     return () => { cancelled = true; };
   }, [isOpen]);
+
+  // Materials-release preflight: fetch fresh whenever the modal is open on
+  // the 'materials' template (open, and every switch into it) so a folder
+  // that was empty a minute ago but has since been populated doesn't show a
+  // stale warning. Same cancelled-flag guard as the release-settings effect
+  // above — no setState after this run is superseded or the modal closes.
+  useEffect(() => {
+    if (!isOpen || templateType !== 'materials' || !requestId) return;
+    let cancelled = false;
+    setMaterialsPreflight({ status: 'checking', fileCount: null });
+    (async () => {
+      try {
+        const res = await fetch(`/api/review-manager/materials-preflight?requestId=${encodeURIComponent(requestId)}`);
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.ok && data?.ok) {
+          setMaterialsPreflight({ status: 'ok', fileCount: typeof data.fileCount === 'number' ? data.fileCount : null });
+        } else {
+          setMaterialsPreflight({ status: 'unavailable', fileCount: null });
+        }
+      } catch (e) {
+        if (!cancelled) setMaterialsPreflight({ status: 'unavailable', fileCount: null });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen, templateType, requestId]);
 
   const resetProposalDoc = useCallback(() => {
     proposalLoadSeq.current += 1;
@@ -482,6 +515,18 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
       return;
     }
 
+    // Empty reviewer-materials folder for a "materials" release: confirm the
+    // PD means to send anyway before creating the (irreversible) email
+    // activities. Only gates on a verified-empty count ('ok' + 0) — an
+    // unverifiable check ('unavailable') must never block a real send.
+    if (templateType === 'materials' && materialsPreflight.status === 'ok' && materialsPreflight.fileCount === 0) {
+      const releaseAnyway = window.confirm(
+        'No reviewer materials are in the download folder for this request — reviewers who follow '
+          + 'their link will find nothing to download. Release anyway?'
+      );
+      if (!releaseAnyway) return;
+    }
+
     const ok = window.confirm(
       `Send ${sendable.length} email${sendable.length !== 1 ? 's' : ''} now via Dynamics? `
         + 'This will create email activities on the linked requests and cannot be undone.'
@@ -607,6 +652,19 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                   ))}
                 </div>
               </div>
+
+              {templateType === 'materials' && materialsPreflight.status === 'ok' && materialsPreflight.fileCount === 0 && (
+                <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
+                  No reviewer materials are in the download folder for this request — reviewers who
+                  follow their link will find nothing to download.
+                </div>
+              )}
+
+              {templateType === 'materials' && materialsPreflight.status === 'unavailable' && (
+                <div className="p-3 bg-gray-50 text-gray-500 rounded-lg text-sm">
+                  Couldn’t verify reviewer materials availability.
+                </div>
+              )}
 
               {/* Email Fields — dates and values for placeholders */}
               <div className="bg-gray-50 rounded-lg p-3 space-y-2">

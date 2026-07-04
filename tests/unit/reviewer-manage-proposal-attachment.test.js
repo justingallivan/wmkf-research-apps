@@ -84,11 +84,13 @@ function renderPanel({
   proposalResponses = [successProposal()],
   reviewers: reviewerList = [reviewer],
   attachProposalEmail = true,
+  materialsPreflight = { ok: true, fileCount: 3 },
 } = {}) {
   const loadProposalResponses = [...proposalResponses];
   global.fetch.mockImplementation(async (url) => {
     if (String(url).startsWith('/api/user-preferences')) return mockJson({});
     if (url === '/api/review-manager/release-settings') return mockJson({ attachProposalEmail });
+    if (String(url).startsWith('/api/review-manager/materials-preflight')) return mockJson(materialsPreflight);
     if (url === '/api/reviewer-finder/load-proposal') {
       return loadProposalResponses.shift() || successProposal();
     }
@@ -314,6 +316,7 @@ describe('ReviewerManagePanel release with attach-proposal-email OFF (default)',
     global.fetch.mockImplementation(async (url) => {
       if (String(url).startsWith('/api/user-preferences')) return mockJson({});
       if (url === '/api/review-manager/release-settings') return mockJson({ attachProposalEmail });
+      if (String(url).startsWith('/api/review-manager/materials-preflight')) return mockJson({ ok: true, fileCount: 3 });
       if (url === '/api/reviewer-finder/load-proposal') return successProposal();
       if (url === '/api/review-manager/render-emails') return mockJson({ drafts: [draft] });
       if (url === '/api/review-manager/send-emails') return mockSseResponse();
@@ -335,5 +338,44 @@ describe('ReviewerManagePanel release with attach-proposal-email OFF (default)',
     attachProposalEmail = true;
     fireEvent.click(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i }));
     await screen.findByText('Proposal document');
+  });
+});
+
+describe('ReviewerManagePanel materials-preflight (empty SharePoint folder guard)', () => {
+  test('empty reviewer-materials folder shows the amber banner and gates send with an extra confirm', async () => {
+    renderPanel({ materialsPreflight: { ok: true, fileCount: 0 } });
+
+    await openReleaseModal();
+    await screen.findByText(/No reviewer materials are in the download folder/i);
+
+    fireEvent.click(screen.getByRole('button', { name: /preview 1 email/i }));
+    const sendButton = await screen.findByRole('button', { name: /send 1 email/i });
+    fireEvent.click(sendButton);
+
+    await waitFor(() => expect(global.fetch.mock.calls.some(([url]) => url === '/api/review-manager/send-emails')).toBe(true));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/Release anyway\?/i));
+  });
+
+  test('non-empty reviewer-materials folder shows no banner and no extra confirm', async () => {
+    renderPanel({ materialsPreflight: { ok: true, fileCount: 5 } });
+
+    await openReleaseModal();
+    await screen.findByText('Proposal document');
+    expect(screen.queryByText(/No reviewer materials are in the download folder/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Couldn.t verify reviewer materials availability/i)).not.toBeInTheDocument();
+
+    await previewAndSend();
+    expect(window.confirm).not.toHaveBeenCalledWith(expect.stringMatching(/Release anyway\?/i));
+  });
+
+  test('preflight check failure shows a neutral note and does not gate send', async () => {
+    renderPanel({ materialsPreflight: { ok: false, reason: 'materials_unavailable' } });
+
+    await openReleaseModal();
+    await screen.findByText(/Couldn.t verify reviewer materials availability/i);
+    expect(screen.queryByText(/No reviewer materials are in the download folder/i)).not.toBeInTheDocument();
+
+    await previewAndSend();
+    expect(window.confirm).not.toHaveBeenCalledWith(expect.stringMatching(/Release anyway\?/i));
   });
 });
