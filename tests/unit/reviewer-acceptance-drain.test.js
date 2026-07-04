@@ -77,8 +77,8 @@ function job({ isAcceptRepeat = false, optedOut = false, status = 'queued', step
 
 function deps(currentSuggestion = acceptedSuggestion()) {
   return {
-    dynamics: {
-      getRecord: jest.fn(async () => currentSuggestion),
+    suggestions: {
+      getForAcceptanceDrain: jest.fn(async () => currentSuggestion),
     },
     potentialReviewers: {
       getById: jest.fn(async () => reviewer()),
@@ -256,7 +256,7 @@ describe('drainReviewerAcceptanceJobs', () => {
   it('records a retry when processing throws', async () => {
     const d = deps();
     d.jobs.claimReviewerAcceptanceJobs.mockResolvedValueOnce([job()]);
-    d.dynamics.getRecord.mockRejectedValueOnce(new Error('Dataverse down'));
+    d.suggestions.getForAcceptanceDrain.mockRejectedValueOnce(new Error('Dataverse down'));
 
     const result = await drainReviewerAcceptanceJobs({ deps: d });
 

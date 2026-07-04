@@ -367,13 +367,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/reviewer-acceptance-drain.js",
-      "kind": "fallback-alias",
-      "clientMethod": "dynamics.getRecord",
-      "entity": "wmkf_appreviewersuggestions",
-      "count": 1
-    },
-    {
       "file": "lib/services/reviewer-acceptance-email.js",
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",
