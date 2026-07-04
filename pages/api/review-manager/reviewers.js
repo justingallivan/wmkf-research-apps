@@ -34,6 +34,7 @@ import { meetingDateToCycleCode, cycleCodeToLabel } from '../../../lib/utils/cyc
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import { sanitizeReviewHtml } from '../../../lib/external/sanitize-review-html';
 import { ratingsFromAnswers } from '../../../lib/external/review-answer-snapshot';
+import { getActiveQuestionSet } from '../../../lib/external/review-question-fetcher';
 
 // Answer-snapshot child columns read back for the workbench Reviews tab (Phase 4).
 const ANSWER_FIELDS = [
@@ -300,6 +301,7 @@ async function handleGet(req, res, access) {
       success: true,
       proposals: proposalList,
       totalReviewers: proposalList.reduce((n, p) => n + p.reviewers.length, 0),
+      liveQuestions: await fetchLiveQuestions(),
     });
   } catch (error) {
     console.error('Review Manager GET error:', error);
@@ -407,6 +409,31 @@ async function fetchPotentialReviewers(ids) {
     for (const p of records) out[p.wmkf_potentialreviewersid] = p;
   }
   return out;
+}
+
+/**
+ * Fetch the live admin-panel question set for the workbench Reviews-tab
+ * comparison matrix (Phase 2, plan §"Comparison matrix"). Projects the
+ * fetcher's normalized fields into the minimal shape the matrix derivation
+ * (`shared/utils/review-matrix.js`) needs: `{key, order, text, type}`.
+ *
+ * Fail-soft by design: `getActiveQuestionSet()` fails CLOSED (throws) on any
+ * Dataverse/shape problem, which is correct for the reviewer-facing form but
+ * wrong here — a workbench read of past submissions must not 500 just because
+ * the LIVE question set is momentarily unavailable. On throw, log and return
+ * null; the matrix derivation module treats null as "unknown live set" and
+ * falls back to snapshot-order-only with nothing marked retired.
+ *
+ * @returns {Promise<Array<{key:string, order:number, text:string, type:string}>|null>}
+ */
+async function fetchLiveQuestions() {
+  try {
+    const questions = await getActiveQuestionSet();
+    return questions.map((q) => ({ key: q.key, order: q.order, text: q.label, type: q.type }));
+  } catch (error) {
+    console.error('Review Manager GET: live question set fetch failed, falling back to snapshot-order-only:', error);
+    return null;
+  }
 }
 
 /**

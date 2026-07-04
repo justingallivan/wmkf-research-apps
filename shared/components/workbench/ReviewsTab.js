@@ -15,12 +15,20 @@
  * narrative rich-text answers render as sanitized HTML (the route re-sanitizes
  * server-side immediately before this read, so the bytes here are trusted).
  *
+ * Phase 2 (docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md) adds a "Compare" view
+ * toggle alongside the default "Cards" rendering above — a schema-free ratings
+ * grid + per-question narrative browser derived via `deriveReviewMatrix`
+ * (shared/utils/review-matrix.js) from the same `reviewer.answers[]` plus the
+ * route's `liveQuestions` (the live admin-panel question set, or null on a
+ * fetch failure). "Cards" stays byte-identical to the pre-Phase-2 rendering.
+ *
  * Panel-prep roll-up / export is a deferred add-on, intentionally out of scope.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card } from '../Layout';
 import { labelForReviewRating, reviewRatingShortLabels } from '../../../lib/external/review-form-schema';
+import { deriveReviewMatrix } from '../../utils/review-matrix';
 
 function formatDate(iso) {
   if (!iso) return null;
@@ -113,6 +121,136 @@ function NarrativeAnswers({ answers }) {
   );
 }
 
+// Phase 2 (schema-free comparison matrix): "Compare" view of the submitted-
+// reviews area, alternative to the default "Cards" rendering above. Everything
+// here is derived via `deriveReviewMatrix` (shared/utils/review-matrix.js) —
+// schema-free per decision 1: no hardcoded question keys, labels come from
+// each row's own `answerText`, live question text where the key is live.
+
+// Ratings grid: rows = picklist (rating) questions in live order, columns =
+// reviewers + Average + Spread. Wide grids scroll horizontally within their
+// own container rather than the page.
+function CompareRatingsGrid({ matrix }) {
+  const ratingQuestions = matrix.questions.filter((q) => q.type === 'picklist');
+  if (ratingQuestions.length === 0) return null;
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-sm border-separate border-spacing-0">
+        <thead>
+          <tr>
+            <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4 sticky left-0 bg-white">
+              Question
+            </th>
+            {matrix.reviewers.map((r) => (
+              <th key={r.suggestionId} className="text-left text-xs font-semibold text-gray-700 py-2 px-3 whitespace-nowrap">
+                {r.name || 'Unnamed reviewer'}
+              </th>
+            ))}
+            <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 px-3 whitespace-nowrap">
+              Average
+            </th>
+            <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 px-3 whitespace-nowrap">
+              Spread
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {ratingQuestions.map((q) => (
+            <tr key={q.key} className="border-t border-gray-100">
+              <td className="py-2 pr-4 align-top sticky left-0 bg-white">
+                <div className="text-gray-900">{q.text}</div>
+                {q.retired && (
+                  <span className="inline-block mt-1 text-[10px] uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                    Prior cycle
+                  </span>
+                )}
+              </td>
+              {q.cells.map((c) => (
+                <td key={c.suggestionId} className="py-2 px-3 align-top whitespace-nowrap">
+                  {c.state === 'not-asked' ? (
+                    <span className="text-xs text-gray-400 italic">Not asked</span>
+                  ) : c.state === 'empty' ? (
+                    <span className="text-xs text-gray-400">—</span>
+                  ) : (
+                    <span className="text-gray-900">
+                      {c.answerText || 'Not provided'}
+                      {Number.isFinite(c.answerValue) ? ` (${c.answerValue})` : ''}
+                    </span>
+                  )}
+                </td>
+              ))}
+              <td className="py-2 px-3 align-top whitespace-nowrap text-gray-900">
+                {q.average != null ? q.average : <span className="text-gray-400">—</span>}
+              </td>
+              <td className="py-2 px-3 align-top whitespace-nowrap text-gray-900">
+                {q.min != null && q.max != null ? `${q.min}–${q.max}` : <span className="text-gray-400">—</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Per-question narrative browser: for each richtext question (live order),
+// all reviewers' answerHtml stacked with reviewer attribution. HTML is
+// rendered the same way NarrativeAnswers (cards view) does — already
+// sanitized server-side, this is the trusted last render step.
+function CompareNarrativeBrowser({ matrix }) {
+  const narrativeQuestions = matrix.questions.filter((q) => q.type === 'richtext');
+  if (narrativeQuestions.length === 0) return null;
+  return (
+    <div className="space-y-6">
+      {narrativeQuestions.map((q) => (
+        <div key={q.key}>
+          <div className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            {q.text}
+            {q.retired && (
+              <span className="text-[10px] uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                Prior cycle
+              </span>
+            )}
+          </div>
+          <div className="mt-2 space-y-3">
+            {matrix.reviewers.map((r) => {
+              const cell = q.cells.find((c) => c.suggestionId === r.suggestionId);
+              return (
+                <div key={r.suggestionId} className="border border-gray-100 rounded-lg p-3">
+                  <div className="text-xs font-semibold text-gray-500 mb-1">{r.name || 'Unnamed reviewer'}</div>
+                  {cell.state === 'not-asked' ? (
+                    <div className="text-xs text-gray-400 italic">Not asked</div>
+                  ) : cell.state === 'empty' ? (
+                    <div className="text-xs text-gray-400">No answer provided</div>
+                  ) : (
+                    <div
+                      className="prose prose-sm max-w-none text-gray-800"
+                      dangerouslySetInnerHTML={{ __html: cell.answerHtml }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CompareView({ submitted, liveQuestions }) {
+  const matrix = useMemo(() => deriveReviewMatrix(submitted, liveQuestions), [submitted, liveQuestions]);
+  if (matrix.questions.length === 0) {
+    return <p className="text-sm text-gray-500">No answers to compare yet.</p>;
+  }
+  return (
+    <div className="space-y-6">
+      <CompareRatingsGrid matrix={matrix} />
+      <CompareNarrativeBrowser matrix={matrix} />
+    </div>
+  );
+}
+
 // Outstanding = accepted but not yet submitted — including reviewers whose
 // materials haven't gone out yet (their nudge button renders disabled with a
 // tooltip; the send route re-derives eligibility itself, so this is a display
@@ -187,8 +325,16 @@ function OutstandingRow({ reviewer, requestId, onSent }) {
 
 export default function ReviewsTab({ requestId }) {
   const [proposal, setProposal] = useState(null);
+  // Phase 2: the live admin-panel question set (or null on fetch failure —
+  // fail-soft per the route; the matrix derivation falls back to
+  // snapshot-order-only and marks nothing retired in that case).
+  const [liveQuestions, setLiveQuestions] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // View toggle for the submitted-reviews area (Phase 2). "cards" is the
+  // existing, unchanged default rendering; "compare" is the new schema-free
+  // matrix.
+  const [view, setView] = useState('cards');
 
   const load = useCallback(async () => {
     if (!requestId) return;
@@ -201,6 +347,7 @@ export default function ReviewsTab({ requestId }) {
         throw new Error(data.error || `Failed to load reviews (${res.status})`);
       }
       setProposal((data.proposals && data.proposals[0]) || null);
+      setLiveQuestions(data.liveQuestions ?? null);
     } catch (e) {
       setError(e.message);
       setProposal(null);
@@ -282,14 +429,38 @@ export default function ReviewsTab({ requestId }) {
         </Card>
       ) : (
         <>
-          <p className="text-sm text-gray-500">
-            {submitted.length} of {acceptedCount} accepted reviewer{acceptedCount === 1 ? '' : 's'} submitted a review.
-          </p>
-          <div className="space-y-3">
-            {submitted.map((r) => (
-              <ReviewCard key={r.suggestionId} reviewer={r} />
-            ))}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-gray-500">
+              {submitted.length} of {acceptedCount} accepted reviewer{acceptedCount === 1 ? '' : 's'} submitted a review.
+            </p>
+            <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden text-xs">
+              <button
+                type="button"
+                onClick={() => setView('cards')}
+                className={`px-3 py-1.5 ${view === 'cards' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >
+                Cards
+              </button>
+              <button
+                type="button"
+                onClick={() => setView('compare')}
+                className={`px-3 py-1.5 border-l border-gray-300 ${view === 'compare' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >
+                Compare
+              </button>
+            </div>
           </div>
+          {view === 'cards' ? (
+            <div className="space-y-3">
+              {submitted.map((r) => (
+                <ReviewCard key={r.suggestionId} reviewer={r} />
+              ))}
+            </div>
+          ) : (
+            <Card hover={false}>
+              <CompareView submitted={submitted} liveQuestions={liveQuestions} />
+            </Card>
+          )}
         </>
       )}
     </div>

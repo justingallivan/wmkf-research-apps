@@ -1,0 +1,104 @@
+/**
+ * GET /api/review-manager/reviewers — `liveQuestions` (workbench Reviews tab
+ * Phase 2, docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md).
+ *
+ * Verifies the route projects `getActiveQuestionSet()` into the minimal
+ * `{key, order, text, type}` shape the matrix derivation module consumes, and
+ * fails SOFT (liveQuestions: null, logged, no 500) when the fetcher throws —
+ * `getActiveQuestionSet()` itself fails closed for the reviewer-facing form,
+ * but a workbench read of past submissions must not 500 on that basis.
+ */
+
+import { createMockReq, createMockRes } from '../helpers/auth-mock';
+import { requireAppAccess } from '../../lib/utils/auth';
+import { DynamicsService } from '../../lib/services/dynamics-service';
+import * as suggestionAdapter from '../../lib/dataverse/adapters/reviewer-suggestion';
+import { getActiveQuestionSet } from '../../lib/external/review-question-fetcher';
+
+jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
+jest.mock('../../lib/services/dynamics-context', () => ({
+  bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
+}));
+jest.mock('../../lib/services/dynamics-service', () => ({
+  DynamicsService: {
+    getRecord: jest.fn(),
+    queryRecords: jest.fn(),
+    queryAllRecords: jest.fn(),
+  },
+}));
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
+  findByRequest: jest.fn(),
+  RESPONSE_TYPE_BY_VALUE: {},
+}));
+jest.mock('../../lib/external/review-question-fetcher', () => ({
+  getActiveQuestionSet: jest.fn(),
+}));
+
+const REQUEST_ID = '550e8400-e29b-41d4-a716-446655440000';
+const SUGGESTION_ID = '11111111-1111-1111-1111-111111111111';
+const PERSON_ID = '22222222-2222-2222-2222-222222222222';
+
+let handler;
+beforeAll(async () => {
+  handler = (await import('../../pages/api/review-manager/reviewers')).default;
+});
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.spyOn(console, 'error').mockImplementation(() => {});
+  requireAppAccess.mockResolvedValue({ session: { user: { azureEmail: 'pd@example.com' } } });
+  DynamicsService.getRecord.mockResolvedValue({
+    akoya_requestid: REQUEST_ID, akoya_requestnum: '1002788', akoya_title: 'Test', wmkf_meetingdate: null,
+  });
+  suggestionAdapter.findByRequest.mockResolvedValue([{
+    wmkf_appreviewersuggestionid: SUGGESTION_ID,
+    _wmkf_request_value: REQUEST_ID,
+    _wmkf_potentialreviewer_value: PERSON_ID,
+    wmkf_accepted: true,
+    wmkf_reviewstatus: 100000003, // review_received
+    wmkf_reviewreceivedat: '2026-06-28T12:00:00Z',
+  }]);
+  DynamicsService.queryRecords.mockResolvedValue({
+    records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_name: 'Dr. X', wmkf_emailaddress: 'x@e.com' }],
+  });
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [] });
+});
+
+afterEach(() => {
+  console.error.mockRestore();
+});
+
+function get(query) {
+  const req = createMockReq({ method: 'GET', query });
+  const res = createMockRes();
+  return { req, res };
+}
+
+test('returns the live question set projected into {key, order, text, type}', async () => {
+  getActiveQuestionSet.mockResolvedValue([
+    { key: 'impact', order: 1, label: 'Impact?', type: 'picklist', required: true, options: [{ value: 1, label: 'Low' }] },
+    { key: 'comments', order: 2, label: 'Comments?', type: 'richtext', required: false },
+  ]);
+
+  const { req, res } = get({ proposalId: REQUEST_ID });
+  await handler(req, res);
+
+  expect(res.statusCode).toBe(200);
+  expect(res._data.liveQuestions).toEqual([
+    { key: 'impact', order: 1, text: 'Impact?', type: 'picklist' },
+    { key: 'comments', order: 2, text: 'Comments?', type: 'richtext' },
+  ]);
+});
+
+test('fails soft to liveQuestions: null (not a 500) when the fetcher throws', async () => {
+  getActiveQuestionSet.mockRejectedValue(new Error('Dataverse unreachable'));
+
+  const { req, res } = get({ proposalId: REQUEST_ID });
+  await handler(req, res);
+
+  expect(res.statusCode).toBe(200);
+  expect(res._data.liveQuestions).toBeNull();
+  expect(res._data.success).toBe(true);
+  // Failure is logged, not swallowed silently.
+  expect(console.error).toHaveBeenCalled();
+});

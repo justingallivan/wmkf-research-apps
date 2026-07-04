@@ -130,10 +130,36 @@ manual and cron sends share one fire-once marker and can never double-send.
 Unlike the cron, a manual re-send when the marker is already set IS allowed
 (staff-initiated); a claim conflict (412) returns an error without sending.
 
-**Still PLANNED:** schema-free comparison matrix (Phase 2), panel-prep export
-(client-side render, pure composition module for a future Power
-Automate/server seam — Phase 3), and Executor-based AI synthesis (Phase 4) —
-plan and owner-confirmed design decisions live in
+**Phase 2 BUILT (S326; tested + gated, pending deploy/E2E):** schema-free
+comparison matrix. `shared/utils/review-matrix.js#deriveReviewMatrix(reviewers,
+liveQuestions)` is a pure, DOM/React/Dataverse-free derivation over each
+reviewer's `answers[]` — union of question keys, ordered by the LIVE question
+set (`review-question-fetcher.js#getActiveQuestionSet()`) with snapshot-only
+keys appended after (flagged `retired: true`); per-question cells are
+`'answered'|'empty'|'not-asked'` (no row at all = not-asked, distinct from a
+blank answer); picklist questions get average/min/max/answeredCount computed
+only across reviewers who answered that key (drift-safe). NO hardcoded
+question keys and no read of `review-form-schema.js` or the legacy
+`reviewerImpact`/`reviewerRisk`/`reviewerOverallRating` projections — labels
+come from each row's own `answerText`. `reviewers.js` GET now also returns
+`liveQuestions` (`{key, order, text, type}[]`) via a new `fetchLiveQuestions()`
+wrapper; it fails SOFT (`liveQuestions: null`, logged) if the fetcher throws —
+`getActiveQuestionSet()` itself fails closed for the reviewer-facing form, but
+a workbench read of past submissions must not 500 on that basis. `ReviewsTab`
+adds a "Cards"/"Compare" toggle above the submitted-reviews area ("Cards" is
+the unchanged Phase-1 rendering, default); "Compare" renders a horizontally-
+scrollable ratings grid (rows = picklist questions in live order, columns =
+reviewers + Average + Spread, retired questions badged "Prior cycle") plus a
+per-question narrative browser (richtext questions, all reviewers' `answerHtml`
+stacked with attribution, rendered the same way the Cards view's
+`NarrativeAnswers` does — already-sanitized server HTML). Duplicate
+`questionKey` with differing snapshot text across reviewers: first-reviewer's
+text wins (documented in the module header) when the key isn't live; live text
+always wins when it is.
+
+**Still PLANNED:** panel-prep export (client-side render, pure composition
+module for a future Power Automate/server seam — Phase 3), and Executor-based
+AI synthesis (Phase 4) — plan and owner-confirmed design decisions live in
 `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`. Update that plan's status (and
 this paragraph) as further phases ship.
 
