@@ -1109,13 +1109,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/workbench/applicant-reviewers.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/workbench/dashboard.js",
       "kind": "import",
       "clientMethod": "DynamicsService.queryAllRecords",
