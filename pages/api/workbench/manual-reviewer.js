@@ -14,7 +14,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
 import { normalizeOrcid } from '../../../lib/utils/orcid-normalize';
@@ -115,7 +115,7 @@ export default async function handler(req, res) {
     try {
       let request;
       try {
-        request = await DynamicsService.getRecord('akoya_requests', requestId, {
+        request = await grantRequestAdapter.getById(requestId, {
           select: 'akoya_requestid,akoya_title,wmkf_meetingdate,_wmkf_programareaserved_value',
         });
       } catch {

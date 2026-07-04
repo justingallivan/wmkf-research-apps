@@ -15,7 +15,7 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
 import { buildReviewerCandidateWorkbook } from '../../../lib/services/reviewer-candidate-export';
@@ -57,7 +57,7 @@ export default async function handler(req, res) {
 
   return bypassDynamicsRestrictions('workbench-export-candidates', async () => {
     try {
-      const r = await DynamicsService.getRecord('akoya_requests', requestGuid, { select: REQUEST_SELECT })
+      const r = await grantRequestAdapter.getById(requestGuid, { select: REQUEST_SELECT })
         .catch(() => null);
       if (!r) {
         return res.status(404).json({ error: 'Request not found' });

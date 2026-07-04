@@ -19,6 +19,7 @@
 
 import { requireAppAccess } from '../../../../lib/utils/auth';
 import { DynamicsService } from '../../../../lib/services/dynamics-service';
+import * as grantRequestAdapter from '../../../../lib/dataverse/adapters/grant-request';
 import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
 import { isGuid } from '../../../../lib/utils/guid';
 import { mintForRequest } from '../../../../lib/external/grantee-token-lifecycle';
@@ -84,9 +85,7 @@ export default async function handler(req, res) {
     try {
       let row;
       try {
-        row = await DynamicsService.getRecord('akoya_requests', requestId, {
-          select: 'akoya_requestid,akoya_requestnum',
-        });
+        row = await grantRequestAdapter.getById(requestId, { select: grantRequestAdapter.SELECT_PROFILES.IDENTITY });
       } catch {
         row = null;
       }

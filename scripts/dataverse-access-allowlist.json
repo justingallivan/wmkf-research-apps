@@ -997,20 +997,6 @@
       "count": 2
     },
     {
-      "file": "pages/api/workbench/download-proposal-document.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/workbench/export-candidates.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/workbench/grantee-deliverables/abstract.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
@@ -1071,41 +1057,6 @@
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",
       "entity": "non-entity-transport",
-      "count": 1
-    },
-    {
-      "file": "pages/api/workbench/grantee-deliverables/send-invite.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/workbench/manual-reviewer.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/workbench/proposal-documents.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/workbench/resolve-request.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/workbench/resolve-request.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "akoya_requests",
       "count": 1
     },
     {
