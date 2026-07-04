@@ -24,9 +24,12 @@ restriction context folds INTO the layer as a deliberate late stage;
 delivery = ratchet + gate (freeze new raw usage immediately, convert
 opportunistically + occasional dedicated sessions).
 
-**Execution status: Stages 0–2 COMPLETE (S329, 2026-07-04).** Census probe,
-line-tolerant ratchet allowlist + CI gate, and the `lib/dataverse/core/`
-toolkit (all 4 adapters converted) are committed. Stages 3–8 have not run.
+**Execution status: Stages 0–2 COMPLETE; Wave 3 + Wave 5 adapter foundations
+BUILT (S329, 2026-07-04).** Census probe, line-tolerant ratchet allowlist + CI
+gate, `lib/dataverse/core/` toolkit (4 original adapters converted), and 5 new
+adapters (policy, review-question, ai-prompt, review-answer + core/changeset,
+grant-request reads) are committed. NO callers converted yet — the allowlist
+still holds the full baseline; conversion waves 3–6 and Stages 7–8 remain.
 
 ## Why (baseline evidence)
 
@@ -410,6 +413,25 @@ Drift found → this doc is edited BEFORE the next stage starts.
   adapters; existing custom guard messages not swapped for `eqGuid`. Merged
   state: full suite 3879/3880 (pricing-canary pre-existing), build clean,
   ratchet + trust-boundary-guid green.
+
+- 2026-07-04 (S329): **Adapter wave executed** (4 parallel Opus worktree
+  builds, Claude review + serial merge `281f4280`…`65b4b7cb`; Codex post-impl
+  review of Stage 2 returned NOT REFUTED with one LOW test-strictness finding,
+  closed in `fac94619`). New adapters, contract-mirroring only, NO callers
+  moved (allowlist unchanged): `policy.js` (wmkf_policies + versions, 10
+  methods), `review-question.js`, `ai-prompt.js` (all 15 census identities
+  incl. the prompt-seed caller), `review-answer.js` + `core/changeset.js`
+  (alt-key upsert contract, registry-validated batch ops, answers-before-
+  parent atomic order; restriction enforcement deferred to Stage 7 by design),
+  `grant-request.js` (Wave 5a/b reads: getById passthrough-select + 3 shared
+  profiles, findByRequestNumber/findByIds/findMeetingDatesByProgramDirector;
+  6 resistant read-shape clusters documented in the adapter for caller-side
+  conversion). 76 new tests; merged state full suite 3958/3958 (pricing-canary
+  fixed in `36ee834b`), build clean, ratchet + atlas green. Known deliberate
+  divergences recorded for conversion commits: static registry set-name
+  resolution replaces runtime `resolveEntitySetName` in the answer path;
+  `readRatingsBySuggestion` carries no bypass wrapper; policy
+  `queryActiveSlotByCode` escapes `wmkf_code` (was raw-interpolated).
 
 ## Appendix A — Baseline census
 

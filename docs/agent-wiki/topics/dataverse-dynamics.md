@@ -60,8 +60,11 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   and a CI ratchet freezes raw usage.** `entity-registry.js` `entitySet()`
   throws on any entity-set name outside the Stage-0 census (never guess names —
   the S328 `wmkf_prompts`/`wmkf_aiprompts` 404s are the motivating case);
-  `odata.js` owns escape/eq/eqGuid filter builders; all 4 adapters consume
-  them. Any NEW raw `DynamicsService` call (direct, aliased, or via
+  `odata.js` owns escape/eq/eqGuid filter builders; the adapter layer (9
+  adapters as of S329, incl. new policy / review-question / ai-prompt /
+  review-answer / grant-request) consumes them, and `core/changeset.js` is the
+  registry-validated batch path. Any NEW raw `DynamicsService` call (direct,
+  aliased, or via
   `executeChangeset`) in `pages/`+`lib/`+`shared/` fails
   `check:dataverse-access-layer` until it moves behind an adapter or the
   allowlist shrinks. Plan + stage log: `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`.
