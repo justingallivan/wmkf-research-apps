@@ -24,8 +24,9 @@ restriction context folds INTO the layer as a deliberate late stage;
 delivery = ratchet + gate (freeze new raw usage immediately, convert
 opportunistically + occasional dedicated sessions).
 
-**Execution status: NOT STARTED.** This document is the plan. No stage below
-has run.
+**Execution status: Stage 0 COMPLETE (S329, 2026-07-04).** Census probe +
+self-test committed; Appendix A holds the baseline census. Stages 1–8 have not
+run.
 
 ## Why (baseline evidence)
 
@@ -361,10 +362,70 @@ Drift found → this doc is edited BEFORE the next stage starts.
   Stage 7 risked erasing caller-owned auth-to-context ordering). Plan amended
   in place (Codex patch, Claude-verified citations); execution still NOT
   started.
+- 2026-07-04 (S329): **Stage 0 executed** (Codex build, Claude review).
+  `scripts/check-dataverse-access-layer.js` (Babel-AST census: direct calls,
+  import/require aliases, defaulted dependency + fallback aliases, changeset
+  operation-URL attribution) + self-test (6 fixture kinds, all pass) +
+  package.json registration. Census: 211 call identities / 84 files / 21
+  entity buckets (Appendix A). Alias detection proven live: 10 identities in 4
+  alias-only files invisible to literal grep. Review verified: 5 dropped
+  files are comment-only mentions; independent literal recount = 85 files
+  with Stage-0 exemptions. Full suite 3836/3837 (pricing-canary pre-existing
+  red), build clean. The allowlist drift-comparison path ships untested until
+  Stage 1's self-test per plan staging.
 
 ## Appendix A — Baseline census
 
-Populated by Stage 0 (`scripts/check-dataverse-access-layer.js --report`).
-Until then the literal-grep baseline stands: 86 caller files / ≥15 entity sets
-/ 39 filter strings / 97 bypass files / 18 suggestion-entity and 74
+Populated by Stage 0 `[VERIFIED 2026-07-04 via
+node scripts/check-dataverse-access-layer.js --report]`.
+
+Literal-grep baseline retained for comparison: 86 caller files / ≥15 entity
+sets / 39 filter strings / 97 bypass files / 18 suggestion-entity and 74
 akoya_requests raw call-site lines (units and exclusions per the Why section).
+
+Stage-0 AST census:
+
+- Total call identities: 211
+- Caller files: 84
+- Entity buckets: 21
+
+Delta against the 86-file literal baseline: **-2 caller files**. The AST probe
+adds four real alias-only caller files missed by literal `DynamicsService.`
+greps: `lib/bill/honorarium-onboard-orchestrator.js`,
+`lib/bill/onboard-reviewer-service.js`,
+`lib/services/reviewer-acceptance-drain.js`, and
+`lib/services/reviewer-merge.js` `[VERIFIED 2026-07-04 via
+node scripts/check-dataverse-access-layer.js --json]`. It drops five
+literal-only files whose `DynamicsService.` occurrences are comments or docs,
+not calls: `lib/external/calendar-invite.js`,
+`lib/services/contact-enrichment-service.js`,
+`lib/services/dynamics-context.js`, `lib/utils/guid.js`, and
+`shared/utils/review-report-docx.js` `[VERIFIED 2026-07-04 via
+literal/AST set diff]`. Rerunning the literal scan with the Stage-0 Permanent
+exemptions today yields 85 files; the remaining one-file gap from the stored
+86-file snapshot is exemption/snapshot precision, not an extra live call
+identity.
+
+| Entity | Calls | Files | Methods |
+|---|---:|---:|---|
+| akoya_requests | 79 | 48 | createRecord:2, disassociate:1, getRecord:44, queryAllRecords:9, queryRecords:7, updateRecord:16 |
+| wmkf_appreviewersuggestions | 27 | 15 | executeChangeset:3, getRecord:9, queryAllRecords:6, updateRecord:9 |
+| wmkf_ai_prompts | 15 | 4 | createRecord:2, getRecord:3, queryRecords:7, updateRecord:3 |
+| contacts | 13 | 8 | createRecord:1, getEntityKey:1, getRecord:6, queryRecords:2, updateRecord:3 |
+| non-entity-transport | 12 | 11 | createAndSendEmail:9, createEmailActivity:1, logAiRun:2 |
+| wmkf_appreviewanswers | 10 | 6 | executeChangeset:3, queryAllRecords:3, resolveEntitySetName:4 |
+| systemusers | 9 | 8 | getRecord:7, queryRecords:2 |
+| unresolved | 9 | 6 | getRecord:2, queryAllRecords:2, queryRecords:1, resolveLogicalName:1, updateRecord:3 |
+| wmkf_potentialreviewerses | 9 | 7 | getRecord:4, queryRecords:5 |
+| wmkf_policies | 6 | 2 | getRecord:3, queryRecords:2, updateRecord:1 |
+| sharepointdocumentlocations | 4 | 2 | queryRecords:4 |
+| wmkf_policyversions | 4 | 1 | createRecord:1, queryRecords:2, updateRecord:1 |
+| wmkf_apprequestpersons | 3 | 3 | queryAllRecords:1, queryRecords:2 |
+| wmkf_granteedeliverables | 3 | 1 | createRecord:1, queryRecords:1, updateRecord:1 |
+| accounts | 2 | 2 | getRecord:1, queryRecords:1 |
+| changeset-unresolved | 1 | 1 | executeChangeset:1 |
+| wmkf_ai_runs | 1 | 1 | createRecord:1 |
+| wmkf_appgrantcycles | 1 | 1 | queryAllRecords:1 |
+| wmkf_portalmemberships | 1 | 1 | queryRecords:1 |
+| wmkf_proposalbudgetlines | 1 | 1 | createRecord:1 |
+| wmkf_reviewquestions | 1 | 1 | queryRecords:1 |

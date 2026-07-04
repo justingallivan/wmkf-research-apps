@@ -67,6 +67,8 @@
     "check:status-enum-parity:self-test": "node scripts/check-status-enum-parity.js --self-test",
     "check:trust-boundary-guid": "node scripts/check-trust-boundary-guid.js",
     "check:trust-boundary-guid:self-test": "node scripts/check-trust-boundary-guid-self-test.js",
+    "check:dataverse-access-layer": "node scripts/check-dataverse-access-layer.js",
+    "check:dataverse-access-layer:self-test": "node scripts/check-dataverse-access-layer-self-test.js",
     "check:route-lifecycle-auth": "node scripts/check-route-lifecycle-auth.js",
     "check:route-lifecycle-auth:self-test": "node scripts/check-route-lifecycle-auth-self-test.js",
     "check:secret-scan": "node scripts/check-secret-scan.js",
