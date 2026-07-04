@@ -346,13 +346,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/review-answers.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryAllRecords",
-      "entity": "wmkf_appreviewanswers",
-      "count": 1
-    },
-    {
       "file": "lib/services/review-upload.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
