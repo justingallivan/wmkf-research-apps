@@ -885,13 +885,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/review-manager/materials-preflight.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/review-manager/regenerate-token.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
