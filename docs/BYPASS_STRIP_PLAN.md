@@ -714,7 +714,23 @@ Decision 4: "trust-model tightening comes at the end of the strip").
     session. This narrows (does not blanket-defer) the original Stage 4 recommendation.
   - Full suite 427/4744 green after each landing; `check:dataverse-access-layer`,
     `check:route-service-boundary`, `check:dynamics-context-boundary` (+ all self-tests),
-    `check:api-routes`, `check:agent-wiki` green throughout. A second fresh-context review round
-    covering the Stage 4 diff specifically is still pending (not yet run this session).
+    `check:api-routes`, `check:agent-wiki` green throughout.
+- 2026-07-05 (S333): **Post-Stage-4 fresh-context review (Codex adversarial, diff `367ee56c..HEAD`):
+  SATISFIED, no findings.** Reviewer independently re-traced every site's caller graph from source
+  (verbatim relay): site 40 `recoverRequestCreated` only reached via a state handler dispatched
+  under `processJob`'s `withDalContext('drain-submissions')` (`drain-submissions-service.js:412,840`);
+  site 47 `mintAndStore`'s callers (`ensureToken`, regenerate/render/reminder paths) all
+  route-wrapped; site 49 `ensureToken`'s sole caller is `my-candidates-service.js:562` under
+  `my-candidates.js:36`'s context; site 50 `extendForPostSubmissionWindow`'s sole caller
+  (`review-upload.js:270`) is wrapped by both its route callers; site 48 `revoke` wrapped at
+  `revoke-token.js:46`; sites 34/35 moved to `cron/maintenance.js:114,157`; site 44 moved to
+  `context-service.js:129`; site 45 wrapped in both grantee callers; site 46 wrapped in all six
+  suggestion-token callers; site 33 confirmed untouched (no diff). Noted (not a blocker): the Stage 0
+  `*-dal-context.test.js` characterization tests for the pushed-up sites mock the adapter layer
+  (weaker pins) vs. `token-lifecycle-nested-context.test.js`'s real-`DynamicsService` drive — the live
+  source/caller graph was independently verified regardless. `npm test` + the three gate self-tests
+  hit the same read-only-sandbox EPERM artifact as the Stage 3 review round; already independently
+  confirmed green in this session's writable environment after every commit (427/4744; all three law
+  gates + self-tests). Stage 4 is closed pending only the owner's own review of the diff.
 
 <!-- end of plan -->
