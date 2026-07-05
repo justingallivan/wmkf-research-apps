@@ -45,6 +45,34 @@ describe('sweepStaleInvites', () => {
     );
   });
 
+  it('chunks distinct request ids at 25 per OR-filter query: first call gets ids 0-24 in order, second gets id 25', async () => {
+    const requestIds = Array.from({ length: 26 }, (_, i) =>
+      `${String(i).padStart(8, '0')}-0000-4000-8000-000000000000`);
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: requestIds.map((rid, i) => ({
+        wmkf_appreviewersuggestionid: `s${i}`,
+        wmkf_emailsentat: '2020-01-01T00:00:00.000Z',
+        _wmkf_request_value: rid,
+        wmkf_accepted: false,
+        wmkf_declined: false,
+        wmkf_responsetype: null,
+      })),
+    });
+    const qSpy = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+
+    await sweepStaleInvites({ actingUserSystemId: 'staff-1' });
+
+    expect(qSpy).toHaveBeenCalledTimes(2);
+    const firstFilter = qSpy.mock.calls[0][1].filter;
+    const secondFilter = qSpy.mock.calls[1][1].filter;
+    expect(firstFilter.split(' or ')).toEqual(
+      requestIds.slice(0, 25).map((id) => `akoya_requestid eq ${id}`),
+    );
+    expect(secondFilter.split(' or ')).toEqual(
+      requestIds.slice(25).map((id) => `akoya_requestid eq ${id}`),
+    );
+  });
+
   it('dry run: identifies eligible rows but writes nothing', async () => {
     jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
       records: [{

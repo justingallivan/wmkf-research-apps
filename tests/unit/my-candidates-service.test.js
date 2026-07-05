@@ -177,6 +177,59 @@ describe('getMyCandidates', () => {
     suggestionAdapter.findByPD.mockRejectedValue(new Error('Dataverse down'));
     await expect(getMyCandidates({ azureEmail: EMAIL })).rejects.toThrow('Dataverse down');
   });
+
+  test('chunk boundary: 26 distinct person ids chunk both the reviewer and researcher OR-chains at 25, first call gets ids 0-24 in order, second gets id 25', async () => {
+    grantRequestAdapter.getById.mockResolvedValue({
+      akoya_requestid: REQUEST_ID, akoya_requestnum: 'R-1', akoya_title: 'A Proposal',
+    });
+    const personIds = Array.from({ length: 26 }, (_, i) => `person-${i}`);
+    suggestionAdapter.findByRequest.mockResolvedValue(
+      personIds.map((pid, i) => ({
+        wmkf_appreviewersuggestionid: `sug-${i}`,
+        _wmkf_request_value: REQUEST_ID,
+        _wmkf_potentialreviewer_value: pid,
+      })),
+    );
+    suggestionAdapter.findRemovedByRequest.mockResolvedValue([]);
+    potentialReviewerAdapter.queryReviewers.mockResolvedValue({ records: [] });
+
+    await getMyCandidates({ requestId: REQUEST_ID, azureEmail: EMAIL });
+
+    const reviewerCalls = potentialReviewerAdapter.queryReviewers.mock.calls.filter((c) => c[0].select.includes('wmkf_name'));
+    const researcherCalls = potentialReviewerAdapter.queryReviewers.mock.calls.filter((c) => c[0].select.includes('wmkf_primaryaffiliation'));
+    expect(reviewerCalls).toHaveLength(2);
+    expect(researcherCalls).toHaveLength(2);
+    for (const calls of [reviewerCalls, researcherCalls]) {
+      expect(calls[0][0].filter.split(' or ')).toEqual(
+        personIds.slice(0, 25).map((id) => `wmkf_potentialreviewersid eq ${id}`),
+      );
+      expect(calls[1][0].filter.split(' or ')).toEqual(
+        personIds.slice(25).map((id) => `wmkf_potentialreviewersid eq ${id}`),
+      );
+    }
+  });
+
+  test('chunk boundary: 26 distinct applicant account ids chunk the AKA OR-chain at 25, first call gets ids 0-24 in order, second gets id 25', async () => {
+    resolveByEmail.mockResolvedValue({ systemuserid: 'pd-1' });
+    const accountIds = Array.from({ length: 26 }, (_, i) => `account-${i}`);
+    const requestById = {};
+    accountIds.forEach((aid, i) => {
+      requestById[`req-${i}`] = { requestId: `req-${i}`, applicantId: aid };
+    });
+    suggestionAdapter.findByPD.mockResolvedValue({
+      suggestions: [{ wmkf_appreviewersuggestionid: 's-0', _wmkf_request_value: 'req-0', _wmkf_potentialreviewer_value: null }],
+      requestById,
+    });
+
+    await getMyCandidates({ azureEmail: EMAIL });
+
+    const accountAdapter = require('../../lib/dataverse/adapters/account');
+    expect(accountAdapter.queryAccounts).toHaveBeenCalledTimes(2);
+    const firstFilter = accountAdapter.queryAccounts.mock.calls[0][0].filter;
+    const secondFilter = accountAdapter.queryAccounts.mock.calls[1][0].filter;
+    expect(firstFilter.split(' or ')).toEqual(accountIds.slice(0, 25).map((id) => `accountid eq ${id}`));
+    expect(secondFilter.split(' or ')).toEqual(accountIds.slice(25).map((id) => `accountid eq ${id}`));
+  });
 });
 
 describe('patchMyCandidates', () => {

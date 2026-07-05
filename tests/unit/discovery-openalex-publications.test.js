@@ -138,4 +138,30 @@ describe('DiscoveryService.backfillOpenAlexPublications', () => {
     expect(c.publications).toEqual([]);
     expect(c.publicationCount5yr).toBeUndefined();
   });
+
+  test('chunk boundary: concurrency+1 trusted candidates run in two Promise.all rounds, first round gets candidates 0..concurrency-1 in order, second gets the last one', async () => {
+    const concurrency = DiscoveryService.OPENALEX_PUB_BACKFILL_CONCURRENCY;
+    const candidates = Array.from({ length: concurrency + 1 }, (_, i) => ({
+      name: `Candidate ${i}`,
+      verified: true,
+      openAlexId: `A${i}`,
+      publications: [],
+    }));
+    const callOrder = [];
+    jest.spyOn(OpenAlexService, 'getWorksByAuthor').mockImplementation(async (authorId) => {
+      callOrder.push(authorId);
+      return { records: [] };
+    });
+
+    await DiscoveryService.backfillOpenAlexPublications(candidates, {});
+
+    // First round (batch 1) covers candidates 0..concurrency-1 in order; the
+    // round boundary means those calls all start before the last candidate's.
+    expect(callOrder.slice(0, concurrency)).toEqual(
+      candidates.slice(0, concurrency).map((c) => c.openAlexId),
+    );
+    expect(callOrder.slice(concurrency)).toEqual(
+      candidates.slice(concurrency).map((c) => c.openAlexId),
+    );
+  });
 });

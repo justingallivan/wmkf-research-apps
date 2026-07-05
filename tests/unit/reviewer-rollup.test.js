@@ -49,10 +49,18 @@ describe('fetchReviewerRollup (characterization)', () => {
     expect(opts.filter).toContain('wmkf_selected eq true');
   });
 
-  test('chunks requestIds at 25 per OR-chain call', async () => {
+  test('chunks requestIds at 25 per OR-chain call: first call gets ids 0-24 in order, second gets id 25', async () => {
     const ids = Array.from({ length: 30 }, (_, i) => `3333333${i.toString().padStart(1, '0')}-0000-4000-8000-000000000000`);
     const spy = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [] });
     await fetchReviewerRollup(ids);
     expect(spy).toHaveBeenCalledTimes(2);
+    const firstFilter = spy.mock.calls[0][1].filter;
+    const secondFilter = spy.mock.calls[1][1].filter;
+    // The filter wraps the OR-chain in parens: `(${orChain}) and wmkf_selected …`.
+    const firstOrChain = firstFilter.slice(firstFilter.indexOf('(') + 1, firstFilter.indexOf(')'));
+    const secondOrChain = secondFilter.slice(secondFilter.indexOf('(') + 1, secondFilter.indexOf(')'));
+    // Exact contents + order: first call gets elements 0..24 in order, second gets element 25..29.
+    expect(firstOrChain.split(' or ')).toEqual(ids.slice(0, 25).map((id) => `_wmkf_request_value eq ${id}`));
+    expect(secondOrChain.split(' or ')).toEqual(ids.slice(25).map((id) => `_wmkf_request_value eq ${id}`));
   });
 });

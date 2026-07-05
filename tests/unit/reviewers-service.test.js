@@ -136,4 +136,38 @@ describe('getReviewers', () => {
     expect(out.proposals[0].statusSummary).toEqual({ materials_sent: 1 });
     expect(out.liveQuestions).toEqual([{ key: 'impact', order: 1, text: 'Impact?', type: 'picklist' }]);
   });
+
+  test('chunk boundary: 26 distinct person ids chunk both the reviewer and researcher OR-chains at 25, first call gets ids 0-24 in order, second gets id 25', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+    });
+    const personIds = Array.from({ length: 26 }, (_, i) => `person-${i}`);
+    findByRequest.mockResolvedValueOnce(
+      personIds.map((pid, i) => ({
+        wmkf_appreviewersuggestionid: `sug-${i}`,
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: pid,
+        wmkf_accepted: true,
+        wmkf_reviewstatus: 100000001,
+      })),
+    );
+
+    await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' });
+
+    // Both fetchPotentialReviewers (wmkf_name select) and fetchResearchersByPerson
+    // (wmkf_primaryaffiliation select) run their own two-chunk loop over the same
+    // personIds; disambiguate by select since the two loops interleave under Promise.all.
+    const reviewerCalls = queryReviewers.mock.calls.filter((c) => c[0].select.includes('wmkf_name'));
+    const researcherCalls = queryReviewers.mock.calls.filter((c) => c[0].select.includes('wmkf_primaryaffiliation'));
+    expect(reviewerCalls).toHaveLength(2);
+    expect(researcherCalls).toHaveLength(2);
+    for (const calls of [reviewerCalls, researcherCalls]) {
+      expect(calls[0][0].filter.split(' or ')).toEqual(
+        personIds.slice(0, 25).map((id) => `wmkf_potentialreviewersid eq ${id}`),
+      );
+      expect(calls[1][0].filter.split(' or ')).toEqual(
+        personIds.slice(25).map((id) => `wmkf_potentialreviewersid eq ${id}`),
+      );
+    }
+  });
 });

@@ -129,3 +129,42 @@ test('capped answer query throws UNTYPED (shell maps to 500 server_error)', asyn
   expect(err).not.toBeInstanceOf(SynthesizeReviewsError);
   expect(err.message).toMatch(/truncated at the 5000-row cap/);
 });
+
+test('chunk boundary: person-name lookup chunks at 25 ids, first call gets ids 0-24 in order, second gets id 25', async () => {
+  const personIds = Array.from({ length: 26 }, (_, i) => `person-${i}`);
+  findByRequest.mockResolvedValueOnce(
+    personIds.map((pid, i) => submittedSuggestion({
+      wmkf_appreviewersuggestionid: `sug-${i}`,
+      _wmkf_potentialreviewer_value: pid,
+    })),
+  );
+  await synthesizeReviews({ requestId: REQ, overwrite: false, actingUserSystemId: ACTOR });
+
+  expect(queryReviewers).toHaveBeenCalledTimes(2);
+  const firstFilter = queryReviewers.mock.calls[0][0].filter;
+  const secondFilter = queryReviewers.mock.calls[1][0].filter;
+  expect(firstFilter.split(' or ')).toEqual(
+    personIds.slice(0, 25).map((id) => `wmkf_potentialreviewersid eq ${id}`),
+  );
+  expect(secondFilter.split(' or ')).toEqual(
+    personIds.slice(25).map((id) => `wmkf_potentialreviewersid eq ${id}`),
+  );
+});
+
+test('chunk boundary: answer-text lookup chunks at 20 suggestion ids, first call gets ids 0-19 in order, second gets id 20', async () => {
+  const suggestionIds = Array.from({ length: 21 }, (_, i) => `sug-${i}`);
+  findByRequest.mockResolvedValueOnce(
+    suggestionIds.map((sid) => submittedSuggestion({ wmkf_appreviewersuggestionid: sid })),
+  );
+  await synthesizeReviews({ requestId: REQ, overwrite: false, actingUserSystemId: ACTOR });
+
+  expect(queryAllAnswers).toHaveBeenCalledTimes(2);
+  const firstFilter = queryAllAnswers.mock.calls[0][0].filter;
+  const secondFilter = queryAllAnswers.mock.calls[1][0].filter;
+  expect(firstFilter.split(' or ')).toEqual(
+    suggestionIds.slice(0, 20).map((id) => `_wmkf_appreviewersuggestion_value eq ${id}`),
+  );
+  expect(secondFilter.split(' or ')).toEqual(
+    suggestionIds.slice(20).map((id) => `_wmkf_appreviewersuggestion_value eq ${id}`),
+  );
+});

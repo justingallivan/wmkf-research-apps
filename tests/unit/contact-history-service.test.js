@@ -120,7 +120,7 @@ test('projectleader-only row is inferred as pi at position 0 with projectleader 
   expect(out.rows[0]).toMatchObject({ role: 'pi', position: 0, sources: ['projectleader'] });
 });
 
-test('metadata fetch is chunked at 50 request ids per OR-filter query', async () => {
+test('metadata fetch is chunked at 50 request ids per OR-filter query: first call gets ids 0-49 in order, second gets ids 50-59', async () => {
   const ids = Array.from({ length: 60 }, (_, i) =>
     `${String(i).padStart(8, '0')}-0000-4000-8000-000000000000`);
   queryAllPersons.mockResolvedValue({
@@ -131,8 +131,13 @@ test('metadata fetch is chunked at 50 request ids per OR-filter query', async ()
   await getContactHistory({ contactId: CONTACT_ID });
 
   expect(queryRequests).toHaveBeenCalledTimes(2);
-  expect(queryRequests.mock.calls[0][0].filter.split(' or ')).toHaveLength(50);
-  expect(queryRequests.mock.calls[1][0].filter.split(' or ')).toHaveLength(10);
+  const firstFilter = queryRequests.mock.calls[0][0].filter;
+  const secondFilter = queryRequests.mock.calls[1][0].filter;
+  expect(firstFilter.split(' or ')).toHaveLength(50);
+  expect(secondFilter.split(' or ')).toHaveLength(10);
+  // Exact contents + order: first call gets elements 0..49 in order, second gets element 50..59.
+  expect(firstFilter.split(' or ')).toEqual(ids.slice(0, 50).map((id) => `akoya_requestid eq ${id}`));
+  expect(secondFilter.split(' or ')).toEqual(ids.slice(50).map((id) => `akoya_requestid eq ${id}`));
 });
 
 test("a non-GUID contactId fails closed via odata.eqGuid before any adapter call", async () => {

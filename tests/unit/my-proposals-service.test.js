@@ -133,19 +133,29 @@ test('a request with no suggestion rows gets 0/0/0/0 counts', async () => {
   });
 });
 
-test('reviewer-count aggregation chunks the OR-chain at 25 request ids per query', async () => {
+test('reviewer-count aggregation chunks the OR-chain at 25 request ids per query: first call gets ids 0-24 in order, second gets ids 25-29', async () => {
+  const ids = Array.from({ length: 30 }, (_, i) => `r${i}`);
   queryAllRequests.mockResolvedValue({
-    records: Array.from({ length: 30 }, (_, i) => ({
-      akoya_requestid: `r${i}`, akoya_requestnum: `REQ-${i}`, wmkf_meetingdate: '2026-06-15',
+    records: ids.map((id) => ({
+      akoya_requestid: id, akoya_requestnum: `REQ-${id}`, wmkf_meetingdate: '2026-06-15',
     })),
   });
 
   await getMyProposals({ azureEmail: EMAIL, cycleCode: 'J26' });
 
   expect(queryAllSuggestions).toHaveBeenCalledTimes(2);
-  expect(queryAllSuggestions.mock.calls[0][0].filter.split(' or ')).toHaveLength(25);
-  expect(queryAllSuggestions.mock.calls[1][0].filter.split(' or ')).toHaveLength(5);
-  expect(queryAllSuggestions.mock.calls[0][0].filter).toContain('not-excluded');
+  const firstFilter = queryAllSuggestions.mock.calls[0][0].filter;
+  const secondFilter = queryAllSuggestions.mock.calls[1][0].filter;
+  expect(firstFilter.split(' or ')).toHaveLength(25);
+  expect(secondFilter.split(' or ')).toHaveLength(5);
+  expect(firstFilter).toContain('not-excluded');
+  // Exact contents + order: first call gets elements 0..24 in order, second gets element 25..29.
+  const firstOrChainStart = firstFilter.indexOf('(') + 1;
+  const firstOrChain = firstFilter.slice(firstOrChainStart, firstFilter.indexOf(')'));
+  expect(firstOrChain.split(' or ')).toEqual(ids.slice(0, 25).map((id) => `_wmkf_request_value eq ${id}`));
+  const secondOrChainStart = secondFilter.indexOf('(') + 1;
+  const secondOrChain = secondFilter.slice(secondOrChainStart, secondFilter.indexOf(')'));
+  expect(secondOrChain.split(' or ')).toEqual(ids.slice(25).map((id) => `_wmkf_request_value eq ${id}`));
 });
 
 test('a suggestion-count chunk failure propagates untyped (clean 500 beats an undercount)', async () => {

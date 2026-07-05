@@ -51,4 +51,22 @@ describe('aggregateReviewHistory', () => {
     expect(occurrences).toBe(1);
     expect(opts.filter).not.toContain('bogus');
   });
+
+  it('chunks ids at 25 per OR-chain call: first call gets ids 0-24 in order, second gets id 25', async () => {
+    const ids = Array.from({ length: 26 }, (_, i) =>
+      `${String(i).padStart(8, '0')}-0000-4000-8000-000000000000`);
+    const spy = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [] });
+    await aggregateReviewHistory(ids);
+    expect(spy).toHaveBeenCalledTimes(2);
+    const firstFilter = spy.mock.calls[0][1].filter;
+    const secondFilter = spy.mock.calls[1][1].filter;
+    const firstOrChain = firstFilter.slice(firstFilter.indexOf('(') + 1, firstFilter.indexOf(')'));
+    const secondOrChain = secondFilter.slice(secondFilter.indexOf('(') + 1, secondFilter.indexOf(')'));
+    expect(firstOrChain.split(' or ')).toEqual(
+      ids.slice(0, 25).map((id) => `_wmkf_potentialreviewer_value eq ${id}`),
+    );
+    expect(secondOrChain.split(' or ')).toEqual(
+      ids.slice(25).map((id) => `_wmkf_potentialreviewer_value eq ${id}`),
+    );
+  });
 });

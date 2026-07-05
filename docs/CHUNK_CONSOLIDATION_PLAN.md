@@ -31,8 +31,10 @@ body differing. This plan consolidates the **scaffold** onto one canonical helpe
 `name-normalization.js`, `orcid-normalize.js`) `[VERIFIED via ls lib/utils/ this session]`. This is a
 motion refactor, not a redesign: same batches, same size, same order, same downstream calls.
 
-**No name collision.** `lib/utils/chunk.js` does not exist
-`[VERIFIED via ls lib/utils/chunk.js → "No such file or directory", this session]`. Nothing under
+**No name collision.** At drafting time `lib/utils/chunk.js` did not exist
+`[VERIFIED via ls lib/utils/chunk.js → "No such file or directory", at drafting]`.
+[RECHECKED after lib/utils/chunk.js change: Stage 0 execution has now created the helper per The-canonical-semantics (771 bytes, ls this session); the executing agent appends its Stage Log entry at close]
+Nothing under
 `lib/`/`pages/`/`shared/`/`modules/` exports a `chunk` helper today; the 20+ occurrences of the token
 `chunk` are all **local loop-slice variables**, not an importable helper `[VERIFIED via the
 disconfirming grep in the Stage Log]`.

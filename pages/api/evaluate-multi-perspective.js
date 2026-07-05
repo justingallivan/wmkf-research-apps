@@ -226,7 +226,7 @@ function sendProgress(res, progress, message, stage = null) {
 /**
  * Process items with concurrency control
  */
-async function processWithConcurrency(items, processorFn, limit) {
+export async function processWithConcurrency(items, processorFn, limit) {
   const results = [];
 
   for (let i = 0; i < items.length; i += limit) {

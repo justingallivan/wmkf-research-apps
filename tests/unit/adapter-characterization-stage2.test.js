@@ -227,6 +227,29 @@ describe('reviewer-suggestion.findByPD (characterization)', () => {
         'wmkf_meetingdate ge 2026-06-01T00:00:00Z and wmkf_meetingdate lt 2026-07-01T00:00:00Z',
     );
   });
+
+  test('chunk boundary: 26 distinct requests chunk the suggestion OR-chain at 25 per query, first call gets requests 0-24 in order, second gets request 25', async () => {
+    const requestIds = Array.from({ length: 26 }, (_, i) =>
+      `${String(i).padStart(8, '0')}-0000-4000-8000-000000000000`);
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: requestIds.map((id, i) => ({ akoya_requestid: id, akoya_requestnum: `REQ-${i}` })),
+    });
+    const q = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+
+    await suggestion.findByPD(PD_ID);
+
+    expect(q).toHaveBeenCalledTimes(2);
+    const firstFilter = q.mock.calls[0][1].filter;
+    const secondFilter = q.mock.calls[1][1].filter;
+    const firstOrChain = firstFilter.slice(firstFilter.indexOf('(') + 1, firstFilter.indexOf(')'));
+    const secondOrChain = secondFilter.slice(secondFilter.indexOf('(') + 1, secondFilter.indexOf(')'));
+    expect(firstOrChain.split(' or ')).toEqual(
+      requestIds.slice(0, 25).map((id) => `_wmkf_request_value eq ${id}`),
+    );
+    expect(secondOrChain.split(' or ')).toEqual(
+      requestIds.slice(25).map((id) => `_wmkf_request_value eq ${id}`),
+    );
+  });
 });
 
 describe('reviewer-suggestion.findAcceptedByPD (characterization)', () => {
@@ -256,5 +279,28 @@ describe('reviewer-suggestion.findAcceptedByPD (characterization)', () => {
     const out = await suggestion.findAcceptedByPD('');
     expect(out).toEqual({ suggestions: [], requestById: {} });
     expect(qAll).not.toHaveBeenCalled();
+  });
+
+  test('chunk boundary: 26 distinct requests chunk the suggestion OR-chain at 25 per query, first call gets requests 0-24 in order, second gets request 25', async () => {
+    const requestIds = Array.from({ length: 26 }, (_, i) =>
+      `${String(i).padStart(8, '0')}-0000-4000-8000-000000000000`);
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: requestIds.map((id, i) => ({ akoya_requestid: id, akoya_requestnum: `REQ-${i}` })),
+    });
+    const q = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+
+    await suggestion.findAcceptedByPD(PD_ID);
+
+    expect(q).toHaveBeenCalledTimes(2);
+    const firstFilter = q.mock.calls[0][1].filter;
+    const secondFilter = q.mock.calls[1][1].filter;
+    const firstOrChain = firstFilter.slice(firstFilter.indexOf('(') + 1, firstFilter.indexOf(')'));
+    const secondOrChain = secondFilter.slice(secondFilter.indexOf('(') + 1, secondFilter.indexOf(')'));
+    expect(firstOrChain.split(' or ')).toEqual(
+      requestIds.slice(0, 25).map((id) => `_wmkf_request_value eq ${id}`),
+    );
+    expect(secondOrChain.split(' or ')).toEqual(
+      requestIds.slice(25).map((id) => `_wmkf_request_value eq ${id}`),
+    );
   });
 });
