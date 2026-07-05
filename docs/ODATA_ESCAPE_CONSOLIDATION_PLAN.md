@@ -20,8 +20,10 @@ related:
 code review of `5477a226..629d67e4`: **PASS-WITH-FINDINGS — no further review round needed** (one
 P3 wording caveat, no regression; verbatim verdict in the Stage Log). The docs-catalog enum has no
 "completed" value, so — mirroring `ROUTE_SERVICE_CONSOLIDATION_PLAN` precedent — frontmatter
-`status` stays `active` (a live enum value) and this body line records completion. Stage 3 (optional
-escape law) NOT built — deferred pending owner decision. See Stage Log for probes/counts/test results.
+`status` stays `active` (a live enum value) and this body line records completion. **Stage 3 (escape
+law) BUILT (S332, 2026-07-05):** `scripts/check-odata-escape.js` + self-test, registered in
+`package.json`, `.github/workflows/test.yml`, `docs/CI_GATES_REFERENCE.md`, and
+`.claude/skills/start/SKILL.md`. See Stage Log for probes/counts/test results.
 
 **Objective.** Several files hand-roll OData single-quoted-literal escaping (`String(x).replace(/'/g, "''")`
 and bare `x.replace(/'/g, "''")` variants) instead of calling the canonical primitive in
@@ -400,6 +402,42 @@ everywhere the other gates are; if declined — record the decision in the Stage
   out-of-scope carve-outs this plan recorded (doc comments, `dynamics-explorer` exempt dir,
   `scripts/`). Build in progress this session — the gate's own Stage entry lands here when it
   clears its self-test and registrations.
+- 2026-07-05 (S332): **Stage 3 (escape-law gate): BUILT.** `scripts/check-odata-escape.js`
+  scans `lib/`, `pages/`, `shared/`, `modules/` (`.js`/`.mjs`) for `<receiver>.replace(/'/g, "''")`
+  and the single-quoted-replacement variant (flexible whitespace, any receiver incl. `String(x)`
+  wrappers), using `scripts/lib/walk-files.js` (`walkTree`) for the directory walk. Comment
+  detection: strips `//` and `/* */` comments (replacing comment characters with whitespace to
+  keep line numbers aligned) before pattern matching, rather than a `//`/`*`-prefix heuristic —
+  this correctly clears the `grant-request.js:99` multi-line JSDoc mention without special-casing
+  block-comment continuation lines. Exemptions: `lib/dataverse/core/odata.js` itself; the
+  `pages/api/dynamics-explorer/` exempt dir (mirrors `check-dataverse-access-layer.js:75-76`
+  `EXEMPT_DIRS`); `scripts/` is out of scope by construction (not a scanned root). `--root`
+  override for testability, mirroring `check-dataverse-access-layer.js`/`check-route-service-boundary.js`.
+  - **Green on current tree:** `565 file(s) scanned; 0 hand-rolled OData escapes found`
+    `[VERIFIED via npm run check:odata-escape this session]` — confirms Stages 0-2 left no
+    in-scope site behind.
+  - **Self-test** `scripts/check-odata-escape-self-test.js`: fixture-based via
+    `scripts/lib/selftest-fixture.js` `registerRepoFixture('lib/.odata_escape_selftest_tmp')`
+    (a fake-root tree with its own `lib/`/`pages/` subdirs, scanned via `--root`, mirroring
+    `check-route-service-boundary-self-test.js`'s mechanic). RED: mechanical
+    `key.replace(/'/g, "''")` AND the `String(key).replace(/'/g,'\'\'')` single-quoted-replacement
+    variant both flagged by file:line. GREEN: gate clears once both are removed. DECOYS not
+    flagged: HTML (`&#39;`) escape, XML (`&apos;`) escape, a doc-comment mention, the canonical
+    `odata.js` fixture, and the `dynamics-explorer` exempt-dir fixture. Cleanup verified (no
+    stray fixture dir left under `lib/` after the run) `[VERIFIED via this session's npm run
+    check:odata-escape / :self-test invocations]`.
+  - **Registrations:** `package.json` (`check:odata-escape` + `:self-test`, next to
+    `check:dataverse-access-layer`); `.github/workflows/test.yml` (both lines, sequential, same
+    location); `docs/CI_GATES_REFERENCE.md` (new `### check:odata-escape` entry under Gate
+    details); `.claude/skills/start/SKILL.md` gate list (paired line + "as of" date bump to
+    2026-07-05).
+  - **Re-certification:** `check:dataverse-access-layer` (+ `:self-test`) exit 0 — unaffected by
+    this change. Docs-surface gates re-run for the touched docs: `check:docs-catalog`,
+    `check:doc-symbol-refs`, `check:build-claim-freshness`, `check:agent-wiki` all green.
+    Scripts-surface gates re-run: `check:secret-scan` (+ `:self-test`), `check:scaffolding-tokens`
+    (+ `:self-test`) all green `[VERIFIED via this session's npm run invocations]`.
+  - Stage 3 done means satisfied per the plan: gate + self-test green, decoys provably not
+    flagged, registered everywhere the other gates are.
   - Staleness recheck (this plan's claims re-read against the executed diff, commit 629d67e4):
     - [RECHECKED after lib/dataverse/role-apply.js change: both sites now `odata.escape`, pins green]
     - [RECHECKED after lib/services/dataverse-settings-service.js change: 3 sites swapped, pins green]

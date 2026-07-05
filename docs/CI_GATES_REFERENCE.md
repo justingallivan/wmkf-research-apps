@@ -68,6 +68,33 @@ no ratchet: Stage 8 deleted both.
   `lib/dataverse/adapters/` (or `lib/dataverse/core/changeset.js` for batches).
 - Self-test: `npm run check:dataverse-access-layer:self-test`.
 
+### `check:odata-escape` — OData escape LAW (S332, Stage 3)
+
+Owner-approved regression gate for `docs/ODATA_ESCAPE_CONSOLIDATION_PLAN.md`
+(Stages 0-2 consolidated every in-scope hand-rolled OData single-quote escape
+onto `odata.escape` from `lib/dataverse/core/odata.js`; Stage 3 keeps it that
+way). Fails on any hand-rolled `<receiver>.replace(/'/g, "''")` escape (or the
+single-quoted-replacement variant, flexible whitespace, any receiver including
+`String(x)` wrappers) found under `lib/`, `pages/`, `shared/`, or `modules/`
+(`.js`/`.mjs`).
+
+- Exemptions: `lib/dataverse/core/odata.js` itself (the primitive necessarily
+  contains the pattern it forbids elsewhere); the `pages/api/dynamics-explorer/`
+  exempt dir (mirrors `check:dataverse-access-layer`'s `EXEMPT_DIRS`);
+  comment-only mentions — `//` and `/* */` comments are stripped (comment
+  characters replaced with whitespace, preserving line numbers) before pattern
+  matching.
+- Does NOT flag HTML (`&#39;`) / XML (`&apos;`) entity escapes — different
+  replacement string, not the doubled-quote form. Never scans `scripts/`
+  (one-off tooling, out of scope per the plan).
+- The fix is always to swap to `odata.escape(value)` (or `odata.eq`/`eqGuid`
+  for a raw lookup position); never add a new receiver-shape exemption.
+- `--root <dir>` override for the self-test's fixture tree.
+- Self-test: `npm run check:odata-escape:self-test` — fixture-based, proves
+  red (mechanical + `String(x)`/single-quoted-replacement variants), green
+  (after removal), and that the HTML/XML/comment-only/canonical-file/exempt-dir
+  shapes are never flagged.
+
 ### `check:fact-consistency` — registered scalar drift
 
 The mandatory fan-in for code-derived scalars that get denormalized across docs (the recurring "fix in one place, stale restatement rots elsewhere" failure mode; S166 produced it ≥3× in one session).

@@ -97,6 +97,7 @@ npm run check:agent-wiki && npm run check:agent-wiki:self-test                 #
 npm run check:status-enum-parity && npm run check:status-enum-parity:self-test # producer↔consumer key parity (status/enum/workRemaining vs label/bucket maps)
 npm run check:trust-boundary-guid && npm run check:trust-boundary-guid:self-test # client-supplied id → Dataverse selector must be GUID-validated (also a blocking commit guard)
 npm run check:dataverse-access-layer && npm run check:dataverse-access-layer:self-test # raw DynamicsService access ratchet; line-tolerant allowlist counts
+npm run check:odata-escape && npm run check:odata-escape:self-test            # hand-rolled OData single-quote escapes must route through odata.escape (sequential pairing, same convention as the gates above)
 npm run check:route-lifecycle-auth && npm run check:route-lifecycle-auth:self-test # ROUTE_NAMESPACE_LIFECYCLE.guardAppKeys must match each route's real requireAppAccess args (fail-closed)
 npm run check:route-service-boundary && npm run check:route-service-boundary:self-test # pages/api routes reaching Dataverse adapters/dynamics-service directly (LAW mode since Route→Service Stage 7; no baseline)
 npm run check:secret-scan && npm run check:secret-scan:self-test              # no real secret-shaped values in tracked files (GHAS-free push protection)
@@ -105,7 +106,7 @@ npm run check:harness-framing && npm run check:harness-framing:self-test        
 npm run check:memory-drift:no-write                                            # advisory: memory↔code drift (read-only)
 ```
 
-**This list is the full set as of 2026-07-04. Before running, `grep '"check:' package.json` — if a `check:*` script exists that is NOT above (and is not a `:self-test` of one already listed), run it too and add it here.** That keeps the list from silently going stale as gates are added. Skip silently only if NONE of these scripts is defined (not every project has them); do not skip a gate that IS defined.
+**This list is the full set as of 2026-07-05. Before running, `grep '"check:' package.json` — if a `check:*` script exists that is NOT above (and is not a `:self-test` of one already listed), run it too and add it here.** That keeps the list from silently going stale as gates are added. Skip silently only if NONE of these scripts is defined (not every project has them); do not skip a gate that IS defined.
 
 **If any gate is red:** report it as the FIRST thing in the Step 4 summary, before recapping the previous session. A red gate is a P0 blocker for any new feature work in the affected area (data layer for `check:atlas`, API routes for `check:api-routes`, docs/memory drift for the rest), regardless of which session caused it. Treat fixing it as a candidate first task, not a side-note.
 
