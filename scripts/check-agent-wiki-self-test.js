@@ -2,9 +2,9 @@
 'use strict';
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { registerTmpFixture } = require('./lib/selftest-fixture');
 
 const repoRoot = path.resolve(__dirname, '..');
 let failures = 0;
@@ -31,7 +31,7 @@ function run(root) {
 }
 
 function fixtureRoot() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-agent-wiki-self-test-'));
+  const { dir: root } = registerTmpFixture('wmkf-agent-wiki-self-test-');
   writeFile(root, 'CLAUDE.md', '# Fixture\n');
   writeFile(root, 'docs/CLAUDE_INSTRUCTION_AUTHORITY.md', '# Authority\n');
   writeFile(root, 'lib/services/contact-enrichment-service.js', '// fixture\n');

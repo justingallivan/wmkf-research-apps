@@ -4,9 +4,9 @@
  */
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { registerTmpFixture } = require('./lib/selftest-fixture');
 
 const CHECK = path.resolve(__dirname, 'check-model-registry.js');
 
@@ -16,7 +16,7 @@ function write(file, text) {
 }
 
 function fixture({ appModel = 'claude-opus-4-8', fallback = 'claude-opus-4-8', capability = true, pricing = true, badCapability = '' } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'model-registry-'));
+  const { dir: root } = registerTmpFixture('model-registry-');
   write(path.join(root, 'shared/config/baseConfig.js'), `
 export const BASE_CONFIG = {
   CLAUDE: { DEFAULT_MODEL: 'sonnet', FALLBACK_MODEL: 'haiku' },

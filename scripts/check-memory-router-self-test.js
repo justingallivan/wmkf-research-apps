@@ -9,8 +9,8 @@
  */
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
+const { registerTmpFixture } = require('./lib/selftest-fixture');
 const { validateStore, MAX_LINES, TARGET_BYTES, WARN_BYTES, MAX_PROSE_LEN } = require('./check-memory-router.js');
 
 let failures = 0;
@@ -20,7 +20,7 @@ function assert(cond, label) {
 }
 
 function mkStore(memoryMd, topicFiles) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memrouter-'));
+  const { dir } = registerTmpFixture('memrouter-');
   fs.writeFileSync(path.join(dir, 'MEMORY.md'), memoryMd);
   for (const [name, body] of Object.entries(topicFiles || {})) {
     fs.writeFileSync(path.join(dir, name), body);
@@ -96,7 +96,7 @@ const goodTopic = '---\nname: x\ndescription: y\nmetadata:\n  type: project\n  s
 
 // 6. Missing MEMORY.md → error.
 {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memrouter-'));
+  const { dir } = registerTmpFixture('memrouter-');
   const { errors } = validateStore(dir);
   assert(errors.some((e) => e.includes('MEMORY.md missing')), 'missing MEMORY.md flagged');
 }
