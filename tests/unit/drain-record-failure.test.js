@@ -35,7 +35,9 @@ jest.mock('../../lib/services/intake-audit-service', () => ({
 }));
 
 const AlertService = require('../../lib/services/alert-service').default;
-const cronModule = require('../../pages/api/cron/drain-submissions');
+// Stage 5 extraction (plumbing-only retarget): the drain engine incl.
+// recordFailure moved to the cron service; assertions unchanged.
+const cronModule = require('../../lib/services/cron/drain-submissions-service');
 const { _testing } = cronModule;
 const { recordFailure } = _testing;
 

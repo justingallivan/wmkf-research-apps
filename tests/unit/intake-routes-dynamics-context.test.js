@@ -261,8 +261,11 @@ describe('drain duplicate-PK recovery wraps the request read', () => {
   test('source wraps the recovery read in bypassDynamicsRestrictions', () => {
     const fs = require('fs');
     const path = require('path');
+    // Stage 5 extraction (plumbing-only retarget): the drain engine incl.
+    // recoverRequestCreated moved to the cron service; the wrapper shape and
+    // label are unchanged, so the pin now reads the service source.
     const src = fs.readFileSync(
-      path.join(__dirname, '../../pages/api/cron/drain-submissions.js'),
+      path.join(__dirname, '../../lib/services/cron/drain-submissions-service.js'),
       'utf8'
     );
     // The wrapper must lexically enclose the request read, not just appear

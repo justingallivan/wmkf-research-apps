@@ -22,7 +22,9 @@ const { hasTrustedDalContext } = require('../../lib/dataverse/core/context');
 
 describe('drain-submissions processJob DAL context (S331 enforcement fix)', () => {
   test('state handlers run inside a trusted Dataverse context', async () => {
-    const { _testing } = require('../../pages/api/cron/drain-submissions');
+    // Stage 5 extraction (plumbing-only retarget): processJob moved to the
+    // cron service with its withDalContext wrapper; assertion unchanged.
+    const { _testing } = require('../../lib/services/cron/drain-submissions-service');
     const seen = { inside: null };
 
     // Drive processJob with a real dispatchable status but intercept before
