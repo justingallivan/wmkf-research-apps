@@ -33,6 +33,7 @@ import { LLMClient } from '../../../lib/services/llm-client';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { loadFile, httpError } from '../../../lib/utils/file-loader';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import {
   DATA_CLASSES,
   GRANT_REPORTING_REPORT_MAX_CHARS,
@@ -587,16 +588,22 @@ function validateAndStrip(parsed, schema, context) {
 async function tryLogAiRun({ requestGuid, model, status, rawOutput, notes, actingUserSystemId }) {
   if (!requestGuid) return;
   try {
-    await DynamicsService.logAiRun({
-      requestGuid,
-      taskType: 'report',
-      model,
-      promptVersion: GRANT_REPORT_PROMPT_VERSION,
-      status,
-      rawOutput,
-      notes,
-      actingUserSystemId,
-    });
+    // DynamicsService writes require a trusted DAL context (see
+    // lib/services/dynamics-context.js assertTrustedDalContext); without
+    // this wrapper the write throws under DAL enforcement and is swallowed by
+    // the catch below, silently dropping the audit log.
+    await withDalContext('grant-reporting-extract-ai-log', () =>
+      DynamicsService.logAiRun({
+        requestGuid,
+        taskType: 'report',
+        model,
+        promptVersion: GRANT_REPORT_PROMPT_VERSION,
+        status,
+        rawOutput,
+        notes,
+        actingUserSystemId,
+      })
+    );
   } catch (err) {
     console.warn(`[GrantReporting:extract] logAiRun failed (non-fatal): ${err.message}`);
   }

@@ -529,6 +529,36 @@ Drift found → this doc is edited BEFORE the next stage starts.
   finding — treat the email-write gap as open before calling Stage 7/8
   security-complete or flipping `DATAVERSE_DAL_ENFORCEMENT` in prod.
 
+- 2026-07-04 (S330): **Closed the S329 High finding.**
+  `assertTrustedDalContext('DynamicsService.<method>')` added as the first
+  statement in `createEmailActivity`, `addEmailAttachment`, and `sendEmail`
+  (`dynamics-service.js:1231-1339`), mirroring the `createRecord` pattern;
+  `createAndSendEmail` left unchanged (inherits enforcement from the three
+  inner calls). Also closed the S329 Medium finding on
+  `pages/api/grant-reporting/extract.js`: `tryLogAiRun` now wraps
+  `DynamicsService.logAiRun` in `withDalContext('grant-reporting-extract-ai-log',
+  ...)` — this audit write was throwing and being silently swallowed under
+  `DATAVERSE_DAL_ENFORCEMENT=on`. Test coverage added to
+  `tests/unit/dal-enforcement.test.js`: fail-closed + success cases for all
+  three email methods, plus a case proving
+  `withDynamicsContext({ restrictions: [], requestId })` counts as a
+  write-trusted context for `createRecord` (closes the S329 Low/Medium test-gap
+  finding). `npm run check:dataverse-access-layer` and its self-test still
+  pass unchanged — Stage 8's `non-entity-transport` exemption for these four
+  method names is intentional and stays; the new asserts are a runtime
+  guard layered on top, not a gate change.
+
+  The S329 Medium finding on "ALS-presence-only trust" (no way to
+  distinguish a caller-owned post-auth wrap from an arbitrary
+  `withDynamicsContext`/legacy-bypass context) is **accepted as-is, not
+  fixed**: tightening `hasTrustedDalContext`/`assertTrustedDalContext` today
+  would break the 105 non-test files across the live tree that import
+  `bypassDynamicsRestrictions` `[VERIFIED via grep -rl "import.*
+  bypassDynamicsRestrictions" --include="*.js", excluding tests/ and
+  .claude/worktrees/]` — all trusted by design under the current model.
+  Revisit when the mechanical strip of those legacy bypass call sites runs;
+  no code change made this session.
+
 ## Appendix A — Census (Stage 0 baseline → Stage 8 final)
 
 **Stage 8 FINAL census** `[VERIFIED 2026-07-04 via

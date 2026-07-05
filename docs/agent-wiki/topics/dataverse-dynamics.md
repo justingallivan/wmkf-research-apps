@@ -52,13 +52,15 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   lib/services/dynamics-context.js:123 isDalEnforcementOn + 5
   assertTrustedDalContext call sites in lib/services/dynamics-service.js]`.
   Prod flip is a pending deploy decision.
-  **Known gap (Codex post-impl review, 2026-07-05, not yet fixed):** the
-  email-write helpers `createEmailActivity`/`addEmailAttachment`/`sendEmail`
-  in `dynamics-service.js` reach the network with NO
-  `assertTrustedDalContext` call — Stage 8's gate exempts their method names
-  as `non-entity-transport`, so this stays green. Do not treat "entity writes
-  are fail-closed" as covering email sends until this is fixed; see
-  `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` stage log 2026-07-05 entry.
+  **Resolved (Session 330, 2026-07-04):** the email-write helpers
+  `createEmailActivity`/`addEmailAttachment`/`sendEmail` in
+  `dynamics-service.js` now call `assertTrustedDalContext` as their first
+  statement, matching entity-write enforcement (Codex post-impl review,
+  2026-07-05, flagged this gap; closed same session per stage log). Stage 8's
+  gate still exempts their method names as `non-entity-transport` — that
+  exemption is unchanged and intentional (they're guarded at runtime instead
+  of by the static gate); see `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`
+  stage log Session 330 entry.
 - Validate OData before issuing it.
 - Entity/table schemas, read/write paths, source-of-truth, and drop status live in the Atlas.
 - Existing databases use `node scripts/apply-migrations.js`; `scripts/setup-database.js` is fresh-install-only.

@@ -20,7 +20,7 @@ The pre-Session 84 chronological per-session log (everything after the September
 - Entity writes fail closed outside a trusted post-auth context under `DATAVERSE_DAL_ENFORCEMENT` (on outside prod; **prod flip pending owner deploy decision**). CLAUDE.md invariant updated.
 - Also: pricing-canary standing test red fixed (was masking CI `Tests` for 2+ sessions — the atlas red it hid is the cautionary tale).
 **Why it matters:** entity-name guessing, per-route SELECT/filter drift, and unwrapped writes are now structurally unrepresentable, not just policed after the fact.
-**Open:** post-impl Codex adversarial review of Stage 7 (completed 2026-07-05) found a High-severity gap — `createEmailActivity`/`addEmailAttachment`/`sendEmail` in `dynamics-service.js` reach the network with no `assertTrustedDalContext`, exempted by Stage 8's own gate as `non-entity-transport`. Fix before calling Stage 7/8 security-complete. Also open: mechanical strip of 79 legacy wrapper importers; prod enforcement flip.
+**Open:** post-impl Codex adversarial review of Stage 7 (completed 2026-07-05) found a High-severity gap — `createEmailActivity`/`addEmailAttachment`/`sendEmail` in `dynamics-service.js` reach the network with no `assertTrustedDalContext`, exempted by Stage 8's own gate as `non-entity-transport`. Fix before calling Stage 7/8 security-complete. (closed Session 330) Also open: mechanical strip of 79 legacy wrapper importers; prod enforcement flip.
 **Pointers:** `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md` (stage log = full audit trail); merges `6b9ddc83`…`3cf4a506`.
 
 ## July 2026 — Reviewer pipeline browser-proven end-to-end; release flow hardened; thank-you automation (Session 328)

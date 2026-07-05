@@ -28,6 +28,7 @@ import {
   assertTrustedDalContext,
   bypassDynamicsRestrictions,
   enterDynamicsBypassForScript,
+  withDynamicsContext,
 } from '../../lib/services/dynamics-context.js';
 import { withDalContext, hasTrustedDalContext } from '../../lib/dataverse/core/context.js';
 import { runChangeset } from '../../lib/dataverse/core/changeset.js';
@@ -136,6 +137,87 @@ describe('DynamicsService entity CRUD — fail-closed without a trusted context'
       DynamicsService.createRecord('wmkf_ai_runs', { foo: 'bar' }),
     );
     expect(created).toEqual({ id: '1' });
+  });
+
+  test('succeeds under withDynamicsContext({ restrictions: [], requestId }) — script-style trusted context', async () => {
+    global.fetch = jest.fn((url) => {
+      if (String(url).includes('login.microsoftonline.com')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ access_token: 't', expires_in: 3600 }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: '1' }) });
+    });
+    const created = await withDynamicsContext({ restrictions: [], requestId: 'x' }, () =>
+      DynamicsService.createRecord('wmkf_ai_runs', { foo: 'bar' }),
+    );
+    expect(created).toEqual({ id: '1' });
+  });
+});
+
+describe('DynamicsService email writes — fail-closed without a trusted context', () => {
+  test('createEmailActivity throws before any network call', async () => {
+    const spy = jest.spyOn(global, 'fetch');
+    await expect(
+      DynamicsService.createEmailActivity({ subject: 's', body: 'b', from: 'a@example.com', to: 'b@example.com' }),
+    ).rejects.toThrow(/no trusted Dataverse context/);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  test('addEmailAttachment throws before any network call', async () => {
+    const spy = jest.spyOn(global, 'fetch');
+    await expect(
+      DynamicsService.addEmailAttachment('email-guid', { filename: 'f.txt', contentType: 'text/plain', content: 'x' }),
+    ).rejects.toThrow(/no trusted Dataverse context/);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  test('sendEmail throws before any network call', async () => {
+    const spy = jest.spyOn(global, 'fetch');
+    await expect(
+      DynamicsService.sendEmail('email-guid'),
+    ).rejects.toThrow(/no trusted Dataverse context/);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  test('createEmailActivity succeeds when called under withDalContext', async () => {
+    global.fetch = jest.fn((url) => {
+      if (String(url).includes('login.microsoftonline.com')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ access_token: 't', expires_in: 3600 }) });
+      }
+      if (String(url).includes('systemusers')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ value: [{ systemuserid: 'su-1' }] }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ activityid: 'email-1' }) });
+    });
+    const activityId = await withDalContext('test-entry-point', () =>
+      DynamicsService.createEmailActivity({ subject: 's', body: 'b', from: 'a@example.com', to: 'b@example.com' }),
+    );
+    expect(activityId).toBe('email-1');
+  });
+
+  test('addEmailAttachment succeeds when called under withDalContext', async () => {
+    global.fetch = jest.fn((url) => {
+      if (String(url).includes('login.microsoftonline.com')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ access_token: 't', expires_in: 3600 }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+    await expect(
+      withDalContext('test-entry-point', () =>
+        DynamicsService.addEmailAttachment('email-guid', { filename: 'f.txt', contentType: 'text/plain', content: 'x' }),
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  test('sendEmail succeeds when called under withDalContext', async () => {
+    global.fetch = jest.fn((url) => {
+      if (String(url).includes('login.microsoftonline.com')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ access_token: 't', expires_in: 3600 }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+    await expect(
+      withDalContext('test-entry-point', () => DynamicsService.sendEmail('email-guid')),
+    ).resolves.toBeUndefined();
   });
 });
 
