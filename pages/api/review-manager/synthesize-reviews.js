@@ -32,13 +32,14 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
+import { getById as getRequestById } from '../../../lib/dataverse/adapters/grant-request';
+import { queryReviewers } from '../../../lib/dataverse/adapters/potential-reviewer';
+import { queryAllAnswers } from '../../../lib/dataverse/adapters/review-answer';
 import { executePrompt } from '../../../lib/services/execute-prompt';
 
 const PROMPT_NAME = 'review-synthesis.generate';
-const REQUESTS_ENTITY = 'akoya_requests';
 
 const ANSWER_FIELDS = [
   'wmkf_questionkey',
@@ -63,7 +64,7 @@ async function fetchAnswerTextsBySuggestion(suggestionIds) {
   for (let i = 0; i < suggestionIds.length; i += CHUNK) {
     const chunk = suggestionIds.slice(i, i + CHUNK);
     const orChain = chunk.map((id) => `_wmkf_appreviewersuggestion_value eq ${id}`).join(' or ');
-    const { records, capped } = await DynamicsService.queryAllRecords('wmkf_appreviewanswers', {
+    const { records, capped } = await queryAllAnswers({
       select: ANSWER_FIELDS.join(','),
       filter: orChain,
       orderby: 'wmkf_questionorder',
@@ -133,7 +134,7 @@ async function fetchPersonNames(personIds) {
   for (let i = 0; i < personIds.length; i += CHUNK) {
     const chunk = personIds.slice(i, i + CHUNK);
     const orChain = chunk.map((id) => `wmkf_potentialreviewersid eq ${id}`).join(' or ');
-    const { records } = await DynamicsService.queryRecords('wmkf_potentialreviewerses', {
+    const { records } = await queryReviewers({
       select: 'wmkf_potentialreviewersid,wmkf_name',
       filter: orChain,
       top: 500,
@@ -192,7 +193,7 @@ export default async function handler(req, res) {
       // Regeneration gate lives here, not in the Executor (guard is
       // always-overwrite on the prompt's output). Read the current value and
       // refuse without calling the LLM unless the caller explicitly opted in.
-      const currentRow = await DynamicsService.getRecord(REQUESTS_ENTITY, requestId, {
+      const currentRow = await getRequestById(requestId, {
         select: 'wmkf_reviewsynthesisjson,modifiedon',
       });
       if (!isEmptyMemo(currentRow?.wmkf_reviewsynthesisjson) && !overwrite) {
