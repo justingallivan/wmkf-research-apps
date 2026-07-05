@@ -87,27 +87,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/grantee-deliverable-record.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.createRecord",
-      "entity": "wmkf_granteedeliverables",
-      "count": 1
-    },
-    {
-      "file": "lib/services/grantee-deliverable-record.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "wmkf_granteedeliverables",
-      "count": 1
-    },
-    {
-      "file": "lib/services/grantee-deliverable-record.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "wmkf_granteedeliverables",
-      "count": 1
-    },
-    {
       "file": "lib/services/grantee-document-assembly.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
