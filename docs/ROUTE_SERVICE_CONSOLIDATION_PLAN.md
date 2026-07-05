@@ -301,3 +301,88 @@ review verdict + findings + resolutions)*
   plan promoted draft → active. Execution not started; Stage 0 is the next action for this
   campaign, in a dedicated session, after the owner's prod `DATAVERSE_DAL_ENFORCEMENT` flip
   per the agreed sequencing.
+- 2026-07-04 (S331): **Stage 0 executed.** Pre-stage re-probe matched the S330 baseline with
+  zero drift `[VERIFIED via sorted-union grep this session: 47 adapter-importing, union 49,
+  DynamicsService-only = grant-reporting/extract.js + test-email.js]`. Built:
+  `scripts/lib/ast-scan-core.js` (shared scanner core extracted from the dataverse gate —
+  parse/walk/alias/dynamic-import/re-export/export-scope primitives plus a
+  `createSourceRecognizers(isModuleSource)` factory; DynamicsService-specific attribution,
+  `unattributable-use` audit, and law-mode stayed in `scripts/check-dataverse-access-layer.js`,
+  which now imports the core — its inserted lines are import plumbing only
+  `[VERIFIED via git diff]`, behavior pinned by its unchanged 27-assertion self-test);
+  `scripts/check-route-service-boundary.js` (`--report` wave-bucket rollup + default ratchet
+  vs `scripts/route-service-boundary-baseline.json` `{ "boundaryImportingRoutes": 49 }`,
+  fail-closed on unclassifiable routes; re-export taint resolves relative specifiers and does
+  NOT propagate through legitimate service use of adapters); self-test with temp-root fixtures
+  covering red classes (a)–(g) from the Stage 0 spec plus green shell/service/exempt-dir
+  fixtures. Registered in `package.json`, `docs/CI_GATES_REFERENCE.md`,
+  `.claude/skills/start/SKILL.md`, and `.github/workflows/test.yml` (workflow rows were a gap
+  caught in owner review — CI enumerates gates explicitly). Live census 49 == baseline; wave
+  buckets sum 1+8+1+1+5+16+17 = 49.
+  **Test inventory (deliverable 4):** 49/49 routes classified; all 49 have at least one
+  route-exercising test. (An initial sweep reported `workbench/dashboard.js` as untested;
+  the disconfirming grep found `tests/integration/workbench-routes.test.js:57-59` loads its
+  handler directly `[VERIFIED via that file]` — table corrected before commit.) "No gap"
+  here means *some* handler/endpoint test exists; positive rows were spot-checked, not each
+  re-read, and the per-wave minimum (auth/method/envelope/one error path) is still verified
+  at wave start per the per-wave contract. Trait routes confirmed: streaming = `review-manager/send-emails.js`,
+  `reviewer-finder/generate-emails.js`, `workbench/enrich-recommended.js`; multi-verb =
+  `reviewer-finder/my-candidates.js`. Thin coverage flagged for wave planning:
+  `reviewer-finder/save-candidates.js` (29.3 KB) and `workbench/enrich-recommended.js` are
+  each covered only by `tests/unit/reviewer-route-identity-gate.test.js`. Full route→test
+  table below. Post-stage fresh-context review: pending (interval rule — Stage 1 may not
+  start until it clears).
+
+### Stage 0 route→test inventory (2026-07-04, S331)
+
+| route (`pages/api/`) | test file(s) | gap | traits |
+|---|---|---|---|
+| test-email.js | test-email-auth.test.js | no | root-level |
+| admin/policies.js | admin-policies-route.test.js | no | |
+| admin/prompts/[name].js | admin-prompts-publish.test.js | no | |
+| admin/prompts/index.js | admin-prompts-list.test.js | no | |
+| admin/review-questions.js | admin-review-questions-route.test.js | no | |
+| cron/drain-submissions.js | drain-record-failure.test.js, drain-submissions-telemetry.test.js | no | cron |
+| cron/generate-grantee-titles.js | generate-grantee-titles-cron.test.js | no | cron |
+| cron/grantee-deliverable-reminders.js | grantee-deliverable-reminders-cron.test.js | no | cron |
+| expertise-finder/batch-match.js | expertise-finder-batch-match-route.test.js | no | |
+| expertise-finder/proposals.js | expertise-finder-proposals-route.test.js | no | |
+| external/review/[token]/context.js | external-review-routes.test.js | no | external-token |
+| external/review/[token]/respond.js | external-review-routes.test.js, email-token-resolvers.test.js, respond-required-address.test.js | no | external-token |
+| external/review/[token]/submit.js | external-review-submit-route.test.js | no | external-token |
+| field-primer/generate.js | field-primer-generate-route.test.js | no | |
+| grant-reporting/extract.js | grant-reporting-extract-routes.test.js, grant-reporting-extract-payload-boundary.test.js | no | DynamicsService-only |
+| grant-reporting/lookup-grant.js | classify-file.test.js, lookup-grant.test.js | no | |
+| phase-i-dynamics/summarize.js | phase-i-dynamics-summarize-payload-boundary.test.js, phase-i-dynamics-summarize-v2-payload-boundary.test.js, phase-i-dynamics-summarize-route.test.js | no | |
+| review-manager/campaign-config.js | campaign-config-route.test.js | no | |
+| review-manager/download-review.js | review-manager-download-review.test.js | no | |
+| review-manager/mark-received-no-file.js | mark-received-no-file-route.test.js | no | |
+| review-manager/materials-preflight.js | materials-preflight.test.js | no | |
+| review-manager/regenerate-token.js | review-manager-token-routes.test.js | no | |
+| review-manager/render-emails.js | render-emails-route.test.js | no | |
+| review-manager/reviewers.js | auth-routes.test.js, review-manager-reviewers-answers.test.js, review-manager-reviewers-live-questions.test.js, review-manager-reviewers-outstanding-dto.test.js, review-manager-reviewers-synthesis-dto.test.js | no | |
+| review-manager/send-emails.js | auth-routes.test.js, cross-user-isolation.test.js, send-emails-route.test.js | no | streaming/SSE (stage 2b) |
+| review-manager/synthesize-reviews.js | synthesize-reviews.test.js | no | |
+| review-manager/withdraw-sufficient.js | withdraw-sufficient-route.test.js | no | Stage 1 pilot |
+| reviewer-finder/contact-history.js | contact-history-route.test.js | no | |
+| reviewer-finder/generate-emails.js | auth-routes.test.js, cross-user-isolation.test.js, generate-emails-route.test.js | no | streaming/SSE (stage 2s pilot) |
+| reviewer-finder/load-proposal.js | load-proposal.test.js | no | |
+| reviewer-finder/my-candidates.js | my-candidates-faculty-page-url-gate.test.js, my-candidates-partial-save-on-email-conflict.test.js | no | multi-verb (P1m) |
+| reviewer-finder/my-proposals.js | auth-routes.test.js, my-proposals-route.test.js | no | |
+| reviewer-finder/save-candidates.js | reviewer-route-identity-gate.test.js | no (thin) | |
+| workbench/applicant-reviewers.js | applicant-reviewers-endpoint.test.js | no | |
+| workbench/dashboard.js | workbench-routes.test.js | no | |
+| workbench/download-proposal-document.js | workbench-download-proposal-document-route.test.js | no | |
+| workbench/enrich-recommended.js | reviewer-route-identity-gate.test.js | no (thin) | streaming/SSE |
+| workbench/export-candidates.js | workbench-export-candidates-route.test.js | no | |
+| workbench/manual-reviewer.js | manual-reviewer-endpoint.test.js | no | |
+| workbench/promote-applicant-reviewer.js | promote-applicant-reviewer-contact.test.js, promote-applicant-reviewer-endpoint.test.js | no | |
+| workbench/proposal-documents.js | workbench-proposal-documents-route.test.js | no | |
+| workbench/resolve-request.js | workbench-resolve-request-route.test.js | no | |
+| workbench/triage.js | workbench-triage-endpoint.test.js | no | |
+| workbench/grantee-deliverables/abstract.js | grantee-deliverables-abstract-route.test.js | no | |
+| workbench/grantee-deliverables/awardees.js | grantee-awardees-route.test.js | no | |
+| workbench/grantee-deliverables/cycle-export.js | grantee-cycle-export-route.test.js | no | |
+| workbench/grantee-deliverables/generate.js | grantee-deliverables-generate-route.test.js | no | |
+| workbench/grantee-deliverables/recipients.js | grantee-recipients-route.test.js | no | |
+| workbench/grantee-deliverables/send-invite.js | grantee-send-invite-route.test.js | no | |

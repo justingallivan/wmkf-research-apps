@@ -98,6 +98,7 @@ npm run check:status-enum-parity && npm run check:status-enum-parity:self-test #
 npm run check:trust-boundary-guid && npm run check:trust-boundary-guid:self-test # client-supplied id → Dataverse selector must be GUID-validated (also a blocking commit guard)
 npm run check:dataverse-access-layer && npm run check:dataverse-access-layer:self-test # raw DynamicsService access ratchet; line-tolerant allowlist counts
 npm run check:route-lifecycle-auth && npm run check:route-lifecycle-auth:self-test # ROUTE_NAMESPACE_LIFECYCLE.guardAppKeys must match each route's real requireAppAccess args (fail-closed)
+npm run check:route-service-boundary && npm run check:route-service-boundary:self-test # pages/api routes reaching Dataverse adapters/dynamics-service directly (ratchet vs baseline; Route→Service consolidation)
 npm run check:secret-scan && npm run check:secret-scan:self-test              # no real secret-shaped values in tracked files (GHAS-free push protection)
 npm run check:scaffolding-tokens && npm run check:scaffolding-tokens:self-test  # no leaked tool-call scaffolding tags (bare-line </content>/</invoke>/antml:*) in tracked files
 npm run check:harness-framing && npm run check:harness-framing:self-test        # active harness wording stays expert/procedural; rationale lives in sidecars/backups

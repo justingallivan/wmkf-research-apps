@@ -71,6 +71,8 @@
     "check:dataverse-access-layer:self-test": "node scripts/check-dataverse-access-layer-self-test.js",
     "check:route-lifecycle-auth": "node scripts/check-route-lifecycle-auth.js",
     "check:route-lifecycle-auth:self-test": "node scripts/check-route-lifecycle-auth-self-test.js",
+    "check:route-service-boundary": "node scripts/check-route-service-boundary.js",
+    "check:route-service-boundary:self-test": "node scripts/check-route-service-boundary-self-test.js",
     "check:secret-scan": "node scripts/check-secret-scan.js",
     "check:secret-scan:self-test": "node scripts/check-secret-scan-self-test.js",
     "check:scaffolding-tokens": "node scripts/check-scaffolding-tokens.js",
