@@ -24,7 +24,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
-import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../lib/dataverse/core/context';
 import { resolveByEmail } from '../../../lib/services/program-director-resolver';
 import { meetingDateToCycleCode, cycleCodeToOdataFilter } from '../../../lib/utils/cycle-code';
 import { RESPONSE_TYPE_MAP, notExcludedFilter, queryAllSuggestions } from '../../../lib/dataverse/adapters/reviewer-suggestion';
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
   }
 
   // Read-only Dynamics queries; bypass field/table restrictions for this trusted endpoint.
-  return bypassDynamicsRestrictions('reviewer-finder-my-proposals', async () => {
+  return withDalContext('reviewer-finder-my-proposals', async () => {
   try {
     const pd = await resolveByEmail(azureEmail);
     if (!pd) {
