@@ -15,11 +15,15 @@ related:
 
 # NotificationService Trust-Model Push-Up Plan
 
-**Execution status: STAGE 1 EXECUTED, REVIEWED, AND COMMITTED (`23cff83`, 2026-07-05).** Census
-re-closed at 23 (three-way verified, `02d3cd9`); Stage 0 passed; all 9 single-hop push-ups landed with
-characterization coverage; `notify()`'s shared internal wrapper intentionally retained. **Remaining:
-Stage 2 (multi-hop #10/#11) not started, and the shared-wrapper removal is a separate later human
-decision once every REACHES site is covered — neither is done.** This is the site-33 follow-on
+**Execution status: STAGES 1 AND 2 EXECUTED, REVIEWED, AND COMMITTED; STAGE 3 IN PROGRESS
+(2026-07-05).** Census re-closed at 23 (three-way verified, `02d3cd9`); Stage 0 passed; Stage 1's 9
+single-hop push-ups landed (`23cff83`) and Stage 2's 1 push-up + coverage landed (`1b69d4f`), both under
+fresh-context Codex review. `notify()`'s shared internal wrapper is intentionally retained. **Stage 3
+(remove the shared wrapper) is underway: its precondition is upgrading all 10 already-covered
+characterization tests from service-level to handler-driven — 5 of 10 done (`a1f13af`, `5fa8522`), the
+remaining 5 (drain cron ×3 sharing one wrap, #22 maintenance, #12 review-upload ×2) deferred into the
+removal change. The wrapper removal itself is NOT done** and is a separate reviewed step once all 10
+guards exist. This is the site-33 follow-on
 the owner asked for after `docs/BYPASS_STRIP_PLAN.md` Stage 4 closed everything else. Stage 4's own
 text explicitly deferred this site: its DAL-touching branch sits inside a shared utility (`notify()`),
 most of whose callers never reach it, and safely auditing that full fan-out was out of scope for that
@@ -392,8 +396,13 @@ Precondition now MET on coverage (every REACHES entry point establishes context,
 on test-guard: first upgrade EVERY already-covered site's characterization test from service-level to
 handler-level — **#12, #13, #22 (Stage 1) AND #10b + all six #11 entry points (Stage 2), ten sites in
 all** (per the Codex P2, which flagged that #12/#13/#22 were omitted from the original precondition) — so
-removing the net cannot silently un-guard a handler wrap. The grantee POC (Stage Log 2026-07-05) is the
-template; one of the ten is already converted. Then remove
+removing the net cannot silently un-guard a handler wrap. **5 of the 10 are converted and committed**
+(`a1f13af`, `5fa8522`): grantee-deliverable-reminders, send-review-thankyous, reviewer-reminders (crons)
+and send-review-reminder, withdraw-sufficient (routes) — each mutation-proven to guard its wrap. The
+remaining 5 conversion units are the **drain cron** (one handler-driven test covers #10b, #13, and the
+#11-acceptance path, all sharing `withDalContext('cron-drain-reviewer-acceptances')`), **#22 maintenance**
+(`sweepBillOnboarding`), and **#12 review-upload** (two upload routes); they need heavier handler mocking
+(job-queue claim, sweep machinery, multipart) and are deferred into this removal change. Then remove
 `withDalContext('notification-email', ...)` from `sendAdminEmail` (`notification-service.js`), and prove
 via the (now handler-level) characterization suite + the existing no-context negative control that every
 path still establishes trusted context at its entry point. This is the dangerous step (the drain-defect
