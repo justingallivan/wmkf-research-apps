@@ -269,20 +269,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/reviewer-quota.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 2
-    },
-    {
-      "file": "lib/services/reviewer-quota.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "lib/services/reviewer-reminder-sweep.js",
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",
