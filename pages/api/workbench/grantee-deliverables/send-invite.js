@@ -2,45 +2,32 @@
  * API: POST /api/workbench/grantee-deliverables/send-invite
  *
  * Chunk 3c of the Grantee Deliverables Portal. Staff-initiated (Awardee tab):
- * email the grantee a magic-link to the deliverables portal. The invite
- * addresses the PI in `To` and Cc's the liaison (owner S268). Staff have already
- * confirmed/overridden the recipients and previewed/edited the email body, so
- * this route accepts the final to/cc/subject/body and:
- *   - requires the abstract to be generated first (status >= Drafted),
- *   - refuses if already Submitted+ (don't re-invite a responded package),
- *   - mints a stateless per-request magic-link SERVER-SIDE (chunk 1) and injects
- *     the action button + fallback link into the body (never from staff input),
- *   - sends from the staff member's mailbox (azureEmail) via the Dynamics email
- *     activity (same M365 path as reviewer invites), regarding the request,
- *   - flips status Drafted -> Invited (non-downgrade; never on a later status).
+ * email the grantee a magic-link to the deliverables portal (PI in To,
+ * liaison Cc'd — owner S268). Staff have already confirmed/overridden the
+ * recipients and previewed/edited the body.
+ *
+ * Thin route shell (Route→Service Consolidation Plan, Stage 4 series C):
+ * method dispatch → auth guard → sender/recipient/subject/body validation →
+ * withDalContext → one service call → result/error→HTTP mapping. The
+ * generate-first / already-submitted / request-number guards, server-side
+ * magic-link mint + injection, Dynamics email send, and the non-downgrade
+ * status flip (partial success = 200 with statusPersisted:false) live in
+ * lib/services/workbench/grantee-deliverables/send-invite-service.js.
  *
  * AUTH: requireAppAccess('reviewers'). requestId GUID-validated off req.body.
  */
 
 import { requireAppAccess } from '../../../../lib/utils/auth';
-import { DynamicsService } from '../../../../lib/services/dynamics-service';
-import * as grantRequestAdapter from '../../../../lib/dataverse/adapters/grant-request';
-import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
+import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { isGuid } from '../../../../lib/utils/guid';
-import { mintForRequest } from '../../../../lib/external/grantee-token-lifecycle';
-import { renderGranteeInviteHtml } from '../../../../lib/external/grantee-invite-email';
-import { appendSignatureBlock, resolveSignatureForRequest } from '../../../../lib/services/email-signature';
-import {
-  ensureDeliverableForRequest,
-  patchDeliverable,
-} from '../../../../lib/services/grantee-deliverable-record';
-import { GRANTEE_DELIVERABLE_STATUS } from '../../../../shared/config/granteeDeliverableStatus';
+import { ServiceHttpError } from '../../../../lib/services/service-http-error';
+import { sendGranteeInvite } from '../../../../lib/services/workbench/grantee-deliverables/send-invite-service';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '64kb' } },
 };
 
 const isEmail = (s) => typeof s === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.trim());
-const normStatus = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
-const containsRequestNumber = (text, requestNumber) => {
-  const n = String(requestNumber || '').trim();
-  return Boolean(n && String(text || '').includes(n));
-};
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -81,90 +68,16 @@ export default async function handler(req, res) {
 
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
 
-  return bypassDynamicsRestrictions('grantee-send-invite', async () => {
+  return withDalContext('grantee-send-invite', async () => {
     try {
-      let row;
-      try {
-        row = await grantRequestAdapter.getById(requestId, { select: grantRequestAdapter.SELECT_PROFILES.IDENTITY });
-      } catch {
-        row = null;
-      }
-      if (!row?.akoya_requestid) {
-        return res.status(404).json({ error: `No request found for ${requestId}` });
-      }
-      if (containsRequestNumber(subject, row.akoya_requestnum) || containsRequestNumber(bodyText, row.akoya_requestnum)) {
-        return res.status(400).json({ error: 'Email subject/body cannot include the internal request number.' });
-      }
-
-      const deliverable = await ensureDeliverableForRequest(requestId, {
-        requestNumber: row.akoya_requestnum,
-        actingUserSystemId,
+      const body = await sendGranteeInvite({
+        requestId, toEmail, ccEmail, subject, bodyText, fromEmail, actingUserSystemId,
       });
-      const status = normStatus(deliverable?.wmkf_deliverablestatus);
-      // Corrupt/non-numeric status must NOT slip past the guards — NaN comparisons
-      // are all false, which would otherwise let a bad value reach mint/send. Fail loud.
-      if (status !== null && Number.isNaN(status)) {
-        console.error('[grantee-deliverables/send-invite] non-numeric status on', requestId);
-        return res.status(500).json({ error: 'This request has an invalid deliverable status; cannot send.' });
-      }
-      // Must generate the abstract first.
-      if (status === null || status < GRANTEE_DELIVERABLE_STATUS.DRAFTED) {
-        return res.status(400).json({ error: 'Generate the abstract before sending the invite.' });
-      }
-      // Don't re-invite a package the grantee has already submitted/closed.
-      if (status >= GRANTEE_DELIVERABLE_STATUS.SUBMITTED) {
-        return res.status(409).json({ error: 'This package has already been submitted; a new invite cannot be sent.' });
-      }
-
-      // Mint the magic-link SERVER-SIDE and inject it — never trust a link in the body.
-      const { url } = await mintForRequest({ requestId });
-      const signatureBlock = await resolveSignatureForRequest(requestId);
-      const html = renderGranteeInviteHtml({
-        bodyText: appendSignatureBlock(bodyText, signatureBlock),
-        url,
-      });
-
-      let sent;
-      try {
-        sent = await DynamicsService.createAndSendEmail({
-          subject,
-          body: html,
-          from: fromEmail,
-          to: toEmail,
-          cc: ccEmail || undefined,
-          regardingId: requestId,
-          regardingType: 'akoya_request',
-          actingUserSystemId,
-        });
-      } catch (e) {
-        console.error('[grantee-deliverables/send-invite] send failed:', e.message);
-        return res.status(502).json({ error: 'Failed to send the invitation email.' });
-      }
-
-      // Flip Drafted -> Invited. Non-downgrade: a re-send while already Invited /
-      // Reminder Sent leaves status unchanged. Non-fatal — the email is already out.
-      // Report the ACTUAL persisted status: a failed write must NOT be reported as
-      // Invited (the email sent, but status stays Drafted durably).
-      let finalStatus = status;
-      let statusPersisted = true;
-      if (status === GRANTEE_DELIVERABLE_STATUS.DRAFTED) {
-        try {
-          await patchDeliverable(requestId, {
-            wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.INVITED,
-            wmkf_inviteddate: new Date().toISOString(),
-          }, {
-            ifMatch: deliverable._etag,
-            actingUserSystemId,
-          });
-          finalStatus = GRANTEE_DELIVERABLE_STATUS.INVITED;
-        } catch (e) {
-          console.error('[grantee-deliverables/send-invite] status update failed (email already sent):', e.message);
-          statusPersisted = false;
-        }
-      }
-
-      return res.status(200).json({ ok: true, emailId: sent?.emailId || null, status: finalStatus, statusPersisted });
+      return res.status(200).json(body);
     } catch (error) {
+      if (error instanceof ServiceHttpError) {
+        return res.status(error.httpStatus).json(error.body ?? { error: error.message });
+      }
       console.error('[grantee-deliverables/send-invite] error:', error);
       return res.status(500).json({ error: 'Failed to send the invitation.' });
     }

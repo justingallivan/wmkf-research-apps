@@ -40,6 +40,36 @@ test('non-GET → 405', async () => {
   expect(res.statusCode).toBe(405);
 });
 
+test('unauthenticated caller: short-circuit, no PD resolve or query', async () => {
+  requireAppAccess.mockResolvedValue(null);
+  const res = mockRes();
+  await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
+  expect(resolveByEmail).not.toHaveBeenCalled();
+  expect(DynamicsService.queryRecords).not.toHaveBeenCalled();
+});
+
+test('query failure → 500 with the sanitized error envelope', async () => {
+  DynamicsService.queryRecords.mockRejectedValue(new Error('dataverse down'));
+  const res = mockRes();
+  await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
+  expect(res.statusCode).toBe(500);
+  expect(res.body).toEqual({ error: 'Failed to list awardees.' });
+});
+
+test('mine-scope 200 envelope pins the full key set (cycleLabel/scope/pdResolved/programDirector)', async () => {
+  const res = mockRes();
+  await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
+  expect(res.body).toEqual({
+    cycleCode: 'J26',
+    cycleLabel: 'June 2026',
+    count: 0,
+    awardees: [],
+    scope: 'mine',
+    pdResolved: true,
+    programDirector: { name: 'Justin Gallivan' },
+  });
+});
+
 test('invalid cycleCode → 400, no query', async () => {
   const res = mockRes();
   await handler({ method: 'GET', query: { cycleCode: 'NOPE' }, headers: {} }, res);

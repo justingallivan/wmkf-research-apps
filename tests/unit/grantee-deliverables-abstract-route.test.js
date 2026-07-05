@@ -90,12 +90,21 @@ test('auth gate short-circuits', async () => {
 });
 
 // ── GET ──
-test('GET resolves the DRAFT as effective when approved is empty', async () => {
+test('GET resolves the DRAFT as effective when approved is empty (full envelope pin)', async () => {
   DynamicsService.getRecord.mockResolvedValue(row());
   const res = mockRes();
   await handler(getReq({ requestId: GUID }), res);
   expect(res.statusCode).toBe(200);
-  expect(res.body).toMatchObject({ effective: DRAFT, effectiveField: 'formatted', etag: 'W/"1"', editable: true });
+  expect(res.body).toEqual({
+    abstractFormatted: DRAFT,
+    abstractApproved: '',
+    effective: DRAFT,
+    effectiveField: 'formatted',
+    etag: 'W/"1"',
+    status: GRANTEE_DELIVERABLE_STATUS.DRAFTED,
+    statusLabel: 'Drafted',
+    editable: true,
+  });
 });
 
 test('GET resolves the APPROVED version as effective once present', async () => {
@@ -159,7 +168,14 @@ test('PUT writes the DRAFT field with the client etag, leaves status untouched',
   expect(opts).toMatchObject({ ifMatch: 'W/"1"', actingUserSystemId: 'sys-1' });
   // never touches deliverable status
   expect(patch).not.toHaveProperty('wmkf_deliverablestatus');
-  expect(res.body).toMatchObject({ ok: true, field: 'formatted', etag: 'W/"2"' });
+  // Full 200 envelope pin.
+  expect(res.body).toEqual({
+    ok: true,
+    field: 'formatted',
+    etag: 'W/"2"',
+    status: GRANTEE_DELIVERABLE_STATUS.DRAFTED,
+    statusLabel: 'Drafted',
+  });
 });
 
 test('PUT writes the APPROVED field once the grantee has submitted', async () => {

@@ -57,13 +57,22 @@ test('invalid requestId → 400 (no read)', async () => {
   expect(DynamicsService.getRecord).not.toHaveBeenCalled();
 });
 
-test('resolves PI + liaison with names and emails', async () => {
+test('unauthenticated caller: short-circuit, no read', async () => {
+  requireAppAccess.mockResolvedValue(null);
+  const res = mockRes();
+  await handler({ method: 'GET', query: { requestId: GUID }, headers: {} }, res);
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+});
+
+test('resolves PI + liaison with names and emails (full envelope pin)', async () => {
   wireContacts();
   const res = mockRes();
   await handler({ method: 'GET', query: { requestId: GUID }, headers: {} }, res);
   expect(res.statusCode).toBe(200);
-  expect(res.body.pi).toEqual({ contactId: 'pi-1', name: 'Monika Raj', email: 'monika.raj@emory.edu', hasEmail: true });
-  expect(res.body.liaison).toEqual({ contactId: 'li-1', name: 'Lorena McLaren', email: 'lorena.mclaren@emory.edu', hasEmail: true });
+  expect(res.body).toEqual({
+    pi: { contactId: 'pi-1', name: 'Monika Raj', email: 'monika.raj@emory.edu', hasEmail: true },
+    liaison: { contactId: 'li-1', name: 'Lorena McLaren', email: 'lorena.mclaren@emory.edu', hasEmail: true },
+  });
 });
 
 test('an empty liaison lookup → hasEmail false (no crash)', async () => {

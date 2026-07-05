@@ -81,12 +81,21 @@ test('invalid requestId → 400', async () => {
   expect(res.statusCode).toBe(400);
 });
 
+test('unauthenticated caller: short-circuit, nothing read, minted, or sent', async () => {
+  requireAppAccess.mockResolvedValue(null);
+  const res = mockRes();
+  await handler(reqOf(body()), res);
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+  expect(mintForRequest).not.toHaveBeenCalled();
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+});
+
 test('happy path: PI To, liaison Cc, server-injected link, status Drafted→Invited', async () => {
   const res = mockRes();
   await handler(reqOf(body()), res);
   expect(res.statusCode).toBe(200);
-  expect(res.body.ok).toBe(true);
-  expect(res.body.status).toBe(GRANTEE_DELIVERABLE_STATUS.INVITED);
+  // Full 200 envelope pin.
+  expect(res.body).toEqual({ ok: true, emailId: 'email-1', status: GRANTEE_DELIVERABLE_STATUS.INVITED, statusPersisted: true });
 
   expect(mintForRequest).toHaveBeenCalledWith({ requestId: GUID });
   const sent = DynamicsService.createAndSendEmail.mock.calls[0][0];

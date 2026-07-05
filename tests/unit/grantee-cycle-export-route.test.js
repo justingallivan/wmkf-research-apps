@@ -41,6 +41,22 @@ test('non-GET → 405', async () => {
   expect(res.statusCode).toBe(405);
 });
 
+test('unauthenticated caller: short-circuit, no query or assembly', async () => {
+  requireAppAccess.mockResolvedValue(null);
+  const res = mockRes();
+  await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
+  expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
+  expect(assembleGranteeDocument).not.toHaveBeenCalled();
+});
+
+test('query failure envelope carries the cycleCode (non-{error}-only body)', async () => {
+  DynamicsService.queryAllRecords.mockRejectedValue(new Error('dataverse down'));
+  const res = mockRes();
+  await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
+  expect(res.statusCode).toBe(503);
+  expect(res.body).toEqual({ error: 'Awardee query failed.', cycleCode: 'J26' });
+});
+
 test('invalid cycleCode → 400 (no query)', async () => {
   const res = mockRes();
   await handler({ method: 'GET', query: { cycleCode: 'nope' }, headers: {} }, res);

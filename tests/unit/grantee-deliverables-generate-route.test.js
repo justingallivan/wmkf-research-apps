@@ -98,14 +98,21 @@ test('auth gate short-circuits (requireAppAccess returns falsy)', async () => {
   expect(DynamicsService.getRecord).not.toHaveBeenCalled();
 });
 
-test('happy path: generate, persist, stamp Drafted from null status', async () => {
+test('happy path: generate, persist, stamp Drafted from null status (full envelope pin)', async () => {
   DynamicsService.getRecord.mockResolvedValue(row());
   const res = mockRes();
   await handler(reqOf({ requestId: GUID }), res);
   expect(loadModelOverrides).toHaveBeenCalled();
   expect(res.statusCode).toBe(200);
-  expect(res.body.abstractFormatted).toBe(FORMATTED);
-  expect(res.body.persisted).toBe(true);
+  expect(res.body).toEqual({
+    abstractFormatted: FORMATTED,
+    persisted: true,
+    regenerated: false,
+    status: GRANTEE_DELIVERABLE_STATUS.DRAFTED,
+    statusLabel: 'Drafted',
+    runId: 'r1',
+    model: 'm1',
+  });
   const [, , patch, opts] = DynamicsService.updateRecord.mock.calls[0];
   expect(patch).toEqual({ wmkf_abstractformatted: FORMATTED });
   expect(opts).toMatchObject({ ifMatch: 'W/"1"', actingUserSystemId: 'sys-1' });

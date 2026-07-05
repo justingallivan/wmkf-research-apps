@@ -2,41 +2,26 @@
  * API: GET /api/workbench/grantee-deliverables/awardees?cycleCode=J26
  *
  * Lists the research AWARDEES for a board cycle so staff can drive the grantee
- * deliverables workflow without hunting for request GUIDs (the reviewer-finding
- * dashboard doesn't surface awardees — it filters Phase-II-Pending/Advancing).
+ * deliverables workflow without hunting for request GUIDs. Scope (S271):
+ * defaults to the logged-in user's awardees; `?scope=all` lists everyone.
  *
- * Eligibility (confirmed S268 against live J26, owner-validated = 12):
- *   akoya_requeststatus = 'Active'  (funded)
- *   AND akoya_programid ∈ GRANTEE_RESEARCH_PROGRAM_IDS  (research; EDITABLE config,
- *       keyed by GUID — names may change)
- *   AND wmkf_projectleader present  (has a PI — excludes the standing endowment)
+ * Thin route shell (Route→Service Consolidation Plan, Stage 4 series C):
+ * method dispatch → auth guard → cycleCode/config validation →
+ * withDalContext → one service call → result/error→HTTP mapping.
+ * Eligibility filter + PD scoping + projection live in
+ * lib/services/workbench/grantee-deliverables/awardees-service.js.
  *
- * Scope (S271): defaults to the LOGGED-IN user's awardees
- * (`_wmkf_programdirector_value eq <my systemuserid>`); `?scope=all` lists every
- * research awardee for the cycle. The PD systemuserid is server-resolved from the
- * session email (resolveByEmail) — never client-supplied — so still no
- * trust-boundary concern.
- *
- * AUTH: requireAppAccess('reviewers'). No client GUIDs reach a selector (cycleCode
- * builds a date filter; program GUIDs are server config; PD id is server-resolved).
+ * AUTH: requireAppAccess('reviewers'). No client GUIDs reach a selector
+ * (cycleCode builds a date filter; program GUIDs are server config; PD id is
+ * server-resolved).
  */
 
 import { requireAppAccess } from '../../../../lib/utils/auth';
-import * as grantRequestAdapter from '../../../../lib/dataverse/adapters/grant-request.js';
-import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
-import { resolveByEmail } from '../../../../lib/services/program-director-resolver';
-import { getDeliverableForRequest } from '../../../../lib/services/grantee-deliverable-record';
-import { cycleCodeToOdataFilter, cycleCodeToLabel } from '../../../../lib/utils/cycle-code';
-import { GRANTEE_RESEARCH_PROGRAM_IDS, GRANTEE_AWARDED_STATUS } from '../../../../shared/config/granteeResearchPrograms';
-import { GRANTEE_DELIVERABLE_LABEL } from '../../../../shared/config/granteeDeliverableStatus';
-
-const SELECT = [
-  'akoya_requestid', 'akoya_requestnum', 'akoya_title',
-  '_wmkf_projectleader_value', '_akoya_primarycontactid_value', '_akoya_programid_value',
-  'wmkf_abstractformatted',
-].join(',');
-
-const normStatus = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
+import { withDalContext } from '../../../../lib/dataverse/core/context';
+import { cycleCodeToOdataFilter } from '../../../../lib/utils/cycle-code';
+import { GRANTEE_RESEARCH_PROGRAM_IDS } from '../../../../shared/config/granteeResearchPrograms';
+import { ServiceHttpError } from '../../../../lib/services/service-http-error';
+import { listGranteeAwardees } from '../../../../lib/services/workbench/grantee-deliverables/awardees-service';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -56,62 +41,17 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'No research programs are configured.' });
   }
 
-  const programClause = GRANTEE_RESEARCH_PROGRAM_IDS.map((id) => `_akoya_programid_value eq ${id}`).join(' or ');
   const showAll = req.query?.scope === 'all';
   const azureEmail = access.session?.user?.azureEmail || null;
 
-  return bypassDynamicsRestrictions('grantee-awardees', async () => {
+  return withDalContext('grantee-awardees', async () => {
     try {
-      // Default scope = the logged-in user's awardees. PD systemuserid is
-      // server-resolved from the session email (never client input).
-      const pd = azureEmail ? await resolveByEmail(azureEmail).catch(() => null) : null;
-      const scope = showAll ? 'all' : 'mine';
-
-      // Mine-scope needs a resolved PD; without one we can't safely filter, so
-      // return an empty list flagged so the UI can prompt "Show all".
-      if (scope === 'mine' && !pd?.systemuserid) {
-        return res.status(200).json({
-          cycleCode, cycleLabel: cycleCodeToLabel(cycleCode), count: 0, awardees: [],
-          scope, pdResolved: false, programDirector: null,
-        });
-      }
-
-      const filter =
-        `${cycleFilter} and akoya_requeststatus eq '${GRANTEE_AWARDED_STATUS}'` +
-        ` and _wmkf_projectleader_value ne null and (${programClause})` +
-        (scope === 'mine' ? ` and _wmkf_programdirector_value eq ${pd.systemuserid}` : '');
-
-      const { records } = await grantRequestAdapter.queryRequests({
-        select: SELECT,
-        filter,
-        orderby: 'akoya_requestnum asc',
-      });
-
-      const deliverables = await Promise.all(
-        (records || []).map((r) => getDeliverableForRequest(r.akoya_requestid).catch(() => null)),
-      );
-
-      const awardees = (records || []).map((r, i) => {
-        const status = normStatus(deliverables[i]?.wmkf_deliverablestatus);
-        return {
-          requestId: r.akoya_requestid,
-          requestNumber: r.akoya_requestnum,
-          title: r.akoya_title || null,
-          pi: { contactId: r._wmkf_projectleader_value || null, name: r._wmkf_projectleader_value_formatted || null },
-          liaison: { contactId: r._akoya_primarycontactid_value || null, name: r._akoya_primarycontactid_value_formatted || null },
-          program: r._akoya_programid_value_formatted || null,
-          status,
-          statusLabel: status !== null ? (GRANTEE_DELIVERABLE_LABEL[status] || null) : null,
-          abstractReady: Boolean(r.wmkf_abstractformatted),
-        };
-      });
-
-      return res.status(200).json({
-        cycleCode, cycleLabel: cycleCodeToLabel(cycleCode), count: awardees.length, awardees,
-        scope, pdResolved: scope === 'all' ? undefined : true,
-        programDirector: pd?.systemuserid ? { name: pd.fullName || null } : null,
-      });
+      const body = await listGranteeAwardees({ cycleCode, showAll, azureEmail });
+      return res.status(200).json(body);
     } catch (error) {
+      if (error instanceof ServiceHttpError) {
+        return res.status(error.httpStatus).json(error.body ?? { error: error.message });
+      }
       console.error('[grantee-deliverables/awardees] error:', error);
       return res.status(500).json({ error: 'Failed to list awardees.' });
     }
