@@ -135,11 +135,16 @@ test('metadata fetch is chunked at 50 request ids per OR-filter query', async ()
   expect(queryRequests.mock.calls[1][0].filter.split(' or ')).toHaveLength(10);
 });
 
-test("contactId single quotes are OData-escaped in both source filters", async () => {
-  await getContactHistory({ contactId: "11111111'1111-4111-8111-111111111111" });
+test("a non-GUID contactId fails closed via odata.eqGuid before any adapter call", async () => {
+  // D2 ruling (OData Escape Consolidation Plan, S331): the raw lookup filters
+  // are built with odata.eqGuid, which rejects a non-GUID. This adds a
+  // service-level guard on top of the route shell's existing GUID validation.
+  await expect(
+    getContactHistory({ contactId: "11111111'1111-4111-8111-111111111111" }),
+  ).rejects.toThrow(/must be a GUID/);
 
-  expect(queryAllPersons.mock.calls[0][0].filter).toContain("11111111''1111");
-  expect(queryAllRequests.mock.calls[0][0].filter).toContain("11111111''1111");
+  expect(queryAllPersons).not.toHaveBeenCalled();
+  expect(queryAllRequests).not.toHaveBeenCalled();
 });
 
 test('adapter failure propagates untyped (shell owns the 500 mapping)', async () => {

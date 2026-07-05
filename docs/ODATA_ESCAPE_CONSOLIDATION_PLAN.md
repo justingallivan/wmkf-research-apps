@@ -2,8 +2,8 @@
 title: OData Escape Consolidation Plan
 domain: architecture
 kind: plan
-status: draft
-summary: "Consolidate hand-rolled OData quote escaping onto canonical odata.escape; 10 same-semantics sites swap mechanically, 2 divergent sites STOP-AND-ASK."
+status: active
+summary: "Consolidate hand-rolled OData escaping onto odata.escape; 8 mechanical + 2 guarded swaps + 2 divergent sites per owner ruling. Executed S331."
 canonical: true
 cataloged: 2026-07-05
 owner: product-engineering
@@ -15,6 +15,11 @@ related:
 ---
 
 # OData Escape Consolidation Plan
+
+**Execution status: STAGES 0–2 COMPLETE (S331, 2026-07-05).** The docs-catalog enum has no
+"completed" value, so — mirroring `ROUTE_SERVICE_CONSOLIDATION_PLAN` precedent — frontmatter
+`status` stays `active` (a live enum value) and this body line records completion. Stage 3 (optional
+escape law) NOT built — deferred pending owner decision. See Stage Log for probes/counts/test results.
 
 **Objective.** Several files hand-roll OData single-quoted-literal escaping (`String(x).replace(/'/g, "''")`
 and bare `x.replace(/'/g, "''")` variants) instead of calling the canonical primitive in
@@ -49,10 +54,11 @@ pre-made is marked **STOP-AND-ASK**.
 | — of those, executable code sites | 13 | 1 of the 14 is a doc comment (`lib/dataverse/adapters/grant-request.js:99`) `[VERIFIED via Read]` |
 | — in an EXEMPT dir (out of scope) | 1: `pages/api/dynamics-explorer/chat.js:959` | dynamics-explorer is a DAL-gate exempt dir `[VERIFIED via scripts/check-dataverse-access-layer.js:75-76 EXEMPT_DIRS]` |
 | **In-scope production code sites** | **12** (across 9 files) | derived independently: 14 − 1 comment − 1 exempt = 12 |
-| — SAME-SEMANTICS (mechanical swap) | **10 sites / 7 files** | see Classification table |
-| — DIVERGENT (STOP-AND-ASK) | **2 sites / 2 files** | see Classification table |
+| — SAME-SEMANTICS (mechanical swap) | **8 sites / 5 files** | see Classification table (was 10/7; #8 and #10 reclassified GUARDED-SWAP per owner review) |
+| — GUARDED-SWAP (odata.escape + explicit string guard) | **2 sites / 2 files** | #8 app-access, #10 prefs — owner review ruling |
+| — DIVERGENT (owner-ruled) | **2 sites / 2 files** | see Classification table |
 | Decoy escapes that must NOT be conflated (HTML `&#39;` / XML `&apos;`) | 4 sites / 4 files | `[VERIFIED via Read of each]` |
-| Out-of-scope one-off tooling matches | `scripts/` 25 files; `_archived/` 0 files | `[VERIFIED via grep -rln … scripts/ \| wc -l = 25; _archived/ = 0]` |
+| Out-of-scope one-off tooling matches | `scripts/` 42 matching `.js`/`.mjs` files; `_archived/` 0 files | `[VERIFIED via grep -rln … scripts/ --include=*.js --include=*.mjs \| wc -l = 42; _archived/ = 0]` |
 | DAL-gate command | `npm run check:dataverse-access-layer` (+ `:self-test`) | `[VERIFIED via package.json:70-71]` |
 | Full suite | `npm test` (`jest`) | `[VERIFIED via package.json:19]` |
 
@@ -66,9 +72,9 @@ pre-made is marked **STOP-AND-ASK**.
 | `lib/external/review-answer-snapshot.js` | `tests/unit/review-answer-snapshot.test.js` (+5 others) | present — Stage 0 confirms it pins `answerRowUrl` byte output |
 | `lib/services/dataverse-settings-service.js` | `tests/unit/alert-recipients.test.js` (indirect) | **GAP** on the `findRow`/`listSettings` filter string |
 | `lib/services/dataverse-identity-map.js` | `tests/unit/email-signature-service.test.js` (indirect) | **GAP** on the `internalemailaddress` filter |
-| `lib/services/dataverse-app-access-service.js` | none found | **GAP** |
+| `lib/services/dataverse-app-access-service.js` (GUARDED-SWAP) | none found | **GAP** — Stage 0 adds a rejection pin (non-string key throws, no client.get) |
 | `lib/services/program-director-resolver.js` | `tests/unit/program-director-resolver.test.js` (+several) | Stage 0 confirms whether it pins the filter string |
-| `lib/services/dataverse-prefs-service.js` | none found | **GAP** |
+| `lib/services/dataverse-prefs-service.js` (GUARDED-SWAP) | none found | **GAP** — Stage 0 adds a rejection pin (non-string key throws, no client.get) |
 | `lib/services/grant-cycles-dataverse.js` (DIVERGENT) | none found | **GAP** — but DIVERGENT, resolved in Stage 2 |
 | `lib/services/reviewer-finder/contact-history-service.js` (DIVERGENT) | `tests/unit/contact-history-service.test.js` | Stage 0 confirms whether it pins the filter string |
 
@@ -123,11 +129,12 @@ change and STOP-AND-ASK unnecessarily.
 > - `[NOT-READ: lib/services/grant-cycles-dataverse.js — READ IN FULL this session; guard cannot see subagent reads]`
 > - `[NOT-READ: lib/services/program-director-resolver.js — READ IN FULL this session; guard cannot see subagent reads]`
 
-### SAME-SEMANTICS → mechanical swap (10 sites / 7 files)
+### SAME-SEMANTICS → mechanical swap (8 sites / 5 files)
 
 Each feeds a single-quoted OData literal; output is byte-identical to `odata.escape` for the string
 inputs these callers pass. Swap the inline `value.replace(/'/g, "''")` → `odata.escape(value)` and
-add the `odata` import if absent.
+add the `odata` import if absent. **Sites #8 and #10 were reclassified GUARDED-SWAP by owner review
+(see next subsection) — they are no longer in this table.**
 
 | # | Site | Current expression | Query context it feeds | Notes |
 |---|---|---|---|---|
@@ -138,16 +145,40 @@ add the `odata` import if absent.
 | 5 | `lib/services/dataverse-settings-service.js:70` | `keyPrefix.replace(/'/g,"''")` | `` `startswith(wmkf_settingkey,'${…}')` `` (listSettings) | maps to `odata.startsWith('wmkf_settingkey', keyPrefix)` OR minimal `odata.escape(keyPrefix)`. |
 | 6 | `lib/services/dataverse-settings-service.js:88` | `keyPrefix.replace(/'/g,"''")` | same `startswith` (listSettingsWithMeta) | same as #5. |
 | 7 | `lib/services/dataverse-identity-map.js:55` | `sourceProfile.azure_email.replace(/'/g,"''")` | `` `internalemailaddress eq '${…}'` `` → `/systemusers?$filter=` | guarded by `if (!sourceProfile?.azure_email) continue;` (`:53`), so always a string here. |
-| 8 | `lib/services/dataverse-app-access-service.js:32` | `appKey.replace(/'/g,"''")` | `` `_wmkf_user_value eq ${systemuserid} and wmkf_appkey eq '${…}'` `` | app-key string; `systemuserid` is raw, leave as-is. |
 | 9 | `lib/services/program-director-resolver.js:45` | `key.replace(/'/g,"''")` (→ `escaped`) | `` `internalemailaddress eq '${escaped}' and isdisabled eq false` `` via `systemUserAdapter.queryUsers` (`:46-50`) | `key` is a normalized (trim+lowercase) email string (`:36`,`:23-26`). |
-| 10 | `lib/services/dataverse-prefs-service.js:43` | `key.replace(/'/g,"''")` | `` `_ownerid_value eq ${systemuserid} and wmkf_preferencekey eq '${…}'` `` | preference-key string; `systemuserid` raw, leave as-is. |
 
-### DIVERGENT → STOP-AND-ASK (2 sites / 2 files)
+### GUARDED-SWAP → owner-ruled micro-change (2 sites / 2 files)
 
-| # | Site | Current | Divergence from `odata.escape` | Proposed ruling (owner decides) |
+`[VERIFIED via Read of each file, this session]` These two feed a single-quoted OData literal like
+the SAME-SEMANTICS sites, but owner review (S331) ruled them a **guarded swap** rather than a bare
+mechanical swap: a bare `odata.escape(x)` would silently coerce a non-string (`null`→`"null"`) and
+issue a query, whereas the current `x.replace(...)` throws on a non-string. The guard preserves that
+fail-closed throw (it is caught by the outer function's `try/catch`, matching today's behavior for a
+non-string key) while sourcing the doubling from canonical. This is an **intentional,
+owner-acknowledged micro-change** (the morning handoff carries it).
+
+Shape at each site — add the guard IMMEDIATELY BEFORE the escape, inside `findRow`:
+
+```js
+if (typeof appKey !== 'string') throw new TypeError('appKey must be a string'); // (or: key)
+const filter = `… eq '${odata.escape(appKey)}'`;
+```
+
+| # | Site | Current expression | Guarded-swap result | Pin |
 |---|---|---|---|---|
-| D1 | `lib/services/grant-cycles-dataverse.js:46-47`, used `:129` | `function escapeODataString(s){ return encodeURIComponent(String(s).replace(/'/g,"''")); }` in `` `/wmkf_appgrantcycles(wmkf_shortcode='${escapeODataString(sc)}')?$select=…` `` | **Adds `encodeURIComponent`.** `odata.escape` does NOT URL-encode. The inner `String(s).replace(...)` half IS identical to `odata.escape`; the outer encode is extra. | **STOP-AND-ASK.** Not a drop-in swap. Options: (a) leave as-is — it interpolates into a path segment (not a `$filter` a client later encodes), so the encode is deliberate; (b) refactor to `encodeURIComponent(odata.escape(sc))`, sourcing the doubling from canonical while preserving the encode (byte output == current). **Do NOT silently drop `encodeURIComponent`** — that changes the emitted URL (a real behavior change). Recommend (b) for full consolidation; else document why it stays hand-rolled. |
-| D2 | `lib/services/reviewer-finder/contact-history-service.js:57`, used `:71` and `:79` | `contactId.replace(/'/g,"''")` (→ `escapedContactId`) | Interpolated into `` `_wmkf_contact_value eq ${escapedContactId}` `` / `_wmkf_projectleader_value eq ${escapedContactId}` — a **RAW/unquoted lookup position, NO surrounding single quotes** `[VERIFIED via Read of :71,:79 this session]`. `odata.escape` is for INSIDE a quoted literal; a raw lookup GUID belongs to `odata.eqRaw`/`odata.eqGuid`. The escape is a functional no-op (a valid GUID has no `'`) — misleading, not incorrect. | **STOP-AND-ASK.** A mechanical `odata.escape` swap would be byte-identical but perpetuate the semantic mismatch. `contactId` is documented as a shell-validated GUID (`:52`). Cleanest: `odata.eqRaw('_wmkf_contact_value', contactId)` (unquoted, no escape) or `odata.eqGuid(...)` for defense-in-depth (adds a throw on non-GUID). Recommend `odata.eqGuid` (matches the trust-boundary convention `odata.js:39-50`) but note it introduces a throw on the error path. |
+| 8 | `lib/services/dataverse-app-access-service.js:32` (`findRow`) | `appKey.replace(/'/g,"''")` in `` `_wmkf_user_value eq ${systemuserid} and wmkf_appkey eq '${…}'` `` | `if (typeof appKey !== 'string') throw new TypeError('appKey must be a string');` then `odata.escape(appKey)`. `systemuserid` raw, unchanged. | Service test: `findRow(mockClient,'sid',123)` rejects with `TypeError`, `mockClient.get` NOT called. |
+| 10 | `lib/services/dataverse-prefs-service.js:43` (`findRow`) | `key.replace(/'/g,"''")` in `` `_ownerid_value eq ${systemuserid} and wmkf_preferencekey eq '${…}'` `` | `if (typeof key !== 'string') throw new TypeError('key must be a string');` then `odata.escape(key)`. `systemuserid` raw, unchanged. | Service test: `findRow(mockClient,'sid',123)` rejects with `TypeError`, `mockClient.get` NOT called. |
+
+> Both `findRow` functions are internal; the pins require exporting `findRow` from each module (a
+> test-only export, matching the "utils exposed for tests" convention already used by
+> `grant-cycles-dataverse.js`). No production caller changes.
+
+### DIVERGENT → owner-ruled (2 sites / 2 files)
+
+| # | Site | Current | Divergence from `odata.escape` | Owner ruling (S331) |
+|---|---|---|---|---|
+| D1 | `lib/services/grant-cycles-dataverse.js:46-47`, used `:129` | `function escapeODataString(s){ return encodeURIComponent(String(s).replace(/'/g,"''")); }` in `` `/wmkf_appgrantcycles(wmkf_shortcode='${escapeODataString(sc)}')?$select=…` `` | **Adds `encodeURIComponent`.** `odata.escape` does NOT URL-encode. The inner `String(s).replace(...)` half IS identical to `odata.escape`; the outer encode is extra. | **RULED: option (b).** Refactor the helper body to `return encodeURIComponent(odata.escape(sc));`, sourcing the doubling from canonical while preserving the `encodeURIComponent` (byte output == current). Characterization pin MUST use an input containing BOTH a single quote AND a char `encodeURIComponent` actually encodes (space/`%`), asserting the full built URL. |
+| D2 | `lib/services/reviewer-finder/contact-history-service.js:57`, used `:71` and `:79` | `contactId.replace(/'/g,"''")` (→ `escapedContactId`) | Interpolated into `` `_wmkf_contact_value eq ${escapedContactId}` `` / `_wmkf_projectleader_value eq ${escapedContactId}` — a **RAW/unquoted lookup position, NO surrounding single quotes** `[VERIFIED via Read of :71,:79 this session]`. `odata.escape` is for INSIDE a quoted literal; a raw lookup GUID belongs to `odata.eqRaw`/`odata.eqGuid`. The escape is a functional no-op (a valid GUID has no `'`) — misleading, not incorrect. | **RULED: adopt `odata.eqGuid(...)`.** Build both filters with `odata.eqGuid('_wmkf_contact_value', contactId)` / `odata.eqGuid('_wmkf_projectleader_value', contactId)`. Byte-identical for a valid GUID; adds a **service-level fail-closed guard** (throws on non-GUID) ON TOP of the route's existing GUID validation (`:52` docstring). REPLACE the existing non-GUID quote-escape test at `tests/unit/contact-history-service.test.js:138` with a rejection/no-adapter-call test (non-GUID → `getContactHistory` rejects, `queryAllPersons`/`queryAllRequests` NOT called). |
 
 ### Decoys — MUST NOT be conflated (verified NOT OData escapes)
 
@@ -167,7 +198,8 @@ These stay untouched. Any Stage-3 law must be written so it does NOT match `&#39
 - `pages/api/dynamics-explorer/chat.js:959` — DAL-gate exempt dir `[VERIFIED via check-dataverse-access-layer.js:75-76]`.
 - `lib/dataverse/adapters/grant-request.js:99` — a **doc comment** describing the idiom; the adapter
   itself already uses `odata.eq` (`:117`) `[VERIFIED via Read]`. Optional: refresh the comment; no code change.
-- `scripts/` (25 files) and `_archived/` (0) — one-off probes/backfills, not shipped runtime.
+- `scripts/` (42 matching `.js`/`.mjs` files) and `_archived/` (0) — one-off probes/backfills, not
+  shipped runtime `[VERIFIED via grep -rln … scripts/ --include=*.js --include=*.mjs \| wc -l = 42, this session]`.
 
 ---
 
@@ -234,40 +266,48 @@ their CURRENT output so Stage 2 can prove its ruling preserves or intentionally 
    contains a `'`, and asserts the captured string contains the doubled `''` form byte-for-byte.
    - `role-apply.js`: capture the `client.get` path for `findRoleByName` and `resolvePrivilegeIds`.
    - `dataverse-settings-service.js`: capture `findRow` filter and `listSettings` startswith.
-   - `dataverse-identity-map.js`, `dataverse-app-access-service.js`, `dataverse-prefs-service.js`:
-     capture the respective `client.get` filter.
+   - `dataverse-identity-map.js`: capture the `client.get` filter for a quote-containing email.
+   - `dataverse-app-access-service.js`, `dataverse-prefs-service.js` (**GUARDED-SWAP**): instead of a
+     byte pin, add a rejection pin — `findRow(mockClient, 'sid', 123)` rejects with `TypeError` and
+     `mockClient.get` is never called (proves the guard fires before the escape). Requires exporting
+     `findRow` (test-only export).
    - `program-director-resolver.js`: if `tests/unit/program-director-resolver.test.js` does not
      already assert the `queryUsers` filter string, extend it; else record "already pinned".
    - `review-answer-snapshot.js`: confirm `tests/unit/review-answer-snapshot.test.js` pins
      `answerRowUrl` for a quote-containing key; add the case if missing.
-   - D1 `grant-cycles-dataverse.js`: pin `escapeODataString`'s CURRENT output (including
-     `encodeURIComponent`) for a quote input, or `findByShortCode`'s built URL.
-   - D2 `contact-history-service.js`: pin the CURRENT `_wmkf_contact_value eq …` filter for the
-     GUID input the existing test already uses.
+   - D1 `grant-cycles-dataverse.js`: pin `findByShortCode`'s built URL for an input containing BOTH
+     a `'` AND a space/`%` (e.g. `"O'Brien Lab"`), asserting the full URL byte-for-byte (captures
+     both the doubled `''` and the `encodeURIComponent` `%20`). Survives the option-(b) refactor.
+   - D2 `contact-history-service.js`: the existing valid-GUID tests already exercise the built
+     filter (byte-identical under `eqGuid`); the non-GUID quote-escape test at `:138` is REPLACED in
+     Stage 2 with a rejection/no-adapter-call pin (see D2 ruling).
 3. **Done means:** every SAME-SEMANTICS and divergent site has a byte-output pin; full suite green
    at the prior count or better; commit.
 
 **Verification:** targeted jest on the new/changed suites; `npm run check:dataverse-access-layer`
 (+ self-test); full `npm test`.
 
-### Stage 1 — Mechanical swaps (SAME-SEMANTICS sites only)
+### Stage 1 — Mechanical + guarded swaps (SAME-SEMANTICS + GUARDED-SWAP sites)
 
 **Tests that must exist first:** Stage 0 pins for every site touched in the cluster.
 
-Cluster by directory, one commit each, gates between:
+Cluster by directory (one logical cluster is acceptable given the small size), gates between:
 
 - **Cluster A — `lib/dataverse/role-apply.js`** (sites 1,2). CJS file — resolve the import form per
   Decision 3; swap both inline `.replace` calls to `odata.escape(...)`.
-- **Cluster B — `lib/services/` settings/prefs/app-access + identity-map** (sites 4,5,6,7,8,10).
-  All CJS; swap each. (`dataverse-settings-service.js` has 3 sites.)
+- **Cluster B — `lib/services/` settings + identity-map (mechanical) + app-access/prefs (guarded)**
+  (mechanical sites 4,5,6,7; **guarded sites 8,10**). All CJS. Mechanical sites: swap each.
+  Guarded sites (#8, #10): add the `typeof … !== 'string'` throw guard IMMEDIATELY BEFORE the
+  `odata.escape(...)`. (`dataverse-settings-service.js` has 3 mechanical sites.)
 - **Cluster C — `lib/services/program-director-resolver.js` (ESM) + `lib/external/review-answer-snapshot.js` (ESM)**
   (sites 9,3). Site 3 is already `String()`-wrapped → the swap is exact.
 
 Per-cluster loop: swap → run the Stage 0 pins for the cluster (must stay green, proving byte
-identity) → `npm run check:dataverse-access-layer` (+ self-test) → commit.
+identity / the guard throws) → `npm run check:dataverse-access-layer` (+ self-test) → commit.
 
-**Done means:** all 10 SAME-SEMANTICS sites call `odata.escape`; no inline `.replace(/'/g, "''")`
-remains in those 7 files; Stage 0 pins unchanged-green; full suite green.
+**Done means:** all 8 SAME-SEMANTICS + 2 GUARDED-SWAP sites call `odata.escape`; no inline
+`.replace(/'/g, "''")` remains in those 7 files; guarded sites throw a `TypeError` on a non-string
+BEFORE the escape; Stage 0 pins unchanged-green; full suite green.
 
 **STOP-AND-ASK markers:** if any swap changes a Stage 0 pin's output, STOP — the site was
 misclassified. If CJS↔ESM import interop for `odata.js` is uncertain in a file, verify before
@@ -322,3 +362,32 @@ everywhere the other gates are; if declined — record the decision in the Stage
   25 script sites out of scope `[all VERIFIED via grep/Read this session]`. Corrected the
   helper name: canonical export is `odata.escape`, not `escapeOData` (zero matches for the
   latter). Not yet reviewed; execution not started.
+- 2026-07-05 (S331): **Adversarial review folded + Stages 0–2 executed.** Amendments: #8
+  (`dataverse-app-access-service.js:32`) and #10 (`dataverse-prefs-service.js:43`) reclassified
+  SAME-SEMANTICS→GUARDED-SWAP (odata.escape + `typeof … !== 'string'` throw before the escape,
+  preserving the fail-closed throw); D1 ruled option (b) `encodeURIComponent(odata.escape(sc))`;
+  D2 ruled `odata.eqGuid(...)` (service-level guard atop the route's GUID check); P2 scripts census
+  corrected 25→**42 matching `.js`/`.mjs` files** `[VERIFIED via grep --include, this session]`.
+  Frontmatter `status` draft→active (catalog enum has no "completed"; body line records completion,
+  mirroring ROUTE_SERVICE precedent).
+  - **Census re-probe:** 14 raw `replace(/'/g,"''")` matches under lib/pages/shared/modules (excl
+    odata.js); after execution 0 remain in the 9 in-scope code files; 2 out-of-scope matches persist
+    as expected (`grant-request.js:99` doc comment, `dynamics-explorer/chat.js:959` exempt dir)
+    `[VERIFIED via grep this session]`.
+  - **Stage 0 (pins):** added `tests/unit/role-apply-odata-escape.test.js`,
+    `dataverse-settings-service-odata-escape.test.js`, `dataverse-identity-map-odata-escape.test.js`,
+    `dataverse-guarded-swap-odata-escape.test.js` (rejection pins, sites 8/10),
+    `grant-cycles-dataverse-odata-escape.test.js` (D1 full-URL pin, input `"O'Brien Lab"` →
+    `wmkf_shortcode='O''BRIEN%20LAB'`); extended `program-director-resolver.test.js` (site 9). Site 3
+    already pinned in `review-answer-snapshot.test.js`. Exported `findRow` (test-only) from
+    app-access + prefs. Targeted jest across the 8 suites: **36/36 green BEFORE any swap.**
+  - **Stage 1 (10 swaps):** role-apply (2), settings (3), identity-map (1) mechanical;
+    app-access + prefs guarded; program-director-resolver + review-answer-snapshot (ESM) mechanical.
+    CJS files `require('…/core/odata.js')`, ESM files `import * as odata` — interop confirmed green
+    under jest (babel) and the gates. Same 8 suites: **36/36 still green (byte identity + guard throw).**
+  - **Stage 2:** D1 helper body → `encodeURIComponent(odata.escape(s))` (full-URL pin unchanged-green);
+    D2 both filters → `odata.eqGuid(...)`, and the old non-GUID quote-escape test at
+    `contact-history-service.test.js:138` REPLACED with a non-GUID rejection/no-adapter-call pin.
+  - **Verification:** targeted jest 36/36; `check:dataverse-access-layer` (+ self-test) exit 0;
+    `check:route-service-boundary` exit 0; **full `npm test`: 414 suites / 4680 tests, exit 0.**
+  - Stage 3 (escape law) NOT built — deferred pending owner decision.

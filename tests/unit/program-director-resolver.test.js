@@ -12,6 +12,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import {
+  resolveByEmail,
   resolveProgramDirectorEmailForRequest,
   clearResolverCache,
 } from '../../lib/services/program-director-resolver';
@@ -60,4 +61,15 @@ test('invalid requestId short-circuits to null without a query', async () => {
   const email = await resolveProgramDirectorEmailForRequest(null);
   expect(email).toBeNull();
   expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+});
+
+// Stage 0 characterization pin (OData Escape Consolidation Plan, site 9):
+// resolveByEmail doubles an embedded single quote in the internalemailaddress
+// filter literal. Survives the odata.escape swap unchanged.
+test('resolveByEmail doubles single quotes in the internalemailaddress filter', async () => {
+  DynamicsService.queryRecords.mockReset();
+  DynamicsService.queryRecords.mockResolvedValue({ records: [] });
+  await resolveByEmail("o'brien@example.com");
+  const options = DynamicsService.queryRecords.mock.calls[0][1];
+  expect(options.filter).toContain("internalemailaddress eq 'o''brien@example.com'");
 });
