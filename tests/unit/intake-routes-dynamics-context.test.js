@@ -224,19 +224,36 @@ describe('notification email transport is wrapped', () => {
 });
 
 describe('test-email endpoint is wrapped', () => {
-  test('source wraps both createAndSendEmail and createEmailActivity', () => {
+  // Route→Service Consolidation Stage 5: the route is now a thin shell that
+  // establishes withDalContext around the service call (labels preserved via
+  // branch dispatch); the Dynamics email calls live in
+  // lib/services/admin/test-email-service.js and are additionally guarded
+  // fail-closed by assertTrustedDalContext inside DynamicsService (S330).
+  test('shell establishes the DAL context (historical labels kept) around the service call', () => {
     const fs = require('fs');
     const path = require('path');
     const src = fs.readFileSync(
       path.join(__dirname, '../../pages/api/test-email.js'),
       'utf8'
     );
-    expect(src).toMatch(
-      /bypassDynamicsRestrictions\(\s*['"]test-email-send['"][^]*?DynamicsService\.createAndSendEmail\s*\(/
+    // Both historical labels still selected at dispatch time…
+    expect(src).toMatch(/['"]test-email-send['"]/);
+    expect(src).toMatch(/['"]test-email-draft['"]/);
+    // …and the context lexically encloses the one service call.
+    expect(src).toMatch(/withDalContext\(\s*label[^]*?sendTestEmail\s*\(/);
+    // No unwrapped legacy shape remains.
+    expect(src).not.toMatch(/bypassDynamicsRestrictions/);
+  });
+
+  test('service performs the Dynamics email calls (context assumed, enforced by DynamicsService)', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const src = fs.readFileSync(
+      path.join(__dirname, '../../lib/services/admin/test-email-service.js'),
+      'utf8'
     );
-    expect(src).toMatch(
-      /bypassDynamicsRestrictions\(\s*['"]test-email-draft['"][^]*?DynamicsService\.createEmailActivity\s*\(/
-    );
+    expect(src).toMatch(/DynamicsService\.createAndSendEmail\s*\(/);
+    expect(src).toMatch(/DynamicsService\.createEmailActivity\s*\(/);
   });
 });
 

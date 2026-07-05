@@ -4,11 +4,21 @@
  * Skinny test endpoint for Dynamics email sending.
  * Superuser-only. Not a production feature — exists to verify
  * that the Dynamics email privileges are working.
+ *
+ * Thin route shell (Route→Service Consolidation Plan, Stage 5): method
+ * dispatch → superuser gate → input validation → withDalContext → one service
+ * call → result/error→HTTP mapping. Business logic lives in
+ * lib/services/admin/test-email-service.js.
+ *
+ * Context labels: the historical route wrapped each sendMode branch in its own
+ * bypass label (test-email-send / test-email-draft). Both branches share one
+ * verb and one auth boundary (P1m base case), but the labels are preserved by
+ * picking the branch label at dispatch time — same scopes, same observability.
  */
 
 import { requireSuperuser, getSession } from '../../lib/utils/auth';
-import { DynamicsService } from '../../lib/services/dynamics-service';
-import { bypassDynamicsRestrictions } from '../../lib/services/dynamics-context';
+import { withDalContext } from '../../lib/dataverse/core/context';
+import { sendTestEmail } from '../../lib/services/admin/test-email-service';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -39,49 +49,18 @@ export default async function handler(req, res) {
   }
 
   const actingUserSystemId = session?.user?.dynamicsSystemuserId || null;
+  const label = sendMode === 'send' ? 'test-email-send' : 'test-email-draft';
 
-  try {
-    if (sendMode === 'send') {
-      const { emailId } = await bypassDynamicsRestrictions('test-email-send', () =>
-        DynamicsService.createAndSendEmail({
-          subject,
-          body,
-          from,
-          to,
-          actingUserSystemId,
-        })
-      );
-
-      return res.json({
-        success: true,
-        emailId,
-        status: 'sent',
-        message: `Email sent successfully from ${from} to ${to}`,
-      });
-    } else {
-      // Draft only
-      const emailId = await bypassDynamicsRestrictions('test-email-draft', () =>
-        DynamicsService.createEmailActivity({
-          subject,
-          body,
-          from,
-          to,
-          actingUserSystemId,
-        })
-      );
-
-      return res.json({
-        success: true,
-        emailId,
-        status: 'draft',
-        message: `Draft email created (not sent). Activity ID: ${emailId}`,
+  return withDalContext(label, async () => {
+    try {
+      const result = await sendTestEmail({ to, subject, body, from, sendMode, actingUserSystemId });
+      return res.json(result);
+    } catch (error) {
+      console.error('Test email error:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
       });
     }
-  } catch (error) {
-    console.error('Test email error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
+  });
 }
