@@ -17,13 +17,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/prompt-resolver.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "unresolved",
-      "count": 1
-    },
-    {
       "file": "lib/services/reviewer-acceptance-email.js",
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",
