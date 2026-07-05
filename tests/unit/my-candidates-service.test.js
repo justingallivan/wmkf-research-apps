@@ -1,0 +1,320 @@
+/**
+ * @jest-environment node
+ *
+ * Unit tests for lib/services/reviewer-finder/my-candidates-service.js
+ * (Route→Service Consolidation Plan, Stage 3 — P1m multi-verb pilot).
+ * One method per verb, adapters mocked: per-verb happy paths, the
+ * mode=proposals GET branch (incl. its sanitized 500), PATCH bulk-vs-single
+ * dispatch, duplicate-email partial success + savedFields, restore path,
+ * and DELETE semantics (atomic softDelete args; failure propagation).
+ */
+
+jest.mock('../../lib/services/program-director-resolver', () => ({
+  resolveByEmail: jest.fn(),
+}));
+jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
+  __esModule: true,
+  getById: jest.fn(),
+  findByRequestNumber: jest.fn(),
+}));
+jest.mock('../../lib/dataverse/adapters/account', () => ({
+  __esModule: true,
+  queryAccounts: jest.fn(async () => ({ records: [] })),
+}));
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
+  __esModule: true,
+  findByRequest: jest.fn(async () => []),
+  findRemovedByRequest: jest.fn(async () => []),
+  findByPD: jest.fn(async () => ({ suggestions: [], requestById: {} })),
+  aggregateReviewHistory: jest.fn(async () => ({})),
+  findById: jest.fn(),
+  updateLifecycle: jest.fn(async () => {}),
+  restore: jest.fn(async () => {}),
+  softDelete: jest.fn(async () => {}),
+  bulkUpdateByRequest: jest.fn(async () => 0),
+  APPLICANT_DISPOSITION_MAP: { recommended: 100000000 },
+  RESPONSE_TYPE_BY_VALUE: { 100000001: 'accepted' },
+}));
+jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
+  __esModule: true,
+  queryReviewers: jest.fn(async () => ({ records: [] })),
+  update: jest.fn(async () => {}),
+  findByEmailCandidates: jest.fn(),
+}));
+jest.mock('../../lib/dataverse/adapters/researcher', () => ({
+  __esModule: true,
+  updateById: jest.fn(async () => {}),
+}));
+jest.mock('../../lib/external/token-lifecycle', () => ({ ensureToken: jest.fn(async () => {}) }));
+jest.mock('../../lib/dataverse/duplicate-key', () => ({ translateDuplicateKeyError: jest.fn(() => null) }));
+
+const { resolveByEmail } = require('../../lib/services/program-director-resolver');
+const grantRequestAdapter = require('../../lib/dataverse/adapters/grant-request');
+const suggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
+const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
+const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
+const { ensureToken } = require('../../lib/external/token-lifecycle');
+const { translateDuplicateKeyError } = require('../../lib/dataverse/duplicate-key');
+const {
+  getMyCandidates,
+  patchMyCandidates,
+  deleteMyCandidates,
+  MyCandidatesError,
+} = require('../../lib/services/reviewer-finder/my-candidates-service');
+
+const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
+const SUGGESTION_ID = '33333333-3333-3333-3333-333333333333';
+const PERSON_ID = '22222222-2222-2222-2222-222222222222';
+const EMAIL = 'pd@example.org';
+const SYS = 'u-1';
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  translateDuplicateKeyError.mockReturnValue(null);
+});
+
+describe('getMyCandidates', () => {
+  test('single-request scope: hydrates person/researcher and groups candidates under the proposal', async () => {
+    grantRequestAdapter.getById.mockResolvedValue({
+      akoya_requestid: REQUEST_ID,
+      akoya_requestnum: 'R-1',
+      akoya_title: 'A Proposal',
+      wmkf_meetingdate: '2026-06-15',
+    });
+    suggestionAdapter.findByRequest.mockResolvedValue([{
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_request_value: REQUEST_ID,
+      _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_sources: 'literature_retrieved',
+      wmkf_responsetype: 100000001,
+    }]);
+    potentialReviewerAdapter.queryReviewers.mockImplementation(async ({ select }) => (
+      select.includes('wmkf_organizationname')
+        ? { records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_name: 'Dr X', wmkf_emailaddress: 'x@example.org' }] }
+        : { records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_primaryaffiliation: 'MIT' }] }
+    ));
+
+    const out = await getMyCandidates({ requestId: REQUEST_ID, azureEmail: EMAIL });
+
+    expect(out.success).toBe(true);
+    expect(out.totalCandidates).toBe(1);
+    expect(out.proposals[0]).toMatchObject({ proposalId: REQUEST_ID, requestNumber: 'R-1' });
+    expect(out.proposals[0].candidates[0]).toMatchObject({
+      suggestionId: SUGGESTION_ID,
+      name: 'Dr X',
+      affiliation: 'MIT',
+      responseType: 'accepted', // optionset → string code mapping preserved
+    });
+    expect(resolveByEmail).not.toHaveBeenCalled(); // explicit request skips PD scope
+  });
+
+  test('single-request scope with only REMOVED rows builds a proposal shell carrying removedCandidates', async () => {
+    grantRequestAdapter.getById.mockResolvedValue({
+      akoya_requestid: REQUEST_ID, akoya_requestnum: 'R-1', akoya_title: 'A Proposal',
+    });
+    suggestionAdapter.findByRequest.mockResolvedValue([]);
+    suggestionAdapter.findRemovedByRequest.mockResolvedValue([{
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_invited: true,
+      modifiedon: '2026-06-01',
+    }]);
+    potentialReviewerAdapter.queryReviewers.mockImplementation(async ({ select }) => (
+      select.includes('wmkf_organizationname')
+        ? { records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_name: 'Dr X' }] }
+        : { records: [] }
+    ));
+
+    const out = await getMyCandidates({ requestId: REQUEST_ID, azureEmail: EMAIL });
+
+    expect(out.totalCandidates).toBe(0);
+    expect(out.proposals[0].candidates).toEqual([]);
+    expect(out.proposals[0].removedCandidates).toEqual([expect.objectContaining({
+      suggestionId: SUGGESTION_ID, name: 'Dr X', wasInvited: true, removedAt: '2026-06-01',
+    })]);
+  });
+
+  test('PD scope with unresolvable PD returns the empty envelope with programDirector: null', async () => {
+    resolveByEmail.mockResolvedValue(null);
+    const out = await getMyCandidates({ azureEmail: EMAIL });
+    expect(out).toEqual({ success: true, proposals: [], totalCandidates: 0, programDirector: null });
+  });
+
+  test('mode=proposals returns the sorted distinct request list', async () => {
+    resolveByEmail.mockResolvedValue({ systemuserid: 'pd-1' });
+    suggestionAdapter.findByPD.mockResolvedValue({
+      requestById: {
+        [REQUEST_ID]: { requestId: REQUEST_ID, title: 'Old', requestNumber: 'R-1', cycleCode: 'D25', cycleLabel: 'Dec 2025', meetingDate: '2025-12-01' },
+        [SUGGESTION_ID]: { requestId: SUGGESTION_ID, title: 'New', requestNumber: 'R-2', cycleCode: 'J26', cycleLabel: 'Jun 2026', meetingDate: '2026-06-15' },
+      },
+    });
+
+    const out = await getMyCandidates({ mode: 'proposals', azureEmail: EMAIL });
+
+    expect(out.success).toBe(true);
+    expect(out.proposals.map((p) => p.title)).toEqual(['New', 'Old']); // newest first
+    expect(out.proposals[0]).toEqual({
+      id: SUGGESTION_ID,
+      proposalHash: SUGGESTION_ID,
+      title: 'New',
+      cycleCode: 'J26',
+      cycleLabel: 'Jun 2026',
+      requestNumber: 'R-2',
+      meetingDate: '2026-06-15',
+    });
+  });
+
+  test('mode=proposals failure throws the SANITIZED 500 (no details) MyCandidatesError', async () => {
+    resolveByEmail.mockRejectedValue(new Error('secret upstream detail'));
+    const err = await getMyCandidates({ mode: 'proposals', azureEmail: EMAIL }).catch((e) => e);
+    expect(err).toBeInstanceOf(MyCandidatesError);
+    expect(err.httpStatus).toBe(500);
+    expect(err.body).toEqual({ error: 'Failed to fetch proposals' });
+  });
+
+  test('default-scope adapter failure propagates untyped (shell owns the detailed 500)', async () => {
+    resolveByEmail.mockResolvedValue({ systemuserid: 'pd-1' });
+    suggestionAdapter.findByPD.mockRejectedValue(new Error('Dataverse down'));
+    await expect(getMyCandidates({ azureEmail: EMAIL })).rejects.toThrow('Dataverse down');
+  });
+});
+
+describe('patchMyCandidates', () => {
+  test('bulk-by-request dispatch: proposalId without suggestionId → bulkUpdateByRequest, bulk envelope', async () => {
+    suggestionAdapter.bulkUpdateByRequest.mockResolvedValue(3);
+    const out = await patchMyCandidates({
+      body: { proposalId: REQUEST_ID, programArea: 'Science' },
+      actingUserSystemId: SYS,
+    });
+    expect(out).toEqual({
+      success: true,
+      message: 'Proposal updated',
+      updated: { proposalId: REQUEST_ID, programArea: 'Science', suggestionsUpdated: 3 },
+    });
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  });
+
+  test('bulk rejected fields (PI/institution) → 400 with rejectedFields + hint body', async () => {
+    const err = await patchMyCandidates({
+      body: { proposalId: REQUEST_ID, proposalAuthors: 'X', grantCycleCode: 'J26' },
+      actingUserSystemId: SYS,
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(MyCandidatesError);
+    expect(err.httpStatus).toBe(400);
+    expect(err.body).toEqual({
+      error: 'Editing PI / institution is not supported here',
+      rejectedFields: ['proposalAuthors'],
+      hint: 'These fields belong on akoya_request and are managed in CRM.',
+    });
+    expect(suggestionAdapter.bulkUpdateByRequest).not.toHaveBeenCalled();
+  });
+
+  test('single-suggestion dispatch: lifecycle edit calls updateLifecycle; accepted=true auto-mints token non-fatally', async () => {
+    ensureToken.mockRejectedValue(new Error('mint failed'));
+    const out = await patchMyCandidates({
+      body: { suggestionId: SUGGESTION_ID, accepted: true },
+      actingUserSystemId: SYS,
+    });
+    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(
+      SUGGESTION_ID, { accepted: true }, { actingUserSystemId: SYS },
+    );
+    expect(ensureToken).toHaveBeenCalledWith(SUGGESTION_ID, { actingUserSystemId: SYS });
+    expect(out).toEqual({
+      success: true,
+      message: 'Candidate updated',
+      updated: { suggestionId: SUGGESTION_ID, accepted: true },
+    });
+  });
+
+  test('restore: true re-selects via restore() and returns the restore envelope', async () => {
+    const out = await patchMyCandidates({
+      body: { suggestionId: SUGGESTION_ID, restore: true },
+      actingUserSystemId: SYS,
+    });
+    expect(suggestionAdapter.restore).toHaveBeenCalledWith(SUGGESTION_ID, { actingUserSystemId: SYS });
+    expect(out).toEqual({ success: true, message: 'Candidate restored' });
+  });
+
+  test('validation: neither id → 400; bad GUIDs → 400; no supported fields → 400; missing person link → 404', async () => {
+    await expect(patchMyCandidates({ body: {} })).rejects.toMatchObject({ httpStatus: 400, message: 'suggestionId or proposalId is required' });
+    await expect(patchMyCandidates({ body: { proposalId: 'nope', programArea: 'x' } })).rejects.toMatchObject({ httpStatus: 400, message: 'proposalId is not a valid GUID' });
+    await expect(patchMyCandidates({ body: { suggestionId: 'nope', invited: true } })).rejects.toMatchObject({ httpStatus: 400, message: 'suggestionId is not a valid GUID' });
+    await expect(patchMyCandidates({ body: { suggestionId: SUGGESTION_ID } })).rejects.toMatchObject({ httpStatus: 400, message: 'No supported fields to update' });
+    suggestionAdapter.findById.mockResolvedValue({ _wmkf_potentialreviewer_value: null });
+    await expect(patchMyCandidates({ body: { suggestionId: SUGGESTION_ID, name: 'X' } })).rejects.toMatchObject({ httpStatus: 404, message: 'Linked potential reviewer not found for this suggestion' });
+  });
+
+  test('duplicate-email 409: conflict-safe fields committed first, savedFields + partialSuccess + conflictingRecordId in body', async () => {
+    suggestionAdapter.findById.mockResolvedValue({ _wmkf_potentialreviewer_value: PERSON_ID });
+    potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
+      if (updates && 'email' in updates) throw new Error('alt-key duplicate');
+      return undefined;
+    });
+    translateDuplicateKeyError.mockImplementation((e) => (
+      e?.message === 'alt-key duplicate'
+        ? { field: 'wmkf_emailaddress', value: 'dup@x.org', message: 'That email is already in use.' }
+        : null
+    ));
+    potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue({
+      one: true, id: 'WINNER-1', row: { statecode: 0 },
+    });
+
+    const err = await patchMyCandidates({
+      body: { suggestionId: SUGGESTION_ID, affiliation: 'JILA', website: 'https://jila.edu', email: 'dup@x.org' },
+      actingUserSystemId: SYS,
+    }).catch((e) => e);
+
+    expect(err).toBeInstanceOf(MyCandidatesError);
+    expect(err.httpStatus).toBe(409);
+    expect(err.body).toEqual({
+      field: 'wmkf_emailaddress',
+      value: 'dup@x.org',
+      message: 'That email is already in use.',
+      conflictingRecordId: 'WINNER-1',
+      partialSuccess: true,
+      savedFields: ['affiliation', 'website'],
+    });
+    // emailSource never stamped manual for an email that did not land.
+    expect(researcherAdapter.updateById).not.toHaveBeenCalledWith(
+      PERSON_ID, expect.objectContaining({ emailSource: 'manual' }), expect.anything(),
+    );
+  });
+
+  test('duplicate-key conflicting owner is fail-closed: ambiguous/inactive owner → conflictingRecordId null', async () => {
+    suggestionAdapter.findById.mockResolvedValue({ _wmkf_potentialreviewer_value: PERSON_ID });
+    potentialReviewerAdapter.update.mockRejectedValue(new Error('dup'));
+    translateDuplicateKeyError.mockReturnValue({ field: 'wmkf_emailaddress', value: 'dup@x.org', message: 'in use' });
+    potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue({ one: false });
+
+    const err = await patchMyCandidates({
+      body: { suggestionId: SUGGESTION_ID, email: 'dup@x.org' },
+    }).catch((e) => e);
+
+    expect(err.httpStatus).toBe(409);
+    expect(err.body.conflictingRecordId).toBeNull();
+    expect(err.body.partialSuccess).toBe(false);
+    expect(err.body.savedFields).toEqual([]);
+  });
+
+  test('non-duplicate adapter failures propagate untyped (shell owns the 500)', async () => {
+    suggestionAdapter.updateLifecycle.mockRejectedValue(new Error('Dataverse down'));
+    await expect(patchMyCandidates({
+      body: { suggestionId: SUGGESTION_ID, invited: true },
+    })).rejects.toThrow('Dataverse down');
+  });
+});
+
+describe('deleteMyCandidates', () => {
+  test('happy path: ONE atomic softDelete with alsoRevokeToken, removal envelope', async () => {
+    const out = await deleteMyCandidates({ suggestionId: SUGGESTION_ID, actingUserSystemId: SYS });
+    expect(suggestionAdapter.softDelete).toHaveBeenCalledWith(
+      SUGGESTION_ID, { actingUserSystemId: SYS, alsoRevokeToken: true },
+    );
+    expect(out).toEqual({ success: true, message: 'Candidate removed' });
+  });
+
+  test('missing-row softDelete failure propagates untyped (caller keeps the row; shell 500s)', async () => {
+    suggestionAdapter.softDelete.mockRejectedValue(new Error('row not found'));
+    await expect(deleteMyCandidates({ suggestionId: SUGGESTION_ID })).rejects.toThrow('row not found');
+  });
+});
