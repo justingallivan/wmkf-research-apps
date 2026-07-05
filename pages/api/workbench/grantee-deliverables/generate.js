@@ -24,7 +24,7 @@
  */
 
 import { requireAppAccess } from '../../../../lib/utils/auth';
-import { DynamicsService } from '../../../../lib/services/dynamics-service';
+import * as grantRequestAdapter from '../../../../lib/dataverse/adapters/grant-request.js';
 import { bypassDynamicsRestrictions } from '../../../../lib/services/dynamics-context';
 import { loadModelOverrides } from '../../../../lib/services/model-override-loader';
 import { isGuid } from '../../../../lib/utils/guid';
@@ -68,7 +68,7 @@ export default async function handler(req, res) {
     try {
       let row;
       try {
-        row = await DynamicsService.getRecord('akoya_requests', requestId, { select: REQUEST_SELECT });
+        row = await grantRequestAdapter.getById(requestId, { select: REQUEST_SELECT });
       } catch {
         row = null;
       }
@@ -131,7 +131,7 @@ export default async function handler(req, res) {
       const patch = { wmkf_abstractformatted: gen.abstractFormatted };
 
       try {
-        await DynamicsService.updateRecord('akoya_requests', row.akoya_requestid, patch, {
+        await grantRequestAdapter.updateById(row.akoya_requestid, patch, {
           ifMatch: row._etag,
           actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
         });
@@ -139,7 +139,7 @@ export default async function handler(req, res) {
         if (e.status === 412) {
           // Concurrent write won the race. Prefer the now-stored value; if still
           // empty, ask the caller to retry rather than leaking the raw 412.
-          const re = await DynamicsService.getRecord('akoya_requests', requestId, {
+          const re = await grantRequestAdapter.getById(requestId, {
             select: 'wmkf_abstractformatted',
           });
           const reFormatted = (re.wmkf_abstractformatted || '').trim();
