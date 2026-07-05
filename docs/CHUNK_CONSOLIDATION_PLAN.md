@@ -467,7 +467,7 @@ flagged, registered everywhere the other gates are; if declined — record the d
     `fetchAnswerTextsBySuggestion` CHUNK=20), `reviewers-service.test.js` (both
     `fetchPotentialReviewers`/`fetchResearchersByPerson`, disambiguated by `select` since the two
     loops interleave under `Promise.all`), `my-candidates-service.test.js` (person-id pin +
-    account-id pin covering all three of its chunked helpers), `discovery-openalex-publications.test.js`
+    account-id pin covering all three of its chunked helpers), `discovery-openalex-publications.test.js` <!-- drain-table:ignore reason=jest-test-filename-not-a-table-claim -->
     (`backfillOpenAlexPublications` concurrency-batch pin), and a new
     `tests/unit/evaluate-multi-perspective-concurrency.test.js` (required exporting
     `processWithConcurrency`, previously module-local — no behavior change). Full suite green at
