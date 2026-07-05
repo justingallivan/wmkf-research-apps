@@ -197,3 +197,51 @@ test('email-send failure still reports the reviewer as withdrawn (state already 
   expect(res._data.withdrawn).toBe(1);
   expect(res._data.results[0].status).toBe('withdrawn_email_failed');
 });
+
+// --- Characterization additions (Stage 1 pilot, Route→Service Consolidation Plan) ---
+
+test('wrong HTTP method (GET) -> 405 with Allow: POST, no work performed', async () => {
+  const req = createMockReq({ method: 'GET', body: { requestId: REQ, suggestionIds: [SUG] } });
+  const res = createMockRes();
+  await handler(req, res);
+  expect(res.statusCode).toBe(405);
+  expect(res.setHeader).toHaveBeenCalledWith('Allow', 'POST');
+  expect(res._data).toEqual({ error: 'Method not allowed' });
+  expect(findById).not.toHaveBeenCalled();
+});
+
+test('unauthenticated (requireAppAccess denies) -> route returns immediately, does not touch the response requireAppAccess already sent', async () => {
+  const { requireAppAccess } = require('../../lib/utils/auth');
+  requireAppAccess.mockImplementationOnce(async (req, res) => {
+    res.status(401).json({ error: 'Authentication required' });
+    return null;
+  });
+  const res = await run({ requestId: REQ, suggestionIds: [SUG] });
+  expect(res.statusCode).toBe(401);
+  expect(res._data).toEqual({ error: 'Authentication required' });
+  expect(findById).not.toHaveBeenCalled();
+  expect(updateLifecycle).not.toHaveBeenCalled();
+});
+
+test('happy-path response envelope is pinned exactly (full shape, not just 200)', async () => {
+  findById.mockResolvedValue(pendingRow());
+  const res = await run({ requestId: REQ, suggestionIds: [SUG] });
+  expect(res.statusCode).toBe(200);
+  expect(res._data).toEqual({
+    ok: true,
+    withdrawn: 1,
+    results: [{ suggestionId: SUG, status: 'withdrawn_emailed' }],
+  });
+});
+
+test('domain error: no request found for requestId -> 404 with exact error body, no per-suggestion work', async () => {
+  getRecord.mockImplementation(async (set) => {
+    if (set === 'akoya_requests') return null;
+    return null;
+  });
+  const res = await run({ requestId: REQ, suggestionIds: [SUG] });
+  expect(res.statusCode).toBe(404);
+  expect(res._data).toEqual({ error: `No request found for ${REQ}` });
+  expect(findById).not.toHaveBeenCalled();
+  expect(updateLifecycle).not.toHaveBeenCalled();
+});
