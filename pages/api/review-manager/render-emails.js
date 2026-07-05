@@ -35,12 +35,13 @@ import { requireAppAccess } from '../../../lib/utils/auth';
 import { allGuids } from '../../../lib/utils/guid';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
 import { formatNameList, stripHonorific } from '../../../lib/utils/format-name-list';
 import { getHonorariumAmount } from '../../../lib/services/honorarium-config';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
+import { getByIdWithSelect as getReviewerByIdWithSelect } from '../../../lib/dataverse/adapters/potential-reviewer';
+import { getById as getRequestById } from '../../../lib/dataverse/adapters/grant-request';
 import { fetchCoPIs } from '../../../lib/services/proposal-participants';
 import { mintAndStore } from '../../../lib/external/token-lifecycle';
 import { emailConfidence, isKnownTemplateType } from '../../../lib/utils/reviewer-invite';
@@ -100,10 +101,10 @@ export default async function handler(req, res) {
       const personId = sug._wmkf_potentialreviewer_value;
       const requestId = sug._wmkf_request_value;
       const [person, request] = await Promise.all([
-        personId ? DynamicsService.getRecord('wmkf_potentialreviewerses', personId, {
+        personId ? getReviewerByIdWithSelect(personId, {
           select: 'wmkf_name,wmkf_emailaddress,wmkf_organizationname,wmkf_primaryaffiliation,wmkf_emailsource,wmkf_identitystatus',
         }).catch(() => null) : null,
-        requestId ? DynamicsService.getRecord('akoya_requests', requestId, {
+        requestId ? getRequestById(requestId, {
           select: 'akoya_requestid,akoya_requestnum,akoya_title,wmkf_abstract,wmkf_organizationname,_akoya_applicantid_value,_wmkf_projectleader_value,wmkf_meetingdate,wmkf_reviewduedate',
         }).catch(() => null) : null,
       ]);

@@ -22,7 +22,16 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   APPLICANT_DISPOSITION_MAP: { recommended: 100000000 },
   RESPONSE_TYPE_BY_VALUE: {},
 }));
-jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({}));
+jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => {
+  // queryReviewers is a thin DynamicsService.queryRecords passthrough
+  // (data-access-layer conversion, Stages 3-6) — forward through the
+  // ALSO-mocked dynamics-service module so the existing entity-keyed stub
+  // below keeps working.
+  const { DynamicsService } = jest.requireMock('../../lib/services/dynamics-service');
+  return {
+    queryReviewers: (options) => DynamicsService.queryRecords('wmkf_potentialreviewerses', options),
+  };
+});
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({}));
 jest.mock('../../lib/external/token-lifecycle', () => ({
   ensureToken: jest.fn(),

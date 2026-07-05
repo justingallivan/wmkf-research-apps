@@ -24,11 +24,11 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { resolveByEmail } from '../../../lib/services/program-director-resolver';
 import { meetingDateToCycleCode, cycleCodeToOdataFilter } from '../../../lib/utils/cycle-code';
-import { RESPONSE_TYPE_MAP, notExcludedFilter } from '../../../lib/dataverse/adapters/reviewer-suggestion';
+import { RESPONSE_TYPE_MAP, notExcludedFilter, queryAllSuggestions } from '../../../lib/dataverse/adapters/reviewer-suggestion';
+import { queryAllRequests } from '../../../lib/dataverse/adapters/grant-request';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -77,7 +77,7 @@ async function listCycles(res, pd) {
   // Per Justin: ~6 proposals per cycle per PD, so even across all history
   // this is a small set. Filter out rows with no meeting date or non-J/D months.
   const filter = `_wmkf_programdirector_value eq ${pd.systemuserid} and wmkf_meetingdate ne null`;
-  const { records } = await DynamicsService.queryAllRecords('akoya_requests', {
+  const { records } = await queryAllRequests({
     select: 'akoya_requestid,wmkf_meetingdate',
     filter,
     orderby: 'wmkf_meetingdate desc',
@@ -128,7 +128,7 @@ async function listProposalsInCycle(res, pd, cycleCode, status) {
     : `akoya_requeststatus eq 'Phase II Pending'`;
 
   const filter = `_wmkf_programdirector_value eq ${pd.systemuserid} and ${cycleFilter} and ${statusFilter}`;
-  const { records } = await DynamicsService.queryAllRecords('akoya_requests', {
+  const { records } = await queryAllRequests({
     select: [
       'akoya_requestid',
       'akoya_requestnum',
@@ -215,7 +215,7 @@ async function fetchReviewerCounts(requestIds) {
   for (let i = 0; i < requestIds.length; i += CHUNK) {
     const chunk = requestIds.slice(i, i + CHUNK);
     const orChain = chunk.map((id) => `_wmkf_request_value eq ${id}`).join(' or ');
-    const { records } = await DynamicsService.queryAllRecords('wmkf_appreviewersuggestions', {
+    const { records } = await queryAllSuggestions({
       select: '_wmkf_request_value,wmkf_invited,wmkf_accepted,wmkf_declined,wmkf_emailsentat,wmkf_responsetype',
       filter: `(${orChain}) and wmkf_selected eq true and ${notExcludedFilter()}`,
     });

@@ -44,6 +44,7 @@ import { isGuid } from '../../../lib/utils/guid';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { meetingDateToCycleCode, cycleCodeToLabel } from '../../../lib/utils/cycle-code';
+import { queryAllRequests, queryRequests } from '../../../lib/dataverse/adapters/grant-request';
 
 const ROLE_PI = 100000000;
 const ROLE_COPI = 100000001;
@@ -96,7 +97,7 @@ export default async function handler(req, res) {
         }),
         // akoya_request rows where this contact is the project leader.
         // Role inferred = pi, position = 0 (matches backfill convention).
-        DynamicsService.queryAllRecords('akoya_requests', {
+        queryAllRequests({
           select: 'akoya_requestid',
           filter: `_wmkf_projectleader_value eq ${escapedContactId}`,
         }),
@@ -154,7 +155,7 @@ export default async function handler(req, res) {
       for (let i = 0; i < distinctRequestIds.length; i += CHUNK_SIZE) {
         const chunk = distinctRequestIds.slice(i, i + CHUNK_SIZE);
         const orFilter = chunk.map(id => `akoya_requestid eq ${id}`).join(' or ');
-        const meta = await DynamicsService.queryRecords('akoya_requests', {
+        const meta = await queryRequests({
           select: REQUEST_SELECT,
           filter: orFilter,
           top: CHUNK_SIZE,

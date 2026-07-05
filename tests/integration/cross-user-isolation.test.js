@@ -188,6 +188,10 @@ describe('/api/reviewer-finder/generate-emails cross-user isolation', () => {
     updateRecord = jest.fn(async () => {});
     jest.doMock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
       findById: (...a) => findById(...a),
+      // patchFields is a thin DynamicsService.updateRecord passthrough
+      // (data-access-layer conversion, Stages 3-6) — forward through the
+      // ALSO-mocked updateRecord below so the existing assertion on it holds.
+      patchFields: (id, payload, opts = {}) => updateRecord('wmkf_appreviewersuggestions', id, payload, opts),
     }));
     jest.doMock('../../lib/services/dynamics-service', () => ({
       DynamicsService: {
@@ -238,6 +242,7 @@ describe('/api/reviewer-finder/generate-emails cross-user isolation', () => {
       'wmkf_appreviewersuggestions',
       SUGGESTION_OWNED_BY_A,
       { wmkf_emailsentat: expect.any(String), wmkf_invited: true },
+      {},
     );
   });
 });

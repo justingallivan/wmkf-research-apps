@@ -24,6 +24,9 @@ import { isGuid, allGuids } from '../../../lib/utils/guid';
 import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
+import { getById as getRequestById } from '../../../lib/dataverse/adapters/grant-request';
+import { getById as getSystemUserById } from '../../../lib/dataverse/adapters/system-user';
+import { getByIdWithSelect as getReviewerByIdWithSelect } from '../../../lib/dataverse/adapters/potential-reviewer';
 import { resolveSignatureForRequest } from '../../../lib/services/email-signature';
 import { renderWithdrawSufficient } from '../../../lib/external/reviewer-withdraw-email';
 import { readRequiredEmailDefaults } from '../../../lib/services/email-defaults';
@@ -70,7 +73,7 @@ export default async function handler(req, res) {
       // Resolve PD sender + signature once for the request.
       let request;
       try {
-        request = await DynamicsService.getRecord('akoya_requests', requestId, {
+        request = await getRequestById(requestId, {
           select: 'akoya_requestid,akoya_title,_wmkf_programdirector_value',
         });
       } catch {
@@ -81,9 +84,7 @@ export default async function handler(req, res) {
       }
       let pd = null;
       if (request._wmkf_programdirector_value) {
-        pd = await DynamicsService.getRecord('systemusers', request._wmkf_programdirector_value, {
-          select: 'systemuserid,internalemailaddress,isdisabled',
-        }).catch(() => null);
+        pd = await getSystemUserById(request._wmkf_programdirector_value).catch(() => null);
       }
       const canEmail = pd && pd.isdisabled === false && pd.internalemailaddress && pd.systemuserid;
       const signatureBlock = await resolveSignatureForRequest(requestId).catch(() => null);
@@ -122,7 +123,7 @@ export default async function handler(req, res) {
         withdrawn++;
 
         if (canEmail) {
-          const reviewer = await DynamicsService.getRecord('wmkf_potentialreviewerses', s._wmkf_potentialreviewer_value, {
+          const reviewer = await getReviewerByIdWithSelect(s._wmkf_potentialreviewer_value, {
             select: 'wmkf_name,wmkf_emailaddress',
           }).catch(() => null);
           if (reviewer?.wmkf_emailaddress) {

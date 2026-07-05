@@ -29,6 +29,7 @@ import { meetingDateToCycleCode, cycleCodeToLabel } from '../../../lib/utils/cyc
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
 import * as researcherAdapter from '../../../lib/dataverse/adapters/researcher';
+import { getById as getRequestById, findByRequestNumber } from '../../../lib/dataverse/adapters/grant-request';
 import { ensureToken } from '../../../lib/external/token-lifecycle';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { translateDuplicateKeyError } from '../../../lib/dataverse/duplicate-key';
@@ -328,19 +329,14 @@ async function handleProposalsList(req, res, access, { cycleCode }) {
 async function fetchRequestByIdOrNumber({ requestId, requestNumber }) {
   if (requestId) {
     try {
-      const r = await DynamicsService.getRecord('akoya_requests', requestId, { select: REQUEST_FIELDS.join(',') });
+      const r = await getRequestById(requestId, { select: REQUEST_FIELDS });
       return projectRequest(r);
     } catch (e) {
       return null;
     }
   }
   if (requestNumber) {
-    const safe = String(requestNumber).replace(/'/g, "''");
-    const { records } = await DynamicsService.queryRecords('akoya_requests', {
-      select: REQUEST_FIELDS.join(','),
-      filter: `akoya_requestnum eq '${safe}'`,
-      top: 1,
-    });
+    const { records } = await findByRequestNumber(requestNumber, { select: REQUEST_FIELDS, top: 1 });
     return records[0] ? projectRequest(records[0]) : null;
   }
   return null;
@@ -353,7 +349,7 @@ async function fetchPotentialReviewers(ids) {
   for (let i = 0; i < ids.length; i += CHUNK) {
     const chunk = ids.slice(i, i + CHUNK);
     const orChain = chunk.map((id) => `wmkf_potentialreviewersid eq ${id}`).join(' or ');
-    const { records } = await DynamicsService.queryRecords('wmkf_potentialreviewerses', {
+    const { records } = await potentialReviewerAdapter.queryReviewers({
       select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_emailaddress,wmkf_organizationname,wmkf_areaofexpertise,wmkf_academicrank,wmkf_primarydepartment,wmkf_maininstitution',
       filter: orChain,
       top: 500,
@@ -392,7 +388,7 @@ async function fetchResearchersByPerson(personIds) {
   for (let i = 0; i < personIds.length; i += CHUNK) {
     const chunk = personIds.slice(i, i + CHUNK);
     const orChain = chunk.map((id) => `wmkf_potentialreviewersid eq ${id}`).join(' or ');
-    const { records } = await DynamicsService.queryRecords('wmkf_potentialreviewerses', {
+    const { records } = await potentialReviewerAdapter.queryReviewers({
       select: 'wmkf_potentialreviewersid,wmkf_primaryaffiliation,wmkf_website,wmkf_facultypageurl,wmkf_hindex,wmkf_totalcitations,wmkf_orcid,wmkf_orcidurl,wmkf_googlescholarid,wmkf_googlescholarurl,wmkf_keywords',
       filter: orChain,
       top: 500,

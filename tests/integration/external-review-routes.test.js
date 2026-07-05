@@ -97,9 +97,22 @@ jest.mock('../../lib/services/review-upload', () => ({
   writeReviewFiles: jest.fn(),
 }));
 
-jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
-  applyStage2aResponse: jest.fn(async () => ({})),
-}));
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
+  // getForEtagRefresh / stampProposalFirstAccessed are thin DynamicsService
+  // passthroughs (data-access-layer conversion, Stages 3-6) — forward through
+  // the ALSO-mocked dynamics-service module so the existing assertions on
+  // DynamicsService.getRecord/updateRecord below still see these calls.
+  const { DynamicsService } = jest.requireMock('../../lib/services/dynamics-service');
+  return {
+    applyStage2aResponse: jest.fn(async () => ({})),
+    getForEtagRefresh: (id) =>
+      DynamicsService.getRecord('wmkf_appreviewersuggestions', id, { select: 'wmkf_appreviewersuggestionid' }),
+    stampProposalFirstAccessed: (id) =>
+      DynamicsService.updateRecord('wmkf_appreviewersuggestions', id, {
+        wmkf_proposalfirstaccessed: new Date().toISOString(),
+      }),
+  };
+});
 
 jest.mock('../../lib/services/reviewer-acceptance-job-service', () => ({
   enqueueReviewerAcceptanceJob: jest.fn(async () => ({ id: 101, acceptance_key: 'acceptance-1', status: 'accept_pending' })),

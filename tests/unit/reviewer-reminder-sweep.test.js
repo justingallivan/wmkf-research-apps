@@ -29,9 +29,18 @@ jest.mock('../../lib/services/notification-service', () => ({
 jest.mock('../../lib/services/email-signature', () => ({
   resolveSignatureForRequest: jest.fn(async () => ({ signature: 'Dr. PD\nW. M. Keck Foundation' })),
 }));
-jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
-  notExcludedFilter: () => 'wmkf_applicantdisposition ne 100000001',
-}));
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
+  // queryAllSuggestions / patchFields are thin DynamicsService passthroughs
+  // (data-access-layer conversion, Stages 3-6) — forward through the
+  // ALSO-mocked dynamics-service module so the existing assertions on
+  // DynamicsService.queryAllRecords/updateRecord below still see these calls.
+  const { DynamicsService } = jest.requireMock('../../lib/services/dynamics-service');
+  return {
+    notExcludedFilter: () => 'wmkf_applicantdisposition ne 100000001',
+    queryAllSuggestions: (options) => DynamicsService.queryAllRecords('wmkf_appreviewersuggestions', options),
+    patchFields: (id, payload, opts = {}) => DynamicsService.updateRecord('wmkf_appreviewersuggestions', id, payload, opts),
+  };
+});
 
 const { sweepRespondReminders, sweepReviewDueReminders } = require('../../lib/services/reviewer-reminder-sweep');
 
