@@ -11,7 +11,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 
 // Map dropdown codes to program name matching patterns
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
 
   return bypassDynamicsRestrictions('expertise-finder-proposals', async () => {
   try {
-    const result = await DynamicsService.queryAllRecords('akoya_requests', {
+    const result = await grantRequestAdapter.queryAllRequests({
       select: [
         'akoya_requestid', 'akoya_requestnum', 'akoya_title', 'akoya_fiscalyear',
         'wmkf_phaseistatus', 'wmkf_phaseiistatus',

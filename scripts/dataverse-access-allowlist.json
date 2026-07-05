@@ -444,13 +444,6 @@
       "count": 2
     },
     {
-      "file": "pages/api/expertise-finder/proposals.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryAllRecords",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/external/review/[token]/context.js",
       "kind": "import",
       "clientMethod": "DynamicsService.getRecord",
