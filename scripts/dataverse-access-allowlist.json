@@ -157,13 +157,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/cron/drain-submissions.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.createRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/cron/grantee-deliverable-reminders.js",
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",
