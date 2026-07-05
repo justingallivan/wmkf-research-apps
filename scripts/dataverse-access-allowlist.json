@@ -234,13 +234,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/review-manager/send-emails.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "systemusers",
-      "count": 1
-    },
-    {
       "file": "pages/api/review-manager/withdraw-sufficient.js",
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",

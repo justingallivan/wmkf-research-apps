@@ -55,6 +55,7 @@ import { meetingDateToCycleCode } from '../../../lib/utils/cycle-code';
 import * as suggestionAdapter from '../../../lib/dataverse/adapters/reviewer-suggestion';
 import * as contactAdapter from '../../../lib/dataverse/adapters/contact';
 import * as potentialReviewerAdapter from '../../../lib/dataverse/adapters/potential-reviewer';
+import * as systemUserAdapter from '../../../lib/dataverse/adapters/system-user';
 import { getById as getRequestById, updateById as updateRequestById } from '../../../lib/dataverse/adapters/grant-request';
 import { backPropReviewerOrcidToContact } from '../../../lib/services/backprop-reviewer-orcid';
 import { getSettingStrict } from '../../../lib/services/settings-service';
@@ -212,9 +213,7 @@ export default async function handler(req, res) {
     )];
     await Promise.all(distinctProgramDirectorIds.map(async (pdId) => {
       try {
-        const pd = await DynamicsService.getRecord('systemusers', pdId, {
-          select: 'fullname,internalemailaddress,isdisabled',
-        });
+        const pd = await systemUserAdapter.getByIdWithSelect(pdId, 'fullname,internalemailaddress,isdisabled');
         if (pd && pd.isdisabled !== true) {
           programDirectorById.set(pdId, {
             name: pd.fullname || null,
