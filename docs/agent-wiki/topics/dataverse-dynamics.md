@@ -85,11 +85,13 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   `core/changeset.js` is the registry-validated batch path. The gate
   (`check:dataverse-access-layer`) is now LAW, not a ratchet — the allowlist
   file was deleted at Stage 8; any raw `DynamicsService` call (direct,
-  aliased, or via `executeChangeset`) in `pages/`+`lib/`+`shared/` that isn't
-  behind an adapter or on the closed `non-entity-transport` method list fails
-  closed, including unrecognized method names. Plan + full stage log:
-  `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`. See the known email-helper
-  enforcement gap above before assuming this closes every write path.
+  aliased, via `executeChangeset`, or via exported/source-expression
+  indirection) in `pages/`+`lib/`+`shared/`+`modules/` that isn't behind an
+  adapter or on the closed `non-entity-transport` method list fails closed,
+  including unrecognized method names and `unattributable-use:*` reference
+  shapes. Plan + full stage log: `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`.
+  See the resolved email-helper note above for the runtime guard layered under
+  the static gate exemption.
 - OData null filters do not behave like SQL.
 - The sandbox is not drop-in prod parity.
 - Do not rebuild Explorer behavior when the Power Tools surface should be reused.

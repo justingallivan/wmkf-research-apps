@@ -12,10 +12,12 @@
  *
  * 2. Stage-8 law-mode fixtures (runLaw*Assertion): default-mode pass/fail
  *    behavior now that the allowlist file and count ratchet are gone —
- *    a clean non-entity-transport-only tree passes; an entity-attributed
- *    call, an unresolved alias, an unresolved changeset operation, and an
- *    unrecognized method name on a Dynamics alias each fail; exempt paths
- *    still pass regardless of what they call.
+ *    clean non-entity-transport-only direct/alias/dynamic-import calls pass;
+ *    entity-attributed calls, unresolved aliases, unresolved changesets,
+ *    unknown methods, exported/re-exported aliases, method extraction/binding,
+ *    client/namespace pass-through, computed method strings, inline source
+ *    misuse, and unresolved dynamic imports fail; exempt paths still pass
+ *    regardless of what they call.
  */
 
 const fs = require('fs');
@@ -349,6 +351,316 @@ function runLawExemptPathAssertion() {
   expectGreen('exempt power-tool and DAL-internal paths still pass');
 }
 
+function runLawCrossModuleReexportAssertion() {
+  cleanup();
+
+  write(tempRoot, 'lib/services/exported-dynamics-alias.js', `
+    import { DynamicsService } from './dynamics-service.js';
+    export const D = DynamicsService;
+  `);
+
+  write(tempRoot, 'pages/api/use-exported-alias.js', `
+    import { D } from '../../lib/services/exported-dynamics-alias.js';
+    export default async function handler(req, res) {
+      await D.createAndSendEmail({ subject: 's' });
+      res.status(200).end();
+    }
+  `);
+
+  expectRed('cross-module re-exported alias fails at exporting file', (output) => {
+    expect(output.includes('LAW VIOLATION'), output);
+    expect(output.includes('lib/services/exported-dynamics-alias.js'), output);
+    expect(output.includes('export.export | unattributable-use:export'), output);
+  });
+}
+
+function runLawExportAliasAssertion() {
+  cleanup();
+
+  write(tempRoot, 'shared/export-alias.js', `
+    import { DynamicsService } from '../lib/services/dynamics-service.js';
+    export const D = DynamicsService;
+  `);
+
+  expectRed('exported in-file alias fails', (output) => {
+    expect(output.includes('shared/export-alias.js'), output);
+    expect(output.includes('unattributable-use:export'), output);
+  });
+}
+
+function runLawDestructuredMethodAssertion() {
+  cleanup();
+
+  write(tempRoot, 'pages/api/destructured-method.js', `
+    import { DynamicsService } from '../../lib/services/dynamics-service.js';
+    export default async function handler(req, res) {
+      const { createRecord } = DynamicsService;
+      await createRecord('contacts', {});
+      res.status(200).end();
+    }
+  `);
+
+  expectRed('destructured method extraction fails', (output) => {
+    expect(output.includes('pages/api/destructured-method.js'), output);
+    expect(output.includes('unattributable-use:Identifier'), output);
+  });
+}
+
+function runLawExtractedMethodAssertion() {
+  cleanup();
+
+  write(tempRoot, 'pages/api/extracted-method.js', `
+    import { DynamicsService } from '../../lib/services/dynamics-service.js';
+    export default async function handler(req, res) {
+      const create = DynamicsService.createRecord;
+      await create('contacts', {});
+      res.status(200).end();
+    }
+  `);
+
+  expectRed('extracted method reference fails', (output) => {
+    expect(output.includes('pages/api/extracted-method.js'), output);
+    expect(output.includes('unattributable-use:MemberExpression'), output);
+  });
+}
+
+function runLawBoundMethodAssertion() {
+  cleanup();
+
+  write(tempRoot, 'pages/api/bound-method.js', `
+    import { DynamicsService } from '../../lib/services/dynamics-service.js';
+    export default async function handler(req, res) {
+      const create = DynamicsService.createRecord.bind(DynamicsService);
+      await create('contacts', {});
+      res.status(200).end();
+    }
+  `);
+
+  expectRed('bound method reference fails', (output) => {
+    expect(output.includes('pages/api/bound-method.js'), output);
+    expect(output.includes('unattributable-use:MemberExpression'), output);
+  });
+}
+
+function runLawClientArgumentAssertion() {
+  cleanup();
+
+  write(tempRoot, 'pages/api/client-argument.js', `
+    import { DynamicsService } from '../../lib/services/dynamics-service.js';
+    export default async function handler(req, res) {
+      await sink(DynamicsService);
+      res.status(200).end();
+    }
+    async function sink(client) {
+      return client.createAndSendEmail({ subject: 's' });
+    }
+  `);
+
+  expectRed('client passed as function argument fails', (output) => {
+    expect(output.includes('pages/api/client-argument.js'), output);
+    expect(output.includes('unattributable-use:Identifier'), output);
+  });
+}
+
+function runLawComputedConcatMethodAssertion() {
+  cleanup();
+
+  write(tempRoot, 'pages/api/computed-concat.js', `
+    import { DynamicsService } from '../../lib/services/dynamics-service.js';
+    export default async function handler(req, res) {
+      await DynamicsService['create' + 'Record']('contacts', {});
+      res.status(200).end();
+    }
+  `);
+
+  expectRed('computed-concat method call fails closed', (output) => {
+    expect(output.includes('pages/api/computed-concat.js'), output);
+    expect(output.includes('unattributable-use:MemberExpression'), output);
+  });
+}
+
+function runLawDynamicImportUnresolvedAssertion() {
+  cleanup();
+
+  write(tempRoot, 'pages/api/dynamic-import-unresolved.js', `
+    export default async function handler(req, res) {
+      const { DynamicsService } = await import(req.query.source);
+      await DynamicsService.createAndSendEmail({ subject: 's' });
+      res.status(200).end();
+    }
+  `);
+
+  expectRed('unresolved dynamic import alias fails', (output) => {
+    expect(output.includes('pages/api/dynamic-import-unresolved.js'), output);
+    expect(output.includes('unattributable-use:dynamic-import'), output);
+  });
+}
+
+function runLawEsmSourceReexportAssertion() {
+  cleanup();
+
+  write(tempRoot, 'shared/reexport-from-source.js', `
+    export { DynamicsService } from '../lib/services/dynamics-service.js';
+  `);
+
+  expectRed('ESM source re-export fails', (output) => {
+    expect(output.includes('shared/reexport-from-source.js'), output);
+    expect(output.includes('unattributable-use:reexport-from-source'), output);
+  });
+}
+
+function runLawCjsRequireReexportAssertion() {
+  cleanup();
+
+  write(tempRoot, 'shared/cjs-reexport.js', `
+    module.exports = require('../lib/services/dynamics-service.js');
+  `);
+
+  expectRed('CJS require re-export fails', (output) => {
+    expect(output.includes('shared/cjs-reexport.js'), output);
+    expect(output.includes('unattributable-use:reexport-from-source'), output);
+  });
+}
+
+function runLawCjsObjectReexportAssertion() {
+  cleanup();
+
+  write(tempRoot, 'shared/cjs-object-reexport.js', `
+    module.exports = {
+      DynamicsService: require('../lib/services/dynamics-service.js').DynamicsService,
+    };
+  `);
+
+  expectRed('CJS object-literal source re-export fails', (output) => {
+    expect(output.includes('shared/cjs-object-reexport.js'), output);
+    expect(output.includes('unattributable-use:reexport-from-source'), output);
+  });
+}
+
+function runLawInlineRequireAttributedAssertion() {
+  cleanup();
+
+  write(tempRoot, 'pages/api/inline-require-attributed.js', `
+    export default async function handler(req, res) {
+      await require('../../lib/services/dynamics-service.js').DynamicsService.createRecord('contacts', {});
+      res.status(200).end();
+    }
+  `);
+
+  expectRed('inline require direct call is entity-attributed', (output) => {
+    expect(output.includes('pages/api/inline-require-attributed.js'), output);
+    expect(output.includes('require(...).DynamicsService.createRecord | contacts'), output);
+    expect(!output.includes('unattributable-use:inline-require'), output);
+  });
+}
+
+function runLawInlineRequireComputedAssertion() {
+  cleanup();
+
+  write(tempRoot, 'pages/api/inline-require-computed.js', `
+    export default async function handler(req, res) {
+      await require('../../lib/services/dynamics-service.js').DynamicsService['create' + 'Record']('contacts', {});
+      res.status(200).end();
+    }
+  `);
+
+  expectRed('inline require computed method fails as unattributable', (output) => {
+    expect(output.includes('pages/api/inline-require-computed.js'), output);
+    expect(output.includes('unattributable-use:inline-require'), output);
+  });
+}
+
+function runLawEsmNamespaceReexportAssertion() {
+  cleanup();
+
+  write(tempRoot, 'shared/namespace-reexport.js', `
+    import * as dyn from '../lib/services/dynamics-service.js';
+    export { dyn };
+  `);
+
+  expectRed('ESM namespace re-export fails', (output) => {
+    expect(output.includes('shared/namespace-reexport.js'), output);
+    expect(output.includes('unattributable-use:export'), output);
+  });
+}
+
+function runLawCjsNamespaceContainerExportAssertion() {
+  cleanup();
+
+  write(tempRoot, 'shared/cjs-namespace-container.js', `
+    const dyn = require('../lib/services/dynamics-service.js');
+    module.exports = { dyn };
+  `);
+
+  expectRed('CJS namespace container export fails', (output) => {
+    expect(output.includes('shared/cjs-namespace-container.js'), output);
+    expect(output.includes('unattributable-use:export'), output);
+  });
+}
+
+function runLawNamespaceArgumentAssertion() {
+  cleanup();
+
+  write(tempRoot, 'pages/api/namespace-argument.js', `
+    const dyn = require('../../lib/services/dynamics-service.js');
+    export default async function handler(req, res) {
+      await sink(dyn);
+      res.status(200).end();
+    }
+    async function sink(moduleNamespace) {
+      return moduleNamespace.DynamicsService.createAndSendEmail({ subject: 's' });
+    }
+  `);
+
+  expectRed('namespace argument pass-through fails', (output) => {
+    expect(output.includes('pages/api/namespace-argument.js'), output);
+    expect(output.includes('unattributable-use:Identifier'), output);
+  });
+}
+
+function runLawSanctionedDirectCallAssertion() {
+  cleanup();
+
+  write(tempRoot, 'pages/api/sanctioned-direct.js', `
+    import { DynamicsService } from '../../lib/services/dynamics-service.js';
+    export default async function handler(req, res) {
+      await DynamicsService.createAndSendEmail({ subject: 's' });
+      res.status(200).end();
+    }
+  `);
+
+  expectGreen('sanctioned direct non-entity call passes');
+}
+
+function runLawNonExportedAliasGreenAssertion() {
+  cleanup();
+
+  write(tempRoot, 'pages/api/non-exported-alias.js', `
+    import { DynamicsService } from '../../lib/services/dynamics-service.js';
+    const D = DynamicsService;
+    export default async function handler(req, res) {
+      await D.createAndSendEmail({ subject: 's' });
+      res.status(200).end();
+    }
+  `);
+
+  expectGreen('tracked non-exported in-file alias call passes');
+}
+
+function runLawDynamicImportDirectGreenAssertion() {
+  cleanup();
+
+  write(tempRoot, 'pages/api/dynamic-import-direct.js', `
+    export default async function handler(req, res) {
+      const dyn = await import('../../lib/services/dynamics-service.js');
+      await dyn.DynamicsService.createAndSendEmail({ subject: 's' });
+      res.status(200).end();
+    }
+  `);
+
+  expectGreen('resolvable awaited dynamic-import direct call passes');
+}
+
 function runLiveParseAssertion() {
   const output = execSync(`node ${JSON.stringify(gate)} --report`, {
     cwd: repoRoot,
@@ -366,7 +678,12 @@ function parseMode(argv) {
   if (!mode) {
     throw new Error(
       '--mode requires one of: all, fixtures, clean, entity, unresolved-alias, '
-      + 'changeset-unresolved, unknown-method, exempt',
+      + 'changeset-unresolved, unknown-method, exempt, sanctioned-direct, alias-green, '
+      + 'dynamic-import-green, cross-module-reexport, export-alias, destructured-method, '
+      + 'extracted-method, bound-method, client-argument, computed-concat, '
+      + 'dynamic-import-unresolved, esm-source-reexport, cjs-require-reexport, '
+      + 'cjs-object-reexport, inline-require-attributed, inline-require-computed, '
+      + 'esm-namespace-reexport, cjs-namespace-container, namespace-argument',
     );
   }
   return mode;
@@ -381,6 +698,25 @@ function runMode(mode) {
     runLawChangesetUnresolvedAssertion();
     runLawUnknownMethodAssertion();
     runLawExemptPathAssertion();
+    runLawCrossModuleReexportAssertion();
+    runLawExportAliasAssertion();
+    runLawDestructuredMethodAssertion();
+    runLawExtractedMethodAssertion();
+    runLawBoundMethodAssertion();
+    runLawClientArgumentAssertion();
+    runLawComputedConcatMethodAssertion();
+    runLawDynamicImportUnresolvedAssertion();
+    runLawEsmSourceReexportAssertion();
+    runLawCjsRequireReexportAssertion();
+    runLawCjsObjectReexportAssertion();
+    runLawInlineRequireAttributedAssertion();
+    runLawInlineRequireComputedAssertion();
+    runLawEsmNamespaceReexportAssertion();
+    runLawCjsNamespaceContainerExportAssertion();
+    runLawNamespaceArgumentAssertion();
+    runLawSanctionedDirectCallAssertion();
+    runLawNonExportedAliasGreenAssertion();
+    runLawDynamicImportDirectGreenAssertion();
     runLiveParseAssertion();
     return;
   }
@@ -391,6 +727,25 @@ function runMode(mode) {
   if (mode === 'changeset-unresolved') return runLawChangesetUnresolvedAssertion();
   if (mode === 'unknown-method') return runLawUnknownMethodAssertion();
   if (mode === 'exempt') return runLawExemptPathAssertion();
+  if (mode === 'cross-module-reexport') return runLawCrossModuleReexportAssertion();
+  if (mode === 'export-alias') return runLawExportAliasAssertion();
+  if (mode === 'destructured-method') return runLawDestructuredMethodAssertion();
+  if (mode === 'extracted-method') return runLawExtractedMethodAssertion();
+  if (mode === 'bound-method') return runLawBoundMethodAssertion();
+  if (mode === 'client-argument') return runLawClientArgumentAssertion();
+  if (mode === 'computed-concat') return runLawComputedConcatMethodAssertion();
+  if (mode === 'dynamic-import-unresolved') return runLawDynamicImportUnresolvedAssertion();
+  if (mode === 'esm-source-reexport') return runLawEsmSourceReexportAssertion();
+  if (mode === 'cjs-require-reexport') return runLawCjsRequireReexportAssertion();
+  if (mode === 'cjs-object-reexport') return runLawCjsObjectReexportAssertion();
+  if (mode === 'inline-require-attributed') return runLawInlineRequireAttributedAssertion();
+  if (mode === 'inline-require-computed') return runLawInlineRequireComputedAssertion();
+  if (mode === 'esm-namespace-reexport') return runLawEsmNamespaceReexportAssertion();
+  if (mode === 'cjs-namespace-container') return runLawCjsNamespaceContainerExportAssertion();
+  if (mode === 'namespace-argument') return runLawNamespaceArgumentAssertion();
+  if (mode === 'sanctioned-direct') return runLawSanctionedDirectCallAssertion();
+  if (mode === 'alias-green') return runLawNonExportedAliasGreenAssertion();
+  if (mode === 'dynamic-import-green') return runLawDynamicImportDirectGreenAssertion();
   throw new Error(`unknown --mode ${mode}`);
 }
 

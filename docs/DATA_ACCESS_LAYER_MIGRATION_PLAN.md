@@ -145,7 +145,7 @@ service aliases to entity-set strings.
 
 **Work:**
 1. `scripts/check-dataverse-access-layer.js` — walks `pages/` + `lib/` +
-   `shared/` (minus exemptions and DAL internals), parses JS/TS modules, finds:
+   `shared/` + `modules/` (minus exemptions and DAL internals), parses JS/TS modules, finds:
    direct `DynamicsService.<method>(...)`; imported/required aliases; defaulted
    dependency aliases such as `const { dynamics = DynamicsService } = deps`;
    variables such as `const dyn = deps.dynamics || DynamicsService`; and method
@@ -561,10 +561,51 @@ Drift found → this doc is edited BEFORE the next stage starts.
   Revisit when the mechanical strip of those legacy bypass call sites runs;
   no code change made this session.
 
+- 2026-07-04 (S330): **Stage 8 law-mode census correction executed** (Codex
+  correction plan approved in session `019f3064-8e05-7aa1-995c-330287fd581d`;
+  implementation left uncommitted for review). Finding→fix map:
+  1. Cross-module exported aliases/re-exports could make downstream raw calls
+     invisible → exporting a recognized alias/namespace now emits
+     `unattributable-use:export`; source-based ESM/CJS re-exports emit
+     `unattributable-use:reexport-from-source`.
+  2. Destructured, extracted, or `.bind()`-bound methods could bypass call
+     attribution → every recognized alias/namespace reference is now audited
+     after alias collection; only sanctioned direct-call shapes or non-exported
+     alias creation are allowed.
+  3. Passing a client/namespace as an argument could hide later calls → any
+     non-call reference such as `sink(DynamicsService)` or `sink(dyn)` now
+     emits `unattributable-use:Identifier`.
+  4. Computed method strings could produce zero entries → computed/unresolved
+     method members now fail closed as `unattributable-use:MemberExpression`
+     (including inline `require(...).DynamicsService['create' + 'Record']`).
+  5. Inline `require()` / awaited dynamic `import()` chains and source aliases
+     could be stored, passed, or re-exported → literal direct
+     `require(...).DynamicsService.<method>(...)` / dynamic-import namespace
+     calls are attributed normally, while all other source-expression shapes
+     fail as `unattributable-use:inline-require` or
+     `unattributable-use:dynamic-import`.
+  6. `modules/` was outside the law census → `SCAN_DIRS` is now
+     `pages`, `lib`, `shared`, `modules`.
+
+  Self-test coverage added for all red classes plus greens for sanctioned
+  direct non-entity calls, tracked non-exported aliases, and resolvable
+  awaited dynamic-import direct calls. Live burn-down: **zero reds** after the
+  correction (`node scripts/check-dataverse-access-layer.js` exited 0), so no
+  call-site refactors and no new exemptions were needed.
+
+  Accepted residuals: `scripts/` remains outside the blocking law boundary
+  (probes/one-offs are advisory here; do **not** infer that all script writes
+  use `enterDynamicsBypassForScript` or any equivalent wrapper), and directory
+  symlinks remain skipped by the scanner to avoid duplicate/out-of-root
+  traversal. The review findings were **uncensused**, not **unguarded**:
+  runtime `assertTrustedDalContext` still guarded entity writes and the S330
+  email-helper methods; this correction closes the static-census silent-green
+  gap rather than adding the first runtime guard.
+
 ## Appendix A — Census (Stage 0 baseline → Stage 8 final)
 
 **Stage 8 FINAL census** `[VERIFIED 2026-07-04 via
-node scripts/check-dataverse-access-layer.js --report, post-Stage-8]`:
+node scripts/check-dataverse-access-layer.js --report, post-S330 correction]`:
 
 | Entity | Calls | Files | Methods |
 |---|---:|---:|---|

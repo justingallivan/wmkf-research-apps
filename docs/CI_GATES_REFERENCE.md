@@ -28,8 +28,8 @@ A red gate in this set on `main` blocks new commits to the affected surface. Est
 | `check:atlas:self-test` | Every Atlas detection pattern from `docs/CLAUDE_COVERAGE_LESSONS.md` exercised against synthetic fixtures. | Same scope as `:atlas` — silent detector regressions would be invisible without it. |
 | `check:api-routes` | API route files under `pages/api/**` must appear in `docs/API_ROUTE_SECURITY_MATRIX.md`. Hard-fails on missing-from-matrix; **warns** (non-fatal) on routes with no recognized guard token. Recognized guards include session guards (`requireAppAccess`, etc.), the cron/suggestion-token helpers, and (2026-06-11) HMAC helpers `verifyInternalCall`/`verifyBillWebhook` — the HMAC exemption applies only when the route's matrix row also documents a shared-secret/HMAC boundary, so an undocumented HMAC-token route still warns. Paths overridable via `API_ROUTE_GATE_API_ROOT`/`API_ROUTE_GATE_MATRIX_PATH` (used by the self-test). | PRs touching `pages/api/**` without a matrix update. |
 | `check:api-routes:self-test` | Drives the gate against synthetic fixture routes + matrix: HMAC-documented → no warn; HMAC-undocumented → warn; known guard → no warn; intentional `None` → no warn; no-guard → warn; missing-from-matrix → hard-fail. | Silent regressions in guard recognition or the missing-route hard-fail. |
-| `check:dataverse-access-layer` | Babel-AST census of raw `DynamicsService` calls in application code (import/require aliases, defaulted dependency aliases, `executeChangeset` operation URLs). LAW MODE since Stage 8: fails on ANY identity whose entity is not `non-entity-transport` — no allowlist, no ratchet. | Any raw entity-attributed, unresolved, changeset-unresolved, or unknown-method Dataverse transport use outside the DAL (`lib/dataverse/`) and exempt power tools. |
-| `check:dataverse-access-layer:self-test` | Synthetic fixture tree proving direct calls, constants, aliases, changesets, exemptions, plus law-mode reds: entity call, unresolved alias, unresolved changeset op, unknown method name; clean transport-only tree passes. | Silent regressions in the law gate or its census classification. |
+| `check:dataverse-access-layer` | Babel-AST census of raw `DynamicsService` calls in application code (import/require aliases, namespaces, defaulted dependency aliases, `executeChangeset` operation URLs, source-expression indirection). LAW MODE since Stage 8: fails on ANY identity whose entity is not `non-entity-transport` — no allowlist, no ratchet. | Any raw entity-attributed, unresolved, changeset-unresolved, unknown-method, or `unattributable-use:*` Dataverse transport use outside the DAL (`lib/dataverse/`) and exempt power tools. |
+| `check:dataverse-access-layer:self-test` | Synthetic fixture tree proving direct calls, constants, aliases, changesets, exemptions, exported/re-exported aliases, method extraction/binding, client pass-through, computed methods, inline source expressions, dynamic import, plus clean transport-only greens. | Silent regressions in the law gate or its census classification. |
 
 The fix is always to make the gate green. Adding to `ALLOWED_UNDOCUMENTED_*` requires a written justification and is a last resort, not a default. The rule applies regardless of which session caused the red state: "not my regression" is not a valid reason to proceed past it.
 
@@ -45,19 +45,23 @@ If a retry reports "Another next build process is already running" after an inte
 
 ### `check:dataverse-access-layer` — Dataverse data-access LAW (S329, Stage 8)
 
-The migration's permanent gate. Scans `pages/`, `lib/`, and `shared/` (minus
-the entity-generic power tools, the transport itself, and DAL internals listed
-in `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`) and fails on ANY raw
-`DynamicsService` call identity that does not classify as
+The migration's permanent gate. Scans `pages/`, `lib/`, `shared/`, and
+`modules/` (minus the entity-generic power tools, the transport itself, and DAL
+internals listed in `docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md`) and fails on
+ANY raw `DynamicsService` call identity that does not classify as
 `non-entity-transport` — the closed permanent surface (`createAndSendEmail`,
 `addEmailAttachment`, `createEmailActivity`, `logAiRun`). No allowlist file,
 no ratchet: Stage 8 deleted both.
 
 - Failure classes: entity-attributed raw call; unresolved alias; unresolved
   changeset operation; unrecognized method name (`unknown-method:*` — a new
-  DynamicsService method fails closed until the census is taught its name).
-- Alias-aware (import/require aliases, defaulted dependency injection) and
-  changeset-aware (per-operation URL attribution), unchanged from Stage 0.
+  DynamicsService method fails closed until the census is taught its name);
+  unattributable alias/namespace/source-expression reference
+  (`unattributable-use:*`).
+- Alias-aware (import/require/dynamic-import aliases, namespaces, defaulted
+  dependency injection) and changeset-aware (per-operation URL attribution);
+  exported/re-exported aliases, method extraction/binding, pass-through
+  clients, and computed method strings are outlawed rather than traced.
 - The fix is never "exempt it": route the call through
   `lib/dataverse/adapters/` (or `lib/dataverse/core/changeset.js` for batches).
 - Self-test: `npm run check:dataverse-access-layer:self-test`.
@@ -229,7 +233,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:harness-framing` | `check:harness-framing:self-test` |
 | `check:status-enum-parity` | `check:status-enum-parity:self-test` |
 | `check:trust-boundary-guid` | `check:trust-boundary-guid:self-test` |
-| `check:dataverse-access-layer` | `check:dataverse-access-layer:self-test` — green baseline plus count-exceeds, stale-entry, and new-unresolved red fixtures. |
+| `check:dataverse-access-layer` | `check:dataverse-access-layer:self-test` — law-mode greens plus red fixtures for entity calls, unresolved aliases/changesets, unknown methods, exported/re-exported aliases, method extraction/binding, client pass-through, computed methods, inline source expressions, and dynamic import. |
 | `check:secret-scan` | `check:secret-scan:self-test` |
 
 **When external review catches a structural pattern an existing gate missed, the order is mandatory:**

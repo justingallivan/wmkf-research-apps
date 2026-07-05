@@ -5,13 +5,14 @@
  * Scans application code for DynamicsService transport calls, including local
  * aliases and injectable clients that default to DynamicsService. Default mode
  * enforces the permanent law: every raw call identity found in pages/, lib/,
- * shared/ (outside the DAL internals and the exempt power tools) must resolve
- * to entity 'non-entity-transport' — the plan's permanent DynamicsService
- * surface (createAndSendEmail, addEmailAttachment, createEmailActivity,
- * logAiRun). Anything else (an entity-attributed call, an unresolved alias, an
- * unresolved changeset operation, or a call to a method this script does not
- * recognize at all) fails the gate. There is no allowlist file and no count
- * ratchet anymore — Stage 8 deleted both; the law is unconditional.
+ * shared/, or modules/ (outside the DAL internals and the exempt power tools)
+ * must resolve to entity 'non-entity-transport' — the plan's permanent
+ * DynamicsService surface (createAndSendEmail, addEmailAttachment,
+ * createEmailActivity, logAiRun). Anything else (an entity-attributed call, an
+ * unresolved alias, an unresolved changeset operation, an unattributable alias
+ * use, or a call to a method this script does not recognize at all) fails the
+ * gate. There is no allowlist file and no count ratchet anymore — Stage 8
+ * deleted both; the law is unconditional.
  */
 
 const fs = require('fs');
@@ -19,7 +20,7 @@ const path = require('path');
 const parser = require('@babel/parser');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
-const SCAN_DIRS = ['pages', 'lib', 'shared'];
+const SCAN_DIRS = ['pages', 'lib', 'shared', 'modules'];
 const JS_EXT_RE = /\.(?:cjs|mjs|js|jsx|ts|tsx)$/;
 
 const EXEMPT_FILES = new Set([
@@ -276,6 +277,47 @@ function isRequireCall(node) {
     && isDynamicsModuleSource(stringLiteralValue(node.arguments[0]));
 }
 
+function importCallSourceNode(node) {
+  if (!node) return null;
+  if (node.type === 'ImportExpression') return node.source || null;
+  if (node.type === 'CallExpression' && node.callee.type === 'Import') return node.arguments[0] || null;
+  return null;
+}
+
+function isDynamicImportCall(node) {
+  return !!importCallSourceNode(node);
+}
+
+function isDynamicsDynamicImportCall(node) {
+  const source = importCallSourceNode(node);
+  return !!source && isDynamicsModuleSource(stringLiteralValue(source));
+}
+
+function isUnresolvedDynamicImportCall(node) {
+  const source = importCallSourceNode(node);
+  return !!source && stringLiteralValue(source) == null;
+}
+
+function isDynamicsSourceModuleExpression(node) {
+  node = unwrapExpression(node);
+  return isRequireCall(node) || isDynamicsDynamicImportCall(node);
+}
+
+function isDynamicsServiceSourceMember(node) {
+  node = unwrapExpression(node);
+  return node
+    && (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression')
+    && propName(node.property) === 'DynamicsService'
+    && isDynamicsSourceModuleExpression(node.object);
+}
+
+function sourceExpressionKind(node) {
+  node = unwrapExpression(node);
+  if (isRequireCall(node)) return 'inline-require';
+  if (isDynamicImportCall(node)) return 'dynamic-import';
+  return 'source-expression';
+}
+
 function unwrapExpression(node) {
   let cur = node;
   while (cur && (
@@ -318,17 +360,21 @@ function collectImportAndRequireAliases(ast) {
 
     if (node.type !== 'VariableDeclarator' || !node.init) return;
     const init = unwrapExpression(node.init);
-    if (isRequireCall(init)) {
+    if (isRequireCall(init) || isDynamicsDynamicImportCall(init)) {
       if (node.id.type === 'ObjectPattern') {
         for (const prop of node.id.properties || []) {
           if (prop.type !== 'ObjectProperty') continue;
           if (propName(prop.key) === 'DynamicsService') {
-            for (const name of bindingNames(prop.value)) addAlias(aliases, name, 'require');
+            for (const name of bindingNames(prop.value)) {
+              addAlias(aliases, name, isRequireCall(init) ? 'require' : 'dynamic-import');
+            }
           }
         }
       } else if (node.id.type === 'Identifier') {
         namespaces.add(node.id.name);
-        if (node.id.name === 'DynamicsService') addAlias(aliases, node.id.name, 'require');
+        if (node.id.name === 'DynamicsService') {
+          addAlias(aliases, node.id.name, isRequireCall(init) ? 'require' : 'dynamic-import');
+        }
       }
       return;
     }
@@ -336,9 +382,9 @@ function collectImportAndRequireAliases(ast) {
     if (init
       && (init.type === 'MemberExpression' || init.type === 'OptionalMemberExpression')
       && propName(init.property) === 'DynamicsService'
-      && isRequireCall(unwrapExpression(init.object))
+      && isDynamicsSourceModuleExpression(init.object)
       && node.id.type === 'Identifier') {
-      addAlias(aliases, node.id.name, 'require-member');
+      addAlias(aliases, node.id.name, isRequireCall(unwrapExpression(init.object)) ? 'require-member' : 'dynamic-import-member');
     }
   });
 
@@ -360,6 +406,8 @@ function isAliasLikeExpression(node, aliases, namespaces) {
     && namespaces.has(node.object.name)) {
     return true;
   }
+
+  if (isDynamicsServiceSourceMember(node)) return true;
 
   if (node.type === 'LogicalExpression') {
     return isAliasLikeExpression(node.left, aliases, namespaces)
@@ -571,6 +619,15 @@ function isDynamicsObject(node, ctx) {
     && ctx.namespaces.has(node.object.name)) {
     return { client: `${node.object.name}.DynamicsService`, kind: 'namespace' };
   }
+  if (isDynamicsServiceSourceMember(node)) {
+    const sourceKind = sourceExpressionKind(node.object);
+    return {
+      client: sourceKind === 'dynamic-import'
+        ? 'import(...).DynamicsService'
+        : 'require(...).DynamicsService',
+      kind: sourceKind,
+    };
+  }
   return null;
 }
 
@@ -735,6 +792,534 @@ function makeEntry({ rel, entity, method, line, client, kind, comparisonKind, su
   };
 }
 
+function nodeLine(node) {
+  return node && node.loc && node.loc.start ? node.loc.start.line : 0;
+}
+
+function makeUnattributableEntry({ rel, node, client, nodeType }) {
+  return makeEntry({
+    rel,
+    entity: `unattributable-use:${nodeType}`,
+    method: nodeType,
+    line: nodeLine(node),
+    client: client || 'DynamicsService',
+    kind: 'unattributable-use',
+  });
+}
+
+function buildParentMap(ast) {
+  const parents = new WeakMap();
+  walkAst(ast, (node, parent) => {
+    if (parent) parents.set(node, parent);
+  });
+  return parents;
+}
+
+function isMember(node) {
+  return node && (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression');
+}
+
+function isCall(node) {
+  return node && (node.type === 'CallExpression' || node.type === 'OptionalCallExpression');
+}
+
+function isFunctionNode(node) {
+  return node && (
+    node.type === 'FunctionDeclaration'
+    || node.type === 'FunctionExpression'
+    || node.type === 'ArrowFunctionExpression'
+    || node.type === 'ObjectMethod'
+    || node.type === 'ClassMethod'
+  );
+}
+
+function isCalleeOfCall(node, parentMap) {
+  const parent = parentMap.get(node);
+  return isCall(parent) && parent.callee === node;
+}
+
+function isExpressionWrapper(parent, child) {
+  return parent && (
+    (parent.type === 'AwaitExpression' && parent.argument === child)
+    || ((parent.type === 'ParenthesizedExpression'
+      || parent.type === 'TSAsExpression'
+      || parent.type === 'TSTypeAssertion'
+      || parent.type === 'TSNonNullExpression') && parent.expression === child)
+  );
+}
+
+function climbExpressionWrappers(node, parentMap) {
+  let cur = node;
+  let parent = parentMap.get(cur);
+  while (isExpressionWrapper(parent, cur)) {
+    cur = parent;
+    parent = parentMap.get(cur);
+  }
+  return cur;
+}
+
+function isWithin(node, ancestor, parentMap) {
+  let cur = node;
+  while (cur) {
+    if (cur === ancestor) return true;
+    cur = parentMap.get(cur);
+  }
+  return false;
+}
+
+function isModuleExportsMember(node) {
+  if (!isMember(node)) return false;
+  if (node.object.type === 'Identifier'
+    && node.object.name === 'module'
+    && propName(node.property) === 'exports') {
+    return true;
+  }
+  return isModuleExportsMember(node.object);
+}
+
+function isCommonJsExportTarget(node) {
+  if (!isMember(node)) return false;
+  if (node.object.type === 'Identifier' && node.object.name === 'exports') return true;
+  return isModuleExportsMember(node);
+}
+
+function isInsideCommonJsExportRight(node, parentMap) {
+  let cur = node;
+  while (cur) {
+    const parent = parentMap.get(cur);
+    if (!parent) return false;
+    if (parent.type === 'AssignmentExpression') {
+      return parent.right === cur && isCommonJsExportTarget(parent.left);
+    }
+    cur = parent;
+  }
+  return false;
+}
+
+function isInsideExportAliasSyntax(node, parentMap) {
+  let cur = node;
+  while (cur) {
+    const parent = parentMap.get(cur);
+    if (!parent) return false;
+    if (cur !== node && (isFunctionNode(cur) || cur.type === 'ClassDeclaration' || cur.type === 'ClassExpression')) {
+      return false;
+    }
+    if (parent.type === 'ExportSpecifier') return true;
+    if (parent.type === 'ExportDefaultDeclaration') return parent.declaration === cur;
+    if (parent.type === 'ExportNamedDeclaration') {
+      return parent.declaration === cur && cur.type === 'VariableDeclaration';
+    }
+    cur = parent;
+  }
+  return false;
+}
+
+function isPropertyKeyIdentifier(node, parent) {
+  return (isMember(parent) && parent.property === node && !parent.computed)
+    || ((parent && (parent.type === 'ObjectProperty' || parent.type === 'ObjectMethod' || parent.type === 'ClassMethod'))
+      && parent.key === node
+      && !parent.computed);
+}
+
+function isBindingIdentifier(node, parentMap) {
+  let cur = node;
+  while (cur) {
+    const parent = parentMap.get(cur);
+    if (!parent) return false;
+    if (parent.type === 'ImportSpecifier'
+      || parent.type === 'ImportDefaultSpecifier'
+      || parent.type === 'ImportNamespaceSpecifier') {
+      return parent.local === node || parent.imported === node;
+    }
+    if (parent.type === 'AssignmentPattern') {
+      if (parent.right === cur) return false;
+      cur = parent;
+      continue;
+    }
+    if (parent.type === 'VariableDeclarator') return parent.id === cur;
+    if (isFunctionNode(parent) && (parent.params || []).includes(cur)) return true;
+    if (parent.type === 'CatchClause' && parent.param === cur) return true;
+    cur = parent;
+  }
+  return false;
+}
+
+function isAssignmentAliasTarget(node, parentMap, ctx) {
+  let cur = node;
+  while (cur) {
+    const parent = parentMap.get(cur);
+    if (!parent) return false;
+    if (parent.type === 'AssignmentExpression') {
+      if (parent.left !== cur || isCommonJsExportTarget(parent.left)) return false;
+      return isAliasLikeExpression(parent.right, ctx.aliases, ctx.namespaces)
+        || isDynamicClientExpression(parent.right);
+    }
+    cur = parent;
+  }
+  return false;
+}
+
+function isSourceAliasDeclarator(declarator) {
+  if (!declarator || declarator.type !== 'VariableDeclarator' || !declarator.init) return false;
+  const init = unwrapExpression(declarator.init);
+  if (isDynamicsSourceModuleExpression(init)) {
+    return declarator.id.type === 'Identifier' || declarator.id.type === 'ObjectPattern';
+  }
+  if (isDynamicsServiceSourceMember(init)) return declarator.id.type === 'Identifier';
+  return false;
+}
+
+function isSanctionedAliasDeclarator(declarator, ctx) {
+  if (!declarator || declarator.type !== 'VariableDeclarator' || !declarator.init) return false;
+  if (isSourceAliasDeclarator(declarator)) return true;
+  if (declarator.id.type !== 'Identifier') return false;
+  return isAliasLikeExpression(declarator.init, ctx.aliases, ctx.namespaces)
+    || isDynamicClientExpression(declarator.init);
+}
+
+function isExportedVariableDeclarator(declarator, parentMap) {
+  const declaration = parentMap.get(declarator);
+  const parent = declaration && parentMap.get(declaration);
+  return parent && parent.type === 'ExportNamedDeclaration';
+}
+
+function isNonExportedAliasCreationReference(node, parentMap, ctx) {
+  let cur = node;
+  while (cur) {
+    const parent = parentMap.get(cur);
+    if (!parent) return false;
+
+    if (parent.type === 'VariableDeclarator' && parent.init && isWithin(node, parent.init, parentMap)) {
+      if (isExportedVariableDeclarator(parent, parentMap)) return false;
+      return isSanctionedAliasDeclarator(parent, ctx);
+    }
+
+    if (parent.type === 'AssignmentExpression' && parent.right === cur) {
+      if (isCommonJsExportTarget(parent.left)) return false;
+      return parent.left.type === 'Identifier'
+        && (isAliasLikeExpression(parent.right, ctx.aliases, ctx.namespaces)
+          || isDynamicClientExpression(parent.right));
+    }
+
+    if (parent.type === 'AssignmentPattern' && parent.right === cur) {
+      return isAliasLikeExpression(parent.right, ctx.aliases, ctx.namespaces)
+        || isDynamicClientExpression(parent.right);
+    }
+
+    cur = parent;
+  }
+  return false;
+}
+
+function isDirectAliasCallReference(identifier, parentMap) {
+  const parent = parentMap.get(identifier);
+  return isMember(parent)
+    && parent.object === identifier
+    && !!propName(parent.property)
+    && isCalleeOfCall(parent, parentMap);
+}
+
+function isDirectNamespaceCallReference(identifier, parentMap) {
+  const serviceMember = parentMap.get(identifier);
+  if (!isMember(serviceMember)
+    || serviceMember.object !== identifier
+    || propName(serviceMember.property) !== 'DynamicsService') {
+    return false;
+  }
+  const methodMember = parentMap.get(serviceMember);
+  return isMember(methodMember)
+    && methodMember.object === serviceMember
+    && !!propName(methodMember.property)
+    && isCalleeOfCall(methodMember, parentMap);
+}
+
+function rootedMemberUseType(identifier, parentMap) {
+  let cur = identifier;
+  let parent = parentMap.get(cur);
+  let rooted = null;
+  while (isMember(parent) && parent.object === cur) {
+    rooted = parent;
+    cur = parent;
+    parent = parentMap.get(cur);
+  }
+  return rooted ? rooted.type : identifier.type;
+}
+
+function patternMentionsDynamicsService(pattern) {
+  if (!pattern) return false;
+  if (pattern.type === 'Identifier') return pattern.name === 'DynamicsService';
+  if (pattern.type === 'ObjectPattern') {
+    return (pattern.properties || []).some((prop) => {
+      if (prop.type === 'RestElement') return patternMentionsDynamicsService(prop.argument);
+      return prop.type === 'ObjectProperty'
+        && (propName(prop.key) === 'DynamicsService' || patternMentionsDynamicsService(prop.value));
+    });
+  }
+  if (pattern.type === 'AssignmentPattern') return patternMentionsDynamicsService(pattern.left);
+  if (pattern.type === 'RestElement') return patternMentionsDynamicsService(pattern.argument);
+  if (pattern.type === 'ArrayPattern') return (pattern.elements || []).some(patternMentionsDynamicsService);
+  return false;
+}
+
+function isUnresolvedDynamicImportSourceMember(node) {
+  node = unwrapExpression(node);
+  return node
+    && (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression')
+    && propName(node.property) === 'DynamicsService'
+    && isUnresolvedDynamicImportCall(unwrapExpression(node.object));
+}
+
+function isUnresolvedDynamicImportDeclarator(declarator) {
+  if (!declarator || declarator.type !== 'VariableDeclarator' || !declarator.init) return false;
+  const init = unwrapExpression(declarator.init);
+  if (isUnresolvedDynamicImportCall(init)) return patternMentionsDynamicsService(declarator.id);
+  return isUnresolvedDynamicImportSourceMember(init);
+}
+
+function isSourceExpressionDirectCall(sourceNode, parentMap) {
+  const sourceRoot = climbExpressionWrappers(sourceNode, parentMap);
+  const serviceMember = parentMap.get(sourceRoot);
+  if (!isMember(serviceMember)
+    || serviceMember.object !== sourceRoot
+    || propName(serviceMember.property) !== 'DynamicsService') {
+    return false;
+  }
+  const methodMember = parentMap.get(serviceMember);
+  return isMember(methodMember)
+    && methodMember.object === serviceMember
+    && !!propName(methodMember.property)
+    && isCalleeOfCall(methodMember, parentMap);
+}
+
+function isSourceExpressionAliasCreation(sourceNode, parentMap) {
+  let cur = sourceNode;
+  while (cur) {
+    const parent = parentMap.get(cur);
+    if (!parent) return false;
+    if (parent.type === 'VariableDeclarator' && parent.init && isWithin(sourceNode, parent.init, parentMap)) {
+      return !isExportedVariableDeclarator(parent, parentMap) && isSourceAliasDeclarator(parent);
+    }
+    cur = parent;
+  }
+  return false;
+}
+
+function isUnresolvedDynamicImportRelevant(sourceNode, parentMap) {
+  const sourceRoot = climbExpressionWrappers(sourceNode, parentMap);
+  const serviceMember = parentMap.get(sourceRoot);
+  if (isMember(serviceMember)
+    && serviceMember.object === sourceRoot
+    && propName(serviceMember.property) === 'DynamicsService') {
+    return true;
+  }
+
+  let cur = sourceNode;
+  while (cur) {
+    const parent = parentMap.get(cur);
+    if (!parent) return false;
+    if (parent.type === 'VariableDeclarator' && parent.init && isWithin(sourceNode, parent.init, parentMap)) {
+      return isUnresolvedDynamicImportDeclarator(parent);
+    }
+    cur = parent;
+  }
+  return false;
+}
+
+function expressionContainsRecognizedBinding(node, ctx) {
+  let found = false;
+  walkAst(node, (child, parent) => {
+    if (found) return false;
+    if (child.type === 'Identifier'
+      && !isPropertyKeyIdentifier(child, parent)
+      && (ctx.aliases.has(child.name) || ctx.namespaces.has(child.name))) {
+      found = true;
+      return false;
+    }
+    return undefined;
+  });
+  return found;
+}
+
+function expressionContainsDynamicsSourceExpression(node) {
+  let found = false;
+  walkAst(node, (child) => {
+    if (found) return false;
+    if (isDynamicsSourceModuleExpression(child) || isDynamicsServiceSourceMember(child)) {
+      found = true;
+      return false;
+    }
+    return undefined;
+  });
+  return found;
+}
+
+function variableDeclarationExportsRecognizedBinding(declaration, ctx) {
+  if (!declaration || declaration.type !== 'VariableDeclaration') return false;
+  return (declaration.declarations || []).some((declarator) => (
+    declarator.init
+    && (isAliasLikeExpression(declarator.init, ctx.aliases, ctx.namespaces)
+      || isDynamicClientExpression(declarator.init)
+      || isDynamicsSourceModuleExpression(declarator.init)
+      || isDynamicsServiceSourceMember(declarator.init))
+  ));
+}
+
+function defaultExportExpressionIsRecognizedBinding(node, ctx) {
+  const expression = unwrapExpression(node);
+  if (!expression) return false;
+  if (expression.type === 'Identifier') {
+    return ctx.aliases.has(expression.name) || ctx.namespaces.has(expression.name);
+  }
+  if (expression.type === 'ObjectExpression' || expression.type === 'ArrayExpression') {
+    return expressionContainsRecognizedBinding(expression, ctx)
+      || expressionContainsDynamicsSourceExpression(expression);
+  }
+  return isAliasLikeExpression(expression, ctx.aliases, ctx.namespaces)
+    || isDynamicClientExpression(expression)
+    || isDynamicsSourceModuleExpression(expression)
+    || isDynamicsServiceSourceMember(expression);
+}
+
+function emitOnce(entries, emitted, entry, node) {
+  if (emitted.has(node)) return;
+  emitted.add(node);
+  entries.push(entry);
+}
+
+function auditExportAndReexportUse(node, parentMap, ctx, rel, entries, emitted) {
+  if ((node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration')
+    && node.source
+    && isDynamicsModuleSource(node.source.value)) {
+    emitOnce(entries, emitted, makeUnattributableEntry({
+      rel,
+      node,
+      client: 'export',
+      nodeType: 'reexport-from-source',
+    }), node);
+    return;
+  }
+
+  if (node.type === 'ExportNamedDeclaration' && !node.source) {
+    if (variableDeclarationExportsRecognizedBinding(node.declaration, ctx)) {
+      emitOnce(entries, emitted, makeUnattributableEntry({
+        rel,
+        node,
+        client: 'export',
+        nodeType: 'export',
+      }), node);
+      return;
+    }
+    for (const spec of node.specifiers || []) {
+      if (spec.type === 'ExportSpecifier'
+        && spec.local
+        && (ctx.aliases.has(spec.local.name) || ctx.namespaces.has(spec.local.name))) {
+        emitOnce(entries, emitted, makeUnattributableEntry({
+          rel,
+          node: spec,
+          client: spec.local.name,
+          nodeType: 'export',
+        }), spec);
+      }
+    }
+    return;
+  }
+
+  if (node.type === 'ExportDefaultDeclaration'
+    && node.declaration
+    && defaultExportExpressionIsRecognizedBinding(node.declaration, ctx)) {
+    emitOnce(entries, emitted, makeUnattributableEntry({
+      rel,
+      node,
+      client: 'export',
+      nodeType: expressionContainsDynamicsSourceExpression(node.declaration) ? 'reexport-from-source' : 'export',
+    }), node);
+    return;
+  }
+
+  if (node.type === 'AssignmentExpression' && isCommonJsExportTarget(node.left)) {
+    if (expressionContainsDynamicsSourceExpression(node.right)) {
+      emitOnce(entries, emitted, makeUnattributableEntry({
+        rel,
+        node,
+        client: 'module.exports',
+        nodeType: 'reexport-from-source',
+      }), node);
+      return;
+    }
+    if (expressionContainsRecognizedBinding(node.right, ctx)) {
+      emitOnce(entries, emitted, makeUnattributableEntry({
+        rel,
+        node,
+        client: 'module.exports',
+        nodeType: 'export',
+      }), node);
+    }
+  }
+}
+
+function auditSourceExpressionUse(node, parentMap, rel, entries, emitted) {
+  if (!isRequireCall(node) && !isDynamicsDynamicImportCall(node) && !isUnresolvedDynamicImportCall(node)) return;
+
+  if (isInsideCommonJsExportRight(node, parentMap)) return;
+
+  if (isUnresolvedDynamicImportCall(node)) {
+    if (!isUnresolvedDynamicImportRelevant(node, parentMap)) return;
+    emitOnce(entries, emitted, makeUnattributableEntry({
+      rel,
+      node,
+      client: 'import(...)',
+      nodeType: 'dynamic-import',
+    }), node);
+    return;
+  }
+
+  if (isSourceExpressionDirectCall(node, parentMap) || isSourceExpressionAliasCreation(node, parentMap)) return;
+
+  emitOnce(entries, emitted, makeUnattributableEntry({
+    rel,
+    node,
+    client: isRequireCall(node) ? 'require(...)' : 'import(...)',
+    nodeType: 'inline-require',
+  }), node);
+}
+
+function auditRecognizedIdentifierUse(node, parent, parentMap, ctx, rel, entries, emitted) {
+  if (node.type !== 'Identifier') return;
+  const isAlias = ctx.aliases.has(node.name);
+  const isNamespace = ctx.namespaces.has(node.name);
+  if (!isAlias && !isNamespace) return;
+
+  if (isPropertyKeyIdentifier(node, parent)
+    || isBindingIdentifier(node, parentMap)
+    || isAssignmentAliasTarget(node, parentMap, ctx)
+    || isInsideExportAliasSyntax(node, parentMap)
+    || isInsideCommonJsExportRight(node, parentMap)) {
+    return;
+  }
+
+  if (isAlias && isDirectAliasCallReference(node, parentMap)) return;
+  if (isNamespace && isDirectNamespaceCallReference(node, parentMap)) return;
+  if (isNonExportedAliasCreationReference(node, parentMap, ctx)) return;
+
+  emitOnce(entries, emitted, makeUnattributableEntry({
+    rel,
+    node,
+    client: node.name,
+    nodeType: rootedMemberUseType(node, parentMap),
+  }), node);
+}
+
+function auditUnattributableUses(ast, ctx, rel, parentMap) {
+  const entries = [];
+  const emitted = new WeakSet();
+  walkAst(ast, (node, parent) => {
+    auditExportAndReexportUse(node, parentMap, ctx, rel, entries, emitted);
+    auditSourceExpressionUse(node, parentMap, rel, entries, emitted);
+    auditRecognizedIdentifierUse(node, parent, parentMap, ctx, rel, entries, emitted);
+  });
+  return entries;
+}
+
 function analyzeFile(root, fullPath) {
   const rel = toRel(root, fullPath);
   const source = fs.readFileSync(fullPath, 'utf8');
@@ -743,7 +1328,10 @@ function analyzeFile(root, fullPath) {
   const stringCtx = collectStringBindings(ast);
   const operationBindings = collectOperationBindings(ast);
   const ctx = { ...stringCtx, aliases, namespaces, operationBindings };
+  const parentMap = buildParentMap(ast);
   const entries = [];
+
+  entries.push(...auditUnattributableUses(ast, ctx, rel, parentMap));
 
   walkAst(ast, (node) => {
     if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') return;
