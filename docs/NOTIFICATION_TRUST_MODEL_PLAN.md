@@ -289,10 +289,18 @@ Codex adversarial review of the full diff, same acceptance bar as `BYPASS_STRIP_
   `'cold-start-alerts'` (`instrumentation.js` `register()`, covering both #15's and #16's cold-start
   alert calls). Claude reviewed the uncommitted diff at source before commit: confirmed the shared
   internal `notify()` wrapper and #10/#11 are untouched; each new wrap encloses the reaching `notify()`
-  call and mirrors an existing sibling wrap; fire-and-forget (#9/#21) and cold-start catch/log/swallow
-  (#15/#16) semantics preserved; nested same-label `withDalContext` is safe (ALS re-entrancy, covered by
-  `token-lifecycle-nested-context.test.js`); no double-wrap in `maintenance.js` (`:231/:258` are
-  top-level, outside the `bill-onboarding-resume`/`maintenance-blob-scan` scopes). Green independently:
+  call. Two sites are a deliberate scope-widen rather than a notify-only wrap (sanctioned by Decision 5):
+  the auth-bypass-check route (#15) and `instrumentation.js`'s `register()` (#15/#16) wrap the WHOLE
+  `checkEmergencyAuthBypass()` / `detectMigrationDrift()` monitor call, so those monitors' own Dataverse
+  reads also run under the trusted `restrictions: []` context, not just their notify path. Fire-and-forget
+  (#9/#21) and cold-start catch/log/swallow (#15/#16) semantics preserved; nested same-label
+  `withDalContext` is safe (ALS re-entrancy, covered by `token-lifecycle-nested-context.test.js`); no
+  double-wrap in `maintenance.js` (`:231/:258` are top-level, outside the
+  `bill-onboarding-resume`/`maintenance-blob-scan` scopes). The characterization suite genuinely
+  DISCRIMINATES the entry-point wrap (it stubs `notify` and asserts `hasTrustedDalContext()` at the
+  callsite BEFORE the retained internal wrap runs, so it is not riding that wrap) — proven by a mutation
+  check: reverting the #17 wrap flips its test to red at `expect(hit.trusted).toBe(true)`. This is what
+  the internal wrapper's eventual removal will rely on. Green independently:
   full suite 428 suites / 4758 tests, `check:dynamics-context-boundary` / `dataverse-access-layer` /
   `route-service-boundary` / `api-routes` (+ self-tests), and `npm run build`. Stage 2 (#10/#11) and the
   shared-wrapper removal remain open.
