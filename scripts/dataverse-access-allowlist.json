@@ -514,20 +514,6 @@
       "count": 1
     },
     {
-      "file": "pages/api/review-manager/campaign-config.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 2
-    },
-    {
-      "file": "pages/api/review-manager/campaign-config.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/review-manager/mark-received-no-file.js",
       "kind": "import",
       "clientMethod": "DynamicsService.resolveEntitySetName",
