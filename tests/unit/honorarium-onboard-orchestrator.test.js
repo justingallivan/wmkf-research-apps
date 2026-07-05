@@ -34,16 +34,16 @@ function baseArgs(overrides = {}) {
 
 function makeDeps(overrides = {}) {
   return {
-    dynamics: {
-      createRecord: jest.fn().mockResolvedValue({ akoya_requestid: 'HON' }),
-      getRecord: jest.fn().mockResolvedValue(null),
-      updateRecord: jest.fn().mockResolvedValue(undefined),
-      ...overrides.dynamics,
+    requests: {
+      create: jest.fn().mockResolvedValue({ akoya_requestid: 'HON' }),
+      getById: jest.fn().mockResolvedValue(null),
+      ...overrides.requests,
     },
     contacts: {
       findByEmail: jest.fn().mockResolvedValue(null),
       findByOrcidCandidates: jest.fn().mockResolvedValue({ none: true }),
       findOrCreateByEmail: jest.fn().mockResolvedValue({ id: 'contact-new', created: true }),
+      updateFields: jest.fn().mockResolvedValue(undefined),
       ...overrides.contacts,
     },
     potentialReviewers: { setContactLink: jest.fn().mockResolvedValue(undefined), ...overrides.potentialReviewers },
@@ -63,7 +63,7 @@ describe('ensureHonorariumOnboarding', () => {
     const res = await ensureHonorariumOnboarding(baseArgs(), deps);
 
     expect(deps.contacts.findOrCreateByEmail).not.toHaveBeenCalled();
-    const createArg = deps.dynamics.createRecord.mock.calls[0][1];
+    const createArg = deps.requests.create.mock.calls[0][0];
     expect(createArg.akoya_requestid).toBe(`det-${SUGGESTION_ID}`);
     // Amount stamped on all three money fields the GoApply cohort carries.
     expect(createArg.akoya_recommendedamount).toBe(250);
@@ -105,7 +105,7 @@ describe('ensureHonorariumOnboarding', () => {
     const deps = makeDeps();
     const args = baseArgs({ request: { wmkf_meetingdate: null } });
     await expect(ensureHonorariumOnboarding(args, deps)).rejects.toMatchObject({ code: 'honorarium_no_meeting_date' });
-    expect(deps.dynamics.createRecord).not.toHaveBeenCalled();
+    expect(deps.requests.create).not.toHaveBeenCalled();
     expect(deps.suggestions.setHonorariumRequest).not.toHaveBeenCalled();
   });
 
@@ -117,7 +117,7 @@ describe('ensureHonorariumOnboarding', () => {
     try {
       const deps = makeDeps();
       await withCurrency(baseArgs(), deps);
-      expect(deps.dynamics.createRecord.mock.calls[0][1]['transactioncurrencyid@odata.bind'])
+      expect(deps.requests.create.mock.calls[0][0]['transactioncurrencyid@odata.bind'])
         .toBe('/transactioncurrencies(00000000-0000-0000-0000-0000000000dd)');
     } finally {
       restoreEnv('HONORARIUM_CURRENCY_ID', prev);
@@ -131,7 +131,7 @@ describe('ensureHonorariumOnboarding', () => {
     await ensureHonorariumOnboarding(args, deps);
     expect(deps.contacts.findOrCreateByEmail).toHaveBeenCalledWith(expect.objectContaining({ email: 'jane@uni.edu' }), { actingUserSystemId: undefined });
     expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-new', { actingUserSystemId: undefined });
-    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-new)');
+    expect(deps.requests.create.mock.calls[0][0]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-new)');
   });
 
   it('contact absent, email matches an existing contact → links it; no create, cross-checks ORCID when present', async () => {
@@ -142,7 +142,7 @@ describe('ensureHonorariumOnboarding', () => {
     expect(deps.contacts.findByOrcidCandidates).toHaveBeenCalledWith('0000-0002-1825-0097');
     expect(deps.contacts.findOrCreateByEmail).not.toHaveBeenCalled();
     expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-email', { actingUserSystemId: undefined });
-    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
+    expect(deps.requests.create.mock.calls[0][0]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
   });
 
   it('email hit + ORCID uniquely matches a different contact → warns but links and binds the email contact', async () => {
@@ -171,7 +171,7 @@ describe('ensureHonorariumOnboarding', () => {
       }),
     }));
     expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-email', { actingUserSystemId: undefined });
-    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
+    expect(deps.requests.create.mock.calls[0][0]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
   });
 
   it('email hit + ORCID uniquely matches the same contact → no split warning', async () => {
@@ -185,7 +185,7 @@ describe('ensureHonorariumOnboarding', () => {
     await ensureHonorariumOnboarding(args, deps);
 
     expect(deps.notify).not.toHaveBeenCalled();
-    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
+    expect(deps.requests.create.mock.calls[0][0]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
   });
 
   it('email hit + ORCID lookup throws → proceeds with the email contact', async () => {
@@ -202,7 +202,7 @@ describe('ensureHonorariumOnboarding', () => {
 
       expect(res.honorariumRequestId).toBe(`det-${SUGGESTION_ID}`);
       expect(deps.notify).not.toHaveBeenCalled();
-      expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
+      expect(deps.requests.create.mock.calls[0][0]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
     } finally {
       warn.mockRestore();
     }
@@ -223,7 +223,7 @@ describe('ensureHonorariumOnboarding', () => {
 
       expect(deps.notify).toHaveBeenCalledWith(expect.objectContaining({ type: 'contact_orcid_email_split' }));
       expect(res.honorariumRequestId).toBe(`det-${SUGGESTION_ID}`);
-      expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
+      expect(deps.requests.create.mock.calls[0][0]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
     } finally {
       warn.mockRestore();
     }
@@ -244,10 +244,10 @@ describe('ensureHonorariumOnboarding', () => {
 
     expect(res.created).toBe(true);
     expect(deps.contacts.findByEmail).toHaveBeenCalledWith('payee@new.edu');
-    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
-    const contactUpdates = deps.dynamics.updateRecord.mock.calls.filter((call) => call[0] === 'contacts');
+    expect(deps.requests.create.mock.calls[0][0]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
+    const contactUpdates = deps.contacts.updateFields.mock.calls;
     expect(contactUpdates.length).toBeGreaterThan(0);
-    expect(contactUpdates.some((call) => Object.prototype.hasOwnProperty.call(call[2], 'emailaddress1'))).toBe(false);
+    expect(contactUpdates.some((call) => Object.prototype.hasOwnProperty.call(call[1], 'emailaddress1'))).toBe(false);
   });
 
   it('email misses but reviewer ORCID uniquely matches a contact → links existing, NO duplicate created', async () => {
@@ -262,7 +262,7 @@ describe('ensureHonorariumOnboarding', () => {
     expect(deps.contacts.findByOrcidCandidates).toHaveBeenCalledWith('0000-0002-1825-0097');
     expect(deps.contacts.findOrCreateByEmail).not.toHaveBeenCalled(); // the bug fix: no duplicate
     expect(deps.potentialReviewers.setContactLink).toHaveBeenCalledWith('pr-1', 'contact-orcid', { actingUserSystemId: undefined });
-    expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-orcid)');
+    expect(deps.requests.create.mock.calls[0][0]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-orcid)');
   });
 
   it('email misses and ORCID is ambiguous → creates a new contact + logs a server warning (durable staff-review surface deferred), never blocks', async () => {
@@ -345,7 +345,7 @@ describe('ensureHonorariumOnboarding', () => {
       const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_potentialreviewersid: 'pr-1', wmkf_emailaddress: 'jane@uni.edu', wmkf_name: 'Jane' } });
       await ensureHonorariumOnboarding(args, deps);
       // Authoritative live link wins over the contact we picked by email.
-      expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-live)');
+      expect(deps.requests.create.mock.calls[0][0]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-live)');
     } finally {
       warn.mockRestore();
     }
@@ -360,7 +360,7 @@ describe('ensureHonorariumOnboarding', () => {
       });
       const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_potentialreviewersid: 'pr-1', wmkf_emailaddress: 'jane@uni.edu', wmkf_name: 'Jane' } });
       const res = await ensureHonorariumOnboarding(args, deps);
-      expect(deps.dynamics.createRecord.mock.calls[0][1]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
+      expect(deps.requests.create.mock.calls[0][0]['akoya_primarycontactid@odata.bind']).toBe('/contacts(contact-email)');
       expect(res.honorariumRequestId).toBe(`det-${SUGGESTION_ID}`);
     } finally {
       warn.mockRestore();
@@ -371,14 +371,14 @@ describe('ensureHonorariumOnboarding', () => {
     const deps = makeDeps();
     const args = baseArgs({ reviewer: { _wmkf_contact_value: null, wmkf_emailaddress: null }, body: { contactEdits: {}, address: {} } });
     await expect(ensureHonorariumOnboarding(args, deps)).rejects.toMatchObject({ code: 'honorarium_no_email' });
-    expect(deps.dynamics.createRecord).not.toHaveBeenCalled();
+    expect(deps.requests.create).not.toHaveBeenCalled();
   });
 
   it('junction already set → skip create + junction PATCH; still calls onboard with the existing id', async () => {
     const deps = makeDeps();
     const args = baseArgs({ suggestion: { _wmkf_honorariumrequest_value: 'existing-hon' } });
     const res = await ensureHonorariumOnboarding(args, deps);
-    expect(deps.dynamics.createRecord).not.toHaveBeenCalled();
+    expect(deps.requests.create).not.toHaveBeenCalled();
     expect(deps.suggestions.setHonorariumRequest).not.toHaveBeenCalled();
     expect(deps.onboard).toHaveBeenCalledWith(expect.objectContaining({ honorariumRequestId: 'existing-hon' }));
     expect(res.created).toBe(false);
@@ -386,24 +386,22 @@ describe('ensureHonorariumOnboarding', () => {
 
   it('duplicate-PK on create → confirm-by-read finds the row → no rethrow, proceeds to junction PATCH', async () => {
     const deps = makeDeps({
-      dynamics: {
-        createRecord: jest.fn().mockRejectedValue(new Error('duplicate key')),
-        getRecord: jest.fn().mockResolvedValue({ akoya_requestid: `det-${SUGGESTION_ID}` }),
-        updateRecord: jest.fn().mockResolvedValue(undefined),
+      requests: {
+        create: jest.fn().mockRejectedValue(new Error('duplicate key')),
+        getById: jest.fn().mockResolvedValue({ akoya_requestid: `det-${SUGGESTION_ID}` }),
       },
     });
     const res = await ensureHonorariumOnboarding(baseArgs(), deps);
-    expect(deps.dynamics.getRecord).toHaveBeenCalledWith('akoya_requests', `det-${SUGGESTION_ID}`, expect.anything());
+    expect(deps.requests.getById).toHaveBeenCalledWith(`det-${SUGGESTION_ID}`, expect.anything());
     expect(deps.suggestions.setHonorariumRequest).toHaveBeenCalled();
     expect(res.honorariumRequestId).toBe(`det-${SUGGESTION_ID}`);
   });
 
   it('create error AND row not found → rethrows (genuine failure)', async () => {
     const deps = makeDeps({
-      dynamics: {
-        createRecord: jest.fn().mockRejectedValue(new Error('dataverse 500')),
-        getRecord: jest.fn().mockResolvedValue(null),
-        updateRecord: jest.fn().mockResolvedValue(undefined),
+      requests: {
+        create: jest.fn().mockRejectedValue(new Error('dataverse 500')),
+        getById: jest.fn().mockResolvedValue(null),
       },
     });
     await expect(ensureHonorariumOnboarding(baseArgs(), deps)).rejects.toThrow('dataverse 500');
@@ -413,8 +411,8 @@ describe('ensureHonorariumOnboarding', () => {
   it('PATCHes the address onto the contact (address1_*)', async () => {
     const deps = makeDeps();
     await ensureHonorariumOnboarding(baseArgs(), deps);
-    const addrCall = deps.dynamics.updateRecord.mock.calls.find(c => c[0] === 'contacts');
-    expect(addrCall[2]).toMatchObject({
+    const addrCall = deps.contacts.updateFields.mock.calls[0];
+    expect(addrCall[1]).toMatchObject({
       address1_line1: '1 Lab Rd', address1_city: 'Sci City',
       address1_stateorprovince: 'CA', address1_postalcode: '90001', address1_country: 'US',
       address1_telephone1: '+1 555 0100',
@@ -423,16 +421,15 @@ describe('ensureHonorariumOnboarding', () => {
 
   it('contact address PATCH failure is non-fatal — honorarium still created + onboarded (Codex post-impl)', async () => {
     const deps = makeDeps({
-      dynamics: {
-        createRecord: jest.fn().mockResolvedValue({ akoya_requestid: 'HON' }),
-        getRecord: jest.fn().mockResolvedValue(null),
-        updateRecord: jest.fn().mockImplementation(async (entitySet) => {
-          if (entitySet === 'contacts') throw new Error('address PATCH 500');
-        }),
+      contacts: {
+        findByEmail: jest.fn().mockResolvedValue(null),
+        findByOrcidCandidates: jest.fn().mockResolvedValue({ none: true }),
+        findOrCreateByEmail: jest.fn().mockResolvedValue({ id: 'contact-new', created: true }),
+        updateFields: jest.fn().mockRejectedValue(new Error('address PATCH 500')),
       },
     });
     const res = await ensureHonorariumOnboarding(baseArgs(), deps);
-    expect(deps.dynamics.createRecord).toHaveBeenCalled();
+    expect(deps.requests.create).toHaveBeenCalled();
     expect(deps.suggestions.setHonorariumRequest).toHaveBeenCalled();
     expect(deps.onboard).toHaveBeenCalled();
     expect(res.honorariumRequestId).toBe(`det-${SUGGESTION_ID}`);
@@ -442,7 +439,7 @@ describe('ensureHonorariumOnboarding', () => {
     const err = Object.assign(new Error('down'), { code: 'honorarium_amount_unavailable' });
     const deps = makeDeps({ getAmount: jest.fn().mockRejectedValue(err) });
     await expect(ensureHonorariumOnboarding(baseArgs(), deps)).rejects.toMatchObject({ code: 'honorarium_amount_unavailable' });
-    expect(deps.dynamics.createRecord).not.toHaveBeenCalled();
+    expect(deps.requests.create).not.toHaveBeenCalled();
   });
 
   it('back-propagates the reviewer ORCID onto the ensured contact (design §5)', async () => {
@@ -459,7 +456,7 @@ describe('ensureHonorariumOnboarding', () => {
   it('ORCID back-prop failure is non-fatal — honorarium still created + onboarded', async () => {
     const deps = makeDeps({ backProp: jest.fn().mockRejectedValue(new Error('contact 403')) });
     const res = await ensureHonorariumOnboarding(baseArgs(), deps);
-    expect(deps.dynamics.createRecord).toHaveBeenCalled();
+    expect(deps.requests.create).toHaveBeenCalled();
     expect(deps.onboard).toHaveBeenCalled();
     expect(res.honorariumRequestId).toBe(`det-${SUGGESTION_ID}`);
   });
@@ -470,11 +467,11 @@ describe('ensureHonorariumOnboarding', () => {
       const res = await ensureHonorariumOnboarding(baseArgs(), deps);
 
       // Address still PATCHed onto the contact (the data we want to capture).
-      const addrCall = deps.dynamics.updateRecord.mock.calls.find(c => c[0] === 'contacts');
-      expect(addrCall[2]).toMatchObject({ address1_line1: '1 Lab Rd', address1_telephone1: '+1 555 0100' });
+      const addrCall = deps.contacts.updateFields.mock.calls[0];
+      expect(addrCall[1]).toMatchObject({ address1_line1: '1 Lab Rd', address1_telephone1: '+1 555 0100' });
 
       // No payment record minted, no amount read, no BILL onboarding.
-      expect(deps.dynamics.createRecord).not.toHaveBeenCalled();
+      expect(deps.requests.create).not.toHaveBeenCalled();
       expect(deps.getAmount).not.toHaveBeenCalled();
       expect(deps.onboard).not.toHaveBeenCalled();
       expect(deps.suggestions.setHonorariumRequest).not.toHaveBeenCalled();
@@ -486,17 +483,18 @@ describe('ensureHonorariumOnboarding', () => {
     it('deferred surfaces an address-capture failure instead of silently succeeding (P1)', async () => {
       const deps = makeDeps({
         isDeferred: () => true,
-        dynamics: {
-          createRecord: jest.fn(),
-          getRecord: jest.fn(),
-          updateRecord: jest.fn().mockRejectedValue(new Error('address PATCH 500')),
+        contacts: {
+          findByEmail: jest.fn().mockResolvedValue(null),
+          findByOrcidCandidates: jest.fn().mockResolvedValue({ none: true }),
+          findOrCreateByEmail: jest.fn().mockResolvedValue({ id: 'contact-new', created: true }),
+          updateFields: jest.fn().mockRejectedValue(new Error('address PATCH 500')),
         },
       });
       const res = await ensureHonorariumOnboarding(baseArgs(), deps);
       expect(res.status).toBe('deferred');
       expect(res.addressCaptureError).toMatch(/address PATCH 500/);
       // Still no payment record minted on the failure path.
-      expect(deps.dynamics.createRecord).not.toHaveBeenCalled();
+      expect(deps.requests.create).not.toHaveBeenCalled();
     });
 
     it('deferred flags partial discriminator config (some-but-not-all GUIDs, no explicit flag) (P2)', async () => {
@@ -557,7 +555,7 @@ describe('ensureHonorariumOnboarding', () => {
         // No isDeferred injected → exercises defaultHonorariumOnboardingDeferred().
         const deps = makeDeps();
         const res = await ensureHonorariumOnboarding(baseArgs(), deps);
-        expect(deps.dynamics.createRecord).not.toHaveBeenCalled();
+        expect(deps.requests.create).not.toHaveBeenCalled();
         expect(res.status).toBe('deferred');
       } finally {
         if (prev === undefined) delete process.env.HONORARIUM_ONBOARDING_DEFERRED;

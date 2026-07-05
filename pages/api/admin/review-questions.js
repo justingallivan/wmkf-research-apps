@@ -33,18 +33,7 @@ import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { normalizeRow, questionSetVersion, invalidate } from '../../../lib/external/review-question-fetcher';
 import { validateSubmittedSet, buildChangeset, missingParentBoundKeys, ENTITY_SET } from '../../../lib/admin/review-question-save';
-
-const SELECT = [
-  'wmkf_reviewquestionid',
-  'wmkf_questionkey',
-  'wmkf_questionorder',
-  'wmkf_questiontext',
-  'wmkf_questiontype',
-  'wmkf_required',
-  'wmkf_maxlength',
-  'wmkf_hint',
-  'wmkf_options',
-].join(',');
+import { queryActiveQuestions } from '../../../lib/dataverse/adapters/review-question';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -73,12 +62,7 @@ export default async function handler(req, res) {
  * partial editor.
  */
 async function readActiveSetWithIds() {
-  const { records, totalCount, hasMore } = await DynamicsService.queryRecords(ENTITY_SET, {
-    select: SELECT,
-    filter: 'statecode eq 0',
-    orderby: 'wmkf_questionorder',
-    top: 100,
-  });
+  const { records, totalCount, hasMore } = await queryActiveQuestions();
   // Same 100-row fail-closed contract the reviewer fetcher enforces: never show
   // the editor a truncated set (it would soft-delete the unseen rows on save).
   if (hasMore || (Number.isFinite(totalCount) && totalCount > (records || []).length)) {

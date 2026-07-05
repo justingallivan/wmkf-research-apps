@@ -48,7 +48,6 @@
 import crypto from 'crypto';
 import pkg from 'pg';
 import { get as blobGet } from '@vercel/blob';
-import { DynamicsService } from '../../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions } from '../../../lib/services/dynamics-context';
 import { GraphService } from '../../../lib/services/graph-service';
 import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request.js';
@@ -414,7 +413,7 @@ async function handleScanning(client, job) {
   };
 
   try {
-    const created = await DynamicsService.createRecord('akoya_requests', createBody);
+    const created = await grantRequestAdapter.create(createBody);
     const akoyaRequestnum = created?.akoya_requestnum;
     if (!akoyaRequestnum) {
       // Shouldn't happen — akoya_requestnum is server-autonumber. Treat as fatal.

@@ -34,6 +34,12 @@ jest.mock('../../shared/utils/review-report-docx', () => ({
 }));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   notExcludedFilter: () => 'wmkf_applicantdisposition ne 100000001',
+  // queryAllSuggestions/patchReviewReceipt are thin DynamicsService
+  // passthroughs (data-access-layer conversion, Stages 3-6) — forward
+  // through the ALSO-mocked dynamics-service module so the existing
+  // queryAllRecords/updateRecord assertions below still see these calls.
+  queryAllSuggestions: (options) => queryAllRecords('wmkf_appreviewersuggestions', options),
+  patchReviewReceipt: (id, payload, opts) => updateRecord('wmkf_appreviewersuggestions', id, payload, opts),
 }));
 
 const { sweepReviewThankYous } = require('../../lib/services/reviewer-thankyou-sweep');

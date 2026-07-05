@@ -35,3 +35,21 @@ describe('ai-run.create (characterization)', () => {
     await expect(aiRun.create({}, { actingUserSystemId: 'sys' })).rejects.toThrow('boom');
   });
 });
+
+describe('ai-run.getByIdWithSelect (characterization)', () => {
+  test('byte-mirrors prompt-resolver\'s scratch-row select', async () => {
+    const g = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_ai_notes: 'system prompt', wmkf_ai_rawoutput: 'user template {{var}}',
+    });
+    const out = await aiRun.getByIdWithSelect('a03f77d9-913a-f111-88b5-000d3a3065b8', 'wmkf_ai_notes,wmkf_ai_rawoutput');
+    expect(out).toEqual({ wmkf_ai_notes: 'system prompt', wmkf_ai_rawoutput: 'user template {{var}}' });
+    expect(g).toHaveBeenCalledWith('wmkf_ai_runs', 'a03f77d9-913a-f111-88b5-000d3a3065b8', {
+      select: 'wmkf_ai_notes,wmkf_ai_rawoutput',
+    });
+  });
+
+  test('failure path: propagates a getRecord rejection', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockRejectedValue(new Error('not found'));
+    await expect(aiRun.getByIdWithSelect('x', 'a,b')).rejects.toThrow('not found');
+  });
+});

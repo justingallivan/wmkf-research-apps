@@ -16,6 +16,7 @@ import {
   setPortalOid,
   createPortalContact,
   getEntityKeyStatus,
+  getByIdWithSelect,
 } from '../../lib/dataverse/adapters/contact.js';
 
 afterEach(() => jest.restoreAllMocks());
@@ -94,5 +95,20 @@ describe('contact.getEntityKeyStatus', () => {
     const out = await getEntityKeyStatus('contact', 'wmkf_portaloid');
     expect(out).toEqual({ EntityKeyIndexStatus: 'Active' });
     expect(getKey).toHaveBeenCalledWith('contact', 'wmkf_portaloid');
+  });
+});
+
+describe('contact.getByIdWithSelect', () => {
+  test('byte-mirrors the external review context route select', async () => {
+    const get = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ contactid: 'c1' });
+    const select = [
+      'firstname', 'lastname', 'nickname', 'jobtitle', 'emailaddress1',
+      'wmkf_orcid', 'adx_organizationname', '_parentcustomerid_value',
+      'address1_line1', 'address1_line2', 'address1_city',
+      'address1_stateorprovince', 'address1_postalcode', 'address1_country',
+    ];
+    const out = await getByIdWithSelect('c1', select);
+    expect(out).toEqual({ contactid: 'c1' });
+    expect(get).toHaveBeenCalledWith('contacts', 'c1', { select: select.join(',') });
   });
 });

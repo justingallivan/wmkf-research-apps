@@ -13,10 +13,11 @@ import { mintForRequest } from '../../../lib/external/grantee-token-lifecycle';
 import { renderGranteeReminderHtml } from '../../../lib/external/grantee-invite-email';
 import { readRequiredEmailDefaults } from '../../../lib/services/email-defaults';
 import { resolveSignatureForRequest } from '../../../lib/services/email-signature';
-import {
-  GRANTEE_DELIVERABLE_ENTITY_SET,
-} from '../../../lib/services/grantee-deliverable-record';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../../shared/config/granteeDeliverableStatus';
+import * as contactAdapter from '../../../lib/dataverse/adapters/contact';
+import * as systemUserAdapter from '../../../lib/dataverse/adapters/system-user';
+import * as grantRequestAdapter from '../../../lib/dataverse/adapters/grant-request';
+import * as granteeDeliverableAdapter from '../../../lib/dataverse/adapters/grantee-deliverable';
 
 const SELECT = [
   'wmkf_granteedeliverableid',
@@ -49,7 +50,7 @@ function contactName(c) {
 async function readContact(id) {
   if (!id) return null;
   try {
-    return await DynamicsService.getRecord('contacts', id, { select: CONTACT_SELECT });
+    return await contactAdapter.getByIdWithSelect(id, CONTACT_SELECT);
   } catch {
     return null;
   }
@@ -58,7 +59,7 @@ async function readContact(id) {
 async function readPd(id) {
   if (!id) return null;
   try {
-    const pd = await DynamicsService.getRecord('systemusers', id, { select: PD_SELECT });
+    const pd = await systemUserAdapter.getByIdWithSelect(id, PD_SELECT);
     if (!pd || pd.isdisabled === true) return null;
     return pd;
   } catch {
@@ -90,7 +91,7 @@ export default async function handler(req, res) {
     let capped = false;
     let totalCount = 0;
     try {
-      const result = await DynamicsService.queryAllRecords(GRANTEE_DELIVERABLE_ENTITY_SET, {
+      const result = await granteeDeliverableAdapter.queryAllDeliverables({
         select: SELECT,
         filter,
         orderby: 'wmkf_inviteddate asc',
@@ -159,7 +160,7 @@ async function processRow(row, summary, emailDefaultValues) {
 
   let request;
   try {
-    request = await DynamicsService.getRecord('akoya_requests', requestId, { select: REQUEST_SELECT });
+    request = await grantRequestAdapter.getById(requestId, { select: REQUEST_SELECT });
     requestNum = request?.akoya_requestnum || null;
   } catch (err) {
     summary.skippedNoRecipient++;
@@ -191,8 +192,7 @@ async function processRow(row, summary, emailDefaultValues) {
   }
 
   try {
-    await DynamicsService.updateRecord(
-      GRANTEE_DELIVERABLE_ENTITY_SET,
+    await granteeDeliverableAdapter.update(
       deliverableId,
       { wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.REMINDER_SENT },
       { ifMatch: row._etag },
@@ -233,8 +233,7 @@ async function processRow(row, summary, emailDefaultValues) {
   }
 
   try {
-    await DynamicsService.updateRecord(
-      GRANTEE_DELIVERABLE_ENTITY_SET,
+    await granteeDeliverableAdapter.update(
       deliverableId,
       {
         wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.REMINDER_SENT,

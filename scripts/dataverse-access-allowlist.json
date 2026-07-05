@@ -3,73 +3,10 @@
   "generatedFrom": "node scripts/check-dataverse-access-layer.js --json",
   "entries": [
     {
-      "file": "lib/bill/honorarium-onboard-orchestrator.js",
-      "kind": "dynamic-client",
-      "clientMethod": "dynamics.createRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "lib/bill/honorarium-onboard-orchestrator.js",
-      "kind": "dynamic-client",
-      "clientMethod": "dynamics.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "lib/bill/honorarium-onboard-orchestrator.js",
-      "kind": "dynamic-client",
-      "clientMethod": "dynamics.updateRecord",
-      "entity": "contacts",
-      "count": 1
-    },
-    {
-      "file": "lib/bill/honorarium-onboard-orchestrator.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.createRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "lib/bill/onboard-reviewer-service.js",
-      "kind": "dynamic-client",
-      "clientMethod": "dynamics.getRecord",
-      "entity": "contacts",
-      "count": 1
-    },
-    {
-      "file": "lib/bill/onboard-reviewer-service.js",
-      "kind": "dynamic-client",
-      "clientMethod": "dynamics.updateRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "lib/bill/onboard-reviewer-service.js",
-      "kind": "dynamic-client",
-      "clientMethod": "dynamics.updateRecord",
-      "entity": "contacts",
-      "count": 1
-    },
-    {
       "file": "lib/services/dynamics-explorer-taxonomy.js",
       "kind": "import",
       "clientMethod": "DynamicsService.resolveLogicalName",
       "entity": "unresolved",
-      "count": 1
-    },
-    {
-      "file": "lib/services/email-signature.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "systemusers",
-      "count": 1
-    },
-    {
-      "file": "lib/services/maintenance-service.js",
-      "kind": "require",
-      "clientMethod": "DynamicsService.queryAllRecords",
-      "entity": "wmkf_appreviewersuggestions",
       "count": 1
     },
     {
@@ -80,66 +17,10 @@
       "count": 1
     },
     {
-      "file": "lib/services/program-director-resolver.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "systemusers",
-      "count": 1
-    },
-    {
-      "file": "lib/services/program-director-resolver.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "systemusers",
-      "count": 1
-    },
-    {
-      "file": "lib/services/prompt-resolver.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "unresolved",
-      "count": 1
-    },
-    {
       "file": "lib/services/reviewer-acceptance-email.js",
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",
       "entity": "non-entity-transport",
-      "count": 1
-    },
-    {
-      "file": "lib/services/reviewer-manual-reminder.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "unresolved",
-      "count": 1
-    },
-    {
-      "file": "lib/services/reviewer-merge.js",
-      "kind": "fallback-alias",
-      "clientMethod": "dyn.disassociate",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "lib/services/reviewer-merge.js",
-      "kind": "fallback-alias",
-      "clientMethod": "dyn.queryAllRecords",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "lib/services/reviewer-merge.js",
-      "kind": "fallback-alias",
-      "clientMethod": "dyn.updateRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "lib/services/reviewer-merge.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.disassociate",
-      "entity": "akoya_requests",
       "count": 1
     },
     {
@@ -157,27 +38,6 @@
       "count": 1
     },
     {
-      "file": "lib/services/reviewer-thankyou-sweep.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryAllRecords",
-      "entity": "unresolved",
-      "count": 1
-    },
-    {
-      "file": "lib/services/reviewer-thankyou-sweep.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "unresolved",
-      "count": 1
-    },
-    {
-      "file": "pages/api/admin/review-questions.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "unresolved",
-      "count": 1
-    },
-    {
       "file": "pages/api/admin/review-questions.js",
       "kind": "import:changeset-unresolved",
       "clientMethod": "DynamicsService.executeChangeset",
@@ -185,59 +45,10 @@
       "count": 1
     },
     {
-      "file": "pages/api/cron/drain-submissions.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.createRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
       "file": "pages/api/cron/grantee-deliverable-reminders.js",
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",
       "entity": "non-entity-transport",
-      "count": 1
-    },
-    {
-      "file": "pages/api/cron/grantee-deliverable-reminders.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "akoya_requests",
-      "count": 1
-    },
-    {
-      "file": "pages/api/cron/grantee-deliverable-reminders.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "contacts",
-      "count": 1
-    },
-    {
-      "file": "pages/api/cron/grantee-deliverable-reminders.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "systemusers",
-      "count": 1
-    },
-    {
-      "file": "pages/api/cron/grantee-deliverable-reminders.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryAllRecords",
-      "entity": "unresolved",
-      "count": 1
-    },
-    {
-      "file": "pages/api/cron/grantee-deliverable-reminders.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.updateRecord",
-      "entity": "unresolved",
-      "count": 2
-    },
-    {
-      "file": "pages/api/external/review/[token]/context.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "contacts",
       "count": 1
     },
     {
@@ -262,38 +73,10 @@
       "count": 1
     },
     {
-      "file": "pages/api/review-manager/send-emails.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.getRecord",
-      "entity": "systemusers",
-      "count": 1
-    },
-    {
       "file": "pages/api/review-manager/withdraw-sufficient.js",
       "kind": "import",
       "clientMethod": "DynamicsService.createAndSendEmail",
       "entity": "non-entity-transport",
-      "count": 1
-    },
-    {
-      "file": "pages/api/reviewer-finder/contact-history.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryAllRecords",
-      "entity": "wmkf_apprequestpersons",
-      "count": 1
-    },
-    {
-      "file": "pages/api/reviewer-finder/generate-emails.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "wmkf_apprequestpersons",
-      "count": 1
-    },
-    {
-      "file": "pages/api/reviewer-finder/my-candidates.js",
-      "kind": "import",
-      "clientMethod": "DynamicsService.queryRecords",
-      "entity": "accounts",
       "count": 1
     },
     {
