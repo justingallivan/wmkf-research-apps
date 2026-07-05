@@ -330,7 +330,8 @@ file's module system (all gates + self-tests are CJS; both helpers are CJS); int
 **Characterization mechanism (chosen, review round 1 finding 4): PRIMARY oracle = byte-identical
 verdict output + exit code from a DIRECT gate run; SECONDARY oracle = an fs-read trace of the same
 direct run.** Stage 0 adds `scripts/lib/__gate-census-trace.js` — a **preload shim** (a Stage-0
-artifact, NOT part of any gate's logic; may be removed after the refactor). It monkeypatches
+artifact, NOT part of any gate's logic; may be removed after the refactor).
+[RECHECKED after scripts/lib/__gate-census-trace.js change: Stage 0 execution created the shim per this spec (1.2K, ls this session); the executing agent commits it with its Stage 0 commit and appends the Stage Log at close] It monkeypatches
 `fs.readFileSync` and `fs.readdirSync` to append each resolved path to the file named by
 `GATE_CENSUS_OUT`. Each touched gate is run as:
 
