@@ -199,16 +199,45 @@ each call (or both, in one `withDalContext` spanning the function body) without 
 into an uncaught one that could break server cold start. `pages/api/cron/auth-bypass-check.js` (#15's
 other caller) is a plain route wrap, same shape as #17/#18/#20.
 
-Once Stage 1 closes, `notify()`'s own `'notification-email'` wrap still stays in place until a human
-follow-up review explicitly removes it. That follow-up is allowed only if every REACHES site — #9,
-#12, #13, #14, #15, #16, #17, #18, #19, #20, #21, #22 — is covered by its own caller (excluding the
-explicitly-deferred #10/#11 multi-hop sites, per Decision 3). A partial push-up must not remove the
-shared safety net.
+Once Stage 1 AND Stage 2 close, `notify()`'s own `'notification-email'` wrap still stays in place until
+a human follow-up review explicitly removes it. That follow-up is allowed only if every REACHES site —
+#9 through #22 (all fourteen: #9, #10, #11, #12, #13, #14, #15, #16, #17, #18, #19, #20, #21, #22) — is
+covered by its own entry point. Stage 2 (below) closes the last two (#10/#11), so after it lands this
+precondition is met. A partial push-up must not remove the shared safety net.
 
-### Stage 2 (separately scoped, NOT part of this plan's execution) — Multi-hop sites #10, #11
+### Stage 2 — Multi-hop sites #10, #11 (TRACED; scope is 1 new wrap + 7 characterization sites)
 
-Deferred. Requires its own caller-graph trace of `onboardReviewer`'s callers and
-`readRequiredEmailDefaults`'s callers before any decision.
+Both fan-outs were traced 2026-07-05 (CodeGraph caller query + `grep -a` + lexical-scope reads of each
+entry point). Result — far smaller than the "open-ended fan-out" the draft feared:
+
+**#10 `onboardReviewer` — 2 terminal entry points:**
+- `pages/api/bill/onboard-reviewer.js:81` — `await onboardReviewer(body)` sits in the route's `try`
+  block (line 80), OUTSIDE the `'notification-email'` wrap that only covers the route's own notify in
+  the `catch` (line 91) `[VERIFIED via pages/api/bill/onboard-reviewer.js:80-83,91]`. **UNCOVERED — needs
+  ONE new wrap** around the `onboardReviewer(body)` call.
+- `pages/api/cron/drain-reviewer-acceptances.js` — reaches `onboardReviewer` via
+  `drainReviewerAcceptanceJobs → processReviewerAcceptanceJob → ensureHonorariumOnboarding → onboardReviewer`,
+  all synchronously awaited inside `withDalContext('cron-drain-reviewer-acceptances', ...)` at `:34`
+  `[VERIFIED via pages/api/cron/drain-reviewer-acceptances.js:33-36]`. **COVERED — characterization only.**
+  (Note: `honorarium-onboard-orchestrator.js` establishes NO context of its own; the cron is the sole
+  establisher, so a future caller of `ensureHonorariumOnboarding` outside a context would regress #10b.)
+
+**#11 `readRequiredEmailDefaults` → `notifyMisconfiguredDefault` — 6 terminal entry points, ALL COVERED**
+(characterization only), each already inside its entry point's existing wrap
+`[VERIFIED via lexical-scope reads this session]`:
+- `pages/api/review-manager/send-review-reminder.js` → `withDalContext('review-manager-send-review-reminder')` :59
+- `pages/api/cron/send-review-thankyous.js` → `withDalContext('cron-review-thankyous')` :45
+- `pages/api/cron/reviewer-reminders.js` (both respond + reviewDue sweeps) → `withDalContext('cron-reviewer-reminders')` :43
+- `pages/api/review-manager/withdraw-sufficient.js` → `withDalContext('review-manager-withdraw-sufficient')` :51
+- `pages/api/cron/drain-reviewer-acceptances.js` (`sendAcceptanceConfirmationEmail`) → `withDalContext('cron-drain-reviewer-acceptances')` :34
+- `pages/api/cron/grantee-deliverable-reminders.js` → `withDalContext('grantee-deliverable-reminders-cron')` :29
+
+**Stage 2 execution scope:** ONE new production wrap (`onboard-reviewer.js:81`, wrapping
+`onboardReviewer(body)` — a scope-widen that also nests onboardReviewer's own inner wraps, safe per ALS
+re-entrancy; label e.g. `'bill-onboard-reviewer'`), plus characterization tests for the 8 already-covered
+paths (#10b drain + the 6 #11 entry points; the reminder cron covers two sweeps). No change to #10/#11
+service internals. After Stage 2 lands, EVERY REACHES entry point establishes context — the precondition
+for removing the shared internal wrapper (Stage 3 below).
 
 ### Stage 3 — Fresh-context review
 
@@ -304,5 +333,18 @@ Codex adversarial review of the full diff, same acceptance bar as `BYPASS_STRIP_
   full suite 428 suites / 4758 tests, `check:dynamics-context-boundary` / `dataverse-access-layer` /
   `route-service-boundary` / `api-routes` (+ self-tests), and `npm run build`. Stage 2 (#10/#11) and the
   shared-wrapper removal remain open.
+
+- 2026-07-05: **Stage 2 traced — scope is far smaller than the draft feared: 1 new wrap + 8
+  characterization sites.** Traced both multi-hop fan-outs with a CodeGraph caller query + `grep -a` +
+  independent lexical-scope reads of every terminal entry point (see the rewritten Stage 2 section for
+  the per-entry-point matrix with file:line evidence). #10 `onboardReviewer` has exactly 2 entry points:
+  the HTTP route `onboard-reviewer.js:81` is UNCOVERED (its `onboardReviewer(body)` call is in the `try`,
+  outside the `catch`-block `'notification-email'` wrap) and needs ONE new wrap; the drain cron is
+  already covered by `withDalContext('cron-drain-reviewer-acceptances')`. #11
+  `readRequiredEmailDefaults`'s 6 terminal entry points (7 call sites; the reminder cron covers two
+  sweeps) are ALL already covered by their existing route/cron wraps — each `withDalContext` open line
+  personally read this session. So CodeGraph's "15 callers" was a transitive count; the direct call set
+  is 7 sites in 6 functions. Stage 2 execution = one production wrap (`onboard-reviewer.js:81`) plus
+  characterization tests for the 8 already-covered paths; no service-internal changes. Not yet executed.
 
 <!-- end of plan -->
