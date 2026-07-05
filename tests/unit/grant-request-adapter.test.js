@@ -1,12 +1,13 @@
 /**
- * Characterization tests for the akoya_requests READ adapter
- * (lib/dataverse/adapters/grant-request.js, Wave 5(a)+(b)).
+ * Characterization tests for the akoya_requests adapter
+ * (lib/dataverse/adapters/grant-request.js, Wave 5(a)+(b)+(c)).
  *
  * Each test asserts the EXACT DynamicsService call the raw callers make — entity
- * set, `$select`, `$filter`, `top`, `$orderby` — plus the pass-through return
- * contract, so the later in-place conversion is provably behavior-preserving
- * (Wave 5 behavior freeze). No write methods exist on this adapter and none are
- * exercised here.
+ * set, `$select`, `$filter`, `top`, `$orderby`, PATCH body/options — plus the
+ * pass-through return contract, so the later in-place conversion is provably
+ * behavior-preserving (Wave 5 behavior freeze). `updateById`/`queryRequests`/
+ * `queryAllRequests` (Wave 5(c)) assert the exact PATCH body / forwarded query
+ * options per the plan's Wave-5(c) requirement.
  *
  * @jest-environment node
  */
@@ -172,5 +173,72 @@ describe('grant-request.findMeetingDatesByProgramDirector (characterization)', (
     const result = { records: [], capped: false, totalCount: 0, hasMore: false };
     jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue(result);
     expect(await grantRequest.findMeetingDatesByProgramDirector(PD_ID)).toBe(result);
+  });
+});
+
+// ──────────────────────────── updateById (Wave 5c) ────────────────────────────
+
+describe('grant-request.updateById (exact PATCH body)', () => {
+  test('golden: simple patch + ifMatch — forwards entity, id, body, options verbatim', async () => {
+    const u = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({ ok: true });
+    const out = await grantRequest.updateById(GUID_A, { wmkf_triagestatus: 100000000 }, { ifMatch: 'W/"1"' });
+    expect(out).toEqual({ ok: true });
+    expect(u).toHaveBeenCalledWith('akoya_requests', GUID_A, { wmkf_triagestatus: 100000000 }, { ifMatch: 'W/"1"' });
+  });
+
+  test('golden: actingUserSystemId only (no ifMatch) — mirrors triage.js / campaign-config.js shape', async () => {
+    const u = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
+    await grantRequest.updateById(GUID_A, { wmkf_respondoffsetdays: 5 }, { actingUserSystemId: 'su-1' });
+    expect(u).toHaveBeenCalledWith('akoya_requests', GUID_A, { wmkf_respondoffsetdays: 5 }, { actingUserSystemId: 'su-1' });
+  });
+
+  test('golden: ifMatch + actingUserSystemId together — mirrors abstract.js / generate.js shape', async () => {
+    const u = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
+    await grantRequest.updateById(GUID_A, { wmkf_abstractapproved: 'text' }, {
+      ifMatch: 'W/"2"',
+      actingUserSystemId: 'su-2',
+    });
+    expect(u).toHaveBeenCalledWith('akoya_requests', GUID_A, { wmkf_abstractapproved: 'text' }, {
+      ifMatch: 'W/"2"',
+      actingUserSystemId: 'su-2',
+    });
+  });
+
+  test('behavior lock: NO options arg at all — calls updateRecord with exactly 3 args (field-primer restorePrior shape)', async () => {
+    const u = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
+    await grantRequest.updateById(GUID_A, { wmkf_ai_fieldprimer: null });
+    expect(u).toHaveBeenCalledWith('akoya_requests', GUID_A, { wmkf_ai_fieldprimer: null });
+    expect(u.mock.calls[0]).toHaveLength(3);
+  });
+
+  test('behavior lock: an explicit empty options object {} is still forwarded as a 4th arg', async () => {
+    const u = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
+    await grantRequest.updateById(GUID_A, { wmkf_triagestatus: 1 }, {});
+    expect(u.mock.calls[0]).toHaveLength(4);
+    expect(u.mock.calls[0][3]).toEqual({});
+  });
+});
+
+// ──────────────── queryRequests / queryAllRequests (Wave 5c passthroughs) ────────────────
+
+describe('grant-request.queryRequests (business-filter passthrough)', () => {
+  test('forwards the options object verbatim to queryRecords, returns raw result', async () => {
+    const result = { records: [{ akoya_requestid: GUID_A }], count: 1, totalCount: 1, hasMore: false };
+    const q = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue(result);
+    const opts = { select: 'akoya_requestid,akoya_requestnum', filter: "akoya_requeststatus eq 'Active'", orderby: 'akoya_requestnum asc' };
+    const out = await grantRequest.queryRequests(opts);
+    expect(out).toBe(result);
+    expect(q).toHaveBeenCalledWith('akoya_requests', opts);
+  });
+});
+
+describe('grant-request.queryAllRequests (business-filter passthrough)', () => {
+  test('forwards the options object verbatim to queryAllRecords, returns raw result', async () => {
+    const result = { records: [], capped: false, totalCount: 0, hasMore: false };
+    const qAll = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue(result);
+    const opts = { select: 'akoya_requestid', filter: 'akoya_fiscalyear eq \'2026\'', orderby: 'akoya_requestnum asc' };
+    const out = await grantRequest.queryAllRequests(opts);
+    expect(out).toBe(result);
+    expect(qAll).toHaveBeenCalledWith('akoya_requests', opts);
   });
 });
