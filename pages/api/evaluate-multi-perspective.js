@@ -38,6 +38,7 @@ import {
   PERSPECTIVE_SCHEMAS,
   INTEGRATOR_SCHEMA,
 } from '../../shared/config/multi-perspective-output-schema';
+import { chunk as chunked } from '../../lib/utils/chunk.js';
 
 // A7 follow-up (step 0): validate a parsed stage output against its schema.
 // On success returns the cleaned value (undeclared keys dropped — the
@@ -229,8 +230,7 @@ function sendProgress(res, progress, message, stage = null) {
 export async function processWithConcurrency(items, processorFn, limit) {
   const results = [];
 
-  for (let i = 0; i < items.length; i += limit) {
-    const chunk = items.slice(i, i + limit);
+  for (const chunk of chunked(items, limit)) {
     const chunkResults = await Promise.all(chunk.map(processorFn));
     results.push(...chunkResults);
   }
