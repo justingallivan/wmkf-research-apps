@@ -4,6 +4,7 @@ description: "Don't read a guard hook's source and iteratively reword content or
 metadata: 
   node_type: memory
   type: feedback
+  status: active
   originSessionId: fdb785fa-fa6a-4e1d-8c19-fabfad8a1890
 ---
 
