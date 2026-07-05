@@ -270,29 +270,25 @@ describe('test-email endpoint is wrapped', () => {
   });
 });
 
-describe('drain duplicate-PK recovery wraps the request read', () => {
-  // S333 bypass-strip Stage 2: the wrapper is now the sanctioned
-  // `withDalContext` (behavior-identical to the retired
-  // `bypassDynamicsRestrictions`, same label); the shape assertion tracks
-  // the rename.
-  test('source wraps the recovery read in a trusted DAL context', () => {
+describe('drain duplicate-PK recovery relies on the outer processJob context', () => {
+  // S333 Stage 4a: the local `drain-recover-request-created` withDalContext
+  // wrap was removed as nested-redundant — recoverRequestCreated is only ever
+  // reached from within a state handler dispatched under processJob's own
+  // withDalContext('drain-submissions'), which already covers this read (not
+  // enforcement-gated itself, but the invariant — trusted context reaches
+  // every state-handler branch — still holds; proven at runtime by
+  // tests/unit/drain-submissions-dal-context.test.js).
+  test('source no longer wraps the recovery read in its own local context', () => {
     const fs = require('fs');
     const path = require('path');
-    // Stage 5 extraction (plumbing-only retarget): the drain engine incl.
-    // recoverRequestCreated moved to the cron service; the wrapper shape and
-    // label are unchanged, so the pin now reads the service source.
     const src = fs.readFileSync(
       path.join(__dirname, '../../lib/services/cron/drain-submissions-service.js'),
       'utf8'
     );
-    // The wrapper must lexically enclose the request read, not just appear
-    // somewhere in the file with the right label. The read now goes through
-    // grantRequestAdapter.getById (data-access-layer migration tail-2B) — that
-    // adapter itself still calls DynamicsService.getRecord, so the
-    // restriction-context invariant is preserved one call deeper.
-    expect(src).toMatch(
-      /withDalContext\(\s*['"]drain-recover-request-created['"][^]*?grantRequestAdapter\.getById\s*\(/
-    );
+    expect(src).not.toMatch(/withDalContext\(\s*['"]drain-recover-request-created['"]/);
     expect(src).not.toMatch(/bypassDynamicsRestrictions/);
+    // The outer dispatcher wrap must still exist — that's what makes the
+    // removal safe rather than a stranding regression.
+    expect(src).toMatch(/withDalContext\(\s*['"]drain-submissions['"][^]*?handler\s*\(/);
   });
 });

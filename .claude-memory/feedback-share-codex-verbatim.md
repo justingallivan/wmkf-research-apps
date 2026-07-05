@@ -11,7 +11,16 @@ metadata:
 ## Recall Trigger
 
 Read this when an `Agent(codex:codex-rescue)`, `/codex:rescue`, Codex review,
-rescue, or diagnostic tool result returns — every round-trip.
+rescue, or diagnostic tool result returns — every round-trip. This explicitly
+includes `/codex:review` and `/codex:adversarial-review`, which run
+`codex-companion.mjs` directly via **Bash**, not through the Agent/Task tool —
+`.claude/hooks/codex-verbatim-reminder.js` only matches `Agent`/`Task` calls
+with `subagent_type: codex:*` and by design does NOT fire for a raw Bash
+invocation. Confirmed missed live on 2026-07-05 (S333): an
+`/codex:adversarial-review --wait` Bash call returned a real P1 finding, and
+the next message paraphrased/summarized it instead of pasting verbatim — no
+hook caught it because the tool was Bash, not Agent. Do not rely on the hook
+for these two commands; apply the rule from memory alone.
 
 ## Expert Procedure
 
