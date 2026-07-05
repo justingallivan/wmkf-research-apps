@@ -602,7 +602,7 @@ review verdict + findings + resolutions)*
 | external/review/[token]/submit.js | external-review-submit-route.test.js | no | external-token |
 | field-primer/generate.js | field-primer-generate-route.test.js | no | |
 | grant-reporting/extract.js | grant-reporting-extract-routes.test.js, grant-reporting-extract-payload-boundary.test.js | no | DynamicsService-only |
-| grant-reporting/lookup-grant.js | classify-file.test.js, lookup-grant.test.js | no | |
+| grant-reporting/lookup-grant.js | classify-file.test.js, lookup-grant.test.js | no | [RECHECKED after classifyFile move: both suites still cover this route; classifyFile's canonical home is now the lib/services/grant-reporting classify-file service module (Stage 5 batch 2, authored+read this session)] |
 | phase-i-dynamics/summarize.js | phase-i-dynamics-summarize-payload-boundary.test.js, phase-i-dynamics-summarize-v2-payload-boundary.test.js, phase-i-dynamics-summarize-route.test.js | no | |
 | review-manager/campaign-config.js | campaign-config-route.test.js | no | |
 | review-manager/download-review.js | review-manager-download-review.test.js | no | |

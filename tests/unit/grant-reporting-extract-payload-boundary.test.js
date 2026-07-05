@@ -56,7 +56,10 @@ jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { logAiRun: jest.fn(() => Promise.resolve()) },
 }));
 
-import { extractReport, compareProposalToReport } from '../../pages/api/grant-reporting/extract';
+// Import path retargeted to the canonical home (Stage 5 batch 2 plumbing-only
+// change): the pure helpers moved from the route to the grant-reporting
+// extract service with the Route→Service extraction.
+import { extractReport, compareProposalToReport } from '../../lib/services/grant-reporting/extract-service';
 import { UNTRUSTED_SENTINEL } from '../../lib/utils/ai-payload-boundary';
 
 beforeEach(() => {

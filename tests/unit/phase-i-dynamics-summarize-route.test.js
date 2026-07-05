@@ -59,6 +59,94 @@ beforeEach(() => {
   process.env.CLAUDE_API_KEY = 'sk-ant-test';
 });
 
+describe('POST /api/phase-i-dynamics/summarize — envelope inventory gap fill (Stage 5 Phase A)', () => {
+  const validBody = () => ({
+    requestGuid: GUID,
+    fileRef: { source: 'upload', fileUrl: 'https://x.public.blob.vercel-storage.com/p.pdf', filename: 'phase1.pdf' },
+  });
+
+  test('405 on non-POST with pinned envelope, no auth check', async () => {
+    const res = mockRes();
+    await handler({ method: 'GET', body: {}, headers: {} }, res);
+    expect(res.statusCode).toBe(405);
+    expect(res.body).toEqual({ error: 'Method not allowed' });
+    expect(requireAppAccess).not.toHaveBeenCalled();
+  });
+
+  test('unauth: requireAppAccess short-circuits before any Dynamics call', async () => {
+    requireAppAccess.mockResolvedValueOnce(null);
+    const res = mockRes();
+    await handler(reqOf(validBody()), res);
+    expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+    expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'batch-phase-i-summaries');
+  });
+
+  test('domain error: missing requestGuid -> 400 pinned', async () => {
+    const res = mockRes();
+    await handler(reqOf({ fileRef: { source: 'upload' } }), res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: 'requestGuid is required' });
+  });
+
+  test('domain error: non-GUID requestGuid -> 400 pinned, no record read', async () => {
+    const res = mockRes();
+    await handler(reqOf({ requestGuid: 'not-a-guid', fileRef: {} }), res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: 'requestGuid is not a valid GUID' });
+    expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+  });
+
+  test('domain error: missing fileRef -> 400 pinned', async () => {
+    const res = mockRes();
+    await handler(reqOf({ requestGuid: GUID }), res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: 'fileRef is required' });
+  });
+
+  test('golden: 200 envelope pinned fully', async () => {
+    DynamicsService.getRecord.mockResolvedValueOnce({ wmkf_ai_summary: '', modifiedon: null, _etag: 'W/"1"' });
+    const res = mockRes();
+    await handler(reqOf(validBody()), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({
+      summary: 'A multi-paragraph Phase I summary that is well over twenty characters long.',
+      filename: 'phase1.pdf',
+      model: 'claude-test',
+      writtenToDynamics: true,
+      writebackFailure: null,
+      auditLogCreated: true,
+    });
+  });
+
+  test('409 conflict envelope pinned fully (existing summary, no overwrite)', async () => {
+    DynamicsService.getRecord.mockResolvedValueOnce({
+      wmkf_ai_summary: 'An existing prior summary.', modifiedon: '2026-01-01T00:00:00Z', _etag: 'W/"1"',
+    });
+    const res = mockRes();
+    await handler(reqOf(validBody()), res);
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toEqual({
+      error: 'wmkf_ai_summary already populated — confirm overwrite to proceed',
+      conflict: {
+        field: 'wmkf_ai_summary',
+        existingLength: 26,
+        existingContent: 'An existing prior summary.',
+        recordModifiedOn: '2026-01-01T00:00:00Z',
+      },
+    });
+  });
+
+  test('writeback failure is non-fatal: 200 with writebackFailure category + needs_review audit', async () => {
+    DynamicsService.getRecord.mockResolvedValueOnce({ wmkf_ai_summary: '', modifiedon: null, _etag: 'W/"1"' });
+    DynamicsService.updateRecord.mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }));
+    const res = mockRes();
+    await handler(reqOf(validBody()), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ writtenToDynamics: false, writebackFailure: 'conflict', auditLogCreated: true });
+    expect(DynamicsService.logAiRun).toHaveBeenCalledWith(expect.objectContaining({ status: 'needs_review' }));
+  });
+});
+
 describe('POST /api/phase-i-dynamics/summarize (grant-request adapter contract)', () => {
   test('golden: preflight read + conditional writeback, written to Dynamics', async () => {
     DynamicsService.getRecord.mockResolvedValueOnce({ wmkf_ai_summary: '', modifiedon: null, _etag: 'W/"1"' });

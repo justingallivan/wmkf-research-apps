@@ -78,6 +78,98 @@ beforeEach(() => {
   process.env.CLAUDE_API_KEY = 'sk-ant-test';
 });
 
+describe('/api/grant-reporting/extract — envelope inventory gap fill (Stage 5 Phase A)', () => {
+  const importHandler = async () => (await import('../../pages/api/grant-reporting/extract')).default;
+  const baseReq = (body) => createMockReq({
+    method: 'POST',
+    headers: { origin: 'http://localhost:3000', host: 'localhost:3000' },
+    body,
+  });
+  const regenBody = (over = {}) => ({
+    mode: 'regenerate',
+    reportRef: { source: 'upload', fileUrl: 'https://test.public.blob.vercel-storage.com/r.pdf', filename: 'r.pdf' },
+    fieldKey: 'project_impacts',
+    currentValues: { narratives: {} },
+    ...over,
+  });
+
+  test('405 on non-POST with pinned envelope', async () => {
+    mockAuthenticatedUser(2, ['grant-reporting']);
+    const handler = await importHandler();
+    const res = createMockRes();
+    await handler(createMockReq({ method: 'GET' }), res);
+    expect(res.statusCode).toBe(405);
+    expect(res._data).toEqual({ error: 'Method not allowed' });
+  });
+
+  test('unauth: 401 short-circuit, no LLM call', async () => {
+    const { mockUnauthenticated } = await import('../helpers/auth-mock');
+    mockUnauthenticated();
+    const handler = await importHandler();
+    const res = createMockRes();
+    await handler(baseReq(regenBody()), res);
+    expect(res.statusCode).toBe(401);
+    expect(sentPrompts.length).toBe(0);
+  });
+
+  test('domain error: unknown mode -> 400 with pinned envelope', async () => {
+    mockAuthenticatedUser(2, ['grant-reporting']);
+    const handler = await importHandler();
+    const res = createMockRes();
+    await handler(baseReq({ mode: 'bogus' }), res);
+    expect(res.statusCode).toBe(400);
+    expect(res._data).toEqual({ error: 'Unknown mode: bogus' });
+  });
+
+  test('domain error: regenerate without reportRef -> 400', async () => {
+    mockAuthenticatedUser(2, ['grant-reporting']);
+    const handler = await importHandler();
+    const res = createMockRes();
+    await handler(baseReq(regenBody({ reportRef: null })), res);
+    expect(res.statusCode).toBe(400);
+    expect(res._data).toEqual({ error: 'reportRef is required for mode=regenerate' });
+  });
+
+  test('domain error: regenerate with a non-allowlisted fieldKey -> 400', async () => {
+    mockAuthenticatedUser(2, ['grant-reporting']);
+    const handler = await importHandler();
+    const res = createMockRes();
+    await handler(baseReq(regenBody({ fieldKey: 'not_a_field' })), res);
+    expect(res.statusCode).toBe(400);
+    expect(res._data.error).toMatch(/fieldKey must be one of/);
+  });
+
+  test('happy path: regenerate 200 envelope pinned fully ({ value })', async () => {
+    mockedReportText = 'A grant report body.';
+    mockAuthenticatedUser(2, ['grant-reporting']);
+    const handler = await importHandler();
+    const res = createMockRes();
+    await handler(baseReq(regenBody()), res);
+    expect(res.statusCode).toBe(200);
+    expect(res._data).toEqual({ value: 'regenerated narrative' });
+  });
+
+  test('happy path: mode=full 200 envelope keys pinned (no proposal → goalsAssessment null)', async () => {
+    mockedReportText = 'A grant report body.';
+    mockAuthenticatedUser(2, ['grant-reporting']);
+    const handler = await importHandler();
+    const res = createMockRes();
+    await handler(baseReq({
+      mode: 'full',
+      reportRef: { source: 'upload', fileUrl: 'https://test.public.blob.vercel-storage.com/r.pdf', filename: 'r.pdf' },
+      headerFromDynamics: {},
+    }), res);
+    expect(res.statusCode).toBe(200);
+    expect(Object.keys(res._data).sort()).toEqual(['counts', 'goalsAssessment', 'header', 'metadata', 'narratives']);
+    expect(res._data.goalsAssessment).toBeNull();
+    expect(res._data.metadata).toEqual({
+      reportFilename: 'report.pdf',
+      proposalFilename: null,
+      model: 'claude-test',
+    });
+  });
+});
+
 describe('/api/grant-reporting/extract handler — regenerate boundary', () => {
   test('caps reportText under GRANT_REPORTING_REPORT_MAX_CHARS for handleRegenerate', async () => {
     mockedReportText = `${'R'.repeat(GRANT_REPORTING_REPORT_MAX_CHARS + 500)}UNSENT_TAIL`;

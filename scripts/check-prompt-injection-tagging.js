@@ -92,7 +92,9 @@ const SURFACES = [
     inv: 12,
     status: 'migrated',
     promptFiles: ['shared/config/prompts/grant-reporting.js'],
-    callSiteFiles: ['pages/api/grant-reporting/extract.js'],
+    // Call sites moved with the Route→Service extraction (Stage 5); the
+    // route is a thin shell with no wrapUntrustedContent references.
+    callSiteFiles: ['lib/services/grant-reporting/extract-service.js'],
     builders: [
       'createGrantReportExtractionPrompt',
       'createFieldRegenerationPrompt',
@@ -232,7 +234,8 @@ const SURFACES = [
     promptFiles: ['shared/config/prompts/expertise-finder.js'],
     callSiteFiles: [
       'pages/api/expertise-finder/match.js',
-      'pages/api/expertise-finder/batch-match.js',
+      // batch-match's call site moved with the Route→Service extraction (Stage 5 batch 1).
+      'lib/services/expertise-finder/batch-match-service.js',
     ],
     // buildCacheableSystemPrompt self-carries the preamble; buildUserPrompt
     // builds the user message and relies on the system-prompt preamble.
@@ -308,7 +311,8 @@ const SURFACES = [
     id: 'phase-i-dynamics-legacy',
     inv: 19,
     status: 'migrated',
-    callSiteFiles: ['pages/api/phase-i-dynamics/summarize.js'],
+    // Call site moved with the Route→Service extraction (Stage 5).
+    callSiteFiles: ['lib/services/phase-i-dynamics/summarize-service.js'],
   },
   {
     id: 'execute-prompt-executor',

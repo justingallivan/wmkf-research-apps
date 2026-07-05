@@ -26,9 +26,9 @@ jest.mock('../../lib/utils/sharepoint-buckets', () => ({
 }));
 const put = jest.fn();
 jest.mock('@vercel/blob', () => ({ put: (...a) => put(...a) }));
-// classifyFile is imported from the (unconverted) lookup-grant route — mock the
-// module so this unit test does not load that route's import graph.
-jest.mock('../../pages/api/grant-reporting/lookup-grant', () => ({
+// classifyFile now lives in its canonical service home (Stage 5 batch 2 —
+// plumbing-only mock retarget; the mocked classifier behavior is unchanged).
+jest.mock('../../lib/services/grant-reporting/classify-file', () => ({
   classifyFile: (name) => (/narrative|proposal|phase/i.test(name) ? 'proposal' : 'other'),
 }));
 

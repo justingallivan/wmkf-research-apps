@@ -9,7 +9,10 @@
  * @jest-environment node
  */
 
-import { classifyFile } from '../../pages/api/grant-reporting/lookup-grant.js';
+// Import path retargeted to the canonical home (Stage 5 batch 2 plumbing-only
+// change): classifyFile moved from the lookup-grant route to the shared
+// grant-reporting service module.
+import { classifyFile } from '../../lib/services/grant-reporting/classify-file.js';
 
 describe('classifyFile — front-matter is never the proposal', () => {
   test.each([
