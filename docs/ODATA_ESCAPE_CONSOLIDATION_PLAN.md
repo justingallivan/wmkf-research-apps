@@ -391,3 +391,13 @@ everywhere the other gates are; if declined — record the decision in the Stage
   - **Verification:** targeted jest 36/36; `check:dataverse-access-layer` (+ self-test) exit 0;
     `check:route-service-boundary` exit 0; **full `npm test`: 414 suites / 4680 tests, exit 0.**
   - Stage 3 (escape law) NOT built — deferred pending owner decision.
+  - Staleness recheck (this plan's claims re-read against the executed diff, commit 629d67e4):
+    - [RECHECKED after lib/dataverse/role-apply.js change: both sites now `odata.escape`, pins green]
+    - [RECHECKED after lib/services/dataverse-settings-service.js change: 3 sites swapped, pins green]
+    - [RECHECKED after lib/services/dataverse-identity-map.js change: 1 site swapped, pin green]
+    - [RECHECKED after lib/services/dataverse-app-access-service.js change: guarded swap per amendment, typeof throw pinned]
+    - [RECHECKED after lib/services/dataverse-prefs-service.js change: guarded swap per amendment, typeof throw pinned]
+    - [RECHECKED after lib/services/program-director-resolver.js change: mechanical swap, extended pin green]
+    - [RECHECKED after lib/external/review-answer-snapshot.js change: ESM mechanical swap, existing pin green]
+    - [RECHECKED after lib/services/grant-cycles-dataverse.js change: D1 encodeURIComponent(odata.escape) per ruling, full-URL pin green]
+    - [RECHECKED after lib/services/reviewer-finder/contact-history-service.js change: D2 eqGuid per ruling, rejection pin replaces quote-escape test]

@@ -517,6 +517,7 @@ review verdict + findings + resolutions)*
   fresh-context): SATISFIED, no findings — 2b CLEARS, Stage 3 may start.** Reviewer
   verified both historical projections at pinned file:lines, swept lib/ for a third
   cycle-config duplicate (none — grant-cycles-dataverse.js, maintenance-service.js,
+  [RECHECKED after lib/services/grant-cycles-dataverse.js change: odata-escape D1 swap only (escapeODataString body + require + comment, sole hunk in commit 629d67e4 per git show); the no-cycle-config-duplicate claim is unaffected]
   grant-cycle.js adapter are different concerns), confirmed all seven Dataverse touchpoints
   inside the new context, guard order, lifecycle-after-send + failure-skips-lifecycle,
   characterization byte-integrity via git diff. Milestone sweep: all gates green, suite
