@@ -1,12 +1,17 @@
 #!/usr/bin/env node
 /**
- * Stage-0 Dataverse data-access census.
+ * Stage-8 Dataverse data-access law gate.
  *
  * Scans application code for DynamicsService transport calls, including local
- * aliases and injectable clients that default to DynamicsService. In default
- * mode the script is silent when the Stage-1 allowlist does not exist.
- * When the allowlist exists, comparison is line-tolerant: entries are counted by
- * file + access kind + client method + entity instead of by source line.
+ * aliases and injectable clients that default to DynamicsService. Default mode
+ * enforces the permanent law: every raw call identity found in pages/, lib/,
+ * shared/ (outside the DAL internals and the exempt power tools) must resolve
+ * to entity 'non-entity-transport' — the plan's permanent DynamicsService
+ * surface (createAndSendEmail, addEmailAttachment, createEmailActivity,
+ * logAiRun). Anything else (an entity-attributed call, an unresolved alias, an
+ * unresolved changeset operation, or a call to a method this script does not
+ * recognize at all) fails the gate. There is no allowlist file and no count
+ * ratchet anymore — Stage 8 deleted both; the law is unconditional.
  */
 
 const fs = require('fs');
@@ -16,7 +21,6 @@ const parser = require('@babel/parser');
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
 const SCAN_DIRS = ['pages', 'lib', 'shared'];
 const JS_EXT_RE = /\.(?:cjs|mjs|js|jsx|ts|tsx)$/;
-const ALLOWLIST_REL = path.join('scripts', 'dataverse-access-allowlist.json');
 
 const EXEMPT_FILES = new Set([
   'pages/dynamics-explorer.js',
@@ -52,6 +56,18 @@ const ENTITY_ARG_METHODS = new Set([
   'resolveEntitySetName',
   'getPrimaryIdAttribute',
   'getEntityKey',
+]);
+
+// The plan's permanent DynamicsService surface (docs/DATA_ACCESS_LAYER_MIGRATION_PLAN.md
+// "Permanent exemptions" + Appendix A's non-entity-transport bucket). This is a CLOSED
+// list of method names, not "anything not in ENTITY_ARG_METHODS": a future DynamicsService
+// method this script has never seen must fail closed (see resolveEntityForCall) rather than
+// silently default to non-entity-transport just because nobody taught the census its name.
+const NON_ENTITY_TRANSPORT_METHODS = new Set([
+  'createAndSendEmail',
+  'addEmailAttachment',
+  'createEmailActivity',
+  'logAiRun',
 ]);
 
 const LOGICAL_TO_ENTITY_SET = {
@@ -122,8 +138,9 @@ function usage() {
   return [
     'Usage: node scripts/check-dataverse-access-layer.js [--root <dir>] [--report] [--json]',
     '',
-    'Default mode compares the current census against scripts/dataverse-access-allowlist.json.',
-    'If that allowlist is absent, default mode exits 0 silently.',
+    'Default mode fails on any raw call identity whose entity is not non-entity-transport',
+    '(the permanent DynamicsService surface: createAndSendEmail, addEmailAttachment,',
+    'createEmailActivity, logAiRun). No allowlist file, no count ratchet -- this is the law.',
     '--report prints a per-entity rollup.',
     '--json prints the raw {file, entity, method, line, kind, clientMethod, callIdentity} entries.',
   ].join('\n');
@@ -682,9 +699,15 @@ function resolveOperations(node, ctx) {
 }
 
 function resolveEntityForCall(method, args, ctx) {
-  if (!ENTITY_ARG_METHODS.has(method)) return 'non-entity-transport';
-  const value = resolveString(args[0], ctx);
-  return value ? logicalToEntitySet(value) : 'unresolved';
+  if (ENTITY_ARG_METHODS.has(method)) {
+    const value = resolveString(args[0], ctx);
+    return value ? logicalToEntitySet(value) : 'unresolved';
+  }
+  if (NON_ENTITY_TRANSPORT_METHODS.has(method)) return 'non-entity-transport';
+  // A method name this census has never classified. Fail closed instead of
+  // defaulting to non-entity-transport: an unrecognized method could be a new
+  // entity-taking DynamicsService API the census hasn't been taught yet.
+  return `unknown-method:${method}`;
 }
 
 function makeIdentity({ rel, line, client, kind, method, entity, suffix }) {
@@ -835,144 +858,35 @@ function formatReport(entries) {
   return lines.join('\n');
 }
 
-function allowlistEntries(data) {
-  if (Array.isArray(data)) return data;
-  if (data && Array.isArray(data.entries)) return data.entries;
-  throw new Error('dataverse-access-allowlist.json must be an array or { "entries": [...] }');
+function formatViolationRow(entry) {
+  return `${entry.file}:${entry.line} | ${entry.kind} | ${entry.clientMethod} | ${entry.entity}`;
 }
 
-function comparisonParts(entry) {
-  const clientMethod = entry.clientMethod || entry['client.method'];
-  if (!entry.file || !entry.kind || !clientMethod || !entry.entity) {
-    throw new Error('dataverse access entries must include file, kind, clientMethod, and entity');
-  }
-  return {
-    file: entry.file,
-    kind: entry.kind,
-    clientMethod,
-    entity: entry.entity,
-  };
-}
-
-function comparisonKey(parts) {
-  return `${parts.file}\u001f${parts.kind}\u001f${parts.clientMethod}\u001f${parts.entity}`;
-}
-
-function sortComparisonRows(rows) {
+function sortViolations(rows) {
   return rows.sort((a, b) => (
     a.file.localeCompare(b.file)
-    || a.kind.localeCompare(b.kind)
+    || a.line - b.line
     || a.clientMethod.localeCompare(b.clientMethod)
     || a.entity.localeCompare(b.entity)
   ));
 }
 
-function buildAllowlist(entries) {
-  const byKey = new Map();
-  for (const entry of entries) {
-    const parts = comparisonParts(entry);
-    const key = comparisonKey(parts);
-    if (!byKey.has(key)) byKey.set(key, { ...parts, count: 0 });
-    byKey.get(key).count += 1;
+// Stage 8 law: every raw call identity found by the census must be
+// non-entity-transport (the plan's permanent DynamicsService surface). Any
+// entity-attributed call, any unresolved alias/changeset call, and any call to
+// a method name this script does not recognize (see resolveEntityForCall) are
+// all violations -- there is no allowlist and no count ratchet left to exempt
+// them file-by-file.
+function checkLaw(entries) {
+  const violations = sortViolations(entries.filter((entry) => entry.entity !== 'non-entity-transport'));
+  if (violations.length === 0) return 0;
+
+  console.error('dataverse-access-layer LAW VIOLATION:');
+  console.error(`  raw transport use outside the permanent non-entity-transport surface (${violations.length}):`);
+  for (const row of violations.slice(0, 50)) {
+    console.error(`    + ${formatViolationRow(row)}`);
   }
-  return sortComparisonRows([...byKey.values()]);
-}
-
-function countCurrentEntries(entries) {
-  const byKey = new Map();
-  for (const entry of entries) {
-    const parts = comparisonParts(entry);
-    const key = comparisonKey(parts);
-    if (!byKey.has(key)) byKey.set(key, { ...parts, count: 0, lines: [] });
-    const row = byKey.get(key);
-    row.count += 1;
-    if (Number.isInteger(entry.line) && entry.line > 0) row.lines.push(entry.line);
-  }
-  for (const row of byKey.values()) row.lines.sort((a, b) => a - b);
-  return byKey;
-}
-
-function countAllowedEntries(entries) {
-  const byKey = new Map();
-  for (const entry of entries) {
-    const parts = comparisonParts(entry);
-    const key = comparisonKey(parts);
-    const count = entry.count == null ? 1 : Number(entry.count);
-    if (!Number.isInteger(count) || count < 1) {
-      throw new Error(`invalid dataverse allowlist count for ${parts.file}: ${entry.count}`);
-    }
-    if (!byKey.has(key)) byKey.set(key, { ...parts, count: 0 });
-    byKey.get(key).count += count;
-  }
-  return byKey;
-}
-
-function isUnresolvedEntity(entity) {
-  return entity === 'unresolved' || entity === 'changeset-unresolved';
-}
-
-function formatComparisonRow(row) {
-  return `${row.file} | ${row.kind} | ${row.clientMethod} | ${row.entity}`;
-}
-
-function formatCountDetail(row, allowedCount) {
-  const lines = row.lines && row.lines.length ? `; lines ${row.lines.join(', ')}` : '';
-  return `current ${row.count}, allowlist ${allowedCount}${lines}`;
-}
-
-function compareAllowlist(root, entries) {
-  const allowlistPath = path.join(root, ALLOWLIST_REL);
-  if (!fs.existsSync(allowlistPath)) return 0;
-
-  const allowed = allowlistEntries(JSON.parse(fs.readFileSync(allowlistPath, 'utf8')));
-  const currentCounts = countCurrentEntries(entries);
-  const allowedCounts = countAllowedEntries(allowed);
-  const extra = [];
-  const stale = [];
-
-  for (const [key, row] of currentCounts.entries()) {
-    const allowedRow = allowedCounts.get(key);
-    if (!allowedRow) {
-      extra.push({ ...row, allowedCount: 0, reason: 'new-key' });
-    } else if (row.count > allowedRow.count) {
-      extra.push({ ...row, allowedCount: allowedRow.count, reason: 'count-exceeds' });
-    }
-  }
-
-  for (const [key, row] of allowedCounts.entries()) {
-    const currentRow = currentCounts.get(key);
-    const currentCount = currentRow ? currentRow.count : 0;
-    if (currentCount < row.count) stale.push({ ...row, currentCount });
-  }
-
-  sortComparisonRows(extra);
-  sortComparisonRows(stale);
-  const newUnresolved = extra.filter((row) => row.reason === 'new-key' && isUnresolvedEntity(row.entity));
-
-  if (extra.length === 0 && stale.length === 0) return 0;
-
-  console.error('dataverse-access-layer DRIFT:');
-  if (extra.length) {
-    console.error(`  raw access keys not in allowlist or above allowed count (${extra.length}):`);
-    for (const row of extra.slice(0, 50)) {
-      console.error(`    + ${formatComparisonRow(row)} (${formatCountDetail(row, row.allowedCount)})`);
-    }
-    if (extra.length > 50) console.error(`    ... ${extra.length - 50} more`);
-  }
-  if (stale.length) {
-    console.error(`  allowlist entries above current census; shrink required (${stale.length}):`);
-    for (const row of stale.slice(0, 50)) {
-      console.error(`    - ${formatComparisonRow(row)} (current ${row.currentCount}, allowlist ${row.count})`);
-    }
-    if (stale.length > 50) console.error(`    ... ${stale.length - 50} more`);
-  }
-  if (newUnresolved.length) {
-    console.error(`  new unresolved raw access keys not in Stage-0 allowlist (${newUnresolved.length}):`);
-    for (const row of newUnresolved.slice(0, 50)) {
-      console.error(`    ? ${formatComparisonRow(row)} (${formatCountDetail(row, row.allowedCount)})`);
-    }
-    if (newUnresolved.length > 50) console.error(`    ... ${newUnresolved.length - 50} more`);
-  }
+  if (violations.length > 50) console.error(`    ... ${violations.length - 50} more`);
   return 1;
 }
 
@@ -991,7 +905,7 @@ function main(argv = process.argv.slice(2)) {
     console.log(formatReport(entries));
   }
   if (args.report || args.json) return 0;
-  return compareAllowlist(args.root, entries);
+  return checkLaw(entries);
 }
 
 if (require.main === module) {
@@ -1006,7 +920,7 @@ if (require.main === module) {
 module.exports = {
   collectCensus,
   buildRollup,
-  buildAllowlist,
+  checkLaw,
   formatReport,
   parseEntityFromUrlText,
 };
