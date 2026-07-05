@@ -23,7 +23,7 @@ This is a Next.js multi-application system for grant and document workflows, dep
 - Never accept user/profile identity from request input when authenticated context supplies it.
 - API keys and secrets stay server-side. Environment contracts live in `docs/CREDENTIALS_RUNBOOK.md`; tracked secret names live in `lib/utils/tracked-secrets.js`.
 - Use `lib/services/llm-client.js` for provider calls and `lib/services/execute-prompt.js` for the shared Executor contract.
-- Use explicit Dynamics restriction context; preserve fail-closed auth and restriction behavior.
+- Use explicit Dynamics restriction context; preserve fail-closed auth and restriction behavior. Post-auth entry points establish it via `lib/dataverse/core/context.js` `withDalContext`; entity writes fail closed outside a trusted context under `DATAVERSE_DAL_ENFORCEMENT` (on outside production; prod flip pending).
 - Private intake Blob operations use `INTAKE_BLOB_RW_TOKEN`, never the shared Blob token.
 
 ## High-Risk Workflows

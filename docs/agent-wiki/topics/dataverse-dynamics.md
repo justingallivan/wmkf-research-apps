@@ -42,6 +42,16 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 ## Ground Rules
 
 - Use explicit Dynamics restriction context and preserve fail-closed auth.
+  Since Stage 7 (S329): post-auth entry points establish it via
+  `lib/dataverse/core/context.js` `withDalContext(scopeLabel, fn)` — a
+  DAL-labeled wrapper over the same ALS machinery `[VERIFIED via
+  lib/dataverse/core/context.js:46]`; entity WRITES
+  (create/update/delete/disassociate/executeChangeset) are fail-closed outside
+  a trusted context under `DATAVERSE_DAL_ENFORCEMENT` — explicit `on`/`off`,
+  unset = on outside production `[VERIFIED via
+  lib/services/dynamics-context.js:123 isDalEnforcementOn + 5
+  assertTrustedDalContext call sites in lib/services/dynamics-service.js]`.
+  Prod flip is a pending deploy decision.
 - Validate OData before issuing it.
 - Entity/table schemas, read/write paths, source-of-truth, and drop status live in the Atlas.
 - Existing databases use `node scripts/apply-migrations.js`; `scripts/setup-database.js` is fresh-install-only.

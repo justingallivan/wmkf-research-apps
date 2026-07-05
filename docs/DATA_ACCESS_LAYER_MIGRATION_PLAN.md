@@ -24,12 +24,15 @@ restriction context folds INTO the layer as a deliberate late stage;
 delivery = ratchet + gate (freeze new raw usage immediately, convert
 opportunistically + occasional dedicated sessions).
 
-**Execution status: Stages 0–6 COMPLETE (S329, 2026-07-04).** Census probe,
-ratchet gate, core toolkit, 18 adapters, and ALL conversion waves done:
-allowlist 181 → 12 count-keys, every remaining entry non-entity-transport
-(permanent exemptions). Entity + unresolved raw Dataverse usage in
-`pages/`+`lib/`+`shared/` is ZERO. Remaining: Stage 7 (restriction fold-in;
-owner go given S329) and Stage 8 (close-out).
+**Execution status: Stages 0–7 COMPLETE (S329, 2026-07-04).** Census probe,
+ratchet gate, core toolkit, 18 adapters, all conversion waves (allowlist
+181 → 12, all non-entity-transport), and the Stage 7 restriction fold-in:
+`core/context.js` post-auth trusted context, flag-gated fail-closed entity-
+write enforcement (`DATAVERSE_DAL_ENFORCEMENT`, on outside production), 8
+canary wrapper strips. Remaining: the mechanical strip of 79 wrapper files
+`[VERIFIED 2026-07-04 via grep -rl "^import.*bypassDynamicsRestrictions"
+pages lib shared, minus core/context.js]` (follow-up pass), the PROD
+enforcement flip (owner deploy decision), and Stage 8 (close-out).
 
 ## Why (baseline evidence)
 
@@ -463,6 +466,27 @@ Drift found → this doc is edited BEFORE the next stage starts.
   lib/dataverse/adapters]`. Allowlist 132 → 12, all 12 non-entity-transport
   `[VERIFIED via allowlist entity scan — 0 non-transport]`. Full suite
   4163/4163; build clean. Stage 7 precondition MET.
+
+- 2026-07-04 (S329): **Stage 7 executed** (Sonnet worktree build, Claude
+  review + merge; owner go given in-session). Trusted context = the EXISTING
+  ALS store (no second trust concept): `core/context.js` `withDalContext`
+  wraps `bypassDynamicsRestrictions` with a DAL label `[VERIFIED via
+  lib/dataverse/core/context.js:46]`; `DynamicsService`
+  create/update/delete/disassociate/executeChangeset assert trusted context
+  under `DATAVERSE_DAL_ENFORCEMENT` (explicit on/off; unset = on outside
+  production — a committed `.env.development` is impossible here, .gitignore
+  excludes `.env*`) `[VERIFIED via lib/services/dynamics-context.js:123 +
+  5 assert sites in dynamics-service.js]`; `runChangeset` asserts
+  independently for call-site attribution. Reads keep prior `checkRestriction`
+  behavior; exempt tools unaffected (no entity CRUD in their paths). 8 canary
+  wrapper strips landed one-per-commit; 79 files still import
+  `bypassDynamicsRestrictions` post-merge `[VERIFIED via grep, exact query in
+  the execution-status note; the build report's own pre-merge count was 82]`
+  (mechanical strip = follow-up pass — they remain functionally correct, the
+  legacy wrapper IS a trusted context). Suite 4181/4181 with enforcement ON
+  in tests; build clean; access-layer/route-lifecycle-auth/api-routes gates
+  green. CLAUDE.md invariant wording + wiki reconciled this commit. PROD flag
+  flip = pending owner deploy decision.
 
 ## Appendix A — Baseline census
 
