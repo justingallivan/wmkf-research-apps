@@ -232,6 +232,7 @@ const healthCheckHandler = require('../../pages/api/cron/health-check').default;
 const logAnalysisHandler = require('../../pages/api/cron/log-analysis').default;
 const maintenanceHandler = require('../../pages/api/cron/maintenance').default;
 const secretCheckHandler = require('../../pages/api/cron/secret-check').default;
+const granteeRemindersHandler = require('../../pages/api/cron/grantee-deliverable-reminders').default;
 const attachHandler = require('../../pages/api/intake/draft/attach').default;
 const MaintenanceService = require('../../lib/services/maintenance-service');
 const { writeReviewFiles } = require('../../lib/services/review-upload');
@@ -994,13 +995,17 @@ describe('notification trust-model Stage 2 pushed-up wrappers', () => {
   });
 
   test('site 11 - grantee deliverable reminder default alert inherits grantee-deliverable-reminders-cron context', async () => {
+    // Form A: drive the REAL cron handler so the wrap it establishes is what
+    // provides the context — this guards the handler's own withDalContext, not
+    // just service context-propagation (Stage 3 precondition).
     const seen = watchNotifyEntry();
     mockUnavailableEmailDefault((key) => key === 'email.grantee_reminder.body');
 
-    await expect(withDalContext('grantee-deliverable-reminders-cron', () =>
-      runGranteeDeliverableReminders(),
-    )).resolves.toMatchObject({ scanned: 1, skippedMisconfigured: 1 });
+    const res = makeRes();
+    await granteeRemindersHandler({ method: 'GET', headers: {}, query: {} }, res);
 
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ scanned: 1, skippedMisconfigured: 1 });
     expectTrustedNotify(seen, {
       type: 'email_default_misconfigured',
       source: 'grantee-deliverable-reminders',

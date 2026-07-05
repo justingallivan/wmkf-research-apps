@@ -362,15 +362,38 @@ Codex adversarial review of the full diff, same acceptance bar as `BYPASS_STRIP_
   the grantee cron's own wrap left its test green. Handler coverage for those 7 paths therefore rests on
   the source trace above (each handler's `withDalContext` open line was personally read), which is
   sufficient while the shared internal `'notification-email'` net remains. **Precondition added to the
-  net-removal step (below): before removing the shared net, upgrade the #10b/#11 characterization tests
-  to drive their real handlers (Form A), so the handler wraps are regression-guarded once the net — the
-  current backstop — is gone.**
+  net-removal step (below): before removing the shared net, upgrade the already-covered characterization
+  tests (#10b/#11 AND Stage 1's #12/#13/#22 — see the Codex-review Stage Log entry) to drive their real
+  handlers (Form A), so the handler wraps are regression-guarded once the net is gone.**
+
+- 2026-07-05: **Fresh-context Codex adversarial review of the full Stage 1+2 code diff (detached
+  `codex exec`, read-only) returned REQUIRED CHANGES with ONE P2 — a widening of the precondition below,
+  not a defect in what landed.** All eight technical claims on the code were independently CONFIRMED:
+  nested same-label context safety (ALS restores the outer store), fire-and-forget preserved (#9/#21),
+  cold-start catch/log/swallow preserved (#15/#16 inside existing try/catch), no double-wrap in
+  `maintenance.js` (:231/:258 outside :114/:157), monitor scope-widen acceptable (cron auth checked
+  before the wrap; no user-controlled Dataverse selector), #10 route wrap correct, service internals +
+  shared wrapper untouched, and census complete at 23. **P2:** the removal precondition named only
+  #10b/#11, but Stage 1's #12/#13/#22 have the SAME service-level tests and must be upgraded too, else a
+  future handler-scope regression there could stay green once the net is gone. Runtime unaffected today
+  (net remains). Precondition corrected below.
+
+- 2026-07-05: **Stage 3 test-upgrade approach validated (proof-of-concept, uncommitted at time of
+  writing).** Converted the grantee cron characterization test from service-level to handler-driven and
+  mutation-proved it now GUARDS the handler wrap: neutralizing the cron's own `withDalContext` flips it
+  red, where the old service-level version stayed green under the same mutation. The other pure-cron
+  sites convert the same way; the two routes (#11 send-review-reminder, withdraw-sufficient) also need
+  `requireAppAccess` mocked, and the drain-based tests (#10b, #13, #11-acceptance) need the handler
+  driven with real adapter mocks instead of injected `deps`.
 
 ## Stage 3 — Remove the shared internal `'notification-email'` wrapper (NOT YET DONE)
 
 Precondition now MET on coverage (every REACHES entry point establishes context, Stages 1-2), but NOT
-on test-guard: first upgrade the #10b/#11 tests from service-level to handler-level (see the caveat in
-the 2026-07-05 Stage 2 entry) so removing the net cannot silently un-guard a handler wrap. Then remove
+on test-guard: first upgrade EVERY already-covered site's characterization test from service-level to
+handler-level — **#12, #13, #22 (Stage 1) AND #10b + all six #11 entry points (Stage 2), ten sites in
+all** (per the Codex P2, which flagged that #12/#13/#22 were omitted from the original precondition) — so
+removing the net cannot silently un-guard a handler wrap. The grantee POC (Stage Log 2026-07-05) is the
+template; one of the ten is already converted. Then remove
 `withDalContext('notification-email', ...)` from `sendAdminEmail` (`notification-service.js`), and prove
 via the (now handler-level) characterization suite + the existing no-context negative control that every
 path still establishes trusted context at its entry point. This is the dangerous step (the drain-defect
